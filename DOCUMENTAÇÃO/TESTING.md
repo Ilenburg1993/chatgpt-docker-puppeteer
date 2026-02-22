@@ -1,15 +1,14 @@
 # 🧪 Guia de Testing
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Desenvolvedores, QA
-**Tempo de Leitura**: ~25 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Desenvolvedores, QA **Tempo de
+Leitura**: ~25 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento detalha **estratégia de testes** do sistema `chatgpt-docker-puppeteer`: test suite atual, padrões, escrita de testes, cobertura, CI/CD.
+Este documento detalha **estratégia de testes** do sistema `chatgpt-docker-puppeteer`: test suite
+atual, padrões, escrita de testes, cobertura, CI/CD.
 
 ---
 
@@ -62,8 +61,8 @@ tests/
 
 ### Status (14 testes funcionais)
 
-| Arquivo                         | Status    | Assertions | Duração   |
-| ------------------------------- | --------- | ---------- | --------- |
+| Arquivo                         | Status     | Assertions | Duração   |
+| ------------------------------- | ---------- | ---------- | --------- |
 | test_config_validation.js       | ✅ 100%    | 8          | 0.5s      |
 | test_driver_nerv_integration.js | ✅ 100%    | 12         | 2s        |
 | test_boot_sequence.js           | ✅ 100%    | 12         | 1s        |
@@ -76,6 +75,7 @@ tests/
 | **Total**                       | **✅ 89%** | **104**    | **~150s** |
 
 **Legend**:
+
 - ✅ = Passing (all assertions)
 - ⚠️ = Flaky (occasional failures)
 
@@ -87,24 +87,25 @@ tests/
 
 ```javascript
 function mockNERV() {
-    const eventLog = [];
+  const eventLog = [];
 
-    return {
-        emit: (type, payload) => {
-            eventLog.push({ type, payload, ts: Date.now() });
-        },
-        on: jest.fn(),
-        once: jest.fn(),
-        eventLog,  // Inspect emitted events
+  return {
+    emit: (type, payload) => {
+      eventLog.push({ type, payload, ts: Date.now() });
+    },
+    on: jest.fn(),
+    once: jest.fn(),
+    eventLog, // Inspect emitted events
 
-        // Helpers
-        getEventsByType: (type) => eventLog.filter(e => e.type === type),
-        clearLog: () => eventLog.splice(0, eventLog.length)
-    };
+    // Helpers
+    getEventsByType: type => eventLog.filter(e => e.type === type),
+    clearLog: () => eventLog.splice(0, eventLog.length),
+  };
 }
 ```
 
 **Uso**:
+
 ```javascript
 const mockNerv = mockNERV();
 const driver = new ChatGPTDriver({ nerv: mockNerv });
@@ -123,25 +124,26 @@ expect(execEvents[0].payload.prompt).toBe('Hello');
 
 ```javascript
 function mockBrowser() {
-    const mockPage = {
-        goto: jest.fn().mockResolvedValue(undefined),
-        waitForSelector: jest.fn().mockResolvedValue(undefined),
-        type: jest.fn().mockResolvedValue(undefined),
-        click: jest.fn().mockResolvedValue(undefined),
-        evaluate: jest.fn().mockResolvedValue('Mocked response'),
-        close: jest.fn().mockResolvedValue(undefined),
-        url: jest.fn().mockReturnValue('https://example.com')
-    };
+  const mockPage = {
+    goto: jest.fn().mockResolvedValue(undefined),
+    waitForSelector: jest.fn().mockResolvedValue(undefined),
+    type: jest.fn().mockResolvedValue(undefined),
+    click: jest.fn().mockResolvedValue(undefined),
+    evaluate: jest.fn().mockResolvedValue('Mocked response'),
+    close: jest.fn().mockResolvedValue(undefined),
+    url: jest.fn().mockReturnValue('https://example.com'),
+  };
 
-    return {
-        allocatePage: jest.fn().mockResolvedValue(mockPage),
-        releasePage: jest.fn().mockResolvedValue(undefined),
-        mockPage
-    };
+  return {
+    allocatePage: jest.fn().mockResolvedValue(mockPage),
+    releasePage: jest.fn().mockResolvedValue(undefined),
+    mockPage,
+  };
 }
 ```
 
 **Uso**:
+
 ```javascript
 const mockPool = mockBrowser();
 
@@ -162,19 +164,20 @@ expect(mockPool.mockPage.type).toHaveBeenCalledWith('textarea', 'Hello');
 
 ```javascript
 function createTestTask(overrides = {}) {
-    return {
-        id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        target: 'chatgpt',
-        prompt: 'Test prompt',
-        state: 'PENDING',
-        priority: 5,
-        createdAt: Date.now(),
-        ...overrides
-    };
+  return {
+    id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    target: 'chatgpt',
+    prompt: 'Test prompt',
+    state: 'PENDING',
+    priority: 5,
+    createdAt: Date.now(),
+    ...overrides,
+  };
 }
 ```
 
 **Uso**:
+
 ```javascript
 const task1 = createTestTask();
 const task2 = createTestTask({ target: 'gemini', priority: 10 });
@@ -187,23 +190,24 @@ const task3 = createTestTask({ state: 'RUNNING', allocatedAt: Date.now() });
 
 ```javascript
 async function waitForState(taskId, expectedState, timeoutMs = 5000) {
-    const start = Date.now();
+  const start = Date.now();
 
-    while (Date.now() - start < timeoutMs) {
-        const task = await io.getTask(taskId);
+  while (Date.now() - start < timeoutMs) {
+    const task = await io.getTask(taskId);
 
-        if (task.state === expectedState) {
-            return task;
-        }
-
-        await new Promise(r => setTimeout(r, 100));  // Poll every 100ms
+    if (task.state === expectedState) {
+      return task;
     }
 
-    throw new Error(`Timeout: Task ${taskId} never reached state ${expectedState}`);
+    await new Promise(r => setTimeout(r, 100)); // Poll every 100ms
+  }
+
+  throw new Error(`Timeout: Task ${taskId} never reached state ${expectedState}`);
 }
 ```
 
 **Uso**:
+
 ```javascript
 // Add task to queue
 await io.saveTask(createTestTask({ id: 'test-123' }));
@@ -237,58 +241,58 @@ const { createTestTask, mockNERV, waitForState } = require('./helpers');
 let nerv, component;
 
 beforeEach(() => {
-    nerv = mockNERV();
-    component = new MyComponent({ nerv });
+  nerv = mockNERV();
+  component = new MyComponent({ nerv });
 });
 
 afterEach(() => {
-    nerv.clearLog();
+  nerv.clearLog();
 });
 
 // Test suites
 describe('MyComponent', () => {
-    describe('Happy Path', () => {
-        test('should process valid input', async () => {
-            // Arrange
-            const input = createTestTask();
+  describe('Happy Path', () => {
+    test('should process valid input', async () => {
+      // Arrange
+      const input = createTestTask();
 
-            // Act
-            const result = await component.process(input);
+      // Act
+      const result = await component.process(input);
 
-            // Assert
-            expect(result).toBeDefined();
-            expect(result.status).toBe('ok');
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.status).toBe('ok');
 
-            // Verify NERV events
-            const events = nerv.getEventsByType('PROCESS_COMPLETE');
-            expect(events).toHaveLength(1);
-        });
+      // Verify NERV events
+      const events = nerv.getEventsByType('PROCESS_COMPLETE');
+      expect(events).toHaveLength(1);
     });
+  });
 
-    describe('Error Cases', () => {
-        test('should handle invalid input', async () => {
-            // Arrange
-            const invalidInput = { ...createTestTask(), target: 'unknown' };
+  describe('Error Cases', () => {
+    test('should handle invalid input', async () => {
+      // Arrange
+      const invalidInput = { ...createTestTask(), target: 'unknown' };
 
-            // Act & Assert
-            await expect(component.process(invalidInput)).rejects.toThrow('Unknown target');
-        });
+      // Act & Assert
+      await expect(component.process(invalidInput)).rejects.toThrow('Unknown target');
     });
+  });
 
-    describe('Edge Cases', () => {
-        test('should handle empty prompt', async () => {
-            const task = createTestTask({ prompt: '' });
-            const result = await component.process(task);
-            expect(result.status).toBe('error');
-        });
+  describe('Edge Cases', () => {
+    test('should handle empty prompt', async () => {
+      const task = createTestTask({ prompt: '' });
+      const result = await component.process(task);
+      expect(result.status).toBe('error');
     });
+  });
 });
 
 // Run
 if (require.main === module) {
-    // Run with Jest or Node directly
-    // jest myTest.js
-    // node myTest.js
+  // Run with Jest or Node directly
+  // jest myTest.js
+  // node myTest.js
 }
 ```
 
@@ -316,8 +320,8 @@ await expect(asyncFunc()).resolves.toBe('result');
 await expect(asyncFunc()).rejects.toThrow('Error message');
 
 // ❌ Generic checks
-expect(task).toBeTruthy();  // Too vague
-expect(response.length > 0).toBe(true);  // Use toBeGreaterThan
+expect(task).toBeTruthy(); // Too vague
+expect(response.length > 0).toBe(true); // Use toBeGreaterThan
 
 // ✅ Check all relevant state
 expect(task.state).toBe('DONE');
@@ -332,23 +336,23 @@ expect(task.failureCount).toBe(0);
 
 ```javascript
 test('should emit NERV events', async () => {
-    await component.execute(task);
+  await component.execute(task);
 
-    // Check NERV emissions
-    expect(nerv.eventLog).toHaveLength(2);
-    expect(nerv.eventLog[0].type).toBe('TASK_START');
-    expect(nerv.eventLog[1].type).toBe('TASK_COMPLETE');
+  // Check NERV emissions
+  expect(nerv.eventLog).toHaveLength(2);
+  expect(nerv.eventLog[0].type).toBe('TASK_START');
+  expect(nerv.eventLog[1].type).toBe('TASK_COMPLETE');
 });
 
 test('should write response file', async () => {
-    await component.execute(task);
+  await component.execute(task);
 
-    // Check file system
-    const responsePath = path.join('respostas', `${task.id}.txt`);
-    expect(fs.existsSync(responsePath)).toBe(true);
+  // Check file system
+  const responsePath = path.join('respostas', `${task.id}.txt`);
+  expect(fs.existsSync(responsePath)).toBe(true);
 
-    const content = fs.readFileSync(responsePath, 'utf8');
-    expect(content).toContain('Expected response text');
+  const content = fs.readFileSync(responsePath, 'utf8');
+  expect(content).toContain('Expected response text');
 });
 ```
 
@@ -411,8 +415,8 @@ node --inspect-brk tests/test_p9_fixes.js
 
 ### Current Coverage (~50%)
 
-| Module      | Coverage | Goal    | Status   |
-| ----------- | -------- | ------- | -------- |
+| Module      | Coverage | Goal    | Status    |
+| ----------- | -------- | ------- | --------- |
 | **core/**   | 85%      | 90%     | ✅ Good   |
 | **nerv/**   | 75%      | 85%     | ⚠️ Medium |
 | **kernel/** | 60%      | 85%     | ⏳ Low    |
@@ -427,17 +431,20 @@ node --inspect-brk tests/test_p9_fixes.js
 ### Focus Areas
 
 **High Priority** (Critical paths):
+
 - `kernel/kernel_loop.js` - Main execution cycle (60% → 90%)
 - `kernel/task_runtime.js` - Task allocation (70% → 95%)
 - `infra/lock_manager.js` - Locking (P5.1) (50% → 90%)
 - `infra/pool_manager.js` - Browser pool (P9.2) (55% → 85%)
 
 **Medium Priority**:
+
 - `driver/targets/chatgpt.js` - ChatGPT automation (40% → 70%)
 - `logic/collection_logic.js` - Response collection (45% → 75%)
 - `server/routes/queue.js` - API routes (35% → 70%)
 
 **Low Priority** (Nice to have):
+
 - `core/logger.js` - Logging (85% → 90%)
 - `nerv/telemetry.js` - Metrics (80% → 85%)
 
@@ -554,6 +561,7 @@ chmod +x .husky/pre-commit
 **Causa**: Browser externo não iniciado ou porta 9224 (container-facing) ocupada
 
 **Workaround**:
+
 ```bash
 # Start external browser BEFORE test (usar porta container-facing 9224)
 chrome --remote-debugging-port=9224 &
@@ -573,15 +581,16 @@ node tests/test_integration_complete.js
 **Causa**: Circuit breaker não thread-safe (P9.2)
 
 **Fix** (em progresso):
+
 ```javascript
 // pool_manager.js
 const mutex = require('async-mutex');
 const lock = new mutex.Mutex();
 
 async function allocatePage() {
-    return lock.runExclusive(async () => {
-        // Allocation logic (now serialized)
-    });
+  return lock.runExclusive(async () => {
+    // Allocation logic (now serialized)
+  });
 }
 ```
 
@@ -615,6 +624,7 @@ done
 ### Artillery.io (Load Testing)
 
 **Install**:
+
 ```bash
 npm install -g artillery
 ```
@@ -626,25 +636,26 @@ config:
   target: 'http://localhost:3008'
   phases:
     - duration: 60
-      arrivalRate: 5  # 5 requests/sec for 1 min
+      arrivalRate: 5 # 5 requests/sec for 1 min
     - duration: 120
-      arrivalRate: 10  # Ramp up to 10 req/sec for 2 min
+      arrivalRate: 10 # Ramp up to 10 req/sec for 2 min
 
 scenarios:
-  - name: "Add tasks"
+  - name: 'Add tasks'
     flow:
       - post:
-          url: "/api/queue/add"
+          url: '/api/queue/add'
           headers:
-            Content-Type: "application/json"
+            Content-Type: 'application/json'
           json:
-            target: "chatgpt"
-            prompt: "Hello {{ $randomString() }}"
+            target: 'chatgpt'
+            prompt: 'Hello {{ $randomString() }}'
             priority: 5
-      - think: 2  # Wait 2s between requests
+      - think: 2 # Wait 2s between requests
 ```
 
 **Run**:
+
 ```bash
 artillery run load-test.yml
 
@@ -734,4 +745,4 @@ watch -n 5 'curl -s http://localhost:3008/api/queue | jq ".summary"'
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, QA Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, QA Team_

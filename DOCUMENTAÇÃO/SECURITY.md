@@ -1,15 +1,14 @@
 # 🔒 Security Policy
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Security teams, DevOps, Desenvolvedores
-**Tempo de Leitura**: ~20 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Security teams, DevOps,
+Desenvolvedores **Tempo de Leitura**: ~20 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento define **políticas de segurança** do projeto `chatgpt-docker-puppeteer`: vulnerability reporting, credential rotation, hardening guide, compliance, audit history.
+Este documento define **políticas de segurança** do projeto `chatgpt-docker-puppeteer`:
+vulnerability reporting, credential rotation, hardening guide, compliance, audit history.
 
 ---
 
@@ -22,12 +21,14 @@ Este documento define **políticas de segurança** do projeto `chatgpt-docker-pu
 **Preferred method**: Email to **security@project.com**
 
 Include:
+
 - Vulnerability description
 - Steps to reproduce
 - Impact assessment (CVSS score if possible)
 - Suggested fix (optional)
 
 **Response time**:
+
 - Initial acknowledgment: 48 hours
 - Status update: 7 days
 - Fix timeline: 30 days (critical), 90 days (medium/low)
@@ -37,6 +38,7 @@ Include:
 ### Disclosure Policy
 
 **Coordinated disclosure**:
+
 1. Security team acknowledges report (48h)
 2. Team validates vulnerability (7 days)
 3. Fix developed and tested (30-90 days)
@@ -64,11 +66,13 @@ Include:
 ### Rotation Schedule
 
 **Mandatory rotation**:
+
 - Production passwords: **90 days**
 - JWT secrets: **180 days**
 - SSL certificates: **before expiry** (Let's Encrypt: 60 days auto-renewal)
 
 **Immediate rotation** (security incident):
+
 - Suspected compromise
 - Employee departure (access keys)
 - Third-party breach (dependency)
@@ -158,6 +162,7 @@ echo "Manual step: Delete .env.backup files after confirming all clients updated
 ```
 
 **Usage**:
+
 ```bash
 cd /path/to/project
 bash analysis/rotation-scripts/rotate-dashboard-password.sh
@@ -172,6 +177,7 @@ bash analysis/rotation-scripts/rotate-dashboard-password.sh
 ```
 
 **Post-rotation checklist**:
+
 - [ ] Clients updated with new password
 - [ ] Monitoring tools updated
 - [ ] Old password deleted from password manager
@@ -218,18 +224,21 @@ echo "$(date) - JWT secret rotated" >> logs/security-audit.log
 ### SSL Certificate Rotation (Let's Encrypt)
 
 **Automatic renewal** (certbot cron):
+
 ```bash
 # /etc/cron.d/certbot
 0 */12 * * * certbot renew --quiet
 ```
 
 **Manual renewal**:
+
 ```bash
 sudo certbot renew --force-renewal
 sudo systemctl reload nginx
 ```
 
 **Verify expiry**:
+
 ```bash
 sudo certbot certificates
 
@@ -247,6 +256,7 @@ sudo certbot certificates
 ### Network Security
 
 **1. HTTPS Only** (production):
+
 ```nginx
 # Nginx config
 server {
@@ -256,11 +266,13 @@ server {
 ```
 
 **2. HSTS Header**:
+
 ```nginx
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 ```
 
 **3. Firewall** (UFW - Ubuntu):
+
 ```bash
 sudo ufw allow 22/tcp    # SSH
 sudo ufw allow 80/tcp    # HTTP (redirect)
@@ -272,6 +284,7 @@ sudo ufw deny 3008/tcp
 ```
 
 **4. Rate Limiting** (Nginx):
+
 ```nginx
 limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
 
@@ -285,6 +298,7 @@ location /api/ {
 ### Application Security
 
 **1. Authentication**:
+
 ```json
 // config.json (production)
 {
@@ -300,6 +314,7 @@ SESSION_SECRET=64-char-hex-string-different-from-jwt
 ```
 
 **2. CORS Whitelist**:
+
 ```bash
 # .env (production)
 CORS_ORIGIN=https://dashboard.example.com
@@ -308,38 +323,42 @@ CORS_ORIGIN=https://dashboard.example.com
 ```
 
 **3. Input Validation** (Zod schemas):
+
 ```javascript
 // All inputs validated
 const taskSchema = z.object({
-    target: z.enum(['chatgpt', 'gemini']),
-    prompt: z.string().min(1).max(10000),
-    priority: z.number().int().min(0).max(10)
+  target: z.enum(['chatgpt', 'gemini']),
+  prompt: z.string().min(1).max(10000),
+  priority: z.number().int().min(0).max(10),
 });
 ```
 
 **4. Sanitization** (P8 fixes):
+
 ```javascript
 // Remove control characters
 function sanitizePrompt(prompt) {
-    return prompt.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+  return prompt.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
 }
 ```
 
 **5. Path Traversal Protection** (P8.7):
+
 ```javascript
 // Validate paths
 const safePath = path.resolve(QUEUE_DIR, taskId + '.json');
 if (!safePath.startsWith(QUEUE_DIR)) {
-    throw new Error('Path traversal attempt');
+  throw new Error('Path traversal attempt');
 }
 ```
 
 **6. Symlink Attack Protection** (P8.8):
+
 ```javascript
 // Check for symlinks
 const stats = await fs.lstat(filePath);
 if (stats.isSymbolicLink()) {
-    throw new Error('Symlink detected');
+  throw new Error('Symlink detected');
 }
 ```
 
@@ -348,6 +367,7 @@ if (stats.isSymbolicLink()) {
 ### Container Security (Docker)
 
 **1. Non-root User**:
+
 ```dockerfile
 # Dockerfile
 RUN useradd -m -u 1000 agente
@@ -355,6 +375,7 @@ USER agente
 ```
 
 **2. Read-only Root Filesystem**:
+
 ```yaml
 # docker-compose.yml
 services:
@@ -366,14 +387,16 @@ services:
 ```
 
 **3. Drop Capabilities**:
+
 ```yaml
 cap_drop:
   - ALL
 cap_add:
-  - NET_BIND_SERVICE  # Only if needed
+  - NET_BIND_SERVICE # Only if needed
 ```
 
 **4. Security Scanning**:
+
 ```bash
 # Scan image
 docker scan agente-gpt:latest
@@ -387,25 +410,28 @@ trivy image agente-gpt:latest
 ### Secrets Management
 
 **DO NOT**:
+
 - ❌ Commit secrets to Git
 - ❌ Hardcode passwords in code
 - ❌ Log credentials
 - ❌ Share secrets via email/chat
 
 **DO**:
+
 - ✅ Use `.env` (excluded from Git)
 - ✅ Use environment variables
 - ✅ Use secret managers (AWS Secrets Manager, HashiCorp Vault)
 - ✅ Encrypt secrets at rest
 
 **Example** (AWS Secrets Manager):
+
 ```javascript
 const AWS = require('aws-sdk');
 const secretsManager = new AWS.SecretsManager();
 
 async function getSecret(secretName) {
-    const data = await secretsManager.getSecretValue({ SecretId: secretName }).promise();
-    return JSON.parse(data.SecretString);
+  const data = await secretsManager.getSecretValue({ SecretId: secretName }).promise();
+  return JSON.parse(data.SecretString);
 }
 
 // Usage
@@ -421,10 +447,10 @@ process.env.DASHBOARD_PASSWORD = secrets.dashboardPassword;
 
 **P8 Tier** (Security fixes):
 
-| Fix  | Description                                  | Status  | Commit  |
-| ---- | -------------------------------------------- | ------- | ------- |
+| Fix  | Description                                  | Status   | Commit  |
+| ---- | -------------------------------------------- | -------- | ------- |
 | P8.1 | Input sanitization (control chars)           | ✅ FIXED | abc1234 |
-| P8.2 | SQL injection prevention (N/A - no SQL)      | N/A     | -       |
+| P8.2 | SQL injection prevention (N/A - no SQL)      | N/A      | -       |
 | P8.3 | XSS prevention (HTML escaping)               | ✅ FIXED | def5678 |
 | P8.4 | Auth bypass protection (password null check) | ✅ FIXED | ghi9012 |
 | P8.5 | CSRF protection (Socket.io origins)          | ✅ FIXED | jkl3456 |
@@ -441,6 +467,7 @@ process.env.DASHBOARD_PASSWORD = secrets.dashboardPassword;
 **Location**: `logs/security-audit.log`
 
 **Events logged**:
+
 - Credential rotations
 - Failed authentication attempts (>5 in 1min)
 - Path traversal attempts
@@ -449,6 +476,7 @@ process.env.DASHBOARD_PASSWORD = secrets.dashboardPassword;
 - Security scan results
 
 **Format**:
+
 ```
 2026-01-21 10:30:45 - [ROTATION] Dashboard password rotated
 2026-01-21 11:15:23 - [AUTH_FAIL] Failed login attempt from 192.168.1.50 (5th attempt)
@@ -463,6 +491,7 @@ process.env.DASHBOARD_PASSWORD = secrets.dashboardPassword;
 ### Vulnerability Scanning
 
 **Dependency Scanning** (npm audit):
+
 ```bash
 # Check vulnerabilities
 npm audit
@@ -477,6 +506,7 @@ npm audit fix --force
 **Schedule**: Weekly automated scan (GitHub Dependabot).
 
 **Container Scanning** (Trivy):
+
 ```bash
 # Scan Dockerfile
 trivy config Dockerfile
@@ -531,28 +561,33 @@ trivy image --exit-code 1 --severity CRITICAL agente-gpt:latest
 ### Response Procedure
 
 **1. Detection** (0-1h):
+
 - Monitor alerts (failed auth, rate limits)
 - Review security audit log
 - Check system integrity
 
 **2. Containment** (1-4h):
+
 - Isolate affected systems
 - Rotate all credentials
 - Block attacker IPs (firewall)
 - Preserve evidence (logs, snapshots)
 
 **3. Eradication** (4-24h):
+
 - Identify root cause
 - Remove backdoors/malware
 - Patch vulnerabilities
 - Restore from clean backup
 
 **4. Recovery** (24-48h):
+
 - Restore services
 - Verify integrity
 - Monitor for re-infection
 
 **5. Post-Incident** (1 week):
+
 - Write incident report
 - Update security policies
 - Train team
@@ -593,6 +628,7 @@ mQINBGXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 **Fingerprint**: `ABCD 1234 EFGH 5678 IJKL 9012 MNOP 3456 QRST 7890`
 
 **Usage**:
+
 ```bash
 # Encrypt sensitive report
 gpg --encrypt --recipient security@project.com report.txt
@@ -603,4 +639,4 @@ gpg --encrypt --recipient security@project.com report.txt
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, Security Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, Security Team_

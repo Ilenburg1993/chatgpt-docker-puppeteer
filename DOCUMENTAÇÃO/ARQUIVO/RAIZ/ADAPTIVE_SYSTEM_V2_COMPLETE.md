@@ -1,23 +1,24 @@
 # ADAPTIVE SYSTEM V2.0 - CONSOLIDATION COMPLETE ✅
 
-**Date**: 2026-02-04
-**Version**: V46 (Statistical Engine 2.0)
-**Status**: PRODUCTION READY - 100% TESTED
-**Tests**: 7/7 PASSING (100%)
+**Date**: 2026-02-04 **Version**: V46 (Statistical Engine 2.0) **Status**: PRODUCTION READY - 100%
+TESTED **Tests**: 7/7 PASSING (100%)
 
 ---
 
 ## 📊 EXECUTIVE SUMMARY
 
-O **Adaptive System V46** foi completamente consolidado com **1 bug crítico corrigido** e **7 features de produção implementadas**. Todos os testes passando (100%).
+O **Adaptive System V46** foi completamente consolidado com **1 bug crítico corrigido** e **7
+features de produção implementadas**. Todos os testes passando (100%).
 
 ### O Que Foi Feito
 
 **CORREÇÕES CRÍTICAS** (P0):
+
 - ✅ **Variância Welford correta**: Fórmula matemática corrigida (diff2 com nova média)
 - ✅ **Precisão mantida**: Variância não-arredondada para cálculos precisos
 
 **FEATURES DE PRODUÇÃO** (P1-P2):
+
 - ✅ **Circuit Breaker**: Detecta targets > 120s e retorna timeout fixo 5min
 - ✅ **Health Check API**: `getHealthStatus()` - diagnóstico completo do sistema
 - ✅ **Target GC**: Limite de 100 targets, remove os mais antigos automaticamente
@@ -27,6 +28,7 @@ O **Adaptive System V46** foi completamente consolidado com **1 bug crítico cor
 - ✅ **Remoção de código morto**: Campo `success_count` removido do schema
 
 **DOCUMENTAÇÃO** (P3):
+
 - ✅ **context_penalty documentado**: Rationale matemático explicado
 - ✅ **Audit report**: ADAPTIVE_SYSTEM_AUDIT.md (completo)
 - ✅ **Tests**: test_adaptive_v46.js (7 testes, 100% passing)
@@ -38,6 +40,7 @@ O **Adaptive System V46** foi completamente consolidado com **1 bug crítico cor
 ### 1. BUG CRÍTICO CORRIGIDO: Variância Welford
 
 **Problema Original**:
+
 ```javascript
 // ❌ ERRADO (V45)
 const diff = value - stats.avg;
@@ -46,6 +49,7 @@ stats.var = Math.max(0, Math.round((1 - alpha) * (stats.var + alpha * diff * dif
 ```
 
 **Correção Implementada**:
+
 ```javascript
 // ✅ CORRETO (V46)
 const diff = value - stats.avg;
@@ -63,6 +67,7 @@ stats.count++;
 ```
 
 **Impacto**:
+
 - Variância agora converge corretamente
 - Timeouts P95/P99 precisos
 - Teste validando: avg=924±10%, std=83 após 100 samples ✅
@@ -72,13 +77,15 @@ stats.count++;
 ### 2. Circuit Breaker (NEW)
 
 **Funcionalidade**:
+
 ```javascript
 function shouldCircuitBreak(stats) {
-    return stats.count >= 5 && stats.avg > 120000; // 2min threshold
+  return stats.count >= 5 && stats.avg > 120000; // 2min threshold
 }
 ```
 
 **Comportamento**:
+
 - Target com avg > 120s (2min) → Circuit breaker ativo
 - Retorna timeout fixo de 300s (5min)
 - Adiciona warning: "Target extremamente lento - considere fallback"
@@ -91,25 +98,27 @@ function shouldCircuitBreak(stats) {
 ### 3. Health Check API (NEW)
 
 **Funcionalidade**:
+
 ```javascript
 async function getHealthStatus()
 ```
 
 **Retorna**:
+
 ```json
 {
-    "status": "HEALTHY",
-    "state_file": "/path/to/adaptive_state.json",
-    "targets_count": 42,
-    "stale_targets_count": 3,
-    "stale_targets": ["target1", "target2"],
-    "circuit_broken_count": 1,
-    "circuit_broken_targets": [{"target": "slow-api", "avg": 135000}],
-    "infra_health": "SUFFICIENT_DATA",
-    "infra_samples": 150,
-    "last_adjustment": "2026-02-04T06:54:34.803Z",
-    "persist_locked": false,
-    "pending_persist": false
+  "status": "HEALTHY",
+  "state_file": "/path/to/adaptive_state.json",
+  "targets_count": 42,
+  "stale_targets_count": 3,
+  "stale_targets": ["target1", "target2"],
+  "circuit_broken_count": 1,
+  "circuit_broken_targets": [{ "target": "slow-api", "avg": 135000 }],
+  "infra_health": "SUFFICIENT_DATA",
+  "infra_samples": 150,
+  "last_adjustment": "2026-02-04T06:54:34.803Z",
+  "persist_locked": false,
+  "pending_persist": false
 }
 ```
 
@@ -120,23 +129,25 @@ async function getHealthStatus()
 ### 4. Target GC (NEW)
 
 **Funcionalidade**:
+
 ```javascript
 const MAX_TARGETS = 100;
 
 function garbageCollectTargets() {
-    const targets = Object.entries(state.targets);
-    if (targets.length > MAX_TARGETS) {
-        const sorted = targets.sort((a, b) => a[1].last_update - b[1].last_update);
-        const toRemove = sorted.slice(0, sorted.length - MAX_TARGETS);
-        toRemove.forEach(([key]) => {
-            delete state.targets[key];
-            log('INFO', `[ADAPTIVE] GC: removido target inativo: ${key}`);
-        });
-    }
+  const targets = Object.entries(state.targets);
+  if (targets.length > MAX_TARGETS) {
+    const sorted = targets.sort((a, b) => a[1].last_update - b[1].last_update);
+    const toRemove = sorted.slice(0, sorted.length - MAX_TARGETS);
+    toRemove.forEach(([key]) => {
+      delete state.targets[key];
+      log('INFO', `[ADAPTIVE] GC: removido target inativo: ${key}`);
+    });
+  }
 }
 ```
 
 **Comportamento**:
+
 - Executa com probabilidade de 1% por `recordMetric()` call (evita overhead)
 - Remove targets mais antigos (por `last_update`)
 - Mantém apenas os 100 mais recentes
@@ -148,21 +159,23 @@ function garbageCollectTargets() {
 ### 5. Decay de Targets Inativos (NEW)
 
 **Funcionalidade**:
+
 ```javascript
 const TARGET_INACTIVE_THRESHOLD_MS = 86400000; // 24h
 
 function decayIfNeeded(profile, now) {
-    const age = now - profile.last_update;
-    if (age > TARGET_INACTIVE_THRESHOLD_MS) {
-        const decayFactor = Math.max(0.1, Math.exp(-age / (7 * TARGET_INACTIVE_THRESHOLD_MS)));
-        profile.ttft.count = Math.floor(profile.ttft.count * decayFactor);
-        profile.stream.count = Math.floor(profile.stream.count * decayFactor);
-        profile.echo.count = Math.floor(profile.echo.count * decayFactor);
-    }
+  const age = now - profile.last_update;
+  if (age > TARGET_INACTIVE_THRESHOLD_MS) {
+    const decayFactor = Math.max(0.1, Math.exp(-age / (7 * TARGET_INACTIVE_THRESHOLD_MS)));
+    profile.ttft.count = Math.floor(profile.ttft.count * decayFactor);
+    profile.stream.count = Math.floor(profile.stream.count * decayFactor);
+    profile.echo.count = Math.floor(profile.echo.count * decayFactor);
+  }
 }
 ```
 
 **Comportamento**:
+
 - Targets inativos por 24h+ têm confidence reduzida exponencialmente
 - Decay factor: `e^(-age/7days)` → 37% após 1 semana, 13% após 2 semanas
 - Chamado automaticamente em `getAdjustedTimeout()`
@@ -174,28 +187,30 @@ function decayIfNeeded(profile, now) {
 ### 6. Percentile Support (NEW)
 
 **Funcionalidade**:
+
 ```javascript
 function getPercentileTimeout(stats, percentile = 95) {
-    const z_scores = {
-        50: 0.0,    // P50 (mediana)
-        95: 1.645,  // P95
-        99: 2.326,  // P99
-        99.7: 3.0   // P99.7 (atual padrão)
-    };
+  const z_scores = {
+    50: 0.0, // P50 (mediana)
+    95: 1.645, // P95
+    99: 2.326, // P99
+    99.7: 3.0, // P99.7 (atual padrão)
+  };
 
-    const avg = Math.max(1, stats.avg);
-    const std = Math.sqrt(Math.max(0, stats.var));
-    const z = z_scores[percentile] || 1.645;
+  const avg = Math.max(1, stats.avg);
+  const std = Math.sqrt(Math.max(0, stats.var));
+  const z = z_scores[percentile] || 1.645;
 
-    return Math.round(avg + z * std);
+  return Math.round(avg + z * std);
 }
 ```
 
 **Uso**:
+
 ```javascript
 const stats = snapshot.targets['chatgpt'].stream;
-const p95 = adaptive.getPercentileTimeout(stats, 95);  // Timeout P95
-const p99 = adaptive.getPercentileTimeout(stats, 99);  // Timeout P99
+const p95 = adaptive.getPercentileTimeout(stats, 95); // Timeout P95
+const p99 = adaptive.getPercentileTimeout(stats, 99); // Timeout P99
 ```
 
 **Teste**: ✅ Validado - P50 ≤ P95 < P99 < P99.7 (ordem correta)
@@ -205,16 +220,18 @@ const p99 = adaptive.getPercentileTimeout(stats, 99);  // Timeout P99
 ### 7. last_update Tracking (NEW)
 
 **Schema Atualizado**:
+
 ```javascript
 const TargetProfileSchema = z.object({
-    ttft: StatsSchema,
-    stream: StatsSchema,
-    echo: StatsSchema,
-    last_update: z.number().default(0)  // NEW - timestamp última atualização
+  ttft: StatsSchema,
+  stream: StatsSchema,
+  echo: StatsSchema,
+  last_update: z.number().default(0), // NEW - timestamp última atualização
 });
 ```
 
 **Comportamento**:
+
 - Atualizado em `recordMetric()` para `Date.now()`
 - Usado por `decayIfNeeded()` e `garbageCollectTargets()`
 - Visível em `getHealthStatus()` como `last_adjustment`
@@ -226,6 +243,7 @@ const TargetProfileSchema = z.object({
 ### 8. context_penalty Documentado
 
 **Código Atualizado**:
+
 ```javascript
 // Context penalty: log2(n+2)*2000 = ~2s por dobra de mensagens (cap 20s)
 // Rationale: conversas longas precisam de mais tempo (modelo carrega mais contexto)
@@ -233,6 +251,7 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 ```
 
 **Explicação**:
+
 - `log2(messageCount + 2)`: Crescimento sublinear
 - `* 2000`: ~2s por dobra de mensagens
 - `min(20000)`: Cap de 20s para conversas muito longas
@@ -253,11 +272,13 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 7. ✅ **last_update** (timestamp correto após recordMetric)
 
 **Comando**:
+
 ```bash
 node -r module-alias/register tests/test_adaptive_v46.js
 ```
 
 **Output**:
+
 ```
 ╔════════════════════════════════════════════════════════════════╗
 ║       ADAPTIVE SYSTEM V46 - VALIDATION TESTS                 ║
@@ -280,8 +301,8 @@ node -r module-alias/register tests/test_adaptive_v46.js
 
 ## 📈 MÉTRICAS DE QUALIDADE
 
-| Métrica               | V45 (Antes)             | V46 (Depois)        | Melhoria           |
-| --------------------- | ----------------------- | ------------------- | ------------------ |
+| Métrica               | V45 (Antes)              | V46 (Depois)         | Melhoria           |
+| --------------------- | ------------------------ | -------------------- | ------------------ |
 | **Variância Correta** | ❌ Subestimada           | ✅ Welford completo  | 100% fix           |
 | **Circuit Breaker**   | ❌ Ausente               | ✅ Implementado      | NEW                |
 | **Health Check**      | ❌ Ausente               | ✅ API completa      | NEW                |
@@ -290,19 +311,21 @@ node -r module-alias/register tests/test_adaptive_v46.js
 | **Percentiles**       | ❌ Apenas P99.7          | ✅ P50/P95/P99/P99.7 | 4x opções          |
 | **last_update**       | ❌ Ausente               | ✅ Tracking completo | NEW                |
 | **Código Morto**      | ❌ success_count         | ✅ Removido          | Cleanup            |
-| **Tests**             | 0                       | 7 (100% passing)    | Cobertura completa |
+| **Tests**             | 0                        | 7 (100% passing)     | Cobertura completa |
 
 ---
 
 ## 📦 ARQUIVOS MODIFICADOS/CRIADOS
 
 **Modificados** (1):
+
 - `src/logic/adaptive.js` (V45 → V46)
   - +100 linhas (funções auxiliares)
   - +50 linhas (API expandida)
   - +20 linhas (documentação)
 
 **Criados** (2):
+
 - `tests/test_adaptive_v46.js` (270 linhas)
 - `ADAPTIVE_SYSTEM_AUDIT.md` (300+ linhas)
 
@@ -313,6 +336,7 @@ node -r module-alias/register tests/test_adaptive_v46.js
 ## 🚀 COMO USAR AS NOVAS FEATURES
 
 ### 1. Health Check
+
 ```javascript
 const adaptive = require('@logic/adaptive');
 
@@ -322,30 +346,33 @@ console.log(health);
 ```
 
 ### 2. Percentiles
+
 ```javascript
 const snapshot = adaptive.getSnapshot();
 const stats = snapshot.targets['chatgpt'].stream;
 
-const p95 = adaptive.getPercentileTimeout(stats, 95);  // Conservative
-const p99 = adaptive.getPercentileTimeout(stats, 99);  // Safer
+const p95 = adaptive.getPercentileTimeout(stats, 95); // Conservative
+const p99 = adaptive.getPercentileTimeout(stats, 99); // Safer
 ```
 
 ### 3. Circuit Breaker (Automático)
+
 ```javascript
 const result = await adaptive.getAdjustedTimeout('slow-api', 0, 'STREAM');
 
 if (result.circuit_broken) {
-    console.warn(`Circuit breaker ativado: ${result.warning}`);
-    // Considerar fallback para outro serviço
+  console.warn(`Circuit breaker ativado: ${result.warning}`);
+  // Considerar fallback para outro serviço
 }
 ```
 
 ### 4. Force Persist (Graceful Shutdown)
+
 ```javascript
 // Em shutdown hook
 process.on('SIGTERM', async () => {
-    await adaptive.forcePersist();
-    process.exit(0);
+  await adaptive.forcePersist();
+  process.exit(0);
 });
 ```
 
@@ -354,16 +381,23 @@ process.on('SIGTERM', async () => {
 ## ⚠️ BREAKING CHANGES
 
 ### 1. Schema Change (Minor)
+
 ```javascript
 // V45
-{ ttft, stream, echo, success_count }
+{
+  (ttft, stream, echo, success_count);
+}
 
 // V46
-{ ttft, stream, echo, last_update }
+{
+  (ttft, stream, echo, last_update);
+}
 ```
+
 **Mitigação**: Schema Zod com `.default(0)` garante compatibilidade retroativa
 
 ### 2. API Response Change
+
 ```javascript
 // V46 - circuit_broken sempre presente
 {
@@ -374,6 +408,7 @@ process.on('SIGTERM', async () => {
     target: 'chatgpt'
 }
 ```
+
 **Mitigação**: Campo sempre presente (true/false), consumidores existentes ignoram
 
 ---
@@ -397,11 +432,13 @@ process.on('SIGTERM', async () => {
 ## 🎯 PRÓXIMOS PASSOS (OPCIONAL - V47)
 
 **Observability** (P3):
+
 - [ ] Export metrics para Prometheus (gauge, histogram)
 - [ ] Grafana dashboard template
 - [ ] Alertas configuráveis (circuit breaker, stale targets)
 
 **Avançado** (P4):
+
 - [ ] Adaptive alpha (ajustar baseado em stability score)
 - [ ] Multi-phase percentiles (P95 para TTFT, P99 para stream)
 - [ ] Warmup detection (skip primeiras N execuções)
@@ -410,7 +447,8 @@ process.on('SIGTERM', async () => {
 
 ## 🏁 CONCLUSÃO
 
-O **Adaptive System V46** está **PRODUCTION READY** com todas as correções críticas, features de produção e testes implementados.
+O **Adaptive System V46** está **PRODUCTION READY** com todas as correções críticas, features de
+produção e testes implementados.
 
 **Status Final**: ✅ **CONSOLIDADO E VALIDADO (100%)**
 
@@ -419,6 +457,7 @@ O **Adaptive System V46** está **PRODUCTION READY** com todas as correções cr
 ---
 
 **Changelog V45 → V46**:
+
 ```
 - FIX CRÍTICO: Variância Welford correta (diff2 com nova média)
 - ADD: Circuit breaker (avg > 120s → timeout 5min)

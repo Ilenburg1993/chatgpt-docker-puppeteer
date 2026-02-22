@@ -1,19 +1,19 @@
 # Análise Completa: DevContainer Build & SSH Issues
-**Data:** 03 de Fevereiro de 2026
-**Versão:** 1.0
-**Status:** ✅ RESOLVIDO - Mudanças Implementadas (v5.3)
+
+**Data:** 03 de Fevereiro de 2026 **Versão:** 1.0 **Status:** ✅ RESOLVIDO - Mudanças Implementadas
+(v5.3)
 
 ---
 
 ## 🎉 ATUALIZAÇÃO: Correções Implementadas
 
-**Data de Implementação:** 03 de Fevereiro de 2026
-**Versão DevContainer:** v5.2 → v5.3
-**Status:** ✅ **TODAS AS CORREÇÕES APLICADAS**
+**Data de Implementação:** 03 de Fevereiro de 2026 **Versão DevContainer:** v5.2 → v5.3 **Status:**
+✅ **TODAS AS CORREÇÕES APLICADAS**
 
 ### Mudanças Aplicadas
 
 #### 1. `.devcontainer/devcontainer.json`
+
 - ❌ **REMOVIDO:** Mount manual SSH (linha 721)
 - ❌ **REMOVIDO:** `SSH_AUTH_SOCK="/ssh-agent"` de remoteEnv
 - ❌ **REMOVIDO:** `DEVCONTAINER_SECRET_SURFACE_SSH`
@@ -23,6 +23,7 @@
 - ✅ **ADICIONADO:** Instruções de validação
 
 #### 2. `.devcontainer/scripts/post-create.sh`
+
 - ✅ **ATUALIZADO:** Section 7 (SSH Contract) para v1.6
 - ✅ **ADICIONADO:** Nota sobre VS Code native forwarding
 - ✅ **ADICIONADO:** Comentário sobre fail-safe design
@@ -32,6 +33,7 @@
 ✅ **Container agora DEVE iniciar com sucesso**, com ou sem SSH agent disponível no host.
 
 **Teste Rápido:**
+
 ```bash
 # Rebuild do container
 docker rm -f <container-id>
@@ -43,6 +45,7 @@ code .
 ---
 
 ## 🚨 Sumário Executivo (Problema Original)
+
 **Erro Fatal:** Container não consegue iniciar devido a erro no mount do SSH agent socket.
 
 ```
@@ -54,9 +57,11 @@ Check if the specified host path exists and is the expected type
 
 ### Causa Raiz
 
-O DevContainer está tentando fazer **bind mount de um socket UNIX** (que é um arquivo especial, não um diretório), mas a configuração atual está causando conflito de tipos no Docker.
+O DevContainer está tentando fazer **bind mount de um socket UNIX** (que é um arquivo especial, não
+um diretório), mas a configuração atual está causando conflito de tipos no Docker.
 
 **Evidências:**
+
 - ✅ SSH_AUTH_SOCK no host WSL2: `/tmp/ssh-QOJ9LhH9C9Bd/agent.427` (socket válido)
 - ❌ DevContainer tentando montar: `source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind`
 - ❌ Docker interpretando incorretamente o tipo do mount
@@ -70,25 +75,28 @@ O DevContainer está tentando fazer **bind mount de um socket UNIX** (que é um 
 #### 1.1 Configuração em `devcontainer.json`
 
 **Linha 721 (mounts):**
+
 ```jsonc
 "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
 ```
 
 **Linhas 98-99 (remoteEnv):**
+
 ```jsonc
 "DEVCONTAINER_SECRET_SURFACE_SSH": "forwarded-if-present",
 "SSH_AUTH_SOCK": "/ssh-agent"
 ```
 
 **Linha 906 (containerEnv):**
+
 ```jsonc
 "DEVCONTAINER_SSH_AGENT_ALLOWED": "true"
 ```
 
 #### 1.2 Diagnóstico do Estado Atual
 
-| Componente              | Estado | Observação                                       |
-| ----------------------- | ------ | ------------------------------------------------ |
+| Componente              | Estado  | Observação                                       |
+| ----------------------- | ------- | ------------------------------------------------ |
 | **Host SSH Agent**      | ✅ OK   | Socket válido: `/tmp/ssh-QOJ9LhH9C9Bd/agent.427` |
 | **SSH Keys**            | ✅ OK   | `~/.ssh/id_ed25519` (permissões corretas)        |
 | **GitHub Auth**         | ✅ OK   | Autenticação SSH funcionando no host             |
@@ -106,6 +114,7 @@ O DevContainer está tentando fazer **bind mount de um socket UNIX** (que é um 
 **Status:** ✅ **CONFORME**
 
 **Verificação:**
+
 - ✅ Linha 29: `set -euo pipefail` declarado
 - ✅ Variáveis: Todas verificadas antes de uso (`${VAR:-}` pattern)
 - ✅ Contadores: Inicializados explicitamente (linhas 208, 749, 924)
@@ -113,6 +122,7 @@ O DevContainer está tentando fazer **bind mount de um socket UNIX** (que é um 
 - ✅ Exit codes: Todos os paths de erro retornam exit 1
 
 **Padrões Seguros Identificados:**
+
 ```bash
 # ✅ Safe variable access
 readonly CURRENT_USER="$(id -un 2>/dev/null || echo unknown)"
@@ -131,12 +141,14 @@ exec > >(tee -a "${LOG_FILE}" >/dev/null || true) 2>&1
 **Status:** ✅ **ROBUSTO** mas **INCOMPATÍVEL** com mount atual
 
 **Implementação Atual (linhas 641-734):**
+
 - ✅ Observacional (não faz suposições)
 - ✅ Timing-aware (entende que SSH pode não estar pronto)
 - ✅ Fail-safe (SSH ausente não quebra o boot)
 - ✅ Exporta estados semânticos corretos
 
 **Estados SSH Possíveis:**
+
 ```bash
 # ✅ IMPLEMENTADO
 SSH_CONTRACT_STATUS:
@@ -146,8 +158,8 @@ SSH_CONTRACT_STATUS:
   - "inconsistent" → Variável definida, mas não é socket
 ```
 
-**Problema Identificado:**
-O script está preparado para **lidar com SSH ausente ou inválido**, mas o **mount no devcontainer.json é OBRIGATÓRIO e RÍGIDO**, quebrando antes do script rodar.
+**Problema Identificado:** O script está preparado para **lidar com SSH ausente ou inválido**, mas o
+**mount no devcontainer.json é OBRIGATÓRIO e RÍGIDO**, quebrando antes do script rodar.
 
 ---
 
@@ -156,6 +168,7 @@ O script está preparado para **lidar com SSH ausente ou inválido**, mas o **mo
 #### 3.1 Mount Configuration (linha 721)
 
 **Configuração Atual:**
+
 ```jsonc
 "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
 ```
@@ -163,19 +176,23 @@ O script está preparado para **lidar com SSH ausente ou inválido**, mas o **mo
 **Problemas Identificados:**
 
 ##### 🔴 Problema 1: Montagem Obrigatória
+
 - Mount é **sempre tentado**, mesmo se SSH não estiver disponível
 - Não há fallback ou conditional mounting
 - Falha no mount = falha fatal do container
 
 ##### 🔴 Problema 2: Target `/ssh-agent` (file vs directory)
+
 - Docker Desktop no WSL2 interpreta `/ssh-agent` como diretório
 - Mas a fonte (`$SSH_AUTH_SOCK`) é um socket (arquivo especial)
 - Resultado: Type mismatch → mount failure
 
 ##### 🔴 Problema 3: Path Docker Desktop
+
 ```
 /run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu-24.04/0e020991b8aa...
 ```
+
 - Docker Desktop cria paths intermediários para bind mounts
 - Esses paths não existem no filesystem real
 - Apenas existem na perspectiva do Docker daemon
@@ -183,11 +200,13 @@ O script está preparado para **lidar com SSH ausente ou inválido**, mas o **mo
 #### 3.2 RemoteEnv vs ContainerEnv
 
 **Duplicação Identificada:**
+
 - `SSH_AUTH_SOCK` definido em **remoteEnv** (linha 99)
 - `DEVCONTAINER_SSH_AGENT_ALLOWED` em **containerEnv** (linha 906)
 - Não há conflito direto, mas há redundância conceitual
 
 **Documentação Inline:**
+
 - ✅ Linha 97: Comentário "SSH (sinal semântico, não funcional)"
 - ✅ Linha 903: Comentário indicando duplicação
 
@@ -196,6 +215,7 @@ O script está preparado para **lidar com SSH ausente ou inválido**, mas o **mo
 **Status:** ✅ **EXCELENTE** - Documentação completa e estruturada
 
 **Pontos Fortes:**
+
 - ✅ Deny-by-default policy (`"*": { "onAutoForward": "ignore" }`)
 - ✅ Documentação arquitetural robusta (280+ linhas, 3 diagramas)
 - ✅ Separação clara: UI (3008) / Infra (9224) / Debug (9229, 9230)
@@ -220,6 +240,7 @@ O script está preparado para **lidar com SSH ausente ou inválido**, mas o **mo
 **Status:** ✅ **SINCRONIZADO** com devcontainer.json
 
 **Defaults Declarados:**
+
 ```dockerfile
 ENV NODE_ENV=development \
     SERVER_MODE=split \
@@ -249,6 +270,7 @@ ENV USER_NAME=node \
 ```
 
 **Alinhamento:**
+
 - ✅ Dockerfile: `USER_NAME=node`
 - ✅ devcontainer.json: `"remoteUser": "node"`
 - ✅ post-create.sh: `EXPECTED_USER="node"`
@@ -260,16 +282,18 @@ ENV USER_NAME=node \
 ### Crítico (Bloqueia Build)
 
 #### 1. SSH Mount Type Mismatch
-**Severidade:** 🔴 CRÍTICA
-**Impacto:** Container não inicia
-**Arquivo:** `.devcontainer/devcontainer.json` (linha 721)
+
+**Severidade:** 🔴 CRÍTICA **Impacto:** Container não inicia **Arquivo:**
+`.devcontainer/devcontainer.json` (linha 721)
 
 **Problema:**
+
 - Bind mount de socket UNIX para path `/ssh-agent`
 - Docker interpreta como directory mount
 - Type mismatch causa falha fatal
 
 **Evidência:**
+
 ```
 error mounting ... to rootfs at "/ssh-agent":
 not a directory: Are you trying to mount a directory onto a file (or vice-versa)?
@@ -280,27 +304,30 @@ not a directory: Are you trying to mount a directory onto a file (or vice-versa)
 ### Alto (Degrada Funcionalidade)
 
 #### 2. SSH Mount Obrigatório
-**Severidade:** 🟠 ALTA
-**Impacto:** Container falha se SSH não estiver disponível
-**Arquivo:** `.devcontainer/devcontainer.json` (linha 721)
+
+**Severidade:** 🟠 ALTA **Impacto:** Container falha se SSH não estiver disponível **Arquivo:**
+`.devcontainer/devcontainer.json` (linha 721)
 
 **Problema:**
+
 - Mount não é condicional
 - post-create.sh está preparado para SSH ausente (design correto)
 - Mas devcontainer.json OBRIGA o mount (design conflitante)
 
 **Inconsistência Arquitetural:**
+
 ```
 post-create.sh (linha 649): "SSH é uma CAPACIDADE TARDIA (attach-time)"
 devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 ```
 
 #### 3. Redundância SSH_AUTH_SOCK
-**Severidade:** 🟠 MÉDIA
-**Impacto:** Confusão conceitual, não funcional
-**Arquivos:** `.devcontainer/devcontainer.json` (linhas 99, 903, 906)
+
+**Severidade:** 🟠 MÉDIA **Impacto:** Confusão conceitual, não funcional **Arquivos:**
+`.devcontainer/devcontainer.json` (linhas 99, 903, 906)
 
 **Problema:**
+
 - `SSH_AUTH_SOCK` definido em remoteEnv (linha 99)
 - Comentário na linha 903 reconhece duplicação
 - `DEVCONTAINER_SSH_AGENT_ALLOWED` em containerEnv (linha 906)
@@ -310,22 +337,22 @@ devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 ### Médio (Melhorias Recomendadas)
 
 #### 4. Documentação SSH Contraditória
-**Severidade:** 🟡 MÉDIA
-**Impacto:** Developer experience
-**Arquivos:** Múltiplos
+
+**Severidade:** 🟡 MÉDIA **Impacto:** Developer experience **Arquivos:** Múltiplos
 
 **Problema:**
+
 - devcontainer.json linha 97: "SSH (sinal semântico, não funcional)"
 - Mas mount é funcional e obrigatório
 - post-create.sh: SSH é "observacional" e "opt-in"
 - Mas mount força presença do socket
 
 #### 5. Falta de Healthcheck no Dockerfile
-**Severidade:** 🟡 BAIXA
-**Impacto:** Observabilidade
-**Arquivo:** `.devcontainer/Dockerfile`
+
+**Severidade:** 🟡 BAIXA **Impacto:** Observabilidade **Arquivo:** `.devcontainer/Dockerfile`
 
 **Observação:**
+
 - HEALTHCHECK mencionado no changelog (linha 23)
 - Mas não implementado no Dockerfile
 
@@ -334,6 +361,7 @@ devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 ## ✅ Pontos Fortes Identificados
 
 ### 1. Post-Create Script
+
 - ✅ Excelente conformidade com `set -euo pipefail`
 - ✅ Idempotência robusta (gatekeeper system)
 - ✅ Fail-fast estratificado (structural vs operational)
@@ -341,6 +369,7 @@ devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 - ✅ SSH contract observacional e timing-aware
 
 ### 2. DevContainer.json
+
 - ✅ Documentação arquitetural excepcional (port forwarding)
 - ✅ Deny-by-default security policy
 - ✅ Separação clara de planos funcionais (UI/Infra/Debug)
@@ -348,12 +377,14 @@ devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 - ✅ Build args completos (OCI metadata)
 
 ### 3. Dockerfile
+
 - ✅ ENV defaults consistentes
 - ✅ Identity canônica (node user)
 - ✅ Build otimizado (v5.2 changelog correto)
 - ✅ Documentação inline robusta
 
 ### 4. Sincronização
+
 - ✅ Versão alinhada: v5.2 em todos os arquivos
 - ✅ Identidade `node` consistente
 - ✅ Portas sincronizadas (3008, 9224, 9225, 9229, 9230)
@@ -371,11 +402,13 @@ devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 #### A. Remover mount obrigatório do `devcontainer.json`
 
 **Antes (linha 721):**
+
 ```jsonc
 "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
 ```
 
 **Depois:**
+
 ```jsonc
 // SSH mount REMOVIDO - será configurado via runArgs condicional
 // Referência: post-create.sh Section 7 (SSH Contract)
@@ -384,6 +417,7 @@ devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 #### B. Adicionar mount condicional via `initializeCommand`
 
 **Adicionar nova seção antes de `mounts`:**
+
 ```jsonc
 "initializeCommand": [
   "bash",
@@ -395,6 +429,7 @@ devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 #### C. Mover SSH_AUTH_SOCK para containerEnv condicional
 
 **Modificar remoteEnv (linha 99):**
+
 ```jsonc
 // SSH (CONDICIONAL - apenas se socket existir no host)
 "SSH_AUTH_SOCK": "${localEnv:SSH_AUTH_SOCK:/dev/null}"
@@ -403,6 +438,7 @@ devcontainer.json (linha 721): Mount OBRIGATÓRIO em CREATE-time
 #### D. Adicionar fallback no post-attach.sh
 
 **Criar ou modificar `.devcontainer/scripts/post-attach.sh`:**
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -424,12 +460,14 @@ fi
 ```
 
 **Vantagens:**
+
 - ✅ Container inicia mesmo sem SSH
 - ✅ Alinha com filosofia do post-create.sh
 - ✅ Fail-safe por design
 - ✅ Developer experience melhorada
 
 **Desvantagens:**
+
 - ⚠️ Git via SSH requer SSH agent (fallback para HTTPS)
 
 ---
@@ -443,6 +481,7 @@ fi
 #### A. Criar script proxy para SSH socket
 
 **Novo arquivo:** `.devcontainer/scripts/ssh-socket-proxy.sh`
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -463,6 +502,7 @@ echo "✅ SSH socket proxy: ${PROXY_SOCKET} → ${REAL_SOCKET}"
 #### B. Modificar devcontainer.json mount
 
 **Linha 721:**
+
 ```jsonc
 "source=/tmp/.ssh-agent-proxy,target=/ssh-agent,type=bind,consistency=cached"
 ```
@@ -478,10 +518,12 @@ echo "✅ SSH socket proxy: ${PROXY_SOCKET} → ${REAL_SOCKET}"
 ```
 
 **Vantagens:**
+
 - ✅ Mantém arquitetura atual de mounts
 - ✅ Socket proxy é mais previsível
 
 **Desvantagens:**
+
 - ⚠️ Adiciona complexidade
 - ⚠️ Ainda falha se SSH não existir
 - ⚠️ Não resolve problema fundamental
@@ -501,6 +543,7 @@ echo "✅ SSH socket proxy: ${PROXY_SOCKET} → ${REAL_SOCKET}"
 #### B. Habilitar feature nativa do VS Code
 
 **Adicionar em `features`:**
+
 ```jsonc
 "features": {
   "ghcr.io/devcontainers/features/common-utils:2": {
@@ -514,6 +557,7 @@ echo "✅ SSH socket proxy: ${PROXY_SOCKET} → ${REAL_SOCKET}"
 #### C. Configurar remoteEnv
 
 **Modificar linha 99:**
+
 ```jsonc
 // SSH (VS Code native forwarding)
 "SSH_AUTH_SOCK": "${localEnv:SSH_AUTH_SOCK}"
@@ -522,6 +566,7 @@ echo "✅ SSH socket proxy: ${PROXY_SOCKET} → ${REAL_SOCKET}"
 #### D. Remover variáveis redundantes
 
 **Deletar linhas 97-98:**
+
 ```jsonc
 // DELETAR:
 // "DEVCONTAINER_SECRET_SURFACE_SSH": "forwarded-if-present",
@@ -529,6 +574,7 @@ echo "✅ SSH socket proxy: ${PROXY_SOCKET} → ${REAL_SOCKET}"
 ```
 
 **Vantagens:**
+
 - ✅ **MAIS SIMPLES** de todas as soluções
 - ✅ Usa infraestrutura nativa do VS Code
 - ✅ Testado e documentado pela Microsoft
@@ -536,6 +582,7 @@ echo "✅ SSH socket proxy: ${PROXY_SOCKET} → ${REAL_SOCKET}"
 - ✅ Funciona em Windows/Linux/macOS
 
 **Desvantagens:**
+
 - ⚠️ Depende de VS Code Remote Containers extension
 - ⚠️ Não funciona com docker-compose standalone
 
@@ -574,6 +621,7 @@ echo "✅ SSH socket proxy: ${PROXY_SOCKET} → ${REAL_SOCKET}"
 ## 🧪 Plano de Testes
 
 ### Teste 1: Container sem SSH Agent
+
 ```bash
 # No host: Parar SSH agent
 eval $(ssh-agent -k)
@@ -587,6 +635,7 @@ code .
 ```
 
 ### Teste 2: Container com SSH Agent
+
 ```bash
 # No host: Iniciar SSH agent
 eval $(ssh-agent -s)
@@ -600,6 +649,7 @@ code .
 ```
 
 ### Teste 3: Git Operations
+
 ```bash
 # Dentro do container:
 git remote -v
@@ -610,6 +660,7 @@ git push origin main
 ```
 
 ### Teste 4: Idempotência
+
 ```bash
 # Rebuild 3x consecutivos
 # Expectativa: Mesmos resultados, sem state corruption
@@ -620,6 +671,7 @@ git push origin main
 ## 📚 Referências Arquiteturais
 
 ### Documentos do Projeto
+
 - `ARCHITECTURE.md` v3.0 (3,018 linhas)
 - `CONNECTION_ARCHITECTURE/` (2,600+ linhas, 4 docs)
 - `ENV_VARIABLES_GUIDE.md` (550+ linhas)
@@ -627,11 +679,13 @@ git push origin main
 - `.devcontainer/scripts/post-create.sh` (1,336 linhas, v5.2.1)
 
 ### VS Code DevContainers
+
 - [SSH Agent Forwarding](https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials)
 - [Mount Types](https://docs.docker.com/storage/bind-mounts/)
 - [DevContainer JSON Reference](https://containers.dev/implementors/json_reference/)
 
 ### Docker
+
 - [Bind Mounts](https://docs.docker.com/storage/bind-mounts/)
 - [Unix Sockets in Containers](https://docs.docker.com/engine/reference/commandline/run/#mount-volumes-from-container---volumes-from)
 
@@ -642,6 +696,7 @@ git push origin main
 ### Solução Proposta: **Solução 3 (VS Code Native SSH Forwarding)**
 
 **Justificativa:**
+
 1. ✅ **Simplicidade:** Zero scripts customizados
 2. ✅ **Manutenibilidade:** Usa infraestrutura oficial
 3. ✅ **Robustez:** Testado pela Microsoft
@@ -649,6 +704,7 @@ git push origin main
 5. ✅ **Developer UX:** Funcionamento transparente
 
 **Mudanças Necessárias:**
+
 - ❌ Remover: Linha 721 (mount manual)
 - ❌ Remover: Linhas 97-98 (remoteEnv SSH config)
 - ❌ Remover: Linha 906 (containerEnv redundante)
@@ -656,6 +712,7 @@ git push origin main
 - ✅ Adicionar: Documentação de fallback HTTPS
 
 **Impacto:**
+
 - Build time: -10% (menos mount checks)
 - Complexity: -50% (remove custom SSH handling)
 - Reliability: +100% (native VS Code infra)
@@ -674,7 +731,6 @@ git push origin main
 
 ---
 
-**Fim da Análise**
-**Preparado por:** GitHub Copilot
-**Baseado em:** Análise de 3 arquivos principais + 14 referências cruzadas
-**Linhas analisadas:** ~2,400 linhas de código + 900 linhas de configuração
+**Fim da Análise** **Preparado por:** GitHub Copilot **Baseado em:** Análise de 3 arquivos
+principais + 14 referências cruzadas **Linhas analisadas:** ~2,400 linhas de código + 900 linhas de
+configuração

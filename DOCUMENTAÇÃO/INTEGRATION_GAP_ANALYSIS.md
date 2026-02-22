@@ -125,15 +125,15 @@ $ grep -r "kernel" src/server/
 ```javascript
 // src/nerv/nerv.js - Compositor estrutural
 function createNERV(config) {
-    // Componentes internos
-    const telemetry = createTelemetry();
-    const envelopes = createEnvelopes();
-    const correlation = createCorrelation();
-    const buffers = createBuffers();
-    const transport = createTransport();
-    const emission = createEmission();
-    const reception = createReception();
-    const health = createHealth();
+  // Componentes internos
+  const telemetry = createTelemetry();
+  const envelopes = createEnvelopes();
+  const correlation = createCorrelation();
+  const buffers = createBuffers();
+  const transport = createTransport();
+  const emission = createEmission();
+  const reception = createReception();
+  const health = createHealth();
 }
 ```
 
@@ -195,17 +195,17 @@ const nerv = createNERV({ transport: { adapter: socketio } });
 ```javascript
 // src/driver/factory.js
 const factory = {
-    create(targetName) {
-        // Retorna driver específico
-    }
+  create(targetName) {
+    // Retorna driver específico
+  },
 };
 
 // src/driver/DriverLifecycleManager.js
 class DriverLifecycleManager {
-    async executeTask(task) {
-        const driver = factory.create(task.target);
-        await driver.execute();
-    }
+  async executeTask(task) {
+    const driver = factory.create(task.target);
+    await driver.execute();
+  }
 }
 ```
 
@@ -226,7 +226,7 @@ const driverFactory = require('../../driver/factory');
 ```javascript
 // Deveria:
 driver.on('response:chunk', chunk => {
-    nerv.emit('TASK_PROGRESS', { chunk });
+  nerv.emit('TASK_PROGRESS', { chunk });
 });
 
 // Faz:
@@ -238,7 +238,7 @@ driver.on('response:chunk', chunk => {
 ```javascript
 // Deveria:
 kernel.on('TASK_ABORT', taskId => {
-    driver.abort(taskId);
+  driver.abort(taskId);
 });
 
 // Faz:
@@ -273,16 +273,16 @@ kernelTelemetry.record('driver_latency', 1500);
 ```javascript
 // src/server/main.js
 async function bootstrap() {
-    // Inicia Express + Socket.io
-    // Watchers
-    // PM2 bridge
-    // Supervisor/Reconciler
+  // Inicia Express + Socket.io
+  // Watchers
+  // PM2 bridge
+  // Supervisor/Reconciler
 }
 
 // src/server/engine/socket.js
 function init(httpServer) {
-    io = socketio(httpServer);
-    // Setup de eventos WebSocket
+  io = socketio(httpServer);
+  // Setup de eventos WebSocket
 }
 ```
 
@@ -464,8 +464,7 @@ $ grep "ExecutionEngine" index.js
 - Investimento em arquitetura nova **sem ROI**
 - Dívida técnica aumentando (2 engines paralelos)
 
-**Esforço para Resolver**: 3-5 dias
-**Prioridade**: CRÍTICA
+**Esforço para Resolver**: 3-5 dias **Prioridade**: CRÍTICA
 
 ---
 
@@ -489,8 +488,7 @@ $ grep "ipc_client" index.js
 - NERV novo não substitui nada
 - 2 sistemas IPC paralelos (confusão)
 
-**Esforço para Resolver**: 2-3 dias
-**Prioridade**: CRÍTICA
+**Esforço para Resolver**: 2-3 dias **Prioridade**: CRÍTICA
 
 ---
 
@@ -512,8 +510,7 @@ $ grep "ipc_client" index.js
 - Sem telemetria centralizada
 - Abort/Pause não funcionam via Kernel
 
-**Esforço para Resolver**: 2-3 dias
-**Prioridade**: ALTA
+**Esforço para Resolver**: 2-3 dias **Prioridade**: ALTA
 
 ---
 
@@ -532,8 +529,7 @@ $ grep -r "kernel" src/server/
 - Kernel não pode notificar Dashboard
 - Comunicação ad-hoc via IPC antigo
 
-**Esforço para Resolver**: 2-3 dias
-**Prioridade**: ALTA
+**Esforço para Resolver**: 2-3 dias **Prioridade**: ALTA
 
 ---
 
@@ -554,8 +550,7 @@ io.emit('task:progress', data);
 - Sem benefícios do NERV (correlation, buffers, health)
 - Arquitetura inconsistente
 
-**Esforço para Resolver**: 3-4 dias
-**Prioridade**: ALTA
+**Esforço para Resolver**: 3-4 dias **Prioridade**: ALTA
 
 ---
 
@@ -590,9 +585,9 @@ const ipc = require('./src/infra/ipc_client');
 // DEPOIS:
 const { createNERV } = require('./src/nerv/nerv');
 const nerv = createNERV({
-    transport: {
-        adapter: require('./src/infra/ipc/websocket_adapter')
-    }
+  transport: {
+    adapter: require('./src/infra/ipc/websocket_adapter'),
+  },
 });
 ```
 
@@ -645,26 +640,26 @@ const kernel = createKernel({
 ```javascript
 // Em DriverLifecycleManager:
 class DriverLifecycleManager {
-    constructor({ nerv, telemetry }) {
-        this.nerv = nerv;
-        this.telemetry = telemetry;
-    }
+  constructor({ nerv, telemetry }) {
+    this.nerv = nerv;
+    this.telemetry = telemetry;
+  }
 
-    async executeTask(task) {
-        // Emite eventos via NERV
-        this.nerv.emit('TASK_STARTED', { taskId: task.id });
+  async executeTask(task) {
+    // Emite eventos via NERV
+    this.nerv.emit('TASK_STARTED', { taskId: task.id });
 
-        // Driver executa
-        const result = await driver.execute(task);
+    // Driver executa
+    const result = await driver.execute(task);
 
-        // Emite progresso
-        driver.on('chunk', chunk => {
-            this.nerv.emit('TASK_PROGRESS', { taskId, chunk });
-        });
+    // Emite progresso
+    driver.on('chunk', chunk => {
+      this.nerv.emit('TASK_PROGRESS', { taskId, chunk });
+    });
 
-        // Telemetria ao Kernel
-        this.telemetry.record('driver_latency', latency);
-    }
+    // Telemetria ao Kernel
+    this.telemetry.record('driver_latency', latency);
+  }
 }
 ```
 
@@ -830,7 +825,8 @@ Semana 4: SERVER-NERV Integration
 
 ### Diagnóstico: **FRAGMENTAÇÃO CRÍTICA**
 
-Vocês construíram **componentes excelentes** mas **não os conectaram**. É como construir um carro de Fórmula 1 com:
+Vocês construíram **componentes excelentes** mas **não os conectaram**. É como construir um carro de
+Fórmula 1 com:
 
 - ✅ Motor V12 potente (Kernel)
 - ✅ Sistema elétrico sofisticado (NERV)

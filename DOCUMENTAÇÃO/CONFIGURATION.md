@@ -1,15 +1,15 @@
 # ⚙️ Guia de Configuração
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: DevOps, Desenvolvedores
-**Tempo de Leitura**: ~30 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: DevOps, Desenvolvedores **Tempo
+de Leitura**: ~30 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento detalha **todos os parâmetros de configuração** do sistema `chatgpt-docker-puppeteer`: arquivos de config, variáveis de ambiente, schemas de validação, tuning por ambiente.
+Este documento detalha **todos os parâmetros de configuração** do sistema
+`chatgpt-docker-puppeteer`: arquivos de config, variáveis de ambiente, schemas de validação, tuning
+por ambiente.
 
 ---
 
@@ -81,7 +81,8 @@ Este documento detalha **todos os parâmetros de configuração** do sistema `ch
 // src/core/schemas.js
 const { z } = require('zod');
 
-const configSchema = z.object({
+const configSchema = z
+  .object({
     browserMode: z.enum(['launcher', 'external', 'hybrid']),
     externalBrowserPort: z.number().int().min(1024).max(65535),
     maxWorkers: z.number().int().min(1).max(20),
@@ -102,8 +103,9 @@ const configSchema = z.object({
     collectionMaxStable: z.number().int().min(2).max(10),
     nervBufferMaxSize: z.number().int().min(1000).max(100000),
     queueConcurrency: z.number().int().min(1).max(50),
-    broadcastDebounce: z.number().int().min(10).max(500)
-}).strict();
+    broadcastDebounce: z.number().int().min(10).max(500),
+  })
+  .strict();
 
 // Validation on load
 const validatedConfig = configSchema.parse(rawConfig);
@@ -327,36 +329,36 @@ DASHBOARD_PORT=3008
 
 ```javascript
 module.exports = {
-    apps: [
-        {
-            name: 'agente-gpt',
-            script: './index.js',
-            instances: 1,
-            exec_mode: 'fork',
-            autorestart: true,
-            watch: false,
-            max_memory_restart: '800M',
-            env: {
-                NODE_ENV: 'production'
-            },
-            error_file: './logs/agente-gpt-err.log',
-            out_file: './logs/agente-gpt-out.log',
-            log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-            merge_logs: true,
-            min_uptime: '10s',
-            max_restarts: 10,
-            restart_delay: 4000
-        },
-        {
-            name: 'dashboard-web',
-            script: 'npx',
-            args: 'http-server ./public -p 3009',
-            instances: 1,
-            autorestart: true,
-            watch: false,
-            max_memory_restart: '200M'
-        }
-    ]
+  apps: [
+    {
+      name: 'agente-gpt',
+      script: './index.js',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '800M',
+      env: {
+        NODE_ENV: 'production',
+      },
+      error_file: './logs/agente-gpt-err.log',
+      out_file: './logs/agente-gpt-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '10s',
+      max_restarts: 10,
+      restart_delay: 4000,
+    },
+    {
+      name: 'dashboard-web',
+      script: 'npx',
+      args: 'http-server ./public -p 3009',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '200M',
+    },
+  ],
 };
 ```
 
@@ -377,6 +379,7 @@ HEADLESS=false
 ```
 
 **Características**:
+
 - Browser externo (debug facilitado)
 - 1 worker (simplicidade)
 - Logs DEBUG (máximo detalhe)
@@ -402,6 +405,7 @@ HEAP_MONITORING_ENABLED=true
 ```
 
 **Características**:
+
 - Launcher mode (PM2 gerencia browser)
 - 2 workers (testes de concorrência)
 - Logs INFO (moderado)
@@ -433,6 +437,7 @@ CACHE_METRICS_ENABLED=true
 ```
 
 **Características**:
+
 - 10 workers (máxima performance)
 - Logs WARN (apenas problemas)
 - Senha via env secret (segurança)
@@ -465,12 +470,14 @@ CACHE_METRICS_ENABLED=true
 ```
 
 **Impacto**:
+
 - Throughput: ~150 tasks/h (+400% vs baseline)
 - CPU: ~70% (+300%)
 - Memory: ~1.2GB (+700%)
 - Latency p95: ~4200ms (+50%)
 
 **Trade-offs**:
+
 - ⚠️ Alto consumo de recursos
 - ⚠️ Risco de rate limiting (LLMs)
 - ⚠️ Maior chance de browser crashes
@@ -495,12 +502,14 @@ CACHE_METRICS_ENABLED=true
 ```
 
 **Impacto**:
+
 - Throughput: ~30-40 tasks/h (-70%)
 - CPU: ~8% (-70%)
 - Memory: ~120MB (-80%)
 - Latency p95: ~5000ms (+80%)
 
 **Trade-offs**:
+
 - ✅ Ideal para VPS pequenas (1GB RAM)
 - ⚠️ Baixo throughput
 - ⚠️ Fila pode acumular
@@ -527,6 +536,7 @@ CACHE_METRICS_ENABLED=true
 ```
 
 **+ PM2**:
+
 ```javascript
 {
   max_restarts: 50,
@@ -536,12 +546,14 @@ CACHE_METRICS_ENABLED=true
 ```
 
 **Impacto**:
+
 - Uptime: 99.9%
 - Throughput: ~60-80 tasks/h (moderado)
 - Memory: ~600MB (oversized pool)
 - Falhas recuperadas: 98%
 
 **Trade-offs**:
+
 - ✅ Tolerância a crashes
 - ✅ Retries agressivos
 - ⚠️ Oversized resources (+30% overhead)
@@ -575,6 +587,7 @@ CACHE_METRICS_ENABLED=true
 ### Problema: Config validation failed
 
 **Erro**:
+
 ```
 [ERROR] Configuration validation failed:
   - maxWorkers: Expected number, received string
@@ -582,6 +595,7 @@ CACHE_METRICS_ENABLED=true
 ```
 
 **Solução**:
+
 1. Verificar tipos (números sem aspas)
 2. Password min 8 chars ou null
 3. Validar com: `node -e "require('./src/core/config').validateConfig()"`
@@ -591,12 +605,14 @@ CACHE_METRICS_ENABLED=true
 ### Problema: MAX_WORKERS não está sendo aplicado
 
 **Diagnóstico**:
+
 ```bash
 # Verificar config carregado
 curl http://localhost:3008/api/health | jq '.config.maxWorkers'
 ```
 
 **Soluções**:
+
 1. `.env` override: Verificar se `MAX_WORKERS` está em `.env` (override de config.json)
 2. PM2 restart: `pm2 restart agente-gpt --update-env`
 3. Hot-reload: `curl -X POST http://localhost:3008/api/config/reload`
@@ -608,6 +624,7 @@ curl http://localhost:3008/api/health | jq '.config.maxWorkers'
 **Causa**: `dashboardPassword` configurado mas não enviando no request
 
 **Solução**:
+
 ```bash
 # Incluir password em requests
 curl -u :YOUR_PASSWORD http://localhost:3008/api/queue
@@ -627,4 +644,4 @@ curl -H "Authorization: Bearer YOUR_PASSWORD" http://localhost:3008/api/queue
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, DevOps Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, DevOps Team_

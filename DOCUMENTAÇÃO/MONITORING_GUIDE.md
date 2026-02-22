@@ -1,7 +1,6 @@
 # 🏥 Sistema de Verificação e Monitoramento
 
-> **Como verificamos se o sistema está funcionando?**
-> **Versão**: 1.0 (2026-02-01)
+> **Como verificamos se o sistema está funcionando?** **Versão**: 1.0 (2026-02-01)
 
 ---
 
@@ -40,6 +39,7 @@ O sistema possui **4 camadas de monitoramento** que funcionam como uma orquestra
 ## 🔍 Camada 1: PM2 Runtime (Gerenciamento de Processos)
 
 ### **O que monitora**
+
 - 3 processos: `agente-gpt`, `dashboard-web`, `chrome-proxy`
 - Status: `online`, `stopped`, `errored`, `one-launch-status`
 - Uptime, restarts, memória, CPU
@@ -47,6 +47,7 @@ O sistema possui **4 camadas de monitoramento** que funcionam como uma orquestra
 ### **Como usar**
 
 #### Comando: `pm2 status`
+
 ```bash
 pm2 status
 
@@ -61,6 +62,7 @@ pm2 status
 ```
 
 #### Comando: `pm2 monit` (Dashboard Interativo)
+
 ```bash
 pm2 monit
 
@@ -71,6 +73,7 @@ pm2 monit
 ```
 
 #### Comando: `pm2 logs` (Logs Consolidados)
+
 ```bash
 # Todos os processos
 pm2 logs
@@ -114,6 +117,7 @@ pm2Raw.list(err => {
 ### **Endpoints Disponíveis**
 
 #### 1️⃣ **GET /api/health** (Geral)
+
 ```bash
 curl http://localhost:3008/api/health
 
@@ -131,6 +135,7 @@ curl http://localhost:3008/api/health
 ```
 
 #### 2️⃣ **GET /api/health/chrome** (Browser Pool)
+
 ```bash
 curl http://localhost:3008/api/health/chrome
 
@@ -147,6 +152,7 @@ curl http://localhost:3008/api/health/chrome
 ```
 
 #### 3️⃣ **GET /api/health/pm2** (Processos)
+
 ```bash
 curl http://localhost:3008/api/health/pm2
 
@@ -162,6 +168,7 @@ curl http://localhost:3008/api/health/pm2
 ```
 
 #### 4️⃣ **GET /api/health/kernel** (Task Engine)
+
 ```bash
 curl http://localhost:3008/api/health/kernel
 
@@ -178,6 +185,7 @@ curl http://localhost:3008/api/health/kernel
 ```
 
 #### 5️⃣ **GET /api/health/disk** (Filesystem)
+
 ```bash
 curl http://localhost:3008/api/health/disk
 
@@ -196,17 +204,18 @@ curl http://localhost:3008/api/health/disk
 ### **Controller**: `src/server/api/controllers/health.js`
 
 **Estrutura**:
+
 ```javascript
 router.get('/health', async (req, res) => {
-    // Agrega checks de múltiplos componentes
-    const checks = await Promise.allSettled([
-        checkKernel(),
-        checkBrowser(),
-        checkNERV(),
-        checkDisk()
-    ]);
+  // Agrega checks de múltiplos componentes
+  const checks = await Promise.allSettled([
+    checkKernel(),
+    checkBrowser(),
+    checkNERV(),
+    checkDisk(),
+  ]);
 
-    res.json({ status: 'ok', components: checks });
+  res.json({ status: 'ok', components: checks });
 });
 ```
 
@@ -215,6 +224,7 @@ router.get('/health', async (req, res) => {
 ## 📡 Camada 3: NERV Telemetry (Event Bus)
 
 ### **O que monitora**
+
 - Eventos de boot: `INFRA_READY`, `SERVER_READY`
 - Health snapshots: buffers, conexões, última atividade
 - Telemetria granular de cada subsistema
@@ -222,6 +232,7 @@ router.get('/health', async (req, res) => {
 ### **Arquivo**: `src/nerv/health/health.js`
 
 **Snapshot observável**:
+
 ```javascript
 {
     timestamp: 1738414896789,
@@ -244,40 +255,43 @@ router.get('/health', async (req, res) => {
 ### **Eventos Chave**
 
 #### **INFRA_READY** (Chrome Proxy)
+
 ```javascript
 // Emitido por: src/main.js Fase 2.5
 sendEvent(nerv, ActorRole.INFRA, ActionCode.INFRA_READY, {
-    component: 'ChromeProxyService',
-    port: 9224,
-    host: '192.168.0.2',
-    timestamp: Date.now(),
-    mode: 'inline'
+  component: 'ChromeProxyService',
+  port: 9224,
+  host: '192.168.0.2',
+  timestamp: Date.now(),
+  mode: 'inline',
 });
 ```
 
 #### **SERVER_READY** (Dashboard Web)
+
 ```javascript
 // Emitido por: src/server/main.js Fase 8
 sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, {
-    port: 3008,
-    pid: process.pid,
-    authority: 'standalone'
+  port: 3008,
+  pid: process.pid,
+  authority: 'standalone',
 });
 ```
 
 ### **Discovery Mechanism**
 
 **Maestro escuta SERVER_READY** (30s timeout):
+
 ```javascript
 // src/main.js Fase 2.5B
 const discoveredServerInfo = await waitForServerReady(nerv, {
-    timeoutMs: 30000
+  timeoutMs: 30000,
 });
 
 if (discoveredServerInfo) {
-    log('INFO', `Server descoberto: porta ${discoveredServerInfo.port}`);
+  log('INFO', `Server descoberto: porta ${discoveredServerInfo.port}`);
 } else {
-    log('WARN', 'Discovery timeout - usando fallback');
+  log('WARN', 'Discovery timeout - usando fallback');
 }
 ```
 
@@ -293,15 +307,15 @@ if (discoveredServerInfo) {
 
 ```javascript
 // Cliente (Dashboard)
-socket.on('log:new', (data) => {
-    console.log(data.message);
+socket.on('log:new', data => {
+  console.log(data.message);
 });
 
 // Servidor emite:
 notify('log:new', {
-    level: 'INFO',
-    message: '[KERNEL] Task executada',
-    timestamp: Date.now()
+  level: 'INFO',
+  message: '[KERNEL] Task executada',
+  timestamp: Date.now(),
 });
 ```
 
@@ -310,6 +324,7 @@ notify('log:new', {
 **Arquivo**: `src/server/realtime/telemetry/hardware.js`
 
 **Métricas coletadas**:
+
 - CPU usage (%)
 - Memória RAM (MB / %)
 - Disco (GB / %)
@@ -401,12 +416,14 @@ curl http://localhost:3008/api/metrics
 ### **3. Monitoramento Contínuo (Produção)**
 
 #### **Opção A: PM2 Plus** (SaaS)
+
 ```bash
 pm2 link <secret> <public>
 # Dashboard web: https://app.pm2.io
 ```
 
 #### **Opção B: Logs + Alertas**
+
 ```bash
 # Centralizar logs
 pm2 install pm2-logrotate
@@ -416,6 +433,7 @@ pm2 install pm2-slack  # ou pm2-discord
 ```
 
 #### **Opção C: Dashboard Custom**
+
 ```bash
 # Abrir dashboard web local
 open http://localhost:3008
@@ -450,17 +468,20 @@ open http://localhost:3008
 ## 📚 Arquivos Relacionados
 
 **Monitoring**:
+
 - `src/server/realtime/bus/pm2_bridge.js` - PM2 eventos
 - `src/server/api/controllers/health.js` - Health endpoints
 - `src/nerv/health/health.js` - NERV telemetry
 - `src/server/realtime/telemetry/hardware.js` - Métricas hardware
 
 **Logs**:
+
 - `logs/app.log` - Logs gerais
 - `logs/error.log` - Apenas erros
 - `logs/crash_reports/` - Dumps de crashes
 
 **Scripts**:
+
 - `scripts/validate-boot-fixes.sh` - Validação boot
 - `Makefile` - Targets: `make health`, `make status`, `make logs`
 
@@ -469,16 +490,18 @@ open http://localhost:3008
 ## 🎯 Próximos Passos
 
 ### **P1 - Implementar** (próxima sprint)
+
 - [ ] `/api/health/full` - Health check consolidado
 - [ ] Alertas via Slack/Discord/Email
 - [ ] Dashboard React completo
 
 ### **P2 - Melhorar**
+
 - [ ] Métricas Prometheus/Grafana
 - [ ] Logs centralizados (ELK/Loki)
 - [ ] Tracing distribuído (OpenTelemetry)
 
 ---
 
-**🎉 Sistema de monitoramento completo e funcional!**
-**Use**: `pm2 status` + `curl /api/health` para verificação rápida
+**🎉 Sistema de monitoramento completo e funcional!** **Use**: `pm2 status` + `curl /api/health`
+para verificação rápida

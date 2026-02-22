@@ -1,10 +1,8 @@
 # BiomechanicsEngine v2.0 Audit Report
 
-**Arquivo**: `src/driver/modules/biomechanics_engine.js`
-**Versão Atual**: v1.x (Audit Level 500, Protocol 11)
-**Linhas**: 293 linhas
-**Data**: 2026-02-01
-**Auditor**: GitHub Copilot (Claude Sonnet 4.5)
+**Arquivo**: `src/driver/modules/biomechanics_engine.js` **Versão Atual**: v1.x (Audit Level 500,
+Protocol 11) **Linhas**: 293 linhas **Data**: 2026-02-01 **Auditor**: GitHub Copilot (Claude Sonnet
+4.5)
 
 ---
 
@@ -15,16 +13,17 @@
 | Métrica                 | Valor                     | Observação                                                                                                              |
 | ----------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | **Total de Linhas**     | 293                       | Médio/Compacto                                                                                                          |
-| **Tipo de Classe**      | Classe (non-EventEmitter) | ❌ Inconsistente com v2.0                                                                                                |
+| **Tipo de Classe**      | Classe (non-EventEmitter) | ❌ Inconsistente com v2.0                                                                                               |
 | **Métodos Públicos**    | 9                         | constructor, getModifier, releaseModifiers, waitIfBusy, getStableRect, omniScroll, prepareElement, clearInput, typeText |
-| **Eventos Locais**      | 0                         | ❌ Sem EventEmitter (usa driver._emitVital)                                                                              |
-| **Config Centralizado** | ❌ Não                     | Magic numbers dispersos                                                                                                 |
-| **Metrics Tracking**    | ❌ Não                     | Zero counters                                                                                                           |
+| **Eventos Locais**      | 0                         | ❌ Sem EventEmitter (usa driver.\_emitVital)                                                                            |
+| **Config Centralizado** | ❌ Não                    | Magic numbers dispersos                                                                                                 |
+| **Metrics Tracking**    | ❌ Não                    | Zero counters                                                                                                           |
 | **JSDoc Coverage**      | ~15%                      | 2/9 métodos documentados                                                                                                |
 
 ### Responsabilidades
 
 O **BiomechanicsEngine** coordena a execução física de interações com a interface:
+
 - **Gestão de modificadores** (Meta/Control/mobile detection)
 - **Espera inteligente** (waitIfBusy com keep-alive)
 - **Scroll omni-frame** (main page + nested frames)
@@ -33,53 +32,58 @@ O **BiomechanicsEngine** coordena a execução física de interações com a int
 - **Limpeza de inputs** (cross-platform clear)
 
 Integra com:
+
 - `human.js` (humanClick, humanType, wakeUpMove)
 - `analyzer.js` (findResponseArea)
 - `stabilizer.js` (getPageLoadStatus, measureEventLoopLag)
 - `adaptive.js` (getAdjustedTimeout)
-- `BaseDriver` (via driver._emitVital, driver.page, driver.signal)
+- `BaseDriver` (via driver.\_emitVital, driver.page, driver.signal)
 
 ---
 
 ## 🐛 BUGS IDENTIFICADOS (10 Total)
 
 ### BUG #1 (P0 - CRÍTICO): Não herda EventEmitter
-**Severidade**: P0 - BLOCKER
-**Impacto**: Inconsistência com stack v2.0 (todos os módulos devem herdar EventEmitter)
+
+**Severidade**: P0 - BLOCKER **Impacto**: Inconsistência com stack v2.0 (todos os módulos devem
+herdar EventEmitter)
 
 **Código Atual**:
+
 ```javascript
 class BiomechanicsEngine {
-    constructor(driver) {
-        this.driver = driver;
-        // ...
-    }
-    // Usa driver._emitVital para telemetria
+  constructor(driver) {
+    this.driver = driver;
+    // ...
+  }
+  // Usa driver._emitVital para telemetria
 }
 ```
 
 **Problema**:
-- Não emite eventos locais (apenas IPC via driver._emitVital)
+
+- Não emite eventos locais (apenas IPC via driver.\_emitVital)
 - Não permite observers diretos no biomechanics
 - Inconsistente com recovery_system, submission_controller, input_resolver
 
 **Fix**:
+
 ```javascript
 const EventEmitter = require('events');
 
 class BiomechanicsEngine extends EventEmitter {
-    constructor(driver) {
-        super();
-        this.driver = driver;
-        // ...
-    }
+  constructor(driver) {
+    super();
+    this.driver = driver;
+    // ...
+  }
 
-    // Emit eventos locais + IPC
-    async prepareElement(execContext, selector) {
-        this.emit(BIOMECH_EVENTS.PREPARE_STARTED, { selector });
-        // ... lógica ...
-        this.emit(BIOMECH_EVENTS.PREPARE_COMPLETED, { selector });
-    }
+  // Emit eventos locais + IPC
+  async prepareElement(execContext, selector) {
+    this.emit(BIOMECH_EVENTS.PREPARE_STARTED, { selector });
+    // ... lógica ...
+    this.emit(BIOMECH_EVENTS.PREPARE_COMPLETED, { selector });
+  }
 }
 ```
 
@@ -89,26 +93,31 @@ class BiomechanicsEngine extends EventEmitter {
 
 ### BUG #2 (P1 - ALTO): Magic numbers dispersos
 
-**Severidade**: P1 - HIGH
-**Impacto**: Configuração não centralizável via env vars
+**Severidade**: P1 - HIGH **Impacto**: Configuração não centralizável via env vars
 
 **Código Atual**:
+
 ```javascript
 // waitIfBusy
 while (Date.now() - start < timeout && iterations < 50) {
-    if (Date.now() - this.lastKeepAlive > 25000) {
-        await human.wakeUpMove(this.driver.page).catch(() => {});
-        this.lastKeepAlive = Date.now();
-    }
-    await new Promise(r => setTimeout(r, 800));
+  if (Date.now() - this.lastKeepAlive > 25000) {
+    await human.wakeUpMove(this.driver.page).catch(() => {});
+    this.lastKeepAlive = Date.now();
+  }
+  await new Promise(r => setTimeout(r, 800));
 }
 
 // getStableRect
 for (let i = 0; i < 10; i++) {
-    if (lastRect && rect && Math.abs(rect.x - lastRect.x) < 0.5 && Math.abs(rect.y - lastRect.y) < 0.5) {
-        return rect;
-    }
-    await new Promise(r => setTimeout(r, 60));
+  if (
+    lastRect &&
+    rect &&
+    Math.abs(rect.x - lastRect.x) < 0.5 &&
+    Math.abs(rect.y - lastRect.y) < 0.5
+  ) {
+    return rect;
+  }
+  await new Promise(r => setTimeout(r, 60));
 }
 
 // omniScroll
@@ -117,35 +126,37 @@ await new Promise(r => setTimeout(r, 500));
 
 // typeText
 if (text.length > 2000) {
-    // Zen Mode
+  // Zen Mode
 }
 
 const threshold = text.length > 50 ? 0.6 : 0.5;
 ```
 
 **Problema**:
+
 - **11 magic numbers**: 50, 25000, 800, 10, 0.5, 60, 0.15, 0.3, 500, 2000, 0.6, 0.5
 - Não configuráveis via env vars
 - Difícil ajustar sem modificar código
 
 **Fix**:
+
 ```javascript
 const BIOMECH_CONFIG = {
-    MAX_WAIT_ITERATIONS: parseInt(process.env.BIOMECH_MAX_ITERATIONS || '50'),
-    KEEP_ALIVE_INTERVAL_MS: parseInt(process.env.BIOMECH_KEEP_ALIVE || '25000'),
-    WAIT_POLL_INTERVAL_MS: parseInt(process.env.BIOMECH_WAIT_POLL || '800'),
+  MAX_WAIT_ITERATIONS: parseInt(process.env.BIOMECH_MAX_ITERATIONS || '50'),
+  KEEP_ALIVE_INTERVAL_MS: parseInt(process.env.BIOMECH_KEEP_ALIVE || '25000'),
+  WAIT_POLL_INTERVAL_MS: parseInt(process.env.BIOMECH_WAIT_POLL || '800'),
 
-    STABLE_RECT_MAX_ATTEMPTS: parseInt(process.env.BIOMECH_STABLE_ATTEMPTS || '10'),
-    STABLE_RECT_TOLERANCE_PX: parseFloat(process.env.BIOMECH_STABLE_TOLERANCE || '0.5'),
-    STABLE_RECT_POLL_MS: parseInt(process.env.BIOMECH_STABLE_POLL || '60'),
+  STABLE_RECT_MAX_ATTEMPTS: parseInt(process.env.BIOMECH_STABLE_ATTEMPTS || '10'),
+  STABLE_RECT_TOLERANCE_PX: parseFloat(process.env.BIOMECH_STABLE_TOLERANCE || '0.5'),
+  STABLE_RECT_POLL_MS: parseInt(process.env.BIOMECH_STABLE_POLL || '60'),
 
-    SCROLL_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_OFFSET || '0.15'),
-    SCROLL_MAX_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_MAX || '0.3'),
-    POST_SCROLL_DELAY_MS: parseInt(process.env.BIOMECH_POST_SCROLL_DELAY || '500'),
+  SCROLL_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_OFFSET || '0.15'),
+  SCROLL_MAX_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_MAX || '0.3'),
+  POST_SCROLL_DELAY_MS: parseInt(process.env.BIOMECH_POST_SCROLL_DELAY || '500'),
 
-    ZEN_MODE_THRESHOLD_CHARS: parseInt(process.env.BIOMECH_ZEN_THRESHOLD || '2000'),
-    ECHO_THRESHOLD_LONG: parseFloat(process.env.BIOMECH_ECHO_LONG || '0.6'),
-    ECHO_THRESHOLD_SHORT: parseFloat(process.env.BIOMECH_ECHO_SHORT || '0.5')
+  ZEN_MODE_THRESHOLD_CHARS: parseInt(process.env.BIOMECH_ZEN_THRESHOLD || '2000'),
+  ECHO_THRESHOLD_LONG: parseFloat(process.env.BIOMECH_ECHO_LONG || '0.6'),
+  ECHO_THRESHOLD_SHORT: parseFloat(process.env.BIOMECH_ECHO_SHORT || '0.5'),
 };
 ```
 
@@ -155,10 +166,10 @@ const BIOMECH_CONFIG = {
 
 ### BUG #3 (P2 - MÉDIO): Constructor sem validação de parâmetros
 
-**Severidade**: P2 - MEDIUM
-**Impacto**: Crashes silenciosos se driver inválido
+**Severidade**: P2 - MEDIUM **Impacto**: Crashes silenciosos se driver inválido
 
 **Código Atual**:
+
 ```javascript
 constructor(driver) {
     this.driver = driver;
@@ -168,12 +179,14 @@ constructor(driver) {
 ```
 
 **Problema**:
+
 - Não valida se driver existe
 - Não valida se driver.page existe
-- Não valida se driver._emitVital é função
+- Não valida se driver.\_emitVital é função
 - Pode causar crashes posteriores (`this.driver.page.evaluate`)
 
 **Fix**:
+
 ```javascript
 constructor(driver) {
     super();
@@ -216,10 +229,10 @@ constructor(driver) {
 
 ### BUG #4 (P2 - MÉDIO): Métodos sem timeout protection
 
-**Severidade**: P2 - MEDIUM
-**Impacto**: Operações podem hang indefinidamente
+**Severidade**: P2 - MEDIUM **Impacto**: Operações podem hang indefinidamente
 
 **Código Atual**:
+
 ```javascript
 async getStableRect(ctx, selector) {
     for (let i = 0; i < 10; i++) {
@@ -246,11 +259,13 @@ async typeText(ctx, selector, text, signal) {
 ```
 
 **Problema**:
+
 - `ctx.evaluate` pode hang sem timeout
 - `human.humanType` pode ser interrompido mas sem timeout global
 - `omniScroll` sem timeout nas operações de scroll
 
 **Fix**:
+
 ```javascript
 async getStableRect(ctx, selector) {
     const timeout = BIOMECH_CONFIG.STABLE_RECT_TIMEOUT_MS;
@@ -289,10 +304,10 @@ _timeout(ms, operation) {
 
 ### BUG #5 (P2 - MÉDIO): Sem metrics tracking
 
-**Severidade**: P2 - MEDIUM
-**Impacto**: Zero observabilidade de operações biomecânicas
+**Severidade**: P2 - MEDIUM **Impacto**: Zero observabilidade de operações biomecânicas
 
 **Código Atual**:
+
 ```javascript
 // Nenhum tracking de:
 // - Total de cliques executados
@@ -303,11 +318,13 @@ _timeout(ms, operation) {
 ```
 
 **Problema**:
+
 - Impossível determinar volume de operações
 - Sem tracking de zen mode usage
 - Sem visibility de keep-alive frequency
 
 **Fix**:
+
 ```javascript
 this.stats = {
     totalClicks: 0,
@@ -361,10 +378,10 @@ getStats() {
 
 ### BUG #6 (P3 - BAIXO): JSDoc incompleto
 
-**Severidade**: P3 - LOW
-**Impacto**: Baixa documentação (2/9 métodos)
+**Severidade**: P3 - LOW **Impacto**: Baixa documentação (2/9 métodos)
 
 **Código Atual**:
+
 ```javascript
 // ✅ Documentado
 constructor(driver) { ... }
@@ -381,6 +398,7 @@ typeText(ctx, selector, text, signal) { ... }
 ```
 
 **Problema**:
+
 - 7/9 métodos sem JSDoc
 - Sem @param, @returns, @throws
 - Sem @example
@@ -393,10 +411,10 @@ typeText(ctx, selector, text, signal) { ... }
 
 ### BUG #7 (P2 - MÉDIO): clearInput não valida se elemento existe
 
-**Severidade**: P2 - MEDIUM
-**Impacto**: Operações de clearing podem falhar silenciosamente
+**Severidade**: P2 - MEDIUM **Impacto**: Operações de clearing podem falhar silenciosamente
 
 **Código Atual**:
+
 ```javascript
 async clearInput(ctx, selector) {
     this.driver._emitVital('PROGRESS_UPDATE', { step: 'CLEARING_INPUT', selector });
@@ -423,11 +441,13 @@ async clearInput(ctx, selector) {
 ```
 
 **Problema**:
+
 - Se elemento não existe, método não lança erro
 - Continua execução mesmo se clear falhou
 - Sem verificação de sucesso
 
 **Fix**:
+
 ```javascript
 async clearInput(ctx, selector) {
     this.emit(BIOMECH_EVENTS.CLEAR_STARTED, { selector });
@@ -475,10 +495,10 @@ async clearInput(ctx, selector) {
 
 ### BUG #8 (P3 - BAIXO): waitIfBusy sem AbortSignal support
 
-**Severidade**: P3 - LOW
-**Impacto**: Não pode ser cancelado externamente
+**Severidade**: P3 - LOW **Impacto**: Não pode ser cancelado externamente
 
 **Código Atual**:
+
 ```javascript
 async waitIfBusy(taskId) {
     const { timeout } = await adaptive.getAdjustedTimeout(...);
@@ -492,11 +512,13 @@ async waitIfBusy(taskId) {
 ```
 
 **Problema**:
+
 - Não aceita AbortSignal
 - Loop continua mesmo se task cancelada
 - Inconsistente com typeText (que recebe signal)
 
 **Fix**:
+
 ```javascript
 async waitIfBusy(taskId, signal) {
     const { timeout } = await adaptive.getAdjustedTimeout(...);
@@ -520,10 +542,10 @@ async waitIfBusy(taskId, signal) {
 
 ### BUG #9 (P3 - BAIXO): getModifier sem cache timeout
 
-**Severidade**: P3 - LOW
-**Impacto**: Modifier pode ser re-detectado desnecessariamente
+**Severidade**: P3 - LOW **Impacto**: Modifier pode ser re-detectado desnecessariamente
 
 **Código Atual**:
+
 ```javascript
 async getModifier() {
     if (this.modifier) {
@@ -534,11 +556,13 @@ async getModifier() {
 ```
 
 **Problema**:
+
 - Cache infinito (never expires)
 - Se user troca de device/browser durante sessão longa, mantém modifier errado
 - Melhor: cache com TTL
 
 **Fix**:
+
 ```javascript
 async getModifier() {
     const now = Date.now();
@@ -559,10 +583,10 @@ async getModifier() {
 
 ### BUG #10 (P3 - BAIXO): releaseModifiers não reporta eventos
 
-**Severidade**: P3 - LOW
-**Impacto**: Operação silenciosa
+**Severidade**: P3 - LOW **Impacto**: Operação silenciosa
 
 **Código Atual**:
+
 ```javascript
 async releaseModifiers() {
     try {
@@ -579,11 +603,13 @@ async releaseModifiers() {
 ```
 
 **Problema**:
+
 - Operação crítica mas sem eventos
 - Sem telemetria de quais mods foram released
 - Catch silencioso
 
 **Fix**:
+
 ```javascript
 async releaseModifiers() {
     this.emit(BIOMECH_EVENTS.MODIFIERS_RELEASE_STARTED);
@@ -619,29 +645,28 @@ async releaseModifiers() {
 
 ### IMPROVEMENT #1: EventEmitter inheritance + Eventos locais
 
-**Prioridade**: P0 - CRÍTICO
-**Benefício**: Consistência com v2.0 stack + observability
+**Prioridade**: P0 - CRÍTICO **Benefício**: Consistência com v2.0 stack + observability
 
 ```javascript
 const BIOMECH_EVENTS = {
-    PREPARE_STARTED: 'biomech:prepare_started',
-    PREPARE_COMPLETED: 'biomech:prepare_completed',
-    SCROLL_STARTED: 'biomech:scroll_started',
-    SCROLL_COMPLETED: 'biomech:scroll_completed',
-    TYPING_STARTED: 'biomech:typing_started',
-    TYPING_COMPLETED: 'biomech:typing_completed',
-    ZEN_MODE_ACTIVATED: 'biomech:zen_mode_activated',
-    HUMAN_MODE_ACTIVATED: 'biomech:human_mode_activated',
-    CLEAR_STARTED: 'biomech:clear_started',
-    CLEAR_COMPLETED: 'biomech:clear_completed',
-    WAIT_STARTED: 'biomech:wait_started',
-    WAIT_COMPLETED: 'biomech:wait_completed',
-    MODIFIERS_RELEASE_STARTED: 'biomech:modifiers_release_started',
-    MODIFIERS_RELEASE_COMPLETED: 'biomech:modifiers_release_completed'
+  PREPARE_STARTED: 'biomech:prepare_started',
+  PREPARE_COMPLETED: 'biomech:prepare_completed',
+  SCROLL_STARTED: 'biomech:scroll_started',
+  SCROLL_COMPLETED: 'biomech:scroll_completed',
+  TYPING_STARTED: 'biomech:typing_started',
+  TYPING_COMPLETED: 'biomech:typing_completed',
+  ZEN_MODE_ACTIVATED: 'biomech:zen_mode_activated',
+  HUMAN_MODE_ACTIVATED: 'biomech:human_mode_activated',
+  CLEAR_STARTED: 'biomech:clear_started',
+  CLEAR_COMPLETED: 'biomech:clear_completed',
+  WAIT_STARTED: 'biomech:wait_started',
+  WAIT_COMPLETED: 'biomech:wait_completed',
+  MODIFIERS_RELEASE_STARTED: 'biomech:modifiers_release_started',
+  MODIFIERS_RELEASE_COMPLETED: 'biomech:modifiers_release_completed',
 };
 
 class BiomechanicsEngine extends EventEmitter {
-    // Emit eventos locais + continua IPC via driver._emitVital
+  // Emit eventos locais + continua IPC via driver._emitVital
 }
 ```
 
@@ -651,36 +676,35 @@ class BiomechanicsEngine extends EventEmitter {
 
 ### IMPROVEMENT #2: BIOMECH_CONFIG centralizado
 
-**Prioridade**: P1 - HIGH
-**Benefício**: Zero magic numbers + configurável via env vars
+**Prioridade**: P1 - HIGH **Benefício**: Zero magic numbers + configurável via env vars
 
 ```javascript
 const BIOMECH_CONFIG = {
-    // Wait & Stability
-    MAX_WAIT_ITERATIONS: parseInt(process.env.BIOMECH_MAX_ITERATIONS || '50'),
-    KEEP_ALIVE_INTERVAL_MS: parseInt(process.env.BIOMECH_KEEP_ALIVE || '25000'),
-    WAIT_POLL_INTERVAL_MS: parseInt(process.env.BIOMECH_WAIT_POLL || '800'),
+  // Wait & Stability
+  MAX_WAIT_ITERATIONS: parseInt(process.env.BIOMECH_MAX_ITERATIONS || '50'),
+  KEEP_ALIVE_INTERVAL_MS: parseInt(process.env.BIOMECH_KEEP_ALIVE || '25000'),
+  WAIT_POLL_INTERVAL_MS: parseInt(process.env.BIOMECH_WAIT_POLL || '800'),
 
-    // Stable Rect
-    STABLE_RECT_MAX_ATTEMPTS: parseInt(process.env.BIOMECH_STABLE_ATTEMPTS || '10'),
-    STABLE_RECT_TOLERANCE_PX: parseFloat(process.env.BIOMECH_STABLE_TOLERANCE || '0.5'),
-    STABLE_RECT_POLL_MS: parseInt(process.env.BIOMECH_STABLE_POLL || '60'),
-    STABLE_RECT_TIMEOUT_MS: parseInt(process.env.BIOMECH_STABLE_TIMEOUT || '5000'),
+  // Stable Rect
+  STABLE_RECT_MAX_ATTEMPTS: parseInt(process.env.BIOMECH_STABLE_ATTEMPTS || '10'),
+  STABLE_RECT_TOLERANCE_PX: parseFloat(process.env.BIOMECH_STABLE_TOLERANCE || '0.5'),
+  STABLE_RECT_POLL_MS: parseInt(process.env.BIOMECH_STABLE_POLL || '60'),
+  STABLE_RECT_TIMEOUT_MS: parseInt(process.env.BIOMECH_STABLE_TIMEOUT || '5000'),
 
-    // Scroll
-    SCROLL_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_OFFSET || '0.15'),
-    SCROLL_MAX_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_MAX || '0.3'),
-    POST_SCROLL_DELAY_MS: parseInt(process.env.BIOMECH_POST_SCROLL_DELAY || '500'),
+  // Scroll
+  SCROLL_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_OFFSET || '0.15'),
+  SCROLL_MAX_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_MAX || '0.3'),
+  POST_SCROLL_DELAY_MS: parseInt(process.env.BIOMECH_POST_SCROLL_DELAY || '500'),
 
-    // Typing
-    ZEN_MODE_THRESHOLD_CHARS: parseInt(process.env.BIOMECH_ZEN_THRESHOLD || '2000'),
-    ZEN_MODE_TIMEOUT_MS: parseInt(process.env.BIOMECH_ZEN_TIMEOUT || '30000'),
-    HUMAN_TYPE_TIMEOUT_MS: parseInt(process.env.BIOMECH_HUMAN_TIMEOUT || '60000'),
-    ECHO_THRESHOLD_LONG: parseFloat(process.env.BIOMECH_ECHO_LONG || '0.6'),
-    ECHO_THRESHOLD_SHORT: parseFloat(process.env.BIOMECH_ECHO_SHORT || '0.5'),
+  // Typing
+  ZEN_MODE_THRESHOLD_CHARS: parseInt(process.env.BIOMECH_ZEN_THRESHOLD || '2000'),
+  ZEN_MODE_TIMEOUT_MS: parseInt(process.env.BIOMECH_ZEN_TIMEOUT || '30000'),
+  HUMAN_TYPE_TIMEOUT_MS: parseInt(process.env.BIOMECH_HUMAN_TIMEOUT || '60000'),
+  ECHO_THRESHOLD_LONG: parseFloat(process.env.BIOMECH_ECHO_LONG || '0.6'),
+  ECHO_THRESHOLD_SHORT: parseFloat(process.env.BIOMECH_ECHO_SHORT || '0.5'),
 
-    // Modifier Cache
-    MODIFIER_CACHE_TTL_MS: parseInt(process.env.BIOMECH_MODIFIER_TTL || '3600000') // 1h
+  // Modifier Cache
+  MODIFIER_CACHE_TTL_MS: parseInt(process.env.BIOMECH_MODIFIER_TTL || '3600000'), // 1h
 };
 ```
 
@@ -690,8 +714,7 @@ const BIOMECH_CONFIG = {
 
 ### IMPROVEMENT #3: Validação completa de parâmetros
 
-**Prioridade**: P1 - HIGH
-**Benefício**: Fail-fast com erros claros
+**Prioridade**: P1 - HIGH **Benefício**: Fail-fast com erros claros
 
 ```javascript
 constructor(driver) {
@@ -718,8 +741,7 @@ constructor(driver) {
 
 ### IMPROVEMENT #4: JSDoc 100%
 
-**Prioridade**: P2 - MEDIUM
-**Benefício**: Documentação completa de todos métodos
+**Prioridade**: P2 - MEDIUM **Benefício**: Documentação completa de todos métodos
 
 ```javascript
 /**
@@ -748,8 +770,7 @@ async getModifier() { ... }
 
 ### IMPROVEMENT #5: Metrics tracking completo
 
-**Prioridade**: P2 - MEDIUM
-**Benefício**: Observability de operações biomecânicas
+**Prioridade**: P2 - MEDIUM **Benefício**: Observability de operações biomecânicas
 
 ```javascript
 this.stats = {
@@ -786,8 +807,7 @@ getStats() {
 
 ### IMPROVEMENT #6: Timeout protection em todas operações
 
-**Prioridade**: P2 - MEDIUM
-**Benefício**: Previne hangs indefinidos
+**Prioridade**: P2 - MEDIUM **Benefício**: Previne hangs indefinidos
 
 ```javascript
 async getStableRect(ctx, selector) {
@@ -825,8 +845,7 @@ _timeout(ms, operation) {
 
 ### IMPROVEMENT #7: AbortSignal support em todos métodos
 
-**Prioridade**: P3 - LOW
-**Benefício**: Cancelamento graceful
+**Prioridade**: P3 - LOW **Benefício**: Cancelamento graceful
 
 ```javascript
 async waitIfBusy(taskId, signal) {
@@ -853,8 +872,7 @@ async clearInput(ctx, selector, signal) {
 
 ### IMPROVEMENT #8: Enhanced error handling
 
-**Prioridade**: P2 - MEDIUM
-**Benefício**: Erros tipados + recovery hints
+**Prioridade**: P2 - MEDIUM **Benefício**: Erros tipados + recovery hints
 
 ```javascript
 class BiomechError extends Error {
@@ -887,8 +905,7 @@ async typeText(ctx, selector, text, signal) {
 
 ### IMPROVEMENT #9: Retry logic em operações críticas
 
-**Prioridade**: P3 - LOW
-**Benefício**: Resiliência em operações flaky
+**Prioridade**: P3 - LOW **Benefício**: Resiliência em operações flaky
 
 ```javascript
 async getStableRect(ctx, selector, maxRetries = 3) {
@@ -913,15 +930,14 @@ async getStableRect(ctx, selector, maxRetries = 3) {
 
 ### IMPROVEMENT #10: Module exports completo
 
-**Prioridade**: P3 - LOW
-**Benefício**: Consistência com v2.0 stack
+**Prioridade**: P3 - LOW **Benefício**: Consistência com v2.0 stack
 
 ```javascript
 module.exports = {
-    BiomechanicsEngine,
-    BIOMECH_CONFIG,
-    BIOMECH_EVENTS,
-    create: (driver) => new BiomechanicsEngine(driver)
+  BiomechanicsEngine,
+  BIOMECH_CONFIG,
+  BIOMECH_EVENTS,
+  create: driver => new BiomechanicsEngine(driver),
 };
 ```
 
@@ -956,25 +972,30 @@ module.exports = {
 ### Breakdown Detalhado
 
 **Sprint 1 (P0 - 2-3h)**:
+
 - BUG #1: EventEmitter inheritance (2h)
 - IMPROVEMENT #1: 14 eventos locais (1h)
 
 **Sprint 2 (P1 - 3-4h)**:
+
 - BUG #2: BIOMECH_CONFIG centralizado (2h)
 - BUG #3: Validação completa (1h)
 - IMPROVEMENT #3: Validação de parâmetros (1h)
 
 **Sprint 3 (P2 - 4-5h)**:
+
 - BUG #4: Timeout protection (3h)
 - BUG #5: Metrics tracking (2h)
 - IMPROVEMENT #5: getStats() (1h)
 
 **Sprint 4 (P2 - 3-4h)**:
+
 - BUG #6: JSDoc 100% (2h)
 - BUG #7: clearInput validation (1h)
 - IMPROVEMENT #8: Enhanced error handling (1h)
 
 **Sprint 5 (P3 - 2-3h)**:
+
 - BUG #8: AbortSignal support (1h)
 - BUG #9: Modifier cache TTL (30min)
 - BUG #10: releaseModifiers events (30min)
@@ -1004,16 +1025,16 @@ module.exports = {
 
 ### BiomechanicsEngine v1.x vs Stack v2.0
 
-| Feature            | v1.x         | v2.0 Stack (recovery, submission, input_resolver) | Gap                            |
-| ------------------ | ------------ | ------------------------------------------------- | ------------------------------ |
-| **EventEmitter**   | ❌ Não        | ✅ Sim                                             | 🔴 **2 generations behind**     |
-| **Config Object**  | ❌ Não        | ✅ BIOMECH_CONFIG (16 keys)                        | 🔴 **Magic numbers everywhere** |
-| **Events**         | ❌ 0          | ✅ 8-14 eventos                                    | 🔴 **Zero local events**        |
-| **Metrics**        | ❌ 0          | ✅ 7-11 counters                                   | 🔴 **Zero observability**       |
-| **Timeout**        | ❌ Não        | ✅ Promise.race wrappers                           | 🔴 **Can hang indefinitely**    |
-| **JSDoc**          | 🟡 15%        | ✅ 100%                                            | 🟡 **Partial documentation**    |
-| **Validação**      | ❌ Minimal    | ✅ Complete (driver, page, methods)                | 🔴 **Weak validation**          |
-| **Module Exports** | 🟡 Class only | ✅ { Class, CONFIG, EVENTS, create }               | 🟡 **Incomplete**               |
+| Feature            | v1.x          | v2.0 Stack (recovery, submission, input_resolver) | Gap                             |
+| ------------------ | ------------- | ------------------------------------------------- | ------------------------------- |
+| **EventEmitter**   | ❌ Não        | ✅ Sim                                            | 🔴 **2 generations behind**     |
+| **Config Object**  | ❌ Não        | ✅ BIOMECH_CONFIG (16 keys)                       | 🔴 **Magic numbers everywhere** |
+| **Events**         | ❌ 0          | ✅ 8-14 eventos                                   | 🔴 **Zero local events**        |
+| **Metrics**        | ❌ 0          | ✅ 7-11 counters                                  | 🔴 **Zero observability**       |
+| **Timeout**        | ❌ Não        | ✅ Promise.race wrappers                          | 🔴 **Can hang indefinitely**    |
+| **JSDoc**          | 🟡 15%        | ✅ 100%                                           | 🟡 **Partial documentation**    |
+| **Validação**      | ❌ Minimal    | ✅ Complete (driver, page, methods)               | 🔴 **Weak validation**          |
+| **Module Exports** | 🟡 Class only | ✅ { Class, CONFIG, EVENTS, create }              | 🟡 **Incomplete**               |
 
 **Conclusão**: BiomechanicsEngine v1.x está **2 gerações atrás** do stack v2.0.
 
@@ -1057,9 +1078,10 @@ module.exports = {
 ### Nenhuma Breaking Change Detectada
 
 ✅ **100% Backward Compatible**:
+
 - Constructor signature preservado
 - Métodos públicos inalterados
-- IPC telemetry mantida (driver._emitVital)
+- IPC telemetry mantida (driver.\_emitVital)
 - Module exports expandido (não quebra imports existentes)
 
 ---
@@ -1069,7 +1091,7 @@ module.exports = {
 ### Pontos Positivos v1.x
 
 1. ✅ **Código compacto** (293 linhas, funcional)
-2. ✅ **IPC telemetry** (driver._emitVital bem integrado)
+2. ✅ **IPC telemetry** (driver.\_emitVital bem integrado)
 3. ✅ **Zen mode inteligente** (>2000 chars → direct injection)
 4. ✅ **Keep-alive automático** (wakeUpMove a cada 25s)
 5. ✅ **Omni-scroll robusto** (nested frames support)
@@ -1085,6 +1107,7 @@ module.exports = {
 ### Recomendação
 
 **Implementar v2.0 COMPLETO** seguindo priorização RICE:
+
 1. Sprint 1 (P0): EventEmitter + eventos (2-3h)
 2. Sprint 2 (P1): BIOMECH_CONFIG + validação (3-4h)
 3. Sprint 3-4 (P2): Timeout + metrics + JSDoc (7-9h)
@@ -1094,7 +1117,5 @@ module.exports = {
 
 ---
 
-**Audit Version**: 2.0.0
-**Audited By**: GitHub Copilot (Claude Sonnet 4.5)
-**Date**: 2026-02-01
+**Audit Version**: 2.0.0 **Audited By**: GitHub Copilot (Claude Sonnet 4.5) **Date**: 2026-02-01
 **Next Step**: Aguardar aprovação do usuário para implementação v2.0

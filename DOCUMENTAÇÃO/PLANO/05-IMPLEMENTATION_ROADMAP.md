@@ -2,9 +2,11 @@
 
 ## Visão Geral da Implementação
 
-Este documento detalha o **plano de implementação completo** para transformar o sistema chatgpt-docker-puppeteer em uma **plataforma de orquestração autônoma de LLMs de nível enterprise**.
+Este documento detalha o **plano de implementação completo** para transformar o sistema
+chatgpt-docker-puppeteer em uma **plataforma de orquestração autônoma de LLMs de nível enterprise**.
 
 **Duração Total**: 17 semanas (4.5 meses)
+
 - **Parte 1**: Dashboard Enterprise (Semanas 1-5)
 - **Parte 2**: Sistema de Orquestração Autônoma (Semanas 6-17)
 
@@ -17,6 +19,7 @@ Este documento detalha o **plano de implementação completo** para transformar 
 ### Semana 1: Infraestrutura Frontend
 
 #### Objetivos
+
 - Criar base do projeto Vue.js 3
 - Configurar build tooling (Vite)
 - Implementar layout e roteamento básico
@@ -25,6 +28,7 @@ Este documento detalha o **plano de implementação completo** para transformar 
 #### Tarefas Detalhadas
 
 **Dia 1-2: Setup Inicial**
+
 ```bash
 # Criar diretório
 mkdir -p src/dashboard-ui
@@ -47,6 +51,7 @@ npm install lodash-es@4 date-fns@3 uuid@10
 ```
 
 **Dia 3: Configuração Vite**
+
 - Editar `vite.config.js`:
   - Proxy para backend (http://localhost:3008)
   - Alias para paths (@/ → src/)
@@ -54,6 +59,7 @@ npm install lodash-es@4 date-fns@3 uuid@10
   - Source maps para dev
 
 **Dia 4-5: Estrutura de Diretórios**
+
 ```
 src/dashboard-ui/src/
 ├── main.js                 # Entry point
@@ -91,7 +97,9 @@ mkdir -p src/{router,stores,composables,views,components/{layout,task,workflow,c
 ```
 
 **Dia 5: Integração com Backend**
+
 - Atualizar `src/server/engine/app.js`:
+
   ```javascript
   // Servir dashboard Vue.js
   app.use('/dashboard', express.static(path.join(__dirname, '../../dashboard-ui/dist')));
@@ -103,6 +111,7 @@ mkdir -p src/{router,stores,composables,views,components/{layout,task,workflow,c
   ```
 
 #### Entregáveis
+
 - ✅ Projeto Vue.js 3 inicializado
 - ✅ Estrutura de diretórios completa
 - ✅ Layout básico renderizando
@@ -110,6 +119,7 @@ mkdir -p src/{router,stores,composables,views,components/{layout,task,workflow,c
 - ✅ Dashboard acessível em http://localhost:3008/dashboard
 
 #### Critérios de Aceite
+
 - [ ] `npm run dev` inicia dev server em http://localhost:5173
 - [ ] `npm run build` gera build em dist/
 - [ ] Navegação entre rotas funciona
@@ -120,6 +130,7 @@ mkdir -p src/{router,stores,composables,views,components/{layout,task,workflow,c
 ### Semana 2: Backend APIs e Sincronização
 
 #### Objetivos
+
 - Implementar TaskSyncBridge (unificar Queue + Kernel)
 - Implementar TelemetryAggregator
 - Estender APIs REST
@@ -128,6 +139,7 @@ mkdir -p src/{router,stores,composables,views,components/{layout,task,workflow,c
 #### Tarefas Detalhadas
 
 **Dia 1-2: TaskSyncBridge**
+
 ```javascript
 // src/infra/queue/task_sync_bridge.js
 
@@ -155,7 +167,7 @@ class TaskSyncBridge extends EventEmitter {
       return {
         ...diskTask,
         runtime_state: kernelState || null,
-        unified_status: this._computeUnifiedStatus(diskTask, kernelState)
+        unified_status: this._computeUnifiedStatus(diskTask, kernelState),
       };
     });
   }
@@ -170,7 +182,7 @@ class TaskSyncBridge extends EventEmitter {
     return {
       ...diskTask,
       runtime_state: kernelState,
-      unified_status: this._computeUnifiedStatus(diskTask, kernelState)
+      unified_status: this._computeUnifiedStatus(diskTask, kernelState),
     };
   }
 
@@ -178,50 +190,50 @@ class TaskSyncBridge extends EventEmitter {
    * Listen to NERV events to update kernel state cache
    */
   _setupNervListeners() {
-    nervClient.on(ActionCode.TASK_STARTED, (envelope) => {
+    nervClient.on(ActionCode.TASK_STARTED, envelope => {
       const { task_id, worker_id } = envelope.payload;
 
       this.kernelStateCache.set(task_id, {
         status: 'RUNNING',
         worker_id,
-        started_at: Date.now()
+        started_at: Date.now(),
       });
 
       this._notifyDashboards(task_id);
     });
 
-    nervClient.on(ActionCode.TASK_COMPLETED, (envelope) => {
+    nervClient.on(ActionCode.TASK_COMPLETED, envelope => {
       const { task_id, result } = envelope.payload;
 
       this.kernelStateCache.set(task_id, {
         status: 'DONE',
         completed_at: Date.now(),
-        result_preview: result?.substring(0, 200)
+        result_preview: result?.substring(0, 200),
       });
 
       this._notifyDashboards(task_id);
     });
 
-    nervClient.on(ActionCode.TASK_FAILED, (envelope) => {
+    nervClient.on(ActionCode.TASK_FAILED, envelope => {
       const { task_id, error } = envelope.payload;
 
       this.kernelStateCache.set(task_id, {
         status: 'FAILED',
         failed_at: Date.now(),
-        error: error.message
+        error: error.message,
       });
 
       this._notifyDashboards(task_id);
     });
 
-    nervClient.on(ActionCode.TASK_PROGRESS, (envelope) => {
+    nervClient.on(ActionCode.TASK_PROGRESS, envelope => {
       const { task_id, progress_percent, current_step } = envelope.payload;
 
       const existing = this.kernelStateCache.get(task_id) || {};
       this.kernelStateCache.set(task_id, {
         ...existing,
         progress_percent,
-        current_step
+        current_step,
       });
 
       this._notifyDashboards(task_id);
@@ -252,6 +264,7 @@ module.exports = new TaskSyncBridge();
 ```
 
 **Dia 2-3: TelemetryAggregator**
+
 ```javascript
 // src/server/dashboard-api/telemetry_aggregator.js
 
@@ -321,24 +334,24 @@ class TelemetryAggregator {
       cpu: {
         current: cpuUsage,
         avg: this._average(this.cpuHistory),
-        max: Math.max(...this.cpuHistory, 0)
+        max: Math.max(...this.cpuHistory, 0),
       },
       memory: {
         used: heapStats.used,
         total: heapStats.total,
-        percent: (heapStats.used / heapStats.total) * 100
+        percent: (heapStats.used / heapStats.total) * 100,
       },
       nerv: {
         latency: nervStats.latency_ms || 0,
         throughput: nervStats.events_per_second || 0,
-        eventCount: nervStats.total_events || 0
+        eventCount: nervStats.total_events || 0,
       },
       eventLoopLag,
       queue: {
         size: queueMetrics.queue_size || 0,
         hitRate: queueMetrics.hit_rate || 0,
-        corrupt: queueMetrics.corrupt_count || 0
-      }
+        corrupt: queueMetrics.corrupt_count || 0,
+      },
     };
   }
 
@@ -379,7 +392,9 @@ module.exports = new TelemetryAggregator();
 ```
 
 **Dia 4: Estender APIs REST**
+
 - Modificar `src/server/api/controllers/tasks.js`:
+
   ```javascript
   const taskSyncBridge = require('@infra/queue/task_sync_bridge');
 
@@ -400,9 +415,7 @@ module.exports = new TelemetryAggregator();
     const task = await taskSyncBridge.getUnifiedTask(req.params.id);
     const dependencies = task.policy.dependencies || [];
 
-    const depTasks = await Promise.all(
-      dependencies.map(id => taskSyncBridge.getUnifiedTask(id))
-    );
+    const depTasks = await Promise.all(dependencies.map(id => taskSyncBridge.getUnifiedTask(id)));
 
     res.json({ task_id: req.params.id, dependencies: depTasks });
   });
@@ -421,6 +434,7 @@ module.exports = new TelemetryAggregator();
   ```
 
 - Criar novos controllers:
+
   ```javascript
   // src/server/api/controllers/telemetry.js
   const telemetryAggregator = require('@server/dashboard-api/telemetry_aggregator');
@@ -438,7 +452,9 @@ module.exports = new TelemetryAggregator();
   ```
 
 **Dia 5: Estender Socket.io**
+
 - Modificar `src/server/engine/socket.js`:
+
   ```javascript
   // Adicionar novos eventos (já existe broadcastTaskUpdate)
 
@@ -464,17 +480,19 @@ module.exports = new TelemetryAggregator();
     // ... existing exports
     broadcastTelemetryMetrics,
     broadcastHealthUpdate,
-    broadcastAlert
+    broadcastAlert,
   };
   ```
 
 #### Entregáveis
+
 - ✅ `task_sync_bridge.js` implementado
 - ✅ `telemetry_aggregator.js` implementado
 - ✅ APIs REST estendidas
 - ✅ Novos eventos Socket.io configurados
 
 #### Critérios de Aceite
+
 - [ ] `GET /api/tasks` retorna unified tasks (disk + kernel)
 - [ ] `GET /api/telemetry/metrics` retorna métricas atuais
 - [ ] Socket.io emite `telemetry:metrics` a 1Hz
@@ -486,6 +504,7 @@ module.exports = new TelemetryAggregator();
 ### Semana 3: Frontend Core (Stores + Composables + Views Básicas)
 
 #### Objetivos
+
 - Implementar Pinia stores
 - Criar composables para Socket.io e APIs
 - Implementar Dashboard principal e Task Queue
@@ -493,6 +512,7 @@ module.exports = new TelemetryAggregator();
 #### Tarefas Detalhadas
 
 **Dia 1: Pinia Stores - Tasks**
+
 ```javascript
 // src/dashboard-ui/src/stores/tasks.js
 
@@ -505,15 +525,15 @@ export const useTaskStore = defineStore('tasks', {
     filters: {
       status: null,
       priority: null,
-      dateRange: null
+      dateRange: null,
     },
     selectedTaskId: null,
     loading: false,
-    error: null
+    error: null,
   }),
 
   getters: {
-    filteredTasks: (state) => {
+    filteredTasks: state => {
       let tasks = state.tasks;
 
       if (state.filters.status) {
@@ -527,10 +547,10 @@ export const useTaskStore = defineStore('tasks', {
       return tasks;
     },
 
-    runningTasks: (state) => state.tasks.filter(t => t.unified_status === 'RUNNING'),
-    pendingTasks: (state) => state.tasks.filter(t => t.unified_status === 'PENDING'),
+    runningTasks: state => state.tasks.filter(t => t.unified_status === 'RUNNING'),
+    pendingTasks: state => state.tasks.filter(t => t.unified_status === 'PENDING'),
 
-    taskById: (state) => (id) => state.tasks.find(t => t.meta.id === id)
+    taskById: state => id => state.tasks.find(t => t.meta.id === id),
   },
 
   actions: {
@@ -605,12 +625,13 @@ export const useTaskStore = defineStore('tasks', {
         task.runtime_state = { ...task.runtime_state, ...state };
         task.unified_status = state.status || task.unified_status;
       }
-    }
-  }
+    },
+  },
 });
 ```
 
 **Dia 2: Composables - useSocket**
+
 ```javascript
 // src/dashboard-ui/src/composables/useSocket.js
 
@@ -626,7 +647,7 @@ export function useSocket(url = '', options = {}) {
     socket.value = io(url, {
       transports: ['websocket'],
       auth: options.auth || {},
-      ...options
+      ...options,
     });
 
     socket.value.on('connect', () => {
@@ -639,7 +660,7 @@ export function useSocket(url = '', options = {}) {
       console.log('[Socket.io] Disconnected');
     });
 
-    socket.value.on('error', (err) => {
+    socket.value.on('error', err => {
       error.value = err.message;
       console.error('[Socket.io] Error:', err);
     });
@@ -686,12 +707,13 @@ export function useSocket(url = '', options = {}) {
     disconnect,
     subscribe,
     unsubscribe,
-    emit
+    emit,
   };
 }
 ```
 
 **Dia 3: Views - Dashboard Principal**
+
 ```vue
 <!-- src/dashboard-ui/src/views/Dashboard.vue -->
 
@@ -717,12 +739,7 @@ export function useSocket(url = '', options = {}) {
         :color="getMemoryColor(metrics.memory.percent)"
       />
 
-      <metric-card
-        title="NERV Latency"
-        :value="metrics.nerv.latency"
-        suffix="ms"
-        icon="zap"
-      />
+      <metric-card title="NERV Latency" :value="metrics.nerv.latency" suffix="ms" icon="zap" />
 
       <metric-card
         title="Throughput"
@@ -736,26 +753,10 @@ export function useSocket(url = '', options = {}) {
     <div class="task-summary">
       <h2>Tasks Overview</h2>
       <div class="summary-cards">
-        <summary-card
-          label="Running"
-          :count="taskCounts.running"
-          color="yellow"
-        />
-        <summary-card
-          label="Pending"
-          :count="taskCounts.pending"
-          color="gray"
-        />
-        <summary-card
-          label="Done"
-          :count="taskCounts.done"
-          color="green"
-        />
-        <summary-card
-          label="Failed"
-          :count="taskCounts.failed"
-          color="red"
-        />
+        <summary-card label="Running" :count="taskCounts.running" color="yellow" />
+        <summary-card label="Pending" :count="taskCounts.pending" color="gray" />
+        <summary-card label="Done" :count="taskCounts.done" color="green" />
+        <summary-card label="Failed" :count="taskCounts.failed" color="red" />
       </div>
     </div>
 
@@ -795,18 +796,18 @@ export default {
       running: taskStore.runningTasks.length,
       pending: taskStore.pendingTasks.length,
       done: taskStore.tasks.filter(t => t.unified_status === 'DONE').length,
-      failed: taskStore.tasks.filter(t => t.unified_status === 'FAILED').length
+      failed: taskStore.tasks.filter(t => t.unified_status === 'FAILED').length,
     }));
 
     const healthComponents = computed(() => Object.values(systemStore.components));
 
-    const getCpuColor = (value) => {
+    const getCpuColor = value => {
       if (value > 90) return 'red';
       if (value > 70) return 'yellow';
       return 'green';
     };
 
-    const getMemoryColor = (value) => {
+    const getMemoryColor = value => {
       if (value > 95) return 'red';
       if (value > 80) return 'yellow';
       return 'green';
@@ -822,14 +823,15 @@ export default {
       taskCounts,
       healthComponents,
       getCpuColor,
-      getMemoryColor
+      getMemoryColor,
     };
-  }
+  },
 };
 </script>
 ```
 
 **Dia 4-5: Task Queue View**
+
 ```vue
 <!-- src/dashboard-ui/src/views/TaskQueue.vue -->
 
@@ -837,9 +839,7 @@ export default {
   <div class="task-queue">
     <div class="header">
       <h1>Task Queue</h1>
-      <button @click="createTask" class="btn-primary">
-        Create Task
-      </button>
+      <button @click="createTask" class="btn-primary">Create Task</button>
     </div>
 
     <!-- Filters -->
@@ -860,19 +860,13 @@ export default {
         max="100"
       />
 
-      <button @click="clearFilters" class="btn-secondary">
-        Clear Filters
-      </button>
+      <button @click="clearFilters" class="btn-secondary">Clear Filters</button>
     </div>
 
     <!-- Task List -->
-    <div v-if="loading" class="loading">
-      Loading tasks...
-    </div>
+    <div v-if="loading" class="loading">Loading tasks...</div>
 
-    <div v-else-if="error" class="error">
-      Error: {{ error }}
-    </div>
+    <div v-else-if="error" class="error">Error: {{ error }}</div>
 
     <div v-else class="task-list">
       <task-card
@@ -904,7 +898,7 @@ export default {
 
     const filters = reactive({
       status: null,
-      priority: null
+      priority: null,
     });
 
     const loading = computed(() => taskStore.loading);
@@ -915,17 +909,17 @@ export default {
       router.push('/tasks/new');
     };
 
-    const editTask = (taskId) => {
+    const editTask = taskId => {
       router.push(`/tasks/${taskId}`);
     };
 
-    const deleteTask = async (taskId) => {
+    const deleteTask = async taskId => {
       if (confirm('Delete this task?')) {
         await taskStore.deleteTask(taskId);
       }
     };
 
-    const retryTask = async (taskId) => {
+    const retryTask = async taskId => {
       await taskStore.retryTask(taskId);
     };
 
@@ -939,7 +933,7 @@ export default {
     });
 
     // Watch filters and update store
-    watch(filters, (newFilters) => {
+    watch(filters, newFilters => {
       taskStore.filters = { ...newFilters };
     });
 
@@ -952,14 +946,15 @@ export default {
       editTask,
       deleteTask,
       retryTask,
-      clearFilters
+      clearFilters,
     };
-  }
+  },
 };
 </script>
 ```
 
 #### Entregáveis
+
 - ✅ 5 Pinia stores implementadas
 - ✅ 3 composables implementados
 - ✅ Dashboard principal funcional
@@ -967,6 +962,7 @@ export default {
 - ✅ Real-time updates via Socket.io
 
 #### Critérios de Aceite
+
 - [ ] Dashboard carrega e exibe métricas em tempo real
 - [ ] Task queue lista tarefas corretamente
 - [ ] Filtros funcionam
@@ -978,18 +974,21 @@ export default {
 ### Semana 4: Visualizações Avançadas
 
 #### Objetivos
+
 - Implementar Performance Metrics (Charts)
 - Implementar Workflow Editor (DAG)
 - Implementar Event Correlation
 - Implementar System Health
 
 #### Tarefas Resumidas (detalhes no plano principal)
+
 - **Dia 1-2**: Performance Metrics com Chart.js
 - **Dia 3**: Workflow Editor com Cytoscape.js
 - **Dia 4**: Event Correlation com Vis-Timeline
 - **Dia 5**: System Health view
 
 #### Entregáveis
+
 - ✅ PerformanceMetrics.vue com charts real-time
 - ✅ WorkflowEditor.vue com DAG canvas
 - ✅ EventCorrelation.vue com timeline
@@ -1000,6 +999,7 @@ export default {
 ### Semana 5: Refinamento e Deploy
 
 #### Objetivos
+
 - Polimento de UI/UX
 - Otimização de performance
 - Testes E2E
@@ -1007,12 +1007,14 @@ export default {
 - Rollout para produção
 
 #### Tarefas Resumidas
+
 - **Dia 1-2**: UI/UX polimento, loading states, error handling
 - **Dia 3**: Performance optimization (lazy loading, virtual scrolling)
 - **Dia 4**: Testes E2E com Playwright
 - **Dia 5**: Documentação e deploy
 
 #### Entregáveis
+
 - ✅ UI polida e responsiva
 - ✅ Performance otimizada
 - ✅ Testes E2E passando
@@ -1026,6 +1028,7 @@ export default {
 ### Semana 6: Task Schema V5
 
 #### Objetivos
+
 - Projetar e implementar Task Schema V5
 - Adicionar suporte a MISSIONS, WORKFLOWS, STRATEGIES
 - Criar migrador V4 → V5
@@ -1040,14 +1043,14 @@ const TaskSchemaV5 = z.object({
   meta: z.object({
     id: z.string().uuid(),
     project_id: z.string().default('default'),
-    parent_id: z.string().uuid().optional(),      // NOVO: Hierarchical tasks
-    mission_id: z.string().uuid().optional(),     // NOVO: Mission grouping
-    workflow_id: z.string().uuid().optional(),    // NOVO: Workflow grouping
+    parent_id: z.string().uuid().optional(), // NOVO: Hierarchical tasks
+    mission_id: z.string().uuid().optional(), // NOVO: Mission grouping
+    workflow_id: z.string().uuid().optional(), // NOVO: Workflow grouping
     correlation_id: z.string().uuid().optional(),
     version: z.literal('5.0'),
     created_at: z.string().datetime(),
     priority: z.number().int().min(0).max(100).default(50),
-    tags: z.array(z.string()).default([])
+    tags: z.array(z.string()).default([]),
   }),
 
   spec: z.object({
@@ -1057,107 +1060,138 @@ const TaskSchemaV5 = z.object({
     payload: z.object({
       system_message: z.string().optional(),
       user_message: z.string(),
-      context: z.any().optional()              // NOVO: Previous results, external data
+      context: z.any().optional(), // NOVO: Previous results, external data
     }),
 
     // NOVO: Execution strategy
-    execution: z.object({
-      strategy: z.enum([
-        'SINGLE_SHOT',        // Execute once
-        'ITERATIVE',          // Execute → Validate → Retry
-        'MULTI_STEP',         // Workflow with multiple steps
-        'TREE_OF_THOUGHT',    // Generate N solutions, pick best
-        'CHAIN_OF_THOUGHT'    // Step-by-step reasoning
-      ]).default('SINGLE_SHOT'),
+    execution: z
+      .object({
+        strategy: z
+          .enum([
+            'SINGLE_SHOT', // Execute once
+            'ITERATIVE', // Execute → Validate → Retry
+            'MULTI_STEP', // Workflow with multiple steps
+            'TREE_OF_THOUGHT', // Generate N solutions, pick best
+            'CHAIN_OF_THOUGHT', // Step-by-step reasoning
+          ])
+          .default('SINGLE_SHOT'),
 
-      // For ITERATIVE strategy
-      iterative_config: z.object({
-        max_iterations: z.number().int().positive().default(3),
-        validation_criteria: z.object({
-          validators: z.array(z.string()),      // ['regex', 'schema', 'llm_judge']
-          min_quality_score: z.number().min(0).max(100).default(70)
-        }).optional()
-      }).optional(),
+        // For ITERATIVE strategy
+        iterative_config: z
+          .object({
+            max_iterations: z.number().int().positive().default(3),
+            validation_criteria: z
+              .object({
+                validators: z.array(z.string()), // ['regex', 'schema', 'llm_judge']
+                min_quality_score: z.number().min(0).max(100).default(70),
+              })
+              .optional(),
+          })
+          .optional(),
 
-      // For MULTI_STEP strategy
-      workflow_config: z.object({
-        steps: z.array(z.object({
-          id: z.string(),
-          name: z.string(),
-          action: z.enum(['execute_prompt', 'validate', 'branch', 'loop', 'spawn_subtask']),
-          config: z.any(),
-          dependencies: z.array(z.string()).default([])
-        })),
-        max_subtasks: z.number().int().positive().default(50)
-      }).optional()
-    }).default({ strategy: 'SINGLE_SHOT' }),
+        // For MULTI_STEP strategy
+        workflow_config: z
+          .object({
+            steps: z.array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                action: z.enum(['execute_prompt', 'validate', 'branch', 'loop', 'spawn_subtask']),
+                config: z.any(),
+                dependencies: z.array(z.string()).default([]),
+              })
+            ),
+            max_subtasks: z.number().int().positive().default(50),
+          })
+          .optional(),
+      })
+      .default({ strategy: 'SINGLE_SHOT' }),
 
     // NOVO: Validation rules
-    validation: z.object({
-      validators: z.array(z.object({
-        type: z.enum(['regex', 'schema', 'length', 'llm_judge', 'custom']),
-        config: z.any()
-      })).default([])
-    }).optional(),
+    validation: z
+      .object({
+        validators: z
+          .array(
+            z.object({
+              type: z.enum(['regex', 'schema', 'length', 'llm_judge', 'custom']),
+              config: z.any(),
+            })
+          )
+          .default([]),
+      })
+      .optional(),
 
     // NOVO: Context management
-    context_config: z.object({
-      inject_previous_results: z.boolean().default(false),
-      context_window_strategy: z.enum(['full', 'chunked', 'summarized']).default('full'),
-      max_context_tokens: z.number().int().positive().optional()
-    }).optional()
+    context_config: z
+      .object({
+        inject_previous_results: z.boolean().default(false),
+        context_window_strategy: z.enum(['full', 'chunked', 'summarized']).default('full'),
+        max_context_tokens: z.number().int().positive().optional(),
+      })
+      .optional(),
   }),
 
   state: z.object({
     status: z.enum(['PENDING', 'RUNNING', 'DONE', 'FAILED', 'SKIPPED', 'PAUSED']),
 
     // NOVO: Workflow state
-    workflow_state: z.object({
-      current_step_index: z.number().int().nonnegative().default(0),
-      completed_steps: z.array(z.string()).default([]),
-      accumulated_context: z.any().optional()
-    }).optional(),
+    workflow_state: z
+      .object({
+        current_step_index: z.number().int().nonnegative().default(0),
+        completed_steps: z.array(z.string()).default([]),
+        accumulated_context: z.any().optional(),
+      })
+      .optional(),
 
     // NOVO: Quality metrics
-    quality_metrics: z.object({
-      overall_score: z.number().min(0).max(100).optional(),
-      validation_passed: z.boolean().optional()
-    }).optional(),
+    quality_metrics: z
+      .object({
+        overall_score: z.number().min(0).max(100).optional(),
+        validation_passed: z.boolean().optional(),
+      })
+      .optional(),
 
     // NOVO: Cost tracking
-    cost_tracking: z.object({
-      input_tokens: z.number().int().nonnegative().default(0),
-      output_tokens: z.number().int().nonnegative().default(0),
-      cost_usd: z.number().nonnegative().default(0)
-    }).optional()
-  })
+    cost_tracking: z
+      .object({
+        input_tokens: z.number().int().nonnegative().default(0),
+        output_tokens: z.number().int().nonnegative().default(0),
+        cost_usd: z.number().nonnegative().default(0),
+      })
+      .optional(),
+  }),
 });
 ```
 
 #### Tarefas Detalhadas
 
 **Dia 1-2: Schema Design**
+
 - Definir estrutura completa do V5
 - Documentar todos os campos novos
 - Criar exemplos de uso
 
 **Dia 3-4: Implementação**
+
 - Implementar `task_schema_v5.js` com Zod
 - Implementar validadores
 - Implementar `migrator_v4_to_v5.js`
 
 **Dia 5: Testes**
+
 - Testes unitários do schema
 - Testes de migração V4 → V5
 - Verificar compatibilidade retroativa
 
 #### Entregáveis
+
 - ✅ `src/core/schemas/task_schema_v5.js`
 - ✅ `src/core/schemas/migrator_v4_to_v5.js`
 - ✅ Testes passando
 - ✅ Documentação
 
 #### Critérios de Aceite
+
 - [ ] Schema V5 valida corretamente
 - [ ] Tasks V4 continuam funcionando
 - [ ] Migração V4 → V5 preserva dados
@@ -1167,6 +1201,7 @@ const TaskSchemaV5 = z.object({
 ### Semanas 7-8: Orchestrator Engine
 
 #### Objetivos
+
 - Implementar OrchestratorEngine (motor de execução)
 - Implementar estratégias: SINGLE_SHOT, ITERATIVE, MULTI_STEP
 - Integrar ao kernel loop
@@ -1188,6 +1223,7 @@ Strategy Handler (based on task.spec.execution.strategy)
 #### Tarefas Detalhadas
 
 **Semana 7, Dia 1-3: OrchestratorEngine Base**
+
 ```javascript
 // src/orchestrator/orchestrator_engine.js
 
@@ -1202,7 +1238,7 @@ class OrchestratorEngine {
     this.strategyHandlers = {
       SINGLE_SHOT: this._handleSingleShot.bind(this),
       ITERATIVE: this._handleIterative.bind(this),
-      MULTI_STEP: this._handleMultiStep.bind(this)
+      MULTI_STEP: this._handleMultiStep.bind(this),
     };
   }
 
@@ -1217,7 +1253,7 @@ class OrchestratorEngine {
     // Emit orchestration start
     this.nerv.emit({
       actionCode: 'ORCHESTRATION_STARTED',
-      payload: { task_id: task.meta.id, strategy }
+      payload: { task_id: task.meta.id, strategy },
     });
 
     try {
@@ -1225,14 +1261,14 @@ class OrchestratorEngine {
 
       this.nerv.emit({
         actionCode: 'ORCHESTRATION_COMPLETED',
-        payload: { task_id: task.meta.id, quality_score: result.quality_score }
+        payload: { task_id: task.meta.id, quality_score: result.quality_score },
       });
 
       return result;
     } catch (error) {
       this.nerv.emit({
         actionCode: 'ORCHESTRATION_FAILED',
-        payload: { task_id: task.meta.id, error: error.message }
+        payload: { task_id: task.meta.id, error: error.message },
       });
       throw error;
     }
@@ -1250,7 +1286,7 @@ class OrchestratorEngine {
     for (let i = 0; i < maxIterations; i++) {
       this.nerv.emit({
         actionCode: 'ITERATION_STARTED',
-        payload: { task_id: task.meta.id, iteration: i + 1 }
+        payload: { task_id: task.meta.id, iteration: i + 1 },
       });
 
       const result = await this._getDriver(task.spec.target).execute(task);
@@ -1266,7 +1302,7 @@ class OrchestratorEngine {
       // Inject feedback for next iteration
       task.spec.payload.context = {
         previous_output: result.output,
-        validation_feedback: validation.feedback
+        validation_feedback: validation.feedback,
       };
     }
 
@@ -1281,16 +1317,19 @@ class OrchestratorEngine {
 ```
 
 **Semana 7, Dia 4-5: MULTI_STEP Strategy**
+
 - Implementar execução de workflow com steps
 - Dependency resolution
 - Context accumulation entre steps
 
 **Semana 8: Integração**
+
 - Integrar OrchestratorEngine ao kernel loop
 - Testes de integração
 - Performance tuning
 
 #### Entregáveis
+
 - ✅ `src/orchestrator/orchestrator_engine.js`
 - ✅ Estratégias implementadas
 - ✅ Integração com kernel
@@ -1301,6 +1340,7 @@ class OrchestratorEngine {
 ### Semana 9: Validation Framework
 
 #### Objetivos
+
 - Implementar ValidationService
 - Implementar validadores: regex, schema, llm_judge
 - Integrar ao orchestrator
@@ -1313,6 +1353,7 @@ class OrchestratorEngine {
 4. **LLMJudgeValidator**: LLM avalia qualidade
 
 #### LLM-as-Judge Implementation
+
 ```javascript
 // src/orchestrator/validation/llm_judge_validator.js
 
@@ -1341,8 +1382,8 @@ Return JSON:
         model: 'gpt-4o',
         temperature: 0.2,
         response_format: { type: 'json_object' },
-        payload: { user_message: judgePrompt }
-      }
+        payload: { user_message: judgePrompt },
+      },
     });
 
     const evaluation = JSON.parse(result.output);
@@ -1350,13 +1391,14 @@ Return JSON:
     return {
       passed: evaluation.overall_score >= criteria.min_score,
       score: evaluation.overall_score,
-      feedback: evaluation.suggestions.join('; ')
+      feedback: evaluation.suggestions.join('; '),
     };
   }
 }
 ```
 
 #### Entregáveis
+
 - ✅ ValidationService
 - ✅ 4+ validadores
 - ✅ LLM-as-judge funcional
@@ -1367,12 +1409,14 @@ Return JSON:
 ### Semanas 10-11: Multi-Driver Architecture
 
 #### Objetivos
+
 - Definir BaseDriverV2 interface
 - Refatorar drivers existentes
 - Implementar novos drivers (Gemini, Claude)
 - Implementar auto-selection e fallback
 
 #### BaseDriverV2 Interface
+
 ```javascript
 class BaseDriverV2 {
   getCapabilities() {
@@ -1381,7 +1425,7 @@ class BaseDriverV2 {
       max_tokens: 4096,
       supports_json: false,
       cost_per_1k_input: 0,
-      cost_per_1k_output: 0
+      cost_per_1k_output: 0,
     };
   }
 
@@ -1396,11 +1440,13 @@ class BaseDriverV2 {
 ```
 
 #### Driver Factory V2
+
 - Auto-select best driver based on requirements
 - Fallback strategy (primary → secondary)
 - Cost optimization
 
 #### Entregáveis
+
 - ✅ BaseDriverV2
 - ✅ ChatGPTDriverV2, GeminiDriverV2, ClaudeDriverV2
 - ✅ DriverFactoryV2
@@ -1412,18 +1458,21 @@ class BaseDriverV2 {
 ### Semana 12: Context Management
 
 #### Objetivos
+
 - Implementar ContextManager
 - Chunking de contexto grande
 - Context injection entre steps
 - Long-term memory
 
 #### Features
+
 - **Chunking**: Split large context into chunks
 - **Injection**: Inject previous results into prompts
 - **Summarization**: Summarize context to fit window
 - **Memory**: Store and retrieve patterns
 
 #### Entregáveis
+
 - ✅ ContextManager
 - ✅ MemoryStore
 - ✅ Chunking strategies
@@ -1434,42 +1483,45 @@ class BaseDriverV2 {
 ### Semana 13: Semantic Telemetry
 
 #### Objetivos
+
 - Estender NERV constants (30+ novos eventos)
 - Implementar SemanticTelemetry
 - Implementar CostTracker
 - Dashboard integration
 
 #### Novos Eventos NERV
+
 ```javascript
 // Orchestration
-'ORCHESTRATION_STARTED'
-'ORCHESTRATION_COMPLETED'
-'ORCHESTRATION_FAILED'
+'ORCHESTRATION_STARTED';
+'ORCHESTRATION_COMPLETED';
+'ORCHESTRATION_FAILED';
 
 // Workflow
-'WORKFLOW_STEP_STARTED'
-'WORKFLOW_STEP_COMPLETED'
+'WORKFLOW_STEP_STARTED';
+'WORKFLOW_STEP_COMPLETED';
 
 // Iteration
-'ITERATION_STARTED'
-'ITERATION_COMPLETED'
-'ITERATION_CONVERGED'
+'ITERATION_STARTED';
+'ITERATION_COMPLETED';
+'ITERATION_CONVERGED';
 
 // Validation
-'VALIDATION_PASSED'
-'VALIDATION_FAILED'
+'VALIDATION_PASSED';
+'VALIDATION_FAILED';
 
 // Quality
-'QUALITY_ASSESSED'
-'QUALITY_IMPROVED'
+'QUALITY_ASSESSED';
+'QUALITY_IMPROVED';
 
 // Cost
-'TOKEN_USAGE_RECORDED'
-'COST_CALCULATED'
-'BUDGET_WARNING'
+'TOKEN_USAGE_RECORDED';
+'COST_CALCULATED';
+'BUDGET_WARNING';
 ```
 
 #### Entregáveis
+
 - ✅ Novos ActionCode constants
 - ✅ SemanticTelemetry service
 - ✅ CostTracker service
@@ -1480,30 +1532,35 @@ class BaseDriverV2 {
 ### Semanas 14-15: Dashboard Orchestration UI
 
 #### Objetivos
+
 - Workflow Designer (visual editor)
 - Quality Dashboard
 - Cost Dashboard
 - Reasoning Trace Viewer
 
 #### Workflow Designer
+
 - Visual DAG editor (Cytoscape.js)
 - Drag-and-drop nodes
 - Validate workflow
 - Execute workflow
 
 #### Quality Dashboard
+
 - Quality scores over time
 - Validation pass rate
 - Iteration statistics
 - Task quality table
 
 #### Cost Dashboard
+
 - Cost tracking (hoje, semana, mês)
 - Cost by model
 - Cost by mission
 - Budget alerts
 
 #### Entregáveis
+
 - ✅ WorkflowDesigner.vue
 - ✅ QualityDashboard.vue
 - ✅ CostDashboard.vue
@@ -1514,6 +1571,7 @@ class BaseDriverV2 {
 ### Semana 16: Use Cases Implementation
 
 #### Objetivos
+
 - Criar templates para use cases principais
 - Implementar workflows pré-configurados
 - Testes E2E de cada use case
@@ -1546,6 +1604,7 @@ class BaseDriverV2 {
    - Validation: Tests passing, complexity reduction
 
 #### Entregáveis
+
 - ✅ 5 templates pré-configurados
 - ✅ Workflows funcionais
 - ✅ Testes E2E passando
@@ -1556,6 +1615,7 @@ class BaseDriverV2 {
 ### Semana 17: Production Hardening
 
 #### Objetivos
+
 - Testes de carga
 - Performance optimization
 - Security hardening
@@ -1565,30 +1625,35 @@ class BaseDriverV2 {
 #### Tarefas
 
 **Dia 1-2: Performance**
+
 - Load testing (100+ concurrent missions)
 - Memory leak detection
 - Performance profiling
 - Optimization
 
 **Dia 3: Security**
+
 - Input validation
 - Authentication/authorization
 - Rate limiting
 - Audit logging
 
 **Dia 4: Documentation**
+
 - User guide
 - Developer guide
 - API reference
 - Mission templates guide
 
 **Dia 5: Deploy**
+
 - Production deployment
 - Monitoring setup
 - Rollback plan
 - Launch announcement
 
 #### Entregáveis
+
 - ✅ Performance benchmarks
 - ✅ Security audit passed
 - ✅ Documentation completa
@@ -1599,6 +1664,7 @@ class BaseDriverV2 {
 ## MÉTRICAS DE SUCESSO
 
 ### Dashboard Enterprise (Semana 5)
+
 - [ ] Dashboard carrega em < 2s
 - [ ] Real-time updates < 50ms latency
 - [ ] Suporta 1000+ tasks sem degradação
@@ -1606,6 +1672,7 @@ class BaseDriverV2 {
 - [ ] 80%+ test coverage
 
 ### Sistema de Orquestração (Semana 17)
+
 - [ ] Missão "Escrever Livro" executa autonomamente
 - [ ] Iteração automática até qualidade 70/100
 - [ ] Multi-driver fallback funciona
@@ -1619,21 +1686,22 @@ class BaseDriverV2 {
 
 ## RISCOS E MITIGAÇÕES
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|---------------|---------|-----------|
-| Memory leaks em real-time | Média | Alto | Ring buffers limitados, monitoring |
-| LLM-as-judge inconsistente | Alta | Médio | Temperatura baixa (0.2), múltiplos judges |
-| Context window overflow | Alta | Alto | Chunking, summarization, memory store |
-| Budget overrun | Média | Alto | Budget limits, cost estimation, alerts |
-| Workflow deadlocks | Baixa | Alto | Dependency validation, timeout policies |
-| Driver API changes | Média | Médio | Adapter pattern, version pinning |
-| Performance degradation (100+ tasks) | Alta | Médio | Concurrency limits, lazy loading |
+| Risco                                | Probabilidade | Impacto | Mitigação                                 |
+| ------------------------------------ | ------------- | ------- | ----------------------------------------- |
+| Memory leaks em real-time            | Média         | Alto    | Ring buffers limitados, monitoring        |
+| LLM-as-judge inconsistente           | Alta          | Médio   | Temperatura baixa (0.2), múltiplos judges |
+| Context window overflow              | Alta          | Alto    | Chunking, summarization, memory store     |
+| Budget overrun                       | Média         | Alto    | Budget limits, cost estimation, alerts    |
+| Workflow deadlocks                   | Baixa         | Alto    | Dependency validation, timeout policies   |
+| Driver API changes                   | Média         | Médio   | Adapter pattern, version pinning          |
+| Performance degradation (100+ tasks) | Alta          | Médio   | Concurrency limits, lazy loading          |
 
 ---
 
 ## DEPENDÊNCIAS CRÍTICAS
 
 ### Externas
+
 - **Node.js 20.19.2+**: Runtime
 - **Chrome 130+**: Browser automation
 - **Socket.io 4.8+**: Real-time communication
@@ -1641,12 +1709,14 @@ class BaseDriverV2 {
 - **Zod 4.3.5+**: Schema validation
 
 ### APIs Externas
+
 - **ChatGPT API** (OpenAI)
 - **Gemini API** (Google)
 - **Claude API** (Anthropic)
 - **Ollama** (local LLMs)
 
 ### Internas
+
 - **NERV Event Bus**: Universal transport
 - **Queue System**: Task persistence
 - **Kernel Loop**: Execution engine
@@ -1657,17 +1727,20 @@ class BaseDriverV2 {
 ## RECURSOS NECESSÁRIOS
 
 ### Desenvolvimento
+
 - **2 Desenvolvedores Full-Stack**: Frontend + Backend
 - **1 DevOps Engineer**: Deploy, monitoring
 - **1 QA Engineer**: Testes, validação
 
 ### Infraestrutura
+
 - **Servidor de Desenvolvimento**: 8 vCPUs, 16GB RAM
 - **Servidor de Produção**: 16 vCPUs, 32GB RAM
 - **Chrome Instances**: 3x containers (3GB RAM cada)
 - **Storage**: 100GB SSD (tasks, results, logs)
 
 ### APIs
+
 - **ChatGPT API**: $500/mês (estimativa)
 - **Gemini API**: $200/mês
 - **Claude API**: $300/mês
@@ -1678,6 +1751,7 @@ class BaseDriverV2 {
 ## PRÓXIMOS PASSOS IMEDIATOS
 
 ### Semana 1, Dia 1 (Amanhã)
+
 ```bash
 # 1. Criar branch de desenvolvimento
 git checkout -b feature/dashboard-enterprise
@@ -1707,6 +1781,7 @@ git push -u origin feature/dashboard-enterprise
 ```
 
 ### Checklist Primeira Semana
+
 - [ ] Projeto Vue inicializado
 - [ ] Dependências instaladas
 - [ ] Estrutura de diretórios criada
@@ -1719,9 +1794,11 @@ git push -u origin feature/dashboard-enterprise
 
 ## CONCLUSÃO
 
-Este roadmap detalha a implementação completa de uma **plataforma de orquestração autônoma de LLMs de nível enterprise** em 17 semanas.
+Este roadmap detalha a implementação completa de uma **plataforma de orquestração autônoma de LLMs
+de nível enterprise** em 17 semanas.
 
 **Principais Entregas**:
+
 1. **Dashboard Enterprise** (Vue.js 3) com telemetria profunda
 2. **Sistema de Orquestração** capaz de executar missões complexas autonomamente
 3. **Validação Automática** com LLM-as-judge
@@ -1732,12 +1809,9 @@ Este roadmap detalha a implementação completa de uma **plataforma de orquestra
 
 **Status**: ✅ Planejamento completo, pronto para execução
 
-**Data de Início Sugerida**: Imediatamente
-**Data de Conclusão Estimada**: +17 semanas
+**Data de Início Sugerida**: Imediatamente **Data de Conclusão Estimada**: +17 semanas
 
 ---
 
-**Documento criado**: 2026-01-27
-**Versão**: 1.0
-**Autor**: Claude AI Assistant (Plan Mode)
+**Documento criado**: 2026-01-27 **Versão**: 1.0 **Autor**: Claude AI Assistant (Plan Mode)
 **Projeto**: chatgpt-docker-puppeteer v1.1.0 → v2.0.0

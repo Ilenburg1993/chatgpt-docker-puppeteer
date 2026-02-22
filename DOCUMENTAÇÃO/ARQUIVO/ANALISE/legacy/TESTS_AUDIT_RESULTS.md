@@ -1,8 +1,6 @@
 # 📊 Auditoria de Testes - Resultados Finais
 
-**Data**: 2026-01-20
-**Status**: ✅ CONCLUÍDA
-**Arquivos auditados**: 30 testes
+**Data**: 2026-01-20 **Status**: ✅ CONCLUÍDA **Arquivos auditados**: 30 testes
 
 ---
 
@@ -27,23 +25,27 @@
 ## ✅ Testes Mantidos (14)
 
 ### Regressão (4 suites, 23 assertions)
+
 - ✅ `test_p1_fixes.js` - 5/5 testes OK (locks, concurrency, temp files)
 - ✅ `test_p2_fixes.js` - 5/5 testes OK (shutdown isolamento, AbortController)
 - ✅ `test_p3_fixes.js` - 5/5 testes OK (kill timeouts com Promise.race)
 - ⚠️ `test_p4_p5_fixes.js` - 6/7 testes OK (P5.2 precisa fix)
 
 ### Arquitetura Core (4)
+
 - ✅ `test_config_validation.js` - 4/4 testes (Zod schemas, gitignore)
 - ✅ `test_health_endpoint.js` - Health check essencial
 - ✅ `test_driver_nerv_integration.js` - 8/8 testes (zero coupling)
 - ✅ `identity_lifecycle.test.js` - DNA persistence OK
 
 ### Boot & Orchestration (3)
+
 - ✅ `test_ariadne_thread.js` - E2E boot completo (2.4s, 6 fases)
 - ✅ `test_boot_sequence.js` - 6 fases validadas
 - ✅ `test_connection_orchestrator.js` - Launcher/auto/fallback OK
 
 ### E2E & Browser (3)
+
 - ✅ `test_integration_complete.js` - Pool + páginas + navegação
 - ✅ `test_browser_pool.js` - Pool manager 100%
 - ✅ `test_puppeteer_launch.js` - Launcher mode OK
@@ -81,10 +83,12 @@
 **Motivo**: Dependências de módulos inexistentes (IPC refatorado)
 
 ### Unit Tests (2 - pasta `tests/unit/` removida)
+
 - ❌ `ipc_envelope.test.js` - MODULE_NOT_FOUND: src/shared/ipc/schemas
 - ❌ `ipc_identity.test.js` - MODULE_NOT_FOUND: src/shared/ipc/schemas
 
 ### Integration Tests (9)
+
 - ❌ `biomechanical_pulse.test.js` - MODULE_NOT_FOUND: src/server/engine/socket
 - ❌ `causality_tracing.test.js` - MODULE_NOT_FOUND: módulos IPC antigos
 - ❌ `discovery.test.js` - MODULE_NOT_FOUND: módulos IPC antigos
@@ -102,16 +106,19 @@
 ## 🔧 Ações Pendentes
 
 ### Prioridade ALTA
+
 - [ ] **Fix P5.2**: Corrigir ordem de cache invalidation em `src/infra/io.js`
   - Problema: `markDirty()` está DEPOIS de `saveTask/deleteTask`
   - Solução: Mover `markDirty()` para ANTES das operações
 
 ### Prioridade MÉDIA
+
 - [ ] **Fix npm test**: Corrigir `scripts/run_all_tests.sh` linha 3
   - Problema: `set -euo pipefail` inválido em algumas shells
   - Solução: Remover `-o pipefail` ou usar `#!/bin/bash` explícito
 
 ### Prioridade BAIXA
+
 - [ ] Reescrever 4 testes como unit tests (lock, control, recovery, watchdog)
 - [ ] Documentar `test_chrome_connection.js` como teste manual
 - [ ] Criar testes unitários para gaps de cobertura:
@@ -124,13 +131,13 @@
 
 ## 📈 Métricas Antes/Depois
 
-| Métrica | Antes | Depois | Variação |
-|---------|-------|--------|----------|
-| Total de testes | 30 | 19 | -37% |
-| Testes funcionais | 6 | 14 | +133% |
-| Testes quebrados | 24 | 5 | -79% |
-| Taxa de sucesso | 20% | 74% | +270% |
-| Pasta obsoletas | 2 | 1 | -50% |
+| Métrica           | Antes | Depois | Variação |
+| ----------------- | ----- | ------ | -------- |
+| Total de testes   | 30    | 19     | -37%     |
+| Testes funcionais | 6     | 14     | +133%    |
+| Testes quebrados  | 24    | 5      | -79%     |
+| Taxa de sucesso   | 20%   | 74%    | +270%    |
+| Pasta obsoletas   | 2     | 1      | -50%     |
 
 ---
 
@@ -145,6 +152,7 @@
 ## ✅ Conclusão
 
 **Suite de testes validada e limpa:**
+
 - 14 testes funcionais mantidos (47% de sucesso)
 - 11 testes obsoletos removidos (36% da base)
 - 5 testes identificados para refatoração (17%)

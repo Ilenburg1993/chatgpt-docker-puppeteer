@@ -1,15 +1,14 @@
 # 🗺️ Plano Mestre: Cobertura Completa de Auditorias
 
-**Data**: 2026-01-21
-**Versão**: 1.0
-**Status**: 📋 Planejamento
-**Propósito**: Garantir cobertura 100% do sistema antes de documentação canônica
+**Data**: 2026-01-21 **Versão**: 1.0 **Status**: 📋 Planejamento **Propósito**: Garantir cobertura
+100% do sistema antes de documentação canônica
 
 ---
 
 ## 📊 RESUMO EXECUTIVO
 
-Este documento define **TODAS** as auditorias necessárias para cobrir o sistema chatgpt-docker-puppeteer de forma completa, organizadas em **3 categorias**:
+Este documento define **TODAS** as auditorias necessárias para cobrir o sistema
+chatgpt-docker-puppeteer de forma completa, organizadas em **3 categorias**:
 
 1. **Auditorias de Subsistemas** (8 auditorias) - Módulos principais
 2. **Auditorias Transversais** (6 auditorias) - Questões cross-cutting
@@ -53,13 +52,13 @@ DOCUMENTAÇÃO/AUDITORIAS/
 
 ### 1.2. Categorias e Propósitos
 
-| Categoria | Propósito | Quando Usar | Exemplo |
-|-----------|-----------|-------------|---------|
-| **ROOT** | Arquivos root workspace | Primeira auditoria | 00_ROOT_FILES_AUDIT.md |
-| **SUBSISTEMAS** | Módulos src/* por função | Core, NERV, Kernel, etc. | 01_CORE_AUDIT.md |
-| **TRANSVERSAIS** | Questões cross-cutting | Portas, Docker, Segurança | CROSS_CUTTING_PORTS_AUDIT.md |
-| **TEMÁTICAS** | Aspectos específicos | Testes, Deploy, Observ. | THEMATIC_TESTING_AUDIT.md |
-| **CORREÇÕES** | Resumo de correções | Após implementar fixes | CORE_CORRECTIONS_SUMMARY.md |
+| Categoria        | Propósito                 | Quando Usar               | Exemplo                      |
+| ---------------- | ------------------------- | ------------------------- | ---------------------------- |
+| **ROOT**         | Arquivos root workspace   | Primeira auditoria        | 00_ROOT_FILES_AUDIT.md       |
+| **SUBSISTEMAS**  | Módulos src/\* por função | Core, NERV, Kernel, etc.  | 01_CORE_AUDIT.md             |
+| **TRANSVERSAIS** | Questões cross-cutting    | Portas, Docker, Segurança | CROSS_CUTTING_PORTS_AUDIT.md |
+| **TEMÁTICAS**    | Aspectos específicos      | Testes, Deploy, Observ.   | THEMATIC_TESTING_AUDIT.md    |
+| **CORREÇÕES**    | Resumo de correções       | Após implementar fixes    | CORE_CORRECTIONS_SUMMARY.md  |
 
 ---
 
@@ -68,6 +67,7 @@ DOCUMENTAÇÃO/AUDITORIAS/
 ### 2.1. Critérios de Classificação
 
 Um **subsistema** é definido como:
+
 - ✅ Diretório em `src/` com responsabilidade única
 - ✅ Conjunto coeso de módulos relacionados
 - ✅ Pode ser auditado independentemente
@@ -76,6 +76,7 @@ Um **subsistema** é definido como:
 ### 2.2. Lista de Subsistemas
 
 #### ✅ 00 - ROOT FILES (COMPLETO)
+
 - **Escopo**: Arquivos root do workspace
 - **Arquivo**: `00_ROOT_FILES_AUDIT.md`
 - **Status**: ✅ COMPLETO (2026-01-21)
@@ -83,6 +84,7 @@ Um **subsistema** é definido como:
 - **Correções**: 9/9 aplicadas (4 P1 + 5 P2)
 
 #### ✅ 01 - CORE (COMPLETO)
+
 - **Escopo**: `src/core/` (config, schemas, logger, identity, forensics)
 - **Arquivo**: `01_CORE_AUDIT.md`
 - **Status**: ✅ COMPLETO (2026-01-21)
@@ -92,6 +94,7 @@ Um **subsistema** é definido como:
 - **Audit Levels**: 32-740
 
 #### ✅ 02 - NERV (COMPLETO + CORRIGIDO - 2026-01-21)
+
 - **Escopo**: `src/shared/nerv/` + `src/nerv/` (IPC 2.0, Event Bus)
 - **Arquivo**: `02_NERV_AUDIT.md`
 - **Status**: ✅ COMPLETO + ✅ CORREÇÕES P1 APLICADAS (13 correções)
@@ -113,6 +116,7 @@ Um **subsistema** é definido como:
   - Adapter pattern (Driver, Server)
 
 #### ✅ 03 - INFRA (COMPLETO + CORRIGIDO - 2026-01-21)
+
 - **Escopo**: `src/infra/` (Browser pool, I/O, locks, queue)
 - **Arquivo**: `03_INFRA_AUDIT.md`
 - **Status**: ✅ COMPLETO + ✅ CORREÇÕES P3 APLICADAS
@@ -136,6 +140,7 @@ Um **subsistema** é definido como:
   - Memory management (WeakMap, GC)
 
 #### ✅ 04 - KERNEL (COMPLETO + CORRIGIDO - 2026-01-21)
+
 - **Escopo**: `src/kernel/` (Task execution engine)
 - **Arquivo**: `04_KERNEL_AUDIT.md`
 - **Status**: ✅ COMPLETO + ✅ CORREÇÕES P2+P3 APLICADAS (5 correções)
@@ -156,6 +161,7 @@ Um **subsistema** é definido como:
   - Stall detection and mitigation
 
 #### ✅ 05 - DRIVER (COMPLETO + CORRIGIDO - 2026-01-21)
+
 - **Escopo**: `src/driver/` (ChatGPT/Gemini drivers, DNA)
 - **Arquivo**: `05_DRIVER_AUDIT.md`
 - **Status**: ✅ COMPLETO + ✅ CORREÇÕES P3 APLICADAS (1 correção)
@@ -182,6 +188,7 @@ Um **subsistema** é definido como:
   - NERV adapter 100% pub/sub (zero coupling)
 
 #### ✅ 06 - SERVER (COMPLETO + CORRIGIDO - 2026-01-21)
+
 - **Escopo**: `src/server/` (Dashboard backend, API, WebSocket)
 - **Arquivo**: `06_SERVER_AUDIT.md`
 - **Status**: ✅ COMPLETO + ✅ CORREÇÕES P2+P3 APLICADAS (4 correções)
@@ -211,6 +218,7 @@ Um **subsistema** é definido como:
   - Static file serving
 
 #### 📋 07 - LOGIC (PENDENTE)
+
 - **Escopo**: `src/logic/` (Business rules, adaptive, validation)
 - **Arquivo**: `07_LOGIC_AUDIT.md`
 - **Status**: 📋 PENDENTE
@@ -227,6 +235,7 @@ Um **subsistema** é definido como:
   - Post-response validation
 
 #### 📋 08 - DASHBOARD (PENDENTE)
+
 - **Escopo**: `public/` (Frontend HTML/CSS/JS)
 - **Arquivo**: `08_DASHBOARD_AUDIT.md`
 - **Status**: 📋 PENDENTE
@@ -250,6 +259,7 @@ Um **subsistema** é definido como:
 ### 3.1. Definição de Transversal
 
 Uma **auditoria transversal** cobre aspectos que:
+
 - ❌ NÃO pertencem a um único subsistema
 - ✅ Atravessam múltiplos módulos
 - ✅ Afetam arquitetura global
@@ -258,6 +268,7 @@ Uma **auditoria transversal** cobre aspectos que:
 ### 3.2. Lista de Transversais
 
 #### ✅ PORTS & NETWORKING (COMPLETO)
+
 - **Arquivo**: `CROSS_CUTTING_PORTS_AUDIT.md`
 - **Status**: ✅ COMPLETO (2026-01-21)
 - **Escopo**: Todas as portas usadas no sistema
@@ -269,6 +280,7 @@ Uma **auditoria transversal** cobre aspectos que:
 - **Correções Necessárias**: 6 P1 + 3 P2
 
 #### 📋 PUPPETEER & CHROME (PENDENTE)
+
 - **Arquivo**: `CROSS_CUTTING_PUPPETEER_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 3-4 horas
@@ -293,6 +305,7 @@ Uma **auditoria transversal** cobre aspectos que:
   - Troubleshooting connection issues
 
 #### 📋 PM2 & DAEMON MODE (PENDENTE)
+
 - **Arquivo**: `CROSS_CUTTING_PM2_DAEMON_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 2-3 horas
@@ -317,6 +330,7 @@ Uma **auditoria transversal** cobre aspectos que:
   - Deployment best practices
 
 #### 📋 DOCKER & CONTAINERS (PENDENTE)
+
 - **Arquivo**: `CROSS_CUTTING_DOCKER_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 3-4 horas
@@ -331,7 +345,7 @@ Uma **auditoria transversal** cobre aspectos que:
   - Health checks in containers
   - Multi-stage builds
 - **Componentes Afetados**:
-  - ROOT: Dockerfile, docker-compose*.yml
+  - ROOT: Dockerfile, docker-compose\*.yml
   - ALL: Environment variables
   - INFRA: Chrome connection via host.docker.internal
 - **Aspectos-chave**:
@@ -342,6 +356,7 @@ Uma **auditoria transversal** cobre aspectos que:
   - Production deployment
 
 #### 📋 SECURITY & PERMISSIONS (PENDENTE)
+
 - **Arquivo**: `CROSS_CUTTING_SECURITY_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 3-4 horas
@@ -369,6 +384,7 @@ Uma **auditoria transversal** cobre aspectos que:
   - Compliance considerations
 
 #### 📋 PERFORMANCE & OPTIMIZATION (PENDENTE)
+
 - **Arquivo**: `CROSS_CUTTING_PERFORMANCE_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 3-4 horas
@@ -402,6 +418,7 @@ Uma **auditoria transversal** cobre aspectos que:
 ### 4.1. Definição de Temática
 
 Uma **auditoria temática** foca em:
+
 - ✅ Aspecto específico do sistema
 - ✅ Pode envolver múltiplos subsistemas
 - ✅ Perspectiva única (testes, deploy, observabilidade)
@@ -410,6 +427,7 @@ Uma **auditoria temática** foca em:
 ### 4.2. Lista de Temáticas
 
 #### 📋 TESTING & QUALITY ASSURANCE (PENDENTE)
+
 - **Arquivo**: `THEMATIC_TESTING_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 3-4 horas
@@ -436,6 +454,7 @@ Uma **auditoria temática** foca em:
   - Coverage thresholds
 
 #### 📋 DEPLOYMENT & OPERATIONS (PENDENTE)
+
 - **Arquivo**: `THEMATIC_DEPLOYMENT_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 2-3 horas
@@ -462,6 +481,7 @@ Uma **auditoria temática** foca em:
   - Maintenance windows
 
 #### 📋 OBSERVABILITY & TELEMETRY (PENDENTE)
+
 - **Arquivo**: `THEMATIC_OBSERVABILITY_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 2-3 horas
@@ -488,6 +508,7 @@ Uma **auditoria temática** foca em:
   - Production monitoring
 
 #### 📋 DATA FLOW & STATE MANAGEMENT (PENDENTE)
+
 - **Arquivo**: `THEMATIC_DATA_FLOW_AUDIT.md`
 - **Status**: 📋 PENDENTE
 - **Estimativa**: 3-4 horas
@@ -521,6 +542,7 @@ Uma **auditoria temática** foca em:
 ### 5.1. Ordem Recomendada
 
 **Fase 1: Subsistemas Core** (Semana 1-2)
+
 ```
 ✅ 00_ROOT_FILES_AUDIT.md         [COMPLETO]
 ✅ 01_CORE_AUDIT.md                [COMPLETO]
@@ -530,6 +552,7 @@ Uma **auditoria temática** foca em:
 ```
 
 **Fase 2: Subsistemas Específicos** (Semana 2-3)
+
 ```
 📋 05_DRIVER_AUDIT.md              [Dia 5-6 - 4-5h - maior complexidade]
 📋 06_SERVER_AUDIT.md              [Dia 7 - 3-4h]
@@ -538,6 +561,7 @@ Uma **auditoria temática** foca em:
 ```
 
 **Fase 3: Transversais Críticos** (Semana 3-4)
+
 ```
 ✅ CROSS_CUTTING_PORTS_AUDIT.md   [COMPLETO]
 📋 CROSS_CUTTING_PUPPETEER_AUDIT.md     [Dia 10 - 3-4h]
@@ -546,12 +570,14 @@ Uma **auditoria temática** foca em:
 ```
 
 **Fase 4: Transversais Secundários** (Semana 4)
+
 ```
 📋 CROSS_CUTTING_SECURITY_AUDIT.md      [Dia 13 - 3-4h]
 📋 CROSS_CUTTING_PERFORMANCE_AUDIT.md   [Dia 14 - 3-4h]
 ```
 
 **Fase 5: Temáticas** (Semana 5)
+
 ```
 📋 THEMATIC_TESTING_AUDIT.md            [Dia 15 - 3-4h]
 📋 THEMATIC_DEPLOYMENT_AUDIT.md         [Dia 16 - 2-3h]
@@ -560,6 +586,7 @@ Uma **auditoria temática** foca em:
 ```
 
 **Fase 6: Consolidação** (Semana 5-6)
+
 ```
 📋 AUDIT_INDEX.md                       [Dia 19 - 2h - índice geral]
 📋 Implementar correções pendentes      [Dia 20-25 - variável]
@@ -568,15 +595,15 @@ Uma **auditoria temática** foca em:
 
 ### 5.2. Estimativas de Tempo
 
-| Fase | Auditorias | Tempo Total | Semanas |
-|------|------------|-------------|---------|
-| Fase 1 | 3 subsistemas (NERV, INFRA, KERNEL) | 10-12h | 1.5 |
-| Fase 2 | 4 subsistemas (DRIVER, SERVER, LOGIC, DASH) | 12-15h | 2 |
-| Fase 3 | 3 transversais (Puppeteer, PM2, Docker) | 8-11h | 1.5 |
-| Fase 4 | 2 transversais (Security, Performance) | 6-8h | 1 |
-| Fase 5 | 4 temáticas | 10-13h | 1.5 |
-| Fase 6 | Consolidação + correções | 20-40h | 2-4 |
-| **TOTAL** | **18 auditorias** | **66-99h** | **9-12 semanas** |
+| Fase      | Auditorias                                  | Tempo Total | Semanas          |
+| --------- | ------------------------------------------- | ----------- | ---------------- |
+| Fase 1    | 3 subsistemas (NERV, INFRA, KERNEL)         | 10-12h      | 1.5              |
+| Fase 2    | 4 subsistemas (DRIVER, SERVER, LOGIC, DASH) | 12-15h      | 2                |
+| Fase 3    | 3 transversais (Puppeteer, PM2, Docker)     | 8-11h       | 1.5              |
+| Fase 4    | 2 transversais (Security, Performance)      | 6-8h        | 1                |
+| Fase 5    | 4 temáticas                                 | 10-13h      | 1.5              |
+| Fase 6    | Consolidação + correções                    | 20-40h      | 2-4              |
+| **TOTAL** | **18 auditorias**                           | **66-99h**  | **9-12 semanas** |
 
 ---
 
@@ -622,6 +649,7 @@ Cada auditoria deve conter:
 ### 6.2. Critérios de Qualidade
 
 Cada auditoria deve ser:
+
 - ✅ **Completa**: Cobre 100% do escopo definido
 - ✅ **Acionável**: Recomendações claras e implementáveis
 - ✅ **Detalhada**: Mínimo 800 linhas (exceto temáticas menores)
@@ -667,6 +695,7 @@ DATA_FLOW (thematic) → Integra queue + state management
 ### 7.2. Ordem de Dependência
 
 **Restrições**:
+
 1. ROOT deve ser primeiro (já completo ✅)
 2. CORE deve ser segundo (já completo ✅)
 3. NERV deve vir antes de KERNEL, DRIVER, SERVER (são dependentes)
@@ -675,6 +704,7 @@ DATA_FLOW (thematic) → Integra queue + state management
 6. Temáticas devem ser últimas (integram conhecimento de várias auditorias)
 
 **Ordem Flexível**:
+
 - NERV ↔ INFRA (podem ser intercalados)
 - KERNEL ↔ DRIVER (podem ser paralelos após NERV)
 - SERVER ↔ LOGIC (independentes)
@@ -759,6 +789,7 @@ DOCUMENTAÇÃO CANÔNICA (user-friendly, estruturada)
 ```
 
 **Exemplo**:
+
 ```
 01_CORE_AUDIT.md (1128 linhas técnicas)
     ↓
@@ -771,19 +802,20 @@ ARCHITECTURE.md - Seção CORE (conceitual, 300 linhas)
 
 ### 9.2. Mapeamento: Auditorias → Docs Canônicos
 
-| Auditoria | Vira Documentação Canônica | Seção/Arquivo |
-|-----------|----------------------------|---------------|
-| ROOT, CORE, NERV, INFRA, KERNEL, DRIVER, SERVER | ARCHITECTURE.md | Seções por subsistema |
-| PORTS, PUPPETEER, PM2, DOCKER | DEPLOYMENT.md | Configuração e deployment |
-| SECURITY, PERFORMANCE | ARCHITECTURE.md | Best Practices + Performance |
-| TESTING | TESTING.md | Test Strategy + Coverage |
-| DEPLOYMENT, OBSERVABILITY | DEPLOYMENT.md + TROUBLESHOOTING.md | Ops guides |
-| DATA_FLOW | ARCHITECTURE.md | Data Flow Diagrams |
-| LOGIC, DASHBOARD | API_REFERENCE.md | Módulos específicos |
+| Auditoria                                       | Vira Documentação Canônica         | Seção/Arquivo                |
+| ----------------------------------------------- | ---------------------------------- | ---------------------------- |
+| ROOT, CORE, NERV, INFRA, KERNEL, DRIVER, SERVER | ARCHITECTURE.md                    | Seções por subsistema        |
+| PORTS, PUPPETEER, PM2, DOCKER                   | DEPLOYMENT.md                      | Configuração e deployment    |
+| SECURITY, PERFORMANCE                           | ARCHITECTURE.md                    | Best Practices + Performance |
+| TESTING                                         | TESTING.md                         | Test Strategy + Coverage     |
+| DEPLOYMENT, OBSERVABILITY                       | DEPLOYMENT.md + TROUBLESHOOTING.md | Ops guides                   |
+| DATA_FLOW                                       | ARCHITECTURE.md                    | Data Flow Diagrams           |
+| LOGIC, DASHBOARD                                | API_REFERENCE.md                   | Módulos específicos          |
 
 ### 9.3. Documentos Canônicos Planejados
 
 **Sprint 1 - Fundação** (pós-auditorias):
+
 1. **ARCHITECTURE.md** (800-1000 linhas)
    - Overview do sistema
    - Subsistemas detalhados (CORE, NERV, INFRA, KERNEL, DRIVER, SERVER)
@@ -811,13 +843,13 @@ ARCHITECTURE.md - Seção CORE (conceitual, 300 linhas)
    - Manual controls
    - Future vision
 
-**Sprint 2 - Operação**:
-5. **CONFIGURATION.md** (600-800 linhas)
-   - config.json reference
-   - Environment variables
-   - Dynamic rules
-   - Hot-reload
-   - Validation
+**Sprint 2 - Operação**: 5. **CONFIGURATION.md** (600-800 linhas)
+
+- config.json reference
+- Environment variables
+- Dynamic rules
+- Hot-reload
+- Validation
 
 6. **DEPLOYMENT.md** (800-1000 linhas)
    - Local setup
@@ -833,13 +865,13 @@ ARCHITECTURE.md - Seção CORE (conceitual, 300 linhas)
    - Coverage goals
    - CI/CD integration
 
-**Sprint 3 - Troubleshooting**:
-8. **TROUBLESHOOTING.md** (800-1000 linhas)
-   - Common issues
-   - Diagnostics tools
-   - Log analysis
-   - Health checks
-   - Incident response
+**Sprint 3 - Troubleshooting**: 8. **TROUBLESHOOTING.md** (800-1000 linhas)
+
+- Common issues
+- Diagnostics tools
+- Log analysis
+- Health checks
+- Incident response
 
 9. **DRIVERS.md** (600-800 linhas)
    - DNA system
@@ -854,11 +886,8 @@ ARCHITECTURE.md - Seção CORE (conceitual, 300 linhas)
     - PR process
     - Testing requirements
 
-**Sprint 4 - Consolidação**:
-11. Reorganizar estrutura DOCUMENTAÇÃO/
-12. Criar INDEX.md navegável
-13. Atualizar README.md como portal
-14. Arquivar documentação antiga
+**Sprint 4 - Consolidação**: 11. Reorganizar estrutura DOCUMENTAÇÃO/ 12. Criar INDEX.md
+navegável 13. Atualizar README.md como portal 14. Arquivar documentação antiga
 
 ---
 
@@ -867,11 +896,13 @@ ARCHITECTURE.md - Seção CORE (conceitual, 300 linhas)
 ### 10.1. Ações Prioritárias
 
 **AGORA** (antes de NERV audit):
+
 1. ✅ Implementar correções PORTS (3 arquivos + .env.example)
 2. ✅ Criar NETWORKING.md
 3. ✅ Validar correções (lint + testes)
 
 **PRÓXIMO** (sequência de auditorias):
+
 1. ⏳ 02_NERV_AUDIT.md (3-4h)
 2. 📋 03_INFRA_AUDIT.md (3-4h)
 3. 📋 04_KERNEL_AUDIT.md (3-4h)
@@ -907,16 +938,19 @@ ARCHITECTURE.md - Seção CORE (conceitual, 300 linhas)
 ### 11.1. Cobertura Completa Garantida
 
 ✅ **18 auditorias** cobrem:
+
 - 8 subsistemas (100% de `src/`)
 - 6 transversais (portas, Puppeteer, PM2, Docker, Security, Performance)
 - 4 temáticas (Testing, Deployment, Observability, Data Flow)
 
 ✅ **Nenhum gap identificado**:
+
 - Todos os módulos principais cobertos
 - Questões cross-cutting mapeadas
 - Aspectos operacionais incluídos
 
 ✅ **Base sólida para documentação canônica**:
+
 - Material estruturado e detalhado
 - Conceitos extraíveis
 - Fluxos documentados
@@ -925,30 +959,29 @@ ARCHITECTURE.md - Seção CORE (conceitual, 300 linhas)
 ### 11.2. Tempo e Esforço
 
 **Estimativa Conservadora**:
+
 - 18 auditorias × 3h média = **54 horas** (auditorias)
 - Correções variadas = **20-40 horas** (implementação)
 - **Total**: 74-94 horas (**9-12 semanas**)
 
 **Estimativa Otimista** (se poucas correções):
+
 - 18 auditorias × 2.5h = **45 horas**
 - Correções mínimas = **10 horas**
 - **Total**: 55 horas (**7 semanas**)
 
 ### 11.3. Ready to Proceed
 
-✅ **Plano completo e validado**
-✅ **Ordem de execução definida**
-✅ **Critérios de qualidade estabelecidos**
-✅ **Integração com docs canônicos planejada**
+✅ **Plano completo e validado** ✅ **Ordem de execução definida** ✅ **Critérios de qualidade
+estabelecidos** ✅ **Integração com docs canônicos planejada**
 
 **Aguardando confirmação do usuário para**:
+
 1. Implementar correções PORTS
 2. Iniciar auditoria NERV (02_NERV_AUDIT.md)
 3. Seguir sequência definida
 
 ---
 
-**Assinado**: Sistema de Planejamento de Auditorias
-**Data**: 2026-01-21
-**Versão**: 1.0
-**Status**: 📋 PLANEJAMENTO COMPLETO - Aguardando aprovação
+**Assinado**: Sistema de Planejamento de Auditorias **Data**: 2026-01-21 **Versão**: 1.0 **Status**:
+📋 PLANEJAMENTO COMPLETO - Aguardando aprovação

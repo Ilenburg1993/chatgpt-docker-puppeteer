@@ -1,7 +1,6 @@
 # 🚀 GUIA RÁPIDO - WSL Edition
 
-**Arquitetura**: WSL ↔ Windows Host
-**Objetivo**: Setup ultra-rápido em 3 comandos
+**Arquitetura**: WSL ↔ Windows Host **Objetivo**: Setup ultra-rápido em 3 comandos
 
 ---
 

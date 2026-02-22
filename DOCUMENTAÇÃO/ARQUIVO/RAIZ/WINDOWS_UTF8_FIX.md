@@ -36,14 +36,14 @@ Ou adicione no `settings.json`:
 
 ```json
 {
-    "profiles": {
-        "defaults": {
-            "fontFace": "Consolas",
-            "fontSize": 10,
-            "startingDirectory": "%USERPROFILE%",
-            "commandline": "cmd.exe /K chcp 65001"
-        }
+  "profiles": {
+    "defaults": {
+      "fontFace": "Consolas",
+      "fontSize": 10,
+      "startingDirectory": "%USERPROFILE%",
+      "commandline": "cmd.exe /K chcp 65001"
     }
+  }
 }
 ```
 
@@ -58,6 +58,7 @@ chcp 65001
 ```
 
 **O que cada codepage significa**:
+
 - `437` - US English (padrão antigo)
 - `850` - Western European (Latin-1)
 - `1252` - Windows Western European
@@ -112,6 +113,7 @@ chcp
 ```
 
 **Saída esperada**:
+
 ```
 Active code page: 65001
 ```
@@ -135,11 +137,11 @@ Para garantir caracteres corretos em TODOS os scripts:
 
 Já corrigidos com `chcp 65001`:
 
-| Script | Status |
-|--------|--------|
-| `verify-chrome-setup-fixed.bat` | ✅ Corrigido |
-| `start-chrome-proxy.bat` | ⚠️ Precisa adicionar |
-| `LAUNCHER.bat` | ⚠️ Precisa adicionar |
+| Script                          | Status               |
+| ------------------------------- | -------------------- |
+| `verify-chrome-setup-fixed.bat` | ✅ Corrigido         |
+| `start-chrome-proxy.bat`        | ⚠️ Precisa adicionar |
+| `LAUNCHER.bat`                  | ⚠️ Precisa adicionar |
 
 ---
 
@@ -150,6 +152,7 @@ Já corrigidos com `chcp 65001`:
 **Causa**: Arquivo `.bat` salvo com encoding errado
 
 **Solução**:
+
 1. Abra o arquivo no Notepad++, VS Code ou similar
 2. Vá em **File → Save with Encoding → UTF-8** (sem BOM)
 3. Salve
@@ -161,6 +164,7 @@ Já corrigidos com `chcp 65001`:
 **Causa**: PATH do Windows quebrado ou CMD muito antigo
 
 **Solução**:
+
 1. Abra CMD como Administrador
 2. Execute: `sfc /scannow`
 3. Reinicie
@@ -172,8 +176,7 @@ Já corrigidos com `chcp 65001`:
 
 **Causa**: Fonte do terminal não suporta todos os caracteres
 
-**Solução**:
-Troque a fonte do terminal para uma que suporte Unicode completo:
+**Solução**: Troque a fonte do terminal para uma que suporte Unicode completo:
 
 - **Cascadia Code** (grátis, Microsoft)
 - **Fira Code** (grátis, Mozilla)
@@ -181,6 +184,7 @@ Troque a fonte do terminal para uma que suporte Unicode completo:
 - **Consolas** (padrão Windows, mas suporte limitado)
 
 No Windows Terminal:
+
 1. `Ctrl + ,` (Settings)
 2. Perfil → Appearance
 3. Font face → Selecione uma fonte Unicode
@@ -190,13 +194,15 @@ No Windows Terminal:
 ## 📚 Documentação Relacionada
 
 - **Microsoft Docs - Code Pages**: https://docs.microsoft.com/en-us/windows/win32/intl/code-pages
-- **Windows Terminal Settings**: https://docs.microsoft.com/en-us/windows/terminal/customize-settings/profile-general
+- **Windows Terminal Settings**:
+  https://docs.microsoft.com/en-us/windows/terminal/customize-settings/profile-general
 
 ---
 
 ## ✅ Resumo Rápido
 
 **Para usuário final**:
+
 ```batch
 REM No início de CADA arquivo .bat:
 @echo off
@@ -204,9 +210,11 @@ chcp 65001 >nul 2>&1
 ```
 
 **Para configuração permanente**:
+
 - Windows Terminal → Settings → Default profile → Text encoding: UTF-8
 
 **Para testar**:
+
 ```batch
 chcp
 REM Deve retornar: Active code page: 65001
@@ -214,5 +222,4 @@ REM Deve retornar: Active code page: 65001
 
 ---
 
-**Última Atualização**: 2026-01-30
-**Autor**: Claude Code Integration
+**Última Atualização**: 2026-01-30 **Autor**: Claude Code Integration

@@ -2,7 +2,8 @@
 
 ## Executive Summary
 
-**Objetivo**: Mover `analyzer.js` de `src/driver/modules/` para `src/shared/sadi/` para corrigir inversão de hierarquia arquitetural.
+**Objetivo**: Mover `analyzer.js` de `src/driver/modules/` para `src/shared/sadi/` para corrigir
+inversão de hierarquia arquitetural.
 
 **Status**: ✅ COMPLETO - Todas as mudanças implementadas e testadas
 
@@ -20,6 +21,7 @@ src/core/validators/ → depende de → src/driver/modules/
 ```
 
 **Por quê é problema?**
+
 - Camadas inferiores (CORE) não devem depender de camadas superiores (DRIVER)
 - Viola princípios de arquitetura em camadas
 - Dificulta reuso e manutenção
@@ -44,6 +46,7 @@ src/shared/sadi/ ← usado por → src/core/validators/
 ```
 
 **Rationale**:
+
 - `analyzer.js` é uma biblioteca utilitária de percepção (SADI)
 - Não depende de driver instanciado
 - Pode ser usado por qualquer camada (CORE ou DRIVER)
@@ -56,6 +59,7 @@ src/shared/sadi/ ← usado por → src/core/validators/
 ### 1. Estrutura de Diretórios
 
 **Criados**:
+
 ```
 src/shared/               ← Nova camada
 src/shared/sadi/          ← Módulo SADI
@@ -63,6 +67,7 @@ src/shared/sadi/README.md ← Documentação completa
 ```
 
 **Movido**:
+
 ```
 src/driver/modules/analyzer.js → src/shared/sadi/analyzer.js
 ```
@@ -85,16 +90,19 @@ src/driver/modules/analyzer.js → src/shared/sadi/analyzer.js
 ### 4. Documentação
 
 **Criado**: `src/shared/sadi/README.md` (120 linhas)
+
 - O que é SADI
 - Como usar standalone (sem driver)
 - Exemplos de código
 - Arquitetura e migração
 
 **Atualizado**: Header do `analyzer.js`
+
 - Path atualizado: `src/shared/sadi/analyzer.js`
 - Documentação de camada compartilhada
 
 **Criado**: `analysis/ANALYZER_ARCHITECTURE_REVIEW.md` (410 linhas)
+
 - Análise completa do problema
 - 3 soluções propostas
 - Recomendação e implementação
@@ -206,7 +214,7 @@ await driver.validatePage();
 const analyzer = require('@shared/sadi/analyzer');
 const inputProtocol = await analyzer.findChatInputSelector(page);
 if (inputProtocol) {
-    console.log('✅ Interface detectada');
+  console.log('✅ Interface detectada');
 }
 ```
 
@@ -269,11 +277,13 @@ if (inputProtocol) {
 **Se houver problemas críticos**:
 
 1. Reverter commit Git:
+
    ```bash
    git revert HEAD
    ```
 
 2. Ou manualmente:
+
    ```bash
    # Move analyzer de volta
    mv src/shared/sadi/analyzer.js src/driver/modules/analyzer.js
@@ -291,6 +301,7 @@ if (inputProtocol) {
    ```
 
 **Probabilidade de rollback necessário**: Baixa (<5%)
+
 - Testes passaram
 - Imports validados
 - Nenhum breaking change
@@ -332,7 +343,5 @@ if (inputProtocol) {
 
 ---
 
-**Autor**: chatgpt-docker-puppeteer core team
-**Data**: 2026-02-01
-**Versão**: SADI v3.0
-**Commit**: (a ser preenchido após merge)
+**Autor**: chatgpt-docker-puppeteer core team **Data**: 2026-02-01 **Versão**: SADI v3.0 **Commit**:
+(a ser preenchido após merge)

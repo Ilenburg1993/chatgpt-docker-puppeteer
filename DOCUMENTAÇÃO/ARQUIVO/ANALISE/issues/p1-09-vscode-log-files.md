@@ -10,5 +10,4 @@ Recommended actions:
 1. Review the index and sanitize/remove sensitive log files.
 2. Ensure scanning excludes these runtime logs to avoid noise.
 
-Owner: @owner-placeholder
-Labels: security, P1, logs
+Owner: @owner-placeholder Labels: security, P1, logs

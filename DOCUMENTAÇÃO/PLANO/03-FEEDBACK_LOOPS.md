@@ -2,7 +2,9 @@
 
 ## 1. VISÃO GERAL
 
-O sistema de feedback loops é o que torna o sistema verdadeiramente **adaptativo** e **colaborativo**. Permite que:
+O sistema de feedback loops é o que torna o sistema verdadeiramente **adaptativo** e
+**colaborativo**. Permite que:
+
 1. **Usuário** supervisione execução e dê feedback em tempo real
 2. **LLM** auto-avalie seus outputs e refine automaticamente
 3. **Sistema** aprenda padrões e preferências do usuário
@@ -55,16 +57,17 @@ class LLMJudgeValidator {
     const evaluation = await driver.execute({
       spec: {
         target: 'chatgpt',
-        model: 'gpt-4o',  // Use most capable model for judging
+        model: 'gpt-4o', // Use most capable model for judging
         payload: {
-          system_message: 'You are an expert evaluator. Provide objective, constructive assessments.',
-          user_message: judgePrompt
+          system_message:
+            'You are an expert evaluator. Provide objective, constructive assessments.',
+          user_message: judgePrompt,
         },
         parameters: {
-          temperature: 0.2,  // Low temp for consistency
-          response_format: { type: 'json_object' }
-        }
-      }
+          temperature: 0.2, // Low temp for consistency
+          response_format: { type: 'json_object' },
+        },
+      },
     });
 
     const result = JSON.parse(evaluation.output);
@@ -76,7 +79,7 @@ class LLMJudgeValidator {
       strengths: result.strengths,
       weaknesses: result.weaknesses,
       suggestions: result.suggestions,
-      feedback: this.generateDetailedFeedback(result)
+      feedback: this.generateDetailedFeedback(result),
     };
   }
 
@@ -153,7 +156,7 @@ class ValidationPipeline {
         stage: stage.name,
         passed: result.passed,
         score: result.score,
-        feedback: result.feedback
+        feedback: result.feedback,
       });
 
       // If failed and refinement enabled, refine output
@@ -176,22 +179,20 @@ class ValidationPipeline {
       passed: overallPassed,
       overall_score: avgScore,
       pipeline_results: pipelineResults,
-      final_output: currentOutput
+      final_output: currentOutput,
     };
   }
 
   async refineOutput(output, feedback, refinePrompt) {
-    const prompt = refinePrompt
-      .replace('{{output}}', output)
-      .replace('{{feedback}}', feedback);
+    const prompt = refinePrompt.replace('{{output}}', output).replace('{{feedback}}', feedback);
 
     const driver = await DriverFactory.createDriver('chatgpt');
     const result = await driver.execute({
       spec: {
         target: 'chatgpt',
         model: 'gpt-4o',
-        payload: { user_message: prompt }
-      }
+        payload: { user_message: prompt },
+      },
     });
 
     return result.output;
@@ -200,6 +201,7 @@ class ValidationPipeline {
 ```
 
 **Example Pipeline Config**:
+
 ```json
 {
   "stages": [
@@ -270,7 +272,7 @@ class SelfCritiqueLoop {
     return {
       final_output: currentOutput,
       history,
-      rounds: history.length - 1
+      rounds: history.length - 1,
     };
   }
 
@@ -298,10 +300,10 @@ Provide your critique as JSON:
         model: 'gpt-4o',
         payload: {
           system_message: 'You are a critical but constructive reviewer.',
-          user_message: prompt
+          user_message: prompt,
         },
-        parameters: { response_format: { type: 'json_object' } }
-      }
+        parameters: { response_format: { type: 'json_object' } },
+      },
     });
 
     return JSON.parse(result.output);
@@ -329,8 +331,8 @@ Provide improved version addressing all critique points.
       spec: {
         target: 'chatgpt',
         model: 'gpt-4o',
-        payload: { user_message: prompt }
-      }
+        payload: { user_message: prompt },
+      },
     });
 
     return result.output;
@@ -631,10 +633,7 @@ class FeedbackInjector {
     let enhancedPrompt = basePrompt;
 
     // 1. Inject relevant user feedback
-    const relevantFeedback = this.getRelevantFeedback(
-      missionState.user_feedback,
-      stepConfig
-    );
+    const relevantFeedback = this.getRelevantFeedback(missionState.user_feedback, stepConfig);
 
     if (relevantFeedback.length > 0) {
       enhancedPrompt += `\n\n---\n**User Feedback to Incorporate:**\n`;
@@ -644,10 +643,11 @@ class FeedbackInjector {
     }
 
     // 2. Inject learned patterns from memory
-    const learnedPatterns = MemoryStore.retrieveFacts(
-      missionState.mission_id,
-      ['preferences', 'style_guide', 'examples_policy']
-    );
+    const learnedPatterns = MemoryStore.retrieveFacts(missionState.mission_id, [
+      'preferences',
+      'style_guide',
+      'examples_policy',
+    ]);
 
     if (Object.keys(learnedPatterns).length > 0) {
       enhancedPrompt += `\n\n---\n**Learned Preferences:**\n`;
@@ -715,7 +715,7 @@ class TestDrivenLoop {
         iteration,
         passed: testResults.passed,
         total: testResults.total,
-        failures: testResults.failures
+        failures: testResults.failures,
       });
 
       // Check if all tests passed
@@ -724,7 +724,7 @@ class TestDrivenLoop {
           code,
           iterations: iteration,
           test_results: testResults,
-          converged: true
+          converged: true,
         };
       }
 
@@ -737,8 +737,8 @@ class TestDrivenLoop {
           test: f.name,
           error: f.error,
           expected: f.expected,
-          actual: f.actual
-        }))
+          actual: f.actual,
+        })),
       };
     }
 
@@ -748,7 +748,7 @@ class TestDrivenLoop {
       iterations: maxIterations,
       test_results: tests.lastResults,
       converged: false,
-      error: 'Could not generate code that passes all tests'
+      error: 'Could not generate code that passes all tests',
     };
   }
 
@@ -770,8 +770,8 @@ class TestDrivenLoop {
       spec: {
         target: 'chatgpt',
         model: 'gpt-4o',
-        payload: { user_message: prompt }
-      }
+        payload: { user_message: prompt },
+      },
     });
 
     return this.extractCode(result.output);
@@ -795,14 +795,14 @@ class TestDrivenLoop {
         passed: results.passed,
         total: results.total,
         all_passed: results.passed === results.total,
-        failures: results.failures
+        failures: results.failures,
       };
     } catch (error) {
       return {
         passed: 0,
         total: tests.count,
         all_passed: false,
-        failures: [{ name: 'execution_error', error: error.message }]
+        failures: [{ name: 'execution_error', error: error.message }],
       };
     }
   }
@@ -831,7 +831,7 @@ class LintingLoop {
         return {
           code,
           iterations: iteration,
-          lint_results: lintResults
+          lint_results: lintResults,
         };
       }
 
@@ -842,7 +842,7 @@ class LintingLoop {
         return {
           code: fixed.code,
           iterations: iteration,
-          lint_results: { errors: [], warnings: [] }
+          lint_results: { errors: [], warnings: [] },
         };
       }
 
@@ -850,7 +850,7 @@ class LintingLoop {
       spec.context = {
         ...spec.context,
         previous_code: code,
-        lint_errors: lintResults.errors
+        lint_errors: lintResults.errors,
       };
     }
 
@@ -859,7 +859,7 @@ class LintingLoop {
       code,
       iterations: maxIterations,
       lint_results: lintResults,
-      warning: 'Code has unresolved linting errors'
+      warning: 'Code has unresolved linting errors',
     };
   }
 
@@ -867,12 +867,12 @@ class LintingLoop {
     // Run ESLint, Pylint, etc.
     const { exec } = require('child_process');
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       exec(`eslint --format json`, { input: code }, (error, stdout) => {
         const results = JSON.parse(stdout);
         resolve({
           errors: results.filter(r => r.severity === 2),
-          warnings: results.filter(r => r.severity === 1)
+          warnings: results.filter(r => r.severity === 1),
         });
       });
     });
@@ -886,13 +886,13 @@ class LintingLoop {
       spec: {
         target: 'chatgpt',
         model: 'gpt-4o',
-        payload: { user_message: prompt }
-      }
+        payload: { user_message: prompt },
+      },
     });
 
     return {
       success: true,
-      code: this.extractCode(result.output)
+      code: this.extractCode(result.output),
     };
   }
 }
@@ -968,11 +968,11 @@ class MissionLearner {
     const trend = this.linearRegression(scores);
 
     return {
-      improving: trend.slope > 2,  // Improving if slope > 2 points per step
+      improving: trend.slope > 2, // Improving if slope > 2 points per step
       declining: trend.slope < -2,
       stable: Math.abs(trend.slope) <= 2,
       slope: trend.slope,
-      avg_score: scores.reduce((sum, s) => sum + s, 0) / scores.length
+      avg_score: scores.reduce((sum, s) => sum + s, 0) / scores.length,
     };
   }
 
@@ -984,11 +984,16 @@ Analyze this mission execution history and identify why quality scores are decli
 **Quality Trend:** Declining (slope: ${trend.slope})
 
 **Recent Steps:**
-${Object.entries(history).slice(-5).map(([id, result]) => `
+${Object.entries(history)
+  .slice(-5)
+  .map(
+    ([id, result]) => `
 - Step: ${id}
   Quality Score: ${result.quality_score}
   Issues: ${result.validation_issues?.join(', ') || 'none'}
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 Provide analysis as JSON:
 {
@@ -1003,8 +1008,8 @@ Provide analysis as JSON:
         target: 'chatgpt',
         model: 'gpt-4o',
         payload: { user_message: prompt },
-        parameters: { response_format: { type: 'json_object' } }
-      }
+        parameters: { response_format: { type: 'json_object' } },
+      },
     });
 
     return JSON.parse(result.output);
@@ -1027,7 +1032,7 @@ Provide analysis as JSON:
       timestamp: Date.now(),
       causes: causes.likely_causes,
       recommendations: causes.recommendations,
-      actions_taken: []
+      actions_taken: [],
     });
 
     await mission.save();
@@ -1100,8 +1105,8 @@ Extract style guide as JSON:
         target: 'chatgpt',
         model: 'gpt-4o',
         payload: { user_message: prompt },
-        parameters: { response_format: { type: 'json_object' } }
-      }
+        parameters: { response_format: { type: 'json_object' } },
+      },
     });
 
     return JSON.parse(result.output);
@@ -1124,15 +1129,9 @@ Extract style guide as JSON:
 
     <!-- Quick Actions -->
     <div class="quick-actions">
-      <button @click="approve" class="btn-approve">
-        👍 Approve
-      </button>
-      <button @click="requestRevision" class="btn-revision">
-        🔄 Request Revision
-      </button>
-      <button @click="reject" class="btn-reject">
-        👎 Reject
-      </button>
+      <button @click="approve" class="btn-approve">👍 Approve</button>
+      <button @click="requestRevision" class="btn-revision">🔄 Request Revision</button>
+      <button @click="reject" class="btn-reject">👎 Reject</button>
     </div>
 
     <!-- Detailed Feedback Form -->
@@ -1157,23 +1156,15 @@ Extract style guide as JSON:
       </div>
 
       <div class="form-actions">
-        <button @click="submitFeedback" class="btn-primary">
-          Submit Feedback
-        </button>
-        <button @click="cancel" class="btn-secondary">
-          Cancel
-        </button>
+        <button @click="submitFeedback" class="btn-primary">Submit Feedback</button>
+        <button @click="cancel" class="btn-secondary">Cancel</button>
       </div>
     </div>
 
     <!-- Feedback History -->
     <div class="feedback-history">
       <h4>Your Feedback History</h4>
-      <div
-        v-for="fb in feedbackHistory"
-        :key="fb.timestamp"
-        class="feedback-item"
-      >
+      <div v-for="fb in feedbackHistory" :key="fb.timestamp" class="feedback-item">
         <div class="feedback-meta">
           <span class="timestamp">{{ formatTime(fb.timestamp) }}</span>
           <span class="step-id">Step: {{ fb.step_id }}</span>
@@ -1198,7 +1189,7 @@ export default {
       feedbackText: '',
       applyToFuture: false,
       isPriority: false,
-      feedbackHistory: []
+      feedbackHistory: [],
     };
   },
 
@@ -1216,7 +1207,7 @@ export default {
       const reason = prompt('Why reject this output?');
       if (reason) {
         api.post(`/missions/${this.missionId}/steps/${this.stepId}/reject`, {
-          reason
+          reason,
         });
       }
     },
@@ -1226,7 +1217,7 @@ export default {
         step_id: this.stepId,
         feedback: this.feedbackText,
         apply_to_future_steps: this.applyToFuture,
-        priority: this.isPriority ? 'high' : 'medium'
+        priority: this.isPriority ? 'high' : 'medium',
       });
 
       this.feedbackText = '';
@@ -1237,12 +1228,12 @@ export default {
     async loadFeedbackHistory() {
       const response = await api.get(`/missions/${this.missionId}/feedback`);
       this.feedbackHistory = response.data;
-    }
+    },
   },
 
   mounted() {
     this.loadFeedbackHistory();
-  }
+  },
 };
 </script>
 ```
@@ -1271,7 +1262,7 @@ class FeedbackMetrics {
 
       // Learning effectiveness
       patterns_learned: MemoryStore.countFacts(missionId),
-      pattern_reuse_count: this.calculatePatternReuse(mission)
+      pattern_reuse_count: this.calculatePatternReuse(mission),
     };
   }
 

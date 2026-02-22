@@ -99,20 +99,20 @@ npm run lint:report       # Gera relatório em logs/eslint-report.txt
 ```javascript
 // ✅ BOM: Função focada
 async function processTask(task) {
-    validateTask(task);
-    const result = await executeTask(task);
-    return result;
+  validateTask(task);
+  const result = await executeTask(task);
+  return result;
 }
 
 // ❌ EVITAR: Função com muita complexidade
 async function processTask(task) {
-    if (!task) return;
-    if (task.type === 'A') {
-        if (task.priority > 5) {
-            // 15+ caminhos lógicos aqui...
-        }
+  if (!task) return;
+  if (task.type === 'A') {
+    if (task.priority > 5) {
+      // 15+ caminhos lógicos aqui...
     }
-    // complexity: 18 → WARNING
+  }
+  // complexity: 18 → WARNING
 }
 ```
 
@@ -180,14 +180,14 @@ Source type: `module` (ESM ao invés de CommonJS)
 
 ```javascript
 ignores: [
-    '**/node_modules/**',
-    '**/logs/**',
-    '**/fila/**', // Arquivos de fila
-    '**/respostas/**', // Outputs de tarefas
-    '**/profile/**', // Perfis Chromium
-    '**/tmp/**',
-    '**/*.min.js',
-    'public/js/libs/**'
+  '**/node_modules/**',
+  '**/logs/**',
+  '**/fila/**', // Arquivos de fila
+  '**/respostas/**', // Outputs de tarefas
+  '**/profile/**', // Perfis Chromium
+  '**/tmp/**',
+  '**/*.min.js',
+  'public/js/libs/**',
 ];
 ```
 
@@ -252,12 +252,12 @@ let config = require('./config');
 ```javascript
 // ✅ BOM
 app.use((req, res, _next) => {
-    res.send('OK');
+  res.send('OK');
 });
 
 // ⚠️ WARNING: _next não usado
 app.use((req, res, next) => {
-    res.send('OK');
+  res.send('OK');
 });
 ```
 
@@ -276,13 +276,13 @@ if (value == null) { ... }
 ```javascript
 // ✅ BOM
 async function loadData() {
-    const data = await fetchData();
-    return data;
+  const data = await fetchData();
+  return data;
 }
 
 // ❌ ERRO: no-return-await
 async function loadData() {
-    return await fetchData();
+  return await fetchData();
 }
 ```
 
@@ -291,22 +291,22 @@ async function loadData() {
 ```javascript
 // ✅ BOM: Extrair lógica complexa
 function validateTask(task) {
-    if (!isValidType(task.type)) return false;
-    if (!isValidPriority(task.priority)) return false;
-    return true;
+  if (!isValidType(task.type)) return false;
+  if (!isValidPriority(task.priority)) return false;
+  return true;
 }
 
 // ❌ EVITAR: If aninhado demais
 function validateTask(task) {
-    if (task) {
-        if (task.type) {
-            if (task.type === 'A') {
-                if (task.priority) {
-                    // complexity > 15
-                }
-            }
+  if (task) {
+    if (task.type) {
+      if (task.type === 'A') {
+        if (task.priority) {
+          // complexity > 15
         }
+      }
     }
+  }
 }
 ```
 

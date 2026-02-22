@@ -16,18 +16,18 @@ Health check endpoint for monitoring.
 
 ```json
 {
-    "status": "ok",
-    "timestamp": "2026-01-19T12:00:00.000Z",
-    "uptime": 3600,
-    "chrome": {
-        "connected": true,
-        "endpoint": "ws://host.docker.internal:9224"
-    },
-    "queue": {
-        "pending": 5,
-        "running": 1,
-        "completed": 42
-    }
+  "status": "ok",
+  "timestamp": "2026-01-19T12:00:00.000Z",
+  "uptime": 3600,
+  "chrome": {
+    "connected": true,
+    "endpoint": "ws://host.docker.internal:9224"
+  },
+  "queue": {
+    "pending": 5,
+    "running": 1,
+    "completed": 42
+  }
 }
 ```
 
@@ -48,18 +48,18 @@ Create a new task.
 
 ```json
 {
-    "id": "task-001",
-    "target": "chatgpt",
-    "prompt": "Explain quantum computing in simple terms",
-    "validation": {
-        "minLength": 100,
-        "maxLength": 5000,
-        "forbiddenTerms": []
-    },
-    "metadata": {
-        "priority": "normal",
-        "tags": ["science", "education"]
-    }
+  "id": "task-001",
+  "target": "chatgpt",
+  "prompt": "Explain quantum computing in simple terms",
+  "validation": {
+    "minLength": 100,
+    "maxLength": 5000,
+    "forbiddenTerms": []
+  },
+  "metadata": {
+    "priority": "normal",
+    "tags": ["science", "education"]
+  }
 }
 ```
 
@@ -67,10 +67,10 @@ Create a new task.
 
 ```json
 {
-    "success": true,
-    "taskId": "task-001",
-    "queuePosition": 3,
-    "estimatedStart": "2026-01-19T12:05:00.000Z"
+  "success": true,
+  "taskId": "task-001",
+  "queuePosition": 3,
+  "estimatedStart": "2026-01-19T12:05:00.000Z"
 }
 ```
 
@@ -96,18 +96,18 @@ List all tasks.
 
 ```json
 {
-    "tasks": [
-        {
-            "id": "task-001",
-            "target": "chatgpt",
-            "status": "running",
-            "createdAt": "2026-01-19T12:00:00.000Z",
-            "startedAt": "2026-01-19T12:01:30.000Z"
-        }
-    ],
-    "total": 48,
-    "limit": 50,
-    "offset": 0
+  "tasks": [
+    {
+      "id": "task-001",
+      "target": "chatgpt",
+      "status": "running",
+      "createdAt": "2026-01-19T12:00:00.000Z",
+      "startedAt": "2026-01-19T12:01:30.000Z"
+    }
+  ],
+  "total": 48,
+  "limit": 50,
+  "offset": 0
 }
 ```
 
@@ -121,20 +121,20 @@ Get specific task details.
 
 ```json
 {
-    "id": "task-001",
-    "target": "chatgpt",
-    "prompt": "Explain quantum computing...",
-    "status": "done",
-    "result": "Quantum computing is...",
-    "createdAt": "2026-01-19T12:00:00.000Z",
-    "startedAt": "2026-01-19T12:01:30.000Z",
-    "completedAt": "2026-01-19T12:03:45.000Z",
-    "duration": 135000,
-    "retries": 0,
-    "validation": {
-        "passed": true,
-        "length": 1234
-    }
+  "id": "task-001",
+  "target": "chatgpt",
+  "prompt": "Explain quantum computing...",
+  "status": "done",
+  "result": "Quantum computing is...",
+  "createdAt": "2026-01-19T12:00:00.000Z",
+  "startedAt": "2026-01-19T12:01:30.000Z",
+  "completedAt": "2026-01-19T12:03:45.000Z",
+  "duration": 135000,
+  "retries": 0,
+  "validation": {
+    "passed": true,
+    "length": 1234
+  }
 }
 ```
 
@@ -153,8 +153,8 @@ Cancel/delete a task.
 
 ```json
 {
-    "success": true,
-    "message": "Task task-001 cancelled"
+  "success": true,
+  "message": "Task task-001 cancelled"
 }
 ```
 
@@ -176,23 +176,23 @@ Get queue statistics.
 
 ```json
 {
-    "stats": {
-        "pending": 5,
-        "running": 2,
-        "done": 42,
-        "failed": 3,
-        "total": 52
-    },
-    "queue": {
-        "size": 7,
-        "oldestTask": "2026-01-19T10:00:00.000Z",
-        "newestTask": "2026-01-19T12:00:00.000Z"
-    },
-    "workers": {
-        "active": 2,
-        "idle": 0,
-        "maxConcurrency": 3
-    }
+  "stats": {
+    "pending": 5,
+    "running": 2,
+    "done": 42,
+    "failed": 3,
+    "total": 52
+  },
+  "queue": {
+    "size": 7,
+    "oldestTask": "2026-01-19T10:00:00.000Z",
+    "newestTask": "2026-01-19T12:00:00.000Z"
+  },
+  "workers": {
+    "active": 2,
+    "idle": 0,
+    "maxConcurrency": 3
+  }
 }
 ```
 
@@ -206,8 +206,8 @@ Clear all pending tasks.
 
 ```json
 {
-    "confirm": true,
-    "preserveRunning": true
+  "confirm": true,
+  "preserveRunning": true
 }
 ```
 
@@ -215,9 +215,9 @@ Clear all pending tasks.
 
 ```json
 {
-    "success": true,
-    "removed": 5,
-    "preserved": 2
+  "success": true,
+  "removed": 5,
+  "preserved": 2
 }
 ```
 
@@ -233,13 +233,13 @@ Get current configuration.
 
 ```json
 {
-    "target": "chatgpt",
-    "maxRetries": 3,
-    "timeout": 30000,
-    "logLevel": "info",
-    "chrome": {
-        "endpoint": "ws://host.docker.internal:9224"
-    }
+  "target": "chatgpt",
+  "maxRetries": 3,
+  "timeout": 30000,
+  "logLevel": "info",
+  "chrome": {
+    "endpoint": "ws://host.docker.internal:9224"
+  }
 }
 ```
 
@@ -253,8 +253,8 @@ Update configuration (hot reload).
 
 ```json
 {
-    "maxRetries": 5,
-    "timeout": 45000
+  "maxRetries": 5,
+  "timeout": 45000
 }
 ```
 
@@ -262,9 +262,9 @@ Update configuration (hot reload).
 
 ```json
 {
-    "success": true,
-    "updated": ["maxRetries", "timeout"],
-    "reloadRequired": false
+  "success": true,
+  "updated": ["maxRetries", "timeout"],
+  "reloadRequired": false
 }
 ```
 
@@ -282,8 +282,8 @@ Subscribe to task updates.
 
 ```json
 {
-    "event": "subscribe",
-    "taskId": "task-001"
+  "event": "subscribe",
+  "taskId": "task-001"
 }
 ```
 
@@ -293,8 +293,8 @@ Unsubscribe from task updates.
 
 ```json
 {
-    "event": "unsubscribe",
-    "taskId": "task-001"
+  "event": "unsubscribe",
+  "taskId": "task-001"
 }
 ```
 
@@ -306,11 +306,11 @@ Unsubscribe from task updates.
 
 ```json
 {
-    "event": "task:created",
-    "data": {
-        "taskId": "task-001",
-        "queuePosition": 3
-    }
+  "event": "task:created",
+  "data": {
+    "taskId": "task-001",
+    "queuePosition": 3
+  }
 }
 ```
 
@@ -318,11 +318,11 @@ Unsubscribe from task updates.
 
 ```json
 {
-    "event": "task:started",
-    "data": {
-        "taskId": "task-001",
-        "startedAt": "2026-01-19T12:01:30.000Z"
-    }
+  "event": "task:started",
+  "data": {
+    "taskId": "task-001",
+    "startedAt": "2026-01-19T12:01:30.000Z"
+  }
 }
 ```
 
@@ -330,12 +330,12 @@ Unsubscribe from task updates.
 
 ```json
 {
-    "event": "task:progress",
-    "data": {
-        "taskId": "task-001",
-        "progress": 45,
-        "message": "Processing response..."
-    }
+  "event": "task:progress",
+  "data": {
+    "taskId": "task-001",
+    "progress": 45,
+    "message": "Processing response..."
+  }
 }
 ```
 
@@ -343,13 +343,13 @@ Unsubscribe from task updates.
 
 ```json
 {
-    "event": "task:completed",
-    "data": {
-        "taskId": "task-001",
-        "status": "done",
-        "result": "Quantum computing is...",
-        "duration": 135000
-    }
+  "event": "task:completed",
+  "data": {
+    "taskId": "task-001",
+    "status": "done",
+    "result": "Quantum computing is...",
+    "duration": 135000
+  }
 }
 ```
 
@@ -357,13 +357,13 @@ Unsubscribe from task updates.
 
 ```json
 {
-    "event": "task:failed",
-    "data": {
-        "taskId": "task-001",
-        "error": "Timeout after 30s",
-        "retries": 3,
-        "willRetry": false
-    }
+  "event": "task:failed",
+  "data": {
+    "taskId": "task-001",
+    "error": "Timeout after 30s",
+    "retries": 3,
+    "willRetry": false
+  }
 }
 ```
 
@@ -371,11 +371,11 @@ Unsubscribe from task updates.
 
 ```json
 {
-    "event": "queue:updated",
-    "data": {
-        "pending": 4,
-        "running": 2
-    }
+  "event": "queue:updated",
+  "data": {
+    "pending": 4,
+    "running": 2
+  }
 }
 ```
 
@@ -387,35 +387,35 @@ Unsubscribe from task updates.
 
 ```typescript
 interface Task {
-    id: string; // Unique identifier
-    target: 'chatgpt' | 'gemini'; // LLM target
-    prompt: string; // Input prompt
-    status: 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED';
-    result?: string; // Output (when completed)
+  id: string; // Unique identifier
+  target: 'chatgpt' | 'gemini'; // LLM target
+  prompt: string; // Input prompt
+  status: 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED';
+  result?: string; // Output (when completed)
 
-    // Validation rules
-    validation?: {
-        minLength?: number; // Min response length
-        maxLength?: number; // Max response length
-        forbiddenTerms?: string[]; // Terms that fail validation
-    };
+  // Validation rules
+  validation?: {
+    minLength?: number; // Min response length
+    maxLength?: number; // Max response length
+    forbiddenTerms?: string[]; // Terms that fail validation
+  };
 
-    // Metadata
-    metadata?: {
-        priority?: 'low' | 'normal' | 'high';
-        tags?: string[];
-        userId?: string;
-    };
+  // Metadata
+  metadata?: {
+    priority?: 'low' | 'normal' | 'high';
+    tags?: string[];
+    userId?: string;
+  };
 
-    // Timestamps
-    createdAt: string;
-    startedAt?: string;
-    completedAt?: string;
+  // Timestamps
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
 
-    // Execution data
-    duration?: number; // ms
-    retries?: number;
-    failureReason?: string;
+  // Execution data
+  duration?: number; // ms
+  retries?: number;
+  failureReason?: string;
 }
 ```
 
@@ -427,13 +427,13 @@ All error responses follow this format:
 
 ```json
 {
-    "error": true,
-    "code": "INVALID_TASK",
-    "message": "Task validation failed",
-    "details": {
-        "field": "prompt",
-        "reason": "Prompt cannot be empty"
-    }
+  "error": true,
+  "code": "INVALID_TASK",
+  "message": "Task validation failed",
+  "details": {
+    "field": "prompt",
+    "reason": "Prompt cannot be empty"
+  }
 }
 ```
 
@@ -509,13 +509,13 @@ curl http://localhost:3008/api/queue/status
 ```javascript
 // Create task
 const response = await fetch('http://localhost:3008/api/tasks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        id: 'task-001',
-        target: 'chatgpt',
-        prompt: 'Explain AI'
-    })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    id: 'task-001',
+    target: 'chatgpt',
+    prompt: 'Explain AI',
+  }),
 });
 
 const result = await response.json();
@@ -528,15 +528,15 @@ console.log(result);
 const socket = io('http://localhost:3008');
 
 socket.on('connect', () => {
-    socket.emit('subscribe', { taskId: 'task-001' });
+  socket.emit('subscribe', { taskId: 'task-001' });
 });
 
 socket.on('task:progress', data => {
-    console.log(`Progress: ${data.progress}%`);
+  console.log(`Progress: ${data.progress}%`);
 });
 
 socket.on('task:completed', data => {
-    console.log('Result:', data.result);
+  console.log('Result:', data.result);
 });
 ```
 

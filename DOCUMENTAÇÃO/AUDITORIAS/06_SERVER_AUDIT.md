@@ -1,9 +1,7 @@
 # 🖥️ Auditoria SERVER - Mission Control Prime
 
-**Data**: 2026-01-21
-**Subsistema**: SERVER (Dashboard + API + Socket.io + Watchers)
-**Arquivos**: 20 arquivos JavaScript (~2,899 LOC)
-**Audit Levels**: 100-800 (HTTP Engine → Critical Decoupling)
+**Data**: 2026-01-21 **Subsistema**: SERVER (Dashboard + API + Socket.io + Watchers) **Arquivos**:
+20 arquivos JavaScript (~2,899 LOC) **Audit Levels**: 100-800 (HTTP Engine → Critical Decoupling)
 
 ---
 
@@ -21,7 +19,8 @@
 
 ## 🎯 Visão Geral
 
-O subsistema SERVER é o **Mission Control Prime** - dashboard e API para controle e observabilidade do sistema:
+O subsistema SERVER é o **Mission Control Prime** - dashboard e API para controle e observabilidade
+do sistema:
 
 - **Dashboard**: Interface web para visualização e controle
 - **API REST**: Endpoints para CRUD de tasks, configuração, sistema
@@ -30,9 +29,9 @@ O subsistema SERVER é o **Mission Control Prime** - dashboard e API para contro
 - **Telemetria**: Hardware metrics, log streaming, PM2 events
 - **Supervisor**: Reconciliador e sistema de autocura
 
-**Status**: CONSOLIDADO (Protocol 11 - Zero-Bug Tolerance)
-**Complexidade**: Média-Alta (barramento de eventos + lifecycle management)
-**Dependências**: NERV (IPC), INFRA (io/system), CORE (logger/config)
+**Status**: CONSOLIDADO (Protocol 11 - Zero-Bug Tolerance) **Complexidade**: Média-Alta (barramento
+de eventos + lifecycle management) **Dependências**: NERV (IPC), INFRA (io/system), CORE
+(logger/config)
 
 ---
 
@@ -84,6 +83,7 @@ src/server/
 ### 1. **Bootstrap Sequence Rigoroso** (main.js)
 
 Sequência de 8 passos determinística:
+
 ```javascript
 1. Lifecycle signals (SIGINT/SIGTERM)
 2. HTTP Server start (port hunting)
@@ -103,11 +103,11 @@ Sequência de 8 passos determinística:
 
 ```javascript
 httpServer.on('error', e => {
-    if (e.code === 'EADDRINUSE') {
-        log('WARN', `Porta ${port} ocupada. Escalando para ${port + 1}...`);
-        httpServer.close();
-        resolve(start(port + 1)); // Recursive retry
-    }
+  if (e.code === 'EADDRINUSE') {
+    log('WARN', `Porta ${port} ocupada. Escalando para ${port + 1}...`);
+    httpServer.close();
+    resolve(start(port + 1)); // Recursive retry
+  }
 });
 ```
 
@@ -128,10 +128,10 @@ httpServer.on('error', e => {
 ```javascript
 // Handshake timeout guard
 const handshakeTimeout = setTimeout(() => {
-    if (!socket.authorized) {
-        socket.emit('handshake:rejected', { reason: 'TIMEOUT' });
-        socket.disconnect();
-    }
+  if (!socket.authorized) {
+    socket.emit('handshake:rejected', { reason: 'TIMEOUT' });
+    socket.disconnect();
+  }
 }, 5000);
 ```
 
@@ -143,16 +143,16 @@ const handshakeTimeout = setTimeout(() => {
 
 ```javascript
 function requestId(req, res, next) {
-    let id = req.headers['x-request-id'];
+  let id = req.headers['x-request-id'];
 
-    // Validação UUID v4
-    if (!id || !UUID_REGEX.test(id)) {
-        id = crypto.randomUUID();
-    }
+  // Validação UUID v4
+  if (!id || !UUID_REGEX.test(id)) {
+    id = crypto.randomUUID();
+  }
 
-    req.id = id;
-    res.setHeader('x-request-id', id);
-    next();
+  req.id = id;
+  res.setHeader('x-request-id', id);
+  next();
 }
 ```
 
@@ -178,13 +178,13 @@ function requestId(req, res, next) {
 const result = schema.safeParse(req.body);
 
 if (!result.success) {
-    const errorDetails = result.error.issues.map(issue => ({
-        field: issue.path.join('.'),
-        message: issue.message
-    }));
+  const errorDetails = result.error.issues.map(issue => ({
+    field: issue.path.join('.'),
+    message: issue.message,
+  }));
 
-    audit('SCHEMA_VIOLATION', { errors: errorDetails });
-    return res.status(400).json({ error: 'Contrato violado', details: errorDetails });
+  audit('SCHEMA_VIOLATION', { errors: errorDetails });
+  return res.status(400).json({ error: 'Contrato violado', details: errorDetails });
 }
 
 req.body = result.data; // Dados curados (defaults + coerção)
@@ -198,15 +198,15 @@ req.body = result.data; // Dados curados (defaults + coerção)
 
 ```javascript
 const forceExitTimeout = setTimeout(() => {
-    log('FATAL', 'Shutdown excedeu 5s. Forçando saída.');
-    process.exit(1);
+  log('FATAL', 'Shutdown excedeu 5s. Forçando saída.');
+  process.exit(1);
 }, 5000);
 
 // Cascata reversa: Watchers → Telemetry → Socket → HTTP
 await fsWatcher.stop();
 await hardwareTelemetry.stop();
 await socketHub.stop(); // Força desconexão
-await server.stop();    // Libera porta
+await server.stop(); // Libera porta
 
 clearTimeout(forceExitTimeout);
 process.exit(0);
@@ -222,14 +222,14 @@ process.exit(0);
 let debounceTimer;
 
 fsWatcher = fs.watch(queuePath, (event, filename) => {
-    if (filename && filename.endsWith('.json')) {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            io.setCacheDirty(); // Invalida cache
-            notify('update');   // Notifica dashboard
-            notifyAgent('cache_dirty'); // Notifica maestro
-        }, 100); // Debounce de 100ms
-    }
+  if (filename && filename.endsWith('.json')) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      io.setCacheDirty(); // Invalida cache
+      notify('update'); // Notifica dashboard
+      notifyAgent('cache_dirty'); // Notifica maestro
+    }, 100); // Debounce de 100ms
+  }
 });
 ```
 
@@ -279,13 +279,17 @@ LIMIT_REACHED: {
 
 **Arquivo**: `src/server/nerv_adapter/server_nerv_adapter.js`
 
-**Problema**: Adapter define métodos `_handleDashboardCommand()` e `_handleStatusRequest()` mas não está conectado ao Socket.io.
+**Problema**: Adapter define métodos `_handleDashboardCommand()` e `_handleStatusRequest()` mas não
+está conectado ao Socket.io.
 
 **Evidência**:
+
 ```javascript
 // Linha 90: Setup listeners
 this.socketHub.on('dashboard:command', data => {
-    this._handleDashboardCommand(data).catch(err => { /* ... */ });
+  this._handleDashboardCommand(data).catch(err => {
+    /* ... */
+  });
 });
 
 // MAS socketHub não emite 'dashboard:command', é socket.io!
@@ -304,15 +308,18 @@ this.socketHub.on('dashboard:command', data => {
 **Problema**: Variável `debounceTimer` usada mas não declarada no topo.
 
 **Evidência**:
+
 ```javascript
 let fsWatcher = null;
 let signaling = false;
 // ❌ debounceTimer NÃO declarado
 
 function init() {
-    // Linha 50:
-    clearTimeout(debounceTimer); // ⚠️ Undefined!
-    debounceTimer = setTimeout(() => { /* ... */ }, 100);
+  // Linha 50:
+  clearTimeout(debounceTimer); // ⚠️ Undefined!
+  debounceTimer = setTimeout(() => {
+    /* ... */
+  }, 100);
 }
 ```
 
@@ -329,6 +336,7 @@ function init() {
 **Problema**: Método implementado mas sem lógica.
 
 **Evidência**:
+
 ```javascript
 _checkTaskDrift(agent, now) {
     // Implementação futura: detecção de inconsistência entre disco e memória
@@ -354,6 +362,7 @@ _checkTaskDrift(agent, now) {
 ### 5. **Magic Numbers em Timeouts**
 
 **Exemplos**:
+
 - `lifecycle.js:L34` - 5000ms watchdog
 - `socket.js:L46` - 5000ms handshake timeout
 - `reconcilier.js:L18` - 30000ms heartbeat threshold
@@ -379,21 +388,23 @@ _checkTaskDrift(agent, now) {
 
 ### P2.1 - fs_watcher.js: debounceTimer não declarado
 
-**Arquivo**: `src/server/watchers/fs_watcher.js`
-**Linha**: 50
-**Severidade**: P2 (Média - funciona mas bug)
+**Arquivo**: `src/server/watchers/fs_watcher.js` **Linha**: 50 **Severidade**: P2 (Média - funciona
+mas bug)
 
 **Problema**: Variável `debounceTimer` não declarada no escopo do módulo.
 
 **Código Atual**:
+
 ```javascript
 let fsWatcher = null;
 let signaling = false;
 // ❌ debounceTimer ausente
 
 function init() {
-    clearTimeout(debounceTimer); // Undefined!
-    debounceTimer = setTimeout(() => { /* ... */ }, 100);
+  clearTimeout(debounceTimer); // Undefined!
+  debounceTimer = setTimeout(() => {
+    /* ... */
+  }, 100);
 }
 ```
 
@@ -430,6 +441,7 @@ function init() {
 **Solução**: Adicionar declaração.
 
 **Código**:
+
 ```javascript
 // ANTES (linha 22):
 let fsWatcher = null;
@@ -441,8 +453,7 @@ let signaling = false;
 let debounceTimer = null; // ✅ Declarado
 ```
 
-**Tempo**: 5 minutos
-**Arquivo**: `src/server/watchers/fs_watcher.js`
+**Tempo**: 5 minutos **Arquivo**: `src/server/watchers/fs_watcher.js`
 
 ---
 
@@ -480,18 +491,18 @@ let debounceTimer = null; // ✅ Declarado
 
 ## 📊 Resumo Executivo
 
-| Categoria | Quantidade | Status |
-|-----------|-----------|--------|
-| **Arquivos** | 20 arquivos | ✅ 100% auditados |
-| **Linhas de Código** | ~2,899 LOC | ✅ 100% coberto |
-| **Audit Levels** | 100-800 | ✅ Engine → Decoupling |
-| **Pontos Fortes** | 10 identificados | ✅ |
-| **Pontos de Atenção** | 6 identificados | ⚠️ |
-| **Bugs P1** | 0 bugs | ✅ Zero críticos |
-| **Bugs P2** | 1 (debounceTimer) | ⚠️ Requer correção |
-| **Bugs P3** | 0 bugs | ✅ |
-| **Correções P2** | 1 (5 min) | ⏳ Pendente |
-| **Correções P3** | 3 (4h) | ⏳ Opcionais |
+| Categoria             | Quantidade        | Status                 |
+| --------------------- | ----------------- | ---------------------- |
+| **Arquivos**          | 20 arquivos       | ✅ 100% auditados      |
+| **Linhas de Código**  | ~2,899 LOC        | ✅ 100% coberto        |
+| **Audit Levels**      | 100-800           | ✅ Engine → Decoupling |
+| **Pontos Fortes**     | 10 identificados  | ✅                     |
+| **Pontos de Atenção** | 6 identificados   | ⚠️                     |
+| **Bugs P1**           | 0 bugs            | ✅ Zero críticos       |
+| **Bugs P2**           | 1 (debounceTimer) | ⚠️ Requer correção     |
+| **Bugs P3**           | 0 bugs            | ✅                     |
+| **Correções P2**      | 1 (5 min)         | ⏳ Pendente            |
+| **Correções P3**      | 3 (4h)            | ⏳ Opcionais           |
 
 ---
 
@@ -501,26 +512,18 @@ let debounceTimer = null; // ✅ Declarado
 
 O subsistema SERVER é **muito bem arquitetado**:
 
-✅ **Bootstrap Sequence Rigoroso**: 8 passos determinísticos
-✅ **Port Hunting**: Escalonamento automático
-✅ **Socket.io IPC 2.0**: Handshake + validation + registry
-✅ **Request Correlation**: UUID em todos os requests
-✅ **Error Boundary**: 404 + 500 handlers + audit
-✅ **Schema Guard**: Validação Zod antes de lógica
-✅ **Graceful Shutdown**: Watchdog 5s + cascata reversa
-✅ **FS Watcher**: Debounce 100ms + 3 canais de notificação
-✅ **Log Streaming**: Rotation-aware com auto-recovery
-✅ **Supervisor/Reconciler**: Auto-cure com 14 políticas
+✅ **Bootstrap Sequence Rigoroso**: 8 passos determinísticos ✅ **Port Hunting**: Escalonamento
+automático ✅ **Socket.io IPC 2.0**: Handshake + validation + registry ✅ **Request Correlation**:
+UUID em todos os requests ✅ **Error Boundary**: 404 + 500 handlers + audit ✅ **Schema Guard**:
+Validação Zod antes de lógica ✅ **Graceful Shutdown**: Watchdog 5s + cascata reversa ✅ **FS
+Watcher**: Debounce 100ms + 3 canais de notificação ✅ **Log Streaming**: Rotation-aware com
+auto-recovery ✅ **Supervisor/Reconciler**: Auto-cure com 14 políticas
 
-**Áreas de Melhoria**:
-⚠️ debounceTimer não declarado (P2 - 5min fix)
-⏳ ServerNERVAdapter não integrado (P3 - opcional)
-⏳ Magic numbers em timeouts (P3 - opcional)
-⏳ Rate limiting ausente (P3 - para produção externa)
+**Áreas de Melhoria**: ⚠️ debounceTimer não declarado (P2 - 5min fix) ⏳ ServerNERVAdapter não
+integrado (P3 - opcional) ⏳ Magic numbers em timeouts (P3 - opcional) ⏳ Rate limiting ausente
+(P3 - para produção externa)
 
 ---
 
-**Assinado**: Sistema de Auditoria de Código
-**Data**: 2026-01-21
-**Versão**: 1.0
-**Próxima Auditoria**: Correção P2.1 + validação final
+**Assinado**: Sistema de Auditoria de Código **Data**: 2026-01-21 **Versão**: 1.0 **Próxima
+Auditoria**: Correção P2.1 + validação final

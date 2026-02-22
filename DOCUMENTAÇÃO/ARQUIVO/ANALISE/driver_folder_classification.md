@@ -1,16 +1,16 @@
 # Classificação de Arquivos - src/driver/
 
-**Data**: 1 de Fevereiro de 2026
-**Objetivo**: Identificar quais arquivos da pasta `driver/` devem migrar para `shared/` vs quais são específicos de driver
+**Data**: 1 de Fevereiro de 2026 **Objetivo**: Identificar quais arquivos da pasta `driver/` devem
+migrar para `shared/` vs quais são específicos de driver
 
 ---
 
 ## Executive Summary
 
-**Total de arquivos**: 13 arquivos JavaScript
-**Total de linhas**: ~2,724 linhas
+**Total de arquivos**: 13 arquivos JavaScript **Total de linhas**: ~2,724 linhas
 
 **Classificação**:
+
 - ✅ **JÁ MIGRADOS**: 2 arquivos (human.js, stabilizer.js)
 - 🔵 **ESPECÍFICOS DE DRIVER**: 11 arquivos (permanecem em `driver/`)
 - 🟡 **CANDIDATOS A MIGRAÇÃO**: 0 arquivos (nenhum universal tool restante)
@@ -161,7 +161,8 @@ Arquivos que **NÃO DEVEM MIGRAR** pois são acoplados à arquitetura de drivers
     - **Acoplamento**:
       - Sobrescreve métodos de `BaseDriver`
       - Usa `triage`, `analyzer`, `adaptive`
-      - **BUG DETECTADO**: Ainda importa `require('../modules/stabilizer')` (deve ser `@shared/page_stability/stabilizer`)
+      - **BUG DETECTADO**: Ainda importa `require('../modules/stabilizer')` (deve ser
+        `@shared/page_stability/stabilizer`)
     - **Razão para manter**: É a **implementação concreta** de um target
 
 ---
@@ -198,6 +199,7 @@ Arquivos que **NÃO DEVEM MIGRAR** pois são acoplados à arquitetura de drivers
 **NENHUM arquivo da pasta `driver/` deve ser migrado para `shared/`**.
 
 **Razões**:
+
 1. ✅ **Universal tools já foram migrados** (human.js, stabilizer.js)
 2. 🔵 **Todos os arquivos restantes são driver-specific**:
    - São **acoplados à arquitetura de drivers** (recebem `driver` no construtor)
@@ -208,11 +210,13 @@ Arquivos que **NÃO DEVEM MIGRAR** pois são acoplados à arquitetura de drivers
 ### 🐛 **Bug Detectado em ChatGPTDriver.js**
 
 **Linha 19**:
+
 ```javascript
 const stabilizer = require('../modules/stabilizer');
 ```
 
 **Deve ser**:
+
 ```javascript
 const stabilizer = require('@shared/page_stability/stabilizer');
 ```
@@ -241,38 +245,40 @@ const stabilizer = require('@shared/page_stability/stabilizer');
 ### 🎯 **Estratégia de Upgrade**
 
 **Prioridade 1** (Arquitetura Core):
+
 - BaseDriver.js
 - TargetDriver.js
 - factory.js
 - DriverLifecycleManager.js
 
 **Prioridade 2** (Modules Críticos):
+
 - biomechanics_engine.js (usa human.js v2.0)
 - triage.js (usa stabilizer.js v2.0)
 - input_resolver.js (usa analyzer.js v4.0)
 
 **Prioridade 3** (Modules Auxiliares):
+
 - recovery_system.js
 - frame_navigator.js
 - submission_controller.js
 - handle_manager.js
 
 **Prioridade 4** (Targets):
+
 - ChatGPTDriver.js (fix import bug + upgrade)
 
 ---
 
 ## Métricas de Migração
 
-| Categoria                      | Arquivos | Linhas | Status                 |
-| ------------------------------ | -------- | ------ | ---------------------- |
+| Categoria                      | Arquivos | Linhas | Status                  |
+| ------------------------------ | -------- | ------ | ----------------------- |
 | **Universal Tools (migrados)** | 2        | ~1,300 | ✅ COMPLETE             |
 | **Driver-Specific (manter)**   | 11       | ~2,724 | 🔵 MANTER               |
 | **Bugs Detectados**            | 1        | -      | 🐛 ChatGPTDriver import |
 
 ---
 
-**Criado por**: GitHub Copilot
-**Data**: 1 de Fevereiro de 2026
-**Versão**: 1.0
-**Status**: ✅ **ANÁLISE COMPLETA**
+**Criado por**: GitHub Copilot **Data**: 1 de Fevereiro de 2026 **Versão**: 1.0 **Status**: ✅
+**ANÁLISE COMPLETA**

@@ -1,7 +1,6 @@
 # Task Schema V5 - Complete Guide
 
-**Version**: 5.0 Unified (Fevereiro 2026)
-**Status**: ✅ PRODUCTION READY (56/56 tests passing)
+**Version**: 5.0 Unified (Fevereiro 2026) **Status**: ✅ PRODUCTION READY (56/56 tests passing)
 **Migration**: V4 → V5 automática, backward compatible
 
 ---
@@ -30,14 +29,14 @@ Task Schema V5 é uma **evolução unificada** que combina:
 
 ```javascript
 TaskSchemaV5 = {
-    meta: MetaSchemaV5,           // V4 + workflow_id, mission_id
-    spec: SpecSchemaV5,           // V4 + execution strategies
-    policy: PolicySchemaV5,       // V4 + workflow_policy
-    execution: ExecutionSchemaV5, // NOVO - driver, environment, retry
-    mission: MissionSchemaV5,     // NOVO - mission context
-    state: StateSchemaV5,         // V4 + metrics.phases, perception, history.summary
-    result: ResultSchemaV5        // V2 - storage, generation, validation, preview
-}
+  meta: MetaSchemaV5, // V4 + workflow_id, mission_id
+  spec: SpecSchemaV5, // V4 + execution strategies
+  policy: PolicySchemaV5, // V4 + workflow_policy
+  execution: ExecutionSchemaV5, // NOVO - driver, environment, retry
+  mission: MissionSchemaV5, // NOVO - mission context
+  state: StateSchemaV5, // V4 + metrics.phases, perception, history.summary
+  result: ResultSchemaV5, // V2 - storage, generation, validation, preview
+};
 ```
 
 ---
@@ -259,7 +258,7 @@ Todo o sistema migra automaticamente V4 → V5:
 
 ```javascript
 // ✅ AUTOMÁTICO - Transparente para usuário
-const task = loadTask('test-v4-001');  // Task V4 no disco
+const task = loadTask('test-v4-001'); // Task V4 no disco
 // task é retornado como V5 (auto-migrado em memória)
 ```
 
@@ -310,42 +309,42 @@ const taskV4 = downgradeV5toV4(taskV5);
 const { TaskSchemaV5 } = require('@core/schemas/task_schema_v5');
 
 const task = TaskSchemaV5.parse({
-    meta: {
-        id: 'task-001',
-        project_id: 'default',
-        version: '5.0',
-        created_at: new Date().toISOString(),
-        priority: 50,
-        source: 'api',
-        tags: ['test']
+  meta: {
+    id: 'task-001',
+    project_id: 'default',
+    version: '5.0',
+    created_at: new Date().toISOString(),
+    priority: 50,
+    source: 'api',
+    tags: ['test'],
+  },
+  spec: {
+    target: 'chatgpt',
+    model: 'gpt-4-turbo',
+    payload: {
+      system_message: 'You are a helpful assistant',
+      user_message: 'Hello!',
     },
-    spec: {
-        target: 'chatgpt',
-        model: 'gpt-4-turbo',
-        payload: {
-            system_message: 'You are a helpful assistant',
-            user_message: 'Hello!'
-        }
-    },
-    policy: {
-        max_attempts: 3,
-        timeout_ms: 60000
-    },
-    execution: {},  // Preenchido por fillExecutionContext()
-    mission: {},    // Preenchido por MissionManager (se missão)
-    state: {
-        status: 'PENDING',
-        attempts: 0,
-        metrics: {},
-        history: { events: [], summary: {} }
-    },
-    result: {
-        storage: {},
-        generation: {},
-        validation: null,
-        preview: {},
-        finish_reason: 'unknown'
-    }
+  },
+  policy: {
+    max_attempts: 3,
+    timeout_ms: 60000,
+  },
+  execution: {}, // Preenchido por fillExecutionContext()
+  mission: {}, // Preenchido por MissionManager (se missão)
+  state: {
+    status: 'PENDING',
+    attempts: 0,
+    metrics: {},
+    history: { events: [], summary: {} },
+  },
+  result: {
+    storage: {},
+    generation: {},
+    validation: null,
+    preview: {},
+    finish_reason: 'unknown',
+  },
 });
 ```
 
@@ -356,10 +355,10 @@ const { fillExecutionContext } = require('@shared/utils/execution_context_filler
 
 // No driver, após conectar browser
 const task = fillExecutionContext(task, {
-    driver: this,  // ChatGPTDriver instance
-    browserPool: this.browserPool,
-    tacticalAttempts: 0,
-    strategicAttempts: 0
+  driver: this, // ChatGPTDriver instance
+  browserPool: this.browserPool,
+  tacticalAttempts: 0,
+  strategicAttempts: 0,
 });
 
 // Execution context preenchido:
@@ -371,7 +370,10 @@ const task = fillExecutionContext(task, {
 ### Tracking Retries
 
 ```javascript
-const { incrementTacticalAttempts, incrementStrategicAttempts } = require('@shared/utils/execution_context_filler');
+const {
+  incrementTacticalAttempts,
+  incrementStrategicAttempts,
+} = require('@shared/utils/execution_context_filler');
 
 // Driver retry (selector error, timeout, etc)
 incrementTacticalAttempts(task, 'SELECTOR_NOT_FOUND', 1000);
@@ -391,15 +393,15 @@ incrementStrategicAttempts(task, 'CHROME_DISCONNECTED', 5000);
 ```javascript
 // No MissionManager, ao criar task de step
 task.mission = {
-    mission_id: 'mission-001',
-    step_id: 'analyze-data',
-    step_index: 2,
-    step_dependencies: ['fetch-data', 'clean-data'],
-    mission_context: {
-        previous_output: missionState.steps['clean-data'].output,
-        accumulated_data: missionState.context
-    },
-    is_checkpoint: true  // Step crítico (checkpoint para recovery)
+  mission_id: 'mission-001',
+  step_id: 'analyze-data',
+  step_index: 2,
+  step_dependencies: ['fetch-data', 'clean-data'],
+  mission_context: {
+    previous_output: missionState.steps['clean-data'].output,
+    accumulated_data: missionState.context,
+  },
+  is_checkpoint: true, // Step crítico (checkpoint para recovery)
 };
 ```
 
@@ -408,32 +410,32 @@ task.mission = {
 ```javascript
 // Após execution (Response Capture V2)
 task.result = {
-    storage: {
-        text_file: '/workspaces/respostas/task-001.txt',
-        markdown_file: '/workspaces/respostas/task-001.md',
-        json_file: '/workspaces/respostas/task-001.json',
-        html_file: '/workspaces/respostas/task-001.html'
-    },
-    generation: {
-        model: 'gpt-4-turbo',
-        started_at: '2026-02-04T05:00:00.000Z',
-        completed_at: '2026-02-04T05:00:05.342Z',
-        duration_ms: 5342,
-        tokens_estimate: 150,
-        continuations: 0,
-        thought_blocks_pruned: 2,
-        retry_attempts: 0
-    },
-    validation: null,  // LLM-as-judge fase posterior
-    preview: {
-        text: 'Hello! How can I assist you today?',
-        sections_count: 1,
-        code_blocks_count: 0,
-        links_count: 0,
-        images_count: 0
-    },
-    session_url: 'https://chatgpt.com/c/abc123',
-    finish_reason: 'success'
+  storage: {
+    text_file: '/workspaces/respostas/task-001.txt',
+    markdown_file: '/workspaces/respostas/task-001.md',
+    json_file: '/workspaces/respostas/task-001.json',
+    html_file: '/workspaces/respostas/task-001.html',
+  },
+  generation: {
+    model: 'gpt-4-turbo',
+    started_at: '2026-02-04T05:00:00.000Z',
+    completed_at: '2026-02-04T05:00:05.342Z',
+    duration_ms: 5342,
+    tokens_estimate: 150,
+    continuations: 0,
+    thought_blocks_pruned: 2,
+    retry_attempts: 0,
+  },
+  validation: null, // LLM-as-judge fase posterior
+  preview: {
+    text: 'Hello! How can I assist you today?',
+    sections_count: 1,
+    code_blocks_count: 0,
+    links_count: 0,
+    images_count: 0,
+  },
+  session_url: 'https://chatgpt.com/c/abc123',
+  finish_reason: 'success',
 };
 ```
 
@@ -542,7 +544,5 @@ npm test
 
 ---
 
-**Versão**: 1.0 (Fevereiro 2026)
-**Status**: ✅ PRODUCTION READY
-**Tests**: 56/56 passing
+**Versão**: 1.0 (Fevereiro 2026) **Status**: ✅ PRODUCTION READY **Tests**: 56/56 passing
 **Maintainer**: chatgpt-docker-puppeteer team

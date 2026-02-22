@@ -1,8 +1,7 @@
 # 🏗️ Driver Pool - Decisão Arquitetural
 
-**Data**: 3 de Fevereiro de 2026
-**Decisão**: ✅ **Evoluir Factory.js para DriverFactory com Pool** (NÃO criar arquivo novo)
-**Status**: 📋 Planejamento Completo
+**Data**: 3 de Fevereiro de 2026 **Decisão**: ✅ **Evoluir Factory.js para DriverFactory com Pool**
+(NÃO criar arquivo novo) **Status**: 📋 Planejamento Completo
 
 ---
 
@@ -17,6 +16,7 @@
 ### Opção 1: ❌ Novo Arquivo `DriverPoolManager.js`
 
 **Estrutura Proposta**:
+
 ```
 src/driver/
 ├── factory.js              (mantém lazy-load + discovery)
@@ -26,11 +26,13 @@ src/driver/
 ```
 
 **Prós**:
+
 - ✅ Separação clara de responsabilidades (Factory vs Pool)
 - ✅ Código novo não afeta factory existente
 - ✅ Facilita testes isolados de pool
 
 **Contras**:
+
 - ❌ **Duplicação**: Pool precisa de discovery (já existe em Factory)
 - ❌ **Acoplamento**: DriverNERVAdapter precisa conhecer 2 componentes (Factory + Pool)
 - ❌ **Overhead**: 2 caches (Factory WeakMap + Pool Map) → conflito de responsabilidades
@@ -38,6 +40,7 @@ src/driver/
 - ❌ **Complexidade**: Adiciona +1 camada desnecessária
 
 **Violação de Princípios**:
+
 ```
 ❌ SOLID - Violação do Princípio de Responsabilidade Única (SRP)
    Factory cria, Pool gerencia → Ambos manipulam mesma entidade (Driver)
@@ -52,6 +55,7 @@ src/driver/
 ### Opção 2: ✅ **Evoluir `factory.js` para DriverFactory com Pool**
 
 **Estrutura Proposta**:
+
 ```
 src/driver/
 ├── factory.js → Evolui para DriverFactory v3.0
@@ -64,6 +68,7 @@ src/driver/
 ```
 
 **Prós**:
+
 - ✅ **Single Source of Truth**: Factory é O componente de lifecycle de drivers
 - ✅ **Evolução Natural**: Cache → Pool é extensão lógica (não ruptura)
 - ✅ **Zero Duplicação**: Discovery, lazy-load, registry compartilhados
@@ -72,12 +77,14 @@ src/driver/
 - ✅ **Backward Compatible**: Código existente continua funcionando
 
 **Contras**:
+
 - ⚠️ **Tamanho do Arquivo**: factory.js cresce ~300 linhas (de 850 → 1150 linhas)
   - **Mitigação**: Ainda é razoável (< 1500 linhas), bem estruturado em seções
 - ⚠️ **Complexidade Interna**: Factory tem 2 modos (cache + pool)
   - **Mitigação**: Separação clara via métodos distintos (`getDriver` vs `acquireFromPool`)
 
 **Alinhamento com Princípios**:
+
 ```
 ✅ SOLID - Responsabilidade Única (SRP)
    Factory: "Gerenciar instâncias de Driver (criar, cachear, poolizar, destruir)"
@@ -98,6 +105,7 @@ src/driver/
 ### Opção 3: ❌ Integrar em `driver_nerv_adapter.js`
 
 **Estrutura Proposta**:
+
 ```
 src/driver/nerv_adapter/
 └── driver_nerv_adapter.js
@@ -106,16 +114,19 @@ src/driver/nerv_adapter/
 ```
 
 **Prós**:
+
 - ✅ Adapter já tem Map de drivers ativos (activeDrivers)
 - ✅ Centraliza gerenciamento de lifecycle em 1 lugar
 
 **Contras**:
+
 - ❌ **Violação Ontológica**: Adapter é NERV bridge, não gerenciador de instâncias
 - ❌ **Responsabilidade Excessiva**: Adapter faria NERV + Pool + Telemetria
 - ❌ **Acoplamento Ruim**: Factory perderia controle sobre instâncias que criou
 - ❌ **Confusão de Domínios**: activeDrivers é "drivers em uso", não "pool de warm drivers"
 
 **Violação de Princípios**:
+
 ```
 ❌ Separação de Responsabilidades (SoC)
    Adapter = NERV bridge (comunicação)
@@ -135,6 +146,7 @@ src/driver/nerv_adapter/
 ### **Evoluir factory.js para DriverFactory v3.0 com Pool Management**
 
 **Justificativa Técnica**:
+
 1. **Responsabilidade Natural**: Factory JÁ gerencia instâncias de drivers
    - Create (lazy-load)
    - Cache (WeakMap)
@@ -147,6 +159,7 @@ src/driver/nerv_adapter/
    - Telemetria (FACTORY_EVENTS)
 
 3. **API Clara e Consistente**:
+
    ```javascript
    // Modo 1: Cache (stateless, attached to page)
    const driver = factory.getDriver(target, page, config, signal);
@@ -172,22 +185,24 @@ src/driver/nerv_adapter/
 
 ### Fase 1: Adicionar Pool Structure (30min)
 
-**Arquivo**: `src/driver/factory.js`
-**Linhas**: +150 linhas
+**Arquivo**: `src/driver/factory.js` **Linhas**: +150 linhas
 
 **Mudanças**:
+
 1. **POOL_CONFIG** (novo):
+
    ```javascript
    const POOL_CONFIG = {
-       MAX_POOL_SIZE: 5,          // Máximo de drivers no pool
-       MIN_POOL_SIZE: 2,          // Mínimo de drivers (warm start)
-       IDLE_TIMEOUT_MS: 300000,   // 5min idle → eviction
-       WARMUP_TARGETS: ['chatgpt', 'gemini'],
-       HEALTH_CHECK_INTERVAL_MS: 30000
+     MAX_POOL_SIZE: 5, // Máximo de drivers no pool
+     MIN_POOL_SIZE: 2, // Mínimo de drivers (warm start)
+     IDLE_TIMEOUT_MS: 300000, // 5min idle → eviction
+     WARMUP_TARGETS: ['chatgpt', 'gemini'],
+     HEALTH_CHECK_INTERVAL_MS: 30000,
    };
    ```
 
 2. **Novo atributo no constructor**:
+
    ```javascript
    constructor() {
        // ... código existente ...
@@ -215,6 +230,7 @@ src/driver/nerv_adapter/
    ```
 
 3. **Novo método: `initializePool()`** (chamado após discovery)
+
    ```javascript
    async initializePool() {
        log('INFO', '[FACTORY] Initializing driver pool...');
@@ -247,6 +263,7 @@ src/driver/nerv_adapter/
 **Desafio**: Como criar driver SEM page?
 
 **Solução 1** (Preferida): **Mock Page Object**
+
 ```javascript
 async _createWarmDriver(target) {
     // Cria mock page (não é Puppeteer page real)
@@ -267,6 +284,7 @@ async _createWarmDriver(target) {
 ```
 
 **Solução 2** (Alternativa): **Modificar TargetDriver para aceitar null page**
+
 ```javascript
 // Em TargetDriver.js constructor:
 constructor(page, config, signal) {
@@ -280,6 +298,7 @@ constructor(page, config, signal) {
 ```
 
 **Decisão**: **Solução 1 (Mock Page)** é preferível porque:
+
 - ✅ Não modifica TargetDriver (menos risco)
 - ✅ Validações de `page.isClosed()` continuam funcionando
 - ✅ Mais fácil de debugar (mock é explícito)
@@ -454,11 +473,13 @@ _startPoolHealthChecks() {
 
 ### Fase 5: Integração com DriverLifecycleManager (30min)
 
-**⚠️ DECISÃO ARQUITETURAL**: Pool integration acontece no **DriverLifecycleManager**, NÃO no Adapter.
+**⚠️ DECISÃO ARQUITETURAL**: Pool integration acontece no **DriverLifecycleManager**, NÃO no
+Adapter.
 
 **Razão**: DriverLifecycleManager JÁ é responsável por acquire/release drivers via Factory.
 
 **Arquitetura**:
+
 ```
 DriverNERVAdapter
   └─> DriverLifecycleManager
@@ -473,17 +494,17 @@ DriverNERVAdapter
 ```javascript
 // ANTES (v2.1 - Cache):
 this.driver = driverFactory.getDriver(
-    this.task.spec.target,
-    this.page,
-    this.config,
-    this.abortController.signal
+  this.task.spec.target,
+  this.page,
+  this.config,
+  this.abortController.signal
 );
 
 // DEPOIS (v3.0 - Pool):
 this.driver = await driverFactory.acquireFromPool(
-    this.task.spec.target,
-    this.page,
-    this.abortController.signal
+  this.task.spec.target,
+  this.page,
+  this.abortController.signal
 );
 
 // ✅ Retry logic continua funcionando (envolve acquireFromPool)
@@ -496,37 +517,44 @@ this.driver = await driverFactory.acquireFromPool(
 ```javascript
 // ANTES (v2.1 - Cache):
 if (this.driver) {
-    // ... removeListener ...
+  // ... removeListener ...
 
-    const destroyPromise = this.driver.destroy().catch(err => {
-        log('WARN', `[LIFECYCLE] Erro no descarte do driver: ${err.message}`, this.correlationId);
-    });
+  const destroyPromise = this.driver.destroy().catch(err => {
+    log('WARN', `[LIFECYCLE] Erro no descarte do driver: ${err.message}`, this.correlationId);
+  });
 
-    // Timeout de 5s para prevenir hang
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Driver destroy timeout')), LIFECYCLE_CONFIG.DESTROY_TIMEOUT_MS);
-    });
+  // Timeout de 5s para prevenir hang
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(
+      () => reject(new Error('Driver destroy timeout')),
+      LIFECYCLE_CONFIG.DESTROY_TIMEOUT_MS
+    );
+  });
 
-    await Promise.race([destroyPromise, timeoutPromise]).catch(err => {
-        log('ERROR', `[LIFECYCLE] Destroy timeout ou erro: ${err.message}`, this.correlationId);
-    });
+  await Promise.race([destroyPromise, timeoutPromise]).catch(err => {
+    log('ERROR', `[LIFECYCLE] Destroy timeout ou erro: ${err.message}`, this.correlationId);
+  });
 }
 
 // DEPOIS (v3.0 - Pool):
 if (this.driver) {
-    // ... removeListener ...
+  // ... removeListener ...
 
-    // ✅ Pool-aware release (não destrói, volta para pool)
-    try {
-        driverFactory.releaseToPool(this.driver);
-        log('DEBUG', `[LIFECYCLE] Driver released to pool (warm)`, this.correlationId);
-    } catch (err) {
-        // Fallback: Se pool rejeita (driver inválido), destrói
-        log('WARN', `[LIFECYCLE] Pool release failed, destroying driver: ${err.message}`, this.correlationId);
-        await this.driver.destroy().catch(destroyErr => {
-            log('ERROR', `[LIFECYCLE] Destroy fallback error: ${destroyErr.message}`, this.correlationId);
-        });
-    }
+  // ✅ Pool-aware release (não destrói, volta para pool)
+  try {
+    driverFactory.releaseToPool(this.driver);
+    log('DEBUG', `[LIFECYCLE] Driver released to pool (warm)`, this.correlationId);
+  } catch (err) {
+    // Fallback: Se pool rejeita (driver inválido), destrói
+    log(
+      'WARN',
+      `[LIFECYCLE] Pool release failed, destroying driver: ${err.message}`,
+      this.correlationId
+    );
+    await this.driver.destroy().catch(destroyErr => {
+      log('ERROR', `[LIFECYCLE] Destroy fallback error: ${destroyErr.message}`, this.correlationId);
+    });
+  }
 }
 ```
 
@@ -559,12 +587,14 @@ if (this.driver) {
 ### Trade-offs
 
 **Custos**:
+
 - ✅ **Memória**: +50MB (5 warm drivers @ 10MB cada)
   - **Aceitável**: Memória é barata, latência é cara
 - ✅ **Complexidade**: +300 linhas em factory.js
   - **Aceitável**: Bem estruturado, separado em métodos claros
 
 **Benefícios**:
+
 - ✅ **Latência**: -90% em acquire (100ms → 10ms)
 - ✅ **Throughput**: +30% (10 → 13 tasks/min)
 - ✅ **UX**: Tasks começam 90ms mais rápido
@@ -575,6 +605,7 @@ if (this.driver) {
 ## 🧪 PLANO DE TESTES
 
 ### Teste 1: Pool Initialization
+
 ```bash
 # Scenario: Boot com pool warmup
 node tests/integration/test_driver_pool_init.js
@@ -587,6 +618,7 @@ node tests/integration/test_driver_pool_init.js
 ```
 
 ### Teste 2: Acquire from Pool (HIT)
+
 ```bash
 # Scenario: Acquire driver de pool não vazio
 node tests/performance/test_pool_acquire_hit.js
@@ -599,6 +631,7 @@ node tests/performance/test_pool_acquire_hit.js
 ```
 
 ### Teste 3: Acquire from Pool (MISS → Create)
+
 ```bash
 # Scenario: Pool vazio, cria novo driver
 node tests/performance/test_pool_acquire_miss.js
@@ -610,6 +643,7 @@ node tests/performance/test_pool_acquire_miss.js
 ```
 
 ### Teste 4: Release to Pool
+
 ```bash
 # Scenario: Libera driver de volta ao pool
 node tests/integration/test_pool_release.js
@@ -622,6 +656,7 @@ node tests/integration/test_pool_release.js
 ```
 
 ### Teste 5: Pool Exhaustion
+
 ```bash
 # Scenario: Todos os drivers busy
 node tests/reliability/test_pool_exhausted.js
@@ -632,6 +667,7 @@ node tests/reliability/test_pool_exhausted.js
 ```
 
 ### Teste 6: Garbage Collection
+
 ```bash
 # Scenario: Driver idle por > 5min
 node tests/integration/test_pool_gc.js
@@ -647,6 +683,7 @@ node tests/integration/test_pool_gc.js
 ## 📅 CRONOGRAMA IMPLEMENTAÇÃO
 
 ### Dia 1 (Manhã - 4h)
+
 - ✅ Fase 1: Pool structure em factory.js (30min)
 - ✅ Fase 2: Warm drivers com mock page (1h)
 - ✅ Fase 3: Acquire/Release em factory.js (1h)
@@ -654,6 +691,7 @@ node tests/integration/test_pool_gc.js
 - ✅ Testes unitários básicos (1h)
 
 ### Dia 1 (Tarde - 4h)
+
 - ✅ Fase 5: Integração em DriverLifecycleManager (30min) ← **MUDANÇA AQUI**
 - ✅ Testes de integração (2h)
 - ✅ Benchmarks (antes/depois) (1h)
@@ -668,7 +706,9 @@ node tests/integration/test_pool_gc.js
 ### Decisão Arquitetural: **Evoluir factory.js para v3.0 com Pool**
 
 **Razões**:
-1. ✅ **Responsabilidade Natural**: Factory gerencia instâncias (cache + pool são parte dessa responsabilidade)
+
+1. ✅ **Responsabilidade Natural**: Factory gerencia instâncias (cache + pool são parte dessa
+   responsabilidade)
 2. ✅ **Zero Duplicação**: Reusa discovery, lazy-load, registry existente
 3. ✅ **API Clara**: `getDriver()` (cache) vs `acquireFromPool()` (pool)
 4. ✅ **Backward Compatible**: Código existente continua funcionando
@@ -676,5 +716,4 @@ node tests/integration/test_pool_gc.js
 
 **Próximo Passo**: Implementar Fase 1 (Pool Structure)
 
-**Aprovador**: @Ilenburg1993
-**Status**: 📋 **AGUARDANDO APROVAÇÃO PARA IMPLEMENTAÇÃO**
+**Aprovador**: @Ilenburg1993 **Status**: 📋 **AGUARDANDO APROVAÇÃO PARA IMPLEMENTAÇÃO**

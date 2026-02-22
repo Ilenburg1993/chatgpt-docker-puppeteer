@@ -12,5 +12,4 @@ Recommended actions:
 2. Rotate any leaked tokens immediately if confirmed active.
 3. Update CI secrets and re-run workflows.
 
-Owner: @owner-placeholder
-Labels: security, P1, ci
+Owner: @owner-placeholder Labels: security, P1, ci

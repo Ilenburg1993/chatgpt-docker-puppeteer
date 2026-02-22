@@ -1,16 +1,19 @@
 # Driver Modules Architecture Analysis
+
 ## Universal Tools vs Driver-Specific Components
 
-**Data**: 1 Fevereiro 2026
-**Objetivo**: Identificar ferramentas universais em `src/driver/modules/` que devem ser movidas para `src/shared/`
-**Contexto**: SADI analyzer foi movido (driver → shared), precisamos avaliar outros módulos
+**Data**: 1 Fevereiro 2026 **Objetivo**: Identificar ferramentas universais em `src/driver/modules/`
+que devem ser movidas para `src/shared/` **Contexto**: SADI analyzer foi movido (driver → shared),
+precisamos avaliar outros módulos
 
 ---
 
 ## 📊 Executive Summary
 
 ### Módulos Analisados: **9**
+
 ### Ferramentas Universais Identificadas: **2 candidatos fortes + 1 moderado**
+
 ### Recomendação: **Migrar 2 módulos para shared layer**
 
 ---
@@ -20,40 +23,45 @@
 ### ✅ UNIVERSAL TOOLS (Devem ser movidos para shared/)
 
 #### 1. **human.js** - ⭐ CANDIDATO FORTE
-**Localização Atual**: `src/driver/modules/human.js`
-**Proposta**: `src/shared/biomechanics/human.js`
+
+**Localização Atual**: `src/driver/modules/human.js` **Proposta**:
+`src/shared/biomechanics/human.js`
 
 **Análise**:
+
 ```javascript
 // Exports
 module.exports = { humanClick, humanType, wakeUpMove };
 
 // Dependências
-const { createCursor } = require('ghost-cursor');  // External lib
-const { log: _log } = require('@core/logger');     // Core only
+const { createCursor } = require('ghost-cursor'); // External lib
+const { log: _log } = require('@core/logger'); // Core only
 ```
 
 **Responsabilidade**:
+
 - Simulação biomecânica de mouse e teclado
 - Variações gaussianas para typing natural
 - Cursor movement com ghost-cursor
 - Keyboard layouts (QWERTY)
 - Typo simulation (teclas adjacentes)
 
-**Por que é universal**:
-✅ **Zero dependência do driver** (não usa `this.driver`, não tem contexto de task)
-✅ **Pure utility functions** (stateless, side-effect free)
-✅ **Reusável em múltiplos contextos**:
-   - Health checks (simulate user activity)
-   - Testing automation (mock user interactions)
-   - Browser pool diagnostics (test interactivity)
-   - Future: CLI tools for browser testing
+**Por que é universal**: ✅ **Zero dependência do driver** (não usa `this.driver`, não tem contexto
+de task) ✅ **Pure utility functions** (stateless, side-effect free) ✅ **Reusável em múltiplos
+contextos**:
+
+- Health checks (simulate user activity)
+- Testing automation (mock user interactions)
+- Browser pool diagnostics (test interactivity)
+- Future: CLI tools for browser testing
 
 **Usuários Atuais**:
+
 - `biomechanics_engine.js` (driver)
 - `BaseDriver.js` (driver)
 
 **Usuários Potenciais (após migração)**:
+
 - `src/infra/browser_pool/` (health checks)
 - `src/core/validators/` (interactivity validation)
 - `tests/` (E2E testing)
@@ -61,6 +69,7 @@ const { log: _log } = require('@core/logger');     // Core only
 **Breaking Changes**: ❌ NENHUM (apenas imports)
 
 **Benefícios**:
+
 - Testável isoladamente (sem mock de driver)
 - Reusável em health checks
 - Standalone CLI tools possíveis
@@ -69,41 +78,46 @@ const { log: _log } = require('@core/logger');     // Core only
 ---
 
 #### 2. **stabilizer.js** - ⭐ CANDIDATO FORTE
-**Localização Atual**: `src/driver/modules/stabilizer.js`
-**Proposta**: `src/shared/page_stability/stabilizer.js`
+
+**Localização Atual**: `src/driver/modules/stabilizer.js` **Proposta**:
+`src/shared/page_stability/stabilizer.js`
 
 **Análise**:
+
 ```javascript
 // Exports
 module.exports = { waitForStability, measureEventLoopLag, getPageLoadStatus };
 
 // Dependências
-const { log } = require('@core/logger');           // Core only
+const { log } = require('@core/logger'); // Core only
 const { STATUS_VALUES } = require('@core/constants/tasks.js');
-const adaptive = require('@logic/adaptive');       // Logic layer
+const adaptive = require('@logic/adaptive'); // Logic layer
 ```
 
 **Responsabilidade**:
+
 - Medir event loop lag (performance.now())
 - Detectar spinners/loading indicators (deep scan)
 - Verificar network idle state
 - Aguardar estabilização da página
 
-**Por que é universal**:
-✅ **Funções stateless** (não dependem de driver context)
-✅ **Page stability é conceito universal** (não específico de LLM drivers)
-✅ **Reusável em múltiplos contextos**:
-   - Browser pool health checks (lag detection)
-   - Connection orchestrator (page ready validation)
-   - Chrome proxy (stability before routing)
-   - Future: Monitoring dashboard (real-time lag metrics)
+**Por que é universal**: ✅ **Funções stateless** (não dependem de driver context) ✅ **Page
+stability é conceito universal** (não específico de LLM drivers) ✅ **Reusável em múltiplos
+contextos**:
+
+- Browser pool health checks (lag detection)
+- Connection orchestrator (page ready validation)
+- Chrome proxy (stability before routing)
+- Future: Monitoring dashboard (real-time lag metrics)
 
 **Usuários Atuais**:
+
 - `biomechanics_engine.js` (driver)
 - `triage.js` (driver)
 - `recovery_system.js` (driver)
 
 **Usuários Potenciais (após migração)**:
+
 - `src/infra/browser_pool/pool_manager.js` (health validation)
 - `src/infra/ConnectionOrchestrator.js` (connection ready check)
 - `src/core/validators/prerequisite_validator.js` (page stability validation)
@@ -111,6 +125,7 @@ const adaptive = require('@logic/adaptive');       // Logic layer
 **Breaking Changes**: ❌ NENHUM (apenas imports)
 
 **Benefícios**:
+
 - Usável em health checks sem driver context
 - Monitoramento de performance centralizado
 - Testável isoladamente
@@ -119,33 +134,36 @@ const adaptive = require('@logic/adaptive');       // Logic layer
 ---
 
 #### 3. **triage.js** - 🟡 CANDIDATO MODERADO
-**Localização Atual**: `src/driver/modules/triage.js`
-**Proposta**: `src/shared/diagnostics/triage.js` (com refatoração)
+
+**Localização Atual**: `src/driver/modules/triage.js` **Proposta**:
+`src/shared/diagnostics/triage.js` (com refatoração)
 
 **Análise**:
+
 ```javascript
 // Exports
 module.exports = { diagnoseStall };
 
 // Dependências
-const stabilizer = require('./stabilizer');         // Universal (shared)
+const stabilizer = require('./stabilizer'); // Universal (shared)
 const { STATUS_VALUES } = require('@core/constants/tasks.js');
-const i18n = require('@core/i18n');                // Core only
-const { log } = require('@core/logger');           // Core only
+const i18n = require('@core/i18n'); // Core only
+const { log } = require('@core/logger'); // Core only
 ```
 
 **Responsabilidade**:
+
 - Diagnóstico de travamentos (stall detection)
 - Análise semântica de erros (i18n)
 - Detecção de modals/overlays
 - Classificação de severidade
 
-**Por que é parcialmente universal**:
-✅ **Diagnóstico de página é conceito universal** (não específico de LLM)
-⚠️ **Usa i18n para detectar erros LLM** (mas poderia ser parametrizado)
-⚠️ **Retorna objetos com tipos específicos** (mas poderiam ser generalizados)
+**Por que é parcialmente universal**: ✅ **Diagnóstico de página é conceito universal** (não
+específico de LLM) ⚠️ **Usa i18n para detectar erros LLM** (mas poderia ser parametrizado) ⚠️
+**Retorna objetos com tipos específicos** (mas poderiam ser generalizados)
 
 **Refatoração Necessária** (para ser universal):
+
 ```javascript
 // ANTES (específico de LLM)
 const errorTerms = await i18n.getTerms('error_indicators', langCode);
@@ -165,9 +183,11 @@ async function diagnoseStall(page, options = {}) {
 ```
 
 **Usuários Atuais**:
+
 - `BaseDriver.js` (driver)
 
 **Usuários Potenciais (após refatoração + migração)**:
+
 - `src/infra/browser_pool/` (detect browser freezes)
 - `src/infra/ConnectionOrchestrator.js` (detect connection stalls)
 - `src/core/validators/` (validate page responsiveness)
@@ -181,7 +201,9 @@ async function diagnoseStall(page, options = {}) {
 ### ❌ DRIVER-SPECIFIC TOOLS (Devem permanecer em driver/)
 
 #### 4. **biomechanics_engine.js** - ❌ DRIVER-SPECIFIC
+
 **Por quê**:
+
 - ❌ Depende de `driver` instance (`this.driver`)
 - ❌ Usa `_emitVital()` para telemetria (driver method)
 - ❌ Usa `_assertPageAlive()` (driver method)
@@ -193,7 +215,9 @@ async function diagnoseStall(page, options = {}) {
 ---
 
 #### 5. **input_resolver.js** - ❌ DRIVER-SPECIFIC
+
 **Por quê**:
+
 - ❌ Depende de `driver` instance
 - ❌ Usa SADI analyzer (já shared) mas com contexto de driver
 - ❌ Cache específico de LLM inputs (não genérico)
@@ -205,7 +229,9 @@ async function diagnoseStall(page, options = {}) {
 ---
 
 #### 6. **frame_navigator.js** - ❌ DRIVER-SPECIFIC
+
 **Por quê**:
+
 - ❌ Depende de `driver` instance
 - ❌ Usa `_emitVital()` para progress updates
 - ❌ Contexto de task execution (correlationId)
@@ -216,7 +242,9 @@ async function diagnoseStall(page, options = {}) {
 ---
 
 #### 7. **submission_controller.js** - ❌ DRIVER-SPECIFIC
+
 **Por quê**:
+
 - ❌ Depende de `driver` instance
 - ❌ Submission lock specific to LLM workflow
 - ❌ Uses adaptive timeout (business logic)
@@ -228,7 +256,9 @@ async function diagnoseStall(page, options = {}) {
 ---
 
 #### 8. **recovery_system.js** - ❌ DRIVER-SPECIFIC
+
 **Por quê**:
+
 - ❌ Depende de `driver` instance
 - ❌ Recovery tiers específicos de LLM workflow
 - ❌ Usa `inputResolver.clearCache()` (driver component)
@@ -240,7 +270,9 @@ async function diagnoseStall(page, options = {}) {
 ---
 
 #### 9. **handle_manager.js** - ❌ DRIVER-SPECIFIC
+
 **Por quê**:
+
 - ❌ Depende de `driver` instance
 - ❌ Lifecycle management específico de driver context
 - ❌ Cleanup integrado com driver teardown
@@ -254,11 +286,12 @@ async function diagnoseStall(page, options = {}) {
 ### ✅ MIGRAR AGORA (v4.0)
 
 #### 1. **human.js** → `src/shared/biomechanics/human.js`
-**Prioridade**: 🔴 **ALTA**
-**Esforço**: 🟢 Baixo (2-3h)
-**Risco**: 🟢 Baixo (0 breaking changes, apenas imports)
+
+**Prioridade**: 🔴 **ALTA** **Esforço**: 🟢 Baixo (2-3h) **Risco**: 🟢 Baixo (0 breaking changes,
+apenas imports)
 
 **Ações**:
+
 1. Criar `src/shared/biomechanics/` directory
 2. Mover `human.js` para nova localização
 3. Atualizar imports em 2 arquivos:
@@ -268,6 +301,7 @@ async function diagnoseStall(page, options = {}) {
 5. Criar testes unitários (sem mock de driver)
 
 **Benefícios Imediatos**:
+
 - Health checks podem usar humanClick/humanType
 - Testes E2E podem simular interações sem driver
 - Standalone CLI tools para browser testing
@@ -275,11 +309,12 @@ async function diagnoseStall(page, options = {}) {
 ---
 
 #### 2. **stabilizer.js** → `src/shared/page_stability/stabilizer.js`
-**Prioridade**: 🟠 **MÉDIA-ALTA**
-**Esforço**: 🟢 Baixo (2-3h)
-**Risco**: 🟢 Baixo (0 breaking changes, apenas imports)
+
+**Prioridade**: 🟠 **MÉDIA-ALTA** **Esforço**: 🟢 Baixo (2-3h) **Risco**: 🟢 Baixo (0 breaking
+changes, apenas imports)
 
 **Ações**:
+
 1. Criar `src/shared/page_stability/` directory
 2. Mover `stabilizer.js` para nova localização
 3. Atualizar imports em 3 arquivos:
@@ -290,6 +325,7 @@ async function diagnoseStall(page, options = {}) {
 5. Integrar com browser pool health checks
 
 **Benefícios Imediatos**:
+
 - pool_manager pode medir lag sem driver
 - ConnectionOrchestrator pode validar page ready
 - Telemetria de lag centralizada
@@ -299,17 +335,19 @@ async function diagnoseStall(page, options = {}) {
 ### 🟡 AVALIAR DEPOIS (v5.0)
 
 #### 3. **triage.js** → `src/shared/diagnostics/triage.js` (requer refatoração)
-**Prioridade**: 🟡 **BAIXA**
-**Esforço**: 🟠 Médio (6-8h - redesign necessário)
-**Risco**: 🟠 Médio (breaking changes na interface)
+
+**Prioridade**: 🟡 **BAIXA** **Esforço**: 🟠 Médio (6-8h - redesign necessário) **Risco**: 🟠 Médio
+(breaking changes na interface)
 
 **Ações** (v5.0):
+
 1. Redesign para interface genérica (não LLM-specific)
 2. Parametrizar error patterns (não hardcode i18n)
 3. Generalizar tipos de diagnóstico
 4. Mover após redesign completo
 
 **Benefícios Futuros**:
+
 - Browser diagnostics universais
 - Reutilizável em monitoring dashboard
 - Testável com múltiplos cenários
@@ -318,11 +356,11 @@ async function diagnoseStall(page, options = {}) {
 
 ## 📊 COMPARAÇÃO FINAL
 
-| Módulo                   | Status Atual   | Recomendação                | Prioridade | Esforço | Breaking Changes |
-| ------------------------ | -------------- | --------------------------- | ---------- | ------- | ---------------- |
-| **human.js**             | driver/modules | ✅ Migrar para shared/       | 🔴 ALTA     | 🟢 2-3h  | ❌ Não            |
-| **stabilizer.js**        | driver/modules | ✅ Migrar para shared/       | 🟠 MÉDIA    | 🟢 2-3h  | ❌ Não            |
-| **triage.js**            | driver/modules | 🟡 Refatorar + Migrar (v5.0) | 🟡 BAIXA    | 🟠 6-8h  | ⚠️ Sim            |
+| Módulo                   | Status Atual   | Recomendação                 | Prioridade | Esforço | Breaking Changes |
+| ------------------------ | -------------- | ---------------------------- | ---------- | ------- | ---------------- |
+| **human.js**             | driver/modules | ✅ Migrar para shared/       | 🔴 ALTA    | 🟢 2-3h | ❌ Não           |
+| **stabilizer.js**        | driver/modules | ✅ Migrar para shared/       | 🟠 MÉDIA   | 🟢 2-3h | ❌ Não           |
+| **triage.js**            | driver/modules | 🟡 Refatorar + Migrar (v5.0) | 🟡 BAIXA   | 🟠 6-8h | ⚠️ Sim           |
 | biomechanics_engine.js   | driver/modules | ❌ Manter                    | -          | -       | -                |
 | input_resolver.js        | driver/modules | ❌ Manter                    | -          | -       | -                |
 | frame_navigator.js       | driver/modules | ❌ Manter                    | -          | -       | -                |
@@ -335,6 +373,7 @@ async function diagnoseStall(page, options = {}) {
 ## 🎯 CRITÉRIOS DE DECISÃO
 
 ### ✅ Deve ser SHARED se:
+
 1. **Stateless** (não depende de driver instance)
 2. **Pure functions** (input → output, sem side effects)
 3. **Reusável em múltiplos contextos** (não apenas driver)
@@ -342,6 +381,7 @@ async function diagnoseStall(page, options = {}) {
 5. **Zero dependências de driver** (não usa `this.driver`, `_emitVital`, etc.)
 
 ### ❌ Deve ser DRIVER se:
+
 1. **Stateful** (depende de driver instance)
 2. **Orchestrator** (coordena múltiplos componentes)
 3. **Business logic** (LLM-specific workflow)
@@ -353,6 +393,7 @@ async function diagnoseStall(page, options = {}) {
 ## 🚀 ROADMAP DE MIGRAÇÃO
 
 ### Phase 1: human.js Migration (Sprint atual)
+
 ```bash
 # Esforço: 2-3 horas
 # Risco: Baixo
@@ -367,6 +408,7 @@ async function diagnoseStall(page, options = {}) {
 ```
 
 ### Phase 2: stabilizer.js Migration (Sprint atual)
+
 ```bash
 # Esforço: 2-3 horas
 # Risco: Baixo
@@ -381,6 +423,7 @@ async function diagnoseStall(page, options = {}) {
 ```
 
 ### Phase 3: triage.js Redesign (v5.0 - Futuro)
+
 ```bash
 # Esforço: 6-8 horas
 # Risco: Médio
@@ -398,6 +441,7 @@ async function diagnoseStall(page, options = {}) {
 ## 📚 ARQUITETURA PROPOSTA
 
 ### Antes (v3.0)
+
 ```
 src/
 ├── driver/
@@ -415,6 +459,7 @@ src/
 ```
 
 ### Depois (v4.0)
+
 ```
 src/
 ├── driver/
@@ -435,6 +480,7 @@ src/
 ```
 
 ### Futuro (v5.0)
+
 ```
 src/
 ├── driver/
@@ -456,15 +502,18 @@ src/
 ## 🎯 IMPACTO ESPERADO
 
 ### Performance
+
 - **Cache hit rate**: human.js usável em health checks (sem overhead de driver)
 - **Test speed**: Testes unitários de human/stabilizer sem mock de driver
 
 ### Code Quality
+
 - **Testability**: 100% coverage em shared utilities (vs 60% com driver mock)
 - **Reusability**: 3+ componentes podem usar human/stabilizer
 - **Separation of Concerns**: Clear boundary entre tools e orchestrators
 
 ### Developer Experience
+
 - **Discoverability**: Ferramentas universais em shared/ (fácil de encontrar)
 - **Documentation**: READMEs específicos para cada ferramenta
 - **Standalone Usage**: CLI tools para testing sem inicializar driver completo
@@ -474,12 +523,14 @@ src/
 ## ✅ VALIDAÇÃO
 
 ### Tests Necessários
+
 1. ✅ Unit tests para `human.js` (sem mock de driver)
 2. ✅ Unit tests para `stabilizer.js` (sem mock de page)
 3. ✅ Integration tests (driver continua funcionando)
 4. ✅ E2E tests (workflow completo)
 
 ### Success Criteria
+
 - ✅ All tests passing (make test-all)
 - ✅ 0 ESLint errors
 - ✅ 0 breaking changes (backward compatible)
@@ -490,9 +541,11 @@ src/
 
 ## 🔚 CONCLUSÃO
 
-**Recomendação Final**: Migrar **human.js** e **stabilizer.js** para `src/shared/` no sprint atual (v4.0).
+**Recomendação Final**: Migrar **human.js** e **stabilizer.js** para `src/shared/` no sprint atual
+(v4.0).
 
 **Justificativa**:
+
 - São ferramentas universais (stateless, pure functions)
 - Zero breaking changes (apenas imports)
 - Esforço baixo (4-6h total)
@@ -500,11 +553,14 @@ src/
 - Segue o padrão estabelecido pelo analyzer.js
 
 **Não Migrar**:
-- biomechanics_engine, input_resolver, frame_navigator, submission_controller, recovery_system, handle_manager
+
+- biomechanics_engine, input_resolver, frame_navigator, submission_controller, recovery_system,
+  handle_manager
 - São orchestrators/business logic (não ferramentas)
 - Dependem de driver context
 
 **Avaliar Depois (v5.0)**:
+
 - triage.js (requer redesign para ser universal)
 
 ---
@@ -513,6 +569,4 @@ src/
 
 ---
 
-*Análise realizada por: GitHub Copilot*
-*Data: 1 Fevereiro 2026*
-*Status: ✅ ANÁLISE COMPLETA*
+_Análise realizada por: GitHub Copilot_ _Data: 1 Fevereiro 2026_ _Status: ✅ ANÁLISE COMPLETA_

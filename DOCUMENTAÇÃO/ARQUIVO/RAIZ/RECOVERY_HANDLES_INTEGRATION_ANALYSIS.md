@@ -1,17 +1,17 @@
 # Recovery & Handles Integration Analysis
 
-**Date**: February 2026
-**Context**: Post-Phase 1 (Critical Fixes) + Phase 2 (Performance Upgrades)
+**Date**: February 2026 **Context**: Post-Phase 1 (Critical Fixes) + Phase 2 (Performance Upgrades)
 **Purpose**: Avaliar integração de `recovery` e `handles` no contexto atual
 
 ---
 
 ## Executive Summary
 
-**Status**: ✅ **INTEGRAÇÃO CORRETA** - Sem competição crítica detectada
-**Recomendações**: 3 melhorias sugeridas (não bloqueantes)
+**Status**: ✅ **INTEGRAÇÃO CORRETA** - Sem competição crítica detectada **Recomendações**: 3
+melhorias sugeridas (não bloqueantes)
 
 ### TL;DR
+
 - ✅ `RecoverySystem` e `HandleManager` têm responsabilidades **bem definidas**
 - ✅ Não há **sobreposição direta** com componentes Phase 1/2
 - ⚠️ **3 oportunidades de melhoria** identificadas (integração com novos componentes)
@@ -52,6 +52,7 @@
 ### 1. RecoverySystem Integration
 
 #### Current Role
+
 - **Triggered**: Após erro em `sendPrompt()` (catch block)
 - **Purpose**: Tentar recuperar de falhas via 4 tiers:
   1. **Tier 0**: Cache invalidation + tactical delay
@@ -60,6 +61,7 @@
   4. **Tier 3**: Nuclear process kill
 
 #### Integration Points
+
 ```javascript
 // BaseDriver.sendPrompt() - linha 691
 catch (err) {
@@ -79,6 +81,7 @@ catch (err) {
 ```
 
 #### Dependencies
+
 - ✅ `system.killProcess()` (Tier 3)
 - ✅ `stabilizer.waitForStability()` (Tier 2)
 - ✅ `driver.inputResolver.clearCache()` (Tier 0, Tier 1)
@@ -86,6 +89,7 @@ catch (err) {
 - ✅ `driver._emitVital()` (All tiers - telemetry)
 
 #### Phase 1/2 Interactions
+
 1. **Error Classification** (Phase 1):
    - ✅ **CORRETA**: `_classifyError()` roda ANTES de `recovery.applyTier()`
    - ✅ Classification determina retry strategy, recovery é último recurso
@@ -107,6 +111,7 @@ catch (err) {
    - 💡 **IMPROVEMENT OPPORTUNITY**: Emit recovery event to sessionTracker
 
 #### Verdict
+
 ✅ **INTEGRAÇÃO CORRETA** - RecoverySystem tem escopo bem definido (reactive, post-error)
 
 **Sobreposições detectadas**: 0 críticas, 1 menor (PageLifecycleMonitor)
@@ -116,10 +121,12 @@ catch (err) {
 ### 2. HandleManager Integration
 
 #### Current Role
+
 - **Triggered**: Múltiplas vezes durante execução
 - **Purpose**: Gerenciar lifecycle de Puppeteer JSHandles (evitar memory leaks)
 
 #### Integration Points
+
 ```javascript
 // BaseDriver.sendPrompt() - linha 522 (start of retry loop)
 await this.handles.clearAll();
@@ -138,11 +145,13 @@ finally {
 ```
 
 #### Dependencies
+
 - ✅ Puppeteer JSHandles (from `inputResolver`, `frameNavigator`)
 - ✅ `EventEmitter` (telemetry local)
 - ✅ `log()` (observability)
 
 #### Phase 1/2 Interactions
+
 1. **PageValidator** (Phase 1):
    - ✅ **NO INTERACTION**: Validator não usa handles
    - ✅ **NO CONFLICT**
@@ -167,6 +176,7 @@ finally {
    - ✅ **NO CONFLICT**
 
 #### Verdict
+
 ✅ **INTEGRAÇÃO CORRETA** - HandleManager tem escopo bem definido (handle lifecycle)
 
 **Sobreposições detectadas**: 0 críticas
@@ -197,10 +207,10 @@ finally {
 
 ### Issue 1: RecoverySystem não notifica PageSessionTracker (Minor)
 
-**Severity**: 🟡 Minor
-**Impact**: Session metrics podem ficar desatualizados após Tier 2 (reload)
+**Severity**: 🟡 Minor **Impact**: Session metrics podem ficar desatualizados após Tier 2 (reload)
 
 **Scenario**:
+
 ```
 1. Session has 15 turns (long session)
 2. Execution fails → Recovery Tier 2 (reload page)
@@ -210,13 +220,14 @@ finally {
 ```
 
 **Recommendation**:
+
 ```javascript
 // recovery_system.js - _executeTier2() após reload success
 
 // ✅ Notify sessionTracker about reload
 if (this.driver.sessionTracker) {
-    this.driver.sessionTracker.reset();
-    log('DEBUG', '[RECOVERY] SessionTracker reset após page reload', correlationId);
+  this.driver.sessionTracker.reset();
+  log('DEBUG', '[RECOVERY] SessionTracker reset após page reload', correlationId);
 }
 ```
 
@@ -226,10 +237,10 @@ if (this.driver.sessionTracker) {
 
 ### Issue 2: PageLifecycleMonitor pode ser triggered por RecoverySystem Tier 2 (Minor)
 
-**Severity**: 🟡 Minor
-**Impact**: Pool cleanup duplicado (não causa erro, mas é ineficiente)
+**Severity**: 🟡 Minor **Impact**: Pool cleanup duplicado (não causa erro, mas é ineficiente)
 
 **Scenario**:
+
 ```
 1. Execution fails → Recovery Tier 2 (reload page)
 2. page.reload() triggers page.on('close') event
@@ -239,10 +250,12 @@ if (this.driver.sessionTracker) {
 ```
 
 **Analysis**:
+
 - ✅ Comportamento está **correto** (pool cleanup é desejado)
 - ⚠️ Log messages podem ser confusos ("Page closed by user" quando na verdade foi reload)
 
 **Recommendation**:
+
 ```javascript
 // recovery_system.js - _executeTier2() ANTES de reload
 
@@ -266,10 +279,11 @@ await this.driver.page.reload({ ... });
 
 ### Issue 3: HandleManager não valida se handles são do stabilizer (Minor)
 
-**Severity**: 🟡 Minor
-**Impact**: Stabilizer pode criar handles temporários não registrados → memory leak potential
+**Severity**: 🟡 Minor **Impact**: Stabilizer pode criar handles temporários não registrados →
+memory leak potential
 
 **Scenario**:
+
 ```
 1. DriverReadinessGuard calls stabilizer.waitForStability()
 2. Stabilizer usa page.$() ou page.$$() internamente (creates handles)
@@ -278,10 +292,12 @@ await this.driver.page.reload({ ... });
 ```
 
 **Analysis**:
+
 - ⚠️ Stabilizer **não passa driver.handles** como parâmetro
 - ⚠️ Sem visibilidade se stabilizer faz cleanup interno
 
 **Recommendation**:
+
 ```javascript
 // DriverReadinessGuard.js - validateReadiness()
 
@@ -290,9 +306,9 @@ await stabilizer.waitForStability(this.driver.page, opts.stabilityTimeout);
 
 // AFTER:
 await stabilizer.waitForStability(
-    this.driver.page,
-    opts.stabilityTimeout,
-    this.driver.handles // ✅ Pass handles for registration
+  this.driver.page,
+  opts.stabilityTimeout,
+  this.driver.handles // ✅ Pass handles for registration
 );
 ```
 
@@ -305,47 +321,50 @@ await stabilizer.waitForStability(
 ### Integration Tests Needed
 
 1. **Recovery + PageSessionTracker**:
+
    ```javascript
    // Test: Session metrics reset após Tier 2 reload
    it('should reset sessionTracker after page reload', async () => {
-       // Setup: 15 turns
-       for (let i = 0; i < 15; i++) {
-           await driver.sendPrompt('test', taskId);
-       }
-       expect(driver.sessionTracker.turnCount).toBe(15);
+     // Setup: 15 turns
+     for (let i = 0; i < 15; i++) {
+       await driver.sendPrompt('test', taskId);
+     }
+     expect(driver.sessionTracker.turnCount).toBe(15);
 
-       // Trigger: Tier 2 reload (force failure)
-       await driver.recovery.applyTier(new Error('test'), 2, taskId);
+     // Trigger: Tier 2 reload (force failure)
+     await driver.recovery.applyTier(new Error('test'), 2, taskId);
 
-       // Verify: Session reset
-       expect(driver.sessionTracker.turnCount).toBe(0);
+     // Verify: Session reset
+     expect(driver.sessionTracker.turnCount).toBe(0);
    });
    ```
 
 2. **Recovery + PageLifecycleMonitor**:
+
    ```javascript
    // Test: Pool cleanup durante reload
    it('should not double-cleanup pool during reload', async () => {
-       const cleanupSpy = jest.spyOn(poolManager, 'removePageFromPool');
+     const cleanupSpy = jest.spyOn(poolManager, 'removePageFromPool');
 
-       // Trigger: Tier 2 reload
-       await driver.recovery.applyTier(new Error('test'), 2, taskId);
+     // Trigger: Tier 2 reload
+     await driver.recovery.applyTier(new Error('test'), 2, taskId);
 
-       // Verify: Single cleanup
-       expect(cleanupSpy).toHaveBeenCalledTimes(1);
+     // Verify: Single cleanup
+     expect(cleanupSpy).toHaveBeenCalledTimes(1);
    });
    ```
 
 3. **HandleManager + Stabilizer**:
+
    ```javascript
    // Test: Stabilizer handles são registrados
    it('should register all stabilizer handles', async () => {
-       const initialCount = driver.handles.activeHandles.length;
+     const initialCount = driver.handles.activeHandles.length;
 
-       await stabilizer.waitForStability(driver.page, 10000, driver.handles);
+     await stabilizer.waitForStability(driver.page, 10000, driver.handles);
 
-       const finalCount = driver.handles.activeHandles.length;
-       expect(finalCount).toBeGreaterThanOrEqual(initialCount); // May create handles
+     const finalCount = driver.handles.activeHandles.length;
+     expect(finalCount).toBeGreaterThanOrEqual(initialCount); // May create handles
    });
    ```
 
@@ -356,12 +375,14 @@ await stabilizer.waitForStability(
 ### RecoverySystem Overhead
 
 **Per-execution cost**:
+
 - **Tier 0**: ~1.2-2.0s (cache clear + delay)
 - **Tier 1**: ~0.1-2.0s (focus operations with timeout)
 - **Tier 2**: ~5-30s (page reload + stabilizer)
 - **Tier 3**: ~0.5-5.0s (process kill with timeout)
 
 **Frequency**:
+
 - Tier 0: ~5% executions (transient errors)
 - Tier 1: ~2% executions (focus issues)
 - Tier 2: ~1% executions (hard failures)
@@ -372,6 +393,7 @@ await stabilizer.waitForStability(
 ### HandleManager Overhead
 
 **Per-execution cost**:
+
 - **register()**: < 0.1ms (push to array)
 - **clearAll()**: ~1-10ms (depends on handle count)
 - **Total**: ~10-50ms per execution (2 clearAll calls)
@@ -387,11 +409,13 @@ await stabilizer.waitForStability(
 ### ✅ Integration Status: HEALTHY
 
 **RecoverySystem**:
+
 - ✅ Responsibilities bem definidas (reactive recovery)
 - ✅ Zero competição crítica com Phase 1/2 components
 - ⚠️ 2 minor improvements sugeridas (sessionTracker reset, monitor flag)
 
 **HandleManager**:
+
 - ✅ Responsibilities bem definidas (handle lifecycle)
 - ✅ Zero competição crítica com Phase 1/2 components
 - ⚠️ 1 minor improvement sugerida (stabilizer integration)
@@ -404,8 +428,7 @@ await stabilizer.waitForStability(
 | #2: PageLifecycleMonitor reload flag       | Very Low | 10 min | Minor (log clarity)              |
 | #3: HandleManager + Stabilizer integration | Low      | 15 min | Minor (memory leak prevention)   |
 
-**Total effort**: ~30 minutes
-**Total impact**: Incremental improvements (não bloqueantes)
+**Total effort**: ~30 minutes **Total impact**: Incremental improvements (não bloqueantes)
 
 ### Action Items
 
@@ -416,6 +439,4 @@ await stabilizer.waitForStability(
 
 ---
 
-**Version**: 1.0
-**Date**: February 2026
-**Status**: ✅ NO CRITICAL ISSUES DETECTED
+**Version**: 1.0 **Date**: February 2026 **Status**: ✅ NO CRITICAL ISSUES DETECTED

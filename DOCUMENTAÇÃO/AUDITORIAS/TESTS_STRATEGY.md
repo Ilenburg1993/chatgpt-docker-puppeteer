@@ -1,8 +1,7 @@
 # 🧪 Estratégia de Organização de Testes
 
-**Data**: 2026-01-20
-**Objetivo**: Definir a melhor forma de organizar, criar e manter testes para atingir 80%+ de cobertura
-**Status**: 📋 PLANO ESTRATÉGICO
+**Data**: 2026-01-20 **Objetivo**: Definir a melhor forma de organizar, criar e manter testes para
+atingir 80%+ de cobertura **Status**: 📋 PLANO ESTRATÉGICO
 
 ---
 
@@ -227,12 +226,12 @@ Total estimado:
 
 ### Opções Avaliadas
 
-| Framework | Vantagens | Desvantagens | Recomendação |
-|-----------|-----------|--------------|--------------|
-| **Node.js `node:test`** | ✅ Nativo (Node 20+)<br>✅ Zero deps<br>✅ Rápido | ❌ Menos features<br>❌ Ecosystem menor | ⭐⭐⭐ **RECOMENDADO** |
-| **Jest** | ✅ Maduro<br>✅ Ecosystem rico<br>✅ Mocking built-in | ❌ Pesado (19MB)<br>❌ Lento em grandes bases | ⭐⭐⭐⭐ Alternativa |
-| **Vitest** | ✅ Muito rápido<br>✅ ESM nativo<br>✅ Compatible Jest | ❌ Mais novo<br>❌ Foco em Vite | ⭐⭐ Não ideal |
-| **Mocha + Chai** | ✅ Flexível<br>✅ Escolha de assertion libs | ❌ Precisa configuração<br>❌ Sem mocking built-in | ⭐ Legacy |
+| Framework               | Vantagens                                              | Desvantagens                                       | Recomendação           |
+| ----------------------- | ------------------------------------------------------ | -------------------------------------------------- | ---------------------- |
+| **Node.js `node:test`** | ✅ Nativo (Node 20+)<br>✅ Zero deps<br>✅ Rápido      | ❌ Menos features<br>❌ Ecosystem menor            | ⭐⭐⭐ **RECOMENDADO** |
+| **Jest**                | ✅ Maduro<br>✅ Ecosystem rico<br>✅ Mocking built-in  | ❌ Pesado (19MB)<br>❌ Lento em grandes bases      | ⭐⭐⭐⭐ Alternativa   |
+| **Vitest**              | ✅ Muito rápido<br>✅ ESM nativo<br>✅ Compatible Jest | ❌ Mais novo<br>❌ Foco em Vite                    | ⭐⭐ Não ideal         |
+| **Mocha + Chai**        | ✅ Flexível<br>✅ Escolha de assertion libs            | ❌ Precisa configuração<br>❌ Sem mocking built-in | ⭐ Legacy              |
 
 ### ✅ Decisão: Node.js `node:test` + c8 coverage
 
@@ -288,32 +287,32 @@ tests/
 ```javascript
 // ✅ BOM:
 describe('ExecutionEngine', () => {
-    describe('executeTask()', () => {
-        it('should execute task successfully when all deps are valid', async () => {
-            // ...
-        });
-
-        it('should throw error when taskRuntime is missing', async () => {
-            // ...
-        });
-
-        it('should emit telemetry event on completion', async () => {
-            // ...
-        });
+  describe('executeTask()', () => {
+    it('should execute task successfully when all deps are valid', async () => {
+      // ...
     });
 
-    describe('evaluateState()', () => {
-        it('should return correct decision proposals', async () => {
-            // ...
-        });
+    it('should throw error when taskRuntime is missing', async () => {
+      // ...
     });
+
+    it('should emit telemetry event on completion', async () => {
+      // ...
+    });
+  });
+
+  describe('evaluateState()', () => {
+    it('should return correct decision proposals', async () => {
+      // ...
+    });
+  });
 });
 
 // ❌ RUIM:
 describe('Test 1', () => {
-    it('works', () => {
-        // Não descritivo
-    });
+  it('works', () => {
+    // Não descritivo
+  });
 });
 ```
 
@@ -345,151 +344,151 @@ const mockLogger = require('../../mocks/mock_logger');
 const mockNerv = require('../../mocks/mock_nerv');
 
 describe('ModuleName', () => {
-    let instance;
-    let mockDeps;
+  let instance;
+  let mockDeps;
 
-    beforeEach(() => {
-        // Setup: criar instância com mocks
-        mockDeps = {
-            logger: mockLogger.create(),
-            nerv: mockNerv.create()
-        };
+  beforeEach(() => {
+    // Setup: criar instância com mocks
+    mockDeps = {
+      logger: mockLogger.create(),
+      nerv: mockNerv.create(),
+    };
 
-        instance = new ModuleName(mockDeps);
+    instance = new ModuleName(mockDeps);
+  });
+
+  afterEach(() => {
+    // Cleanup: resetar mocks, fechar conexões, etc
+    mockLogger.reset();
+    mockNerv.reset();
+  });
+
+  // ===== CONSTRUCTOR =====
+  describe('constructor()', () => {
+    it('should initialize with valid dependencies', () => {
+      assert.ok(instance);
+      assert.strictEqual(typeof instance.method, 'function');
     });
 
-    afterEach(() => {
-        // Cleanup: resetar mocks, fechar conexões, etc
-        mockLogger.reset();
-        mockNerv.reset();
+    it('should throw when required dependency is missing', () => {
+      assert.throws(
+        () =>
+          new ModuleName({
+            /* logger missing */
+          }),
+        { message: /logger/i }
+      );
     });
 
-    // ===== CONSTRUCTOR =====
-    describe('constructor()', () => {
-        it('should initialize with valid dependencies', () => {
-            assert.ok(instance);
-            assert.strictEqual(typeof instance.method, 'function');
-        });
+    it('should use default values for optional parameters', () => {
+      const defaultInstance = new ModuleName(mockDeps);
+      assert.strictEqual(defaultInstance.timeout, 5000); // default
+    });
+  });
 
-        it('should throw when required dependency is missing', () => {
-            assert.throws(
-                () => new ModuleName({ /* logger missing */ }),
-                { message: /logger/i }
-            );
-        });
+  // ===== HAPPY PATH =====
+  describe('mainMethod()', () => {
+    it('should return expected result for valid input', async () => {
+      const input = { foo: 'bar' };
+      const result = await instance.mainMethod(input);
 
-        it('should use default values for optional parameters', () => {
-            const defaultInstance = new ModuleName(mockDeps);
-            assert.strictEqual(defaultInstance.timeout, 5000); // default
-        });
+      assert.strictEqual(result.status, 'success');
+      assert.deepStrictEqual(result.data, { processed: true });
     });
 
-    // ===== HAPPY PATH =====
-    describe('mainMethod()', () => {
-        it('should return expected result for valid input', async () => {
-            const input = { foo: 'bar' };
-            const result = await instance.mainMethod(input);
+    it('should emit telemetry event on success', async () => {
+      await instance.mainMethod({ foo: 'bar' });
 
-            assert.strictEqual(result.status, 'success');
-            assert.deepStrictEqual(result.data, { processed: true });
-        });
+      assert.strictEqual(mockNerv.emittedEvents.length, 1);
+      assert.strictEqual(mockNerv.emittedEvents[0].type, 'MODULE_SUCCESS');
+    });
+  });
 
-        it('should emit telemetry event on success', async () => {
-            await instance.mainMethod({ foo: 'bar' });
-
-            assert.strictEqual(mockNerv.emittedEvents.length, 1);
-            assert.strictEqual(mockNerv.emittedEvents[0].type, 'MODULE_SUCCESS');
-        });
+  // ===== ERROR HANDLING =====
+  describe('mainMethod() - error cases', () => {
+    it('should handle invalid input gracefully', async () => {
+      await assert.rejects(() => instance.mainMethod(null), { message: /invalid input/i });
     });
 
-    // ===== ERROR HANDLING =====
-    describe('mainMethod() - error cases', () => {
-        it('should handle invalid input gracefully', async () => {
-            await assert.rejects(
-                () => instance.mainMethod(null),
-                { message: /invalid input/i }
-            );
-        });
+    it('should retry on transient errors', async () => {
+      let attempts = 0;
+      mockDeps.externalService = mock.fn(() => {
+        attempts++;
+        if (attempts < 3) throw new Error('Transient');
+        return 'success';
+      });
 
-        it('should retry on transient errors', async () => {
-            let attempts = 0;
-            mockDeps.externalService = mock.fn(() => {
-                attempts++;
-                if (attempts < 3) throw new Error('Transient');
-                return 'success';
-            });
+      const result = await instance.mainMethod({ retry: true });
 
-            const result = await instance.mainMethod({ retry: true });
-
-            assert.strictEqual(attempts, 3);
-            assert.strictEqual(result, 'success');
-        });
-
-        it('should emit error telemetry on failure', async () => {
-            await assert.rejects(() => instance.mainMethod(null));
-
-            const errorEvent = mockNerv.emittedEvents.find(e => e.type === 'MODULE_ERROR');
-            assert.ok(errorEvent);
-            assert.match(errorEvent.error, /invalid input/i);
-        });
+      assert.strictEqual(attempts, 3);
+      assert.strictEqual(result, 'success');
     });
 
-    // ===== EDGE CASES =====
-    describe('mainMethod() - edge cases', () => {
-        it('should handle empty input', async () => {
-            const result = await instance.mainMethod({});
-            assert.strictEqual(result.status, 'empty');
-        });
+    it('should emit error telemetry on failure', async () => {
+      await assert.rejects(() => instance.mainMethod(null));
 
-        it('should handle very large input (performance)', async () => {
-            const largeInput = { data: 'x'.repeat(1000000) }; // 1MB
-            const start = Date.now();
+      const errorEvent = mockNerv.emittedEvents.find(e => e.type === 'MODULE_ERROR');
+      assert.ok(errorEvent);
+      assert.match(errorEvent.error, /invalid input/i);
+    });
+  });
 
-            await instance.mainMethod(largeInput);
-
-            const elapsed = Date.now() - start;
-            assert.ok(elapsed < 1000, 'Should process 1MB in < 1s');
-        });
-
-        it('should be idempotent (multiple calls same result)', async () => {
-            const input = { foo: 'bar' };
-
-            const result1 = await instance.mainMethod(input);
-            const result2 = await instance.mainMethod(input);
-
-            assert.deepStrictEqual(result1, result2);
-        });
+  // ===== EDGE CASES =====
+  describe('mainMethod() - edge cases', () => {
+    it('should handle empty input', async () => {
+      const result = await instance.mainMethod({});
+      assert.strictEqual(result.status, 'empty');
     });
 
-    // ===== INTEGRATION WITH DEPENDENCIES =====
-    describe('integration with logger', () => {
-        it('should log info messages', async () => {
-            await instance.mainMethod({ foo: 'bar' });
+    it('should handle very large input (performance)', async () => {
+      const largeInput = { data: 'x'.repeat(1000000) }; // 1MB
+      const start = Date.now();
 
-            assert.ok(mockLogger.calls.some(c => c.level === 'INFO'));
-        });
+      await instance.mainMethod(largeInput);
 
-        it('should log errors with context', async () => {
-            await assert.rejects(() => instance.mainMethod(null));
-
-            const errorLog = mockLogger.calls.find(c => c.level === 'ERROR');
-            assert.ok(errorLog);
-            assert.ok(errorLog.context.taskId);
-        });
+      const elapsed = Date.now() - start;
+      assert.ok(elapsed < 1000, 'Should process 1MB in < 1s');
     });
+
+    it('should be idempotent (multiple calls same result)', async () => {
+      const input = { foo: 'bar' };
+
+      const result1 = await instance.mainMethod(input);
+      const result2 = await instance.mainMethod(input);
+
+      assert.deepStrictEqual(result1, result2);
+    });
+  });
+
+  // ===== INTEGRATION WITH DEPENDENCIES =====
+  describe('integration with logger', () => {
+    it('should log info messages', async () => {
+      await instance.mainMethod({ foo: 'bar' });
+
+      assert.ok(mockLogger.calls.some(c => c.level === 'INFO'));
+    });
+
+    it('should log errors with context', async () => {
+      await assert.rejects(() => instance.mainMethod(null));
+
+      const errorLog = mockLogger.calls.find(c => c.level === 'ERROR');
+      assert.ok(errorLog);
+      assert.ok(errorLog.context.taskId);
+    });
+  });
 });
 
 // ===== HELPER FUNCTIONS (dentro do arquivo de teste) =====
 function createValidInput() {
-    return {
-        id: 'test-001',
-        type: 'task',
-        data: { message: 'Hello' }
-    };
+  return {
+    id: 'test-001',
+    type: 'task',
+    data: { message: 'Hello' },
+  };
 }
 
 function createInvalidInput() {
-    return null;
+  return null;
 }
 ```
 
@@ -518,68 +517,64 @@ const { createNERV } = require('../../../src/nerv/nerv');
 const logger = require('../../../src/core/logger');
 
 describe('ComponentA + ComponentB Integration', () => {
-    let nerv;
-    let componentA;
-    let componentB;
+  let nerv;
+  let componentA;
+  let componentB;
 
-    before(async () => {
-        // Setup: inicializar componentes REAIS
-        nerv = await createNERV({ mode: 'local' });
+  before(async () => {
+    // Setup: inicializar componentes REAIS
+    nerv = await createNERV({ mode: 'local' });
 
-        componentA = new ComponentA({ nerv, logger });
-        componentB = new ComponentB({ nerv, logger });
+    componentA = new ComponentA({ nerv, logger });
+    componentB = new ComponentB({ nerv, logger });
 
-        await componentA.initialize();
-        await componentB.initialize();
+    await componentA.initialize();
+    await componentB.initialize();
+  });
+
+  after(async () => {
+    // Cleanup: fechar conexões
+    await componentA.shutdown();
+    await componentB.shutdown();
+    await nerv.close();
+  });
+
+  describe('message flow A → B', () => {
+    it('should send message from A to B via NERV', async () => {
+      const message = { type: 'TEST', data: 'hello' };
+
+      // B escuta mensagens
+      const received = new Promise(resolve => {
+        componentB.on('message', resolve);
+      });
+
+      // A envia mensagem
+      await componentA.sendMessage(message);
+
+      // B recebe mensagem
+      const receivedMessage = await received;
+      assert.deepStrictEqual(receivedMessage, message);
     });
 
-    after(async () => {
-        // Cleanup: fechar conexões
-        await componentA.shutdown();
-        await componentB.shutdown();
-        await nerv.close();
+    it('should handle message timeout gracefully', async () => {
+      // Simular B não respondendo
+      componentB.pause(); // método para pausar processamento
+
+      const result = await componentA.sendMessageWithTimeout({ type: 'TEST' }, { timeout: 1000 });
+
+      assert.strictEqual(result.status, 'timeout');
     });
+  });
 
-    describe('message flow A → B', () => {
-        it('should send message from A to B via NERV', async () => {
-            const message = { type: 'TEST', data: 'hello' };
+  describe('error propagation', () => {
+    it('should propagate errors from B to A', async () => {
+      componentB.simulateError(new Error('Test error'));
 
-            // B escuta mensagens
-            const received = new Promise(resolve => {
-                componentB.on('message', resolve);
-            });
-
-            // A envia mensagem
-            await componentA.sendMessage(message);
-
-            // B recebe mensagem
-            const receivedMessage = await received;
-            assert.deepStrictEqual(receivedMessage, message);
-        });
-
-        it('should handle message timeout gracefully', async () => {
-            // Simular B não respondendo
-            componentB.pause(); // método para pausar processamento
-
-            const result = await componentA.sendMessageWithTimeout(
-                { type: 'TEST' },
-                { timeout: 1000 }
-            );
-
-            assert.strictEqual(result.status, 'timeout');
-        });
+      await assert.rejects(() => componentA.sendMessage({ type: 'TEST' }), {
+        message: /Test error/,
+      });
     });
-
-    describe('error propagation', () => {
-        it('should propagate errors from B to A', async () => {
-            componentB.simulateError(new Error('Test error'));
-
-            await assert.rejects(
-                () => componentA.sendMessage({ type: 'TEST' }),
-                { message: /Test error/ }
-            );
-        });
-    });
+  });
 });
 ```
 
@@ -606,101 +601,99 @@ const { startAgent, stopAgent, waitForAgent } = require('../../helpers/test_help
 const { writeTask, readResponse } = require('../../helpers/async_helpers');
 
 describe('E2E: Full Task Flow', () => {
-    let agentProcess;
+  let agentProcess;
 
-    before(async () => {
-        // Limpar ambiente
-        cleanTestEnvironment();
+  before(async () => {
+    // Limpar ambiente
+    cleanTestEnvironment();
 
-        // Iniciar agente completo
-        agentProcess = await startAgent({ mode: 'test' });
+    // Iniciar agente completo
+    agentProcess = await startAgent({ mode: 'test' });
 
-        // Aguardar ready
-        await waitForAgent({ timeout: 10000 });
+    // Aguardar ready
+    await waitForAgent({ timeout: 10000 });
+  });
+
+  after(async () => {
+    // Parar agente
+    await stopAgent(agentProcess);
+
+    // Limpar arquivos de teste
+    cleanTestEnvironment();
+  });
+
+  it('should process task from creation to completion', async () => {
+    // 1. Criar tarefa na fila
+    const taskId = await writeTask({
+      prompt: 'What is 2+2?',
+      target: 'chatgpt',
+      model: 'gpt-4',
     });
 
-    after(async () => {
-        // Parar agente
-        await stopAgent(agentProcess);
+    // 2. Aguardar processamento (polling)
+    const response = await waitForResponse(taskId, { timeout: 60000 });
 
-        // Limpar arquivos de teste
-        cleanTestEnvironment();
+    // 3. Validar resposta
+    assert.ok(response);
+    assert.strictEqual(response.status, 'DONE');
+    assert.match(response.result, /4/);
+
+    // 4. Verificar artefatos criados
+    const responseFile = path.join(__dirname, '../../respostas', `${taskId}.txt`);
+    assert.ok(fs.existsSync(responseFile));
+
+    // 5. Verificar logs
+    const logs = await readAgentLogs();
+    assert.ok(logs.some(l => l.includes(`Task ${taskId} completed`)));
+  });
+
+  it('should handle multiple tasks concurrently', async () => {
+    const tasks = [];
+
+    // Criar 3 tarefas simultâneas
+    for (let i = 0; i < 3; i++) {
+      tasks.push(writeTask({ prompt: `Test ${i}` }));
+    }
+
+    const taskIds = await Promise.all(tasks);
+
+    // Aguardar todas completarem
+    const responses = await Promise.all(taskIds.map(id => waitForResponse(id, { timeout: 90000 })));
+
+    // Validar todas completaram
+    assert.strictEqual(responses.length, 3);
+    responses.forEach(r => {
+      assert.strictEqual(r.status, 'DONE');
     });
-
-    it('should process task from creation to completion', async () => {
-        // 1. Criar tarefa na fila
-        const taskId = await writeTask({
-            prompt: 'What is 2+2?',
-            target: 'chatgpt',
-            model: 'gpt-4'
-        });
-
-        // 2. Aguardar processamento (polling)
-        const response = await waitForResponse(taskId, { timeout: 60000 });
-
-        // 3. Validar resposta
-        assert.ok(response);
-        assert.strictEqual(response.status, 'DONE');
-        assert.match(response.result, /4/);
-
-        // 4. Verificar artefatos criados
-        const responseFile = path.join(__dirname, '../../respostas', `${taskId}.txt`);
-        assert.ok(fs.existsSync(responseFile));
-
-        // 5. Verificar logs
-        const logs = await readAgentLogs();
-        assert.ok(logs.some(l => l.includes(`Task ${taskId} completed`)));
-    });
-
-    it('should handle multiple tasks concurrently', async () => {
-        const tasks = [];
-
-        // Criar 3 tarefas simultâneas
-        for (let i = 0; i < 3; i++) {
-            tasks.push(writeTask({ prompt: `Test ${i}` }));
-        }
-
-        const taskIds = await Promise.all(tasks);
-
-        // Aguardar todas completarem
-        const responses = await Promise.all(
-            taskIds.map(id => waitForResponse(id, { timeout: 90000 }))
-        );
-
-        // Validar todas completaram
-        assert.strictEqual(responses.length, 3);
-        responses.forEach(r => {
-            assert.strictEqual(r.status, 'DONE');
-        });
-    });
+  });
 });
 
 // ===== HELPERS LOCAIS =====
 function cleanTestEnvironment() {
-    // Limpar fila, logs, locks, etc
+  // Limpar fila, logs, locks, etc
 }
 
 async function waitForResponse(taskId, { timeout = 30000 }) {
-    const start = Date.now();
-    const responseFile = path.join(__dirname, '../../respostas', `${taskId}.txt`);
+  const start = Date.now();
+  const responseFile = path.join(__dirname, '../../respostas', `${taskId}.txt`);
 
-    while (Date.now() - start < timeout) {
-        if (fs.existsSync(responseFile)) {
-            return JSON.parse(fs.readFileSync(responseFile, 'utf-8'));
-        }
-        await sleep(1000);
+  while (Date.now() - start < timeout) {
+    if (fs.existsSync(responseFile)) {
+      return JSON.parse(fs.readFileSync(responseFile, 'utf-8'));
     }
+    await sleep(1000);
+  }
 
-    throw new Error(`Response timeout for task ${taskId}`);
+  throw new Error(`Response timeout for task ${taskId}`);
 }
 
 async function readAgentLogs() {
-    const logFile = path.join(__dirname, '../../logs', 'agente_current.log');
-    return fs.readFileSync(logFile, 'utf-8').split('\n');
+  const logFile = path.join(__dirname, '../../logs', 'agente_current.log');
+  return fs.readFileSync(logFile, 'utf-8').split('\n');
 }
 
 function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 ```
 
@@ -731,26 +724,26 @@ npm install --save-dev @faker-js/faker
 
 ```json
 {
-    "scripts": {
-        "test": "node --test tests/**/*.spec.js",
-        "test:unit": "node --test tests/unit/**/*.spec.js",
-        "test:integration": "node --test tests/integration/**/*.spec.js",
-        "test:e2e": "node --test tests/e2e/**/*.spec.js",
-        "test:regression": "node --test tests/regression/**/*.spec.js",
+  "scripts": {
+    "test": "node --test tests/**/*.spec.js",
+    "test:unit": "node --test tests/unit/**/*.spec.js",
+    "test:integration": "node --test tests/integration/**/*.spec.js",
+    "test:e2e": "node --test tests/e2e/**/*.spec.js",
+    "test:regression": "node --test tests/regression/**/*.spec.js",
 
-        "test:watch": "node --test --watch tests/**/*.spec.js",
+    "test:watch": "node --test --watch tests/**/*.spec.js",
 
-        "test:coverage": "c8 --reporter=html --reporter=text npm test",
-        "test:coverage:unit": "c8 --reporter=text npm run test:unit",
+    "test:coverage": "c8 --reporter=html --reporter=text npm test",
+    "test:coverage:unit": "c8 --reporter=text npm run test:unit",
 
-        "test:ci": "c8 --reporter=lcov --reporter=text npm test",
+    "test:ci": "c8 --reporter=lcov --reporter=text npm test",
 
-        "test:specific": "node --test",
+    "test:specific": "node --test",
 
-        "test:debug": "node --inspect-brk --test tests/**/*.spec.js",
+    "test:debug": "node --inspect-brk --test tests/**/*.spec.js",
 
-        "test:summary": "node scripts/test-summary.js"
-    }
+    "test:summary": "node scripts/test-summary.js"
+  }
 }
 ```
 
@@ -758,29 +751,23 @@ npm install --save-dev @faker-js/faker
 
 ```json
 {
-    "all": true,
-    "include": ["src/**/*.js"],
-    "exclude": [
-        "src/**/*.test.js",
-        "src/**/*.spec.js",
-        "node_modules/**",
-        "tests/**",
-        "coverage/**"
-    ],
-    "reporter": ["html", "text", "lcov"],
-    "check-coverage": true,
-    "lines": 80,
-    "functions": 75,
-    "branches": 75,
-    "statements": 80,
-    "watermarks": {
-        "lines": [80, 95],
-        "functions": [75, 90],
-        "branches": [75, 90],
-        "statements": [80, 95]
-    },
-    "temp-directory": "./tests/tmp/.c8",
-    "report-dir": "./coverage"
+  "all": true,
+  "include": ["src/**/*.js"],
+  "exclude": ["src/**/*.test.js", "src/**/*.spec.js", "node_modules/**", "tests/**", "coverage/**"],
+  "reporter": ["html", "text", "lcov"],
+  "check-coverage": true,
+  "lines": 80,
+  "functions": 75,
+  "branches": 75,
+  "statements": 80,
+  "watermarks": {
+    "lines": [80, 95],
+    "functions": [75, 90],
+    "branches": [75, 90],
+    "statements": [80, 95]
+  },
+  "temp-directory": "./tests/tmp/.c8",
+  "report-dir": "./coverage"
 }
 ```
 
@@ -796,19 +783,13 @@ const fs = require('fs');
 const path = require('path');
 
 // Criar diretórios necessários
-const dirs = [
-    'tests/tmp',
-    'tests/tmp/tasks',
-    'tests/tmp/responses',
-    'tests/tmp/logs',
-    'coverage'
-];
+const dirs = ['tests/tmp', 'tests/tmp/tasks', 'tests/tmp/responses', 'tests/tmp/logs', 'coverage'];
 
 dirs.forEach(dir => {
-    const fullPath = path.join(__dirname, '..', dir);
-    if (!fs.existsSync(fullPath)) {
-        fs.mkdirSync(fullPath, { recursive: true });
-    }
+  const fullPath = path.join(__dirname, '..', dir);
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+  }
 });
 
 // Configurar variáveis de ambiente para testes
@@ -818,10 +799,10 @@ process.env.BROWSER_MODE = 'launcher'; // Sempre launcher em testes
 
 // Mock do logger global (opcional)
 global.testLogger = {
-    log: () => {}, // silent
-    info: () => {},
-    warn: () => {},
-    error: () => {}
+  log: () => {}, // silent
+  info: () => {},
+  warn: () => {},
+  error: () => {},
 };
 
 console.log('✅ Global test setup complete');
@@ -841,8 +822,8 @@ const path = require('path');
 // Limpar arquivos temporários
 const tmpDir = path.join(__dirname, '..', 'tests/tmp');
 if (fs.existsSync(tmpDir)) {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-    console.log('✅ Cleaned test tmp directory');
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+  console.log('✅ Cleaned test tmp directory');
 }
 
 // Fechar conexões pendentes (se houver)
@@ -882,6 +863,7 @@ mv tests/test_health_endpoint.js tests/integration/api/test_health_endpoint.spec
 ```
 
 **Checklist**:
+
 - [ ] Dependências instaladas
 - [ ] Estrutura de diretórios criada
 - [ ] Configuração c8 feita
@@ -921,6 +903,7 @@ npm test
 ```
 
 **Checklist**:
+
 - [ ] 14 testes convertidos para novo formato
 - [ ] 10 fixtures básicas criadas
 - [ ] 5 mocks básicos criados
@@ -936,33 +919,28 @@ npm test
 **Resultado Final**:
 
 ✅ **Core (3 arquivos)**:
+
 1. test_logger.spec.js (8 suites, 12+ tests) - ALL PASSING
 2. test_schemas.spec.js (5 suites, 18 tests) - 6/18 PASSING (bugs encontrados)
 3. test_config.spec.js (8 suites, 8+ tests) - modernizado
 
-✅ **NERV (2 arquivos)**:
-4. test_nerv_core.spec.js (8 suites, 15 tests) - event bus
-5. test_envelope.spec.js (8 suites, 20 tests) - protocol validation
+✅ **NERV (2 arquivos)**: 4. test_nerv_core.spec.js (8 suites, 15 tests) - event bus 5.
+test_envelope.spec.js (8 suites, 20 tests) - protocol validation
 
-✅ **Kernel (3 arquivos)**:
-6. test_execution_engine.spec.js (8 suites, 12 tests) - task lifecycle
-7. test_task_runtime.spec.js (10 suites, 18 tests) - runtime context
-8. test_policy_engine.spec.js (9 suites, 15 tests) - retry policies
+✅ **Kernel (3 arquivos)**: 6. test_execution_engine.spec.js (8 suites, 12 tests) - task
+lifecycle 7. test_task_runtime.spec.js (10 suites, 18 tests) - runtime context 8.
+test_policy_engine.spec.js (9 suites, 15 tests) - retry policies
 
-✅ **Driver (2 arquivos)**:
-9. test_driver_factory.spec.js (8 suites, 12 tests) - driver creation
-10. test_driver_adapters.spec.js (10 suites, 18 tests) - ChatGPT/Gemini
+✅ **Driver (2 arquivos)**: 9. test_driver_factory.spec.js (8 suites, 12 tests) - driver
+creation 10. test_driver_adapters.spec.js (10 suites, 18 tests) - ChatGPT/Gemini
 
-✅ **Infra (4 arquivos)** - inclui 2 da FASE 2:
-11. test_io.spec.js (10 suites, 20 tests) - 🔴 INCLUI FIX P5.2
-12. test_lock_manager.spec.js (10 suites, 14 tests) - PID validation
-13. test_browser_pool.spec.js (migrado FASE 2)
-14. test_puppeteer_launcher.spec.js (migrado FASE 2)
+✅ **Infra (4 arquivos)** - inclui 2 da FASE 2: 11. test_io.spec.js (10 suites, 20 tests) - 🔴
+INCLUI FIX P5.2 12. test_lock_manager.spec.js (10 suites, 14 tests) - PID validation 13.
+test_browser_pool.spec.js (migrado FASE 2) 14. test_puppeteer_launcher.spec.js (migrado FASE 2)
 
-✅ **Server (3 arquivos)**:
-15. test_server_nerv_adapter.spec.js (10 suites, 12 tests) - NERV integration
-16. test_api_router.spec.js (15 suites, 15 tests) - HTTP routes
-17. test_middleware.spec.js (10 suites, 10 tests) - request processing
+✅ **Server (3 arquivos)**: 15. test_server_nerv_adapter.spec.js (10 suites, 12 tests) - NERV
+integration 16. test_api_router.spec.js (15 suites, 15 tests) - HTTP routes 17.
+test_middleware.spec.js (10 suites, 10 tests) - request processing
 
 **Total Real**: 17 arquivos | ~154 testes | 100% dos críticos cobertos
 
@@ -1041,7 +1019,6 @@ npm run test:coverage
 
 ---
 
-**Status**: ✅ ESTRATÉGIA COMPLETA DEFINIDA
-**Próxima ação**: Começar FASE 1 (Preparação)
-**Tempo estimado**: 4 horas para setup inicial
-**Resultado esperado**: Estrutura completa + 14 testes migrados
+**Status**: ✅ ESTRATÉGIA COMPLETA DEFINIDA **Próxima ação**: Começar FASE 1 (Preparação) **Tempo
+estimado**: 4 horas para setup inicial **Resultado esperado**: Estrutura completa + 14 testes
+migrados

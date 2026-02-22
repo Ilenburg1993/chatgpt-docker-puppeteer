@@ -1,9 +1,7 @@
 # ❓ FAQ (Perguntas Frequentes)
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Todos
-**Tempo de Leitura**: ~20 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Todos **Tempo de Leitura**: ~20
+min
 
 ---
 
@@ -30,9 +28,12 @@ Respostas rápidas para **30 perguntas frequentes** sobre o sistema `chatgpt-doc
 
 ### Q1: O que é chatgpt-docker-puppeteer?
 
-**A**: Sistema autônomo para automação de LLMs (ChatGPT, Gemini) via browser, usando Puppeteer. Processa tasks em fila, coleta respostas, gerencia concorrência com event-driven architecture (NERV).
+**A**: Sistema autônomo para automação de LLMs (ChatGPT, Gemini) via browser, usando Puppeteer.
+Processa tasks em fila, coleta respostas, gerencia concorrência com event-driven architecture
+(NERV).
 
 **Principais features**:
+
 - ✅ Multi-target (ChatGPT, Gemini, extensível)
 - ✅ Queue-based (file system)
 - ✅ Event-driven (NERV bus)
@@ -46,18 +47,19 @@ Respostas rápidas para **30 perguntas frequentes** sobre o sistema `chatgpt-doc
 ### Q2: Quais LLMs são suportados?
 
 **A**:
+
 - ✅ **ChatGPT** (OpenAI) - Estável
 - ✅ **Gemini** (Google) - Estável
 - ⏳ **Claude** (Anthropic) - Roadmap Q1 2026
 
-**Como adicionar novos**:
-Ver [DEVELOPMENT.md](DEVELOPMENT.md) seção "Adicionar Novo LLM Target".
+**Como adicionar novos**: Ver [DEVELOPMENT.md](DEVELOPMENT.md) seção "Adicionar Novo LLM Target".
 
 ---
 
 ### Q3: É necessário API key dos LLMs?
 
 **A**: **NÃO**. O sistema usa automação de browser (Puppeteer), não APIs oficiais. Funciona com:
+
 - Contas gratuitas (ChatGPT free tier)
 - Login manual no browser
 - Sem rate limits de API
@@ -70,16 +72,17 @@ Ver [DEVELOPMENT.md](DEVELOPMENT.md) seção "Adicionar Novo LLM Target".
 
 **A**:
 
-| Mode         | Browser                                   | Quando usar                  |
-| ------------ | ----------------------------------------- | ---------------------------- |
-| **launcher** | Agent inicia browser automaticamente      | Production, Docker, PM2      |
+| Mode         | Browser                                                    | Quando usar                  |
+| ------------ | ---------------------------------------------------------- | ---------------------------- |
+| **launcher** | Agent inicia browser automaticamente                       | Production, Docker, PM2      |
 | **external** | Conecta a browser já rodando (porta container-facing 9224) | Development (debug DevTools) |
-| **hybrid**   | Tenta external, fallback launcher         | Versatilidade (dev/prod)     |
+| **hybrid**   | Tenta external, fallback launcher                          | Versatilidade (dev/prod)     |
 
 **Config**:
+
 ```json
 {
-  "browserMode": "launcher"  // launcher | external | hybrid
+  "browserMode": "launcher" // launcher | external | hybrid
 }
 ```
 
@@ -156,11 +159,13 @@ make queue-add
 **A**:
 
 **Hardware**:
+
 - CPU: 2 cores (4+ recomendado)
 - RAM: 1GB (2GB+ recomendado)
 - Disk: 500MB + espaço para fila/respostas
 
 **Software**:
+
 - Node.js: ≥20.0.0 LTS
 - npm: ≥10.0.0
 - Chrome/Edge: Latest stable
@@ -173,11 +178,13 @@ make queue-add
 ### Q8: Funciona no Windows?
 
 **A**: **SIM**. Cross-platform completo:
+
 - ✅ Windows 10/11 (cmd, PowerShell, Git Bash)
 - ✅ Linux (Ubuntu, Debian, outros)
 - ✅ macOS (Intel + Apple Silicon)
 
 **Scripts disponíveis**:
+
 - Windows: `.bat`, `.ps1`
 - Linux/macOS: `.sh`
 
@@ -223,6 +230,7 @@ make health
 **A**: 3 métodos:
 
 **1. Via Makefile** (interativo):
+
 ```bash
 make queue-add
 # Prompt: Target? chatgpt
@@ -230,6 +238,7 @@ make queue-add
 ```
 
 **2. Via API**:
+
 ```bash
 curl -X POST http://localhost:3008/api/queue/add \
   -H "Content-Type: application/json" \
@@ -241,6 +250,7 @@ curl -X POST http://localhost:3008/api/queue/add \
 ```
 
 **3. Via arquivo** (manual):
+
 ```bash
 # Create file: fila/task-abc123.json
 {
@@ -262,12 +272,14 @@ curl -X POST http://localhost:3008/api/queue/add \
 **A**: 4 opções:
 
 **1. Dashboard HTML**:
+
 ```bash
 make dashboard
 # Abre http://localhost:3008
 ```
 
 **2. Via API**:
+
 ```bash
 # Queue summary
 curl http://localhost:3008/api/queue | jq '.summary'
@@ -277,11 +289,13 @@ curl http://localhost:3008/api/task/task-abc123 | jq
 ```
 
 **3. Via Makefile**:
+
 ```bash
 make queue-status
 ```
 
 **4. Via arquivos**:
+
 ```bash
 # List PENDING
 ls fila/*-PENDING-*.json
@@ -316,12 +330,14 @@ curl http://localhost:3008/api/response/task-abc123
 **A**:
 
 **Via API**:
+
 ```bash
 curl -X POST http://localhost:3008/api/task/task-abc123/cancel \
   -H "Authorization: Bearer YOUR_PASSWORD"
 ```
 
 **Manual**:
+
 ```bash
 # Remove from queue
 rm fila/task-abc123.json
@@ -353,6 +369,7 @@ grep "ERROR" logs/agente-gpt-err.log
 ```
 
 **Níveis de log**:
+
 - DEBUG: Tudo (desenvolvimento)
 - INFO: Eventos importantes (padrão)
 - WARN: Avisos (produção)
@@ -369,6 +386,7 @@ grep "ERROR" logs/agente-gpt-err.log
 **A**: Ver [TROUBLESHOOTING.md](TROUBLESHOOTING.md) seção "Task stuck em RUNNING".
 
 **Quick fix**:
+
 ```bash
 # Cancel via API
 curl -X POST http://localhost:3008/api/task/TASK_ID/cancel
@@ -384,6 +402,7 @@ make restart
 **A**: Ver [TROUBLESHOOTING.md](TROUBLESHOOTING.md) seção "Browser connection failed".
 
 **Quick fix**:
+
 ```bash
 # Option 1: Start external browser (host) + proxy (container-facing)
 google-chrome --remote-debugging-port=9224 &
@@ -403,6 +422,7 @@ make restart
 **A**: Ver [TROUBLESHOOTING.md](TROUBLESHOOTING.md) seção "High memory usage".
 
 **Quick fix**:
+
 ```bash
 # Restart PM2
 make restart
@@ -418,6 +438,7 @@ make restart
 **A**: Ver [TROUBLESHOOTING.md](TROUBLESHOOTING.md) seção "Dashboard 401".
 
 **Quick fix**:
+
 ```bash
 # Include password
 curl -u :YOUR_PASSWORD http://localhost:3008/api/queue
@@ -451,16 +472,17 @@ curl -u :YOUR_PASSWORD http://localhost:3008/api/queue
 ```json
 // config.json
 {
-  "maxWorkers": 10,           // De 3 para 10
-  "kernelCycleMs": 20,        // De 50 para 20 (50Hz)
-  "browserPoolSize": 10,      // Match workers
-  "queueConcurrency": 20,     // De 10 para 20
-  "adaptiveDelayMin": 30,     // Delays menores
+  "maxWorkers": 10, // De 3 para 10
+  "kernelCycleMs": 20, // De 50 para 20 (50Hz)
+  "browserPoolSize": 10, // Match workers
+  "queueConcurrency": 20, // De 10 para 20
+  "adaptiveDelayMin": 30, // Delays menores
   "adaptiveDelayMax": 100
 }
 ```
 
 **Trade-offs**:
+
 - ➕ +400% throughput
 - ➖ +300% CPU usage
 - ➖ +700% memory usage
@@ -484,6 +506,7 @@ curl -u :YOUR_PASSWORD http://localhost:3008/api/queue
 ```
 
 **Resultado**:
+
 - ➕ -80% memory
 - ➕ -70% CPU
 - ➖ -70% throughput (30-40 tasks/h)
@@ -493,10 +516,12 @@ curl -u :YOUR_PASSWORD http://localhost:3008/api/queue
 ### Q22: Queue scan está lento (>1s)
 
 **A**: Causas:
+
 - Muitos arquivos na fila (>100)
 - Cache invalidado (P9.4)
 
 **Soluções**:
+
 ```bash
 # Archive completed tasks
 mv fila/*-DONE-*.json fila/archive/
@@ -569,6 +594,7 @@ sudo systemctl restart nginx
 **A**: Ver [SECURITY.md](SECURITY.md) seção "Credential Rotation".
 
 **Quick steps**:
+
 ```bash
 # 1. Generate new password
 NEW_PASS=$(openssl rand -base64 32)
@@ -617,6 +643,7 @@ npm test -- --coverage
 **A**: 3 métodos:
 
 **1. VS Code debugger**:
+
 ```bash
 # Start with inspect
 node --inspect index.js
@@ -626,12 +653,14 @@ node --inspect index.js
 ```
 
 **2. Chrome DevTools**:
+
 ```bash
 node --inspect-brk index.js
 # Chrome: chrome://inspect
 ```
 
 **3. Logs DEBUG**:
+
 ```bash
 # .env
 LOG_LEVEL=DEBUG
@@ -649,24 +678,27 @@ make watch-logs
 **A**: 3 passos:
 
 **1. Create driver**:
+
 ```javascript
 // src/driver/targets/claude.js
 class ClaudeDriver extends BaseDriver {
-    async execute(page, prompt) {
-        await page.goto('https://claude.ai/chats');
-        await page.type('div[contenteditable]', prompt);
-        // ... (collection logic)
-    }
+  async execute(page, prompt) {
+    await page.goto('https://claude.ai/chats');
+    await page.type('div[contenteditable]', prompt);
+    // ... (collection logic)
+  }
 }
 ```
 
 **2. Register factory**:
+
 ```javascript
 // src/driver/driver_factory.js
 case 'claude': return new ClaudeDriver(opts);
 ```
 
 **3. Add rules**:
+
 ```json
 // dynamic_rules.json
 {
@@ -719,6 +751,7 @@ git push origin feature/my-feature
 **A**: 3 opções:
 
 **1. PM2 (bare metal)**:
+
 ```bash
 # Install PM2
 npm install -g pm2
@@ -732,6 +765,7 @@ pm2 save
 ```
 
 **2. Docker**:
+
 ```bash
 # Build
 docker-compose -f docker-compose.yml build
@@ -741,6 +775,7 @@ docker-compose -f docker-compose.yml up -d
 ```
 
 **3. Nginx + PM2 + HTTPS**:
+
 ```bash
 # 1. Deploy with PM2
 pm2 start ecosystem.config.js
@@ -761,17 +796,20 @@ sudo certbot --nginx -d agente.example.com
 ### Documentação Completa (16 docs canônicos)
 
 **FASE 1 - Fundação**:
+
 - [PHILOSOPHY.md](PHILOSOPHY.md) - Princípios de design
 - [ARCHITECTURE_v2.md](ARCHITECTURE_v2.md) - Arquitetura NERV
 - [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) - Design patterns
 
 **FASE 2 - Estrutural**:
+
 - [DATA_FLOW.md](DATA_FLOW.md) - Fluxos de dados
 - [SUBSYSTEMS.md](SUBSYSTEMS.md) - Componentes (CORE, NERV, KERNEL, etc)
 - [PATTERNS.md](PATTERNS.md) - 15 patterns catalogados
 - [GLOSSARY.md](GLOSSARY.md) - 42 termos técnicos
 
 **FASE 3 - Operacional**:
+
 - [CONFIGURATION.md](CONFIGURATION.md) - Configuração (22 params, 50+ env vars)
 - [API_REFERENCE.md](API_REFERENCE.md) - REST + WebSocket (10 endpoints, 7 eventos)
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Docker, PM2, HTTPS, scaling
@@ -780,6 +818,7 @@ sudo certbot --nginx -d agente.example.com
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Git workflow, standards
 
 **FASE 4 - Referência**:
+
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Problemas comuns
 - **FAQ.md** (este documento)
 - [SECURITY.md](SECURITY.md) - Políticas de segurança
@@ -792,4 +831,4 @@ sudo certbot --nginx -d agente.example.com
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, Community Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, Community Team_

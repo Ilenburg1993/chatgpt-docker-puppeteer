@@ -1,7 +1,7 @@
 # 🎯 Consolidação dos Sistemas Fundamentais
-**Data**: 3 de Fevereiro de 2026
-**Versão**: v1.0
-**Status**: ✅ Revisão Completa | 🔍 Documentação Canônica
+
+**Data**: 3 de Fevereiro de 2026 **Versão**: v1.0 **Status**: ✅ Revisão Completa | 🔍 Documentação
+Canônica
 
 ---
 
@@ -21,18 +21,21 @@
 
 ### Propósito Deste Documento
 
-Este documento consolida a arquitetura e funcionamento dos **3 sistemas fundamentais** que servem de base para toda a operação do projeto:
+Este documento consolida a arquitetura e funcionamento dos **3 sistemas fundamentais** que servem de
+base para toda a operação do projeto:
 
 1. **Boot Sequence** (`src/main.js` + `boot_resilience_manager.js`)
 2. **Browser Connection** (`ConnectionOrchestrator.js` + `pool_manager.js`)
 3. **Driver Integration** (`DriverLifecycleManager.js` + `execution_engine.js`)
 
 **Por que são fundamentais?**
+
 - ✅ **Boot** garante inicialização ordenada e resiliente de todos os subsistemas
 - ✅ **Browser Connection** estabelece comunicação com Chrome via Puppeteer
 - ✅ **Driver Integration** executa automação via drivers (ChatGPT, Gemini, Claude)
 
 **Interdependências**:
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ BOOT SEQUENCE                                                   │
@@ -69,10 +72,11 @@ Este documento consolida a arquitetura e funcionamento dos **3 sistemas fundamen
 
 ### Responsabilidades
 
-**Arquivo Principal**: `src/main.js`
-**Módulo de Resiliência**: `src/core/boot_resilience_manager.js`
+**Arquivo Principal**: `src/main.js` **Módulo de Resiliência**:
+`src/core/boot_resilience_manager.js`
 
 **O que faz**:
+
 - ✅ Orquestra boot sequence em 6 fases ordenadas
 - ✅ Detecta e trata falhas durante boot (modo degradado)
 - ✅ Valida conflitos de configuração (PM2 + SERVER_MODE, porta EADDRINUSE)
@@ -82,6 +86,7 @@ Este documento consolida a arquitetura e funcionamento dos **3 sistemas fundamen
 ### Arquitetura - 6 Fases de Boot
 
 #### **Fase 1: Configuração e Identidade**
+
 ```javascript
 // Carga de configuração
 await CONFIG.reload('sys-boot');
@@ -93,33 +98,38 @@ const identity = identityManager.getFullIdentity();
 ```
 
 **Validações**:
+
 - ✅ Resolve `SERVER_AUTHORITY` (standalone | delegated)
 - ✅ Resolve `SERVER_MODE` (integrated | split | disabled)
 - ✅ Detecta conflito PM2 + SERVER_MODE=integrated → FATAL exit
 
 **Outputs**:
+
 - `identity.robot_id` disponível globalmente
 - `SERVER_MODE` determinístico
 
 ---
 
 #### **Fase 2: NERV (Event Bus)**
+
 ```javascript
 const nerv = await createNERV({
-    mode: CONNECTION_MODES.HYBRID,
-    correlation: true,
-    bufferSize: 1000,
-    telemetry: true
+  mode: CONNECTION_MODES.HYBRID,
+  correlation: true,
+  bufferSize: 1000,
+  telemetry: true,
 });
 ```
 
 **Features**:
+
 - ✅ Event-driven architecture (zero acoplamento direto)
 - ✅ Correlation IDs para rastreamento
 - ✅ Buffer de 1000 eventos (overflow policy)
 - ✅ Telemetria integrada
 
 **Injeção NERV**:
+
 ```javascript
 forensics.setNERV(nerv);
 setInfraPolicyNERV(nerv);
@@ -130,55 +140,60 @@ setInfraPolicyNERV(nerv);
 ---
 
 #### **Fase 2.5: Chrome Proxy Service** (🆕 v3.0)
+
 ```javascript
 // Validação: Proxy duplicado?
 const proxyAlreadyRunning = await checkPortInUse(9224);
 
 if (!proxyAlreadyRunning) {
-    const chromeProxy = new ChromeProxyService({
-        PROXY_PORT: 9224,
-        CHROME_PORT: 9225,
-        CHROME_HOST: 'host.docker.internal'
-    });
+  const chromeProxy = new ChromeProxyService({
+    PROXY_PORT: 9224,
+    CHROME_PORT: 9225,
+    CHROME_HOST: 'host.docker.internal',
+  });
 
-    chromeProxy.setNERV(nerv);
-    await chromeProxy.start();
+  chromeProxy.setNERV(nerv);
+  await chromeProxy.start();
 }
 ```
 
 **Arquitetura Ontológica**:
+
 ```
 DevContainer (Puppeteer) → localhost:9224 (Proxy) → host.docker.internal:9225 (Chrome)
 ```
 
 **Princípios**:
+
 - ✅ DevContainer **NÃO inicia Chrome** (responsabilidade do Windows Host)
 - ✅ DevContainer **APENAS conecta** via proxy
 - ✅ Proxy gerenciado por PM2 OU inline (validação anti-duplicação)
 
 **Validação Anti-Duplicação**:
+
 - Se porta 9224 já está em uso → assume proxy externo (PM2) → não cria inline
 - Previne erro EADDRINUSE
 
 ---
 
 #### **Fase 3: Browser Pool Manager**
+
 ```javascript
 const { initializeBrowserPoolResilient } = require('./core/boot_resilience_manager');
 
 const browserPoolResult = await initializeBrowserPoolResilient(
-    {
-        poolSize: 3,
-        allocationStrategy: 'round-robin',
-        healthCheckInterval: 30000,
-        browserEndpoint: { url: 'http://localhost:9224' }
-    },
-    {
-        nerv,
-        allowDegradedMode: true,
-        autoRetry: true,
-        maxAutoRetries: 2
-    }
+  {
+    poolSize: 3,
+    allocationStrategy: 'round-robin',
+    healthCheckInterval: 30000,
+    browserEndpoint: { url: 'http://localhost:9224' },
+  },
+  {
+    nerv,
+    allowDegradedMode: true,
+    autoRetry: true,
+    maxAutoRetries: 2,
+  }
 );
 
 const browserPool = browserPoolResult.browserPool;
@@ -186,6 +201,7 @@ const systemMode = browserPoolResult.mode; // 'full' | 'degraded'
 ```
 
 **Features de Resiliência**:
+
 1. **Auto-Retry**: Tenta iniciar Chrome automaticamente (2 tentativas)
 2. **Modo Degradado**: Sistema continua sem Browser Pool
 3. **Opções ao Usuário**: Mostra instruções para corrigir Chrome
@@ -195,10 +211,11 @@ const systemMode = browserPoolResult.mode; // 'full' | 'degraded'
 
 | Modo         | Browser Pool | Driver Tasks | Dashboard | Uso                   |
 | ------------ | ------------ | ------------ | --------- | --------------------- |
-| **Full**     | ✅ Ativo      | ✅ Executam   | ✅ Sim     | Produção normal       |
-| **Degraded** | ❌ Null       | ⏸️ Pausadas   | ✅ Sim     | Chrome não disponível |
+| **Full**     | ✅ Ativo     | ✅ Executam  | ✅ Sim    | Produção normal       |
+| **Degraded** | ❌ Null      | ⏸️ Pausadas  | ✅ Sim    | Chrome não disponível |
 
 **Decision Tree**:
+
 ```
 Chrome OK?
   ├─ YES → Full mode (browserPool ativa)
@@ -216,17 +233,19 @@ Chrome OK?
 ---
 
 #### **Fase 3.5: ContextManager**
+
 ```javascript
 const { ContextManager } = require('./orchestrator/context_manager');
 
 const contextManager = new ContextManager({
-    strategy: 'sliding_window',
-    maxTokens: 100000,
-    summarizationPolicy: 'on_overflow'
+  strategy: 'sliding_window',
+  maxTokens: 100000,
+  summarizationPolicy: 'on_overflow',
 });
 ```
 
 **Compartilhamento**:
+
 - ✅ Usado por **Kernel** (task execution context)
 - ✅ Usado por **MissionManager** (multi-step context)
 - ✅ Sliding window com summarization automática
@@ -234,17 +253,19 @@ const contextManager = new ContextManager({
 ---
 
 #### **Fase 4: KERNEL**
+
 ```javascript
 const kernel = await createKernel({
-    nerv,
-    contextManager,
-    telemetry: { source: 'kernel', retention: 1000 },
-    policy: {},
-    loop: { cycleInterval: 50 } // 20 Hz
+  nerv,
+  contextManager,
+  telemetry: { source: 'kernel', retention: 1000 },
+  policy: {},
+  loop: { cycleInterval: 50 }, // 20 Hz
 });
 ```
 
 **Responsabilidades**:
+
 - ✅ Orquestra execução de tasks
 - ✅ Loop 20 Hz (50ms cycle interval)
 - ✅ Policy Engine (timeout, retry, abort)
@@ -255,35 +276,36 @@ const kernel = await createKernel({
 #### **Fase 5: Adapters (Pontes NERV)**
 
 **DriverNERVAdapter**:
+
 ```javascript
 const driverAdapter = new DriverNERVAdapter(nerv, browserPool, CONFIG);
 
 // Modo degradado: browserPool = null
 if (systemMode === 'degraded') {
-    log('WARN', 'DriverAdapter em modo degradado (tasks pausadas)');
+  log('WARN', 'DriverAdapter em modo degradado (tasks pausadas)');
 }
 ```
 
 **ServerNERVAdapter** (Condicional):
+
 ```javascript
 if (SERVER_MODE === 'integrated') {
-    // Maestro sobe server local
-    const { server, port } = await serverEngine.start(3008);
-    socketHub = socketModule.init(server);
-    serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
-
+  // Maestro sobe server local
+  const { server, port } = await serverEngine.start(3008);
+  socketHub = socketModule.init(server);
+  serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
 } else if (SERVER_MODE === 'split') {
-    // Maestro conecta em server externo
-    socketHub = await socketModule.connectExternal(3008);
-    serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
-
+  // Maestro conecta em server externo
+  socketHub = await socketModule.connectExternal(3008);
+  serverAdapter = new ServerNERVAdapter(nerv, socketHub, CONFIG);
 } else if (SERVER_MODE === 'disabled') {
-    // Sem camada server
-    serverAdapter = null;
+  // Sem camada server
+  serverAdapter = null;
 }
 ```
 
 **Modos de Server**:
+
 - `integrated`: Maestro sobe HTTP server inline (porta 3008)
 - `split`: Maestro conecta em server externo (PM2 gerencia processos separados)
 - `disabled`: Sem camada server (headless mode)
@@ -291,17 +313,19 @@ if (SERVER_MODE === 'integrated') {
 ---
 
 #### **Fase 5.5: Mission Orchestration**
+
 ```javascript
 const missionManager = new MissionManager({
-    kernel,
-    nerv,
-    contextManager,
-    feedbackProcessor,
-    checkpointManager
+  kernel,
+  nerv,
+  contextManager,
+  feedbackProcessor,
+  checkpointManager,
 });
 ```
 
 **Componentes**:
+
 - `FeedbackProcessor`: LLM-as-judge (validação de outputs)
 - `CheckpointManager`: Recovery em <5min (granular state)
 - `MissionManager`: Orquestra workflows multi-step (97 templates)
@@ -312,29 +336,29 @@ const missionManager = new MissionManager({
 
 ```javascript
 process.on('SIGTERM', async () => {
-    log('INFO', 'SIGTERM received, shutting down gracefully...');
+  log('INFO', 'SIGTERM received, shutting down gracefully...');
 
-    // 1. Para kernel loop
-    if (kernel && typeof kernel.stop === 'function') {
-        await kernel.stop();
-    }
+  // 1. Para kernel loop
+  if (kernel && typeof kernel.stop === 'function') {
+    await kernel.stop();
+  }
 
-    // 2. Fecha browser pool
-    if (browserPool && typeof browserPool.shutdown === 'function') {
-        await browserPool.shutdown();
-    }
+  // 2. Fecha browser pool
+  if (browserPool && typeof browserPool.shutdown === 'function') {
+    await browserPool.shutdown();
+  }
 
-    // 3. Fecha Chrome Proxy
-    if (global.chromeProxy && typeof global.chromeProxy.stop === 'function') {
-        await global.chromeProxy.stop();
-    }
+  // 3. Fecha Chrome Proxy
+  if (global.chromeProxy && typeof global.chromeProxy.stop === 'function') {
+    await global.chromeProxy.stop();
+  }
 
-    // 4. Fecha HTTP server
-    if (httpServer) {
-        httpServer.close();
-    }
+  // 4. Fecha HTTP server
+  if (httpServer) {
+    httpServer.close();
+  }
 
-    process.exit(0);
+  process.exit(0);
 });
 ```
 
@@ -344,10 +368,11 @@ process.on('SIGTERM', async () => {
 
 ### Responsabilidades
 
-**Arquivo Principal**: `src/infra/ConnectionOrchestrator.js`
-**Pool Manager**: `src/infra/browser_pool/pool_manager.js`
+**Arquivo Principal**: `src/infra/ConnectionOrchestrator.js` **Pool Manager**:
+`src/infra/browser_pool/pool_manager.js`
 
 **O que faz**:
+
 - ✅ Conecta a Chrome via Puppeteer (3 modos: wsEndpoint, connect, auto)
 - ✅ Gerencia pool de 3 instâncias Chrome (round-robin, least-loaded, target-affinity)
 - ✅ Health checks periódicos (heartbeat a cada 30s)
@@ -390,6 +415,7 @@ process.on('SIGTERM', async () => {
 ### ConnectionOrchestrator v3.0
 
 **Princípios Ontológicos**:
+
 ```javascript
 /* ONTOLOGICAL PRINCIPLE:
    Chrome é propriedade do Windows Host. DevContainer APENAS conecta. */
@@ -414,45 +440,47 @@ process.on('SIGTERM', async () => {
 | **auto**       | 3          | Tenta todos os modos em ordem     |
 
 **Config Padrão**:
+
 ```javascript
 const DEFAULTS = {
-    mode: 'wsEndpoint',
-    ports: [9224], // Chrome Proxy port
-    hosts: ['localhost'],
-    retryDelayMs: 3000,
-    maxRetryDelayMs: 15000,
-    maxConnectionAttempts: 5,
-    connectionTimeout: 30000,
-    pageScanIntervalMs: 4000,
-    allowedDomains: ['chatgpt.com', 'gemini.google.com', 'claude.ai'],
-    pageSelectionPolicy: 'FIRST'
+  mode: 'wsEndpoint',
+  ports: [9224], // Chrome Proxy port
+  hosts: ['localhost'],
+  retryDelayMs: 3000,
+  maxRetryDelayMs: 15000,
+  maxConnectionAttempts: 5,
+  connectionTimeout: 30000,
+  pageScanIntervalMs: 4000,
+  allowedDomains: ['chatgpt.com', 'gemini.google.com', 'claude.ai'],
+  pageSelectionPolicy: 'FIRST',
 };
 ```
 
 **Método Principal**: `ensureBrowser()`
+
 ```javascript
 // 1. Detecta se browser já está conectado
 if (this.browser && this.browser.isConnected()) {
-    return this.browser;
+  return this.browser;
 }
 
 // 2. Tenta conectar (retry logic com exponential backoff)
 for (let attempt = 1; attempt <= maxConnectionAttempts; attempt++) {
-    try {
-        this.browser = await this._connectMode(mode);
-        this.state = STATES.BROWSER_READY;
-        return this.browser;
-
-    } catch (err) {
-        const backoffDelay = retryDelayMs * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, backoffDelay));
-    }
+  try {
+    this.browser = await this._connectMode(mode);
+    this.state = STATES.BROWSER_READY;
+    return this.browser;
+  } catch (err) {
+    const backoffDelay = retryDelayMs * Math.pow(2, attempt - 1);
+    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+  }
 }
 
 throw new Error('Browser connection failed after retries');
 ```
 
 **Page Selection**:
+
 ```javascript
 async scanForTargetPage() {
     const pages = await this.browser.pages();
@@ -480,6 +508,7 @@ async scanForTargetPage() {
 ### BrowserPoolManager v2.0
 
 **Pool de 3 Instâncias**:
+
 ```javascript
 const pool = [
     {
@@ -504,6 +533,7 @@ const pool = [
 **Estratégias de Alocação**:
 
 1. **round-robin** (padrão):
+
 ```javascript
 allocatePage(task) {
     const poolEntry = this.pool[this.roundRobinIndex];
@@ -517,6 +547,7 @@ allocatePage(task) {
 ```
 
 2. **least-loaded**:
+
 ```javascript
 allocatePage(task) {
     // Encontra instância com menos tasks ativas
@@ -530,6 +561,7 @@ allocatePage(task) {
 ```
 
 3. **target-affinity**:
+
 ```javascript
 allocatePage(task) {
     // Reutiliza instância se task tem mesmo target
@@ -546,6 +578,7 @@ allocatePage(task) {
 ```
 
 **Health Checks**:
+
 ```javascript
 async _startHealthChecks() {
     this.healthCheckTimer = setInterval(async () => {
@@ -577,47 +610,48 @@ async _startHealthChecks() {
 ```
 
 **Circuit Breaker** (🆕 v1.0):
+
 ```javascript
 class CircuitBreakerManager {
-    constructor({ poolSize, nerv }) {
-        this.poolSize = poolSize;
-        this.nerv = nerv;
-        this.states = new Map(); // instanceId → CircuitState
+  constructor({ poolSize, nerv }) {
+    this.poolSize = poolSize;
+    this.nerv = nerv;
+    this.states = new Map(); // instanceId → CircuitState
+  }
+
+  recordFailure(instanceId, cause) {
+    const state = this.states.get(instanceId) || {
+      consecutiveFailures: 0,
+      state: 'CLOSED', // CLOSED | OPEN | HALF_OPEN
+    };
+
+    state.consecutiveFailures++;
+
+    if (state.consecutiveFailures >= 3) {
+      state.state = 'OPEN'; // Desativa instância
+      this._emitCircuitEvent('OPEN', instanceId, cause);
     }
 
-    recordFailure(instanceId, cause) {
-        const state = this.states.get(instanceId) || {
-            consecutiveFailures: 0,
-            state: 'CLOSED' // CLOSED | OPEN | HALF_OPEN
-        };
+    this.states.set(instanceId, state);
+  }
 
-        state.consecutiveFailures++;
-
-        if (state.consecutiveFailures >= 3) {
-            state.state = 'OPEN'; // Desativa instância
-            this._emitCircuitEvent('OPEN', instanceId, cause);
-        }
-
-        this.states.set(instanceId, state);
+  recordSuccess(instanceId) {
+    const state = this.states.get(instanceId);
+    if (state && state.state === 'HALF_OPEN') {
+      state.state = 'CLOSED'; // Reativa instância
+      state.consecutiveFailures = 0;
+      this._emitCircuitEvent('CLOSED', instanceId);
     }
+  }
 
-    recordSuccess(instanceId) {
-        const state = this.states.get(instanceId);
-        if (state && state.state === 'HALF_OPEN') {
-            state.state = 'CLOSED'; // Reativa instância
-            state.consecutiveFailures = 0;
-            this._emitCircuitEvent('CLOSED', instanceId);
-        }
+  _emitCircuitEvent(newState, instanceId, cause) {
+    if (this.nerv) {
+      this.nerv.emit({
+        type: 'CIRCUIT_BREAKER_STATE_CHANGE',
+        payload: { instanceId, newState, cause },
+      });
     }
-
-    _emitCircuitEvent(newState, instanceId, cause) {
-        if (this.nerv) {
-            this.nerv.emit({
-                type: 'CIRCUIT_BREAKER_STATE_CHANGE',
-                payload: { instanceId, newState, cause }
-            });
-        }
-    }
+  }
 }
 ```
 
@@ -627,11 +661,11 @@ class CircuitBreakerManager {
 
 ### Responsabilidades
 
-**Lifecycle Manager**: `src/driver/DriverLifecycleManager.js` (v2.0)
-**Execution Engine**: `src/kernel/execution_engine/execution_engine.js`
-**Factory**: `src/driver/factory.js`
+**Lifecycle Manager**: `src/driver/DriverLifecycleManager.js` (v2.0) **Execution Engine**:
+`src/kernel/execution_engine/execution_engine.js` **Factory**: `src/driver/factory.js`
 
 **O que faz**:
+
 - ✅ Orquestra ciclo de vida do driver (acquire → execute → release)
 - ✅ Gerencia AbortController (kill switch soberano)
 - ✅ Emite eventos via EventEmitter (6 lifecycle events)
@@ -641,46 +675,49 @@ class CircuitBreakerManager {
 ### DriverLifecycleManager v2.0
 
 **Herança EventEmitter**:
+
 ```javascript
 class DriverLifecycleManager extends EventEmitter {
-    constructor(page, task, config) {
-        super();
+  constructor(page, task, config) {
+    super();
 
-        this.page = page; // Puppeteer page instance
-        this.task = task; // Task object (Schema V4)
-        this.config = config;
-        this.driver = null;
+    this.page = page; // Puppeteer page instance
+    this.task = task; // Task object (Schema V4)
+    this.config = config;
+    this.driver = null;
 
-        // ✅ Kill Switch Soberano
-        this.abortController = new AbortController();
+    // ✅ Kill Switch Soberano
+    this.abortController = new AbortController();
 
-        // ✅ Métricas de lifecycle
-        this.metrics = {
-            acquireAttempts: 0,
-            acquireTime: 0,
-            releaseTime: 0,
-            stateChanges: 0,
-            progressUpdates: 0
-        };
+    // ✅ Métricas de lifecycle
+    this.metrics = {
+      acquireAttempts: 0,
+      acquireTime: 0,
+      releaseTime: 0,
+      stateChanges: 0,
+      progressUpdates: 0,
+    };
 
-        this.setMaxListeners(20); // Memory leak detection
-    }
+    this.setMaxListeners(20); // Memory leak detection
+  }
 }
 ```
 
 **6 Lifecycle Events**:
+
 ```javascript
 const LIFECYCLE_EVENTS = {
-    ACQUIRED: 'lifecycle:acquired',     // Driver adquirido com sucesso
-    RELEASED: 'lifecycle:released',     // Driver liberado
-    ERROR: 'lifecycle:error',           // Erro em operação
-    STATE_CHANGE: 'lifecycle:state_change', // Mudança de estado
-    PROGRESS: 'lifecycle:progress',     // Atualização de progresso
-    HEALTH: 'lifecycle:health'          // Health check executado
+  ACQUIRED: 'lifecycle:acquired', // Driver adquirido com sucesso
+  RELEASED: 'lifecycle:released', // Driver liberado
+  ERROR: 'lifecycle:error', // Erro em operação
+  STATE_CHANGE: 'lifecycle:state_change', // Mudança de estado
+  PROGRESS: 'lifecycle:progress', // Atualização de progresso
+  HEALTH: 'lifecycle:health', // Health check executado
 };
 ```
 
 **Método Principal**: `acquire()`
+
 ```javascript
 async acquire(options = {}) {
     const startTime = Date.now();
@@ -738,6 +775,7 @@ async acquire(options = {}) {
 ```
 
 **Método**: `release()`
+
 ```javascript
 async release() {
     const startTime = Date.now();
@@ -784,6 +822,7 @@ async release() {
 ```
 
 **Handlers de Telemetria**:
+
 ```javascript
 // Sincroniza estado do Driver com Task state
 async _handleStateChange(data) {
@@ -844,6 +883,7 @@ async _handleProgress(data) {
 ```
 
 **Health Check Endpoint**:
+
 ```javascript
 getHealth() {
     return {
@@ -876,80 +916,82 @@ getHealth() {
 **Arquivo**: `src/driver/factory.js`
 
 **Padrão Factory**:
+
 ```javascript
 const DRIVERS = {
-    'chatgpt.com': require('./chatgpt/chatgpt_driver_v2'),
-    'gemini.google.com': require('./gemini/gemini_driver_v2'),
-    'claude.ai': require('./claude/claude_driver_v2')
+  'chatgpt.com': require('./chatgpt/chatgpt_driver_v2'),
+  'gemini.google.com': require('./gemini/gemini_driver_v2'),
+  'claude.ai': require('./claude/claude_driver_v2'),
 };
 
 function getDriver(target, page, config, abortSignal) {
-    const driverClass = DRIVERS[target];
+  const driverClass = DRIVERS[target];
 
-    if (!driverClass) {
-        throw new Error(`No driver found for target: ${target}`);
-    }
+  if (!driverClass) {
+    throw new Error(`No driver found for target: ${target}`);
+  }
 
-    // Instancia driver com AbortSignal
-    const driver = new driverClass(page, config, abortSignal);
+  // Instancia driver com AbortSignal
+  const driver = new driverClass(page, config, abortSignal);
 
-    // ✅ Todos os drivers v2.0 herdam EventEmitter
-    // ✅ Todos possuem .destroy(), .setCorrelationId(), .getHealth()
+  // ✅ Todos os drivers v2.0 herdam EventEmitter
+  // ✅ Todos possuem .destroy(), .setCorrelationId(), .getHealth()
 
-    return driver;
+  return driver;
 }
 ```
 
 **Estrutura de Driver v2.0**:
+
 ```javascript
 class ChatGPTDriver extends EventEmitter {
-    constructor(page, config, abortSignal) {
-        super();
+  constructor(page, config, abortSignal) {
+    super();
 
-        this.name = 'ChatGPTDriver';
-        this.page = page;
-        this.config = config;
-        this.abortSignal = abortSignal;
-        this.correlationId = null;
+    this.name = 'ChatGPTDriver';
+    this.page = page;
+    this.config = config;
+    this.abortSignal = abortSignal;
+    this.correlationId = null;
 
-        this.capabilities = {
-            text: true,
-            vision: true,
-            files: true,
-            browsing: true
-        };
-    }
+    this.capabilities = {
+      text: true,
+      vision: true,
+      files: true,
+      browsing: true,
+    };
+  }
 
-    async execute(task) {
-        // 1. Emite state_change
-        this.emit('state_change', { from: 'PENDING', to: 'RUNNING' });
+  async execute(task) {
+    // 1. Emite state_change
+    this.emit('state_change', { from: 'PENDING', to: 'RUNNING' });
 
-        // 2. Executa automação
-        // ...
+    // 2. Executa automação
+    // ...
 
-        // 3. Emite progress
-        this.emit('progress', { length: 1500 });
+    // 3. Emite progress
+    this.emit('progress', { length: 1500 });
 
-        // 4. Retorna resultado
-        return { success: true, output: '...' };
-    }
+    // 4. Retorna resultado
+    return { success: true, output: '...' };
+  }
 
-    async destroy() {
-        // Cleanup resources
-        this.removeAllListeners();
-    }
+  async destroy() {
+    // Cleanup resources
+    this.removeAllListeners();
+  }
 
-    setCorrelationId(id) {
-        this.correlationId = id;
-    }
+  setCorrelationId(id) {
+    this.correlationId = id;
+  }
 
-    getHealth() {
-        return {
-            name: this.name,
-            capabilities: this.capabilities,
-            connected: this.page ? true : false
-        };
-    }
+  getHealth() {
+    return {
+      name: this.name,
+      capabilities: this.capabilities,
+      connected: this.page ? true : false,
+    };
+  }
 }
 ```
 
@@ -960,6 +1002,7 @@ class ChatGPTDriver extends EventEmitter {
 **Arquivo**: `src/kernel/execution_engine/execution_engine.js`
 
 **Fluxo Completo**:
+
 ```javascript
 async executeTask(task) {
     // 1. Aloca página do Browser Pool
@@ -1097,6 +1140,7 @@ async executeTask(task) {
 ```
 
 **Timing Típico**:
+
 - Boot: ~4.5s
 - Task submission: ~50ms
 - Kernel detect: ~50ms (loop 20 Hz)
@@ -1195,6 +1239,7 @@ make test-integration    # Full integration tests
 ### Problema 1: Boot Fails - Chrome Not Available
 
 **Sintomas**:
+
 ```
 [BOOT] Fase 3/6: Inicializando Browser Pool
 [ERROR] Chrome remote debugging não está acessível
@@ -1202,6 +1247,7 @@ make test-integration    # Full integration tests
 ```
 
 **Diagnóstico**:
+
 ```bash
 # 1. Chrome está rodando no Windows?
 curl http://localhost:9225/json/version  # (executar no Windows)
@@ -1216,6 +1262,7 @@ lsof -i :9225  # Windows (PowerShell: Get-NetTCPConnection -LocalPort 9225)
 ```
 
 **Soluções**:
+
 ```bash
 # A. Iniciar Chrome no Windows
 START-CHROME-SIMPLE.bat
@@ -1233,6 +1280,7 @@ make start
 ### Problema 2: Browser Pool Initialization Fails
 
 **Sintomas**:
+
 ```
 [BrowserPool] ❌ Bug #3: Proxy não está acessível
 [BrowserPool] Curl test FALHOU: http://localhost:9224/json/version
@@ -1240,6 +1288,7 @@ make start
 ```
 
 **Diagnóstico**:
+
 ```bash
 # 1. Validar proxy health
 bash wsl-chrome-integration.sh all
@@ -1252,6 +1301,7 @@ curl -v http://localhost:9224/json/version
 ```
 
 **Soluções**:
+
 ```bash
 # A. Restart proxy
 pm2 restart chrome-proxy
@@ -1269,6 +1319,7 @@ node -e "console.log(require('./src/core/config').CHROME_PROXY_PORT)"
 ### Problema 3: Driver Acquisition Fails
 
 **Sintomas**:
+
 ```
 [LIFECYCLE] Tentativa 1/3 falhou: Driver not found for target: chatgpt.com
 [LIFECYCLE] Tentativa 2/3 falhou: Driver not found for target: chatgpt.com
@@ -1276,6 +1327,7 @@ node -e "console.log(require('./src/core/config').CHROME_PROXY_PORT)"
 ```
 
 **Diagnóstico**:
+
 ```bash
 # 1. Driver existe?
 ls -la src/driver/chatgpt/
@@ -1291,6 +1343,7 @@ console.log('Drivers:', Object.keys(factory.DRIVERS));
 ```
 
 **Soluções**:
+
 ```bash
 # A. Corrigir target na task
 # ERRADO: "target": "https://chatgpt.com"
@@ -1309,6 +1362,7 @@ const DRIVERS = {
 ### Problema 4: AbortController Not Working
 
 **Sintomas**:
+
 ```
 [LIFECYCLE] AbortSignal triggered for task ABC123
 [WARN] Driver não respondeu a abort signal
@@ -1316,6 +1370,7 @@ const DRIVERS = {
 ```
 
 **Diagnóstico**:
+
 ```bash
 # 1. Driver está escutando signal?
 node -e "
@@ -1328,6 +1383,7 @@ console.log('Has abort listener:', driver.abortSignal.aborted);
 ```
 
 **Soluções**:
+
 ```bash
 # A. Validar driver implementation
 # Driver DEVE checar abortSignal periodicamente:
@@ -1353,11 +1409,13 @@ const LIFECYCLE_CONFIG = {
 ### Problema 5: EventEmitter Memory Leak
 
 **Sintomas**:
+
 ```
 (node:12345) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 state_change listeners added to DriverLifecycleManager.
 ```
 
 **Diagnóstico**:
+
 ```bash
 # 1. Listeners não estão sendo removidos?
 node -e "
@@ -1373,6 +1431,7 @@ console.log('Listeners after release:', lifecycle.listenerCount('state_change'))
 ```
 
 **Soluções**:
+
 ```bash
 # A. Validar cleanup em release()
 async release() {
@@ -1404,16 +1463,19 @@ constructor() {
 ### Arquivos-Chave
 
 **Boot**:
+
 - `src/main.js` (1,229 linhas)
 - `src/core/boot_resilience_manager.js` (465 linhas)
 
 **Browser Connection**:
+
 - `src/infra/ConnectionOrchestrator.js` (771 linhas)
 - `src/infra/browser_pool/pool_manager.js` (569 linhas)
 - `src/infra/browser_pool/circuit_breaker.js`
 - `src/infra/proxy/chromeProxyService.js`
 
 **Driver Integration**:
+
 - `src/driver/DriverLifecycleManager.js` (490 linhas)
 - `src/driver/factory.js`
 - `src/kernel/execution_engine/execution_engine.js`
@@ -1422,10 +1484,12 @@ constructor() {
 ### Constantes e Schemas
 
 **Browser**:
+
 - `src/core/constants/browser.js` - CONNECTION_MODES, BROWSER_STATES
 - `src/core/constants/tasks.js` - STATUS_VALUES, TASK_TYPES
 
 **Lifecycle**:
+
 - `LIFECYCLE_CONFIG` - Timeouts, retries, thresholds
 - `LIFECYCLE_EVENTS` - 6 eventos de telemetria
 
@@ -1434,6 +1498,7 @@ constructor() {
 ## ✅ CHECKLIST DE VALIDAÇÃO
 
 ### Boot Sequence
+
 - [ ] Fase 1: Config + Identity completa
 - [ ] Fase 2: NERV online (hybrid mode)
 - [ ] Fase 2.5: Chrome Proxy rodando (9224)
@@ -1445,6 +1510,7 @@ constructor() {
 - [ ] Graceful shutdown funcionando
 
 ### Browser Connection
+
 - [ ] Chrome rodando no Windows (9225)
 - [ ] Proxy rodando no container (9224)
 - [ ] ConnectionOrchestrator.ensureBrowser() sucesso
@@ -1454,20 +1520,20 @@ constructor() {
 - [ ] Auto-restart de instâncias crashed
 
 ### Driver Integration
+
 - [ ] Factory retorna driver correto para target
 - [ ] DriverLifecycleManager.acquire() sucesso
 - [ ] AbortController funcionando
 - [ ] EventEmitter emitindo 6 eventos
-- [ ] Telemetria via _handleStateChange e _handleProgress
+- [ ] Telemetria via \_handleStateChange e \_handleProgress
 - [ ] Release() limpando listeners
 - [ ] Health endpoint retornando métricas
 
 ---
 
-**Documento Criado**: 3 de Fevereiro de 2026
-**Autor**: GitHub Copilot
-**Base**: 3 sistemas fundamentais (Boot, Connection, Driver)
-**Próxima Revisão**: Após implementação de melhorias (ANÁLISE_E_MELHORIAS_FEV2026.md)
+**Documento Criado**: 3 de Fevereiro de 2026 **Autor**: GitHub Copilot **Base**: 3 sistemas
+fundamentais (Boot, Connection, Driver) **Próxima Revisão**: Após implementação de melhorias
+(ANÁLISE_E_MELHORIAS_FEV2026.md)
 
 ---
 

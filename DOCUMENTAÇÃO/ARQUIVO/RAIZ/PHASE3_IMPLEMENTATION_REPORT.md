@@ -1,11 +1,11 @@
 # Phase 3 Implementation Report
+
 **Monitoring & Reconnection System (P2-U1 & P2-U2)**
 
 ## Executive Summary
 
-**Status**: ✅ **COMPLETE** (13h implementation)
-**Date**: February 4, 2026
-**Scope**: CDP-based health monitoring + graceful reconnection strategy for external browser mode
+**Status**: ✅ **COMPLETE** (13h implementation) **Date**: February 4, 2026 **Scope**: CDP-based
+health monitoring + graceful reconnection strategy for external browser mode
 
 ### Deliverables
 
@@ -42,10 +42,12 @@ Windows Host (Chrome:9225)  ←→  Docker Container (Node.js + Puppeteer)
 ```
 
 **Constraints**:
+
 - ❌ **CANNOT**: Kill browser process, restart Chrome, access Windows filesystem
 - ✅ **CAN**: All CDP operations (metrics, navigation, evaluate), connection monitoring
 
 **Phase 3 Design Philosophy**:
+
 - Monitor health via CDP **ONLY**
 - Graceful reconnection (not browser restart)
 - User notification when manual action required
@@ -63,6 +65,7 @@ Proactive browser health monitoring WITHOUT requiring process-level access.
 **File**: `src/infra/browser_pool/PeriodicHealthMonitor.js` (715 lines)
 
 **Responsibilities**:
+
 - Periodic connection health checks (browser.isConnected)
 - Page-level memory metrics (page.metrics via CDP)
 - Target monitoring (Target.detached events)
@@ -70,30 +73,29 @@ Proactive browser health monitoring WITHOUT requiring process-level access.
 - Auto-trigger reconnection strategy (via events)
 
 **Health Checks** (3 types):
+
 1. **CONNECTION**: browser.isConnected() validation
 2. **PAGE_MEMORY**: JS heap size, DOM nodes (via page.metrics)
 3. **PAGE_TARGETS**: Target count validation (via browser.targets)
 
 **Health Status Levels**:
+
 ```javascript
 HEALTH_STATUS = {
-    HEALTHY: 'HEALTHY',      // All checks passing
-    WARNING: 'WARNING',      // Some metrics elevated
-    DEGRADED: 'DEGRADED',    // Multiple issues
-    CRITICAL: 'CRITICAL',    // Severe issues
-    DISCONNECTED: 'DISCONNECTED', // Browser disconnected
-}
+  HEALTHY: 'HEALTHY', // All checks passing
+  WARNING: 'WARNING', // Some metrics elevated
+  DEGRADED: 'DEGRADED', // Multiple issues
+  CRITICAL: 'CRITICAL', // Severe issues
+  DISCONNECTED: 'DISCONNECTED', // Browser disconnected
+};
 ```
 
-**Thresholds** (CDP-based):
-| Metric               | Warning | Critical |
-| -------------------- | ------- | -------- |
-| Page Memory          | 500MB   | 1000MB   |
-| JS Heap Size         | 300MB   | 600MB    |
-| DOM Nodes            | 10,000  | 50,000   |
-| Consecutive Failures | -       | 3        |
+**Thresholds** (CDP-based): | Metric | Warning | Critical | | -------------------- | ------- |
+-------- | | Page Memory | 500MB | 1000MB | | JS Heap Size | 300MB | 600MB | | DOM Nodes | 10,000 |
+50,000 | | Consecutive Failures | - | 3 |
 
 **Check Intervals**:
+
 - **Normal mode**: 30s (configurable)
 - **Critical mode**: 5s (auto-enabled on CRITICAL/DISCONNECTED)
 
@@ -101,13 +103,13 @@ HEALTH_STATUS = {
 
 ```javascript
 MONITOR_EVENTS = {
-    HEALTH_CHECK_COMPLETE: 'health:check_complete',
-    STATUS_CHANGED: 'health:status_changed',
-    WARNING_DETECTED: 'health:warning',
-    CRITICAL_ISSUE: 'health:critical',
-    CONNECTION_LOST: 'health:connection_lost',
-    RECOVERY_NEEDED: 'health:recovery_needed', // ← Triggers reconnection
-}
+  HEALTH_CHECK_COMPLETE: 'health:check_complete',
+  STATUS_CHANGED: 'health:status_changed',
+  WARNING_DETECTED: 'health:warning',
+  CRITICAL_ISSUE: 'health:critical',
+  CONNECTION_LOST: 'health:connection_lost',
+  RECOVERY_NEEDED: 'health:recovery_needed', // ← Triggers reconnection
+};
 ```
 
 ### 1.4 Integration with pool_manager
@@ -123,10 +125,10 @@ this._attachHealthMonitorEvents();
 this.healthMonitor.start(this.config.healthCheckInterval); // 30s
 
 // pool_manager.js _attachHealthMonitorEvents()
-this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async (data) => {
-    if (!this.reconnectionInProgress) {
-        await this._attemptReconnection(); // ← P2-U2
-    }
+this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async data => {
+  if (!this.reconnectionInProgress) {
+    await this._attemptReconnection(); // ← P2-U2
+  }
 });
 ```
 
@@ -134,37 +136,37 @@ this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async (data) => {
 
 ```json
 {
-    "timestamp": 1738639200000,
-    "checks": {
-        "CONNECTION": {
-            "passed": true,
-            "status": "HEALTHY",
-            "message": "Connected"
-        },
-        "PAGE_MEMORY": {
-            "passed": true,
-            "status": "HEALTHY",
-            "message": "2 pages, 250MB JS heap",
-            "details": {
-                "totalMemoryMB": 400,
-                "totalJSHeapMB": 250,
-                "maxPageMemoryMB": 200,
-                "pageCount": 2
-            }
-        },
-        "PAGE_TARGETS": {
-            "passed": true,
-            "status": "HEALTHY",
-            "message": "2 page targets",
-            "details": {
-                "totalTargets": 3,
-                "pageTargets": 2
-            }
-        }
+  "timestamp": 1738639200000,
+  "checks": {
+    "CONNECTION": {
+      "passed": true,
+      "status": "HEALTHY",
+      "message": "Connected"
     },
-    "issues": [],
-    "overallStatus": "HEALTHY",
-    "duration": 45
+    "PAGE_MEMORY": {
+      "passed": true,
+      "status": "HEALTHY",
+      "message": "2 pages, 250MB JS heap",
+      "details": {
+        "totalMemoryMB": 400,
+        "totalJSHeapMB": 250,
+        "maxPageMemoryMB": 200,
+        "pageCount": 2
+      }
+    },
+    "PAGE_TARGETS": {
+      "passed": true,
+      "status": "HEALTHY",
+      "message": "2 page targets",
+      "details": {
+        "totalTargets": 3,
+        "pageTargets": 2
+      }
+    }
+  },
+  "issues": [],
+  "overallStatus": "HEALTHY",
+  "duration": 45
 }
 ```
 
@@ -181,6 +183,7 @@ Graceful reconnection flow for external browser mode (CDP-only, no process resta
 **File**: `src/infra/browser_pool/pool_manager.js` (+280 lines)
 
 **Methods Added**:
+
 1. `_attachHealthMonitorEvents()` - Wire monitor events to reconnection
 2. `_attemptReconnection()` - Main reconnection strategy (5 attempts)
 3. `_clearAllPageConnections()` - Close pages before reconnect
@@ -222,20 +225,16 @@ Graceful reconnection flow for external browser mode (CDP-only, no process resta
 ### 2.3 Backoff Strategy
 
 **Configuration**:
+
 ```javascript
 RECONNECT_BACKOFF_BASE_MS: 2000,    // 2s base
 RECONNECT_BACKOFF_MAX_MS: 30000,    // 30s max
 RECONNECT_MAX_ATTEMPTS: 5
 ```
 
-**Backoff Calculation** (exponential):
-| Attempt | Calculation         | Backoff |
-| ------- | ------------------- | ------- |
-| 1       | 2000 × 2^0          | 2s      |
-| 2       | 2000 × 2^1          | 4s      |
-| 3       | 2000 × 2^2          | 8s      |
-| 4       | 2000 × 2^3          | 16s     |
-| 5       | 2000 × 2^4 (capped) | 30s     |
+**Backoff Calculation** (exponential): | Attempt | Calculation | Backoff | | ------- |
+------------------- | ------- | | 1 | 2000 × 2^0 | 2s | | 2 | 2000 × 2^1 | 4s | | 3 | 2000 × 2^2 |
+8s | | 4 | 2000 × 2^3 | 16s | | 5 | 2000 × 2^4 (capped) | 30s |
 
 **Total time**: ~60s before giving up
 
@@ -263,6 +262,7 @@ REQUIRED ACTIONS:
 ```
 
 **NERV Event**:
+
 ```javascript
 {
     type: 'USER_NOTIFICATION',
@@ -370,6 +370,7 @@ REQUIRED ACTIONS:
    - ✅ Enums complete (HEALTH_STATUS, CHECK_TYPES, MONITOR_EVENTS)
 
 **Results**:
+
 ```
 Passed: 6/6
 Failed: 0/6
@@ -467,12 +468,14 @@ $ node --check src/infra/browser_pool/pool_manager.js
 ### 6.1 P2-U1: PeriodicHealthMonitor
 
 **Original Scope** (ARCHITECTURE_V4.md):
+
 - Periodic health checks
 - Memory leak detection
 - Process-level monitoring ⚠️
 - Browser restart triggers ⚠️
 
 **Implemented Scope** (Phase 3):
+
 - ✅ Periodic health checks (30s/5s intervals)
 - ✅ Memory leak detection (page.metrics via CDP)
 - ❌ Process-level monitoring (NOT POSSIBLE - external browser)
@@ -482,6 +485,7 @@ $ node --check src/infra/browser_pool/pool_manager.js
 - ✅ Auto-trigger reconnection on critical issues
 
 **Justification**:
+
 - External browser mode prevents process-level access
 - CDP-based monitoring provides sufficient visibility
 - Reconnection strategy handles transient issues
@@ -490,16 +494,19 @@ $ node --check src/infra/browser_pool/pool_manager.js
 ### 6.2 P2-U2: ConnectionRecoveryStrategy
 
 **Original Scope** (ARCHITECTURE_V4.md):
+
 - Auto-restart on connection issues
 - Graceful reconnection
 
 **Implemented Scope** (Phase 3):
+
 - ✅ Graceful reconnection with exponential backoff
 - ✅ Auto-recovery from transient connection issues
 - ✅ User notification for manual restart (external mode)
 - ❌ Auto-restart Chrome process (NOT POSSIBLE - external browser)
 
 **Justification**:
+
 - External browser mode prevents process restart
 - Graceful reconnection handles 90% of issues
 - User notification covers remaining 10% (crashes)
@@ -523,16 +530,19 @@ $ node --check src/infra/browser_pool/pool_manager.js
 ### 7.2 Separation of Concerns (Phase 3 vs. Phase 1/2)
 
 **Phase 1/2 Components** (Driver-level):
+
 - PageSessionTracker: Turn-level metrics
 - RecoverySystem: Page-level recovery (reload, restart, disconnect)
 - DriverReadinessGuard: Pre-execution validation
 - HandleManager: Page lifecycle events
 
 **Phase 3 Components** (Pool-level):
+
 - PeriodicHealthMonitor: Pool-level health monitoring
 - ConnectionRecoveryStrategy: Pool-level reconnection
 
 **Responsibility Split**:
+
 ```
 Driver-Level (Phase 1/2)         Pool-Level (Phase 3)
 ├─> Single page operations       ├─> Multi-page monitoring
@@ -588,8 +598,8 @@ Driver-Level (Phase 1/2)         Pool-Level (Phase 3)
 
 ## 9. Success Criteria (Phase 3)
 
-| Criterion                | Target                           | Actual                           | Status     |
-| ------------------------ | -------------------------------- | -------------------------------- | ---------- |
+| Criterion                | Target                           | Actual                           | Status      |
+| ------------------------ | -------------------------------- | -------------------------------- | ----------- |
 | **P2-U1 Implementation** | PeriodicHealthMonitor (CDP-only) | 715 lines, 6 events              | ✅ COMPLETE |
 | **P2-U2 Implementation** | ConnectionRecoveryStrategy       | 280 lines, 5 attempts            | ✅ COMPLETE |
 | **Integration**          | pool_manager.js integration      | Event-driven, NERV bridge        | ✅ COMPLETE |
@@ -605,8 +615,8 @@ Driver-Level (Phase 1/2)         Pool-Level (Phase 3)
 
 ## 10. Timeline & Effort
 
-| Task                                  | Estimated | Actual  | Status     |
-| ------------------------------------- | --------- | ------- | ---------- |
+| Task                                  | Estimated | Actual  | Status      |
+| ------------------------------------- | --------- | ------- | ----------- |
 | **P2-U1: PeriodicHealthMonitor**      | 8h        | 6h      | ✅ COMPLETE |
 | **P2-U2: ConnectionRecoveryStrategy** | 5h        | 4h      | ✅ COMPLETE |
 | **Integration**                       | Bundled   | 1h      | ✅ COMPLETE |
@@ -631,14 +641,15 @@ Driver-Level (Phase 1/2)         Pool-Level (Phase 3)
 
 ### 11.2 Overall Project Status
 
-| Phase                        | Tasks        | Time    | Status              |
-| ---------------------------- | ------------ | ------- | ------------------- |
+| Phase                        | Tasks        | Time    | Status               |
+| ---------------------------- | ------------ | ------- | -------------------- |
 | **Phase 1** (Critical Fixes) | 6 P0 items   | 23h     | ✅ COMPLETE          |
 | **Phase 2** (Performance)    | 3 P1 items   | 16h     | ✅ COMPLETE          |
 | **Phase 3** (Monitoring)     | 2 P2 items   | 13h     | ✅ COMPLETE          |
 | **Total**                    | **11 items** | **52h** | ✅ **100% COMPLETE** |
 
 **Cumulative Stats**:
+
 - Files created: 8 (trackers, monitors, tests, reports)
 - Files modified: 7 (BaseDriver, ReadinessGuard, recovery_system, pool_manager, etc.)
 - Total lines added: ~4,200 lines
@@ -668,6 +679,7 @@ Driver-Level (Phase 1/2)         Pool-Level (Phase 3)
 **Phase 3 Components**: ✅ **READY FOR PRODUCTION**
 
 **Checklist**:
+
 - ✅ Syntax validated (zero errors)
 - ✅ Integration tested (6/6 passed)
 - ✅ External browser mode compatible
@@ -680,6 +692,7 @@ Driver-Level (Phase 1/2)         Pool-Level (Phase 3)
 - ✅ Documentation complete
 
 **Deployment Notes**:
+
 1. PeriodicHealthMonitor starts automatically with pool_manager
 2. Default check interval: 30s (configurable via `healthCheckInterval`)
 3. Critical mode (5s) auto-enabled on CRITICAL/DISCONNECTED status
@@ -711,18 +724,18 @@ Driver-Level (Phase 1/2)         Pool-Level (Phase 3)
 ### 12.2 Maintenance Considerations
 
 **PeriodicHealthMonitor**:
+
 - Review thresholds after 1 month production data
 - Adjust check intervals if CPU overhead too high
 - Add new check types if needed (e.g., network latency)
 
 **ConnectionRecoveryStrategy**:
+
 - Monitor reconnection success rate
 - Adjust backoff strategy if success rate <90%
 - Log manual restart frequency (user notifications)
 
 ---
 
-**Report Version**: 1.0
-**Author**: AI Coding Assistant
-**Date**: February 4, 2026
-**Status**: ✅ Phase 3 Complete - Production Ready
+**Report Version**: 1.0 **Author**: AI Coding Assistant **Date**: February 4, 2026 **Status**: ✅
+Phase 3 Complete - Production Ready

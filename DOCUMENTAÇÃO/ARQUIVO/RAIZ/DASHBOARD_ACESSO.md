@@ -1,7 +1,6 @@
 # 🎯 Como Acessar o Dashboard
 
-**Data**: 4 de Fevereiro de 2026
-**Status**: ✅ Sistema Funcionando
+**Data**: 4 de Fevereiro de 2026 **Status**: ✅ Sistema Funcionando
 
 ## URLs de Acesso
 
@@ -14,6 +13,7 @@ http://172.17.0.2:5176/dashboard/
 ```
 
 **Ou tente também:**
+
 ```
 http://localhost:5176/dashboard/
 ```
@@ -27,12 +27,14 @@ curl http://localhost:5174/dashboard/
 ## ⚙️ Serviços Rodando
 
 ### Frontend (Vite Dev Server)
+
 - **Porta**: 5174
 - **Status**: 🟢 ONLINE
 - **Build time**: 195ms
 - **Processo**: nohup npm run dev
 
 ### Backend (PM2)
+
 - **Porta API**: 3008
 - **Porta Socket.io**: 3008
 - **Status**: 🟢 ONLINE
@@ -44,17 +46,20 @@ curl http://localhost:5174/dashboard/
 ## 🔍 Verificar Status
 
 ### Vite Dev Server
+
 ```bash
 tail -f /tmp/vite-final.log
 ```
 
 ### Backend API
+
 ```bash
 curl http://localhost:3008/health
 curl http://localhost:3008/api/dashboard/tasks
 ```
 
 ### PM2 Status
+
 ```bash
 npx pm2 list
 npx pm2 logs
@@ -65,17 +70,21 @@ npx pm2 logs
 ### Dashboard não abre no navegador?
 
 1. **Verifique se está usando a URL correta:**
+
    ```
    http://172.17.0.2:5174/dashboard/
    ```
+
    Note o `/dashboard/` no final!
 
 2. **Teste se o servidor está respondendo:**
+
    ```bash
    curl -I http://172.17.0.2:5174/dashboard/
    ```
 
 3. **Veja logs do Vite:**
+
    ```bash
    tail -50 /tmp/vite-final.log
    ```
@@ -90,6 +99,7 @@ npx pm2 logs
 ### API não responde?
 
 1. **Verifique PM2:**
+
    ```bash
    npx pm2 list
    npx pm2 restart dashboard-web

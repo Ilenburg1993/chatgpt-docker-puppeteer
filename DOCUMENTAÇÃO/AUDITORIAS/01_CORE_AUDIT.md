@@ -1,9 +1,6 @@
 # 🔬 Mini-Auditoria: CORE (Subsistema Fundacional)
 
-**Data**: 2026-01-21
-**Auditor**: Sistema Automático
-**Status**: ✅ Completa
-**Duração**: 2.5h
+**Data**: 2026-01-21 **Auditor**: Sistema Automático **Status**: ✅ Completa **Duração**: 2.5h
 
 ---
 
@@ -11,9 +8,12 @@
 
 ### Status Geral: 🟢 **SAUDÁVEL**
 
-O subsistema CORE está **bem estruturado e consolidado**, com audit levels elevados (100-740) e arquitetura modular. Identificados **3 TODOs** de refactoring NERV e alguns pontos de atenção, mas nenhum bug crítico.
+O subsistema CORE está **bem estruturado e consolidado**, com audit levels elevados (100-740) e
+arquitetura modular. Identificados **3 TODOs** de refactoring NERV e alguns pontos de atenção, mas
+nenhum bug crítico.
 
 ### Métricas:
+
 - **Arquivos**: 13 módulos principais + 4 constants + 6 schemas + 5 context
 - **Linhas de Código**: ~3,500 linhas
 - **JSDoc Coverage**: ~95% (excelente) ✅ Atualizado 2026-01-21
@@ -24,7 +24,10 @@ O subsistema CORE está **bem estruturado e consolidado**, com audit levels elev
 - **Correções Aplicadas**: 5/5 recomendações curto/médio prazo ✅ Completo
 
 ### Veredicto:
-✅ **Pronto para documentação canônica**. Arquitetura sólida, código bem auditado, ConfigSchema 100% completo, TODOs ONDA 2 documentados com issue tracking e migration plans. JSDoc completo em módulos de contexto.
+
+✅ **Pronto para documentação canônica**. Arquitetura sólida, código bem auditado, ConfigSchema 100%
+completo, TODOs ONDA 2 documentados com issue tracking e migration plans. JSDoc completo em módulos
+de contexto.
 
 ---
 
@@ -74,20 +77,20 @@ src/core/
 
 ### Responsabilidades por Módulo:
 
-| Módulo | Responsabilidade | Audit Level | LOC |
-|--------|------------------|-------------|-----|
-| `config.js` | Gestão reativa de configuração (config.json) | 740 | ~140 |
-| `logger.js` | Logging, metrics, audit com rotação | 40 | ~158 |
-| `schemas.js` | Facade para schemas Zod | 100 | ~30 |
-| `identity_manager.js` | Identidade soberana (robot_id) | 510 | ~107 |
-| `doctor.js` | Health checks e diagnósticos | 39 | ~317 |
-| `forensics.js` | Crash dumps e screenshots | 710 | ~150 |
-| `environment_resolver.js` | Resolução de ambiente (ChatGPT/Gemini) | 700 | ~200 |
-| `infra_failure_policy.js` | Políticas de falha | 700 | ~120 |
-| `i18n.js` | Internacionalização | 32 | ~80 |
-| **Schemas** | Task, DNA, Bootstrap validation | 100 | ~800 |
-| **Context** | Context management, budgeting | 100 | ~600 |
-| **Constants** | Typed constants (zero magic strings) | 35 | ~400 |
+| Módulo                    | Responsabilidade                             | Audit Level | LOC  |
+| ------------------------- | -------------------------------------------- | ----------- | ---- |
+| `config.js`               | Gestão reativa de configuração (config.json) | 740         | ~140 |
+| `logger.js`               | Logging, metrics, audit com rotação          | 40          | ~158 |
+| `schemas.js`              | Facade para schemas Zod                      | 100         | ~30  |
+| `identity_manager.js`     | Identidade soberana (robot_id)               | 510         | ~107 |
+| `doctor.js`               | Health checks e diagnósticos                 | 39          | ~317 |
+| `forensics.js`            | Crash dumps e screenshots                    | 710         | ~150 |
+| `environment_resolver.js` | Resolução de ambiente (ChatGPT/Gemini)       | 700         | ~200 |
+| `infra_failure_policy.js` | Políticas de falha                           | 700         | ~120 |
+| `i18n.js`                 | Internacionalização                          | 32          | ~80  |
+| **Schemas**               | Task, DNA, Bootstrap validation              | 100         | ~800 |
+| **Context**               | Context management, budgeting                | 100         | ~600 |
+| **Constants**             | Typed constants (zero magic strings)         | 35          | ~400 |
 
 **Total**: ~3,500 linhas de código (estimativa)
 
@@ -100,6 +103,7 @@ src/core/
 **Arquitetura**: ✅ Singleton + EventEmitter + Zod validation
 
 **Pontos Fortes**:
+
 - ✅ Hot-reload reativo (`reload()` method)
 - ✅ Validação Zod completa (`ConfigSchema`)
 - ✅ Valores default sensatos
@@ -108,6 +112,7 @@ src/core/
 - ✅ `.passthrough()` para preservar comentários JSON
 
 **Schema Validado**:
+
 ```javascript
 ConfigSchema = z.object({
     DEBUG_PORT: z.string().url().default('http://localhost:9224'),
@@ -120,10 +125,13 @@ ConfigSchema = z.object({
 ```
 
 **Pontos de Atenção**:
-- ⚠️ Schema não valida todos os parâmetros de `config.json` (alguns faltam: `BROWSER_MODE`, `DEFAULT_MODEL_ID`, `adaptive_mode`, etc.)
+
+- ⚠️ Schema não valida todos os parâmetros de `config.json` (alguns faltam: `BROWSER_MODE`,
+  `DEFAULT_MODEL_ID`, `adaptive_mode`, etc.)
 - 🟡 **Gap**: Parâmetros adicionais não estão no schema
 
 **Recomendação**:
+
 ```javascript
 // Adicionar ao ConfigSchema:
 BROWSER_MODE: z.enum(['launcher', 'external', 'auto']).default('launcher'),
@@ -140,6 +148,7 @@ STABILITY_INTERVAL: z.number().default(2000),
 **Arquitetura**: ✅ Rotação automática + Multi-channel (log, metrics, audit)
 
 **Pontos Fortes**:
+
 - ✅ Rotação automática quando excede 5MB (log) / 2MB (audit)
 - ✅ Limpeza automática (mantém 5 arquivos históricos)
 - ✅ 3 canais: `log()`, `metric()`, `audit()`
@@ -147,18 +156,22 @@ STABILITY_INTERVAL: z.number().default(2000),
 - ✅ Formato ISO 8601 timestamps
 
 **Funcionalidades**:
+
 ```javascript
-log(level, msg, taskId)  // Log operacional
-metric(name, value, ctx) // Métricas numéricas
-audit(event, actor, ctx) // Auditoria governamental (NASA Standard)
+log(level, msg, taskId); // Log operacional
+metric(name, value, ctx); // Métricas numéricas
+audit(event, actor, ctx); // Auditoria governamental (NASA Standard)
 ```
 
 **Pontos de Atenção**:
+
 - ✅ Implementação sólida, sem TODOs
 - ⚠️ Não usa constants de `LOG_CATEGORIES` (apenas documentação)
 
 **Recomendação**:
-- Considerar adicionar `log.debug()`, `log.info()`, `log.warn()`, `log.error()` como wrappers para melhor DX
+
+- Considerar adicionar `log.debug()`, `log.info()`, `log.warn()`, `log.error()` como wrappers para
+  melhor DX
 
 ---
 
@@ -167,6 +180,7 @@ audit(event, actor, ctx) // Auditoria governamental (NASA Standard)
 **Arquitetura**: ✅ Modular + Facade pattern + Healer
 
 **Estrutura**:
+
 1. `schemas.js` - **SHIM** (facade de compatibilidade)
 2. `schema_core.js` - Ponto de entrada unificado
 3. `task_schema.js` - TaskSchema V4 (Gold Standard)
@@ -176,6 +190,7 @@ audit(event, actor, ctx) // Auditoria governamental (NASA Standard)
 7. `bootstrap_state_schema.js` - Estado de boot
 
 **TaskSchema V4** (estrutura):
+
 ```javascript
 TaskSchema = z.object({
     id: ID_SCHEMA,
@@ -203,33 +218,36 @@ TaskSchema = z.object({
 ```
 
 **DnaSchema** (regras dinâmicas):
+
 ```javascript
 DnaSchema = z.object({
-    target: z.string(),
-    version: z.number(),
-    learned_at: z.string(),
-    selectors: z.object({
-        submit_button: SelectorProtocolSchema,
-        textarea: SelectorProtocolSchema,
-        output_area: SelectorProtocolSchema
-    })
-})
+  target: z.string(),
+  version: z.number(),
+  learned_at: z.string(),
+  selectors: z.object({
+    submit_button: SelectorProtocolSchema,
+    textarea: SelectorProtocolSchema,
+    output_area: SelectorProtocolSchema,
+  }),
+});
 
 SelectorProtocolSchema = z.object({
-    selector: z.string().min(1),
-    context: z.enum(['root', 'iframe', 'cross-origin']),
-    isShadow: z.boolean(),
-    fallback: z.string().optional()
-})
+  selector: z.string().min(1),
+  context: z.enum(['root', 'iframe', 'cross-origin']),
+  isShadow: z.boolean(),
+  fallback: z.string().optional(),
+});
 ```
 
 **healTask()** - Auto-cura de tarefas:
+
 - Normaliza campos obrigatórios
 - Aplica defaults de `spec.validation`, `policy`
 - Cura timestamps faltantes
 - Valida com Zod no final
 
 **Pontos Fortes**:
+
 - ✅ Arquitetura modular e escalável
 - ✅ Validação rigorosa (Zod)
 - ✅ Healer pattern (robustez)
@@ -237,6 +255,7 @@ SelectorProtocolSchema = z.object({
 - ✅ Audit Level 100 (Industrial Hardening)
 
 **Pontos de Atenção**:
+
 - ✅ Nenhum TODO ou FIXME
 - ✅ Schemas completos e validados
 
@@ -247,23 +266,26 @@ SelectorProtocolSchema = z.object({
 **Arquitetura**: ✅ Singleton + Persistent DNA + Ephemeral Instance
 
 **Responsabilidades**:
+
 1. `robot_id` - DNA persistente (UUID imutável no disco)
 2. `instance_id` - Vida efêmera (gerada a cada boot)
 3. `capabilities` - Declaração de habilidades
 
 **Capabilities Declaradas**:
+
 ```javascript
 [
-    'BROWSER_CONTROL',
-    'SADI_V19',
-    'HUMAN_BIOMECHANICS',
-    'CONTEXT_RECURSION_V1',
-    'ADAPTIVE_TIMEOUTS',
-    'FRAME_NAVIGATION'
-]
+  'BROWSER_CONTROL',
+  'SADI_V19',
+  'HUMAN_BIOMECHANICS',
+  'CONTEXT_RECURSION_V1',
+  'ADAPTIVE_TIMEOUTS',
+  'FRAME_NAVIGATION',
+];
 ```
 
 **Fluxo de Inicialização**:
+
 ```javascript
 initialize() →
     io.getIdentity() →
@@ -272,13 +294,15 @@ initialize() →
 ```
 
 **API Pública**:
+
 ```javascript
-getFullIdentity()  // Retorna identidade validada (NERV Protocol)
-getRobotId()       // Acesso controlado ao DNA
-getInstanceId()    // Acesso à vida efêmera
+getFullIdentity(); // Retorna identidade validada (NERV Protocol)
+getRobotId(); // Acesso controlado ao DNA
+getInstanceId(); // Acesso à vida efêmera
 ```
 
 **Integração com NERV**:
+
 ```javascript
 // Validação nativa via Shared Kernel
 const { validateRobotIdentity } = require('../shared/nerv/schemas');
@@ -286,12 +310,14 @@ return validateRobotIdentity(identity); // Performance máxima
 ```
 
 **Pontos Fortes**:
+
 - ✅ Separação clara (DNA vs Instance)
 - ✅ Validação NERV integrada
 - ✅ Persistência delegada ao `io` (infra)
 - ✅ Audit Level 510 (Canonical)
 
 **Pontos de Atenção**:
+
 - ✅ Sem TODOs ou bugs
 
 ---
@@ -326,12 +352,14 @@ return validateRobotIdentity(identity); // Performance máxima
    - Relatório completo (health + chrome + network + queue + logs + config)
 
 **Pontos Fortes**:
+
 - ✅ Diagnóstico abrangente
 - ✅ Trends persistentes
 - ✅ Timeout handling (5s)
 - ✅ Error handling robusto
 
 **Pontos de Atenção**:
+
 - ✅ Sem TODOs ou bugs
 - 🟡 **Observação**: Usa `const CONFIG = require('./config')` (singleton)
 
@@ -349,6 +377,7 @@ return validateRobotIdentity(identity); // Performance máxima
    - Retorna dump ID
 
 2. **Dump Structure**:
+
 ```javascript
 {
     id: `crash_${Date.now()}_${shortId}`,
@@ -366,12 +395,15 @@ return validateRobotIdentity(identity); // Performance máxima
 ```
 
 **Pontos Fortes**:
+
 - ✅ Evidências visuais (screenshot)
 - ✅ Snapshot de DOM
 - ✅ Metadata rica (URL, target, timing)
 
 **Pontos de Atenção**:
-- ⚠️ **TODO [ONDA 2]**: Migrar para NERV (`TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter`)
+
+- ⚠️ **TODO [ONDA 2]**: Migrar para NERV
+  (`TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter`)
 - 🟡 Atualmente usa broadcast direto via socket
 - 🟡 Após NERV: emitir evento `FORENSICS:DUMP_CREATED`
 
@@ -382,11 +414,13 @@ return validateRobotIdentity(identity); // Performance máxima
 **Arquitetura**: ✅ Heuristic-based environment resolution
 
 **Responsabilidades**:
+
 - Analisar URL da página
 - Identificar target (ChatGPT, Gemini, Claude)
 - Retornar confidence score (0-1)
 
 **Heuristics**:
+
 ```javascript
 chatgpt.com     → 'chatgpt' (conf: 1.0)
 gemini.google.com → 'gemini' (conf: 1.0)
@@ -395,16 +429,19 @@ outros          → 'unknown' (conf: 0.0)
 ```
 
 **API**:
+
 ```javascript
 resolveEnvironment(url, taskTarget) → {env, confidence, meta}
 ```
 
 **Pontos Fortes**:
+
 - ✅ Lógica simples e robusta
 - ✅ Confidence scoring
 - ✅ Metadata contextual
 
 **Pontos de Atenção**:
+
 - ✅ Sem TODOs ou bugs
 
 ---
@@ -414,19 +451,22 @@ resolveEnvironment(url, taskTarget) → {env, confidence, meta}
 **Arquitetura**: ✅ Policy-based failure classification
 
 **Responsabilidades**:
+
 - Classificar falhas de infraestrutura
 - Decidir se task deve ser retried
 - Escalate para KERNEL se necessário
 
 **Tipos de Falha**:
+
 ```javascript
-'TARGET_CLOSED'    // Chrome crashed
-'PROTOCOL_ERROR'   // CDP protocol error
-'CONTEXT_DESTROYED' // Page destroyed
-'TIMEOUT'          // Operation timeout
+'TARGET_CLOSED'; // Chrome crashed
+'PROTOCOL_ERROR'; // CDP protocol error
+'CONTEXT_DESTROYED'; // Page destroyed
+'TIMEOUT'; // Operation timeout
 ```
 
 **API**:
+
 ```javascript
 classifyAndSaveFailure(task, failureType, failureMsg)
 → Salva no task.history
@@ -434,6 +474,7 @@ classifyAndSaveFailure(task, failureType, failureMsg)
 ```
 
 **Pontos de Atenção**:
+
 - ⚠️ **TODO [ONDA 2]**: Migrar para NERV (`TODO [ONDA 2]: Migrar para NERV.emit()`)
 - 🟡 Atualmente não emite eventos
 
@@ -444,25 +485,29 @@ classifyAndSaveFailure(task, failureType, failureMsg)
 **Arquitetura**: ✅ Message templates + Language detection
 
 **Funcionalidades**:
+
 - Templates de mensagens (pt-BR, en-US)
 - Detecção automática de idioma (`process.env.LANG`)
 - Fallback para en-US
 
 **Mensagens**:
+
 ```javascript
 MESSAGES = {
-    TASK_STARTED: { 'pt-BR': 'Tarefa iniciada', 'en-US': 'Task started' },
-    TASK_COMPLETE: { 'pt-BR': 'Tarefa concluída', 'en-US': 'Task completed' },
-    // ... 20+ mensagens
-}
+  TASK_STARTED: { 'pt-BR': 'Tarefa iniciada', 'en-US': 'Task started' },
+  TASK_COMPLETE: { 'pt-BR': 'Tarefa concluída', 'en-US': 'Task completed' },
+  // ... 20+ mensagens
+};
 ```
 
 **API**:
+
 ```javascript
-t('TASK_STARTED') // Returns localized string
+t('TASK_STARTED'); // Returns localized string
 ```
 
 **Pontos de Atenção**:
+
 - ✅ Audit Level 32 (NASA Standard)
 - 🟡 Baixo uso no sistema (pouco utilizado)
 - 💡 **Sugestão**: Considerar deprecar se não for usado
@@ -474,6 +519,7 @@ t('TASK_STARTED') // Returns localized string
 **Arquitetura**: ✅ Budget management + Transformers
 
 **Módulos**:
+
 1. `context_core.js` - Gerenciador central
 2. `budget_manager.js` - Token budget tracking
 3. `guardrails.js` - Limite enforcement
@@ -481,16 +527,19 @@ t('TASK_STARTED') // Returns localized string
 5. `transformers/` - Identity, metadata, summary
 
 **Funcionalidades**:
+
 - Gestão de contexto de conversação
 - Budget tracking (tokens)
 - Transformações (metadata injection)
 - Guardrails (limites de segurança)
 
 **Pontos Fortes**:
+
 - ✅ Arquitetura modular
 - ✅ Audit Level 100 (Industrial Hardening)
 
 **Pontos de Atenção**:
+
 - ✅ Sem TODOs ou bugs identificados
 
 ---
@@ -502,23 +551,25 @@ t('TASK_STARTED') // Returns localized string
 ✅ **100% Compliant** com CONSTANTS_INVENTORY.md
 
 **Constantes Usadas**:
+
 ```javascript
 // tasks.js
 const { STATUS_VALUES, TASK_STATES } = require('./constants/tasks');
-STATUS_VALUES.PENDING   // 'PENDING'
-STATUS_VALUES.RUNNING   // 'RUNNING'
-STATUS_VALUES.DONE      // 'DONE'
-STATUS_VALUES.FAILED    // 'FAILED'
+STATUS_VALUES.PENDING; // 'PENDING'
+STATUS_VALUES.RUNNING; // 'RUNNING'
+STATUS_VALUES.DONE; // 'DONE'
+STATUS_VALUES.FAILED; // 'FAILED'
 
 // browser.js
 const { CONNECTION_MODES, BROWSER_STATES } = require('./constants/browser');
 
 // logging.js (documentação apenas)
-LOG_CATEGORIES.CONFIG   // 'CONFIG'
-LOG_CATEGORIES.FORENSICS // 'FORENSICS'
+LOG_CATEGORIES.CONFIG; // 'CONFIG'
+LOG_CATEGORIES.FORENSICS; // 'FORENSICS'
 ```
 
 **Validação**:
+
 - ✅ Zero magic strings no CORE
 - ✅ Todos enums tipados
 - ✅ Exports centralizados via `constants/index.js`
@@ -528,27 +579,30 @@ LOG_CATEGORIES.FORENSICS // 'FORENSICS'
 ### 3.2. Schemas Zod Validados
 
 **TaskSchema V4**:
+
 - ✅ 15+ campos validados
 - ✅ Nested objects (spec, policy, timestamps)
 - ✅ Enum constraints (target, status)
 - ✅ Defaults aplicados
 
 **DnaSchema**:
+
 - ✅ SelectorProtocolSchema completo
 - ✅ Versioning (learned_at, version)
 - ✅ Context enum (root, iframe, cross-origin)
 
 **ConfigSchema**:
+
 - ⚠️ **Gap**: Faltam ~8 parâmetros do config.json
 
-**Recomendação**:
-Completar ConfigSchema com todos os parâmetros documentados em config.json.
+**Recomendação**: Completar ConfigSchema com todos os parâmetros documentados em config.json.
 
 ---
 
 ## 4. TESTES
 
 ### Coverage Atual:
+
 - ✅ **test_config_validation.spec.js** (100% passa)
   - Valida ConfigurationManager
   - Testa reload com config inválido
@@ -559,6 +613,7 @@ Completar ConfigSchema com todos os parâmetros documentados em config.json.
   - test_p4_p5_fixes (usa schemas)
 
 ### Gaps de Teste:
+
 1. ❌ Testes unitários para `identity_manager.js`
 2. ❌ Testes unitários para `doctor.js`
 3. ❌ Testes unitários para `forensics.js`
@@ -566,20 +621,21 @@ Completar ConfigSchema com todos os parâmetros documentados em config.json.
 5. ❌ Testes para edge cases de `environment_resolver.js`
 
 ### Recomendação:
+
 ```javascript
 // tests/unit/test_identity_manager.spec.js
 describe('IdentityManager', () => {
-    it('should generate robot_id on first boot');
-    it('should reuse robot_id on subsequent boots');
-    it('should generate unique instance_id per boot');
-    it('should validate identity via NERV schemas');
+  it('should generate robot_id on first boot');
+  it('should reuse robot_id on subsequent boots');
+  it('should generate unique instance_id per boot');
+  it('should validate identity via NERV schemas');
 });
 
 // tests/unit/test_doctor.spec.js
 describe('Doctor', () => {
-    it('should detect Chrome connection');
-    it('should return metrics in correct format');
-    it('should handle connection timeout gracefully');
+  it('should detect Chrome connection');
+  it('should return metrics in correct format');
+  it('should handle connection timeout gracefully');
 });
 ```
 
@@ -590,15 +646,16 @@ describe('Doctor', () => {
 ### 5.1. APIs Públicas
 
 #### **ConfigurationManager** (Singleton)
+
 ```javascript
 const CONFIG = require('./core/config');
 
 // API Pública:
-await CONFIG.reload(correlationId)  // Recarrega config.json
-CONFIG.all                           // Retorna objeto completo
-CONFIG.IDLE_SLEEP                    // Getter específico
-CONFIG.CYCLE_DELAY                   // Getter específico
-CONFIG.on('updated', handler)        // EventEmitter
+await CONFIG.reload(correlationId); // Recarrega config.json
+CONFIG.all; // Retorna objeto completo
+CONFIG.IDLE_SLEEP; // Getter específico
+CONFIG.CYCLE_DELAY; // Getter específico
+CONFIG.on('updated', handler); // EventEmitter
 
 // Uso típico:
 const delay = CONFIG.CYCLE_DELAY;
@@ -606,13 +663,14 @@ await CONFIG.reload('sys-boot');
 ```
 
 #### **Logger** (Module)
+
 ```javascript
 const { log, metric, audit } = require('./core/logger');
 
 // API Pública:
-log(level, msg, taskId)              // Log operacional
-metric(name, value, context)         // Métricas numéricas
-audit(event, actor, context)         // Auditoria NASA
+log(level, msg, taskId); // Log operacional
+metric(name, value, context); // Métricas numéricas
+audit(event, actor, context); // Auditoria NASA
 
 // Exemplo:
 log('INFO', 'Task started', taskId);
@@ -621,27 +679,29 @@ audit('CONFIG_CHANGED', 'admin', { param: 'CYCLE_DELAY' });
 ```
 
 #### **Schemas** (Module)
+
 ```javascript
 const { TaskSchema, DnaSchema, parseTask } = require('./core/schemas');
 
 // API Pública:
-TaskSchema.parse(rawTask)            // Valida task (throws se inválido)
-DnaSchema.parse(rawDna)              // Valida DNA
-parseTask(rawTask)                   // Parser com healer (safe)
+TaskSchema.parse(rawTask); // Valida task (throws se inválido)
+DnaSchema.parse(rawDna); // Valida DNA
+parseTask(rawTask); // Parser com healer (safe)
 
 // Exemplo:
 const validTask = parseTask(userInput); // Auto-cura + validação
 ```
 
 #### **IdentityManager** (Singleton)
+
 ```javascript
 const identity = require('./core/identity_manager');
 
 // API Pública:
-await identity.initialize()          // Inicializa DNA
-identity.getFullIdentity()           // Identidade NERV completa
-identity.getRobotId()                // DNA persistente
-identity.getInstanceId()             // Vida efêmera
+await identity.initialize(); // Inicializa DNA
+identity.getFullIdentity(); // Identidade NERV completa
+identity.getRobotId(); // DNA persistente
+identity.getInstanceId(); // Vida efêmera
 
 // Exemplo:
 await identity.initialize();
@@ -649,14 +709,15 @@ const robotId = identity.getRobotId();
 ```
 
 #### **Doctor** (Module)
+
 ```javascript
 const doctor = require('./core/doctor');
 
 // API Pública:
-await doctor.getFullReport()         // Relatório completo
-await doctor.probeChromeConnection() // Verifica Chrome
-doctor.getHardwareMetrics()          // Métricas de CPU/RAM
-await doctor.probeNetworkStack()     // Testa conectividade
+await doctor.getFullReport(); // Relatório completo
+await doctor.probeChromeConnection(); // Verifica Chrome
+doctor.getHardwareMetrics(); // Métricas de CPU/RAM
+await doctor.probeNetworkStack(); // Testa conectividade
 
 // Exemplo:
 const report = await doctor.getFullReport();
@@ -664,18 +725,19 @@ console.log(report.chrome.connected); // true/false
 ```
 
 #### **Forensics** (Module)
+
 ```javascript
 const { createCrashDump } = require('./core/forensics');
 
 // API Pública:
-await createCrashDump(task, error, page)  // Cria dump de crash
+await createCrashDump(task, error, page); // Cria dump de crash
 
 // Exemplo:
 try {
-    await executeTask(task);
+  await executeTask(task);
 } catch (error) {
-    const dumpId = await createCrashDump(task, error, page);
-    log('ERROR', `Crash dump created: ${dumpId}`);
+  const dumpId = await createCrashDump(task, error, page);
+  log('ERROR', `Crash dump created: ${dumpId}`);
 }
 ```
 
@@ -684,26 +746,30 @@ try {
 ### 5.2. APIs Internas
 
 #### `environment_resolver.js`
+
 ```javascript
-resolveEnvironment(url, taskTarget) // Identifica ambiente (ChatGPT/Gemini)
+resolveEnvironment(url, taskTarget); // Identifica ambiente (ChatGPT/Gemini)
 ```
 
 #### `infra_failure_policy.js`
+
 ```javascript
-classifyAndSaveFailure(task, type, msg) // Classifica falha de infra
+classifyAndSaveFailure(task, type, msg); // Classifica falha de infra
 ```
 
 #### `i18n.js`
+
 ```javascript
-t(key) // Tradução de mensagens
+t(key); // Tradução de mensagens
 ```
 
 #### `context/`
+
 ```javascript
 // APIs de gestão de contexto (usado pelo DRIVER)
-contextCore.initialize()
-contextCore.injectMetadata()
-budgetManager.track(tokens)
+contextCore.initialize();
+contextCore.injectMetadata();
+budgetManager.track(tokens);
 ```
 
 ---
@@ -711,6 +777,7 @@ budgetManager.track(tokens)
 ## 6. BUGS IDENTIFICADOS
 
 ### 🔴 P0 - CRÍTICO:
+
 **Nenhum identificado** ✅
 
 ---
@@ -718,90 +785,101 @@ budgetManager.track(tokens)
 ### 🟡 P1 - IMPORTANTE:
 
 #### ✅ 1. **ConfigSchema incompleto** - **CORRIGIDO**
-   - **Localização**: `config.js:21-68`
-   - **Descrição**: Schema não validava todos os parâmetros de `config.json`
-   - **Status**: ✅ **CORRIGIDO em 2026-01-21**
-   - **Parâmetros Adicionados** (14 novos):
-     - `BROWSER_MODE: z.enum(['launcher', 'external', 'auto']).default('launcher')`
-     - `DEFAULT_MODEL_ID: z.string().default('gpt-5')`
-     - `adaptive_mode: z.enum(['auto', 'manual']).default('auto')`
-     - `STABILITY_INTERVAL: z.number().min(500).default(2000)`
-     - `ECHO_RETRIES: z.number().int().min(1).max(10).default(5)`
-     - `CHUNK_SIZE: z.number().int().min(50).max(500).default(150)`
-     - `ADAPTIVE_DELAY_BASE: z.number().min(10).max(100).default(40)`
-     - `ADAPTIVE_DELAY_MAX: z.number().min(100).max(1000).default(250)`
-     - `USER_INACTIVITY_THRESHOLD_MS: z.number().min(1000).default(5000)`
-     - `USER_ABORT_ACTION: z.enum(['PAUSE', 'FAIL', 'IGNORE']).default('PAUSE')`
-     - `multi_tab_policy: z.enum(['AUTO_CLOSE', 'MANUAL', 'IGNORE']).default('AUTO_CLOSE')`
-     - `allow_dom_assist: z.boolean().default(true)`
-     - `ADAPTIVE_ALPHA: z.number().min(0).max(1).default(0.15)`
-     - `ADAPTIVE_COOLDOWN_MS: z.number().min(1000).default(5000)`
-   - **ConfigSchema agora completo**: 29/29 parâmetros validados com constraints Zod
-   - **Impacto da correção**: Todos parâmetros agora validados, previne valores inválidos
+
+- **Localização**: `config.js:21-68`
+- **Descrição**: Schema não validava todos os parâmetros de `config.json`
+- **Status**: ✅ **CORRIGIDO em 2026-01-21**
+- **Parâmetros Adicionados** (14 novos):
+  - `BROWSER_MODE: z.enum(['launcher', 'external', 'auto']).default('launcher')`
+  - `DEFAULT_MODEL_ID: z.string().default('gpt-5')`
+  - `adaptive_mode: z.enum(['auto', 'manual']).default('auto')`
+  - `STABILITY_INTERVAL: z.number().min(500).default(2000)`
+  - `ECHO_RETRIES: z.number().int().min(1).max(10).default(5)`
+  - `CHUNK_SIZE: z.number().int().min(50).max(500).default(150)`
+  - `ADAPTIVE_DELAY_BASE: z.number().min(10).max(100).default(40)`
+  - `ADAPTIVE_DELAY_MAX: z.number().min(100).max(1000).default(250)`
+  - `USER_INACTIVITY_THRESHOLD_MS: z.number().min(1000).default(5000)`
+  - `USER_ABORT_ACTION: z.enum(['PAUSE', 'FAIL', 'IGNORE']).default('PAUSE')`
+  - `multi_tab_policy: z.enum(['AUTO_CLOSE', 'MANUAL', 'IGNORE']).default('AUTO_CLOSE')`
+  - `allow_dom_assist: z.boolean().default(true)`
+  - `ADAPTIVE_ALPHA: z.number().min(0).max(1).default(0.15)`
+  - `ADAPTIVE_COOLDOWN_MS: z.number().min(1000).default(5000)`
+- **ConfigSchema agora completo**: 29/29 parâmetros validados com constraints Zod
+- **Impacto da correção**: Todos parâmetros agora validados, previne valores inválidos
 
 ---
 
 ### 🟢 P2 - MENOR:
 
 #### 1. **TODOs de migração NERV**
-   - **Localização**:
-     - `infra_failure_policy.js:11` - `TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter`
-     - `infra_failure_policy.js:81` - `TODO [ONDA 2]: Migrar para NERV.emit()`
-     - `forensics.js:17` - `TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter`
-     - `forensics.js:81` - `TODO [ONDA 2]: Migrar para NERV.emit()`
-   - **Descrição**: Módulos ainda usam broadcast direto, devem migrar para NERV
-   - **Impacto**: Baixo (funciona, mas não usa arquitetura NERV)
-   - **Recomendação**: Planejar ONDA 2 de refactoring NERV
+
+- **Localização**:
+  - `infra_failure_policy.js:11` - `TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter`
+  - `infra_failure_policy.js:81` - `TODO [ONDA 2]: Migrar para NERV.emit()`
+  - `forensics.js:17` - `TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter`
+  - `forensics.js:81` - `TODO [ONDA 2]: Migrar para NERV.emit()`
+- **Descrição**: Módulos ainda usam broadcast direto, devem migrar para NERV
+- **Impacto**: Baixo (funciona, mas não usa arquitetura NERV)
+- **Recomendação**: Planejar ONDA 2 de refactoring NERV
 
 #### 2. **i18n subutilizado**
-   - **Localização**: `i18n.js`
-   - **Descrição**: Sistema de i18n existe mas é pouco usado no código
-   - **Impacto**: Baixo (não crítico)
-   - **Recomendação**: Considerar deprecar ou expandir uso
+
+- **Localização**: `i18n.js`
+- **Descrição**: Sistema de i18n existe mas é pouco usado no código
+- **Impacto**: Baixo (não crítico)
+- **Recomendação**: Considerar deprecar ou expandir uso
 
 ---
 
 ## 7. GAPS FUNCIONAIS
 
 ### ✅ 1. **ConfigSchema Incompleto** - **CORRIGIDO**
-   - **Descrição**: Faltavam ~14 parâmetros no schema de validação
-   - **Status**: ✅ **CORRIGIDO em 2026-01-21**
-   - **Solução**: Adicionados 14 parâmetros com validação Zod completa (enums, min/max, defaults)
-   - **ConfigSchema agora**: 29/29 parâmetros (100% completo)
+
+- **Descrição**: Faltavam ~14 parâmetros no schema de validação
+- **Status**: ✅ **CORRIGIDO em 2026-01-21**
+- **Solução**: Adicionados 14 parâmetros com validação Zod completa (enums, min/max, defaults)
+- **ConfigSchema agora**: 29/29 parâmetros (100% completo)
 
 ### 2. **Testes Unitários Faltantes**
-   - **Descrição**: Faltam testes para identity_manager, doctor, forensics
-   - **Impacto**: Médio (código funciona, mas sem cobertura de testes)
-   - **Prioridade**: P2
+
+- **Descrição**: Faltam testes para identity_manager, doctor, forensics
+- **Impacto**: Médio (código funciona, mas sem cobertura de testes)
+- **Prioridade**: P2
 
 ### 3. **Logger sem Wrappers**
-   - **Descrição**: Não há `log.debug()`, `log.info()`, `log.warn()`, `log.error()`
-   - **Impacto**: Baixo (apenas DX)
-   - **Prioridade**: P3
+
+- **Descrição**: Não há `log.debug()`, `log.info()`, `log.warn()`, `log.error()`
+- **Impacto**: Baixo (apenas DX)
+- **Prioridade**: P3
 
 ### 4. **Forensics sem integração NERV**
-   - **Descrição**: Ainda usa broadcast direto (não usa NERV)
-   - **Impacto**: Médio (funciona, mas desalinhado com arquitetura)
-   - **Prioridade**: P2 (ONDA 2)
+
+- **Descrição**: Ainda usa broadcast direto (não usa NERV)
+- **Impacto**: Médio (funciona, mas desalinhado com arquitetura)
+- **Prioridade**: P2 (ONDA 2)
 
 ---
 
 ## 8. INCONSISTÊNCIAS
 
 ### 1. **Naming: ConfigurationManager vs CONFIG**
-   - **Descrição**: Classe se chama `ConfigurationManager` mas export é `manager`
-   - **Arquivos**: `config.js:144`
-   - **Recomendação**: Documentar claramente que é Singleton
+
+- **Descrição**: Classe se chama `ConfigurationManager` mas export é `manager`
+- **Arquivos**: `config.js:144`
+- **Recomendação**: Documentar claramente que é Singleton
 
 ### 2. **LOG_CATEGORIES não usado**
-   - **Descrição**: `constants/logging.js` exporta `LOG_CATEGORIES` mas não é usado (apenas documentação)
-   - **Arquivos**: `constants/logging.js`
-   - **Recomendação**: Documentar que é apenas referência, não runtime constant
+
+- **Descrição**: `constants/logging.js` exporta `LOG_CATEGORIES` mas não é usado (apenas
+  documentação)
+- **Arquivos**: `constants/logging.js`
+- **Recomendação**: Documentar que é apenas referência, não runtime constant
 
 ### 3. **SHIM pattern em 2 arquivos**
-   - **Descrição**: `schemas.js` e `memory.js` são SHIMs de compatibilidade
-   - **Arquivos**: `schemas.js:5`, `memory.js:5`
-   - **Recomendação**: Documentar claramente padrão SHIM/Facade
+
+- **Descrição**: `schemas.js` e `memory.js` são SHIMs de compatibilidade
+- **Arquivos**: `schemas.js:5`, `memory.js:5`
+- **Recomendação**: Documentar claramente padrão SHIM/Facade
 
 ---
 
@@ -810,6 +888,7 @@ budgetManager.track(tokens)
 ### ✅ Curto Prazo (antes da documentação canônica):
 
 1. ✅ **Completar ConfigSchema** (P1) - **CONCLUÍDO em 2026-01-21**
+
    ```javascript
    // ✅ IMPLEMENTADO em config.js:21-68
    BROWSER_MODE: z.enum(['launcher', 'external', 'auto']).default('launcher'),
@@ -841,6 +920,7 @@ budgetManager.track(tokens)
 ### 🟡 Médio Prazo (após documentação):
 
 4. **Criar testes unitários** (P2)
+
    ```javascript
    // Adicionar:
    tests/unit/test_identity_manager.spec.js (8 tests)
@@ -850,6 +930,7 @@ budgetManager.track(tokens)
    ```
 
 5. **Logger wrappers** (P3)
+
    ```javascript
    // Adicionar a logger.js:
    log.debug = (msg, taskId) => log('DEBUG', msg, taskId);
@@ -868,10 +949,11 @@ budgetManager.track(tokens)
 ### 🔵 Longo Prazo (futuro):
 
 6. **Criar testes unitários** (P2 médio prazo)
+
    ```javascript
-   tests/unit/test_config_schema.js
-   tests/unit/test_budget_manager.js
-   tests/unit/test_forensics.js
+   tests / unit / test_config_schema.js;
+   tests / unit / test_budget_manager.js;
+   tests / unit / test_forensics.js;
    ```
 
 7. **ONDA 2: Migração NERV completa** (P2)
@@ -938,6 +1020,7 @@ budgetManager.track(tokens)
 ### Diagramas Necessários:
 
 #### 1. **ConfigurationManager Flow**
+
 ```
 config.json → safeReadJSON() → ConfigSchema.safeParse() →
     ✅ Valid: Update cache + emit('updated')
@@ -945,6 +1028,7 @@ config.json → safeReadJSON() → ConfigSchema.safeParse() →
 ```
 
 #### 2. **Identity Lifecycle**
+
 ```
 Boot → initialize() →
     Check disk (io.getIdentity()) →
@@ -955,6 +1039,7 @@ Boot → initialize() →
 ```
 
 #### 3. **Logging Architecture**
+
 ```
 Application Code →
     log(level, msg, taskId) → agente_current.log (rotates @ 5MB)
@@ -963,6 +1048,7 @@ Application Code →
 ```
 
 #### 4. **Schema Validation Flow**
+
 ```
 Raw Task Input →
     healTask() →
@@ -979,6 +1065,7 @@ Raw Task Input →
 ### Exemplos de Uso:
 
 #### **1. Configuration Management**
+
 ```javascript
 const CONFIG = require('./core/config');
 
@@ -991,8 +1078,8 @@ const timeout = CONFIG.TASK_TIMEOUT_MS;
 
 // Escutar mudanças
 CONFIG.on('updated', ({ new: newConfig, old: oldConfig }) => {
-    console.log('Config changed!');
-    // Reagir às mudanças...
+  console.log('Config changed!');
+  // Reagir às mudanças...
 });
 
 // Hot-reload manual
@@ -1000,6 +1087,7 @@ await CONFIG.reload('admin-request');
 ```
 
 #### **2. Logging**
+
 ```javascript
 const { log, metric, audit } = require('./core/logger');
 
@@ -1013,30 +1101,31 @@ metric('tokens_used', 2400, { model: 'gpt-4o' });
 
 // Auditoria governamental (NASA Standard)
 audit('CONFIG_CHANGED', 'admin', {
-    param: 'CYCLE_DELAY',
-    old: 2000,
-    new: 3000
+  param: 'CYCLE_DELAY',
+  old: 2000,
+  new: 3000,
 });
 ```
 
 #### **3. Schema Validation**
+
 ```javascript
 const { parseTask, TaskSchema, DnaSchema } = require('./core/schemas');
 
 // Safe parsing com healer (recomendado)
 try {
-    const task = parseTask(rawInput); // Auto-cura + validação
-    console.log('Task válida:', task);
+  const task = parseTask(rawInput); // Auto-cura + validação
+  console.log('Task válida:', task);
 } catch (error) {
-    console.error('Task inválida:', error.message);
+  console.error('Task inválida:', error.message);
 }
 
 // Validação direta (strict)
 const result = TaskSchema.safeParse(rawTask);
 if (result.success) {
-    const task = result.data;
+  const task = result.data;
 } else {
-    const errors = result.error.errors;
+  const errors = result.error.errors;
 }
 
 // DNA validation
@@ -1044,6 +1133,7 @@ const dna = DnaSchema.parse(rawDna);
 ```
 
 #### **4. Identity Management**
+
 ```javascript
 const identity = require('./core/identity_manager');
 
@@ -1051,18 +1141,19 @@ const identity = require('./core/identity_manager');
 await identity.initialize();
 
 // Get identifiers
-const robotId = identity.getRobotId();       // Persistent DNA
+const robotId = identity.getRobotId(); // Persistent DNA
 const instanceId = identity.getInstanceId(); // Ephemeral
 
 // NERV Protocol handshake
 const fullIdentity = identity.getFullIdentity();
 nerv.send({
-    actionCode: 'IDENTIFY',
-    payload: fullIdentity
+  actionCode: 'IDENTIFY',
+  payload: fullIdentity,
 });
 ```
 
 #### **5. Health Checks**
+
 ```javascript
 const doctor = require('./core/doctor');
 
@@ -1079,20 +1170,21 @@ const network = await doctor.probeNetworkStack();
 ```
 
 #### **6. Forensics**
+
 ```javascript
 const { createCrashDump } = require('./core/forensics');
 
 try {
-    await executeTask(task, page);
+  await executeTask(task, page);
 } catch (error) {
-    // Automated crash dump
-    const dumpId = await createCrashDump(task, error, page);
+  // Automated crash dump
+  const dumpId = await createCrashDump(task, error, page);
 
-    log('ERROR', `Task crashed. Dump ID: ${dumpId}`, task.id);
+  log('ERROR', `Task crashed. Dump ID: ${dumpId}`, task.id);
 
-    // Dump saved to:
-    // - logs/crash_reports/${dumpId}.json
-    // - logs/crash_reports/${dumpId}_screenshot.png
+  // Dump saved to:
+  // - logs/crash_reports/${dumpId}.json
+  // - logs/crash_reports/${dumpId}_screenshot.png
 }
 ```
 
@@ -1103,36 +1195,32 @@ try {
 ### Status Geral: 🟢 **SAUDÁVEL E PRONTO**
 
 ### Pontos Fortes:
-✅ Arquitetura modular e bem organizada
-✅ Audit levels elevados (32-740)
-✅ Zod validation completa (schemas)
-✅ Hot-reload configuration
-✅ Logging robusto com rotação
-✅ Identity management sólido
-✅ Health checks abrangentes
-✅ Forensics automáticos
-✅ Zero magic strings
-✅ JSDoc coverage ~85%
+
+✅ Arquitetura modular e bem organizada ✅ Audit levels elevados (32-740) ✅ Zod validation completa
+(schemas) ✅ Hot-reload configuration ✅ Logging robusto com rotação ✅ Identity management sólido
+✅ Health checks abrangentes ✅ Forensics automáticos ✅ Zero magic strings ✅ JSDoc coverage ~85%
 
 ### Pontos de Melhoria:
-⚠️ ConfigSchema incompleto (~14 parâmetros faltantes)
-⚠️ Testes unitários limitados (doctor, identity, forensics)
-⚠️ 3 TODOs de migração NERV (ONDA 2)
-⚠️ i18n subutilizado
+
+⚠️ ConfigSchema incompleto (~14 parâmetros faltantes) ⚠️ Testes unitários limitados (doctor,
+identity, forensics) ⚠️ 3 TODOs de migração NERV (ONDA 2) ⚠️ i18n subutilizado
 
 ### Veredicto:
+
 ✅ **Subsistema CORE está PRONTO para documentação canônica**
 
 **Ações Necessárias Antes da Documentação**:
+
 1. Completar ConfigSchema (1h)
 2. Documentar TODOs de ONDA 2 (30min)
 
 **Ações Recomendadas Após Documentação**:
+
 1. Criar testes unitários (4-6h)
 2. Adicionar logger wrappers (1h)
 3. Planejar ONDA 2 (NERV migration)
 
 ---
 
-**Gerado em**: 2026-01-21
-**Próxima Ação**: Completar ConfigSchema → Documentar CORE → Prosseguir para NERV
+**Gerado em**: 2026-01-21 **Próxima Ação**: Completar ConfigSchema → Documentar CORE → Prosseguir
+para NERV

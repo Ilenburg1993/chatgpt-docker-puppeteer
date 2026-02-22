@@ -2,17 +2,21 @@
 
 > **Sistema de Gerenciamento de Contexto para Missões Autônomas**
 >
-> Permite acumular outputs de steps anteriores, aplicar chunking/summarization, e reutilizar patterns aprendidos via Memory Store.
+> Permite acumular outputs de steps anteriores, aplicar chunking/summarization, e reutilizar
+> patterns aprendidos via Memory Store.
 
 ---
 
 ## Visão Geral
 
-O **Context Management System** é responsável por gerenciar o fluxo de contexto entre steps de uma missão, garantindo que informações relevantes de steps anteriores sejam disponibilizadas para steps subsequentes.
+O **Context Management System** é responsável por gerenciar o fluxo de contexto entre steps de uma
+missão, garantindo que informações relevantes de steps anteriores sejam disponibilizadas para steps
+subsequentes.
 
 ### Problema Resolvido
 
-Em missões longas (ex: escrever livro de 300 páginas = 15+ capítulos), steps posteriores precisam de contexto de steps anteriores:
+Em missões longas (ex: escrever livro de 300 páginas = 15+ capítulos), steps posteriores precisam de
+contexto de steps anteriores:
 
 - **Step 1** (Outline): Gera estrutura do livro
 - **Step 2** (Capítulo 1): Precisa da outline + nenhum contexto
@@ -21,6 +25,7 @@ Em missões longas (ex: escrever livro de 300 páginas = 15+ capítulos), steps 
 - **Step 17** (Consistency Check): Precisa de TODOS os capítulos
 
 **Desafios**:
+
 - Context window overflow (100k+ tokens)
 - Informações irrelevantes dilui signal
 - Memória limitada do LLM
@@ -79,20 +84,24 @@ Em missões longas (ex: escrever livro de 300 páginas = 15+ capítulos), steps 
 **API Principal**:
 
 ```javascript
-const { ContextManager, CHUNKING_STRATEGY, SUMMARIZATION_POLICY } = require('./orchestrator/context_manager');
+const {
+  ContextManager,
+  CHUNKING_STRATEGY,
+  SUMMARIZATION_POLICY,
+} = require('./orchestrator/context_manager');
 
 const contextManager = new ContextManager({
-    maxTokens: 100000,                                  // Max tokens no contexto
-    chunkingStrategy: CHUNKING_STRATEGY.SLIDING_WINDOW, // Estratégia de chunking
-    windowSize: 10,                                     // Para sliding window
-    summarizationPolicy: SUMMARIZATION_POLICY.ON_OVERFLOW,
-    enableMemory: true,                                 // Habilitar Memory Store
-    memoryRetention: 1000                               // Max patterns no memory
+  maxTokens: 100000, // Max tokens no contexto
+  chunkingStrategy: CHUNKING_STRATEGY.SLIDING_WINDOW, // Estratégia de chunking
+  windowSize: 10, // Para sliding window
+  summarizationPolicy: SUMMARIZATION_POLICY.ON_OVERFLOW,
+  enableMemory: true, // Habilitar Memory Store
+  memoryRetention: 1000, // Max patterns no memory
 });
 
 // Inicializa contexto para uma missão
 contextManager.initializeContext('mission-123', {
-    metadata: { template: 'book_writing' }
+  metadata: { template: 'book_writing' },
 });
 
 // Adiciona output de um step
@@ -147,14 +156,16 @@ Controla **quais steps** são incluídos no contexto retornado.
 **Quando usar**: Missões sequenciais onde steps recentes são mais relevantes.
 
 **Configuração**:
+
 ```javascript
 new ContextManager({
-    chunkingStrategy: CHUNKING_STRATEGY.SLIDING_WINDOW,
-    windowSize: 10  // Últimos 10 steps
+  chunkingStrategy: CHUNKING_STRATEGY.SLIDING_WINDOW,
+  windowSize: 10, // Últimos 10 steps
 });
 ```
 
 **Exemplo**:
+
 ```
 Steps disponíveis: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 windowSize: 5
@@ -170,14 +181,16 @@ Retorna: [8, 9, 10, 11, 12]
 **Quando usar**: Missões onde context histórico importa mas pode ser resumido.
 
 **Configuração**:
+
 ```javascript
 new ContextManager({
-    chunkingStrategy: CHUNKING_STRATEGY.HIERARCHICAL,
-    windowSize: 5
+  chunkingStrategy: CHUNKING_STRATEGY.HIERARCHICAL,
+  windowSize: 5,
 });
 ```
 
 **Exemplo**:
+
 ```
 Steps disponíveis: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 windowSize: 3
@@ -195,14 +208,16 @@ Retorna:
 **Quando usar**: Controle estrito de context window.
 
 **Configuração**:
+
 ```javascript
 new ContextManager({
-    chunkingStrategy: CHUNKING_STRATEGY.TOKEN_LIMIT,
-    maxTokens: 50000  // Max 50k tokens
+  chunkingStrategy: CHUNKING_STRATEGY.TOKEN_LIMIT,
+  maxTokens: 50000, // Max 50k tokens
 });
 ```
 
 **Exemplo**:
+
 ```
 Steps: [1: 10k tokens, 2: 15k tokens, 3: 20k tokens, 4: 25k tokens]
 maxTokens: 50000
@@ -218,9 +233,10 @@ Retorna: [3, 4]  (total: 45k tokens)
 **Quando usar**: Missões curtas (< 5 steps) ou debugging.
 
 **Configuração**:
+
 ```javascript
 new ContextManager({
-    chunkingStrategy: CHUNKING_STRATEGY.NONE
+  chunkingStrategy: CHUNKING_STRATEGY.NONE,
 });
 ```
 
@@ -245,6 +261,7 @@ Controla **quando** resumir contexto antigo.
 **Quando usar**: Missões normais com controle de custo.
 
 **Funcionamento**:
+
 ```
 Steps adicionados: 1, 2, 3, 4, 5, ...
 Quando token_count > maxTokens:
@@ -263,10 +280,11 @@ Quando token_count > maxTokens:
 **Quando usar**: Missões previsíveis (ex: 100 capítulos).
 
 **Configuração**:
+
 ```javascript
 new ContextManager({
-    summarizationPolicy: SUMMARIZATION_POLICY.PERIODIC,
-    summarizationInterval: 10  // Resume a cada 10 steps
+  summarizationPolicy: SUMMARIZATION_POLICY.PERIODIC,
+  summarizationInterval: 10, // Resume a cada 10 steps
 });
 ```
 
@@ -285,6 +303,7 @@ new ContextManager({
 **Responsabilidade**: Armazenar patterns aprendidos (feedbacks, sucessos, erros) para reutilização.
 
 **Pattern Types**:
+
 - `FEEDBACK`: Feedback do usuário
 - `VALIDATION`: Resultados de validação (scores)
 - `ERROR`: Erros encontrados
@@ -296,9 +315,9 @@ new ContextManager({
 ```javascript
 // Adiciona pattern
 contextManager.addPattern({
-    type: 'FEEDBACK',
-    content: 'Add more code examples',
-    metadata: { mission: 'mission-123', step: 'step-5' }
+  type: 'FEEDBACK',
+  content: 'Add more code examples',
+  metadata: { mission: 'mission-123', step: 'step-5' },
 });
 
 // Busca patterns relevantes
@@ -311,6 +330,7 @@ const stats = contextManager.getStats();
 ```
 
 **Search Scoring**:
+
 ```javascript
 score = (keyword_matches * 1.0)
       + (pattern < 7 days old ? 0.5 : 0)
@@ -342,7 +362,7 @@ async createMission({ title, templateId, params }) {
 
 ---
 
-### 2. Geração de Prompt (_generateTaskV5FromStep)
+### 2. Geração de Prompt (\_generateTaskV5FromStep)
 
 ```javascript
 _generateTaskV5FromStep(step, missionState) {
@@ -388,7 +408,7 @@ Step step-2-chapter-4: Chapter 4: Traits and Generics. Traits allow for polymorp
 
 ---
 
-### 3. Após Step Completo (_handleTaskCompleted)
+### 3. Após Step Completo (\_handleTaskCompleted)
 
 ```javascript
 async _handleTaskCompleted(missionId, stepIndex, taskId, result) {
@@ -432,7 +452,7 @@ async _failMission(missionId, reason) {
 
 O **OrchestratorEngine** usa ContextManager para workflows **MULTI_STEP**.
 
-### Inicialização (_initializeWorkflowState)
+### Inicialização (\_initializeWorkflowState)
 
 ```javascript
 _initializeWorkflowState(task) {
@@ -448,7 +468,7 @@ _initializeWorkflowState(task) {
 }
 ```
 
-### Adicionar Output (_handleMultiStepStrategy)
+### Adicionar Output (\_handleMultiStepStrategy)
 
 ```javascript
 async _handleMultiStepStrategy(task, executionResult) {
@@ -461,7 +481,7 @@ async _handleMultiStepStrategy(task, executionResult) {
 }
 ```
 
-### Gerar Prompt (_buildStepPrompt)
+### Gerar Prompt (\_buildStepPrompt)
 
 ```javascript
 _buildStepPrompt(step, accumulated_context, workflow_id) {
@@ -488,11 +508,11 @@ _buildStepPrompt(step, accumulated_context, workflow_id) {
 
 ```javascript
 new ContextManager({
-    chunkingStrategy: CHUNKING_STRATEGY.HIERARCHICAL,
-    windowSize: 3,  // Últimos 3 capítulos completos
-    summarizationPolicy: SUMMARIZATION_POLICY.ON_OVERFLOW,
-    maxTokens: 50000,
-    enableMemory: true
+  chunkingStrategy: CHUNKING_STRATEGY.HIERARCHICAL,
+  windowSize: 3, // Últimos 3 capítulos completos
+  summarizationPolicy: SUMMARIZATION_POLICY.ON_OVERFLOW,
+  maxTokens: 50000,
+  enableMemory: true,
 });
 ```
 
@@ -504,10 +524,10 @@ new ContextManager({
 
 ```javascript
 new ContextManager({
-    chunkingStrategy: CHUNKING_STRATEGY.SLIDING_WINDOW,
-    windowSize: 5,  // Últimos 5 arquivos
-    summarizationPolicy: SUMMARIZATION_POLICY.DISABLED,  // Não precisa resumir
-    enableMemory: true  // Aprende patterns de code smells
+  chunkingStrategy: CHUNKING_STRATEGY.SLIDING_WINDOW,
+  windowSize: 5, // Últimos 5 arquivos
+  summarizationPolicy: SUMMARIZATION_POLICY.DISABLED, // Não precisa resumir
+  enableMemory: true, // Aprende patterns de code smells
 });
 ```
 
@@ -517,10 +537,10 @@ new ContextManager({
 
 ```javascript
 new ContextManager({
-    chunkingStrategy: CHUNKING_STRATEGY.TOKEN_LIMIT,
-    maxTokens: 80000,  // Fit em GPT-4 Turbo (128k)
-    summarizationPolicy: SUMMARIZATION_POLICY.ADAPTIVE,
-    enableMemory: true
+  chunkingStrategy: CHUNKING_STRATEGY.TOKEN_LIMIT,
+  maxTokens: 80000, // Fit em GPT-4 Turbo (128k)
+  summarizationPolicy: SUMMARIZATION_POLICY.ADAPTIVE,
+  enableMemory: true,
 });
 ```
 
@@ -541,6 +561,7 @@ _estimateTokens(text) {
 ### Memory Usage
 
 **Per Context**:
+
 - 1 step output (~1KB) × windowSize (10) = ~10KB
 - Summary (~500 bytes)
 - Metadata (~100 bytes)
@@ -551,9 +572,7 @@ _estimateTokens(text) {
 
 ### Memory Store
 
-**Per Pattern**: ~200 bytes
-**Max Patterns**: 1000 (default)
-**Total**: ~200KB RAM
+**Per Pattern**: ~200 bytes **Max Patterns**: 1000 (default) **Total**: ~200KB RAM
 
 ---
 
@@ -564,6 +583,7 @@ _estimateTokens(text) {
 **Sintoma**: LLM retorna erro "context too long"
 
 **Solução**:
+
 1. Reduzir `windowSize`
 2. Usar `TOKEN_LIMIT` strategy
 3. Ativar `summarizationPolicy: ON_OVERFLOW`
@@ -575,6 +595,7 @@ _estimateTokens(text) {
 **Sintoma**: Step 10 não sabe o que aconteceu no Step 2
 
 **Solução**:
+
 1. Aumentar `windowSize`
 2. Usar `HIERARCHICAL` strategy (summary + recent)
 3. Verificar se summary está sendo gerado corretamente
@@ -586,6 +607,7 @@ _estimateTokens(text) {
 **Sintoma**: RAM cresce indefinidamente
 
 **Solução**:
+
 1. Verificar se `clearContext()` é chamado no complete/fail
 2. Reduzir `memoryRetention` do Memory Store
 3. Ativar summarization mais agressiva (`PERIODIC`)
@@ -599,6 +621,7 @@ _estimateTokens(text) {
 Localização: `tests/unit/orchestrator/test_context_manager.spec.js`
 
 **Cobertura**:
+
 - Context initialization ✅
 - Adding step outputs ✅
 - Chunking strategies (SLIDING_WINDOW, TOKEN_LIMIT, HIERARCHICAL) ✅
@@ -615,6 +638,7 @@ Localização: `tests/unit/orchestrator/test_context_manager.spec.js`
 Localização: `tests/integration/test_context_flow.spec.js`
 
 **Cobertura**:
+
 - Context initialization on mission creation ✅
 - Context accumulation during execution ✅
 - Context in task prompt generation ✅
@@ -649,8 +673,10 @@ Localização: `tests/integration/test_context_flow.spec.js`
 - **Código**: `src/orchestrator/context_manager.js`
 - **Memory Store**: `src/orchestrator/memory_store.js`
 - **MissionManager Integration**: `src/missions/mission_manager.js` (linhas 107, 348, 407, 447, 457)
-- **OrchestratorEngine Integration**: `src/orchestrator/orchestrator_engine.js` (linhas 169, 325, 346, 418)
-- **Tests**: `tests/unit/orchestrator/test_context_manager.spec.js`, `tests/integration/test_context_flow.spec.js`
+- **OrchestratorEngine Integration**: `src/orchestrator/orchestrator_engine.js` (linhas 169, 325,
+  346, 418)
+- **Tests**: `tests/unit/orchestrator/test_context_manager.spec.js`,
+  `tests/integration/test_context_flow.spec.js`
 
 ---
 
@@ -658,31 +684,44 @@ Localização: `tests/integration/test_context_flow.spec.js`
 
 ```javascript
 // 1. Setup
-const { ContextManager, CHUNKING_STRATEGY, SUMMARIZATION_POLICY } = require('./orchestrator/context_manager');
+const {
+  ContextManager,
+  CHUNKING_STRATEGY,
+  SUMMARIZATION_POLICY,
+} = require('./orchestrator/context_manager');
 
 const contextManager = new ContextManager({
-    chunkingStrategy: CHUNKING_STRATEGY.HIERARCHICAL,
-    windowSize: 3,
-    summarizationPolicy: SUMMARIZATION_POLICY.ON_OVERFLOW,
-    maxTokens: 50000,
-    enableMemory: true,
-    memoryRetention: 1000
+  chunkingStrategy: CHUNKING_STRATEGY.HIERARCHICAL,
+  windowSize: 3,
+  summarizationPolicy: SUMMARIZATION_POLICY.ON_OVERFLOW,
+  maxTokens: 50000,
+  enableMemory: true,
+  memoryRetention: 1000,
 });
 
 // 2. Inicializa missão
 contextManager.initializeContext('mission-book-writing', {
-    metadata: { template: 'book_writing', chapters: 15 }
+  metadata: { template: 'book_writing', chapters: 15 },
 });
 
 // 3. Simula execução de steps
-await contextManager.addStepOutput('mission-book-writing', 'step-1',
-    'Outline: Introduction, Chapter 1: Basics, Chapter 2: Advanced...');
+await contextManager.addStepOutput(
+  'mission-book-writing',
+  'step-1',
+  'Outline: Introduction, Chapter 1: Basics, Chapter 2: Advanced...'
+);
 
-await contextManager.addStepOutput('mission-book-writing', 'step-2',
-    'Chapter 1: Rust Basics. Rust is a systems programming language...');
+await contextManager.addStepOutput(
+  'mission-book-writing',
+  'step-2',
+  'Chapter 1: Rust Basics. Rust is a systems programming language...'
+);
 
-await contextManager.addStepOutput('mission-book-writing', 'step-3',
-    'Chapter 2: Ownership. The ownership system is Rust\'s most unique feature...');
+await contextManager.addStepOutput(
+  'mission-book-writing',
+  'step-3',
+  "Chapter 2: Ownership. The ownership system is Rust's most unique feature..."
+);
 
 // 4. Gera prompt para próximo step
 const context = contextManager.getContextForStep('mission-book-writing', 'step-4');
@@ -698,9 +737,9 @@ ${context.steps.map(s => `${s.step_id}: ${s.output.substring(0, 200)}...`).join(
 
 // 5. Adiciona pattern ao memory store
 contextManager.addPattern({
-    type: 'FEEDBACK',
-    content: 'Always include code examples in technical chapters',
-    metadata: { mission: 'mission-book-writing' }
+  type: 'FEEDBACK',
+  content: 'Always include code examples in technical chapters',
+  metadata: { mission: 'mission-book-writing' },
 });
 
 // 6. Busca patterns relevantes
@@ -722,6 +761,4 @@ contextManager.clearContext('mission-book-writing');
 
 ---
 
-**Last Updated**: 2026-01-28
-**Version**: 2.0
-**Status**: Production Ready ✅
+**Last Updated**: 2026-01-28 **Version**: 2.0 **Status**: Production Ready ✅

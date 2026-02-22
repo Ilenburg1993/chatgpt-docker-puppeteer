@@ -1,14 +1,13 @@
 # 🔧 Guia de Integração: ConnectionOrchestrator + Chrome Proxy
 
-**Data**: 2026-01-30
-**Versão**: 1.0
-**Status**: ✅ Implementação Completa
+**Data**: 2026-01-30 **Versão**: 1.0 **Status**: ✅ Implementação Completa
 
 ---
 
 ## 📋 Resumo Executivo
 
-O **ConnectionOrchestrator** agora está totalmente integrado com o **Chrome Proxy Service**. O sistema prioriza automaticamente conexão via proxy, com fallback robusto para conexão direta.
+O **ConnectionOrchestrator** agora está totalmente integrado com o **Chrome Proxy Service**. O
+sistema prioriza automaticamente conexão via proxy, com fallback robusto para conexão direta.
 
 ### Mudanças Implementadas:
 
@@ -77,43 +76,47 @@ O **ConnectionOrchestrator** agora está totalmente integrado com o **Chrome Pro
 
 **⚠️ AÇÃO NECESSÁRIA**: Criar/atualizar `config.json` na raiz do projeto.
 
-**Localização**: `/workspaces/chatgpt-docker-puppeteer/config.json`
-**Arquivo temporário**: `/tmp/config_proxy_updated.json` (devido a problema de filesystem)
+**Localização**: `/workspaces/chatgpt-docker-puppeteer/config.json` **Arquivo temporário**:
+`/tmp/config_proxy_updated.json` (devido a problema de filesystem)
 
 ### Mudanças Críticas:
 
 **ANTES**:
+
 ```json
 {
   "BROWSER_MODE": "remote",
-  "DEBUG_PORT": "http://host.docker.internal:9224",
+  "DEBUG_PORT": "http://host.docker.internal:9224"
 }
 ```
 
 **DEPOIS**:
+
 ```json
 {
   "// [A] MODO DE OPERAÇÃO DO BROWSER": "",
-  "BROWSER_MODE": "wsEndpoint",  // ✅ MUDANÇA CRÍTICA
-  "DEBUG_PORT": "http://192.168.0.2:9224",  // ✅ MUDANÇA CRÍTICA
+  "BROWSER_MODE": "wsEndpoint", // ✅ MUDANÇA CRÍTICA
+  "DEBUG_PORT": "http://192.168.0.2:9224", // ✅ MUDANÇA CRÍTICA
 
   "// [A.1] CHROME PROXY CONFIGURATION": "",
   "CHROME_PROXY_ENABLED": true,
   "CHROME_PROXY_HOST": "192.168.0.2",
   "CHROME_PROXY_PORT": 9224,
   "CHROME_DIRECT_PORT": 9224,
-  "ALLOW_BROWSER_FALLBACK": true,
+  "ALLOW_BROWSER_FALLBACK": true
 }
 ```
 
 ### Como Aplicar:
 
 **Opção A - Copiar do /tmp** (no container):
+
 ```bash
 cp /tmp/config_proxy_updated.json config.json
 ```
 
 **Opção B - Criar manualmente no Windows** (se container tiver problema de filesystem):
+
 1. Abrir editor de texto (VSCode, Notepad++)
 2. Copiar conteúdo de `/tmp/config_proxy_updated.json`
 3. Salvar como `config.json` na raiz do projeto
@@ -129,29 +132,32 @@ cp /tmp/config_proxy_updated.json config.json
 #### 1. **Defaults - Priorização de Proxy** (linhas 73-85)
 
 **ANTES**:
+
 ```javascript
 const DEFAULTS = {
-    mode: process.env.BROWSER_MODE || 'launcher',
-    ports: [9224, 9223, 9224],  // Porta direta primeiro
-    hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
-}
+  mode: process.env.BROWSER_MODE || 'launcher',
+  ports: [9224, 9223, 9224], // Porta direta primeiro
+  hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
+};
 ```
 
 **DEPOIS**:
+
 ```javascript
 const DEFAULTS = {
-    mode: process.env.BROWSER_MODE || 'wsEndpoint',  // ✅ wsEndpoint como padrão
-    ports: [9224, 9224, 9223],  // ✅ Porta proxy (9224) PRIMEIRO
-    hosts: [
-        '192.168.0.2',           // ✅ IP público Windows (proxy) PRIMEIRO
-        'host.docker.internal',
-        '172.17.0.1',
-        '127.0.0.1'
-    ],
-}
+  mode: process.env.BROWSER_MODE || 'wsEndpoint', // ✅ wsEndpoint como padrão
+  ports: [9224, 9224, 9223], // ✅ Porta proxy (9224) PRIMEIRO
+  hosts: [
+    '192.168.0.2', // ✅ IP público Windows (proxy) PRIMEIRO
+    'host.docker.internal',
+    '172.17.0.1',
+    '127.0.0.1',
+  ],
+};
 ```
 
 **Por quê isso importa**:
+
 - Container tenta `192.168.0.2:9224` PRIMEIRO (proxy)
 - Se proxy falhar, tenta `host.docker.internal:9224` (proxy via Docker DNS)
 - Se proxy não estiver disponível, tenta conexão direta em `9224`
@@ -159,6 +165,7 @@ const DEFAULTS = {
 #### 2. **Logs e Telemetria** (linhas 278-334)
 
 **ADICIONADO**:
+
 ```javascript
 async tryConnectWSEndpoint() {
     for (const host of this.config.hosts) {
@@ -185,6 +192,7 @@ async tryConnectWSEndpoint() {
 ```
 
 **Benefício**:
+
 - Logs mostram claramente se conectou via proxy ou direto
 - Facilita debugging e monitoramento
 
@@ -206,6 +214,7 @@ async tryConnectWSEndpoint() {
 ### Teste 1: Iniciar Proxy no Windows
 
 **PowerShell (Windows)**:
+
 ```powershell
 # Navegar para pasta do projeto
 cd C:\path\to\chatgpt-docker-puppeteer
@@ -218,6 +227,7 @@ node scripts/chrome-proxy-service.js 192.168.0.2 info
 ```
 
 **Output esperado**:
+
 ```
 ✅ Chrome Proxy Service started
    Listening: 0.0.0.0:9224
@@ -228,11 +238,13 @@ node scripts/chrome-proxy-service.js 192.168.0.2 info
 ### Teste 2: Verificar Proxy Acessível do Container
 
 **Do container Docker**:
+
 ```bash
 curl http://192.168.0.2:9224/json/version
 ```
 
 **Output esperado** (JSON com IP público):
+
 ```json
 {
   "Browser": "Chrome/144.0.0.0",
@@ -245,11 +257,13 @@ curl http://192.168.0.2:9224/json/version
 ### Teste 3: Iniciar Sistema e Verificar Logs
 
 **Do container Docker**:
+
 ```bash
 npm start
 ```
 
 **Logs esperados** (stdout do sistema):
+
 ```
 [INFO] [ORCH] State: DETECTING_ENV
 [INFO] [ORCH] State: WAITING_FOR_BROWSER
@@ -263,11 +277,13 @@ npm start
 
 ✅ **Se ver "Conectado via Chrome Proxy Service"**: Integração funcionando perfeitamente!
 
-❌ **Se ver "Conectado diretamente ao Chrome"**: Sistema está usando fallback, proxy pode não estar funcionando.
+❌ **Se ver "Conectado diretamente ao Chrome"**: Sistema está usando fallback, proxy pode não estar
+funcionando.
 
 ### Teste 4: Verificar Conexão WebSocket Ativa
 
 **PowerShell (Windows) - no terminal do Proxy**:
+
 ```
 Quando container conectar, proxy deve mostrar:
 
@@ -284,16 +300,19 @@ Quando container conectar, proxy deve mostrar:
 ### Problema 1: Container Não Conecta ao Proxy
 
 **Sintoma**:
+
 ```
 [ORCH] WS endpoint unreachable: 192.168.0.2:9224 - connect ETIMEDOUT
 ```
 
 **Causas Possíveis**:
+
 1. Proxy não está rodando no Windows
 2. Firewall bloqueando porta 9224
 3. IP público mudou (DHCP)
 
 **Solução**:
+
 ```powershell
 # Windows - Verificar se proxy está rodando
 netstat -ano | findstr :9224
@@ -311,6 +330,7 @@ New-NetFirewallRule -DisplayName "Chrome Proxy 9224" -Direction Inbound -LocalPo
 ### Problema 2: Logs Mostram "[DIRECT]" em vez de "[PROXY]"
 
 **Sintoma**:
+
 ```
 [INFO] [ORCH] ✅ Conectado diretamente ao Chrome (host.docker.internal:9224)
 ```
@@ -318,6 +338,7 @@ New-NetFirewallRule -DisplayName "Chrome Proxy 9224" -Direction Inbound -LocalPo
 **Causa**: Proxy não respondeu, sistema usou fallback.
 
 **Diagnóstico**:
+
 ```bash
 # Do container
 curl http://192.168.0.2:9224/json/version
@@ -334,6 +355,7 @@ curl http://192.168.0.2:9224/json/version
 **Causa**: Proxy não está reescrevendo URLs ou container não está usando proxy.
 
 **Diagnóstico**:
+
 ```bash
 # Verificar response do proxy
 curl -s http://192.168.0.2:9224/json/version | grep webSocketDebuggerUrl
@@ -343,6 +365,7 @@ curl -s http://192.168.0.2:9224/json/version | grep webSocketDebuggerUrl
 ```
 
 **Solução**:
+
 1. Verificar logs do proxy (deve mostrar "URL rewritten")
 2. Confirmar que container está usando porta 9224 (não 9224)
 3. Verificar config.json: `DEBUG_PORT` deve ser `http://192.168.0.2:9224`
@@ -354,24 +377,28 @@ curl -s http://192.168.0.2:9224/json/version | grep webSocketDebuggerUrl
 ### Ações Pendentes:
 
 1. ✅ **FAZER AGORA**: Atualizar `config.json` conforme seção "Arquivo 1"
+
    ```bash
    # No container
    cp /tmp/config_proxy_updated.json config.json
    ```
 
 2. ✅ **FAZER AGORA**: Iniciar Chrome + Proxy no Windows
+
    ```powershell
    # PowerShell
    scripts\start-chrome-with-proxy.bat
    ```
 
 3. ✅ **FAZER AGORA**: Testar conexão do container
+
    ```bash
    # No container
    curl http://192.168.0.2:9224/json/version
    ```
 
 4. ✅ **FAZER AGORA**: Iniciar sistema e verificar logs
+
    ```bash
    # No container
    npm start
@@ -396,14 +423,14 @@ curl -s http://192.168.0.2:9224/json/version | grep webSocketDebuggerUrl
 
 ## 📚 Arquivos de Referência
 
-| Arquivo | Localização | Status |
-|---------|-------------|--------|
-| **config.json** | `/workspaces/chatgpt-docker-puppeteer/config.json` | ⚠️ Precisa atualizar |
-| **config.json (backup)** | `/tmp/config_proxy_updated.json` | ✅ Pronto para copiar |
-| **ConnectionOrchestrator.js** | `src/infra/ConnectionOrchestrator.js` | ✅ Atualizado |
-| **chrome-proxy-service.js** | `scripts/chrome-proxy-service.js` | ✅ Criado anteriormente |
-| **start-chrome-with-proxy.bat** | `scripts/start-chrome-with-proxy.bat` | ✅ Criado anteriormente |
-| **CHROME_PROXY_SETUP.md** | `DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md` | ✅ Criado anteriormente |
+| Arquivo                         | Localização                                        | Status                  |
+| ------------------------------- | -------------------------------------------------- | ----------------------- |
+| **config.json**                 | `/workspaces/chatgpt-docker-puppeteer/config.json` | ⚠️ Precisa atualizar    |
+| **config.json (backup)**        | `/tmp/config_proxy_updated.json`                   | ✅ Pronto para copiar   |
+| **ConnectionOrchestrator.js**   | `src/infra/ConnectionOrchestrator.js`              | ✅ Atualizado           |
+| **chrome-proxy-service.js**     | `scripts/chrome-proxy-service.js`                  | ✅ Criado anteriormente |
+| **start-chrome-with-proxy.bat** | `scripts/start-chrome-with-proxy.bat`              | ✅ Criado anteriormente |
+| **CHROME_PROXY_SETUP.md**       | `DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md`               | ✅ Criado anteriormente |
 
 ---
 
@@ -461,6 +488,5 @@ curl -s http://192.168.0.2:9224/json/version | grep webSocketDebuggerUrl
 
 ---
 
-**Última atualização**: 2026-01-30
-**Autor**: Claude Sonnet 4.5 (AI Assistant)
-**Versão**: 1.0 - Integração Completa
+**Última atualização**: 2026-01-30 **Autor**: Claude Sonnet 4.5 (AI Assistant) **Versão**: 1.0 -
+Integração Completa

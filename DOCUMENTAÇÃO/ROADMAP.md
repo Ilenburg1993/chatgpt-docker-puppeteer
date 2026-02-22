@@ -1,7 +1,7 @@
 # 🗺️ Project Roadmap - chatgpt-docker-puppeteer
 
-> **Status Atual**: Pre-v1.0 - Sistema funcional em fase de consolidação arquitetural
-> **Última atualização**: 19 de Janeiro de 2026
+> **Status Atual**: Pre-v1.0 - Sistema funcional em fase de consolidação arquitetural **Última
+> atualização**: 19 de Janeiro de 2026
 
 ---
 
@@ -9,7 +9,8 @@
 
 ### Visão de Longo Prazo
 
-Criar o **framework de referência open-source** para automação autônoma de LLMs via browser automation, com arquitetura extensível, observabilidade completa e deployment simplificado.
+Criar o **framework de referência open-source** para automação autônoma de LLMs via browser
+automation, com arquitetura extensível, observabilidade completa e deployment simplificado.
 
 ### Objetivos Estratégicos
 
@@ -93,14 +94,14 @@ Criar o **framework de referência open-source** para automação autônoma de L
 
 - [ ] Migrar para ES Modules (type: "module")
 - [ ] Reorganizar `src/` seguindo DDD rigoroso
-    ```
-    src/
-    ├── core/           # Domain logic
-    ├── application/    # Use cases
-    ├── infrastructure/ # Technical concerns
-    ├── interfaces/     # API, CLI, Dashboard
-    └── shared/         # Cross-cutting
-    ```
+  ```
+  src/
+  ├── core/           # Domain logic
+  ├── application/    # Use cases
+  ├── infrastructure/ # Technical concerns
+  ├── interfaces/     # API, CLI, Dashboard
+  └── shared/         # Cross-cutting
+  ```
 - [ ] Centralizar configurações em `src/core/config/`
 - [ ] Unificar schemas em `src/core/schemas/`
 - [ ] Extrair constantes para `src/shared/constants/`

@@ -1,10 +1,10 @@
 # Port Architecture Analysis & Mapping
-**Data**: 2 de Fevereiro de 2026
-**Status**: ANÁLISE COMPLETA + CORREÇÕES APLICADAS
-**Contexto**: Auditoria de portas configuradas no `.devcontainer/devcontainer.json` vs uso real
 
-> **📝 Update (2026-02-07)**: Sistema de port-manager mencionado em outras docs foi removido (código morto).
-> Sistema atual usa **port hunting nativo** em `src/main.js`.
+**Data**: 2 de Fevereiro de 2026 **Status**: ANÁLISE COMPLETA + CORREÇÕES APLICADAS **Contexto**:
+Auditoria de portas configuradas no `.devcontainer/devcontainer.json` vs uso real
+
+> **📝 Update (2026-02-07)**: Sistema de port-manager mencionado em outras docs foi removido (código
+> morto). Sistema atual usa **port hunting nativo** em `src/main.js`.
 
 ---
 
@@ -121,8 +121,8 @@
 
 ### ✅ Portas Realmente Usadas
 
-| Porta | Processo           | Tipo      | Função Real                               | Status     |
-| ----- | ------------------ | --------- | ----------------------------------------- | ---------- |
+| Porta | Processo           | Tipo      | Função Real                               | Status      |
+| ----- | ------------------ | --------- | ----------------------------------------- | ----------- |
 | 3008  | dashboard-web      | HTTP + WS | Dashboard Principal (Mission Control)     | ✅ CORRETO  |
 | 9224  | chrome-proxy       | HTTP + WS | Proxy Container → Chrome Windows          | ❌ AUSENTE  |
 | 9225  | Chrome (Windows)   | CDP (WS)  | Chrome DevTools Protocol (LLM Automation) | ✅ IGNORADO |
@@ -143,6 +143,7 @@
 ## 3. PM2 ARCHITECTURE (3 Processos)
 
 ### Processo 1: `agente-gpt` (Main Process)
+
 - **Script**: `index.js` → `src/main.js`
 - **Função**: Kernel + Drivers + Orchestration + NERV
 - **Porta**: **NENHUMA** (comunicação 100% via NERV IPC)
@@ -152,6 +153,7 @@
 - **Browser**: Chrome Windows (via Puppeteer)
 
 ### Processo 2: `dashboard-web` (Server Process)
+
 - **Script**: `src/server/main.js`
 - **Função**: HTTP Server + Socket.io + API REST + Telemetry
 - **Porta**: `3008` (HTTP + WebSocket)
@@ -174,6 +176,7 @@
 #### Endpoints REST API (porta 3008)
 
 **Health & Monitoring**:
+
 - `GET /health` - Health check rápido
 - `GET /api/health` - Health check completo
 - `GET /api/health/chrome` - Status do Chrome/Puppeteer
@@ -183,6 +186,7 @@
 - `GET /api/metrics` - Métricas do sistema
 
 **Tasks**:
+
 - `GET /api/tasks` - Listar tasks
 - `GET /api/tasks/:id` - Detalhes de task
 - `POST /api/tasks` - Criar task
@@ -190,6 +194,7 @@
 - `DELETE /api/tasks/:id` - Deletar task
 
 **Missions**:
+
 - `POST /api/missions` - Criar missão
 - `GET /api/missions` - Listar missões
 - `GET /api/missions/:id` - Detalhes de missão
@@ -201,20 +206,24 @@
 - `DELETE /api/missions/:id` - Deletar missão
 
 **System**:
+
 - `GET /api/system/status` - Status do sistema
 - `GET /api/system/logs` - Logs do sistema
 - `POST /api/system/restart` - Reiniciar sistema
 
 **Dashboard**:
+
 - `GET /dashboard` - Dashboard HTML
 - `GET /dashboard/system/health` - Health do sistema
 - `GET /dashboard/bridge/metrics` - Métricas da bridge
 
 **DNA (Configuration)**:
+
 - `GET /api/dna` - Configuração do sistema
 - `PATCH /api/dna` - Atualizar configuração
 
 ### Processo 3: `chrome-proxy` (Proxy Service)
+
 - **Script**: `scripts/chrome-proxy-service.js`
 - **Função**: Transparent Proxy (HTTP + WebSocket)
 - **Portas**:
@@ -251,6 +260,7 @@ Usuário (Browser ANY) → http://localhost:3008 → DevContainer (dashboard-web
 ```
 
 **Características**:
+
 - ✅ Browser-agnostic (Chrome, Firefox, Edge, Safari)
 - ✅ ZERO dependência de Puppeteer
 - ✅ ZERO dependência de Chrome Windows
@@ -285,6 +295,7 @@ agente-gpt (Puppeteer) → localhost:9224 → chrome-proxy → host.docker.inter
 ```
 
 **Características**:
+
 - ✅ Depende de Chrome Windows (porta 9225)
 - ✅ Usa Puppeteer (mode: connect)
 - ✅ Atravessa proxy transparente (9224)
@@ -344,6 +355,7 @@ pm2 web
 ```
 
 **CORREÇÃO**:
+
 ```json
 // CORRETO:
 "3008": {
@@ -512,6 +524,7 @@ Humano → Chrome Windows (browser comum)
 ```
 
 **Características**:
+
 - ANY browser funciona (Chrome, Firefox, Edge, Safari)
 - ZERO dependência de Puppeteer
 - ZERO dependência de Chrome Windows CDP (porta 9225)
@@ -532,6 +545,7 @@ agente-gpt (container) → Puppeteer
 ```
 
 **Características**:
+
 - Puppeteer required
 - Chrome Windows (CDP) required
 - Proxy transparente (9224)
@@ -544,6 +558,7 @@ agente-gpt (container) → Puppeteer
 ### O Que É PM2?
 
 **PM2** é um **Process Manager** para Node.js que:
+
 - ✅ Inicia/para/reinicia processos
 - ✅ Gerencia logs
 - ✅ Monitora recursos (CPU, memória)
@@ -646,6 +661,7 @@ pm2 web  # NÃO ativo por padrão
 ### Porta 3008 (Dashboard + API)
 
 **Do Windows Host (desenvolvimento)**:
+
 ```bash
 # Dashboard HTML
 http://localhost:3008/dashboard
@@ -660,31 +676,34 @@ curl http://localhost:3008/api/missions
 ```
 
 **Socket.io (JavaScript)**:
+
 ```javascript
 // Conectar ao servidor Socket.io
 const socket = io('http://localhost:3008');
 
 // Escutar eventos
-socket.on('task:created', (data) => {
-    console.log('Nova task:', data);
+socket.on('task:created', data => {
+  console.log('Nova task:', data);
 });
 
-socket.on('mission:progress', (data) => {
-    console.log('Progresso:', data);
+socket.on('mission:progress', data => {
+  console.log('Progresso:', data);
 });
 ```
 
 ### Porta 9224 (Chrome Proxy)
 
 **Do Container (Puppeteer)**:
+
 ```javascript
 // Puppeteer conecta automaticamente
 const browser = await puppeteer.connect({
-    browserWSEndpoint: 'http://localhost:9224'
+  browserWSEndpoint: 'http://localhost:9224',
 });
 ```
 
 **Health check manual**:
+
 ```bash
 # Do container
 curl http://localhost:9224/json/version
@@ -695,6 +714,7 @@ curl http://localhost:9224/json/version
 ### Porta 9225 (Chrome Windows)
 
 **Do Windows (validação)**:
+
 ```bash
 # Verificar se Chrome está rodando
 curl http://localhost:9225/json/version
@@ -708,17 +728,19 @@ curl http://localhost:9225/json/list
 ### Portas 9229/9230 (Debug)
 
 **VSCode (launch.json)**:
+
 ```json
 {
-    "type": "node",
-    "request": "attach",
-    "name": "Attach to agente-gpt",
-    "port": 9229,
-    "restart": true
+  "type": "node",
+  "request": "attach",
+  "name": "Attach to agente-gpt",
+  "port": 9229,
+  "restart": true
 }
 ```
 
 **Chrome DevTools**:
+
 ```
 chrome://inspect
 → Configure: localhost:9229
@@ -727,5 +749,4 @@ chrome://inspect
 
 ---
 
-**Versão**: 2.0 (Expandido com REST API + Socket.io)
-**Próximos Passos**: Testes de integração E2E
+**Versão**: 2.0 (Expandido com REST API + Socket.io) **Próximos Passos**: Testes de integração E2E

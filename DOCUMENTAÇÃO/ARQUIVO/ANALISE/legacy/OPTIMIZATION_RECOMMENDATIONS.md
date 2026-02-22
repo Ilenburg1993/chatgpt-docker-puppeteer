@@ -54,10 +54,10 @@ SENTRY_DSN=https://your-sentry-dsn
 
 ```yaml
 services:
-    agent:
-        # ... existing config ...
-        extra_hosts:
-            - 'host.docker.internal:host-gateway' # Linux compatibility
+  agent:
+    # ... existing config ...
+    extra_hosts:
+      - 'host.docker.internal:host-gateway' # Linux compatibility
 ```
 
 **Alternativa**: Criar variante `docker-compose.linux.yml` com override
@@ -74,8 +74,8 @@ services:
 
 ```yaml
 limits:
-    cpus: '2'
-    memory: 2G
+  cpus: '2'
+  memory: 2G
 ```
 
 **Recomendação**:
@@ -104,21 +104,21 @@ reservations:
 ```javascript
 // scripts/healthcheck.js (sugestão de evolução)
 async function healthcheck() {
-    const checks = [
-        checkHTTPServer(), // ✅ Já implementado
-        checkChromeConnection(), // TODO: Verificar ws://
-        checkQueueAccess(), // TODO: Testar fila/
-        checkDiskSpace() // TODO: Garantir espaço
-    ];
+  const checks = [
+    checkHTTPServer(), // ✅ Já implementado
+    checkChromeConnection(), // TODO: Verificar ws://
+    checkQueueAccess(), // TODO: Testar fila/
+    checkDiskSpace(), // TODO: Garantir espaço
+  ];
 
-    const results = await Promise.allSettled(checks);
-    const failed = results.filter(r => r.status === 'rejected');
+  const results = await Promise.allSettled(checks);
+  const failed = results.filter(r => r.status === 'rejected');
 
-    if (failed.length > 0) {
-        console.error('Health check failed:', failed);
-        process.exit(1);
-    }
-    process.exit(0);
+  if (failed.length > 0) {
+    console.error('Health check failed:', failed);
+    process.exit(1);
+  }
+  process.exit(0);
 }
 ```
 
@@ -167,30 +167,30 @@ RUN mkdir -p fila respostas logs profile && \
 
 ```yaml
 logging:
-    driver: fluentd
-    options:
-        fluentd-address: localhost:24224
-        tag: chatgpt-agent
+  driver: fluentd
+  options:
+    fluentd-address: localhost:24224
+    tag: chatgpt-agent
 ```
 
 **Opção 2 - AWS CloudWatch**:
 
 ```yaml
 logging:
-    driver: awslogs
-    options:
-        awslogs-region: us-east-1
-        awslogs-group: /chatgpt-agent
-        awslogs-stream: ${CONTAINER_NAME}
+  driver: awslogs
+  options:
+    awslogs-region: us-east-1
+    awslogs-group: /chatgpt-agent
+    awslogs-stream: ${CONTAINER_NAME}
 ```
 
 **Opção 3 - Loki (self-hosted)**:
 
 ```yaml
 logging:
-    driver: loki
-    options:
-        loki-url: 'http://localhost:3100/loki/api/v1/push'
+  driver: loki
+  options:
+    loki-url: 'http://localhost:3100/loki/api/v1/push'
 ```
 
 ---
@@ -214,11 +214,11 @@ INICIAR_TUDO.BAT
 
 ```json
 {
-    "scripts": {
-        "start:all": "npm run daemon:start && npm run queue:add",
-        "dev:full": "concurrently \"npm run dev\" \"npm run queue:status -- --watch\"",
-        "prod": "cross-env NODE_ENV=production npm run daemon:start"
-    }
+  "scripts": {
+    "start:all": "npm run daemon:start && npm run queue:add",
+    "dev:full": "concurrently \"npm run dev\" \"npm run queue:status -- --watch\"",
+    "prod": "cross-env NODE_ENV=production npm run daemon:start"
+  }
 }
 ```
 
@@ -240,17 +240,17 @@ dev-full:
 **Priorização de Testes**:
 
 1. **Crítico - Implementar primeiro**:
-    - `test:health` - Valida endpoint de health
-    - `test:lock` - Garante exclusão mútua na fila
-    - `test:chrome-connection` - Testa conexão com Chrome remoto
+   - `test:health` - Valida endpoint de health
+   - `test:lock` - Garante exclusão mútua na fila
+   - `test:chrome-connection` - Testa conexão com Chrome remoto
 
 2. **Importante - Próxima iteração**:
-    - `test:integration` - Fluxo completo de tarefa
-    - `test:config` - Validação de configurações
+   - `test:integration` - Fluxo completo de tarefa
+   - `test:config` - Validação de configurações
 
 3. **Desejável - v1.0**:
-    - `test:e2e` - Testes end-to-end com LLM real
-    - `test:performance` - Benchmarks de throughput
+   - `test:e2e` - Testes end-to-end com LLM real
+   - `test:performance` - Benchmarks de throughput
 
 **Comando de teste mínimo**:
 
@@ -271,23 +271,23 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v3
-            - uses: actions/setup-node@v3
-              with:
-                  node-version: '20'
-            - run: npm ci
-            - run: npm run test:health
-            - run: npm run test:config
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run test:health
+      - run: npm run test:config
 
-    docker:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v3
-            - run: docker build -t test .
-            - run: docker run --rm test npm run test:health
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: docker build -t test .
+      - run: docker run --rm test npm run test:health
 ```
 
 ### 12. **Configuração - Validação com Zod**
@@ -301,18 +301,18 @@ jobs:
 const { z } = require('zod');
 
 const ConfigSchema = z.object({
-    BROWSER_MODE: z.enum(['launcher', 'remote']),
-    DEBUG_PORT: z.string().url(),
-    CYCLE_DELAY: z.number().min(100).max(10000),
-    DEFAULT_MODEL_ID: z.string(),
-    allowedDomains: z.array(z.string().regex(/^[a-z0-9.-]+$/))
-    // ... resto do schema
+  BROWSER_MODE: z.enum(['launcher', 'remote']),
+  DEBUG_PORT: z.string().url(),
+  CYCLE_DELAY: z.number().min(100).max(10000),
+  DEFAULT_MODEL_ID: z.string(),
+  allowedDomains: z.array(z.string().regex(/^[a-z0-9.-]+$/)),
+  // ... resto do schema
 });
 
 // Validar na carga
 function loadConfig() {
-    const raw = require('./config.json');
-    return ConfigSchema.parse(raw); // Throws se inválido
+  const raw = require('./config.json');
+  return ConfigSchema.parse(raw); // Throws se inválido
 }
 ```
 
@@ -348,11 +348,11 @@ respostas/
 ```json
 // config.json
 {
-    "multi_tenancy": {
-        "enabled": true,
-        "default_tenant": "default",
-        "tenant_header": "X-Tenant-ID"
-    }
+  "multi_tenancy": {
+    "enabled": true,
+    "default_tenant": "default",
+    "tenant_header": "X-Tenant-ID"
+  }
 }
 ```
 
@@ -367,21 +367,21 @@ respostas/
 const client = require('prom-client');
 
 const taskCounter = new client.Counter({
-    name: 'chatgpt_agent_tasks_total',
-    help: 'Total tasks processed',
-    labelNames: ['status', 'target']
+  name: 'chatgpt_agent_tasks_total',
+  help: 'Total tasks processed',
+  labelNames: ['status', 'target'],
 });
 
 const taskDuration = new client.Histogram({
-    name: 'chatgpt_agent_task_duration_seconds',
-    help: 'Task processing duration',
-    buckets: [1, 5, 10, 30, 60, 120, 300]
+  name: 'chatgpt_agent_task_duration_seconds',
+  help: 'Task processing duration',
+  buckets: [1, 5, 10, 30, 60, 120, 300],
 });
 
 // Expor /metrics endpoint
 app.get('/metrics', async (req, res) => {
-    res.set('Content-Type', client.register.contentType);
-    res.end(await client.register.metrics());
+  res.set('Content-Type', client.register.contentType);
+  res.end(await client.register.metrics());
 });
 ```
 
@@ -396,9 +396,9 @@ app.get('/metrics', async (req, res) => {
 const rateLimit = require('express-rate-limit');
 
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 min
-    max: 100, // 100 requests por janela
-    message: 'Too many requests from this IP'
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 100, // 100 requests por janela
+  message: 'Too many requests from this IP',
 });
 
 app.use('/api/', limiter);

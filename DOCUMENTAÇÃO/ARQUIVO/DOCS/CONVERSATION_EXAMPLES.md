@@ -9,9 +9,11 @@ Este documento mostra **conversas reais** de como LLMs usam o sistema RAG natura
 ### Conversa:
 
 **Usuário:**
+
 > Onde está definida a variável CHROME_PROXY_PORT?
 
 **Claude (internamente):**
+
 ```
 [Pensamento] Usuário quer encontrar uma variável no código.
 Tenho a ferramenta rag_search que pode buscar no codebase.
@@ -21,25 +23,31 @@ Vou usá-la!
 ```
 
 **Claude (responde ao usuário):**
+
 > Encontrei CHROME_PROXY_PORT definida em 3 locais principais:
 >
 > **1. `.devcontainer/devcontainer.json` (linhas 87-106)**
+>
 > ```json
 > "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
 > "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
 > ```
+>
 > Este é o arquivo de configuração do DevContainer que define a porta 9224.
 >
 > **2. `.env.development` (linha 39)**
+>
 > ```bash
 > CHROME_PROXY_PORT=9224
 > ```
 >
 > **3. `ecosystem.config.cjs` (chrome-proxy process)**
 >
-> A porta 9224 é usada para o proxy do Chrome no container, que redireciona para a porta 9225 no host Windows.
+> A porta 9224 é usada para o proxy do Chrome no container, que redireciona para a porta 9225 no
+> host Windows.
 
 **🎯 O que aconteceu:**
+
 - Usuário fez uma pergunta natural
 - Claude automaticamente decidiu usar `rag_search`
 - Buscou no código com semantic search
@@ -53,9 +61,11 @@ Vou usá-la!
 ### Conversa:
 
 **Usuário:**
+
 > Como funciona o kernel loop? Me explique a implementação
 
 **Claude:**
+
 ```
 [Pensamento] Preciso encontrar o código do kernel loop primeiro.
 Vou usar rag_search para achar a implementação.
@@ -64,9 +74,11 @@ Vou usar rag_search para achar a implementação.
 ```
 
 **Claude (após receber resultados):**
+
 > O kernel loop está implementado em `src/kernel/kernel_loop/kernel_loop.js`. Vou te explicar:
 >
 > **Estrutura Principal:**
+>
 > ```javascript
 > async function kernelLoop() {
 >   while (!shouldStop) {
@@ -83,17 +95,20 @@ Vou usar rag_search para achar a implementação.
 > ```
 >
 > **Como funciona:**
+>
 > 1. Loop infinito que processa tarefas sequencialmente
 > 2. Interval configurável via `KERNEL_CYCLE_INTERVAL` (default: 50ms)
 > 3. Graceful shutdown quando `shouldStop` é true
 > 4. Integrado com NERV para comunicação IPC
 >
 > **Arquivos relacionados:**
+>
 > - `kernel_loop.js` - Loop principal
 > - `task_runtime.js` - Execução de tarefas
 > - `execution_engine.js` - Engine de execução
 
 **🎯 O que aconteceu:**
+
 - Claude usou RAG para encontrar o código
 - Analisou o código encontrado
 - Explicou com exemplos e contexto
@@ -106,9 +121,11 @@ Vou usar rag_search para achar a implementação.
 ### Conversa:
 
 **Usuário:**
+
 > Preciso criar uma função que valida CPF. Pode gerar o código com docstring completa?
 
 **Claude:**
+
 ```
 [Pensamento] Usuário quer gerar código novo.
 Tenho a ferramenta ollama_generate que pode usar o modelo local.
@@ -118,6 +135,7 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 ```
 
 **Claude (responde):**
+
 > Claro! Vou gerar usando o modelo local qwen2.5-coder:
 >
 > ```javascript
@@ -172,6 +190,7 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 > ```
 >
 > Esta função foi gerada localmente usando **qwen2.5-coder:7b**. Ela inclui:
+>
 > - ✅ Docstring JSDoc completa
 > - ✅ Validação de formato
 > - ✅ Verificação de sequências repetidas
@@ -179,6 +198,7 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 > - ✅ Exemplos de uso
 
 **🎯 O que aconteceu:**
+
 - Claude usou Ollama local (privacidade total!)
 - Gerou código de qualidade com documentação
 - Explicou o que a função faz
@@ -191,9 +211,12 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 ### Conversa:
 
 **Usuário:**
-> Quais modelos Ollama eu tenho? E depois use o melhor para gerar um comentário explicando o que é MMR no RAG
+
+> Quais modelos Ollama eu tenho? E depois use o melhor para gerar um comentário explicando o que é
+> MMR no RAG
 
 **Claude:**
+
 ```
 [Pensamento] Usuário fez duas perguntas:
 1. Listar modelos - vou usar ollama_models
@@ -203,16 +226,20 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 ```
 
 **Claude (primeira resposta):**
+
 > Você tem 4 modelos Ollama instalados:
 >
 > **Para Geração de Código:**
+>
 > - qwen2.5-coder:7b (4.68 GB) - **Melhor qualidade**
 > - qwen2.5-coder:3b (1.93 GB) - Balanceado
 >
 > **Para Chat Geral:**
+>
 > - qwen2.5:3b-instruct (1.93 GB)
 >
 > **Para Embeddings:**
+>
 > - nomic-embed-text (0.27 GB)
 >
 > Vou usar o **qwen2.5-coder:7b** para gerar o comentário sobre MMR...
@@ -222,7 +249,7 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 ```
 
 **Claude (segunda resposta):**
->
+
 > ```javascript
 > /**
 >  * MMR (Maximal Marginal Relevance) - Algoritmo de Diversificação
@@ -252,6 +279,7 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 > ```
 
 **🎯 O que aconteceu:**
+
 - Claude usou 2 ferramentas em sequência
 - Escolheu o modelo apropriado automaticamente
 - Gerou comentário educativo e completo
@@ -264,20 +292,26 @@ Vou usar qwen2.5-coder:7b que é bom para código.
 ### Conversa Contínua:
 
 **Usuário:**
+
 > Me mostre onde está o adaptive throttling
 
 **Claude:**
+
 ```
 [Ação] rag_search("adaptive throttling implementation")
 ```
 
 **Claude:**
-> O adaptive throttling está em `src/logic/adaptive.js`. O sistema ajusta dinamicamente o delay entre operações baseado na carga da CPU...
+
+> O adaptive throttling está em `src/logic/adaptive.js`. O sistema ajusta dinamicamente o delay
+> entre operações baseado na carga da CPU...
 
 **Usuário (continua):**
+
 > E como eu uso isso no meu código?
 
 **Claude:**
+
 ```
 [Pensamento] Já sei onde está o código (da busca anterior).
 Agora vou buscar exemplos de uso.
@@ -286,6 +320,7 @@ Agora vou buscar exemplos de uso.
 ```
 
 **Claude:**
+
 > Para usar o adaptive throttling no seu código:
 >
 > ```javascript
@@ -304,14 +339,17 @@ Agora vou buscar exemplos de uso.
 > O delay varia automaticamente de 50ms a 5000ms baseado na CPU.
 
 **Usuário (continua):**
+
 > Legal! Pode gerar uma docstring melhor para essa função getDelay?
 
 **Claude:**
+
 ```
 [Ação] ollama_generate("Generate improved JSDoc for adaptive.getDelay() method")
 ```
 
 **Claude:**
+
 > ```javascript
 > /**
 >  * Obtém o delay adaptativo atual baseado na carga do sistema
@@ -341,6 +379,7 @@ Agora vou buscar exemplos de uso.
 > ```
 
 **🎯 O que aconteceu:**
+
 - Conversa natural de 3 turnos
 - Claude manteve contexto entre perguntas
 - Usou 3 ferramentas diferentes apropriadamente
@@ -375,35 +414,39 @@ SE usuário quer COMPARAR similaridade de textos
 
 ### Exemplos de Triggers:
 
-| Pergunta do Usuário | Ferramenta Usada | Por quê |
-|---------------------|------------------|---------|
-| "Onde está X?" | `rag_search` | Busca no código |
-| "Como funciona Y?" | `rag_search` | Encontra implementação |
-| "Gere código para Z" | `ollama_generate` | Geração de código |
-| "Quais modelos tenho?" | `ollama_models` | Lista modelos |
-| "RAG está funcionando?" | `rag_health` | Verifica saúde |
-| "Estes textos são similares?" | `ollama_embed` | Calcula embeddings |
+| Pergunta do Usuário           | Ferramenta Usada  | Por quê                |
+| ----------------------------- | ----------------- | ---------------------- |
+| "Onde está X?"                | `rag_search`      | Busca no código        |
+| "Como funciona Y?"            | `rag_search`      | Encontra implementação |
+| "Gere código para Z"          | `ollama_generate` | Geração de código      |
+| "Quais modelos tenho?"        | `ollama_models`   | Lista modelos          |
+| "RAG está funcionando?"       | `rag_health`      | Verifica saúde         |
+| "Estes textos são similares?" | `ollama_embed`    | Calcula embeddings     |
 
 ---
 
 ## 🌟 Características do Uso Natural
 
 ### ✅ **Transparente**
+
 - Usuário não precisa saber que ferramentas existem
 - LLM decide automaticamente
 - Fluxo natural de conversa
 
 ### ✅ **Contextual**
+
 - LLM mantém contexto entre perguntas
 - Pode usar múltiplas ferramentas em sequência
 - Respostas constroem em cima de queries anteriores
 
 ### ✅ **Privado**
+
 - Ollama roda localmente (nenhum código sai do container)
 - RAG busca apenas no codebase local
 - Zero dados enviados para cloud
 
 ### ✅ **Rápido**
+
 - Cache de embeddings (40-60% hit rate)
 - Resultados em <2 segundos
 - Ollama local (sem latência de rede)
@@ -463,6 +506,7 @@ opencode
 5. **Respostas são formatadas** pela LLM de forma útil
 
 **É como ter um assistente especialista no seu codebase que:**
+
 - Conhece todo o código (via RAG)
 - Pode gerar código novo (via Ollama)
 - Responde em linguagem natural

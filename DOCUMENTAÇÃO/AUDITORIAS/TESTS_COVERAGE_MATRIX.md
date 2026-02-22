@@ -1,8 +1,7 @@
 # 🧪 Matriz de Cobertura Completa de Testes
 
-**Data**: 2026-01-20
-**Objetivo**: Mapear TODOS os módulos do sistema vs. testes necessários para atingir 80%+ de cobertura
-**Status Atual**: 14 testes funcionais | 135 arquivos fonte | 3.688 LOC
+**Data**: 2026-01-20 **Objetivo**: Mapear TODOS os módulos do sistema vs. testes necessários para
+atingir 80%+ de cobertura **Status Atual**: 14 testes funcionais | 135 arquivos fonte | 3.688 LOC
 
 ---
 
@@ -26,22 +25,23 @@
 
 ### 1️⃣ CORE (30 arquivos | 17% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **config.js** | 1 | 180 | ✅ test_config_validation.js (4 tests) | - | ✅ COMPLETO |
-| **logger.js** | 1 | 150 | ❌ Nenhum | test_logger_unit.js (5 tests) | 🔴 CRÍTICO |
-| **identity_manager.js** | 1 | 120 | ✅ identity_lifecycle.test.js | - | ✅ COMPLETO |
-| **forensics.js** | 1 | 200 | ❌ Nenhum | test_forensics_unit.js (6 tests) | 🟡 ALTO |
-| **schemas.js** + schemas/ | 6 | 450 | ✅ test_schema (indireto) | test_schemas_unit.js (8 tests) | 🟡 ALTO |
-| **context/** (9 arquivos) | 9 | 600 | ❌ Nenhum | test_context_engine_unit.js (10 tests) | 🟠 MÉDIO |
-| **constants/** | 4 | 100 | ✅ (via import nos testes) | - | ✅ COMPLETO |
-| **doctor.js** | 1 | 80 | ❌ Nenhum | test_doctor_unit.js (4 tests) | 🟢 BAIXO |
-| **environment_resolver.js** | 1 | 60 | ❌ Nenhum | test_env_resolver_unit.js (3 tests) | 🟢 BAIXO |
-| **memory.js** | 1 | 100 | ❌ Nenhum | test_memory_unit.js (5 tests) | 🟠 MÉDIO |
-| **i18n.js** | 1 | 40 | ❌ Nenhum | - | ⚪ SKIP |
-| **infra_failure_policy.js** | 1 | 70 | ❌ Nenhum | test_infra_failure_unit.js (4 tests) | 🟠 MÉDIO |
+| Módulo                      | Arquivos | LOC Est. | Testes Existentes                      | Testes Faltando                        | Prioridade  |
+| --------------------------- | -------- | -------- | -------------------------------------- | -------------------------------------- | ----------- |
+| **config.js**               | 1        | 180      | ✅ test_config_validation.js (4 tests) | -                                      | ✅ COMPLETO |
+| **logger.js**               | 1        | 150      | ❌ Nenhum                              | test_logger_unit.js (5 tests)          | 🔴 CRÍTICO  |
+| **identity_manager.js**     | 1        | 120      | ✅ identity_lifecycle.test.js          | -                                      | ✅ COMPLETO |
+| **forensics.js**            | 1        | 200      | ❌ Nenhum                              | test_forensics_unit.js (6 tests)       | 🟡 ALTO     |
+| **schemas.js** + schemas/   | 6        | 450      | ✅ test_schema (indireto)              | test_schemas_unit.js (8 tests)         | 🟡 ALTO     |
+| **context/** (9 arquivos)   | 9        | 600      | ❌ Nenhum                              | test_context_engine_unit.js (10 tests) | 🟠 MÉDIO    |
+| **constants/**              | 4        | 100      | ✅ (via import nos testes)             | -                                      | ✅ COMPLETO |
+| **doctor.js**               | 1        | 80       | ❌ Nenhum                              | test_doctor_unit.js (4 tests)          | 🟢 BAIXO    |
+| **environment_resolver.js** | 1        | 60       | ❌ Nenhum                              | test_env_resolver_unit.js (3 tests)    | 🟢 BAIXO    |
+| **memory.js**               | 1        | 100      | ❌ Nenhum                              | test_memory_unit.js (5 tests)          | 🟠 MÉDIO    |
+| **i18n.js**                 | 1        | 40       | ❌ Nenhum                              | -                                      | ⚪ SKIP     |
+| **infra_failure_policy.js** | 1        | 70       | ❌ Nenhum                              | test_infra_failure_unit.js (4 tests)   | 🟠 MÉDIO    |
 
 **Subtotal CORE**:
+
 - ✅ Cobertura atual: 3/30 arquivos (10%)
 - 🎯 Testes novos necessários: **9 suites de teste (47 tests)**
 
@@ -49,18 +49,19 @@
 
 ### 2️⃣ NERV (22 arquivos | 12% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **nerv.js** (main) | 1 | 200 | ✅ test_driver_nerv (indireto) | test_nerv_core_unit.js (8 tests) | 🔴 CRÍTICO |
-| **buffers/** | 3 | 250 | ❌ Nenhum | test_nerv_buffers_unit.js (10 tests) | 🔴 CRÍTICO |
-| **emission/** | 3 | 180 | ❌ Nenhum | test_nerv_emission_unit.js (6 tests) | 🟡 ALTO |
-| **reception/** | 3 | 180 | ❌ Nenhum | test_nerv_reception_unit.js (6 tests) | 🟡 ALTO |
-| **correlation/** | 3 | 200 | ❌ Nenhum | test_nerv_correlation_unit.js (7 tests) | 🟡 ALTO |
-| **transport/** | 3 | 150 | ❌ Nenhum | test_nerv_transport_unit.js (5 tests) | 🟠 MÉDIO |
-| **telemetry/** | 3 | 120 | ❌ Nenhum | test_nerv_telemetry_unit.js (4 tests) | 🟠 MÉDIO |
-| **health/** | 3 | 100 | ✅ test_health_endpoint.js | test_nerv_health_unit.js (3 tests) | 🟢 BAIXO |
+| Módulo             | Arquivos | LOC Est. | Testes Existentes              | Testes Faltando                         | Prioridade |
+| ------------------ | -------- | -------- | ------------------------------ | --------------------------------------- | ---------- |
+| **nerv.js** (main) | 1        | 200      | ✅ test_driver_nerv (indireto) | test_nerv_core_unit.js (8 tests)        | 🔴 CRÍTICO |
+| **buffers/**       | 3        | 250      | ❌ Nenhum                      | test_nerv_buffers_unit.js (10 tests)    | 🔴 CRÍTICO |
+| **emission/**      | 3        | 180      | ❌ Nenhum                      | test_nerv_emission_unit.js (6 tests)    | 🟡 ALTO    |
+| **reception/**     | 3        | 180      | ❌ Nenhum                      | test_nerv_reception_unit.js (6 tests)   | 🟡 ALTO    |
+| **correlation/**   | 3        | 200      | ❌ Nenhum                      | test_nerv_correlation_unit.js (7 tests) | 🟡 ALTO    |
+| **transport/**     | 3        | 150      | ❌ Nenhum                      | test_nerv_transport_unit.js (5 tests)   | 🟠 MÉDIO   |
+| **telemetry/**     | 3        | 120      | ❌ Nenhum                      | test_nerv_telemetry_unit.js (4 tests)   | 🟠 MÉDIO   |
+| **health/**        | 3        | 100      | ✅ test_health_endpoint.js     | test_nerv_health_unit.js (3 tests)      | 🟢 BAIXO   |
 
 **Subtotal NERV**:
+
 - ✅ Cobertura atual: 2/22 arquivos (9%)
 - 🎯 Testes novos necessários: **7 suites de teste (49 tests)**
 
@@ -68,22 +69,23 @@
 
 ### 3️⃣ KERNEL (13 arquivos | 7% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **kernel.js** (factory) | 1 | 250 | ✅ test_ariadne_thread.js | test_kernel_factory_unit.js (5 tests) | 🟡 ALTO |
-| **execution_engine/** | 1 | 400 | ❌ Nenhum | test_execution_engine_unit.js (12 tests) | 🔴 CRÍTICO |
-| **kernel_loop/** | 1 | 200 | ✅ test_boot_sequence.js | test_kernel_loop_unit.js (8 tests) | 🟡 ALTO |
-| **task_runtime/** | 1 | 350 | ✅ test_running_recovery.js (quebrado) | test_task_runtime_unit.js (10 tests) | 🔴 CRÍTICO |
-| **observation_store/** | 1 | 180 | ❌ Nenhum | test_observation_store_unit.js (7 tests) | 🟡 ALTO |
-| **policy_engine/** | 1 | 200 | ❌ Nenhum | test_policy_engine_unit.js (9 tests) | 🔴 CRÍTICO |
-| **nerv_bridge/** | 1 | 150 | ✅ test_driver_nerv (indireto) | test_kernel_nerv_bridge_unit.js (6 tests) | 🟠 MÉDIO |
-| **telemetry/** | 1 | 100 | ❌ Nenhum | test_kernel_telemetry_unit.js (4 tests) | 🟠 MÉDIO |
-| **state/** | 2 | 120 | ❌ Nenhum | test_kernel_state_unit.js (5 tests) | 🟠 MÉDIO |
-| **policies/** | 1 | 80 | ❌ Nenhum | test_policies_unit.js (4 tests) | 🟢 BAIXO |
-| **adapters/** | 1 | 60 | ❌ Nenhum | - | ⚪ SKIP |
-| **example/** | 1 | 50 | ❌ Nenhum | - | ⚪ SKIP |
+| Módulo                  | Arquivos | LOC Est. | Testes Existentes                      | Testes Faltando                           | Prioridade |
+| ----------------------- | -------- | -------- | -------------------------------------- | ----------------------------------------- | ---------- |
+| **kernel.js** (factory) | 1        | 250      | ✅ test_ariadne_thread.js              | test_kernel_factory_unit.js (5 tests)     | 🟡 ALTO    |
+| **execution_engine/**   | 1        | 400      | ❌ Nenhum                              | test_execution_engine_unit.js (12 tests)  | 🔴 CRÍTICO |
+| **kernel_loop/**        | 1        | 200      | ✅ test_boot_sequence.js               | test_kernel_loop_unit.js (8 tests)        | 🟡 ALTO    |
+| **task_runtime/**       | 1        | 350      | ✅ test_running_recovery.js (quebrado) | test_task_runtime_unit.js (10 tests)      | 🔴 CRÍTICO |
+| **observation_store/**  | 1        | 180      | ❌ Nenhum                              | test_observation_store_unit.js (7 tests)  | 🟡 ALTO    |
+| **policy_engine/**      | 1        | 200      | ❌ Nenhum                              | test_policy_engine_unit.js (9 tests)      | 🔴 CRÍTICO |
+| **nerv_bridge/**        | 1        | 150      | ✅ test_driver_nerv (indireto)         | test_kernel_nerv_bridge_unit.js (6 tests) | 🟠 MÉDIO   |
+| **telemetry/**          | 1        | 100      | ❌ Nenhum                              | test_kernel_telemetry_unit.js (4 tests)   | 🟠 MÉDIO   |
+| **state/**              | 2        | 120      | ❌ Nenhum                              | test_kernel_state_unit.js (5 tests)       | 🟠 MÉDIO   |
+| **policies/**           | 1        | 80       | ❌ Nenhum                              | test_policies_unit.js (4 tests)           | 🟢 BAIXO   |
+| **adapters/**           | 1        | 60       | ❌ Nenhum                              | -                                         | ⚪ SKIP    |
+| **example/**            | 1        | 50       | ❌ Nenhum                              | -                                         | ⚪ SKIP    |
 
 **Subtotal KERNEL**:
+
 - ✅ Cobertura atual: 3/13 arquivos (23%)
 - 🎯 Testes novos necessários: **9 suites de teste (70 tests)**
 
@@ -91,19 +93,20 @@
 
 ### 4️⃣ DRIVER (17 arquivos | 10% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **factory.js** | 1 | 150 | ❌ Nenhum | test_driver_factory_unit.js (8 tests) | 🔴 CRÍTICO |
-| **DriverLifecycleManager.js** | 1 | 200 | ❌ Nenhum | test_driver_lifecycle_unit.js (10 tests) | 🔴 CRÍTICO |
-| **core/BaseDriver.js** | 1 | 250 | ✅ test_driver_nerv (parcial) | test_base_driver_unit.js (8 tests) | 🟡 ALTO |
-| **core/TargetDriver.js** | 1 | 180 | ❌ Nenhum | test_target_driver_unit.js (6 tests) | 🟡 ALTO |
-| **targets/ChatGPTDriver.js** | 1 | 600 | ❌ Nenhum | test_chatgpt_driver_integration.js (15 tests) | 🔴 CRÍTICO |
-| **targets/GeminiDriver.js** | 1 | 500 | ❌ Nenhum | test_gemini_driver_integration.js (12 tests) | 🟡 ALTO |
-| **targets/ClaudeDriver.js** | 1 | 450 | ❌ Nenhum | test_claude_driver_integration.js (10 tests) | 🟠 MÉDIO |
-| **modules/** (8 arquivos) | 8 | 800 | ❌ Nenhum | test_driver_modules_unit.js (12 tests) | 🟡 ALTO |
-| **nerv_adapter/** | 2 | 150 | ✅ test_driver_nerv (8 tests) | - | ✅ COMPLETO |
+| Módulo                        | Arquivos | LOC Est. | Testes Existentes             | Testes Faltando                               | Prioridade  |
+| ----------------------------- | -------- | -------- | ----------------------------- | --------------------------------------------- | ----------- |
+| **factory.js**                | 1        | 150      | ❌ Nenhum                     | test_driver_factory_unit.js (8 tests)         | 🔴 CRÍTICO  |
+| **DriverLifecycleManager.js** | 1        | 200      | ❌ Nenhum                     | test_driver_lifecycle_unit.js (10 tests)      | 🔴 CRÍTICO  |
+| **core/BaseDriver.js**        | 1        | 250      | ✅ test_driver_nerv (parcial) | test_base_driver_unit.js (8 tests)            | 🟡 ALTO     |
+| **core/TargetDriver.js**      | 1        | 180      | ❌ Nenhum                     | test_target_driver_unit.js (6 tests)          | 🟡 ALTO     |
+| **targets/ChatGPTDriver.js**  | 1        | 600      | ❌ Nenhum                     | test_chatgpt_driver_integration.js (15 tests) | 🔴 CRÍTICO  |
+| **targets/GeminiDriver.js**   | 1        | 500      | ❌ Nenhum                     | test_gemini_driver_integration.js (12 tests)  | 🟡 ALTO     |
+| **targets/ClaudeDriver.js**   | 1        | 450      | ❌ Nenhum                     | test_claude_driver_integration.js (10 tests)  | 🟠 MÉDIO    |
+| **modules/** (8 arquivos)     | 8        | 800      | ❌ Nenhum                     | test_driver_modules_unit.js (12 tests)        | 🟡 ALTO     |
+| **nerv_adapter/**             | 2        | 150      | ✅ test_driver_nerv (8 tests) | -                                             | ✅ COMPLETO |
 
 **Subtotal DRIVER**:
+
 - ✅ Cobertura atual: 2/17 arquivos (12%)
 - 🎯 Testes novos necessários: **8 suites de teste (81 tests)**
 
@@ -111,18 +114,19 @@
 
 ### 5️⃣ INFRA (22 arquivos | 12% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **io.js** | 1 | 250 | ❌ Nenhum | test_io_unit.js (8 tests) | 🔴 CRÍTICO |
-| **browser_pool/** | 3 | 400 | ✅ test_browser_pool.js | test_connection_orchestrator (já existe) | ✅ COMPLETO |
-| **locks/** | 3 | 300 | ✅ test_lock.js (quebrado) | test_lock_manager_unit.js (10 tests) | 🔴 CRÍTICO |
-| **queue/** | 4 | 450 | ❌ Nenhum | test_queue_unit.js (12 tests) | 🔴 CRÍTICO |
-| **storage/** | 3 | 250 | ❌ Nenhum | test_storage_unit.js (9 tests) | 🟡 ALTO |
-| **fs/** | 5 | 350 | ❌ Nenhum | test_fs_unit.js (10 tests) | 🟡 ALTO |
-| **ipc/** | 2 | 120 | ❌ Nenhum (obsoleto) | test_ipc_unit.js (6 tests) | 🟠 MÉDIO |
-| **transport/** | 1 | 80 | ❌ Nenhum | test_transport_unit.js (4 tests) | 🟢 BAIXO |
+| Módulo            | Arquivos | LOC Est. | Testes Existentes          | Testes Faltando                          | Prioridade  |
+| ----------------- | -------- | -------- | -------------------------- | ---------------------------------------- | ----------- |
+| **io.js**         | 1        | 250      | ❌ Nenhum                  | test_io_unit.js (8 tests)                | 🔴 CRÍTICO  |
+| **browser_pool/** | 3        | 400      | ✅ test_browser_pool.js    | test_connection_orchestrator (já existe) | ✅ COMPLETO |
+| **locks/**        | 3        | 300      | ✅ test_lock.js (quebrado) | test_lock_manager_unit.js (10 tests)     | 🔴 CRÍTICO  |
+| **queue/**        | 4        | 450      | ❌ Nenhum                  | test_queue_unit.js (12 tests)            | 🔴 CRÍTICO  |
+| **storage/**      | 3        | 250      | ❌ Nenhum                  | test_storage_unit.js (9 tests)           | 🟡 ALTO     |
+| **fs/**           | 5        | 350      | ❌ Nenhum                  | test_fs_unit.js (10 tests)               | 🟡 ALTO     |
+| **ipc/**          | 2        | 120      | ❌ Nenhum (obsoleto)       | test_ipc_unit.js (6 tests)               | 🟠 MÉDIO    |
+| **transport/**    | 1        | 80       | ❌ Nenhum                  | test_transport_unit.js (4 tests)         | 🟢 BAIXO    |
 
 **Subtotal INFRA**:
+
 - ✅ Cobertura atual: 2/22 arquivos (9%)
 - 🎯 Testes novos necessários: **7 suites de teste (59 tests)**
 
@@ -130,18 +134,19 @@
 
 ### 6️⃣ SERVER (20 arquivos | 11% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **main.js** | 1 | 200 | ✅ test_health_endpoint.js (parcial) | test_server_main_integration.js (8 tests) | 🟡 ALTO |
-| **api/** (5 routes) | 5 | 400 | ❌ Nenhum | test_api_routes_integration.js (15 tests) | 🔴 CRÍTICO |
-| **engine/** | 3 | 250 | ❌ Nenhum | test_server_engine_unit.js (8 tests) | 🟡 ALTO |
-| **middleware/** | 3 | 150 | ❌ Nenhum | test_middleware_unit.js (6 tests) | 🟠 MÉDIO |
-| **realtime/** (Socket.io) | 3 | 200 | ❌ Nenhum | test_realtime_integration.js (10 tests) | 🟡 ALTO |
-| **supervisor/** | 2 | 120 | ❌ Nenhum | test_supervisor_unit.js (5 tests) | 🟠 MÉDIO |
-| **watchers/** | 2 | 100 | ❌ Nenhum | test_watchers_unit.js (4 tests) | 🟢 BAIXO |
-| **nerv_adapter/** | 1 | 80 | ❌ Nenhum | test_server_nerv_adapter_unit.js (4 tests) | 🟠 MÉDIO |
+| Módulo                    | Arquivos | LOC Est. | Testes Existentes                    | Testes Faltando                            | Prioridade |
+| ------------------------- | -------- | -------- | ------------------------------------ | ------------------------------------------ | ---------- |
+| **main.js**               | 1        | 200      | ✅ test_health_endpoint.js (parcial) | test_server_main_integration.js (8 tests)  | 🟡 ALTO    |
+| **api/** (5 routes)       | 5        | 400      | ❌ Nenhum                            | test_api_routes_integration.js (15 tests)  | 🔴 CRÍTICO |
+| **engine/**               | 3        | 250      | ❌ Nenhum                            | test_server_engine_unit.js (8 tests)       | 🟡 ALTO    |
+| **middleware/**           | 3        | 150      | ❌ Nenhum                            | test_middleware_unit.js (6 tests)          | 🟠 MÉDIO   |
+| **realtime/** (Socket.io) | 3        | 200      | ❌ Nenhum                            | test_realtime_integration.js (10 tests)    | 🟡 ALTO    |
+| **supervisor/**           | 2        | 120      | ❌ Nenhum                            | test_supervisor_unit.js (5 tests)          | 🟠 MÉDIO   |
+| **watchers/**             | 2        | 100      | ❌ Nenhum                            | test_watchers_unit.js (4 tests)            | 🟢 BAIXO   |
+| **nerv_adapter/**         | 1        | 80       | ❌ Nenhum                            | test_server_nerv_adapter_unit.js (4 tests) | 🟠 MÉDIO   |
 
 **Subtotal SERVER**:
+
 - ✅ Cobertura atual: 1/20 arquivos (5%)
 - 🎯 Testes novos necessários: **8 suites de teste (60 tests)**
 
@@ -149,14 +154,15 @@
 
 ### 7️⃣ STATE (11 arquivos | 6% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **kernel/** | 3 | 150 | ❌ Nenhum | test_state_kernel_unit.js (6 tests) | 🟠 MÉDIO |
-| **memory/** | 3 | 120 | ❌ Nenhum | test_state_memory_unit.js (5 tests) | 🟠 MÉDIO |
-| **tasks/** | 3 | 180 | ❌ Nenhum | test_state_tasks_unit.js (7 tests) | 🟡 ALTO |
-| **workflows/** | 2 | 100 | ❌ Nenhum | test_state_workflows_unit.js (4 tests) | 🟢 BAIXO |
+| Módulo         | Arquivos | LOC Est. | Testes Existentes | Testes Faltando                        | Prioridade |
+| -------------- | -------- | -------- | ----------------- | -------------------------------------- | ---------- |
+| **kernel/**    | 3        | 150      | ❌ Nenhum         | test_state_kernel_unit.js (6 tests)    | 🟠 MÉDIO   |
+| **memory/**    | 3        | 120      | ❌ Nenhum         | test_state_memory_unit.js (5 tests)    | 🟠 MÉDIO   |
+| **tasks/**     | 3        | 180      | ❌ Nenhum         | test_state_tasks_unit.js (7 tests)     | 🟡 ALTO    |
+| **workflows/** | 2        | 100      | ❌ Nenhum         | test_state_workflows_unit.js (4 tests) | 🟢 BAIXO   |
 
 **Subtotal STATE**:
+
 - ✅ Cobertura atual: 0/11 arquivos (0%)
 - 🎯 Testes novos necessários: **4 suites de teste (22 tests)**
 
@@ -164,11 +170,12 @@
 
 ### 8️⃣ LOGIC (5 arquivos | 3% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **validation/** | 5 | 250 | ❌ Nenhum | test_validation_logic_unit.js (10 tests) | 🟡 ALTO |
+| Módulo          | Arquivos | LOC Est. | Testes Existentes | Testes Faltando                          | Prioridade |
+| --------------- | -------- | -------- | ----------------- | ---------------------------------------- | ---------- |
+| **validation/** | 5        | 250      | ❌ Nenhum         | test_validation_logic_unit.js (10 tests) | 🟡 ALTO    |
 
 **Subtotal LOGIC**:
+
 - ✅ Cobertura atual: 0/5 arquivos (0%)
 - 🎯 Testes novos necessários: **1 suite de teste (10 tests)**
 
@@ -176,13 +183,14 @@
 
 ### 9️⃣ OUTROS (15 arquivos | 8% da base)
 
-| Módulo | Arquivos | LOC Est. | Testes Existentes | Testes Faltando | Prioridade |
-|--------|----------|----------|-------------------|-----------------|------------|
-| **scripts/** (18 scripts) | 18 | 800 | ❌ Nenhum | test_scripts_integration.js (8 tests) | 🟢 BAIXO |
-| **shared/nerv/** | 2 | 80 | ❌ Nenhum | test_shared_nerv_unit.js (4 tests) | 🟠 MÉDIO |
-| **index.js** (main entry) | 1 | 150 | ✅ test_ariadne_thread.js | - | ✅ COMPLETO |
+| Módulo                    | Arquivos | LOC Est. | Testes Existentes         | Testes Faltando                       | Prioridade  |
+| ------------------------- | -------- | -------- | ------------------------- | ------------------------------------- | ----------- |
+| **scripts/** (18 scripts) | 18       | 800      | ❌ Nenhum                 | test_scripts_integration.js (8 tests) | 🟢 BAIXO    |
+| **shared/nerv/**          | 2        | 80       | ❌ Nenhum                 | test_shared_nerv_unit.js (4 tests)    | 🟠 MÉDIO    |
+| **index.js** (main entry) | 1        | 150      | ✅ test_ariadne_thread.js | -                                     | ✅ COMPLETO |
 
 **Subtotal OUTROS**:
+
 - ✅ Cobertura atual: 1/21 arquivos (5%)
 - 🎯 Testes novos necessários: **2 suites de teste (12 tests)**
 
@@ -437,8 +445,8 @@ FASE 4 (🟢 Baixo)      - Opcional     -  8 suites |  34 tests | 20h
 TOTAL                  - 5 semanas    - 49 suites | 349 tests | 220h
 ```
 
-**Estimativa**: 1 desenvolvedor a tempo completo = 5-6 semanas
-**Meta**: 80%+ cobertura de linhas | 90%+ cobertura de branches críticas
+**Estimativa**: 1 desenvolvedor a tempo completo = 5-6 semanas **Meta**: 80%+ cobertura de linhas |
+90%+ cobertura de branches críticas
 
 ---
 
@@ -456,40 +464,39 @@ const assert = require('node:assert');
 const [ModuleName] = require('../../../src/[path]/[module]');
 
 describe('[ModuleName] - Unit Tests', () => {
-    let instance;
+  let instance;
 
-    beforeEach(() => {
-        // Setup
-        instance = new [ModuleName]({ /* deps */ });
+  beforeEach(() => {
+    // Setup
+    instance = new [ModuleName]({
+      /* deps */
+    });
+  });
+
+  afterEach(() => {
+    // Cleanup
+  });
+
+  describe('Constructor', () => {
+    it('should initialize with valid config', () => {
+      assert.ok(instance);
     });
 
-    afterEach(() => {
-        // Cleanup
+    it('should throw on missing required params', () => {
+      assert.throws(() => new [ModuleName]());
+    });
+  });
+
+  describe('[Method Name]', () => {
+    it('should [behavior] when [condition]', async () => {
+      const result = await instance.method();
+      assert.strictEqual(result, expectedValue);
     });
 
-    describe('Constructor', () => {
-        it('should initialize with valid config', () => {
-            assert.ok(instance);
-        });
-
-        it('should throw on missing required params', () => {
-            assert.throws(() => new [ModuleName]());
-        });
+    it('should handle errors gracefully', async () => {
+      await assert.rejects(() => instance.methodThatFails(), { message: /expected error/ });
     });
-
-    describe('[Method Name]', () => {
-        it('should [behavior] when [condition]', async () => {
-            const result = await instance.method();
-            assert.strictEqual(result, expectedValue);
-        });
-
-        it('should handle errors gracefully', async () => {
-            await assert.rejects(
-                () => instance.methodThatFails(),
-                { message: /expected error/ }
-            );
-        });
-    });
+  });
 });
 ```
 
@@ -591,7 +598,5 @@ tests/
 
 ---
 
-**Status**: ✅ Matriz completa criada
-**Próxima ação**: Revisar com equipe e começar FASE 1
-**Responsável**: [A definir]
-**Deadline**: [A definir]
+**Status**: ✅ Matriz completa criada **Próxima ação**: Revisar com equipe e começar FASE 1
+**Responsável**: [A definir] **Deadline**: [A definir]

@@ -1,6 +1,6 @@
 # Chrome Proxy Service - Audit & Upgrade Proposal
-**Data**: 2 de Fevereiro de 2026
-**Arquivo**: `src/infra/proxy/chromeProxyService.js` (652 linhas)
+
+**Data**: 2 de Fevereiro de 2026 **Arquivo**: `src/infra/proxy/chromeProxyService.js` (652 linhas)
 **Status**: ANÁLISE COMPLETA + PROPOSTAS DE MELHORIA
 
 ---
@@ -10,6 +10,7 @@
 **Status Atual**: ✅ Funcional, ⚠️ Precisa de Hardening
 
 **Métricas do Código**:
+
 - **Linhas**: 652 (módulo principal)
 - **Classes**: 1 (ChromeProxyService)
 - **Métodos Públicos**: 7
@@ -17,6 +18,7 @@
 - **`void err`**: 21 ocorrências (⚠️ silencia erros)
 
 **Score de Qualidade**: 7.5/10
+
 - ✅ Arquitetura sólida
 - ✅ Métricas Prometheus
 - ✅ Graceful shutdown
@@ -81,6 +83,7 @@ Puppeteer → localhost:9224 (HTTP/WS) → Proxy → host.docker.internal:9225 �
 #### 2.1 Segurança - CORS Wildcard
 
 **Problema**:
+
 ```javascript
 'Access-Control-Allow-Origin': '*'  // ❌ Muito permissivo
 ```
@@ -88,12 +91,13 @@ Puppeteer → localhost:9224 (HTTP/WS) → Proxy → host.docker.internal:9225 �
 **Impacto**: Qualquer site pode fazer requests ao proxy (XSS attack vector).
 
 **Correção**:
+
 ```javascript
 // Whitelist de origens permitidas
 const ALLOWED_ORIGINS = [
-    'http://localhost:3008',     // Dashboard
-    'http://127.0.0.1:3008',
-    process.env.ALLOWED_ORIGIN   // Custom
+  'http://localhost:3008', // Dashboard
+  'http://127.0.0.1:3008',
+  process.env.ALLOWED_ORIGIN, // Custom
 ].filter(Boolean);
 
 const origin = req.headers.origin;
@@ -106,32 +110,35 @@ res.setHeader('Access-Control-Allow-Credentials', 'true');
 #### 2.2 Erro Handling - `void err` (21 ocorrências)
 
 **Problema**:
+
 ```javascript
 try {
-    this.metrics.httpRequests.inc();
+  this.metrics.httpRequests.inc();
 } catch (err) {
-    void err;  // ❌ Silencia erro completamente
+  void err; // ❌ Silencia erro completamente
 }
 ```
 
 **Impacto**: Falhas em métricas/logs são invisíveis, dificulta debugging.
 
 **Correção**:
+
 ```javascript
 try {
-    this.metrics.httpRequests.inc();
+  this.metrics.httpRequests.inc();
 } catch (err) {
-    // Log com contexto mínimo
-    this.log('debug', 'Metrics error (non-critical)', {
-        metric: 'httpRequests',
-        error: err.message
-    });
+  // Log com contexto mínimo
+  this.log('debug', 'Metrics error (non-critical)', {
+    metric: 'httpRequests',
+    error: err.message,
+  });
 }
 ```
 
 #### 2.3 Rate Limiting Desativado
 
 **Problema**:
+
 ```javascript
 // Código comentado:
 // try {
@@ -144,15 +151,16 @@ try {
 **Impacto**: Sem proteção contra DoS/flood attacks.
 
 **Correção**:
+
 ```javascript
 // Ativar com configuração adequada
 const limiter = rateLimit({
-    windowMs: 60 * 1000,        // 1 minuto
-    max: 1000,                  // 1000 requests/min (alto para proxy)
-    message: 'Too many requests',
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => req.url === '/health'  // Exceção para health checks
+  windowMs: 60 * 1000, // 1 minuto
+  max: 1000, // 1000 requests/min (alto para proxy)
+  message: 'Too many requests',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: req => req.url === '/health', // Exceção para health checks
 });
 
 this.app.use(limiter);
@@ -165,6 +173,7 @@ this.app.use(limiter);
 #### 2.4 Idle Timeout Muito Curto
 
 **Problema**:
+
 ```javascript
 this._idleTimeoutMs = parseInt(process.env.WS_IDLE_TIMEOUT_MS || '60000', 10);
 // 60s é curto para sessões LLM (prompts podem demorar 5+ minutos)
@@ -173,17 +182,18 @@ this._idleTimeoutMs = parseInt(process.env.WS_IDLE_TIMEOUT_MS || '60000', 10);
 **Impacto**: Conexões WebSocket fechadas prematuramente durante prompts longos.
 
 **Correção**:
+
 ```javascript
 // Timeout mais generoso para LLM automation
 this._idleTimeoutMs = parseInt(
-    process.env.WS_IDLE_TIMEOUT_MS || '300000',  // 5 minutos
-    10
+  process.env.WS_IDLE_TIMEOUT_MS || '300000', // 5 minutos
+  10
 );
 
 // Adicionar ping/pong para keep-alive
 socket.on('ping', () => {
-    markActive(socket);
-    socket.pong();
+  markActive(socket);
+  socket.pong();
 });
 ```
 
@@ -192,46 +202,47 @@ socket.on('ping', () => {
 **Problema**: Quando Chrome está down, proxy continua tentando conectar indefinidamente.
 
 **Correção**:
+
 ```javascript
 class CircuitBreaker {
-    constructor(threshold = 5, timeout = 30000) {
-        this.failures = 0;
-        this.threshold = threshold;
-        this.timeout = timeout;
-        this.state = 'CLOSED';  // CLOSED, OPEN, HALF_OPEN
-        this.nextAttempt = 0;
+  constructor(threshold = 5, timeout = 30000) {
+    this.failures = 0;
+    this.threshold = threshold;
+    this.timeout = timeout;
+    this.state = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
+    this.nextAttempt = 0;
+  }
+
+  async call(fn) {
+    if (this.state === 'OPEN') {
+      if (Date.now() < this.nextAttempt) {
+        throw new Error('Circuit breaker OPEN');
+      }
+      this.state = 'HALF_OPEN';
     }
 
-    async call(fn) {
-        if (this.state === 'OPEN') {
-            if (Date.now() < this.nextAttempt) {
-                throw new Error('Circuit breaker OPEN');
-            }
-            this.state = 'HALF_OPEN';
-        }
-
-        try {
-            const result = await fn();
-            this.onSuccess();
-            return result;
-        } catch (err) {
-            this.onFailure();
-            throw err;
-        }
+    try {
+      const result = await fn();
+      this.onSuccess();
+      return result;
+    } catch (err) {
+      this.onFailure();
+      throw err;
     }
+  }
 
-    onSuccess() {
-        this.failures = 0;
-        this.state = 'CLOSED';
-    }
+  onSuccess() {
+    this.failures = 0;
+    this.state = 'CLOSED';
+  }
 
-    onFailure() {
-        this.failures++;
-        if (this.failures >= this.threshold) {
-            this.state = 'OPEN';
-            this.nextAttempt = Date.now() + this.timeout;
-        }
+  onFailure() {
+    this.failures++;
+    if (this.failures >= this.threshold) {
+      this.state = 'OPEN';
+      this.nextAttempt = Date.now() + this.timeout;
     }
+  }
 }
 
 // Uso no constructor
@@ -239,13 +250,14 @@ this.circuitBreaker = new CircuitBreaker(5, 30000);
 
 // Uso em proxyReq.on('error')
 await this.circuitBreaker.call(async () => {
-    // Connection logic
+  // Connection logic
 });
 ```
 
 #### 2.6 PUBLIC_IP Detection Frágil
 
 **Problema**:
+
 ```javascript
 _detectPublicIP() {
     const interfaces = os.networkInterfaces();
@@ -255,6 +267,7 @@ _detectPublicIP() {
 ```
 
 **Correção**:
+
 ```javascript
 _detectPublicIP() {
     // 1. Env var (mais confiável)
@@ -291,27 +304,28 @@ _getDockerInternalIP() {
 **Problema**: Métricas sem contexto (endpoint, status code, method).
 
 **Correção**:
+
 ```javascript
 // Substituir Counter simples por Counter com labels
 this.metrics = {
-    httpRequests: new promClient.Counter({
-        name: 'chrome_proxy_http_requests_total',
-        help: 'Total HTTP requests',
-        labelNames: ['method', 'path', 'status']  // ✅ Labels
-    }),
+  httpRequests: new promClient.Counter({
+    name: 'chrome_proxy_http_requests_total',
+    help: 'Total HTTP requests',
+    labelNames: ['method', 'path', 'status'], // ✅ Labels
+  }),
 
-    wsUpgrades: new promClient.Counter({
-        name: 'chrome_proxy_ws_upgrades_total',
-        help: 'Total WebSocket upgrades',
-        labelNames: ['success']  // ✅ Track failures
-    })
+  wsUpgrades: new promClient.Counter({
+    name: 'chrome_proxy_ws_upgrades_total',
+    help: 'Total WebSocket upgrades',
+    labelNames: ['success'], // ✅ Track failures
+  }),
 };
 
 // Uso com labels
 this.metrics.httpRequests.inc({
-    method: req.method,
-    path: req.url,
-    status: proxyRes.statusCode
+  method: req.method,
+  path: req.url,
+  status: proxyRes.statusCode,
 });
 ```
 
@@ -320,6 +334,7 @@ this.metrics.httpRequests.inc({
 **Problema**: Cada request a `/json/version` vai ao Chrome (overhead).
 
 **Correção**:
+
 ```javascript
 constructor() {
     this.cache = {
@@ -352,18 +367,21 @@ async handleHTTPRequest(req, res) {
 **Problema**: Respostas HTTP não são comprimidas (bandwidth desperdiçado).
 
 **Correção**:
+
 ```javascript
 const compression = require('compression');
 
 // No start()
-this.app.use(compression({
+this.app.use(
+  compression({
     filter: (req, res) => {
-        // Comprimir apenas JSON
-        if (req.headers['x-no-compression']) return false;
-        return compression.filter(req, res);
+      // Comprimir apenas JSON
+      if (req.headers['x-no-compression']) return false;
+      return compression.filter(req, res);
     },
-    threshold: 512  // Comprimir apenas > 512 bytes
-}));
+    threshold: 512, // Comprimir apenas > 512 bytes
+  })
+);
 ```
 
 #### 2.10 Graceful Shutdown - Timeout
@@ -371,6 +389,7 @@ this.app.use(compression({
 **Problema**: `stop()` espera indefinidamente se conexões não fecham.
 
 **Correção**:
+
 ```javascript
 async stop() {
     this.log('info', 'Shutting down proxy...');
@@ -600,8 +619,8 @@ constructor(config = {}) {
 
 ### Antes (Atual)
 
-| Métrica               | Valor Atual      |
-| --------------------- | ---------------- |
+| Métrica               | Valor Atual       |
+| --------------------- | ----------------- |
 | **CORS Security**     | ❌ Wildcard (`*`) |
 | **Error Visibility**  | ❌ 21 `void err`  |
 | **Rate Limiting**     | ❌ Desativado     |
@@ -613,8 +632,8 @@ constructor(config = {}) {
 
 ### Depois (Target)
 
-| Métrica               | Valor Target          |
-| --------------------- | --------------------- |
+| Métrica               | Valor Target           |
+| --------------------- | ---------------------- |
 | **CORS Security**     | ✅ Whitelist           |
 | **Error Visibility**  | ✅ Logs estruturados   |
 | **Rate Limiting**     | ✅ 1000 req/min        |
@@ -629,6 +648,7 @@ constructor(config = {}) {
 ## 6. PRIORIZAÇÃO (MoSCoW)
 
 ### Must Have (P0-P1)
+
 1. ✅ Corrigir CORS wildcard
 2. ✅ Substituir `void err` por logs
 3. ✅ Ativar rate limiting
@@ -637,17 +657,20 @@ constructor(config = {}) {
 6. ✅ Circuit breaker
 
 ### Should Have (P2)
+
 7. ✅ Retry com backoff
 8. ✅ Métricas com labels
 9. ✅ Health check aprimorado
 10. ✅ Request tracing
 
 ### Could Have (P3)
+
 11. ⏸️ Compression middleware
 12. ⏸️ Cache de `/json/version`
 13. ⏸️ Connection pooling
 
 ### Won't Have (Fora de Escopo)
+
 - Load balancing múltiplos Chrome backends
 - Autenticação/autorização (fora do escopo do proxy)
 - TLS/SSL termination (não necessário em rede interna)
@@ -668,66 +691,67 @@ constructor(config = {}) {
 ## 8. TESTES NECESSÁRIOS
 
 ### Unit Tests
+
 ```javascript
 describe('ChromeProxyService', () => {
-    it('should validate config on construction', () => {
-        expect(() => new ChromeProxyService({ PROXY_PORT: 'invalid' }))
-            .toThrow('Invalid PROXY_PORT');
+  it('should validate config on construction', () => {
+    expect(() => new ChromeProxyService({ PROXY_PORT: 'invalid' })).toThrow('Invalid PROXY_PORT');
+  });
+
+  it('should rewrite WebSocket URLs correctly', () => {
+    const proxy = new ChromeProxyService();
+    const data = JSON.stringify({
+      webSocketDebuggerUrl: 'ws://host.docker.internal:9225/devtools/...',
     });
+    const rewritten = proxy.rewriteWebSocketURL(data, 'localhost:9224');
+    expect(rewritten).toContain('ws://localhost:9224/devtools/');
+  });
 
-    it('should rewrite WebSocket URLs correctly', () => {
-        const proxy = new ChromeProxyService();
-        const data = JSON.stringify({
-            webSocketDebuggerUrl: 'ws://host.docker.internal:9225/devtools/...'
-        });
-        const rewritten = proxy.rewriteWebSocketURL(data, 'localhost:9224');
-        expect(rewritten).toContain('ws://localhost:9224/devtools/');
-    });
+  it('should open circuit breaker after threshold failures', async () => {
+    const breaker = new CircuitBreaker(3, 5000);
+    const failingFn = () => Promise.reject(new Error('fail'));
 
-    it('should open circuit breaker after threshold failures', async () => {
-        const breaker = new CircuitBreaker(3, 5000);
-        const failingFn = () => Promise.reject(new Error('fail'));
+    for (let i = 0; i < 3; i++) {
+      await expect(breaker.call(failingFn)).rejects.toThrow();
+    }
 
-        for (let i = 0; i < 3; i++) {
-            await expect(breaker.call(failingFn)).rejects.toThrow();
-        }
-
-        expect(breaker.state).toBe('OPEN');
-    });
+    expect(breaker.state).toBe('OPEN');
+  });
 });
 ```
 
 ### Integration Tests
+
 ```javascript
 describe('ChromeProxyService E2E', () => {
-    let proxy, chromeProcess;
+  let proxy, chromeProcess;
 
-    beforeAll(async () => {
-        // Start real Chrome
-        chromeProcess = startChrome();
+  beforeAll(async () => {
+    // Start real Chrome
+    chromeProcess = startChrome();
 
-        // Start proxy
-        proxy = new ChromeProxyService();
-        await proxy.start();
-    });
+    // Start proxy
+    proxy = new ChromeProxyService();
+    await proxy.start();
+  });
 
-    it('should proxy HTTP requests to Chrome', async () => {
-        const res = await fetch('http://localhost:9224/json/version');
-        expect(res.ok).toBe(true);
-        const json = await res.json();
-        expect(json.Browser).toContain('Chrome');
-    });
+  it('should proxy HTTP requests to Chrome', async () => {
+    const res = await fetch('http://localhost:9224/json/version');
+    expect(res.ok).toBe(true);
+    const json = await res.json();
+    expect(json.Browser).toContain('Chrome');
+  });
 
-    it('should upgrade to WebSocket', async () => {
-        const ws = new WebSocket('ws://localhost:9224/devtools/browser/abc-123');
-        await new Promise(resolve => ws.on('open', resolve));
-        expect(ws.readyState).toBe(WebSocket.OPEN);
-    });
+  it('should upgrade to WebSocket', async () => {
+    const ws = new WebSocket('ws://localhost:9224/devtools/browser/abc-123');
+    await new Promise(resolve => ws.on('open', resolve));
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+  });
 
-    afterAll(async () => {
-        await proxy.stop();
-        chromeProcess.kill();
-    });
+  afterAll(async () => {
+    await proxy.stop();
+    chromeProcess.kill();
+  });
 });
 ```
 
@@ -742,7 +766,8 @@ describe('ChromeProxyService E2E', () => {
 | **Envoy proxy**           | Service mesh, observability  | Overhead alto, curva aprendizado | 7/10   |
 | **http-proxy-middleware** | Simples, Node.js native      | Menos features, sem WS robusto   | 6/10   |
 
-**Recomendação**: **Manter custom proxy** após hardening. Oferece melhor integração com NERV e customizações específicas do projeto.
+**Recomendação**: **Manter custom proxy** após hardening. Oferece melhor integração com NERV e
+customizações específicas do projeto.
 
 ---
 
@@ -757,6 +782,7 @@ O Chrome Proxy Service está **funcional e atende aos requisitos**, mas precisa 
 Com as melhorias propostas, o proxy alcançará **enterprise-grade quality** (Score 9/10).
 
 **Próximos Passos**:
+
 1. Revisar e aprovar propostas
 2. Implementar Fase 1 (Hardening)
 3. Testar em ambiente de staging
@@ -764,6 +790,4 @@ Com as melhorias propostas, o proxy alcançará **enterprise-grade quality** (Sc
 
 ---
 
-**Versão**: 1.0
-**Aprovação Pendente**: Sim
-**Estimativa Total**: 5-8 dias de desenvolvimento
+**Versão**: 1.0 **Aprovação Pendente**: Sim **Estimativa Total**: 5-8 dias de desenvolvimento

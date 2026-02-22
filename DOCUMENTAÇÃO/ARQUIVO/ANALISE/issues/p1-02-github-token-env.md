@@ -12,5 +12,4 @@ Recommended actions:
 2. Provide secure token to CI via repository secrets (do not paste in logs).
 3. Rotate any tokens that were accidentally exposed.
 
-Owner: @owner-placeholder
-Labels: security, P1, ci
+Owner: @owner-placeholder Labels: security, P1, ci

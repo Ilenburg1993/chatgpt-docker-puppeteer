@@ -95,14 +95,14 @@ Configure in `docker-compose.yml`:
 
 ```yaml
 environment:
-    # Chrome WebSocket endpoint
-    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
+  # Chrome WebSocket endpoint
+  - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 
-    # Timezone
-    - TZ=America/Sao_Paulo
+  # Timezone
+  - TZ=America/Sao_Paulo
 
-    # Node environment
-    - NODE_ENV=production
+  # Node environment
+  - NODE_ENV=production
 ```
 
 ---
@@ -126,7 +126,7 @@ environment:
 
 ```yaml
 extra_hosts:
-    - 'host.docker.internal:host-gateway'
+  - 'host.docker.internal:host-gateway'
 ```
 
 ### Port 9224 already in use
@@ -147,7 +147,7 @@ Edit your code to use environment variable:
 
 ```javascript
 const browser = await puppeteer.connect({
-    browserWSEndpoint: process.env.CHROME_WS_ENDPOINT || 'ws://host.docker.internal:9224'
+  browserWSEndpoint: process.env.CHROME_WS_ENDPOINT || 'ws://host.docker.internal:9224',
 });
 ```
 

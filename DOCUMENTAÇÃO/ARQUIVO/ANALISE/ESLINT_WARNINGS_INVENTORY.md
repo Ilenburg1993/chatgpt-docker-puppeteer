@@ -1,9 +1,8 @@
 # ESLint Warnings Inventory
 
-**Data**: 22/01/2026
-**Total de Warnings**: 116 (0 erros)
-**Contexto**: Pré-push para .github v2.0 upgrade
-**Status**: **AUTORIZADO** para push (warnings pré-existentes, não introduzidos pelas mudanças .github)
+**Data**: 22/01/2026 **Total de Warnings**: 116 (0 erros) **Contexto**: Pré-push para .github v2.0
+upgrade **Status**: **AUTORIZADO** para push (warnings pré-existentes, não introduzidos pelas
+mudanças .github)
 
 ---
 
@@ -11,14 +10,14 @@
 
 | Categoria                               | Quantidade | Severidade | Ação Recomendada           |
 | --------------------------------------- | ---------- | ---------- | -------------------------- |
-| `no-unused-vars`                        | 78 (67%)   | 🟡 BAIXA    | Refatoração futura         |
-| `complexity`                            | 8 (7%)     | 🟠 MÉDIA    | Code split (fase 9+)       |
-| `no-shadow`                             | 6 (5%)     | 🟡 BAIXA    | Rename variáveis           |
-| `max-params` / `max-lines-per-function` | 4 (3%)     | 🟠 MÉDIA    | Refatoração (fase 9+)      |
-| `max-depth`                             | 1 (1%)     | 🟠 MÉDIA    | Simplificar lógica         |
-| `require-atomic-updates`                | 2 (2%)     | 🟡 BAIXA    | Análise de race conditions |
-| `prefer-const`                          | 2 (2%)     | 🟢 TRIVIAL  | Auto-fix                   |
-| Outros                                  | 15 (13%)   | 🟡 BAIXA    | Caso a caso                |
+| `no-unused-vars`                        | 78 (67%)   | 🟡 BAIXA   | Refatoração futura         |
+| `complexity`                            | 8 (7%)     | 🟠 MÉDIA   | Code split (fase 9+)       |
+| `no-shadow`                             | 6 (5%)     | 🟡 BAIXA   | Rename variáveis           |
+| `max-params` / `max-lines-per-function` | 4 (3%)     | 🟠 MÉDIA   | Refatoração (fase 9+)      |
+| `max-depth`                             | 1 (1%)     | 🟠 MÉDIA   | Simplificar lógica         |
+| `require-atomic-updates`                | 2 (2%)     | 🟡 BAIXA   | Análise de race conditions |
+| `prefer-const`                          | 2 (2%)     | 🟢 TRIVIAL | Auto-fix                   |
+| Outros                                  | 15 (13%)   | 🟡 BAIXA   | Caso a caso                |
 
 **Nenhum warning crítico ou blocker para deploy.**
 
@@ -31,6 +30,7 @@
 **Descrição**: Variáveis, funções ou parâmetros declarados mas não utilizados.
 
 **Distribuição**:
+
 - **Frontend** (`public/js/app.js`): 14 warnings
   - Funções UI não conectadas ao HTML: `copyToClipboard`, `openTaskWizard`, `submitWizard`, etc.
   - Variável `selectedTaskId` não utilizada
@@ -52,19 +52,23 @@
 **Impacto**: 🟡 BAIXO - Código funcional, apenas poluição de namespace
 
 **Ação**:
+
 - ✅ **Autorizado para push** (não afeta funcionalidade)
 - 🔄 **Futuro**: Refatoração em FASE 9+ ou usar `_` prefix para indicar unused
 
 **Exemplo de fix futuro**:
+
 ```javascript
 // Antes
-function handler(event, data, context) {  // context não usado
-    doSomething(event, data);
+function handler(event, data, context) {
+  // context não usado
+  doSomething(event, data);
 }
 
 // Depois
-function handler(event, data, _context) {  // _ prefix indica unused proposital
-    doSomething(event, data);
+function handler(event, data, _context) {
+  // _ prefix indica unused proposital
+  doSomething(event, data);
 }
 ```
 
@@ -110,6 +114,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Impacto**: 🟠 MÉDIO - Reduz manutenibilidade, mas não afeta funcionalidade
 
 **Ação**:
+
 - ✅ **Autorizado para push** (funcionalidade crítica)
 - 🔄 **Futuro FASE 9+**: Code split para reduzir complexidade
   - `humanType()` → extrair lógica de delays em funções menores
@@ -123,6 +128,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Descrição**: Variável redeclara nome de variável em escopo superior.
 
 **Lista**:
+
 1. `scripts/analyze-code-graph.js:227` - `path` (shadowing line 23)
 2. `scripts/codemods/transform-connection-modes.js:42` - `path`
 3. `scripts/codemods/transform-log-categories.js:76,92` - `path` (2x)
@@ -136,6 +142,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Impacto**: 🟡 BAIXO - Confusão de leitura, mas não afeta execução
 
 **Ação**:
+
 - ✅ **Autorizado para push**
 - 🔄 **Fix simples**: Renomear variáveis locais (`filePath`, `nodePath`, etc.)
 
@@ -146,6 +153,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Descrição**: Funções com muitos parâmetros ou linhas.
 
 **Lista**:
+
 1. **`src/driver/modules/human.js:149`** - `humanType()` (7 params, limite: 6)
    - Parâmetros: `page, selector, text, typeDelay, mistakeProb, correctionDelay, naturalPause`
    - **Justificativa**: Configuração completa de digitação humana
@@ -157,6 +165,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Impacto**: 🟠 MÉDIO - Reduz legibilidade
 
 **Ação**:
+
 - ✅ **Autorizado para push**
 - 🔄 **Futuro**:
   - `humanType()` → usar objeto de configuração `{ page, selector, config: {...} }`
@@ -169,6 +178,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Descrição**: Blocos aninhados além de 5 níveis.
 
 **Lista**:
+
 1. **`src/driver/modules/stabilizer.js:186`** - Depth: 6
    - Lógica de estabilização de página (wait for selectors, retry, fallback)
    - **Contexto**: try-catch dentro de loops dentro de condicionais
@@ -176,6 +186,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Impacto**: 🟠 MÉDIO - Dificulta debug
 
 **Ação**:
+
 - ✅ **Autorizado para push**
 - 🔄 **Refatoração sugerida**: Extrair lógica interna em funções auxiliares
 
@@ -186,6 +197,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Descrição**: Possível race condition em updates de variáveis.
 
 **Lista**:
+
 1. **`src/infra/storage/dna_store.js:64`** - `cachedDna` reassigned
    - Cache de identidade DNA
    - **Análise**: Falso positivo - operação é síncrona dentro de função async
@@ -205,12 +217,14 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 **Descrição**: Variáveis declaradas com `let` mas nunca reatribuídas.
 
 **Lista**:
+
 1. `tests/test_errors_communication.js:22` - `y`
 2. `tests/test_errors_communication.js:26` - `neverReassigned`
 
 **Impacto**: 🟢 TRIVIAL
 
 **Ação**:
+
 - ✅ **Autorizado para push**
 - ✅ **Auto-fixável**: `npx eslint --fix tests/test_errors_communication.js`
 
@@ -266,6 +280,7 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
 ### FASE 9 - Code Quality Improvements (Futuro)
 
 **Prioridade ALTA** (impacto em manutenibilidade):
+
 1. ✅ Reduzir complexidade de `humanType()` (human.js)
    - Extrair lógica de delays em funções menores
    - Usar objeto de configuração em vez de 7 parâmetros
@@ -278,17 +293,16 @@ function handler(event, data, _context) {  // _ prefix indica unused proposital
    - Conectar funções UI ao HTML ou remover
    - Documentar funções que serão usadas em features futuras
 
-**Prioridade MÉDIA**:
-4. 🔄 Aplicar `_` prefix em parâmetros unused intencionais
-   - Exemplo: `function handler(event, _data, _context)`
-   - Reduz warnings de 78 para ~20
+**Prioridade MÉDIA**: 4. 🔄 Aplicar `_` prefix em parâmetros unused intencionais
+
+- Exemplo: `function handler(event, _data, _context)`
+- Reduz warnings de 78 para ~20
 
 5. 🔄 Renomear variáveis com shadow (6 arquivos)
    - `path` → `filePath`, `nodePath`, etc.
 
-**Prioridade BAIXA**:
-6. 🔄 Auto-fix `prefer-const` (2 warnings)
-7. 🔄 Revisar complexity em scripts de análise (não afeta produção)
+**Prioridade BAIXA**: 6. 🔄 Auto-fix `prefer-const` (2 warnings) 7. 🔄 Revisar complexity em scripts
+de análise (não afeta produção)
 
 ---
 
@@ -321,10 +335,12 @@ rules: {
 ### CI/CD v2.0 - Política de Warnings
 
 **Pre-commit** (`pre-commit.yml`):
+
 - ESLint com `--max-warnings 0` para **novo código**
 - Warnings em código existente não bloqueiam (focado em zero novos warnings)
 
 **CI Pipeline** (`ci.yml`):
+
 - Job 2 (Lint) executa `npx eslint . --quiet` (mostra apenas erros)
 - Warnings não bloqueiam builds (apenas erros bloqueiam)
 
@@ -334,9 +350,11 @@ rules: {
 
 **Status**: **AUTORIZADO PARA PUSH**
 
-**Razão**: Warnings pré-existentes, não introduzidos pelas mudanças .github v2.0. Zero erros ESLint. Código de produção funcional e testado.
+**Razão**: Warnings pré-existentes, não introduzidos pelas mudanças .github v2.0. Zero erros ESLint.
+Código de produção funcional e testado.
 
 **Próximos Passos**:
+
 1. ✅ Commit .github v2.0 upgrade
 2. ✅ Push para remote
 3. ✅ CI/CD v2.0 pipeline validation
@@ -344,9 +362,8 @@ rules: {
 
 ---
 
-**Gerado em**: 22/01/2026
-**Ferramenta**: ESLint 9.x (flat config)
-**Comando**: `npx eslint . --ignore-pattern "backups/**"`
-**Relatórios**:
+**Gerado em**: 22/01/2026 **Ferramenta**: ESLint 9.x (flat config) **Comando**:
+`npx eslint . --ignore-pattern "backups/**"` **Relatórios**:
+
 - JSON: `analysis/eslint-warnings-report.json`
 - Texto: `analysis/eslint-warnings-readable.txt`

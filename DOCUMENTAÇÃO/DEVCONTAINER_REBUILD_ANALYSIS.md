@@ -1,8 +1,7 @@
 # Análise DevContainer - Rebuild Without Cache
-**chatgpt-docker-puppeteer**
-**Data**: 2 de Fevereiro de 2026
-**Versão**: 1.0
-**Pré-rebuild Analysis**
+
+**chatgpt-docker-puppeteer** **Data**: 2 de Fevereiro de 2026 **Versão**: 1.0 **Pré-rebuild
+Analysis**
 
 ---
 
@@ -21,6 +20,7 @@
 ## 1. EXECUTIVE SUMMARY
 
 ### Status Geral
+
 - **Dockerfile**: ✅ Robusto, mas pode integrar ENV vars
 - **devcontainer.json**: ⚠️ Inconsistência com novos ENV files
 - **post-create.sh**: ✅ Sólido, mas pode validar ENV
@@ -29,16 +29,19 @@
 ### Principais Achados
 
 #### 🔴 CRÍTICO
+
 1. **devcontainer.json não carrega .env files** - Novo sistema ENV não está integrado
 2. **Falta validação de ENV obrigatórios** - Sistema pode iniciar com config incompleta
 3. **ENABLE_STATE_FILE hardcoded** - Deveria vir de ENV
 
 #### 🟡 RECOMENDADO
+
 4. **Dockerfile não expõe ENV defaults** - Novo sistema de 150+ vars não documentado na imagem
 5. **post-create.sh pode validar ENV críticos** - Fail-fast para misconfigs
 6. **Scripts não usam dotenv** - Dependem de shell env vars apenas
 
 #### 🟢 MELHORIAS
+
 7. **Adicionar ENV health check** - Validar config antes de iniciar serviços
 8. **Documentar ENV no Dockerfile** - Self-documenting image
 9. **Adicionar ENV examples no post-attach** - Guiar usuário visualmente
@@ -49,11 +52,11 @@
 
 ### 2.1 Dockerfile (979 linhas)
 
-**Versão**: 5.0
-**Base**: mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
-**Score**: 9/10
+**Versão**: 5.0 **Base**: mcr.microsoft.com/devcontainers/javascript-node:24-bookworm **Score**:
+9/10
 
 #### ✅ Pontos Fortes
+
 - Arquitetura em 9 seções bem definidas
 - Instalação completa de dependências (Chromium, fonts, dev tools)
 - PowerShell integrado (instrumental)
@@ -62,6 +65,7 @@
 - Shell contract robusto
 
 #### ⚠️ Pontos de Atenção
+
 1. **ENV variables não documentados na imagem**
    - Novo sistema de 150+ vars criado DEPOIS do Dockerfile
    - Imagem não tem defaults visíveis
@@ -79,7 +83,9 @@
    - Novos ENV vars (ALLOWED_ORIGINS, etc) não documentados
 
 #### 📊 Estatísticas
-- **Seções**: 9 (Identity, Locale, Toolchain, Browser, Fonts, Dev UX, PowerShell, Docker CLI, User Context, Shell Contract)
+
+- **Seções**: 9 (Identity, Locale, Toolchain, Browser, Fonts, Dev UX, PowerShell, Docker CLI, User
+  Context, Shell Contract)
 - **Pacotes APT**: 100+
 - **Layers**: ~15-20 (otimizado com multi-stage caching)
 - **Tamanho estimado**: 2-3GB
@@ -88,10 +94,10 @@
 
 ### 2.2 devcontainer.json (807 linhas)
 
-**Versão**: 5.0
-**Score**: 7/10 (downgrade por ENV integration)
+**Versão**: 5.0 **Score**: 7/10 (downgrade por ENV integration)
 
 #### ✅ Pontos Fortes
+
 - Documentação arquitetural excepcional (200+ linhas de comentários)
 - Port forwarding bem documentado
 - Topologia física clara (3 camadas)
@@ -101,6 +107,7 @@
 #### 🔴 Problemas Críticos
 
 **1. ENV Files não carregados**
+
 ```jsonc
 // AUSENTE no devcontainer.json atual:
 "runArgs": [
@@ -109,11 +116,13 @@
 ```
 
 **Impacto**:
+
 - Novo sistema de 150+ vars NÃO é carregado no container
 - Sistema inicia com defaults do código apenas
 - Variáveis críticas (DASHBOARD_PASSWORD, ALLOWED_ORIGINS) ignoradas
 
 **2. DOCKER_GID pode ser automatizado**
+
 ```jsonc
 // Atual: Requer export manual
 "DOCKER_GID": "${localEnv:DOCKER_GID}"
@@ -123,6 +132,7 @@
 ```
 
 **3. remoteEnv vazio**
+
 ```jsonc
 // AUSENTE no devcontainer.json atual:
 "remoteEnv": {
@@ -135,6 +145,7 @@
 #### ⚠️ Pontos de Atenção
 
 **1. Post-create settings**
+
 ```jsonc
 // Atual
 "postCreateCommand": "bash .devcontainer/scripts/post-create.sh"
@@ -144,6 +155,7 @@
 ```
 
 **2. Features version pinning**
+
 ```jsonc
 // Atual: Version pinned corretamente
 "ghcr.io/devcontainers/features/common-utils:2": {...}
@@ -153,12 +165,13 @@
 ```
 
 **3. Mounts podem incluir ENV cache**
+
 ```jsonc
 // AUSENTE: Cache de validação ENV
 {
-    "source": "devcontainer-env-cache",
-    "target": "/tmp/devcontainer-env",
-    "type": "volume"
+  "source": "devcontainer-env-cache",
+  "target": "/tmp/devcontainer-env",
+  "type": "volume",
 }
 ```
 
@@ -166,10 +179,10 @@
 
 ### 2.3 post-create.sh (860 linhas)
 
-**Versão**: 3.9.0-ELITE
-**Score**: 9.5/10
+**Versão**: 3.9.0-ELITE **Score**: 9.5/10
 
 #### ✅ Pontos Fortes
+
 - Estrutura impecável (10 seções)
 - Fail-fast apropriado
 - Logging forense excelente
@@ -181,6 +194,7 @@
 #### ⚠️ Oportunidades de Melhoria
 
 **1. ENV Validation ausente**
+
 ```bash
 # PROPOSTA: Nova Section 3.5
 # =============================================================================
@@ -206,6 +220,7 @@ done
 ```
 
 **2. Dotenv não utilizado**
+
 ```bash
 # PROPOSTA: Carregar .env se existir
 if [[ -f "${PROJECT_ROOT}/.env" ]]; then
@@ -217,6 +232,7 @@ fi
 ```
 
 **3. State Manifesto pode incluir ENV snapshot**
+
 ```bash
 # PROPOSTA: Adicionar ao manifesto (Section 10)
 cat >> "${STATE_SWAP}" <<EOF
@@ -233,6 +249,7 @@ EOF
 ```
 
 **4. Chrome Proxy v2.0 dependencies**
+
 ```bash
 # PROPOSTA: Nova Section 7.5 - NPM Dependencies Validation
 log "Validando dependências NPM críticas..."
@@ -258,10 +275,10 @@ fi
 
 ### 2.4 post-attach.sh (655 linhas)
 
-**Versão**: 3.6
-**Score**: 9/10
+**Versão**: 3.6 **Score**: 9/10
 
 #### ✅ Pontos Fortes
+
 - UX resiliente (nunca falha)
 - Banner informativo
 - State manifesto reader
@@ -272,6 +289,7 @@ fi
 #### 🟢 Melhorias Propostas
 
 **1. ENV Status Display**
+
 ```bash
 # PROPOSTA: Nova Phase 6.3 - ENV Configuration Status
 
@@ -301,6 +319,7 @@ echo ""
 ```
 
 **2. Quick Start Guide**
+
 ```bash
 # PROPOSTA: Nova Phase 8 - Quick Start Guide (First Attach Only)
 
@@ -336,8 +355,8 @@ fi
 
 ### 3.1 ENV System Integration
 
-| Componente          | Status ENV      | Problema                    |
-| ------------------- | --------------- | --------------------------- |
+| Componente          | Status ENV       | Problema                    |
+| ------------------- | ---------------- | --------------------------- |
 | Dockerfile          | ❌ Não integrado | Defaults não documentados   |
 | devcontainer.json   | 🔴 **CRÍTICO**   | Não carrega .env files      |
 | post-create.sh      | ⚠️ Parcial       | Não valida ENV obrigatórios |
@@ -350,9 +369,9 @@ fi
 
 ### 3.2 State Management
 
-| Estado            | Atual     | Proposta          |
-| ----------------- | --------- | ----------------- |
-| ENABLE_STATE_FILE | Hardcoded | ENV var           |
+| Estado            | Atual      | Proposta          |
+| ----------------- | ---------- | ----------------- |
+| ENABLE_STATE_FILE | Hardcoded  | ENV var           |
 | State Manifesto   | ✅ Robusto | + ENV snapshot    |
 | ENV Validation    | ❌ Ausente | + Fail-fast check |
 
@@ -360,8 +379,8 @@ fi
 
 ### 3.3 Dependencies
 
-| Dependência        | Status      | Ação                    |
-| ------------------ | ----------- | ----------------------- |
+| Dependência        | Status       | Ação                    |
+| ------------------ | ------------ | ----------------------- |
 | compression        | ❓ Verificar | Validar em post-create  |
 | express-rate-limit | ✅ OK        | -                       |
 | helmet             | ✅ OK        | -                       |
@@ -377,12 +396,10 @@ fi
 **Problema**: Novo sistema ENV não é carregado no container.
 
 **Solução**:
+
 ```jsonc
 {
-  "runArgs": [
-    "--env-file",
-    "${localWorkspaceFolder}/.env.development"
-  ],
+  "runArgs": ["--env-file", "${localWorkspaceFolder}/.env.development"],
   "remoteEnv": {
     "NODE_ENV": "${localEnv:NODE_ENV:development}",
     "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
@@ -391,12 +408,13 @@ fi
     "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
     "LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
     "BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
-    "ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}"
-  }
+    "ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}",
+  },
 }
 ```
 
 **Validação**:
+
 ```bash
 # Após rebuild
 docker exec -it <container> bash -c 'echo $NODE_ENV'
@@ -412,6 +430,7 @@ docker exec -it <container> bash -c 'echo $NODE_ENV'
 **Solução**: Nova section 3.5 (ver código acima)
 
 **Validação**:
+
 ```bash
 # Testar sem .env
 rm .env
@@ -425,6 +444,7 @@ rm .env
 **Problema**: Configuração hardcoded em múltiplos scripts.
 
 **Solução**:
+
 ```bash
 # .env.example
 ENABLE_STATE_FILE=true
@@ -444,6 +464,7 @@ fi
 **Problema**: Imagem não é self-documenting.
 
 **Solução**:
+
 ```dockerfile
 # SECTION 9.5 — ENV DEFAULTS (DOCUMENTATION)
 #
@@ -528,6 +549,7 @@ exit 0
 ```
 
 **Integração**:
+
 ```jsonc
 // devcontainer.json
 "postCreateCommand": "bash .devcontainer/scripts/validate-env.sh && bash .devcontainer/scripts/post-create.sh"
@@ -561,6 +583,7 @@ fi
 ```
 
 **Ou usar dotenv-cli**:
+
 ```bash
 # package.json
 {
@@ -575,6 +598,7 @@ fi
 ## 6. PLANO DE IMPLEMENTAÇÃO
 
 ### Fase 1: Correções Críticas (Obrigatório)
+
 **Tempo estimado**: 30 minutos
 
 1. ✅ **Integrar ENV no devcontainer.json**
@@ -595,6 +619,7 @@ fi
 ---
 
 ### Fase 2: Melhorias Recomendadas (Alta Prioridade)
+
 **Tempo estimado**: 1 hora
 
 4. ✅ **Documentar ENV no Dockerfile**
@@ -615,6 +640,7 @@ fi
 ---
 
 ### Fase 3: Upgrades (Opcional)
+
 **Tempo estimado**: 30 minutos
 
 7. ⏸️ **Quick Start Guide no post-attach**
@@ -772,6 +798,5 @@ cat .devcontainer/logs/post-create.log
 
 ---
 
-**Versão**: 1.0
-**Autor**: GitHub Copilot (Claude Sonnet 4.5)
-**Status**: ✅ Análise Completa - Pronto para Implementação
+**Versão**: 1.0 **Autor**: GitHub Copilot (Claude Sonnet 4.5) **Status**: ✅ Análise Completa -
+Pronto para Implementação

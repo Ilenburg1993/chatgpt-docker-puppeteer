@@ -1,8 +1,6 @@
 # 🎭 Auditoria Transversal: Puppeteer & Chrome Strategy
 
-**Data**: 2026-01-21
-**Tipo**: Auditoria Cross-Cutting (Transversal)
-**Status**: ✅ Completa
+**Data**: 2026-01-21 **Tipo**: Auditoria Cross-Cutting (Transversal) **Status**: ✅ Completa
 **Prioridade**: P1 (Crítica - fundação do sistema)
 
 ---
@@ -11,9 +9,11 @@
 
 ### Status Geral: ✅ **EXCELENTE (NASA-Grade)**
 
-O sistema implementa uma **estratégia multi-modo universal** para conexão Chrome/Puppeteer, com fallback automático e zero acoplamento.
+O sistema implementa uma **estratégia multi-modo universal** para conexão Chrome/Puppeteer, com
+fallback automático e zero acoplamento.
 
 ### Métricas:
+
 - **Modos suportados**: 5 (launcher, connect, wsEndpoint, executablePath, auto)
 - **ConnectionOrchestrator**: 584 LOC, audit level 21 (Hardened Infrastructure)
 - **Browser pool**: WeakMap-based, memory-leak proof
@@ -21,7 +21,9 @@ O sistema implementa uma **estratégia multi-modo universal** para conexão Chro
 - **Documentação**: ✅ CHROME_EXTERNAL_SETUP.md completo
 
 ### Veredicto:
+
 ✅ **SISTEMA MADURO E PRODUCTION-READY**:
+
 - Suporta todos os modos de conexão Puppeteer
 - Fallback automático entre modos
 - State machine com histórico (50 estados)
@@ -60,13 +62,13 @@ src/infra/
 
 ### 2.1. Matriz de Modos
 
-| Modo | Descrição | Quando Usar | Status |
-|------|-----------|-------------|--------|
-| **launcher** | Puppeteer inicia Chrome | Produção, mais confiável | ✅ PADRÃO |
-| **connect** | Conecta via browserURL (http://host:port) | Docker → Windows host | ✅ TESTADO |
-| **wsEndpoint** | Conecta via WebSocket direto | Baixa latência | ✅ TESTADO |
-| **executablePath** | Chrome customizado (path) | Chromium, Docker images | ✅ SUPORTADO |
-| **auto** | Tenta todos em ordem | Fallback automático | ✅ FUNCIONAL |
+| Modo               | Descrição                                 | Quando Usar              | Status       |
+| ------------------ | ----------------------------------------- | ------------------------ | ------------ |
+| **launcher**       | Puppeteer inicia Chrome                   | Produção, mais confiável | ✅ PADRÃO    |
+| **connect**        | Conecta via browserURL (http://host:port) | Docker → Windows host    | ✅ TESTADO   |
+| **wsEndpoint**     | Conecta via WebSocket direto              | Baixa latência           | ✅ TESTADO   |
+| **executablePath** | Chrome customizado (path)                 | Chromium, Docker images  | ✅ SUPORTADO |
+| **auto**           | Tenta todos em ordem                      | Fallback automático      | ✅ FUNCIONAL |
 
 ### 2.2. Launcher Mode (Padrão)
 
@@ -101,6 +103,7 @@ async tryLauncher() {
 ```
 
 **Características**:
+
 - ✅ Chrome gerenciado pelo Puppeteer
 - ✅ Profile isolado (temporário ou persistente)
 - ✅ Headless mode suportado ('new', true, false)
@@ -143,6 +146,7 @@ async tryConnect() {
 ```
 
 **Características**:
+
 - ✅ Multi-host support (localhost, host.docker.internal, bridge IP)
 - ✅ Multi-port scanning (9224, 9223, 9224)
 - ✅ Retry automático (12 tentativas = 4 hosts × 3 portas)
@@ -186,6 +190,7 @@ async tryWsEndpoint() {
 ```
 
 **Características**:
+
 - ✅ Descobre wsEndpoint via `/json/version`
 - ✅ Conexão WebSocket direta (baixa latência)
 - ✅ Multi-host/port scanning
@@ -217,6 +222,7 @@ async tryExecutablePath() {
 ```
 
 **Uso**:
+
 - Docker images com Chromium pré-instalado
 - Chrome customizado (Canary, Beta)
 - Linux (chromium-browser package)
@@ -258,6 +264,7 @@ async connectAuto() {
 ```
 
 **Estratégia de Fallback**:
+
 1. **launcher** (mais confiável)
 2. **connect** (Docker scenario)
 3. **wsEndpoint** (baixa latência)
@@ -273,40 +280,41 @@ async connectAuto() {
 
 ```javascript
 class BrowserPoolManager {
-    constructor() {
-        this.entries = new Map(); // taskId -> PoolEntry
-        this.browserCache = new WeakMap(); // browser -> metadata
+  constructor() {
+    this.entries = new Map(); // taskId -> PoolEntry
+    this.browserCache = new WeakMap(); // browser -> metadata
+  }
+
+  async acquire(taskId, target) {
+    // 1. Verifica se já existe pool entry
+    if (this.entries.has(taskId)) {
+      return this.entries.get(taskId);
     }
 
-    async acquire(taskId, target) {
-        // 1. Verifica se já existe pool entry
-        if (this.entries.has(taskId)) {
-            return this.entries.get(taskId);
-        }
+    // 2. Cria nova entrada no pool
+    const orch = new ConnectionOrchestrator({ mode: config.BROWSER_MODE });
+    await orch.connect();
 
-        // 2. Cria nova entrada no pool
-        const orch = new ConnectionOrchestrator({ mode: config.BROWSER_MODE });
-        await orch.connect();
+    const entry = new PoolEntry(taskId, target, orch.browser, orch.page);
+    this.entries.set(taskId, entry);
+    this.browserCache.set(orch.browser, { created: Date.now(), taskId });
 
-        const entry = new PoolEntry(taskId, target, orch.browser, orch.page);
-        this.entries.set(taskId, entry);
-        this.browserCache.set(orch.browser, { created: Date.now(), taskId });
+    return entry;
+  }
 
-        return entry;
-    }
+  async release(taskId) {
+    const entry = this.entries.get(taskId);
+    if (!entry) return;
 
-    async release(taskId) {
-        const entry = this.entries.get(taskId);
-        if (!entry) return;
-
-        await entry.cleanup(); // Fecha páginas, browser
-        this.entries.delete(taskId);
-        // WeakMap limpa automaticamente quando browser é GC'd
-    }
+    await entry.cleanup(); // Fecha páginas, browser
+    this.entries.delete(taskId);
+    // WeakMap limpa automaticamente quando browser é GC'd
+  }
 }
 ```
 
 **Características**:
+
 - ✅ **WeakMap para browser metadata** (memory-leak proof)
 - ✅ **Manual GC triggers** (`global.gc()` em cleanup)
 - ✅ **Per-task isolation** (cada task tem seu browser)
@@ -347,6 +355,7 @@ async checkHealth(browser, page) {
 ```
 
 **Melhorias P5.3** (aplicadas 2026-01-21):
+
 - ✅ Detecção de degradação por timing (>5s)
 - ✅ Não apenas crashes, mas slowdowns
 - ✅ Usado pelo PoolManager para recriar browsers ruins
@@ -368,7 +377,9 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 puppeteer.use(StealthPlugin());
 
-const browser = await puppeteer.launch({ /* ... */ });
+const browser = await puppeteer.launch({
+  /* ... */
+});
 ```
 
 **Status**: ⚠️ **INSTALADO MAS NÃO USADO DIRETAMENTE**
@@ -387,25 +398,26 @@ const browser = await puppeteer.launch({ /* ... */ });
 
 ```javascript
 args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-gpu',
-    '--disable-web-security',
-    '--disable-features=IsolateOrigins,site-per-process',
-    '--disable-blink-features=AutomationControlled', // ✅ Anti-detection
-    '--disable-background-networking',
-    '--disable-default-apps',
-    '--disable-extensions',
-    '--disable-sync',
-    '--metrics-recording-only',
-    '--mute-audio',
-    '--no-first-run',
-    '--safebrowsing-disable-auto-update'
-]
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--disable-web-security',
+  '--disable-features=IsolateOrigins,site-per-process',
+  '--disable-blink-features=AutomationControlled', // ✅ Anti-detection
+  '--disable-background-networking',
+  '--disable-default-apps',
+  '--disable-extensions',
+  '--disable-sync',
+  '--metrics-recording-only',
+  '--mute-audio',
+  '--no-first-run',
+  '--safebrowsing-disable-auto-update',
+];
 ```
 
 **Flags de Anti-Detection**:
+
 - ✅ `--disable-blink-features=AutomationControlled` (esconde navigator.webdriver)
 - ✅ `--disable-extensions` (evita fingerprinting)
 - ✅ `--disable-web-security` (bypass CORS, cuidado!)
@@ -421,9 +433,9 @@ Atualmente não há rotação de user-agent. Poderia ser adicionado:
 ```javascript
 // Exemplo P3:
 const userAgents = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0.0.0',
-    'Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0.0.0'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0.0.0',
+  'Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0.0.0',
 ];
 
 await page.setUserAgent(userAgents[Math.floor(Math.random() * userAgents.length)]);
@@ -438,20 +450,23 @@ await page.setUserAgent(userAgents[Math.floor(Math.random() * userAgents.length)
 **Tipos suportados**:
 
 1. **Temporário** (padrão):
+
 ```javascript
-userDataDir: path.join(os.tmpdir(), `chrome-profile-${Date.now()}`)
+userDataDir: path.join(os.tmpdir(), `chrome-profile-${Date.now()}`);
 // Criado em /tmp, deletado após execução
 ```
 
 2. **Persistente**:
+
 ```javascript
-userDataDir: path.join(ROOT, 'profile')
+userDataDir: path.join(ROOT, 'profile');
 // Mantém cookies, localStorage, cache entre execuções
 ```
 
 3. **Per-Task Isolation**:
+
 ```javascript
-userDataDir: path.join(ROOT, 'profile', taskId)
+userDataDir: path.join(ROOT, 'profile', taskId);
 // Cada task tem profile separado
 ```
 
@@ -490,6 +505,7 @@ static async cleanupTempProfiles() {
 ```
 
 **Invocado**:
+
 - Startup (limpa profiles órfãos)
 - Shutdown (limpa profiles atuais)
 - Manual (`ConnectionOrchestrator.cleanupTempProfiles()`)
@@ -504,10 +520,10 @@ static async cleanupTempProfiles() {
 
 ```javascript
 class BrowserPoolManager {
-    constructor() {
-        this.entries = new Map(); // Strong reference (controlado manualmente)
-        this.browserCache = new WeakMap(); // ✅ GC automático quando browser é destruído
-    }
+  constructor() {
+    this.entries = new Map(); // Strong reference (controlado manualmente)
+    this.browserCache = new WeakMap(); // ✅ GC automático quando browser é destruído
+  }
 }
 ```
 
@@ -571,19 +587,19 @@ async release(taskId) {
 
 ```javascript
 const STATES = Object.freeze({
-    INIT: 'INIT',                           // Inicialização
-    DETECTING_ENV: 'DETECTING_ENV',         // Detectando SO
-    WAITING_FOR_BROWSER: 'WAITING_FOR_BROWSER', // Aguardando conexão
-    CONNECTING_BROWSER: 'CONNECTING_BROWSER',   // Conectando
-    RETRY_BROWSER: 'RETRY_BROWSER',         // Retry após falha
-    BROWSER_READY: 'BROWSER_READY',         // Browser conectado
-    BROWSER_LOST: 'BROWSER_LOST',           // Browser disconnected
-    WAITING_FOR_PAGE: 'WAITING_FOR_PAGE',   // Aguardando página válida
-    PAGE_SELECTED: 'PAGE_SELECTED',         // Página selecionada
-    VALIDATING_PAGE: 'VALIDATING_PAGE',     // Validando página
-    PAGE_VALIDATED: 'PAGE_VALIDATED',       // Página OK
-    PAGE_INVALID: 'PAGE_INVALID',           // Página inválida
-    READY: 'READY'                          // Pronto para uso
+  INIT: 'INIT', // Inicialização
+  DETECTING_ENV: 'DETECTING_ENV', // Detectando SO
+  WAITING_FOR_BROWSER: 'WAITING_FOR_BROWSER', // Aguardando conexão
+  CONNECTING_BROWSER: 'CONNECTING_BROWSER', // Conectando
+  RETRY_BROWSER: 'RETRY_BROWSER', // Retry após falha
+  BROWSER_READY: 'BROWSER_READY', // Browser conectado
+  BROWSER_LOST: 'BROWSER_LOST', // Browser disconnected
+  WAITING_FOR_PAGE: 'WAITING_FOR_PAGE', // Aguardando página válida
+  PAGE_SELECTED: 'PAGE_SELECTED', // Página selecionada
+  VALIDATING_PAGE: 'VALIDATING_PAGE', // Validando página
+  PAGE_VALIDATED: 'PAGE_VALIDATED', // Página OK
+  PAGE_INVALID: 'PAGE_INVALID', // Página inválida
+  READY: 'READY', // Pronto para uso
 });
 ```
 
@@ -593,11 +609,11 @@ const STATES = Object.freeze({
 
 ```javascript
 const ISSUE_TYPES = Object.freeze({
-    BROWSER_NOT_STARTED: 'BROWSER_NOT_STARTED',
-    BROWSER_DISCONNECTED: 'BROWSER_DISCONNECTED',
-    PAGE_NOT_FOUND: 'PAGE_NOT_FOUND',
-    PAGE_CLOSED_BY_USER: 'PAGE_CLOSED_BY_USER',
-    PAGE_INVALID: 'PAGE_INVALID'
+  BROWSER_NOT_STARTED: 'BROWSER_NOT_STARTED',
+  BROWSER_DISCONNECTED: 'BROWSER_DISCONNECTED',
+  PAGE_NOT_FOUND: 'PAGE_NOT_FOUND',
+  PAGE_CLOSED_BY_USER: 'PAGE_CLOSED_BY_USER',
+  PAGE_INVALID: 'PAGE_INVALID',
 });
 ```
 
@@ -633,13 +649,14 @@ _pushStateHistory(state, meta) {
 
 ```json
 {
-    "BROWSER_MODE": "launcher",
-    "DEBUG_PORT": "http://localhost:9224",
-    "IDLE_SLEEP": 3000
+  "BROWSER_MODE": "launcher",
+  "DEBUG_PORT": "http://localhost:9224",
+  "IDLE_SLEEP": 3000
 }
 ```
 
 **Variáveis de Ambiente**:
+
 - `BROWSER_MODE`: launcher | connect | wsEndpoint | executablePath | auto
 - `CHROME_REMOTE_URL`: http://host:port (para connect mode)
 - `CHROME_WS_ENDPOINT`: ws://host:port/devtools/browser/... (para wsEndpoint)
@@ -653,24 +670,26 @@ _pushStateHistory(state, meta) {
 
 ```javascript
 const DEFAULTS = {
-    mode: 'launcher',
-    ports: [9224, 9223, 9224],
-    hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
-    connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
-    headless: 'new',
-    executablePath: null,
-    userDataDir: null,
-    cacheDir: path.join(process.env.HOME || '/home/node', '.cache', 'puppeteer'),
-    args: [ /* 20+ flags */ ],
-    retryDelayMs: 3000,
-    maxRetryDelayMs: 15000,
-    maxConnectionAttempts: 5,
-    connectionTimeout: 30000,
-    pageScanIntervalMs: 4000,
-    allowedDomains: ['chatgpt.com', 'gemini.google.com', 'claude.ai', 'openai.com'],
-    pageSelectionPolicy: 'FIRST',
-    stateHistorySize: 50,
-    autoFallback: true
+  mode: 'launcher',
+  ports: [9224, 9223, 9224],
+  hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
+  connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
+  headless: 'new',
+  executablePath: null,
+  userDataDir: null,
+  cacheDir: path.join(process.env.HOME || '/home/node', '.cache', 'puppeteer'),
+  args: [
+    /* 20+ flags */
+  ],
+  retryDelayMs: 3000,
+  maxRetryDelayMs: 15000,
+  maxConnectionAttempts: 5,
+  connectionTimeout: 30000,
+  pageScanIntervalMs: 4000,
+  allowedDomains: ['chatgpt.com', 'gemini.google.com', 'claude.ai', 'openai.com'],
+  pageSelectionPolicy: 'FIRST',
+  stateHistorySize: 50,
+  autoFallback: true,
 };
 ```
 
@@ -692,6 +711,7 @@ async connect() {
 ```
 
 **Fluxo**:
+
 ```
 Driver.connect()
   └─→ PoolManager.acquire()
@@ -725,13 +745,14 @@ Driver.connect()
 
 ### 10.1. Arquivos de Documentação
 
-| Arquivo | Tamanho | Qualidade | Status |
-|---------|---------|-----------|--------|
-| [CHROME_EXTERNAL_SETUP.md](CHROME_EXTERNAL_SETUP.md) | ~400 linhas | ✅ EXCELENTE | Completo |
-| [DOCUMENTAÇÃO/CONNECTION_ORCHESTRATOR.md](DOCUMENTAÇÃO/CONNECTION_ORCHESTRATOR.md) | ~200 linhas | ✅ BOM | Completo |
-| README.md (seção Puppeteer) | ~50 linhas | ✅ BOM | Completo |
+| Arquivo                                                                            | Tamanho     | Qualidade    | Status   |
+| ---------------------------------------------------------------------------------- | ----------- | ------------ | -------- |
+| [CHROME_EXTERNAL_SETUP.md](CHROME_EXTERNAL_SETUP.md)                               | ~400 linhas | ✅ EXCELENTE | Completo |
+| [DOCUMENTAÇÃO/CONNECTION_ORCHESTRATOR.md](DOCUMENTAÇÃO/CONNECTION_ORCHESTRATOR.md) | ~200 linhas | ✅ BOM       | Completo |
+| README.md (seção Puppeteer)                                                        | ~50 linhas  | ✅ BOM       | Completo |
 
 **Cobertura**:
+
 - ✅ Setup Chrome externo (Windows, Linux, Mac)
 - ✅ Troubleshooting comum
 - ✅ Configuração de modos
@@ -745,6 +766,7 @@ Driver.connect()
 ### 1. **Universal Connection Strategy** ⭐⭐⭐⭐⭐
 
 5 modos suportados com fallback automático:
+
 ```javascript
 launcher → connect → wsEndpoint → executablePath
 ```
@@ -778,8 +800,8 @@ launcher → connect → wsEndpoint → executablePath
 ### 4. **Multi-Host/Port Discovery** ⭐⭐⭐⭐⭐
 
 ```javascript
-hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1']
-ports: [9224, 9223, 9224]
+hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'];
+ports: [9224, 9223, 9224];
 // Total: 12 tentativas (4 hosts × 3 portas)
 ```
 
@@ -790,9 +812,9 @@ ports: [9224, 9223, 9224]
 ### 5. **Retry Logic Exponencial** ⭐⭐⭐⭐
 
 ```javascript
-retryDelayMs: 3000        // 3s
-maxRetryDelayMs: 15000    // 15s (máximo)
-maxConnectionAttempts: 5
+retryDelayMs: 3000; // 3s
+maxRetryDelayMs: 15000; // 15s (máximo)
+maxConnectionAttempts: 5;
 ```
 
 **Qualidade**: Backoff jitter implementado.
@@ -812,6 +834,7 @@ maxConnectionAttempts: 5
 ### 7. **Chrome Args Optimization** ⭐⭐⭐⭐
 
 20+ flags otimizados:
+
 - Performance (`--disable-dev-shm-usage`, `--disable-gpu`)
 - Segurança (`--no-sandbox`, `--disable-web-security`)
 - Anti-detection (`--disable-blink-features=AutomationControlled`)
@@ -823,6 +846,7 @@ maxConnectionAttempts: 5
 ### 8. **Documentação Completa** ⭐⭐⭐⭐⭐
 
 [CHROME_EXTERNAL_SETUP.md](CHROME_EXTERNAL_SETUP.md):
+
 - Setup passo a passo (Windows, Linux, Mac)
 - Troubleshooting (8 casos comuns)
 - Segurança (--remote-debugging-address)
@@ -836,7 +860,7 @@ maxConnectionAttempts: 5
 
 ```javascript
 if (latency > 5000) {
-    return { healthy: false, reason: 'Browser degradado' };
+  return { healthy: false, reason: 'Browser degradado' };
 }
 ```
 
@@ -861,6 +885,7 @@ if (latency > 5000) {
 **Problema**: `puppeteer-extra-plugin-stealth` instalado mas não usado.
 
 **Evidência**:
+
 ```javascript
 // package.json tem:
 "puppeteer-extra-plugin-stealth": "^2.11.2"
@@ -888,7 +913,8 @@ const puppeteer = require('puppeteer');
 
 ### 3. **Profile Persistente Pode Crescer** ⚠️
 
-**Problema**: Se usar `userDataDir: 'profile'` (persistente), pode crescer indefinidamente (cache, cookies, localStorage).
+**Problema**: Se usar `userDataDir: 'profile'` (persistente), pode crescer indefinidamente (cache,
+cookies, localStorage).
 
 **Impacto**: ⚠️ Disk usage aumenta com tempo
 
@@ -919,8 +945,7 @@ puppeteer.use(StealthPlugin());
 // const puppeteer = require('puppeteer-extra');
 ```
 
-**Tempo**: 30 minutos
-**Benefício**: Melhor anti-detection (navigator.webdriver, canvas, webgl)
+**Tempo**: 30 minutos **Benefício**: Melhor anti-detection (navigator.webdriver, canvas, webgl)
 
 ---
 
@@ -946,8 +971,7 @@ async selectAndValidatePage() {
 }
 ```
 
-**Tempo**: 20 minutos
-**Benefício**: Dificulta fingerprinting
+**Tempo**: 20 minutos **Benefício**: Dificulta fingerprinting
 
 ---
 
@@ -963,29 +987,28 @@ const fs = require('fs');
 const path = require('path');
 
 async function rotateProfiles() {
-    const profileDir = path.join(__dirname, '..', 'profile');
-    const backupDir = path.join(__dirname, '..', 'profile_backups');
+  const profileDir = path.join(__dirname, '..', 'profile');
+  const backupDir = path.join(__dirname, '..', 'profile_backups');
 
-    // Backup profile atual
-    const timestamp = new Date().toISOString().replace(/:/g, '-');
-    const backupPath = path.join(backupDir, `profile_${timestamp}`);
+  // Backup profile atual
+  const timestamp = new Date().toISOString().replace(/:/g, '-');
+  const backupPath = path.join(backupDir, `profile_${timestamp}`);
 
-    await fs.promises.rename(profileDir, backupPath);
-    await fs.promises.mkdir(profileDir);
+  await fs.promises.rename(profileDir, backupPath);
+  await fs.promises.mkdir(profileDir);
 
-    console.log(`Profile rotacionado: ${backupPath}`);
+  console.log(`Profile rotacionado: ${backupPath}`);
 
-    // Limpa backups >30 dias
-    // ...
+  // Limpa backups >30 dias
+  // ...
 }
 
 if (require.main === module) {
-    rotateProfiles();
+  rotateProfiles();
 }
 ```
 
-**Tempo**: 1 hora
-**Benefício**: Mantém disk usage controlado
+**Tempo**: 1 hora **Benefício**: Mantém disk usage controlado
 
 ---
 
@@ -993,12 +1016,12 @@ if (require.main === module) {
 
 ### 14.1. Testes Existentes
 
-| Arquivo | Tipo | Status |
-|---------|------|--------|
+| Arquivo                                                          | Tipo        | Status       |
+| ---------------------------------------------------------------- | ----------- | ------------ |
 | `tests/integration/browser/test_connection_orchestrator.spec.js` | Integration | ✅ FUNCIONAL |
-| `tests/e2e/test_integration_complete.spec.js` | E2E | ✅ FUNCIONAL |
-| `tests/unit/infra/test_puppeteer_launcher.spec.js` | Unit | ✅ FUNCIONAL |
-| `tests/manual/test_chrome_connection.js` | Manual | ✅ FUNCIONAL |
+| `tests/e2e/test_integration_complete.spec.js`                    | E2E         | ✅ FUNCIONAL |
+| `tests/unit/infra/test_puppeteer_launcher.spec.js`               | Unit        | ✅ FUNCIONAL |
+| `tests/manual/test_chrome_connection.js`                         | Manual      | ✅ FUNCIONAL |
 
 **Cobertura**: ~85% (boa cobertura de casos reais)
 
@@ -1006,33 +1029,28 @@ if (require.main === module) {
 
 ### 14.2. Casos Testados
 
-✅ Launcher mode (Puppeteer.launch)
-✅ Connect mode (Chrome externo)
-✅ Multi-port scanning (9224, 9223, 9224)
-✅ Multi-host (localhost, host.docker.internal)
-✅ Profile cleanup (temporários deletados)
-✅ Health checks (timing + crash detection)
-✅ WeakMap cache (GC validation)
-✅ State machine transitions
-✅ Auto-fallback (launcher → connect → wsEndpoint)
+✅ Launcher mode (Puppeteer.launch) ✅ Connect mode (Chrome externo) ✅ Multi-port scanning (9224,
+9223, 9224) ✅ Multi-host (localhost, host.docker.internal) ✅ Profile cleanup (temporários
+deletados) ✅ Health checks (timing + crash detection) ✅ WeakMap cache (GC validation) ✅ State
+machine transitions ✅ Auto-fallback (launcher → connect → wsEndpoint)
 
 ---
 
 ## 15. RESUMO EXECUTIVO
 
-| Categoria | Quantidade | Status |
-|-----------|-----------|--------|
-| **Modos de Conexão** | 5 suportados | ✅ Completo |
-| **LOC Puppeteer** | ~1,143 | ✅ |
-| **State Machine** | 13 estados | ✅ NASA-grade |
-| **Memory Management** | WeakMap + GC | ✅ Leak-proof |
-| **Documentação** | 3 arquivos (~650 linhas) | ✅ Excelente |
-| **Pontos Fortes** | 10 identificados | ✅ |
-| **Pontos de Atenção** | 3 identificados | ⚠️ |
-| **Bugs P1** | 0 bugs | ✅ Zero críticos |
-| **Bugs P2** | 0 bugs | ✅ |
-| **Bugs P3** | 0 bugs | ✅ |
-| **Correções P3** | 3 opcionais | ⏳ |
+| Categoria             | Quantidade               | Status           |
+| --------------------- | ------------------------ | ---------------- |
+| **Modos de Conexão**  | 5 suportados             | ✅ Completo      |
+| **LOC Puppeteer**     | ~1,143                   | ✅               |
+| **State Machine**     | 13 estados               | ✅ NASA-grade    |
+| **Memory Management** | WeakMap + GC             | ✅ Leak-proof    |
+| **Documentação**      | 3 arquivos (~650 linhas) | ✅ Excelente     |
+| **Pontos Fortes**     | 10 identificados         | ✅               |
+| **Pontos de Atenção** | 3 identificados          | ⚠️               |
+| **Bugs P1**           | 0 bugs                   | ✅ Zero críticos |
+| **Bugs P2**           | 0 bugs                   | ✅               |
+| **Bugs P3**           | 0 bugs                   | ✅               |
+| **Correções P3**      | 3 opcionais              | ⏳               |
 
 ---
 
@@ -1042,25 +1060,18 @@ if (require.main === module) {
 
 O subsistema Puppeteer é **NASA-grade**:
 
-✅ **Universal Connection Strategy**: 5 modos com fallback automático
-✅ **State Machine Robusto**: 13 estados, histórico de 50 transições
-✅ **Memory Management Perfeito**: WeakMap, manual GC, profile cleanup
-✅ **Multi-Host/Port Discovery**: Funciona em Docker, Linux, Mac, Windows
-✅ **Retry Logic Exponencial**: Backoff implementado
-✅ **Profile Isolation**: Temporário, persistente, per-task
-✅ **Chrome Args Otimizados**: 20+ flags de performance/segurança
-✅ **Documentação Completa**: Tutorial-grade (CHROME_EXTERNAL_SETUP.md)
-✅ **Health Checks Timing-Based**: Detecta degradação (P5.3 fix)
-✅ **Zero Acoplamento**: Arquitetura limpa e testável
+✅ **Universal Connection Strategy**: 5 modos com fallback automático ✅ **State Machine Robusto**:
+13 estados, histórico de 50 transições ✅ **Memory Management Perfeito**: WeakMap, manual GC,
+profile cleanup ✅ **Multi-Host/Port Discovery**: Funciona em Docker, Linux, Mac, Windows ✅ **Retry
+Logic Exponencial**: Backoff implementado ✅ **Profile Isolation**: Temporário, persistente,
+per-task ✅ **Chrome Args Otimizados**: 20+ flags de performance/segurança ✅ **Documentação
+Completa**: Tutorial-grade (CHROME_EXTERNAL_SETUP.md) ✅ **Health Checks Timing-Based**: Detecta
+degradação (P5.3 fix) ✅ **Zero Acoplamento**: Arquitetura limpa e testável
 
-**Áreas de Melhoria (P3)**:
-⏳ Integrar stealth plugin (30min)
-⏳ User-agent rotation (20min)
-⏳ Profile rotation job (1h)
+**Áreas de Melhoria (P3)**: ⏳ Integrar stealth plugin (30min) ⏳ User-agent rotation (20min) ⏳
+Profile rotation job (1h)
 
 ---
 
-**Assinado**: Sistema de Auditoria de Código
-**Data**: 2026-01-21
-**Versão**: 1.0
-**Próxima Auditoria**: PM2 & DAEMON MODE
+**Assinado**: Sistema de Auditoria de Código **Data**: 2026-01-21 **Versão**: 1.0 **Próxima
+Auditoria**: PM2 & DAEMON MODE

@@ -1,26 +1,26 @@
 # DevContainer Scripts Analysis v5.2
 
-**Data**: 02 de Fevereiro de 2026
-**Versão**: 5.2.0
-**Escopo**: post-create.sh + post-attach.sh
+**Data**: 02 de Fevereiro de 2026 **Versão**: 5.2.0 **Escopo**: post-create.sh + post-attach.sh
 **Status**: ⚠️ CORREÇÕES E UPGRADES NECESSÁRIOS
 
 ---
 
 ## 📋 Executive Summary
 
-Análise abrangente dos lifecycle hooks do DevContainer (`post-create.sh` e `post-attach.sh`), identificando **22 issues** (13 high priority, 9 medium priority) e propondo **12 upgrades** para alinhar com a arquitetura v5.2.
+Análise abrangente dos lifecycle hooks do DevContainer (`post-create.sh` e `post-attach.sh`),
+identificando **22 issues** (13 high priority, 9 medium priority) e propondo **12 upgrades** para
+alinhar com a arquitetura v5.2.
 
 ### Métricas Gerais
 
-| Métrica             | post-create.sh | post-attach.sh | Total           |
-| ------------------- | -------------- | -------------- | --------------- |
-| **Linhas**          | 934            | 774            | 1,708           |
-| **Seções/Phases**   | 11             | 9              | 20              |
+| Métrica             | post-create.sh | post-attach.sh | Total            |
+| ------------------- | -------------- | -------------- | ---------------- |
+| **Linhas**          | 934            | 774            | 1,708            |
+| **Seções/Phases**   | 11             | 9              | 20               |
 | **Versão Atual**    | 3.9.0-ELITE    | 3.6/3.7/3.8    | ❌ Inconsistente |
 | **Versão Alvo**     | 5.2.0          | 5.2.0          | ✅ Sincronizado  |
-| **Issues Críticos** | 7              | 6              | **13**          |
-| **Issues Médios**   | 5              | 4              | **9**           |
+| **Issues Críticos** | 7              | 6              | **13**           |
+| **Issues Médios**   | 5              | 4              | **9**            |
 
 ### Impacto Estimado
 
@@ -36,32 +36,33 @@ Análise abrangente dos lifecycle hooks do DevContainer (`post-create.sh` e `pos
 ### **post-create.sh Issues**
 
 #### **Issue #1: Versão Inconsistente**
-**Severidade**: 🔴 HIGH
-**Linha**: 4
-**Problema**:
+
+**Severidade**: 🔴 HIGH **Linha**: 4 **Problema**:
+
 ```bash
 # Version: v3.9.0-ELITE
 readonly SCRIPT_VERSION="3.9.0-ELITE"
 ```
+
 - Desalinhado com Dockerfile v5.2 e devcontainer.json v5.2
 - Confunde auditoria de versões
 - Quebra rastreabilidade forense
 
 **Solução**:
+
 ```bash
 # Version: v5.2.0
 readonly SCRIPT_VERSION="5.2.0"
 ```
 
-**Impacto**: ✅ Sincronização de versionamento
-**Esforço**: 🟢 5 min
+**Impacto**: ✅ Sincronização de versionamento **Esforço**: 🟢 5 min
 
 ---
 
 #### **Issue #2: ENV Vars Incompletas**
-**Severidade**: 🔴 HIGH
-**Linha**: 161-166
-**Problema**:
+
+**Severidade**: 🔴 HIGH **Linha**: 161-166 **Problema**:
+
 ```bash
 readonly CRITICAL_ENV_VARS=(
     "NODE_ENV"
@@ -71,11 +72,13 @@ readonly CRITICAL_ENV_VARS=(
     "ENABLE_STATE_FILE"
 )
 ```
+
 - Faltam vars críticas: `CHROME_PROXY_PORT`, `CHROME_PORT`, `CHROME_HOST`
 - Fail-fast não detecta misconfigurações do proxy
 - Sistema inicia com configuração parcial
 
 **Solução**:
+
 ```bash
 readonly CRITICAL_ENV_VARS=(
     "NODE_ENV"
@@ -90,20 +93,20 @@ readonly CRITICAL_ENV_VARS=(
 )
 ```
 
-**Impacto**: 🔒 Previne startups com configuração incompleta
-**Esforço**: 🟢 5 min
+**Impacto**: 🔒 Previne startups com configuração incompleta **Esforço**: 🟢 5 min
 
 ---
 
 #### **Issue #3: Falta Healthcheck Final**
-**Severidade**: 🔴 HIGH
-**Linha**: 934 (EOF)
-**Problema**:
+
+**Severidade**: 🔴 HIGH **Linha**: 934 (EOF) **Problema**:
+
 - Script termina sem validar se tudo foi configurado corretamente
 - Não valida conectividade Chrome proxy → Windows host
 - Não salva estado de health para post-attach
 
 **Solução** (nova seção ao final):
+
 ```bash
 # =============================================================================
 # SECTION 11 — FINAL HEALTH CHECK & SUCCESS BANNER v5.2.0
@@ -149,20 +152,20 @@ echo "  • Documentação: ARCHITECTURE.md"
 echo ""
 ```
 
-**Impacto**: 📊 Observabilidade + 🔒 Validação
-**Esforço**: 🟡 15 min
+**Impacto**: 📊 Observabilidade + 🔒 Validação **Esforço**: 🟡 15 min
 
 ---
 
 #### **Issue #4: Falta Timestamp de Início**
-**Severidade**: 🔴 HIGH
-**Linha**: 90 (após log inicial)
-**Problema**:
+
+**Severidade**: 🔴 HIGH **Linha**: 90 (após log inicial) **Problema**:
+
 - Não captura timestamp de início
 - Impossível calcular tempo total de execução
 - Performance não é rastreável
 
 **Solução** (adicionar após linha 90):
+
 ```bash
 # Timestamp de início (para cálculo de duração)
 readonly BOOT_START_TIME="$(date +%s)"
@@ -170,15 +173,14 @@ readonly BOOT_START_TIME="$(date +%s)"
 log "Simbiose inicializada"
 ```
 
-**Impacto**: ⏱️ Métricas de performance
-**Esforço**: 🟢 2 min
+**Impacto**: ⏱️ Métricas de performance **Esforço**: 🟢 2 min
 
 ---
 
 #### **Issue #5: Comentários de Seção Redundantes**
-**Severidade**: 🟡 MEDIUM
-**Linha**: Múltiplas (96, 210, 293, etc)
-**Problema**:
+
+**Severidade**: 🟡 MEDIUM **Linha**: Múltiplas (96, 210, 293, etc) **Problema**:
+
 ```bash
 # SECTION 2 — CONTRATO DE IDENTIDADE (GUARD RAILS) v3.9.0-ELITE
 # ...
@@ -186,24 +188,25 @@ log "Simbiose inicializada"
 # ...
 # SECTION 3 — CONTEXTO, PATHS & IDEMPOTÊNCIA (GATEKEEPER) v3.9.0-ELITE
 ```
+
 - Versionamento inconsistente dentro de seções (v3.9.0-ELITE vs v1.0)
 - Confunde auditoria
 - Numeros de seção inconsistentes (2.5 deveria ser subsection, não nova seção)
 
 **Solução**:
+
 - Usar versionamento único: `v5.2.0`
 - Renumerar seções claramente (SECTION 1, 2, 3... sem sub-numeração confusa)
 - Manter hierarquia com sub-títulos, não sub-números
 
-**Impacto**: 📚 Clareza de documentação
-**Esforço**: 🟡 10 min
+**Impacto**: 📚 Clareza de documentação **Esforço**: 🟡 10 min
 
 ---
 
 #### **Issue #6: SSH Contract Complexo**
-**Severidade**: 🟡 MEDIUM
-**Linha**: 448-489
-**Problema**:
+
+**Severidade**: 🟡 MEDIUM **Linha**: 448-489 **Problema**:
+
 ```bash
 # Estados possíveis (vereditos, não erros):
 #   • absent  → SSH não solicitado (SSH_AUTH_SOCK ausente)
@@ -211,12 +214,13 @@ log "Simbiose inicializada"
 #   • valid   → SSH disponível e conforme contrato (/ssh-agent)
 #   • invalid → SSH solicitado, mas estruturalmente inconsistente
 ```
+
 - 4 estados para algo que deveria ser binário (ok/not ok)
 - Estado "pending" cria ambiguidade
 - Lógica condicional excessiva (5 níveis de if/elif)
 
-**Solução**:
-Simplificar para 3 estados:
+**Solução**: Simplificar para 3 estados:
+
 ```bash
 # Estados canônicos:
 #   • disabled → SSH_AUTH_SOCK não definido (feature desativada)
@@ -224,15 +228,14 @@ Simplificar para 3 estados:
 #   • broken   → Socket definido mas não acessível
 ```
 
-**Impacto**: 🧹 Redução de complexidade
-**Esforço**: 🟡 10 min
+**Impacto**: 🧹 Redução de complexidade **Esforço**: 🟡 10 min
 
 ---
 
 #### **Issue #7: Hardcoded Paths**
-**Severidade**: 🟡 MEDIUM
-**Linha**: 393-407
-**Problema**:
+
+**Severidade**: 🟡 MEDIUM **Linha**: 393-407 **Problema**:
+
 ```bash
 readonly VOLUME_DIRS=(
     "${HOME_DIR}/.cache"
@@ -241,11 +244,13 @@ readonly VOLUME_DIRS=(
     # ...
 )
 ```
+
 - Mistura `${HOME_DIR}` com `/home/node` hardcoded
 - Quebra se CURRENT_USER não for "node"
 - Inconsistente com princípio de identidade dinâmica
 
 **Solução**:
+
 ```bash
 readonly VOLUME_DIRS=(
     "${HOME_DIR}/.cache"
@@ -262,17 +267,16 @@ readonly VOLUME_DIRS=(
 )
 ```
 
-**Impacto**: 🔧 Flexibilidade de configuração
-**Esforço**: 🟢 5 min
+**Impacto**: 🔧 Flexibilidade de configuração **Esforço**: 🟢 5 min
 
 ---
 
 ### **post-attach.sh Issues**
 
 #### **Issue #8: Versionamento Inconsistente**
-**Severidade**: 🔴 HIGH
-**Linhas**: 3, 25, 94, 158, 244, 322, 396, 512, 578, 680
-**Problema**:
+
+**Severidade**: 🔴 HIGH **Linhas**: 3, 25, 94, 158, 244, 322, 396, 512, 578, 680 **Problema**:
+
 ```bash
 # PHASE 0 — CANONICAL v3.6
 SCRIPT_VERSION="3.6"
@@ -280,35 +284,38 @@ SCRIPT_VERSION="3.6"
 # PHASE 6 — CANONICAL v3.8
 # PHASE 7 — CANONICAL v3.5
 ```
+
 - 4 versões diferentes no mesmo arquivo (v3.5, v3.6, v3.7, v3.8)
 - Confunde rastreabilidade
 - Nenhuma alinhada com v5.2
 
 **Solução**:
+
 ```bash
 # Versão canônica única (todas as fases)
 readonly SCRIPT_VERSION="5.2.0"
 # Remover sufixos de versão dos comentários de fase
 ```
 
-**Impacto**: ✅ Sincronização de versionamento
-**Esforço**: 🟢 5 min
+**Impacto**: ✅ Sincronização de versionamento **Esforço**: 🟢 5 min
 
 ---
 
 #### **Issue #9: Chrome Diagnostics Incompleto**
-**Severidade**: 🔴 HIGH
-**Linha**: 578-665
-**Problema**:
+
+**Severidade**: 🔴 HIGH **Linha**: 578-665 **Problema**:
+
 ```bash
 info "Chrome externo (CDP — via proxy local, diagnóstico passivo):"
 CHROME_ENDPOINT="${PUPPETEER_WS_ENDPOINT:-http://localhost:9224}"
 ```
+
 - Só verifica localhost:9224 (proxy)
 - Não documenta arquitetura completa (proxy → host:9225)
 - Não explica que proxy pode estar OK mas Chrome não
 
 **Solução**:
+
 ```bash
 info "Chrome externo (arquitetura proxy):"
 echo ""
@@ -335,20 +342,20 @@ if [[ "${CHROME_PROXY_STATUS}" == *"✅"* ]]; then
 fi
 ```
 
-**Impacto**: 📊 Diagnóstico preciso da topologia
-**Esforço**: 🟡 15 min
+**Impacto**: 📊 Diagnóstico preciso da topologia **Esforço**: 🟡 15 min
 
 ---
 
 #### **Issue #10: Falta Status de Volumes**
-**Severidade**: 🔴 HIGH
-**Linha**: Não existe
-**Problema**:
+
+**Severidade**: 🔴 HIGH **Linha**: Não existe **Problema**:
+
 - Não mostra status de volumes persistentes
 - Impossível diagnosticar problemas de cache/state
 - Usuário não sabe se volumes estão montados corretamente
 
 **Solução** (nova fase após PHASE 6.3):
+
 ```bash
 # =============================================================================
 # PHASE 6.4 — VOLUMES & CACHE STATUS (DIAGNOSTIC) v5.2.0
@@ -379,46 +386,48 @@ done
 echo ""
 ```
 
-**Impacto**: 📊 Observabilidade de volumes
-**Esforço**: 🟡 10 min
+**Impacto**: 📊 Observabilidade de volumes **Esforço**: 🟡 10 min
 
 ---
 
 #### **Issue #11: PM2 Timeout Curto**
-**Severidade**: 🟡 MEDIUM
-**Linha**: 530
-**Problema**:
+
+**Severidade**: 🟡 MEDIUM **Linha**: 530 **Problema**:
+
 ```bash
 PM2_TIMEOUT_SECONDS=2
 ```
+
 - 2 segundos pode ser insuficiente em sistemas lentos
 - Causa false negatives
 - PM2 pode estar iniciando mas timeout antes de responder
 
 **Solução**:
+
 ```bash
 PM2_TIMEOUT_SECONDS=5  # Aumentado para acomodar sistemas lentos
 ```
 
-**Impacto**: 🔧 Redução de false negatives
-**Esforço**: 🟢 1 min
+**Impacto**: 🔧 Redução de false negatives **Esforço**: 🟢 1 min
 
 ---
 
 #### **Issue #12: PM2 Diagnostics Limitado**
-**Severidade**: 🟡 MEDIUM
-**Linha**: 542-563
-**Problema**:
+
+**Severidade**: 🟡 MEDIUM **Linha**: 542-563 **Problema**:
+
 ```bash
 if timeout "${PM2_TIMEOUT_SECONDS}" pm2 jlist >/dev/null 2>&1; then
     PROC_COUNT="$(pm2 jlist 2>/dev/null | jq -r '. | length' || echo 0)"
     ok "PM2 disponível (${PROC_COUNT} processos registrados)"
 ```
+
 - Só mostra count, não status individual
 - Não identifica qual processo está down
 - Sem informação de uptime ou memory
 
 **Solução**:
+
 ```bash
 if timeout "${PM2_TIMEOUT_SECONDS}" pm2 jlist >/dev/null 2>&1; then
     PROC_LIST="$(pm2 jlist 2>/dev/null || echo '[]')"
@@ -434,20 +443,20 @@ if timeout "${PM2_TIMEOUT_SECONDS}" pm2 jlist >/dev/null 2>&1; then
     fi
 ```
 
-**Impacto**: 📊 Diagnóstico detalhado de processos
-**Esforço**: 🟡 10 min
+**Impacto**: 📊 Diagnóstico detalhado de processos **Esforço**: 🟡 10 min
 
 ---
 
 #### **Issue #13: Falta Disk Usage**
-**Severidade**: 🟡 MEDIUM
-**Linha**: Não existe
-**Problema**:
+
+**Severidade**: 🟡 MEDIUM **Linha**: Não existe **Problema**:
+
 - Não mostra espaço em disco disponível
 - Usuário pode ficar sem espaço sem perceber
 - Volumes persistentes crescem indefinidamente
 
 **Solução** (nova fase após volumes):
+
 ```bash
 # =============================================================================
 # PHASE 6.5 — DISK USAGE WARNING v5.2.0
@@ -472,17 +481,17 @@ fi
 echo ""
 ```
 
-**Impacto**: ⚠️ Prevenção de problemas de espaço
-**Esforço**: 🟢 5 min
+**Impacto**: ⚠️ Prevenção de problemas de espaço **Esforço**: 🟢 5 min
 
 ---
 
 ## 🔧 Issues Médios (Medium Priority)
 
 ### **Issue #14: Falta Sumário Executivo** (post-create.sh)
-**Severidade**: 🟡 MEDIUM
-**Linha**: 1-11 (header)
-**Solução**: Adicionar sumário executivo no header:
+
+**Severidade**: 🟡 MEDIUM **Linha**: 1-11 (header) **Solução**: Adicionar sumário executivo no
+header:
+
 ```bash
 # =============================================================================
 # post-create.sh — Inicialização Estrutural do DevContainer
@@ -506,25 +515,26 @@ echo ""
 # =============================================================================
 ```
 
-**Impacto**: 📚 Documentação
-**Esforço**: 🟢 5 min
+**Impacto**: 📚 Documentação **Esforço**: 🟢 5 min
 
 ---
 
 ### **Issue #15: Quick Start Guide Só no Primeiro Attach** (post-attach.sh)
-**Severidade**: 🟡 MEDIUM
-**Linha**: 465-505
-**Problema**:
+
+**Severidade**: 🟡 MEDIUM **Linha**: 465-505 **Problema**:
+
 ```bash
 if [ "${IS_FIRST_ATTACH}" = true ]; then
     # Quick start guide (300+ linhas)
 fi
 ```
+
 - Útil, mas só aparece uma vez
 - Usuários esquecem comandos
 - Sem quick tips em reattach
 
 **Solução**:
+
 ```bash
 # Quick Start (sempre, mas resumido após primeiro attach)
 if [ "${IS_FIRST_ATTACH}" = true ]; then
@@ -539,19 +549,19 @@ else
 fi
 ```
 
-**Impacto**: 🎯 UX melhorado
-**Esforço**: 🟢 5 min
+**Impacto**: 🎯 UX melhorado **Esforço**: 🟢 5 min
 
 ---
 
 ### **Issue #16: Mapa de Portas Incompleto** (post-attach.sh)
-**Severidade**: 🟡 MEDIUM
-**Linha**: 680+ (final)
-**Problema**:
+
+**Severidade**: 🟡 MEDIUM **Linha**: 680+ (final) **Problema**:
+
 - Mapa de portas não documenta 9229, 9230 (debug)
 - Falta documentação de 3008 (dashboard)
 
 **Solução**:
+
 ```bash
 info "Mapa de portas (contratos arquiteturais):"
 echo ""
@@ -570,24 +580,26 @@ echo "  Para detalhes: devcontainer.json (forwardPorts section)"
 echo ""
 ```
 
-**Impacto**: 📚 Documentação completa
-**Esforço**: 🟢 5 min
+**Impacto**: 📚 Documentação completa **Esforço**: 🟢 5 min
 
 ---
 
 ### **Issue #17-22**: (Issues menores de formatação, typos, etc)
 
-*(Omitidos por brevidade — incluem: typos em comentários, formatação inconsistente, falta de links para docs, etc)*
+_(Omitidos por brevidade — incluem: typos em comentários, formatação inconsistente, falta de links
+para docs, etc)_
 
 ---
 
 ## 🚀 Upgrades Propostos
 
 ### **Upgrade #1: Performance Metrics**
-**Categoria**: Observabilidade
-**Benefício**: Rastrear tempo de inicialização e identificar bottlenecks
+
+**Categoria**: Observabilidade **Benefício**: Rastrear tempo de inicialização e identificar
+bottlenecks
 
 **Implementação** (post-create.sh):
+
 ```bash
 # Início (após linha 90)
 readonly BOOT_START_TIME="$(date +%s)"
@@ -612,10 +624,11 @@ checkpoint "Volumes audit"
 ---
 
 ### **Upgrade #2: Parallel Diagnostics** (post-attach.sh)
-**Categoria**: Performance
-**Benefício**: Reduzir tempo de attach em 50% (15s → 7s)
+
+**Categoria**: Performance **Benefício**: Reduzir tempo de attach em 50% (15s → 7s)
 
 **Implementação**:
+
 ```bash
 # Executar diagnósticos em paralelo (onde possível)
 (
@@ -644,10 +657,11 @@ checkpoint "Volumes audit"
 ---
 
 ### **Upgrade #3: Links para Documentação**
-**Categoria**: UX
-**Benefício**: Guiar usuários para docs relevantes
+
+**Categoria**: UX **Benefício**: Guiar usuários para docs relevantes
 
 **Implementação** (ambos scripts):
+
 ```bash
 # Banner final com links
 echo "📚 Documentação:"
@@ -679,8 +693,7 @@ echo ""
 5. ✅ **Issue #7**: Corrigir hardcoded paths (/home/node → ${HOME_DIR})
 6. ✅ **Issue #11**: Aumentar PM2_TIMEOUT_SECONDS (2s → 5s)
 
-**Estimativa**: 30 minutos
-**Risco**: BAIXO (mudanças incrementais)
+**Estimativa**: 30 minutos **Risco**: BAIXO (mudanças incrementais)
 
 ---
 
@@ -694,8 +707,7 @@ echo ""
 10. ✅ **Issue #12**: Melhorar PM2 diagnostics (detalhes de processos)
 11. ✅ **Upgrade #1**: Performance metrics (checkpoints)
 
-**Estimativa**: 60 minutos
-**Risco**: BAIXO (diagnóstico passivo)
+**Estimativa**: 60 minutos **Risco**: BAIXO (diagnóstico passivo)
 
 ---
 
@@ -709,8 +721,7 @@ echo ""
 15. ✅ **Issue #16**: Expandir mapa de portas (incluir debug)
 16. ✅ **Upgrade #3**: Links para documentação
 
-**Estimativa**: 45 minutos
-**Risco**: BAIXO (mudanças de texto)
+**Estimativa**: 45 minutos **Risco**: BAIXO (mudanças de texto)
 
 ---
 
@@ -722,8 +733,7 @@ echo ""
 18. ✅ **Issue #6**: Simplificar SSH contract (4 estados → 3)
 19. ✅ **Upgrade #2**: Parallel diagnostics (post-attach)
 
-**Estimativa**: 60 minutos
-**Risco**: MÉDIO (refactoring)
+**Estimativa**: 60 minutos **Risco**: MÉDIO (refactoring)
 
 ---
 
@@ -799,7 +809,7 @@ echo ""
 | **Validações críticas**     | 5 vars        | 9 vars            | +80%     |
 | **Observabilidade**         | Básica        | Avançada          | +100%    |
 | **Links para docs**         | 0             | 4                 | ∞        |
-| **Versionamento**           | Inconsistente | Sincronizado      | ✅        |
+| **Versionamento**           | Inconsistente | Sincronizado      | ✅       |
 
 ---
 
@@ -824,7 +834,5 @@ echo ""
 
 ---
 
-**Versão do Documento**: 1.0
-**Autor**: GitHub Copilot (Claude Sonnet 4.5)
-**Data de Criação**: 02/02/2026
-**Próxima Revisão**: Após implementação Phase 1-2
+**Versão do Documento**: 1.0 **Autor**: GitHub Copilot (Claude Sonnet 4.5) **Data de Criação**:
+02/02/2026 **Próxima Revisão**: Após implementação Phase 1-2

@@ -1,15 +1,17 @@
 # Task Input Validation Analysis
-**Version**: 1.0
-**Date**: February 2026
-**Status**: ✅ SECURE (com melhorias identificadas)
+
+**Version**: 1.0 **Date**: February 2026 **Status**: ✅ SECURE (com melhorias identificadas)
 
 ---
 
 ## 📋 Sumário Executivo
 
-Este documento analisa a segurança e robustez do **fluxo de entrada de tasks** (task creation, validation, queuing), complementando o [TASK_PROCESSING_ANALYSIS.md](TASK_PROCESSING_ANALYSIS.md) que focou no fluxo de saída (response capture).
+Este documento analisa a segurança e robustez do **fluxo de entrada de tasks** (task creation,
+validation, queuing), complementando o [TASK_PROCESSING_ANALYSIS.md](TASK_PROCESSING_ANALYSIS.md)
+que focou no fluxo de saída (response capture).
 
 **Estado Atual**: ✅ **FUNDAMENTALMENTE SEGURO**
+
 - Schema validation ativa (V5)
 - Auto-migration V4 → V5
 - Symlink attack prevention
@@ -47,6 +49,7 @@ Este documento analisa a segurança e robustez do **fluxo de entrada de tasks** 
 **Arquivo**: `src/core/schemas/task_schema_v5.js`
 
 **Proteções Ativas**:
+
 ```javascript
 // 1. Required fields
 meta: {
@@ -81,18 +84,21 @@ const safeId = req.params.id.replace(/[^a-zA-Z0-9._-]/g, '');
 ```
 
 **Proteções**:
+
 - ✅ Remove caracteres perigosos (`../`, `%00`, etc.)
 - ✅ Previne path traversal via URL params
 
-**GAP**: POST endpoint (linha 46) **NÃO** sanitiza req.body.meta.id diretamente (confia 100% no parseTask).
+**GAP**: POST endpoint (linha 46) **NÃO** sanitiza req.body.meta.id diretamente (confia 100% no
+parseTask).
 
 **Risco**: BAIXO (parseTask tem regex validation, mas melhor ser explícito)
 
 **Recomendação**:
+
 ```javascript
 // ANTES de parseTask(), adicionar:
 if (req.body?.meta?.id) {
-    req.body.meta.id = req.body.meta.id.replace(/[^a-zA-Z0-9._-]/g, '');
+  req.body.meta.id = req.body.meta.id.replace(/[^a-zA-Z0-9._-]/g, '');
 }
 const task = schemas.parseTask(req.body);
 ```
@@ -104,6 +110,7 @@ const task = schemas.parseTask(req.body);
 **Arquivo**: `src/infra/storage/task_store.js` (linha 41)
 
 **Proteções Ativas**:
+
 ```javascript
 // 1. Symlink Attack Prevention (P8.8 desde V4.1)
 // fs_core.js verifica fs.lstatSync() antes de writes
@@ -113,7 +120,7 @@ await atomicWrite(filepath, JSON.stringify(validatedTask, null, 2));
 
 // 3. Auto-Migration V4 → V5 (backward compatibility)
 if (task.meta?.version === '4.0') {
-    taskV5 = autoMigrateTask(task);
+  taskV5 = autoMigrateTask(task);
 }
 ```
 
@@ -134,6 +141,7 @@ async saveTask(task) {
 ```
 
 **Proteções**:
+
 - ✅ Cache invalidation após writes (consistência)
 - ✅ Delegação para task_store (single responsibility)
 
@@ -142,6 +150,7 @@ async saveTask(task) {
 **Risco**: MÉDIO (adversário pode criar 100k tasks vazias)
 
 **Recomendação**:
+
 ```javascript
 // Em io.js, adicionar:
 const MAX_QUEUE_DEPTH = 10000;
@@ -159,8 +168,8 @@ async saveTask(task) {
 
 ## 📊 Checklist de Validação INPUT
 
-| Check                  | Status      | Localização        | Nota                              |
-| ---------------------- | ----------- | ------------------ | --------------------------------- |
+| Check                  | Status       | Localização        | Nota                              |
+| ---------------------- | ------------ | ------------------ | --------------------------------- |
 | Schema V5 validation   | ✅ ATIVO     | task_schema_v5.js  | 56/56 tests                       |
 | Required fields check  | ✅ ATIVO     | parseTask()        | meta.id, spec.prompt, spec.target |
 | ID regex validation    | ✅ ATIVO     | meta.id schema     | `/^[a-zA-Z0-9._-]+$/`             |
@@ -185,6 +194,7 @@ async saveTask(task) {
 **Arquivo**: `src/server/api/controllers/tasks.js` (linha 46)
 
 **Modificação**:
+
 ```javascript
 router.post('/', async (req, res) => {
     try {
@@ -209,6 +219,7 @@ router.post('/', async (req, res) => {
 **Arquivo**: `src/infra/io.js` (linha 86)
 
 **Modificação**:
+
 ```javascript
 const MAX_QUEUE_DEPTH = 10000; // configurável via config.json
 
@@ -237,6 +248,7 @@ async saveTask(task) {
 **Arquivo**: `src/infra/storage/task_store.js` (linha 41)
 
 **Modificação**:
+
 ```javascript
 async function saveTask(task) {
     try {
@@ -305,16 +317,16 @@ POST /api/tasks (id: "test-123")  // duplicate
 
 ## 📈 Comparação: INPUT vs OUTPUT
 
-| Aspecto               | INPUT (Criação)              | OUTPUT (Capture)                  |
-| --------------------- | ---------------------------- | --------------------------------- |
-| **Schema Validation** | ✅ V5 (56 tests)              | ✅ ResponseV2 (6 tests)            |
-| **Entry Points**      | 3 (API, Dashboard, Internal) | 1 (Driver)                        |
-| **Sanitization**      | ⚠️ Implícito (parseTask)      | ✅ Explícito (StructuredExtractor) |
-| **Storage**           | ✅ Atomic writes              | ✅ 4-format atomic                 |
-| **Auto-Migration**    | ✅ V4 → V5                    | ✅ V1 → V2                         |
-| **Testing**           | ✅ 56/56 tests                | ⏳ 6/10 tests                      |
-| **Documentation**     | ✅ Este documento             | ✅ TASK_PROCESSING_ANALYSIS.md     |
-| **Status Geral**      | ✅ SEGURO                     | 🔄 70% COMPLETO                    |
+| Aspecto               | INPUT (Criação)              | OUTPUT (Capture)                   |
+| --------------------- | ---------------------------- | ---------------------------------- |
+| **Schema Validation** | ✅ V5 (56 tests)             | ✅ ResponseV2 (6 tests)            |
+| **Entry Points**      | 3 (API, Dashboard, Internal) | 1 (Driver)                         |
+| **Sanitization**      | ⚠️ Implícito (parseTask)     | ✅ Explícito (StructuredExtractor) |
+| **Storage**           | ✅ Atomic writes             | ✅ 4-format atomic                 |
+| **Auto-Migration**    | ✅ V4 → V5                   | ✅ V1 → V2                         |
+| **Testing**           | ✅ 56/56 tests               | ⏳ 6/10 tests                      |
+| **Documentation**     | ✅ Este documento            | ✅ TASK_PROCESSING_ANALYSIS.md     |
+| **Status Geral**      | ✅ SEGURO                    | 🔄 70% COMPLETO                    |
 
 ---
 
@@ -323,6 +335,7 @@ POST /api/tasks (id: "test-123")  // duplicate
 ### Estado Atual: FUNDAMENTALMENTE SEGURO
 
 O fluxo de entrada de tasks está **protegido em camadas**:
+
 1. ✅ Schema V5 com 56 tests (100% coverage)
 2. ✅ Atomic writes + symlink protection (P8.8)
 3. ✅ Auto-migration V4 → V5 (backward compatible)
@@ -354,4 +367,5 @@ O fluxo de entrada de tasks está **protegido em camadas**:
 
 ---
 
-**Próximo Passo**: Implement optional hardenings OU prosseguir para Dashboard V2 (sistema já está seguro).
+**Próximo Passo**: Implement optional hardenings OU prosseguir para Dashboard V2 (sistema já está
+seguro).

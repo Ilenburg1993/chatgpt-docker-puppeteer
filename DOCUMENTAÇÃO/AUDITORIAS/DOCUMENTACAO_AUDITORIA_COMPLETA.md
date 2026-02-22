@@ -1,8 +1,7 @@
 # 📋 Auditoria Completa para Documentação Canônica
 
-**Data**: 2026-01-21
-**Objetivo**: Mapear TUDO antes de iniciar documentação canônica
-**Status**: 🔍 ANÁLISE PROFUNDA
+**Data**: 2026-01-21 **Objetivo**: Mapear TUDO antes de iniciar documentação canônica **Status**: 🔍
+ANÁLISE PROFUNDA
 
 ---
 
@@ -33,6 +32,7 @@ AUDITORIA → PLANEJAMENTO → ESCLARECIMENTO → IMPLEMENTAÇÃO → VALIDAÇÃ
 #### **A. Raiz do Projeto (23 arquivos)**
 
 ##### ✅ **Documentos Recentes e Válidos** (mantidos):
+
 1. `README.md` - Porta de entrada (304 linhas, atualizado)
 2. `CONSTANTS_INVENTORY.md` - Inventário de constantes (recém-criado)
 3. `IMPLEMENTATION_PLAN.md` - Plano de melhorias type safety
@@ -43,6 +43,7 @@ AUDITORIA → PLANEJAMENTO → ESCLARECIMENTO → IMPLEMENTAÇÃO → VALIDAÇÃ
 8. `CHROME_EXTERNAL_SETUP.md` - Setup Chrome debugging
 
 ##### ⚠️ **Documentos de Processo** (arquivar ou consolidar):
+
 9. `ANALISE_NERV_ENVELOPE.md` - Análise NERV (consolidar)
 10. `CONFIGURATION_OPTIMIZATION_COMPLETE.md` - Otimização feita
 11. `ESLINT_IMPROVEMENTS_COMPLETE.md` - ESLint concluído
@@ -55,6 +56,7 @@ AUDITORIA → PLANEJAMENTO → ESCLARECIMENTO → IMPLEMENTAÇÃO → VALIDAÇÃ
 18. `DOCKER_SETUP.md` / `DOCKERFILE_OPTIMIZATION_REPORT.md`
 
 ##### ❓ **Documentos de Arquitetura** (revisar validade):
+
 19. `TYPES_ARCHITECTURE.md` - Arquitetura de tipos
 20. `SECURITY_SCAN_POLICY.md` - Política de segurança
 
@@ -63,6 +65,7 @@ AUDITORIA → PLANEJAMENTO → ESCLARECIMENTO → IMPLEMENTAÇÃO → VALIDAÇÃ
 #### **B. Pasta DOCUMENTAÇÃO/ (31 arquivos)**
 
 ##### ✅ **Core - Arquitetura e Sistema**:
+
 1. `CANONICAL_DOCS_PLAN.md` ⭐ - Plano canônico (1057 linhas)
 2. `ARCHITECTURE.md` - Arquitetura (precisa atualização?)
 3. `ARCHITECTURE_DIAGRAMS.md` - Diagramas
@@ -70,23 +73,27 @@ AUDITORIA → PLANEJAMENTO → ESCLARECIMENTO → IMPLEMENTAÇÃO → VALIDAÇÃ
 5. `README.md` - Índice da documentação
 
 ##### ✅ **Configuração e Setup**:
+
 6. `CONFIGURATION.md` - Configuração geral
 7. `CONFIG_FILES.md` - Arquivos de config
 8. `DEPLOYMENT.md` - Deploy (Docker + PM2)
 9. `QUICK_START.md` - Guia rápido
 
 ##### ✅ **APIs e Componentes**:
+
 10. `API.md` - APIs públicas
 11. `CONNECTION_ORCHESTRATOR.md` - Orquestrador de conexão
 12. `HEALTH_ENDPOINT.md` - Endpoint de saúde
 
 ##### ✅ **Qualidade e Testes**:
+
 13. `ESLINT_GUIDE.md` - Guia ESLint completo
 14. `ESLINT_SETUP_SUMMARY.md` - Setup ESLint
 15. `ESLINT_FIXES_SUMMARY.md` - Correções ESLint
 16. `ESLINT_ERROR_FIXES.md` - Erros corrigidos
 
 ##### ✅ **Análises Técnicas**:
+
 17. `ANALISE_TECNICA.md` - Análise técnica
 18. `CONNECTION_ORCHESTRATOR_ANALYSIS.md` - Análise profunda
 19. `CRITICAL_CASES_ANALYSIS.md` - Casos críticos V1
@@ -99,17 +106,20 @@ AUDITORIA → PLANEJAMENTO → ESCLARECIMENTO → IMPLEMENTAÇÃO → VALIDAÇÃ
 26. `P1_FIXES_SUMMARY.md` - Correções P1
 
 ##### ✅ **Roadmaps e Planejamento**:
+
 27. `ROADMAP.md` - Roadmap geral
 28. `ROADMAP_DOCUMENTATION.md` - Roadmap da documentação
 29. `SUMMARY.md` - Sumário executivo
 
 ##### ✅ **Outros**:
+
 30. `SECURITY.md` - Segurança
 31. `EXECUTIVE_SUMMARY_MIGRACAO.md` - Migração
 32. `DEPENDENCY_UPGRADE_RISK_ANALYSIS.md` - Análise de dependências
 33. `PROJECT_CONFIGURATION_AUDIT.md` - Auditoria de config
 
 ##### 📄 **Arquivos Legados** (não-Markdown):
+
 - `DOC-SISTEMA.docx`
 - `DOCUMENTAÇÃO GERAL 2.0.docx/pdf/txt`
 - `DOCUMENTAÇÃO GERAL.docx/txt`
@@ -121,6 +131,7 @@ AUDITORIA → PLANEJAMENTO → ESCLARECIMENTO → IMPLEMENTAÇÃO → VALIDAÇÃ
 ---
 
 #### **C. Subpastas do Código** (3 arquivos):
+
 1. `scripts/README.md` - Scripts (448 linhas, recém-criado)
 2. `src/shared/nerv/README.md` - NERV
 3. `src/state/README.md` - State management
@@ -147,6 +158,7 @@ public/            # ⚠️ Dashboard frontend BÁSICO (HTML/CSS/JS vanilla)
 ```
 
 **Totais**:
+
 - 135 arquivos .js (backend)
 - 20,313 linhas de código
 - 445 JSDoc comments
@@ -156,12 +168,14 @@ public/            # ⚠️ Dashboard frontend BÁSICO (HTML/CSS/JS vanilla)
 #### **⚠️ INFORMAÇÃO CRÍTICA - DASHBOARD Futuro**:
 
 O **DASHBOARD atual** (`public/`) é uma **interface básica** (Mission Control v3.2):
+
 - ✅ HTML/CSS/JS vanilla
 - ✅ Socket.io client básico
 - ✅ Task CRUD simples
 - ✅ Health indicators básicos
 
 O **DASHBOARD COMPLETO** será criado **do zero** quando fundamentos estiverem consolidados:
+
 - 🎯 Sistema de Telemetria Completo (real-time metrics, histórico)
 - 🎯 Management Avançado de Tarefas (filters, batch ops, scheduling)
 - 🎯 Indicadores de Performance (dashboards, charts, trends)
@@ -173,6 +187,7 @@ O **DASHBOARD COMPLETO** será criado **do zero** quando fundamentos estiverem c
 - 🎯 Extensibilidade: Plugin system para futuras features
 
 **Impacto na Documentação**:
+
 1. APIs devem ser documentadas pensando no **DASHBOARD futuro**
 2. ARCHITECTURE.md deve mencionar **SERVER como backend + DASHBOARD frontend**
 3. Criar documentação "DASHBOARD.md" com visão e roadmap
@@ -185,6 +200,7 @@ O **DASHBOARD COMPLETO** será criado **do zero** quando fundamentos estiverem c
 ✅ **CONSTANTS_INVENTORY.md criado** (331 linhas)
 
 **Categorias**:
+
 1. Global (4 arquivos): tasks, browser, logging, index
 2. NERV Protocol (5 enums, 72 valores)
 3. Local Domain (6 módulos)
@@ -199,6 +215,7 @@ O **DASHBOARD COMPLETO** será criado **do zero** quando fundamentos estiverem c
 ✅ **TEST_REPORT_FINAL.md criado** (283 linhas)
 
 **Suites**:
+
 - E2E: 3 suites (test_ariadne_thread, test_boot_sequence, test_integration_complete)
 - Regression: 4 suites (test_p1-p5_fixes)
 
@@ -304,25 +321,26 @@ O **DASHBOARD COMPLETO** será criado **do zero** quando fundamentos estiverem c
    - APIs que o DASHBOARD futuro vai precisar?
    - Incluir DASHBOARD como 8º subsistema ou separado?
 
-5. ❓ **Quais são as APIs públicas vs internas?**
+4. ❓ **Quais são as APIs públicas vs internas?**
    - NERV: nerv.emit(), nerv.send(), nerv.onReceive() - públicas?
    - KERNEL: kernel.initialize(), kernel.shutdown() - públicas?
    - BrowserPool: acquireConnection(), releaseConnection() - públicas?
    - Driver: Qual API pública existe?
    - **SERVER**: APIs REST + WebSocket events - são frontend-friendly?
 
-6. ❓ **APIs estão prontas para o DASHBOARD futuro?** ⭐ **NOVO**
+5. ❓ **APIs estão prontas para o DASHBOARD futuro?** ⭐ **NOVO**
    - REST API está RESTful e completa?
    - WebSocket events são suficientes para real-time?
    - Faltam endpoints para telemetria/management avançado?
    - Precisa de novas APIs antes de criar DASHBOARD?
 
-7
-4. ❓ **Quais são as APIs públicas vs internas?**
-   - NERV: nerv.emit(), nerv.send(), nerv.onReceive() - públicas?
-   - KERNEL: kernel.initialize(), kernel.shutdown() - públicas?
-   - BrowserPool: acquireConnection(), releaseConnection() - públicas?
-   - Driver: Qual API pública existe?
+7 4. ❓ **Quais são as APIs públicas vs internas?**
+
+- NERV: nerv.emit(), nerv.send(), nerv.onReceive() - públicas?
+- KERNEL: kernel.initialize(), kernel.shutdown() - públicas?
+- BrowserPool: acquireConnection(), releaseConnection() - públicas?
+- Driver: Qual API pública existe?
+
 8. ❓ **config.json está com todos os parâmetros documentados?**
    - Valores default
    - Ranges válidos
@@ -502,25 +520,20 @@ DOCUMENTAÇÃO/
 #### **Ordem Proposta** (Tier by Tier):
 
 **Sprint 1** (Fundação - 10-12h):
+
 1. ARCHITECTURE.md (revisão completa + DASHBOARD como subsistema futuro)
 2. NERV_PROTOCOL.md (consolidar)
 3. API_REFERENCE.md (todas APIs + preparação para DASHBOARD)
 4. DASHBOARD.md ⭐ (visão, roadmap, arquitetura futura)
 
-**Sprint 2** (Configuração - 4-6h):
-5. CONFIGURATION.md (completo)
-6. DEPLOYMENT.md (validar)
-7. TESTING.md (criar)
+**Sprint 2** (Configuração - 4-6h): 5. CONFIGURATION.md (completo) 6. DEPLOYMENT.md (validar) 7.
+TESTING.md (criar)
 
-**Sprint 3** (Experiência - 4-6h):
-8. TROUBLESHOOTING.md
-9. DRIVERS.md
-10. CONTRIBUTING.md (atualizar)
+**Sprint 3** (Experiência - 4-6h): 8. TROUBLESHOOTING.md 9. DRIVERS.md 10. CONTRIBUTING.md
+(atualizar)
 
-**Sprint 4** (Organização - 2-3h):
-11. Reorganizar estrutura de pastas
-12. Criar índice master
-13. Atualizar README.md
+**Sprint 4** (Organização - 2-3h): 11. Reorganizar estrutura de pastas 12. Criar índice master 13.
+Atualizar README.md
 
 ---
 
@@ -551,12 +564,14 @@ DOCUMENTAÇÃO/
 ### Recomendação:
 
 **OPÇÃO A** (Cautelosa - RECOMENDADA):
+
 1. Fase de Esclarecimento (2-4h) → Resolver todas as dúvidas
 2. Fase de Planejamento (1-2h) → Definir ordem
 3. Sprint 1 (8-10h) → Documentos críticos
 4. Validação contínua
 
 **OPÇÃO B** (Ágil):
+
 1. Começar ARCHITECTURE.md já
 2. Esclarecer dúvidas conforme aparecem
 3. Iterar rapidamente
@@ -566,12 +581,14 @@ DOCUMENTAÇÃO/
 ## 📊 RESUMO EXECUTIVO
 
 ### Status Atual:
+
 - ✅ 99 arquivos .md existem (muitos obsoletos)
 - ✅ Código 100% mapeado (constantes, testes, estrutura)
 - ⚠️ CANONICAL_DOCS_PLAN.md existe mas precisa execução
 - ❌ Documentação canônica não está implementada
 
 ### Trabalho Estimado:
+
 - **Esclarecimento**: 2-4h (agora inclui análise DASHBOARD)
 - **Planejamento**: 1-2h
 - **Sprint 1** (Tier 1): 10-12h (inclui DASHBOARD.md)
@@ -581,11 +598,13 @@ DOCUMENTAÇÃO/
 - **TOTAL**: 23-33h (~3-4 dias úteis)
 
 ### Adições Críticas:
+
 - ⭐ **DASHBOARD.md**: Documentar visão futura (~400-500 linhas)
 - ⭐ **14 dúvidas** a esclarecer (antes eram 10, adicionadas 4 sobre DASHBOARD)
 - ⭐ **APIs preparadas** para DASHBOARD futuro (validação necessária)
 
 ### Risco de Retrabalho:
+
 - 🔴 **ALTO** se começarmos sem esclarecer dúvidas
 - 🟡 **MÉDIO** se seguirmos CANONICAL_DOCS_PLAN.md sem revisar
 - 🟢 **BAIXO** se fizermos esclarecimento completo primeiro
@@ -602,6 +621,5 @@ DOCUMENTAÇÃO/
 
 ---
 
-**Gerado em**: 2026-01-21
-**Por**: Auditoria Automática
-**Próximo passo**: Decisão do usuário sobre metodologia
+**Gerado em**: 2026-01-21 **Por**: Auditoria Automática **Próximo passo**: Decisão do usuário sobre
+metodologia

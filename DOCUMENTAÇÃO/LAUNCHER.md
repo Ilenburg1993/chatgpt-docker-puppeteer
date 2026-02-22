@@ -21,7 +21,8 @@
 
 ## 🎯 Visão Geral
 
-O **Super Launcher v2.0** é um sistema completo de gerenciamento e monitoramento para o projeto ChatGPT Docker Puppeteer, implementando a estratégia **PM2-First** com foco em:
+O **Super Launcher v2.0** é um sistema completo de gerenciamento e monitoramento para o projeto
+ChatGPT Docker Puppeteer, implementando a estratégia **PM2-First** com foco em:
 
 - ✅ **Simplicidade**: Interface interativa sem dependências pesadas
 - ✅ **Robustez**: PM2 com NASA-Grade (9.5/10) após correções P3
@@ -31,14 +32,14 @@ O **Super Launcher v2.0** é um sistema completo de gerenciamento e monitorament
 
 ### Componentes Principais
 
-| Componente | Descrição | Arquivos |
-|------------|-----------|----------|
-| **Super Launcher** | Menu interativo 10 opções | `LAUNCHER.bat`, `launcher.sh` |
-| **Scripts CLI** | Operações rápidas CLI | `scripts/quick-ops.*`, `watch-logs.*` |
-| **Dashboard HTML** | Interface web standalone | `scripts/launcher-dashboard.html` |
-| **Health Endpoints** | APIs de monitoramento | `/api/health/*` |
-| **Chrome Config** | Exportador de configuração | `chrome-config.json` |
-| **PM2 Helpers** | Instaladores GUI/Plus | `scripts/install-pm2-gui.*`, `setup-pm2-plus.*` |
+| Componente           | Descrição                  | Arquivos                                        |
+| -------------------- | -------------------------- | ----------------------------------------------- |
+| **Super Launcher**   | Menu interativo 10 opções  | `LAUNCHER.bat`, `launcher.sh`                   |
+| **Scripts CLI**      | Operações rápidas CLI      | `scripts/quick-ops.*`, `watch-logs.*`           |
+| **Dashboard HTML**   | Interface web standalone   | `scripts/launcher-dashboard.html`               |
+| **Health Endpoints** | APIs de monitoramento      | `/api/health/*`                                 |
+| **Chrome Config**    | Exportador de configuração | `chrome-config.json`                            |
+| **PM2 Helpers**      | Instaladores GUI/Plus      | `scripts/install-pm2-gui.*`, `setup-pm2-plus.*` |
 
 ---
 
@@ -188,11 +189,13 @@ chmod +x scripts/*.sh
 ### Primeiro Boot
 
 **Windows:**
+
 ```cmd
 LAUNCHER.bat
 ```
 
 **Linux/Mac:**
+
 ```bash
 ./launcher.sh
 ```
@@ -208,17 +211,20 @@ O launcher executará todas as validações automaticamente e iniciará o sistem
 #### [1] Start System
 
 **Funcionalidade:**
+
 - 5 validações pré-boot (Node, PM2, deps, Chrome config, crashes)
 - Backup automático de configs críticos
 - Inicialização PM2 via `npm run daemon:start`
 - Health check automático após 10s
 
 **Uso:**
+
 ```
 Escolha uma opção: 1
 ```
 
 **Output esperado:**
+
 ```
 [1/5] Verificando Node.js...
         ✓ Node.js v20.x.x detectado
@@ -250,16 +256,19 @@ Logs: Opção [5] no menu
 #### [2] Stop System
 
 **Funcionalidade:**
+
 - Shutdown gracioso PM2 (timeout: 5s configurável)
 - Salva estado de todos os processos
 - Não remove logs
 
 **Uso:**
+
 ```
 Escolha uma opção: 2
 ```
 
 **Comandos executados:**
+
 ```bash
 npm run daemon:stop
 # Equivale a: pm2 stop agente-gpt dashboard-web
@@ -268,16 +277,19 @@ npm run daemon:stop
 #### [3] Restart System
 
 **Funcionalidade:**
+
 - Reload sem downtime (zero-downtime restart)
 - Mantém conexões ativas durante restart
 - Usa PM2 cluster mode
 
 **Uso:**
+
 ```
 Escolha uma opção: 3
 ```
 
 **Comandos executados:**
+
 ```bash
 npm run daemon:reload
 # Equivale a: pm2 reload agente-gpt dashboard-web
@@ -286,16 +298,19 @@ npm run daemon:reload
 #### [4] Status Check
 
 **Funcionalidade:**
+
 - Lista processos PM2 com PID, status, memória, CPU
 - Verifica health endpoints (Chrome, PM2, Kernel, Disk)
 - Mostra status da fila
 
 **Uso:**
+
 ```
 Escolha uma opção: 4
 ```
 
 **Output esperado:**
+
 ```
 [PM2 Processes]
   agente-gpt: online (PID: 12345, Memory: 450MB)
@@ -317,6 +332,7 @@ Escolha uma opção: 4
 #### [5] View Logs
 
 **Funcionalidade:**
+
 - 4 modos de visualização:
   1. PM2 Logs (agente + dashboard)
   2. Error Logs
@@ -324,12 +340,14 @@ Escolha uma opção: 4
   4. Todos os logs
 
 **Uso:**
+
 ```
 Escolha uma opção: 5
 Opção: 1  # PM2 logs em tempo real
 ```
 
 **Comandos executados:**
+
 ```bash
 # Opção 1: pm2 logs
 # Opção 2: tail -f logs/error.log
@@ -340,16 +358,19 @@ Opção: 1  # PM2 logs em tempo real
 #### [6] Open PM2 GUI
 
 **Funcionalidade:**
+
 - Abre pm2-gui (interface Electron)
 - Instala automaticamente se não encontrado
 - Dashboard: http://localhost:8088
 
 **Uso:**
+
 ```
 Escolha uma opção: 6
 ```
 
 **Primeira vez:**
+
 ```
 pm2-gui não está instalado.
 Deseja instalar agora? (S/N): S
@@ -360,6 +381,7 @@ Abrindo pm2-gui...
 ```
 
 **Recursos pm2-gui:**
+
 - Dashboard visual de processos
 - Monitoramento CPU/RAM em tempo real
 - Logs integrados
@@ -369,15 +391,18 @@ Abrindo pm2-gui...
 #### [7] PM2 Monit
 
 **Funcionalidade:**
+
 - Dashboard CLI oficial do PM2
 - Monitoramento interativo no terminal
 
 **Uso:**
+
 ```
 Escolha uma opção: 7
 ```
 
 **Interface:**
+
 ```
 ┌─ PM2 Monit ─────────────────────────────────────┐
 │                                                  │
@@ -396,23 +421,27 @@ Escolha uma opção: 7
 #### [8] Clean System
 
 **Funcionalidade:**
+
 - Remove logs antigos (mantém 7 dias)
 - Limpa arquivos temporários (.tmp)
 - Limpa cache PM2
 - Limpa crash reports processados
 
 **Uso:**
+
 ```
 Escolha uma opção: 8
 Confirma limpeza? (S/N): S
 ```
 
 **Comandos executados:**
+
 ```bash
 npm run clean
 ```
 
 **O que é removido:**
+
 - `logs/*.log` (>7 dias)
 - `**/*.tmp.*`
 - `logs/crash_reports/*.processed`
@@ -421,16 +450,19 @@ npm run clean
 #### [9] Diagnose Crashes
 
 **Funcionalidade:**
+
 - Lista crash reports recentes
 - Exibe stack traces
 - Executa análise forense completa
 
 **Uso:**
+
 ```
 Escolha uma opção: 9
 ```
 
 **Output esperado:**
+
 ```
 Analisando crash reports...
 
@@ -448,16 +480,19 @@ Executando diagnóstico completo...
 #### [10] Backup Configuration
 
 **Funcionalidade:**
+
 - Snapshot de configs críticos
 - Copia fila de tarefas
 - Timestamp automático
 
 **Uso:**
+
 ```
 Escolha uma opção: 10
 ```
 
 **Arquivos incluídos:**
+
 ```
 backups/manual-20260121-063000-12345/
 ├── config.json
@@ -516,6 +551,7 @@ backups/manual-20260121-063000-12345/
 ```
 
 **Casos de uso:**
+
 - Automação via cron/systemd
 - CI/CD pipelines
 - Scripts de manutenção
@@ -526,6 +562,7 @@ backups/manual-20260121-063000-12345/
 **Localização:** `scripts/watch-logs.bat` | `scripts/watch-logs.sh`
 
 **Uso básico:**
+
 ```bash
 # Todos os logs
 ./scripts/watch-logs.sh
@@ -538,6 +575,7 @@ backups/manual-20260121-063000-12345/
 ```
 
 **Saída esperada:**
+
 ```
 ============================================================
   WATCH-LOGS - Monitoramento em Tempo Real
@@ -552,6 +590,7 @@ Pressione Ctrl+C para sair
 ```
 
 **Casos de uso:**
+
 - Debug em produção
 - Monitoramento de erros
 - Análise de performance
@@ -562,11 +601,13 @@ Pressione Ctrl+C para sair
 **Localização:** `scripts/install-pm2-gui.bat` | `scripts/install-pm2-gui.sh`
 
 **Funcionalidade:**
+
 - Detecta se pm2-gui já está instalado
 - Instala via npm global
 - Abre automaticamente após instalação
 
 **Uso:**
+
 ```bash
 ./scripts/install-pm2-gui.sh
 
@@ -591,11 +632,13 @@ Pressione Ctrl+C para sair
 **Localização:** `scripts/setup-pm2-plus.bat` | `scripts/setup-pm2-plus.sh`
 
 **Funcionalidade:**
+
 - Guia interativo para configuração PM2 Plus
 - Abre site oficial
 - **OPCIONAL** - Sistema funciona 100% standalone
 
 **Uso:**
+
 ```bash
 ./scripts/setup-pm2-plus.sh
 
@@ -630,6 +673,7 @@ Pressione Ctrl+C para sair
 **Localização:** `scripts/launcher-dashboard.html`
 
 **Características:**
+
 - ✅ Standalone (funciona sem servidor Node.js rodando - apenas precisa do server para dados)
 - ✅ Auto-refresh a cada 5 segundos
 - ✅ Dark theme (VS Code style)
@@ -640,6 +684,7 @@ Pressione Ctrl+C para sair
 ### Como Usar
 
 **Método 1: Abrir diretamente**
+
 ```bash
 # Windows
 start scripts/launcher-dashboard.html
@@ -651,6 +696,7 @@ xdg-open scripts/launcher-dashboard.html
 ```
 
 **Método 2: Via servidor HTTP local**
+
 ```bash
 # Servidor Python (porta 8000)
 python3 -m http.server 8000
@@ -665,12 +711,14 @@ npx live-server --port=8000
 #### 🖥️ Server Card
 
 **Dados exibidos:**
+
 - Status geral (healthy/unhealthy)
 - Timestamp da última verificação
 
 **Endpoint:** `GET /api/health`
 
 **Exemplo:**
+
 ```json
 {
   "status": "healthy",
@@ -681,6 +729,7 @@ npx live-server --port=8000
 #### 🌐 Chrome Debug Card
 
 **Dados exibidos:**
+
 - Conectado (Sim/Não)
 - Endpoint debug
 - Versão Chrome
@@ -689,6 +738,7 @@ npx live-server --port=8000
 **Endpoint:** `GET /api/health/chrome`
 
 **Exemplo:**
+
 ```json
 {
   "status": "healthy",
@@ -702,6 +752,7 @@ npx live-server --port=8000
 #### ⚙️ PM2 Processes Card
 
 **Dados exibidos:**
+
 - Total de processos
 - Processos online
 - Lista de processos com status
@@ -709,6 +760,7 @@ npx live-server --port=8000
 **Endpoint:** `GET /api/health/pm2`
 
 **Exemplo:**
+
 ```json
 {
   "status": "healthy",
@@ -729,6 +781,7 @@ npx live-server --port=8000
 #### 🧠 Kernel Card
 
 **Dados exibidos:**
+
 - State (running/idle/error)
 - Active (Sim/Não)
 - NERV Bus status
@@ -736,6 +789,7 @@ npx live-server --port=8000
 **Endpoint:** `GET /api/health/kernel`
 
 **Exemplo:**
+
 ```json
 {
   "status": "healthy",
@@ -748,6 +802,7 @@ npx live-server --port=8000
 #### 💾 Disk Usage Card
 
 **Dados exibidos:**
+
 - Uso total (MB)
 - Logs, Queue, Responses (MB)
 - Barra de progresso visual
@@ -756,6 +811,7 @@ npx live-server --port=8000
 **Endpoint:** `GET /api/health/disk`
 
 **Exemplo:**
+
 ```json
 {
   "status": "healthy",
@@ -776,6 +832,7 @@ npx live-server --port=8000
 ### Status Badges
 
 **Cores:**
+
 - 🟢 **Healthy** - Verde (#4ec9b0)
 - 🔴 **Unhealthy** - Vermelho (#f44747)
 - 🟡 **Warning** - Amarelo (#ce9178)
@@ -803,6 +860,7 @@ app.get('/api/health/:component?', async (req, res) => {
 **Descrição:** Agregador geral de saúde do sistema
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -821,18 +879,20 @@ app.get('/api/health/:component?', async (req, res) => {
 **Descrição:** Valida conexão Chrome debug port
 
 **Implementação:**
+
 ```javascript
 const chrome = await doctor.probeChromeConnection();
 res.status(chrome.connected ? 200 : 503).json({
-    status: chrome.connected ? 'healthy' : 'unhealthy',
-    connected: chrome.connected,
-    endpoint: chrome.endpoint,
-    version: chrome.version,
-    latency_ms: chrome.latency_ms
+  status: chrome.connected ? 'healthy' : 'unhealthy',
+  connected: chrome.connected,
+  endpoint: chrome.endpoint,
+  version: chrome.version,
+  latency_ms: chrome.latency_ms,
 });
 ```
 
 **Casos de uso:**
+
 - Verificar se Chrome está disponível para automação
 - Detectar problemas de conexão debug port
 - Monitorar latência de comunicação
@@ -842,21 +902,23 @@ res.status(chrome.connected ? 200 : 503).json({
 **Descrição:** Lista processos PM2 com métricas
 
 **Implementação:**
+
 ```javascript
 const agentStatus = await system.getAgentStatus();
 const pm2List = await pm2.list();
 const processes = pm2List.map(proc => ({
-    name: proc.name,
-    status: proc.pm2_env.status,
-    pid: proc.pid,
-    uptime: formatUptime(proc.pm2_env.pm_uptime),
-    restarts: proc.pm2_env.restart_time,
-    memory: formatMemory(proc.monit.memory),
-    cpu: proc.monit.cpu + '%'
+  name: proc.name,
+  status: proc.pm2_env.status,
+  pid: proc.pid,
+  uptime: formatUptime(proc.pm2_env.pm_uptime),
+  restarts: proc.pm2_env.restart_time,
+  memory: formatMemory(proc.monit.memory),
+  cpu: proc.monit.cpu + '%',
 }));
 ```
 
 **Casos de uso:**
+
 - Monitorar saúde de processos PM2
 - Detectar processos offline
 - Acompanhar uso de memória/CPU
@@ -866,17 +928,18 @@ const processes = pm2List.map(proc => ({
 **Descrição:** Verifica estado Kernel via NERV bus
 
 **Implementação:**
+
 ```javascript
 // Tenta ping NERV
 const response = await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Kernel timeout')), 2000);
-    nerv.emit({
-        messageType: 'REQUEST',
-        actionCode: 'KERNEL_STATUS',
-        sender: { componentId: 'health-check', instanceId: 'api' },
-        payload: {}
-    });
-    // Observer aguarda resposta...
+  const timeout = setTimeout(() => reject(new Error('Kernel timeout')), 2000);
+  nerv.emit({
+    messageType: 'REQUEST',
+    actionCode: 'KERNEL_STATUS',
+    sender: { componentId: 'health-check', instanceId: 'api' },
+    payload: {},
+  });
+  // Observer aguarda resposta...
 });
 
 // Fallback: verifica tarefas ativas
@@ -887,6 +950,7 @@ isActive = runningTasks > 0;
 ```
 
 **Casos de uso:**
+
 - Verificar se Kernel está processando tarefas
 - Detectar travamentos no loop principal
 - Monitorar NERV bus
@@ -896,10 +960,11 @@ isActive = runningTasks > 0;
 **Descrição:** Monitora uso de disco com alertas
 
 **Implementação:**
+
 ```javascript
 const getDirSize = dirPath => {
-    const output = execSync(`du -sb "${dirPath}"`, { encoding: 'utf-8' });
-    return parseInt(output.split('\t')[0]);
+  const output = execSync(`du -sb "${dirPath}"`, { encoding: 'utf-8' });
+  return parseInt(output.split('\t')[0]);
 };
 
 const logsSize = getDirSize(path.join(ROOT, 'logs'));
@@ -910,13 +975,14 @@ const totalSize = logsSize + queueSize + responsesSize;
 // Alertas
 const alerts = [];
 if (totalSize > 1024 * 1024 * 1024) {
-    alerts.push('CRITICAL: Disk usage exceeds 1GB!');
+  alerts.push('CRITICAL: Disk usage exceeds 1GB!');
 } else if (totalSize > 500 * 1024 * 1024) {
-    alerts.push('WARNING: Disk usage exceeds 500MB');
+  alerts.push('WARNING: Disk usage exceeds 500MB');
 }
 ```
 
 **Casos de uso:**
+
 - Prevenir estouro de disco
 - Alertar sobre crescimento de logs
 - Monitorar fila de tarefas
@@ -930,11 +996,13 @@ if (totalSize > 1024 * 1024 * 1024) {
 #### 1. Launcher não inicia
 
 **Sintoma:**
+
 ```
 'node' is not recognized as an internal or external command
 ```
 
 **Solução:**
+
 ```bash
 # Instalar Node.js
 # Windows: https://nodejs.org/
@@ -949,11 +1017,13 @@ npm --version
 #### 2. PM2 não encontrado
 
 **Sintoma:**
+
 ```
 'pm2' is not recognized as an internal or external command
 ```
 
 **Solução:**
+
 ```bash
 # Instalar PM2 globalmente
 npm install -g pm2
@@ -969,16 +1039,19 @@ pm2 --version
 #### 3. Health endpoints não respondem
 
 **Sintoma:**
+
 ```
 [ERROR] Health endpoint not responding
 ```
 
 **Causas possíveis:**
+
 - Servidor não está rodando
 - Porta 2998 ocupada
 - Firewall bloqueando
 
 **Solução:**
+
 ```bash
 # 1. Verificar se servidor está rodando
 pm2 list
@@ -999,6 +1072,7 @@ pm2 logs dashboard-web --lines 50
 #### 4. Chrome connection failed
 
 **Sintoma:**
+
 ```json
 {
   "status": "unhealthy",
@@ -1008,11 +1082,12 @@ pm2 logs dashboard-web --lines 50
 ```
 
 **Causas possíveis:**
-- Chrome não está rodando em modo debug
--- Porta 9224 ocupada
+
+- Chrome não está rodando em modo debug -- Porta 9224 ocupada
 - Configuração incorreta
 
 **Solução:**
+
 ```bash
 # 1. Verificar chrome-config.json
 cat chrome-config.json
@@ -1032,12 +1107,14 @@ curl http://localhost:9224/json/version
 #### 5. Crash loop detected
 
 **Sintoma:**
+
 ```
 ⚠ 5 crash(es) detectado(s)!
 Execute opção [9] para diagnóstico
 ```
 
 **Solução:**
+
 ```bash
 # 1. Analisar crashes
 ./launcher.sh
@@ -1059,6 +1136,7 @@ rm logs/crash_reports/*.processed
 #### 6. Disk space warning
 
 **Sintoma:**
+
 ```json
 {
   "status": "warning",
@@ -1067,6 +1145,7 @@ rm logs/crash_reports/*.processed
 ```
 
 **Solução:**
+
 ```bash
 # 1. Verificar uso atual
 du -sh logs/ fila/ respostas/
@@ -1089,6 +1168,7 @@ find . -name "*.tmp.*" -delete
 ### Logs de Debug
 
 **Localizações importantes:**
+
 ```
 logs/
 ├── application.log          # Log principal da aplicação
@@ -1105,6 +1185,7 @@ logs/
 ```
 
 **Ver logs em tempo real:**
+
 ```bash
 # PM2 logs agregados
 pm2 logs
@@ -1123,27 +1204,28 @@ tail -f logs/error.log
 
 ### Super Launcher vs PM2 GUI vs Tauri vs Dashboard Web
 
-| Critério | Super Launcher | PM2 GUI | Tauri | Dashboard Web |
-|----------|----------------|---------|-------|---------------|
-| **Instalação** | ✅ Imediata (scripts) | ⚠️ npm install -g | ❌ Build complexo (10h) | ⏳ Futuro (50-70h) |
-| **Dependências** | ✅ Node + PM2 apenas | ⚠️ Electron (~200MB) | ❌ Rust + Node + Webview | ⚠️ Next.js stack |
-| **Tempo Setup** | ✅ <5min | ⚠️ ~15min | ❌ ~2h | ⏳ N/A (não criado) |
-| **Cross-platform** | ✅ Windows + Linux + Mac | ✅ Windows + Linux + Mac | ✅ Windows + Linux + Mac | ✅ Browser-based |
-| **Interface** | ✅ Menu interativo CLI | ✅ Electron GUI | ✅ Native GUI | ✅ Web dashboard |
-| **Health Checks** | ✅✅ 5 endpoints integrados | ❌ Apenas PM2 | ❌ Requer implementação | ✅✅ Customizável |
-| **Automação** | ✅✅ Scripts + CLI | ⚠️ Via PM2 API | ⚠️ Via API REST | ✅ Via API |
-| **Monitoramento** | ✅ Real-time (5s refresh) | ✅ Real-time | ✅ Real-time | ✅ Real-time |
-| **Backup** | ✅ Automático + manual | ❌ Não tem | ❌ Requer implementação | ⏳ Planejado |
-| **Crash Detection** | ✅✅ Análise forense | ⚠️ Básico | ❌ Requer implementação | ⏳ Planejado |
-| **Logs** | ✅ 4 modos visualização | ✅ Integrado | ⚠️ Requer implementação | ✅ Planejado |
-| **Validações** | ✅✅ 5 pré-boot | ❌ Não tem | ❌ Requer implementação | ⏳ Planejado |
-| **Manutenção** | ✅ Baixa | ⚠️ Média (updates Electron) | ❌ Alta (Rust + deps) | ⚠️ Média (Next.js) |
-| **Footprint** | ✅ ~50KB scripts | ⚠️ ~200MB instalado | ❌ ~500MB build | ⚠️ ~100MB node_modules |
-| **Pronto para uso** | ✅✅ Sim (implementado) | ✅ Sim (existente) | ❌ Não (10h dev) | ❌ Não (50-70h dev) |
+| Critério            | Super Launcher              | PM2 GUI                     | Tauri                    | Dashboard Web          |
+| ------------------- | --------------------------- | --------------------------- | ------------------------ | ---------------------- |
+| **Instalação**      | ✅ Imediata (scripts)       | ⚠️ npm install -g           | ❌ Build complexo (10h)  | ⏳ Futuro (50-70h)     |
+| **Dependências**    | ✅ Node + PM2 apenas        | ⚠️ Electron (~200MB)        | ❌ Rust + Node + Webview | ⚠️ Next.js stack       |
+| **Tempo Setup**     | ✅ <5min                    | ⚠️ ~15min                   | ❌ ~2h                   | ⏳ N/A (não criado)    |
+| **Cross-platform**  | ✅ Windows + Linux + Mac    | ✅ Windows + Linux + Mac    | ✅ Windows + Linux + Mac | ✅ Browser-based       |
+| **Interface**       | ✅ Menu interativo CLI      | ✅ Electron GUI             | ✅ Native GUI            | ✅ Web dashboard       |
+| **Health Checks**   | ✅✅ 5 endpoints integrados | ❌ Apenas PM2               | ❌ Requer implementação  | ✅✅ Customizável      |
+| **Automação**       | ✅✅ Scripts + CLI          | ⚠️ Via PM2 API              | ⚠️ Via API REST          | ✅ Via API             |
+| **Monitoramento**   | ✅ Real-time (5s refresh)   | ✅ Real-time                | ✅ Real-time             | ✅ Real-time           |
+| **Backup**          | ✅ Automático + manual      | ❌ Não tem                  | ❌ Requer implementação  | ⏳ Planejado           |
+| **Crash Detection** | ✅✅ Análise forense        | ⚠️ Básico                   | ❌ Requer implementação  | ⏳ Planejado           |
+| **Logs**            | ✅ 4 modos visualização     | ✅ Integrado                | ⚠️ Requer implementação  | ✅ Planejado           |
+| **Validações**      | ✅✅ 5 pré-boot             | ❌ Não tem                  | ❌ Requer implementação  | ⏳ Planejado           |
+| **Manutenção**      | ✅ Baixa                    | ⚠️ Média (updates Electron) | ❌ Alta (Rust + deps)    | ⚠️ Média (Next.js)     |
+| **Footprint**       | ✅ ~50KB scripts            | ⚠️ ~200MB instalado         | ❌ ~500MB build          | ⚠️ ~100MB node_modules |
+| **Pronto para uso** | ✅✅ Sim (implementado)     | ✅ Sim (existente)          | ❌ Não (10h dev)         | ❌ Não (50-70h dev)    |
 
 ### Recomendações de Uso
 
 **Use Super Launcher quando:**
+
 - ✅ Quer algo imediato e funcional
 - ✅ Prefere CLI/terminal
 - ✅ Precisa automação via scripts
@@ -1152,17 +1234,20 @@ tail -f logs/error.log
 - ✅ Quer backups automáticos
 
 **Use PM2 GUI quando:**
+
 - ✅ Prefere interface gráfica Electron
 - ✅ Quer dashboard visual bonito
 - ⚠️ Não se importa com ~200MB instalado
 - ⚠️ Não precisa health checks customizados
 
 **Use Tauri quando:**
+
 - ❌ **NÃO RECOMENDADO no momento**
 - Motivo: 10h de desenvolvimento para features que Super Launcher já tem
 - Considerar apenas se precisar: distribuição standalone, menor footprint que Electron
 
 **Use Dashboard Web (futuro) quando:**
+
 - ⏳ For implementado (estimativa: 50-70h)
 - ✅ Precisar acesso remoto via browser
 - ✅ Precisar interface customizada avançada
@@ -1171,11 +1256,13 @@ tail -f logs/error.log
 ### Estratégia Atual: PM2-First
 
 **Decisão arquitetural:**
+
 1. **Fase 1 (Concluída)**: Super Launcher + Scripts CLI + Dashboard HTML
 2. **Fase 2 (Futuro)**: Dashboard Web customizado (Next.js)
 3. **Fase 3 (Opcional)**: Tauri se necessário
 
 **Justificativa:**
+
 - Super Launcher entrega 80% das features necessárias em 3-5h
 - Tauri levaria 10h para entregar 90% das features
 - Dashboard Web levará 50-70h mas será mais completo e extensível
@@ -1446,6 +1533,4 @@ jobs:
 
 ---
 
-**Documentação atualizada:** 2026-01-21
-**Versão Launcher:** 2.0
-**Estratégia:** PM2-First (Opção A)
+**Documentação atualizada:** 2026-01-21 **Versão Launcher:** 2.0 **Estratégia:** PM2-First (Opção A)

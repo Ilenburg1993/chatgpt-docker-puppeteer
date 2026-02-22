@@ -52,26 +52,26 @@ npm run analyze:deps:graph   # Gerar grafo visual
 
 1. **Dependência Circular** (ALTA PRIORIDADE)
 
-    ```
-    core/config.js → infra/io.js → infra/queue/task_loader.js
-    ```
+   ```
+   core/config.js → infra/io.js → infra/queue/task_loader.js
+   ```
 
-    **Ação**: Refatorar para injeção de dependência
+   **Ação**: Refatorar para injeção de dependência
 
 2. **2 Locks Órfãos na Fila** (MÉDIA PRIORIDADE)
 
-    ```
-    TASK-GUI-1768290824104.json.tmp.4016 (PID morto)
-    test-lock-001.json.tmp.19100 (PID morto)
-    ```
+   ```
+   TASK-GUI-1768290824104.json.tmp.4016 (PID morto)
+   test-lock-001.json.tmp.19100 (PID morto)
+   ```
 
-    **Ação**: `rm fila/*.tmp.*` + script de cleanup
+   **Ação**: `rm fila/*.tmp.*` + script de cleanup
 
 3. **Chrome Não Configurado** (OPERACIONAL)
-    ```
-    Chrome não detectado na porta 9224
-    ```
-    **Ação**: Ver comando no output do `npm run doctor`
+   ```
+   Chrome não detectado na porta 9224
+   ```
+   **Ação**: Ver comando no output do `npm run doctor`
 
 ---
 
@@ -178,38 +178,38 @@ npm run setup
 ### 🏗️ Arquitetura
 
 - **[ARCHITECTURE_DIAGRAMS.md](DOCUMENTAÇÃO/ARCHITECTURE_DIAGRAMS.md)**
-    - C4 Context & Container
-    - Sequence Diagrams
-    - Class Diagrams
-    - State Machines
-    - Deployment Architecture
-    - 11 diagramas no total
+  - C4 Context & Container
+  - Sequence Diagrams
+  - Class Diagrams
+  - State Machines
+  - Deployment Architecture
+  - 11 diagramas no total
 
 ### 🗺️ Planejamento
 
 - **[ROADMAP.md](DOCUMENTAÇÃO/ROADMAP.md)**
-    - 6 Fases até v1.0
-    - Timeline: Jan-Abr 2026
-    - Gantt chart visual
-    - Métricas de sucesso
-    - Post-v1.0 vision
+  - 6 Fases até v1.0
+  - Timeline: Jan-Abr 2026
+  - Gantt chart visual
+  - Métricas de sucesso
+  - Post-v1.0 vision
 
 ### 🔍 Análise
 
 - **[GAP_ANALYSIS.md](DOCUMENTAÇÃO/GAP_ANALYSIS.md)**
-    - 6 categorias auditadas
-    - Issues priorizados
-    - Plano de 2 semanas
-    - Riscos e mitigações
-    - Checklist de validação
+  - 6 categorias auditadas
+  - Issues priorizados
+  - Plano de 2 semanas
+  - Riscos e mitigações
+  - Checklist de validação
 
 ### 📋 Resumo
 
 - **[SUMMARY.md](DOCUMENTAÇÃO/SUMMARY.md)**
-    - Overview executivo
-    - Descobertas críticas
-    - Próximos passos
-    - FAQs
+  - Overview executivo
+  - Descobertas críticas
+  - Próximos passos
+  - FAQs
 
 ---
 

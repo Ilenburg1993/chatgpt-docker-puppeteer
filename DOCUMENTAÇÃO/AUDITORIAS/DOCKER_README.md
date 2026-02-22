@@ -1,7 +1,6 @@
 # 🐳 Docker Setup Guide
 
-**Versão**: 2.0
-**Data**: 21/01/2026
+**Versão**: 2.0 **Data**: 21/01/2026
 
 ---
 
@@ -38,16 +37,19 @@ nano .env
 ### 2. Choose Mode
 
 **Development** (hot-reload, debugging):
+
 ```bash
 docker-compose -f docker-compose.dev.yml up
 ```
 
 **Production** (optimized):
+
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
 **Default** (balanced):
+
 ```bash
 docker-compose up -d
 ```
@@ -61,12 +63,14 @@ docker-compose up -d
 **Use case**: General purpose, development + light production
 
 **Features**:
+
 - Bind mounts (easy file access)
 - Configurable via .env
 - Resource limits (2 CPU, 1GB RAM)
 - Health checks enabled
 
 **Start**:
+
 ```bash
 docker-compose up -d
 docker-compose logs -f
@@ -79,6 +83,7 @@ docker-compose logs -f
 **Use case**: Local development with hot-reload
 
 **Features**:
+
 - ✅ **Hot-reload** (nodemon watches /app/src)
 - ✅ **Node.js inspector** (port 9229 - Chrome DevTools)
 - ✅ Source code mounted read-only (:ro)
@@ -86,6 +91,7 @@ docker-compose logs -f
 - ✅ Debug-friendly logging (LOG_LEVEL=debug)
 
 **Start**:
+
 ```bash
 # 1. Start external Chrome (optional, if using external mode)
 google-chrome --remote-debugging-port=9224 &
@@ -98,6 +104,7 @@ docker-compose -f docker-compose.dev.yml up
 ```
 
 **Volume Strategy**:
+
 - Source code: Read-only bind mounts (./src → /app/src:ro)
 - node_modules: Named volume (performance)
 - Data dirs: Bind mounts (./fila, ./respostas, ./logs)
@@ -109,6 +116,7 @@ docker-compose -f docker-compose.dev.yml up
 **Use case**: Production deployment
 
 **Features**:
+
 - ✅ **Named volumes** (Docker-managed, isolated)
 - ✅ **Resource limits** (2 CPU, 2GB RAM)
 - ✅ **Security hardening** (no-new-privileges)
@@ -116,6 +124,7 @@ docker-compose -f docker-compose.dev.yml up
 - ✅ Environment variables from .env
 
 **Start**:
+
 ```bash
 # 1. Build image
 docker-compose -f docker-compose.prod.yml build
@@ -129,6 +138,7 @@ curl http://localhost:3008/api/health
 ```
 
 **Monitoring** (optional):
+
 ```bash
 # Start with monitoring profile
 docker-compose -f docker-compose.prod.yml --profile monitoring up -d
@@ -145,8 +155,8 @@ docker-compose -f docker-compose.prod.yml --profile monitoring up -d
 | Feature      | Dockerfile (prod) | Dockerfile.dev |
 | ------------ | ----------------- | -------------- |
 | Base image   | node:20-slim      | node:20        |
-| Build stages | Multi-stage ✅     | Single stage   |
-| Chromium     | Bundled ✅         | External only  |
+| Build stages | Multi-stage ✅    | Single stage   |
+| Chromium     | Bundled ✅        | External only  |
 | User         | Non-root (agente) | root           |
 | Size         | ~400MB            | ~800MB         |
 | CMD          | node index.js     | npm run dev    |
@@ -270,12 +280,14 @@ docker-compose -f docker-compose.dev.yml up
 ## 🔒 Security Best Practices
 
 ### 1. Non-root User
+
 ```dockerfile
 # Dockerfile already implements this
 USER agente
 ```
 
 ### 2. Read-only Root FS (optional)
+
 ```yaml
 # docker-compose.prod.yml
 read_only: true
@@ -284,14 +296,16 @@ tmpfs:
 ```
 
 ### 3. Drop Capabilities
+
 ```yaml
 cap_drop:
   - ALL
 cap_add:
-  - NET_BIND_SERVICE  # Only if needed
+  - NET_BIND_SERVICE # Only if needed
 ```
 
 ### 4. Secrets Management
+
 ```bash
 # Use Docker secrets (Swarm mode)
 docker secret create dashboard_password ./password.txt
@@ -309,6 +323,7 @@ echo "DASHBOARD_PASSWORD=secret" >> .env
 Endpoint: `http://localhost:3008/api/metrics`
 
 Metrics exposed:
+
 - Heap usage (P9.1)
 - Cache hit rate (P9.6)
 - Queue depth
@@ -414,4 +429,4 @@ BROWSER_MODE=launcher docker-compose up
 
 ---
 
-*Última atualização: 21/01/2026 | Docker v2.0*
+_Última atualização: 21/01/2026 | Docker v2.0_

@@ -1,9 +1,7 @@
 # triage.js v2.0 - Comprehensive Audit Report
 
-**Data**: 2026-02-01
-**Versão Atual**: v1.x (CONSOLIDATED Protocol 11)
-**Audit Level**: 500 (Instrumented Diagnostic Triage IPC 2.0)
-**Status**: CONSOLIDATED
+**Data**: 2026-02-01 **Versão Atual**: v1.x (CONSOLIDATED Protocol 11) **Audit Level**: 500
+(Instrumented Diagnostic Triage IPC 2.0) **Status**: CONSOLIDATED
 
 ---
 
@@ -17,9 +15,9 @@
 | **Events**           | 0 local (usa IPC via NERV)                      |
 | **Config**           | 2 constants (SNAPSHOT_DELAY_MS, MAX_TEXT_PARTS) |
 | **JSDoc**            | 10% (apenas function signature)                 |
-| **EventEmitter**     | ❌ Não                                           |
-| **Metrics Tracking** | ❌ Não                                           |
-| **Validation**       | ❌ Mínima                                        |
+| **EventEmitter**     | ❌ Não                                          |
+| **Metrics Tracking** | ❌ Não                                          |
+| **Validation**       | ❌ Mínima                                       |
 
 ---
 
@@ -30,7 +28,8 @@ O `triage.js` é o **sistema de diagnóstico em tempo real** do driver, respons�
 1. **Detecção de Travamentos**: Browser frozen, event loop lag
 2. **Detecção de Barreiras**: CAPTCHA, Cloudflare, CORS, CSP
 3. **Detecção de Erros**: Login required, quota exceeded, generic errors
-4. **Detecção de Anomalias**: Logical loops (spinning sem progresso), visual errors (cores de alerta)
+4. **Detecção de Anomalias**: Logical loops (spinning sem progresso), visual errors (cores de
+   alerta)
 5. **Análise Semântica**: Varredura de DOM + Shadow DOM + IFrames para detectar padrões
 6. **Telemetria**: Diagnostics para RemediationEngine (recovery decisions)
 
@@ -125,60 +124,71 @@ module.exports = { diagnoseStall };
 ## 🐛 Bugs Identified (10 total)
 
 ### ❌ BUG #1: Não herda EventEmitter (P0 - CRITICAL)
+
 - **Impact**: Inconsistência com stack v2.0 (todos os outros módulos são EventEmitter)
 - **Evidence**: `module.exports = { diagnoseStall }` (function export)
 - **Expected**: `class Triage extends EventEmitter`
 - **RICE Score**: Reach: 5, Impact: 5, Confidence: 5, Effort: 2 → **62.5**
 
 ### ❌ BUG #2: Zero configuração centralizada (P1 - HIGH)
+
 - **Impact**: Hardcoded constants (SNAPSHOT_DELAY_MS: 600ms, MAX_TEXT_PARTS: 1000)
 - **Evidence**: No `TRIAGE_CONFIG` object
-- **Expected**: Config via env vars (LAG_THRESHOLD_MS, SNAPSHOT_DELAY_MS, MAX_TEXT_PARTS, MAX_SCAN_DEPTH, etc.)
+- **Expected**: Config via env vars (LAG_THRESHOLD_MS, SNAPSHOT_DELAY_MS, MAX_TEXT_PARTS,
+  MAX_SCAN_DEPTH, etc.)
 - **RICE Score**: Reach: 5, Impact: 4, Confidence: 5, Effort: 2 → **50.0**
 
 ### ❌ BUG #3: Nenhum metrics tracking (P2 - MEDIUM)
+
 - **Impact**: Zero observabilidade de performance/detecções
 - **Evidence**: No stats object, no counters
 - **Expected**: Metrics (totalDiagnoses, patterns detected, timing, scan depth)
 - **RICE Score**: Reach: 4, Impact: 4, Confidence: 5, Effort: 3 → **26.7**
 
 ### ❌ BUG #4: Validação de parâmetros ausente (P2 - MEDIUM)
+
 - **Impact**: Função aceita page null/undefined sem validação
 - **Evidence**: `async function diagnoseStall(page, langCode = 'en')` → no checks
 - **Expected**: Validate page.evaluate, page.title, langCode
 - **RICE Score**: Reach: 4, Impact: 3, Confidence: 5, Effort: 1 → **60.0**
 
 ### ❌ BUG #5: Timeout protection ausente (P1 - HIGH)
+
 - **Impact**: page.evaluate pode travar indefinidamente (browser frozen)
 - **Evidence**: No timeout wrapper em page.evaluate (248 linhas de browser code)
 - **Expected**: Promise.race com timeout (default: 10s)
 - **RICE Score**: Reach: 5, Impact: 5, Confidence: 4, Effort: 2 → **50.0**
 
 ### ❌ BUG #6: JSDoc incompleto (P3 - LOW)
+
 - **Impact**: Apenas 10% documentado (function signature)
 - **Evidence**: No JSDoc para Probe.scan, Probe.checkVisualError, patterns
 - **Expected**: JSDoc 100% (all methods + patterns)
 - **RICE Score**: Reach: 3, Impact: 2, Confidence: 5, Effort: 4 → **7.5**
 
 ### ❌ BUG #7: Nenhum AbortSignal support (P3 - LOW)
+
 - **Impact**: Não pode cancelar diagnósticos longos
 - **Evidence**: Função não aceita AbortSignal
 - **Expected**: signal parameter + checks
 - **RICE Score**: Reach: 3, Impact: 3, Confidence: 4, Effort: 2 → **18.0**
 
 ### ❌ BUG #8: Error handling limitado (P2 - MEDIUM)
+
 - **Impact**: Try-catch genérico retorna DIAGNOSTIC_CRASH (perde contexto)
 - **Evidence**: `catch (e) { ... return { type: 'DIAGNOSTIC_CRASH' } }`
 - **Expected**: TriageError class com type/context
 - **RICE Score**: Reach: 4, Impact: 4, Confidence: 4, Effort: 2 → **32.0**
 
 ### ❌ BUG #9: Hardcoded lag threshold (P2 - MEDIUM)
+
 - **Impact**: `if (lag > 1500)` → não configurável
 - **Evidence**: Magic number 1500ms
 - **Expected**: Config key (LAG_THRESHOLD_MS: 1500)
 - **RICE Score**: Reach: 4, Impact: 3, Confidence: 5, Effort: 1 → **60.0**
 
 ### ❌ BUG #10: Sem retry logic para stabilizer (P3 - LOW)
+
 - **Impact**: Falha em measureEventLoopLag pode crashar diagnostic
 - **Evidence**: `const lag = await stabilizer.measureEventLoopLag(page);` → no retry
 - **Expected**: Retry wrapper (3 attempts)
@@ -189,25 +199,27 @@ module.exports = { diagnoseStall };
 ## ✨ Improvements Suggested (10 total)
 
 ### 1. EventEmitter Class Architecture
+
 **Implementar classe Triage extends EventEmitter**
 
 ```javascript
 class Triage extends EventEmitter {
-    constructor(page, langCode = 'en') {
-        super();
-        // Validation
-        // Metrics initialization
-    }
+  constructor(page, langCode = 'en') {
+    super();
+    // Validation
+    // Metrics initialization
+  }
 
-    async diagnose(signal) {
-        this.emit('triage:diagnosis_started', { langCode: this.langCode });
-        // ... diagnosis logic
-        this.emit('triage:diagnosis_completed', { result, duration });
-    }
+  async diagnose(signal) {
+    this.emit('triage:diagnosis_started', { langCode: this.langCode });
+    // ... diagnosis logic
+    this.emit('triage:diagnosis_completed', { result, duration });
+  }
 }
 ```
 
 **Eventos propostos** (8 total):
+
 - `triage:diagnosis_started` (diagnóstico iniciado)
 - `triage:diagnosis_completed` (diagnóstico completo)
 - `triage:diagnosis_failed` (diagnóstico falhou)
@@ -218,6 +230,7 @@ class Triage extends EventEmitter {
 - `triage:timeout_reached` (timeout excedido)
 
 **Benefits**:
+
 - Consistência com stack v2.0 (14 modules EventEmitter)
 - Observable diagnostic lifecycle
 - Hook points para extensões
@@ -226,35 +239,37 @@ class Triage extends EventEmitter {
 ---
 
 ### 2. TRIAGE_CONFIG Object
+
 **Centralizar todas as configurações**
 
 ```javascript
 const TRIAGE_CONFIG = {
-    // Lag detection
-    LAG_THRESHOLD_MS: parseInt(process.env.TRIAGE_LAG_THRESHOLD || '1500'),
-    LAG_RETRY_ATTEMPTS: parseInt(process.env.TRIAGE_LAG_RETRIES || '3'),
+  // Lag detection
+  LAG_THRESHOLD_MS: parseInt(process.env.TRIAGE_LAG_THRESHOLD || '1500'),
+  LAG_RETRY_ATTEMPTS: parseInt(process.env.TRIAGE_LAG_RETRIES || '3'),
 
-    // Snapshot timing
-    SNAPSHOT_DELAY_MS: parseInt(process.env.TRIAGE_SNAPSHOT_DELAY || '600'),
+  // Snapshot timing
+  SNAPSHOT_DELAY_MS: parseInt(process.env.TRIAGE_SNAPSHOT_DELAY || '600'),
 
-    // Scan limits
-    MAX_TEXT_PARTS: parseInt(process.env.TRIAGE_MAX_TEXT_PARTS || '1000'),
-    MAX_SCAN_DEPTH: parseInt(process.env.TRIAGE_MAX_DEPTH || '15'),
+  // Scan limits
+  MAX_TEXT_PARTS: parseInt(process.env.TRIAGE_MAX_TEXT_PARTS || '1000'),
+  MAX_SCAN_DEPTH: parseInt(process.env.TRIAGE_MAX_DEPTH || '15'),
 
-    // Timeouts
-    DIAGNOSIS_TIMEOUT_MS: parseInt(process.env.TRIAGE_TIMEOUT || '10000'),
-    SCAN_TIMEOUT_MS: parseInt(process.env.TRIAGE_SCAN_TIMEOUT || '5000'),
+  // Timeouts
+  DIAGNOSIS_TIMEOUT_MS: parseInt(process.env.TRIAGE_TIMEOUT || '10000'),
+  SCAN_TIMEOUT_MS: parseInt(process.env.TRIAGE_SCAN_TIMEOUT || '5000'),
 
-    // Visual error detection
-    ERROR_COLOR_RED_THRESHOLD: parseInt(process.env.TRIAGE_RED_THRESHOLD || '180'),
-    ERROR_COLOR_ORANGE_THRESHOLD: parseInt(process.env.TRIAGE_ORANGE_THRESHOLD || '200'),
+  // Visual error detection
+  ERROR_COLOR_RED_THRESHOLD: parseInt(process.env.TRIAGE_RED_THRESHOLD || '180'),
+  ERROR_COLOR_ORANGE_THRESHOLD: parseInt(process.env.TRIAGE_ORANGE_THRESHOLD || '200'),
 
-    // Barrier detection
-    IFRAME_SIZE_THRESHOLD: parseFloat(process.env.TRIAGE_IFRAME_THRESHOLD || '0.4')
+  // Barrier detection
+  IFRAME_SIZE_THRESHOLD: parseFloat(process.env.TRIAGE_IFRAME_THRESHOLD || '0.4'),
 };
 ```
 
 **Benefits**:
+
 - Tunable via env vars
 - Consistent with v2.0 pattern
 - Easy testing (override config)
@@ -263,6 +278,7 @@ const TRIAGE_CONFIG = {
 ---
 
 ### 3. Complete Validation
+
 **Validar todos os parâmetros no constructor**
 
 ```javascript
@@ -300,6 +316,7 @@ constructor(page, langCode = 'en') {
 ```
 
 **Benefits**:
+
 - Early error detection
 - Clear error messages
 - Consistent with v2.0 validation pattern
@@ -308,9 +325,11 @@ constructor(page, langCode = 'en') {
 ---
 
 ### 4. JSDoc 100%
+
 **Documentar todas as classes, métodos e padrões**
 
 Adicionar JSDoc completo (~200+ linhas):
+
 - Class documentation com @extends, @example
 - Method documentation com @param, @returns, @throws, @emits
 - Pattern detection documentation (cada um dos 9 padrões)
@@ -319,6 +338,7 @@ Adicionar JSDoc completo (~200+ linhas):
 - Error class documentation
 
 **Benefits**:
+
 - IntelliSense support
 - API discoverability
 - Maintenance clarity
@@ -327,48 +347,51 @@ Adicionar JSDoc completo (~200+ linhas):
 ---
 
 ### 5. Metrics Tracking (12 counters)
+
 **Rastrear todas as métricas de diagnóstico**
 
 ```javascript
 this.stats = {
-    // Diagnosis
-    totalDiagnoses: 0,
-    successfulDiagnoses: 0,
-    failedDiagnoses: 0,
-    timeoutDiagnoses: 0,
+  // Diagnosis
+  totalDiagnoses: 0,
+  successfulDiagnoses: 0,
+  failedDiagnoses: 0,
+  timeoutDiagnoses: 0,
 
-    // Patterns (per-pattern counters)
-    patternsDetected: {
-        BROWSER_FROZEN: 0,
-        CAPTCHA_CHALLENGE: 0,
-        LOGIN_REQUIRED: 0,
-        INFRA_BARRIER_DETECTED: 0,
-        LIMIT_REACHED: 0,
-        GENERIC_ERROR_TEXT: 0,
-        VISUAL_ERROR_DETECTED: 0,
-        FINISHED_ABRUPTLY: 0,
-        LOGICAL_LOOP: 0
-    },
+  // Patterns (per-pattern counters)
+  patternsDetected: {
+    BROWSER_FROZEN: 0,
+    CAPTCHA_CHALLENGE: 0,
+    LOGIN_REQUIRED: 0,
+    INFRA_BARRIER_DETECTED: 0,
+    LIMIT_REACHED: 0,
+    GENERIC_ERROR_TEXT: 0,
+    VISUAL_ERROR_DETECTED: 0,
+    FINISHED_ABRUPTLY: 0,
+    LOGICAL_LOOP: 0,
+  },
 
-    // Timing
-    totalDiagnosisTime: 0,
-    maxDiagnosisTime: 0,
-    totalScanTime: 0,
+  // Timing
+  totalDiagnosisTime: 0,
+  maxDiagnosisTime: 0,
+  totalScanTime: 0,
 
-    // Lag
-    totalLagMeasurements: 0,
-    totalLag: 0,
-    maxLag: 0
+  // Lag
+  totalLagMeasurements: 0,
+  totalLag: 0,
+  maxLag: 0,
 };
 ```
 
 **Derived metrics**:
+
 - `avgDiagnosisTime`: totalDiagnosisTime / totalDiagnoses
-- `successRate`: successfulDiagnoses / totalDiagnoses * 100
+- `successRate`: successfulDiagnoses / totalDiagnoses \* 100
 - `avgLag`: totalLag / totalLagMeasurements
 - `mostCommonPattern`: argmax(patternsDetected)
 
 **getStats() method**:
+
 ```javascript
 getStats() {
     return {
@@ -390,6 +413,7 @@ getStats() {
 ---
 
 ### 6. Timeout Protection
+
 **Promise.race em todas as operações críticas**
 
 ```javascript
@@ -443,6 +467,7 @@ _timeout(ms, operation) {
 ---
 
 ### 7. AbortSignal Support
+
 **Permitir cancelamento de diagnósticos**
 
 ```javascript
@@ -468,35 +493,38 @@ async diagnose(signal) {
 ---
 
 ### 8. Enhanced Error Handling
+
 **Classe customizada TriageError**
 
 ```javascript
 class TriageError extends Error {
-    constructor(type, message, context) {
-        super(message);
-        this.name = 'TriageError';
-        this.type = type;  // TIMEOUT, ABORTED, INVALID_PAGE, SCAN_FAILED, PATTERN_DETECTION_FAILED
-        this.context = context;
-        this.timestamp = Date.now();
-    }
+  constructor(type, message, context) {
+    super(message);
+    this.name = 'TriageError';
+    this.type = type; // TIMEOUT, ABORTED, INVALID_PAGE, SCAN_FAILED, PATTERN_DETECTION_FAILED
+    this.context = context;
+    this.timestamp = Date.now();
+  }
 }
 ```
 
 **Usage**:
+
 ```javascript
 try {
-    const lag = await this._measureLagWithRetry();
+  const lag = await this._measureLagWithRetry();
 } catch (err) {
-    throw new TriageError('LAG_MEASUREMENT_FAILED', err.message, {
-        attempts: 3,
-        langCode: this.langCode
-    });
+  throw new TriageError('LAG_MEASUREMENT_FAILED', err.message, {
+    attempts: 3,
+    langCode: this.langCode,
+  });
 }
 ```
 
 ---
 
 ### 9. Retry Logic para Stabilizer
+
 **Wrapper com retry para measureEventLoopLag**
 
 ```javascript
@@ -531,25 +559,27 @@ async _measureLagWithRetry() {
 ---
 
 ### 10. Module Exports Completo
+
 **Exportar classe + config + eventos + factory**
 
 ```javascript
 module.exports = {
-    Triage,
-    TRIAGE_CONFIG,
-    TRIAGE_EVENTS,
-    TriageError,
-    create: (page, langCode) => new Triage(page, langCode),
+  Triage,
+  TRIAGE_CONFIG,
+  TRIAGE_EVENTS,
+  TriageError,
+  create: (page, langCode) => new Triage(page, langCode),
 
-    // ✅ Backward compatibility (legacy function export)
-    diagnoseStall: async (page, langCode) => {
-        const triage = new Triage(page, langCode);
-        return await triage.diagnose();
-    }
+  // ✅ Backward compatibility (legacy function export)
+  diagnoseStall: async (page, langCode) => {
+    const triage = new Triage(page, langCode);
+    return await triage.diagnose();
+  },
 };
 ```
 
 **Benefits**:
+
 - Consistent with v2.0 pattern (todas as outras 13 modules)
 - Factory function para convenience
 - Backward compatibility (diagnoseStall preserved)
@@ -561,18 +591,18 @@ module.exports = {
 
 ### Transformation Estimate
 
-| Metric          | v1.x | v2.0                                                                                   | Δ            |
-| --------------- | ---- | -------------------------------------------------------------------------------------- | ------------ |
-| **Lines**       | 248  | ~620                                                                                   | +372 (+150%) |
-| **Classes**     | 0    | 2 (Triage, TriageError)                                                                | +2           |
-| **Methods**     | 1    | 6 (diagnose, _executeDiagnosis, _measureLagWithRetry, _timeout, getStats, constructor) | +5           |
-| **Events**      | 0    | 8 (TRIAGE_EVENTS)                                                                      | +8           |
-| **Config Keys** | 2    | 10 (TRIAGE_CONFIG)                                                                     | +8           |
-| **Metrics**     | 0    | 12 counters + 4 derived                                                                | +16          |
-| **JSDoc Lines** | ~10  | ~200                                                                                   | +190         |
-| **Validation**  | ❌    | ✅                                                                                      | Full         |
-| **Timeout**     | ❌    | ✅                                                                                      | Yes          |
-| **AbortSignal** | ❌    | ✅                                                                                      | Yes          |
+| Metric          | v1.x | v2.0                                                                                      | Δ            |
+| --------------- | ---- | ----------------------------------------------------------------------------------------- | ------------ |
+| **Lines**       | 248  | ~620                                                                                      | +372 (+150%) |
+| **Classes**     | 0    | 2 (Triage, TriageError)                                                                   | +2           |
+| **Methods**     | 1    | 6 (diagnose, \_executeDiagnosis, \_measureLagWithRetry, \_timeout, getStats, constructor) | +5           |
+| **Events**      | 0    | 8 (TRIAGE_EVENTS)                                                                         | +8           |
+| **Config Keys** | 2    | 10 (TRIAGE_CONFIG)                                                                        | +8           |
+| **Metrics**     | 0    | 12 counters + 4 derived                                                                   | +16          |
+| **JSDoc Lines** | ~10  | ~200                                                                                      | +190         |
+| **Validation**  | ❌   | ✅                                                                                        | Full         |
+| **Timeout**     | ❌   | ✅                                                                                        | Yes          |
+| **AbortSignal** | ❌   | ✅                                                                                        | Yes          |
 
 **Estimated Effort**: 15-18 hours (5 sprints)
 
@@ -581,6 +611,7 @@ module.exports = {
 ### Sprint Breakdown
 
 #### Sprint 1: P0 - EventEmitter + Config (4-5h)
+
 - [ ] BUG #1: Convert to EventEmitter class
 - [ ] BUG #2: TRIAGE_CONFIG object (10 keys)
 - [ ] IMPROVEMENT #1: 8 eventos locais
@@ -588,6 +619,7 @@ module.exports = {
 - [ ] Validation: Class structure
 
 #### Sprint 2: P1 - Validation + Timeout (5-6h)
+
 - [ ] BUG #4: Parameter validation (page, langCode)
 - [ ] BUG #5: Timeout protection (Promise.race)
 - [ ] BUG #9: Config-based lag threshold
@@ -596,6 +628,7 @@ module.exports = {
 - [ ] Validation: Timeout scenarios
 
 #### Sprint 3: P2 - Metrics + Error Handling (4-5h)
+
 - [ ] BUG #3: Metrics tracking (12 counters)
 - [ ] BUG #8: TriageError class
 - [ ] IMPROVEMENT #5: getStats() method
@@ -603,6 +636,7 @@ module.exports = {
 - [ ] Validation: Metrics accuracy
 
 #### Sprint 4: P3 - JSDoc + Retry + AbortSignal (3-4h)
+
 - [ ] BUG #6: JSDoc 100% (~200 lines)
 - [ ] BUG #7: AbortSignal support
 - [ ] BUG #10: Retry logic (lag measurement)
@@ -612,6 +646,7 @@ module.exports = {
 - [ ] Validation: Documentation coverage
 
 #### Sprint 5: Polish + Module Exports (2-3h)
+
 - [ ] IMPROVEMENT #10: Module exports completo
 - [ ] Backward compatibility testing (diagnoseStall function)
 - [ ] Integration tests
@@ -644,15 +679,15 @@ module.exports = {
 
 ### triage.js v1.x vs v2.0 Stack
 
-| Feature           | v1.x              | v2.0 Stack (14 modules)      | Gap           |
-| ----------------- | ----------------- | ---------------------------- | ------------- |
+| Feature           | v1.x               | v2.0 Stack (14 modules)       | Gap           |
+| ----------------- | ------------------ | ----------------------------- | ------------- |
 | **EventEmitter**  | ❌ Function export | ✅ Class extends EventEmitter | 2 generations |
 | **Config Object** | ❌ Hardcoded (2)   | ✅ Centralized (5-16 keys)    | 2 generations |
 | **Events**        | ❌ None (IPC only) | ✅ 8-14 local events          | 2 generations |
 | **Metrics**       | ❌ None            | ✅ 10-16 counters + derived   | 2 generations |
 | **Validation**    | ❌ None            | ✅ Complete (constructor)     | 2 generations |
 | **Timeout**       | ❌ None            | ✅ Promise.race               | 2 generations |
-| **JSDoc**         | 10%               | 100%                         | 2 generations |
+| **JSDoc**         | 10%                | 100%                          | 2 generations |
 | **AbortSignal**   | ❌ None            | ✅ Signal checks              | 1 generation  |
 | **Error Class**   | ❌ Generic         | ✅ Custom (type/context)      | 1 generation  |
 | **getStats()**    | ❌ None            | ✅ Full introspection         | 1 generation  |
@@ -720,8 +755,8 @@ const triage = create(page, 'en');
 const triage = new Triage(page, 'en');
 
 // Listen to events
-triage.on('triage:pattern_detected', (data) => {
-    console.log('Pattern:', data.pattern);
+triage.on('triage:pattern_detected', data => {
+  console.log('Pattern:', data.pattern);
 });
 
 // Diagnose with AbortSignal
@@ -740,18 +775,23 @@ console.log('Success rate:', stats.successRate);
 ## 📚 Related Modules
 
 ### Dependencies (Unchanged)
+
 - `stabilizer.js` (event loop lag)
 - `STATUS_VALUES` (task constants)
 - `i18n.js` (error terms)
 - `logger.js` (logging)
 
 ### Integration Points
+
 - **BaseDriver**: Calls `triage.diagnose()` para recovery decisions
 - **RemediationEngine**: Consumes diagnostic results
-- **NERV**: Receives IPC telemetry (via driver._emitVital)
+- **NERV**: Receives IPC telemetry (via driver.\_emitVital)
 
 ### v2.0 Stack Completion
-- **Complete**: 14 modules (human, stabilizer, TargetDriver, BaseDriver, ChatGPTDriver, DriverLifecycleManager, factory, driver_nerv_adapter, handle_manager, recovery_system, submission_controller, input_resolver, biomechanics_engine, frame_navigator)
+
+- **Complete**: 14 modules (human, stabilizer, TargetDriver, BaseDriver, ChatGPTDriver,
+  DriverLifecycleManager, factory, driver_nerv_adapter, handle_manager, recovery_system,
+  submission_controller, input_resolver, biomechanics_engine, frame_navigator)
 - **Pending**: triage ← **ÚLTIMO**
 
 ---
@@ -767,50 +807,50 @@ console.log('Success rate:', stats.successRate);
 
 ---
 
-**Audit Date**: 2026-02-01
-**Auditor**: GitHub Copilot + Claude Sonnet 4.5
-**Status**: ✅ READY FOR IMPLEMENTATION
-**Priority**: HIGH (último módulo para completar stack v2.0)
+**Audit Date**: 2026-02-01 **Auditor**: GitHub Copilot + Claude Sonnet 4.5 **Status**: ✅ READY FOR
+IMPLEMENTATION **Priority**: HIGH (último módulo para completar stack v2.0)
 
 ---
 
 ## Appendix: Code Snippets
 
 ### Current v1.x Signature
+
 ```javascript
 async function diagnoseStall(page, langCode = 'en') {
-    // ... 248 lines
-    return diagnosis || { type: STATUS_VALUES.HEALTHY, severity: 'NONE', ts: Date.now() };
+  // ... 248 lines
+  return diagnosis || { type: STATUS_VALUES.HEALTHY, severity: 'NONE', ts: Date.now() };
 }
 module.exports = { diagnoseStall };
 ```
 
 ### Proposed v2.0 Signature
+
 ```javascript
 class Triage extends EventEmitter {
-    constructor(page, langCode = 'en') {
-        super();
-        // Validation + metrics initialization
-    }
+  constructor(page, langCode = 'en') {
+    super();
+    // Validation + metrics initialization
+  }
 
-    async diagnose(signal) {
-        // EventEmitter events + timeout + metrics
-        return result;
-    }
+  async diagnose(signal) {
+    // EventEmitter events + timeout + metrics
+    return result;
+  }
 
-    getStats() {
-        return { ...this.stats, avgDiagnosisTime, successRate, avgLag, config };
-    }
+  getStats() {
+    return { ...this.stats, avgDiagnosisTime, successRate, avgLag, config };
+  }
 }
 
 // ✅ Backward compatibility
 module.exports = {
-    Triage,
-    TRIAGE_CONFIG,
-    TRIAGE_EVENTS,
-    TriageError,
-    create,
-    diagnoseStall  // Legacy function preserved
+  Triage,
+  TRIAGE_CONFIG,
+  TRIAGE_EVENTS,
+  TriageError,
+  create,
+  diagnoseStall, // Legacy function preserved
 };
 ```
 

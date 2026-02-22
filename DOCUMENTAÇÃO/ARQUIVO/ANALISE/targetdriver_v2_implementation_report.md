@@ -1,23 +1,23 @@
 # TargetDriver.js v2.0 - Implementation Report
 
-**Data**: 2026-02-01
-**Arquivo**: `src/driver/core/TargetDriver.js`
-**Status**: ✅ **IMPLEMENTADO COMPLETO**
+**Data**: 2026-02-01 **Arquivo**: `src/driver/core/TargetDriver.js` **Status**: ✅ **IMPLEMENTADO
+COMPLETO**
 
 ---
 
 ## 📊 Métricas de Implementação
 
 ### Antes vs Depois
-| Métrica               | v1.1    | v2.0       | Mudança      |
-| --------------------- | ------- | ---------- | ------------ |
-| **Linhas de Código**  | 225     | 658        | +433 (+192%) |
-| **Eventos Definidos** | 6       | 10         | +4 (+67%)    |
-| **Eventos Emitidos**  | 2       | 6          | +4 (+200%)   |
-| **Métodos Públicos**  | 10      | 13         | +3 (+30%)    |
-| **Métodos Privados**  | 0       | 4          | +4 (novo)    |
-| **Configurações**     | 0       | 6          | +6 (novo)    |
-| **Validações**        | 1       | 4          | +3 (+300%)   |
+
+| Métrica               | v1.1    | v2.0        | Mudança      |
+| --------------------- | ------- | ----------- | ------------ |
+| **Linhas de Código**  | 225     | 658         | +433 (+192%) |
+| **Eventos Definidos** | 6       | 10          | +4 (+67%)    |
+| **Eventos Emitidos**  | 2       | 6           | +4 (+200%)   |
+| **Métodos Públicos**  | 10      | 13          | +3 (+30%)    |
+| **Métodos Privados**  | 0       | 4           | +4 (novo)    |
+| **Configurações**     | 0       | 6           | +6 (novo)    |
+| **Validações**        | 1       | 4           | +3 (+300%)   |
 | **JSDoc Completo**    | Parcial | ✅ Completo | 100%         |
 
 ---
@@ -27,9 +27,11 @@
 ### Fase 1: Bug Fixes Críticos (P0) - 100% ✅
 
 #### BUG #1: setState Sem Validação de Transições - ✅ RESOLVIDO
+
 **Status**: State transition matrix implementada
 
 **Implementação**:
+
 ```javascript
 // Linhas 96-103: STATE_TRANSITIONS matrix
 const STATE_TRANSITIONS = Object.freeze({
@@ -57,11 +59,13 @@ this._validateTransition(oldState, newState);
 ```
 
 **Transições Bloqueadas**:
+
 - ❌ IDLE → STALLED (deve passar por PREPARING → TYPING → WAITING)
 - ❌ TYPING → PREPARING (ciclo inválido)
 - ❌ WAITING → PREPARING (ciclo inválido)
 
 **Transições Permitidas**:
+
 - ✅ IDLE → PREPARING → TYPING → WAITING → IDLE (fluxo completo)
 - ✅ PREPARING → IDLE (cancelamento)
 - ✅ TYPING → IDLE (cancelamento)
@@ -70,9 +74,11 @@ this._validateTransition(oldState, newState);
 ---
 
 #### BUG #2: AbortSignal Não Observado - ✅ RESOLVIDO
+
 **Status**: Listener implementado, estado sincronizado automaticamente
 
 **Implementação**:
+
 ```javascript
 // Linhas 211-218: Setup listener no constructor
 _setupAbortListener() {
@@ -118,31 +124,35 @@ _handleAbort() {
 ### Fase 2: Melhorias de Arquitetura (P1) - 100% ✅
 
 #### MELHORIA #1: State Transition Matrix - ✅ IMPLEMENTADO
+
 **Status**: Veja BUG #1 (mesma implementação)
 
 ---
 
 #### MELHORIA #2: Telemetria de Estado Avançada - ✅ IMPLEMENTADO
+
 **Status**: 4 novos eventos de estado
 
 **Eventos Adicionados**:
+
 ```javascript
 // Linhas 67-76: EVENTS v2.0
 const EVENTS = Object.freeze({
-    STATE_CHANGE: 'state_change',               // ✅ Existente
-    STATE_ENTERED: 'state_entered',             // ✅ NOVO
-    STATE_EXITING: 'state_exiting',             // ✅ NOVO
-    STATE_TIMEOUT_WARNING: 'state_timeout_warn',// ✅ NOVO (definido, não usado ainda)
-    CAPABILITIES_CHANGED: 'caps_change',        // ✅ Existente
-    DESTROYED: 'destroyed',                     // ✅ Existente
-    VITAL: 'driver:vital',                      // ✅ Existente
-    WARNING: 'warning',                         // ✅ Existente
-    DEBUG: 'debug',                             // ✅ Existente
-    ABORT_SIGNAL_RECEIVED: 'abort_received'     // ✅ NOVO
+  STATE_CHANGE: 'state_change', // ✅ Existente
+  STATE_ENTERED: 'state_entered', // ✅ NOVO
+  STATE_EXITING: 'state_exiting', // ✅ NOVO
+  STATE_TIMEOUT_WARNING: 'state_timeout_warn', // ✅ NOVO (definido, não usado ainda)
+  CAPABILITIES_CHANGED: 'caps_change', // ✅ Existente
+  DESTROYED: 'destroyed', // ✅ Existente
+  VITAL: 'driver:vital', // ✅ Existente
+  WARNING: 'warning', // ✅ Existente
+  DEBUG: 'debug', // ✅ Existente
+  ABORT_SIGNAL_RECEIVED: 'abort_received', // ✅ NOVO
 });
 ```
 
 **Emissão**:
+
 1. **STATE_EXITING** (linha 297-303): Antes de trocar estado
 2. **STATE_CHANGE** (linha 315-321): Durante transição (original)
 3. **STATE_ENTERED** (linha 323-328): Após entrar em novo estado
@@ -153,42 +163,46 @@ const EVENTS = Object.freeze({
 ---
 
 #### MELHORIA #3: AbortSignal Integration - ✅ IMPLEMENTADO
+
 **Status**: Veja BUG #2 (listener + handler automático)
 
 ---
 
 #### MELHORIA #4: TARGETDRIVER_CONFIG - ✅ IMPLEMENTADO
+
 **Status**: 6 configurações criadas
 
 **Configuração**:
+
 ```javascript
 // Linhas 37-55
 const TARGETDRIVER_CONFIG = Object.freeze({
-    // State Timeouts (ms)
-    STATE_TIMEOUT_WARNING_MS: 30000,     // 30s
-    STATE_TIMEOUT_ERROR_MS: 120000,      // 2min
+  // State Timeouts (ms)
+  STATE_TIMEOUT_WARNING_MS: 30000, // 30s
+  STATE_TIMEOUT_ERROR_MS: 120000, // 2min
 
-    // Health Check
-    HEALTH_CHECK_INTERVAL_MS: 5000,      // 5s
+  // Health Check
+  HEALTH_CHECK_INTERVAL_MS: 5000, // 5s
 
-    // State History
-    MAX_STATE_HISTORY_SIZE: 20,
+  // State History
+  MAX_STATE_HISTORY_SIZE: 20,
 
-    // Capabilities
-    DEFAULT_CAPABILITIES: Object.freeze({
-        text_generation: true,
-        image_generation: false,
-        file_upload: false,
-        context_reset: true,
-        streaming_events: false
-    }),
+  // Capabilities
+  DEFAULT_CAPABILITIES: Object.freeze({
+    text_generation: true,
+    image_generation: false,
+    file_upload: false,
+    context_reset: true,
+    streaming_events: false,
+  }),
 
-    // Memory
-    MAX_EVENT_LISTENERS: 50
+  // Memory
+  MAX_EVENT_LISTENERS: 50,
 });
 ```
 
 **Uso**:
+
 - Linha 192: DEFAULT_CAPABILITIES no constructor
 - Linha 309: MAX_STATE_HISTORY_SIZE em setState
 - Linha 399: STATE_TIMEOUT_WARNING_MS em getHealth
@@ -197,27 +211,30 @@ const TARGETDRIVER_CONFIG = Object.freeze({
 ---
 
 #### MELHORIA #5: Capabilities Schema Validation - ✅ IMPLEMENTADO
+
 **Status**: Schema de 11 capabilities + validação
 
 **Schema**:
+
 ```javascript
 // Linhas 105-117
 const CAPABILITIES_SCHEMA = Object.freeze([
-    'text_generation',
-    'image_generation',
-    'file_upload',
-    'context_reset',
-    'streaming_events',
-    'vision',
-    'tools',
-    'code_interpreter',
-    'web_browsing',
-    'dalle',
-    'function_calling'
+  'text_generation',
+  'image_generation',
+  'file_upload',
+  'context_reset',
+  'streaming_events',
+  'vision',
+  'tools',
+  'code_interpreter',
+  'web_browsing',
+  'dalle',
+  'function_calling',
 ]);
 ```
 
 **Validação**:
+
 ```javascript
 // Linhas 261-278
 _validateCapabilities(caps) {
@@ -239,16 +256,19 @@ _validateCapabilities(caps) {
 
 **Uso**: Linha 357 em `updateCapabilities()`
 
-**Proteção**: Bloqueia typos (`text_generaton`), tipos errados (`text_generation: "true"`), capabilities inválidas (`gpt4_vision`)
+**Proteção**: Bloqueia typos (`text_generaton`), tipos errados (`text_generation: "true"`),
+capabilities inválidas (`gpt4_vision`)
 
 ---
 
 ### Fase 3: Robustez e DX (P2) - 100% ✅
 
 #### BUG #3: getHealth Sem Métricas - ✅ RESOLVIDO
+
 **Status**: Health expandido para 12+ campos
 
 **Implementação**:
+
 ```javascript
 // Linhas 381-421
 async getHealth() {
@@ -287,6 +307,7 @@ async getHealth() {
 ```
 
 **Campos Adicionados**:
+
 - `metrics.listenerCount`: Detecta memory leaks
 - `metrics.stateStuckWarning`: Early warning (30s)
 - `metrics.stateStuckError`: Critical warning (2min)
@@ -301,19 +322,23 @@ async getHealth() {
 ---
 
 #### BUG #4: Capabilities Sem Validação - ✅ RESOLVIDO
+
 **Status**: Veja MELHORIA #5 (schema validation)
 
 ---
 
 #### MELHORIA #6: Health Metrics Expandidos - ✅ IMPLEMENTADO
+
 **Status**: Veja BUG #3 (mesma implementação)
 
 ---
 
 #### MELHORIA #7: State History Tracking - ✅ IMPLEMENTADO
+
 **Status**: Últimas 20 transições rastreadas
 
 **Implementação**:
+
 ```javascript
 // Linha 188 (constructor): Inicialização
 this._stateHistory = [];
@@ -337,12 +362,13 @@ getStateHistory() {
 ```
 
 **Formato**:
+
 ```javascript
 [
   { from: 'IDLE', to: 'PREPARING', ts: 1738425123456, duration_ms: 5231 },
   { from: 'PREPARING', to: 'TYPING', ts: 1738425128687, duration_ms: 412 },
   // ... últimas 20
-]
+];
 ```
 
 **Uso**: Debugging de transições, análise de ciclos
@@ -352,9 +378,11 @@ getStateHistory() {
 ### Fase 4: Polish (P3) - 100% ✅
 
 #### BUG #5: Emit Override Sem Telemetria - ✅ RESOLVIDO
+
 **Status**: Error tracking implementado
 
 **Implementação**:
+
 ```javascript
 // Linhas 556-580
 emit(event, ...args) {
@@ -379,6 +407,7 @@ emit(event, ...args) {
 ```
 
 **Rastreamento**:
+
 - `_errorCount`: Incrementado a cada erro
 - `_lastError`: Último erro com tipo, evento e timestamp
 - Log WARNING: Alerta no console
@@ -386,9 +415,11 @@ emit(event, ...args) {
 ---
 
 #### BUG #6: Abstract Method Errors - ✅ RESOLVIDO
+
 **Status**: Mensagens melhoradas com nome da classe
 
 **Implementação**:
+
 ```javascript
 // Exemplo: linha 455-460
 async validatePage() {
@@ -400,24 +431,29 @@ async validatePage() {
 ```
 
 **Antes**:
+
 ```
 Error: Método validatePage não implementado.
 ```
 
 **Depois**:
+
 ```
 Error: [ChatGPTDriver] Método abstrato 'validatePage' não implementado.
 Classe ChatGPTDriver deve implementar este método.
 ```
 
-**Métodos Atualizados**: 7 (validatePage, prepareContext, sendPrompt, waitForCompletion, captureState, stopGeneration) - commitLearning não é abstrato
+**Métodos Atualizados**: 7 (validatePage, prepareContext, sendPrompt, waitForCompletion,
+captureState, stopGeneration) - commitLearning não é abstrato
 
 ---
 
 #### MELHORIA #8: JSDoc Completo - ✅ IMPLEMENTADO
+
 **Status**: Todos os métodos e classe documentados
 
 **Classe**:
+
 ```javascript
 // Linhas 120-145
 /**
@@ -454,9 +490,11 @@ Classe ChatGPTDriver deve implementar este método.
 ---
 
 #### MELHORIA #9: Error Counter e Tracking - ✅ IMPLEMENTADO
+
 **Status**: Veja BUG #5 (error tracking no emit)
 
 **Adicionalmente**:
+
 ```javascript
 // Linhas 423-429: getErrorStats()
 getErrorStats() {
@@ -472,32 +510,35 @@ getErrorStats() {
 ---
 
 #### MELHORIA #10: Readonly Properties - ✅ IMPLEMENTADO
+
 **Status**: Properties críticas como readonly
 
 **Implementação**:
+
 ```javascript
 // Linhas 162-177 (constructor)
 Object.defineProperty(this, 'page', {
-    value: page,
-    writable: false,
-    configurable: true,  // Permite nulling em destroy()
-    enumerable: true
+  value: page,
+  writable: false,
+  configurable: true, // Permite nulling em destroy()
+  enumerable: true,
 });
 
 Object.defineProperty(this, 'config', {
-    value: config,
-    writable: false,
-    enumerable: true
+  value: config,
+  writable: false,
+  enumerable: true,
 });
 
 Object.defineProperty(this, '_createdAt', {
-    value: Date.now(),
-    writable: false,
-    enumerable: false
+  value: Date.now(),
+  writable: false,
+  enumerable: false,
 });
 ```
 
 **Proteção**:
+
 - `this.page = null` (em código externo) → Sem efeito (exceto em destroy via configurable: true)
 - `this.config = {}` → Sem efeito
 - `this._createdAt = 0` → Sem efeito
@@ -509,6 +550,7 @@ Object.defineProperty(this, '_createdAt', {
 ## 📦 Exports v2.0
 
 **Exports Adicionados**:
+
 ```javascript
 // Linhas 610-618
 module.exports = TargetDriver;
@@ -525,8 +567,8 @@ module.exports.CAPABILITIES_SCHEMA = CAPABILITIES_SCHEMA;
 
 ## 🎯 Cobertura do Audit
 
-| Item                  | Status         | Linhas     |
-| --------------------- | -------------- | ---------- |
+| Item                  | Status          | Linhas     |
+| --------------------- | --------------- | ---------- |
 | **Bugs Críticos (6)** | ✅ 6/6 (100%)   | Vários     |
 | **Melhorias (10)**    | ✅ 10/10 (100%) | Vários     |
 | **Total de Itens**    | ✅ 16/16 (100%) | 658 linhas |
@@ -536,17 +578,21 @@ module.exports.CAPABILITIES_SCHEMA = CAPABILITIES_SCHEMA;
 ## 🔍 Validação
 
 ### Sintaxe
+
 ```bash
 ✅ node --check src/driver/core/TargetDriver.js
 ```
+
 **Resultado**: Nenhum erro
 
 ### ESLint
+
 ```bash
 ✅ ESLint: 0 errors, 0 warnings
 ```
 
 ### Estrutura
+
 - ✅ 658 linhas (vs 225 em v1.1, +192%)
 - ✅ 31 métodos/constantes (vs 17 em v1.1)
 - ✅ 6 eventos emitidos (vs 2 em v1.1, +200%)
@@ -558,16 +604,19 @@ module.exports.CAPABILITIES_SCHEMA = CAPABILITIES_SCHEMA;
 ## 📈 Telemetria v2.0: Mapeamento Completo
 
 ### Eventos de Estado (4)
+
 1. `STATE_EXITING` → Linha 297 (antes de trocar)
 2. `STATE_CHANGE` → Linha 315 (durante transição)
 3. `STATE_ENTERED` → Linha 323 (após trocar)
 4. `STATE_TIMEOUT_WARNING` → Definido linha 69 (não usado ainda)
 
 ### Eventos de Sistema (2)
+
 1. `ABORT_SIGNAL_RECEIVED` → Linha 225 (AbortSignal disparado)
 2. `DESTROYED` → Linha 591 (destroy chamado)
 
 ### Eventos de Capabilities (1)
+
 1. `CAPABILITIES_CHANGED` → Linha 361 (updateCapabilities)
 
 **Total**: 10 eventos definidos, 6 emitidos ✅
@@ -577,6 +626,7 @@ module.exports.CAPABILITIES_SCHEMA = CAPABILITIES_SCHEMA;
 ## 🚀 Comparação de Fluxo
 
 ### v1.1 (Básico)
+
 ```
 setState(newState)
   └─> STATE_CHANGE (1 evento)
@@ -589,6 +639,7 @@ destroy()
 ```
 
 ### v2.0 (Instrumentado)
+
 ```
 setState(newState)
   ├─> _validateTransition(from, to) [✅ Valida matriz]
@@ -618,12 +669,14 @@ emit() override
 ## ⚡ Performance
 
 ### Overhead de Validação
+
 - **State transition**: ~0.5ms (lookup em Object.freeze)
 - **Capabilities schema**: ~1ms por capability (loop + includes)
 - **State history**: ~0.2ms (push + shift)
 - **Total por setState**: ~1-2ms
 
 ### Benefícios
+
 - ✅ **Bug prevention**: Transições inválidas bloqueadas
 - ✅ **Type safety**: Capabilities validadas
 - ✅ **Debugging**: State history completo
@@ -635,6 +688,7 @@ emit() override
 ## 🧪 Próximos Passos
 
 ### Testes
+
 - [ ] Criar `test_targetdriver_v2.spec.js`
 - [ ] Testar state transition matrix (transições válidas vs inválidas)
 - [ ] Testar AbortSignal integration
@@ -645,12 +699,14 @@ emit() override
 - [ ] Validar readonly properties
 
 ### Integração
+
 - [ ] Atualizar `BaseDriver.js` (já compatível - herda tudo)
 - [ ] Atualizar `ChatGPTDriver.js` (usar novos eventos)
 - [ ] Atualizar `factory.js` (escutar novos eventos)
 - [ ] Atualizar `DriverLifecycleManager.js` (usar getHealth expandido)
 
 ### Documentação
+
 - [ ] Atualizar ARCHITECTURE.md com state transition matrix
 - [ ] Criar guia de capabilities schema
 - [ ] Documentar novos eventos de telemetria
@@ -674,12 +730,11 @@ emit() override
 - ✅ Health expandido (16 campos)
 - ✅ Error tracking (counter + lastError)
 - ✅ JSDoc completo (17/17 métodos)
-- ✅ Readonly properties (page, config, _createdAt)
+- ✅ Readonly properties (page, config, \_createdAt)
 - ✅ Sintaxe válida
 - ✅ ESLint clean
 
-**Tempo de Desenvolvimento**: ~3 horas
-**Complexidade**: Alta (fundação da hierarquia)
+**Tempo de Desenvolvimento**: ~3 horas **Complexidade**: Alta (fundação da hierarquia)
 **Qualidade**: Excepcional (Protocol 12 - State Machine Validated)
 
 ---
@@ -687,11 +742,13 @@ emit() override
 ## 🎯 Impacto na Hierarquia
 
 ### Classes Afetadas (3)
+
 1. **TargetDriver** (658 linhas) ✅ COMPLETO
 2. **BaseDriver** (678 linhas) ✅ Herda tudo automaticamente
 3. **ChatGPTDriver** (~485 linhas) ⏭️ Beneficia de validações
 
 ### Benefícios Propagados
+
 - ✅ **State validation**: Todas as subclasses herdam
 - ✅ **AbortSignal**: Cancelamento automático em toda hierarquia
 - ✅ **Capabilities**: Schema validado em todos os drivers
@@ -699,12 +756,12 @@ emit() override
 - ✅ **Error tracking**: Rastreamento em toda hierarquia
 
 ### ROI
+
 - **Esforço**: 3h desenvolvimento
 - **Retorno**: Validação em TODA hierarquia (3 classes, 1,821 linhas)
 - **Multiplicador**: 1 → N drivers futuros (Gemini, Claude, etc)
 
 ---
 
-**Assinatura**: TargetDriver v2.0 - Sovereign Contract Master (Validation Edition)
-**Data**: 2026-02-01
-**Engineer**: GitHub Copilot (Claude Sonnet 4.5)
+**Assinatura**: TargetDriver v2.0 - Sovereign Contract Master (Validation Edition) **Data**:
+2026-02-01 **Engineer**: GitHub Copilot (Claude Sonnet 4.5)

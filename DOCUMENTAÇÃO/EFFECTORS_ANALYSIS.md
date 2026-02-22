@@ -10,7 +10,9 @@
 
 **RECOMENDAÇÃO**: **DELETAR** os effectors (`task_effector.js` e `io_effector.js`)
 
-**Razão Principal**: Os effectors representam uma **camada de indireção obsoleta** que duplica responsabilidades já implementadas na arquitetura NERV atual. Todos os seus comportamentos já estão cobertos por módulos consolidados.
+**Razão Principal**: Os effectors representam uma **camada de indireção obsoleta** que duplica
+responsabilidades já implementadas na arquitetura NERV atual. Todos os seus comportamentos já estão
+cobertos por módulos consolidados.
 
 ---
 
@@ -28,7 +30,8 @@
 
 #### Problema 1: **Duplicação com DriverNERVAdapter**
 
-O `DriverNERVAdapter` (`src/driver/nerv_adapter/driver_nerv_adapter.js`) JÁ FAZ TUDO que o TaskEffector promete:
+O `DriverNERVAdapter` (`src/driver/nerv_adapter/driver_nerv_adapter.js`) JÁ FAZ TUDO que o
+TaskEffector promete:
 
 ```javascript
 // DriverNERVAdapter.js (L108-140)
@@ -52,7 +55,8 @@ async _executeTask(payload, correlationId) {
 }
 ```
 
-**Conclusão**: O TaskEffector é uma **tentativa abandonada de bridge** que foi **completamente substituída** pelo DriverNERVAdapter.
+**Conclusão**: O TaskEffector é uma **tentativa abandonada de bridge** que foi **completamente
+substituída** pelo DriverNERVAdapter.
 
 #### Problema 2: **Código Incompleto e Não Usado**
 
@@ -68,7 +72,8 @@ const factory = require('../driver/factory');
 const page = await factory.getPage(); // ❌ MÉTODO NÃO EXISTE
 ```
 
-**Evidência**: O grep não encontrou NENHUM uso de `new TaskEffector` ou `require('./effectors/task_effector')` em toda a codebase.
+**Evidência**: O grep não encontrou NENHUM uso de `new TaskEffector` ou
+`require('./effectors/task_effector')` em toda a codebase.
 
 #### Problema 3: **Violação do Princípio NERV**
 
@@ -135,11 +140,12 @@ async saveTask(task) {
 ```javascript
 // io_effector.js (L31-36)
 if (!force && now - this.lastSaveTimestamp < this.saveInterval) {
-    return; // Ignora silenciosamente ❌ PERDA DE DADOS
+  return; // Ignora silenciosamente ❌ PERDA DE DADOS
 }
 ```
 
-Ignorar salvamentos silenciosamente é PERIGOSO. O io.js faz corretamente com cache reativo que preserva todas as escritas.
+Ignorar salvamentos silenciosamente é PERIGOSO. O io.js faz corretamente com cache reativo que
+preserva todas as escritas.
 
 #### Problema 3: **Não Usado**
 
@@ -160,7 +166,8 @@ Grep não encontrou nenhum uso de `new IOEffector` ou `require('./effectors/io_e
 | Throttle I/O                      | ✗ Perde dados           | ✅ io.js cache reativo                      |
 | Isolamento de erros               | ✗ try/catch simples     | ✅ io.js + error classification             |
 
-**Cobertura**: 100% das responsabilidades dos effectors já estão implementadas em módulos consolidados.
+**Cobertura**: 100% das responsabilidades dos effectors já estão implementadas em módulos
+consolidados.
 
 ---
 
@@ -220,7 +227,8 @@ grep -r "TaskEffector\|IOEffector" src/ | grep -v "^src/effectors/"
 3. **DriverNERVAdapter**: Sem audit level (código novo, consolidado)
 4. **DriverLifecycleManager**: Audit Level 700 (código consolidado)
 
-**Interpretação**: Os effectors foram **tentativa anterior** de arquitetura (pré-NERV) que foi **abandonada** quando a arquitetura NERV foi consolidada.
+**Interpretação**: Os effectors foram **tentativa anterior** de arquitetura (pré-NERV) que foi
+**abandonada** quando a arquitetura NERV foi consolidada.
 
 ### Evidências nos comentários:
 
@@ -300,7 +308,8 @@ Atualizar todos os documentos para remover menções aos effectors:
 
 ## 9. Conclusão
 
-Os **effectors** são **vestígios de uma arquitetura anterior** (pré-NERV) que nunca foram completamente integrados e foram **completamente substituídos** por:
+Os **effectors** são **vestígios de uma arquitetura anterior** (pré-NERV) que nunca foram
+completamente integrados e foram **completamente substituídos** por:
 
 - **DriverNERVAdapter** (substitui TaskEffector)
 - **infra/io.js + kernel/adapters/state_persistence.js** (substitui IOEffector)

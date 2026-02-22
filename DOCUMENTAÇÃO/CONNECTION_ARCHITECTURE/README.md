@@ -1,9 +1,7 @@
 # Arquitetura de Conexão Browser - Sistema Agente GPT
 
-**Versão**: 3.0 Docker Desktop Edition
-**Data**: 01 de Fevereiro de 2026
-**Autor**: Sistema de Automação com Puppeteer + Chrome Proxy
-**Status**: ✅ Validado e Funcionando
+**Versão**: 3.0 Docker Desktop Edition **Data**: 01 de Fevereiro de 2026 **Autor**: Sistema de
+Automação com Puppeteer + Chrome Proxy **Status**: ✅ Validado e Funcionando
 
 ---
 
@@ -25,16 +23,21 @@
 
 ## 🎯 Visão Geral
 
-Este sistema permite que código JavaScript executando dentro de um **container Docker** (ambiente Linux isolado) controle um navegador **Google Chrome** rodando no **sistema operacional host Windows**.
+Este sistema permite que código JavaScript executando dentro de um **container Docker** (ambiente
+Linux isolado) controle um navegador **Google Chrome** rodando no **sistema operacional host
+Windows**.
 
 ### Por Que Isso É Necessário?
 
-**Problema Real**: Queremos automatizar interações com sites (ChatGPT, Gemini) usando Puppeteer, mas:
+**Problema Real**: Queremos automatizar interações com sites (ChatGPT, Gemini) usando Puppeteer,
+mas:
+
 - O código JavaScript roda em um container Linux (leve, portável)
 - O Chrome precisa rodar no Windows (interface gráfica, recursos completos)
 - Containers Linux **não conseguem** executar aplicações gráficas Windows diretamente
 
-**Solução**: Separar os componentes e conectá-los via rede usando o protocolo Chrome DevTools Protocol (CDP).
+**Solução**: Separar os componentes e conectá-los via rede usando o protocolo Chrome DevTools
+Protocol (CDP).
 
 ---
 
@@ -43,11 +46,13 @@ Este sistema permite que código JavaScript executando dentro de um **container 
 ### Analogia: Controle Remoto de TV
 
 Imagine que você tem:
+
 - Um **controle remoto** (código JavaScript no container)
 - Uma **TV** (Chrome no Windows)
 - Eles estão em **cômodos diferentes** (container vs Windows)
 
 Para o controle funcionar, você precisa:
+
 1. **Sinal sem fio** que atravesse as paredes (rede TCP/IP)
 2. **Receptor na TV** que entenda os comandos (Chrome Remote Debugging)
 3. **Repetidor de sinal** se o alcance não for suficiente (Chrome Proxy)
@@ -83,9 +88,11 @@ Para o controle funcionar, você precisa:
 
 **Pergunta comum**: "Por que não executar o Chrome dentro do container?"
 
-**Resposta curta**: Containers Linux não têm interface gráfica completa. Chrome sem GUI (headless) é limitado e detectado por sites anti-bot.
+**Resposta curta**: Containers Linux não têm interface gráfica completa. Chrome sem GUI (headless) é
+limitado e detectado por sites anti-bot.
 
 **Resposta longa**:
+
 1. **Interface Gráfica**: Chrome precisa de bibliotecas visuais do Windows (DirectX, GDI+)
 2. **Detecção Anti-Bot**: Sites como ChatGPT detectam Chrome headless e bloqueiam
 3. **Recursos do Windows**: Aceleração de GPU, codecs de vídeo, fontes nativas
@@ -98,12 +105,14 @@ Para o controle funcionar, você precisa:
 ### Contexto Técnico
 
 **Ambiente**:
+
 - **Runtime**: Docker Desktop para Windows (WSL2 backend)
 - **Container**: Debian 12 (bookworm) com Node.js 24.13.0
 - **Host**: Windows 10/11 com Chrome 144.0.7559.110
 - **Rede**: Bridge Docker Desktop com DNS especial `host.docker.internal`
 
 **Protocolo**: Chrome DevTools Protocol (CDP)
+
 - **Transporte**: WebSocket (bidirectional, full-duplex)
 - **Porta Chrome**: 9225 (remote debugging)
 - **Porta Proxy**: 9224 (HTTP + WebSocket proxy)
@@ -119,6 +128,7 @@ Windows Host: Acessível via DNS especial "host.docker.internal"
 ```
 
 **Problema Crítico**: Chrome no Windows, por padrão, faz bind em `127.0.0.1` (localhost):
+
 ```
 Windows: 127.0.0.1:9225 ← Chrome escutando APENAS aqui
                   ↑
@@ -129,12 +139,14 @@ Container: Precisa de um IP roteável → host.docker.internal
 ```
 
 **Solução**:
+
 ```powershell
 # Chrome DEVE fazer bind em todas as interfaces (0.0.0.0)
 chrome.exe --remote-debugging-address=0.0.0.0 --remote-debugging-port=9225
 ```
 
 Isso permite:
+
 ```
 Windows: 0.0.0.0:9225 → Escuta em TODAS as interfaces
                         ├─ 127.0.0.1 (localhost Windows)
@@ -151,6 +163,7 @@ Container: curl http://host.docker.internal:9225
 **Problema 1: Host Header Validation**
 
 Chrome valida o header HTTP `Host:` para segurança:
+
 ```http
 GET /json/version HTTP/1.1
 Host: host.docker.internal:9225  ← Chrome REJEITA (não é IP ou localhost)
@@ -160,17 +173,19 @@ Host header is specified and is not an IP address or localhost.
 ```
 
 **Solução**: Proxy reescreve o header:
+
 ```javascript
 // ChromeProxyService intercepta e corrige
 const proxyRequest = {
   ...originalRequest,
-  headers: { 'Host': 'localhost' }  // Chrome aceita!
+  headers: { Host: 'localhost' }, // Chrome aceita!
 };
 ```
 
 **Problema 2: WebSocket URL Rewriting**
 
 Chrome retorna WebSocket URLs usando `localhost`:
+
 ```json
 {
   "webSocketDebuggerUrl": "ws://localhost/devtools/browser/abc123"
@@ -178,14 +193,16 @@ Chrome retorna WebSocket URLs usando `localhost`:
 ```
 
 Se o container usar esse URL diretamente:
+
 ```javascript
 await puppeteer.connect({
-  browserWSEndpoint: "ws://localhost/devtools/browser/abc123"
+  browserWSEndpoint: 'ws://localhost/devtools/browser/abc123',
   // ❌ ERRO: localhost no container ≠ localhost no Windows
 });
 ```
 
 **Solução**: Proxy reescreve URLs dinamicamente:
+
 ```javascript
 // ChromeProxyService.rewriteWebSocketURL()
 "ws://localhost/devtools/browser/abc123"
@@ -197,18 +214,20 @@ await puppeteer.connect({
 **Problema 3: Transparência para Puppeteer**
 
 Puppeteer espera conectar a **um único endpoint**. Sem proxy:
+
 ```javascript
 // ❌ Não funciona: Puppeteer não sabe lidar com host.docker.internal
 const browser = await puppeteer.connect({
-  browserWSEndpoint: "ws://host.docker.internal:9225/devtools/..."
+  browserWSEndpoint: 'ws://host.docker.internal:9225/devtools/...',
 });
 ```
 
 Com proxy:
+
 ```javascript
 // ✅ Funciona: Proxy lida com toda a complexidade
 const browser = await puppeteer.connect({
-  browserWSEndpoint: "ws://localhost:9224/devtools/..."
+  browserWSEndpoint: 'ws://localhost:9224/devtools/...',
   // Proxy traduz tudo automaticamente
 });
 ```
@@ -387,13 +406,13 @@ Puppeteer          Proxy              Docker Net         Chrome
 
 ### 1. ConnectionOrchestrator (`src/infra/browser_pool/ConnectionOrchestrator.js`)
 
-**Versão**: 3.0 (739 linhas)
-**Responsabilidade**: Estratégia de conexão ao Chrome
+**Versão**: 3.0 (739 linhas) **Responsabilidade**: Estratégia de conexão ao Chrome
 
 **Modos de Operação**:
+
 ```javascript
 const DEFAULTS = {
-  mode: 'launcher',  // launcher | external | hybrid | auto
+  mode: 'launcher', // launcher | external | hybrid | auto
   // ...
 };
 ```
@@ -404,16 +423,18 @@ const DEFAULTS = {
 - **auto**: Detecção inteligente
 
 **No Nosso Caso (Docker Desktop)**:
+
 ```javascript
 // ConnectionOrchestrator usa EXTERNAL mode
 // pois Chrome roda no Windows (fora do container)
 const orchestrator = new ConnectionOrchestrator({
   mode: 'external',
-  externalEndpoint: 'http://localhost:9224'  // Proxy, não Chrome direto!
+  externalEndpoint: 'http://localhost:9224', // Proxy, não Chrome direto!
 });
 ```
 
 **Helpers Compartilhados** (.puppeteerrc.cjs):
+
 ```javascript
 const puppeteerConfig = require('../../.puppeteerrc.cjs');
 
@@ -425,10 +446,10 @@ const cacheDir = puppeteerConfig.getCacheDirectory();
 
 ### 2. ChromeProxyService (`src/infra/proxy/chromeProxyService.js`)
 
-**Versão**: 3.0 (643 linhas)
-**Responsabilidade**: Proxy HTTP + WebSocket com reescrita de URLs
+**Versão**: 3.0 (643 linhas) **Responsabilidade**: Proxy HTTP + WebSocket com reescrita de URLs
 
 **API Pública**:
+
 ```javascript
 class ChromeProxyService {
   constructor({
@@ -450,6 +471,7 @@ class ChromeProxyService {
 ```
 
 **Endpoints Expostos**:
+
 ```
 GET  /health                    → { status: 'ok', uptime, stats }
 GET  /json/*                    → Proxy para Chrome (URL rewriting)
@@ -460,6 +482,7 @@ WS   /devtools/page/*           → WebSocket tunnel
 ```
 
 **Exemplo de Reescrita**:
+
 ```javascript
 // Input do Chrome
 {
@@ -477,6 +500,7 @@ WS   /devtools/page/*           → WebSocket tunnel
 **Responsabilidade**: Pool de instâncias Puppeteer com health checks
 
 **Método Crítico (BUG #2 corrigido)**:
+
 ```javascript
 // ❌ ANTES (ERRADO)
 async getBrowserInstance() {
@@ -498,6 +522,7 @@ async getBrowserInstance() {
 ```
 
 **Validação de Proxy (BUG #3 corrigido)**:
+
 ```javascript
 async _validateProxyAvailability() {
   const PROXY_HOST = CONFIG.CHROME_PROXY_HOST || 'localhost';
@@ -523,6 +548,7 @@ async _validateProxyAvailability() {
 ### 4. Main Boot Sequence (`src/main.js`)
 
 **Phase 2.5: ChromeProxy Startup (BUG #1 & #4 corrigidos)**:
+
 ```javascript
 // Linha 207-265 (59 linhas adicionadas)
 log('INFO', '[BOOT] ─────────────────────────────────────────────────────');
@@ -538,7 +564,7 @@ if (CONFIG.CHROME_PROXY_ENABLED) {
     PUBLIC_IP: process.env.PUBLIC_IP || null,
     CHROME_PORT: CONFIG.CHROME_PORT,
     PROXY_PORT: CONFIG.CHROME_PROXY_PORT,
-    CHROME_HOST: CONFIG.CHROME_PROXY_HOST
+    CHROME_HOST: CONFIG.CHROME_PROXY_HOST,
   });
 
   // Injeta NERV para eventos
@@ -553,7 +579,7 @@ if (CONFIG.CHROME_PROXY_ENABLED) {
     component: 'ChromeProxyService',
     port: CONFIG.CHROME_PROXY_PORT,
     chromeHost: CONFIG.CHROME_PROXY_HOST,
-    chromePort: CONFIG.CHROME_PORT
+    chromePort: CONFIG.CHROME_PORT,
   });
 
   log('INFO', '[BOOT] ✅ Chrome Proxy Service iniciado com sucesso');
@@ -563,6 +589,7 @@ if (CONFIG.CHROME_PROXY_ENABLED) {
 ```
 
 **Shutdown (BUG #6 corrigido)**:
+
 ```javascript
 // Linha 710-745 (28 linhas adicionadas)
 log('INFO', '[SHUTDOWN] Stopping ChromeProxyService...');
@@ -572,7 +599,7 @@ if (global.chromeProxy && typeof global.chromeProxy.stop === 'function') {
   const adapter = require('./infra/nerv/high_level_adapter');
   adapter.sendEvent(nerv, 'INFRA_SHUTDOWN', {
     component: 'ChromeProxyService',
-    reason: 'Graceful shutdown'
+    reason: 'Graceful shutdown',
   });
 
   log('INFO', '[SHUTDOWN] ✅ ChromeProxyService stopped');
@@ -675,6 +702,7 @@ Puppeteer                      Proxy                       Chrome
 ```
 
 **Problemas**:
+
 - ❌ Chrome headless detectado por anti-bot
 - ❌ Sem aceleração GPU
 - ❌ Fonts limitadas
@@ -727,6 +755,7 @@ Puppeteer                      Proxy                       Chrome
 ```
 
 **Solução Definitiva**:
+
 - ✅ Chrome full no Windows (GUI, GPU, extensões)
 - ✅ Proxy no container (gerenciamento unificado)
 - ✅ DNS Docker Desktop (`host.docker.internal`)
@@ -741,24 +770,26 @@ Puppeteer                      Proxy                       Chrome
 ```javascript
 // ❌ NÃO FUNCIONA
 const browser = await puppeteer.launch({
-  headless: true,  // Chrome headless
-  executablePath: '/usr/bin/chromium'
+  headless: true, // Chrome headless
+  executablePath: '/usr/bin/chromium',
 });
 ```
 
 **Problemas**:
+
 1. **Anti-Bot Detection**: ChatGPT detecta headless via `navigator.webdriver`
 2. **Canvas Fingerprinting**: Headless retorna hash diferente de Chrome normal
 3. **WebGL**: Headless não tem aceleração GPU → sites detectam
 4. **Fonts**: Fonts do container ≠ fonts do Windows
 
 **Evidência**:
+
 ```javascript
 // Em headless
-await page.evaluate(() => navigator.webdriver);  // true ❌
+await page.evaluate(() => navigator.webdriver); // true ❌
 
 // Em Chrome GUI
-await page.evaluate(() => navigator.webdriver);  // undefined ✅
+await page.evaluate(() => navigator.webdriver); // undefined ✅
 ```
 
 ### Tentativa 2: "Por que não conectar direto ao Chrome (sem proxy)?"
@@ -766,26 +797,30 @@ await page.evaluate(() => navigator.webdriver);  // undefined ✅
 ```javascript
 // ❌ NÃO FUNCIONA (Host header error)
 const browser = await puppeteer.connect({
-  browserWSEndpoint: 'ws://host.docker.internal:9225/devtools/...'
+  browserWSEndpoint: 'ws://host.docker.internal:9225/devtools/...',
 });
 ```
 
 **Erro**:
+
 ```
 Error: Unexpected server response: 400
 Host header is specified and is not an IP address or localhost.
 ```
 
-**Explicação**: Chrome valida o header `Host:` por segurança. `host.docker.internal` não é reconhecido.
+**Explicação**: Chrome valida o header `Host:` por segurança. `host.docker.internal` não é
+reconhecido.
 
 ### Tentativa 3: "Por que não rodar proxy no Windows?"
 
 **Desvantagens**:
+
 1. **Duplicação de Stack**:
    - Container: Node.js + PM2 + logs
    - Windows: Node.js + PM2 + logs (separado!)
 
 2. **Gerenciamento Complexo**:
+
    ```
    ┌─ Container ─┐   ┌─ Windows ──┐
    │ PM2 (agent) │   │ PM2 (proxy)│
@@ -797,6 +832,7 @@ Host header is specified and is not an IP address or localhost.
    ```
 
 3. **Deploy Complicado**:
+
    ```bash
    # Container
    docker-compose up -d
@@ -811,7 +847,7 @@ Host header is specified and is not an IP address or localhost.
 
 ```javascript
 // ❌ NÃO FUNCIONA
-CHROME_PROXY_HOST: "localhost"
+CHROME_PROXY_HOST: 'localhost';
 ```
 
 **Problema**: `localhost` no container aponta para **o próprio container**, não para Windows!
@@ -824,6 +860,7 @@ São máquinas diferentes!
 ```
 
 **Solução Docker Desktop**: DNS especial `host.docker.internal`
+
 ```
 Container: host.docker.internal → IP da interface Windows ✅
 ```
@@ -852,6 +889,7 @@ Com Proxy (necessário):
 ### Complexidade
 
 **Antes (tentativa ingênua)**:
+
 ```javascript
 // 5 linhas
 const browser = await puppeteer.launch();
@@ -860,6 +898,7 @@ await page.goto('https://chatgpt.com');
 ```
 
 **Depois (arquitetura real)**:
+
 ```javascript
 // 800+ linhas distribuídas:
 // - ConnectionOrchestrator: 739 linhas
@@ -869,23 +908,27 @@ await page.goto('https://chatgpt.com');
 ```
 
 **Justificativa**: Complexidade **essencial** vs complexidade **acidental**
+
 - Essencial: Necessária para funcionar em produção
 - Acidental: Poderia ser evitada (não é o nosso caso!)
 
 ### Manutenibilidade
 
 **Vantagens**:
+
 - ✅ **Single Source of Truth**: Tudo gerenciado pelo PM2 no container
 - ✅ **Logs Unificados**: `pm2 logs` mostra tudo
 - ✅ **Deploy Atômico**: `docker-compose up -d` sobe tudo
 
 **Desvantagens**:
+
 - ⚠️ **Curva de Aprendizado**: Novos devs precisam entender networking Docker
 - ⚠️ **Debugging**: Requer conhecimento de CDP + WebSocket + Docker
 
 ### Portabilidade
 
 **Multiplataforma**:
+
 ```
 ✅ Windows + Docker Desktop
 ✅ macOS + Docker Desktop
@@ -894,6 +937,7 @@ await page.goto('https://chatgpt.com');
 ```
 
 **Cloud**:
+
 ```
 ✅ AWS ECS + Chrome no EC2
 ✅ Google Cloud Run + Chrome sidecar
@@ -908,19 +952,23 @@ await page.goto('https://chatgpt.com');
 ### Erro: "Connection refused" ao acessar Chrome
 
 **Sintomas**:
+
 ```bash
 $ curl http://host.docker.internal:9225/json/version
 curl: (7) Failed to connect
 ```
 
 **Diagnóstico**:
+
 1. **Chrome está rodando?**
+
    ```powershell
    # Windows
    tasklist | findstr chrome
    ```
 
 2. **Chrome fez bind em 0.0.0.0?**
+
    ```powershell
    # Windows
    netstat -an | findstr :9225
@@ -935,6 +983,7 @@ curl: (7) Failed to connect
    ```
 
 **Solução**:
+
 ```powershell
 # Windows: Feche Chrome atual
 taskkill /F /IM chrome.exe
@@ -948,23 +997,26 @@ START-CHROME-SIMPLE.bat
 **Causa**: Tentativa de conectar direto ao Chrome sem proxy
 
 **Solução**:
+
 ```javascript
 // ❌ ERRADO
-browserWSEndpoint: 'ws://host.docker.internal:9225/devtools/...'
+browserWSEndpoint: 'ws://host.docker.internal:9225/devtools/...';
 
 // ✅ CORRETO
-browserWSEndpoint: 'ws://localhost:9224/devtools/...'
+browserWSEndpoint: 'ws://localhost:9224/devtools/...';
 //                         proxy ────┘
 ```
 
 ### Erro: "Proxy validation failed"
 
 **Sintomas**:
+
 ```
 [ERROR] Chrome Proxy não está acessível em http://localhost:9224/health
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Container
 curl http://localhost:9224/health
@@ -974,6 +1026,7 @@ ps aux | grep chrome-proxy
 ```
 
 **Solução**:
+
 ```bash
 # Container
 CHROME_HOST=host.docker.internal node scripts/chrome-proxy-service.js &
@@ -1088,7 +1141,8 @@ wsl-chrome-integration.sh        # Suite completa
 
 ## 🎯 Conclusão
 
-Esta arquitetura é **necessária** e **não pode ser significativamente simplificada** sem perder funcionalidade crítica:
+Esta arquitetura é **necessária** e **não pode ser significativamente simplificada** sem perder
+funcionalidade crítica:
 
 1. **Chrome no Windows**: Obrigatório para evitar detecção anti-bot
 2. **Proxy no Container**: Necessário para reescrever headers e URLs
@@ -1096,12 +1150,14 @@ Esta arquitetura é **necessária** e **não pode ser significativamente simplif
 4. **Chrome bind 0.0.0.0**: Única forma de aceitar conexões do container
 
 **Trade-off Fundamental**:
+
 ```
 Complexidade Arquitetural ↔ Funcionalidade Completa
        (necessária)              (não negociável)
 ```
 
 **Próximos Passos de Desenvolvimento**:
+
 - ✅ Arquitetura validada e documentada
 - ⏳ Integração com sistema principal (boot completo)
 - ⏳ Testes de stress (múltiplas conexões simultâneas)
@@ -1109,6 +1165,5 @@ Complexidade Arquitetural ↔ Funcionalidade Completa
 
 ---
 
-**Última Atualização**: 01 de Fevereiro de 2026
-**Versão da Arquitetura**: 3.0 Docker Desktop Edition
-**Status**: ✅ Produção (validado com 6 testes)
+**Última Atualização**: 01 de Fevereiro de 2026 **Versão da Arquitetura**: 3.0 Docker Desktop
+Edition **Status**: ✅ Produção (validado com 6 testes)

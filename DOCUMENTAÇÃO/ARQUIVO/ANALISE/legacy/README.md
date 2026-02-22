@@ -10,8 +10,8 @@ Mantidos apenas para referência histórica - **não representam o estado atual 
 
 ### ✅ Fases Concluídas
 
-| Arquivo | Data | Descrição |
-|---------|------|-----------|
+| Arquivo              | Data | Descrição                    |
+| -------------------- | ---- | ---------------------------- |
 | `FASE1_CONCLUIDA.md` | 2025 | Fase 1 do projeto completada |
 | `FASE2_CONCLUIDA.md` | 2025 | Fase 2 do projeto completada |
 
@@ -21,14 +21,14 @@ Mantidos apenas para referência histórica - **não representam o estado atual 
 
 ### ✅ Otimizações Aplicadas
 
-| Arquivo | Data | Descrição |
-|---------|------|-----------|
-| `MERGE_UPGRADE_COMPLETE.md` | 2025 | Merge e upgrade de dependências |
-| `CONFIGURATION_OPTIMIZATION_COMPLETE.md` | 2025 | Otimização de configurações |
-| `ESLINT_IMPROVEMENTS_COMPLETE.md` | 2025 | Melhorias no ESLint v9 |
-| `DOCKERFILE_OPTIMIZATION_REPORT.md` | 2025 | Otimização do Dockerfile (multi-stage Alpine) |
-| `OPTIMIZATION_RECOMMENDATIONS.md` | 2025 | Recomendações de otimização |
-| `OPTIMIZATION_SUMMARY.md` | 2025 | Sumário de otimizações aplicadas |
+| Arquivo                                  | Data | Descrição                                     |
+| ---------------------------------------- | ---- | --------------------------------------------- |
+| `MERGE_UPGRADE_COMPLETE.md`              | 2025 | Merge e upgrade de dependências               |
+| `CONFIGURATION_OPTIMIZATION_COMPLETE.md` | 2025 | Otimização de configurações                   |
+| `ESLINT_IMPROVEMENTS_COMPLETE.md`        | 2025 | Melhorias no ESLint v9                        |
+| `DOCKERFILE_OPTIMIZATION_REPORT.md`      | 2025 | Otimização do Dockerfile (multi-stage Alpine) |
+| `OPTIMIZATION_RECOMMENDATIONS.md`        | 2025 | Recomendações de otimização                   |
+| `OPTIMIZATION_SUMMARY.md`                | 2025 | Sumário de otimizações aplicadas              |
 
 **Status**: Otimizações já aplicadas no código atual.
 
@@ -36,12 +36,13 @@ Mantidos apenas para referência histórica - **não representam o estado atual 
 
 ### 📊 Relatórios Antigos
 
-| Arquivo | Data | Descrição |
-|---------|------|-----------|
-| `TEST_REPORT_FINAL.md` | 2025 | Relatório final de testes (pre-cleanup) |
-| `TESTS_AUDIT_RESULTS.md` | 2025 | Resultados de auditoria de testes |
+| Arquivo                  | Data | Descrição                               |
+| ------------------------ | ---- | --------------------------------------- |
+| `TEST_REPORT_FINAL.md`   | 2025 | Relatório final de testes (pre-cleanup) |
+| `TESTS_AUDIT_RESULTS.md` | 2025 | Resultados de auditoria de testes       |
 
-**Status**: Relatórios históricos - ver [TESTS_COVERAGE_MATRIX.md](../../TESTS_COVERAGE_MATRIX.md) para estado atual.
+**Status**: Relatórios históricos - ver [TESTS_COVERAGE_MATRIX.md](../../TESTS_COVERAGE_MATRIX.md)
+para estado atual.
 
 ---
 
@@ -86,6 +87,5 @@ chatgpt-docker-puppeteer/
 
 ---
 
-**Movidos para legacy**: 2026-01-21
-**Razão**: Fases concluídas, otimizações aplicadas, relatórios obsoletos
-**Total**: 11 arquivos organizados
+**Movidos para legacy**: 2026-01-21 **Razão**: Fases concluídas, otimizações aplicadas, relatórios
+obsoletos **Total**: 11 arquivos organizados

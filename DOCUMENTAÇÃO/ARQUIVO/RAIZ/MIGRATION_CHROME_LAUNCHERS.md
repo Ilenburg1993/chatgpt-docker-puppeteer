@@ -1,18 +1,18 @@
 # Migração de Scripts de Inicialização do Chrome
 
-> **Data**: 2026-01-30
-> **Versão**: 3.0
-> **Status**: Consolidação Completa
+> **Data**: 2026-01-30 **Versão**: 3.0 **Status**: Consolidação Completa
 
 ---
 
 ## 📋 Resumo da Migração
 
-O sistema de inicialização do Chrome foi consolidado para resolver problemas de conectividade Docker↔Windows e eliminar duplicação de scripts.
+O sistema de inicialização do Chrome foi consolidado para resolver problemas de conectividade
+Docker↔Windows e eliminar duplicação de scripts.
 
 ### Problema Resolvido
 
-**Antes**: Container Docker não conseguia conectar ao Chrome no Windows porque `webSocketDebuggerUrl` retornava `ws://localhost:9224/...` (não acessível do container).
+**Antes**: Container Docker não conseguia conectar ao Chrome no Windows porque
+`webSocketDebuggerUrl` retornava `ws://localhost:9224/...` (não acessível do container).
 
 **Solução**: Chrome Proxy Service que reescreve URLs e proxia WebSocket transparentemente.
 
@@ -30,8 +30,8 @@ O sistema de inicialização do Chrome foi consolidado para resolver problemas d
 
 ### 🗑️ Scripts Removidos/Depreciados
 
-| Arquivo                                 | Status                    | Motivo                                  |
-| --------------------------------------- | ------------------------- | --------------------------------------- |
+| Arquivo                                 | Status                     | Motivo                                  |
+| --------------------------------------- | -------------------------- | --------------------------------------- |
 | **scripts/start-chrome.bat**            | ⚠️ DEPRECADO (.deprecated) | Não inicia proxy, substituído           |
 | **scripts/start-chrome-with-proxy.bat** | ❌ DELETADO                | Duplicado, substituído pela versão root |
 
@@ -111,6 +111,7 @@ Se você estava usando um desses scripts, migre conforme a tabela:
 ### config.json
 
 **Antes**:
+
 ```json
 {
   "BROWSER_MODE": "remote",
@@ -121,6 +122,7 @@ Se você estava usando um desses scripts, migre conforme a tabela:
 ```
 
 **Depois**:
+
 ```json
 {
   "BROWSER_MODE": "wsEndpoint",
@@ -135,20 +137,22 @@ Se você estava usando um desses scripts, migre conforme a tabela:
 ### ConnectionOrchestrator.js
 
 **Antes**:
+
 ```javascript
 const DEFAULTS = {
-    mode: 'launcher',
-    ports: [9224, 9223, 9224],
-    hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1']
+  mode: 'launcher',
+  ports: [9224, 9223, 9224],
+  hosts: ['127.0.0.1', 'localhost', 'host.docker.internal', '172.17.0.1'],
 };
 ```
 
 **Depois**:
+
 ```javascript
 const DEFAULTS = {
-  mode: 'wsEndpoint',  // ← Mudança
-  ports: [9224, 9223, 9224],  // ← Proxy primeiro, fallback por ordem
-  hosts: ['192.168.0.2', 'host.docker.internal', '172.17.0.1', '127.0.0.1']  // ← IP público primeiro
+  mode: 'wsEndpoint', // ← Mudança
+  ports: [9224, 9223, 9224], // ← Proxy primeiro, fallback por ordem
+  hosts: ['192.168.0.2', 'host.docker.internal', '172.17.0.1', '127.0.0.1'], // ← IP público primeiro
 };
 ```
 
@@ -161,6 +165,7 @@ const DEFAULTS = {
 **Sintoma**: `start-chrome.bat` mostra mensagem de deprecação
 
 **Solução**:
+
 ```batch
 cd C:\caminho\para\chatgpt-docker-puppeteer
 start-chrome-proxy.bat
@@ -175,6 +180,7 @@ start-chrome-proxy.bat
 **Causa**: `start-chrome-proxy.bat` não está na pasta root
 
 **Solução**:
+
 ```batch
 # Verificar se arquivo existe
 dir start-chrome-proxy.bat
@@ -188,16 +194,17 @@ dir start-chrome-proxy.bat
 
 **Sintoma**: CI/CD falha com "script not found"
 
-**Solução**:
-Atualize seus scripts de CI/CD para usar o novo caminho:
+**Solução**: Atualize seus scripts de CI/CD para usar o novo caminho:
 
 **Antes**:
+
 ```yaml
 - name: Start Chrome
   run: scripts\start-chrome-with-proxy.bat
 ```
 
 **Depois**:
+
 ```yaml
 - name: Start Chrome + Proxy
   run: start-chrome-proxy.bat
@@ -269,7 +276,8 @@ git checkout HEAD~1 -- config.json
 scripts\start-chrome-with-proxy.bat
 ```
 
-**Nota**: Rollback não é recomendado pois os scripts novos resolvem problemas críticos de conectividade.
+**Nota**: Rollback não é recomendado pois os scripts novos resolvem problemas críticos de
+conectividade.
 
 ---
 
@@ -284,6 +292,5 @@ Se encontrar problemas após a migração:
 
 ---
 
-**Última Atualização**: 2026-01-30
-**Responsável**: Consolidação via Claude Code
-**Versão**: 3.0 (Production-Ready)
+**Última Atualização**: 2026-01-30 **Responsável**: Consolidação via Claude Code **Versão**: 3.0
+(Production-Ready)

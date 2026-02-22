@@ -1,8 +1,8 @@
 # 🎯 Análise Estratégica: Próximos Passos
 
-**Data**: 01 de Fevereiro de 2026
-**Contexto**: Sistema de conexão básico arrumado, documentação ARCHITECTURE_V4.md iniciada (BLOCOS I-II completos)
-**Objetivo**: Definir caminho estratégico de continuação
+**Data**: 01 de Fevereiro de 2026 **Contexto**: Sistema de conexão básico arrumado, documentação
+ARCHITECTURE_V4.md iniciada (BLOCOS I-II completos) **Objetivo**: Definir caminho estratégico de
+continuação
 
 ---
 
@@ -43,6 +43,7 @@
 ### ⚠️ Gaps Identificados
 
 #### **Documentação (10 blocos faltando)**
+
 - BLOCO III: MISSION LAYER (templates, workflows, checkpoints)
 - BLOCO IV: ORCHESTRATION LAYER (context, iterations, validation)
 - BLOCO V: EXECUTION LAYER (kernel, drivers, pool)
@@ -55,12 +56,14 @@
 - BLOCO XII: REFERÊNCIAS E RECURSOS (APIs, troubleshooting)
 
 #### **Código**
+
 - Ausência de TODOs/FIXMEs críticos (boa higiene!)
 - Templates de missions não documentados
 - Testes de integração parciais
 - Métricas/telemetry não unificadas
 
 #### **Operacional**
+
 - 97 missions criadas mas sem análise de sucesso/falha
 - Falta dashboard operacional unificado
 - Sem SLOs/SLIs definidos
@@ -75,12 +78,14 @@
 **Objetivo**: Documentar todo o sistema antes de evoluir
 
 **Vantagens**:
+
 - ✅ Conhecimento consolidado (onboarding futuro)
 - ✅ Identifica gaps arquiteturais durante escrita
 - ✅ Facilita refactorings futuros (design claro)
 - ✅ Previne erosão arquitetural
 
 **Desvantagens**:
+
 - ⚠️ ~2-3 dias de trabalho intenso
 - ⚠️ Código pode evoluir enquanto documenta (dessincronia)
 - ⚠️ Não agrega valor funcional imediato
@@ -88,6 +93,7 @@
 **Esforço Estimado**: 10-15 horas (3-4 sessões)
 
 **Tarefas**:
+
 1. BLOCO III: MISSION LAYER (4 capítulos)
    - Templates disponíveis (book_writing, code_refactor, etc)
    - WorkflowGenerator deep dive
@@ -122,12 +128,14 @@
 **Objetivo**: Validar que o sistema funciona end-to-end em produção
 
 **Vantagens**:
+
 - ✅ Identifica bugs críticos rapidamente
 - ✅ Confiança para escalar (testes provam robustez)
 - ✅ Métricas reais de performance
 - ✅ Feedback loop rápido
 
 **Desvantagens**:
+
 - ⚠️ Pode expor bugs graves (requer fixes)
 - ⚠️ Requer infraestrutura (CI/CD, monitoring)
 - ⚠️ Testes frágeis se arquitetura mudar
@@ -135,6 +143,7 @@
 **Esforço Estimado**: 8-12 horas
 
 **Tarefas**:
+
 1. **Completar Test Suite**
    - Refatorar 5 testes quebrados (test_lock, test_control_pause, etc)
    - Adicionar testes de integração mission-to-completion
@@ -167,11 +176,13 @@
 **Objetivo**: Implementar funcionalidades que desbloqueiam casos de uso críticos
 
 **Vantagens**:
+
 - ✅ Valor funcional imediato
 - ✅ Feedback de usuários reais (se aplicável)
 - ✅ Motivação alta (ver features funcionando)
 
 **Desvantagens**:
+
 - ⚠️ Pode criar dívida técnica se mal implementado
 - ⚠️ Documentação fica para trás
 - ⚠️ Pode quebrar testes existentes
@@ -181,30 +192,35 @@
 **Features Candidatas**:
 
 #### **F1: Template Marketplace (Mission Templates)**
+
 - **O que**: Biblioteca de templates prontos (blog_post, email_campaign, code_review)
 - **Impacto**: Alto (democratiza uso do sistema)
 - **Esforço**: 6-8h (criar 5-10 templates + validação)
 - **Bloqueadores**: Nenhum
 
 #### **F2: Real-Time Mission Monitoring (Dashboard)**
+
 - **O que**: UI React para acompanhar missions em tempo real
 - **Impacto**: Alto (visibilidade operacional)
 - **Esforço**: 12-16h (frontend React + Socket.io integration)
 - **Bloqueadores**: Server já implementado (integrated mode)
 
 #### **F3: Multi-LLM Support (GPT-4, Claude, Gemini)**
+
 - **O que**: Suporte a múltiplos LLMs além de ChatGPT
 - **Impacto**: Médio-Alto (flexibilidade, custos)
 - **Esforço**: 8-10h por LLM adapter
 - **Bloqueadores**: Gemini já parcialmente implementado
 
 #### **F4: Cost Tracking & Budgeting**
+
 - **O que**: Rastreamento detalhado de custos por mission (tokens, $)
 - **Impacto**: Alto (gestão financeira)
 - **Esforço**: 4-6h (adicionar telemetry + report)
 - **Bloqueadores**: Nenhum
 
 #### **F5: Parallel Step Execution**
+
 - **O que**: Steps independentes executam em paralelo (reduz latência)
 - **Impacto**: Médio (performance)
 - **Esforço**: 10-12h (refactor OrchestratorEngine + dependency graph)
@@ -219,11 +235,13 @@
 **Objetivo**: Melhorar qualidade interna do código sem mudar funcionalidades
 
 **Vantagens**:
+
 - ✅ Manutenibilidade futura
 - ✅ Reduz complexidade
 - ✅ Facilita testes
 
 **Desvantagens**:
+
 - ⚠️ Alto risco (pode quebrar funcionalidades)
 - ⚠️ Sem valor funcional direto
 - ⚠️ Requer testes abrangentes (validação)
@@ -233,24 +251,28 @@
 **Candidatos**:
 
 #### **R1: Unificar Telemetry/Metrics**
+
 - **O que**: Sistema centralizado de métricas (NERV, Kernel, Drivers)
 - **Benefício**: Observabilidade unificada
 - **Risco**: Médio
 - **Esforço**: 8-10h
 
 #### **R2: Extrair Mission Templates para arquivos JSON/YAML**
+
 - **O que**: Templates atualmente em código JS → config files
 - **Benefício**: Não-programadores podem criar templates
 - **Risco**: Baixo
 - **Esforço**: 4-6h
 
 #### **R3: Consolidar Logs (Structured Logging)**
+
 - **O que**: Migrar para Winston/Pino com JSON structured logs
 - **Benefício**: Parsing automático, alerting
 - **Risco**: Baixo
 - **Esforço**: 6-8h
 
 #### **R4: Database Migration (Filesystem → SQLite/Postgres)**
+
 - **O que**: Persistência em DB ao invés de JSON files
 - **Benefício**: ACID, queries complexas, escalabilidade
 - **Risco**: Alto (requer migração de dados)
@@ -296,6 +318,7 @@
    - Verificar disk usage, memory leaks
 
 **Entregáveis**:
+
 - ✅ `missions_success_analysis.md` (relatório executivo)
 - ✅ ARCHITECTURE_V4.md BLOCOS III + VII completos
 - ✅ Test suite 100% passing
@@ -326,6 +349,7 @@
    - Gráficos simples (success rate, avg duration)
 
 **Entregáveis**:
+
 - ✅ Cost tracking em produção
 - ✅ 10+ templates prontos para uso
 - ✅ Dashboard funcional (MVP)
@@ -354,6 +378,7 @@
    - Deploy script para produção
 
 **Entregáveis**:
+
 - ✅ ARCHITECTURE_V4.md 100% completo
 - ✅ Logs estruturados em produção
 - ✅ CI/CD pipeline robusto
@@ -464,4 +489,5 @@ cat DOCUMENTAÇÃO/missions_success_analysis.md
 
 ---
 
-**Decisão necessária**: Você prefere seguir o caminho híbrido proposto ou focar em um dos 4 caminhos isoladamente?
+**Decisão necessária**: Você prefere seguir o caminho híbrido proposto ou focar em um dos 4 caminhos
+isoladamente?

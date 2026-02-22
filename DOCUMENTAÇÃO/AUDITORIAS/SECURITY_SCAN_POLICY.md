@@ -4,7 +4,8 @@ This repository includes automated secret scanning and remediation guidelines.
 
 - Scheduled scans: `.github/workflows/secret-scan-schedule.yml` dispatches periodic scans.
 - Pre-commit: ensure `pre-commit` is configured locally to run the included secret checks.
-- Post-rotation verification: use `analysis/rotation-scripts/post_rotation_verify.sh` to collect verification reports.
+- Post-rotation verification: use `analysis/rotation-scripts/post_rotation_verify.sh` to collect
+  verification reports.
 
 Owner responsibilities:
 
@@ -17,7 +18,8 @@ For emergencies, archive `analysis/outputs/final_package.zip` and contact reposi
 
 ## Objetivo
 
-Definir regras, thresholds e procedimentos operacionais para varredura de segredos e artefatos sensíveis no repositório.
+Definir regras, thresholds e procedimentos operacionais para varredura de segredos e artefatos
+sensíveis no repositório.
 
 ## Escopo
 
@@ -35,8 +37,10 @@ Definir regras, thresholds e procedimentos operacionais para varredura de segred
 
 - Ignorar diretórios gerados: `node_modules/`, `vendor/`, `build/`, `dist/`.
 - Ignorar diretórios gerados: `node_modules/`, `vendor/`, `build/`, `dist/`, `local-login/`.
-- Arquivos binários grandes devem ser tratados separadamente (ex.: armazenar em LFS ou repositório de assets).
-- Lockfiles (`package-lock.json`, `yarn.lock`) são escaneados, mas marcados com suspeita reduzida (muitos hashes/integrity são falsos-positives).
+- Arquivos binários grandes devem ser tratados separadamente (ex.: armazenar em LFS ou repositório
+  de assets).
+- Lockfiles (`package-lock.json`, `yarn.lock`) são escaneados, mas marcados com suspeita reduzida
+  (muitos hashes/integrity são falsos-positives).
 
 ## Assinaturas e regex (catálogo)
 
@@ -51,17 +55,18 @@ Definir regras, thresholds e procedimentos operacionais para varredura de segred
 
 - Heurística combinada: entropia (Shannon) + comprimento mínimo.
 - Recomendação inicial: entropia >= 4.5 e comprimento >= 20 bytes para marcar como suspeito.
-- Para base64/hex permitir thresholds diferenciados e sinalizar com menor severidade se o contexto for lockfile.
+- Para base64/hex permitir thresholds diferenciados e sinalizar com menor severidade se o contexto
+  for lockfile.
 
 ## Fluxo de triagem (Triage)
 
 1. Detectado → coletar evidências (path, commit, snippet).
 2. Triage manual por owner: confirmar falso-positivo ou credencial ativa.
 3. Classificação de severidade:
-    - P0: credencial ativa com exposição pública/produção (ação imediata)
-    - P1: credencial válida em ambiente de desenvolvimento/local
-    - P2: possível token / baixa probabilidade
-    - P3: provável falso-positivo (ex.: integrity hashes)
+   - P0: credencial ativa com exposição pública/produção (ação imediata)
+   - P1: credencial válida em ambiente de desenvolvimento/local
+   - P2: possível token / baixa probabilidade
+   - P3: provável falso-positivo (ex.: integrity hashes)
 4. Criar issue/ticket com owner e prazo.
 
 ## Remediação

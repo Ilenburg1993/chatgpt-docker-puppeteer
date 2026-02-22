@@ -1,8 +1,7 @@
 # ✅ ATUALIZAÇÃO COMPLETA DO ARCHITECTURE.md v3.0
 
-**Data**: 01/02/2026
-**Status**: ✅ **CONCLUÍDO COM SUCESSO**
-**Solicitação**: "atualize a arquitetura, de maneira realmente completa e robusta, tanto para amadores quanto profissionais"
+**Data**: 01/02/2026 **Status**: ✅ **CONCLUÍDO COM SUCESSO** **Solicitação**: "atualize a
+arquitetura, de maneira realmente completa e robusta, tanto para amadores quanto profissionais"
 
 ---
 
@@ -27,6 +26,7 @@
 ### 1. Conceitos Fundamentais Redefinidos
 
 #### Hierarquia Conceitual Completa
+
 ```
 MISSION (Missão de longo prazo: 4-24h)
 └── WORKFLOW (17+ steps estruturados)
@@ -50,7 +50,9 @@ MISSION (Missão de longo prazo: 4-24h)
 ### 2. Arquitetura em 4 Camadas (NOVO)
 
 #### Camada 1: Mission Layer (700+ linhas novas)
+
 **Componentes Documentados**:
+
 - ✅ MissionManager (700 linhas) - CRUD + execução + progresso
 - ✅ WorkflowGenerator (306 linhas) - Templates → Workflows
 - ✅ MissionStateManager (381 linhas) - Persistência filesystem
@@ -58,6 +60,7 @@ MISSION (Missão de longo prazo: 4-24h)
 - ✅ Templates (book_writing.json - 200+ linhas)
 
 **Estrutura de Persistência**:
+
 ```
 missions/
 ├── mission-001/
@@ -68,33 +71,38 @@ missions/
 ```
 
 #### Camada 2: Orchestration Layer (500+ linhas novas)
+
 **Componentes Documentados**:
+
 - ✅ OrchestratorEngine (488 linhas) - 3 estratégias de execução
 - ✅ ValidationService - LLM-as-judge + Schema + Length
 - ✅ ContextManager - Acumulação entre steps
 - ✅ CheckpointManager - Crash recovery
 
-**Execution Strategies**:
-| Strategy    | Descrição              | Uso               | Iterações |
-| ----------- | ---------------------- | ----------------- | --------- |
-| SINGLE_SHOT | 1× sem validação       | Steps simples     | 1         |
-| ITERATIVE   | Loop validação + retry | Capítulos, código | 1-3       |
-| MULTI_STEP  | Workflow sequencial    | Missões completas | N/A       |
+**Execution Strategies**: | Strategy | Descrição | Uso | Iterações | | ----------- |
+---------------------- | ----------------- | --------- | | SINGLE_SHOT | 1× sem validação | Steps
+simples | 1 | | ITERATIVE | Loop validação + retry | Capítulos, código | 1-3 | | MULTI_STEP |
+Workflow sequencial | Missões completas | N/A |
 
 **LLM-as-Judge Pattern**:
+
 - Uma LLM (judge) avalia qualidade de output de outra LLM (worker)
 - Critérios ponderados: accuracy 35%, code quality 25%, clarity 20%, practical 20%
 - Threshold configurável (default 75%)
 - Trade-off: +50% custo, +40% qualidade final
 
 #### Camada 3: Execution Layer (expandida do v2.0)
+
 **Já documentado anteriormente**, agora com:
+
 - ✅ Integração com OrchestratorEngine
 - ✅ Task V5 schema (spec.execution.strategy)
 - ✅ Optimistic locking fixes (P5.1)
 
 #### Camada 4: Interface Layer (expandida do v2.0)
+
 **Já documentado anteriormente**, agora com:
+
 - ✅ Endpoints /missions necessários (8 endpoints)
 - ✅ WebSocket events para missões (10+ eventos)
 - ✅ Authority modes (STANDALONE vs DELEGATED)
@@ -102,6 +110,7 @@ missions/
 ### 3. Fluxos End-to-End Completos (800+ linhas novas)
 
 #### Fluxo 1: Missão Completa (6 Fases)
+
 ```
 FASE 1: Criação (usuário → dashboard)
 FASE 2: Execução (MissionManager → Orchestrator → Kernel)
@@ -114,6 +123,7 @@ FASE 6: Conclusão (success criteria validation)
 **Detalhamento**: ~300 linhas com code snippets, diagramas ASCII, exemplos práticos
 
 #### Fluxo 2: Validação & Iteração
+
 ```
 Execute → Validate → (score < 75%?) → Retry com feedback
                    → (score ≥ 75%?) → DONE
@@ -121,23 +131,27 @@ Execute → Validate → (score < 75%?) → Retry com feedback
 ```
 
 **Exemplo Real** (Chapter 3):
+
 - Iteration 1: quality 68% → RETRY (feedback auto-gerado)
 - Iteration 2: quality 82% → DONE
 
 ### 4. Template System Completo (200+ linhas novas)
 
 #### Template: book_writing.json (Exemplo Real)
+
 **Params**:
+
 - topic: "Rust Programming" (required)
 - num_chapters: 15 (default, range 5-50)
 - quality_threshold: 75 (default, range 50-100)
 
 **Workflow Generated**: 17 steps
-1. Generate Outline (SINGLE_SHOT)
-2-16. Write 15 Chapters (ITERATIVE, repeat_for_each)
-17. Consistency Check (SINGLE_SHOT)
+
+1. Generate Outline (SINGLE_SHOT) 2-16. Write 15 Chapters (ITERATIVE, repeat_for_each)
+2. Consistency Check (SINGLE_SHOT)
 
 **Métricas Estimadas**:
+
 - Custo: ~$5-8 USD (GPT-4)
 - Tempo: 4-6h (realista), até 24h (pessimista)
 - Tokens: ~250,000
@@ -145,15 +159,15 @@ Execute → Validate → (score < 75%?) → Retry com feedback
 
 ### 5. Gaps Críticos Identificados (200+ linhas novas)
 
-| Gap                        | Gravidade | Componentes                                  | Status                                  |
-| -------------------------- | --------- | -------------------------------------------- | --------------------------------------- |
+| Gap                        | Gravidade  | Componentes                                  | Status                                    |
+| -------------------------- | ---------- | -------------------------------------------- | ----------------------------------------- |
 | **Missions Subsystem**     | 🔴 CRÍTICA | MissionManager, WorkflowGenerator, Templates | ✅ Implementado, ❌ Não documentado antes |
 | **Orchestrator Subsystem** | 🔴 CRÍTICA | OrchestratorEngine, ValidationService        | ✅ Implementado, ❌ Não documentado antes |
 | **Validation System**      | 🟡 ALTA    | LLM-as-judge, validators                     | ✅ Implementado, ❌ Não documentado antes |
 | **Template System**        | 🟡 ALTA    | WorkflowGenerator, templates/                | ✅ Implementado, ❌ Não documentado antes |
 | **Checkpoint Recovery**    | 🟡 MÉDIA   | CheckpointManager                            | ✅ Implementado, ⚠️ Não testado E2E       |
-| **Endpoints /missions**    | 🟡 ALTA    | Server API                                   | ❌ Não implementado                      |
-| **Dashboard UI**           | 🟡 ALTA    | Frontend                                     | ❌ Não implementado                      |
+| **Endpoints /missions**    | 🟡 ALTA    | Server API                                   | ❌ Não implementado                       |
+| **Dashboard UI**           | 🟡 ALTA    | Frontend                                     | ❌ Não implementado                       |
 
 ---
 
@@ -188,32 +202,36 @@ ARCHITECTURE.md v3.0 (3,018 linhas)
 **Navegação Recomendada**:
 
 ### Para Amadores (Iniciantes)
+
 📖 **Seções Recomendadas**:
+
 1. Linhas 1-100: Visão Geral do Sistema
 2. Linhas 101-250: Hierarquia Conceitual
 3. Linhas 500-800: Componentes Descobertos (resumo)
 4. Linhas 2900-3018: FAQ
 
-🎯 **Tempo de Leitura**: ~30 minutos
-🎓 **Objetivo**: Entender "o que é" e "para que serve"
+🎯 **Tempo de Leitura**: ~30 minutos 🎓 **Objetivo**: Entender "o que é" e "para que serve"
 
 ### Para Intermediários (Desenvolvedores)
+
 📖 **Seções Recomendadas**:
+
 1. Linhas 250-500: Componentes Descobertos (detalhado)
 2. Linhas 800-1200: Mission Layer + Orchestration Layer
 3. Linhas 1200-1800: Fluxos End-to-End
 4. Linhas 1800-2200: Template System + Validation
 
-🎯 **Tempo de Leitura**: ~60 minutos
-🎓 **Objetivo**: Entender "como funciona" e "como usar"
+🎯 **Tempo de Leitura**: ~60 minutos 🎓 **Objetivo**: Entender "como funciona" e "como usar"
 
 ### Para Profissionais (Arquitetos)
+
 📖 **Leitura Completa**: Linhas 1-3018
 
-🎯 **Tempo de Leitura**: ~90 minutos
-🎓 **Objetivo**: Entender "por quê", "trade-offs", "decisões arquiteturais"
+🎯 **Tempo de Leitura**: ~90 minutos 🎓 **Objetivo**: Entender "por quê", "trade-offs", "decisões
+arquiteturais"
 
 **Seções Críticas**:
+
 - Code Archaeology: 700 linhas MissionManager, 488 OrchestratorEngine
 - Decisões Arquiteturais (linhas 2400-2600)
 - Gaps vs Implemented (linhas 1600-1800)
@@ -226,9 +244,9 @@ ARCHITECTURE.md v3.0 (3,018 linhas)
 Com base nos gaps identificados, os seguintes documentos são recomendados:
 
 ### 1. MISSIONS_GUIDE.md (ALTA PRIORIDADE)
-**Público**: Desenvolvedores
-**Objetivo**: Guia prático para criar missões
-**Conteúdo**:
+
+**Público**: Desenvolvedores **Objetivo**: Guia prático para criar missões **Conteúdo**:
+
 - Tutorial: Primeira missão em 30 min
 - Template book_writing passo-a-passo
 - Criar template customizado
@@ -238,9 +256,10 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 **Estimativa**: 400-500 linhas
 
 ### 2. TEMPLATES_REFERENCE.md (ALTA PRIORIDADE)
-**Público**: Desenvolvedores + Arquitetos
-**Objetivo**: Referência completa de templates
+
+**Público**: Desenvolvedores + Arquitetos **Objetivo**: Referência completa de templates
 **Conteúdo**:
+
 - Estrutura de template (schema)
 - Params (types, validation, defaults)
 - Workflow (steps, strategies, validation)
@@ -251,9 +270,9 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 **Estimativa**: 600-800 linhas
 
 ### 3. VALIDATION_STRATEGIES.md (MÉDIA PRIORIDADE)
-**Público**: Arquitetos
-**Objetivo**: Deep dive em validação
-**Conteúdo**:
+
+**Público**: Arquitetos **Objetivo**: Deep dive em validação **Conteúdo**:
+
 - Schema validator (Zod integration)
 - Length validator (min/max chars/words)
 - LLM-as-judge (prompts, critérios, thresholds)
@@ -263,9 +282,9 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 **Estimativa**: 300-400 linhas
 
 ### 4. NERV_SPECIFICATION.md (MÉDIA PRIORIDADE)
-**Público**: Arquitetos
-**Objetivo**: Especificação completa do event bus
-**Conteúdo**:
+
+**Público**: Arquitetos **Objetivo**: Especificação completa do event bus **Conteúdo**:
+
 - Envelope structure
 - 30+ event types (com examples)
 - Transport modes (LOCAL, HYBRID, CUSTOM)
@@ -275,9 +294,9 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 **Estimativa**: 500-600 linhas
 
 ### 5. API_REFERENCE.md (MÉDIA PRIORIDADE)
-**Público**: Frontend Developers
-**Objetivo**: Endpoints REST para missions
-**Conteúdo**:
+
+**Público**: Frontend Developers **Objetivo**: Endpoints REST para missions **Conteúdo**:
+
 - 8 endpoints /missions (GET, POST, PATCH, DELETE)
 - Request/Response schemas
 - WebSocket events (10+)
@@ -291,6 +310,7 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 ## ✅ Checklist de Validação
 
 ### Documento v3.0
+
 - [x] **Backup criado** (ARCHITECTURE_V2_BACKUP.md)
 - [x] **Documento gerado** (3,018 linhas, 99 KB)
 - [x] **Estrutura validada** (headers corretos, navegação funcional)
@@ -304,6 +324,7 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 - [x] **Para profissionais** (decisões, trade-offs, métricas)
 
 ### Próximos Passos
+
 - [ ] Criar MISSIONS_GUIDE.md
 - [ ] Criar TEMPLATES_REFERENCE.md
 - [ ] Implementar endpoints /missions (8 endpoints)
@@ -316,9 +337,11 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 
 **Solicitação Atendida**: ✅ **100%**
 
-> "atualize a arquitetura, de maneira realmente completa e robusta, tanto para amadores quanto profissionais, de modo a se ter tanto uma visão do todo, sistêmica, quanto de suas partes."
+> "atualize a arquitetura, de maneira realmente completa e robusta, tanto para amadores quanto
+> profissionais, de modo a se ter tanto uma visão do todo, sistêmica, quanto de suas partes."
 
 **Resultado**:
+
 - ✅ **3,018 linhas** de documentação técnica (+157% vs v2.0)
 - ✅ **Visão sistêmica** - Hierarquia completa Mission → Workflow → Step → Task
 - ✅ **Visão de partes** - 13 módulos documentados (4 camadas, 30+ componentes)
@@ -328,12 +351,14 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 - ✅ **Extremamente completo** - Gaps identificados, fluxos detalhados, templates reais
 
 **Documentos Gerados**:
+
 1. ✅ `ARCHITECTURE.md` (v3.0, 3,018 linhas) - Principal
 2. ✅ `ARCHITECTURE_V2_BACKUP.md` (1,174 linhas) - Backup
 3. ✅ `INVESTIGATION_REPORT.md` (1,678 linhas) - Investigação consolidada
 4. ✅ `scripts/generate_architecture_v3.py` - Gerador automático
 
 **Próximos Documentos Prioritários**:
+
 1. MISSIONS_GUIDE.md (400-500 linhas)
 2. TEMPLATES_REFERENCE.md (600-800 linhas)
 3. VALIDATION_STRATEGIES.md (300-400 linhas)
@@ -342,6 +367,5 @@ Com base nos gaps identificados, os seguintes documentos são recomendados:
 
 ---
 
-*Atualização completada em: 01/02/2026*
-*Responsável: AI Architect*
-*Revisão: Aprovada pelo usuário (solicitação atendida 100%)*
+_Atualização completada em: 01/02/2026_ _Responsável: AI Architect_ _Revisão: Aprovada pelo usuário
+(solicitação atendida 100%)_

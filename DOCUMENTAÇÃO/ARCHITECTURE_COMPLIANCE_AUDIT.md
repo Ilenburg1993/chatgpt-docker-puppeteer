@@ -1,8 +1,8 @@
 # 🔍 Auditoria de Conformidade Arquitetural
 
-> **Data**: 4 de Fevereiro de 2026
-> **Baseado em**: [CONCEPTUAL_ARCHITECTURE.md](CONCEPTUAL_ARCHITECTURE.md)
-> **Status**: ✅ 100% CONFORME (20/20 componentes, BaseDriver reclassificado como correto)
+> **Data**: 4 de Fevereiro de 2026 **Baseado em**:
+> [CONCEPTUAL_ARCHITECTURE.md](CONCEPTUAL_ARCHITECTURE.md) **Status**: ✅ 100% CONFORME (20/20
+> componentes, BaseDriver reclassificado como correto)
 
 ---
 
@@ -16,16 +16,20 @@
 - **Casos Limítrofes**: 4 (aceitáveis com justificativa)
 - **Totalmente Conformes**: 16 componentes
 
-**Atualização Crítica**: BaseDriver retry reclassificado de "violação" para "comportamento correto" após esclarecimento de responsabilidades. Driver DEVE fazer retry tático (operações de execução) para completar task no contexto de missão.
+**Atualização Crítica**: BaseDriver retry reclassificado de "violação" para "comportamento correto"
+após esclarecimento de responsabilidades. Driver DEVE fazer retry tático (operações de execução)
+para completar task no contexto de missão.
 
 ---
 
 ## ✅ Componentes CONFORMES (16/20)
 
 ### 1. ✅ BaseDriver.js (src/driver/core/BaseDriver.js)
+
 **Status**: 100% CONFORME - **RETRY DE EXECUÇÃO CORRETO**
 
 **Validação**:
+
 - ✅ Executa task até conseguir OU ser cancelada externamente
 - ✅ Retry TÁTICO em falhas técnicas (seletores, frames, operações DOM)
 - ✅ Respeita cancelamento externo (6+ checkpoints de signal.aborted)
@@ -33,6 +37,7 @@
 - ✅ Distingue retry tático (Driver) vs estratégico (Kernel)
 
 **Evidências**:
+
 ```javascript
 // BaseDriver.js - Retry de EXECUÇÃO (linhas 490-650)
 async execute(task, signal) {
@@ -81,17 +86,19 @@ async execute(task, signal) {
 ```
 
 **Classificação de Erros** (linhas 50-120):
+
 ```javascript
 const ERROR_CLASSES = Object.freeze({
-    ABORT: 'ABORT',           // Cancelamento externo → Stop
-    FATAL: 'FATAL',           // Não recuperável → Stop
-    TIMEOUT: 'TIMEOUT',       // Timeout → Retry tático
-    SELECTOR: 'SELECTOR',     // Selector não encontrado → Retry tático
-    TRANSIENT: 'TRANSIENT'    // Erro técnico recuperável → Retry tático
+  ABORT: 'ABORT', // Cancelamento externo → Stop
+  FATAL: 'FATAL', // Não recuperável → Stop
+  TIMEOUT: 'TIMEOUT', // Timeout → Retry tático
+  SELECTOR: 'SELECTOR', // Selector não encontrado → Retry tático
+  TRANSIENT: 'TRANSIENT', // Erro técnico recuperável → Retry tático
 });
 ```
 
 **Checkpoints de Cancelamento** (6+ localizações):
+
 - Linha 508: Início de cada tentativa (retry loop)
 - Linha 540: Após clearAll() (limpeza de handles)
 - Linha 560: Após resolution (resolução de input)
@@ -102,18 +109,21 @@ const ERROR_CLASSES = Object.freeze({
 **Conformidade com Responsabilidades**:
 
 ✅ **Execução Completa de Task**:
+
 - Driver faz o necessário para executar task no contexto de missão
 - Retry tático em falhas técnicas (connection lost, Chrome closed during execution)
 - Backoff exponencial (1s, 2s, 4s, 8s)
 - Telemetria de tentativas (NERV events: RETRY_ATTEMPT, EXECUTION_ABORTED)
 
 ✅ **Respeita Cancelamento Externo**:
+
 - 6+ checkpoints de `signal?.aborted` durante execução
 - Aborta imediatamente se task cancelada (usuário, timeout, externe)
 - Emite evento EXECUTION_ABORTED com contexto (stage, attempt, taskId)
 - Lança OPERATION_ABORTED (não tenta retry após cancelamento)
 
 ✅ **Classifica Erros Corretamente**:
+
 - ABORT: Cancelamento externo → não retry
 - FATAL: Não recuperável (TARGET_CLOSED, PAGE_DESTROYED) → não retry, relata ao Kernel
 - TRANSIENT/TIMEOUT/SELECTOR: Recuperável → retry tático OK
@@ -121,6 +131,7 @@ const ERROR_CLASSES = Object.freeze({
 ✅ **Distingue Retry Tático vs Estratégico**:
 
 **Retry TÁTICO (Driver)**: Completar MESMA task
+
 - Escopo: Operações de execução (seletores, frames, DOM)
 - Decisão: LOCAL (Driver classifica erro e sabe se é recuperável)
 - Limite: 4 tentativas, signal.aborted
@@ -128,6 +139,7 @@ const ERROR_CLASSES = Object.freeze({
 - Exemplo: Selector not found → tenta 4x em 2 segundos
 
 **Retry ESTRATÉGICO (Kernel)**: Reagendar task COMPLETA na fila
+
 - Escopo: Task completa (próxima execução)
 - Decisão: PolicyEngine (usa contexto global + info do Driver)
 - Limite: SLA, rate limits, Circuit Breaker
@@ -139,15 +151,18 @@ const ERROR_CLASSES = Object.freeze({
 ---
 
 ### 2. ✅ Kernel Loop (kernel_loop.js)
+
 **Status**: 100% CONFORME
 
 **Validação**:
+
 - ✅ Não executa Puppeteer (zero chamadas `page.*`)
 - ✅ Decide apenas QUANDO executar (PolicyEngine)
 - ✅ Delega execução via NERV events
 - ✅ Controla tempo soberano (20Hz loop)
 
 **Evidências**:
+
 ```javascript
 // kernel_loop.js - Decisão sem execução
 async step() {
@@ -165,15 +180,18 @@ async step() {
 ---
 
 ### 2. ✅ CircuitBreaker (circuit_breaker.js)
+
 **Status**: 100% CONFORME
 
 **Validação**:
+
 - ✅ Diagnostica CAUSA de falhas (7 cenários)
 - ✅ Não tenta reconectar (zero `puppeteer.connect()`)
 - ✅ Não faz health checks periódicos
 - ✅ Emite eventos (não age diretamente)
 
 **Evidências**:
+
 ```javascript
 // circuit_breaker.js - Diagnóstico sem ação
 registerFailure(poolEntryId, error, context = {}) {
@@ -195,15 +213,18 @@ registerFailure(poolEntryId, error, context = {}) {
 ---
 
 ### 3. ✅ PeriodicHealthMonitor (PeriodicHealthMonitor.js)
+
 **Status**: 100% CONFORME
 
 **Validação**:
+
 - ✅ Mede saúde contínua (CDP checks)
 - ✅ Não decide pausar Kernel (zero `kernel.pause()`)
 - ✅ Não diagnostica causa de falha
 - ✅ Emite eventos para Bridge coordenar
 
 **Evidências**:
+
 ```javascript
 // PeriodicHealthMonitor.js - Medição sem decisão
 async _performHealthCheck() {
@@ -227,15 +248,18 @@ async _performHealthCheck() {
 ---
 
 ### 4. ✅ BrowserPool (pool_manager.js)
+
 **Status**: 100% CONFORME
 
 **Validação**:
+
 - ✅ Gerencia recursos (allocate/release)
 - ✅ Não executa tasks (zero `driver.execute()`)
 - ✅ Não decide políticas (MAX_WORKERS é do Kernel)
 - ✅ Coordena CB + Monitor via Bridge
 
 **Evidências**:
+
 ```javascript
 // pool_manager.js - Gestão sem execução
 async allocate(config = {}) {
@@ -266,15 +290,18 @@ _bridgeCircuitBreakerAndMonitor() {
 ---
 
 ### 5. ✅ PolicyEngine (policy_engine.js)
+
 **Status**: 100% CONFORME
 
 **Validação**:
+
 - ✅ Emite avisos consultivos (não decide)
 - ✅ Não executa ações (zero side effects)
 - ✅ Não controla tempo (avalia passivamente)
 - ✅ Retorna assessment (quem consome decide)
 
 **Evidências**:
+
 ```javascript
 // policy_engine.js - Consultoria sem decisão
 assess({ task, observations, at }) {
@@ -320,27 +347,28 @@ assess({ task, observations, at }) {
 
 ### 🔶 Caso Limítrofe #1: Driver Módulos Internos (InputResolver, SubmissionController, etc.)
 
-**Componente**: `src/driver/modules/*.js`
-**Status**: ACEITÁVEL COM JUSTIFICATIVA
+**Componente**: `src/driver/modules/*.js` **Status**: ACEITÁVEL COM JUSTIFICATIVA
 
 **Observação**:
+
 ```javascript
 // input_resolver.js - Retry interno
 for (let retry = 0; retry < maxRetries; retry++) {
-    try {
-        return await this._resolveInput();
-    } catch (err) {
-        // Retry de resolução de seletor
-    }
+  try {
+    return await this._resolveInput();
+  } catch (err) {
+    // Retry de resolução de seletor
+  }
 }
 
 // submission_controller.js - Similar
 for (let retry = 0; retry < maxRetries; retry++) {
-    // Retry de submit button
+  // Retry de submit button
 }
 ```
 
 **Justificativa**:
+
 - ✅ **Escopo limitado**: Retry de operações Puppeteer específicas (seletores, clicks)
 - ✅ **Contexto local**: Módulo sabe quando seletor é recuperável (ex: animação CSS)
 - ✅ **Performance**: Evita overhead de comunicação NERV para cada micro-retry
@@ -351,12 +379,14 @@ for (let retry = 0; retry < maxRetries; retry++) {
 De acordo com [CONCEPTUAL_ARCHITECTURE.md](CONCEPTUAL_ARCHITECTURE.md), seção 3.4:
 
 > **Condições de Espera (Waiting Conditions)**:
+>
 > - Página carregando, LLM processando, rede lenta
 > - **Responsabilidade**: Driver (aguardar + timeout)
 
 **Classificação**: ✅ ACEITO (retry tático de operações DOM)
 
 **Recomendação**: Documentar explicitamente no código:
+
 ```javascript
 /**
  * RETRY POLICY: Tático (não estratégico)
@@ -371,10 +401,10 @@ for (let retry = 0; retry < 4; retry++) { ... }
 
 ### 🔶 Caso Limítrofe #2: DriverReadinessGuard - Validação de Pré-condições
 
-**Componente**: `src/driver/guards/DriverReadinessGuard.js`
-**Status**: ACEITÁVEL COM JUSTIFICATIVA
+**Componente**: `src/driver/guards/DriverReadinessGuard.js` **Status**: ACEITÁVEL COM JUSTIFICATIVA
 
 **Observação**:
+
 ```javascript
 // DriverReadinessGuard.js
 async waitForChatReady(page, timeout = 10000) {
@@ -391,6 +421,7 @@ async waitForChatReady(page, timeout = 10000) {
 **Questão**: "Isso é retry? Driver está decidindo política de timeout?"
 
 **Justificativa**:
+
 - ✅ **Não é retry**: É **espera com timeout** (Waiting Condition, não retry)
 - ✅ **Timeout configurado**: 10s é parâmetro (não decisão hardcoded)
 - ✅ **Sem loop**: Tenta 1x apenas (não é while/for)
@@ -402,27 +433,27 @@ async waitForChatReady(page, timeout = 10000) {
 
 ### 🔶 Caso Limítrofe #3: RecoverySystem - Tiers de Recovery
 
-**Componente**: `src/driver/modules/recovery_system.js`
-**Status**: ACEITÁVEL COM JUSTIFICATIVA
+**Componente**: `src/driver/modules/recovery_system.js` **Status**: ACEITÁVEL COM JUSTIFICATIVA
 
 **Observação**:
+
 ```javascript
 // recovery_system.js
 for (let retry = 0; retry < maxRetries; retry++) {
-    if (await this._attemptTier1Recovery()) return true;
-    if (await this._attemptTier2Recovery()) return true;
-    if (await this._attemptTier3Recovery()) return true;
+  if (await this._attemptTier1Recovery()) return true;
+  if (await this._attemptTier2Recovery()) return true;
+  if (await this._attemptTier3Recovery()) return true;
 }
 ```
 
 **Justificativa**:
+
 - ✅ **Contexto específico**: Recovery de estado interno do Driver (não task)
 - ✅ **Escopo limitado**: 3 tiers (refresh page → reload context → disconnect)
 - ✅ **Táticas de execução**: Driver decide COMO recuperar (não SE deve recuperar)
 - ✅ **Relata falha**: Se todos os tiers falharem, retorna erro para Kernel
 
-**Paralelo**:
-Similar a um **circuit breaker interno do Driver** (tenta recovery antes de falhar).
+**Paralelo**: Similar a um **circuit breaker interno do Driver** (tenta recovery antes de falhar).
 
 **Classificação**: ✅ ACEITO (recovery tático de estado interno)
 
@@ -430,23 +461,24 @@ Similar a um **circuit breaker interno do Driver** (tenta recovery antes de falh
 
 ### 🔶 Caso Limítrofe #4: FrameNavigator - Retry de Dispose
 
-**Componente**: `src/driver/modules/frame_navigator.js`
-**Status**: ACEITÁVEL COM JUSTIFICATIVA
+**Componente**: `src/driver/modules/frame_navigator.js` **Status**: ACEITÁVEL COM JUSTIFICATIVA
 
 **Observação**:
+
 ```javascript
 // frame_navigator.js
 for (let attempt = 0; attempt < DISPOSE_RETRY_ATTEMPTS; attempt++) {
-    try {
-        await handle.dispose();
-        return true;
-    } catch (err) {
-        // Retry de cleanup (Puppeteer quirk)
-    }
+  try {
+    await handle.dispose();
+    return true;
+  } catch (err) {
+    // Retry de cleanup (Puppeteer quirk)
+  }
 }
 ```
 
 **Justificativa**:
+
 - ✅ **Workaround de Puppeteer**: `handle.dispose()` pode falhar (timing issue)
 - ✅ **Cleanup crítico**: Previne memory leaks (garbage collection)
 - ✅ **Sem impacto funcional**: Falha em dispose não afeta task (apenas performance)
@@ -496,7 +528,8 @@ MÉDIA TOTAL:                          95% ████████████�
 ## 🎯 Plano de Ação
 
 ### Prioridade ALTA (0 itens)
-*Nenhuma violação crítica identificada*
+
+_Nenhuma violação crítica identificada_
 
 ### Prioridade MÉDIA (1 item)
 
@@ -538,33 +571,40 @@ Aplicando as 5 perguntas de validação de [CONCEPTUAL_ARCHITECTURE.md](CONCEPTU
 ### 1. Driver: "Controla Puppeteer OU decide política?"
 
 **Resultado**: ✅ **100% Correto (comportamento conforme)**
+
 - ✅ Módulos controlam Puppeteer corretamente
 - ✅ BaseDriver faz retry TÁTICO (execução) - responsabilidade legítima
 - ✅ Kernel decide retry ESTRATÉGICO (reagendar task) - separação clara
 
-**Esclarecimento**: Retry tático (completar execução atual) é responsabilidade do Driver no contexto de missão. Driver deve fazer o necessário para executar task até conseguir OU ser cancelada externamente.
+**Esclarecimento**: Retry tático (completar execução atual) é responsabilidade do Driver no contexto
+de missão. Driver deve fazer o necessário para executar task até conseguir OU ser cancelada
+externamente.
 
 ### 2. Kernel: "Decide quando OU executa Puppeteer?"
 
 **Resultado**: ✅ **100% Correto**
+
 - ✅ Kernel decide quando (PolicyEngine)
 - ✅ Zero execução Puppeteer (delega via NERV)
 
 ### 3. CircuitBreaker: "Diagnostica causa OU tenta reconectar?"
 
 **Resultado**: ✅ **100% Correto**
+
 - ✅ Diagnostica causa (7 cenários)
 - ✅ Não tenta reconectar (delega para ConnectionRecovery)
 
 ### 4. PeriodicHealthMonitor: "Mede saúde OU decide pausar?"
 
 **Resultado**: ✅ **100% Correto**
+
 - ✅ Mede saúde (CDP checks)
 - ✅ Não decide pausar (emite eventos para Bridge)
 
 ### 5. BrowserPool: "Gerencia recursos OU executa tasks?"
 
 **Resultado**: ✅ **100% Correto**
+
 - ✅ Gerencia recursos (allocate/release)
 - ✅ Não executa tasks (retorna handles apenas)
 
@@ -573,8 +613,10 @@ Aplicando as 5 perguntas de validação de [CONCEPTUAL_ARCHITECTURE.md](CONCEPTU
 ## 📚 Referências
 
 1. [CONCEPTUAL_ARCHITECTURE.md](CONCEPTUAL_ARCHITECTURE.md) - Arquitetura conceitual completa
-2. [CIRCUIT_BREAKER_PHASE3_INTEGRATION_ANALYSIS.md](CIRCUIT_BREAKER_PHASE3_INTEGRATION_ANALYSIS.md) - Análise de integração CB+Monitor
-3. [PHASE3_IMPLEMENTATION_REPORT.md](PHASE3_IMPLEMENTATION_REPORT.md) - Report de implementação Phase 3
+2. [CIRCUIT_BREAKER_PHASE3_INTEGRATION_ANALYSIS.md](CIRCUIT_BREAKER_PHASE3_INTEGRATION_ANALYSIS.md) -
+   Análise de integração CB+Monitor
+3. [PHASE3_IMPLEMENTATION_REPORT.md](PHASE3_IMPLEMENTATION_REPORT.md) - Report de implementação
+   Phase 3
 
 ---
 
@@ -655,14 +697,19 @@ Aplicando as 5 perguntas de validação de [CONCEPTUAL_ARCHITECTURE.md](CONCEPTU
 
 ---
 
-**Conclusão**: Sistema está **100% CONFORME** com arquitetura conceitual definida. BaseDriver retry reclassificado como comportamento correto (Driver DEVE fazer retry tático para completar task no contexto de missão). 20/20 componentes conformes, 4 casos limítrofes aceitáveis documentados.
+**Conclusão**: Sistema está **100% CONFORME** com arquitetura conceitual definida. BaseDriver retry
+reclassificado como comportamento correto (Driver DEVE fazer retry tático para completar task no
+contexto de missão). 20/20 componentes conformes, 4 casos limítrofes aceitáveis documentados.
 
-**Esclarecimento Crítico**: Retry TÁTICO (Driver - operações de execução) vs Retry ESTRATÉGICO (Kernel - reagendar task completa). Driver tem responsabilidade de executar task até conseguir OU ser cancelada externamente.
+**Esclarecimento Crítico**: Retry TÁTICO (Driver - operações de execução) vs Retry ESTRATÉGICO
+(Kernel - reagendar task completa). Driver tem responsabilidade de executar task até conseguir OU
+ser cancelada externamente.
 
-**Próxima Ação Recomendada**: Adicionar JSDoc aos módulos explicando retry tático vs estratégico. Sistema pronto para produção.
+**Próxima Ação Recomendada**: Adicionar JSDoc aos módulos explicando retry tático vs estratégico.
+Sistema pronto para produção.
 
 ---
 
-**Versão**: 2.0 (Atualização: BaseDriver reclassificado)
-**Auditoria Realizada Por**: Análise automatizada + revisão manual + esclarecimento arquitetural
-**Próxima Auditoria**: Após implementação de Mission System
+**Versão**: 2.0 (Atualização: BaseDriver reclassificado) **Auditoria Realizada Por**: Análise
+automatizada + revisão manual + esclarecimento arquitetural **Próxima Auditoria**: Após
+implementação de Mission System

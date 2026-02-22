@@ -1,8 +1,7 @@
 # 🎯 Dashboard Architecture - Análise Completa e Proposta
 
-**Data**: Fevereiro 2026
-**Status**: ANÁLISE COMPLETA + PROPOSTA DE REBUILDING
-**Versão**: 1.0 (Analysis + Recommendations)
+**Data**: Fevereiro 2026 **Status**: ANÁLISE COMPLETA + PROPOSTA DE REBUILDING **Versão**: 1.0
+(Analysis + Recommendations)
 
 ---
 
@@ -23,11 +22,14 @@
 
 ### Situação Atual
 
-O dashboard existe em **estado primitivo** com infraestrutura backend completa mas interface frontend básica e não-funcional. Há **separação clara** entre frontend (Vue 3 app) e backend (Express server), mas design light theme incompatível com requisito de "futuristic dark theme".
+O dashboard existe em **estado primitivo** com infraestrutura backend completa mas interface
+frontend básica e não-funcional. Há **separação clara** entre frontend (Vue 3 app) e backend
+(Express server), mas design light theme incompatível com requisito de "futuristic dark theme".
 
 ### Objetivo
 
 **Rebuild completo** do dashboard mantendo arquitetura de separação existente, mas com:
+
 - ✅ **Dark Theme Futurista** (sóbrio, não exagerado)
 - ✅ **Task CRUD** como feature inicial
 - ✅ **Indicadores Básicos** (métricas, health, alertas)
@@ -36,8 +38,8 @@ O dashboard existe em **estado primitivo** com infraestrutura backend completa m
 
 ### Decisões Chave
 
-| Aspecto           | Decisão                             | Justificativa                                  |
-| ----------------- | ----------------------------------- | ---------------------------------------------- |
+| Aspecto           | Decisão                              | Justificativa                                  |
+| ----------------- | ------------------------------------ | ---------------------------------------------- |
 | **Node Folder**   | ✅ Manter separado                   | Isolamento de dependências, build independente |
 | **Tech Stack**    | ✅ Vue 3 + Vite + Pinia              | Stack moderna, já configurado                  |
 | **UI Library**    | 🔄 Element Plus → Shadcn/TailwindCSS | Mais controle sobre dark theme                 |
@@ -103,34 +105,37 @@ src/
 ### Tech Stack Atual
 
 #### Frontend (dashboard-ui)
+
 ```json
 {
   "dependencies": {
-    "vue": "^3.5.24",              // ✅ Framework
-    "vue-router": "^4.5.0",         // ✅ Routing
-    "pinia": "^2.3.1",              // ✅ State management
-    "element-plus": "^2.13.1",      // ⚠️ UI library (light theme bias)
-    "socket.io-client": "^4.8.3",   // ✅ Realtime communication
-    "axios": "^1.7.9",              // ✅ HTTP client
-    "chart.js": "^4.4.8",           // ✅ Charts
-    "cytoscape": "^3.31.3",         // ⚠️ Graph visualization (heavy)
-    "d3": "^7.9.0",                 // ⚠️ Visualization (heavy)
-    "vis-timeline": "^7.7.3"        // ⚠️ Timeline (heavy)
+    "vue": "^3.5.24", // ✅ Framework
+    "vue-router": "^4.5.0", // ✅ Routing
+    "pinia": "^2.3.1", // ✅ State management
+    "element-plus": "^2.13.1", // ⚠️ UI library (light theme bias)
+    "socket.io-client": "^4.8.3", // ✅ Realtime communication
+    "axios": "^1.7.9", // ✅ HTTP client
+    "chart.js": "^4.4.8", // ✅ Charts
+    "cytoscape": "^3.31.3", // ⚠️ Graph visualization (heavy)
+    "d3": "^7.9.0", // ⚠️ Visualization (heavy)
+    "vis-timeline": "^7.7.3" // ⚠️ Timeline (heavy)
   },
   "devDependencies": {
-    "vite": "^7.2.4",               // ✅ Build tool
-    "@vitejs/plugin-vue": "^6.0.1"  // ✅ Vue plugin
+    "vite": "^7.2.4", // ✅ Build tool
+    "@vitejs/plugin-vue": "^6.0.1" // ✅ Vue plugin
   }
 }
 ```
 
 **Análise**:
+
 - ✅ **Stack sólido**: Vue 3 + Vite + Pinia é moderno e performático
 - ⚠️ **Element Plus**: Boa biblioteca, mas difícil customizar dark theme
 - ⚠️ **Libs pesadas**: cytoscape, d3, vis-timeline (>5MB bundle) - não usados na MVP
 - 💡 **Recomendação**: Manter Vue/Vite/Pinia, considerar TailwindCSS + Shadcn para dark theme
 
 #### Backend (server)
+
 ```javascript
 // Dependências principais (do package.json raiz)
 {
@@ -142,6 +147,7 @@ src/
 ```
 
 **Análise**:
+
 - ✅ **Stack estável**: Express + Socket.io é padrão de mercado
 - ✅ **Separação limpa**: Backend não mistura com frontend
 - ✅ **NERV integration**: Adapter pattern isolando IPC
@@ -212,15 +218,15 @@ Dashboard UI          →  HTTP Request  →  Server API Router
 
 | Método | Endpoint                            | Descrição                       | Implementado |
 | ------ | ----------------------------------- | ------------------------------- | ------------ |
-| GET    | `/dashboard/tasks`                  | Lista unificada (disk + kernel) | ✅            |
-| GET    | `/dashboard/tasks/:id`              | Task específica                 | ✅            |
-| GET    | `/dashboard/tasks/:id/dependencies` | Dependencies graph              | ✅            |
-| GET    | `/dashboard/tasks-stats`            | Estatísticas agregadas          | ✅            |
-| GET    | `/dashboard/telemetry/current`      | Métricas atuais                 | ✅            |
-| GET    | `/dashboard/telemetry/history`      | Histórico (1 hora)              | ✅            |
-| GET    | `/dashboard/alerts`                 | Alertas ativos                  | ✅            |
-| GET    | `/dashboard/system/health`          | Health checks (4 subsystems)    | ✅            |
-| GET    | `/dashboard/system/info`            | System info                     | ✅            |
+| GET    | `/dashboard/tasks`                  | Lista unificada (disk + kernel) | ✅           |
+| GET    | `/dashboard/tasks/:id`              | Task específica                 | ✅           |
+| GET    | `/dashboard/tasks/:id/dependencies` | Dependencies graph              | ✅           |
+| GET    | `/dashboard/tasks-stats`            | Estatísticas agregadas          | ✅           |
+| GET    | `/dashboard/telemetry/current`      | Métricas atuais                 | ✅           |
+| GET    | `/dashboard/telemetry/history`      | Histórico (1 hora)              | ✅           |
+| GET    | `/dashboard/alerts`                 | Alertas ativos                  | ✅           |
+| GET    | `/dashboard/system/health`          | Health checks (4 subsystems)    | ✅           |
+| GET    | `/dashboard/system/info`            | System info                     | ✅           |
 
 #### Realtime (WebSocket)
 
@@ -252,10 +258,12 @@ NERV Event Bus        →  NERV Adapter  →  Socket.io Broadcast
 **Arquivo**: `src/server/dashboard-api/task_sync_bridge.js` (406 linhas)
 
 **Responsabilidade**: Unificar duas fontes de verdade
+
 - **Queue Cache (disco)**: Tarefas persistidas em JSON (`fila/`)
 - **Kernel Runtime (memória)**: Estado de execução em tempo real
 
 **Métodos Principais**:
+
 ```javascript
 class TaskSyncBridge extends EventEmitter {
     // Inicialização
@@ -273,18 +281,20 @@ class TaskSyncBridge extends EventEmitter {
 ```
 
 **Estados Unificados**:
+
 ```javascript
 const UnifiedStatus = {
-    PENDING: 'PENDING',       // Na fila, aguardando
-    RUNNING: 'RUNNING',       // Em execução
-    PAUSED: 'PAUSED',         // Suspenso
-    DONE: 'DONE',             // Concluído
-    FAILED: 'FAILED',         // Falhou
-    CANCELLED: 'CANCELLED'    // Cancelado
+  PENDING: 'PENDING', // Na fila, aguardando
+  RUNNING: 'RUNNING', // Em execução
+  PAUSED: 'PAUSED', // Suspenso
+  DONE: 'DONE', // Concluído
+  FAILED: 'FAILED', // Falhou
+  CANCELLED: 'CANCELLED', // Cancelado
 };
 ```
 
 **Arquitetura**:
+
 - ✅ **Singleton pattern** para acesso global
 - ✅ **Event-driven** para updates em tempo real
 - ✅ **Cache local** para performance
@@ -297,6 +307,7 @@ const UnifiedStatus = {
 **Responsabilidade**: Coletar e agregar métricas de sistema
 
 **Ring Buffers** (3600 amostras = 1 hora @ 1Hz):
+
 - `cpuHistory`: CPU usage (%)
 - `memoryHistory`: Memory usage (MB)
 - `heapHistory`: Heap usage (MB)
@@ -305,34 +316,36 @@ const UnifiedStatus = {
 - `nervThroughputHistory`: NERV throughput (events/s)
 
 **Coleta**:
+
 ```javascript
 // Coleta a 1Hz (1 amostra/segundo)
 setInterval(() => {
-    // Hardware
-    const cpu = hardware.getCPU();
-    const memory = hardware.getMemory();
-    const heap = hardware.getHeapUsage();
+  // Hardware
+  const cpu = hardware.getCPU();
+  const memory = hardware.getMemory();
+  const heap = hardware.getHeapUsage();
 
-    // NERV
-    const nervStats = nervClient.getStats();
+  // NERV
+  const nervStats = nervClient.getStats();
 
-    // Queue
-    const queueStats = queueCache.getStats();
+  // Queue
+  const queueStats = queueCache.getStats();
 
-    // Agregação
-    aggregator.collect({ cpu, memory, heap, nervStats, queueStats });
+  // Agregação
+  aggregator.collect({ cpu, memory, heap, nervStats, queueStats });
 }, 1000);
 ```
 
 **Alertas**:
+
 ```javascript
 // Thresholds configuráveis
 const ALERT_THRESHOLDS = {
-    CPU_HIGH: 80,           // CPU > 80%
-    MEMORY_HIGH: 4096,      // Memory > 4GB
-    HEAP_HIGH: 1536,        // Heap > 1.5GB
-    EVENT_LOOP_LAG: 100,    // Lag > 100ms
-    NERV_LATENCY: 500       // Latency > 500ms
+  CPU_HIGH: 80, // CPU > 80%
+  MEMORY_HIGH: 4096, // Memory > 4GB
+  HEAP_HIGH: 1536, // Heap > 1.5GB
+  EVENT_LOOP_LAG: 100, // Lag > 100ms
+  NERV_LATENCY: 500, // Latency > 500ms
 };
 ```
 
@@ -343,6 +356,7 @@ const ALERT_THRESHOLDS = {
 **Responsabilidade**: Anti-corruption layer entre NERV (IPC) e Socket.io (WebSocket)
 
 **Invariantes** (Audit Level 900):
+
 - ❌ NO business logic
 - ❌ NO Kernel/Driver imports
 - ❌ NO filesystem access
@@ -350,32 +364,33 @@ const ALERT_THRESHOLDS = {
 - ✅ Security: Filter private events (`KERNEL_INTERNAL_ERROR`, `SECURITY_VIOLATION`)
 
 **Tradução de Eventos**:
+
 ```javascript
 // NERV → Socket
-nerv.on('TASK_UPDATED', (event) => {
-    // Anti-corruption: translate event structure
-    const socketPayload = {
-        taskId: event.payload.taskId,
-        status: event.payload.status,
-        progress: event.payload.progress,
-        timestamp: event.timestamp
-    };
+nerv.on('TASK_UPDATED', event => {
+  // Anti-corruption: translate event structure
+  const socketPayload = {
+    taskId: event.payload.taskId,
+    status: event.payload.status,
+    progress: event.payload.progress,
+    timestamp: event.timestamp,
+  };
 
-    // Broadcast via Socket.io
-    socketHub.broadcast('task:updated', socketPayload);
+  // Broadcast via Socket.io
+  socketHub.broadcast('task:updated', socketPayload);
 });
 
 // Socket → NERV
-socket.on('dashboard:execute_task', (payload) => {
-    // Anti-corruption: translate to NERV action
-    nerv.emit({
-        type: 'DRIVER_EXECUTE',
-        action: 'EXECUTE',
-        payload: {
-            taskId: payload.taskId,
-            // ... translation
-        }
-    });
+socket.on('dashboard:execute_task', payload => {
+  // Anti-corruption: translate to NERV action
+  nerv.emit({
+    type: 'DRIVER_EXECUTE',
+    action: 'EXECUTE',
+    payload: {
+      taskId: payload.taskId,
+      // ... translation
+    },
+  });
 });
 ```
 
@@ -386,27 +401,31 @@ socket.on('dashboard:execute_task', (payload) => {
 **Responsabilidade**: State management de tasks no dashboard
 
 **State**:
+
 ```javascript
 state: () => ({
-    tasks: [],                 // Lista de tasks
-    selectedTaskId: null,      // Task selecionada
-    filters: {                 // Filtros ativos
-        status: null,
-        priority: null,
-        search: ''
-    },
-    loading: false,            // Loading state
-    error: null,               // Error state
-    stats: {                   // Estatísticas
-        total: 0,
-        by_status: {},
-        by_priority: {}
-    },
-    lastUpdate: null           // Última atualização
-})
+  tasks: [], // Lista de tasks
+  selectedTaskId: null, // Task selecionada
+  filters: {
+    // Filtros ativos
+    status: null,
+    priority: null,
+    search: '',
+  },
+  loading: false, // Loading state
+  error: null, // Error state
+  stats: {
+    // Estatísticas
+    total: 0,
+    by_status: {},
+    by_priority: {},
+  },
+  lastUpdate: null, // Última atualização
+});
 ```
 
 **Getters**:
+
 ```javascript
 getters: {
     // Tasks filtradas conforme filtros ativos
@@ -427,6 +446,7 @@ getters: {
 ```
 
 **Actions**:
+
 ```javascript
 actions: {
     // Carregar tasks da API
@@ -478,51 +498,64 @@ actions: {
 **Responsabilidade**: Gerenciar conexão Socket.io com backend
 
 **Singleton Pattern**:
+
 ```javascript
 // Singleton da conexão Socket.io
 let socketInstance = null;
 let connectionCount = 0;
 
 function getSocketInstance(url = '', options = {}) {
-    if (!socketInstance) {
-        socketInstance = io(url, {
-            transports: ['websocket'],
-            autoConnect: false,
-            reconnection: true,
-            reconnectionAttempts: 10,
-            reconnectionDelay: 1000,
-            ...options
-        });
-    }
-    return socketInstance;
+  if (!socketInstance) {
+    socketInstance = io(url, {
+      transports: ['websocket'],
+      autoConnect: false,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      ...options,
+    });
+  }
+  return socketInstance;
 }
 ```
 
 **API do Composable**:
+
 ```javascript
 export function useSocket(options = {}) {
-    const socket = getSocketInstance(options.url || '', options);
-    const isConnected = ref(false);
-    const error = ref(null);
-    const reconnectAttempts = ref(0);
+  const socket = getSocketInstance(options.url || '', options);
+  const isConnected = ref(false);
+  const error = ref(null);
+  const reconnectAttempts = ref(0);
 
-    return {
-        // Estado reativo
-        isConnected,
-        error,
-        reconnectAttempts,
+  return {
+    // Estado reativo
+    isConnected,
+    error,
+    reconnectAttempts,
 
-        // Métodos
-        connect: () => { /* ... */ },
-        disconnect: () => { /* ... */ },
-        subscribe: (event, handler) => { /* ... */ },
-        unsubscribe: (event, handler) => { /* ... */ },
-        emit: (event, data) => { /* ... */ }
-    };
+    // Métodos
+    connect: () => {
+      /* ... */
+    },
+    disconnect: () => {
+      /* ... */
+    },
+    subscribe: (event, handler) => {
+      /* ... */
+    },
+    unsubscribe: (event, handler) => {
+      /* ... */
+    },
+    emit: (event, data) => {
+      /* ... */
+    },
+  };
 }
 ```
 
 **Uso em Components**:
+
 ```vue
 <script setup>
 import { onMounted, onUnmounted } from 'vue';
@@ -533,24 +566,24 @@ const { isConnected, subscribe, unsubscribe, connect, disconnect } = useSocket()
 const taskStore = useTaskStore();
 
 // Handler para updates de task
-const handleTaskUpdate = (payload) => {
-    taskStore.handleRealtimeUpdate(payload);
+const handleTaskUpdate = payload => {
+  taskStore.handleRealtimeUpdate(payload);
 };
 
 onMounted(() => {
-    connect();
-    subscribe('task:updated', handleTaskUpdate);
+  connect();
+  subscribe('task:updated', handleTaskUpdate);
 });
 
 onUnmounted(() => {
-    unsubscribe('task:updated', handleTaskUpdate);
-    disconnect();
+  unsubscribe('task:updated', handleTaskUpdate);
+  disconnect();
 });
 </script>
 
 <template>
-    <div v-if="isConnected" class="online-indicator">🟢 Connected</div>
-    <div v-else class="offline-indicator">🔴 Disconnected</div>
+  <div v-if="isConnected" class="online-indicator">🟢 Connected</div>
+  <div v-else class="offline-indicator">🔴 Disconnected</div>
 </template>
 ```
 
@@ -561,12 +594,14 @@ onUnmounted(() => {
 ### ✅ Pontos Fortes
 
 #### 1. Separação de Concerns (EXCELENTE)
+
 - ✅ **Frontend isolado**: `dashboard-ui/` como Vue app separado
 - ✅ **Backend isolado**: `server/` com API, controllers, bridges
 - ✅ **Zero acoplamento direto**: Comunicação via HTTP/WebSocket apenas
 - ✅ **Builds independentes**: Frontend (Vite) e Backend (Node) separados
 
 #### 2. Arquitetura Backend (SÓLIDA)
+
 - ✅ **API Gateway**: Router.js com 7 namespaces organizados
 - ✅ **Controllers**: Separação por domínio (dashboard, tasks, missions, etc.)
 - ✅ **Bridges**: task_sync_bridge e telemetry_aggregator implementados
@@ -574,12 +609,14 @@ onUnmounted(() => {
 - ✅ **Socket Hub**: Realtime funcionando via Socket.io
 
 #### 3. Infraestrutura de Dados (ROBUSTA)
+
 - ✅ **Unified State**: task_sync_bridge unifica disk + kernel
 - ✅ **Ring Buffers**: 1 hora de histórico @ 1Hz (eficiente)
 - ✅ **Alertas**: Thresholds configuráveis
 - ✅ **Debounced Broadcasts**: Evita spam de eventos
 
 #### 4. Tech Stack Moderno (ADEQUADO)
+
 - ✅ **Vue 3**: Framework moderno e performático
 - ✅ **Vite**: Build rápido e eficiente
 - ✅ **Pinia**: State management simples e type-safe
@@ -588,12 +625,14 @@ onUnmounted(() => {
 ### ⚠️ Problemas Identificados
 
 #### 1. Interface Primitiva (CRÍTICO)
+
 - ❌ **Layout básico**: Dashboard.vue é grade simples de métricas
 - ❌ **Light theme**: Background #f5f5f5 (contrasta com requisito "dark theme")
 - ❌ **Não-funcional**: Várias views vazias ou incompletas
 - ❌ **Poor UX**: Sem navegação intuitiva, sem hierarquia visual
 
 **Exemplo de código primitivo** (Dashboard.vue):
+
 ```vue
 <!-- Current primitive implementation -->
 <div class="metrics-grid">
@@ -624,31 +663,35 @@ onUnmounted(() => {
 ```
 
 #### 2. Element Plus Dependency (LIMITAÇÃO)
+
 - ⚠️ **Dark theme limitado**: Element Plus tem suporte, mas não futurista
 - ⚠️ **Customização difícil**: Precisa override de variáveis CSS complexas
 - ⚠️ **Bundle size**: 500KB+ (componentes não tree-shakeable)
 
 #### 3. Libs Pesadas Não Usadas (INEFICIÊNCIA)
+
 - ❌ **cytoscape** (700KB): Não usado em MVP
 - ❌ **d3** (300KB): Não usado em MVP
 - ❌ **vis-timeline** (200KB): Não usado em MVP
 - 💡 Total de ~1.2MB de código não utilizado
 
 #### 4. Falta de Design System (INCONSISTÊNCIA)
+
 - ❌ **Cores hardcoded**: `#f5f5f5`, `#ffffff`, `#34495e` espalhados
 - ❌ **Spacing arbitrário**: `padding: 20px`, `gap: 16px` sem padrão
 - ❌ **Sem tokens**: Cores, fontes, spacing não centralizados
 - ❌ **Tipografia básica**: Sem hierarquia, sem scales
 
 #### 5. Responsividade Ausente (PROBLEMA)
+
 - ❌ **Grid fixo**: `repeat(4, 1fr)` quebra em mobile
 - ❌ **Sem breakpoints**: Nenhum media query
 - ❌ **Sidebar não responsiva**: Sempre visível, não collapsa
 
 ### 🎯 Gaps vs Requisitos
 
-| Requisito                      | Estado Atual                | Gap                                       |
-| ------------------------------ | --------------------------- | ----------------------------------------- |
+| Requisito                      | Estado Atual                 | Gap                                       |
+| ------------------------------ | ---------------------------- | ----------------------------------------- |
 | **Dark Theme Futurista**       | ❌ Light theme (#f5f5f5)     | **CRÍTICO** - Rebuild completo necessário |
 | **Task CRUD**                  | 🟡 API pronta, UI incompleta | **ALTO** - Criar forms, modals, actions   |
 | **Indicadores Básicos**        | 🟡 Métricas brutas mostradas | **MÉDIO** - Melhorar visualização         |
@@ -665,12 +708,14 @@ onUnmounted(() => {
 #### 1. Manter Node Folder Separado ✅
 
 **Justificativa**:
+
 - ✅ **Isolamento**: Dependencies do dashboard não poluem backend
 - ✅ **Build independente**: Vite build roda separado de PM2
 - ✅ **Deploy flexível**: Frontend pode ir para CDN, backend para server
 - ✅ **Dev experience**: `npm run dev` no dashboard não interfere com backend
 
 **Estrutura Proposta**:
+
 ```
 src/
 ├── dashboard-ui/              # Frontend (Vue 3 app) - SEPARADO
@@ -686,6 +731,7 @@ src/
 ```
 
 **Build Process**:
+
 ```bash
 # 1. Build frontend (production)
 cd src/dashboard-ui
@@ -702,6 +748,7 @@ pm2 start ecosystem.config.js   # Server process
 #### 2. Substituir Element Plus por TailwindCSS + Shadcn-Vue 🔄
 
 **Justificativa**:
+
 - ✅ **Dark theme nativo**: Tailwind tem excelente suporte (dark:)
 - ✅ **Customização total**: Utility-first, sem overrides complexos
 - ✅ **Bundle menor**: Tree-shaking agressivo (~50KB vs 500KB)
@@ -709,6 +756,7 @@ pm2 start ecosystem.config.js   # Server process
 - ✅ **Shadcn-Vue**: Componentes headless, 100% customizáveis
 
 **Migration Path**:
+
 ```bash
 # 1. Instalar Tailwind + Shadcn-Vue
 npm install -D tailwindcss postcss autoprefixer
@@ -740,23 +788,25 @@ module.exports = {
 #### 3. Remover Libs Pesadas Não Usadas ❌
 
 **Justificativa**:
+
 - ❌ cytoscape: Não usado em MVP (graph viz para futuro)
 - ❌ d3: Não usado em MVP (use Chart.js apenas)
 - ❌ vis-timeline: Não usado em MVP (timeline para futuro)
 - 💡 **Economia**: ~1.2MB menos no bundle
 
 **Package.json Limpo**:
+
 ```json
 {
   "dependencies": {
-    "vue": "^3.5.24",              // ✅ Keep
-    "vue-router": "^4.5.0",         // ✅ Keep
-    "pinia": "^2.3.1",              // ✅ Keep
-    "socket.io-client": "^4.8.3",   // ✅ Keep
-    "axios": "^1.7.9",              // ✅ Keep
-    "chart.js": "^4.4.8",           // ✅ Keep (para graphs)
-    "@shadcn/vue": "^1.0.0",        // ✅ Add (componentes)
-    "tailwindcss": "^3.4.0",        // ✅ Add (styling)
+    "vue": "^3.5.24", // ✅ Keep
+    "vue-router": "^4.5.0", // ✅ Keep
+    "pinia": "^2.3.1", // ✅ Keep
+    "socket.io-client": "^4.8.3", // ✅ Keep
+    "axios": "^1.7.9", // ✅ Keep
+    "chart.js": "^4.4.8", // ✅ Keep (para graphs)
+    "@shadcn/vue": "^1.0.0", // ✅ Add (componentes)
+    "tailwindcss": "^3.4.0" // ✅ Add (styling)
 
     // ❌ Remover
     // "element-plus": "^2.13.1",   // → Substituído por Shadcn
@@ -770,6 +820,7 @@ module.exports = {
 #### 4. Manter Vue 3 + Vite + Pinia ✅
 
 **Justificativa**:
+
 - ✅ **Stack moderna**: Vue 3 com Composition API é performático
 - ✅ **Vite rápido**: HMR instantâneo, build eficiente
 - ✅ **Pinia simples**: State management sem boilerplate
@@ -778,6 +829,7 @@ module.exports = {
 #### 5. Manter Socket.io + REST ✅
 
 **Justificativa**:
+
 - ✅ **REST para CRUD**: GET/POST/PATCH/DELETE tasks
 - ✅ **Socket para Realtime**: Métricas @ 1Hz, task updates
 - ✅ **NERV integration**: Adapter funcional
@@ -851,52 +903,52 @@ src/dashboard-ui/src/
 import { createRouter, createWebHistory } from 'vue-router';
 
 const routes = [
-    {
-        path: '/dashboard',
-        component: AppLayout,
-        children: [
-            {
-                path: '',
-                name: 'Dashboard',
-                component: () => import('@/views/Dashboard.vue'),
-                meta: { title: 'Dashboard - Mission Control' }
-            },
-            {
-                path: 'tasks',
-                name: 'Tasks',
-                component: () => import('@/views/TasksView.vue'),
-                meta: { title: 'Tasks - Mission Control' }
-            },
-            {
-                path: 'tasks/:id',
-                name: 'TaskDetail',
-                component: () => import('@/components/tasks/TaskDetail.vue'),
-                meta: { title: 'Task Detail - Mission Control' }
-            },
-            {
-                path: 'metrics',
-                name: 'Metrics',
-                component: () => import('@/views/MetricsView.vue'),
-                meta: { title: 'Metrics - Mission Control' }
-            }
-        ]
-    },
-    {
-        path: '/:pathMatch(.*)*',
-        name: 'NotFound',
-        component: () => import('@/views/NotFound.vue')
-    }
+  {
+    path: '/dashboard',
+    component: AppLayout,
+    children: [
+      {
+        path: '',
+        name: 'Dashboard',
+        component: () => import('@/views/Dashboard.vue'),
+        meta: { title: 'Dashboard - Mission Control' },
+      },
+      {
+        path: 'tasks',
+        name: 'Tasks',
+        component: () => import('@/views/TasksView.vue'),
+        meta: { title: 'Tasks - Mission Control' },
+      },
+      {
+        path: 'tasks/:id',
+        name: 'TaskDetail',
+        component: () => import('@/components/tasks/TaskDetail.vue'),
+        meta: { title: 'Task Detail - Mission Control' },
+      },
+      {
+        path: 'metrics',
+        name: 'Metrics',
+        component: () => import('@/views/MetricsView.vue'),
+        meta: { title: 'Metrics - Mission Control' },
+      },
+    ],
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/NotFound.vue'),
+  },
 ];
 
 const router = createRouter({
-    history: createWebHistory('/'),
-    routes
+  history: createWebHistory('/'),
+  routes,
 });
 
 // Navigation guards
 router.beforeEach((to, from, next) => {
-    document.title = to.meta.title || 'Mission Control';
-    next();
+  document.title = to.meta.title || 'Mission Control';
+  next();
 });
 
 export default router;
@@ -911,116 +963,116 @@ export default router;
 ```javascript
 // tailwind.config.js
 module.exports = {
-    darkMode: 'class',
-    theme: {
-        extend: {
-            colors: {
-                // Background layers
-                background: {
-                    DEFAULT: '#0a0e1a',    // Deep navy (fundo principal)
-                    secondary: '#111827',   // Slate darker (cards)
-                    tertiary: '#1e293b',    // Slate dark (hover states)
-                },
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        // Background layers
+        background: {
+          DEFAULT: '#0a0e1a', // Deep navy (fundo principal)
+          secondary: '#111827', // Slate darker (cards)
+          tertiary: '#1e293b', // Slate dark (hover states)
+        },
 
-                // Foreground (text)
-                foreground: {
-                    DEFAULT: '#e2e8f0',     // Slate 200 (texto principal)
-                    muted: '#94a3b8',       // Slate 400 (texto secundário)
-                    subtle: '#64748b',      // Slate 500 (texto terciário)
-                },
+        // Foreground (text)
+        foreground: {
+          DEFAULT: '#e2e8f0', // Slate 200 (texto principal)
+          muted: '#94a3b8', // Slate 400 (texto secundário)
+          subtle: '#64748b', // Slate 500 (texto terciário)
+        },
 
-                // Primary (accent)
-                primary: {
-                    DEFAULT: '#3b82f6',     // Blue 500 (ações principais)
-                    hover: '#2563eb',       // Blue 600 (hover)
-                    active: '#1d4ed8',      // Blue 700 (active)
-                    muted: '#1e3a8a',       // Blue 900 (backgrounds)
-                },
+        // Primary (accent)
+        primary: {
+          DEFAULT: '#3b82f6', // Blue 500 (ações principais)
+          hover: '#2563eb', // Blue 600 (hover)
+          active: '#1d4ed8', // Blue 700 (active)
+          muted: '#1e3a8a', // Blue 900 (backgrounds)
+        },
 
-                // Status colors
-                success: {
-                    DEFAULT: '#10b981',     // Green 500
-                    muted: '#065f46',       // Green 900
-                },
-                warning: {
-                    DEFAULT: '#f59e0b',     // Amber 500
-                    muted: '#78350f',       // Amber 900
-                },
-                error: {
-                    DEFAULT: '#ef4444',     // Red 500
-                    muted: '#7f1d1d',       // Red 900
-                },
-                info: {
-                    DEFAULT: '#06b6d4',     // Cyan 500
-                    muted: '#164e63',       // Cyan 900
-                },
+        // Status colors
+        success: {
+          DEFAULT: '#10b981', // Green 500
+          muted: '#065f46', // Green 900
+        },
+        warning: {
+          DEFAULT: '#f59e0b', // Amber 500
+          muted: '#78350f', // Amber 900
+        },
+        error: {
+          DEFAULT: '#ef4444', // Red 500
+          muted: '#7f1d1d', // Red 900
+        },
+        info: {
+          DEFAULT: '#06b6d4', // Cyan 500
+          muted: '#164e63', // Cyan 900
+        },
 
-                // Borders
-                border: {
-                    DEFAULT: '#334155',     // Slate 700 (borders padrão)
-                    subtle: '#1e293b',      // Slate 800 (borders sutis)
-                },
+        // Borders
+        border: {
+          DEFAULT: '#334155', // Slate 700 (borders padrão)
+          subtle: '#1e293b', // Slate 800 (borders sutis)
+        },
 
-                // Chart colors (accessibility-friendly)
-                chart: {
-                    1: '#3b82f6',  // Blue
-                    2: '#10b981',  // Green
-                    3: '#f59e0b',  // Amber
-                    4: '#ef4444',  // Red
-                    5: '#8b5cf6',  // Purple
-                    6: '#06b6d4',  // Cyan
-                },
-            },
+        // Chart colors (accessibility-friendly)
+        chart: {
+          1: '#3b82f6', // Blue
+          2: '#10b981', // Green
+          3: '#f59e0b', // Amber
+          4: '#ef4444', // Red
+          5: '#8b5cf6', // Purple
+          6: '#06b6d4', // Cyan
+        },
+      },
 
-            // Typography
-            fontFamily: {
-                sans: ['Inter', 'system-ui', 'sans-serif'],
-                mono: ['Fira Code', 'Courier New', 'monospace'],
-            },
+      // Typography
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['Fira Code', 'Courier New', 'monospace'],
+      },
 
-            // Spacing (8px base)
-            spacing: {
-                '18': '4.5rem',  // 72px
-                '88': '22rem',   // 352px
-                '112': '28rem',  // 448px
-            },
+      // Spacing (8px base)
+      spacing: {
+        18: '4.5rem', // 72px
+        88: '22rem', // 352px
+        112: '28rem', // 448px
+      },
 
-            // Border radius
-            borderRadius: {
-                'lg': '0.75rem',   // 12px
-                'xl': '1rem',      // 16px
-                '2xl': '1.5rem',   // 24px
-            },
+      // Border radius
+      borderRadius: {
+        lg: '0.75rem', // 12px
+        xl: '1rem', // 16px
+        '2xl': '1.5rem', // 24px
+      },
 
-            // Box shadows (dark theme)
-            boxShadow: {
-                'sm': '0 1px 2px 0 rgba(0, 0, 0, 0.5)',
-                'DEFAULT': '0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px -1px rgba(0, 0, 0, 0.5)',
-                'md': '0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5)',
-                'lg': '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5)',
-                'xl': '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
-                'glow': '0 0 20px rgba(59, 130, 246, 0.3)',  // Blue glow
-            },
+      // Box shadows (dark theme)
+      boxShadow: {
+        sm: '0 1px 2px 0 rgba(0, 0, 0, 0.5)',
+        DEFAULT: '0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px -1px rgba(0, 0, 0, 0.5)',
+        md: '0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5)',
+        lg: '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5)',
+        xl: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+        glow: '0 0 20px rgba(59, 130, 246, 0.3)', // Blue glow
+      },
 
-            // Animations
-            animation: {
-                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                'bounce-slow': 'bounce 2s infinite',
-                'fade-in': 'fadeIn 0.3s ease-in-out',
-            },
+      // Animations
+      animation: {
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'bounce-slow': 'bounce 2s infinite',
+        'fade-in': 'fadeIn 0.3s ease-in-out',
+      },
 
-            keyframes: {
-                fadeIn: {
-                    '0%': { opacity: '0', transform: 'translateY(-10px)' },
-                    '100%': { opacity: '1', transform: 'translateY(0)' },
-                }
-            }
-        }
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
     },
-    plugins: [
-        require('@tailwindcss/forms'),      // Form styling
-        require('@tailwindcss/typography'), // Prose classes
-    ]
+  },
+  plugins: [
+    require('@tailwindcss/forms'), // Form styling
+    require('@tailwindcss/typography'), // Prose classes
+  ],
 };
 ```
 
@@ -1031,76 +1083,76 @@ module.exports = {
 
 /* Base typography */
 :root {
-    /* Font sizes (1.250 ratio - Major Third) */
-    --text-xs: 0.75rem;      /* 12px */
-    --text-sm: 0.875rem;     /* 14px */
-    --text-base: 1rem;       /* 16px */
-    --text-lg: 1.25rem;      /* 20px */
-    --text-xl: 1.5rem;       /* 24px */
-    --text-2xl: 1.875rem;    /* 30px */
-    --text-3xl: 2.25rem;     /* 36px */
+  /* Font sizes (1.250 ratio - Major Third) */
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-lg: 1.25rem; /* 20px */
+  --text-xl: 1.5rem; /* 24px */
+  --text-2xl: 1.875rem; /* 30px */
+  --text-3xl: 2.25rem; /* 36px */
 
-    /* Line heights */
-    --leading-tight: 1.25;
-    --leading-normal: 1.5;
-    --leading-relaxed: 1.75;
+  /* Line heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
 
-    /* Font weights */
-    --font-normal: 400;
-    --font-medium: 500;
-    --font-semibold: 600;
-    --font-bold: 700;
+  /* Font weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
 }
 
 /* Heading classes */
 .h1 {
-    font-size: var(--text-3xl);
-    font-weight: var(--font-bold);
-    line-height: var(--leading-tight);
-    color: theme('colors.foreground.DEFAULT');
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  line-height: var(--leading-tight);
+  color: theme('colors.foreground.DEFAULT');
 }
 
 .h2 {
-    font-size: var(--text-2xl);
-    font-weight: var(--font-semibold);
-    line-height: var(--leading-tight);
-    color: theme('colors.foreground.DEFAULT');
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  color: theme('colors.foreground.DEFAULT');
 }
 
 .h3 {
-    font-size: var(--text-xl);
-    font-weight: var(--font-semibold);
-    line-height: var(--leading-normal);
-    color: theme('colors.foreground.DEFAULT');
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-normal);
+  color: theme('colors.foreground.DEFAULT');
 }
 
 /* Body classes */
 .body-lg {
-    font-size: var(--text-lg);
-    line-height: var(--leading-relaxed);
-    color: theme('colors.foreground.DEFAULT');
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+  color: theme('colors.foreground.DEFAULT');
 }
 
 .body {
-    font-size: var(--text-base);
-    line-height: var(--leading-normal);
-    color: theme('colors.foreground.DEFAULT');
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: theme('colors.foreground.DEFAULT');
 }
 
 .body-sm {
-    font-size: var(--text-sm);
-    line-height: var(--leading-normal);
-    color: theme('colors.foreground.muted');
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: theme('colors.foreground.muted');
 }
 
 /* Monospace (código) */
 .mono {
-    font-family: theme('fontFamily.mono');
-    font-size: var(--text-sm);
-    color: theme('colors.foreground.DEFAULT');
-    background-color: theme('colors.background.tertiary');
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
+  font-family: theme('fontFamily.mono');
+  font-size: var(--text-sm);
+  color: theme('colors.foreground.DEFAULT');
+  background-color: theme('colors.background.tertiary');
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
 }
 ```
 
@@ -1111,80 +1163,80 @@ module.exports = {
 
 /* Cards */
 .card {
-    background-color: theme('colors.background.secondary');
-    border: 1px solid theme('colors.border.DEFAULT');
-    border-radius: theme('borderRadius.lg');
-    box-shadow: theme('boxShadow.md');
-    padding: theme('spacing.6');
+  background-color: theme('colors.background.secondary');
+  border: 1px solid theme('colors.border.DEFAULT');
+  border-radius: theme('borderRadius.lg');
+  box-shadow: theme('boxShadow.md');
+  padding: theme('spacing.6');
 }
 
 .card:hover {
-    border-color: theme('colors.primary.DEFAULT');
-    box-shadow: theme('boxShadow.glow');
-    transition: all 0.2s ease;
+  border-color: theme('colors.primary.DEFAULT');
+  box-shadow: theme('boxShadow.glow');
+  transition: all 0.2s ease;
 }
 
 /* Buttons */
 .btn-primary {
-    background-color: theme('colors.primary.DEFAULT');
-    color: white;
-    padding: theme('spacing.2') theme('spacing.4');
-    border-radius: theme('borderRadius.DEFAULT');
-    font-weight: theme('fontWeight.medium');
-    transition: background-color 0.2s ease;
+  background-color: theme('colors.primary.DEFAULT');
+  color: white;
+  padding: theme('spacing.2') theme('spacing.4');
+  border-radius: theme('borderRadius.DEFAULT');
+  font-weight: theme('fontWeight.medium');
+  transition: background-color 0.2s ease;
 }
 
 .btn-primary:hover {
-    background-color: theme('colors.primary.hover');
+  background-color: theme('colors.primary.hover');
 }
 
 .btn-primary:active {
-    background-color: theme('colors.primary.active');
+  background-color: theme('colors.primary.active');
 }
 
 /* Badges */
 .badge {
-    display: inline-block;
-    padding: theme('spacing.1') theme('spacing.2');
-    font-size: var(--text-xs);
-    font-weight: theme('fontWeight.medium');
-    border-radius: theme('borderRadius.DEFAULT');
+  display: inline-block;
+  padding: theme('spacing.1') theme('spacing.2');
+  font-size: var(--text-xs);
+  font-weight: theme('fontWeight.medium');
+  border-radius: theme('borderRadius.DEFAULT');
 }
 
 .badge-success {
-    background-color: theme('colors.success.muted');
-    color: theme('colors.success.DEFAULT');
+  background-color: theme('colors.success.muted');
+  color: theme('colors.success.DEFAULT');
 }
 
 .badge-warning {
-    background-color: theme('colors.warning.muted');
-    color: theme('colors.warning.DEFAULT');
+  background-color: theme('colors.warning.muted');
+  color: theme('colors.warning.DEFAULT');
 }
 
 .badge-error {
-    background-color: theme('colors.error.muted');
-    color: theme('colors.error.DEFAULT');
+  background-color: theme('colors.error.muted');
+  color: theme('colors.error.DEFAULT');
 }
 
 /* Inputs */
 .input {
-    background-color: theme('colors.background.tertiary');
-    border: 1px solid theme('colors.border.DEFAULT');
-    color: theme('colors.foreground.DEFAULT');
-    padding: theme('spacing.2') theme('spacing.3');
-    border-radius: theme('borderRadius.DEFAULT');
-    font-size: var(--text-sm);
-    transition: border-color 0.2s ease;
+  background-color: theme('colors.background.tertiary');
+  border: 1px solid theme('colors.border.DEFAULT');
+  color: theme('colors.foreground.DEFAULT');
+  padding: theme('spacing.2') theme('spacing.3');
+  border-radius: theme('borderRadius.DEFAULT');
+  font-size: var(--text-sm);
+  transition: border-color 0.2s ease;
 }
 
 .input:focus {
-    border-color: theme('colors.primary.DEFAULT');
-    outline: none;
-    box-shadow: 0 0 0 3px theme('colors.primary.muted');
+  border-color: theme('colors.primary.DEFAULT');
+  outline: none;
+  box-shadow: 0 0 0 3px theme('colors.primary.muted');
 }
 
 .input::placeholder {
-    color: theme('colors.foreground.subtle');
+  color: theme('colors.foreground.subtle');
 }
 ```
 
@@ -1233,168 +1285,166 @@ Cores:
 ### Component Examples (Shadcn-Vue + Tailwind)
 
 #### Button Component
+
 ```vue
 <!-- src/dashboard-ui/src/components/ui/Button.vue -->
 <template>
-    <button
-        :class="[
-            'btn',
-            variantClasses[variant],
-            sizeClasses[size],
-            disabled && 'opacity-50 cursor-not-allowed'
-        ]"
-        :disabled="disabled"
-        @click="$emit('click', $event)"
-    >
-        <slot />
-    </button>
+  <button
+    :class="[
+      'btn',
+      variantClasses[variant],
+      sizeClasses[size],
+      disabled && 'opacity-50 cursor-not-allowed',
+    ]"
+    :disabled="disabled"
+    @click="$emit('click', $event)"
+  >
+    <slot />
+  </button>
 </template>
 
 <script setup>
 const props = defineProps({
-    variant: {
-        type: String,
-        default: 'primary',
-        validator: (v) => ['primary', 'secondary', 'ghost', 'danger'].includes(v)
-    },
-    size: {
-        type: String,
-        default: 'md',
-        validator: (v) => ['sm', 'md', 'lg'].includes(v)
-    },
-    disabled: {
-        type: Boolean,
-        default: false
-    }
+  variant: {
+    type: String,
+    default: 'primary',
+    validator: v => ['primary', 'secondary', 'ghost', 'danger'].includes(v),
+  },
+  size: {
+    type: String,
+    default: 'md',
+    validator: v => ['sm', 'md', 'lg'].includes(v),
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const variantClasses = {
-    primary: 'bg-primary hover:bg-primary-hover text-white',
-    secondary: 'bg-background-secondary hover:bg-background-tertiary text-foreground border border-border',
-    ghost: 'hover:bg-background-secondary text-foreground-muted hover:text-foreground',
-    danger: 'bg-error hover:bg-error/90 text-white'
+  primary: 'bg-primary hover:bg-primary-hover text-white',
+  secondary:
+    'bg-background-secondary hover:bg-background-tertiary text-foreground border border-border',
+  ghost: 'hover:bg-background-secondary text-foreground-muted hover:text-foreground',
+  danger: 'bg-error hover:bg-error/90 text-white',
 };
 
 const sizeClasses = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-base',
-    lg: 'px-6 py-3 text-lg'
+  sm: 'px-3 py-1.5 text-sm',
+  md: 'px-4 py-2 text-base',
+  lg: 'px-6 py-3 text-lg',
 };
 </script>
 
 <style scoped>
 .btn {
-    @apply rounded-lg font-medium transition-all duration-200;
-    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
+  @apply rounded-lg font-medium transition-all duration-200;
+  @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
 }
 </style>
 ```
 
 #### Card Component
+
 ```vue
 <!-- src/dashboard-ui/src/components/ui/Card.vue -->
 <template>
-    <div
-        :class="[
-            'card',
-            hoverable && 'hover:border-primary hover:shadow-glow cursor-pointer',
-            className
-        ]"
-    >
-        <div v-if="$slots.header" class="card-header">
-            <slot name="header" />
-        </div>
-
-        <div class="card-body">
-            <slot />
-        </div>
-
-        <div v-if="$slots.footer" class="card-footer">
-            <slot name="footer" />
-        </div>
+  <div
+    :class="[
+      'card',
+      hoverable && 'hover:border-primary hover:shadow-glow cursor-pointer',
+      className,
+    ]"
+  >
+    <div v-if="$slots.header" class="card-header">
+      <slot name="header" />
     </div>
+
+    <div class="card-body">
+      <slot />
+    </div>
+
+    <div v-if="$slots.footer" class="card-footer">
+      <slot name="footer" />
+    </div>
+  </div>
 </template>
 
 <script setup>
 defineProps({
-    hoverable: {
-        type: Boolean,
-        default: false
-    },
-    className: {
-        type: String,
-        default: ''
-    }
+  hoverable: {
+    type: Boolean,
+    default: false,
+  },
+  className: {
+    type: String,
+    default: '',
+  },
 });
 </script>
 
 <style scoped>
 .card {
-    @apply bg-background-secondary border border-border rounded-lg shadow-md;
-    @apply transition-all duration-200;
+  @apply bg-background-secondary border border-border rounded-lg shadow-md;
+  @apply transition-all duration-200;
 }
 
 .card-header {
-    @apply px-6 py-4 border-b border-border;
+  @apply px-6 py-4 border-b border-border;
 }
 
 .card-body {
-    @apply px-6 py-4;
+  @apply px-6 py-4;
 }
 
 .card-footer {
-    @apply px-6 py-4 border-t border-border;
+  @apply px-6 py-4 border-t border-border;
 }
 </style>
 ```
 
 #### Badge Component
+
 ```vue
 <!-- src/dashboard-ui/src/components/ui/Badge.vue -->
 <template>
-    <span
-        :class="[
-            'badge',
-            variantClasses[variant],
-            sizeClasses[size]
-        ]"
-    >
-        <slot />
-    </span>
+  <span :class="['badge', variantClasses[variant], sizeClasses[size]]">
+    <slot />
+  </span>
 </template>
 
 <script setup>
 defineProps({
-    variant: {
-        type: String,
-        default: 'default',
-        validator: (v) => ['default', 'success', 'warning', 'error', 'info'].includes(v)
-    },
-    size: {
-        type: String,
-        default: 'md',
-        validator: (v) => ['sm', 'md', 'lg'].includes(v)
-    }
+  variant: {
+    type: String,
+    default: 'default',
+    validator: v => ['default', 'success', 'warning', 'error', 'info'].includes(v),
+  },
+  size: {
+    type: String,
+    default: 'md',
+    validator: v => ['sm', 'md', 'lg'].includes(v),
+  },
 });
 
 const variantClasses = {
-    default: 'bg-background-tertiary text-foreground-muted',
-    success: 'bg-success-muted text-success',
-    warning: 'bg-warning-muted text-warning',
-    error: 'bg-error-muted text-error',
-    info: 'bg-info-muted text-info'
+  default: 'bg-background-tertiary text-foreground-muted',
+  success: 'bg-success-muted text-success',
+  warning: 'bg-warning-muted text-warning',
+  error: 'bg-error-muted text-error',
+  info: 'bg-info-muted text-info',
 };
 
 const sizeClasses = {
-    sm: 'px-2 py-0.5 text-xs',
-    md: 'px-2.5 py-1 text-sm',
-    lg: 'px-3 py-1.5 text-base'
+  sm: 'px-2 py-0.5 text-xs',
+  md: 'px-2.5 py-1 text-sm',
+  lg: 'px-3 py-1.5 text-base',
 };
 </script>
 
 <style scoped>
 .badge {
-    @apply inline-flex items-center justify-center rounded-md font-medium;
+  @apply inline-flex items-center justify-center rounded-md font-medium;
 }
 </style>
 ```
@@ -1406,12 +1456,14 @@ const sizeClasses = {
 ### Fase 1: Setup & Cleanup (2-3 dias)
 
 #### 1.1 Remove Libs Pesadas
+
 ```bash
 cd src/dashboard-ui
 npm uninstall element-plus cytoscape d3 vis-timeline
 ```
 
 #### 1.2 Instalar Tailwind + Shadcn
+
 ```bash
 npm install -D tailwindcss postcss autoprefixer
 npx tailwindcss init -p
@@ -1422,11 +1474,13 @@ npx shadcn-vue@latest init
 ```
 
 #### 1.3 Configurar tailwind.config.js
+
 - Copiar paleta de cores (dark theme)
 - Adicionar custom shadows, animations
 - Configurar plugins (forms, typography)
 
 #### 1.4 Criar Design System Base
+
 - `src/assets/styles/tailwind.css` (base imports)
 - `src/assets/styles/dark-theme.css` (custom tokens)
 - Configurar `main.js` com imports
@@ -1434,6 +1488,7 @@ npx shadcn-vue@latest init
 ### Fase 2: Componentes Base (3-4 dias)
 
 #### 2.1 UI Components (Shadcn)
+
 ```bash
 # Instalar componentes necessários
 npx shadcn-vue@latest add button
@@ -1445,12 +1500,14 @@ npx shadcn-vue@latest add modal
 ```
 
 #### 2.2 Layout Components (Rebuild)
+
 - `AppLayout.vue`: Header + Sidebar + Main (dark theme)
 - `Header.vue`: Logo + Search + Actions + User menu
 - `Sidebar.vue`: Collapsible navigation menu
 - `Footer.vue`: Status bar (connected, version, uptime)
 
 **Checklist AppLayout**:
+
 - ✅ Flexbox 3-column layout (sidebar | main | panel)
 - ✅ Sidebar collapse (desktop + mobile)
 - ✅ Dark background (#0a0e1a)
@@ -1460,6 +1517,7 @@ npx shadcn-vue@latest add modal
 ### Fase 3: Task Management (5-6 dias)
 
 #### 3.1 Task Components
+
 - `TaskList.vue`: Table com filtros + sort + paginação
 - `TaskCard.vue`: Card view (grid layout)
 - `TaskDetail.vue`: Modal com detalhes completos
@@ -1467,6 +1525,7 @@ npx shadcn-vue@latest add modal
 - `TaskFilters.vue`: Filters bar (status, priority, search)
 
 **Checklist TaskList**:
+
 - ✅ Tabela com headers sortable
 - ✅ Status badges (RUNNING, PENDING, DONE, etc.)
 - ✅ Priority indicators (HIGH, MEDIUM, LOW)
@@ -1476,6 +1535,7 @@ npx shadcn-vue@latest add modal
 - ✅ Empty state (nenhuma task)
 
 #### 3.2 Task CRUD Integration
+
 - Connect TaskList → API GET `/api/dashboard/tasks`
 - Connect TaskForm → API POST `/api/tasks`
 - Connect TaskDetail → API PATCH `/api/tasks/:id`
@@ -1485,12 +1545,14 @@ npx shadcn-vue@latest add modal
 ### Fase 4: Metrics Dashboard (4-5 dias)
 
 #### 4.1 Metrics Components
+
 - `MetricsGrid.vue`: Grid com 4-6 metric cards
 - `MetricCard.vue`: Reusable card (gauge + sparkline)
 - `GaugeChart.vue`: Circular gauge (Chart.js)
 - `SparklineChart.vue`: Mini line chart (Chart.js)
 
 **Checklist MetricsGrid**:
+
 - ✅ Grid responsivo (4 cols → 2 cols → 1 col)
 - ✅ Métricas: CPU, Memory, Heap, Event Loop Lag
 - ✅ Thresholds coloridos (green < 60%, yellow < 80%, red >= 80%)
@@ -1499,6 +1561,7 @@ npx shadcn-vue@latest add modal
 - ✅ Loading state (skeleton)
 
 #### 4.2 Telemetry Integration
+
 - Connect MetricsGrid → API GET `/api/dashboard/telemetry/current`
 - Connect Sparklines → API GET `/api/dashboard/telemetry/history?period=1m`
 - Realtime updates via Socket.io (`telemetry:snapshot` @ 1Hz)
@@ -1507,48 +1570,41 @@ npx shadcn-vue@latest add modal
 ### Fase 5: Dashboard View (3-4 dias)
 
 #### 5.1 Dashboard.vue (Rebuild)
+
 ```vue
 <template>
-    <div class="dashboard">
-        <!-- Header with actions -->
-        <div class="dashboard-header">
-            <h1 class="h1">Dashboard</h1>
-            <div class="actions">
-                <Button variant="primary" @click="createTask">
-                    + New Task
-                </Button>
-                <Button variant="ghost" @click="refreshData">
-                    🔄 Refresh
-                </Button>
-            </div>
-        </div>
-
-        <!-- Alerts banner -->
-        <AlertBanner v-if="alerts.length > 0" :alerts="alerts" />
-
-        <!-- Metrics grid -->
-        <MetricsGrid :metrics="telemetryStore.current" />
-
-        <!-- Tasks overview -->
-        <Card>
-            <template #header>
-                <div class="flex items-center justify-between">
-                    <h2 class="h2">Tasks</h2>
-                    <router-link to="/dashboard/tasks">
-                        View all →
-                    </router-link>
-                </div>
-            </template>
-            <TaskList
-                :tasks="taskStore.tasks.slice(0, 10)"
-                :compact="true"
-            />
-        </Card>
+  <div class="dashboard">
+    <!-- Header with actions -->
+    <div class="dashboard-header">
+      <h1 class="h1">Dashboard</h1>
+      <div class="actions">
+        <Button variant="primary" @click="createTask"> + New Task </Button>
+        <Button variant="ghost" @click="refreshData"> 🔄 Refresh </Button>
+      </div>
     </div>
+
+    <!-- Alerts banner -->
+    <AlertBanner v-if="alerts.length > 0" :alerts="alerts" />
+
+    <!-- Metrics grid -->
+    <MetricsGrid :metrics="telemetryStore.current" />
+
+    <!-- Tasks overview -->
+    <Card>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <h2 class="h2">Tasks</h2>
+          <router-link to="/dashboard/tasks"> View all → </router-link>
+        </div>
+      </template>
+      <TaskList :tasks="taskStore.tasks.slice(0, 10)" :compact="true" />
+    </Card>
+  </div>
 </template>
 ```
 
 **Checklist Dashboard.vue**:
+
 - ✅ Header com título + actions
 - ✅ Alert banner (se houver alertas)
 - ✅ Metrics grid (4-6 cards)
@@ -1559,6 +1615,7 @@ npx shadcn-vue@latest add modal
 - ✅ Error handling
 
 #### 5.2 TasksView.vue (Full Page)
+
 - Task list completo (tabela + filtros)
 - Filtros: status, priority, search, date range
 - Actions: create, edit, cancel, delete
@@ -1566,6 +1623,7 @@ npx shadcn-vue@latest add modal
 - Export CSV/JSON (futuro)
 
 #### 5.3 MetricsView.vue (Full Page)
+
 - Métricas expandidas (mais detalhes)
 - Gráficos maiores (line charts, bar charts)
 - Histórico configurável (1h, 6h, 24h, 7d)
@@ -1574,24 +1632,28 @@ npx shadcn-vue@latest add modal
 ### Fase 6: Polishing (2-3 dias)
 
 #### 6.1 Responsiveness
+
 - Testar breakpoints (mobile, tablet, desktop)
 - Ajustar sidebar (collapse em mobile)
 - Ajustar grids (4 cols → 2 cols → 1 col)
 - Ajustar tabelas (scroll horizontal em mobile)
 
 #### 6.2 Animations & Transitions
+
 - Fade in/out (modals, alerts)
 - Slide in/out (sidebar, panels)
 - Skeleton loading (smooth transitions)
 - Hover states (cards, buttons)
 
 #### 6.3 Error States
+
 - Empty states (nenhuma task, nenhuma métrica)
 - Error boundaries (API failures)
 - Retry buttons (quando API falha)
 - Toasts para feedback (task criada, erro, etc.)
 
 #### 6.4 Accessibility
+
 - Focus states (keyboard navigation)
 - ARIA labels (screen readers)
 - Color contrast (WCAG AA compliance)
@@ -1600,22 +1662,26 @@ npx shadcn-vue@latest add modal
 ### Fase 7: Testing & Deploy (2-3 dias)
 
 #### 7.1 Unit Tests (Vitest)
+
 - Components: Button, Card, Badge (render tests)
 - Stores: tasks.js, telemetry.js (actions, getters)
 - Composables: useSocket, useRealtime (mock tests)
 
 #### 7.2 Integration Tests
+
 - Task CRUD flow (create → read → update → delete)
 - Realtime updates (Socket.io mock)
 - Filters e paginação (TaskList)
 
 #### 7.3 E2E Tests (Playwright)
+
 - Login flow (se houver auth)
 - Create task flow
 - Dashboard page load
 - Metrics update realtime
 
 #### 7.4 Build & Deploy
+
 ```bash
 # Build frontend
 cd src/dashboard-ui
@@ -1653,6 +1719,7 @@ pm2 restart ecosystem.config.js
 ### Situação Atual: PRIMITIVA mas ARQUITETURA SÓLIDA
 
 O dashboard atual está em **estado embrionário** com:
+
 - ❌ **UI não funcional**: Light theme, layout básico, componentes genéricos
 - ✅ **Backend completo**: API, controllers, bridges, NERV adapter funcionais
 - ✅ **Infraestrutura pronta**: Socket.io, REST, stores, composables
@@ -1669,6 +1736,7 @@ O dashboard atual está em **estado embrionário** com:
 ### Próximos Passos: REBUILD COMPLETO (4-5 semanas)
 
 **MVP (Sprint 1)**:
+
 - ✅ Dark theme futurista (sóbrio, não exagerado)
 - ✅ Task CRUD (create, read, update, delete)
 - ✅ Indicadores básicos (CPU, Memory, Heap, Event Loop)
@@ -1677,6 +1745,7 @@ O dashboard atual está em **estado embrionário** com:
 - ✅ Layout responsivo (mobile, tablet, desktop)
 
 **Futuro (Sprint 2+)**:
+
 - 🔜 System Health view (health checks, logs)
 - 🔜 Mission orchestration UI (multi-step workflows)
 - 🔜 Workflow editor (visual drag-and-drop)
@@ -1694,7 +1763,5 @@ O dashboard atual está em **estado embrionário** com:
 
 ---
 
-**Data de Criação**: Fevereiro 2026
-**Versão do Sistema**: v2.0 (Mission Control)
-**Status**: ✅ ANÁLISE COMPLETA - PRONTO PARA IMPLEMENTAÇÃO
-**Próxima Ação**: Iniciar Fase 1 (Setup & Cleanup)
+**Data de Criação**: Fevereiro 2026 **Versão do Sistema**: v2.0 (Mission Control) **Status**: ✅
+ANÁLISE COMPLETA - PRONTO PARA IMPLEMENTAÇÃO **Próxima Ação**: Iniciar Fase 1 (Setup & Cleanup)

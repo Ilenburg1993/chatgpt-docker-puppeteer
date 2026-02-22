@@ -1,21 +1,23 @@
 # 🚀 Plano: Sistema de Orquestração Autônoma v2.0
 
-**Status**: 📋 Planejado - Implementação iniciará em 28/01/2026
-**Versão**: 2.0.0
-**Duração Estimada**: 8-10 semanas
-**Última Atualização**: 28/01/2026
+**Status**: 📋 Planejado - Implementação iniciará em 28/01/2026 **Versão**: 2.0.0 **Duração
+Estimada**: 8-10 semanas **Última Atualização**: 28/01/2026
 
 ---
 
 ## 📖 Visão Executiva
 
-Transformar o **chatgpt-docker-puppeteer** de um executor de tasks simples em uma **plataforma de orquestração autônoma** capaz de executar missões complexas de longa duração com **mínima intervenção humana**.
+Transformar o **chatgpt-docker-puppeteer** de um executor de tasks simples em uma **plataforma de
+orquestração autônoma** capaz de executar missões complexas de longa duração com **mínima
+intervenção humana**.
 
 ### Objetivo Principal
 
 **AUTONOMIA > CONCORRÊNCIA**
 
-Não se trata de executar 100 tasks simultaneamente. Trata-se de executar **UMA MISSÃO INTEIRA** (ex: escrever um livro de 300 páginas) do início ao fim automaticamente, com o sistema:
+Não se trata de executar 100 tasks simultaneamente. Trata-se de executar **UMA MISSÃO INTEIRA** (ex:
+escrever um livro de 300 páginas) do início ao fim automaticamente, com o sistema:
+
 - ✅ Decompondo automaticamente em steps
 - ✅ Executando cada step com validação automática
 - ✅ Auto-refinando outputs até atingir qualidade desejada
@@ -53,16 +55,16 @@ Não se trata de executar 100 tasks simultaneamente. Trata-se de executar **UMA 
 
 ```javascript
 // Estratégia: ITERATIVE
-iteration = 1
+iteration = 1;
 while (iteration <= 3) {
-  output = LLM.execute(prompt)
-  validation = LLMJudge.validate(output, criteria)
+  output = LLM.execute(prompt);
+  validation = LLMJudge.validate(output, criteria);
 
-  if (validation.score >= 75) break;  // Passou!
+  if (validation.score >= 75) break; // Passou!
 
   // Retry com feedback
-  prompt += `\nFeedback (iteration ${iteration}): ${validation.issues}`
-  iteration++
+  prompt += `\nFeedback (iteration ${iteration}): ${validation.issues}`;
+  iteration++;
 }
 ```
 
@@ -80,8 +82,8 @@ Avalie este capítulo nos critérios:
 Capítulo: ${output}
 
 Retorne JSON: { overall_score, strengths[], weaknesses[], suggestions[] }
-`
-evaluation = await ChatGPT.execute(judgePrompt)
+`;
+evaluation = await ChatGPT.execute(judgePrompt);
 // { overall_score: 82, suggestions: ["Adicione mais exemplos"] }
 ```
 
@@ -110,6 +112,7 @@ Step 4: Chapter 3 → input: outline + chapter 1 + chapter 2
 **Localização**: `src/orchestrator/orchestrator_engine.js`
 
 **Estratégias de Execução**:
+
 - **SINGLE_SHOT** (atual): Execute once
 - **ITERATIVE** (novo): Execute → Validate → Retry até qualidade OK
 - **MULTI_STEP** (novo): Workflow com N steps sequenciais
@@ -123,6 +126,7 @@ Step 4: Chapter 3 → input: outline + chapter 1 + chapter 2
 **Localização**: `src/orchestrator/validation/validation_service.js`
 
 **Validadores**:
+
 - **RegexValidator**: Padrões regex
 - **SchemaValidator**: JSON schema
 - **LengthValidator**: Word/character count
@@ -133,6 +137,7 @@ Step 4: Chapter 3 → input: outline + chapter 1 + chapter 2
 **Localização**: `src/missions/mission_manager.js`
 
 **API**:
+
 - `createMission(params)` → Gera workflow, inicia execução
 - `pauseMission(id)` → Pausa temporariamente
 - `resumeMission(id)` → Retoma de checkpoint
@@ -140,6 +145,7 @@ Step 4: Chapter 3 → input: outline + chapter 1 + chapter 2
 - `getMissionProgress(id)` → Status em tempo real
 
 **Persistência** (filesystem):
+
 ```
 missions/
 ├── mission-001/
@@ -154,6 +160,7 @@ missions/
 **Localização**: `src/orchestrator/context_manager.js`
 
 **Features**:
+
 - **Accumulation**: Guardar resultados entre steps
 - **Chunking**: Split contexto grande (> token limit)
 - **Summarization**: Comprimir mantendo info crítica
@@ -164,6 +171,7 @@ missions/
 **Localização**: `src/orchestrator/checkpoint_manager.js`
 
 **Checkpoints salvos**:
+
 - A cada step completado
 - Antes de operações críticas
 - Periodicamente (a cada 5 minutos)
@@ -190,9 +198,8 @@ missions/
 
 ### Workflow Gerado (17 steps)
 
-1. Generate Outline → 1 task
-2-16. Write 15 Chapters → 15 tasks (cada um até 3 iterações)
-17. Consistency Check → 1 task
+1. Generate Outline → 1 task 2-16. Write 15 Chapters → 15 tasks (cada um até 3 iterações)
+2. Consistency Check → 1 task
 
 ### Execução (~25 horas)
 
@@ -206,9 +213,8 @@ missions/
 
 `missions/mission-001/rust-advanced-book.pdf` (312 páginas)
 
-**Tempo sem o sistema**: ~200 horas de trabalho manual
-**Tempo com o sistema**: ~25 horas (automático) + 5 min (supervisão)
-**Economia**: **99.6% de tempo humano**
+**Tempo sem o sistema**: ~200 horas de trabalho manual **Tempo com o sistema**: ~25 horas
+(automático) + 5 min (supervisão) **Economia**: **99.6% de tempo humano**
 
 ---
 
@@ -219,6 +225,7 @@ missions/
 **Objetivo**: Permitir primeira missão simples (3-5 steps) executar
 
 **Tarefas**:
+
 1. **Schema V5** (3 dias)
    - Criar `task_schema_v5.js` com suporte a missions/workflows
    - Criar `migrator_v4_to_v5.js` para backward compatibility
@@ -242,6 +249,7 @@ missions/
 **Objetivo**: Todas funcionalidades backend operacionais
 
 **Tarefas**:
+
 1. **ContextManager** (5 dias) - Accumulation, chunking, summarization
 2. **FeedbackProcessor** (3 dias) - Processar feedback, extrair patterns
 3. **CheckpointManager** (2 dias) - Save/load checkpoints
@@ -255,6 +263,7 @@ missions/
 **Objetivo**: Dashboard permite criar/monitorar missões
 
 **Tarefas**:
+
 1. **Mission Store** (2 dias) - Pinia store
 2. **Mission Views** (8 dias) - List, Create, Monitor, Detail
 3. **Socket.io Real-time** (2 dias) - Eventos: MISSION_PROGRESS, MISSION_COMPLETED
@@ -267,6 +276,7 @@ missions/
 **Objetivo**: Power user features
 
 **Tarefas**:
+
 1. **Workflow Editor** (8 dias) - DAG visual com Cytoscape.js
 2. **Quality Dashboard** (3 dias) - Quality scores, validation pass rate
 3. **Cost Dashboard** (3 dias) - Cost tracking, budget alerts
@@ -279,6 +289,7 @@ missions/
 **Objetivo**: v2.0.0 production-ready
 
 **Tarefas**:
+
 1. **Performance Testing** (3 dias) - 100+ concurrent missions
 2. **E2E Tests** (4 dias) - Criar missão → executar → feedback → completar
 3. **Documentation** (3 dias) - User guide, API reference
@@ -302,6 +313,7 @@ OrchestratorEngine → NERV → Driver
 ```
 
 **Exemplo**:
+
 ```javascript
 // OrchestratorEngine NUNCA chama Driver diretamente
 orchestrator.execute(task) {
@@ -325,24 +337,31 @@ orchestrator.execute(task) {
 ## 🆕 Novos Eventos NERV (30+)
 
 **Orquestração**:
+
 - `ORCHESTRATION_STARTED`, `ORCHESTRATION_COMPLETED`, `ORCHESTRATION_FAILED`
 
 **Iteração**:
+
 - `ITERATION_STARTED`, `ITERATION_COMPLETED`, `ITERATION_CONVERGED`
 
 **Validação**:
+
 - `VALIDATION_PASSED`, `VALIDATION_FAILED`, `VALIDATION_RETRY`
 
 **Qualidade**:
+
 - `QUALITY_ASSESSED`, `QUALITY_IMPROVED`, `QUALITY_THRESHOLD_MET`
 
 **Missões**:
+
 - `MISSION_CREATED`, `MISSION_STARTED`, `MISSION_PAUSED`, `MISSION_RESUMED`, `MISSION_COMPLETED`
 
 **Workflow**:
+
 - `WORKFLOW_STEP_STARTED`, `WORKFLOW_STEP_COMPLETED`, `WORKFLOW_STEP_FAILED`
 
 **Custo**:
+
 - `TOKEN_USAGE_RECORDED`, `COST_CALCULATED`, `BUDGET_WARNING`, `BUDGET_EXCEEDED`
 
 ---
@@ -367,11 +386,11 @@ orchestrator.execute(task) {
 ```javascript
 socket.on('mission:progress', ({ missionId, step, progress }) => {
   // Atualizar UI em tempo real
-})
+});
 
 socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
   // Notificar usuário
-})
+});
 ```
 
 ---
@@ -381,6 +400,7 @@ socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
 ### Launch Criteria v2.0
 
 **Backend**:
+
 - [ ] Missão "Escrever Livro" (15 cap) executa do início ao fim automaticamente
 - [ ] Iteração automática funciona (até 3 retries)
 - [ ] LLM-as-judge scoring consistente (±5 pontos)
@@ -389,6 +409,7 @@ socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
 - [ ] Cost tracking com precisão 99%+
 
 **Frontend**:
+
 - [ ] Dashboard mostra progresso em tempo real
 - [ ] Usuário pode criar missão em < 2min
 - [ ] Feedback do usuário injetado em < 10s
@@ -396,6 +417,7 @@ socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
 - [ ] Quality/Cost dashboards com gráficos
 
 **Performance**:
+
 - [ ] 10+ missões simultâneas sem degradação
 - [ ] Missão "Book Writing" (15 cap) completa em < 48h
 - [ ] Memory usage < 1GB (10 missões)
@@ -408,7 +430,8 @@ socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
 ### 1. Por que Filesystem (não Database)?
 
 **Razões**:
-- ✅ Sistema atual já usa com sucesso (fila/*.json)
+
+- ✅ Sistema atual já usa com sucesso (fila/\*.json)
 - ✅ Simplicidade (sem dependency externa)
 - ✅ Fácil debugging (`cat missions/mission-123/state.json`)
 - ✅ Checkpoint recovery trivial
@@ -417,55 +440,62 @@ socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
 ### 2. Quando Usar LLM-as-Judge?
 
 **Usar para**:
+
 - ✅ Escrever capítulo de livro
 - ✅ Gerar documentação técnica
 - ✅ Traduzir conteúdo
 - ✅ Refatorar código
 
 **NÃO usar para**:
+
 - ❌ Validar JSON schema (use SchemaValidator)
 - ❌ Checar regex pattern (use RegexValidator)
 - ❌ Contar palavras (use LengthValidator)
 
 ### 3. Estratégias de Execução - Trade-offs
 
-| Estratégia | Overhead | Quando Usar |
-|-----------|----------|-------------|
-| SINGLE_SHOT | 0% | Task simples, não crítica |
-| ITERATIVE | +100-200% | Qualidade importa, até 3 tentativas |
-| MULTI_STEP | +5-10% | Missões complexas (5-100 steps) |
-| TREE_OF_THOUGHT | +300-500% | Múltiplas soluções, escolher melhor |
-| CHAIN_OF_THOUGHT | +50-100% | Reasoning explícito necessário |
+| Estratégia       | Overhead  | Quando Usar                         |
+| ---------------- | --------- | ----------------------------------- |
+| SINGLE_SHOT      | 0%        | Task simples, não crítica           |
+| ITERATIVE        | +100-200% | Qualidade importa, até 3 tentativas |
+| MULTI_STEP       | +5-10%    | Missões complexas (5-100 steps)     |
+| TREE_OF_THOUGHT  | +300-500% | Múltiplas soluções, escolher melhor |
+| CHAIN_OF_THOUGHT | +50-100%  | Reasoning explícito necessário      |
 
 ---
 
 ## 🎁 Casos de Uso
 
 ### 1. Escrever Livro Técnico
+
 - **Complexidade**: 300 páginas, 15 capítulos
 - **Duration**: ~25 horas
 - **Tasks**: 87
 - **Cost**: ~$42
 
 ### 2. Desenvolver API REST Completa
+
 - **Complexidade**: 11 features, testes automatizados
 - **Duration**: ~11 horas
 - **Tasks**: 33
 - **Cost**: ~$25
 
 ### 3. Research Report
+
 - **Complexidade**: 20 páginas, 28 sources, 38 citations
 - **Duration**: ~8 horas
 - **Tasks**: 15
 - **Cost**: ~$29
 
 ### 4. Tradução Multi-idioma
+
 - **Complexidade**: 12k palavras → 5 idiomas
 - **Duration**: ~6 horas
 - **Tasks**: 10
 - **Cost**: ~$18
 
 ### 5. Refatoração de Codebase
+
 - **Complexidade**: 15k linhas jQuery → React
 - **Duration**: ~12 horas
 - **Tasks**: 48
@@ -491,9 +521,8 @@ socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
 
 ## 🚦 Status Atual
 
-**Data de Início**: 28/01/2026
-**Fase Atual**: Fase 1 - Fundações Críticas
-**Progresso**: 0% (iniciando)
+**Data de Início**: 28/01/2026 **Fase Atual**: Fase 1 - Fundações Críticas **Progresso**: 0%
+(iniciando)
 
 **Primeira Tarefa**: Implementar Task Schema V5
 
@@ -501,22 +530,20 @@ socket.on('mission:completed', ({ missionId, totalSteps, duration }) => {
 
 ## 👥 Equipe
 
-**Arquitetura**: AI Architect + Core Team
-**Desenvolvimento Backend**: 2 desenvolvedores full-stack
-**Desenvolvimento Frontend**: 1 desenvolvedor Vue.js
-**QA**: 1 QA engineer
-**DevOps**: 1 DevOps engineer
+**Arquitetura**: AI Architect + Core Team **Desenvolvimento Backend**: 2 desenvolvedores full-stack
+**Desenvolvimento Frontend**: 1 desenvolvedor Vue.js **QA**: 1 QA engineer **DevOps**: 1 DevOps
+engineer
 
 ---
 
 ## 📞 Contato
 
 Para dúvidas sobre o plano v2.0:
+
 - **Issues**: GitHub Issues com label `v2.0-mission-orchestration`
 - **Discussions**: GitHub Discussions
 
 ---
 
-**Última Atualização**: 28/01/2026
-**Próxima Revisão**: Semanal (toda segunda-feira)
-**Status**: ✅ Aprovado para implementação
+**Última Atualização**: 28/01/2026 **Próxima Revisão**: Semanal (toda segunda-feira) **Status**: ✅
+Aprovado para implementação

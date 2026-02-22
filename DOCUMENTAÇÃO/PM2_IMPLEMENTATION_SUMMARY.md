@@ -2,9 +2,8 @@
 
 > **Sumário Executivo das Implementações PM2 Sovereign (v3.0)**
 
-**Data**: Fev 2026
-**Status**: ✅ Implementado e Validado
-**Baseline**: ecosystem.config.js v3.0 + pm2_bridge.js v800 + Scripts v3.0
+**Data**: Fev 2026 **Status**: ✅ Implementado e Validado **Baseline**: ecosystem.config.js v3.0 +
+pm2_bridge.js v800 + Scripts v3.0
 
 ---
 
@@ -17,7 +16,7 @@
 | **Linhas Adicionadas**     | ~2,100 | 400 (código) + 1,700 (docs)                                      |
 | **Environment Variables**  | 6      | SERVER_MODE, SERVER_AUTHORITY, etc.                              |
 | **Validações Automáticas** | 6      | pm2-check.sh                                                     |
-| **Socket.io Events**       | 4      | pm2:process:*, pm2:snapshot, pm2:metrics                         |
+| **Socket.io Events**       | 4      | pm2:process:\*, pm2:snapshot, pm2:metrics                        |
 | **Processos Monitorados**  | 3      | agente-gpt, dashboard-web, chrome-proxy                          |
 | **Tempo de Implementação** | ~2h    | Design + código + docs + testes                                  |
 
@@ -27,10 +26,10 @@
 
 ### 1. Enforcement (ecosystem.config.js)
 
-**Arquivo**: `ecosystem.config.js`
-**Audit Level**: 500 (Config Enforcement)
+**Arquivo**: `ecosystem.config.js` **Audit Level**: 500 (Config Enforcement)
 
 **Mudanças**:
+
 - ✅ `SERVER_MODE=split` forçado em `agente-gpt` env
 - ✅ `SERVER_AUTHORITY=standalone` em ambos processos
 - ✅ `CHROME_PROXY_ENABLED=false` em `agente-gpt`
@@ -38,6 +37,7 @@
 - ✅ `ENABLE_STATE_FILE=false` em `dashboard-web`
 
 **Antes**:
+
 ```javascript
 env: {
     NODE_ENV: 'development',
@@ -46,6 +46,7 @@ env: {
 ```
 
 **Depois**:
+
 ```javascript
 env: {
     NODE_ENV: 'development',
@@ -62,10 +63,11 @@ env: {
 
 ### 2. All-Process Monitoring (pm2_bridge.js)
 
-**Arquivo**: `src/server/realtime/bus/pm2_bridge.js`
-**Audit Level**: 700 → 800 (PM2 Sovereign Edition)
+**Arquivo**: `src/server/realtime/bus/pm2_bridge.js` **Audit Level**: 700 → 800 (PM2 Sovereign
+Edition)
 
 **Mudanças**:
+
 - ✅ Monitora **3 processos** (antes: 1)
 - ✅ Payload completo (memory, CPU, uptime, restarts, PID)
 - ✅ 4 Socket.io events (`pm2:process:event`, `pm2:process:critical`, `pm2:snapshot`, `pm2:metrics`)
@@ -74,32 +76,42 @@ env: {
 - ✅ Periodic metrics (30s)
 
 **Antes** (Single-Process):
+
 ```javascript
 const AGENTE_NAME = 'agente-gpt';
 
 bus.on('process:event', data => {
-    if (data.process.name === AGENTE_NAME) {
-        notify('pm2:process', { event, status, ts });
-    }
+  if (data.process.name === AGENTE_NAME) {
+    notify('pm2:process', { event, status, ts });
+  }
 });
 ```
 
 **Depois** (All-Process):
+
 ```javascript
 const MANAGED_PROCESSES = ['agente-gpt', 'dashboard-web', 'chrome-proxy'];
 
 bus.on('process:event', data => {
-    if (MANAGED_PROCESSES.includes(processName)) {
-        const payload = {
-            name, event, status, pid, pm_id,
-            restarts, uptime, memory, cpu, ts
-        };
-        notify('pm2:process:event', payload);
+  if (MANAGED_PROCESSES.includes(processName)) {
+    const payload = {
+      name,
+      event,
+      status,
+      pid,
+      pm_id,
+      restarts,
+      uptime,
+      memory,
+      cpu,
+      ts,
+    };
+    notify('pm2:process:event', payload);
 
-        if (['exit', 'error', 'stop'].includes(event)) {
-            notify('pm2:process:critical', payload);
-        }
+    if (['exit', 'error', 'stop'].includes(event)) {
+      notify('pm2:process:critical', payload);
     }
+  }
 });
 
 module.exports = { init, stop, getProcessStates, refreshSnapshot, MANAGED_PROCESSES };
@@ -111,19 +123,20 @@ module.exports = { init, stop, getProcessStates, refreshSnapshot, MANAGED_PROCES
 
 ### 3. Boot Conflict Fixes (src/main.js)
 
-**Arquivo**: `src/main.js`
-**Audit Level**: 500 (Boot Resilience)
+**Arquivo**: `src/main.js` **Audit Level**: 500 (Boot Resilience)
 
 **Mudanças**:
+
 - ✅ **R1**: PM2+integrated validation (fail-fast)
 - ✅ **R2**: Discovery timeout 5s → 30s
 - ✅ **R3**: Chrome Proxy duplication detection
 
 **Implementação R1** (PM2+integrated validation):
+
 ```javascript
 // Validação PM2 + integrated → FAIL FAST
 if (runningUnderPM2 && SERVER_MODE === 'integrated') {
-    const errorMsg = `
+  const errorMsg = `
 ╔════════════════════════════════════════════════════════════╗
 ║  ❌ CONFIGURAÇÃO INVÁLIDA DETECTADA (PM2 + integrated)    ║
 ╚════════════════════════════════════════════════════════════╝
@@ -152,8 +165,8 @@ CONFIGURAÇÃO PM2 SOBERANA:
 ABORTANDO INICIALIZAÇÃO.
     `.trim();
 
-    logger.fatal(errorMsg);
-    process.exit(1);  // Exit code 1 = configuration error
+  logger.fatal(errorMsg);
+  process.exit(1); // Exit code 1 = configuration error
 }
 ```
 
@@ -163,9 +176,7 @@ ABORTANDO INICIALIZAÇÃO.
 
 ### 4. Health Check Automation (pm2-check.sh)
 
-**Arquivo**: `scripts/pm2-check.sh`
-**Linhas**: ~270
-**Exit Codes**: 0 (OK), 1 (FAIL)
+**Arquivo**: `scripts/pm2-check.sh` **Linhas**: ~270 **Exit Codes**: 0 (OK), 1 (FAIL)
 
 **6 Validações**:
 
@@ -177,11 +188,13 @@ ABORTANDO INICIALIZAÇÃO.
 6. ✅ **Logs**: Últimas 50 linhas sem `[FATAL]` ou `[ERROR]`
 
 **Auto-Fix Mode** (com `--fix`):
+
 - Inicia processos faltantes
 - Reinicia processos com erro
 - Para processos órfãos
 
 **Exemplo de Output**:
+
 ```bash
 $ bash scripts/pm2-check.sh
 
@@ -227,9 +240,8 @@ $ bash scripts/pm2-check.sh
 
 ### 5. Safe Startup Sequence (pm2-startup.sh)
 
-**Arquivo**: `scripts/pm2-startup.sh`
-**Linhas**: ~180
-**Fases**: 5 (Pré-voo, Limpeza, Inicialização, Validação, Status)
+**Arquivo**: `scripts/pm2-startup.sh` **Linhas**: ~180 **Fases**: 5 (Pré-voo, Limpeza,
+Inicialização, Validação, Status)
 
 **5 Fases**:
 
@@ -259,6 +271,7 @@ $ bash scripts/pm2-check.sh
    - Dashboard URL
 
 **Exemplo de Output**:
+
 ```bash
 $ bash scripts/pm2-startup.sh
 
@@ -299,8 +312,7 @@ Sistema pronto para uso!
 
 ### 6. Makefile Integration
 
-**Arquivo**: `Makefile`
-**Targets Adicionados**: 4
+**Arquivo**: `Makefile` **Targets Adicionados**: 4
 
 **Novos Targets**:
 
@@ -318,6 +330,7 @@ pm2-validate:     # Valida ecosystem.config.js
 ```
 
 **Help Menu Atualizado**:
+
 ```
 🏥 Health & Validação:
   make health       Health check PM2 (sovereign mode)
@@ -510,6 +523,7 @@ http://localhost:3008
 **PM2 Sovereign Architecture** está **100% implementado e validado**.
 
 **Entregas**:
+
 - ✅ 6 arquivos modificados
 - ✅ 5 arquivos criados
 - ✅ ~2,100 linhas adicionadas
@@ -524,7 +538,5 @@ http://localhost:3008
 
 ---
 
-**Versão**: 3.0 (PM2 Sovereign - Fev 2026)
-**Data**: {{ current_date }}
-**Autor**: AI Agent Expert + GitHub Copilot
-**Baseline**: ecosystem.config.js v3.0 + pm2_bridge.js v800 + Scripts v3.0
+**Versão**: 3.0 (PM2 Sovereign - Fev 2026) **Data**: {{ current_date }} **Autor**: AI Agent Expert +
+GitHub Copilot **Baseline**: ecosystem.config.js v3.0 + pm2_bridge.js v800 + Scripts v3.0

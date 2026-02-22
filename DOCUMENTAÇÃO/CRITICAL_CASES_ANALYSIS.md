@@ -8,7 +8,8 @@
 
 ## 📋 Sumário Executivo
 
-Este documento identifica, cataloga e analisa **casos críticos** (race conditions, memory leaks, error handling inadequado, edge cases não tratados) encontrados no código do Maestro V360.
+Este documento identifica, cataloga e analisa **casos críticos** (race conditions, memory leaks,
+error handling inadequado, edge cases não tratados) encontrados no código do Maestro V360.
 
 **Status Geral**: 🟢 Sistema resiliente com boa cobertura de casos críticos  
 **Áreas de Melhoria Identificadas**: 7 casos médios, 3 casos de baixa prioridade
@@ -27,12 +28,12 @@ Este documento identifica, cataloga e analisa **casos críticos** (race conditio
 ```javascript
 // Caso B: Lock Órfão
 if (!isProcessAlive(currentLock.pid)) {
-    // [ANTI-RACE] Revalida se o lock ainda pertence ao mesmo PID morto
-    const recheck = await safeReadJSON(lockFile);
-    if (recheck && recheck.pid === currentLock.pid) {
-        await fs.unlink(lockFile).catch(() => {});
-    }
-    return acquireLock(taskId, target, attempt + 1);
+  // [ANTI-RACE] Revalida se o lock ainda pertence ao mesmo PID morto
+  const recheck = await safeReadJSON(lockFile);
+  if (recheck && recheck.pid === currentLock.pid) {
+    await fs.unlink(lockFile).catch(() => {});
+  }
+  return acquireLock(taskId, target, attempt + 1);
 }
 ```
 
@@ -45,7 +46,8 @@ if (!isProcessAlive(currentLock.pid)) {
 
 **Impacto**: MÉDIO
 
-- Em cenários de alta concorrência (≥3 agentes simultâneos), pode haver double-acquisition temporária
+- Em cenários de alta concorrência (≥3 agentes simultâneos), pode haver double-acquisition
+  temporária
 - Mitigado pela flag `wx` na criação do lock (atômica)
 
 **Recomendação**:
@@ -55,11 +57,11 @@ if (!isProcessAlive(currentLock.pid)) {
 const tempLock = `${lockFile}.${process.pid}.tmp`;
 await fs.writeFile(tempLock, JSON.stringify(lockData));
 try {
-    await fs.rename(tempLock, lockFile); // Atômico no filesystem
-    return true;
+  await fs.rename(tempLock, lockFile); // Atômico no filesystem
+  return true;
 } catch (err) {
-    await fs.unlink(tempLock).catch(() => {});
-    // Retry logic...
+  await fs.unlink(tempLock).catch(() => {});
+  // Retry logic...
 }
 ```
 
@@ -100,7 +102,8 @@ async clearAll() {
 - ✅ Timeout de 3s para evitar travamento
 - ✅ Fire-and-forget para handles órfãos
 - ⚠️ **Gap**: Promise.race não cancela a promise perdedora
-- ⚠️ **Gap**: Se timeout ocorrer, a promise de cleanup continua rodando em background sem rastreamento
+- ⚠️ **Gap**: Se timeout ocorrer, a promise de cleanup continua rodando em background sem
+  rastreamento
 
 **Impacto**: BAIXO
 
@@ -115,14 +118,14 @@ const controller = new AbortController();
 const timeoutId = setTimeout(() => controller.abort(), 3000);
 
 try {
-    while (this.activeHandles.length > 0) {
-        if (controller.signal.aborted) throw new Error('ABORTED');
-        const h = this.activeHandles.pop();
-        await h.dispose();
-    }
-    clearTimeout(timeoutId);
+  while (this.activeHandles.length > 0) {
+    if (controller.signal.aborted) throw new Error('ABORTED');
+    const h = this.activeHandles.pop();
+    await h.dispose();
+  }
+  clearTimeout(timeoutId);
 } catch (err) {
-    // Handles restantes já marcados para GC
+  // Handles restantes já marcados para GC
 }
 ```
 
@@ -153,7 +156,8 @@ async _processCommand(envelope) {
 
 - ✅ Try-catch captura exceções síncronas
 - ⚠️ **Gap**: Se `this.sendAck()` falhar (socket desconectado), não há tratamento
-- ⚠️ **Gap**: Se `_emitInternal` retornar promise rejeitada, ela é capturada, mas ACK pode não ser enviado se socket cair
+- ⚠️ **Gap**: Se `_emitInternal` retornar promise rejeitada, ela é capturada, mas ACK pode não ser
+  enviado se socket cair
 
 **Impacto**: MÉDIO
 
@@ -281,20 +285,20 @@ async submit(ctx, selector, taskId) {
 
 ```javascript
 class ConnectionOrchestrator {
-    constructor(options = {}) {
-        // Handlers referenciados para remoção limpa
-        this._onDisconnect = this._handleDisconnect.bind(this);
-        this._onTargetDestroyed = this._handleTargetDestroyed.bind(this);
-    }
+  constructor(options = {}) {
+    // Handlers referenciados para remoção limpa
+    this._onDisconnect = this._handleDisconnect.bind(this);
+    this._onTargetDestroyed = this._handleTargetDestroyed.bind(this);
+  }
 
-    cleanup() {
-        if (this.browser) {
-            this.browser.off('disconnected', this._onDisconnect);
-            this.browser.off('targetdestroyed', this._onTargetDestroyed);
-        }
-        this.browser = null;
-        this.page = null;
+  cleanup() {
+    if (this.browser) {
+      this.browser.off('disconnected', this._onDisconnect);
+      this.browser.off('targetdestroyed', this._onTargetDestroyed);
     }
+    this.browser = null;
+    this.page = null;
+  }
 }
 ```
 
@@ -347,15 +351,15 @@ async applyTier(recoveryErr, attempt, taskId) {
 
 ```javascript
 const killWithTimeout = Promise.race([
-    system.killProcess(pid),
-    new Promise((_, rej) => setTimeout(() => rej(new Error('KILL_TIMEOUT')), 5000))
+  system.killProcess(pid),
+  new Promise((_, rej) => setTimeout(() => rej(new Error('KILL_TIMEOUT')), 5000)),
 ]);
 
 try {
-    await killWithTimeout;
+  await killWithTimeout;
 } catch (err) {
-    log('FATAL', `[RECOVERY] Kill falhou: ${err.message}. Delegando ao SO.`);
-    // Deixa processo órfão para SO limpar
+  log('FATAL', `[RECOVERY] Kill falhou: ${err.message}. Delegando ao SO.`);
+  // Deixa processo órfão para SO limpar
 }
 ```
 
@@ -374,12 +378,12 @@ try {
 
 ```javascript
 try {
-    task = schemas.parseTask(rawTask);
+  task = schemas.parseTask(rawTask);
 } catch (schemaErr) {
-    log('ERROR', `Tarefa ${this.state.currentTaskId} rejeitada por integridade.`, correlationId);
-    rawTask.state = { status: 'FAILED', last_error: `Schema Violation: ${schemaErr.message}` };
-    await io.saveTask(rawTask);
-    return;
+  log('ERROR', `Tarefa ${this.state.currentTaskId} rejeitada por integridade.`, correlationId);
+  rawTask.state = { status: 'FAILED', last_error: `Schema Violation: ${schemaErr.message}` };
+  await io.saveTask(rawTask);
+  return;
 }
 ```
 
@@ -398,12 +402,12 @@ try {
 const CAPTURE_TIMEOUT_MS = 5000;
 
 async function createCrashDump(page, error, taskId = 'unknown', correlationId = 'unknown') {
-    // ...
-    try {
-        await _captureVisualEvidence(page, folder, correlationId);
-    } catch (e) {
-        console.error(`[FORENSICS] Falha crítica no motor de evidências: ${e.message}`);
-    }
+  // ...
+  try {
+    await _captureVisualEvidence(page, folder, correlationId);
+  } catch (e) {
+    console.error(`[FORENSICS] Falha crítica no motor de evidências: ${e.message}`);
+  }
 }
 ```
 
@@ -446,31 +450,31 @@ const cleanedProfiles = await ConnectionOrchestrator.cleanupTempProfiles();
 
 ```javascript
 async function shutdown(signal) {
-    const phases = [
-        { name: 'Kernel', fn: () => kernel.stop() },
-        { name: 'BrowserPool', fn: () => browserPool.close() },
-        { name: 'NERV', fn: () => nerv.disconnect() }
-        // ...
-    ];
+  const phases = [
+    { name: 'Kernel', fn: () => kernel.stop() },
+    { name: 'BrowserPool', fn: () => browserPool.close() },
+    { name: 'NERV', fn: () => nerv.disconnect() },
+    // ...
+  ];
 
-    for (const phase of phases) {
-        try {
-            log('INFO', `[SHUTDOWN] Fase: ${phase.name}...`);
-            await phase.fn();
-        } catch (err) {
-            log('ERROR', `[SHUTDOWN] Falha em ${phase.name}: ${err.message}`);
-            // Continua para próxima fase
-        }
-    }
-
-    // Garantia mínima: sempre tenta limpar profiles
+  for (const phase of phases) {
     try {
-        await ConnectionOrchestrator.cleanupTempProfiles();
+      log('INFO', `[SHUTDOWN] Fase: ${phase.name}...`);
+      await phase.fn();
     } catch (err) {
-        log('ERROR', `[SHUTDOWN] Falha na limpeza final: ${err.message}`);
+      log('ERROR', `[SHUTDOWN] Falha em ${phase.name}: ${err.message}`);
+      // Continua para próxima fase
     }
+  }
 
-    process.exit(0);
+  // Garantia mínima: sempre tenta limpar profiles
+  try {
+    await ConnectionOrchestrator.cleanupTempProfiles();
+  } catch (err) {
+    log('ERROR', `[SHUTDOWN] Falha na limpeza final: ${err.message}`);
+  }
+
+  process.exit(0);
 }
 ```
 
@@ -512,18 +516,18 @@ _applyDecisions(proposals, context) {
 
 ```javascript
 function listenToSignals() {
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-    process.on('uncaughtException', err => {
-        log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
-        gracefulShutdown('UNCAUGHT_EXCEPTION');
-    });
+  process.on('uncaughtException', err => {
+    log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
+    gracefulShutdown('UNCAUGHT_EXCEPTION');
+  });
 
-    process.on('unhandledRejection', reason => {
-        log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
-        gracefulShutdown('UNHANDLED_REJECTION');
-    });
+  process.on('unhandledRejection', reason => {
+    log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
+    gracefulShutdown('UNHANDLED_REJECTION');
+  });
 }
 ```
 
@@ -743,7 +747,8 @@ Para novos PRs, validar:
 
 ## 🎯 Conclusão
 
-O sistema **chatgpt-docker-puppeteer V360** possui **excelente resiliência geral** (94/100), com proteções robustas nos subsistemas críticos:
+O sistema **chatgpt-docker-puppeteer V360** possui **excelente resiliência geral** (94/100), com
+proteções robustas nos subsistemas críticos:
 
 ✅ **Pontos Fortes**:
 

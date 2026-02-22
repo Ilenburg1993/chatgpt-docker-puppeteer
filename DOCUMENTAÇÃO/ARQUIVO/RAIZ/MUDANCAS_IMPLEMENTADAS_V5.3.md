@@ -1,20 +1,21 @@
 # 🎉 Mudanças Implementadas - DevContainer v5.3
 
-**Data:** 03 de Fevereiro de 2026
-**Status:** ✅ CONCLUÍDO
-**Tipo:** CORREÇÃO CRÍTICA + UPGRADE
+**Data:** 03 de Fevereiro de 2026 **Status:** ✅ CONCLUÍDO **Tipo:** CORREÇÃO CRÍTICA + UPGRADE
 
 ---
 
 ## 📋 Resumo Executivo
 
 ### Problema Resolvido
+
 **Container não iniciava** devido a erro fatal no mount do SSH agent socket.
 
 ### Solução Implementada
+
 Migração para **VS Code Native SSH Forwarding** (infraestrutura oficial).
 
 ### Resultado
+
 ✅ **Container agora inicia com sucesso**, com ou sem SSH agent disponível.
 
 ---
@@ -22,7 +23,9 @@ Migração para **VS Code Native SSH Forwarding** (infraestrutura oficial).
 ## 📝 Arquivos Modificados
 
 ### 1. `.devcontainer/devcontainer.json` ⭐
+
 **Mudanças:**
+
 - ❌ **REMOVIDO:** Linha 721 - Mount manual SSH
 - ❌ **REMOVIDO:** Linhas 97-99 - `SSH_AUTH_SOCK="/ssh-agent"` (remoteEnv)
 - ❌ **REMOVIDO:** Linha 906 - `DEVCONTAINER_SSH_AGENT_ALLOWED` (containerEnv)
@@ -31,28 +34,35 @@ Migração para **VS Code Native SSH Forwarding** (infraestrutura oficial).
 - ✅ **ATUALIZADO:** Versão no cabeçalho: v5.2 → v5.3
 
 **Impacto:**
+
 - Container agora é **fail-safe** (inicia sempre)
 - Zero configuração manual necessária
 - SSH funciona automaticamente quando disponível no host
 
 ### 2. `.devcontainer/scripts/post-create.sh`
+
 **Mudanças:**
+
 - ✅ **ATUALIZADO:** Section 7 (SSH Contract)
 - ✅ **ADICIONADO:** Nota sobre VS Code native forwarding
 - ✅ **INCREMENTADO:** Versão: SSH_CONTRACT_VERSION="1.5" → "1.6"
 - ✅ **ADICIONADO:** Comentário sobre fail-safe design
 
 **Impacto:**
+
 - Script agora documenta claramente a nova arquitetura
 - Filosofia opt-in mantida e reforçada
 
 ### 3. `DEVCONTAINER_BUILD_ANALYSIS.md`
+
 **Mudanças:**
+
 - ✅ **ADICIONADO:** Seção "Mudanças Implementadas" no topo
 - ✅ **ATUALIZADO:** Status: 🔴 CRÍTICO → ✅ RESOLVIDO
 - ✅ **MANTIDO:** Análise original completa (histórico)
 
 **Impacto:**
+
 - Documentação completa do problema e solução
 - Referência para futuro troubleshooting
 
@@ -61,7 +71,9 @@ Migração para **VS Code Native SSH Forwarding** (infraestrutura oficial).
 ## 📚 Novos Documentos Criados
 
 ### 4. `.devcontainer/MIGRATION_SSH_V5.3.md` ⭐
+
 **Conteúdo:**
+
 - Por que a configuração anterior era incorreta (4 problemas identificados)
 - Por que a nova configuração é a mais adequada (6 vantagens)
 - Como validar a nova configuração (3 testes)
@@ -69,11 +81,12 @@ Migração para **VS Code Native SSH Forwarding** (infraestrutura oficial).
 - Detalhes técnicos (como funciona o VS Code forwarding)
 - Lições aprendidas (5 princípios)
 
-**Tamanho:** ~450 linhas
-**Público:** Desenvolvedores e mantenedores
+**Tamanho:** ~450 linhas **Público:** Desenvolvedores e mantenedores
 
 ### 5. `.devcontainer/TROUBLESHOOTING_SSH.md`
+
 **Conteúdo:**
+
 - Quick check: Container iniciou?
 - Verificar SSH funcionando (passo a passo)
 - Troubleshooting por sintoma (4 sintomas comuns)
@@ -82,11 +95,12 @@ Migração para **VS Code Native SSH Forwarding** (infraestrutura oficial).
 - Debug avançado
 - Reset completo (última recurso)
 
-**Tamanho:** ~350 linhas
-**Público:** Usuários e troubleshooting
+**Tamanho:** ~350 linhas **Público:** Usuários e troubleshooting
 
 ### 6. `MUDANCAS_IMPLEMENTADAS_V5.3.md` (este arquivo)
+
 **Conteúdo:**
+
 - Resumo executivo
 - Arquivos modificados
 - Próximos passos
@@ -99,6 +113,7 @@ Migração para **VS Code Native SSH Forwarding** (infraestrutura oficial).
 ## 🔍 O Que Mudou na Prática
 
 ### ANTES (v5.2) - Configuração Manual
+
 ```jsonc
 // remoteEnv
 "SSH_AUTH_SOCK": "/ssh-agent"
@@ -111,20 +126,22 @@ Migração para **VS Code Native SSH Forwarding** (infraestrutura oficial).
 ```
 
 **Comportamento:**
+
 - ❌ Container **NÃO INICIA** se SSH agent não estiver disponível
 - ❌ Erro fatal: `error mounting ... to rootfs at "/ssh-agent": not a directory`
 - ❌ Developer UX ruim (rebuild quebra sem motivo aparente)
 
 ### DEPOIS (v5.3) - VS Code Native
+
 ```jsonc
 // remoteEnv - SSH section REMOVIDA
 // mounts - Bind mount SSH REMOVIDO
 // containerEnv - Variável SSH REMOVIDA
-
 // VS Code gerencia SSH forwarding automaticamente
 ```
 
 **Comportamento:**
+
 - ✅ Container **SEMPRE INICIA** (com ou sem SSH)
 - ✅ SSH funciona automaticamente quando disponível no host
 - ✅ Fallback para HTTPS se SSH não disponível
@@ -165,6 +182,7 @@ ssh -T git@github.com
 ```
 
 **Se não usa SSH:**
+
 ```bash
 # Trocar para HTTPS (mais simples):
 git remote set-url origin https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
@@ -241,15 +259,19 @@ Antes de considerar concluído, verifique:
 ## 🎓 Lições Aprendidas
 
 ### 1. Infraestrutura Oficial > Customização
+
 Sempre preferir features nativas antes de implementar soluções customizadas.
 
 ### 2. Fail-Safe > Fail-Fast
+
 Container que não inicia é pior que container sem feature opcional.
 
 ### 3. Documentação É Crítica
+
 Este conjunto de documentos explica o "porquê", não apenas o "como".
 
 ### 4. Observabilidade > Controle
+
 `post-create.sh` observa SSH, não tenta controlá-lo. Filosofia correta.
 
 ---
@@ -274,19 +296,15 @@ Este conjunto de documentos explica o "porquê", não apenas o "como".
 
 ### Objetivos Alcançados
 
-✅ **Container inicia sem erros** (fail-safe)
-✅ **SSH funciona automaticamente** (quando disponível)
-✅ **Zero configuração manual** (simplificação)
-✅ **Documentação completa** (manutenibilidade)
-✅ **Alinhamento arquitetural** (consistência)
+✅ **Container inicia sem erros** (fail-safe) ✅ **SSH funciona automaticamente** (quando
+disponível) ✅ **Zero configuração manual** (simplificação) ✅ **Documentação completa**
+(manutenibilidade) ✅ **Alinhamento arquitetural** (consistência)
 
 ### Próxima Milestone
 
-Todos os problemas de build identificados foram resolvidos.
-Projeto está pronto para desenvolvimento normal.
+Todos os problemas de build identificados foram resolvidos. Projeto está pronto para desenvolvimento
+normal.
 
 ---
 
-**Fim do Documento**
-**Versão:** v5.3
-**Status:** ✅ IMPLEMENTADO E DOCUMENTADO
+**Fim do Documento** **Versão:** v5.3 **Status:** ✅ IMPLEMENTADO E DOCUMENTADO

@@ -1,8 +1,6 @@
 # 🔄 WSL Integration Guide - Chrome + Proxy + System
 
-**Data**: 2026-02-01
-**Arquitetura**: WSL ↔ Windows Host
-**Status**: ✅ Otimizado para WSL2
+**Data**: 2026-02-01 **Arquitetura**: WSL ↔ Windows Host **Status**: ✅ Otimizado para WSL2
 
 ---
 
@@ -26,6 +24,7 @@
 ```
 
 **Mudança Crítica**:
+
 - **ANTES**: Dev Container (Windows) → todo código no container
 - **AGORA**: WSL nativo → código direto no filesystem do WSL
 
@@ -42,6 +41,7 @@ START-CHROME-SIMPLE.bat
 ```
 
 **Output esperado**:
+
 ```
 Starting Chrome for WSL access (Port 9225)...
 
@@ -71,6 +71,7 @@ bash wsl-chrome-integration.sh all
 ```
 
 **Output esperado**:
+
 ```
 ═══════════════════════════════════════════════════════════
   WSL CHROME INTEGRATION - FULL VALIDATION
@@ -186,6 +187,7 @@ curl http://localhost:9224/health
 ```
 
 **Ou via IP do WSL**:
+
 ```cmd
 REM Descobrir IP do WSL
 wsl hostname -I
@@ -203,6 +205,7 @@ curl http://172.x.x.x:9224/health
 **Causa**: Firewall do Windows bloqueando WSL
 
 **Solução 1 - Firewall**:
+
 ```powershell
 # PowerShell como Admin (Windows)
 New-NetFirewallRule -DisplayName "Chrome DevTools for WSL" `
@@ -213,6 +216,7 @@ New-NetFirewallRule -DisplayName "Chrome DevTools for WSL" `
 ```
 
 **Solução 2 - Validar Networking**:
+
 ```bash
 # No WSL
 cat /etc/resolv.conf  # Ver IP do Windows
@@ -223,6 +227,7 @@ ping $(grep nameserver /etc/resolv.conf | awk '{print $2}')
 ```
 
 **Solução 3 - Usar IP Direto**:
+
 ```bash
 # Descobrir IP do Windows via WSL
 WINDOWS_IP=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
@@ -238,6 +243,7 @@ curl http://$WINDOWS_IP:9225/json/version
 **Causa**: Proxy já rodando ou porta ocupada
 
 **Solução**:
+
 ```bash
 # Ver processos na porta
 lsof -i :9224
@@ -257,6 +263,7 @@ pm2 delete chrome-proxy-service
 **Causa**: Scripts não têm permissão de execução
 
 **Solução**:
+
 ```bash
 # Tornar executável
 chmod +x wsl-chrome-integration.sh
@@ -273,6 +280,7 @@ bash wsl-chrome-integration.sh all
 **Causa**: Dependências não instaladas no WSL
 
 **Solução**:
+
 ```bash
 # No WSL
 npm install
@@ -298,6 +306,7 @@ npm ci
 | **node_modules** | Lento (volume mount)  | Rápido (ext4 nativo)       |
 
 **Benefícios WSL**:
+
 - ✅ **10-20x mais rápido** para I/O (node_modules, webpack, etc)
 - ✅ **Networking simplificado** (localhost just works)
 - ✅ **Menos overhead** (sem Docker)
@@ -323,11 +332,13 @@ bash wsl-chrome-integration.sh all
 ### Workflow Diário
 
 #### Windows Host (Terminal 1 - deixar aberto)
+
 ```bat
 START-CHROME-SIMPLE.bat
 ```
 
 #### WSL (Terminal 2 - Proxy)
+
 ```bash
 bash wsl-chrome-integration.sh proxy
 # Ou via PM2:
@@ -335,6 +346,7 @@ bash wsl-chrome-integration.sh proxy
 ```
 
 #### WSL (Terminal 3 - Sistema)
+
 ```bash
 npm run daemon:start
 # Ou via Makefile:
@@ -342,6 +354,7 @@ npm run daemon:start
 ```
 
 #### WSL (Terminal 4 - Testes/Comandos)
+
 ```bash
 # Health check
 make health
@@ -360,11 +373,13 @@ make logs-follow
 ### Chrome Binds Apenas localhost
 
 O Chrome no Windows está configurado para bind apenas em `127.0.0.1`:
+
 ```
 --remote-debugging-port=9225
 ```
 
 Isso significa:
+
 - ✅ **Apenas WSL** pode acessar (via localhost)
 - ✅ **Rede externa NÃO** pode acessar
 - ✅ **Seguro** para desenvolvimento
@@ -372,12 +387,14 @@ Isso significa:
 ### Proxy WSL Bind em 0.0.0.0
 
 O proxy no WSL bind em todas interfaces:
+
 ```
 PUBLIC_IP=0.0.0.0
 PROXY_PORT=9224
 ```
 
 Isso permite:
+
 - ✅ Acesso do próprio WSL (localhost:9224)
 - ✅ Acesso do Windows (localhost:9224)
 - ⚠️ **Potencialmente** acesso de rede (se firewall permitir)
@@ -419,11 +436,13 @@ Isso permite:
 ## 🚀 Próximos Passos
 
 1. **Execute no Windows**:
+
    ```bat
    START-CHROME-SIMPLE.bat
    ```
 
 2. **Valide no WSL**:
+
    ```bash
    bash wsl-chrome-integration.sh all
    ```
@@ -435,6 +454,4 @@ Isso permite:
 
 ---
 
-**Arquitetura Otimizada para WSL** ✅
-**Performance Máxima** ✅
-**Simplicidade** ✅
+**Arquitetura Otimizada para WSL** ✅ **Performance Máxima** ✅ **Simplicidade** ✅

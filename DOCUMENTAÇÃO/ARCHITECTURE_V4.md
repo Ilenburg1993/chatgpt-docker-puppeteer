@@ -2,32 +2,35 @@
 
 ## Sistema Autônomo de Controle de LLMs para Missões de Longo Prazo
 
-**Versão**: 4.0 (Mission-Oriented Architecture - Complete Rewrite)
-**Última Atualização**: 01 de Fevereiro de 2026
-**Status**: 📝 Documento Canônico
-**Linhas Estimadas**: ~4,500-5,000 linhas técnicas
+**Versão**: 4.0 (Mission-Oriented Architecture - Complete Rewrite) **Última Atualização**: 01 de
+Fevereiro de 2026 **Status**: 📝 Documento Canônico **Linhas Estimadas**: ~4,500-5,000 linhas
+técnicas
 
 ---
 
 ### 📖 Sobre Este Documento
 
 **Público-Alvo Triplo**:
+
 - 🎓 **Iniciantes** (Amadores): Conceitos simples, diagramas, quick starts
 - 💻 **Intermediários** (Desenvolvedores): APIs, fluxos, exemplos de código
 - 🏛️ **Avançados** (Arquitetos): Decisões, trade-offs, code archaeology
 
 **Tempo de Leitura**:
+
 - ⚡ Iniciantes: ~60-90 min (partes selecionadas)
 - 🔍 Intermediários: ~120-150 min (partes técnicas)
 - 🎯 Avançados: ~180-240 min (documento completo)
 
-**Navegação Modular**: Este documento está organizado em 12 blocos temáticos com múltiplos capítulos cada.
+**Navegação Modular**: Este documento está organizado em 12 blocos temáticos com múltiplos capítulos
+cada.
 
 ---
 
 ## 📑 Índice Navegável
 
 ### BLOCO I: FUNDAMENTOS
+
 **Linhas**: 500-600 | **Tempo de Leitura**: ~20 min
 
 1. [Visão Geral do Sistema](#1-visão-geral-do-sistema)
@@ -45,6 +48,7 @@
 ---
 
 ### BLOCO II: ARQUITETURA CORE
+
 **Linhas**: 400-500 | **Tempo de Leitura**: ~15 min
 
 5. [Overview das 4 Camadas](#5-overview-das-4-camadas)
@@ -70,6 +74,7 @@
 ---
 
 ### BLOCO III: MISSION LAYER
+
 **Linhas**: 700-800 | **Tempo de Leitura**: ~25 min
 
 9. [MissionManager](#9-missionmanager)
@@ -100,6 +105,7 @@
 ---
 
 ### BLOCO IV: ORCHESTRATION LAYER
+
 **Linhas**: 700-800 | **Tempo de Leitura**: ~25 min
 
 13. [OrchestratorEngine](#13-orchestratorengine)
@@ -128,6 +134,7 @@
 ---
 
 ### BLOCO V: EXECUTION LAYER
+
 **Linhas**: 600-700 | **Tempo de Leitura**: ~22 min
 
 17. [Kernel: Núcleo de Decisão](#17-kernel-núcleo-de-decisão)
@@ -155,6 +162,7 @@
 ---
 
 ### BLOCO VI: INTERFACE LAYER
+
 **Linhas**: 500-600 | **Tempo de Leitura**: ~18 min
 
 20. [Server: Express + Socket.io](#20-server-express--socketio)
@@ -172,9 +180,9 @@
     - 21.7. Error Codes (HTTP + Custom)
 22. [WebSocket Events: Real-time](#22-websocket-events-real-time)
     - 22.1. Connection Lifecycle
-    - 22.2. MISSION_* Events (10 tipos)
-    - 22.3. STEP_* Events
-    - 22.4. VALIDATION_* Events
+    - 22.2. MISSION\_\* Events (10 tipos)
+    - 22.3. STEP\_\* Events
+    - 22.4. VALIDATION\_\* Events
     - 22.5. Room Management (Per-Mission Rooms)
 23. [Dashboard UI](#23-dashboard-ui)
     - 23.1. Current State (Implemented vs Planned)
@@ -187,6 +195,7 @@
 ---
 
 ### BLOCO VII: SISTEMA DE CONEXÃO
+
 **Linhas**: 500-600 | **Tempo de Leitura**: ~18 min
 
 24. [ConnectionOrchestrator v3.0](#24-connectionorchestrator-v30)
@@ -214,6 +223,7 @@
 ---
 
 ### BLOCO VIII: NERV EVENT BUS
+
 **Linhas**: 500-600 | **Tempo de Leitura**: ~18 min
 
 27. [Filosofia NERV-First](#27-filosofia-nerv-first)
@@ -228,10 +238,10 @@
     - 28.3. Identity Metadata (Source, Target, Timestamp)
     - 28.4. Envelope Validation (Schema Enforcement)
 29. [Event Types Catalog](#29-event-types-catalog)
-    - 29.1. MISSION_* Events (10 tipos)
-    - 29.2. TASK_* Events (8 tipos)
-    - 29.3. DRIVER_* Events (5 tipos)
-    - 29.4. SYSTEM_* Events (7 tipos)
+    - 29.1. MISSION\_\* Events (10 tipos)
+    - 29.2. TASK\_\* Events (8 tipos)
+    - 29.3. DRIVER\_\* Events (5 tipos)
+    - 29.4. SYSTEM\_\* Events (7 tipos)
     - 29.5. Payload Examples (Per Event Type)
 30. [Transport Modes](#30-transport-modes)
     - 30.1. LOCAL (In-Process Event Emitter)
@@ -248,6 +258,7 @@
 ---
 
 ### BLOCO IX: FLUXOS E INTEGRAÇÕES
+
 **Linhas**: 600-700 | **Tempo de Leitura**: ~22 min
 
 32. [Fluxo End-to-End: Missão Completa](#32-fluxo-end-to-end-missão-completa)
@@ -284,6 +295,7 @@
 ---
 
 ### BLOCO X: PERFORMANCE E OBSERVABILIDADE
+
 **Linhas**: 400-500 | **Tempo de Leitura**: ~15 min
 
 37. [Métricas de Missões](#37-métricas-de-missões)
@@ -313,6 +325,7 @@
 ---
 
 ### BLOCO XI: DECISÕES ARQUITETURAIS
+
 **Linhas**: 400-500 | **Tempo de Leitura**: ~15 min
 
 41. [Por quê Mission-Oriented?](#41-por-quê-mission-oriented)
@@ -355,6 +368,7 @@
 ---
 
 ### BLOCO XII: REFERÊNCIAS E RECURSOS
+
 **Linhas**: 500-600 | **Tempo de Leitura**: ~18 min
 
 47. [Schemas Completos](#47-schemas-completos)
@@ -417,9 +431,13 @@
 
 #### 1.1. Propósito e Filosofia
 
-O **chatgpt-docker-puppeteer** é um sistema autônomo de controle de Large Language Models (LLMs) projetado para **missões de longo prazo** com **mínima intervenção humana**. Diferentemente de executores de tarefas isoladas, este sistema gerencia workflows complexos que podem durar **4 a 24 horas** e envolver **centenas de interações** com LLMs.
+O **chatgpt-docker-puppeteer** é um sistema autônomo de controle de Large Language Models (LLMs)
+projetado para **missões de longo prazo** com **mínima intervenção humana**. Diferentemente de
+executores de tarefas isoladas, este sistema gerencia workflows complexos que podem durar **4 a 24
+horas** e envolver **centenas de interações** com LLMs.
 
 **Filosofia Central**:
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  USUÁRIO = ORIENTADOR (não executor)                        │
@@ -429,12 +447,14 @@ O **chatgpt-docker-puppeteer** é um sistema autônomo de controle de Large Lang
 ```
 
 **Não é**:
+
 - ❌ Executor de prompts únicos (ChatGPT Wrapper)
 - ❌ Sistema de tarefas síncronas (request → response)
 - ❌ Automação sem controle de qualidade
 - ❌ Sistema monolítico acoplado
 
 **É**:
+
 - ✅ **Orquestrador de missões** de longo prazo (4-24h)
 - ✅ **Sistema de validação contínua** (LLM-as-judge)
 - ✅ **Recovery automático** com checkpoints (<5min)
@@ -568,6 +588,7 @@ O **chatgpt-docker-puppeteer** é um sistema autônomo de controle de Large Lang
 #### 1.3. Casos de Uso Principais
 
 ##### Caso de Uso 1: Escrever um Livro Técnico
+
 **Missão**: Criar livro de 15 capítulos sobre "Rust Programming"
 
 ```
@@ -618,6 +639,7 @@ Output (Resultados):
 ```
 
 ##### Caso de Uso 2: Refatoração de Código
+
 **Missão**: Refatorar 5 arquivos JavaScript seguindo best practices
 
 ```
@@ -647,6 +669,7 @@ Output:
 ```
 
 ##### Caso de Uso 3: Research Paper Completo
+
 ```
 Input:
   Template: research_paper.json
@@ -731,12 +754,14 @@ Observações:
 | AgentGPT                     | Goal-oriented    | 5-30min        | Self-evaluation | Nenhum                | Iteração isolada     |
 
 **Vantagens**:
+
 - ✅ Missões mais longas que qualquer alternativa (24h vs 60min)
 - ✅ Validação de qualidade mais rigorosa (LLM-as-judge)
 - ✅ Recovery automático robusto (checkpoints <5min)
 - ✅ Contexto acumulativo entre steps (coerência)
 
 **Desvantagens**:
+
 - ❌ Complexidade maior (curva de aprendizado)
 - ❌ Custo elevado para missões longas ($5-50)
 - ❌ Requer Chrome browser (dependência)
@@ -1229,14 +1254,7 @@ const MissionSchema = z.object({
   missionId: z.string().uuid(),
   templateId: z.string(),
   params: z.record(z.any()),
-  status: z.enum([
-    'PENDING',
-    'RUNNING',
-    'PAUSED',
-    'COMPLETED',
-    'FAILED',
-    'RECOVERING'
-  ]),
+  status: z.enum(['PENDING', 'RUNNING', 'PAUSED', 'COMPLETED', 'FAILED', 'RECOVERING']),
   workflow: z.array(StepSchema),
   currentStepIndex: z.number().int().min(0),
   outputs: z.record(z.string()), // stepId → filePath
@@ -1247,10 +1265,10 @@ const MissionSchema = z.object({
     completedAt: z.string().datetime().optional(),
     totalTokens: z.number().int().optional(),
     totalCost: z.number().optional(),
-    avgQualityScore: z.number().min(0).max(100).optional()
+    avgQualityScore: z.number().min(0).max(100).optional(),
   }),
   createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime()
+  updatedAt: z.string().datetime(),
 });
 
 // Step Schema
@@ -1261,15 +1279,17 @@ const StepSchema = z.object({
   prompt: z.string(),
   execution: z.object({
     strategy: z.enum(['SINGLE_SHOT', 'ITERATIVE', 'MULTI_STEP']),
-    iterative_config: z.object({
-      max_iterations: z.number().int().min(1).max(10),
-      validation_criteria: z.object({
-        min_quality_score: z.number().min(0).max(100)
+    iterative_config: z
+      .object({
+        max_iterations: z.number().int().min(1).max(10),
+        validation_criteria: z.object({
+          min_quality_score: z.number().min(0).max(100),
+        }),
       })
-    }).optional()
+      .optional(),
   }),
   dependencies: z.array(z.string()).optional(), // stepIds
-  outputs: z.array(z.string()).optional() // expected output keys
+  outputs: z.array(z.string()).optional(), // expected output keys
 });
 
 // Task V5 Schema
@@ -1279,24 +1299,26 @@ const TaskV5Schema = z.object({
   target: z.enum(['chatgpt', 'gemini']),
   spec: z.object({
     execution: z.object({
-      strategy: z.enum(['SINGLE_SHOT', 'ITERATIVE', 'MULTI_STEP'])
+      strategy: z.enum(['SINGLE_SHOT', 'ITERATIVE', 'MULTI_STEP']),
     }),
-    validation: z.object({
-      min_length: z.number().int().optional(),
-      max_length: z.number().int().optional(),
-      schema: z.any().optional(),
-      llm_judge_criteria: z.any().optional()
-    }).optional()
+    validation: z
+      .object({
+        min_length: z.number().int().optional(),
+        max_length: z.number().int().optional(),
+        schema: z.any().optional(),
+        llm_judge_criteria: z.any().optional(),
+      })
+      .optional(),
   }),
   metadata: z.object({
     missionId: z.string().uuid().optional(),
     stepId: z.string().optional(),
     iterationIndex: z.number().int().optional(),
-    correlationId: z.string().uuid()
+    correlationId: z.string().uuid(),
   }),
   status: z.enum(['PENDING', 'RUNNING', 'DONE', 'FAILED']),
   createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime()
+  updatedAt: z.string().datetime(),
 });
 
 // NERV Envelope Schema
@@ -1308,8 +1330,8 @@ const NERVEnvelopeSchema = z.object({
     correlationId: z.string().uuid(),
     source: z.string(),
     target: z.string().optional(),
-    timestamp: z.string().datetime()
-  })
+    timestamp: z.string().datetime(),
+  }),
 });
 ```
 
@@ -1319,7 +1341,8 @@ const NERVEnvelopeSchema = z.object({
 
 #### 3.1. MISSION vs TASK: Distinção Crítica
 
-**Problema Comum**: Confundir "Mission" (workflow de longo prazo) com "Task" (unidade atômica de execução).
+**Problema Comum**: Confundir "Mission" (workflow de longo prazo) com "Task" (unidade atômica de
+execução).
 
 **Tabela Comparativa**:
 
@@ -1329,7 +1352,7 @@ const NERVEnvelopeSchema = z.object({
 | **Complexidade**      | Alta (17+ steps sequenciais)             | Baixa (1 prompt → 1 response)         |
 | **Custo**             | $5-50 (total workflow)                   | $0.10-0.50 (single execution)         |
 | **Schema**            | `MissionSchema` (workflow + checkpoints) | `TaskV5Schema` (prompt + spec)        |
-| **Estado Persistido** | Sim (state.json + checkpoints)           | Sim (fila/*.json + respostas/*.txt)   |
+| **Estado Persistido** | Sim (state.json + checkpoints)           | Sim (fila/_.json + respostas/_.txt)   |
 | **Recuperável**       | Sim (<5min checkpoint)                   | Sim (retry com backoff)               |
 | **Validação**         | Success criteria (step-level)            | Validation spec (response-level)      |
 | **Iteração**          | Não (workflow linear)                    | Sim (max 3 iterations per step)       |
@@ -1359,6 +1382,7 @@ MISSION = Construir um Edifício (4-24h)
 ```
 
 **Regra de Ouro**:
+
 - ✅ **MISSION**: "O que o usuário quer alcançar" (outcome-oriented)
 - ✅ **TASK**: "Como executar uma ação específica" (action-oriented)
 
@@ -1717,7 +1741,7 @@ io.saveResponse(taskId, response)
 | **Checkpoint**   | A cada step (~5min)              | Não (unidade atômica)                      |
 | **Recuperação**  | Checkpoint restore (<5min perda) | Retry com backoff (max 3x)                 |
 | **Finalização**  | MISSION_COMPLETED event          | TASK_STATE_CHANGE (DONE) event             |
-| **Persistência** | state.json (1 arquivo)           | fila/*.json + respostas/*.txt (2 arquivos) |
+| **Persistência** | state.json (1 arquivo)           | fila/_.json + respostas/_.txt (2 arquivos) |
 
 ---
 
@@ -1727,8 +1751,8 @@ io.saveResponse(taskId, response)
 
 **Ambiente Suportado**:
 
-| Plataforma  | Status                 | Notas                                             |
-| ----------- | ---------------------- | ------------------------------------------------- |
+| Plataforma  | Status                  | Notas                                             |
+| ----------- | ----------------------- | ------------------------------------------------- |
 | **Linux**   | ✅ Totalmente suportado | Ubuntu 20.04+, Debian 11+, Fedora 35+             |
 | **Windows** | ✅ Totalmente suportado | Windows 10/11 + WSL2 (recomendado) ou nativo      |
 | **macOS**   | 🟡 Suporte parcial      | fsevents pode causar warnings (esperado)          |
@@ -2273,12 +2297,14 @@ make vscode-info
 **🎉 BLOCO I: FUNDAMENTOS - COMPLETO!**
 
 Você agora compreende:
+
 - ✅ Visão geral do sistema (propósito, arquitetura, casos de uso)
 - ✅ Conceitos fundamentais (terminologia, hierarquia, fluxos, estados, NERV)
 - ✅ Hierarquia arquitetural (MISSION vs TASK, 6 níveis, ciclos de vida)
 - ✅ Quick Start (instalação, primeira mission, comandos essenciais)
 
-**Próximo**: BLOCO II: ARQUITETURA CORE (4 capítulos - camadas, componentes, comunicação, persistência)
+**Próximo**: BLOCO II: ARQUITETURA CORE (4 capítulos - camadas, componentes, comunicação,
+persistência)
 
 ---
 
@@ -2288,7 +2314,8 @@ Você agora compreende:
 
 #### 5.1. Arquitetura em Camadas
 
-**Princípio Fundamental**: Separação de responsabilidades em 4 camadas hierárquicas com baixo acoplamento via NERV Event Bus.
+**Princípio Fundamental**: Separação de responsabilidades em 4 camadas hierárquicas com baixo
+acoplamento via NERV Event Bus.
 
 **Diagrama de Camadas**:
 
@@ -2465,19 +2492,20 @@ Componentes se comunicam APENAS via NERV Event Bus (zero acoplamento direto):
 ```javascript
 // ❌ ERRADO - Acoplamento direto
 const kernel = require('../kernel/kernel_loop');
-kernel.executeTask(task);  // Tight coupling!
+kernel.executeTask(task); // Tight coupling!
 
 // ✅ CORRETO - Comunicação via NERV
 nerv.emit({
   type: 'DRIVER',
   action: 'EXECUTE',
   payload: { taskId, prompt },
-  metadata: { correlationId: 'uuid' }
+  metadata: { correlationId: 'uuid' },
 });
 // KernelNERVBridge receberá o evento e processará
 ```
 
 **Benefícios**:
+
 - ✅ Componentes testáveis isoladamente (mocking NERV events)
 - ✅ Substituição fácil (trocar Kernel sem modificar Mission Layer)
 - ✅ Observabilidade total (todos os eventos são rastreáveis)
@@ -2789,6 +2817,7 @@ Lock Management:
 **Arquivo**: `src/mission/mission_manager.js`
 
 **Responsabilidades**:
+
 - Criar missions a partir de templates
 - Iniciar/pausar/cancelar missions
 - Coordenar execução de steps (loop sequencial)
@@ -2812,7 +2841,7 @@ class MissionManager {
       templateId,
       params,
       status: 'PENDING',
-      workflow,  // Array of steps
+      workflow, // Array of steps
       currentStepIndex: 0,
       outputs: {},
       context: {},
@@ -2822,10 +2851,10 @@ class MissionManager {
         completedAt: null,
         totalTokens: 0,
         totalCost: 0,
-        avgQualityScore: 0
+        avgQualityScore: 0,
       },
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await missionStateManager.save(missionId, mission);
@@ -2852,7 +2881,7 @@ class MissionManager {
         type: 'MISSION',
         action: 'STEP_EXECUTE',
         payload: { missionId, stepId: step.stepId, step },
-        metadata: { correlationId: mission.correlationId }
+        metadata: { correlationId: mission.correlationId },
       });
 
       // Aguardar step completion (via NERV event)
@@ -2905,6 +2934,7 @@ class MissionManager {
 ```
 
 **Métricas Internas**:
+
 - Missions criadas: Counter
 - Missions concluídas: Counter
 - Taxa de sucesso: Gauge (completed / total)
@@ -2915,6 +2945,7 @@ class MissionManager {
 **Arquivo**: `src/mission/workflow_generator.js`
 
 **Responsabilidades**:
+
 - Transformar templates em workflows (steps)
 - Substituir placeholders por parâmetros
 - Validar estrutura de workflow
@@ -3009,12 +3040,12 @@ class WorkflowGenerator {
     // Substituir placeholders nos prompts
     const workflow = template.workflow.map(step => ({
       ...step,
-      prompt: this.replacePlaceholders(step.prompt, params)
+      prompt: this.replacePlaceholders(step.prompt, params),
     }));
 
     return {
       steps: workflow,
-      success_criteria: template.success_criteria
+      success_criteria: template.success_criteria,
     };
   }
 
@@ -3031,6 +3062,7 @@ class WorkflowGenerator {
 **Arquivo**: `src/mission/mission_state_manager.js`
 
 **Responsabilidades**:
+
 - Persistir state.json (atomic writes)
 - Carregar estado de missions
 - Validar integridade de estado
@@ -3100,6 +3132,7 @@ class MissionStateManager {
 **Arquivo**: `src/orchestrator/orchestrator_engine.js`
 
 **Responsabilidades**:
+
 - Executar steps individuais (3 estratégias)
 - Criar tasks (Task V5 schema)
 - Gerenciar iterations (retry logic)
@@ -3113,7 +3146,10 @@ class OrchestratorEngine {
    * Executar step (SINGLE_SHOT, ITERATIVE, ou MULTI_STEP)
    */
   async executeStep(step, context) {
-    logger.log('INFO', `[ORCHESTRATOR] Executing step: ${step.stepId} (strategy: ${step.execution.strategy})`);
+    logger.log(
+      'INFO',
+      `[ORCHESTRATOR] Executing step: ${step.stepId} (strategy: ${step.execution.strategy})`
+    );
 
     switch (step.execution.strategy) {
       case 'SINGLE_SHOT':
@@ -3134,7 +3170,7 @@ class OrchestratorEngine {
    * SINGLE_SHOT: 1 task, sem validação
    */
   async executeSingleShot(step, context) {
-    const task = this.createTask(step, context, 0);  // iteration 0
+    const task = this.createTask(step, context, 0); // iteration 0
 
     // Salvar task na fila (Kernel pegará)
     await io.saveTask(task);
@@ -3146,7 +3182,7 @@ class OrchestratorEngine {
       stepId: step.stepId,
       output: response,
       iterations: 1,
-      quality_score: null  // Sem validação em SINGLE_SHOT
+      quality_score: null, // Sem validação em SINGLE_SHOT
     };
   }
 
@@ -3166,10 +3202,7 @@ class OrchestratorEngine {
       const response = await this.waitForTaskCompletion(task.taskId);
 
       // Validar qualidade (LLM-as-judge)
-      const score = await stepValidator.validateQuality(
-        response,
-        config.validation_criteria
-      );
+      const score = await stepValidator.validateQuality(response, config.validation_criteria);
 
       logger.log('INFO', `[ORCHESTRATOR] Iteration ${iteration}: quality = ${score}`, task.taskId);
 
@@ -3190,7 +3223,7 @@ class OrchestratorEngine {
       stepId: step.stepId,
       output: bestResponse,
       iterations: iteration,
-      quality_score: bestScore
+      quality_score: bestScore,
     };
   }
 
@@ -3214,9 +3247,9 @@ class OrchestratorEngine {
 
     return {
       stepId: step.stepId,
-      output: outputs.join('\n\n---\n\n'),  // Concatenar outputs
+      output: outputs.join('\n\n---\n\n'), // Concatenar outputs
       iterations: subSteps.length,
-      quality_score: null
+      quality_score: null,
     };
   }
 
@@ -3234,19 +3267,19 @@ class OrchestratorEngine {
       spec: {
         execution: {
           strategy: 'STANDARD',
-          timeout: step.execution.timeout || 120000
+          timeout: step.execution.timeout || 120000,
         },
-        validation: step.validation || {}
+        validation: step.validation || {},
       },
       metadata: {
         missionId: context.missionId,
         stepId: step.stepId,
         iterationIndex,
-        correlationId: context.correlationId
+        correlationId: context.correlationId,
       },
       status: 'PENDING',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
   }
 }
@@ -3257,6 +3290,7 @@ class OrchestratorEngine {
 **Arquivo**: `src/orchestrator/context_manager.js`
 
 **Responsabilidades**:
+
 - Propagar outputs entre steps
 - Injetar context em prompts
 - Gerenciar context variables
@@ -3320,6 +3354,7 @@ class ContextManager {
 **Arquivo**: `src/orchestrator/step_validator.js`
 
 **Responsabilidades**:
+
 - Validar qualidade de respostas (LLM-as-judge)
 - Calcular quality scores
 - Decidir sobre iterations
@@ -3382,7 +3417,10 @@ Return JSON only: { "coherence": 0.85, "creativity": 0.90, ... }
     const valid = len >= minLength && len <= maxLength;
 
     if (!valid) {
-      logger.log('WARN', `[VALIDATOR] Length validation failed: ${len} (expected: ${minLength}-${maxLength})`);
+      logger.log(
+        'WARN',
+        `[VALIDATOR] Length validation failed: ${len} (expected: ${minLength}-${maxLength})`
+      );
     }
 
     return valid;
@@ -3392,21 +3430,19 @@ Return JSON only: { "coherence": 0.85, "creativity": 0.90, ... }
 
 ---
 
-  /**
-   * Validação de length
-   */
-  validateLength(response, minLength, maxLength) {
-    const len = response.length;
-    const valid = len >= minLength && len <= maxLength;
+/\*\*
 
-    if (!valid) {
-      logger.log('WARN', `[VALIDATOR] Length validation failed: ${len} (expected: ${minLength}-${maxLength})`);
-    }
+- Validação de length \*/ validateLength(response, minLength, maxLength) { const len =
+  response.length; const valid = len >= minLength && len <= maxLength;
 
-    return valid;
-  }
-}
-```
+  if (!valid) { logger.log('WARN',
+  `[VALIDATOR] Length validation failed: ${len} (expected: ${minLength}-${maxLength})`); }
+
+  return valid;
+
+} }
+
+````
 
 ---
 
@@ -3593,13 +3629,14 @@ class Kernel {
     }
   }
 }
-```
+````
 
 **6.3.2. DriverFactory + Adapters**
 
 **Arquivo**: `src/driver/driver_factory.js`
 
 **Responsabilidades**:
+
 - Criar drivers por target (chatgpt/gemini)
 - Gerenciar instâncias de drivers
 
@@ -3644,7 +3681,11 @@ class ChatGPTAdapter {
    * Executar prompt no ChatGPT
    */
   async executePrompt({ prompt, taskId, config }) {
-    logger.log('INFO', `[DRIVER:ChatGPT] Executing prompt for task ${taskId} (${prompt.length} chars)`, taskId);
+    logger.log(
+      'INFO',
+      `[DRIVER:ChatGPT] Executing prompt for task ${taskId} (${prompt.length} chars)`,
+      taskId
+    );
 
     try {
       // 1. Conectar ao browser
@@ -3678,7 +3719,11 @@ class ChatGPTAdapter {
       // 8. Fechar página (browser pool reutiliza instância)
       await page.close();
 
-      logger.log('INFO', `[DRIVER:ChatGPT] ✅ Response collected (${response.length} chars)`, taskId);
+      logger.log(
+        'INFO',
+        `[DRIVER:ChatGPT] ✅ Response collected (${response.length} chars)`,
+        taskId
+      );
 
       return {
         response,
@@ -3686,10 +3731,9 @@ class ChatGPTAdapter {
           taskId,
           target: 'chatgpt',
           timestamp: new Date().toISOString(),
-          responseLength: response.length
-        }
+          responseLength: response.length,
+        },
       };
-
     } catch (error) {
       logger.log('ERROR', `[DRIVER:ChatGPT] Execution failed: ${error.message}`, taskId);
       throw error;
@@ -3700,9 +3744,9 @@ class ChatGPTAdapter {
    * Aguardar resposta completa (anti-loop)
    */
   async waitForCompleteResponse(page, taskId) {
-    const MAX_WAIT = 90000;  // 90s timeout
-    const POLL_INTERVAL = 500;  // 500ms entre polls
-    const STABLE_CHECKS = 3;  // 3 checks iguais = done
+    const MAX_WAIT = 90000; // 90s timeout
+    const POLL_INTERVAL = 500; // 500ms entre polls
+    const STABLE_CHECKS = 3; // 3 checks iguais = done
 
     let previousHash = null;
     let stableCount = 0;
@@ -3714,7 +3758,9 @@ class ChatGPTAdapter {
 
       // Coletar texto atual
       const currentText = await page.evaluate(() => {
-        const elements = Array.from(document.querySelectorAll('[data-message-author-role="assistant"]'));
+        const elements = Array.from(
+          document.querySelectorAll('[data-message-author-role="assistant"]')
+        );
         if (elements.length === 0) return '';
 
         const lastMessage = elements[elements.length - 1];
@@ -3734,7 +3780,7 @@ class ChatGPTAdapter {
           return currentText;
         }
       } else {
-        stableCount = 0;  // Reset
+        stableCount = 0; // Reset
       }
 
       previousHash = currentHash;
@@ -3748,8 +3794,8 @@ class ChatGPTAdapter {
    */
   sanitizePrompt(prompt) {
     return prompt
-      .replace(/[\x00-\x1F\x7F-\x9F]/g, '')  // Remove control chars
-      .replace(/\n{3,}/g, '\n\n')  // Max 2 line breaks
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, '') // Remove control chars
+      .replace(/\n{3,}/g, '\n\n') // Max 2 line breaks
       .trim();
   }
 
@@ -3757,8 +3803,8 @@ class ChatGPTAdapter {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash |= 0;  // Convert to 32bit integer
+      hash = (hash << 5) - hash + char;
+      hash |= 0; // Convert to 32bit integer
     }
     return hash;
   }
@@ -3770,6 +3816,7 @@ class ChatGPTAdapter {
 **Arquivo**: `src/infra/browser/connection_orchestrator.js`
 
 **Responsabilidades**:
+
 - Gerenciar pool de browsers (max 5 instâncias)
 - 3 modos de conexão: launcher, external, auto
 - Health checks (detecção de crashes e degradação)
@@ -3779,9 +3826,9 @@ class ChatGPTAdapter {
 
 ```javascript
 const CONNECTION_MODES = {
-  LAUNCHER: 'launcher',    // Auto-start Chrome com flags corretas
-  EXTERNAL: 'external',    // Conectar a Chrome já rodando (debugging port)
-  AUTO: 'auto'             // Tentar external, fallback para launcher
+  LAUNCHER: 'launcher', // Auto-start Chrome com flags corretas
+  EXTERNAL: 'external', // Conectar a Chrome já rodando (debugging port)
+  AUTO: 'auto', // Tentar external, fallback para launcher
 };
 ```
 
@@ -3790,9 +3837,9 @@ const CONNECTION_MODES = {
 ```javascript
 class ConnectionOrchestrator {
   constructor() {
-    this.pool = new Map();  // browserHash → { browser, page, lastUsed }
+    this.pool = new Map(); // browserHash → { browser, page, lastUsed }
     this.maxInstances = 5;
-    this.healthCheckInterval = 30000;  // 30s
+    this.healthCheckInterval = 30000; // 30s
 
     this.startHealthChecks();
   }
@@ -3821,10 +3868,13 @@ class ConnectionOrchestrator {
     this.pool.set(browserHash, {
       browser,
       lastUsed: Date.now(),
-      healthy: true
+      healthy: true,
     });
 
-    logger.log('INFO', `[POOL] New browser instance created (pool size: ${this.pool.size}/${this.maxInstances})`);
+    logger.log(
+      'INFO',
+      `[POOL] New browser instance created (pool size: ${this.pool.size}/${this.maxInstances})`
+    );
 
     return browser;
   }
@@ -3864,8 +3914,8 @@ class ConnectionOrchestrator {
         '--disable-setuid-sandbox',
         '--disable-blink-features=AutomationControlled',
         '--disable-dev-shm-usage',
-        `--user-data-dir=${path.join(__dirname, '../../profile')}`
-      ]
+        `--user-data-dir=${path.join(__dirname, '../../profile')}`,
+      ],
     });
 
     logger.log('INFO', '[POOL] Browser launched via LAUNCHER mode');
@@ -3919,7 +3969,6 @@ class ConnectionOrchestrator {
           } else {
             instance.healthy = true;
           }
-
         } catch (error) {
           // Crash detectado
           logger.log('ERROR', `[POOL] Browser instance crashed: ${error.message}`);
@@ -3932,7 +3981,6 @@ class ConnectionOrchestrator {
       if (this.pool.size === 0 && global.gc) {
         global.gc();
       }
-
     }, this.healthCheckInterval);
   }
 
@@ -3966,7 +4014,10 @@ class ConnectionOrchestrator {
     }
 
     this.pool.delete(hash);
-    logger.log('INFO', `[POOL] Instance evicted (pool size: ${this.pool.size}/${this.maxInstances})`);
+    logger.log(
+      'INFO',
+      `[POOL] Instance evicted (pool size: ${this.pool.size}/${this.maxInstances})`
+    );
   }
 }
 ```
@@ -4016,10 +4067,10 @@ class ConnectionOrchestrator {
 
 ```javascript
 const EVENT_TYPES = {
-  MISSION: 'MISSION',   // Mission lifecycle events
-  TASK: 'TASK',         // Task lifecycle events
-  DRIVER: 'DRIVER',     // Driver execution events
-  SYSTEM: 'SYSTEM'      // System-wide events (health, config)
+  MISSION: 'MISSION', // Mission lifecycle events
+  TASK: 'TASK', // Task lifecycle events
+  DRIVER: 'DRIVER', // Driver execution events
+  SYSTEM: 'SYSTEM', // System-wide events (health, config)
 };
 ```
 
@@ -4027,16 +4078,16 @@ const EVENT_TYPES = {
 
 ```javascript
 // MISSION events
-MISSION_CREATED, MISSION_STARTED, MISSION_PAUSED, MISSION_COMPLETED, MISSION_FAILED
+(MISSION_CREATED, MISSION_STARTED, MISSION_PAUSED, MISSION_COMPLETED, MISSION_FAILED);
 
 // TASK events
-TASK_CREATED, TASK_STATE_CHANGE, TASK_VALIDATED, TASK_RETRY
+(TASK_CREATED, TASK_STATE_CHANGE, TASK_VALIDATED, TASK_RETRY);
 
 // DRIVER events
-DRIVER_EXECUTE, DRIVER_EXECUTE_COMPLETE, DRIVER_CONNECT, DRIVER_DISCONNECT
+(DRIVER_EXECUTE, DRIVER_EXECUTE_COMPLETE, DRIVER_CONNECT, DRIVER_DISCONNECT);
 
 // SYSTEM events
-SYSTEM_HEALTH_CHECK, SYSTEM_CONFIG_RELOAD, SYSTEM_SHUTDOWN
+(SYSTEM_HEALTH_CHECK, SYSTEM_CONFIG_RELOAD, SYSTEM_SHUTDOWN);
 ```
 
 ---
@@ -4044,6 +4095,7 @@ SYSTEM_HEALTH_CHECK, SYSTEM_CONFIG_RELOAD, SYSTEM_SHUTDOWN
 #### 7.2. Adapter Pattern
 
 **Responsabilidade dos Adapters**:
+
 1. Traduzir chamadas internas → NERV events
 2. Receber NERV events → executar ações internas
 3. Isolar camadas (zero acoplamento direto)
@@ -4064,7 +4116,7 @@ class MissionNERVAdapter {
    */
   setupListeners() {
     // Ouvir MISSION_CREATE do ServerNERVAdapter
-    this.nerv.on('MISSION', (envelope) => {
+    this.nerv.on('MISSION', envelope => {
       if (envelope.action === 'CREATE') {
         this.handleMissionCreate(envelope.payload);
       }
@@ -4086,8 +4138,8 @@ class MissionNERVAdapter {
       metadata: {
         correlationId,
         source: 'MissionManager',
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 
@@ -4105,15 +4157,15 @@ class MissionNERVAdapter {
         payload: { missionId: mission.missionId, status: mission.status },
         metadata: {
           correlationId: mission.correlationId,
-          source: 'MissionNERVAdapter'
-        }
+          source: 'MissionNERVAdapter',
+        },
       });
     } catch (error) {
       this.nerv.emit({
         type: 'MISSION',
         action: 'FAILED',
         payload: { error: error.message },
-        metadata: { source: 'MissionNERVAdapter' }
+        metadata: { source: 'MissionNERVAdapter' },
       });
     }
   }
@@ -4165,7 +4217,7 @@ nerv.emit({
   type: 'MISSION',
   action: 'CREATE',
   payload: { templateId, params },
-  metadata: { correlationId, source: 'ServerNERVAdapter' }
+  metadata: { correlationId, source: 'ServerNERVAdapter' },
 });
 
 // 3. Mission armazena correlationId
@@ -4179,7 +4231,7 @@ nerv.emit({
   type: 'DRIVER',
   action: 'EXECUTE',
   payload: { taskId, prompt },
-  metadata: { correlationId: task.metadata.correlationId }
+  metadata: { correlationId: task.metadata.correlationId },
 });
 
 // 6. Logs incluem correlationId
@@ -4205,12 +4257,14 @@ grep "corr_xyz123" logs/*.log
 #### 7.4. Event-Driven Workflows
 
 **Vantagens**:
+
 - ✅ Desacoplamento total (componentes independentes)
 - ✅ Testabilidade (mocking de eventos)
 - ✅ Observabilidade (todos os eventos logados)
 - ✅ Escalabilidade (adicionar listeners sem modificar emitters)
 
 **Desvantagens**:
+
 - ⚠️ +5-10ms overhead (vs direct calls)
 - ⚠️ Debugging indireto (stack traces não óbvios)
 - ⚠️ Complexidade (múltiplos listeners por evento)
@@ -4227,11 +4281,13 @@ grep "corr_xyz123" logs/*.log
 | **Escalabilidade** | Limitada (tight coupling) | Alta (adicionar listeners)          |
 
 **Quando Usar NERV**:
+
 - ✅ Cross-layer communication (Mission → Orchestration → Execution)
 - ✅ Multi-listener scenarios (1 evento → N listeners)
 - ✅ Audit/telemetry requirements (todos os eventos logados)
 
 **Quando NÃO Usar NERV**:
+
 - ❌ Same-layer calls (OrchestratorEngine → ContextManager)
 - ❌ High-frequency loops (>1000 events/s)
 - ❌ Critical path latency (<5ms requirement)
@@ -4342,12 +4398,12 @@ class FileWatcher {
     this.watcher = chokidar.watch(QUEUE_DIR, {
       ignoreInitial: true,
       awaitWriteFinish: {
-        stabilityThreshold: 100,  // 100ms debounce
-        pollInterval: 50
-      }
+        stabilityThreshold: 100, // 100ms debounce
+        pollInterval: 50,
+      },
     });
 
-    this.watcher.on('change', (filePath) => {
+    this.watcher.on('change', filePath => {
       const taskId = path.basename(filePath, '.json');
       cache.invalidate(taskId);
       logger.log('INFO', `[WATCHER] Cache invalidated: ${taskId}`);
@@ -4361,7 +4417,7 @@ class FileWatcher {
 ```javascript
 class IOManager {
   constructor() {
-    this.taskCache = new WeakMap();  // Auto GC quando taskId não referenciado
+    this.taskCache = new WeakMap(); // Auto GC quando taskId não referenciado
   }
 
   async loadTask(taskId) {
@@ -4407,17 +4463,20 @@ class LockManager {
 
     try {
       // Atomic write (O_EXCL flag)
-      await fs.writeFile(lockFile, JSON.stringify({
-        taskId,
-        target,
-        pid: process.pid,
-        hostname: os.hostname(),
-        acquiredAt: new Date().toISOString()
-      }), { flag: 'wx' });  // wx = write + exclusive (fail if exists)
+      await fs.writeFile(
+        lockFile,
+        JSON.stringify({
+          taskId,
+          target,
+          pid: process.pid,
+          hostname: os.hostname(),
+          acquiredAt: new Date().toISOString(),
+        }),
+        { flag: 'wx' }
+      ); // wx = write + exclusive (fail if exists)
 
       logger.log('INFO', `[LOCK] Acquired: ${taskId} (PID: ${process.pid})`, taskId);
       return true;
-
     } catch (error) {
       if (error.code === 'EEXIST') {
         // Lock já existe, verificar se owner alive
@@ -4427,10 +4486,10 @@ class LockManager {
           // Orphan lock, remover e tentar novamente
           await fs.unlink(lockFile);
           logger.log('WARN', `[LOCK] Orphan lock removed: ${taskId}`, taskId);
-          return await this.acquireLock(taskId, target);  // Retry
+          return await this.acquireLock(taskId, target); // Retry
         }
 
-        return false;  // Lock ocupado por processo vivo
+        return false; // Lock ocupado por processo vivo
       }
 
       throw error;
@@ -4446,12 +4505,11 @@ class LockManager {
       const lock = JSON.parse(data);
 
       // Check PID exists (POSIX)
-      process.kill(lock.pid, 0);  // Signal 0 = check existence
-      return true;  // Processo vivo
-
+      process.kill(lock.pid, 0); // Signal 0 = check existence
+      return true; // Processo vivo
     } catch (error) {
       if (error.code === 'ESRCH') {
-        return false;  // Processo morto
+        return false; // Processo morto
       }
       throw error;
     }
@@ -4467,7 +4525,8 @@ class LockManager {
       await fs.unlink(lockFile);
       logger.log('INFO', `[LOCK] Released: ${taskId}`, taskId);
     } catch (error) {
-      if (error.code !== 'ENOENT') {  // Ignorar se não existe
+      if (error.code !== 'ENOENT') {
+        // Ignorar se não existe
         logger.log('ERROR', `[LOCK] Failed to release: ${taskId} - ${error.message}`, taskId);
       }
     }
@@ -4480,6 +4539,7 @@ class LockManager {
 **🎉 BLOCO II: ARQUITETURA CORE - COMPLETO!**
 
 Você agora domina:
+
 - ✅ Visão geral das 4 camadas (Interface, Mission, Orchestration, Execution)
 - ✅ Componentes principais (MissionManager, OrchestratorEngine, Kernel, Drivers)
 - ✅ Padrões de comunicação (NERV Event Bus, Adapters, Correlation IDs)

@@ -1,8 +1,7 @@
 # 🔬 Driver Lifecycle - Análise Profunda v1.0
 
-**Data**: 3 de Fevereiro de 2026
-**Status**: 🔄 Análise Pre-Sprint 1
-**Objetivo**: Mapear ciclo de vida completo do driver, identificar estados pausados, pré-condições e integração com DNA
+**Data**: 3 de Fevereiro de 2026 **Status**: 🔄 Análise Pre-Sprint 1 **Objetivo**: Mapear ciclo de
+vida completo do driver, identificar estados pausados, pré-condições e integração com DNA
 
 ---
 
@@ -205,20 +204,20 @@ O driver implementa uma **máquina de estados validada** com 5 estados:
 ```javascript
 // src/driver/core/TargetDriver.js
 const STATES = Object.freeze({
-    IDLE: 'IDLE',           // Ocioso, aguardando tarefa
-    PREPARING: 'PREPARING', // Configurando contexto/modelo
-    TYPING: 'TYPING',       // Executando interação biomecânica
-    WAITING: 'WAITING',     // Aguardando resposta da IA
-    STALLED: 'STALLED'      // Detectado provável travamento
+  IDLE: 'IDLE', // Ocioso, aguardando tarefa
+  PREPARING: 'PREPARING', // Configurando contexto/modelo
+  TYPING: 'TYPING', // Executando interação biomecânica
+  WAITING: 'WAITING', // Aguardando resposta da IA
+  STALLED: 'STALLED', // Detectado provável travamento
 });
 
 // State Transition Matrix (validação)
 const STATE_TRANSITIONS = Object.freeze({
-    IDLE: [PREPARING],
-    PREPARING: [TYPING, IDLE],
-    TYPING: [WAITING, IDLE],
-    WAITING: [IDLE, STALLED],
-    STALLED: [IDLE]
+  IDLE: [PREPARING],
+  PREPARING: [TYPING, IDLE],
+  TYPING: [WAITING, IDLE],
+  WAITING: [IDLE, STALLED],
+  STALLED: [IDLE],
 });
 ```
 
@@ -407,6 +406,7 @@ driver.setState('IDLE'); // OK (AbortSignal bypass validation se necessário)
 ### Condições de Falha (Fail-Fast)
 
 **Nível 0 Failure** (SISTEMA):
+
 ```javascript
 // Circuit Breaker OPEN
 → Resultado: Sistema PAUSA (KernelLoop skip execution)
@@ -415,6 +415,7 @@ driver.setState('IDLE'); // OK (AbortSignal bypass validation se necessário)
 ```
 
 **Nível 1 Failure** (PAGE):
+
 ```javascript
 // Page null, closed ou URL inválida
 → Resultado: DRIVER_EXECUTE falha antes de acquire
@@ -423,6 +424,7 @@ driver.setState('IDLE'); // OK (AbortSignal bypass validation se necessário)
 ```
 
 **Nível 2 Failure** (DOMAIN):
+
 ```javascript
 // URL não é LLM suportada
 → Resultado: validatePage() retorna false
@@ -431,6 +433,7 @@ driver.setState('IDLE'); // OK (AbortSignal bypass validation se necessário)
 ```
 
 **Nível 3 Failure** (INTERFACE):
+
 ```javascript
 // Campo de entrada não encontrado ou não interativo
 → Resultado: validateLLMInterface() retorna false
@@ -439,6 +442,7 @@ driver.setState('IDLE'); // OK (AbortSignal bypass validation se necessário)
 ```
 
 **Nível 4 Failure** (DNA):
+
 ```javascript
 // DNA corrompido ou target rules faltando
 → Resultado: Fallback para DEFAULT_DNA
@@ -447,6 +451,7 @@ driver.setState('IDLE'); // OK (AbortSignal bypass validation se necessário)
 ```
 
 **Nível 5 Failure** (DRIVER):
+
 ```javascript
 // Transição inválida ou driver destroyed
 → Resultado: setState() throws Error
@@ -461,6 +466,7 @@ driver.setState('IDLE'); // OK (AbortSignal bypass validation se necessário)
 ### O Que É DNA?
 
 **DNA** (Dynamic Rules) é o "genoma" do sistema que define:
+
 - **Selectors**: Como localizar elementos (input_box, send_button, response_area)
 - **Behavior Overrides**: Ajustes de comportamento (typing_speed, delays, stability_threshold)
 - **Evolution**: Aprende com erros (SADI pode atualizar DNA automaticamente)
@@ -663,6 +669,7 @@ const dna3 = await dna_store.getDna(); // Load + cache (nova versão)
 O driver pode ficar em estado **idle/pausado** por **8 motivos principais**:
 
 #### 1. **IDLE (Aguardando Task)**
+
 ```javascript
 // Driver existe mas não há task para executar
 // Estado: IDLE
@@ -670,8 +677,8 @@ O driver pode ficar em estado **idle/pausado** por **8 motivos principais**:
 // Consumo: Mínimo (apenas listener de eventos)
 
 // Cache:
-factory.cache.get(page).get('chatgpt') // ✅ Driver existe
-driver.state === 'IDLE' // ✅ Ocioso
+factory.cache.get(page).get('chatgpt'); // ✅ Driver existe
+driver.state === 'IDLE'; // ✅ Ocioso
 
 // Causa:
 // - Task anterior já foi concluída (release chamado)
@@ -685,6 +692,7 @@ driver.state === 'IDLE' // ✅ Ocioso
 ```
 
 #### 2. **PREPARING (Model Switching)**
+
 ```javascript
 // Driver preparando contexto (ex: trocando de modelo)
 // Estado: PREPARING
@@ -707,6 +715,7 @@ driver.prepareContext({ model: 'gpt-4o' })
 ```
 
 #### 3. **WAITING (Aguardando Resposta do LLM)**
+
 ```javascript
 // Driver aguardando LLM gerar resposta
 // Estado: WAITING
@@ -745,6 +754,7 @@ while (!stable) {
 ```
 
 #### 4. **STALLED (Travamento Detectado)**
+
 ```javascript
 // Driver detectou possível travamento
 // Estado: STALLED
@@ -753,8 +763,8 @@ while (!stable) {
 
 // Detecção:
 if (Date.now() - lastUpdate > STALL_WARNING_MS) {
-    driver.setState('STALLED');
-    emit('warning', { context: 'stall_detected' });
+  driver.setState('STALLED');
+  emit('warning', { context: 'stall_detected' });
 }
 
 // Causa:
@@ -770,6 +780,7 @@ if (Date.now() - lastUpdate > STALL_WARNING_MS) {
 ```
 
 #### 5. **Sem Tasks no Kernel**
+
 ```javascript
 // Sistema operacional mas não há tasks para processar
 // Estado: N/A (driver não existe ainda)
@@ -797,6 +808,7 @@ const tasks = taskRuntime.listTasks(); // []
 ```
 
 #### 6. **Sem Missões Ativas**
+
 ```javascript
 // MissionManager não tem missões em execução
 // Estado: N/A (nenhuma task gerada)
@@ -820,6 +832,7 @@ const missions = await stateManager.listMissions();
 ```
 
 #### 7. **Circuit Breaker OPEN (Chrome Down)**
+
 ```javascript
 // Chrome fechou ou crashou
 // Estado: N/A (sistema pausado)
@@ -828,8 +841,8 @@ const missions = await stateManager.listMissions();
 
 // Circuit Breaker:
 if (browserPool.circuitBreaker.shouldPauseSystem()) {
-    // KernelLoop skip execution
-    return;
+  // KernelLoop skip execution
+  return;
 }
 
 // Causa:
@@ -849,6 +862,7 @@ if (browserPool.circuitBreaker.shouldPauseSystem()) {
 ```
 
 #### 8. **Page Not Allocated (BrowserPool Exhausted)**
+
 ```javascript
 // BrowserPool não tem pages disponíveis
 // Estado: N/A (aguardando release)
@@ -913,6 +927,7 @@ const page = await this.browserPool.allocate(target);
 ### Factory Cache (WeakMap)
 
 **Estrutura**:
+
 ```javascript
 // src/driver/factory.js
 this.pageCache = new WeakMap();
@@ -930,6 +945,7 @@ WeakMap {
 ```
 
 **Fluxo de Cache**:
+
 ```javascript
 // 1. Task 1 executa (chatgpt)
 Factory.getDriver('chatgpt', page1, ...)
@@ -975,20 +991,20 @@ Factory.getDriver('chatgpt', page2, ...)
 ```javascript
 // Auto-eviction reativa
 driver.once('destroyed', () => {
-    // Remove driver do cache Map
-    const driverMap = this.pageCache.get(page);
-    if (driverMap) {
-        driverMap.delete(target);
+  // Remove driver do cache Map
+  const driverMap = this.pageCache.get(page);
+  if (driverMap) {
+    driverMap.delete(target);
 
-        // Se Map ficou vazio, pode remover (opcional)
-        if (driverMap.size === 0) {
-            // WeakMap não tem .delete(), mas pode limpar Map
-            driverMap.clear();
-        }
+    // Se Map ficou vazio, pode remover (opcional)
+    if (driverMap.size === 0) {
+      // WeakMap não tem .delete(), mas pode limpar Map
+      driverMap.clear();
     }
+  }
 
-    this.metrics.driversDestroyed++;
-    this.emit('driver_evicted', { target, page });
+  this.metrics.driversDestroyed++;
+  this.emit('driver_evicted', { target, page });
 });
 
 // Quando driver é evicted:
@@ -1003,19 +1019,22 @@ driver.once('destroyed', () => {
 ```javascript
 // src/driver/factory.js
 const FACTORY_CONFIG = {
-    MAX_DRIVERS_PER_PAGE: 10  // Limite de drivers por page
+  MAX_DRIVERS_PER_PAGE: 10, // Limite de drivers por page
 };
 
 // Validação em getDriver():
 const driverMap = this.pageCache.get(page) || new Map();
 
 if (driverMap.size >= FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE) {
-    log('WARN', `[Factory] Page has ${driverMap.size} drivers cached. ` +
-                `Limit: ${FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE}. ` +
-                `Consider invalidating cache.`);
+  log(
+    'WARN',
+    `[Factory] Page has ${driverMap.size} drivers cached. ` +
+      `Limit: ${FACTORY_CONFIG.MAX_DRIVERS_PER_PAGE}. ` +
+      `Consider invalidating cache.`
+  );
 
-    // Estratégia: LRU eviction (futuro)
-    // Por ora: Warning apenas
+  // Estratégia: LRU eviction (futuro)
+  // Por ora: Warning apenas
 }
 ```
 
@@ -1135,7 +1154,8 @@ User                    System                  Validation Layers
 7. EXECUTE (Send Prompt)         ← Execução inicia
 ```
 
-**Princípio Fail-Fast**: Se qualquer validação falhar, processo aborta IMEDIATAMENTE (não tenta etapas seguintes).
+**Princípio Fail-Fast**: Se qualquer validação falhar, processo aborta IMEDIATAMENTE (não tenta
+etapas seguintes).
 
 ---
 
@@ -1144,6 +1164,7 @@ User                    System                  Validation Layers
 ### Questão 1: **Driver Pode Ficar "Zumbi"?**
 
 **Cenário**:
+
 ```javascript
 // Driver é instanciado
 const driver = Factory.getDriver('chatgpt', page, ...);
@@ -1162,12 +1183,14 @@ const driver2 = Factory.getDriver('chatgpt', page, ...);
 ```
 
 **Análise**:
+
 - ✅ **OK**: Driver é reutilizado se:
   1. driver.destroyed === false
   2. driver.state === 'IDLE'
   3. Page ainda válida (não closed)
 
 - ❌ **PROBLEMA**: Se driver.destroyed === true MAS ainda em cache?
+
   ```javascript
   // BUG POTENCIAL:
   driver.destroy(); // destroyed = true
@@ -1179,11 +1202,13 @@ const driver2 = Factory.getDriver('chatgpt', page, ...);
   // ✅ Auto-eviction implementado
   ```
 
-**Recomendação**: ✅ **VALIDAR**: `getDriver()` deve checar `driver.destroyed` antes de retornar cache hit.
+**Recomendação**: ✅ **VALIDAR**: `getDriver()` deve checar `driver.destroyed` antes de retornar
+cache hit.
 
 ### Questão 2: **Page Pode Ser Reutilizada Por Múltiplas Tasks Simultâneas?**
 
 **Cenário**:
+
 ```javascript
 // Task 1 aloca page
 const page1 = await BrowserPool.allocate('chatgpt.com');
@@ -1196,9 +1221,11 @@ const page2 = await BrowserPool.allocate('chatgpt.com');
 ```
 
 **Análise**:
+
 - ✅ **OK**: BrowserPool marca page como "em uso"
 - ✅ **OK**: DriverNERVAdapter enfileira task se `MAX_ACTIVE_DRIVERS` atingido
 - ❌ **PROBLEMA**: Se BrowserPool libera page MAS driver ainda executando?
+
   ```javascript
   // Fluxo normal:
   driver.execute() → complete → release() → BrowserPool.release(page)
@@ -1213,11 +1240,13 @@ const page2 = await BrowserPool.allocate('chatgpt.com');
   // ✅ Atomicidade garantida
   ```
 
-**Recomendação**: ✅ **VALIDAR**: Adicionar assertion em `BrowserPool.allocate()` que page não está "em uso".
+**Recomendação**: ✅ **VALIDAR**: Adicionar assertion em `BrowserPool.allocate()` que page não está
+"em uso".
 
 ### Questão 3: **Driver Pode Entrar em Estado Inválido Após Abort?**
 
 **Cenário**:
+
 ```javascript
 // Task em execução: WAITING
 driver.state === 'WAITING';
@@ -1230,9 +1259,11 @@ abortController.abort();
 ```
 
 **Análise**:
+
 - ✅ **OK**: `_setupAbortListener()` reseta driver para IDLE
 - ✅ **OK**: Emite `ABORT_SIGNAL_RECEIVED` event
 - ❌ **PROBLEMA**: E se abort acontece durante `PREPARING` (navegação)?
+
   ```javascript
   // Preparing → Model switching (navegação)
   await page.goto(switchingUrl);
@@ -1246,11 +1277,13 @@ abortController.abort();
   // ✅ Implementado em prepareContext()
   ```
 
-**Recomendação**: ✅ **VALIDAR**: Testar abort durante cada estado (IDLE, PREPARING, TYPING, WAITING, STALLED).
+**Recomendação**: ✅ **VALIDAR**: Testar abort durante cada estado (IDLE, PREPARING, TYPING,
+WAITING, STALLED).
 
 ### Questão 4: **DNA Pode Estar Corrompido E Sistema Continuar?**
 
 **Cenário**:
+
 ```javascript
 // dynamic_rules.json corrompido (JSON inválido)
 // ❓ Sistema crasha ou usa fallback?
@@ -1258,10 +1291,12 @@ abortController.abort();
 ```
 
 **Análise**:
+
 - ✅ **OK**: `dna_store.getDna()` tem try-catch
 - ✅ **OK**: Valida com Zod → Fallback se inválido
 - ✅ **OK**: Usa `global_selectors` se target não existe
 - ❌ **PROBLEMA**: E se `global_selectors` TAMBÉM está corrompido?
+
   ```javascript
   // Cenário extremo:
   // dna.global_selectors = null (corrupted)
@@ -1282,6 +1317,7 @@ abortController.abort();
 ### Questão 5: **Circuit Breaker Pode Parar Sistema Indefinidamente?**
 
 **Cenário**:
+
 ```javascript
 // Chrome fecha → Circuit Breaker OPEN
 browserPool.circuitBreaker.shouldPauseSystem() === true;
@@ -1291,9 +1327,11 @@ browserPool.circuitBreaker.shouldPauseSystem() === true;
 ```
 
 **Análise**:
+
 - ✅ **OK**: Circuit Breaker tem heartbeat periódico
 - ✅ **OK**: Detecta recovery (OPEN → HALF_OPEN → CLOSED)
 - ❌ **PROBLEMA**: E se Chrome reabre MAS em porta diferente?
+
   ```javascript
   // Boot 1: Chrome na porta 9225
   browserPool.connect('http://localhost:9225');
@@ -1371,6 +1409,7 @@ browserPool.circuitBreaker.shouldPauseSystem() === true;
 
 ---
 
-**Próximo Passo**: Com esta análise profunda, podemos prosseguir com **Sprint 1** (correções P0) com **100% de solidez**. Todas as pré-condições, estados pausados e integrações estão mapeadas.
+**Próximo Passo**: Com esta análise profunda, podemos prosseguir com **Sprint 1** (correções P0) com
+**100% de solidez**. Todas as pré-condições, estados pausados e integrações estão mapeadas.
 
 **Status**: ✅ **Análise Completa** - Ready for Sprint 1 Implementation

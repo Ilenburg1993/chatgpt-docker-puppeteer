@@ -12,5 +12,4 @@ Recommended actions:
 2. If active, rotate the credential immediately.
 3. If false-positive (e.g., binary data), mark as exception with justification.
 
-Owner: @owner-placeholder
-Labels: security, P1, trufflehog
+Owner: @owner-placeholder Labels: security, P1, trufflehog

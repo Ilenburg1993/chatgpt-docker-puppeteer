@@ -3,6 +3,7 @@
 ## Status: ✅ PRONTO PARA IMPLEMENTAÇÃO
 
 ## Decisões do Usuário
+
 - **Frontend**: Vue.js 3 + Vite (substituição completa)
 - **Complexidade**: Profissional/Enterprise
 - **Visualizações Prioritárias**: Todas (DAG, métricas real-time, event flow, health dashboard)
@@ -14,6 +15,7 @@
 ### Stack Tecnológica Aprovada
 
 **Frontend (Novo)**:
+
 - Vue.js 3.5+ (Composition API)
 - Vite 6.0+ (build tooling)
 - Pinia 2.3+ (state management)
@@ -22,16 +24,19 @@
 - Axios 1.7+ (HTTP client)
 
 **Visualizações**:
+
 - Chart.js 4.4+ + vue-chartjs (métricas de performance)
 - Cytoscape.js 3.31+ (DAG de dependências)
 - Vis-Timeline 7.7+ (event correlation timeline)
 - D3.js 7.9+ (visualizações customizadas)
 
 **UI Components**:
+
 - Element Plus 2.9+ OU Vuetify 3.7+ (a escolher durante implementação)
 - Tailwind CSS 4.1+ (utility-first styling - opcional)
 
 **Backend (Extensões)**:
+
 - Express 4.22+ (mantido)
 - Socket.io 4.8+ (mantido, estendido)
 - Novas APIs RESTful (workflows, templates, telemetria agregada)
@@ -173,6 +178,7 @@ App.vue
 ### 3.2 Pinia State Stores
 
 #### `stores/tasks.js` - Gerenciamento de Tarefas
+
 ```javascript
 state: {
   tasks: [],              // Unified view (disk + kernel)
@@ -200,6 +206,7 @@ actions: {
 ```
 
 #### `stores/telemetry.js` - Telemetria Real-time
+
 ```javascript
 state: {
   cpuHistory: [],         // Ring buffer (last 1000 points)
@@ -228,6 +235,7 @@ actions: {
 ```
 
 #### `stores/system.js` - System Health
+
 ```javascript
 state: {
   components: {
@@ -247,6 +255,7 @@ actions: {
 ```
 
 #### `stores/workflow.js` - Workflows e DAG
+
 ```javascript
 state: {
   workflows: [],          // All workflows
@@ -262,6 +271,7 @@ actions: {
 ```
 
 #### `stores/nerv.js` - Event Correlation
+
 ```javascript
 state: {
   events: [],             // Recent events (ring buffer)
@@ -286,6 +296,7 @@ actions: {
 ### 4.1 APIs REST (Novas)
 
 **Workflows**:
+
 ```
 GET    /api/workflows           # List all
 POST   /api/workflows           # Create
@@ -297,6 +308,7 @@ POST   /api/workflows/:id/execute      # Execute workflow
 ```
 
 **Templates**:
+
 ```
 GET    /api/templates           # List all
 POST   /api/templates           # Create
@@ -307,6 +319,7 @@ POST   /api/templates/:id/instantiate  # Create task from template
 ```
 
 **Telemetria**:
+
 ```
 GET    /api/telemetry/metrics          # Current snapshot
 GET    /api/telemetry/history          # Time-series data
@@ -315,12 +328,14 @@ GET    /api/telemetry/stats            # Aggregated stats
 ```
 
 **Health**:
+
 ```
 GET    /api/health/aggregate    # All components health
 GET    /api/health/alerts       # Active alerts
 ```
 
 **Tasks (Estender Existente)**:
+
 ```
 GET    /api/tasks/:id/dependencies     # NOVO: Get dependency graph
 GET    /api/tasks/:id/history          # NOVO: Execution history (NERV events)
@@ -330,6 +345,7 @@ POST   /api/tasks?template_id=<id>     # NOVO: Create from template
 ### 4.2 WebSocket Events (Socket.io)
 
 **Novos Eventos Server → Client**:
+
 ```javascript
 'task:updates_batch'            // Batch task updates (50ms debounce - JÁ IMPLEMENTADO)
 'telemetry:metrics'             // Metrics snapshot (1Hz)
@@ -343,13 +359,14 @@ POST   /api/tasks?template_id=<id>     # NOVO: Create from template
 ```
 
 **Eventos Legados (Manter)**:
+
 ```javascript
-'update'                        // DEPRECADO (usar task:updates_batch)
-'status_change'                 // DEPRECADO (usar health:*)
-'log_update'                    // MANTER (terminal logs)
-'maestro:telemetry'             // MANTER (IPC 2.0)
-'hub:agent_online'              // MANTER
-'hub:agent_offline'             // MANTER
+'update'; // DEPRECADO (usar task:updates_batch)
+'status_change'; // DEPRECADO (usar health:*)
+'log_update'; // MANTER (terminal logs)
+'maestro:telemetry'; // MANTER (IPC 2.0)
+'hub:agent_online'; // MANTER
+'hub:agent_offline'; // MANTER
 ```
 
 ### 4.3 Serviços Backend Críticos
@@ -357,12 +374,14 @@ POST   /api/tasks?template_id=<id>     # NOVO: Create from template
 #### `src/server/dashboard-api/telemetry_aggregator.js` (NOVO)
 
 **Responsabilidades**:
+
 - Coletar métricas de múltiplas fontes (NERV, Kernel, Hardware, Queue)
 - Armazenar em ring buffers (3600 pontos = 1 hora @ 1Hz)
 - Streamar via Socket.io (1Hz) para dashboards
 - Calcular estatísticas agregadas (avg, p95, p99)
 
 **Fontes de Dados**:
+
 - `nerv.telemetry.stats()` - NERV IPC telemetry
 - `hardware.getHeapStats()` - Memory stats
 - `hardware.getCPUUsage()` - CPU usage
@@ -370,6 +389,7 @@ POST   /api/tasks?template_id=<id>     # NOVO: Create from template
 - Event loop lag measurement (custom)
 
 **Estrutura de Dados**:
+
 ```javascript
 {
   timestamp: Date.now(),
@@ -384,12 +404,14 @@ POST   /api/tasks?template_id=<id>     # NOVO: Create from template
 #### `src/infra/queue/task_sync_bridge.js` (NOVO)
 
 **Responsabilidades**:
+
 - Unificar visão de tarefas: Disk Queue + Kernel Runtime
 - Escutar eventos NERV para atualizações de estado do Kernel
 - Merge disk state + kernel state → unified task view
 - Notificar dashboards via Socket.io
 
 **Mapeamento de Eventos NERV**:
+
 ```javascript
 ActionCode.TASK_STARTED   → status: 'RUNNING', startedAt
 ActionCode.TASK_COMPLETED → status: 'DONE', completedAt, result
@@ -398,22 +420,25 @@ ActionCode.TASK_PROGRESS  → progress, currentStep
 ```
 
 **API Pública**:
+
 ```javascript
-getUnifiedTasks()           // Disk tasks + kernel state
-getUnifiedTask(taskId)      // Single task merged
-_setupNervListeners()       // Subscribe to NERV events
-_notifyDashboards(taskId)   // Broadcast via Socket.io
+getUnifiedTasks(); // Disk tasks + kernel state
+getUnifiedTask(taskId); // Single task merged
+_setupNervListeners(); // Subscribe to NERV events
+_notifyDashboards(taskId); // Broadcast via Socket.io
 ```
 
 #### `src/server/dashboard-api/workflow_engine.js` (NOVO)
 
 **Responsabilidades**:
+
 - Validar DAG (Directed Acyclic Graph)
 - Detectar ciclos usando graphlib
 - Validar dependências (todas as tasks existem?)
 - Executar workflow (criar tarefas em ordem topológica)
 
 **Validações**:
+
 - Estrutura: nodes válidos, edges válidos
 - Ciclos: usar graphlib.alg.isAcyclic()
 - Dependências: verificar se parent tasks existem
@@ -422,6 +447,7 @@ _notifyDashboards(taskId)   // Broadcast via Socket.io
 #### `src/server/dashboard-api/template_manager.js` (NOVO)
 
 **Responsabilidades**:
+
 - CRUD de templates de tarefas
 - Storage em disco (templates/ directory)
 - Instantiate: criar task a partir de template
@@ -432,6 +458,7 @@ _notifyDashboards(taskId)   // Broadcast via Socket.io
 ## 5. INTEGRAÇÃO QUEUE ↔ KERNEL
 
 ### Problema Atual
+
 - **Queue (Disk-based)**: `src/infra/queue/` - Persistência em JSON
 - **Kernel (In-memory)**: `src/kernel/` - Task runtime lógico
 - **Gap**: Sistemas desacoplados, sem sincronização bidirecional
@@ -439,6 +466,7 @@ _notifyDashboards(taskId)   // Broadcast via Socket.io
 ### Solução: Task Sync Bridge
 
 **Fluxo de Dados**:
+
 ```
 Dashboard → GET /api/tasks
     ↓
@@ -452,6 +480,7 @@ Return unified view to dashboard
 ```
 
 **Real-time Updates**:
+
 ```
 NERV Event: TASK_STARTED
     ↓
@@ -467,6 +496,7 @@ Dashboard: taskStore.handleTaskUpdate()
 ```
 
 **Integração com APIs Existentes**:
+
 - `src/server/api/controllers/tasks.js` (ESTENDER):
   - Trocar `io.getQueue()` por `taskSyncBridge.getUnifiedTasks()`
   - Trocar `io.loadTask(id)` por `taskSyncBridge.getUnifiedTask(id)`
@@ -478,6 +508,7 @@ Dashboard: taskStore.handleTaskUpdate()
 ### 6.1 Sistema de Alertas
 
 **Alert Manager** (`src/server/dashboard-api/alert_manager.js`):
+
 - Monitorar métricas contra thresholds
 - Trigger alertas: warning, critical
 - Broadcast via Socket.io: `alert:triggered`
@@ -485,6 +516,7 @@ Dashboard: taskStore.handleTaskUpdate()
 - Acknowledge alerts
 
 **Thresholds**:
+
 ```javascript
 cpu: { warning: 70%, critical: 90% }
 memory: { warning: 80%, critical: 95% }
@@ -496,23 +528,27 @@ queueSize: { warning: 100, critical: 500 }
 ### 6.2 Métricas Coletadas
 
 **Hardware**:
+
 - CPU usage (%)
 - Memory used/total/percent
 - Disk usage (implementar se necessário)
 
 **NERV**:
+
 - Latency (tempo entre emit e ACK)
 - Throughput (events/second)
 - Event count total
 - Buffer sizes (inbound/outbound)
 
 **Kernel**:
+
 - Task counts (PENDING, RUNNING, DONE, FAILED)
 - Observation count
 - Policy alerts
 - Loop frequency (Hz)
 
 **Queue**:
+
 - Queue size
 - Cache hit rate
 - Corrupt tasks count
@@ -523,7 +559,9 @@ queueSize: { warning: 100, critical: 500 }
 ## 7. MIGRAÇÃO GRADUAL (5 SEMANAS)
 
 ### Fase 1: Infraestrutura (Semana 1)
+
 **Objetivos**:
+
 - Criar diretório `src/dashboard-ui/`
 - Configurar Vite + Vue.js 3
 - Instalar dependências (Pinia, Router, Socket.io, Chart.js, Cytoscape)
@@ -531,6 +569,7 @@ queueSize: { warning: 100, critical: 500 }
 - Configurar Vue Router com todas as rotas
 
 **Entregáveis**:
+
 - `src/dashboard-ui/vite.config.js`
 - `src/dashboard-ui/src/main.js`
 - `src/dashboard-ui/src/App.vue`
@@ -538,11 +577,14 @@ queueSize: { warning: 100, critical: 500 }
 - Componentes de layout básicos
 
 **Servidor**:
+
 - Atualizar `src/server/engine/app.js` para servir Vue app em `/dashboard`
 - Manter dashboard legado funcionando em `/`
 
 ### Fase 2: Backend APIs (Semana 2)
+
 **Objetivos**:
+
 - Implementar `task_sync_bridge.js`
 - Implementar `telemetry_aggregator.js`
 - Estender `src/server/api/controllers/tasks.js`
@@ -550,6 +592,7 @@ queueSize: { warning: 100, critical: 500 }
 - Adicionar novos eventos Socket.io
 
 **Entregáveis**:
+
 - `src/infra/queue/task_sync_bridge.js`
 - `src/server/dashboard-api/telemetry_aggregator.js`
 - `src/server/dashboard-api/alert_manager.js`
@@ -558,12 +601,15 @@ queueSize: { warning: 100, critical: 500 }
 - Novos eventos Socket.io configurados
 
 **Testes**:
+
 - Verificar unified tasks via `/api/tasks`
 - Verificar telemetry streaming via Socket.io
 - Testar alertas
 
 ### Fase 3: Frontend Core (Semana 3)
+
 **Objetivos**:
+
 - Implementar Pinia stores (tasks, telemetry, system)
 - Criar composables (useSocket, useRealtime, useTaskAPI)
 - Implementar Task Queue view (lista, filtros, cards)
@@ -571,6 +617,7 @@ queueSize: { warning: 100, critical: 500 }
 - Conectar Socket.io client
 
 **Entregáveis**:
+
 - `stores/tasks.js`, `stores/telemetry.js`, `stores/system.js`
 - `composables/useSocket.js`, `composables/useRealtime.js`
 - `views/Dashboard.vue`
@@ -579,13 +626,16 @@ queueSize: { warning: 100, critical: 500 }
 - Real-time updates funcionando
 
 **Testes**:
+
 - Dashboard carrega e exibe dados
 - Lista de tarefas renderiza corretamente
 - Real-time updates aparecem na UI
 - Filtros funcionam
 
 ### Fase 4: Visualizações Avançadas (Semana 4)
+
 **Objetivos**:
+
 - Implementar Performance Metrics view (Chart.js)
 - Implementar Workflow Editor (Cytoscape.js DAG)
 - Implementar Event Correlation view (Vis-Timeline)
@@ -593,6 +643,7 @@ queueSize: { warning: 100, critical: 500 }
 - Implementar Templates view
 
 **Entregáveis**:
+
 - `views/PerformanceMetrics.vue` com charts funcionais
 - `views/WorkflowEditor.vue` com DAG editor
 - `views/EventCorrelation.vue` com timeline
@@ -600,13 +651,16 @@ queueSize: { warning: 100, critical: 500 }
 - `views/Templates.vue` com CRUD
 
 **Testes**:
+
 - Charts atualizam em tempo real (1Hz)
 - DAG editor valida dependências
 - Timeline mostra eventos NERV
 - Health cards refletem status real
 
 ### Fase 5: Refinamento e Migração (Semana 5)
+
 **Objetivos**:
+
 - Polimento de UI/UX
 - Performance optimization (lazy loading, virtual scrolling)
 - Testes E2E (Playwright)
@@ -615,6 +669,7 @@ queueSize: { warning: 100, critical: 500 }
 - Adicionar banner de deprecação no dashboard legado
 
 **Entregáveis**:
+
 - UI polida e responsiva
 - Lazy loading de componentes pesados
 - Virtual scrolling na task list (1000+ tasks)
@@ -623,6 +678,7 @@ queueSize: { warning: 100, critical: 500 }
 - Dashboard novo como padrão
 
 **Rollout**:
+
 - Semana 5.1: `/dashboard` vira rota padrão
 - Semana 5.2: Dashboard legado em `/legacy` com banner
 - v2.1 (futuro): Remover completamente dashboard legado
@@ -677,7 +733,7 @@ queueSize: { warning: 100, critical: 500 }
    - Real-time updates
 
 8. **`src/server/engine/socket.js`** (ESTENDER)
-   - Adicionar novos eventos: telemetry:metrics, health:*, alert:triggered
+   - Adicionar novos eventos: telemetry:metrics, health:\*, alert:triggered
    - Manter eventos legados
    - Documentar protocol
 
@@ -805,6 +861,7 @@ queueSize: { warning: 100, critical: 500 }
 ### Testes End-to-End (Playwright)
 
 **Cenário 1: Criar e Executar Tarefa**
+
 ```
 1. Abrir dashboard (/dashboard)
 2. Navegar para /tasks
@@ -821,6 +878,7 @@ queueSize: { warning: 100, critical: 500 }
 ```
 
 **Cenário 2: Visualizar Métricas Real-time**
+
 ```
 1. Abrir /metrics
 2. Verificar charts renderizam (CPU, memory, latency)
@@ -831,6 +889,7 @@ queueSize: { warning: 100, critical: 500 }
 ```
 
 **Cenário 3: Criar Workflow com DAG**
+
 ```
 1. Abrir /workflows
 2. Clicar "Create Workflow"
@@ -845,6 +904,7 @@ queueSize: { warning: 100, critical: 500 }
 ```
 
 **Cenário 4: Filtros e Busca**
+
 ```
 1. Abrir /tasks com 100+ tarefas
 2. Aplicar filtro: status = RUNNING
@@ -856,6 +916,7 @@ queueSize: { warning: 100, critical: 500 }
 ```
 
 **Cenário 5: Bulk Operations**
+
 ```
 1. Abrir /tasks
 2. Criar 5 tasks com payload errado (falharão)
@@ -870,6 +931,7 @@ queueSize: { warning: 100, critical: 500 }
 ### Testes de Performance
 
 **Teste 1: Large Task List**
+
 ```
 Objetivo: Verificar performance com 1000+ tasks
 Método:
@@ -885,6 +947,7 @@ Target: < 100ms
 ```
 
 **Teste 2: Real-time Update Storm**
+
 ```
 Objetivo: Verificar dashboard sob alta carga de updates
 Método:
@@ -904,6 +967,7 @@ Target:
 ```
 
 **Teste 3: Chart Rendering**
+
 ```
 Objetivo: Verificar performance de charts
 Método:
@@ -920,6 +984,7 @@ Método:
 ### Testes de Integração
 
 **Teste 1: Queue ↔ Kernel Sync**
+
 ```
 Objetivo: Verificar sincronização disk ↔ memory
 Método:
@@ -936,6 +1001,7 @@ Expectativa: Todos consistentes
 ```
 
 **Teste 2: NERV Event Flow**
+
 ```
 Objetivo: Verificar propagação de eventos
 Método:
@@ -954,6 +1020,7 @@ Método:
 ```
 
 **Teste 3: Telemetry Aggregation**
+
 ```
 Objetivo: Verificar coleta e agregação de métricas
 Método:
@@ -974,16 +1041,16 @@ Método:
 
 ## 11. PERFORMANCE TARGETS
 
-| Métrica | Target | Medição |
-|---------|--------|---------|
-| **Initial Load (Dashboard)** | < 2s | Time to Interactive (Lighthouse) |
-| **Task List Render (1000 tasks)** | < 100ms | React DevTools Profiler |
-| **Real-time Update Latency** | < 50ms | Socket.io emit → UI update |
-| **Chart Update (1Hz)** | Smooth | 60fps, no jank (Performance API) |
-| **Memory Footprint** | < 100MB | Chrome DevTools Memory |
-| **Bundle Size (Gzipped)** | < 500KB | webpack-bundle-analyzer |
-| **API Response Time** | < 100ms | GET /api/tasks (p95) |
-| **Socket.io Connection** | < 200ms | Initial handshake |
+| Métrica                           | Target  | Medição                          |
+| --------------------------------- | ------- | -------------------------------- |
+| **Initial Load (Dashboard)**      | < 2s    | Time to Interactive (Lighthouse) |
+| **Task List Render (1000 tasks)** | < 100ms | React DevTools Profiler          |
+| **Real-time Update Latency**      | < 50ms  | Socket.io emit → UI update       |
+| **Chart Update (1Hz)**            | Smooth  | 60fps, no jank (Performance API) |
+| **Memory Footprint**              | < 100MB | Chrome DevTools Memory           |
+| **Bundle Size (Gzipped)**         | < 500KB | webpack-bundle-analyzer          |
+| **API Response Time**             | < 100ms | GET /api/tasks (p95)             |
+| **Socket.io Connection**          | < 200ms | Initial handshake                |
 
 ---
 
@@ -1060,32 +1127,35 @@ Método:
 ## 14. CHECKLIST DE IMPLEMENTAÇÃO
 
 ### Fase 1: Infraestrutura (Semana 1)
+
 - [ ] Criar `src/dashboard-ui/` directory
 - [ ] `npm init` e instalar dependências (Vue, Vite, Pinia, Router, Socket.io, Chart.js, Cytoscape)
 - [ ] Configurar `vite.config.js` (proxy para API backend)
 - [ ] Criar `main.js`, `App.vue`, `router/index.js`
 - [ ] Criar componentes de layout: AppLayout, Header, Sidebar
-- [ ] Configurar rotas: Dashboard, TaskQueue, TaskDetail, WorkflowEditor, PerformanceMetrics, EventCorrelation, SystemHealth, Templates
+- [ ] Configurar rotas: Dashboard, TaskQueue, TaskDetail, WorkflowEditor, PerformanceMetrics,
+      EventCorrelation, SystemHealth, Templates
 - [ ] Atualizar `src/server/engine/app.js` para servir Vue app em `/dashboard`
 - [ ] Testar: Dashboard vazio carrega em `/dashboard`
 
 ### Fase 2: Backend APIs (Semana 2)
+
 - [ ] Implementar `src/infra/queue/task_sync_bridge.js`
   - [ ] Constructor + kernelStateCache Map
   - [ ] getUnifiedTasks(), getUnifiedTask(id)
-  - [ ] _setupNervListeners() (TASK_STARTED, TASK_COMPLETED, TASK_FAILED, TASK_PROGRESS)
-  - [ ] _notifyDashboards(taskId)
+  - [ ] \_setupNervListeners() (TASK_STARTED, TASK_COMPLETED, TASK_FAILED, TASK_PROGRESS)
+  - [ ] \_notifyDashboards(taskId)
 - [ ] Implementar `src/server/dashboard-api/telemetry_aggregator.js`
   - [ ] Ring buffers (cpuHistory, memoryHistory, nervLatency, throughput, eventLoopLag)
-  - [ ] _collectMetrics() (NERV, hardware, queue, event loop lag)
-  - [ ] _startCollectionLoop() (1Hz)
-  - [ ] _broadcastMetrics(metrics) via Socket.io
+  - [ ] \_collectMetrics() (NERV, hardware, queue, event loop lag)
+  - [ ] \_startCollectionLoop() (1Hz)
+  - [ ] \_broadcastMetrics(metrics) via Socket.io
   - [ ] getHistory(metric, from, to), getCurrent()
 - [ ] Implementar `src/server/dashboard-api/alert_manager.js`
   - [ ] Thresholds config (cpu, memory, nervLatency, eventLoopLag, queueSize)
-  - [ ] _startMonitoring() (check every 5s)
-  - [ ] _checkThresholds(metrics)
-  - [ ] _triggerAlert(level, component, message)
+  - [ ] \_startMonitoring() (check every 5s)
+  - [ ] \_checkThresholds(metrics)
+  - [ ] \_triggerAlert(level, component, message)
   - [ ] getActiveAlerts(), acknowledgeAlert(alertId)
 - [ ] Estender `src/server/api/controllers/tasks.js`
   - [ ] GET / → usar taskSyncBridge.getUnifiedTasks()
@@ -1108,11 +1178,13 @@ Método:
   - [ ] GET /aggregate (all components health)
   - [ ] GET /alerts (active alerts)
 - [ ] Estender `src/server/engine/socket.js`
-  - [ ] Adicionar novos eventos: telemetry:metrics, health:kernel, health:driver, health:browser_pool, health:nerv, health:queue, alert:triggered
+  - [ ] Adicionar novos eventos: telemetry:metrics, health:kernel, health:driver,
+        health:browser_pool, health:nerv, health:queue, alert:triggered
   - [ ] Manter broadcastTaskUpdate() (já existe com 50ms debounce)
 - [ ] Testar: APIs retornam dados corretos, Socket.io emite eventos
 
 ### Fase 3: Frontend Core (Semana 3)
+
 - [ ] Implementar `stores/tasks.js` (Pinia)
   - [ ] State: tasks[], filters, selectedTaskId, loading, error
   - [ ] Getters: filteredTasks, runningTasks, pendingTasks, taskById
@@ -1131,7 +1203,8 @@ Método:
   - [ ] Actions: handleNervEvent, getCorrelationChain
 - [ ] Implementar `composables/useSocket.js`
   - [ ] Socket.io client connection
-  - [ ] Event subscriptions: task:updates_batch, telemetry:metrics, health:*, alert:triggered, nerv:event
+  - [ ] Event subscriptions: task:updates_batch, telemetry:metrics, health:\*, alert:triggered,
+        nerv:event
   - [ ] Connection management (connect, disconnect, reconnect)
   - [ ] Return { socket, isConnected, subscribe, unsubscribe }
 - [ ] Implementar `composables/useRealtime.js`
@@ -1160,6 +1233,7 @@ Método:
 - [ ] Testar: Dashboard carrega, task list renderiza, real-time updates funcionam, filtros aplicam
 
 ### Fase 4: Visualizações Avançadas (Semana 4)
+
 - [ ] Implementar `views/PerformanceMetrics.vue`
   - [ ] LineChart (CPU history) - Chart.js
   - [ ] LineChart (Memory history) - Chart.js
@@ -1205,9 +1279,11 @@ Método:
   - [ ] TemplateGrid → TemplateCard[] (v-for)
   - [ ] TemplateForm (create/edit modal)
   - [ ] TemplatePreview
-- [ ] Testar: Todas visualizações renderizam, charts atualizam real-time, DAG editor valida, timeline mostra eventos
+- [ ] Testar: Todas visualizações renderizam, charts atualizam real-time, DAG editor valida,
+      timeline mostra eventos
 
 ### Fase 5: Refinamento e Migração (Semana 5)
+
 - [ ] UI/UX Polimento
   - [ ] Ajustar cores, espaçamentos, typography
   - [ ] Adicionar loading states em todos lugares
@@ -1250,6 +1326,7 @@ Método:
 ## 15. CRITÉRIOS DE SUCESSO
 
 ### Funcionalidade
+
 - ✅ Dashboard carrega e exibe dados em < 2s
 - ✅ Real-time updates funcionam sem lag perceptível
 - ✅ CRUD de tarefas funciona 100% via UI
@@ -1260,6 +1337,7 @@ Método:
 - ✅ Templates podem ser criados e usados
 
 ### Performance
+
 - ✅ Dashboard suporta 1000+ tarefas sem degradação
 - ✅ Real-time updates não causam memory leaks
 - ✅ Charts renderizam a 60fps
@@ -1267,12 +1345,14 @@ Método:
 - ✅ API response time < 100ms (p95)
 
 ### Integração
+
 - ✅ Queue ↔ Kernel sincronizam corretamente
 - ✅ NERV events chegam ao dashboard
 - ✅ Comandos do dashboard executam no kernel/driver
 - ✅ Telemetria agregada reflete estado real
 
 ### Qualidade
+
 - ✅ Todos testes E2E passam
 - ✅ Nenhum erro no console em uso normal
 - ✅ Código segue padrões (ESLint passa)
@@ -1282,29 +1362,32 @@ Método:
 
 ## 16. RISCOS E MITIGAÇÕES
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|---------------|---------|-----------|
-| **Memory leaks em real-time updates** | Média | Alto | - Ring buffers com limite fixo<br>- Unsubscribe de listeners ao desmontar componentes<br>- Testes de longa duração |
-| **Performance com 1000+ tasks** | Alta | Médio | - Virtual scrolling<br>- Lazy loading<br>- Pagination (opcional) |
-| **Complexidade de Cytoscape.js** | Média | Médio | - Usar exemplos da documentação<br>- Limitar features iniciais<br>- Adicionar incrementalmente |
-| **Sincronização Queue ↔ Kernel** | Baixa | Alto | - Testes de integração rigorosos<br>- Logging detalhado<br>- Rollback plan |
-| **Compatibilidade com dashboard legado** | Baixa | Baixo | - Migração gradual (parallel deployment)<br>- Manter legado por 1-2 versões |
-| **Browser compatibility** | Baixa | Baixo | - Testar em Chrome, Firefox, Safari<br>- Polyfills via Vite se necessário |
+| Risco                                    | Probabilidade | Impacto | Mitigação                                                                                                          |
+| ---------------------------------------- | ------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Memory leaks em real-time updates**    | Média         | Alto    | - Ring buffers com limite fixo<br>- Unsubscribe de listeners ao desmontar componentes<br>- Testes de longa duração |
+| **Performance com 1000+ tasks**          | Alta          | Médio   | - Virtual scrolling<br>- Lazy loading<br>- Pagination (opcional)                                                   |
+| **Complexidade de Cytoscape.js**         | Média         | Médio   | - Usar exemplos da documentação<br>- Limitar features iniciais<br>- Adicionar incrementalmente                     |
+| **Sincronização Queue ↔ Kernel**         | Baixa         | Alto    | - Testes de integração rigorosos<br>- Logging detalhado<br>- Rollback plan                                         |
+| **Compatibilidade com dashboard legado** | Baixa         | Baixo   | - Migração gradual (parallel deployment)<br>- Manter legado por 1-2 versões                                        |
+| **Browser compatibility**                | Baixa         | Baixo   | - Testar em Chrome, Firefox, Safari<br>- Polyfills via Vite se necessário                                          |
 
 ---
 
 ## 17. PRÓXIMOS PASSOS IMEDIATOS
 
 ### Semana 1 - Dia 1
+
 1. Criar branch: `git checkout -b feature/enterprise-dashboard`
 2. Criar diretório: `mkdir -p src/dashboard-ui/src`
 3. Inicializar projeto Vue: `cd src/dashboard-ui && npm create vite@latest . -- --template vue`
-4. Instalar dependências: `npm install vue-router pinia socket.io-client axios chart.js vue-chartjs cytoscape vis-timeline d3 element-plus`
+4. Instalar dependências:
+   `npm install vue-router pinia socket.io-client axios chart.js vue-chartjs cytoscape vis-timeline d3 element-plus`
 5. Configurar Vite: editar `vite.config.js` (proxy para http://localhost:3008)
 6. Criar estrutura de diretórios: stores/, composables/, views/, components/, services/
 7. Commit: `git commit -m "feat: initialize Vue.js 3 dashboard with Vite"`
 
 ### Semana 1 - Dia 2
+
 1. Implementar `src/main.js` (Pinia + Router + App mount)
 2. Implementar `App.vue` (root component)
 3. Implementar `router/index.js` (todas as rotas)
@@ -1315,6 +1398,7 @@ Método:
 8. Commit: `git commit -m "feat: add layout components and routing"`
 
 ### Semana 1 - Dia 3-5
+
 1. Configurar integração servidor → servir Vue app
 2. Implementar build scripts no package.json raiz
 3. Implementar views básicas (placeholders)
@@ -1327,6 +1411,7 @@ Método:
 ## 18. REFERÊNCIAS E RECURSOS
 
 ### Documentação Oficial
+
 - **Vue.js 3**: https://vuejs.org/guide/
 - **Vite**: https://vite.dev/guide/
 - **Pinia**: https://pinia.vuejs.org/
@@ -1337,6 +1422,7 @@ Método:
 - **Vis-Timeline**: https://visjs.github.io/vis-timeline/docs/timeline/
 
 ### Código Existente (Ler antes de implementar)
+
 - `src/server/engine/socket.js` - Socket.io Hub (IPC 2.0)
 - `src/server/api/controllers/tasks.js` - REST API de tarefas
 - `src/infra/queue/cache.js` - Queue cache system
@@ -1346,6 +1432,7 @@ Método:
 - `src/core/schemas/task_schema.js` - Task schema V4
 
 ### Padrões de Código
+
 - **Indentação**: 4 espaços
 - **Line Length**: 120 caracteres
 - **Quotes**: Single quotes
@@ -1357,18 +1444,25 @@ Método:
 
 ## RESUMO EXECUTIVO
 
-Este plano detalha a transformação completa do sistema chatgpt-docker-puppeteer em uma **plataforma de orquestração autônoma de LLMs de nível enterprise**, com dashboard profissional e capacidades de execução autônoma para tarefas complexas de longa duração (livros, programas, pesquisas).
+Este plano detalha a transformação completa do sistema chatgpt-docker-puppeteer em uma **plataforma
+de orquestração autônoma de LLMs de nível enterprise**, com dashboard profissional e capacidades de
+execução autônoma para tarefas complexas de longa duração (livros, programas, pesquisas).
 
 **Principais Entregas**:
 
 ### PARTE 1: Dashboard Enterprise (5 semanas)
+
 1. **Dashboard Moderno**: Vue.js 3 com Composition API, Pinia state management, Vue Router
-2. **Visualizações Avançadas**: DAG editor (Cytoscape.js), métricas real-time (Chart.js), event correlation (Vis-Timeline), health monitoring
-3. **Telemetria Vasta**: 73+ eventos NERV, agregação de métricas, alertas configuráveis, streaming 1Hz via Socket.io
-4. **Gerenciamento Profundo de Tarefas**: CRUD completo, templates, workflows, bulk operations, dependency management
+2. **Visualizações Avançadas**: DAG editor (Cytoscape.js), métricas real-time (Chart.js), event
+   correlation (Vis-Timeline), health monitoring
+3. **Telemetria Vasta**: 73+ eventos NERV, agregação de métricas, alertas configuráveis, streaming
+   1Hz via Socket.io
+4. **Gerenciamento Profundo de Tarefas**: CRUD completo, templates, workflows, bulk operations,
+   dependency management
 5. **Integração Queue ↔ Kernel**: TaskSyncBridge para unificar visões disk-based + in-memory
 
 ### PARTE 2: Sistema de Orquestração Autônoma (12 semanas)
+
 6. **Orchestrator Engine**: Multi-step workflows, branching, looping, iterative execution
 7. **Validation Framework**: LLM-as-judge, quality scoring, self-correction
 8. **Context Management**: Intelligent chunking, context injection, long-term memory
@@ -1377,6 +1471,7 @@ Este plano detalha a transformação completa do sistema chatgpt-docker-puppetee
 11. **Feedback Loops**: LLM outputs feed back as inputs for refinement
 
 ### Capacidades Autônomas
+
 - ✅ **Escrever livros completos**: Multi-capítulos, auto-revisão, consistência narrativa
 - ✅ **Escrever programas complexos**: Multi-file, testes automáticos, iteração até passar
 - ✅ **Projetos de pesquisa**: Multi-source, síntese, relatórios com citações
@@ -1384,9 +1479,11 @@ Este plano detalha a transformação completa do sistema chatgpt-docker-puppetee
 
 **Duração Total**: 17 semanas (Dashboard: 5 semanas + Orquestração: 12 semanas)
 
-**Arquitetura**: Zero-coupling via NERV event bus (todos componentes se comunicam via NERV), modular (plug-and-play drivers/validators), observável (telemetria em cada decisão)
+**Arquitetura**: Zero-coupling via NERV event bus (todos componentes se comunicam via NERV), modular
+(plug-and-play drivers/validators), observável (telemetria em cada decisão)
 
-**Performance Targets**: < 2s load time, 1000+ tasks concorrentes, < 50ms real-time latency, 60fps charts, 100+ subtasks por workflow
+**Performance Targets**: < 2s load time, 1000+ tasks concorrentes, < 50ms real-time latency, 60fps
+charts, 100+ subtasks por workflow
 
 **Status**: ✅ Pronto para implementação com arquitetura completa aprovada
 
@@ -1401,6 +1498,7 @@ Este plano detalha a transformação completa do sistema chatgpt-docker-puppetee
 O sistema deve ser capaz de executar tarefas complexas de forma autônoma:
 
 **Exemplo 1: Escrever um Livro Técnico**
+
 ```
 Input do usuário:
 - Tópico: "Advanced Rust Programming"
@@ -1428,6 +1526,7 @@ Dashboard mostra:
 ```
 
 **Exemplo 2: Escrever Projeto de Software**
+
 ```
 Input do usuário:
 - Projeto: "REST API para gerenciamento de tarefas"
@@ -1455,6 +1554,7 @@ Dashboard mostra:
 ```
 
 **Exemplo 3: Projeto de Pesquisa**
+
 ```
 Input do usuário:
 - Tópico: "Impacto da IA na saúde"
@@ -1481,29 +1581,34 @@ Dashboard mostra:
 #### 19.2 Estratégias de Execução
 
 **SINGLE_SHOT** (Execução única):
+
 - Tarefa simples, resposta direta
 - Ex: "Resuma este artigo"
 - Sem iteração, sem validação
 
 **ITERATIVE** (Iteração até critério):
+
 - Executa → Valida → Se falha, refina → Repeat
 - Ex: "Escreva código que passe nestes testes"
 - Max 3-5 iterações
 - Validação: testes passam? quality_score > threshold?
 
 **MULTI_STEP** (Workflow sequencial):
+
 - Lista de steps definidos pelo usuário ou sistema
 - Cada step pode ser SINGLE_SHOT ou ITERATIVE
 - Context acumula entre steps
 - Ex: Outline → Write Chapter 1 → Write Chapter 2 → ...
 
 **TREE_OF_THOUGHT** (Exploração de múltiplas alternativas):
+
 - Gera N soluções alternativas
 - Avalia cada uma
 - Escolhe melhor ou combina
 - Ex: "Gere 3 abordagens para este problema, escolha a melhor"
 
 **CHAIN_OF_THOUGHT** (Raciocínio passo-a-passo):
+
 - LLM explicita raciocínio antes de responder
 - Melhora qualidade para problemas complexos
 - Ex: "Resolva este problema matemático, mostrando cada passo"
@@ -1521,14 +1626,14 @@ const TaskSchemaV5 = z.object({
   meta: z.object({
     id: z.string().uuid(),
     project_id: z.string().default('default'),
-    parent_id: z.string().uuid().optional(),       // Hierarchical tasks
-    workflow_id: z.string().uuid().optional(),     // Workflow grouping
+    parent_id: z.string().uuid().optional(), // Hierarchical tasks
+    workflow_id: z.string().uuid().optional(), // Workflow grouping
     correlation_id: z.string().uuid().optional(),
     version: z.literal('5.0'),
     created_at: z.string().datetime(),
     priority: z.number().int().min(0).max(100).default(50),
     source: z.string().default('system'),
-    tags: z.array(z.string()).default([])
+    tags: z.array(z.string()).default([]),
   }),
 
   spec: z.object({
@@ -1537,78 +1642,104 @@ const TaskSchemaV5 = z.object({
     payload: z.object({
       system_message: z.string().optional(),
       user_message: z.string(),
-      context: z.any().optional()              // Previous results, external data
+      context: z.any().optional(), // Previous results, external data
     }),
-    parameters: z.object({
-      temperature: z.number().min(0).max(2).default(0.7),
-      max_tokens: z.number().int().positive().optional(),
-      top_p: z.number().min(0).max(1).optional(),
-      frequency_penalty: z.number().min(-2).max(2).optional(),
-      presence_penalty: z.number().min(-2).max(2).optional(),
-      stop_sequences: z.array(z.string()).optional()
-    }).optional(),
+    parameters: z
+      .object({
+        temperature: z.number().min(0).max(2).default(0.7),
+        max_tokens: z.number().int().positive().optional(),
+        top_p: z.number().min(0).max(1).optional(),
+        frequency_penalty: z.number().min(-2).max(2).optional(),
+        presence_penalty: z.number().min(-2).max(2).optional(),
+        stop_sequences: z.array(z.string()).optional(),
+      })
+      .optional(),
 
     // NOVO: Execution configuration
-    execution: z.object({
-      strategy: z.enum(['SINGLE_SHOT', 'ITERATIVE', 'MULTI_STEP', 'TREE_OF_THOUGHT', 'CHAIN_OF_THOUGHT']).default('SINGLE_SHOT'),
+    execution: z
+      .object({
+        strategy: z
+          .enum(['SINGLE_SHOT', 'ITERATIVE', 'MULTI_STEP', 'TREE_OF_THOUGHT', 'CHAIN_OF_THOUGHT'])
+          .default('SINGLE_SHOT'),
 
-      // For ITERATIVE strategy
-      iterative_config: z.object({
-        max_iterations: z.number().int().positive().default(3),
-        validation_criteria: z.object({
-          validators: z.array(z.string()),      // ['regex', 'schema', 'llm_judge']
-          min_quality_score: z.number().min(0).max(100).default(70),
-          custom_validator: z.any().optional()
-        }).optional(),
-        convergence_detection: z.boolean().default(true)
-      }).optional(),
+        // For ITERATIVE strategy
+        iterative_config: z
+          .object({
+            max_iterations: z.number().int().positive().default(3),
+            validation_criteria: z
+              .object({
+                validators: z.array(z.string()), // ['regex', 'schema', 'llm_judge']
+                min_quality_score: z.number().min(0).max(100).default(70),
+                custom_validator: z.any().optional(),
+              })
+              .optional(),
+            convergence_detection: z.boolean().default(true),
+          })
+          .optional(),
 
-      // For MULTI_STEP strategy
-      workflow_config: z.object({
-        steps: z.array(z.object({
-          id: z.string(),
-          name: z.string(),
-          description: z.string().optional(),
-          action: z.enum(['execute_prompt', 'validate', 'branch', 'loop', 'spawn_subtask']),
-          config: z.any(),                     // Step-specific config
-          dependencies: z.array(z.string()).default([]),  // Step IDs that must complete first
-          on_failure: z.enum(['retry', 'skip', 'abort']).default('abort')
-        })),
-        max_subtasks: z.number().int().positive().default(50),
-        subtask_concurrency: z.number().int().positive().default(3)
-      }).optional(),
+        // For MULTI_STEP strategy
+        workflow_config: z
+          .object({
+            steps: z.array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                description: z.string().optional(),
+                action: z.enum(['execute_prompt', 'validate', 'branch', 'loop', 'spawn_subtask']),
+                config: z.any(), // Step-specific config
+                dependencies: z.array(z.string()).default([]), // Step IDs that must complete first
+                on_failure: z.enum(['retry', 'skip', 'abort']).default('abort'),
+              })
+            ),
+            max_subtasks: z.number().int().positive().default(50),
+            subtask_concurrency: z.number().int().positive().default(3),
+          })
+          .optional(),
 
-      // For TREE_OF_THOUGHT strategy
-      tree_config: z.object({
-        num_branches: z.number().int().min(2).max(10).default(3),
-        evaluation_criteria: z.string(),
-        selection_strategy: z.enum(['best', 'combine', 'vote']).default('best')
-      }).optional()
-    }).default({ strategy: 'SINGLE_SHOT' }),
+        // For TREE_OF_THOUGHT strategy
+        tree_config: z
+          .object({
+            num_branches: z.number().int().min(2).max(10).default(3),
+            evaluation_criteria: z.string(),
+            selection_strategy: z.enum(['best', 'combine', 'vote']).default('best'),
+          })
+          .optional(),
+      })
+      .default({ strategy: 'SINGLE_SHOT' }),
 
     // NOVO: Validation rules
-    validation: z.object({
-      validators: z.array(z.object({
-        type: z.enum(['regex', 'schema', 'length', 'format', 'llm_judge', 'custom']),
-        config: z.any()
-      })).default([]),
-      on_validation_failure: z.enum(['retry', 'abort', 'manual_review']).default('retry')
-    }).optional(),
+    validation: z
+      .object({
+        validators: z
+          .array(
+            z.object({
+              type: z.enum(['regex', 'schema', 'length', 'format', 'llm_judge', 'custom']),
+              config: z.any(),
+            })
+          )
+          .default([]),
+        on_validation_failure: z.enum(['retry', 'abort', 'manual_review']).default('retry'),
+      })
+      .optional(),
 
     // NOVO: Context management
-    context_config: z.object({
-      inject_previous_results: z.boolean().default(false),
-      context_window_strategy: z.enum(['full', 'chunked', 'summarized']).default('full'),
-      max_context_tokens: z.number().int().positive().optional(),
-      memory_keys: z.array(z.string()).default([])  // Keys to fetch from long-term memory
-    }).optional(),
+    context_config: z
+      .object({
+        inject_previous_results: z.boolean().default(false),
+        context_window_strategy: z.enum(['full', 'chunked', 'summarized']).default('full'),
+        max_context_tokens: z.number().int().positive().optional(),
+        memory_keys: z.array(z.string()).default([]), // Keys to fetch from long-term memory
+      })
+      .optional(),
 
     // Existing fields (mantidos)
-    config: z.object({
-      reset_context: z.boolean().default(false),
-      require_history: z.boolean().default(false),
-      output_format: z.enum(['text', 'json', 'markdown']).default('text')
-    }).default({})
+    config: z
+      .object({
+        reset_context: z.boolean().default(false),
+        require_history: z.boolean().default(false),
+        output_format: z.enum(['text', 'json', 'markdown']).default('text'),
+      })
+      .default({}),
   }),
 
   policy: z.object({
@@ -1619,11 +1750,13 @@ const TaskSchemaV5 = z.object({
     priority_weight: z.number().default(1.0),
 
     // NOVO: Workflow policies
-    workflow_policy: z.object({
-      max_execution_time_ms: z.number().int().positive().optional(),
-      budget_limit_usd: z.number().positive().optional(),
-      quality_threshold: z.number().min(0).max(100).optional()
-    }).optional()
+    workflow_policy: z
+      .object({
+        max_execution_time_ms: z.number().int().positive().optional(),
+        budget_limit_usd: z.number().positive().optional(),
+        quality_threshold: z.number().min(0).max(100).optional(),
+      })
+      .optional(),
   }),
 
   state: z.object({
@@ -1637,77 +1770,105 @@ const TaskSchemaV5 = z.object({
     last_error: z.string().optional(),
 
     // NOVO: Workflow state
-    workflow_state: z.object({
-      current_step_index: z.number().int().nonnegative().default(0),
-      completed_steps: z.array(z.string()).default([]),
-      failed_steps: z.array(z.string()).default([]),
-      accumulated_context: z.any().optional()     // Results from previous steps
-    }).optional(),
+    workflow_state: z
+      .object({
+        current_step_index: z.number().int().nonnegative().default(0),
+        completed_steps: z.array(z.string()).default([]),
+        failed_steps: z.array(z.string()).default([]),
+        accumulated_context: z.any().optional(), // Results from previous steps
+      })
+      .optional(),
 
     // NOVO: Iteration state
-    iteration_state: z.object({
-      current_iteration: z.number().int().nonnegative().default(0),
-      iterations_history: z.array(z.object({
-        iteration: z.number(),
-        output: z.string(),
-        quality_score: z.number().optional(),
-        validation_result: z.any().optional()
-      })).default([])
-    }).optional(),
+    iteration_state: z
+      .object({
+        current_iteration: z.number().int().nonnegative().default(0),
+        iterations_history: z
+          .array(
+            z.object({
+              iteration: z.number(),
+              output: z.string(),
+              quality_score: z.number().optional(),
+              validation_result: z.any().optional(),
+            })
+          )
+          .default([]),
+      })
+      .optional(),
 
     // NOVO: Quality metrics
-    quality_metrics: z.object({
-      overall_score: z.number().min(0).max(100).optional(),
-      coherence_score: z.number().min(0).max(100).optional(),
-      accuracy_score: z.number().min(0).max(100).optional(),
-      goal_alignment_score: z.number().min(0).max(100).optional(),
-      validation_passed: z.boolean().optional()
-    }).optional(),
+    quality_metrics: z
+      .object({
+        overall_score: z.number().min(0).max(100).optional(),
+        coherence_score: z.number().min(0).max(100).optional(),
+        accuracy_score: z.number().min(0).max(100).optional(),
+        goal_alignment_score: z.number().min(0).max(100).optional(),
+        validation_passed: z.boolean().optional(),
+      })
+      .optional(),
 
     // NOVO: Cost tracking
-    cost_tracking: z.object({
-      input_tokens: z.number().int().nonnegative().default(0),
-      output_tokens: z.number().int().nonnegative().default(0),
-      total_tokens: z.number().int().nonnegative().default(0),
-      cost_usd: z.number().nonnegative().default(0),
-      model_used: z.string().optional()
-    }).optional(),
+    cost_tracking: z
+      .object({
+        input_tokens: z.number().int().nonnegative().default(0),
+        output_tokens: z.number().int().nonnegative().default(0),
+        total_tokens: z.number().int().nonnegative().default(0),
+        cost_usd: z.number().nonnegative().default(0),
+        model_used: z.string().optional(),
+      })
+      .optional(),
 
-    metrics: z.object({
-      duration_ms: z.number().int().nonnegative().optional(),
-      token_estimate: z.number().int().nonnegative().optional(),
-      event_loop_lag_ms: z.number().nonnegative().optional()
-    }).default({}),
-    history: z.array(z.object({
-      type: z.string(),
-      at: z.string().datetime(),
-      data: z.any().optional(),
-      evidence: z.string().optional()
-    })).default([])
+    metrics: z
+      .object({
+        duration_ms: z.number().int().nonnegative().optional(),
+        token_estimate: z.number().int().nonnegative().optional(),
+        event_loop_lag_ms: z.number().nonnegative().optional(),
+      })
+      .default({}),
+    history: z
+      .array(
+        z.object({
+          type: z.string(),
+          at: z.string().datetime(),
+          data: z.any().optional(),
+          evidence: z.string().optional(),
+        })
+      )
+      .default([]),
   }),
 
   result: z.object({
     file_path: z.string().optional(),
     session_url: z.string().url().optional(),
-    finish_reason: z.enum(['stop', 'length', 'content_filter', 'error', 'manual', 'unknown']).default('unknown'),
+    finish_reason: z
+      .enum(['stop', 'length', 'content_filter', 'error', 'manual', 'unknown'])
+      .default('unknown'),
     raw_output_preview: z.string().optional(),
 
     // NOVO: Subtask results
-    subtask_results: z.array(z.object({
-      subtask_id: z.string().uuid(),
-      status: z.string(),
-      output: z.string().optional(),
-      quality_score: z.number().optional()
-    })).default([]),
+    subtask_results: z
+      .array(
+        z.object({
+          subtask_id: z.string().uuid(),
+          status: z.string(),
+          output: z.string().optional(),
+          quality_score: z.number().optional(),
+        })
+      )
+      .default([]),
 
     // NOVO: Validation results
-    validation_results: z.array(z.object({
-      validator_type: z.string(),
-      passed: z.boolean(),
-      score: z.number().optional(),
-      feedback: z.string().optional()
-    })).default([])
-  })
+    validation_results: z
+      .array(
+        z.object({
+          validator_type: z.string(),
+          passed: z.boolean(),
+          score: z.number().optional(),
+          feedback: z.string().optional(),
+        })
+      )
+      .default([]),
+  }),
 });
 ```
 
@@ -1747,7 +1908,10 @@ const TaskSchemaV5 = z.object({
               "prompt": "Write Chapter 1 based on outline. Context: {outline}",
               "iterative": true,
               "max_iterations": 3,
-              "validation": { "type": "llm_judge", "criteria": "coherence, accuracy, code examples" }
+              "validation": {
+                "type": "llm_judge",
+                "criteria": "coherence, accuracy, code examples"
+              }
             },
             "dependencies": ["step-outline"]
           },
@@ -1760,16 +1924,19 @@ const TaskSchemaV5 = z.object({
               "prompt": "Review all chapters for consistency",
               "context": "all_chapters"
             },
-            "dependencies": ["step-chapter-1", "step-chapter-2", /*...*/]
+            "dependencies": ["step-chapter-1", "step-chapter-2" /*...*/]
           }
         ],
         "max_subtasks": 20,
-        "subtask_concurrency": 1  // Sequential chapters
+        "subtask_concurrency": 1 // Sequential chapters
       }
     },
     "validation": {
       "validators": [
-        { "type": "llm_judge", "config": { "criteria": ["coherence", "accuracy", "readability"], "min_score": 75 } }
+        {
+          "type": "llm_judge",
+          "config": { "criteria": ["coherence", "accuracy", "readability"], "min_score": 75 }
+        }
       ]
     },
     "context_config": {
@@ -1781,7 +1948,7 @@ const TaskSchemaV5 = z.object({
   "policy": {
     "max_attempts": 1,
     "workflow_policy": {
-      "max_execution_time_ms": 36000000,  // 10 hours
+      "max_execution_time_ms": 36000000, // 10 hours
       "budget_limit_usd": 50,
       "quality_threshold": 75
     }
@@ -1790,7 +1957,7 @@ const TaskSchemaV5 = z.object({
     "status": "RUNNING",
     "workflow_state": {
       "current_step_index": 8,
-      "completed_steps": ["step-outline", "step-chapter-1", /*...*/, "step-chapter-7"],
+      "completed_steps": ["step-outline", "step-chapter-1" /*...*/, , "step-chapter-7"],
       "accumulated_context": {
         "outline": "...",
         "chapters": {
@@ -1803,17 +1970,17 @@ const TaskSchemaV5 = z.object({
     },
     "quality_metrics": {
       "overall_score": 82,
-      "chapters_scores": [85, 78, 90, /*...*/]
+      "chapters_scores": [85, 78, 90 /*...*/]
     },
     "cost_tracking": {
       "total_tokens": 450000,
-      "cost_usd": 12.50
+      "cost_usd": 12.5
     }
   },
   "result": {
     "file_path": "respostas/rust-book.md",
     "subtask_results": [
-      { "subtask_id": "step-chapter-1", "status": "DONE", "quality_score": 85 },
+      { "subtask_id": "step-chapter-1", "status": "DONE", "quality_score": 85 }
       // ...
     ]
   }
@@ -1846,7 +2013,7 @@ class OrchestratorEngine {
       ITERATIVE: this._handleIterative.bind(this),
       MULTI_STEP: this._handleMultiStep.bind(this),
       TREE_OF_THOUGHT: this._handleTreeOfThought.bind(this),
-      CHAIN_OF_THOUGHT: this._handleChainOfThought.bind(this)
+      CHAIN_OF_THOUGHT: this._handleChainOfThought.bind(this),
     };
   }
 
@@ -1867,8 +2034,8 @@ class OrchestratorEngine {
       payload: {
         task_id: task.meta.id,
         strategy,
-        workflow_id: task.meta.workflow_id
-      }
+        workflow_id: task.meta.workflow_id,
+      },
     });
 
     try {
@@ -1883,8 +2050,8 @@ class OrchestratorEngine {
         payload: {
           task_id: task.meta.id,
           result_preview: result.output.substring(0, 200),
-          quality_score: result.quality_score
-        }
+          quality_score: result.quality_score,
+        },
       });
 
       return result;
@@ -1893,8 +2060,8 @@ class OrchestratorEngine {
         actionCode: 'ORCHESTRATION_FAILED',
         payload: {
           task_id: task.meta.id,
-          error: error.message
-        }
+          error: error.message,
+        },
       });
       throw error;
     }
@@ -1910,7 +2077,7 @@ class OrchestratorEngine {
     return {
       output: result.output,
       cost_tracking: result.cost_tracking,
-      quality_score: null  // No validation
+      quality_score: null, // No validation
     };
   }
 
@@ -1934,8 +2101,8 @@ class OrchestratorEngine {
         payload: {
           task_id: task.meta.id,
           iteration: currentIteration,
-          max_iterations: maxIterations
-        }
+          max_iterations: maxIterations,
+        },
       });
 
       // Execute LLM
@@ -1945,7 +2112,7 @@ class OrchestratorEngine {
       // Validate
       const validationResult = await this.validationService.validate(result.output, {
         validators: config.validation_criteria.validators,
-        criteria: config.validation_criteria
+        criteria: config.validation_criteria,
       });
 
       const qualityScore = validationResult.overall_score;
@@ -1957,8 +2124,8 @@ class OrchestratorEngine {
           task_id: task.meta.id,
           iteration: currentIteration,
           quality_score: qualityScore,
-          validation_passed: validationResult.passed
-        }
+          validation_passed: validationResult.passed,
+        },
       });
 
       // Track best result
@@ -1973,7 +2140,7 @@ class OrchestratorEngine {
           output: result.output,
           cost_tracking: result.cost_tracking,
           quality_score: qualityScore,
-          iterations: currentIteration
+          iterations: currentIteration,
         };
       }
 
@@ -1983,7 +2150,7 @@ class OrchestratorEngine {
           previous_attempts: currentIteration,
           previous_output: result.output,
           validation_feedback: validationResult.feedback,
-          issues: validationResult.issues
+          issues: validationResult.issues,
         };
 
         task.spec.payload.user_message += `\n\n[Feedback from iteration ${currentIteration}]: ${validationResult.feedback}`;
@@ -1996,7 +2163,7 @@ class OrchestratorEngine {
       cost_tracking: bestResult.cost_tracking,
       quality_score: bestScore,
       iterations: currentIteration,
-      converged: false
+      converged: false,
     };
   }
 
@@ -2016,7 +2183,7 @@ class OrchestratorEngine {
       completed_steps: [],
       failed_steps: [],
       accumulated_context: {},
-      results: []
+      results: [],
     };
 
     this.workflowStates.set(task.meta.workflow_id, workflowState);
@@ -2042,8 +2209,8 @@ class OrchestratorEngine {
           workflow_id: task.meta.workflow_id,
           step_id: step.id,
           step_index: i,
-          total_steps: steps.length
-        }
+          total_steps: steps.length,
+        },
       });
 
       try {
@@ -2078,10 +2245,9 @@ class OrchestratorEngine {
             workflow_id: task.meta.workflow_id,
             step_id: step.id,
             result_preview: stepResult.output?.substring(0, 200),
-            quality_score: stepResult.quality_score
-          }
+            quality_score: stepResult.quality_score,
+          },
         });
-
       } catch (error) {
         workflowState.failed_steps.push(step.id);
 
@@ -2091,8 +2257,8 @@ class OrchestratorEngine {
           payload: {
             workflow_id: task.meta.workflow_id,
             step_id: step.id,
-            error: error.message
-          }
+            error: error.message,
+          },
         });
 
         // Handle failure based on policy
@@ -2108,17 +2274,25 @@ class OrchestratorEngine {
 
     // Aggregate results
     const finalOutput = this._aggregateWorkflowResults(workflowState);
-    const totalCost = workflowState.results.reduce((sum, r) => sum + (r.cost_tracking?.cost_usd || 0), 0);
-    const avgQualityScore = workflowState.results.reduce((sum, r) => sum + (r.quality_score || 0), 0) / workflowState.results.length;
+    const totalCost = workflowState.results.reduce(
+      (sum, r) => sum + (r.cost_tracking?.cost_usd || 0),
+      0
+    );
+    const avgQualityScore =
+      workflowState.results.reduce((sum, r) => sum + (r.quality_score || 0), 0) /
+      workflowState.results.length;
 
     return {
       output: finalOutput,
       cost_tracking: {
         cost_usd: totalCost,
-        total_tokens: workflowState.results.reduce((sum, r) => sum + (r.cost_tracking?.total_tokens || 0), 0)
+        total_tokens: workflowState.results.reduce(
+          (sum, r) => sum + (r.cost_tracking?.total_tokens || 0),
+          0
+        ),
       },
       quality_score: avgQualityScore,
-      workflow_state: workflowState
+      workflow_state: workflowState,
     };
   }
 
@@ -2141,15 +2315,15 @@ class OrchestratorEngine {
       meta: {
         ...parentTask.meta,
         id: `${parentTask.meta.id}-${step.id}`,
-        parent_id: parentTask.meta.id
+        parent_id: parentTask.meta.id,
       },
       spec: {
         ...parentTask.spec,
         payload: {
           user_message: prompt,
-          context: workflowState.accumulated_context
-        }
-      }
+          context: workflowState.accumulated_context,
+        },
+      },
     };
 
     // Execute
@@ -2158,8 +2332,8 @@ class OrchestratorEngine {
         strategy: 'ITERATIVE',
         iterative_config: {
           max_iterations: step.config.max_iterations || 3,
-          validation_criteria: step.config.validation || {}
-        }
+          validation_criteria: step.config.validation || {},
+        },
       };
     } else {
       subtask.spec.execution = { strategy: 'SINGLE_SHOT' };
@@ -2216,7 +2390,7 @@ class ValidationService {
       length: new LengthValidator(),
       format: new FormatValidator(),
       llm_judge: new LLMJudgeValidator(),
-      custom: new CustomValidator()
+      custom: new CustomValidator(),
     };
   }
 
@@ -2243,8 +2417,8 @@ class ValidationService {
         payload: {
           validator_type: validatorConfig.type,
           passed: result.passed,
-          score: result.score
-        }
+          score: result.score,
+        },
       });
     }
 
@@ -2258,14 +2432,14 @@ class ValidationService {
       overall_score: overallScore,
       results,
       feedback: this._generateFeedback(results),
-      issues: results.filter(r => !r.passed).map(r => r.feedback)
+      issues: results.filter(r => !r.passed).map(r => r.feedback),
     };
   }
 
   _generateFeedback(results) {
     const issues = results.filter(r => !r.passed);
     if (issues.length === 0) {
-      return "All validations passed. Output meets quality criteria.";
+      return 'All validations passed. Output meets quality criteria.';
     }
 
     return `Found ${issues.length} issue(s):\n` + issues.map(r => `- ${r.feedback}`).join('\n');
@@ -2302,20 +2476,20 @@ Provide your evaluation as JSON:
 
     // Call LLM (use driver)
     const driverFactory = require('../../driver/factory');
-    const driver = await driverFactory.createDriver('chatgpt');  // Or specified model
+    const driver = await driverFactory.createDriver('chatgpt'); // Or specified model
 
     const result = await driver.execute({
       spec: {
         target: 'chatgpt',
         model: model || 'gpt-4o',
         payload: {
-          user_message: judgePrompt
+          user_message: judgePrompt,
         },
         parameters: {
-          temperature: 0.2,  // Lower temp for consistent evaluation
-          response_format: { type: 'json_object' }
-        }
-      }
+          temperature: 0.2, // Lower temp for consistent evaluation
+          response_format: { type: 'json_object' },
+        },
+      },
     });
 
     const evaluation = JSON.parse(result.output);
@@ -2324,7 +2498,7 @@ Provide your evaluation as JSON:
       passed: evaluation.overall_score >= (min_score || 70),
       score: evaluation.overall_score,
       feedback: `Score: ${evaluation.overall_score}/100. Weaknesses: ${evaluation.weaknesses.join(', ')}`,
-      details: evaluation
+      details: evaluation,
     };
   }
 }
@@ -2347,13 +2521,13 @@ class BaseDriverV2 {
    */
   getCapabilities() {
     return {
-      models: [],              // Supported models
-      max_tokens: 4096,        // Max output tokens
-      supports_json: false,    // JSON mode support
-      supports_vision: false,  // Image input support
+      models: [], // Supported models
+      max_tokens: 4096, // Max output tokens
+      supports_json: false, // JSON mode support
+      supports_vision: false, // Image input support
       supports_function_calling: false,
-      cost_per_1k_input: 0,    // Cost in USD
-      cost_per_1k_output: 0
+      cost_per_1k_input: 0, // Cost in USD
+      cost_per_1k_output: 0,
     };
   }
 
@@ -2383,8 +2557,9 @@ class BaseDriverV2 {
     return {
       input_tokens: estimatedInputTokens,
       output_tokens: estimatedOutputTokens,
-      cost_usd: (estimatedInputTokens / 1000) * capabilities.cost_per_1k_input +
-                (estimatedOutputTokens / 1000) * capabilities.cost_per_1k_output
+      cost_usd:
+        (estimatedInputTokens / 1000) * capabilities.cost_per_1k_input +
+        (estimatedOutputTokens / 1000) * capabilities.cost_per_1k_output,
     };
   }
 
@@ -2413,7 +2588,7 @@ class DriverFactoryV2 {
       chatgpt: ChatGPTDriverV2,
       gemini: GeminiDriverV2,
       claude: ClaudeDriverV2,
-      ollama: OllamaDriverV2
+      ollama: OllamaDriverV2,
     };
   }
 
@@ -2469,7 +2644,7 @@ class DriverFactoryV2 {
       max_tokens: task.spec.parameters?.max_tokens || 4096,
       needs_json: task.spec.parameters?.response_format?.type === 'json_object',
       needs_vision: task.spec.payload.images?.length > 0,
-      budget_limit: task.policy?.workflow_policy?.budget_limit_usd
+      budget_limit: task.policy?.workflow_policy?.budget_limit_usd,
     };
   }
 
@@ -2494,7 +2669,7 @@ class DriverFactoryV2 {
 
     // Prefer cheaper models if budget limited
     if (requirements.budget_limit) {
-      const costScore = Math.max(0, 20 - (capabilities.cost_per_1k_output * 10));
+      const costScore = Math.max(0, 20 - capabilities.cost_per_1k_output * 10);
       score += costScore;
     }
 
@@ -2635,20 +2810,20 @@ export default {
     const workflowSteps = computed(() => workflowStore.currentWorkflow?.steps || []);
     const isValid = computed(() => workflowStore.workflowValidation?.valid || false);
 
-    const addStep = (actionType) => {
+    const addStep = actionType => {
       const newStep = {
         id: `step-${Date.now()}`,
         name: `New ${actionType} Step`,
         action: actionType,
         config: {},
         dependencies: [],
-        on_failure: 'abort'
+        on_failure: 'abort',
       };
 
       workflowStore.addStep(newStep);
     };
 
-    const editStep = (stepId) => {
+    const editStep = stepId => {
       selectedStep.value = workflowStore.getStep(stepId);
     };
 
@@ -2684,9 +2859,9 @@ export default {
       deleteStep,
       validateWorkflow,
       saveWorkflow,
-      executeWorkflow
+      executeWorkflow,
     };
-  }
+  },
 };
 </script>
 ```
@@ -2749,10 +2924,7 @@ export default {
 
       <!-- Validation Results Distribution -->
       <chart-card title="Validation Results">
-        <bar-chart
-          :data="validationDistribution"
-          :labels="['Pass', 'Fail', 'Retry']"
-        />
+        <bar-chart :data="validationDistribution" :labels="['Pass', 'Fail', 'Retry']" />
       </chart-card>
     </div>
 
@@ -2788,9 +2960,9 @@ export default {
       metrics,
       qualityScoreHistory,
       validationDistribution,
-      recentTasks
+      recentTasks,
     };
-  }
+  },
 };
 </script>
 ```
@@ -2855,7 +3027,7 @@ const ActionCodeV2 = {
   BUDGET_EXCEEDED: 'BUDGET_EXCEEDED',
 
   // Progress events
-  PROGRESS_MILESTONE: 'PROGRESS_MILESTONE',      // e.g., "Chapter 5/15 completed"
+  PROGRESS_MILESTONE: 'PROGRESS_MILESTONE', // e.g., "Chapter 5/15 completed"
   PROGRESS_ESTIMATE_UPDATED: 'PROGRESS_ESTIMATE_UPDATED',
   TIME_REMAINING_UPDATED: 'TIME_REMAINING_UPDATED',
 
@@ -2868,7 +3040,7 @@ const ActionCodeV2 = {
   SELF_CORRECTION_INITIATED: 'SELF_CORRECTION_INITIATED',
   SELF_CORRECTION_COMPLETED: 'SELF_CORRECTION_COMPLETED',
   ERROR_ANALYZED: 'ERROR_ANALYZED',
-  FIX_APPLIED: 'FIX_APPLIED'
+  FIX_APPLIED: 'FIX_APPLIED',
 };
 ```
 
@@ -2890,19 +3062,19 @@ class SemanticTelemetry {
 
   _setupListeners() {
     // Quality events
-    this.nerv.on('QUALITY_ASSESSED', (envelope) => {
+    this.nerv.on('QUALITY_ASSESSED', envelope => {
       const { task_id, overall_score, criteria_scores } = envelope.payload;
 
       const metrics = this._getOrCreateMetrics(task_id);
       metrics.quality = {
         overall_score,
         criteria_scores,
-        assessed_at: Date.now()
+        assessed_at: Date.now(),
       };
     });
 
     // Iteration events
-    this.nerv.on('ITERATION_COMPLETED', (envelope) => {
+    this.nerv.on('ITERATION_COMPLETED', envelope => {
       const { task_id, iteration, quality_score } = envelope.payload;
 
       const metrics = this._getOrCreateMetrics(task_id);
@@ -2911,12 +3083,12 @@ class SemanticTelemetry {
       metrics.iterations.push({
         iteration,
         quality_score,
-        completed_at: Date.now()
+        completed_at: Date.now(),
       });
     });
 
     // Cost events
-    this.nerv.on('TOKEN_USAGE_RECORDED', (envelope) => {
+    this.nerv.on('TOKEN_USAGE_RECORDED', envelope => {
       const { task_id, input_tokens, output_tokens, cost_usd, model } = envelope.payload;
 
       const metrics = this._getOrCreateMetrics(task_id);
@@ -2924,12 +3096,12 @@ class SemanticTelemetry {
         input_tokens: (metrics.cost?.input_tokens || 0) + input_tokens,
         output_tokens: (metrics.cost?.output_tokens || 0) + output_tokens,
         total_cost_usd: (metrics.cost?.total_cost_usd || 0) + cost_usd,
-        model
+        model,
       };
     });
 
     // Progress events
-    this.nerv.on('PROGRESS_MILESTONE', (envelope) => {
+    this.nerv.on('PROGRESS_MILESTONE', envelope => {
       const { task_id, milestone, progress_percent } = envelope.payload;
 
       const metrics = this._getOrCreateMetrics(task_id);
@@ -2938,7 +3110,7 @@ class SemanticTelemetry {
       metrics.milestones.push({
         milestone,
         progress_percent,
-        reached_at: Date.now()
+        reached_at: Date.now(),
       });
     });
   }
@@ -2947,7 +3119,7 @@ class SemanticTelemetry {
     if (!this.taskMetrics.has(taskId)) {
       this.taskMetrics.set(taskId, {
         task_id: taskId,
-        created_at: Date.now()
+        created_at: Date.now(),
       });
     }
     return this.taskMetrics.get(taskId);
@@ -2968,10 +3140,15 @@ class SemanticTelemetry {
 
     return {
       total_tasks: allMetrics.length,
-      avg_quality_score: this._average(allMetrics.map(m => m.quality?.overall_score).filter(Boolean)),
+      avg_quality_score: this._average(
+        allMetrics.map(m => m.quality?.overall_score).filter(Boolean)
+      ),
       avg_iterations: this._average(allMetrics.map(m => m.iterations?.length).filter(Boolean)),
       total_cost_usd: allMetrics.reduce((sum, m) => sum + (m.cost?.total_cost_usd || 0), 0),
-      total_tokens: allMetrics.reduce((sum, m) => sum + (m.cost?.input_tokens || 0) + (m.cost?.output_tokens || 0), 0)
+      total_tokens: allMetrics.reduce(
+        (sum, m) => sum + (m.cost?.input_tokens || 0) + (m.cost?.output_tokens || 0),
+        0
+      ),
     };
   }
 
@@ -3009,7 +3186,7 @@ class CostTracker {
       input_tokens: costData.input_tokens,
       output_tokens: costData.output_tokens,
       total_tokens: costData.total_tokens,
-      cost_usd: costData.cost_usd
+      cost_usd: costData.cost_usd,
     };
 
     // Add to cache
@@ -3025,8 +3202,8 @@ class CostTracker {
    * Get costs by date range
    */
   async getCostsByDateRange(startTimestamp, endTimestamp) {
-    const filtered = this.costRecords.filter(r =>
-      r.timestamp >= startTimestamp && r.timestamp <= endTimestamp
+    const filtered = this.costRecords.filter(
+      r => r.timestamp >= startTimestamp && r.timestamp <= endTimestamp
     );
 
     return {
@@ -3036,7 +3213,7 @@ class CostTracker {
       output_tokens: filtered.reduce((sum, r) => sum + r.output_tokens, 0),
       task_count: filtered.length,
       by_task: this._groupBy(filtered, 'task_id'),
-      by_model: this._groupBy(filtered, 'model')
+      by_model: this._groupBy(filtered, 'model'),
     };
   }
 
@@ -3070,43 +3247,55 @@ module.exports = { CostTracker };
 ### 27. MIGRAÇÃO COMPLETA (17 SEMANAS)
 
 #### Fase 1-5: Dashboard Enterprise (Semanas 1-5)
+
 [Já detalhado anteriormente no plano]
 
 #### Fase 6: Task Schema V5 (Semana 6)
+
 **Objetivos**:
+
 - Implementar Task Schema V5 com extensões
 - Criar migrador V4 → V5
 - Testes de compatibilidade retroativa
 
 **Entregáveis**:
+
 - `src/core/schemas/task_schema_v5.js`
 - `src/core/schemas/migrator_v4_to_v5.js`
 - Testes: V4 tasks continuam funcionando
 
 #### Fase 7-8: Orchestrator Engine (Semanas 7-8)
+
 **Objetivos**:
+
 - Implementar OrchestratorEngine
 - Implementar estratégias: SINGLE_SHOT, ITERATIVE, MULTI_STEP
 - Integrar ao kernel loop
 
 **Entregáveis**:
+
 - `src/orchestrator/orchestrator_engine.js`
 - `src/orchestrator/strategies/` (single_shot, iterative, multi_step)
 - Testes: Task simples executa via orchestrator
 
 #### Fase 9: Validation Framework (Semana 9)
+
 **Objetivos**:
+
 - Implementar ValidationService
 - Implementar validadores: regex, schema, length, llm_judge
 - Integrar validação ao orchestrator
 
 **Entregáveis**:
+
 - `src/orchestrator/validation/validation_service.js`
 - `src/orchestrator/validation/validators/` (regex, schema, llm_judge, etc.)
 - Testes: Tasks validam e retry em falha
 
 #### Fase 10-11: Multi-Driver Architecture (Semanas 10-11)
+
 **Objetivos**:
+
 - Implementar BaseDriverV2 interface
 - Refatorar ChatGPTDriver → ChatGPTDriverV2
 - Implementar GeminiDriverV2, ClaudeDriverV2
@@ -3114,6 +3303,7 @@ module.exports = { CostTracker };
 - Implementar FallbackDriver
 
 **Entregáveis**:
+
 - `src/driver/base_driver_v2.js`
 - `src/driver/chatgpt_driver_v2.js`
 - `src/driver/gemini_driver_v2.js`
@@ -3122,38 +3312,47 @@ module.exports = { CostTracker };
 - Testes: Tasks executam em múltiplos drivers
 
 #### Fase 12: Context Management (Semana 12)
+
 **Objetivos**:
+
 - Implementar Context Manager
 - Chunking de contexto grande
 - Context injection entre steps
 - Long-term memory storage
 
 **Entregáveis**:
+
 - `src/orchestrator/context_manager.js`
 - `src/orchestrator/memory_store.js`
 - Testes: Context acumula entre workflow steps
 
 #### Fase 13: Semantic Telemetry (Semana 13)
+
 **Objetivos**:
+
 - Estender NERV constants (30+ novos action codes)
 - Implementar SemanticTelemetry
 - Implementar CostTracker
 - Adicionar novos eventos Socket.io
 
 **Entregáveis**:
+
 - `src/shared/nerv/constants_v2.js`
 - `src/orchestrator/semantic_telemetry.js`
 - `src/orchestrator/cost_tracker.js`
 - Eventos Socket.io estendidos
 
 #### Fase 14-15: Dashboard Orchestration UI (Semanas 14-15)
+
 **Objetivos**:
+
 - Implementar Workflow Designer (Vue component)
 - Implementar Quality Dashboard
 - Implementar Cost Dashboard
 - Implementar Reasoning Trace Viewer
 
 **Entregáveis**:
+
 - `src/dashboard-ui/src/views/WorkflowDesigner.vue`
 - `src/dashboard-ui/src/views/QualityDashboard.vue`
 - `src/dashboard-ui/src/views/CostDashboard.vue`
@@ -3161,7 +3360,9 @@ module.exports = { CostTracker };
 - Testes: Workflows criados via UI executam corretamente
 
 #### Fase 16: Use Cases Implementation (Semana 16)
+
 **Objetivos**:
+
 - Implementar templates para use cases:
   - Book writing workflow
   - Code project workflow
@@ -3169,18 +3370,22 @@ module.exports = { CostTracker };
 - Testes end-to-end de cada use case
 
 **Entregáveis**:
+
 - Templates pré-configurados
 - Documentação de uso
 - Vídeos/tutorials
 
 #### Fase 17: Production Hardening (Semana 17)
+
 **Objetivos**:
+
 - Testes de carga (100+ tasks concorrentes)
 - Otimização de performance
 - Documentação completa
 - Deploy em produção
 
 **Entregáveis**:
+
 - Testes E2E passando (Playwright)
 - Performance benchmarks
 - User guide + Developer guide
@@ -3195,6 +3400,7 @@ module.exports = { CostTracker };
 **Plataforma de Orquestração Autônoma de LLMs de Nível Enterprise**
 
 **Capacidades**:
+
 1. ✅ Dashboard profissional (Vue.js 3 + Vite)
 2. ✅ Telemetria vasta (73+ eventos técnicos + 30+ eventos semânticos)
 3. ✅ Execução autônoma de tarefas complexas (livros, programas, pesquisas)
@@ -3207,6 +3413,7 @@ module.exports = { CostTracker };
 10. ✅ Controle granular de LLMs via dashboard
 
 **Arquitetura**:
+
 - Zero-coupling via NERV (todos componentes se comunicam via event bus)
 - Modular (plug-and-play drivers, validators, strategies)
 - Observable (telemetria em cada decisão, reasoning traces)
@@ -3214,6 +3421,7 @@ module.exports = { CostTracker };
 - Scalable (100+ tasks concorrentes, 50+ subtasks por workflow)
 
 **Duração Total**: 17 semanas
+
 - Dashboard Enterprise: 5 semanas
 - Sistema de Orquestração: 12 semanas
 

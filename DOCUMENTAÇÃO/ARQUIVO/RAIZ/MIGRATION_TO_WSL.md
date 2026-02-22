@@ -1,16 +1,20 @@
 # MIGRATION_TO_WSL
 
-Este documento descreve os passos recomendados para clonar e preparar este repositório no WSL (Windows Subsystem for Linux) e abrir no VS Code.
+Este documento descreve os passos recomendados para clonar e preparar este repositório no WSL
+(Windows Subsystem for Linux) e abrir no VS Code.
 
 ## Objetivo
 
-Garantir que o repositório hospedado em GitHub (`origin/main`) seja uma cópia fiel do diretório local, e preparar um ambiente WSL/VS Code que reproduza o ambiente de desenvolvimento (devcontainer) com o mínimo de atrito.
+Garantir que o repositório hospedado em GitHub (`origin/main`) seja uma cópia fiel do diretório
+local, e preparar um ambiente WSL/VS Code que reproduza o ambiente de desenvolvimento (devcontainer)
+com o mínimo de atrito.
 
 ## Pré-requisitos no Windows
 
 - Windows 10/11 com WSL2 habilitado e uma distribuição instalada (ex.: Ubuntu).
 - VS Code instalado (Stable) com a extensão "Remote - WSL" e "Dev Containers".
-- Docker Desktop (opcional para devcontainer) com integração WSL2 habilitada, se for usar o devcontainer.
+- Docker Desktop (opcional para devcontainer) com integração WSL2 habilitada, se for usar o
+  devcontainer.
 - Conta GitHub e credenciais (SSH ou HTTPS) configuradas.
 
 ## Passos rápidos (resumido)
@@ -32,7 +36,8 @@ git config --global user.email "seu@email"
 git config --global core.autocrlf input
 ```
 
-`core.autocrlf input` preserva `LF` no checkout em Linux/WSL e converte CRLF apenas ao commitar (bom para equipes multi-OS).
+`core.autocrlf input` preserva `LF` no checkout em Linux/WSL e converte CRLF apenas ao commitar (bom
+para equipes multi-OS).
 
 ## Instalar Node.js (recomendado: `nvm`)
 
@@ -73,7 +78,8 @@ npm ci
 make install-deps || true
 ```
 
-Se `npm ci` falhar por dependências nativas, verifique `python3` e `build-essential` e rode `npm rebuild`.
+Se `npm ci` falhar por dependências nativas, verifique `python3` e `build-essential` e rode
+`npm rebuild`.
 
 ## Abrir no VS Code (WSL)
 
@@ -83,9 +89,11 @@ No WSL, execute:
 code .
 ```
 
-No VS Code aberto na WSL, para usar o devcontainer escolha `Dev Containers: Reopen in Container` (Command Palette). Isso criará o ambiente previsto por `.devcontainer`.
+No VS Code aberto na WSL, para usar o devcontainer escolha `Dev Containers: Reopen in Container`
+(Command Palette). Isso criará o ambiente previsto por `.devcontainer`.
 
-Observação: o devcontainer depende do Docker (ou do runtime definido em `.devcontainer`); assegure que o Docker Desktop esteja rodando e com integração WSL habilitada.
+Observação: o devcontainer depende do Docker (ou do runtime definido em `.devcontainer`); assegure
+que o Docker Desktop esteja rodando e com integração WSL habilitada.
 
 ## Verificações pós-instalação
 
@@ -96,9 +104,14 @@ Observação: o devcontainer depende do Docker (ou do runtime definido em `.devc
 
 ## Dicas e resolução de problemas
 
-- CRLF / EOL: já incluímos `.gitattributes` no repositório; se ver avisos, rode `git status` e `git add --renormalize .` seguido de `git commit -m "chore: normalize EOL"` (apenas se for intencional).
-- Node-gyp e builds nativos: instale `python3`, `build-essential` e execute `npm ci --build-from-source` quando necessário.
-- Puppeteer / Chrome: O projeto está desenhado para usar Chrome externo via proxy; veja `.devcontainer/devcontainer.json` e variáveis `PUPPETEER_*` no `containerEnv`. Se faltar Chromium local, ajuste `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD` ou forneça `PUPPETEER_WS_ENDPOINT`.
+- CRLF / EOL: já incluímos `.gitattributes` no repositório; se ver avisos, rode `git status` e
+  `git add --renormalize .` seguido de `git commit -m "chore: normalize EOL"` (apenas se for
+  intencional).
+- Node-gyp e builds nativos: instale `python3`, `build-essential` e execute
+  `npm ci --build-from-source` quando necessário.
+- Puppeteer / Chrome: O projeto está desenhado para usar Chrome externo via proxy; veja
+  `.devcontainer/devcontainer.json` e variáveis `PUPPETEER_*` no `containerEnv`. Se faltar Chromium
+  local, ajuste `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD` ou forneça `PUPPETEER_WS_ENDPOINT`.
 - Docker: se o devcontainer falhar por Docker, verifique `docker version` e a integração WSL.
 - Arquivos grandes / segredos: execute verificações rápidas (opcional) antes de mover o repositório.
 
@@ -130,5 +143,6 @@ git push origin main
 
 Se desejar, eu posso:
 
-- executar uma verificação rápida por arquivos grandes e padrões de segredos no repositório agora; ou
+- executar uma verificação rápida por arquivos grandes e padrões de segredos no repositório agora;
+  ou
 - adaptar este guia com comandos específicos para sua distro WSL (Ubuntu, Debian, etc.).

@@ -1,7 +1,6 @@
 # Guia de Variáveis de Ambiente
-**chatgpt-docker-puppeteer**
-**Versão**: 1.0
-**Data**: 2 de Fevereiro de 2026
+
+**chatgpt-docker-puppeteer** **Versão**: 1.0 **Data**: 2 de Fevereiro de 2026
 
 ---
 
@@ -20,17 +19,18 @@
 
 ## 1. VISÃO GERAL
 
-Este projeto utiliza variáveis de ambiente para configuração flexível e segura. Todas as configurações podem ser ajustadas sem modificar o código.
+Este projeto utiliza variáveis de ambiente para configuração flexível e segura. Todas as
+configurações podem ser ajustadas sem modificar o código.
 
 ### Arquivos Disponíveis
 
 | Arquivo            | Propósito                          | Commitar? |
 | ------------------ | ---------------------------------- | --------- |
-| `.env.example`     | Template com documentação completa | ✅ SIM     |
-| `.env.development` | Configuração para desenvolvimento  | ❌ NÃO     |
-| `.env.production`  | Configuração para produção         | ❌ NÃO     |
-| `.env.test`        | Configuração para testes           | ❌ NÃO     |
-| `.env`             | Arquivo ativo (criado por você)    | ❌ NÃO     |
+| `.env.example`     | Template com documentação completa | ✅ SIM    |
+| `.env.development` | Configuração para desenvolvimento  | ❌ NÃO    |
+| `.env.production`  | Configuração para produção         | ❌ NÃO    |
+| `.env.test`        | Configuração para testes           | ❌ NÃO    |
+| `.env`             | Arquivo ativo (criado por você)    | ❌ NÃO    |
 
 ### Princípios
 
@@ -48,6 +48,7 @@ Este projeto utiliza variáveis de ambiente para configuração flexível e segu
 **Propósito**: Template com todas as variáveis disponíveis e documentação completa.
 
 **Como usar**:
+
 ```bash
 # Copiar para criar seu .env
 cp .env.example .env
@@ -65,6 +66,7 @@ nano .env  # ou vim, code, etc.
 **Propósito**: Configuração otimizada para desenvolvimento local.
 
 **Características**:
+
 - Log level: `debug` (verbose)
 - Browser pool: 2 instâncias (leve)
 - Timeouts: curtos (feedback rápido)
@@ -72,6 +74,7 @@ nano .env  # ou vim, code, etc.
 - Sem senha no dashboard
 
 **Como usar**:
+
 ```bash
 # Opção 1: Copiar para .env
 cp .env.development .env
@@ -87,6 +90,7 @@ NODE_ENV=development npm start
 **Propósito**: Configuração hardened para produção.
 
 **Características**:
+
 - Log level: `info` (menos verbose)
 - Browser pool: 5 instâncias (throughput)
 - Timeouts: generosos (resiliência)
@@ -94,6 +98,7 @@ NODE_ENV=development npm start
 - **DASHBOARD_PASSWORD obrigatório**
 
 **⚠️ CHECKLIST ANTES DE USAR**:
+
 - [ ] `PUBLIC_IP` configurado
 - [ ] `ALLOWED_ORIGINS` inclui domínios de produção
 - [ ] `DASHBOARD_PASSWORD` definido (senha forte)
@@ -102,6 +107,7 @@ NODE_ENV=development npm start
 - [ ] Monitoramento configurado
 
 **Como usar**:
+
 ```bash
 # Copiar e ajustar
 cp .env.production .env
@@ -121,6 +127,7 @@ pm2 restart all --update-env
 **Propósito**: Configuração otimizada para CI/CD e testes locais.
 
 **Características**:
+
 - Log level: `error` (minimal)
 - Browser pool: 1 instância (leve)
 - MOCK_CHROME: habilitado (sem Chrome real)
@@ -128,6 +135,7 @@ pm2 restart all --update-env
 - Timeouts: mínimos (testes rápidos)
 
 **Como usar**:
+
 ```bash
 # Testes locais
 NODE_ENV=test npm test
@@ -155,14 +163,15 @@ O sistema resolve configurações em **3 níveis**:
 ```javascript
 // src/infra/proxy/chromeProxyService.js (linha 50)
 PROXY_PORT: parseInt(
-    process.env.CHROME_PROXY_PORT ||  // 1. Env var
-    CONFIG.CHROME_PROXY_PORT ||       // 2. config.json
-    '9224',                           // 3. Padrão
-    10
-)
+  process.env.CHROME_PROXY_PORT || // 1. Env var
+    CONFIG.CHROME_PROXY_PORT || // 2. config.json
+    '9224', // 3. Padrão
+  10
+);
 ```
 
 **Precedência**:
+
 ```bash
 # .env
 CHROME_PROXY_PORT=9999  # ← USADO (prioridade 1)
@@ -200,6 +209,7 @@ CHROME_PROXY_PORT=9999  # ← USADO (prioridade 1)
 | `HOST`              | string | 0.0.0.0              | Bind do servidor HTTP      |
 
 **Exemplo Docker Desktop**:
+
 ```bash
 CHROME_HOST=host.docker.internal
 CHROME_PORT=9225
@@ -207,6 +217,7 @@ CHROME_PROXY_PORT=9224
 ```
 
 **Exemplo WSL2 (bridge custom)**:
+
 ```bash
 CHROME_HOST=172.17.0.1
 CHROME_PORT=9225
@@ -224,6 +235,7 @@ PUBLIC_IP=172.17.0.2
 | `MOCK_CHROME`                     | 0, 1                                | 0          | Mock para testes         |
 
 **Modos de conexão**:
+
 - `wsEndpoint`: **RECOMENDADO** - Usa Chrome Proxy, WebSocket direto
 - `connect`: HTTP endpoint (2 requests: HTTP + WS)
 - `launcher`: Puppeteer inicia Chrome (não funciona em Docker)
@@ -240,6 +252,7 @@ PUBLIC_IP=172.17.0.2
 | `NERV_INTEGRATION`   | boolean | true               | Habilitar integração NERV             |
 
 **Exemplo CORS**:
+
 ```bash
 # Desenvolvimento
 ALLOWED_ORIGINS=http://localhost:3008,http://127.0.0.1:3008
@@ -262,6 +275,7 @@ ALLOWED_ORIGINS=https://app.exemplo.com,https://www.exemplo.com
 | `MAX_AUTO_RETRIES`      | number  | 2           | Máximo de retries              |
 
 **Estratégias**:
+
 - `round-robin`: Distribuição uniforme
 - `least-busy`: Escolhe browser menos ocupado
 - `random`: Aleatório
@@ -277,6 +291,7 @@ ALLOWED_ORIGINS=https://app.exemplo.com,https://www.exemplo.com
 | `NERV_TELEMETRY`   | boolean                  | true   | Telemetria NERV        |
 
 **Níveis de log**:
+
 - `debug`: Muito verbose (desenvolvimento)
 - `info`: Produção padrão
 - `warn`: Apenas avisos
@@ -300,6 +315,7 @@ ALLOWED_ORIGINS=https://app.exemplo.com,https://www.exemplo.com
 **150+ variáveis** para fine-tuning de módulos. Veja `.env.example` para lista completa.
 
 **Exemplo Biomechanics**:
+
 ```bash
 # Digitação humana
 BIOMECH_HUMAN_TIMEOUT=60000  # 60s (LLM longo)
@@ -315,14 +331,15 @@ BIOMECH_ZEN_TIMEOUT=30000
 
 ### 5.1 Segurança (Produção)
 
-| Variável             | Obrigatório   | Descrição                             |
-| -------------------- | ------------- | ------------------------------------- |
+| Variável             | Obrigatório    | Descrição                             |
+| -------------------- | -------------- | ------------------------------------- |
 | `DASHBOARD_PASSWORD` | ✅ SIM         | Senha do dashboard (produção)         |
 | `ALLOWED_ORIGINS`    | ✅ SIM         | Whitelist CORS (domínios de produção) |
 | `PUBLIC_IP`          | ⚠️ Recomendado | IP público do container               |
 | `NODE_ENV`           | ✅ SIM         | Definir como `production`             |
 
 **Gerar senha forte**:
+
 ```bash
 openssl rand -base64 32
 ```
@@ -338,6 +355,7 @@ openssl rand -base64 32
 | `CHROME_PROXY_PORT` | `9224`                 | Porta do proxy (container) |
 
 **Validação**:
+
 ```bash
 # Verificar se Chrome está acessível
 curl http://host.docker.internal:9225/json/version
@@ -384,6 +402,7 @@ curl http://localhost:9224/health
 ```
 
 **Troubleshooting**:
+
 ```bash
 # Proxy não conecta ao Chrome
 # → Verifique se Chrome está rodando com --remote-debugging-port=9225
@@ -426,6 +445,7 @@ curl https://seu-dominio.com/metrics  # Prometheus
 ```
 
 **Segurança**:
+
 ```bash
 # Verificar permissões do .env
 chmod 600 .env  # Apenas owner pode ler/escrever
@@ -466,6 +486,7 @@ jobs:
 ```
 
 **Ou usar .env.test**:
+
 ```yaml
 - name: Setup env
   run: cp .env.test .env
@@ -480,12 +501,14 @@ jobs:
 ### 7.1 Chrome Proxy não conecta
 
 **Sintomas**:
+
 ```
 Error: Chrome unreachable
 Error: connect ECONNREFUSED 127.0.0.1:9225
 ```
 
 **Soluções**:
+
 ```bash
 # 1. Verificar se Chrome está rodando (Windows)
 # Executar: START-CHROME-SIMPLE.bat
@@ -510,12 +533,14 @@ curl http://localhost:9224/health
 ### 7.2 CORS Errors
 
 **Sintomas**:
+
 ```
 Access to fetch at 'http://localhost:9224' from origin 'http://evil.com'
 has been blocked by CORS policy
 ```
 
 **Soluções**:
+
 ```bash
 # Adicionar origem em ALLOWED_ORIGINS
 ALLOWED_ORIGINS=http://localhost:3008,http://nova-origem.com
@@ -536,11 +561,13 @@ pm2 restart chrome-proxy
 ### 7.3 Dashboard Password
 
 **Sintomas**:
+
 ```
 Dashboard authentication required
 ```
 
 **Soluções**:
+
 ```bash
 # Desenvolvimento: sem senha
 DASHBOARD_PASSWORD=
@@ -560,11 +587,13 @@ pm2 restart dashboard-web --update-env
 ### 7.4 Port Already in Use
 
 **Sintomas**:
+
 ```
 Error: Port 3008 is already in use
 ```
 
 **Soluções**:
+
 ```bash
 # Verificar processo usando porta
 lsof -i :3008  # Linux/Mac
@@ -587,6 +616,7 @@ pm2 restart all
 ### Q1: Qual arquivo .env usar?
 
 **A**: Depende do ambiente:
+
 - Desenvolvimento local: `.env.development` ou copie `.env.example`
 - Produção: `.env.production` (ajuste [REQUIRED] fields)
 - Testes: `.env.test` (CI/CD)
@@ -595,10 +625,11 @@ pm2 restart all
 
 ### Q2: Preciso commitar .env?
 
-**A**: ❌ **NUNCA** commite `.env`, `.env.development`, `.env.production`, `.env.test`.
-✅ **Sempre** commite `.env.example` (template).
+**A**: ❌ **NUNCA** commite `.env`, `.env.development`, `.env.production`, `.env.test`. ✅
+**Sempre** commite `.env.example` (template).
 
 **Verificação**:
+
 ```bash
 # .gitignore deve conter
 .env
@@ -611,6 +642,7 @@ pm2 restart all
 ### Q3: Como atualizar .env em produção sem downtime?
 
 **A**:
+
 ```bash
 # 1. Editar .env
 nano .env
@@ -627,6 +659,7 @@ curl http://localhost:3008/health
 ### Q4: Posso usar múltiplos .env?
 
 **A**: Sim, com ferramentas:
+
 ```bash
 # dotenv-cli
 npm install -g dotenv-cli
@@ -644,6 +677,7 @@ env-cmd -f .env.production npm start
 ### Q5: Como validar meu .env?
 
 **A**:
+
 ```bash
 # 1. Verificar sintaxe
 grep -v '^#' .env | grep -v '^$' | grep '='
@@ -667,12 +701,14 @@ required.forEach(v => {
 ### Q6: Diferença entre .env e config.json?
 
 **A**:
+
 - **`.env`**: Configuração por ambiente (dev, prod, test)
 - **`config.json`**: Configuração compartilhada/base
 
 **Prioridade**: `.env` > `config.json` > código
 
 **Quando usar cada um**:
+
 - **`.env`**: Valores que mudam por ambiente (portas, IPs, senhas)
 - **`config.json`**: Valores estáveis (arquitetura, features flags)
 
@@ -681,6 +717,7 @@ required.forEach(v => {
 ### Q7: Como debugar variáveis não carregadas?
 
 **A**:
+
 ```bash
 # 1. Verificar se .env existe
 ls -la .env
@@ -707,6 +744,7 @@ npm list dotenv
 ### Q8: Posso usar .env com Docker Compose?
 
 **A**: Sim:
+
 ```yaml
 # docker-compose.yml
 services:
@@ -721,6 +759,7 @@ services:
 ```
 
 **Ou passar via CLI**:
+
 ```bash
 docker-compose --env-file .env.production up
 ```
@@ -738,6 +777,5 @@ docker-compose --env-file .env.production up
 
 ---
 
-**Versão**: 1.0
-**Última atualização**: 2 de Fevereiro de 2026
-**Autor**: GitHub Copilot (Claude Sonnet 4.5)
+**Versão**: 1.0 **Última atualização**: 2 de Fevereiro de 2026 **Autor**: GitHub Copilot (Claude
+Sonnet 4.5)

@@ -23,7 +23,8 @@
 
 ## Visão Geral
 
-O **DNA System** é o mecanismo que define a identidade e capacidades do robot, além de gerenciar a evolução automática de seletores aprendidos via SADI Protocol.
+O **DNA System** é o mecanismo que define a identidade e capacidades do robot, além de gerenciar a
+evolução automática de seletores aprendidos via SADI Protocol.
 
 ### O Que É
 
@@ -35,12 +36,14 @@ O **DNA System** é o mecanismo que define a identidade e capacidades do robot, 
 ### Problema Resolvido
 
 **Antes (V1.0)**:
+
 - ❌ Seletores descobertos manualmente
 - ❌ Sem backup (uma versão do DNA)
 - ❌ Perda de dados em crash
 - ❌ Capabilities desatualizadas (6 itens)
 
 **Agora (V2.0)**:
+
 - ✅ SADI persiste seletores automaticamente
 - ✅ 10 versões de backup + rollback
 - ✅ Recovery de corrupção (3-tier fallback)
@@ -117,52 +120,52 @@ O **DNA System** é o mecanismo que define a identidade e capacidades do robot, 
 
 ```javascript
 const ROBOT_CAPABILITIES = [
-    // Core
-    'BROWSER_CONTROL_V3',          // Puppeteer + lifecycle hooks
-    'TASK_SCHEMA_V5',              // Task structure validation
-    'RESPONSE_CAPTURE_V2',         // capture() com frames
+  // Core
+  'BROWSER_CONTROL_V3', // Puppeteer + lifecycle hooks
+  'TASK_SCHEMA_V5', // Task structure validation
+  'RESPONSE_CAPTURE_V2', // capture() com frames
 
-    // SADI Integration
-    'SADI_V19',                    // Full SADI protocol support
-    'AUTOMATIC_MIGRATION_V4_V5',   // v4→v5 adapter layer
+  // SADI Integration
+  'SADI_V19', // Full SADI protocol support
+  'AUTOMATIC_MIGRATION_V4_V5', // v4→v5 adapter layer
 
-    // IPC
-    'NERV_PROTOCOL_V2',            // Event bus integration
-    'WEBSOCKET_IPC',               // Socket.io communication
+  // IPC
+  'NERV_PROTOCOL_V2', // Event bus integration
+  'WEBSOCKET_IPC', // Socket.io communication
 
-    // Mission System
-    'MISSION_ORCHESTRATION',       // Workflows multi-etapa
-    'LLM_AS_JUDGE',               // Validation logic
+  // Mission System
+  'MISSION_ORCHESTRATION', // Workflows multi-etapa
+  'LLM_AS_JUDGE', // Validation logic
 
-    // Chrome Proxy
-    'WINDOWS_CHROME_PROXY',        // v3.0 integration
-    'CONNECTION_MODES_3',          // launcher/external/auto
+  // Chrome Proxy
+  'WINDOWS_CHROME_PROXY', // v3.0 integration
+  'CONNECTION_MODES_3', // launcher/external/auto
 
-    // Security
-    'INPUT_SANITIZATION',          // XSS prevention
-    'RATE_LIMITING',              // Throttle controls
+  // Security
+  'INPUT_SANITIZATION', // XSS prevention
+  'RATE_LIMITING', // Throttle controls
 
-    // DNA System
-    'DNA_EVOLUTION_TRACKING',      // Auto-persist selectors
-    'DNA_BACKUP_ROLLBACK',        // 10-version history
+  // DNA System
+  'DNA_EVOLUTION_TRACKING', // Auto-persist selectors
+  'DNA_BACKUP_ROLLBACK', // 10-version history
 
-    // Observability
-    'STRUCTURED_LOGGING',          // Winston + log levels
-    'HEALTH_ENDPOINTS',           // /health, /metrics
-    'PM2_MONITORING',             // Process management
+  // Observability
+  'STRUCTURED_LOGGING', // Winston + log levels
+  'HEALTH_ENDPOINTS', // /health, /metrics
+  'PM2_MONITORING', // Process management
 
-    // Recovery
-    'CHECKPOINT_RECOVERY',         // <5min granularity
-    'CIRCUIT_BREAKER',            // Fault tolerance
-    'GRACEFUL_SHUTDOWN',          // Cleanup on exit
+  // Recovery
+  'CHECKPOINT_RECOVERY', // <5min granularity
+  'CIRCUIT_BREAKER', // Fault tolerance
+  'GRACEFUL_SHUTDOWN', // Cleanup on exit
 
-    // File System
-    'ATOMIC_FILE_OPERATIONS',      // No corruption
-    'PID_VALIDATED_LOCKS',        // Concurrency safety
+  // File System
+  'ATOMIC_FILE_OPERATIONS', // No corruption
+  'PID_VALIDATED_LOCKS', // Concurrency safety
 
-    // Dashboard
-    'DASHBOARD_V2',               // React + Socket.io
-    'REST_API_V2',                // Express routes
+  // Dashboard
+  'DASHBOARD_V2', // React + Socket.io
+  'REST_API_V2', // Express routes
 ];
 ```
 
@@ -179,7 +182,7 @@ const caps = identity.getCapabilities(); // → 24 capabilities array
 
 // Check specific capability
 if (identity.hasCapability('TASK_SCHEMA_V5')) {
-    // Use Task Schema V5 features
+  // Use Task Schema V5 features
 }
 
 // Initialize (called in boot phase 2)
@@ -196,10 +199,8 @@ await identity.initialize();
 
 #### Features
 
-✅ **In-Memory Backup** (10 versões)
-✅ **Rollback Mechanism** (restore any version)
-✅ **3-Tier Fallback** (cache → disk → recovery → baseline)
-✅ **Atomic Writes** (temp file + rename, via io.js)
+✅ **In-Memory Backup** (10 versões) ✅ **Rollback Mechanism** (restore any version) ✅ **3-Tier
+Fallback** (cache → disk → recovery → baseline) ✅ **Atomic Writes** (temp file + rename, via io.js)
 ✅ **Zod Validation** (DNA schema enforcement)
 
 #### Backup Strategy
@@ -241,34 +242,34 @@ const history = dnaStore.getDnaHistory();
 
 ```javascript
 async function getDna() {
-    // Tier 1: Cache (fast path)
-    if (DNA_CACHE.timestamp > Date.now() - CACHE_TTL) {
-        return DNA_CACHE.data;
-    }
+  // Tier 1: Cache (fast path)
+  if (DNA_CACHE.timestamp > Date.now() - CACHE_TTL) {
+    return DNA_CACHE.data;
+  }
 
-    // Tier 2: Disk + Validation
-    try {
-        const raw = fs.readFileSync(DNA_PATH, 'utf8');
-        const dna = JSON.parse(raw);
-        DNA_SCHEMA.parse(dna); // Zod validation
-        updateCache(dna);
-        return dna;
-    } catch (error) {
-        logger.error('[DNA] Disk read failed, trying recovery', error);
-    }
+  // Tier 2: Disk + Validation
+  try {
+    const raw = fs.readFileSync(DNA_PATH, 'utf8');
+    const dna = JSON.parse(raw);
+    DNA_SCHEMA.parse(dna); // Zod validation
+    updateCache(dna);
+    return dna;
+  } catch (error) {
+    logger.error('[DNA] Disk read failed, trying recovery', error);
+  }
 
-    // Tier 3: Recovery from backup
-    if (DNA_HISTORY.length > 0) {
-        logger.warn('[DNA] Recovering from most recent backup');
-        const recovered = DNA_HISTORY[0];
-        await saveDna(recovered, 'recovery-system');
-        return recovered;
-    }
+  // Tier 3: Recovery from backup
+  if (DNA_HISTORY.length > 0) {
+    logger.warn('[DNA] Recovering from most recent backup');
+    const recovered = DNA_HISTORY[0];
+    await saveDna(recovered, 'recovery-system');
+    return recovered;
+  }
 
-    // Tier 4: Baseline (last resort)
-    logger.error('[DNA] All recovery attempts failed, using DEFAULT_DNA');
-    await saveDna(DEFAULT_DNA, 'baseline-init');
-    return DEFAULT_DNA;
+  // Tier 4: Baseline (last resort)
+  logger.error('[DNA] All recovery attempts failed, using DEFAULT_DNA');
+  await saveDna(DEFAULT_DNA, 'baseline-init');
+  return DEFAULT_DNA;
 }
 ```
 
@@ -282,22 +283,20 @@ async function getDna() {
 
 #### Features
 
-✅ **Confidence Threshold** (minimum 75/100)
-✅ **Rate Limiting** (5 evolutions/domain/session)
-✅ **Duplicate Detection** (don't save same selector twice)
-✅ **Evolution Statistics** (per domain tracking)
-✅ **Two Protocols**: Simple selector + Full SADI protocol
+✅ **Confidence Threshold** (minimum 75/100) ✅ **Rate Limiting** (5 evolutions/domain/session) ✅
+**Duplicate Detection** (don't save same selector twice) ✅ **Evolution Statistics** (per domain
+tracking) ✅ **Two Protocols**: Simple selector + Full SADI protocol
 
 #### Evolution Rules
 
 ```javascript
-const MIN_CONFIDENCE = 75;      // Minimum confidence to accept
+const MIN_CONFIDENCE = 75; // Minimum confidence to accept
 const MAX_EVOLUTIONS_PER_DOMAIN = 5; // Per session limit
 
 // Per session counters
 const evolutionCounters = {
-    'chatgpt.com': 2,  // 2 evolutions this session
-    'gemini.google.com': 0
+  'chatgpt.com': 2, // 2 evolutions this session
+  'gemini.google.com': 0,
 };
 ```
 
@@ -307,17 +306,21 @@ const evolutionCounters = {
 const dnaEvolution = require('@infra/storage/dna_evolution');
 
 // Evolve with simple selector (SADI V19 compact)
-const result = await dnaEvolution.evolveWithSadiProtocol({
+const result = await dnaEvolution.evolveWithSadiProtocol(
+  {
     target: 'textarea[data-id="root"]',
     selector: '#prompt-textarea',
     confidence: 85,
-    shadowRoot: false
-}, 'chatgpt.com', 'send-message');
+    shadowRoot: false,
+  },
+  'chatgpt.com',
+  'send-message'
+);
 
 if (result.accepted) {
-    console.log('DNA evolved!', result.stats);
+  console.log('DNA evolved!', result.stats);
 } else {
-    console.log('Evolution rejected:', result.reason);
+  console.log('Evolution rejected:', result.reason);
 }
 
 // Evolve with full protocol (context + shadow + frame)
@@ -335,53 +338,53 @@ const stats = dnaEvolution.getEvolutionStats();
 
 ```javascript
 async function evolveWithSadiProtocol(protocol, domain, intent) {
-    // 1. Validation
-    if (protocol.confidence < MIN_CONFIDENCE) {
-        return { accepted: false, reason: 'LOW_CONFIDENCE' };
-    }
+  // 1. Validation
+  if (protocol.confidence < MIN_CONFIDENCE) {
+    return { accepted: false, reason: 'LOW_CONFIDENCE' };
+  }
 
-    // 2. Rate Limiting
-    const counter = evolutionCounters[domain] || 0;
-    if (counter >= MAX_EVOLUTIONS_PER_DOMAIN) {
-        return { accepted: false, reason: 'RATE_LIMITED' };
-    }
+  // 2. Rate Limiting
+  const counter = evolutionCounters[domain] || 0;
+  if (counter >= MAX_EVOLUTIONS_PER_DOMAIN) {
+    return { accepted: false, reason: 'RATE_LIMITED' };
+  }
 
-    // 3. Load current DNA
-    const dnaStore = getDnaStore(); // Lazy load (avoid circular dep)
-    const dna = await dnaStore.getDna();
+  // 3. Load current DNA
+  const dnaStore = getDnaStore(); // Lazy load (avoid circular dep)
+  const dna = await dnaStore.getDna();
 
-    // 4. Check duplicates
-    const rules = dna.targets[domain]?.[intent] || [];
-    const isDuplicate = rules.some(r => r.selector === protocol.selector);
-    if (isDuplicate) {
-        return { accepted: false, reason: 'DUPLICATE' };
-    }
+  // 4. Check duplicates
+  const rules = dna.targets[domain]?.[intent] || [];
+  const isDuplicate = rules.some(r => r.selector === protocol.selector);
+  if (isDuplicate) {
+    return { accepted: false, reason: 'DUPLICATE' };
+  }
 
-    // 5. Persist
-    if (!dna.targets[domain]) dna.targets[domain] = {};
-    if (!dna.targets[domain][intent]) dna.targets[domain][intent] = [];
+  // 5. Persist
+  if (!dna.targets[domain]) dna.targets[domain] = {};
+  if (!dna.targets[domain][intent]) dna.targets[domain][intent] = [];
 
-    dna.targets[domain][intent].push({
-        target: protocol.target,
-        selector: protocol.selector,
-        confidence: protocol.confidence,
-        shadowRoot: protocol.shadowRoot,
-        learned_at: new Date().toISOString()
-    });
+  dna.targets[domain][intent].push({
+    target: protocol.target,
+    selector: protocol.selector,
+    confidence: protocol.confidence,
+    shadowRoot: protocol.shadowRoot,
+    learned_at: new Date().toISOString(),
+  });
 
-    await dnaStore.saveDna(dna, `sadi-evolution-${domain}`);
+  await dnaStore.saveDna(dna, `sadi-evolution-${domain}`);
 
-    // 6. Update stats
-    evolutionCounters[domain] = counter + 1;
+  // 6. Update stats
+  evolutionCounters[domain] = counter + 1;
 
-    return {
-        accepted: true,
-        stats: {
-            domain,
-            total_rules: dna.targets[domain][intent].length,
-            session_evolutions: evolutionCounters[domain]
-        }
-    };
+  return {
+    accepted: true,
+    stats: {
+      domain,
+      total_rules: dna.targets[domain][intent].length,
+      session_evolutions: evolutionCounters[domain],
+    },
+  };
 }
 ```
 
@@ -423,6 +426,7 @@ const capabilities = io.getCapabilities();
 **Localização**: `robot_identity.json` (root)
 
 **Estrutura**:
+
 ```json
 {
   "robot_id": "abc-123-def-456",
@@ -440,6 +444,7 @@ const capabilities = io.getCapabilities();
 **Localização**: `dynamic_rules.json` (root)
 
 **Estrutura** (DNA Schema V5):
+
 ```json
 {
   "version": 5,
@@ -497,7 +502,7 @@ const capabilities = identity.getCapabilities();
 
 // Check capability
 if (identity.hasCapability('DNA_EVOLUTION_TRACKING')) {
-    // Feature available
+  // Feature available
 }
 ```
 
@@ -536,33 +541,33 @@ const dnaEvolution = require('@infra/storage/dna_evolution');
 
 // Evolve with SADI protocol (simple)
 const result = await dnaEvolution.evolveWithSadiProtocol(
-    {
-        target: 'textarea[data-id="root"]',
-        selector: '#prompt-textarea',
-        confidence: 85,
-        shadowRoot: false
-    },
-    'chatgpt.com',
-    'send-message'
+  {
+    target: 'textarea[data-id="root"]',
+    selector: '#prompt-textarea',
+    confidence: 85,
+    shadowRoot: false,
+  },
+  'chatgpt.com',
+  'send-message'
 );
 
 if (result.accepted) {
-    console.log('Evolution accepted!');
-    console.log('Total rules:', result.stats.total_rules);
-    console.log('Session evolutions:', result.stats.session_evolutions);
+  console.log('Evolution accepted!');
+  console.log('Total rules:', result.stats.total_rules);
+  console.log('Session evolutions:', result.stats.session_evolutions);
 } else {
-    console.log('Rejected:', result.reason);
-    // Reasons: LOW_CONFIDENCE, RATE_LIMITED, DUPLICATE
+  console.log('Rejected:', result.reason);
+  // Reasons: LOW_CONFIDENCE, RATE_LIMITED, DUPLICATE
 }
 
 // Evolve with full protocol (context + shadow + frame)
 await dnaEvolution.evolveWithFullProtocol({
-    target: 'textarea',
-    selector: '.ql-editor',
-    confidence: 88,
-    shadowRoot: true,
-    framePath: ['iframe#content'],
-    context: { page: 'chat', attempt: 3 }
+  target: 'textarea',
+  selector: '.ql-editor',
+  confidence: 88,
+  shadowRoot: true,
+  framePath: ['iframe#content'],
+  context: { page: 'chat', attempt: 3 },
 });
 
 // Reset session counters (called on boot)
@@ -610,16 +615,16 @@ const dna = await io.getDna();
 
 // 2. Add new selector manually
 if (!dna.targets['example.com']) {
-    dna.targets['example.com'] = {};
+  dna.targets['example.com'] = {};
 }
 dna.targets['example.com']['login'] = [
-    {
-        target: 'button[type="submit"]',
-        selector: '#login-button',
-        confidence: 100, // Manual = always 100
-        shadowRoot: false,
-        learned_at: new Date().toISOString()
-    }
+  {
+    target: 'button[type="submit"]',
+    selector: '#login-button',
+    confidence: 100, // Manual = always 100
+    shadowRoot: false,
+    learned_at: new Date().toISOString(),
+  },
 ];
 
 // 3. Save (will backup old version automatically)
@@ -672,7 +677,7 @@ const history = io.getDnaHistory();
 
 console.log('Available backups:');
 history.forEach((backup, index) => {
-    console.log(`[${index}] v${backup.version} - ${backup.timestamp} (${backup.author})`);
+  console.log(`[${index}] v${backup.version} - ${backup.timestamp} (${backup.author})`);
 });
 
 // 2. Rollback to version
@@ -698,13 +703,13 @@ const stats = io.getEvolutionStats();
 
 console.log('Evolution stats this session:');
 Object.entries(stats).forEach(([domain, count]) => {
-    console.log(`  ${domain}: ${count}/5 evolutions`);
+  console.log(`  ${domain}: ${count}/5 evolutions`);
 });
 
 // Check if domain is rate limited
 const isLimited = stats['chatgpt.com'] >= 5;
 if (isLimited) {
-    console.log('ChatGPT domain is rate limited (restart session to reset)');
+  console.log('ChatGPT domain is rate limited (restart session to reset)');
 }
 ```
 
@@ -714,7 +719,8 @@ if (isLimited) {
 
 ### SADI V19 Protocol
 
-O SADI (Selector Adaptation & Discovery Intelligence) usa o DNA System para persistir seletores descobertos.
+O SADI (Selector Adaptation & Discovery Intelligence) usa o DNA System para persistir seletores
+descobertos.
 
 #### Fluxo de Integração
 
@@ -725,25 +731,29 @@ const discovered = await sadi.discoverSelector('textarea[data-id="root"]');
 
 // 2. SADI attempts auto-evolution
 if (discovered.confidence >= 75) {
-    const result = await io.evolveWithSadiProtocol({
-        target: 'textarea[data-id="root"]',
-        selector: discovered.selector,
-        confidence: discovered.confidence,
-        shadowRoot: discovered.isShadowRoot
-    }, 'chatgpt.com', 'send-message');
+  const result = await io.evolveWithSadiProtocol(
+    {
+      target: 'textarea[data-id="root"]',
+      selector: discovered.selector,
+      confidence: discovered.confidence,
+      shadowRoot: discovered.isShadowRoot,
+    },
+    'chatgpt.com',
+    'send-message'
+  );
 
-    if (result.accepted) {
-        // Success: DNA updated, backup created
-        logger.info('[SADI] Selector persisted to DNA', {
-            domain: 'chatgpt.com',
-            intent: 'send-message',
-            selector: discovered.selector,
-            session_evolutions: result.stats.session_evolutions
-        });
-    } else {
-        // Rejected: confidence too low, rate limited, or duplicate
-        logger.warn('[SADI] Evolution rejected', { reason: result.reason });
-    }
+  if (result.accepted) {
+    // Success: DNA updated, backup created
+    logger.info('[SADI] Selector persisted to DNA', {
+      domain: 'chatgpt.com',
+      intent: 'send-message',
+      selector: discovered.selector,
+      session_evolutions: result.stats.session_evolutions,
+    });
+  } else {
+    // Rejected: confidence too low, rate limited, or duplicate
+    logger.warn('[SADI] Evolution rejected', { reason: result.reason });
+  }
 }
 
 // 3. Next execution uses persisted selector
@@ -759,39 +769,36 @@ const bestRule = rules.sort((a, b) => b.confidence - a.confidence)[0];
 
 ```javascript
 class BaseDriver {
-    async sendMessage(message, driver) {
-        const intent = 'send-message';
+  async sendMessage(message, driver) {
+    const intent = 'send-message';
 
-        // 1. Try DNA-stored selectors first
-        const dna = await io.getDna();
-        const rules = dna.targets[this.domain]?.[intent] || [];
+    // 1. Try DNA-stored selectors first
+    const dna = await io.getDna();
+    const rules = dna.targets[this.domain]?.[intent] || [];
 
-        for (const rule of rules.sort((a, b) => b.confidence - a.confidence)) {
-            try {
-                const element = await this.page.$(rule.selector);
-                if (element) {
-                    await element.type(message);
-                    logger.info(`[DNA] Used stored selector: ${rule.selector}`);
-                    return;
-                }
-            } catch (error) {
-                logger.warn(`[DNA] Stored selector failed: ${rule.selector}`);
-            }
+    for (const rule of rules.sort((a, b) => b.confidence - a.confidence)) {
+      try {
+        const element = await this.page.$(rule.selector);
+        if (element) {
+          await element.type(message);
+          logger.info(`[DNA] Used stored selector: ${rule.selector}`);
+          return;
         }
-
-        // 2. Fallback to SADI discovery
-        const discovered = await this.sadi.adaptSelectorFallback(
-            'textarea[data-id="root"]',
-            intent
-        );
-
-        if (discovered) {
-            // SADI will auto-persist if confidence >= 75
-            await this.page.type(discovered, message);
-        } else {
-            throw new Error('No selector available for send-message');
-        }
+      } catch (error) {
+        logger.warn(`[DNA] Stored selector failed: ${rule.selector}`);
+      }
     }
+
+    // 2. Fallback to SADI discovery
+    const discovered = await this.sadi.adaptSelectorFallback('textarea[data-id="root"]', intent);
+
+    if (discovered) {
+      // SADI will auto-persist if confidence >= 75
+      await this.page.type(discovered, message);
+    } else {
+      throw new Error('No selector available for send-message');
+    }
+  }
 }
 ```
 
@@ -897,6 +904,7 @@ Total: 7 tests
 **Causa**: JSON inválido ou schema Zod falhou.
 
 **Solução**:
+
 ```javascript
 // 1. Verificar histórico de backups
 const history = io.getDnaHistory();
@@ -904,17 +912,17 @@ console.log('Backups disponíveis:', history.length);
 
 // 2. Restaurar backup mais recente
 if (history.length > 0) {
-    await io.rollbackDna(0);
-    console.log('DNA restaurado do backup');
+  await io.rollbackDna(0);
+  console.log('DNA restaurado do backup');
 } else {
-    // 3. Resetar para baseline
-    const DEFAULT_DNA = {
-        version: 5,
-        evolution_count: 0,
-        last_updated: new Date().toISOString(),
-        targets: {}
-    };
-    await io.saveDna(DEFAULT_DNA, 'manual-reset');
+  // 3. Resetar para baseline
+  const DEFAULT_DNA = {
+    version: 5,
+    evolution_count: 0,
+    last_updated: new Date().toISOString(),
+    targets: {},
+  };
+  await io.saveDna(DEFAULT_DNA, 'manual-reset');
 }
 ```
 
@@ -927,6 +935,7 @@ if (history.length > 0) {
 **Causa**: Confidence < 75.
 
 **Solução**:
+
 ```javascript
 // Opção 1: Aceitar confidence menor (ajustar MIN_CONFIDENCE em dna_evolution.js)
 const MIN_CONFIDENCE = 65; // Reduzir threshold
@@ -934,11 +943,11 @@ const MIN_CONFIDENCE = 65; // Reduzir threshold
 // Opção 2: Persistir manualmente
 const dna = await io.getDna();
 dna.targets['chatgpt.com']['send-message'].push({
-    target: 'textarea',
-    selector: '#prompt-textarea',
-    confidence: 100, // Manual = 100
-    shadowRoot: false,
-    learned_at: new Date().toISOString()
+  target: 'textarea',
+  selector: '#prompt-textarea',
+  confidence: 100, // Manual = 100
+  shadowRoot: false,
+  learned_at: new Date().toISOString(),
 });
 await io.saveDna(dna, 'manual-override');
 ```
@@ -952,6 +961,7 @@ await io.saveDna(dna, 'manual-override');
 **Causa**: Domain atingiu limite de 5 evolutions nesta sessão.
 
 **Solução**:
+
 ```javascript
 // Opção 1: Reiniciar sistema (reseta counters)
 make restart
@@ -973,17 +983,21 @@ const MAX_EVOLUTIONS_PER_DOMAIN = 10;
 **Causa**: Selector já existe no DNA para esse domain+intent.
 
 **Solução**:
+
 ```javascript
 // Verificar rules existentes
 const dna = await io.getDna();
 const rules = dna.targets['chatgpt.com']?.['send-message'] || [];
-console.log('Rules existentes:', rules.map(r => r.selector));
+console.log(
+  'Rules existentes:',
+  rules.map(r => r.selector)
+);
 
 // Se quiser forçar update (aumentar confidence):
 const index = rules.findIndex(r => r.selector === '#prompt-textarea');
 if (index >= 0) {
-    rules[index].confidence = 95; // Update
-    await io.saveDna(dna, 'manual-confidence-update');
+  rules[index].confidence = 95; // Update
+  await io.saveDna(dna, 'manual-confidence-update');
 }
 ```
 
@@ -998,6 +1012,7 @@ if (index >= 0) {
 **Comportamento Esperado**: Backups são perdidos no restart. Apenas a versão atual (disk) persiste.
 
 **Alternativa**:
+
 - Implementar DNA_HISTORY em arquivo separado (e.g., `dna_history.json`)
 - Trade-off: Performance vs. persistência
 
@@ -1008,6 +1023,7 @@ if (index >= 0) {
 ### V2.0 (Fevereiro 2026)
 
 #### ✅ Adicionado
+
 - ✅ 24 capabilities modernizadas (V1.0 tinha 6)
 - ✅ Backup system (10 versões in-memory)
 - ✅ Rollback mechanism
@@ -1020,11 +1036,13 @@ if (index >= 0) {
 - ✅ 7 comprehensive tests (100% pass rate)
 
 #### 🔧 Corrigido
+
 - ✅ Circular dependency (io ↔ dna_evolution → lazy load pattern)
 - ✅ Error handling robusto (recovery de corrupção)
 - ✅ Atomic writes (via io.js)
 
 #### 🚀 Melhorado
+
 - ✅ Performance (cache com TTL de 60s)
 - ✅ Logging (Winston integration)
 - ✅ Validation (Zod schema enforcement)
@@ -1034,6 +1052,7 @@ if (index >= 0) {
 ### V1.0 (Baseline)
 
 #### Features
+
 - ✅ Basic DNA storage (dynamic_rules.json)
 - ✅ Manual selector updates
 - ✅ 6 generic capabilities

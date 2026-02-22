@@ -70,7 +70,7 @@
         "iterative": true,
         "max_iterations": 3,
         "estimated_duration_min": 45,
-        "estimated_cost_usd": 2.50
+        "estimated_cost_usd": 2.5
       },
       // ... chapters 2-15 (similar structure)
       {
@@ -78,14 +78,14 @@
         "name": "Cross-Chapter Consistency Check",
         "action": "execute_prompt",
         "estimated_duration_min": 30,
-        "estimated_cost_usd": 3.00
+        "estimated_cost_usd": 3.0
       },
       {
         "id": "step-18-compile",
         "name": "Compile Final Book",
         "action": "compile",
         "estimated_duration_min": 5,
-        "estimated_cost_usd": 0.10
+        "estimated_cost_usd": 0.1
       },
       {
         "id": "step-19-generate-pdf",
@@ -305,7 +305,7 @@ missions/mission-rust-book-001/
         "id": "step-4-loop-features",
         "name": "Implement Features",
         "action": "loop",
-        "iterations": 11,  // 11 features
+        "iterations": 11, // 11 features
         "loop_body": [
           {
             "id": "implement-feature",
@@ -501,28 +501,29 @@ exports.getTasks = async (req, res, next) => {
       userId,
       ...(status && { status }),
       ...(priority && { priority }),
-      ...(dateFrom && dateTo && {
-        createdAt: {
-          gte: new Date(dateFrom),
-          lte: new Date(dateTo)
-        }
-      })
+      ...(dateFrom &&
+        dateTo && {
+          createdAt: {
+            gte: new Date(dateFrom),
+            lte: new Date(dateTo),
+          },
+        }),
     };
 
     const tasks = await prisma.task.findMany({
       where,
       include: {
         assignedTo: {
-          select: { id: true, name: true, email: true }
-        }
+          select: { id: true, name: true, email: true },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     res.json({
       success: true,
       count: tasks.length,
-      data: tasks
+      data: tasks,
     });
   } catch (error) {
     next(error);
@@ -547,13 +548,11 @@ describe('Task Controller', () => {
 
   beforeAll(async () => {
     // Setup test user and get auth token
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({
-        name: 'Test User',
-        email: 'test@example.com',
-        password: 'password123'
-      });
+    const response = await request(app).post('/api/auth/register').send({
+      name: 'Test User',
+      email: 'test@example.com',
+      password: 'password123',
+    });
 
     authToken = response.body.token;
     userId = response.body.user.id;
@@ -585,8 +584,8 @@ describe('Task Controller', () => {
           description: 'Test',
           status: 'PENDING',
           priority: 'HIGH',
-          userId
-        }
+          userId,
+        },
       });
 
       const response = await request(app)
@@ -633,7 +632,7 @@ describe('Task Controller', () => {
         "https://www.nejm.org/ai-research",
         "https://www.nature.com/subjects/medical-research",
         "https://pubmed.ncbi.nlm.nih.gov/",
-        "https://www.who.int/health-topics/artificial-intelligence",
+        "https://www.who.int/health-topics/artificial-intelligence"
         // ... more sources
       ],
       "output_format": "20-page report with citations",
@@ -771,7 +770,7 @@ Charts: 8
       "fluency_score": 85,
       "accuracy_score": 90,
       "terminology_consistency": true,
-      "native_review": true  // Flag for human review
+      "native_review": true // Flag for human review
     }
   }
 }

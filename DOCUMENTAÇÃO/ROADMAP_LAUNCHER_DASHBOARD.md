@@ -1,16 +1,16 @@
 # Roadmap: Launcher & Dashboard Evolution
 
-**Status**: ✅ FASE 1 COMPLETA (21/01/2026) | ⏳ Fase 2 planejada
-**Estratégia**: PM2-First + Ferramentas Standalone (Opção A) - **IMPLEMENTADA**
-**Data de Atualização**: 21 de Janeiro de 2026
-**Prioridade**: Alta (Fase 1 concluída em 3.5h)
-**Estimativa Total**: ~~3-5 horas (Fase 1)~~ **3.5h CONCLUÍDO** + 50-70 horas (Fase 2 futuro)
+**Status**: ✅ FASE 1 COMPLETA (21/01/2026) | ⏳ Fase 2 planejada **Estratégia**: PM2-First +
+Ferramentas Standalone (Opção A) - **IMPLEMENTADA** **Data de Atualização**: 21 de Janeiro de 2026
+**Prioridade**: Alta (Fase 1 concluída em 3.5h) **Estimativa Total**: ~~3-5 horas (Fase 1)~~ **3.5h
+CONCLUÍDO** + 50-70 horas (Fase 2 futuro)
 
 ---
 
 ## Contexto e Motivação
 
 ### Situação Atual (Atualizada - 21/01/2026)
+
 - ✅ PM2 integrado (9.5/10 NASA-Grade) com correções P3 implementadas
 - ✅ Sistema funcional via **Super Launcher v2.0** (menu interativo completo)
 - ✅ **8 scripts utilitários** criados (quick-ops, watch-logs, pm2-gui, pm2-plus)
@@ -22,6 +22,7 @@
 ### Decisão Estratégica (21/01/2026) - **EXECUTADA COM SUCESSO**
 
 **Por que NÃO Tauri primeiro?**
+
 1. PM2 já é NASA-grade (9.5/10) - adicionar Tauri seria over-engineering
 2. pm2-gui existe e é gratuito (Electron app completo)
 3. Tauri exige 10h de desenvolvimento vs 0h do pm2-gui
@@ -30,6 +31,7 @@
 **Stack Escolhida: PM2-First (Opção A)** - ✅ **IMPLEMENTADA COM SUCESSO**
 
 ### Visão Evolutiva Atualizada
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ ✅ FASE 1: Super Launcher + PM2 Tools (3.5h)        │
@@ -75,7 +77,8 @@
 1. **Super Launcher v2.0** (Windows + Linux)
    - `LAUNCHER.bat` - 463 linhas (Windows)
    - `launcher.sh` - 510 linhas (Linux/Mac)
-   - 10 operações de menu: start, stop, restart, status, logs, PM2 GUI, monit, clean, diagnose, backup
+   - 10 operações de menu: start, stop, restart, status, logs, PM2 GUI, monit, clean, diagnose,
+     backup
    - 5 validações pré-boot: Node.js, PM2, dependências, Chrome config, crashes
    - Health checks HTTP + PM2 integrados
    - Backup automático de configurações
@@ -103,7 +106,8 @@
 
 5. **Documentação Completa**
    - `DOCUMENTAÇÃO/LAUNCHER.md` - 1.450 linhas, 37 KB
-   - 10 seções: arquitetura, instalação, menu, scripts, dashboard, health endpoints, troubleshooting, comparações, exemplos, referências
+   - 10 seções: arquitetura, instalação, menu, scripts, dashboard, health endpoints,
+     troubleshooting, comparações, exemplos, referências
    - Diagramas ASCII de arquitetura e fluxo de boot
    - 6 problemas comuns documentados com soluções
    - Tabela comparativa: Launcher vs PM2 GUI vs Tauri vs Dashboard Web
@@ -111,19 +115,20 @@
 
 ### Cronograma Real vs Estimado
 
-| Fase | Tarefa | Estimado | Real | Status |
-|------|--------|----------|------|--------|
-| 1 | Validar Launchers existentes | - | 0.5h | ✅ |
-| 2 | Criar Scripts Utilitários (8 scripts) | 1h | 1h | ✅ |
-| 3 | Implementar Health Endpoints + fix io.js | 0.5h | 0.5h | ✅ |
-| 4 | Chrome Config Export | 0.5h | 0h | ✅ (já existia) |
-| 5 | Dashboard HTML standalone | 1h | 1h | ✅ |
-| 6 | Documentação LAUNCHER.md | 0.5h | 0.5h | ✅ |
-| **TOTAL** | **6 etapas** | **3-5h** | **3.5h** | ✅ **100%** |
+| Fase      | Tarefa                                   | Estimado | Real     | Status          |
+| --------- | ---------------------------------------- | -------- | -------- | --------------- |
+| 1         | Validar Launchers existentes             | -        | 0.5h     | ✅              |
+| 2         | Criar Scripts Utilitários (8 scripts)    | 1h       | 1h       | ✅              |
+| 3         | Implementar Health Endpoints + fix io.js | 0.5h     | 0.5h     | ✅              |
+| 4         | Chrome Config Export                     | 0.5h     | 0h       | ✅ (já existia) |
+| 5         | Dashboard HTML standalone                | 1h       | 1h       | ✅              |
+| 6         | Documentação LAUNCHER.md                 | 0.5h     | 0.5h     | ✅              |
+| **TOTAL** | **6 etapas**                             | **3-5h** | **3.5h** | ✅ **100%**     |
 
 ### Arquivos Criados/Modificados
 
 **Criados (11 arquivos):**
+
 - `scripts/quick-ops.bat` (3.0 KB)
 - `scripts/quick-ops.sh` (4.0 KB)
 - `scripts/watch-logs.bat` (919 B)
@@ -137,10 +142,12 @@
 - `scripts/test-health-logic.js` (teste health endpoints)
 
 **Modificados (2 arquivos):**
+
 - `src/infra/io.js` - Adicionado `loadAllTasks()` (linhas 167-173)
 - `scripts/test-health-logic.js` - Adicionado `process.exit(0)` (linha 165)
 
 **Validados (2 arquivos):**
+
 - `LAUNCHER.bat` (463 linhas) - Confirmadas 10 operações
 - `launcher.sh` (510 linhas) - Feature parity com Windows
 
@@ -158,6 +165,7 @@
 ### Decisão: Tauri Adiado
 
 **Motivo**: Super Launcher PM2-First já entrega:
+
 - Menu interativo completo (10 operações)
 - Validações automáticas pré-boot
 - Health checks integrados
@@ -166,6 +174,7 @@
 - pm2-gui disponível para GUI avançada
 
 **Tauri só será considerado se:**
+
 - Dashboard Web (Fase 2) não cobrir necessidades
 - Precisar tray icon nativo Windows/Mac
 - Precisar distribuição standalone sem Node.js
@@ -174,15 +183,16 @@
 
 ## ⏳ FASE 1 (ORIGINAL TAURI) - MOVIDA PARA FASE 3 OPCIONAL
 
-> **NOTA**: A seção abaixo documenta o plano ORIGINAL de criar Launcher Tauri (10h).
-> Esse plano foi **ADIADO** em favor do Super Launcher PM2-First (3.5h).
-> Mantido apenas como referência histórica e para futuro se necessário.
+> **NOTA**: A seção abaixo documenta o plano ORIGINAL de criar Launcher Tauri (10h). Esse plano foi
+> **ADIADO** em favor do Super Launcher PM2-First (3.5h). Mantido apenas como referência histórica e
+> para futuro se necessário.
 
 ### ~~Escopo Definitivo (TAURI - ADIADO)~~
 
 ### Escopo Definitivo
 
 **O QUE O LAUNCHER FAZ** ✅:
+
 - Ligar/desligar/pausar/reiniciar componentes do sistema
 - Seguir ordem de dependências (Chrome → PM2 → Server → Kernel/Driver)
 - Health checks HTTP básicos (validar que componentes subiram)
@@ -191,6 +201,7 @@
 - Configurações de boot (leitura do ConnectionOrchestrator.js)
 
 **O QUE O LAUNCHER NÃO FAZ** ❌:
+
 - Criar/editar/deletar tarefas (responsabilidade do Dashboard)
 - Visualizar queue/respostas detalhadas
 - Métricas avançadas/gráficos
@@ -200,6 +211,7 @@
 ### Arquitetura Técnica
 
 #### Stack Escolhida
+
 - **Framework**: Tauri v2 (Rust + WebView)
 - **Frontend**: React 18 + Vite
 - **Styling**: Tailwind CSS (minimalista)
@@ -207,12 +219,14 @@
 - **State**: React Context API (sem Redux, escopo pequeno)
 
 #### Por que Tauri?
+
 1. **Leve**: ~3-5 MB (vs Electron ~100+ MB)
 2. **Performático**: Rust backend + WebView nativo
 3. **Seguro**: Sandboxing nativo, sem Node.js no frontend
 4. **Moderno**: Hot reload, build otimizado, cross-platform
 
 #### Estrutura de Diretórios
+
 ```
 launcher/                           # Novo diretório raiz
 ├── src-tauri/                      # Backend Rust
@@ -339,20 +353,28 @@ launcher/                           # Novo diretório raiz
 #### 1. Exportar Configuração do Chrome
 
 **Modificação em ConnectionOrchestrator.js** (adicionar ao final):
+
 ```javascript
 // Exporta DEFAULTS para consumo do launcher
 if (require.main === module || process.env.EXPORT_CHROME_CONFIG === 'true') {
-    const outputPath = path.join(__dirname, '../../chrome-config.json');
-    fs.writeFileSync(outputPath, JSON.stringify({
+  const outputPath = path.join(__dirname, '../../chrome-config.json');
+  fs.writeFileSync(
+    outputPath,
+    JSON.stringify(
+      {
         mode: DEFAULTS.mode,
         ports: DEFAULTS.ports,
         hosts: DEFAULTS.hosts,
         args: DEFAULTS.args,
         headless: DEFAULTS.headless,
         executablePath: DEFAULTS.executablePath,
-        userDataDir: DEFAULTS.userDataDir
-    }, null, 2));
-    console.log(`Chrome config exported to ${outputPath}`);
+        userDataDir: DEFAULTS.userDataDir,
+      },
+      null,
+      2
+    )
+  );
+  console.log(`Chrome config exported to ${outputPath}`);
 }
 ```
 
@@ -361,33 +383,34 @@ if (require.main === module || process.env.EXPORT_CHROME_CONFIG === 'true') {
 #### 2. Health Check Endpoints (a serem criados)
 
 **Criar `src/server/api/health.js`**:
+
 ```javascript
 const express = require('express');
 const router = express.Router();
 
 router.get('/health', (req, res) => {
-    // Agregador de health de todos os subsistemas
-    const health = {
-        timestamp: new Date().toISOString(),
-        server: 'ok',
-        kernel: getKernelHealth(),      // A implementar
-        driver: getDriverHealth(),      // A implementar
-        browser: getBrowserPoolHealth(), // A implementar
-        nerv: getNERVBusHealth()        // A implementar
-    };
+  // Agregador de health de todos os subsistemas
+  const health = {
+    timestamp: new Date().toISOString(),
+    server: 'ok',
+    kernel: getKernelHealth(), // A implementar
+    driver: getDriverHealth(), // A implementar
+    browser: getBrowserPoolHealth(), // A implementar
+    nerv: getNERVBusHealth(), // A implementar
+  };
 
-    const allOk = Object.values(health).every(v => v === 'ok' || v.status === 'ok');
-    res.status(allOk ? 200 : 503).json(health);
+  const allOk = Object.values(health).every(v => v === 'ok' || v.status === 'ok');
+  res.status(allOk ? 200 : 503).json(health);
 });
 
 router.get('/health/chrome', async (req, res) => {
-    try {
-        const response = await fetch('http://localhost:9224/json/version');
-        const data = await response.json();
-        res.json({ status: 'ok', version: data });
-    } catch (error) {
-        res.status(503).json({ status: 'error', message: error.message });
-    }
+  try {
+    const response = await fetch('http://localhost:9224/json/version');
+    const data = await response.json();
+    res.json({ status: 'ok', version: data });
+  } catch (error) {
+    res.status(503).json({ status: 'error', message: error.message });
+  }
 });
 
 module.exports = router;
@@ -396,6 +419,7 @@ module.exports = router;
 #### 3. IPC Protocol (Launcher ↔ Sistema Node)
 
 **Protocolo JSON via stdin/stdout**:
+
 ```json
 // Launcher → Sistema Node (stdin)
 {"command": "START_SERVER", "timestamp": 1234567890}
@@ -416,18 +440,18 @@ module.exports = router;
 
 ### Cronograma de Implementação
 
-| Fase | Tarefa | Tempo | Arquivos Criados |
-|------|--------|-------|------------------|
-| 1 | Scaffold Tauri (init project) | 1h | launcher/, Cargo.toml, tauri.conf.json |
-| 2 | Dependency Graph (Rust) | 1.5h | orchestrator.rs, dependency_graph.rs |
-| 3 | Chrome Config Reader | 1h | chrome_config.rs, chrome-config.json |
-| 4 | Process Manager (spawn/kill) | 2h | process_manager.rs |
-| 5 | Health Checker (HTTP polling) | 1h | health_checker.rs, health.js |
-| 6 | Frontend React (1 tela) | 2h | App.jsx, components/ |
-| 7 | IPC Bridge (JSON stdin/out) | 1h | ipc_bridge.rs, modificar index.js |
-| 8 | Tray Icon + Notifications | 0.5h | system_tray.rs, icons/ |
-| 9 | Build + Testes | 1h | CI scripts, testes unitários |
-| **TOTAL** | **8 componentes** | **10h** | **~950 LOC** |
+| Fase      | Tarefa                        | Tempo   | Arquivos Criados                       |
+| --------- | ----------------------------- | ------- | -------------------------------------- |
+| 1         | Scaffold Tauri (init project) | 1h      | launcher/, Cargo.toml, tauri.conf.json |
+| 2         | Dependency Graph (Rust)       | 1.5h    | orchestrator.rs, dependency_graph.rs   |
+| 3         | Chrome Config Reader          | 1h      | chrome_config.rs, chrome-config.json   |
+| 4         | Process Manager (spawn/kill)  | 2h      | process_manager.rs                     |
+| 5         | Health Checker (HTTP polling) | 1h      | health_checker.rs, health.js           |
+| 6         | Frontend React (1 tela)       | 2h      | App.jsx, components/                   |
+| 7         | IPC Bridge (JSON stdin/out)   | 1h      | ipc_bridge.rs, modificar index.js      |
+| 8         | Tray Icon + Notifications     | 0.5h    | system_tray.rs, icons/                 |
+| 9         | Build + Testes                | 1h      | CI scripts, testes unitários           |
+| **TOTAL** | **8 componentes**             | **10h** | **~950 LOC**                           |
 
 ### Decisões Técnicas Confirmadas
 
@@ -448,6 +472,7 @@ module.exports = router;
 #### Módulos Principais
 
 **1. Gestão de Tarefas**
+
 - Criar/editar/deletar tarefas
 - Formulários avançados (target, prompt, validation, retry policies)
 - Templates de tarefas (reutilizáveis)
@@ -455,6 +480,7 @@ module.exports = router;
 - Import/Export (JSON, CSV)
 
 **2. Queue Management**
+
 - Visualização da fila (pending/running/done/failed)
 - Filtros avançados (por target, data, status)
 - Reordenação manual (drag-and-drop)
@@ -462,6 +488,7 @@ module.exports = router;
 - Pause/resume/cancel individual ou em massa
 
 **3. Response Viewer**
+
 - Leitura de `respostas/*.txt` com syntax highlighting
 - Diff entre versões (se tarefa foi reexecutada)
 - Export (PDF, MD, TXT)
@@ -469,6 +496,7 @@ module.exports = router;
 - Análise de sentimento/qualidade (integração futura com LLM)
 
 **4. Analytics & Metrics**
+
 - Gráficos de desempenho (tarefas/hora, tempo médio)
 - Taxa de sucesso/falha por target (ChatGPT vs Gemini)
 - Histórico temporal (últimas 24h, 7 dias, 30 dias)
@@ -476,6 +504,7 @@ module.exports = router;
 - Exportar relatórios (PDF/Excel)
 
 **5. Configuração Avançada**
+
 - Editor visual de `config.json`
 - Editor visual de `dynamic_rules.json`
 - Validação em tempo real (Zod schemas)
@@ -483,6 +512,7 @@ module.exports = router;
 - Profiles (dev/prod/staging)
 
 **6. Logs & Diagnostics**
+
 - Viewer de logs completo (filtros, search, export)
 - Crash reports explorer
 - Forensics viewer (screenshots, stack traces)
@@ -490,6 +520,7 @@ module.exports = router;
 - Performance profiler
 
 **7. System Control**
+
 - Mesmas funcionalidades do Launcher (start/stop/restart)
 - Controle granular de subsistemas
 - PM2 integration (logs, restart, memory)
@@ -498,13 +529,14 @@ module.exports = router;
 #### Stack Tecnológica Proposta
 
 **Frontend**:
+
 - Framework: **Next.js 14** (App Router)
 - UI Library: **shadcn/ui** (Radix UI + Tailwind)
 - State: **Zustand** (global) + **TanStack Query** (server state)
 - Charts: **Recharts** ou **Chart.js**
 - Real-time: **Socket.io** (client)
 - Forms: **React Hook Form** + **Zod**
-- Tables: **TanStack T (Atualizado - 21/01/2026)
+- Tables: \*\*TanStack T (Atualizado - 21/01/2026)
 
 ### Ordem de Implementação Recomendada
 
@@ -551,6 +583,7 @@ module.exports = router;
 #### Integração com Sistema Atual
 
 **Backend API (Express)**:
+
 ```javascript
 // src/server/api/
 ├── tasks.js         // CRUD de tarefas
@@ -563,46 +596,47 @@ module.exports = router;
 ```
 
 **WebSocket Events**:
+
 ```javascript
 // Real-time updates via Socket.io
-io.on('connection', (socket) => {
-    // Envia atualizações quando tarefas mudam de estado
-    socket.on('subscribe:tasks', () => {
-        socket.join('tasks');
-    });
+io.on('connection', socket => {
+  // Envia atualizações quando tarefas mudam de estado
+  socket.on('subscribe:tasks', () => {
+    socket.join('tasks');
+  });
 
-    // Broadcasting de eventos
-    io.to('tasks').emit('task:state_changed', {
-        taskId: 'abc123',
-        oldState: 'PENDING',
-        newState: 'RUNNING'
-    });
+  // Broadcasting de eventos
+  io.to('tasks').emit('task:state_changed', {
+    taskId: 'abc123',
+    oldState: 'PENDING',
+    newState: 'RUNNING',
+  });
 
-    io.to('logs').emit('log:new', {
-        level: 'INFO',
-        message: 'Task completed',
-        timestamp: Date.now()
-    });
+  io.to('logs').emit('log:new', {
+    level: 'INFO',
+    message: 'Task completed',
+    timestamp: Date.now(),
+  });
 });
 ```
 
 ### Cronograma de Implementação (Estimado)
 
-| Fase | Módulo | Tempo | Complexidade |
-|------|--------|-------|--------------|
-| 1 | Setup Next.js + shadcn/ui | 2h | Baixa |
-| 2 | Layout + Navegação | 3h | Baixa |
-| 3 | Módulo: Tasks (CRUD) | 8h | Média |
-| 4 | Módulo: Queue (Management) | 6h | Média |
-| 5 | Módulo: Responses (Viewer) | 5h | Baixa |
-| 6 | Módulo: Analytics (Charts) | 10h | Alta |
-| 7 | Módulo: Config (Editor) | 6h | Média |
-| 8 | Módulo: Logs (Viewer) | 4h | Baixa |
-| 9 | Módulo: System (Control) | 4h | Baixa |
-| 10 | Real-time (Socket.io) | 6h | Média |
-| 11 | Backend API (Express) | 8h | Média |
-| 12 | Testes + Refatoração | 8h | Alta |
-| **TOTAL** | **11 módulos** | **70h** | **~8000 LOC** |
+| Fase      | Módulo                     | Tempo   | Complexidade  |
+| --------- | -------------------------- | ------- | ------------- |
+| 1         | Setup Next.js + shadcn/ui  | 2h      | Baixa         |
+| 2         | Layout + Navegação         | 3h      | Baixa         |
+| 3         | Módulo: Tasks (CRUD)       | 8h      | Média         |
+| 4         | Módulo: Queue (Management) | 6h      | Média         |
+| 5         | Módulo: Responses (Viewer) | 5h      | Baixa         |
+| 6         | Módulo: Analytics (Charts) | 10h     | Alta          |
+| 7         | Módulo: Config (Editor)    | 6h      | Média         |
+| 8         | Módulo: Logs (Viewer)      | 4h      | Baixa         |
+| 9         | Módulo: System (Control)   | 4h      | Baixa         |
+| 10        | Real-time (Socket.io)      | 6h      | Média         |
+| 11        | Backend API (Express)      | 8h      | Média         |
+| 12        | Testes + Refatoração       | 8h      | Alta          |
+| **TOTAL** | **11 módulos**             | **70h** | **~8000 LOC** |
 
 ---
 
@@ -675,31 +709,31 @@ io.on('connection', (socket) => {
 
 ### Milestones
 
-| Milestone | Entregável | ETA (após início) |
-|-----------|-----------|-------------------|
-| M1 | Auditorias completas | Semana 0 (atual) |
-| M2 | Documentação canônica | Semana 2 |
-| M3 | Launcher Tauri MVP | Semana 3 |
-| M4 | Launcher em produção | Semana 4 |
-| M5 | Dashboard MVP (Tasks + Queue) | Semana 6 |
-| M6 | Dashboard Analytics | Semana 8 |
-| M7 | Dashboard completo | Semana 10 |
-| M8 | Integra (Atualizado - 21/01/2026)
+| Milestone | Entregável                        | ETA (após início) |
+| --------- | --------------------------------- | ----------------- |
+| M1        | Auditorias completas              | Semana 0 (atual)  |
+| M2        | Documentação canônica             | Semana 2          |
+| M3        | Launcher Tauri MVP                | Semana 3          |
+| M4        | Launcher em produção              | Semana 4          |
+| M5        | Dashboard MVP (Tasks + Queue)     | Semana 6          |
+| M6        | Dashboard Analytics               | Semana 8          |
+| M7        | Dashboard completo                | Semana 10         |
+| M8        | Integra (Atualizado - 21/01/2026) |
 
-| Milestone | Entregável | Status | Data |
-|-----------|-----------|--------|------|
-| M1 | Auditorias completas | ✅ CONCLUÍDO | 20/01/2026 |
-| M2 | Documentação canônica | ✅ CONCLUÍDO | 20/01/2026 |
-| ~~M3~~ | ~~Launcher Tauri MVP~~ | ❌ CANCELADO | - |
-| **M3** | **Super Launcher PM2-First** | ✅ **CONCLUÍDO** | **21/01/2026** |
-| M4 | Launcher em produção | ⏳ TESTES | Semana 4 |
-| M5 | Dashboard MVP (Tasks + Queue) | ⏳ PLANEJADO | Semana 6 |
-| M6 | Dashboard Analytics | ⏳ PLANEJADO | Semana 8 |
-| M7 | Dashboard completo | ⏳ PLANEJADO | Semana 10 |
-| M8 | Integração final | ⏳ PLANEJADOfalse positives) | Média | Médio | Retry com backoff + múltiplos checks |
-| Dashboard muito complexo (scope creep) | Alta | Alto | Implementar MVP primeiro, features em releases |
-| IPC instável (JSON stdin/out) | Baixa | Médio | Fallback para TCP sockets se necessário |
-| Real-time (Socket.io) degrada performance | Média | Baixo | Rate limiting + batching de eventos |
+| Milestone                                 | Entregável                    | Status                       | Data                                           |
+| ----------------------------------------- | ----------------------------- | ---------------------------- | ---------------------------------------------- | ----- | ------------------------------------ |
+| M1                                        | Auditorias completas          | ✅ CONCLUÍDO                 | 20/01/2026                                     |
+| M2                                        | Documentação canônica         | ✅ CONCLUÍDO                 | 20/01/2026                                     |
+| ~~M3~~                                    | ~~Launcher Tauri MVP~~        | ❌ CANCELADO                 | -                                              |
+| **M3**                                    | **Super Launcher PM2-First**  | ✅ **CONCLUÍDO**             | **21/01/2026**                                 |
+| M4                                        | Launcher em produção          | ⏳ TESTES                    | Semana 4                                       |
+| M5                                        | Dashboard MVP (Tasks + Queue) | ⏳ PLANEJADO                 | Semana 6                                       |
+| M6                                        | Dashboard Analytics           | ⏳ PLANEJADO                 | Semana 8                                       |
+| M7                                        | Dashboard completo            | ⏳ PLANEJADO                 | Semana 10                                      |
+| M8                                        | Integração final              | ⏳ PLANEJADOfalse positives) | Média                                          | Médio | Retry com backoff + múltiplos checks |
+| Dashboard muito complexo (scope creep)    | Alta                          | Alto                         | Implementar MVP primeiro, features em releases |
+| IPC instável (JSON stdin/out)             | Baixa                         | Médio                        | Fallback para TCP sockets se necessário        |
+| Real-time (Socket.io) degrada performance | Média                         | Baixo                        | Rate limiting + batching de eventos            |
 
 ### Contingências
 
@@ -712,6 +746,7 @@ io.on('connection', (socket) => {
 ## Métricas de Sucesso
 
 ### Launcher (Fase 1)
+
 - ✅ Substitui `INICIAR_TUDO.BAT` 100%
 - ✅ Boot sequence < 30 segundos
 - ✅ Zero falhas de dependência (ordem correta garantida)
@@ -720,6 +755,7 @@ io.on('connection', (socket) => {
 - ✅ Binary < 10 MB (compactado)
 
 ### Dashboard (Fase 2)
+
 - ✅ Criar tarefa em < 3 cliques
 - ✅ Visualizar resposta em < 1 segundo
 - ✅ Real-time updates < 500ms de latência
@@ -732,18 +768,21 @@ io.on('connection', (socket) => {
 ## Documentação Futura (a ser criada)
 
 ### Durante Implementação do Launcher
+
 1. `DOCUMENTAÇÃO/LAUNCHER_ARCHITECTURE.md` - Arquitetura detalhada
 2. `DOCUMENTAÇÃO/LAUNCHER_API.md` - API Tauri Commands
 3. `DOCUMENTAÇÃO/LAUNCHER_IPC_PROTOCOL.md` - Protocolo IPC com Node.js
 4. `launcher/README.md` - Quick start para desenvolvedores
 
 ### Durante Implementação do Dashboard
+
 1. `DOCUMENTAÇÃO/DASHBOARD_ARCHITECTURE.md` - Arquitetura Next.js
 2. `DOCUMENTAÇÃO/DASHBOARD_API.md` - Endpoints REST + WebSocket
 3. `DOCUMENTAÇÃO/DASHBOARD_COMPONENTS.md` - Guia de componentes
 4. `dashboard/README.md` - Setup e desenvolvimento
 
 ### Após Integração Completa
+
 1. `DOCUMENTAÇÃO/SYSTEM_INTEGRATION.md` - Como Launcher + Dashboard interagem
 2. `DOCUMENTAÇÃO/USER_GUIDE.md` - Manual do usuário final
 3. `DOCUMENTAÇÃO/DEPLOYMENT.md` - Deploy em produção (Linux/Windows/Mac)
@@ -759,24 +798,25 @@ io.on('connection', (socket) => {
 2. ✅ **DOCUMENTAÇÃO CANÔNICA** (após auditorias)
    - Consolidar todos os subsistemas auditados
    - Criar documentação de referência unificada
-   - Atualizar diagramas de arquitetura
- (Atualizado - 21/01/2026)
+   - Atualizar diagramas de arquitetura (Atualizado - 21/01/2026)
 
-1. ✅ **CONCLUIR AUDITORIAS** - **COMPLETO**
+3. ✅ **CONCLUIR AUDITORIAS** - **COMPLETO**
    - ✅ Subsistemas: KERNEL, DRIVER, INFRA, CORE, NERV, SERVER auditados
    - ✅ Cross-cutting: PM2 (P3.1-P3.5 corrigidos)
    - ✅ Documentação consolidada criada
 
-2. ✅ **DOCUMENTAÇÃO CANÔNICA** - **COMPLETO**
+4. ✅ **DOCUMENTAÇÃO CANÔNICA** - **COMPLETO**
    - ✅ Subsistemas auditados documentados
    - ✅ Documentação de referência unificada (copilot-instructions.md)
    - ✅ Diagramas de arquitetura atualizados
 
-3. ✅ **SUPER (Atualizada - 21/01/2026)
+5. ✅ \*\*SUPER (Atualizada - 21/01/2026)
 
-Este roadmap definiu claramente a evolução do sistema de uma ferramenta CLI/file-based para uma plataforma moderna:
+Este roadmap definiu claramente a evolução do sistema de uma ferramenta CLI/file-based para uma
+plataforma moderna:
 
 ### ✅ Fase 1 Concluída: Super Launcher PM2-First
+
 - **Implementado**: Menu interativo completo (10 operações)
 - **Implementado**: 8 scripts utilitários cross-platform
 - **Implementado**: 4 health endpoints + testes
@@ -787,33 +827,36 @@ Este roadmap definiu claramente a evolução do sistema de uma ferramenta CLI/fi
 - **Decisão Validada**: PM2-First foi a escolha certa
 
 ### ⏳ Fase 2 Planejada: Dashboard Web
+
 - **Framework**: Next.js 14 + shadcn/ui
 - **Escopo**: 7 módulos (Tasks, Queue, Responses, Analytics, Config, Logs, System)
 - **Estimativa**: 50-70h desenvolvimento
 - **Status**: Aguardando testes integrados da Fase 1
 
 ### 🔒 Fase 3 Opcional: Tauri (CONGELADA)
+
 - **Status**: ADIADA indefinidamente
 - **Motivo**: Super Launcher PM2-First + pm2-gui cobrem 100% das necessidades atuais
-- **Reconsiderar apenas se**: Dashboard Web não cobrir casos específicos (tray icon, standalone, etc)
+- **Reconsiderar apenas se**: Dashboard Web não cobrir casos específicos (tray icon, standalone,
+  etc)
 
-**Prioridade Atual**: Executar testes integrados (FASE 8)
-**Estimativa Restante**: 1h (testes) + 50-70h (Dashboard Web futuro)
-**Benefício Alcançado**: Sistema profissional, escalável e fácil de usar **JÁ IMPLEMENTADO**
-
----
-
-**Status Atual**: ✅ FASE 1 COMPLETA (62.5% do plano 8 fases)
-**Próxima Ação**: FASE 8 - Testes Integrados (1h
-5. ⏸️ **DASHBOARD WEB** (futuro - após testes)
-   - MVP primeiro (Tasks + Queue + Responses)
-   - Iterações com feedback de usuários
-   - Features avançadas em releases subsequentes
-   - Estimativa: 50-70h desenvolvimentoção **ANTES** de qualquer implementação.
-**Estimativa Total**: 60-80 horas de desenvolvimento pós-auditoria.
-**Benefício**: Sistema profissional, escalável e fácil de usar.
+**Prioridade Atual**: Executar testes integrados (FASE 8) **Estimativa Restante**: 1h (testes) +
+50-70h (Dashboard Web futuro) **Benefício Alcançado**: Sistema profissional, escalável e fácil de
+usar **JÁ IMPLEMENTADO**
 
 ---
 
-**Status Atual**: 📋 Documento de planejamento criado
-**Próxima Ação**: Retomar auditorias (cross-cutting: PM2, Docker, Security, Performance)
+**Status Atual**: ✅ FASE 1 COMPLETA (62.5% do plano 8 fases) **Próxima Ação**: FASE 8 - Testes
+Integrados (1h 5. ⏸️ **DASHBOARD WEB** (futuro - após testes)
+
+- MVP primeiro (Tasks + Queue + Responses)
+- Iterações com feedback de usuários
+- Features avançadas em releases subsequentes
+- Estimativa: 50-70h desenvolvimentoção **ANTES** de qualquer implementação. **Estimativa Total**:
+  60-80 horas de desenvolvimento pós-auditoria. **Benefício**: Sistema profissional, escalável e
+  fácil de usar.
+
+---
+
+**Status Atual**: 📋 Documento de planejamento criado **Próxima Ação**: Retomar auditorias
+(cross-cutting: PM2, Docker, Security, Performance)

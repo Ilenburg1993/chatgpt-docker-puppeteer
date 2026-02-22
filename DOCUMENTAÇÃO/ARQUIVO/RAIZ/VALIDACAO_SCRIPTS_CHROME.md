@@ -1,7 +1,6 @@
 # ✅ Scripts de Chrome - Validação e Recomendação
 
-**Data**: 2026-02-01
-**Status**: ✅ PRONTO PARA USO
+**Data**: 2026-02-01 **Status**: ✅ PRONTO PARA USO
 
 ---
 
@@ -9,12 +8,11 @@
 
 ### ✅ RECOMENDADO: `START-CHROME-FOR-PROXY.BAT`
 
-**Arquivo**: `/workspaces/chatgpt-docker-puppeteer/START-CHROME-FOR-PROXY.BAT`
-**Versão**: 2.0 (2026-02-01) - Criado hoje
-**Tamanho**: 266 linhas
-**Encoding**: UTF-8 (BOM)
+**Arquivo**: `/workspaces/chatgpt-docker-puppeteer/START-CHROME-FOR-PROXY.BAT` **Versão**: 2.0
+(2026-02-01) - Criado hoje **Tamanho**: 266 linhas **Encoding**: UTF-8 (BOM)
 
 **Características**:
+
 - ✅ Interface interativa e amigável
 - ✅ Validações automáticas (porta, processo, endpoint)
 - ✅ Feedback visual colorido (usando caracteres box-drawing)
@@ -26,6 +24,7 @@
 - ✅ Configuração via env var (`CHROME_PORT=9225`)
 
 **Melhorias implementadas**:
+
 - Detecção inteligente de Chrome (3 localizações)
 - Verificação se processo na porta é realmente Chrome (via curl)
 - Output de validação JSON para troubleshooting
@@ -33,6 +32,7 @@
 - Mantém janela aberta (Chrome roda em foreground)
 
 **Uso**:
+
 ```bat
 REM Windows Host (CMD, PowerShell, Git Bash)
 START-CHROME-FOR-PROXY.BAT
@@ -46,12 +46,11 @@ START-CHROME-FOR-PROXY.BAT
 
 ### ✅ ALTERNATIVA: `start-chrome-windows.ps1`
 
-**Arquivo**: `/workspaces/chatgpt-docker-puppeteer/start-chrome-windows.ps1`
-**Versão**: 2.0 (2026-02-01) - Melhorado hoje
-**Tamanho**: 202 linhas
-**Linguagem**: PowerShell
+**Arquivo**: `/workspaces/chatgpt-docker-puppeteer/start-chrome-windows.ps1` **Versão**: 2.0
+(2026-02-01) - Melhorado hoje **Tamanho**: 202 linhas **Linguagem**: PowerShell
 
 **Características**:
+
 - ✅ Output estruturado (JSON)
 - ✅ Suporta modo headless (`-Headless`)
 - ✅ Force kill (`-ForceKill`)
@@ -62,6 +61,7 @@ START-CHROME-FOR-PROXY.BAT
 - ✅ Validação DevTools com retry (30 tentativas)
 
 **Melhorias implementadas hoje**:
+
 - Header atualizado com arquitetura (Chrome ← Proxy ← Container)
 - Output visual melhorado (cores, formatação)
 - Seção "PRÓXIMOS PASSOS" integrada
@@ -69,6 +69,7 @@ START-CHROME-FOR-PROXY.BAT
 - Exemplos de uso expandidos
 
 **Uso**:
+
 ```powershell
 # PowerShell (Windows Host)
 .\start-chrome-windows.ps1
@@ -84,6 +85,7 @@ START-CHROME-FOR-PROXY.BAT
 ## 🎯 Qual Usar?
 
 ### Use `START-CHROME-FOR-PROXY.BAT` se:
+
 - ✅ Quer interface interativa com feedback visual
 - ✅ Prefere CMD/Batch (mais familiar)
 - ✅ Quer validações automáticas integradas
@@ -91,6 +93,7 @@ START-CHROME-FOR-PROXY.BAT
 - ✅ Quer ver instruções de próximos passos
 
 ### Use `start-chrome-windows.ps1` se:
+
 - ✅ Prefere PowerShell
 - ✅ Precisa de modo headless
 - ✅ Quer output JSON estruturado
@@ -101,18 +104,18 @@ START-CHROME-FOR-PROXY.BAT
 
 ## 🔍 Comparação Técnica
 
-| Característica  | .BAT          | .PS1                 |
-| --------------- | ------------- | -------------------- |
-| Interface       | Interativa    | Programática         |
+| Característica  | .BAT           | .PS1                  |
+| --------------- | -------------- | --------------------- |
+| Interface       | Interativa     | Programática          |
 | Validação porta | ✅ Auto        | ✅ Auto               |
 | Kill processo   | ✅ Confirmação | ✅ Force (-ForceKill) |
-| Retry logic     | 10x (1s)      | 30x (1s)             |
+| Retry logic     | 10x (1s)       | 30x (1s)              |
 | Output JSON     | ✅ Curl inline | ✅ Structured         |
 | Modo headless   | ❌             | ✅                    |
 | Próximos passos | ✅ Integrado   | ✅ Integrado          |
 | Profile isolado | ✅             | ✅                    |
 | Porta custom    | ✅ env var     | ✅ parâmetro          |
-| Encoding        | UTF-8 BOM     | UTF-8                |
+| Encoding        | UTF-8 BOM      | UTF-8                 |
 
 ---
 
@@ -128,6 +131,7 @@ Retry Delay:       1 segundo
 ```
 
 **Argumentos Chrome** (ambos usam):
+
 ```
 --remote-debugging-port=9225
 --user-data-dir=%TEMP%\chrome-debug-9225
@@ -149,6 +153,7 @@ Retry Delay:       1 segundo
 ### Checklist de Qualidade
 
 **START-CHROME-FOR-PROXY.BAT**:
+
 - [x] Encoding UTF-8 com BOM
 - [x] Chcp 65001 no início (Unicode)
 - [x] Setlocal enabledelayedexpansion
@@ -163,6 +168,7 @@ Retry Delay:       1 segundo
 - [x] Exit codes corretos (0=ok, 1=erro)
 
 **start-chrome-windows.ps1**:
+
 - [x] Set-StrictMode -Version Latest
 - [x] Funções modulares (Find-Chrome, Test-PortOpen, Wait-For-DevTools)
 - [x] Error handling (try/catch)
@@ -179,6 +185,7 @@ Retry Delay:       1 segundo
 ## 🚀 Workflow Recomendado
 
 ### 1. Validar Scripts
+
 ```bash
 # No container (validar sintaxe)
 bash -c "exit 0"  # Scripts estão no Windows Host, não no container
@@ -187,6 +194,7 @@ bash -c "exit 0"  # Scripts estão no Windows Host, não no container
 ### 2. Executar no Windows Host
 
 **Opção A - Batch (RECOMENDADO)**:
+
 ```bat
 REM Windows Host - CMD ou PowerShell
 cd C:\caminho\do\projeto
@@ -194,6 +202,7 @@ START-CHROME-FOR-PROXY.BAT
 ```
 
 **Opção B - PowerShell**:
+
 ```powershell
 # Windows Host - PowerShell
 cd C:\caminho\do\projeto
@@ -201,12 +210,14 @@ cd C:\caminho\do\projeto
 ```
 
 ### 3. Validar Chrome Online
+
 ```bash
 # Windows Host ou Container
 curl http://localhost:9225/json/version
 ```
 
 **Output esperado**:
+
 ```json
 {
   "Browser": "Chrome/131.0.6778.86",
@@ -217,6 +228,7 @@ curl http://localhost:9225/json/version
 ```
 
 ### 4. Próximos Passos
+
 1. ✅ Chrome rodando → Iniciar Proxy (Terminal 2)
 2. ✅ Proxy rodando → Iniciar Sistema (Terminal 3)
 3. ✅ Sistema rodando → Executar Testes
@@ -238,11 +250,8 @@ Antes de executar os testes, certifique-se:
 
 ## 🎯 Status Atual
 
-**Scripts validados**: ✅ 2/2
-**Encoding correto**: ✅ UTF-8
-**Sintaxe verificada**: ✅ Sem erros
-**Melhorias aplicadas**: ✅ Hoje (2026-02-01)
-**Documentação criada**: ✅ GUIA_INICIAR_CHROME.md
+**Scripts validados**: ✅ 2/2 **Encoding correto**: ✅ UTF-8 **Sintaxe verificada**: ✅ Sem erros
+**Melhorias aplicadas**: ✅ Hoje (2026-02-01) **Documentação criada**: ✅ GUIA_INICIAR_CHROME.md
 
 **Pronto para**: Executar no Windows Host e validar
 
@@ -259,6 +268,7 @@ Antes de executar os testes, certifique-se:
 5. Reporte resultado aqui
 
 **Comando exato**:
+
 ```bat
 REM No Windows Host (CMD, PowerShell ou Git Bash)
 cd C:\caminho\para\chatgpt-docker-puppeteer
@@ -266,6 +276,7 @@ START-CHROME-FOR-PROXY.BAT
 ```
 
 **Após Chrome iniciado**, volte aqui e confirme:
+
 ```
 ✅ Chrome rodando na porta 9225
 ✅ DevTools validado
@@ -275,6 +286,7 @@ START-CHROME-FOR-PROXY.BAT
 ---
 
 **Arquivos Criados/Melhorados Hoje**:
+
 1. `START-CHROME-FOR-PROXY.BAT` ✅ NOVO (266 linhas)
 2. `start-chrome-windows.ps1` ✅ MELHORADO (output + docs)
 3. `GUIA_INICIAR_CHROME.md` ✅ NOVO (documentação)

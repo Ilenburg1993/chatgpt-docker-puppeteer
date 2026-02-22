@@ -1,15 +1,16 @@
 # 🌊 Fluxos de Dados do Sistema
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Desenvolvedores (intermediário a avançado)
-**Tempo de Leitura**: ~20 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Desenvolvedores (intermediário
+a avançado) **Tempo de Leitura**: ~20 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento detalha os **fluxos de dados** através do sistema `chatgpt-docker-puppeteer`: como informações transitam entre componentes, transformações aplicadas, e pontos de persistência. Complementa [ARCHITECTURE.md](ARCHITECTURE.md) e [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) com foco em **dados**, não estrutura.
+Este documento detalha os **fluxos de dados** através do sistema `chatgpt-docker-puppeteer`: como
+informações transitam entre componentes, transformações aplicadas, e pontos de persistência.
+Complementa [ARCHITECTURE.md](ARCHITECTURE.md) e [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) com foco em
+**dados**, não estrutura.
 
 ### O Que Este Documento Cobre
 
@@ -32,6 +33,7 @@ Ao ler este documento, você aprenderá:
 - **Observabilidade** (correlation IDs, telemetria)
 
 **Pré-requisitos**:
+
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Entender containers e componentes
 - [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) - Conhecer sequence diagrams básicos
 
@@ -57,15 +59,16 @@ Ao ler este documento, você aprenderá:
 ```json
 // fila/task-abc123.json
 {
-    "id": "task-abc123",
-    "target": "chatgpt",
-    "prompt": "Explique event loop em Node.js",
-    "priority": 1,
-    "createdAt": 1737469200000
+  "id": "task-abc123",
+  "target": "chatgpt",
+  "prompt": "Explique event loop em Node.js",
+  "priority": 1,
+  "createdAt": 1737469200000
 }
 ```
 
 **Validações Pendentes**:
+
 - ❌ Ainda não validado (JSON raw no filesystem)
 - ❌ Pode conter erros de sintaxe
 - ❌ Pode ter campos faltando
@@ -87,6 +90,7 @@ fs.writeFileSync('fila/task-abc123.json', json, 'utf-8');
 **Ponto de Persistência**: `fila/task-abc123.json`
 
 **Eventos Disparados**:
+
 - Sistema operacional: file change event
 - File watcher (100ms debounce): detectará mudança
 
@@ -99,6 +103,7 @@ fs.writeFileSync('fila/task-abc123.json', json, 'utf-8');
 **Ator**: `src/infra/queue/fs_watcher.js`
 
 **Fluxo**:
+
 ```
 OS File Change Event
     ↓
@@ -110,26 +115,28 @@ Trigger action
 ```
 
 **Código**:
+
 ```javascript
 // src/infra/queue/fs_watcher.js
-watcher.on('add', (filePath) => {
-    debouncedInvalidate(() => {
-        log('DEBUG', `[WATCHER] New file detected: ${filePath}`);
+watcher.on('add', filePath => {
+  debouncedInvalidate(() => {
+    log('DEBUG', `[WATCHER] New file detected: ${filePath}`);
 
-        // P5.2: Mark dirty BEFORE any operation
-        cache.markDirty();
+    // P5.2: Mark dirty BEFORE any operation
+    cache.markDirty();
 
-        // Notify NERV
-        nerv.emit('QUEUE_CHANGE', {
-            action: 'add',
-            filePath,
-            timestamp: Date.now()
-        });
-    }, 100);
+    // Notify NERV
+    nerv.emit('QUEUE_CHANGE', {
+      action: 'add',
+      filePath,
+      timestamp: Date.now(),
+    });
+  }, 100);
 });
 ```
 
 **Saída**:
+
 - ✅ Cache invalidado (`isCacheDirty = true`)
 - ✅ Evento NERV emitido (`QUEUE_CHANGE`)
 
@@ -140,6 +147,7 @@ watcher.on('add', (filePath) => {
 **Ator**: `src/infra/queue/cache.js`
 
 **Estado Antes**:
+
 ```javascript
 {
     globalQueueCache: [...], // Snapshot antigo
@@ -149,14 +157,16 @@ watcher.on('add', (filePath) => {
 ```
 
 **Transformação**:
+
 ```javascript
 function markDirty() {
-    isCacheDirty = true;  // P5.2: Marca ANTES de qualquer I/O
-    log('DEBUG', '[CACHE] Marked dirty - next scan will refresh');
+  isCacheDirty = true; // P5.2: Marca ANTES de qualquer I/O
+  log('DEBUG', '[CACHE] Marked dirty - next scan will refresh');
 }
 ```
 
 **Estado Depois**:
+
 ```javascript
 {
     globalQueueCache: [...], // Ainda snapshot antigo
@@ -178,32 +188,30 @@ function markDirty() {
 **Frequência**: 20Hz = 50ms por ciclo
 
 **Fluxo**:
+
 ```javascript
 async function cycle() {
-    const cycleStart = Date.now();
+  const cycleStart = Date.now();
 
-    try {
-        // [P9.4] Timeout wrapper (5s)
-        const decisions = await Promise.race([
-            gatherDecisions(),
-            timeoutPromise(5000)
-        ]);
+  try {
+    // [P9.4] Timeout wrapper (5s)
+    const decisions = await Promise.race([gatherDecisions(), timeoutPromise(5000)]);
 
-        await processDecisions(decisions);
+    await processDecisions(decisions);
+  } catch (error) {
+    handleError(error);
+  }
 
-    } catch (error) {
-        handleError(error);
-    }
+  const cycleDuration = Date.now() - cycleStart;
 
-    const cycleDuration = Date.now() - cycleStart;
-
-    // Manter 20Hz (50ms target)
-    const nextDelay = Math.max(0, 50 - cycleDuration);
-    setTimeout(() => cycle(), nextDelay);
+  // Manter 20Hz (50ms target)
+  const nextDelay = Math.max(0, 50 - cycleDuration);
+  setTimeout(() => cycle(), nextDelay);
 }
 ```
 
 **Métricas**:
+
 - Ciclo típico: 10-30ms
 - Overhead: 20-40% do tempo disponível
 - Remaining: 60-80% para decisões reais
@@ -215,6 +223,7 @@ async function cycle() {
 **Ator**: `src/kernel/policy_engine/policy_engine.js`
 
 **Input**:
+
 ```javascript
 {
     runningTasks: Set(2),     // 2 tasks executando
@@ -224,20 +233,22 @@ async function cycle() {
 ```
 
 **Consulta Queue**:
+
 ```javascript
 async function evaluateTasks() {
-    const queue = await queueCache.getQueue();
-    const running = maestro.getRunningTasks().size;
+  const queue = await queueCache.getQueue();
+  const running = maestro.getRunningTasks().size;
 
-    return {
-        canAllocate: running < CONFIG.MAX_WORKERS,
-        queueSize: queue.length,
-        nextTask: queue[0] || null
-    };
+  return {
+    canAllocate: running < CONFIG.MAX_WORKERS,
+    queueSize: queue.length,
+    nextTask: queue[0] || null,
+  };
 }
 ```
 
 **Output**:
+
 ```javascript
 {
     canAllocate: true,        // 2 < 3 workers
@@ -260,31 +271,30 @@ async function evaluateTasks() {
 **Trigger**: `getQueue()` detectou `isCacheDirty = true`
 
 **Fluxo**:
+
 ```javascript
 async function scanQueue() {
-    const files = fs.readdirSync('fila/')
-        .filter(f => f.endsWith('.json'));
+  const files = fs.readdirSync('fila/').filter(f => f.endsWith('.json'));
 
-    // P9.7: p-limit controla concorrência (10 simultâneos)
-    const limit = pLimit(10);
+  // P9.7: p-limit controla concorrência (10 simultâneos)
+  const limit = pLimit(10);
 
-    const tasks = await Promise.all(
-        files.map(file => limit(() => loadTask(file)))
-    );
+  const tasks = await Promise.all(files.map(file => limit(() => loadTask(file))));
 
-    // P9.6: Cache metrics
-    cacheHits = 0;
-    cacheMisses++;
+  // P9.6: Cache metrics
+  cacheHits = 0;
+  cacheMisses++;
 
-    globalQueueCache = tasks.filter(Boolean);
-    lastFullScan = Date.now();
-    isCacheDirty = false;
+  globalQueueCache = tasks.filter(Boolean);
+  lastFullScan = Date.now();
+  isCacheDirty = false;
 
-    return globalQueueCache;
+  return globalQueueCache;
 }
 ```
 
 **Transformação**:
+
 ```
 Files (15 arquivos)
     ↓ readdir
@@ -298,6 +308,7 @@ Files (15 arquivos)
 ```
 
 **Performance** (P9.7):
+
 - Antes: 15 files = 15 FDs simultâneos
 - Depois: 15 files = 10 FDs max (p-limit)
 - Latência: 200ms (cache miss)
@@ -313,60 +324,66 @@ Files (15 arquivos)
 ```javascript
 // 1. Load raw JSON
 function loadTask(taskId) {
-    const filePath = path.join(ROOT, 'fila', `${taskId}.json`);
+  const filePath = path.join(ROOT, 'fila', `${taskId}.json`);
 
-    // P8.7: Path traversal protection
-    if (!isPathSafe(filePath)) {
-        throw new Error('SECURITY_PATH_TRAVERSAL');
-    }
+  // P8.7: Path traversal protection
+  if (!isPathSafe(filePath)) {
+    throw new Error('SECURITY_PATH_TRAVERSAL');
+  }
 
-    // P8.8: Symlink validation
-    const stats = fs.lstatSync(filePath);
-    if (stats.isSymbolicLink()) {
-        throw new Error('SECURITY_SYMLINK_DENIED');
-    }
+  // P8.8: Symlink validation
+  const stats = fs.lstatSync(filePath);
+  if (stats.isSymbolicLink()) {
+    throw new Error('SECURITY_SYMLINK_DENIED');
+  }
 
-    const rawJson = fs.readFileSync(filePath, 'utf-8');
-    const rawData = JSON.parse(rawJson);
+  const rawJson = fs.readFileSync(filePath, 'utf-8');
+  const rawData = JSON.parse(rawJson);
 
-    // 2. Validate with Zod schema
-    return schemas.parseTask(rawData);
+  // 2. Validate with Zod schema
+  return schemas.parseTask(rawData);
 }
 ```
 
 **Schema Validation** (Zod):
+
 ```javascript
 // src/core/schemas.js
 const TaskSchema = z.object({
-    id: z.string().min(1),
-    target: z.enum(['chatgpt', 'gemini']),
-    prompt: z.string().min(1),
-    state: z.enum(['PENDING', 'RUNNING', 'DONE', 'FAILED']).optional(),
-    priority: z.number().int().min(0).max(10).optional(),
-    createdAt: z.number().int().positive(),
-    spec: z.object({
-        validation: z.object({
-            minLength: z.number().optional(),
-            forbiddenTerms: z.array(z.string()).optional()
-        }).optional()
-    }).optional()
+  id: z.string().min(1),
+  target: z.enum(['chatgpt', 'gemini']),
+  prompt: z.string().min(1),
+  state: z.enum(['PENDING', 'RUNNING', 'DONE', 'FAILED']).optional(),
+  priority: z.number().int().min(0).max(10).optional(),
+  createdAt: z.number().int().positive(),
+  spec: z
+    .object({
+      validation: z
+        .object({
+          minLength: z.number().optional(),
+          forbiddenTerms: z.array(z.string()).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 function parseTask(data) {
-    const result = TaskSchema.safeParse(data);
+  const result = TaskSchema.safeParse(data);
 
-    if (!result.success) {
-        log('ERROR', `[SCHEMA] Invalid task: ${result.error.message}`);
-        // Move para fila/corrupted/
-        moveToCorrupted(data.id);
-        return null;
-    }
+  if (!result.success) {
+    log('ERROR', `[SCHEMA] Invalid task: ${result.error.message}`);
+    // Move para fila/corrupted/
+    moveToCorrupted(data.id);
+    return null;
+  }
 
-    return result.data;
+  return result.data;
 }
 ```
 
 **Transformação**:
+
 ```
 Raw JSON (untyped)
     ↓ JSON.parse()
@@ -386,38 +403,41 @@ Error (moved to corrupted/) ❌
 **Ator**: `src/kernel/maestro/maestro.js`
 
 **Decisão**:
+
 ```javascript
 if (policy.canAllocate && policy.nextTask) {
-    await allocateTask(policy.nextTask);
+  await allocateTask(policy.nextTask);
 }
 ```
 
 **Allocation Flow**:
+
 ```javascript
 async function allocateTask(task) {
-    // 1. Update state (optimistic locking - P5.1)
-    await taskRuntime.updateState(task.id, 'RUNNING', 'PENDING');
+  // 1. Update state (optimistic locking - P5.1)
+  await taskRuntime.updateState(task.id, 'RUNNING', 'PENDING');
 
-    // 2. Add to running set
-    runningTasks.add(task.id);
+  // 2. Add to running set
+  runningTasks.add(task.id);
 
-    // 3. Emit via NERV
-    nervBridge.emit('TASK_ALLOCATED', {
-        taskId: task.id,
-        target: task.target,
-        prompt: task.prompt,
-        correlationId: generateCorrelationId()
-    });
+  // 3. Emit via NERV
+  nervBridge.emit('TASK_ALLOCATED', {
+    taskId: task.id,
+    target: task.target,
+    prompt: task.prompt,
+    correlationId: generateCorrelationId(),
+  });
 
-    // 4. Telemetry
-    telemetry.emit('task.allocated', {
-        taskId: task.id,
-        queueWaitTime: Date.now() - task.createdAt
-    });
+  // 4. Telemetry
+  telemetry.emit('task.allocated', {
+    taskId: task.id,
+    queueWaitTime: Date.now() - task.createdAt,
+  });
 }
 ```
 
 **State Transition**:
+
 ```
 Task {
     state: 'PENDING',
@@ -464,6 +484,7 @@ Driver.on('TASK_ALLOCATED', handler)
 ```
 
 **Envelope Structure**:
+
 ```javascript
 {
     messageType: 'TASK_ALLOCATED',
@@ -480,22 +501,24 @@ Driver.on('TASK_ALLOCATED', handler)
 ```
 
 **Serialization (P9.5 - Memoização)**:
+
 ```javascript
 function serializeEnvelope(envelope) {
-    // Cache hit: retorna imediatamente
-    if (envelope._serialized) {
-        return envelope._serialized;
-    }
-
-    // Cache miss: serializa e guarda
-    const { _serialized, ...clean } = envelope;
-    envelope._serialized = JSON.stringify(clean);
-
+  // Cache hit: retorna imediatamente
+  if (envelope._serialized) {
     return envelope._serialized;
+  }
+
+  // Cache miss: serializa e guarda
+  const { _serialized, ...clean } = envelope;
+  envelope._serialized = JSON.stringify(clean);
+
+  return envelope._serialized;
 }
 ```
 
 **Performance**:
+
 - 1ª serialização: ~5ms (parse + stringify)
 - 2ª+ serializações: ~0.1ms (cache hit)
 - Reduction: 98% em hot paths (kernel loop 20Hz)
@@ -509,29 +532,29 @@ function serializeEnvelope(envelope) {
 **Ator**: `src/driver/nerv_adapter/nerv_adapter.js`
 
 **Handler**:
+
 ```javascript
 class DriverNERVAdapter {
-    constructor() {
-        nerv.on('TASK_ALLOCATED', (envelope) => {
-            this.handleAllocation(envelope.payload);
-        });
+  constructor() {
+    nerv.on('TASK_ALLOCATED', envelope => {
+      this.handleAllocation(envelope.payload);
+    });
+  }
+
+  async handleAllocation({ taskId, target, prompt, correlationId }) {
+    log('INFO', `[DRIVER] Received task ${taskId} for ${target}`, {
+      correlationId,
+    });
+
+    try {
+      const driver = DriverFactory.create(target);
+      const result = await driver.execute(taskId, prompt);
+
+      this.emitResult('SUCCESS', taskId, result, correlationId);
+    } catch (error) {
+      this.emitResult('FAILURE', taskId, error, correlationId);
     }
-
-    async handleAllocation({ taskId, target, prompt, correlationId }) {
-        log('INFO', `[DRIVER] Received task ${taskId} for ${target}`, {
-            correlationId
-        });
-
-        try {
-            const driver = DriverFactory.create(target);
-            const result = await driver.execute(taskId, prompt);
-
-            this.emitResult('SUCCESS', taskId, result, correlationId);
-
-        } catch (error) {
-            this.emitResult('FAILURE', taskId, error, correlationId);
-        }
-    }
+  }
 }
 ```
 
@@ -542,49 +565,52 @@ class DriverNERVAdapter {
 **Ator**: `src/infra/browser_pool/pool_manager.js`
 
 **Request**:
+
 ```javascript
 const page = await browserPool.allocatePage('chatgpt');
 ```
 
 **Pool Selection (P9.2 - Circuit Breaker)**:
+
 ```javascript
 function _selectInstance(target) {
-    // Filtrar apenas instâncias HEALTHY (circuit breaker)
-    const healthy = pool.filter(e =>
-        e.health.status === 'HEALTHY' &&
-        e.health.consecutiveFailures === 0
-    );
+  // Filtrar apenas instâncias HEALTHY (circuit breaker)
+  const healthy = pool.filter(
+    e => e.health.status === 'HEALTHY' && e.health.consecutiveFailures === 0
+  );
 
-    if (healthy.length === 0) {
-        throw new Error('BROWSER_POOL_EXHAUSTED');
-    }
+  if (healthy.length === 0) {
+    throw new Error('BROWSER_POOL_EXHAUSTED');
+  }
 
-    // Round-robin ou least-loaded
-    const instance = selectByStrategy(healthy);
+  // Round-robin ou least-loaded
+  const instance = selectByStrategy(healthy);
 
-    return instance;
+  return instance;
 }
 ```
 
 **Page Allocation**:
+
 ```javascript
 async function allocatePage(target) {
-    const instance = _selectInstance(target);
+  const instance = _selectInstance(target);
 
-    // Criar nova página
-    const page = await instance.browser.newPage();
+  // Criar nova página
+  const page = await instance.browser.newPage();
 
-    // Configurar interceptors, user-agent, etc
-    await setupPage(page);
+  // Configurar interceptors, user-agent, etc
+  await setupPage(page);
 
-    // Incrementar contador
-    instance.stats.activeTasks++;
+  // Incrementar contador
+  instance.stats.activeTasks++;
 
-    return page;
+  return page;
 }
 ```
 
 **State Transition**:
+
 ```
 BrowserInstance {
     health: { status: 'HEALTHY', consecutiveFailures: 0 },
@@ -604,32 +630,36 @@ BrowserInstance {
 **Ator**: `src/driver/modules/human.js`
 
 **Input** (raw prompt):
+
 ```javascript
-const rawPrompt = "Explique\x00event\r\nloop\x1Fem Node.js";
+const rawPrompt = 'Explique\x00event\r\nloop\x1Fem Node.js';
 ```
 
 **Sanitization**:
+
 ```javascript
 function sanitizePrompt(text) {
-    // Remove control characters (\x00-\x1F, exceto \n e \t)
-    let clean = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+  // Remove control characters (\x00-\x1F, exceto \n e \t)
+  let clean = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
 
-    // Normalizar line endings (CRLF → LF)
-    clean = clean.replace(/\r\n/g, '\n');
+  // Normalizar line endings (CRLF → LF)
+  clean = clean.replace(/\r\n/g, '\n');
 
-    // Trim whitespace
-    clean = clean.trim();
+  // Trim whitespace
+  clean = clean.trim();
 
-    return clean;
+  return clean;
 }
 ```
 
 **Output** (sanitized):
+
 ```javascript
-const sanitized = "Explique event\nloop em Node.js";
+const sanitized = 'Explique event\nloop em Node.js';
 ```
 
 **Por Que Importante**:
+
 - ❌ `\x00` (null byte) pode quebrar browser protocol
 - ❌ `\x1F` (control chars) podem causar comportamento inesperado
 - ✅ Sanitização previne ataques de injection
@@ -641,6 +671,7 @@ const sanitized = "Explique event\nloop em Node.js";
 **Ator**: `src/driver/modules/human.js`
 
 **Input**:
+
 ```javascript
 {
     page: ChromiumPage,
@@ -651,47 +682,50 @@ const sanitized = "Explique event\nloop em Node.js";
 ```
 
 **Fluxo**:
+
 ```javascript
 async function type(page, element, text, delays = {}) {
-    const chars = text.split('');
+  const chars = text.split('');
 
-    for (const char of chars) {
-        // Delay adaptativo (EMA algorithm)
-        const delay = adaptiveDelay.next(char);
+  for (const char of chars) {
+    // Delay adaptativo (EMA algorithm)
+    const delay = adaptiveDelay.next(char);
 
-        await element.type(char);
-        await page.waitForTimeout(delay);
-    }
+    await element.type(char);
+    await page.waitForTimeout(delay);
+  }
 }
 ```
 
 **Adaptive Delay** (P7.1-P7.5):
+
 ```javascript
 // src/logic/adaptive_delay.js
 class AdaptiveDelay {
-    constructor() {
-        this.ema = 100;  // Exponential Moving Average
-        this.alpha = 0.3;
+  constructor() {
+    this.ema = 100; // Exponential Moving Average
+    this.alpha = 0.3;
+  }
+
+  next(char) {
+    // Randomização base
+    const base = Math.random() * (150 - 50) + 50;
+
+    // EMA smoothing
+    this.ema = this.alpha * base + (1 - this.alpha) * this.ema;
+
+    // Outlier rejection (6σ)
+    if (Math.abs(base - this.ema) > 6 * stdDev) {
+      return this.ema; // Rejeitar outlier
     }
 
-    next(char) {
-        // Randomização base
-        const base = Math.random() * (150 - 50) + 50;
-
-        // EMA smoothing
-        this.ema = this.alpha * base + (1 - this.alpha) * this.ema;
-
-        // Outlier rejection (6σ)
-        if (Math.abs(base - this.ema) > 6 * stdDev) {
-            return this.ema;  // Rejeitar outlier
-        }
-
-        return Math.round(this.ema);
-    }
+    return Math.round(this.ema);
+  }
 }
 ```
 
 **Timeline**:
+
 ```
 Char: 'E' → delay: 95ms  → type
 Char: 'x' → delay: 103ms → type
@@ -709,49 +743,51 @@ Total: 32 chars × ~95ms avg = ~3s total
 **Goal**: Coletar resposta enquanto LLM gera (30-120s)
 
 **Anti-Loop Heuristics**:
+
 ```javascript
 async function collectResponse(page, taskId) {
-    let response = '';
-    let lastHash = '';
-    let stableCount = 0;
+  let response = '';
+  let lastHash = '';
+  let stableCount = 0;
 
-    const MAX_STABLE = 3;  // 3 chunks idênticos = fim
-    const POLL_INTERVAL = 1000;  // 1s entre polls
+  const MAX_STABLE = 3; // 3 chunks idênticos = fim
+  const POLL_INTERVAL = 1000; // 1s entre polls
 
-    while (stableCount < MAX_STABLE) {
-        // Extrair texto atual
-        const currentText = await page.evaluate(() => {
-            const element = document.querySelector('.response-text');
-            return element ? element.innerText : '';
-        });
+  while (stableCount < MAX_STABLE) {
+    // Extrair texto atual
+    const currentText = await page.evaluate(() => {
+      const element = document.querySelector('.response-text');
+      return element ? element.innerText : '';
+    });
 
-        // Hash comparison (anti-loop)
-        const currentHash = hash(currentText);
+    // Hash comparison (anti-loop)
+    const currentHash = hash(currentText);
 
-        if (currentHash === lastHash) {
-            stableCount++;
-            log('DEBUG', `[COLLECTION] Stable count: ${stableCount}/${MAX_STABLE}`);
-        } else {
-            stableCount = 0;
-            response = currentText;
-            lastHash = currentHash;
+    if (currentHash === lastHash) {
+      stableCount++;
+      log('DEBUG', `[COLLECTION] Stable count: ${stableCount}/${MAX_STABLE}`);
+    } else {
+      stableCount = 0;
+      response = currentText;
+      lastHash = currentHash;
 
-            // Emit progress (optional)
-            nerv.emit('DRIVER_PROGRESS', {
-                taskId,
-                length: response.length,
-                timestamp: Date.now()
-            });
-        }
-
-        await page.waitForTimeout(POLL_INTERVAL);
+      // Emit progress (optional)
+      nerv.emit('DRIVER_PROGRESS', {
+        taskId,
+        length: response.length,
+        timestamp: Date.now(),
+      });
     }
 
-    return response;
+    await page.waitForTimeout(POLL_INTERVAL);
+  }
+
+  return response;
 }
 ```
 
 **Timeline**:
+
 ```
 t=0s    : response = "" (vazio)
 t=1s    : response = "Event loop é..." (generating)
@@ -763,12 +799,13 @@ t=30s   : response = "...conclusão." (stable 3/3) ✅ DONE
 ```
 
 **Hash Function**:
+
 ```javascript
 function hash(text) {
-    // Simple hash (não criptográfico)
-    return text.split('').reduce((acc, char) => {
-        return ((acc << 5) - acc) + char.charCodeAt(0);
-    }, 0);
+  // Simple hash (não criptográfico)
+  return text.split('').reduce((acc, char) => {
+    return (acc << 5) - acc + char.charCodeAt(0);
+  }, 0);
 }
 ```
 
@@ -781,6 +818,7 @@ function hash(text) {
 **Ator**: `src/infra/storage/io.js`
 
 **Input**:
+
 ```javascript
 {
     taskId: 'task-abc123',
@@ -789,21 +827,22 @@ function hash(text) {
 ```
 
 **Fluxo**:
+
 ```javascript
 async function saveResponse(taskId, text) {
-    const filePath = path.join(ROOT, 'respostas', `${taskId}.txt`);
+  const filePath = path.join(ROOT, 'respostas', `${taskId}.txt`);
 
-    // P8.7: Path safety
-    if (!isPathSafe(filePath)) {
-        throw new Error('SECURITY_PATH_TRAVERSAL');
-    }
+  // P8.7: Path safety
+  if (!isPathSafe(filePath)) {
+    throw new Error('SECURITY_PATH_TRAVERSAL');
+  }
 
-    // Write atomically
-    const tmpPath = `${filePath}.tmp`;
-    fs.writeFileSync(tmpPath, text, 'utf-8');
-    fs.renameSync(tmpPath, filePath);  // Atomic on POSIX
+  // Write atomically
+  const tmpPath = `${filePath}.tmp`;
+  fs.writeFileSync(tmpPath, text, 'utf-8');
+  fs.renameSync(tmpPath, filePath); // Atomic on POSIX
 
-    log('INFO', `[STORAGE] Response saved: ${taskId} (${text.length} bytes)`);
+  log('INFO', `[STORAGE] Response saved: ${taskId} (${text.length} bytes)`);
 }
 ```
 
@@ -816,17 +855,19 @@ async function saveResponse(taskId, text) {
 **Ator**: `src/driver/nerv_adapter/nerv_adapter.js`
 
 **Event**:
+
 ```javascript
 nerv.emit('DRIVER_RESULT', {
-    taskId: 'task-abc123',
-    status: 'SUCCESS',
-    responseLength: 1234,
-    duration: 32000,  // 32s
-    correlationId: '550e8400-...'
+  taskId: 'task-abc123',
+  status: 'SUCCESS',
+  responseLength: 1234,
+  duration: 32000, // 32s
+  correlationId: '550e8400-...',
 });
 ```
 
 **Envelope**:
+
 ```javascript
 {
     messageType: 'DRIVER_RESULT',
@@ -844,44 +885,45 @@ nerv.emit('DRIVER_RESULT', {
 **Ator**: `src/kernel/maestro/maestro.js`
 
 **Handler**:
+
 ```javascript
 nerv.on('DRIVER_RESULT', async ({ taskId, status, correlationId }) => {
-    try {
-        // 1. Update state (optimistic locking - P5.1)
-        await taskRuntime.updateState(
-            taskId,
-            status === 'SUCCESS' ? 'DONE' : 'FAILED',
-            'RUNNING'  // Expected state
-        );
+  try {
+    // 1. Update state (optimistic locking - P5.1)
+    await taskRuntime.updateState(
+      taskId,
+      status === 'SUCCESS' ? 'DONE' : 'FAILED',
+      'RUNNING' // Expected state
+    );
 
-        // 2. Remove from running set
-        runningTasks.delete(taskId);
+    // 2. Remove from running set
+    runningTasks.delete(taskId);
 
-        // 3. Move file fila/ → processadas/
-        await moveToProcessed(taskId);
+    // 3. Move file fila/ → processadas/
+    await moveToProcessed(taskId);
 
-        // 4. Telemetry
-        telemetry.emit('task.completed', {
-            taskId,
-            status,
-            totalDuration: Date.now() - task.createdAt,
-            correlationId
-        });
+    // 4. Telemetry
+    telemetry.emit('task.completed', {
+      taskId,
+      status,
+      totalDuration: Date.now() - task.createdAt,
+      correlationId,
+    });
 
-        // 5. Broadcast to dashboard
-        nerv.emit('TASK_STATE_CHANGE', {
-            taskId,
-            state: status === 'SUCCESS' ? 'DONE' : 'FAILED',
-            timestamp: Date.now()
-        });
-
-    } catch (error) {
-        log('ERROR', `[KERNEL] Failed to finalize task ${taskId}: ${error.message}`);
-    }
+    // 5. Broadcast to dashboard
+    nerv.emit('TASK_STATE_CHANGE', {
+      taskId,
+      state: status === 'SUCCESS' ? 'DONE' : 'FAILED',
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    log('ERROR', `[KERNEL] Failed to finalize task ${taskId}: ${error.message}`);
+  }
 });
 ```
 
 **State Transition**:
+
 ```
 Task {
     state: 'RUNNING',
@@ -903,38 +945,40 @@ Task {
 **Ator**: `src/server/engine/socket.js`
 
 **Debouncing** (50ms):
+
 ```javascript
 const pendingBroadcasts = new Map();
 let timer = null;
 
 function debouncedBroadcast(taskId, data) {
-    // Buffer update
-    pendingBroadcasts.set(taskId, { taskId, ...data });
+  // Buffer update
+  pendingBroadcasts.set(taskId, { taskId, ...data });
 
-    // Schedule flush (only once)
-    if (!timer) {
-        timer = setTimeout(() => {
-            flushBroadcasts();
-        }, 50);
-    }
+  // Schedule flush (only once)
+  if (!timer) {
+    timer = setTimeout(() => {
+      flushBroadcasts();
+    }, 50);
+  }
 }
 
 function flushBroadcasts() {
-    const updates = Array.from(pendingBroadcasts.values());
+  const updates = Array.from(pendingBroadcasts.values());
 
-    // Emit batched
-    io.emit('tasks:batch_update', {
-        updates,
-        count: updates.length,
-        timestamp: Date.now()
-    });
+  // Emit batched
+  io.emit('tasks:batch_update', {
+    updates,
+    count: updates.length,
+    timestamp: Date.now(),
+  });
 
-    pendingBroadcasts.clear();
-    timer = null;
+  pendingBroadcasts.clear();
+  timer = null;
 }
 ```
 
 **Timeline**:
+
 ```
 t=0ms  : Task 1 completes → buffer
 t=10ms : Task 2 completes → buffer
@@ -1017,4 +1061,4 @@ t=50ms : FLUSH → emit batched (3 tasks)
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, Core Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, Core Team_

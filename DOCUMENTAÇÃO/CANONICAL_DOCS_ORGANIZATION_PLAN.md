@@ -1,16 +1,16 @@
 # 📚 Plano de Organização: Documentação Canônica
 
-**Data**: 21/01/2026
-**Versão**: 1.0
-**Status**: PLANEJAMENTO
-**Objetivo**: Estruturar documentação base, permanente e sistêmica do projeto
+**Data**: 21/01/2026 **Versão**: 1.0 **Status**: PLANEJAMENTO **Objetivo**: Estruturar documentação
+base, permanente e sistêmica do projeto
 
 ---
 
 ## 🎯 Filosofia e Princípios
 
 ### Propósito
+
 Criar documentação **estrutural e arquitetural** que:
+
 - **Não muda frequentemente** - Representa decisões fundamentais do projeto
 - **Explica desde a base** - Do "por quê" ao "como", do conceito à implementação
 - **Visão sistêmica** - Mostra interconexões, não apenas componentes isolados
@@ -75,10 +75,12 @@ chatgpt-docker-puppeteer/
 ### Documentação Atual (50+ arquivos)
 
 **Auditorias** (14 docs):
+
 - 8 subsistemas: CORE, INFRA, KERNEL, NERV, DRIVER, SERVER, LOGIC, Docker
 - 6 cross-cutting: Puppeteer, IPC/NERV, Error Handling, LOGIC, SECURITY, PERFORMANCE
 
 **Técnicos** (25+ docs):
+
 - ARCHITECTURE.md (existente - 700 LOC, outdated)
 - API.md (existente - 400 LOC, incomplete)
 - CROSS_PLATFORM_SUPPORT.md (285 LOC, v2.1)
@@ -124,6 +126,7 @@ LAYER 4: REFERÊNCIA (Consulta Rápida)
 ### Documentos por Prioridade
 
 **TIER 0 - Fundação (3 docs, 8h)**
+
 1. **PHILOSOPHY.md** (novo) - 2h
    - Decisões arquiteturais fundamentais
    - NERV-centric: por quê event bus?
@@ -142,20 +145,20 @@ LAYER 4: REFERÊNCIA (Consulta Rápida)
    - Sequence diagrams (key scenarios)
    - State machines (task lifecycle, browser health)
 
-**TIER 1 - Estrutural (4 docs, 10h)**
-4. **DATA_FLOW.md** (novo) - 2h
-   - Fluxo de task: fila → kernel → driver → resposta
-   - Fluxo de eventos: NERV buffers → transport → receptors
-   - Fluxo de browser: pool → allocation → page → release
-   - Diagramas de sequência detalhados
+**TIER 1 - Estrutural (4 docs, 10h)** 4. **DATA_FLOW.md** (novo) - 2h
+
+- Fluxo de task: fila → kernel → driver → resposta
+- Fluxo de eventos: NERV buffers → transport → receptors
+- Fluxo de browser: pool → allocation → page → release
+- Diagramas de sequência detalhados
 
 5. **SUBSYSTEMS.md** (novo) - 4h
    - 13 módulos, cada um com:
-     * Responsabilidades
-     * Interfaces públicas
-     * Dependências
-     * Padrões internos
-     * Exemplos de uso
+     - Responsabilidades
+     - Interfaces públicas
+     - Dependências
+     - Padrões internos
+     - Exemplos de uso
 
 6. **PATTERNS.md** (novo) - 2h
    - Event-driven architecture (NERV)
@@ -171,12 +174,12 @@ LAYER 4: REFERÊNCIA (Consulta Rápida)
    - Audit Levels (P1-P9)
    - Task states (PENDING, RUNNING, DONE, FAILED)
 
-**TIER 2 - Operacional (6 docs, 12h)**
-8. **CONFIGURATION.md** (refatorar) - 2h
-   - Todos os parâmetros config.json
-   - Todas as variáveis .env
-   - Defaults, ranges, validações
-   - Tunning guide por ambiente
+**TIER 2 - Operacional (6 docs, 12h)** 8. **CONFIGURATION.md** (refatorar) - 2h
+
+- Todos os parâmetros config.json
+- Todas as variáveis .env
+- Defaults, ranges, validações
+- Tunning guide por ambiente
 
 9. **API_REFERENCE.md** (refatorar) - 3h
    - REST endpoints completos (request/response)
@@ -208,12 +211,9 @@ LAYER 4: REFERÊNCIA (Consulta Rápida)
     - PR process (templates, reviews)
     - Testing requirements
 
-**TIER 3 - Referência (3 docs, 4h)**
-14. **TROUBLESHOOTING.md** (novo) - 2h
-    - Problemas comuns (categorias)
-    - Browser crashes, lock timeouts, queue stuck
-    - Soluções passo-a-passo
-    - Comandos de diagnóstico
+**TIER 3 - Referência (3 docs, 4h)** 14. **TROUBLESHOOTING.md** (novo) - 2h - Problemas comuns
+(categorias) - Browser crashes, lock timeouts, queue stuck - Soluções passo-a-passo - Comandos de
+diagnóstico
 
 15. **FAQ.md** (novo) - 1h
     - Perguntas frequentes (25-30)
@@ -261,17 +261,20 @@ CONFIGURATION.md    API_REFERENCE.md    DEPLOYMENT.md    DEVELOPMENT.md
 ### Links Cross-Document (Exemplos)
 
 **ARCHITECTURE.md** referencia:
+
 - PHILOSOPHY.md para "por quê" das decisões
 - SYSTEM_DESIGN.md para diagramas detalhados
 - SUBSYSTEMS.md para deep dive em módulos
 - GLOSSARY.md para termos técnicos
 
 **API_REFERENCE.md** referencia:
+
 - CONFIGURATION.md para parâmetros de endpoints
 - DEPLOYMENT.md para HTTPS setup
 - TROUBLESHOOTING.md para erros comuns
 
 **DEVELOPMENT.md** referencia:
+
 - ARCHITECTURE.md para entender estrutura
 - TESTING.md para rodar testes
 - CONTRIBUTING.md para standards
@@ -285,59 +288,70 @@ CONFIGURATION.md    API_REFERENCE.md    DEPLOYMENT.md    DEVELOPMENT.md
 ```markdown
 # [Título do Documento]
 
-**Versão**: X.Y
-**Última Atualização**: DD/MM/YYYY
-**Público-Alvo**: [Iniciante|Intermediário|Avançado]
-**Tempo de Leitura**: ~XX min
+**Versão**: X.Y **Última Atualização**: DD/MM/YYYY **Público-Alvo**:
+[Iniciante|Intermediário|Avançado] **Tempo de Leitura**: ~XX min
 
 ## 📖 Visão Geral
+
 [3-5 parágrafos contextualizando o documento]
 
 ## 🎯 Objetivos
+
 - O que o leitor aprenderá
 - Pré-requisitos (links)
 
 ## 📚 Conteúdo Principal
+
 [Seções organizadas hierarquicamente]
 
 ### Conceitos Fundamentais
+
 [Base teórica]
 
 ### Implementação Prática
+
 [Como aplicar]
 
 ### Exemplos
+
 [Código, comandos, outputs]
 
 ## 🔗 Referências
+
 - Docs relacionados (links internos)
 - Recursos externos (se aplicável)
 
 ## ❓ FAQ (seção mini)
+
 - 3-5 perguntas comuns específicas deste doc
 
 ---
-*Última revisão: [Data] | Contribuidores: [Lista]*
+
+_Última revisão: [Data] | Contribuidores: [Lista]_
 ```
 
 ### Níveis de Profundidade
 
 **OVERVIEW (10,000 ft)**:
+
 - O que é? Por que existe?
 - Analogia simples
 - Diagrama de contexto
 
 **STRUCTURAL (1,000 ft)**:
+
 - Como funciona internamente?
 - Componentes principais
 - Diagrama de containers/componentes
 
 **DETAILED (100 ft)**:
+
 - APIs, interfaces, contratos
 - Exemplos de código
 - Edge cases
 
 **IMPLEMENTATION (10 ft)**:
+
 - Código fonte (links)
 - Testes (examples)
 - Troubleshooting específico
@@ -468,17 +482,20 @@ sequenceDiagram
 ### Geração de Diagramas
 
 **Mermaid.js** (inline em Markdown):
+
 - Sequence diagrams
 - Flowcharts
 - State machines
 - GitHub renderiza nativamente
 
 **PlantUML** (se necessário):
+
 - C4 model plugins
 - Component diagrams complexos
 - Gera PNG via CLI
 
 **ASCII Art** (simples):
+
 - Hierarquias de diretórios
 - Boxes e setas básicas
 - Portável (plain text)
@@ -496,6 +513,7 @@ done
 ### Checklist de Qualidade
 
 Cada documento TIER 0-1 deve ter:
+
 - [ ] Diagrama visual (mínimo 1)
 - [ ] 3+ exemplos práticos
 - [ ] Links para 3+ docs relacionados
@@ -510,9 +528,11 @@ Cada documento TIER 0-1 deve ter:
 ## 📅 Roadmap de Implementação
 
 ### FASE 1: Fundação (8h - 1 dia)
+
 **Objetivo**: Estabelecer base conceitual e arquitetural
 
 **Dia 1 - Manhã (4h)**:
+
 1. PHILOSOPHY.md (2h)
    - Escrever decisões arquiteturais fundamentais
    - Por quê NERV-centric?
@@ -524,11 +544,11 @@ Cada documento TIER 0-1 deve ter:
    - 13 módulos (lista + responsabilidades)
    - Diagrama C4 Context
 
-**Dia 1 - Tarde (4h)**:
-3. Refatorar ARCHITECTURE.md - Parte 2 (2h)
-   - Diagrama C4 Container
-   - Fluxo de vida de task (overview)
-   - Interconexões principais
+**Dia 1 - Tarde (4h)**: 3. Refatorar ARCHITECTURE.md - Parte 2 (2h)
+
+- Diagrama C4 Container
+- Fluxo de vida de task (overview)
+- Interconexões principais
 
 4. SYSTEM_DESIGN.md (2h)
    - C4 Component diagrams (3-4 key components)
@@ -540,22 +560,22 @@ Cada documento TIER 0-1 deve ter:
 
 ### FASE 2: Estrutural (10h - 1.5 dias)
 
-**Dia 2 - Manhã (4h)**:
-5. DATA_FLOW.md (2h)
-   - Fluxo de task end-to-end (detalhado)
-   - Fluxo de eventos NERV (buffers → transport)
-   - Fluxo de browser (pool → page)
+**Dia 2 - Manhã (4h)**: 5. DATA_FLOW.md (2h)
+
+- Fluxo de task end-to-end (detalhado)
+- Fluxo de eventos NERV (buffers → transport)
+- Fluxo de browser (pool → page)
 
 6. SUBSYSTEMS.md - Parte 1 (2h)
    - CORE (5 subcomponentes)
    - NERV (13 subcomponentes)
    - KERNEL (6 subcomponentes)
 
-**Dia 2 - Tarde (4h)**:
-7. SUBSYSTEMS.md - Parte 2 (2h)
-   - INFRA (browser_pool, queue, locks, storage)
-   - DRIVER (factory, ChatGPT, Gemini, modules)
-   - SERVER (Express, Socket.io, API)
+**Dia 2 - Tarde (4h)**: 7. SUBSYSTEMS.md - Parte 2 (2h)
+
+- INFRA (browser_pool, queue, locks, storage)
+- DRIVER (factory, ChatGPT, Gemini, modules)
+- SERVER (Express, Socket.io, API)
 
 8. PATTERNS.md (2h)
    - Event-driven (NERV)
@@ -563,11 +583,11 @@ Cada documento TIER 0-1 deve ter:
    - Observer (watchers)
    - Circuit breaker, locks, memoization
 
-**Dia 3 - Manhã (2h)**:
-9. GLOSSARY.md (2h)
-   - Termos técnicos (30-40 definições)
-   - Task states, audit levels, componentes
-   - Organizado alfabeticamente + por categoria
+**Dia 3 - Manhã (2h)**: 9. GLOSSARY.md (2h)
+
+- Termos técnicos (30-40 definições)
+- Task states, audit levels, componentes
+- Organizado alfabeticamente + por categoria
 
 **Deliverable**: Estrutura arquitetural completa (visão 100 ft)
 
@@ -575,23 +595,16 @@ Cada documento TIER 0-1 deve ter:
 
 ### FASE 3: Operacional (12h - 2 dias)
 
-**Dia 3 - Tarde (4h)**:
-10. CONFIGURATION.md (2h)
-    - config.json completo (todos os campos)
-    - .env completo (todas as variáveis)
-    - Defaults, ranges, validações
-    - Tuning guide
+**Dia 3 - Tarde (4h)**: 10. CONFIGURATION.md (2h) - config.json completo (todos os campos) - .env
+completo (todas as variáveis) - Defaults, ranges, validações - Tuning guide
 
 11. API_REFERENCE.md (2h)
     - REST endpoints (request/response schemas)
     - Health endpoints (/api/health, /api/health-metrics)
     - Queue endpoints (/api/queue, /api/queue/add)
 
-**Dia 4 - Manhã (4h)**:
-12. API_REFERENCE.md - Parte 2 (1h)
-    - WebSocket events (emit/receive)
-    - Autenticação e rate limiting
-    - Exemplos curl + JavaScript
+**Dia 4 - Manhã (4h)**: 12. API_REFERENCE.md - Parte 2 (1h) - WebSocket events (emit/receive) -
+Autenticação e rate limiting - Exemplos curl + JavaScript
 
 13. DEPLOYMENT.md (2h)
     - Docker setup (dev + prod)
@@ -603,10 +616,8 @@ Cada documento TIER 0-1 deve ter:
     - Setup ambiente dev
     - Dependências (Node.js 20+, PM2, Chrome)
 
-**Dia 4 - Tarde (4h)**:
-15. DEVELOPMENT.md - Parte 2 (1h)
-    - Workflow com Makefile (58+ targets)
-    - Debugging (VSCode launch.json)
+**Dia 4 - Tarde (4h)**: 15. DEVELOPMENT.md - Parte 2 (1h) - Workflow com Makefile (58+ targets) -
+Debugging (VSCode launch.json)
 
 16. TESTING.md (2h)
     - Estratégia de testes (unit, integration, e2e)
@@ -625,12 +636,8 @@ Cada documento TIER 0-1 deve ter:
 
 ### FASE 4: Referência (4h - 0.5 dia)
 
-**Dia 5 - Manhã (4h)**:
-18. TROUBLESHOOTING.md (2h)
-    - Problemas comuns (10-15 categorias)
-    - Browser crashes, lock timeouts, queue stuck
-    - Soluções passo-a-passo
-    - Comandos de diagnóstico
+**Dia 5 - Manhã (4h)**: 18. TROUBLESHOOTING.md (2h) - Problemas comuns (10-15 categorias) - Browser
+crashes, lock timeouts, queue stuck - Soluções passo-a-passo - Comandos de diagnóstico
 
 19. FAQ.md (1h)
     - 25-30 perguntas frequentes
@@ -649,11 +656,8 @@ Cada documento TIER 0-1 deve ter:
 
 ### FASE 5: Revisão e Refinamento (4h)
 
-**Dia 5 - Tarde (4h)**:
-21. Validação de Links (1h)
-    - Verificar todos os links internos
-    - Corrigir broken links
-    - Garantir navegação fluida
+**Dia 5 - Tarde (4h)**: 21. Validação de Links (1h) - Verificar todos os links internos - Corrigir
+broken links - Garantir navegação fluida
 
 22. Revisão de Diagramas (1h)
     - Validar Mermaid.js renderiza
@@ -677,24 +681,28 @@ Cada documento TIER 0-1 deve ter:
 ## 📊 Métricas de Sucesso
 
 ### Cobertura
+
 - ✅ 100% dos conceitos arquiteturais documentados
 - ✅ 100% dos 13 módulos explicados
 - ✅ 100% dos endpoints API documentados
 - ✅ 100% dos parâmetros config.json/env explicados
 
 ### Qualidade
+
 - ✅ Diagramas em todos os docs TIER 0-1
 - ✅ 3+ exemplos práticos por documento
 - ✅ Links cross-document validados
 - ✅ Glossário com 30+ termos
 
 ### Usabilidade
+
 - ✅ Onboarding <2h (README → ARCHITECTURE → DEVELOPMENT)
 - ✅ FAQ com 25+ perguntas
 - ✅ TROUBLESHOOTING com 10+ problemas comuns
 - ✅ Tempo de leitura estimado em cada doc
 
 ### Manutenibilidade
+
 - ✅ Docs estruturais não mudam frequentemente
 - ✅ Separation of concerns (arquitetura ≠ detalhes voláteis)
 - ✅ Versionamento de docs (semver)
@@ -705,6 +713,7 @@ Cada documento TIER 0-1 deve ter:
 ## 🚀 Próximos Passos Imediatos
 
 ### Decisão Requerida
+
 Antes de começar FASE 1, confirmar:
 
 1. **Estrutura de Docs**:
@@ -725,7 +734,9 @@ Antes de começar FASE 1, confirmar:
    - Ou fazer tudo de uma vez?
 
 ### Iniciar FASE 1
+
 Se aprovado, começar por:
+
 1. **PHILOSOPHY.md** (2h) - Fundamentos conceituais
 2. **ARCHITECTURE.md refactoring** (4h) - Visão sistêmica
 3. **SYSTEM_DESIGN.md** (2h) - Diagramas detalhados
@@ -742,7 +753,9 @@ Se aprovado, começar por:
 ## Por quê NERV-Centric?
 
 ### Problema
+
 Arquiteturas tradicionais criam acoplamento direto:
+
 - Kernel chama Driver.execute()
 - Driver chama Server.broadcast()
 - Server chama Kernel.getStatus()
@@ -751,9 +764,9 @@ Resultado: **Grafo de dependências cíclicas**, dificulta testes, manutenção.
 
 ### Solução: Event Bus Central (NERV)
 ```
-Kernel ─→ NERV ─→ Driver
-  ↑                 ↓
-  └────── NERV ←────┘
+
+Kernel ─→ NERV ─→ Driver ↑ ↓ └────── NERV ←────┘
+
 ```
 
 **Benefícios**:
@@ -772,6 +785,7 @@ Kernel ─→ NERV ─→ Driver
 
 ---
 
-**Total**: 16 documentos canônicos, ~3,000 linhas, ~38h de escrita, estrutura permanente e navegável.
+**Total**: 16 documentos canônicos, ~3,000 linhas, ~38h de escrita, estrutura permanente e
+navegável.
 
 **Status**: PRONTO PARA APROVAÇÃO E EXECUÇÃO

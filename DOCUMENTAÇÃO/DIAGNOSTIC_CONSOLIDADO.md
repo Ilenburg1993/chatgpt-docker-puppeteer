@@ -1,10 +1,9 @@
 # 🔬 DIAGNÓSTICO PROFUNDO CONSOLIDADO
 
-> **Data**: 19 de Janeiro de 2026
-> **Método**: Análise automatizada multi-ferramenta + inspeção manual
-> **Ferramentas**: madge, jscpd, complexity-report, grep avançado, métricas customizadas
-> **Status**: **COMPLETO** - Base para planejamento de ação
-> **Update**: **Estratégia de migração KERNEL→NERV adicionada**
+> **Data**: 19 de Janeiro de 2026 **Método**: Análise automatizada multi-ferramenta + inspeção
+> manual **Ferramentas**: madge, jscpd, complexity-report, grep avançado, métricas customizadas
+> **Status**: **COMPLETO** - Base para planejamento de ação **Update**: **Estratégia de migração
+> KERNEL→NERV adicionada**
 
 ---
 
@@ -12,7 +11,8 @@
 
 > **KERNEL deve SUBSTITUIR `execution_engine.js` e NERV deve SUBSTITUIR `ipc_client.js`**
 
-Não é integração - é **MIGRAÇÃO**. O código novo (4,500 LOC) deve substituir o legacy (696 LOC). Estratégia detalhada na seção ["ESTRATÉGIA DE MIGRAÇÃO"](#-estratégia-de-migração-legacy--novo).
+Não é integração - é **MIGRAÇÃO**. O código novo (4,500 LOC) deve substituir o legacy (696 LOC).
+Estratégia detalhada na seção ["ESTRATÉGIA DE MIGRAÇÃO"](#-estratégia-de-migração-legacy--novo).
 
 **Descoberta crítica**:
 
@@ -21,7 +21,8 @@ Não é integração - é **MIGRAÇÃO**. O código novo (4,500 LOC) deve substi
 - **ipc_client.js** (295 LOC): Socket.io hardcoded, singleton, telemetria básica
 - **NERV** (1,600 LOC): Plugável, correlation tracking, ~15% funcionalidade faltando
 
-**Recomendação**: Migração incremental com feature flags em 5 semanas (ver "RECOMENDAÇÕES DE ENCAMINHAMENTO").
+**Recomendação**: Migração incremental com feature flags em 5 semanas (ver "RECOMENDAÇÕES DE
+ENCAMINHAMENTO").
 
 ---
 
@@ -122,8 +123,8 @@ Distribuição por Camada:
 20. correlation_store.js (nerv)        215 LOC  ⚠️  MÉDIO
 ```
 
-**Análise**: 8 arquivos >350 LOC - candidatos a split.
-**Recomendação**: Arquivos >300 LOC devem ser modularizados.
+**Análise**: 8 arquivos >350 LOC - candidatos a split. **Recomendação**: Arquivos >300 LOC devem ser
+modularizados.
 
 ### Dependências
 
@@ -159,7 +160,8 @@ Comentários DEBUG:            52 encontrados ⚠️  (aceitável)
 console.log/error diretos:    26 encontrados ⚠️  (devem usar logger)
 ```
 
-**Análise**: Código extremamente limpo, sem marcadores de débito técnico. Surpreendente para 18k LOC!
+**Análise**: Código extremamente limpo, sem marcadores de débito técnico. Surpreendente para 18k
+LOC!
 
 ---
 
@@ -373,60 +375,60 @@ class ExecutionEngine {
 
 // kernel.js - Compositor
 function createKernel({ nerv, telemetry, policy, loop }) {
-    // Compõe subsistemas
-    return {
-        start,
-        stop,
-        pause,
-        resume,
-        getStatus,
-        getMetrics
-    };
+  // Compõe subsistemas
+  return {
+    start,
+    stop,
+    pause,
+    resume,
+    getStatus,
+    getMetrics,
+  };
 }
 
 // kernel_loop/kernel_loop.js - Loop isolado
 class KernelLoop {
-    async run(scheduler) {} // Loop controlado
-    pause() {}
-    resume() {}
-    // SEM lógica de negócio
+  async run(scheduler) {} // Loop controlado
+  pause() {}
+  resume() {}
+  // SEM lógica de negócio
 }
 
 // execution_engine/execution_engine.js - Pipeline puro
 class ExecutionEngine {
-    async executeTask(task, context) {
-        // Pipeline limpo
-        // Emite via NERV (injetado)
-    }
-    // SEM IPC hardcoded
+  async executeTask(task, context) {
+    // Pipeline limpo
+    // Emite via NERV (injetado)
+  }
+  // SEM IPC hardcoded
 }
 
 // task_runtime/task_runtime.js - Gerencia tarefas
 class TaskRuntime {
-    async loadTask() {}
-    async saveTask() {}
-    async lockTask() {}
+  async loadTask() {}
+  async saveTask() {}
+  async lockTask() {}
 }
 
 // policy_engine/policy_engine.js - Políticas
 class PolicyEngine {
-    shouldBackoff() {}
-    calculateDelay() {}
-    enforceLimit() {}
+  shouldBackoff() {}
+  calculateDelay() {}
+  enforceLimit() {}
 }
 
 // observation_store/observation_store.js - Telemetria
 class ObservationStore {
-    record(event, data) {}
-    query(filters) {}
+  record(event, data) {}
+  query(filters) {}
 }
 
 // nerv_bridge/kernel_nerv_bridge.js - Adaptador IPC
 class KernelNERVBridge {
-    emitTaskStarted(taskId) {
-        nerv.emit('TASK_STARTED', { taskId });
-    }
-    // Desacopla Kernel do transporte
+  emitTaskStarted(taskId) {
+    nerv.emit('TASK_STARTED', { taskId });
+  }
+  // Desacopla Kernel do transporte
 }
 
 // GANHOS:
@@ -658,78 +660,78 @@ src/driver/modules/telemetry_bridge.js:11  const ipc = require('../../infra/ipc_
 // 1. Criar Socket.io Adapter para NERV
 // src/nerv/transport/adapters/socketio_adapter.js
 class SocketIOAdapter {
-    constructor(config) {
-        this.client = socketIOClient(config.url, config.options);
-    }
+  constructor(config) {
+    this.client = socketIOClient(config.url, config.options);
+  }
 
-    async connect() {
-        /* Socket.io specific */
-    }
-    send(envelope) {
-        this.client.emit('message', envelope);
-    }
-    onReceive(handler) {
-        this.client.on('message', handler);
-    }
-    disconnect() {
-        this.client.disconnect();
-    }
+  async connect() {
+    /* Socket.io specific */
+  }
+  send(envelope) {
+    this.client.emit('message', envelope);
+  }
+  onReceive(handler) {
+    this.client.on('message', handler);
+  }
+  disconnect() {
+    this.client.disconnect();
+  }
 }
 
 // 2. Implementar Handshake V2 no NERV
 // src/nerv/handshake/handshake_v2.js
 class HandshakeV2 {
-    async perform(transport, identity) {
-        // Reimplementa lógica de ipc_client._performHandshake()
-    }
+  async perform(transport, identity) {
+    // Reimplementa lógica de ipc_client._performHandshake()
+  }
 }
 
 // 3. Criar Wrapper de Compatibilidade
 // src/infra/ipc_client_v3.js (drop-in replacement)
 const nerv = createNERV({
-    transport: { adapter: 'socketio', url: '...' },
-    handshake: 'v2'
+  transport: { adapter: 'socketio', url: '...' },
+  handshake: 'v2',
 });
 
 // INTERFACE COMPATÍVEL com ipc_client.js
 module.exports = {
-    async connect(port) {
-        await nerv.connect();
-    },
-    emitEvent(event, data, corrId) {
-        nerv.emit(event, data, { correlationId: corrId });
-    },
-    sendCommand(cmd, data, corrId) {
-        return nerv.send(cmd, data, { correlationId: corrId });
-    },
-    on(event, handler) {
-        nerv.on(event, handler);
-    },
-    off(event, handler) {
-        nerv.off(event, handler);
-    },
-    isConnected() {
-        return nerv.getHealth().connected;
-    }
+  async connect(port) {
+    await nerv.connect();
+  },
+  emitEvent(event, data, corrId) {
+    nerv.emit(event, data, { correlationId: corrId });
+  },
+  sendCommand(cmd, data, corrId) {
+    return nerv.send(cmd, data, { correlationId: corrId });
+  },
+  on(event, handler) {
+    nerv.on(event, handler);
+  },
+  off(event, handler) {
+    nerv.off(event, handler);
+  },
+  isConnected() {
+    return nerv.getHealth().connected;
+  },
 };
 
 // 4. Feature Flag Migration
 // src/core/config.js
 USE_NERV_IPC: process.env.NERV_ENABLED === 'true' ||
-    false -
-        // 5. Substituir import em 5 arquivos
-        src / core / execution_engine.js -
-        src / core / forensics.js -
-        src / core / infra_failure_policy.js -
-        src / server / engine / socket.js -
-        src / driver / modules / telemetry_bridge.js;
+  false -
+    // 5. Substituir import em 5 arquivos
+    src / core / execution_engine.js -
+    src / core / forensics.js -
+    src / core / infra_failure_policy.js -
+    src / server / engine / socket.js -
+    src / driver / modules / telemetry_bridge.js;
 
 // Trocar:
 const ipc = require('../infra/ipc_client');
 // Por:
 const ipc = CONFIG.USE_NERV_IPC
-    ? require('../infra/ipc_client_v3') // NERV
-    : require('../infra/ipc_client'); // Legacy
+  ? require('../infra/ipc_client_v3') // NERV
+  : require('../infra/ipc_client'); // Legacy
 ```
 
 **Critérios de Aceite**:
@@ -743,8 +745,7 @@ const ipc = CONFIG.USE_NERV_IPC
 - [ ] Dashboard conecta via NERV
 - [ ] Zero regressões em staging
 
-**Esforço**: 5 dias
-**Rollback**: Trocar feature flag para `false`
+**Esforço**: 5 dias **Rollback**: Trocar feature flag para `false`
 
 ---
 
@@ -872,8 +873,7 @@ if (CONFIG.USE_KERNEL) {
 - [ ] Remediação (abort, reboot) funcionando
 - [ ] Zero regressões em staging
 
-**Esforço**: 10 dias
-**Rollback**: Trocar feature flag para `false`
+**Esforço**: 10 dias **Rollback**: Trocar feature flag para `false`
 
 ---
 
@@ -884,22 +884,22 @@ if (CONFIG.USE_KERNEL) {
 ```javascript
 // src/server/engine/socket_v3.js (substitui socket.js)
 function initSocketEngine(io, nerv) {
-    // Conecta servidor ao NERV em vez de ipc_client
+  // Conecta servidor ao NERV em vez de ipc_client
 
-    nerv.on('TASK_STARTED', data => {
-        io.emit('task_started', data);
-    });
+  nerv.on('TASK_STARTED', data => {
+    io.emit('task_started', data);
+  });
 
-    nerv.on('TASK_COMPLETED', data => {
-        io.emit('task_completed', data);
-    });
+  nerv.on('TASK_COMPLETED', data => {
+    io.emit('task_completed', data);
+  });
 
-    io.on('connection', clientSocket => {
-        clientSocket.on('ENGINE_PAUSE', () => {
-            nerv.send('KERNEL_PAUSE', {});
-        });
-        // etc
+  io.on('connection', clientSocket => {
+    clientSocket.on('ENGINE_PAUSE', () => {
+      nerv.send('KERNEL_PAUSE', {});
     });
+    // etc
+  });
 }
 ```
 
@@ -1010,8 +1010,7 @@ $ grep "require.*kernel\|require.*nerv" index.js
 
 **Estratégia Correta**: Migração incremental com feature flags (ver seção "ESTRATÉGIA DE MIGRAÇÃO")
 
-**Esforço**: 4 semanas full-time
-**Risco de não resolver**: **Projeto inviável para v1.0**
+**Esforço**: 4 semanas full-time **Risco de não resolver**: **Projeto inviável para v1.0**
 
 ---
 
@@ -1046,8 +1045,7 @@ task_loader.js é usado por:  12 arquivos (9% do código)
 Risco: MUITO ALTO - Módulos centrais em ciclo
 ```
 
-**Esforço**: 1 dia (injeção de dependência)
-**Risco de não resolver**: **Bloqueio total de testes**
+**Esforço**: 1 dia (injeção de dependência) **Risco de não resolver**: **Bloqueio total de testes**
 
 ---
 
@@ -1090,8 +1088,8 @@ Coverage real:                   4.9% ❌
 - **Confiança zero** em deploys
 - **Débito técnico exponencial** - cada feature adiciona mais código não testado
 
-**Esforço**: 3 semanas (40% coverage) → 8 semanas (80% coverage)
-**Risco de não resolver**: **Instabilidade crônica**
+**Esforço**: 3 semanas (40% coverage) → 8 semanas (80% coverage) **Risco de não resolver**:
+**Instabilidade crônica**
 
 ---
 
@@ -1136,8 +1134,7 @@ Socket Systems:
 - **Decisões ambíguas** - qual código usar?
 - **Bloat** - código inflado artificialmente
 
-**Esforço**: 1 semana (cleanup após integração)
-**Risco**: BAIXO se integração for feita primeiro
+**Esforço**: 1 semana (cleanup após integração) **Risco**: BAIXO se integração for feita primeiro
 
 ---
 
@@ -1191,8 +1188,7 @@ execution_engine.js faz:
 - **Difícil de modificar** - mudanças arriscadas
 - **Alta probabilidade de bugs** - complexidade ↑ = bugs ↑
 
-**Esforço**: 2 semanas (refactor top 5)
-**Prioridade**: MÉDIA (após integração)
+**Esforço**: 2 semanas (refactor top 5) **Prioridade**: MÉDIA (após integração)
 
 ---
 
@@ -1239,8 +1235,7 @@ logger.error('critical_failure', { error }, correlationId);
 - **Alerting impossível** (sem métricas)
 - **Root cause analysis** demorado
 
-**Esforço**: 1 semana (Pino + Prometheus + Correlation IDs)
-**Prioridade**: ALTA (Semana 1 do plano)
+**Esforço**: 1 semana (Pino + Prometheus + Correlation IDs) **Prioridade**: ALTA (Semana 1 do plano)
 
 ---
 
@@ -1266,12 +1261,12 @@ Throughput máximo: ~6-20 tasks/segundo
 ```javascript
 // src/infra/queue/task_loader.js
 async function loadAllTasks() {
-    const files = await fs.readdir('fila/'); // I/O
-    for (const file of files) {
-        const stat = await fs.stat(file); // I/O x N
-        const content = await fs.readFile(file); // I/O x N
-        tasks.push(JSON.parse(content)); // CPU
-    }
+  const files = await fs.readdir('fila/'); // I/O
+  for (const file of files) {
+    const stat = await fs.stat(file); // I/O x N
+    const content = await fs.readFile(file); // I/O x N
+    tasks.push(JSON.parse(content)); // CPU
+  }
 }
 // Chamado a cada 5s (CONFIG.POLL_INTERVAL)
 ```
@@ -1295,10 +1290,10 @@ Overhead: 7-15 segundos por task
 // src/logic/validation/validation_core.js
 const content = fs.readFileSync(responsePath); // Blocking!
 for (let line of content.split('\n')) {
-    // Blocking!
-    if (forbiddenTerms.some(t => line.includes(t))) {
-        // Regex checks
-    }
+  // Blocking!
+  if (forbiddenTerms.some(t => line.includes(t))) {
+    // Regex checks
+  }
 }
 ```
 
@@ -1330,8 +1325,7 @@ Latência Otimizada:        ~31s   (-19% improvement)
 Throughput com Pool(5):    ~9 tasks/min (+500%)
 ```
 
-**Esforço**: 2 semanas (browser pool + async validation)
-**Prioridade**: MÉDIA (Semana 2-3 do plano)
+**Esforço**: 2 semanas (browser pool + async validation) **Prioridade**: MÉDIA (Semana 2-3 do plano)
 
 ---
 
@@ -1358,8 +1352,8 @@ Dependências com vulnerabilidades conhecidas
 ```javascript
 // server/engine/socket.js
 io.on('connection', socket => {
-    // SEM verificação de token/auth
-    socket.on('ENGINE_PAUSE', () => engine.pause());
+  // SEM verificação de token/auth
+  socket.on('ENGINE_PAUSE', () => engine.pause());
 });
 ```
 
@@ -1412,8 +1406,7 @@ SCORE GERAL:                ███░░░░░░░ 3.4/10  ❌
 5. npm audit fix
 6. Secrets management (dotenv-vault)
 
-**Esforço**: 1-2 semanas (hardening completo)
-**Prioridade**: MÉDIA-ALTA (Fase 4 do roadmap)
+**Esforço**: 1-2 semanas (hardening completo) **Prioridade**: MÉDIA-ALTA (Fase 4 do roadmap)
 
 ---
 
@@ -2023,9 +2016,7 @@ Conteúdo:
 
 ---
 
-**Analista**: GitHub Copilot (Claude Sonnet 4.5)
-**Data**: 19 de Janeiro de 2026
-**Método**: Análise multi-ferramenta automatizada
-**Ferramentas**: madge, jscpd, complexity-report, métricas customizadas
-**Status**: ✅ DIAGNÓSTICO COMPLETO + ESTRATÉGIA DE MIGRAÇÃO
-**Próximo**: Plano de Ação Detalhado
+**Analista**: GitHub Copilot (Claude Sonnet 4.5) **Data**: 19 de Janeiro de 2026 **Método**: Análise
+multi-ferramenta automatizada **Ferramentas**: madge, jscpd, complexity-report, métricas
+customizadas **Status**: ✅ DIAGNÓSTICO COMPLETO + ESTRATÉGIA DE MIGRAÇÃO **Próximo**: Plano de Ação
+Detalhado

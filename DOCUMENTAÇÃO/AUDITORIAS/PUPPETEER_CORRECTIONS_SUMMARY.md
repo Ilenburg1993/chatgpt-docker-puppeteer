@@ -1,8 +1,7 @@
 # Melhorias Aplicadas - Auditoria Puppeteer & Chrome
 
-**Data**: 2026-01-21
-**Subsistema**: Puppeteer & Chrome Strategy (Cross-Cutting)
-**Total de Melhorias**: 3 P3
+**Data**: 2026-01-21 **Subsistema**: Puppeteer & Chrome Strategy (Cross-Cutting) **Total de
+Melhorias**: 3 P3
 
 ---
 
@@ -12,11 +11,13 @@
 
 #### ✅ P3.1 - Integrar Stealth Plugin
 
-**Problema**: Pacote `puppeteer-extra-plugin-stealth` instalado mas não usado. Sites podem detectar automação via `navigator.webdriver`, canvas fingerprinting, etc.
+**Problema**: Pacote `puppeteer-extra-plugin-stealth` instalado mas não usado. Sites podem detectar
+automação via `navigator.webdriver`, canvas fingerprinting, etc.
 
 **Arquivo**: `src/infra/ConnectionOrchestrator.js`
 
 **Evidência do Problema**:
+
 ```javascript
 // ANTES (linhas 14-15):
 const puppeteer = require('puppeteer');
@@ -25,6 +26,7 @@ const puppeteerCore = require('puppeteer-core');
 ```
 
 **Impacto**:
+
 - ⚠️ Sites podem detectar automação
 - ⚠️ `navigator.webdriver` = true (visível aos sites)
 - ⚠️ Canvas, WebGL fingerprinting facilitado
@@ -49,6 +51,7 @@ puppeteerExtra.use(StealthPlugin());
 ```
 
 **Benefícios**:
+
 - ✅ `navigator.webdriver` = undefined (escondido)
 - ✅ Canvas fingerprinting mitigado
 - ✅ WebGL fingerprinting mitigado
@@ -56,6 +59,7 @@ puppeteerExtra.use(StealthPlugin());
 - ✅ Chrome detection evasion (Headless Chrome UA)
 
 **Validação**:
+
 ```javascript
 // Testar em página:
 await page.evaluate(() => navigator.webdriver);
@@ -74,12 +78,14 @@ await page.evaluate(() => navigator.webdriver);
 **Arquivo**: `src/infra/ConnectionOrchestrator.js`
 
 **Evidência do Problema**:
+
 ```javascript
 // ANTES: User-agent sempre igual
 // Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/120.0.0.0 Safari/537.36
 ```
 
 **Impacto**:
+
 - ⚠️ Fingerprinting facilitado (UA sempre igual)
 - ⚠️ Sites podem bloquear UA específico
 - ⚠️ Menor diversidade de requests
@@ -89,41 +95,44 @@ await page.evaluate(() => navigator.webdriver);
 **Correção Aplicada**:
 
 1. **Adicionar pool de user-agents** (linhas 49-59):
+
 ```javascript
 /* ========================================================================
    USER-AGENTS (ROTATION POOL)
 ======================================================================== */
 const USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
 ];
 ```
 
 2. **Rotacionar UA em ensurePage()** (linhas 465-473):
+
 ```javascript
 const page = await this.scanForTargetPage();
 if (page) {
-    this.page = page;
-    this.setState(STATES.PAGE_SELECTED, { url: page.url() });
+  this.page = page;
+  this.setState(STATES.PAGE_SELECTED, { url: page.url() });
 
-    // P3.2: User-Agent Rotation (anti-fingerprinting)
-    const randomUA = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
-    try {
-        await page.setUserAgent(randomUA);
-        log('DEBUG', `[ORCH] User-Agent rotacionado: ${randomUA.substring(0, 50)}...`);
-    } catch (error) {
-        log('WARN', `[ORCH] Falha ao definir User-Agent: ${error.message}`);
-    }
+  // P3.2: User-Agent Rotation (anti-fingerprinting)
+  const randomUA = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+  try {
+    await page.setUserAgent(randomUA);
+    log('DEBUG', `[ORCH] User-Agent rotacionado: ${randomUA.substring(0, 50)}...`);
+  } catch (error) {
+    log('WARN', `[ORCH] Falha ao definir User-Agent: ${error.message}`);
+  }
 
-    return page;
+  return page;
 }
 ```
 
 **Benefícios**:
+
 - ✅ User-agent rotacionado aleatoriamente (6 opções)
 - ✅ Cobre Windows, Mac, Linux
 - ✅ Chrome 120 e 121 (versões recentes)
@@ -131,6 +140,7 @@ if (page) {
 - ✅ Maior diversidade de requests
 
 **Validação**:
+
 ```javascript
 // Executar múltiplas vezes:
 await page.evaluate(() => navigator.userAgent);
@@ -143,11 +153,13 @@ await page.evaluate(() => navigator.userAgent);
 
 #### ✅ P3.3 - Profile Rotation Job
 
-**Problema**: Profile persistente (`profile/`) pode crescer indefinidamente (cache, cookies, localStorage, history).
+**Problema**: Profile persistente (`profile/`) pode crescer indefinidamente (cache, cookies,
+localStorage, history).
 
 **Arquivo**: `scripts/rotate-profiles.js` (NOVO - 280 LOC)
 
 **Evidência do Problema**:
+
 ```bash
 # Profile pode crescer muito com tempo:
 $ du -sh profile/
@@ -156,6 +168,7 @@ $ du -sh profile/
 ```
 
 **Impacto**:
+
 - ⚠️ Disk usage aumenta com tempo
 - ⚠️ Performance degrada (Chrome lê cache grande)
 - ⚠️ Sem limpeza automática
@@ -167,6 +180,7 @@ $ du -sh profile/
 **Script Criado**: `scripts/rotate-profiles.js`
 
 Funcionalidades:
+
 1. **Rotação de profile**:
    - Move `profile/` para `profile_backups/profile_TIMESTAMP`
    - Cria novo `profile/` vazio
@@ -215,6 +229,7 @@ npm run profiles:stats
 ```
 
 **Benefícios**:
+
 - ✅ Profile rotacionado com backup automático
 - ✅ Backups mantidos por 30 dias (configurável)
 - ✅ Limpeza automática de backups antigos
@@ -224,12 +239,14 @@ npm run profiles:stats
 - ✅ Tratamento de erros robusto
 
 **Scripts npm adicionados** (`package.json`):
+
 ```json
 "profiles:rotate": "node scripts/rotate-profiles.js",
 "profiles:stats": "node -e \"require('./scripts/rotate-profiles').getBackupStats().then(s => console.log(JSON.stringify(s, null, 2)))\""
 ```
 
 **Configuração**:
+
 ```javascript
 // scripts/rotate-profiles.js (linha 27):
 const MAX_BACKUPS_DAYS = 30; // Mantém backups por 30 dias
@@ -241,33 +258,34 @@ const MAX_BACKUPS_DAYS = 30; // Mantém backups por 30 dias
 
 ## 📊 Resumo de Impacto
 
-| Categoria | Antes | Depois | Melhoria |
-|-----------|-------|--------|----------|
-| **Stealth Plugin** | ❌ Não usado | ✅ Ativo | +100% |
-| **navigator.webdriver** | true (detectável) | undefined | ✅ Escondido |
-| **Canvas Fingerprinting** | Vulnerável | ✅ Mitigado | +80% |
-| **WebGL Fingerprinting** | Vulnerável | ✅ Mitigado | +80% |
-| **User-Agent Rotation** | ❌ Fixo | ✅ 6 opções | +500% |
-| **UA Diversity** | 1 UA | 6 UAs | +600% |
-| **Profile Management** | ❌ Manual | ✅ Automático | +100% |
-| **Disk Usage Control** | ❌ Ausente | ✅ Rotação + limpeza | +100% |
-| **Backup Strategy** | ❌ Nenhum | ✅ 30 dias | +100% |
+| Categoria                 | Antes             | Depois               | Melhoria     |
+| ------------------------- | ----------------- | -------------------- | ------------ |
+| **Stealth Plugin**        | ❌ Não usado      | ✅ Ativo             | +100%        |
+| **navigator.webdriver**   | true (detectável) | undefined            | ✅ Escondido |
+| **Canvas Fingerprinting** | Vulnerável        | ✅ Mitigado          | +80%         |
+| **WebGL Fingerprinting**  | Vulnerável        | ✅ Mitigado          | +80%         |
+| **User-Agent Rotation**   | ❌ Fixo           | ✅ 6 opções          | +500%        |
+| **UA Diversity**          | 1 UA              | 6 UAs                | +600%        |
+| **Profile Management**    | ❌ Manual         | ✅ Automático        | +100%        |
+| **Disk Usage Control**    | ❌ Ausente        | ✅ Rotação + limpeza | +100%        |
+| **Backup Strategy**       | ❌ Nenhum         | ✅ 30 dias           | +100%        |
 
 ---
 
 ## 🎯 Status Final
 
-✅ **TODAS as melhorias P3 foram implementadas**
-✅ **Sistema de anti-detection completo (Stealth + UA rotation)**
-✅ **Profile management automático com backups**
-✅ **Zero regressões (tudo backward-compatible)**
+✅ **TODAS as melhorias P3 foram implementadas** ✅ **Sistema de anti-detection completo (Stealth +
+UA rotation)** ✅ **Profile management automático com backups** ✅ **Zero regressões (tudo
+backward-compatible)**
 
 **Arquivos Modificados**:
+
 - ✅ `src/infra/ConnectionOrchestrator.js` (P3.1 + P3.2)
 - ✅ `scripts/rotate-profiles.js` (NOVO - P3.3)
-- ✅ `package.json` (scripts profiles:*)
+- ✅ `package.json` (scripts profiles:\*)
 
 **Benefícios Alcançados**:
+
 1. ✅ Anti-detection robusto (stealth plugin + UA rotation)
 2. ✅ Menor chance de detecção por sites
 3. ✅ Fingerprinting dificultado
@@ -276,6 +294,7 @@ const MAX_BACKUPS_DAYS = 30; // Mantém backups por 30 dias
 6. ✅ Backups de 30 dias (recuperação fácil)
 
 **Testes Necessários**:
+
 ```bash
 # 1. Testar stealth plugin:
 node -e "
@@ -306,6 +325,4 @@ npm run profiles:stats
 
 ---
 
-**Assinado**: Sistema de Melhorias de Código
-**Data**: 2026-01-21
-**Versão**: 1.0
+**Assinado**: Sistema de Melhorias de Código **Data**: 2026-01-21 **Versão**: 1.0

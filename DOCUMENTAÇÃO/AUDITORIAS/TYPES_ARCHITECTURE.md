@@ -27,11 +27,11 @@ src/core/
  * @enum {string}
  */
 const TASK_STATES = Object.freeze({
-    PENDING: 'PENDING',
-    RUNNING: 'RUNNING',
-    DONE: 'DONE',
-    FAILED: 'FAILED',
-    CANCELLED: 'CANCELLED'
+  PENDING: 'PENDING',
+  RUNNING: 'RUNNING',
+  DONE: 'DONE',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
 });
 
 /**
@@ -45,12 +45,12 @@ const TASK_STATES_VALUES = Object.freeze(Object.values(TASK_STATES));
  * @param {string} state
  * @returns {boolean}
  */
-const isValidTaskState = (state) => TASK_STATES_VALUES.includes(state);
+const isValidTaskState = state => TASK_STATES_VALUES.includes(state);
 
 module.exports = {
-    TASK_STATES,
-    TASK_STATES_VALUES,
-    isValidTaskState
+  TASK_STATES,
+  TASK_STATES_VALUES,
+  isValidTaskState,
 };
 ```
 
@@ -62,10 +62,10 @@ const { TASK_STATES_VALUES } = require('./constants/tasks');
 const { LOG_LEVELS_VALUES } = require('./constants/logging');
 
 const taskSchema = z.object({
-    id: z.string().uuid(),
-    state: z.enum(TASK_STATES_VALUES), // ✅ Type-safe
-    priority: z.enum(['HIGH', 'NORMAL', 'LOW']),
-    // ...
+  id: z.string().uuid(),
+  state: z.enum(TASK_STATES_VALUES), // ✅ Type-safe
+  priority: z.enum(['HIGH', 'NORMAL', 'LOW']),
+  // ...
 });
 ```
 
@@ -87,11 +87,13 @@ nerv.emit(NERV_EVENTS.TASK_STATE_CHANGE, data);
 ## 3. Categorias a Mapear
 
 ### 3.1 Task Management (tasks.js)
+
 - **TASK_STATES**: PENDING, RUNNING, DONE, FAILED, CANCELLED
 - **TASK_PRIORITIES**: HIGH, NORMAL, LOW
 - **TASK_TYPES**: SINGLE, BATCH, SCHEDULED
 
 ### 3.2 NERV Events (nerv.js)
+
 - **NERV_EVENTS**:
   - DRIVER_EXECUTE
   - TASK_STATE_CHANGE
@@ -103,6 +105,7 @@ nerv.emit(NERV_EVENTS.TASK_STATE_CHANGE, data);
 - **TRANSPORT_MODES**: LOCAL, REMOTE, HYBRID
 
 ### 3.3 Browser Management (browser.js)
+
 - **CONNECTION_MODES**: launcher, external, auto
 - **BROWSER_STATES**: (do ConnectionOrchestrator)
   - INIT
@@ -114,6 +117,7 @@ nerv.emit(NERV_EVENTS.TASK_STATE_CHANGE, data);
 - **BROWSER_EVENTS**: connected, disconnected, error
 
 ### 3.4 Driver System (drivers.js)
+
 - **DRIVER_TYPES**: chatgpt, gemini, claude (extensível)
 - **DRIVER_STATES**: IDLE, BUSY, ERROR, COOLDOWN
 - **DRIVER_EVENTS**:
@@ -124,10 +128,12 @@ nerv.emit(NERV_EVENTS.TASK_STATE_CHANGE, data);
   - COOLDOWN_END
 
 ### 3.5 Logging (logging.js)
+
 - **LOG_LEVELS**: DEBUG, INFO, WARN, ERROR, CRITICAL
 - **LOG_CATEGORIES**: BOOT, TASK, DRIVER, NERV, KERNEL, SERVER, INFRA
 
 ### 3.6 Error Handling (errors.js)
+
 - **ERROR_TYPES**:
   - VALIDATION_ERROR
   - TIMEOUT_ERROR
@@ -141,11 +147,13 @@ nerv.emit(NERV_EVENTS.TASK_STATE_CHANGE, data);
   - SEMANTIC_FAILURE
 
 ### 3.7 Infra (infra.js)
+
 - **LOCK_TYPES**: EXCLUSIVE, SHARED
 - **LOCK_STATES**: ACQUIRED, RELEASED, ORPHANED
 - **QUEUE_OPERATIONS**: ADD, REMOVE, UPDATE, QUERY
 
 ### 3.8 Server/API (server.js)
+
 - **HTTP_METHODS**: GET, POST, PUT, DELETE
 - **API_ROUTES**: (como constantes)
 - **SOCKET_EVENTS**:
@@ -156,12 +164,14 @@ nerv.emit(NERV_EVENTS.TASK_STATE_CHANGE, data);
 ## 4. Ferramentas de Scan Sugeridas
 
 ### 4.1 AST-based Analysis
+
 ```bash
 # Usar esprima/acorn para parsear JS e extrair literais
 npm install --save-dev esprima
 ```
 
 ### 4.2 Grep Pattern Analysis
+
 ```bash
 # Buscar padrões comuns de magic strings
 grep -r "state === '[A-Z_]*'" src/
@@ -170,6 +180,7 @@ grep -r "mode: '[a-z]*'" src/
 ```
 
 ### 4.3 Custom Node Script
+
 ```javascript
 // scripts/scan_literals.js
 const fs = require('fs');
@@ -182,23 +193,28 @@ const esprima = require('esprima');
 ## 5. Plano de Migração
 
 ### Fase 1: Setup (1 arquivo)
+
 1. Criar `src/core/constants/index.js` vazio
 2. Criar estrutura de pastas
 
 ### Fase 2: Core Constants (3 arquivos)
+
 1. `tasks.js` - Estados e prioridades de tarefas
 2. `nerv.js` - Eventos NERV
 3. `browser.js` - Modos de conexão
 
 ### Fase 3: Atualizar Schemas (1 arquivo)
+
 1. Modificar `src/core/schemas.js` para usar enums
 
 ### Fase 4: Scan & Replace (automático)
+
 1. Executar script de scan
 2. Gerar relatório de ocorrências
 3. Aplicar replacements via jscodeshift/AST
 
 ### Fase 5: Validação (testes)
+
 1. Rodar suite de testes
 2. Verificar ESLint
 3. Verificar tipos em runtime
@@ -206,17 +222,20 @@ const esprima = require('esprima');
 ## 6. Benefícios Esperados
 
 ### 6.1 Development Experience
+
 - ✅ Autocomplete em IDE
 - ✅ Detecção de typos em desenvolvimento
 - ✅ Refactoring seguro (rename all references)
 - ✅ Documentação inline via JSDoc
 
 ### 6.2 Runtime Safety
+
 - ✅ Validação Zod mais forte
 - ✅ Erros detectados cedo (fail-fast)
 - ✅ Stack traces mais claras
 
 ### 6.3 Maintainability
+
 - ✅ Single source of truth
 - ✅ Fácil adicionar novos valores
 - ✅ Documentação centralizada
@@ -225,19 +244,21 @@ const esprima = require('esprima');
 ## 7. Compatibilidade
 
 ### Retrocompatibilidade
+
 - ✅ Valores finais são strings (sem quebra)
 - ✅ Schemas Zod continuam validando igual
 - ✅ Migração incremental possível
 - ✅ Testes garantem comportamento
 
 ### TypeScript Future-Proof
+
 ```typescript
 // Se migrar para TS no futuro
 export enum TaskState {
-    PENDING = 'PENDING',
-    RUNNING = 'RUNNING',
-    DONE = 'DONE',
-    FAILED = 'FAILED'
+  PENDING = 'PENDING',
+  RUNNING = 'RUNNING',
+  DONE = 'DONE',
+  FAILED = 'FAILED',
 }
 ```
 
@@ -255,6 +276,7 @@ export enum TaskState {
 ---
 
 **Estimativa de impacto:**
+
 - ~50-80 magic strings substituídas
 - ~8 arquivos de constantes criados
 - ~1 arquivo schemas.js atualizado

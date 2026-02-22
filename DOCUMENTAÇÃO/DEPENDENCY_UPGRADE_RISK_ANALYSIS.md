@@ -1,8 +1,7 @@
 # 🔬 Análise de Riscos - Atualizações de Dependências
 
-**Versão:** 1.0.0 (pre-release)
-**Data:** 2026-01-20
-**Objetivo:** Avaliar riscos, compatibilidades e estratégias de migração para atualizações de dependências
+**Versão:** 1.0.0 (pre-release) **Data:** 2026-01-20 **Objetivo:** Avaliar riscos, compatibilidades
+e estratégias de migração para atualizações de dependências
 
 ---
 
@@ -103,10 +102,10 @@ docker run --rm -p 3008:3008 chatgpt-agent:test
 
 ```json
 {
-    "puppeteer": "^21.11.0", // Core
-    "puppeteer-extra": "^3.3.6", // Plugin system
-    "puppeteer-extra-plugin-stealth": "^2.11.2", // Anti-detection
-    "ghost-cursor": "^1.1.18" // Human mouse movement
+  "puppeteer": "^21.11.0", // Core
+  "puppeteer-extra": "^3.3.6", // Plugin system
+  "puppeteer-extra-plugin-stealth": "^2.11.2", // Anti-detection
+  "ghost-cursor": "^1.1.18" // Human mouse movement
 }
 ```
 
@@ -266,10 +265,10 @@ npm run daemon:restart
 - **Esforço:** 2 dias
 - **Benefícios:** Performance, bug fixes, security updates
 - **Estratégia:**
-    1. Testar puppeteer-extra v3.3.6 com Puppeteer 24 primeiro
-    2. Se incompatível, aguardar update de puppeteer-extra
-    3. Se compatível, prosseguir com plano de testes
-    4. Rollback preparado
+  1. Testar puppeteer-extra v3.3.6 com Puppeteer 24 primeiro
+  2. Se incompatível, aguardar update de puppeteer-extra
+  3. Se compatível, prosseguir com plano de testes
+  4. Rollback preparado
 - **Prioridade:** 🟡 ALTA (mas não urgente)
 
 ---
@@ -292,10 +291,10 @@ npm run daemon:restart
 
 ```json
 {
-    "engines": {
-        "node": ">=20.0.0", // ✅ Compatível
-        "npm": ">=10.0.0"
-    }
+  "engines": {
+    "node": ">=20.0.0", // ✅ Compatível
+    "npm": ">=10.0.0"
+  }
 }
 ```
 
@@ -321,23 +320,23 @@ npm run daemon:restart
 
 ```javascript
 module.exports = {
-    apps: [
-        {
-            name: 'agente-gpt',
-            script: './index.js',
-            node_args: '--expose-gc', // ✅ Compatível PM2 6
-            max_memory_restart: '1G', // ✅ Compatível
-            exp_backoff_restart_delay: 100 // ✅ Compatível
-        },
-        {
-            name: 'dashboard-web',
-            script: './src/server/main.js',
-            env: {
-                PORT: 3008,
-                DAEMON_MODE: 'true' // ✅ Compatível
-            }
-        }
-    ]
+  apps: [
+    {
+      name: 'agente-gpt',
+      script: './index.js',
+      node_args: '--expose-gc', // ✅ Compatível PM2 6
+      max_memory_restart: '1G', // ✅ Compatível
+      exp_backoff_restart_delay: 100, // ✅ Compatível
+    },
+    {
+      name: 'dashboard-web',
+      script: './src/server/main.js',
+      env: {
+        PORT: 3008,
+        DAEMON_MODE: 'true', // ✅ Compatível
+      },
+    },
+  ],
 };
 ```
 
@@ -345,12 +344,12 @@ module.exports = {
 
 ```json
 {
-    "daemon:start": "pm2 start ecosystem.config.js", // ✅ Compatível
-    "daemon:stop": "pm2 stop agente-gpt dashboard-web", // ✅ Compatível
-    "daemon:restart": "pm2 restart all", // ✅ Compatível
-    "daemon:reload": "pm2 reload all", // ✅ Compatível
-    "daemon:monit": "pm2 monit", // ✅ Compatível
-    "daemon:logs": "pm2 logs --lines 50" // ✅ Compatível
+  "daemon:start": "pm2 start ecosystem.config.js", // ✅ Compatível
+  "daemon:stop": "pm2 stop agente-gpt dashboard-web", // ✅ Compatível
+  "daemon:restart": "pm2 restart all", // ✅ Compatível
+  "daemon:reload": "pm2 reload all", // ✅ Compatível
+  "daemon:monit": "pm2 monit", // ✅ Compatível
+  "daemon:logs": "pm2 logs --lines 50" // ✅ Compatível
 }
 ```
 
@@ -368,9 +367,9 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 2. ✅ **Stability:** Bug fixes de crash detection
 3. ✅ **Security:** Patches de segurança
 4. ✅ **Features:**
-    - Melhor PM2 Plus integration
-    - Enhanced metrics
-    - Better cluster mode
+   - Melhor PM2 Plus integration
+   - Enhanced metrics
+   - Better cluster mode
 
 ### Estratégia de Migração
 
@@ -449,10 +448,10 @@ pm2 resurrect  # Restaurar estado salvo
 - **Esforço:** 1 dia
 - **Benefícios:** Stability, performance, security
 - **Estratégia:**
-    1. Testar em dev primeiro
-    2. Validar scripts e daemon mode
-    3. Testar Docker
-    4. Deploy em produção
+  1. Testar em dev primeiro
+  2. Validar scripts e daemon mode
+  3. Testar Docker
+  4. Deploy em produção
 - **Prioridade:** 🟡 MÉDIA (pode fazer logo após Puppeteer)
 
 ---
@@ -525,9 +524,9 @@ npm test
 
 ```json
 {
-    "scripts": {
-        "test:win": "cross-env NODE_ENV=test ..." // ✅ Compatível
-    }
+  "scripts": {
+    "test:win": "cross-env NODE_ENV=test ..." // ✅ Compatível
+  }
 }
 ```
 
@@ -548,9 +547,9 @@ npm run test:win
 - **Esforço:** 4 horas
 - **Benefícios:** Bug fixes, performance
 - **Estratégia:**
-    1. Atualizar todas em um commit
-    2. Rodar test suite completa
-    3. Validar schemas Zod
+  1. Atualizar todas em um commit
+  2. Rodar test suite completa
+  3. Validar schemas Zod
 - **Prioridade:** 🟢 BAIXA (pode fazer quando tempo disponível)
 
 ---
@@ -572,12 +571,12 @@ npm run test:win
 ```javascript
 // Express 4: Sync error handling
 app.get('/', (req, res) => {
-    throw new Error('sync error'); // ✅ Capturado
+  throw new Error('sync error'); // ✅ Capturado
 });
 
 // Express 5: Async precisa try/catch
 app.get('/', async (req, res, next) => {
-    throw new Error('async error'); // ❌ NÃO capturado sem next()
+  throw new Error('async error'); // ❌ NÃO capturado sem next()
 });
 ```
 
@@ -622,8 +621,8 @@ app.use(errorHandler);             // ⚠️ Error middleware mudou
 
 ```json
 {
-    "compression": "^1.7.4", // ⚠️ Pode ter issues com Express 5
-    "socket.io": "^4.8.3" // ⚠️ Express integration pode quebrar
+  "compression": "^1.7.4", // ⚠️ Pode ter issues com Express 5
+  "socket.io": "^4.8.3" // ⚠️ Express integration pode quebrar
 }
 ```
 
@@ -661,10 +660,10 @@ app.use(errorHandler);             // ⚠️ Error middleware mudou
 - **Esforço:** 2-3 semanas
 - **Benefícios:** Mínimos (Express 4 estável)
 - **Estratégia:**
-    1. **Postergar para v2.0.0 do projeto**
-    2. Focar em atualizações de baixo risco primeiro
-    3. Avaliar novamente em 6-12 meses
-    4. Esperar ecosystem estabilizar
+  1. **Postergar para v2.0.0 do projeto**
+  2. Focar em atualizações de baixo risco primeiro
+  3. Avaliar novamente em 6-12 meses
+  4. Esperar ecosystem estabilizar
 - **Prioridade:** 🔴 BAIXA (última da lista)
 
 ---
@@ -702,8 +701,7 @@ npm test
 # Se OK: merge
 ```
 
-**Status:** 🟡 **Fazer após FASE 0**
-**Condição:** Verificar puppeteer-extra compatibility primeiro
+**Status:** 🟡 **Fazer após FASE 0** **Condição:** Verificar puppeteer-extra compatibility primeiro
 
 ---
 
@@ -822,6 +820,4 @@ docker-compose up -d
 
 **Próximo Passo:** Corrigir Dockerfile CMD (FASE 0)
 
-**Criado:** 2026-01-20
-**Autor:** AI Coding Agent
-**Revisão:** Pendente
+**Criado:** 2026-01-20 **Autor:** AI Coding Agent **Revisão:** Pendente

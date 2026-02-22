@@ -8,7 +8,8 @@
 
 ## 📊 Resumo Executivo
 
-A integração do subsistema **Driver** com o **NERV** (canal universal de transporte) foi **validada com 100% de conformidade arquitetural**. Todos os princípios de desacoplamento foram respeitados:
+A integração do subsistema **Driver** com o **NERV** (canal universal de transporte) foi **validada
+com 100% de conformidade arquitetural**. Todos os princípios de desacoplamento foram respeitados:
 
 - ✅ **Zero acoplamento direto** com KERNEL ou SERVER
 - ✅ **NERV como transportador universal** (100% comunicação pub/sub)
@@ -187,14 +188,14 @@ async abort(taskId) {
 ```javascript
 // Valida que nenhum arquivo do driver importa KERNEL diretamente
 const driverFiles = [
-    'src/driver/lifecycle/DriverLifecycleManager.js',
-    'src/driver/nerv_adapter/driver_nerv_adapter.js',
-    'src/driver/factory.js'
+  'src/driver/lifecycle/DriverLifecycleManager.js',
+  'src/driver/nerv_adapter/driver_nerv_adapter.js',
+  'src/driver/factory.js',
 ];
 
 for (const file of driverFiles) {
-    const content = fs.readFileSync(file, 'utf-8');
-    assert(!content.match(/require\(['"].*kernel/i), `${file} NÃO deve importar KERNEL diretamente`);
+  const content = fs.readFileSync(file, 'utf-8');
+  assert(!content.match(/require\(['"].*kernel/i), `${file} NÃO deve importar KERNEL diretamente`);
 }
 ```
 
@@ -207,8 +208,8 @@ for (const file of driverFiles) {
 ```javascript
 // Valida que nenhum arquivo do driver importa SERVER diretamente
 for (const file of driverFiles) {
-    const content = fs.readFileSync(file, 'utf-8');
-    assert(!content.match(/require\(['"].*server/i), `${file} NÃO deve importar SERVER diretamente`);
+  const content = fs.readFileSync(file, 'utf-8');
+  assert(!content.match(/require\(['"].*server/i), `${file} NÃO deve importar SERVER diretamente`);
 }
 ```
 
@@ -220,18 +221,24 @@ for (const file of driverFiles) {
 
 ```javascript
 // Valida que o driver não acessa filesystem diretamente
-const fsPatterns = [/fs\.readFile/, /fs\.writeFile/, /fs\.appendFile/, /fs\.unlink/, /fsPromises\./];
+const fsPatterns = [
+  /fs\.readFile/,
+  /fs\.writeFile/,
+  /fs\.appendFile/,
+  /fs\.unlink/,
+  /fsPromises\./,
+];
 
 const driverCoreFiles = [
-    'src/driver/lifecycle/DriverLifecycleManager.js',
-    'src/driver/nerv_adapter/driver_nerv_adapter.js'
+  'src/driver/lifecycle/DriverLifecycleManager.js',
+  'src/driver/nerv_adapter/driver_nerv_adapter.js',
 ];
 
 for (const file of driverCoreFiles) {
-    const content = fs.readFileSync(file, 'utf-8');
-    for (const pattern of fsPatterns) {
-        assert(!content.match(pattern), `${file} NÃO deve acessar filesystem diretamente`);
-    }
+  const content = fs.readFileSync(file, 'utf-8');
+  for (const pattern of fsPatterns) {
+    assert(!content.match(pattern), `${file} NÃO deve acessar filesystem diretamente`);
+  }
 }
 ```
 
@@ -250,16 +257,22 @@ const adapterContent = fs.readFileSync('src/driver/nerv_adapter/driver_nerv_adap
 assert(adapterContent.includes('this.nerv'), 'DriverNERVAdapter deve ter referência ao NERV');
 
 // Deve usar nerv.onReceive() para comandos
-assert(adapterContent.includes('nerv.onReceive'), 'Deve usar nerv.onReceive() para escutar comandos');
+assert(
+  adapterContent.includes('nerv.onReceive'),
+  'Deve usar nerv.onReceive() para escutar comandos'
+);
 
 // Deve usar nerv.emitEvent() para telemetria
-assert(adapterContent.includes('nerv.emitEvent'), 'Deve usar nerv.emitEvent() para enviar telemetria');
+assert(
+  adapterContent.includes('nerv.emitEvent'),
+  'Deve usar nerv.emitEvent() para enviar telemetria'
+);
 
 // NÃO deve emitir eventos direto para KERNEL/SERVER
 const forbiddenPatterns = [/kernel\.emit/i, /server\.emit/i, /eventBus\.emit/i];
 
 for (const pattern of forbiddenPatterns) {
-    assert(!adapterContent.match(pattern), 'NÃO deve emitir eventos direto fora do NERV');
+  assert(!adapterContent.match(pattern), 'NÃO deve emitir eventos direto fora do NERV');
 }
 ```
 
@@ -285,9 +298,15 @@ assert(adapterContent.includes("driver.on('state_change'"), 'Deve escutar state_
 assert(adapterContent.includes("driver.on('progress'"), 'Deve escutar progress do driver');
 
 // Usa ActionCodes corretos
-assert(adapterContent.includes('ActionCode.DRIVER_STATE_CHANGE'), 'Deve usar ActionCode.DRIVER_STATE_CHANGE');
+assert(
+  adapterContent.includes('ActionCode.DRIVER_STATE_CHANGE'),
+  'Deve usar ActionCode.DRIVER_STATE_CHANGE'
+);
 
-assert(adapterContent.includes('ActionCode.DRIVER_PROGRESS'), 'Deve usar ActionCode.DRIVER_PROGRESS');
+assert(
+  adapterContent.includes('ActionCode.DRIVER_PROGRESS'),
+  'Deve usar ActionCode.DRIVER_PROGRESS'
+);
 
 // Emite via NERV
 assert(adapterContent.includes('this.nerv.emitEvent'), 'Deve emitir telemetria via NERV');
@@ -318,7 +337,10 @@ const adapterContent = fs.readFileSync('src/driver/nerv_adapter/driver_nerv_adap
 assert(adapterContent.includes('_setupListeners'), 'Deve ter método _setupListeners()');
 
 // Escuta via NERV
-assert(adapterContent.includes('this.nerv.onReceive'), 'Deve escutar comandos via nerv.onReceive()');
+assert(
+  adapterContent.includes('this.nerv.onReceive'),
+  'Deve escutar comandos via nerv.onReceive()'
+);
 
 // Processa comandos corretos
 assert(adapterContent.includes('ActionCode.DRIVER_EXECUTE'), 'Deve processar DRIVER_EXECUTE');
@@ -352,16 +374,21 @@ const lifecycleContent = fs.readFileSync('src/driver/lifecycle/DriverLifecycleMa
 
 // Não deve importar KERNEL (exceto logger)
 const kernelImports = lifecycleContent.match(/require\(['"].*kernel/gi) || [];
-const allowedImports = kernelImports.filter(imp => imp.includes('logger') || imp.includes('telemetry'));
+const allowedImports = kernelImports.filter(
+  imp => imp.includes('logger') || imp.includes('telemetry')
+);
 
 assert.strictEqual(
-    kernelImports.length,
-    allowedImports.length,
-    'LifecycleManager só pode importar logger/telemetry do KERNEL'
+  kernelImports.length,
+  allowedImports.length,
+  'LifecycleManager só pode importar logger/telemetry do KERNEL'
 );
 
 // Não deve importar SERVER
-assert(!lifecycleContent.match(/require\(['"].*server/i), 'LifecycleManager NÃO deve importar SERVER');
+assert(
+  !lifecycleContent.match(/require\(['"].*server/i),
+  'LifecycleManager NÃO deve importar SERVER'
+);
 
 // Deve usar AbortController (soberania)
 assert(lifecycleContent.includes('AbortController'), 'LifecycleManager deve usar AbortController');
@@ -385,25 +412,25 @@ assert(lifecycleContent.includes('DriverFactory'), 'LifecycleManager deve usar D
 ```javascript
 // Analisa dívidas técnicas identificadas em comentários
 const allDriverFiles = [
-    'src/driver/lifecycle/DriverLifecycleManager.js',
-    'src/driver/nerv_adapter/driver_nerv_adapter.js',
-    'src/driver/factory.js'
+  'src/driver/lifecycle/DriverLifecycleManager.js',
+  'src/driver/nerv_adapter/driver_nerv_adapter.js',
+  'src/driver/factory.js',
 ];
 
 let totalTodos = 0;
 const foundTodos = [];
 
 for (const file of allDriverFiles) {
-    const content = fs.readFileSync(file, 'utf-8');
-    const todoMatches = content.match(/\/\/\s*TODO[:\s]+(.*)/gi) || [];
+  const content = fs.readFileSync(file, 'utf-8');
+  const todoMatches = content.match(/\/\/\s*TODO[:\s]+(.*)/gi) || [];
 
-    totalTodos += todoMatches.length;
-    foundTodos.push(...todoMatches.map(todo => ({ file, todo })));
+  totalTodos += todoMatches.length;
+  foundTodos.push(...todoMatches.map(todo => ({ file, todo })));
 }
 
 console.log(`   ⚠️ Encontrados ${totalTodos} TODOs técnicos`);
 foundTodos.forEach(({ file, todo }) => {
-    console.log(`      ${path.basename(file)}: ${todo.trim()}`);
+  console.log(`      ${path.basename(file)}: ${todo.trim()}`);
 });
 ```
 
@@ -444,8 +471,10 @@ DriverLifecycleManager.js:
 
 ### 1. DriverLifecycleManager.js
 
-**Path:** [src/driver/lifecycle/DriverLifecycleManager.js](../src/driver/lifecycle/DriverLifecycleManager.js)  
-**Linhas:** 146  
+**Path:**
+[src/driver/lifecycle/DriverLifecycleManager.js](../src/driver/lifecycle/DriverLifecycleManager.js)  
+**Linhas:**
+146  
 **Responsabilidade:** Gerenciamento de ciclo de vida de execução de drivers
 
 **Imports Analisados:**
@@ -481,8 +510,10 @@ const AbortController = require('abort-controller');
 
 ### 2. driver_nerv_adapter.js
 
-**Path:** [src/driver/nerv_adapter/driver_nerv_adapter.js](../src/driver/nerv_adapter/driver_nerv_adapter.js)  
-**Linhas:** 322  
+**Path:**
+[src/driver/nerv_adapter/driver_nerv_adapter.js](../src/driver/nerv_adapter/driver_nerv_adapter.js)  
+**Linhas:**
+322  
 **Responsabilidade:** Ponte entre DriverLifecycleManager e NERV
 
 **Imports Analisados:**
@@ -522,13 +553,13 @@ driver.on('progress', (data) => {
 
 ```javascript
 this.nerv.onReceive(
-    {
-        actionCode: ActionCode.DRIVER_EXECUTE,
-        actorRole: ActorRole.DRIVER
-    },
-    envelope => {
-        this._handleDriverCommand(envelope);
-    }
+  {
+    actionCode: ActionCode.DRIVER_EXECUTE,
+    actorRole: ActorRole.DRIVER,
+  },
+  envelope => {
+    this._handleDriverCommand(envelope);
+  }
 );
 ```
 
@@ -612,7 +643,8 @@ const GeminiDriver = require('./GeminiDriver');
 
 ### TODO 1: Telemetria via DriverNERVAdapter
 
-**Localização:** [src/driver/lifecycle/DriverLifecycleManager.js](../src/driver/lifecycle/DriverLifecycleManager.js#L45)
+**Localização:**
+[src/driver/lifecycle/DriverLifecycleManager.js](../src/driver/lifecycle/DriverLifecycleManager.js#L45)
 
 **Texto Original:**
 
@@ -624,13 +656,13 @@ const GeminiDriver = require('./GeminiDriver');
 
 - ℹ️ Indica intenção de **refinar** o desacoplamento de telemetria
 - ✅ **Implementação atual já está conforme:**
-    - Driver usa EventEmitter (`state_change`, `progress`)
-    - DriverNERVAdapter escuta e traduz para NERV
-    - Telemetria flui 100% via NERV
+  - Driver usa EventEmitter (`state_change`, `progress`)
+  - DriverNERVAdapter escuta e traduz para NERV
+  - Telemetria flui 100% via NERV
 - 🔍 **Possível trabalho futuro:**
-    - Remover EventEmitter interno do driver?
-    - Emitir direto via DriverNERVAdapter injetado?
-    - Atualizar comentário para refletir estado atual?
+  - Remover EventEmitter interno do driver?
+  - Emitir direto via DriverNERVAdapter injetado?
+  - Atualizar comentário para refletir estado atual?
 
 **Recomendação:** ✅ Atualizar comentário ou remover TODO (já implementado)
 
@@ -641,33 +673,34 @@ const GeminiDriver = require('./GeminiDriver');
 ### ✅ Curto Prazo (Implementar Imediatamente)
 
 1. **Atualizar TODO obsoleto** em DriverLifecycleManager.js
-    - Substituir por comentário descritivo do fluxo atual
-    - Ou remover se não houver trabalho futuro planejado
+   - Substituir por comentário descritivo do fluxo atual
+   - Ou remover se não houver trabalho futuro planejado
 
 ### 🔄 Médio Prazo (Próxima Sprint)
 
 2. **Testes de Carga** para Driver via NERV
-    - Validar throughput de telemetria (100+ msgs/s)
-    - Testar múltiplas execuções simultâneas (5+ drivers)
+   - Validar throughput de telemetria (100+ msgs/s)
+   - Testar múltiplas execuções simultâneas (5+ drivers)
 3. **Documentar Padrão Driver** em CONTRIBUTING.md
-    - Como criar novos drivers (TikTokDriver, ClaudeDriver, etc.)
-    - Checklist de conformidade NERV
-    - Exemplos de uso de AbortController
+   - Como criar novos drivers (TikTokDriver, ClaudeDriver, etc.)
+   - Checklist de conformidade NERV
+   - Exemplos de uso de AbortController
 
 ### 🎯 Longo Prazo (Roadmap)
 
 4. **Driver Registry** via NERV
-    - Auto-descoberta de drivers disponíveis
-    - Registro dinâmico sem modificar factory.js
+   - Auto-descoberta de drivers disponíveis
+   - Registro dinâmico sem modificar factory.js
 5. **Driver Health Monitoring**
-    - Heartbeat de drivers ativos
-    - Auto-recovery de drivers crashados
+   - Heartbeat de drivers ativos
+   - Auto-recovery de drivers crashados
 
 ---
 
 ## 🎉 Conclusão
 
-A integração do **subsistema Driver** com o **NERV** está **100% conforme** com os princípios arquiteturais estabelecidos:
+A integração do **subsistema Driver** com o **NERV** está **100% conforme** com os princípios
+arquiteturais estabelecidos:
 
 ✅ **Zero acoplamento direto** (KERNEL/SERVER)  
 ✅ **NERV como transportador universal** (pub/sub)  

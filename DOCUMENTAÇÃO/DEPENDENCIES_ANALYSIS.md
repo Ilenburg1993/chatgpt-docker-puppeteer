@@ -1,7 +1,6 @@
 # 🔍 ANÁLISE DE DEPENDÊNCIAS - Checagem Completa
-**chatgpt-docker-puppeteer**
-**Data**: 2 de Fevereiro de 2026
-**Versão**: 1.0
+
+**chatgpt-docker-puppeteer** **Data**: 2 de Fevereiro de 2026 **Versão**: 1.0
 
 ---
 
@@ -10,12 +9,13 @@
 **Status**: ✅ **TODAS AS DEPENDÊNCIAS ESTÃO CORRETAS**
 
 Análise detalhada de 3 camadas:
+
 - **package.json** (Node.js dependencies)
 - **Dockerfile** (System packages)
 - **Código fonte** (require/import statements)
 
-**Resultado**: ✅ Nenhuma dependência faltando
-**Última atualização**: Adicionados chalk, dotenv, winston (3 novos pacotes)
+**Resultado**: ✅ Nenhuma dependência faltando **Última atualização**: Adicionados chalk, dotenv,
+winston (3 novos pacotes)
 
 ---
 
@@ -23,8 +23,8 @@ Análise detalhada de 3 camadas:
 
 ### ✅ Dependencies (Runtime - 25 pacotes)
 
-| Pacote                           | Versão   | Uso no Código                                                       | Status     |
-| -------------------------------- | -------- | ------------------------------------------------------------------- | ---------- |
+| Pacote                           | Versão   | Uso no Código                                                       | Status      |
+| -------------------------------- | -------- | ------------------------------------------------------------------- | ----------- |
 | `axios`                          | ^1.13.4  | `src/dashboard-ui/src/stores/*.js`                                  | ✅ OK       |
 | `chalk`                          | ^4.1.2   | Terminal colors em scripts Node.js                                  | ✅ OK       |
 | `compression`                    | ^1.8.1   | `src/server/engine/app.js`, `src/infra/proxy/chromeProxyService.js` | ✅ OK       |
@@ -39,7 +39,7 @@ Análise detalhada de 3 camadas:
 | `module-alias`                   | 2.2.3    | `src/server/main.js` (registro de aliases @core, @infra)            | ✅ OK       |
 | `openai`                         | ^6.16.0  | Futuro suporte API                                                  | ✅ OK       |
 | `p-limit`                        | ^3.1.0   | Concurrency control                                                 | ✅ OK       |
-| `pino`                           | ^8.20.0  | **⚠️ NÃO USADO NO CÓDIGO** (mas declarado)                           | ⚠️ OPTIONAL |
+| `pino`                           | ^8.20.0  | **⚠️ NÃO USADO NO CÓDIGO** (mas declarado)                          | ⚠️ OPTIONAL |
 | `pm2`                            | ^6.0.14  | `src/infra/system.js`, ecosystem.config.js                          | ✅ OK       |
 | `prom-client`                    | ^14.1.0  | Prometheus metrics                                                  | ✅ OK       |
 | `puppeteer`                      | ^24.36.0 | Core automation                                                     | ✅ OK       |
@@ -55,6 +55,7 @@ Análise detalhada de 3 camadas:
 | `zod`                            | ^4.3.6   | Schema validation                                                   | ✅ OK       |
 
 **Análise**:
+
 - ✅ **25/25 pacotes justified**
 - 🆕 **3 novos pacotes adicionados**:
   - `chalk` - Terminal colors para melhor UX em scripts Node.js
@@ -68,32 +69,33 @@ Análise detalhada de 3 camadas:
 
 | Pacote                     | Versão       | Uso                           | Status |
 | -------------------------- | ------------ | ----------------------------- | ------ |
-| `@eslint/css`              | ^0.14.1      | CSS linting                   | ✅ OK   |
-| `@eslint/js`               | ^9.39.2      | ESLint core                   | ✅ OK   |
-| `@eslint/json`             | ^0.14.0      | JSON linting                  | ✅ OK   |
-| `@eslint/markdown`         | ^7.5.1       | Markdown linting              | ✅ OK   |
-| `@faker-js/faker`          | 10.2.0       | Test data generation          | ✅ OK   |
-| `@types/node`              | 25.0.10      | TypeScript definitions        | ✅ OK   |
-| `c8`                       | 10.1.3       | Coverage tool                 | ✅ OK   |
-| `complexity-report`        | ^2.0.0-alpha | Code complexity analysis      | ✅ OK   |
-| `cross-env`                | ^10.1.0      | Cross-platform ENV vars       | ✅ OK   |
-| `eslint`                   | ^9.39.2      | Linting                       | ✅ OK   |
-| `eslint-config-prettier`   | 10.1.8       | Prettier integration          | ✅ OK   |
-| `eslint-plugin-complexity` | ^1.0.2       | Complexity rules              | ✅ OK   |
-| `eslint-plugin-i18next`    | 6.1.3        | i18n linting                  | ✅ OK   |
-| `globals`                  | ^17.1.0      | Global variables              | ✅ OK   |
-| `graphviz-cli`             | ^2.0.0       | Dependency graphs             | ✅ OK   |
-| `jscodeshift`              | 17.3.0       | Codemods                      | ✅ OK   |
-| `jscpd`                    | ^4.0.7       | Copy/paste detection          | ✅ OK   |
-| `madge`                    | ^8.0.0       | Circular dependency detection | ✅ OK   |
-| `mermaid`                  | ^10.9.5      | Diagrams                      | ✅ OK   |
-| `nodemon`                  | ^3.1.11      | Dev server                    | ✅ OK   |
-| `prettier`                 | 3.8.1        | Code formatting               | ✅ OK   |
-| `puppeteer-core`           | ^24.36.0     | Puppeteer sem Chrome bundled  | ✅ OK   |
-| `sinon`                    | 21.0.1       | Mocking library               | ✅ OK   |
-| `supertest`                | 7.2.2        | HTTP testing                  | ✅ OK   |
+| `@eslint/css`              | ^0.14.1      | CSS linting                   | ✅ OK  |
+| `@eslint/js`               | ^9.39.2      | ESLint core                   | ✅ OK  |
+| `@eslint/json`             | ^0.14.0      | JSON linting                  | ✅ OK  |
+| `@eslint/markdown`         | ^7.5.1       | Markdown linting              | ✅ OK  |
+| `@faker-js/faker`          | 10.2.0       | Test data generation          | ✅ OK  |
+| `@types/node`              | 25.0.10      | TypeScript definitions        | ✅ OK  |
+| `c8`                       | 10.1.3       | Coverage tool                 | ✅ OK  |
+| `complexity-report`        | ^2.0.0-alpha | Code complexity analysis      | ✅ OK  |
+| `cross-env`                | ^10.1.0      | Cross-platform ENV vars       | ✅ OK  |
+| `eslint`                   | ^9.39.2      | Linting                       | ✅ OK  |
+| `eslint-config-prettier`   | 10.1.8       | Prettier integration          | ✅ OK  |
+| `eslint-plugin-complexity` | ^1.0.2       | Complexity rules              | ✅ OK  |
+| `eslint-plugin-i18next`    | 6.1.3        | i18n linting                  | ✅ OK  |
+| `globals`                  | ^17.1.0      | Global variables              | ✅ OK  |
+| `graphviz-cli`             | ^2.0.0       | Dependency graphs             | ✅ OK  |
+| `jscodeshift`              | 17.3.0       | Codemods                      | ✅ OK  |
+| `jscpd`                    | ^4.0.7       | Copy/paste detection          | ✅ OK  |
+| `madge`                    | ^8.0.0       | Circular dependency detection | ✅ OK  |
+| `mermaid`                  | ^10.9.5      | Diagrams                      | ✅ OK  |
+| `nodemon`                  | ^3.1.11      | Dev server                    | ✅ OK  |
+| `prettier`                 | 3.8.1        | Code formatting               | ✅ OK  |
+| `puppeteer-core`           | ^24.36.0     | Puppeteer sem Chrome bundled  | ✅ OK  |
+| `sinon`                    | 21.0.1       | Mocking library               | ✅ OK  |
+| `supertest`                | 7.2.2        | HTTP testing                  | ✅ OK  |
 
 **Análise**:
+
 - ✅ **22/22 pacotes justified**
 - ✅ Todas ferramentas de dev/test presentes
 
@@ -128,6 +130,7 @@ ca-certificates      ✅ OK (HTTPS validation)
 ```
 
 **Análise**:
+
 - ✅ Toolchain completa para compilar módulos nativos Node
 - ✅ Python 3 instalado (usado por `colect.py` e `agents/`)
 
@@ -173,6 +176,7 @@ xdg-utils            ✅ OK (desktop integration)
 ```
 
 **Análise**:
+
 - ✅ **Chromium instalado** (fallback técnico)
 - ✅ **Chrome externo é primário** (CDP via host.docker.internal:9225)
 - ✅ Todas libs necessárias para headless browser presentes
@@ -200,6 +204,7 @@ xdg-utils                 ✅ OK (PDF viewers)
 ```
 
 **Análise**:
+
 - ✅ Cobertura completa: PT-BR, EN, EU, CJK, RTL
 - ✅ Emojis suportados
 - ✅ PDF rendering OK
@@ -254,6 +259,7 @@ hyperfine            ✅ OK (benchmarking)
 ```
 
 **Análise**:
+
 - ✅ **jq presente** (CRÍTICO para scripts de validação)
 - ✅ **shellcheck presente** (CRÍTICO para validação .sh)
 - ✅ Toolkit completo de dev/debug
@@ -267,6 +273,7 @@ powershell           ✅ OK (instrumental shell para AI/Copilot)
 ```
 
 **Análise**:
+
 - ✅ PowerShell instalado como shell instrumental (não canônico)
 - ✅ Bash permanece como shell canônico
 
@@ -279,6 +286,7 @@ docker-ce-cli        ✅ OK (apenas CLI, sem daemon)
 ```
 
 **Análise**:
+
 - ✅ Docker CLI presente (acesso via socket do host)
 - ✅ dockerd NÃO instalado (correto, DevContainer não deve rodar daemon)
 
@@ -292,6 +300,7 @@ dumb-init            ✅ OK (PID 1 signal handling)
 ```
 
 **Análise**:
+
 - ✅ Shell UX completo
 - ✅ dumb-init como ENTRYPOINT (correto para containers)
 
@@ -302,6 +311,7 @@ dumb-init            ✅ OK (PID 1 signal handling)
 ### ✅ Checagens Executadas:
 
 #### 1. Node.js Modules (require/import)
+
 - ✅ **express**: Usado em 8 arquivos → ✅ package.json
 - ✅ **socket.io**: Usado em 3 arquivos → ✅ package.json
 - ✅ **compression**: Usado em 2 arquivos → ✅ package.json
@@ -310,6 +320,7 @@ dumb-init            ✅ OK (PID 1 signal handling)
 - ✅ **module-alias**: Usado em 1 arquivo → ✅ package.json
 
 #### 2. System Tools (usado em scripts)
+
 - ✅ **jq**: Usado em `validate-env.sh` → ✅ Dockerfile Section 6
 - ✅ **shellcheck**: Usado no Makefile → ✅ Dockerfile Section 6
 - ✅ **bash**: Shell canônico → ✅ Base image
@@ -317,6 +328,7 @@ dumb-init            ✅ OK (PID 1 signal handling)
 - ✅ **python3**: Scripts de análise → ✅ Dockerfile Section 3
 
 #### 3. Browser Dependencies
+
 - ✅ **Chromium**: Fallback local → ✅ Dockerfile Section 4
 - ✅ **Chrome libs**: 30+ libs X11/NSS/GTK → ✅ Dockerfile Section 4
 - ✅ **Fonts**: 14 font packages → ✅ Dockerfile Section 5
@@ -327,8 +339,8 @@ dumb-init            ✅ OK (PID 1 signal handling)
 
 ### ⚠️ Não Usadas Atualmente (Mas Declaradas)
 
-| Pacote        | Status                  | Ação Recomendada                          |
-| ------------- | ----------------------- | ----------------------------------------- |
+| Pacote        | Status                  | Ação Recomendada                           |
+| ------------- | ----------------------- | ------------------------------------------ |
 | `pino`        | Declarado mas não usado | ✅ **MANTER** (logger alternativo, futuro) |
 | `openai`      | Declarado mas não usado | ✅ **MANTER** (API futura)                 |
 | `prom-client` | Declarado mas não usado | ✅ **MANTER** (metrics futuras)            |
@@ -374,8 +386,8 @@ Nenhuma otimização pendente no momento. Todos os pacotes recomendados foram ad
 
 ### Checagem Contra DEVCONTAINER_REBUILD_ANALYSIS.md
 
-| Item da Análise              | Status na Implementação        |
-| ---------------------------- | ------------------------------ |
+| Item da Análise              | Status na Implementação         |
+| ---------------------------- | ------------------------------- |
 | ENV system integration       | ✅ Implementado (Fase 1)        |
 | validate-env.sh dependencies | ✅ bash, jq presentes           |
 | Chrome dependencies          | ✅ Todas libs presentes         |
@@ -418,6 +430,7 @@ grep -r "@core\\|@infra\\|@shared\\|@nerv" src/ | wc -l
 ### ✅ STATUS: TODAS AS DEPENDÊNCIAS CORRETAS + 3 NOVOS PACOTES
 
 #### Resumo:
+
 - ✅ **25/25 dependencies** no package.json justified (era 22, +3 novos)
 - ✅ **22/22 devDependencies** no package.json justified
 - ✅ **100+ system packages** no Dockerfile justified
@@ -426,6 +439,7 @@ grep -r "@core\\|@infra\\|@shared\\|@nerv" src/ | wc -l
 - 🆕 **Adicionados hoje**: chalk (^4.1.2), dotenv (^16.6.1), winston (^3.19.0)
 
 #### Áreas Validadas:
+
 - ✅ Node.js modules (express, socket.io, puppeteer, etc.)
 - ✅ System tools (jq, shellcheck, curl, etc.)
 - ✅ Browser dependencies (Chromium + 30+ libs)
@@ -434,6 +448,7 @@ grep -r "@core\\|@infra\\|@shared\\|@nerv" src/ | wc -l
 - ✅ Dev UX (40+ CLI tools)
 
 #### Confiança:
+
 - 🟢 **ALTÍSSIMA** (100% coverage validado)
 - 🟢 **Nenhuma ação necessária**
 - 🟢 **Sistema production-ready**
@@ -449,6 +464,5 @@ grep -r "@core\\|@infra\\|@shared\\|@nerv" src/ | wc -l
 
 ---
 
-**Status Final**: ✅ **APROVADO - NENHUMA DEPENDÊNCIA FALTANDO**
-**Data**: 2 de Fevereiro de 2026
+**Status Final**: ✅ **APROVADO - NENHUMA DEPENDÊNCIA FALTANDO** **Data**: 2 de Fevereiro de 2026
 **Autor**: GitHub Copilot (Claude Sonnet 4.5)

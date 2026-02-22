@@ -1,9 +1,8 @@
 # 🧠 Arquitetura Conceitual: Responsabilidades e Taxonomia de Eventos
 
-> **Versão**: 1.0
-> **Data**: 4 de Fevereiro de 2026
-> **Status**: 🟢 PRODUCTION DEFINITION
-> **Objetivo**: Definir claramente as responsabilidades de cada componente e categorizar todos os tipos de eventos/problemas do sistema.
+> **Versão**: 1.0 **Data**: 4 de Fevereiro de 2026 **Status**: 🟢 PRODUCTION DEFINITION
+> **Objetivo**: Definir claramente as responsabilidades de cada componente e categorizar todos os
+> tipos de eventos/problemas do sistema.
 
 ---
 
@@ -23,7 +22,8 @@
 
 ### O Problema Fundamental
 
-O sistema enfrenta **4 tipos diferentes de situações** que frequentemente são confundidas como "falhas":
+O sistema enfrenta **4 tipos diferentes de situações** que frequentemente são confundidas como
+"falhas":
 
 ```
 TAXONOMIA DE EVENTOS
@@ -62,8 +62,8 @@ TAXONOMIA DE EVENTOS
 
 ### Tabela Completa
 
-| Componente                | Responsabilidade Primária    | Escopo                | Inputs                  | Outputs               | NÃO Faz                                                                          |
-| ------------------------- | ---------------------------- | --------------------- | ----------------------- | --------------------- | -------------------------------------------------------------------------------- |
+| Componente                | Responsabilidade Primária    | Escopo                | Inputs                  | Outputs               | NÃO Faz                                                                             |
+| ------------------------- | ---------------------------- | --------------------- | ----------------------- | --------------------- | ----------------------------------------------------------------------------------- |
 | **Driver**                | **Automação de LLM**         | Página LLM específica | Task (prompt, target)   | Result (resposta LLM) | ❌ Não decide quando executar<br>❌ Não gerencia conexões<br>❌ Não decide retry    |
 | **Kernel**                | **Orquestração de Execução** | Sistema completo      | Decisions (políticas)   | Task allocation       | ❌ Não executa tasks<br>❌ Não controla Puppeteer<br>❌ Não detecta falhas técnicas |
 | **CircuitBreaker**        | **Diagnóstico de Causa**     | Browser Pool          | Failures (com contexto) | Pause decisions       | ❌ Não tenta reconectar<br>❌ Não executa health checks<br>❌ Não gerencia recursos |
@@ -111,7 +111,8 @@ TAXONOMIA DE EVENTOS
 
 ### 1. FALHAS TÉCNICAS (System Failures)
 
-**Definição**: Problemas causados por falha em componentes de infraestrutura (não pelo usuário ou LLM).
+**Definição**: Problemas causados por falha em componentes de infraestrutura (não pelo usuário ou
+LLM).
 
 | Tipo                 | Causa                  | Detectado Por                          | Ação                 | Exemplo                       |
 | -------------------- | ---------------------- | -------------------------------------- | -------------------- | ----------------------------- |
@@ -124,6 +125,7 @@ TAXONOMIA DE EVENTOS
 | `PAGE_CRASH`         | Página travou          | page.isClosed()=true                   | Driver retry (3x)    | Tab crash no Chrome           |
 
 **Características**:
+
 - ✅ **NÃO são culpa do usuário** (são falhas técnicas)
 - ✅ **Não são esperadas** (devem ser exceções raras)
 - ✅ **Requerem pause** do sistema (CircuitBreaker CIRCUIT_OPEN)
@@ -133,10 +135,11 @@ TAXONOMIA DE EVENTOS
 
 ### 2. AÇÕES DO USUÁRIO (User Actions)
 
-**Definição**: Decisões conscientes do usuário que não são "falhas", mas requerem que o sistema aguarde pacientemente.
+**Definição**: Decisões conscientes do usuário que não são "falhas", mas requerem que o sistema
+aguarde pacientemente.
 
-| Tipo                     | Ação                                  | Detectado Por                     | Resposta do Sistema                  | Exemplo                               |
-| ------------------------ | ------------------------------------- | --------------------------------- | ------------------------------------ | ------------------------------------- |
+| Tipo                     | Ação                                  | Detectado Por                     | Resposta do Sistema                   | Exemplo                               |
+| ------------------------ | ------------------------------------- | --------------------------------- | ------------------------------------- | ------------------------------------- |
 | `USER_CLOSED_CHROME`     | Usuário fechou Chrome                 | BrowserPool (isConnected=false)   | ✅ Kernel PAUSED (aguarda reopen)     | Usuário clicou X no Chrome            |
 | `USER_NOT_OPENED_CHROME` | Usuário ainda não abriu Chrome        | Puppeteer.connect() fail          | ✅ Kernel PAUSED (aguarda open)       | Sistema iniciado, Chrome não          |
 | `USER_CLOSED_PAGE`       | Usuário fechou tab LLM                | page.isClosed()=true              | ✅ Driver aguarda nova página         | Usuário fechou ChatGPT tab            |
@@ -146,6 +149,7 @@ TAXONOMIA DE EVENTOS
 | `USER_IDLE_SESSION`      | Usuário deixou sistema aberto sem uso | Não é detectado                   | ✅ Sistema continua (sem problema)    | Usuário foi almoçar                   |
 
 **Características**:
+
 - ✅ **São decisões do usuário** (não falhas técnicas)
 - ✅ **São esperadas** (fazem parte do uso normal)
 - ✅ **Não requerem alarmes** (logs informativos apenas)
@@ -153,17 +157,18 @@ TAXONOMIA DE EVENTOS
 - ✅ **Retomada automática** (quando condição satisfeita)
 
 **Princípio de Design**:
+
 ```javascript
 // CORRETO: Aguardar pacientemente
 if (!browserPool.isConnected()) {
-    kernel.setState(KernelLoopState.PAUSED);
-    log('INFO', 'Aguardando usuário abrir Chrome...');
-    return; // Pula ciclo, mas mantém loop ativo
+  kernel.setState(KernelLoopState.PAUSED);
+  log('INFO', 'Aguardando usuário abrir Chrome...');
+  return; // Pula ciclo, mas mantém loop ativo
 }
 
 // ERRADO: Lançar erro
 if (!browserPool.isConnected()) {
-    throw new Error('Chrome não conectado!'); // ❌ NÃO FAÇA ISSO
+  throw new Error('Chrome não conectado!'); // ❌ NÃO FAÇA ISSO
 }
 ```
 
@@ -171,10 +176,11 @@ if (!browserPool.isConnected()) {
 
 ### 3. PROBLEMAS DE NEGÓCIO (Business Problems)
 
-**Definição**: Problemas relacionados ao comportamento do LLM ou às limitações da plataforma (ChatGPT, Gemini).
+**Definição**: Problemas relacionados ao comportamento do LLM ou às limitações da plataforma
+(ChatGPT, Gemini).
 
-| Tipo                       | Problema               | Detectado Por                           | Resposta                                       | Exemplo                             |
-| -------------------------- | ---------------------- | --------------------------------------- | ---------------------------------------------- | ----------------------------------- |
+| Tipo                       | Problema               | Detectado Por                           | Resposta                                        | Exemplo                             |
+| -------------------------- | ---------------------- | --------------------------------------- | ----------------------------------------------- | ----------------------------------- |
 | `CONVERSATION_TOO_LONG`    | Contexto saturado      | Driver (análise de resposta LLM)        | ✅ Task retorna com flag `needsNewConversation` | LLM ignora instruções antigas       |
 | `RATE_LIMIT_HIT`           | Too many requests      | Driver (selector '.rate-limit-warning') | ✅ Task retorna FAILED com retry delay          | ChatGPT: "Try again in 1 hour"      |
 | `LLM_OVERLOADED`           | Serviço sobrecarregado | Driver (timeout > 60s)                  | ✅ Task retorna FAILED com retry                | ChatGPT: Timeout ao gerar resposta  |
@@ -184,6 +190,7 @@ if (!browserPool.isConnected()) {
 | `SESSION_EXPIRED`          | Sessão ChatGPT expirou | Driver (redirect para /auth/login)      | ✅ Task retorna FAILED (requer login)           | 401 Unauthorized                    |
 
 **Características**:
+
 - ✅ **São problemas de NEGÓCIO** (não infraestrutura)
 - ✅ **Driver detecta** (durante execução)
 - ✅ **Driver relata** (via resultado de task)
@@ -191,6 +198,7 @@ if (!browserPool.isConnected()) {
 - ✅ **Podem requerer intervenção humana** (ex: login, clarificação)
 
 **Fluxo de Detecção**:
+
 ```javascript
 // src/driver/targets/ChatGPTDriver.js
 async execute(task) {
@@ -236,6 +244,7 @@ async execute(task) {
 | `BROWSER_CONNECTING`      | Puppeteer.connect()           | ConnectionRecovery (5 tentativas) | 60s (total) | Chrome iniciando                   |
 
 **Características**:
+
 - ✅ **São normais** (fazem parte do fluxo esperado)
 - ✅ **Têm timeouts definidos** (não aguarda infinitamente)
 - ✅ **Driver gerencia** (usando Puppeteer waits)
@@ -243,6 +252,7 @@ async execute(task) {
 - ✅ **Exceções após timeout** (se timeout expirar, vira SYSTEM FAILURE)
 
 **Exemplo de Implementação**:
+
 ```javascript
 // src/driver/guards/DriverReadinessGuard.js
 async waitForChatReady(page, timeout = 10000) {
@@ -272,7 +282,10 @@ async waitForChatReady(page, timeout = 10000) {
 ### 1. DRIVER (Execution Layer)
 
 **Definição Conceitual**:
-> O Driver é o **especialista em automação de LLM**. Ele sabe COMO controlar Puppeteer, QUAIS seletores usar, COMO digitar como humano, COMO coletar respostas incrementais. Ele NÃO decide QUANDO executar tasks (isso é o Kernel).
+
+> O Driver é o **especialista em automação de LLM**. Ele sabe COMO controlar Puppeteer, QUAIS
+> seletores usar, COMO digitar como humano, COMO coletar respostas incrementais. Ele NÃO decide
+> QUANDO executar tasks (isso é o Kernel).
 
 #### Responsabilidades Primárias
 
@@ -324,6 +337,7 @@ async waitForChatReady(page, timeout = 10000) {
 #### O Que o Driver NÃO Faz
 
 ❌ **Não decide retry ESTRATÉGICO de task**:
+
 ```javascript
 // ERRADO: Driver decide reagendar task completa
 async execute(task) {
@@ -352,6 +366,7 @@ async execute(task) {
 ```
 
 ❌ **Não gerencia conexões de browser**:
+
 ```javascript
 // ERRADO: Driver tenta reconectar browser
 async execute(task) {
@@ -363,6 +378,7 @@ async execute(task) {
 ```
 
 ❌ **Não pausa sistema inteiro**:
+
 ```javascript
 // ERRADO: Driver pausa Kernel
 async execute(task) {
@@ -374,6 +390,7 @@ async execute(task) {
 ```
 
 ❌ **Não ignora cancelamento externo**:
+
 ```javascript
 // ERRADO: Driver ignora AbortSignal
 async execute(task, signal) {
@@ -395,6 +412,7 @@ async execute(task, signal) {
 #### Princípios de Design
 
 ✅ **Execute Até Conseguir OU Ser Cancelado**:
+
 ```javascript
 // CORRETO: Driver é persistente com falhas técnicas
 async execute(task, signal) {
@@ -434,6 +452,7 @@ async execute(task, signal) {
 ```
 
 ✅ **Respeite Cancelamento Externo**:
+
 ```javascript
 // CORRETO: Driver aborta imediatamente
 async execute(task, signal) {
@@ -461,6 +480,7 @@ async execute(task, signal) {
 ```
 
 ✅ **Detecte e Relate Problemas de Negócio**:
+
 ```javascript
 // CORRETO: Driver detecta, Kernel decide retry estratégico
 async execute(task) {
@@ -484,7 +504,10 @@ async execute(task) {
 ### 2. KERNEL (Orchestration Layer)
 
 **Definição Conceitual**:
-> O Kernel é o **maestro de orquestração**. Ele decide QUANDO executar tasks (baseado em políticas), quantas tasks simultâneas, quando aguardar, quando retomar. Ele NÃO sabe COMO automatizar LLM (isso é o Driver).
+
+> O Kernel é o **maestro de orquestração**. Ele decide QUANDO executar tasks (baseado em políticas),
+> quantas tasks simultâneas, quando aguardar, quando retomar. Ele NÃO sabe COMO automatizar LLM
+> (isso é o Driver).
 
 #### Responsabilidades Primárias
 
@@ -512,79 +535,84 @@ async execute(task) {
 #### O Que o Kernel NÃO Faz
 
 ❌ **Não executa tasks diretamente**:
+
 ```javascript
 // ERRADO: Kernel executa Puppeteer
 class KernelLoop {
-    async step() {
-        const task = queue.getNext();
-        // ❌ NÃO: Kernel não sabe como automatizar LLM
-        await page.type('#chat-input', task.prompt);
-    }
+  async step() {
+    const task = queue.getNext();
+    // ❌ NÃO: Kernel não sabe como automatizar LLM
+    await page.type('#chat-input', task.prompt);
+  }
 }
 ```
 
 ❌ **Não detecta falhas técnicas**:
+
 ```javascript
 // ERRADO: Kernel detecta causa de falha
 class KernelLoop {
-    async step() {
-        // ❌ NÃO: Isso é responsabilidade do CircuitBreaker
-        if (lastError.message.includes('connection refused')) {
-            this.failureCause = 'NETWORK_ISSUE';
-        }
+  async step() {
+    // ❌ NÃO: Isso é responsabilidade do CircuitBreaker
+    if (lastError.message.includes('connection refused')) {
+      this.failureCause = 'NETWORK_ISSUE';
     }
+  }
 }
 ```
 
 ❌ **Não tenta reconectar browsers**:
+
 ```javascript
 // ERRADO: Kernel tenta reconectar
 class KernelLoop {
-    async step() {
-        if (!browserPool.isConnected()) {
-            // ❌ NÃO: Isso é responsabilidade do BrowserPool/Recovery
-            await browserPool.reconnect();
-        }
+  async step() {
+    if (!browserPool.isConnected()) {
+      // ❌ NÃO: Isso é responsabilidade do BrowserPool/Recovery
+      await browserPool.reconnect();
     }
+  }
 }
 ```
 
 #### Princípios de Design
 
 ✅ **Decida e Delegue**:
+
 ```javascript
 // CORRETO: Kernel decide quando, delega execução
 class KernelLoop {
-    async step() {
-        // 1. Consulta políticas
-        const shouldAllocate = await this.policyEngine.shouldAllocateNext();
+  async step() {
+    // 1. Consulta políticas
+    const shouldAllocate = await this.policyEngine.shouldAllocateNext();
 
-        if (!shouldAllocate) {
-            return; // Aguarda próximo ciclo
-        }
-
-        // 2. Delega execução para Driver (via NERV)
-        const task = await this.queue.getNext();
-        this.nerv.emit('TASK_ALLOCATED', task);
+    if (!shouldAllocate) {
+      return; // Aguarda próximo ciclo
     }
+
+    // 2. Delega execução para Driver (via NERV)
+    const task = await this.queue.getNext();
+    this.nerv.emit('TASK_ALLOCATED', task);
+  }
 }
 ```
 
 ✅ **Aguarde Pacientemente**:
+
 ```javascript
 // CORRETO: Kernel aguarda sem erros
 class KernelLoop {
-    async step() {
-        // Checa CircuitBreaker
-        if (this._checkCircuitBreaker()) {
-            // Sistema pausado - pula ciclo mas mantém loop
-            this.state = KernelLoopState.PAUSED;
-            this.telemetry.info('kernel_loop_paused');
-            return; // Loop continua 20Hz
-        }
-
-        // ... resto do ciclo
+  async step() {
+    // Checa CircuitBreaker
+    if (this._checkCircuitBreaker()) {
+      // Sistema pausado - pula ciclo mas mantém loop
+      this.state = KernelLoopState.PAUSED;
+      this.telemetry.info('kernel_loop_paused');
+      return; // Loop continua 20Hz
     }
+
+    // ... resto do ciclo
+  }
 }
 ```
 
@@ -593,13 +621,17 @@ class KernelLoop {
 ### 3. CIRCUITBREAKER (Infrastructure Layer)
 
 **Definição Conceitual**:
-> O CircuitBreaker é o **diagnosticador de causa**. Ele detecta POR QUE o sistema falhou (não apenas "falhou"). Ele NÃO tenta reconectar (isso é ConnectionRecovery), NÃO mede saúde contínua (isso é Monitor).
+
+> O CircuitBreaker é o **diagnosticador de causa**. Ele detecta POR QUE o sistema falhou (não apenas
+> "falhou"). Ele NÃO tenta reconectar (isso é ConnectionRecovery), NÃO mede saúde contínua (isso é
+> Monitor).
 
 #### Responsabilidades Primárias
 
 1. **Diagnóstico de Causa**:
    - Analisar contexto de falha (error message, stack trace)
-   - Classificar em 7 causas: USER_CLOSED, TECHNICAL_CRASH, NETWORK_ISSUE, PROXY_FAILURE, OUT_OF_MEMORY, PROCESS_SUSPENDED, CHROME_RESTARTED
+   - Classificar em 7 causas: USER_CLOSED, TECHNICAL_CRASH, NETWORK_ISSUE, PROXY_FAILURE,
+     OUT_OF_MEMORY, PROCESS_SUSPENDED, CHROME_RESTARTED
    - Inferir causa quando ambígua
 
 2. **Decisões de Pausa**:
@@ -620,6 +652,7 @@ class KernelLoop {
 #### O Que o CircuitBreaker NÃO Faz
 
 ❌ **Não tenta reconectar**:
+
 ```javascript
 // ERRADO: CB tenta reconectar
 class CircuitBreaker {
@@ -633,55 +666,59 @@ class CircuitBreaker {
 ```
 
 ❌ **Não faz health checks periódicos**:
+
 ```javascript
 // ERRADO: CB faz polling
 class CircuitBreaker {
-    async start() {
-        // ❌ NÃO: Isso é responsabilidade do PeriodicHealthMonitor
-        setInterval(() => {
-            this._checkBrowserHealth();
-        }, 30000);
-    }
+  async start() {
+    // ❌ NÃO: Isso é responsabilidade do PeriodicHealthMonitor
+    setInterval(() => {
+      this._checkBrowserHealth();
+    }, 30000);
+  }
 }
 ```
 
 ❌ **Não gerencia recursos**:
+
 ```javascript
 // ERRADO: CB aloca/libera browsers
 class CircuitBreaker {
-    async recover() {
-        // ❌ NÃO: Isso é responsabilidade do BrowserPool
-        const newBrowser = await puppeteer.launch();
-        this.pool.add(newBrowser);
-    }
+  async recover() {
+    // ❌ NÃO: Isso é responsabilidade do BrowserPool
+    const newBrowser = await puppeteer.launch();
+    this.pool.add(newBrowser);
+  }
 }
 ```
 
 #### Princípios de Design
 
 ✅ **Diagnostique e Decida**:
+
 ```javascript
 // CORRETO: CB diagnostica causa e decide pausa
 class CircuitBreaker {
-    registerFailure(poolEntryId, error, context = {}) {
-        // 1. Diagnostica causa
-        const cause = this._inferCause(error, context);
+  registerFailure(poolEntryId, error, context = {}) {
+    // 1. Diagnostica causa
+    const cause = this._inferCause(error, context);
 
-        // 2. Consulta policy
-        const policy = this.policies[cause];
+    // 2. Consulta policy
+    const policy = this.policies[cause];
 
-        // 3. Decide pausa
-        if (policy.shouldPause) {
-            this.state = 'CIRCUIT_OPEN';
-            this._emitStateChange();
-        }
-
-        // NÃO tenta reconectar aqui (delega para Recovery)
+    // 3. Decide pausa
+    if (policy.shouldPause) {
+      this.state = 'CIRCUIT_OPEN';
+      this._emitStateChange();
     }
+
+    // NÃO tenta reconectar aqui (delega para Recovery)
+  }
 }
 ```
 
 ✅ **Infira Causa Inteligentemente**:
+
 ```javascript
 // CORRETO: CB usa heurísticas para inferir causa
 _inferCause(error, context) {
@@ -714,7 +751,10 @@ _inferCause(error, context) {
 ### 4. PERIODICHEALTHMONITOR (Infrastructure Layer)
 
 **Definição Conceitual**:
-> O Monitor é o **medidor de saúde contínua**. Ele verifica métricas, faz CDP checks, detecta degradação. Ele NÃO diagnostica causa (isso é CB), NÃO decide pausar sistema (isso é CB via Kernel).
+
+> O Monitor é o **medidor de saúde contínua**. Ele verifica métricas, faz CDP checks, detecta
+> degradação. Ele NÃO diagnostica causa (isso é CB), NÃO decide pausar sistema (isso é CB via
+> Kernel).
 
 #### Responsabilidades Primárias
 
@@ -744,75 +784,79 @@ _inferCause(error, context) {
 #### O Que o Monitor NÃO Faz
 
 ❌ **Não diagnostica causa**:
+
 ```javascript
 // ERRADO: Monitor diagnostica causa
 class PeriodicHealthMonitor {
-    _evaluateConnection(result) {
-        if (!result.passed) {
-            // ❌ NÃO: Diagnóstico de causa é responsabilidade do CB
-            this.failureCause = 'NETWORK_ISSUE';
-        }
+  _evaluateConnection(result) {
+    if (!result.passed) {
+      // ❌ NÃO: Diagnóstico de causa é responsabilidade do CB
+      this.failureCause = 'NETWORK_ISSUE';
     }
+  }
 }
 ```
 
 ❌ **Não decide pausar sistema**:
+
 ```javascript
 // ERRADO: Monitor pausa Kernel
 class PeriodicHealthMonitor {
-    async _checkHealth() {
-        const health = await this._performChecks();
+  async _checkHealth() {
+    const health = await this._performChecks();
 
-        if (health.status === 'CRITICAL') {
-            // ❌ NÃO: Decisão de pausar é responsabilidade do Kernel (via CB)
-            kernel.pause();
-        }
+    if (health.status === 'CRITICAL') {
+      // ❌ NÃO: Decisão de pausar é responsabilidade do Kernel (via CB)
+      kernel.pause();
     }
+  }
 }
 ```
 
 ❌ **Não tenta recovery**:
+
 ```javascript
 // ERRADO: Monitor tenta reconectar
 class PeriodicHealthMonitor {
-    async _checkHealth() {
-        if (!browser.isConnected()) {
-            // ❌ NÃO: Recovery é responsabilidade do ConnectionRecoveryStrategy
-            await this._attemptReconnection();
-        }
+  async _checkHealth() {
+    if (!browser.isConnected()) {
+      // ❌ NÃO: Recovery é responsabilidade do ConnectionRecoveryStrategy
+      await this._attemptReconnection();
     }
+  }
 }
 ```
 
 #### Princípios de Design
 
 ✅ **Meça e Relate**:
+
 ```javascript
 // CORRETO: Monitor mede e emite eventos
 class PeriodicHealthMonitor {
-    async _performHealthCheck() {
-        const results = {
-            checks: {
-                CONNECTION: await this._checkConnection(),
-                PAGE_MEMORY: await this._checkMemory(),
-                PAGE_TARGETS: await this._checkTargets()
-            }
-        };
+  async _performHealthCheck() {
+    const results = {
+      checks: {
+        CONNECTION: await this._checkConnection(),
+        PAGE_MEMORY: await this._checkMemory(),
+        PAGE_TARGETS: await this._checkTargets(),
+      },
+    };
 
-        const status = this._calculateStatus(results);
+    const status = this._calculateStatus(results);
 
-        // Emite evento (quem consome decide ação)
-        this.emit(MONITOR_EVENTS.STATUS_CHANGED, {
-            oldStatus: this.currentStatus,
-            newStatus: status,
-            results
-        });
+    // Emite evento (quem consome decide ação)
+    this.emit(MONITOR_EVENTS.STATUS_CHANGED, {
+      oldStatus: this.currentStatus,
+      newStatus: status,
+      results,
+    });
 
-        // Trigger recovery se necessário (delega para outros)
-        if (status === HEALTH_STATUS.DISCONNECTED) {
-            this.emit(MONITOR_EVENTS.RECOVERY_NEEDED, results);
-        }
+    // Trigger recovery se necessário (delega para outros)
+    if (status === HEALTH_STATUS.DISCONNECTED) {
+      this.emit(MONITOR_EVENTS.RECOVERY_NEEDED, results);
     }
+  }
 }
 ```
 
@@ -821,7 +865,9 @@ class PeriodicHealthMonitor {
 ### 5. BROWSERPOOL (Infrastructure Layer)
 
 **Definição Conceitual**:
-> O BrowserPool é o **gestor de recursos**. Ele aloca/libera browsers e páginas, coordena CB + Monitor + Recovery. Ele NÃO executa tasks (isso é Driver), NÃO decide políticas (isso é Kernel).
+
+> O BrowserPool é o **gestor de recursos**. Ele aloca/libera browsers e páginas, coordena CB +
+> Monitor + Recovery. Ele NÃO executa tasks (isso é Driver), NÃO decide políticas (isso é Kernel).
 
 #### Responsabilidades Primárias
 
@@ -851,93 +897,98 @@ class PeriodicHealthMonitor {
 #### O Que o BrowserPool NÃO Faz
 
 ❌ **Não executa tasks**:
+
 ```javascript
 // ERRADO: Pool executa tasks
 class BrowserPoolManager {
-    async executeTask(task) {
-        const poolEntry = await this.allocate();
-        // ❌ NÃO: Execução de task é responsabilidade do Driver
-        await poolEntry.page.type('#input', task.prompt);
-    }
+  async executeTask(task) {
+    const poolEntry = await this.allocate();
+    // ❌ NÃO: Execução de task é responsabilidade do Driver
+    await poolEntry.page.type('#input', task.prompt);
+  }
 }
 ```
 
 ❌ **Não decide políticas**:
+
 ```javascript
 // ERRADO: Pool decide quando executar
 class BrowserPoolManager {
-    async allocate(config) {
-        // ❌ NÃO: Decisões de alocação são responsabilidade do Kernel
-        if (this.activeCount >= MAX_WORKERS) {
-            throw new Error('Too many workers');
-        }
+  async allocate(config) {
+    // ❌ NÃO: Decisões de alocação são responsabilidade do Kernel
+    if (this.activeCount >= MAX_WORKERS) {
+      throw new Error('Too many workers');
     }
+  }
 }
 ```
 
 ❌ **Não controla tempo**:
+
 ```javascript
 // ERRADO: Pool tem próprio loop de tempo
 class BrowserPoolManager {
-    async start() {
-        // ❌ NÃO: Tempo soberano é responsabilidade do Kernel
-        setInterval(() => {
-            this._checkAndAllocate();
-        }, 1000);
-    }
+  async start() {
+    // ❌ NÃO: Tempo soberano é responsabilidade do Kernel
+    setInterval(() => {
+      this._checkAndAllocate();
+    }, 1000);
+  }
 }
 ```
 
 #### Princípios de Design
 
 ✅ **Gerencie Recursos**:
+
 ```javascript
 // CORRETO: Pool gerencia lifecycle de browsers
 class BrowserPoolManager {
-    async allocate(config = {}) {
-        // 1. Valida disponibilidade
-        if (!this._hasAvailableSlots()) {
-            throw new Error('No available slots');
-        }
-
-        // 2. Aloca recursos
-        const poolEntry = await this._createOrReuseEntry(config);
-
-        // 3. Retorna handle
-        return poolEntry;
+  async allocate(config = {}) {
+    // 1. Valida disponibilidade
+    if (!this._hasAvailableSlots()) {
+      throw new Error('No available slots');
     }
 
-    async release(poolEntryId) {
-        // 1. Cleanup de páginas
-        await this._cleanupPages(poolEntryId);
+    // 2. Aloca recursos
+    const poolEntry = await this._createOrReuseEntry(config);
 
-        // 2. Libera recursos
-        this.pool.delete(poolEntryId);
+    // 3. Retorna handle
+    return poolEntry;
+  }
 
-        // 3. Emite evento
-        this.emit('POOL_ENTRY_RELEASED', { poolEntryId });
-    }
+  async release(poolEntryId) {
+    // 1. Cleanup de páginas
+    await this._cleanupPages(poolEntryId);
+
+    // 2. Libera recursos
+    this.pool.delete(poolEntryId);
+
+    // 3. Emite evento
+    this.emit('POOL_ENTRY_RELEASED', { poolEntryId });
+  }
 }
 ```
 
 ✅ **Coordene Subsistemas**:
+
 ```javascript
 // CORRETO: Pool coordena CB ↔ Monitor
 class BrowserPoolManager {
-    _bridgeCircuitBreakerAndMonitor() {
-        // Monitor detecta recovery → notifica CB
-        this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, (data) => {
-            if (data.newStatus === HEALTH_STATUS.HEALTHY) {
-                this.circuitBreaker.registerRecovery(poolEntryId);
-            }
-        });
+  _bridgeCircuitBreakerAndMonitor() {
+    // Monitor detecta recovery → notifica CB
+    this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, data => {
+      if (data.newStatus === HEALTH_STATUS.HEALTHY) {
+        this.circuitBreaker.registerRecovery(poolEntryId);
+      }
+    });
 
-        // Monitor detecta problema → notifica CB
-        this.healthMonitor.on(MONITOR_EVENTS.CRITICAL_ISSUE, (results) => {
-            const error = new Error('Connection lost');
-            this.circuitBreaker.registerFailure(poolEntryId, error);
-        });
-    }
+    // Monitor detecta problema → notifica CB
+    this.healthMonitor.on(MONITOR_EVENTS.CRITICAL_ISSUE, results => {
+      const error = new Error('Connection lost');
+      this.circuitBreaker.registerFailure(poolEntryId, error);
+    });
+  }
 }
 ```
 
@@ -1012,6 +1063,7 @@ T92: Kernel Loop próximo ciclo (50ms depois)
 ```
 
 **Decisões Tomadas**:
+
 - **BrowserPool**: Detectou desconexão, notificou CB
 - **CircuitBreaker**: Diagnosticou USER_CLOSED, decidiu pausar
 - **Kernel**: Aplicou decisão (PAUSED), aguardou pacientemente
@@ -1073,6 +1125,7 @@ T3600: Kernel detecta task pronta para retry (1 hora depois)
 ```
 
 **Decisões Tomadas**:
+
 - **Driver**: Detectou RATE_LIMIT, relatou como businessProblem
 - **Kernel/PolicyEngine**: Decidiu retry com delay de 1 hora
 - **Sistema**: Continuou executando outras tasks (não pausou)
@@ -1152,6 +1205,7 @@ T13: Kernel reprocessa tasks falhadas
 ```
 
 **Decisões Tomadas**:
+
 - **BrowserPool**: Detectou crash, forneceu contexto para CB
 - **CircuitBreaker**: Diagnosticou TECHNICAL_CRASH, decidiu pausar + autoRestart
 - **ConnectionRecoveryStrategy**: Executou 5 tentativas, sucesso na 2ª
@@ -1167,38 +1221,39 @@ T13: Kernel reprocessa tasks falhadas
 ```javascript
 // ❌ ERRADO: Driver decide retry
 class ChatGPTDriver {
-    async execute(task) {
-        let attempts = 0;
-        while (attempts < 3) {
-            try {
-                return await this._tryExecute(task);
-            } catch (err) {
-                attempts++;
-                await sleep(1000 * attempts);
-            }
-        }
-        throw new Error('Failed after 3 attempts');
+  async execute(task) {
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        return await this._tryExecute(task);
+      } catch (err) {
+        attempts++;
+        await sleep(1000 * attempts);
+      }
     }
+    throw new Error('Failed after 3 attempts');
+  }
 }
 
 // ✅ CORRETO: Driver executa e relata
 class ChatGPTDriver {
-    async execute(task) {
-        try {
-            return await this._performAutomation(task);
-        } catch (err) {
-            return {
-                status: 'FAILED',
-                error: err.message,
-                recoverable: this._isRecoverable(err)
-            };
-        }
+  async execute(task) {
+    try {
+      return await this._performAutomation(task);
+    } catch (err) {
+      return {
+        status: 'FAILED',
+        error: err.message,
+        recoverable: this._isRecoverable(err),
+      };
     }
+  }
 }
 ```
 
-**Por Quê?**
-Retry é uma **decisão de política** (Kernel/PolicyEngine), não de execução (Driver). O Driver não sabe o contexto completo do sistema (quantas tasks falharam, qual o SLA, quais são os limites de rate).
+**Por Quê?** Retry é uma **decisão de política** (Kernel/PolicyEngine), não de execução (Driver). O
+Driver não sabe o contexto completo do sistema (quantas tasks falharam, qual o SLA, quais são os
+limites de rate).
 
 ---
 
@@ -1207,34 +1262,34 @@ Retry é uma **decisão de política** (Kernel/PolicyEngine), não de execução
 ```javascript
 // ❌ ERRADO: Kernel controla Puppeteer
 class KernelLoop {
-    async step() {
-        const task = queue.getNext();
-        const page = browserPool.allocate();
+  async step() {
+    const task = queue.getNext();
+    const page = browserPool.allocate();
 
-        // ❌ NÃO: Kernel não sabe como automatizar LLM
-        await page.goto('https://chatgpt.com');
-        await page.type('#chat-input', task.prompt);
-        await page.click('button[type="submit"]');
-    }
+    // ❌ NÃO: Kernel não sabe como automatizar LLM
+    await page.goto('https://chatgpt.com');
+    await page.type('#chat-input', task.prompt);
+    await page.click('button[type="submit"]');
+  }
 }
 
 // ✅ CORRETO: Kernel delega para Driver
 class KernelLoop {
-    async step() {
-        const task = queue.getNext();
+  async step() {
+    const task = queue.getNext();
 
-        // Delega execução via NERV
-        this.nerv.emit('TASK_ALLOCATED', {
-            taskId: task.id,
-            target: task.target,
-            prompt: task.prompt
-        });
-    }
+    // Delega execução via NERV
+    this.nerv.emit('TASK_ALLOCATED', {
+      taskId: task.id,
+      target: task.target,
+      prompt: task.prompt,
+    });
+  }
 }
 ```
 
-**Por Quê?**
-Automação LLM é **conhecimento especializado** (Driver). O Kernel é genérico e deve funcionar com qualquer driver (ChatGPT, Gemini, Claude, etc.).
+**Por Quê?** Automação LLM é **conhecimento especializado** (Driver). O Kernel é genérico e deve
+funcionar com qualquer driver (ChatGPT, Gemini, Claude, etc.).
 
 ---
 
@@ -1243,34 +1298,34 @@ Automação LLM é **conhecimento especializado** (Driver). O Kernel é genéric
 ```javascript
 // ❌ ERRADO: CB tenta reconectar
 class CircuitBreaker {
-    registerFailure(poolEntryId, error) {
-        this.state = 'CIRCUIT_OPEN';
+  registerFailure(poolEntryId, error) {
+    this.state = 'CIRCUIT_OPEN';
 
-        // ❌ NÃO: Recovery é responsabilidade do ConnectionRecoveryStrategy
-        setTimeout(() => {
-            this._tryReconnect(poolEntryId);
-        }, 5000);
-    }
+    // ❌ NÃO: Recovery é responsabilidade do ConnectionRecoveryStrategy
+    setTimeout(() => {
+      this._tryReconnect(poolEntryId);
+    }, 5000);
+  }
 }
 
 // ✅ CORRETO: CB diagnostica e emite eventos
 class CircuitBreaker {
-    registerFailure(poolEntryId, error, context = {}) {
-        const cause = this._inferCause(error, context);
-        const policy = this.policies[cause];
+  registerFailure(poolEntryId, error, context = {}) {
+    const cause = this._inferCause(error, context);
+    const policy = this.policies[cause];
 
-        if (policy.shouldPause) {
-            this.state = 'CIRCUIT_OPEN';
-            this._emitStateChange();
-        }
-
-        // NÃO tenta reconectar - delega para ConnectionRecoveryStrategy
+    if (policy.shouldPause) {
+      this.state = 'CIRCUIT_OPEN';
+      this._emitStateChange();
     }
+
+    // NÃO tenta reconectar - delega para ConnectionRecoveryStrategy
+  }
 }
 ```
 
-**Por Quê?**
-Recovery é uma **operação de infraestrutura** (ConnectionRecoveryStrategy), não de diagnóstico (CircuitBreaker). Separação de concerns: CB diagnostica, Recovery executa.
+**Por Quê?** Recovery é uma **operação de infraestrutura** (ConnectionRecoveryStrategy), não de
+diagnóstico (CircuitBreaker). Separação de concerns: CB diagnostica, Recovery executa.
 
 ---
 
@@ -1279,38 +1334,38 @@ Recovery é uma **operação de infraestrutura** (ConnectionRecoveryStrategy), n
 ```javascript
 // ❌ ERRADO: Monitor pausa Kernel
 class PeriodicHealthMonitor {
-    async _checkHealth() {
-        const health = await this._performChecks();
+  async _checkHealth() {
+    const health = await this._performChecks();
 
-        if (health.status === 'CRITICAL') {
-            // ❌ NÃO: Decisão de pausar é responsabilidade do Kernel (via CB)
-            kernel.setState('PAUSED');
-        }
+    if (health.status === 'CRITICAL') {
+      // ❌ NÃO: Decisão de pausar é responsabilidade do Kernel (via CB)
+      kernel.setState('PAUSED');
     }
+  }
 }
 
 // ✅ CORRETO: Monitor emite eventos
 class PeriodicHealthMonitor {
-    async _checkHealth() {
-        const health = await this._performChecks();
+  async _checkHealth() {
+    const health = await this._performChecks();
 
-        // Emite evento (quem consome decide ação)
-        this.emit(MONITOR_EVENTS.STATUS_CHANGED, {
-            oldStatus: this.currentStatus,
-            newStatus: health.status,
-            results: health.checks
-        });
+    // Emite evento (quem consome decide ação)
+    this.emit(MONITOR_EVENTS.STATUS_CHANGED, {
+      oldStatus: this.currentStatus,
+      newStatus: health.status,
+      results: health.checks,
+    });
 
-        // Se CRITICAL, emite evento para Bridge
-        if (health.status === 'CRITICAL') {
-            this.emit(MONITOR_EVENTS.CRITICAL_ISSUE, health.checks);
-        }
+    // Se CRITICAL, emite evento para Bridge
+    if (health.status === 'CRITICAL') {
+      this.emit(MONITOR_EVENTS.CRITICAL_ISSUE, health.checks);
     }
+  }
 }
 ```
 
-**Por Quê?**
-Pausa é uma **decisão de orquestração** (Kernel), não de monitoramento (Monitor). O Monitor apenas mede e relata, o Kernel decide e aplica.
+**Por Quê?** Pausa é uma **decisão de orquestração** (Kernel), não de monitoramento (Monitor). O
+Monitor apenas mede e relata, o Kernel decide e aplica.
 
 ---
 
@@ -1319,36 +1374,36 @@ Pausa é uma **decisão de orquestração** (Kernel), não de monitoramento (Mon
 ```javascript
 // ❌ ERRADO: Pool decide quando alocar
 class BrowserPoolManager {
-    async allocate(config) {
-        // ❌ NÃO: Decisões de política são responsabilidade do Kernel
-        if (this.activeCount >= MAX_WORKERS) {
-            throw new Error('Too many workers - waiting 5s');
-        }
-
-        if (Date.now() - this.lastAllocation < 1000) {
-            throw new Error('Rate limit - 1 allocation per second');
-        }
-
-        return this._createPoolEntry(config);
+  async allocate(config) {
+    // ❌ NÃO: Decisões de política são responsabilidade do Kernel
+    if (this.activeCount >= MAX_WORKERS) {
+      throw new Error('Too many workers - waiting 5s');
     }
+
+    if (Date.now() - this.lastAllocation < 1000) {
+      throw new Error('Rate limit - 1 allocation per second');
+    }
+
+    return this._createPoolEntry(config);
+  }
 }
 
 // ✅ CORRETO: Pool apenas gerencia recursos
 class BrowserPoolManager {
-    async allocate(config) {
-        // Valida disponibilidade técnica (não política)
-        if (!this._hasAvailableSlots()) {
-            throw new Error('No available slots');
-        }
-
-        // Aloca recursos
-        return this._createPoolEntry(config);
+  async allocate(config) {
+    // Valida disponibilidade técnica (não política)
+    if (!this._hasAvailableSlots()) {
+      throw new Error('No available slots');
     }
+
+    // Aloca recursos
+    return this._createPoolEntry(config);
+  }
 }
 ```
 
-**Por Quê?**
-Políticas (MAX_WORKERS, rate limits) são **responsabilidade do Kernel/PolicyEngine**. O Pool apenas gerencia o que foi decidido pela camada de orquestração.
+**Por Quê?** Políticas (MAX_WORKERS, rate limits) são **responsabilidade do Kernel/PolicyEngine**. O
+Pool apenas gerencia o que foi decidido pela camada de orquestração.
 
 ---
 
@@ -1356,11 +1411,13 @@ Políticas (MAX_WORKERS, rate limits) são **responsabilidade do Kernel/PolicyEn
 
 ### Caso 1: Conversação Longa Degrada LLM
 
-**Situação**: Task executando há 2 horas, contexto com 50 mensagens. ChatGPT começa a ignorar instruções antigas.
+**Situação**: Task executando há 2 horas, contexto com 50 mensagens. ChatGPT começa a ignorar
+instruções antigas.
 
 **Fluxo**:
 
 1. **Driver detecta** (durante execução):
+
    ```javascript
    async execute(task) {
        const response = await this._collectResponse();
@@ -1379,6 +1436,7 @@ Políticas (MAX_WORKERS, rate limits) são **responsabilidade do Kernel/PolicyEn
    ```
 
 2. **Kernel recebe resultado**:
+
    ```javascript
    // TaskExecutionOrchestrator
    _handleTaskCompleted(payload, correlationId) {
@@ -1390,6 +1448,7 @@ Políticas (MAX_WORKERS, rate limits) são **responsabilidade do Kernel/PolicyEn
    ```
 
 3. **MissionManager processa** (se task faz parte de missão):
+
    ```javascript
    // MissionManager
    _handleTaskCompleted(result) {
@@ -1409,6 +1468,7 @@ Políticas (MAX_WORKERS, rate limits) são **responsabilidade do Kernel/PolicyEn
    ```
 
 **Responsabilidades Executadas**:
+
 - ✅ **Driver**: Detectou problema de negócio (conversação longa)
 - ✅ **Kernel**: Decidiu ação (criar nova conversation)
 - ✅ **MissionManager**: Coordenou transição de contexto
@@ -1419,7 +1479,8 @@ Políticas (MAX_WORKERS, rate limits) são **responsabilidade do Kernel/PolicyEn
 
 ### Caso 2: Usuário Não Abre Chrome ao Iniciar Sistema
 
-**Situação**: Sistema iniciado via `make start`, mas usuário ainda não rodou `START-CHROME-SIMPLE.bat`.
+**Situação**: Sistema iniciado via `make start`, mas usuário ainda não rodou
+`START-CHROME-SIMPLE.bat`.
 
 **Fluxo**:
 
@@ -1495,6 +1556,7 @@ T632: Kernel Loop próximo ciclo (50ms depois)
 ```
 
 **Responsabilidades Executadas**:
+
 - ✅ **BrowserPool**: Tentou conectar, falhou, reportou erro
 - ✅ **CircuitBreaker**: Diagnosticou USER_NOT_OPENED_CHROME, decidiu pausar
 - ✅ **Kernel**: Aplicou pausa, aguardou pacientemente (10 minutos sem erros)
@@ -1503,6 +1565,7 @@ T632: Kernel Loop próximo ciclo (50ms depois)
 - ✅ **Sistema**: Retomou automaticamente assim que Chrome ficou disponível
 
 **Garantias Satisfeitas**:
+
 - ✅ Sistema não crashou
 - ✅ Nenhum erro lançado (apenas logs informativos)
 - ✅ Usuário pode demorar quanto quiser para abrir Chrome
@@ -1514,8 +1577,8 @@ T632: Kernel Loop próximo ciclo (50ms depois)
 
 ### Matriz Final de Responsabilidades
 
-| Componente                | Faz (✅)                                                                                                                                | Não Faz (❌)                                                                                                          |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Componente                | Faz (✅)                                                                                                                                    | Não Faz (❌)                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **Driver**                | ✅ Automação Puppeteer<br>✅ Detecta problemas de negócio<br>✅ Aguarda página/LLM prontos<br>✅ Coleta respostas<br>✅ Relata resultado    | ❌ Decide retry<br>❌ Gerencia conexões<br>❌ Pausa sistema<br>❌ Controla tempo<br>❌ Define políticas                   |
 | **Kernel**                | ✅ Decide quando executar<br>✅ Aplica políticas (MAX_WORKERS)<br>✅ Aloca tasks<br>✅ Controla tempo (20Hz)<br>✅ Coordena pausa/retomada  | ❌ Executa Puppeteer<br>❌ Detecta falhas técnicas<br>❌ Diagnostica causa<br>❌ Tenta reconectar<br>❌ Faz health checks |
 | **CircuitBreaker**        | ✅ Diagnostica CAUSA de falha<br>✅ Decide pausar sistema<br>✅ Aplica políticas por causa<br>✅ Tracking de instâncias<br>✅ Emite eventos | ❌ Tenta reconectar<br>❌ Faz health checks<br>❌ Gerencia recursos<br>❌ Executa tasks<br>❌ Define políticas de retry   |
@@ -1531,7 +1594,8 @@ T632: Kernel Loop próximo ciclo (50ms depois)
 1. **Separação de Concerns**: Cada componente tem UMA responsabilidade primária
 2. **Decisão vs. Execução**: Quem decide NÃO executa, quem executa NÃO decide
 3. **Detecção vs. Ação**: Quem detecta NÃO age, quem age NÃO detecta (usa eventos)
-4. **Taxonomia Clara**: 4 tipos de eventos (Falhas, Ações do Usuário, Problemas de Negócio, Condições de Espera)
+4. **Taxonomia Clara**: 4 tipos de eventos (Falhas, Ações do Usuário, Problemas de Negócio,
+   Condições de Espera)
 5. **Aguardar Pacientemente**: Sistema NUNCA lança erro para ações normais do usuário
 
 ### Validação de Arquitetura
@@ -1560,6 +1624,5 @@ Para validar se um componente está bem implementado, pergunte:
 
 ---
 
-**Versão**: 1.0
-**Status**: 🟢 PRODUCTION DEFINITION
-**Próxima Revisão**: Após implementação de LLM-as-judge validation
+**Versão**: 1.0 **Status**: 🟢 PRODUCTION DEFINITION **Próxima Revisão**: Após implementação de
+LLM-as-judge validation

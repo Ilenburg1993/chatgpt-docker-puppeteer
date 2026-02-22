@@ -1,8 +1,6 @@
 # ConnectionOrchestrator Refatoração - Changelog
 
-**Data**: 2 de Fevereiro de 2026
-**Versão**: v4.0 (Connection-Only Pattern)
-**Status**: ✅ CONCLUÍDO
+**Data**: 2 de Fevereiro de 2026 **Versão**: v4.0 (Connection-Only Pattern) **Status**: ✅ CONCLUÍDO
 
 ---
 
@@ -30,7 +28,9 @@ Refatoração completa do ConnectionOrchestrator.js seguindo o princípio ontol�
 ### Fase 1: Remoção de Código Morto ✅
 
 #### 1.1 Header & Documentação Ontológica
+
 **Antes**:
+
 ```javascript
 /* Suporta:
    - launcher: Puppeteer inicia Chrome
@@ -41,6 +41,7 @@ Refatoração completa do ConnectionOrchestrator.js seguindo o princípio ontol�
 ```
 
 **Depois**:
+
 ```javascript
 /* ONTOLOGICAL PRINCIPLE:
    Chrome é propriedade do Windows Host. DevContainer APENAS conecta.
@@ -52,7 +53,9 @@ Refatoração completa do ConnectionOrchestrator.js seguindo o princípio ontol�
 ```
 
 #### 1.2 Imports Simplificados
+
 **Removido**:
+
 ```javascript
 const puppeteerConfig = require('../../.puppeteerrc.cjs');
 const fs = require('fs'); // Não usado
@@ -61,18 +64,22 @@ const fs = require('fs'); // Não usado
 **Impacto**: -1 dependência externa, código mais limpo.
 
 #### 1.3 USER_AGENTS Array
+
 **Removido**:
+
 ```javascript
 const USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0...',
-    // ... 5 mais user agents
+  'Mozilla/5.0 (Windows NT 10.0...',
+  // ... 5 mais user agents
 ];
 ```
 
 **Razão**: Nunca usado para rotation (funcionalidade inexistente).
 
 #### 1.4 DEFAULTS Simplificado
+
 **Removido de DEFAULTS**:
+
 - `headless` (launcher config)
 - `executablePath` (launcher config)
 - `userDataDir` (launcher config)
@@ -81,6 +88,7 @@ const USER_AGENTS = [
 - `args` (20+ linhas de Chrome args)
 
 **Mantido em DEFAULTS**:
+
 - `mode`, `ports`, `hosts`, `connectionStrategies` (conexão)
 - `retryDelayMs`, `maxRetryDelayMs`, `maxConnectionAttempts`, `connectionTimeout` (retry)
 - `pageScanIntervalMs`, `allowedDomains`, `pageSelectionPolicy` (page)
@@ -89,7 +97,9 @@ const USER_AGENTS = [
 **Resultado**: DEFAULTS agora contém APENAS configs de conexão (responsabilidade do container).
 
 #### 1.5 Métodos Removidos
+
 **Removidos completamente**:
+
 1. `tryLauncher()` - apenas throw error
 2. `tryExecutablePath()` - apenas throw error
 3. `_ensureCacheDir()` - não aplicável (connect mode)
@@ -101,28 +111,47 @@ const USER_AGENTS = [
 **Total removido**: ~185 linhas de código morto.
 
 #### 1.6 Switch Case Limpo
+
 **Antes**:
+
 ```javascript
 switch (currentMode) {
-    case 'launcher': this.browser = await this.tryLauncher(); break;
-    case 'connect': this.browser = await this.tryConnectBrowserURL(); break;
-    case 'wsEndpoint': this.browser = await this.tryConnectWSEndpoint(); break;
-    case 'executablePath': this.browser = await this.tryExecutablePath(); break;
-    default: throw new Error(`Modo desconhecido: ${currentMode}`);
+  case 'launcher':
+    this.browser = await this.tryLauncher();
+    break;
+  case 'connect':
+    this.browser = await this.tryConnectBrowserURL();
+    break;
+  case 'wsEndpoint':
+    this.browser = await this.tryConnectWSEndpoint();
+    break;
+  case 'executablePath':
+    this.browser = await this.tryExecutablePath();
+    break;
+  default:
+    throw new Error(`Modo desconhecido: ${currentMode}`);
 }
 ```
 
 **Depois**:
+
 ```javascript
 switch (currentMode) {
-    case 'connect': this.browser = await this.tryConnectBrowserURL(); break;
-    case 'wsEndpoint': this.browser = await this.tryConnectWSEndpoint(); break;
-    default: throw new Error(`Modo desconhecido: ${currentMode} (suportados: wsEndpoint, connect)`);
+  case 'connect':
+    this.browser = await this.tryConnectBrowserURL();
+    break;
+  case 'wsEndpoint':
+    this.browser = await this.tryConnectWSEndpoint();
+    break;
+  default:
+    throw new Error(`Modo desconhecido: ${currentMode} (suportados: wsEndpoint, connect)`);
 }
 ```
 
 #### 1.7 User-Agent Rotation Removido
+
 **Antes** (em `ensurePage()`):
+
 ```javascript
 const randomUA = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 await page.setUserAgent(randomUA);
@@ -175,6 +204,7 @@ Adicionada seção completa documentando configuração do Windows:
 ```
 
 **Benefícios**:
+
 - Documentação clara de responsabilidades
 - Configuração recomendada do Chrome (Windows)
 - Separação ontológica explícita (Container NÃO configura Chrome)
@@ -186,10 +216,9 @@ Adicionada seção completa documentando configuração do Windows:
 
 ### Testes Executados
 
-✅ **Sintaxe válida**: `node --check src/infra/ConnectionOrchestrator.js`
-✅ **Zero código morto**: Todos os métodos usados ou removidos
-✅ **Zero violações ontológicas**: Container não configura Chrome
-✅ **DEFAULTS limpo**: Apenas configs de conexão
+✅ **Sintaxe válida**: `node --check src/infra/ConnectionOrchestrator.js` ✅ **Zero código morto**:
+Todos os métodos usados ou removidos ✅ **Zero violações ontológicas**: Container não configura
+Chrome ✅ **DEFAULTS limpo**: Apenas configs de conexão
 
 ### Checklist de Qualidade
 
@@ -206,13 +235,17 @@ Adicionada seção completa documentando configuração do Windows:
 ## 📖 Arquivos Relacionados
 
 ### Documentação
-- [CONNECTION_ORCHESTRATOR_REFACTORING_PROPOSAL.md](CONNECTION_ORCHESTRATOR_REFACTORING_PROPOSAL.md) - Análise completa
+
+- [CONNECTION_ORCHESTRATOR_REFACTORING_PROPOSAL.md](CONNECTION_ORCHESTRATOR_REFACTORING_PROPOSAL.md) -
+  Análise completa
 
 ### Scripts Windows (Inalterados)
+
 - `START-CHROME-SIMPLE.bat` - Inicia Chrome no Windows (porta 9225)
 - `scripts/start-chrome-proxy-simple.bat` - Inicia proxy (porta 9224)
 
 ### Código Relacionado (Inalterados)
+
 - `src/core/config.js` - CONFIG.BROWSER_ENDPOINT
 - `src/core/boot_resilience_manager.js` - getBrowserEndpoint()
 - `src/infra/proxy/chromeProxyService.js` - Proxy HTTP/WebSocket
@@ -223,12 +256,14 @@ Adicionada seção completa documentando configuração do Windows:
 ## 🔄 Próximos Passos
 
 ### Melhorias Opcionais (Fase 4 - Não Implementadas)
+
 1. ⏸️ Extrair mock check para `_handleMockMode()`
 2. ⏸️ Implementar user agent rotation real (se necessário)
 3. ⏸️ Adicionar telemetria de performance (fast path vs fallback timing)
 4. ⏸️ Criar unit tests para tryConnectBrowserURL/WSEndpoint
 
 ### Testes Recomendados
+
 - [ ] Testar conexão via browserEndpoint (fast path)
 - [ ] Testar conexão sem browserEndpoint (fallback)
 - [ ] Testar modo 'auto' (wsEndpoint → connect)
@@ -242,13 +277,12 @@ Adicionada seção completa documentando configuração do Windows:
 
 Refatoração **CONCLUÍDA COM SUCESSO**:
 
-**Código Removido**: 204 linhas (-21.5%)
-**Violações Ontológicas Corrigidas**: 7
-**Métodos Removidos**: 6
-**Dependências Removidas**: 1
-**Documentação Adicionada**: +50 linhas
+**Código Removido**: 204 linhas (-21.5%) **Violações Ontológicas Corrigidas**: 7 **Métodos
+Removidos**: 6 **Dependências Removidas**: 1 **Documentação Adicionada**: +50 linhas
 
-**Resultado Final**: ConnectionOrchestrator agora segue rigorosamente o princípio ontológico, contendo APENAS lógica de conexão e removendo toda responsabilidade de configuração/gerenciamento do Chrome.
+**Resultado Final**: ConnectionOrchestrator agora segue rigorosamente o princípio ontológico,
+contendo APENAS lógica de conexão e removendo toda responsabilidade de configuração/gerenciamento do
+Chrome.
 
 ---
 

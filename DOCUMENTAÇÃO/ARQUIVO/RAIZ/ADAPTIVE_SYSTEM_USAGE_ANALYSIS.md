@@ -1,17 +1,16 @@
 # ADAPTIVE SYSTEM - USAGE ANALYSIS & INTEGRATION ROADMAP
 
-**Date**: 2026-02-04
-**Version**: V46
-**Status**: PRODUCTION READY - PARCIALMENTE INTEGRADO
+**Date**: 2026-02-04 **Version**: V46 **Status**: PRODUCTION READY - PARCIALMENTE INTEGRADO
 
 ---
 
 ## 📊 EXECUTIVE SUMMARY
 
-O **Adaptive System V46** está **implementado e funcional**, mas **subutilizado**. Atualmente apenas **1 de 2 APIs principais está sendo usada** (`getAdjustedTimeout`), enquanto a API de coleta de métricas (`recordMetric`) **não está integrada em nenhum lugar**.
+O **Adaptive System V46** está **implementado e funcional**, mas **subutilizado**. Atualmente apenas
+**1 de 2 APIs principais está sendo usada** (`getAdjustedTimeout`), enquanto a API de coleta de
+métricas (`recordMetric`) **não está integrada em nenhum lugar**.
 
-**Uso Atual**: 3-4% do potencial
-**Oportunidades de Integração**: 15+ pontos críticos identificados
+**Uso Atual**: 3-4% do potencial **Oportunidades de Integração**: 15+ pontos críticos identificados
 
 ---
 
@@ -22,6 +21,7 @@ O **Adaptive System V46** está **implementado e funcional**, mas **subutilizado
 Usado em **4 módulos críticos** para calcular timeouts adaptativos:
 
 #### 1. **ChatGPTDriver** (`src/driver/targets/ChatGPTDriver.js:618`)
+
 **Finalidade**: Detectar **stall** (IA travou durante geração de resposta)
 
 ```javascript
@@ -30,35 +30,37 @@ const adaptiveData = await adaptive.getAdjustedTimeout(this.currentDomain, 0, 'S
 const watchdogIdleTime = browserNow - lastChange;
 
 if (watchdogIdleTime > adaptiveData.timeout) {
-    throw new Error(`STALL_DETECTED: Latência excedeu ${adaptiveData.timeout}ms`);
+  throw new Error(`STALL_DETECTED: Latência excedeu ${adaptiveData.timeout}ms`);
 }
 ```
 
-**Contexto**: Durante o perception loop, valida se a IA parou de produzir texto
-**Métrica usada**: `stream` (gaps entre chunks de texto)
-**Impacto**: Se timeout adaptativo for muito curto → falsos positivos (stall detectado indevidamente)
+**Contexto**: Durante o perception loop, valida se a IA parou de produzir texto **Métrica usada**:
+`stream` (gaps entre chunks de texto) **Impacto**: Se timeout adaptativo for muito curto → falsos
+positivos (stall detectado indevidamente)
 
 ---
 
 #### 2. **SubmissionController** (`src/driver/modules/submission_controller.js:326`)
+
 **Finalidade**: Calcular **debounce delay** após envio de prompt
 
 ```javascript
 // Linha 326
 const timeoutData = await adaptive.getAdjustedTimeout(this.driver.currentDomain, 0, 'ECHO');
 debounceDelay = Math.min(
-    Math.floor(timeoutData.timeout / 10),  // 10% do timeout ECHO
-    SUBMISSION_CONFIG.DEBOUNCE_MAX_MS
+  Math.floor(timeoutData.timeout / 10), // 10% do timeout ECHO
+  SUBMISSION_CONFIG.DEBOUNCE_MAX_MS
 );
 ```
 
-**Contexto**: Após pressionar Enter, aguarda para verificar se campo foi limpo
-**Métrica usada**: `echo` (tempo de resposta da interface)
-**Impacto**: Debounce muito curto → verificação prematura (falha de confirmação)
+**Contexto**: Após pressionar Enter, aguarda para verificar se campo foi limpo **Métrica usada**:
+`echo` (tempo de resposta da interface) **Impacto**: Debounce muito curto → verificação prematura
+(falha de confirmação)
 
 ---
 
 #### 3. **BiomechanicsEngine** (`src/driver/modules/biomechanics_engine.js:374`)
+
 **Finalidade**: Timeout para **aguardar IA ficar idle** antes de interagir
 
 ```javascript
@@ -66,18 +68,20 @@ debounceDelay = Math.min(
 const { timeout } = await adaptive.getAdjustedTimeout(this.driver.currentDomain, 0, 'INITIAL');
 
 while (Date.now() - start < timeout && iterations < MAX_WAIT_ITERATIONS) {
-    // Aguarda IA terminar de processar
+  // Aguarda IA terminar de processar
 }
 ```
 
-**Contexto**: Antes de digitar prompt, aguarda IA não estar processando outra tarefa
-**Métrica usada**: `ttft` (time to first token - tempo inicial de resposta)
-**Impacto**: Timeout muito curto → interação prematura (conflito com geração em andamento)
+**Contexto**: Antes de digitar prompt, aguarda IA não estar processando outra tarefa **Métrica
+usada**: `ttft` (time to first token - tempo inicial de resposta) **Impacto**: Timeout muito curto →
+interação prematura (conflito com geração em andamento)
 
 ---
 
 #### 4. **Stabilizer** (`src/shared/page_stability/stabilizer.js:387`)
-**Finalidade**: Ajustar **silence window** (período de estabilidade antes de considerar página pronta)
+
+**Finalidade**: Ajustar **silence window** (período de estabilidade antes de considerar página
+pronta)
 
 ```javascript
 // Linha 387-397
@@ -86,17 +90,17 @@ const profile = metrics.targets[target];
 const avgStreamTime = profile?.stream?.avg || 500;
 
 if (avgStreamTime > ADAPTIVE_STREAM_VERY_SLOW) {
-    silenceWindow = 5000;  // 5s para targets muito lentos
+  silenceWindow = 5000; // 5s para targets muito lentos
 } else if (avgStreamTime > ADAPTIVE_STREAM_SLOW) {
-    silenceWindow = 3000;  // 3s para targets lentos
+  silenceWindow = 3000; // 3s para targets lentos
 } else if (avgStreamTime < ADAPTIVE_STREAM_FAST) {
-    silenceWindow = 1000;  // 1s para targets rápidos
+  silenceWindow = 1000; // 1s para targets rápidos
 }
 ```
 
-**Contexto**: Determina quanto tempo aguardar após última mudança na página
-**Métrica usada**: `stream.avg` (velocidade média de streaming)
-**Impacto**: Silence window inadequado → falsos positivos/negativos de estabilidade
+**Contexto**: Determina quanto tempo aguardar após última mudança na página **Métrica usada**:
+`stream.avg` (velocidade média de streaming) **Impacto**: Silence window inadequado → falsos
+positivos/negativos de estabilidade
 
 ---
 
@@ -105,6 +109,7 @@ if (avgStreamTime > ADAPTIVE_STREAM_VERY_SLOW) {
 **PROBLEMA CRÍTICO**: Nenhum módulo está coletando métricas reais!
 
 **Consequência**: O adaptive.js opera apenas com **SEEDS iniciais** (valores default):
+
 - `SEED_TTFT = 15000` (15s)
 - `SEED_STREAM = 500` (500ms)
 - `SEED_ECHO = 2000` (2s)
@@ -118,20 +123,22 @@ if (avgStreamTime > ADAPTIVE_STREAM_VERY_SLOW) {
 ### 🔴 PRIORIDADE CRÍTICA (P0)
 
 #### 1. **ChatGPTDriver: Coletar TTFT** (Time to First Token)
+
 **Localização**: `src/driver/targets/ChatGPTDriver.js` (~linha 340-410)
 
 **O que medir**: Tempo entre envio do prompt e primeiro chunk de texto
 
 **Implementação**:
+
 ```javascript
 // Após sendPrompt() (linha 339)
 const promptSentAt = Date.now();
 
 // Ao detectar primeiro texto no perception loop (linha 498)
 if (!firstTokenReceived) {
-    const ttft = Date.now() - promptSentAt;
-    await adaptive.recordMetric('ttft', ttft, this.currentDomain);
-    firstTokenReceived = true;
+  const ttft = Date.now() - promptSentAt;
+  await adaptive.recordMetric('ttft', ttft, this.currentDomain);
+  firstTokenReceived = true;
 }
 ```
 
@@ -140,20 +147,22 @@ if (!firstTokenReceived) {
 ---
 
 #### 2. **ChatGPTDriver: Coletar Stream Gaps**
+
 **Localização**: `src/driver/targets/ChatGPTDriver.js` (~linha 488-500)
 
 **O que medir**: Intervalo entre chunks consecutivos de texto (gaps)
 
 **Implementação**:
+
 ```javascript
 // No perception loop, ao detectar TEXT_DELTA
 if (delta) {
-    const now = Date.now();
-    if (lastChunkTimestamp) {
-        const gap = now - lastChunkTimestamp;
-        await adaptive.recordMetric('gap', gap, this.currentDomain);
-    }
-    lastChunkTimestamp = now;
+  const now = Date.now();
+  if (lastChunkTimestamp) {
+    const gap = now - lastChunkTimestamp;
+    await adaptive.recordMetric('gap', gap, this.currentDomain);
+  }
+  lastChunkTimestamp = now;
 }
 ```
 
@@ -162,19 +171,21 @@ if (delta) {
 ---
 
 #### 3. **SubmissionController: Coletar Echo Time**
+
 **Localização**: `src/driver/modules/submission_controller.js` (~linha 280-340)
 
 **O que medir**: Tempo entre Enter e confirmação de clearing
 
 **Implementação**:
+
 ```javascript
 // Linha 322 (após Enter)
 const enterPressedAt = Date.now();
 
 // Linha 337 (após verificação)
 if (wasCleared) {
-    const echoTime = Date.now() - enterPressedAt;
-    await adaptive.recordMetric('echo', echoTime, this.driver.currentDomain);
+  const echoTime = Date.now() - enterPressedAt;
+  await adaptive.recordMetric('echo', echoTime, this.driver.currentDomain);
 }
 ```
 
@@ -185,27 +196,31 @@ if (wasCleared) {
 ### 🟡 PRIORIDADE ALTA (P1)
 
 #### 4. **BiomechanicsEngine: Coletar Wait Time**
+
 **Localização**: `src/driver/modules/biomechanics_engine.js` (~linha 380-410)
 
 **O que medir**: Tempo real aguardado até IA ficar idle
 
 **Implementação**:
+
 ```javascript
 // Linha 410 (após loop de wait)
 const actualWaitTime = Date.now() - start;
 if (actualWaitTime > 0) {
-    await adaptive.recordMetric('ttft', actualWaitTime, this.driver.currentDomain);
+  await adaptive.recordMetric('ttft', actualWaitTime, this.driver.currentDomain);
 }
 ```
 
 ---
 
 #### 5. **Stabilizer: Coletar Heartbeat**
+
 **Localização**: `src/shared/page_stability/stabilizer.js` (~linha 250-300)
 
 **O que medir**: Intervalo entre heartbeats (pulso de atividade da página)
 
 **Implementação**:
+
 ```javascript
 // Em _monitorActivityWithWatchdog (linha 250+)
 const lastHeartbeat = await page.evaluate(() => window.__wd_last_change);
@@ -213,7 +228,7 @@ const now = Date.now();
 const heartbeatInterval = now - lastHeartbeat;
 
 if (heartbeatInterval > 0 && heartbeatInterval < 60000) {
-    await adaptive.recordMetric('heartbeat', heartbeatInterval, target);
+  await adaptive.recordMetric('heartbeat', heartbeatInterval, target);
 }
 ```
 
@@ -222,11 +237,13 @@ if (heartbeatInterval > 0 && heartbeatInterval < 60000) {
 ---
 
 #### 6. **ChatGPTDriver: Coletar Continuation Latency**
+
 **Localização**: `src/driver/targets/ChatGPTDriver.js` (~linha 526-550)
 
 **O que medir**: Tempo para detectar e processar botão "Continue"
 
 **Implementação**:
+
 ```javascript
 // Linha 526 (ao detectar continuation)
 const continuationStart = Date.now();
@@ -241,29 +258,33 @@ await adaptive.recordMetric('echo', continuationLatency, this.currentDomain);
 ### 🟢 PRIORIDADE MÉDIA (P2)
 
 #### 7. **NetworkMonitor: Request Timing**
+
 **Localização**: Criar novo módulo ou integrar em `BaseDriver`
 
 **O que medir**: Latência de requests críticos (API calls, page loads)
 
 **Implementação**:
+
 ```javascript
-page.on('response', async (response) => {
-    const timing = response.timing();
-    if (timing) {
-        const totalTime = timing.responseEnd - timing.requestStart;
-        await adaptive.recordMetric('heartbeat', totalTime, domain);
-    }
+page.on('response', async response => {
+  const timing = response.timing();
+  if (timing) {
+    const totalTime = timing.responseEnd - timing.requestStart;
+    await adaptive.recordMetric('heartbeat', totalTime, domain);
+  }
 });
 ```
 
 ---
 
 #### 8. **ModelSwitcher: Model Response Quality**
+
 **Localização**: `src/driver/targets/ChatGPTDriver.js` (~linha 151-180)
 
 **O que medir**: Performance de diferentes modelos (TTFT, completion time)
 
 **Implementação**:
+
 ```javascript
 // Ao trocar modelo (linha 175+)
 const modelStartTime = Date.now();
@@ -279,11 +300,13 @@ await adaptive.recordMetric('ttft', modelResponseTime, modelKey);
 ---
 
 #### 9. **SADI: Selector Discovery Time**
+
 **Localização**: `src/shared/sadi/analyzer.js` (~linha 450-500)
 
 **O que medir**: Tempo para descobrir seletores via SADI
 
 **Implementação**:
+
 ```javascript
 // Linha 450 (início de análise)
 const sadiStart = Date.now();
@@ -291,7 +314,7 @@ const sadiStart = Date.now();
 // Linha 490 (após descoberta)
 const sadiTime = Date.now() - sadiStart;
 if (result.confidence >= 75) {
-    await adaptive.recordMetric('echo', sadiTime, domain);
+  await adaptive.recordMetric('echo', sadiTime, domain);
 }
 ```
 
@@ -302,26 +325,32 @@ if (result.confidence >= 75) {
 ### 🔵 PRIORIDADE BAIXA (P3 - FUTURO)
 
 #### 10. **Gemini Driver** (quando implementado)
+
 - Coletar mesmas métricas (TTFT, stream gaps, echo)
 - Comparar performance ChatGPT vs Gemini
 
 #### 11. **Circuit Breaker Monitoring**
+
 - Registrar quando circuit breaker é ativado
 - Métrica de "targets problemáticos" para alertas
 
 #### 12. **Health Check Automation**
+
 - Chamar `getHealthStatus()` periodicamente (a cada hora)
 - Emitir alerta se targets stale > 50%
 
 #### 13. **Percentile Dashboards**
+
 - Exportar P95/P99 para Grafana/Prometheus
 - Monitorar degradação de performance
 
 #### 14. **Context-Aware Analysis**
+
 - Correlacionar `messageCount` com TTFT real
 - Validar se penalty logarítmica é adequada
 
 #### 15. **Adaptive Policy**
+
 - Implementar `ADAPTIVE` mode em `context_manager.js`
 - Usar stats do adaptive para decidir quando summarizar contexto
 
@@ -339,6 +368,7 @@ if (result.confidence >= 75) {
 4. ✅ Testes: Executar 10-20 tasks e verificar convergência de `avg`
 
 **Entregáveis**:
+
 - 3 pontos de coleta ativos
 - Dashboard simples (logs) mostrando evolução de `avg` e `std`
 
@@ -354,6 +384,7 @@ if (result.confidence >= 75) {
 4. Criar script de análise (`scripts/analyze-adaptive-metrics.js`)
 
 **Entregáveis**:
+
 - 6 pontos de coleta ativos
 - Script de análise com estatísticas (P50/P95/P99)
 - Relatório de recomendações (ajustes de seeds)
@@ -374,6 +405,7 @@ if (result.confidence >= 75) {
    - Stale targets (gauge)
 
 **Entregáveis**:
+
 - Prometheus exporter
 - 4 dashboards Grafana
 - Alerting rules (PagerDuty/Slack)
@@ -390,6 +422,7 @@ if (result.confidence >= 75) {
 4. Reinforcement learning (ajustar alpha dinamicamente)
 
 **Entregáveis**:
+
 - Comparative analysis report (modelos)
 - ML model para predição de timeouts
 - Auto-tuning de hyperparameters (alpha, seeds)
@@ -399,21 +432,25 @@ if (result.confidence >= 75) {
 ## 🚨 GAPS CRÍTICOS ATUAIS
 
 ### 1. **Zero Learning Happening**
+
 - ❌ Sem coleta de métricas → sistema usa apenas seeds
 - ❌ Timeouts não melhoram ao longo do tempo
 - ❌ Circuit breaker nunca ativa (avg sempre em seed value)
 
 ### 2. **Stale Data Risk**
+
 - ❌ `last_update` tracking implementado mas não atualizado
 - ❌ Targets inativos permanecem em state indefinidamente
 - ❌ Decay não funciona (sem last_update real)
 
 ### 3. **No Observability**
+
 - ❌ Impossível diagnosticar problemas de timeout
 - ❌ Sem visibilidade de quando circuit breaker deveria ativar
 - ❌ Sem métricas de health check
 
 ### 4. **Manual Tuning**
+
 - ❌ Seeds escolhidos arbitrariamente (15s, 500ms, 2s)
 - ❌ Sem validação se seeds são adequados
 - ❌ Sem feedback loop para ajustar CONFIG.ADAPTIVE_ALPHA
@@ -423,6 +460,7 @@ if (result.confidence >= 75) {
 ## 💡 QUICK WINS (IMPLEMENTAÇÃO RÁPIDA)
 
 ### Quick Win #1: Logging Metrics (30min)
+
 **Onde**: `src/driver/targets/ChatGPTDriver.js`
 
 Adicionar logs temporários para entender padrões sem integração completa:
@@ -441,15 +479,18 @@ log('INFO', `[ADAPTIVE-DATA] GAP: ${gap}ms, domain: ${this.currentDomain}`);
 ---
 
 ### Quick Win #2: State File Analysis Script (1h)
+
 **Onde**: `scripts/analyze-adaptive-state.js` (NOVO)
 
 ```javascript
 const state = JSON.parse(fs.readFileSync('logs/adaptive_state.json'));
 
 Object.entries(state.targets).forEach(([target, profile]) => {
-    console.log(`${target}:`);
-    console.log(`  TTFT: avg=${profile.ttft.avg}ms, std=${Math.sqrt(profile.ttft.var).toFixed(0)}ms, count=${profile.ttft.count}`);
-    console.log(`  Stream: avg=${profile.stream.avg}ms, count=${profile.stream.count}`);
+  console.log(`${target}:`);
+  console.log(
+    `  TTFT: avg=${profile.ttft.avg}ms, std=${Math.sqrt(profile.ttft.var).toFixed(0)}ms, count=${profile.ttft.count}`
+  );
+  console.log(`  Stream: avg=${profile.stream.avg}ms, count=${profile.stream.count}`);
 });
 ```
 
@@ -458,6 +499,7 @@ Object.entries(state.targets).forEach(([target, profile]) => {
 ---
 
 ### Quick Win #3: Force TTFT Collection (1h)
+
 **Onde**: `src/driver/targets/ChatGPTDriver.js`
 
 Implementar apenas coleta de TTFT (mais fácil que stream gaps):
@@ -468,9 +510,9 @@ this._ttftStart = Date.now();
 
 // Linha 498+ (ao detectar TEXT_DELTA pela primeira vez)
 if (this._ttftStart && !this._ttftRecorded) {
-    const ttft = Date.now() - this._ttftStart;
-    await adaptive.recordMetric('ttft', ttft, this.currentDomain);
-    this._ttftRecorded = true;
+  const ttft = Date.now() - this._ttftStart;
+  await adaptive.recordMetric('ttft', ttft, this.currentDomain);
+  this._ttftRecorded = true;
 }
 ```
 
@@ -531,14 +573,18 @@ if (this._ttftStart && !this._ttftRecorded) {
 
 ## 📝 CONCLUSÃO
 
-O **Adaptive System V46** está **tecnicamente pronto**, mas **operacionalmente inativo**. A arquitetura é sólida, o código é production-ready, mas **falta integração**.
+O **Adaptive System V46** está **tecnicamente pronto**, mas **operacionalmente inativo**. A
+arquitetura é sólida, o código é production-ready, mas **falta integração**.
 
 **Status Atual**: 🟡 **IMPLEMENTADO MAS SUBUTILIZADO (3-4% de uso)**
 
 **Próxima Ação Crítica**: 🔴 **IMPLEMENTAR COLETA DE MÉTRICAS (FASE 1)**
 
-Sem coleta de métricas, o adaptive.js é apenas um **timeout fixo sofisticado**. Com coleta ativa, torna-se um **sistema de aprendizado contínuo** que melhora a confiabilidade e performance do projeto.
+Sem coleta de métricas, o adaptive.js é apenas um **timeout fixo sofisticado**. Com coleta ativa,
+torna-se um **sistema de aprendizado contínuo** que melhora a confiabilidade e performance do
+projeto.
 
 ---
 
-**Ação Recomendada**: Implementar **Quick Win #3 (TTFT collection)** como prova de conceito em **< 2 horas** e validar learning loop completo.
+**Ação Recomendada**: Implementar **Quick Win #3 (TTFT collection)** como prova de conceito em **< 2
+horas** e validar learning loop completo.

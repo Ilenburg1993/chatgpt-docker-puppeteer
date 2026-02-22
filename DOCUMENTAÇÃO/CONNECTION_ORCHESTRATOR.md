@@ -2,19 +2,22 @@
 
 ## Visão Geral
 
-O `ConnectionOrchestrator` é um gerenciador universal de conexões Puppeteer com suporte a múltiplos modos, fallback automático e cache persistente.
+O `ConnectionOrchestrator` é um gerenciador universal de conexões Puppeteer com suporte a múltiplos
+modos, fallback automático e cache persistente.
 
 ## Modos de Operação
 
 ### 1. **connect-only** (Recomendado - Padrão)
 
-O `ConnectionOrchestrator` opera em modo *connect-only* por padrão, usando o contrato canônico `browserEndpoint = { url, wsEndpoint? }`.
-Este modo conecta-se a um Chrome/Proxy exposto na porta container-facing canônica `9224` (proxy-first). Quando `wsEndpoint` estiver disponível, ele será priorizado para maior estabilidade.
+O `ConnectionOrchestrator` opera em modo _connect-only_ por padrão, usando o contrato canônico
+`browserEndpoint = { url, wsEndpoint? }`. Este modo conecta-se a um Chrome/Proxy exposto na porta
+container-facing canônica `9224` (proxy-first). Quando `wsEndpoint` estiver disponível, ele será
+priorizado para maior estabilidade.
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    mode: 'connect-only',
-    browserEndpoint: { url: 'http://host.docker.internal:9224' }
+  mode: 'connect-only',
+  browserEndpoint: { url: 'http://host.docker.internal:9224' },
 });
 const browser = await orch.connect();
 ```
@@ -27,32 +30,36 @@ const browser = await orch.connect();
 
 ### 2. **connect** (alias legado / compatibilidade)
 
-Conecta a Chrome externo via `browserEndpoint.url` (HTTP) ou `browserEndpoint.wsEndpoint` (WebSocket). Use a porta container-facing canônica `9224` quando houver um Chrome Proxy entre o container e o host.
+Conecta a Chrome externo via `browserEndpoint.url` (HTTP) ou `browserEndpoint.wsEndpoint`
+(WebSocket). Use a porta container-facing canônica `9224` quando houver um Chrome Proxy entre o
+container e o host.
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    mode: 'connect',
-    browserEndpoint: { url: 'http://host.docker.internal:9224' },
-    hosts: ['127.0.0.1', 'host.docker.internal'],
-    ports: [9224]
+  mode: 'connect',
+  browserEndpoint: { url: 'http://host.docker.internal:9224' },
+  hosts: ['127.0.0.1', 'host.docker.internal'],
+  ports: [9224],
 });
 const browser = await orch.connect();
 ```
 
 **Requisitos:**
 
-- Chrome (ou Proxy) expondo endpoint acessível ao container na porta `9224` (ex.: `--remote-debugging-port=9224`, ou um Chrome Proxy que encaminhe para o host).
+- Chrome (ou Proxy) expondo endpoint acessível ao container na porta `9224` (ex.:
+  `--remote-debugging-port=9224`, ou um Chrome Proxy que encaminhe para o host).
 
 ### 3. **wsEndpoint**
 
-Conecta via WebSocket Debugger URL (preferível quando disponível). Atualize `wsEndpoint` para apontar para a versão WebSocket do endpoint na porta `9224`.
+Conecta via WebSocket Debugger URL (preferível quando disponível). Atualize `wsEndpoint` para
+apontar para a versão WebSocket do endpoint na porta `9224`.
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    mode: 'wsEndpoint',
-    browserEndpoint: { wsEndpoint: 'ws://host.docker.internal:9224/devtools/browser/<id>' },
-    hosts: ['host.docker.internal'],
-    ports: [9224]
+  mode: 'wsEndpoint',
+  browserEndpoint: { wsEndpoint: 'ws://host.docker.internal:9224/devtools/browser/<id>' },
+  hosts: ['host.docker.internal'],
+  ports: [9224],
 });
 const browser = await orch.connect();
 ```
@@ -64,20 +71,23 @@ const browser = await orch.connect();
 
 ### 4. **executablePath** (Depreciado para produção)
 
-Usar `executablePath` significa iniciar binários locais; esse modo é útil apenas para desenvolvimento local ou debugging. Em containers e produção, prefira *connect-only* com `browserEndpoint`.
+Usar `executablePath` significa iniciar binários locais; esse modo é útil apenas para
+desenvolvimento local ou debugging. Em containers e produção, prefira _connect-only_ com
+`browserEndpoint`.
 
 ```javascript
 // Somente para dev/local
 const orch = new ConnectionOrchestrator({
-    mode: 'executablePath',
-    executablePath: '/usr/bin/google-chrome-stable'
+  mode: 'executablePath',
+  executablePath: '/usr/bin/google-chrome-stable',
 });
 const browser = await orch.connect();
 ```
 
 ### 5. **auto** (Fallback Inteligente)
 
-Quando `auto` está ativo, o `ConnectionOrchestrator` tentará modos em ordem de prioridade orientada para connect-only/proxy-first.
+Quando `auto` está ativo, o `ConnectionOrchestrator` tentará modos em ordem de prioridade orientada
+para connect-only/proxy-first.
 
 **Ordem de fallback (recomendada):**
 
@@ -94,7 +104,7 @@ Por padrão, Chromium é salvo em `~/.cache/puppeteer` (não /tmp).
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    cacheDir: '/home/node/.cache/puppeteer' // Persistente
+  cacheDir: '/home/node/.cache/puppeteer', // Persistente
 });
 ```
 
@@ -102,12 +112,12 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    args: [
-        '--no-sandbox',
-        '--disable-gpu',
-        '--window-size=1920,1080',
-        '--disable-web-security' // Apenas para dev
-    ]
+  args: [
+    '--no-sandbox',
+    '--disable-gpu',
+    '--window-size=1920,1080',
+    '--disable-web-security', // Apenas para dev
+  ],
 });
 ```
 
@@ -115,7 +125,7 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    userDataDir: '/workspace/profile' // Salva cookies, localStorage, etc
+  userDataDir: '/workspace/profile', // Salva cookies, localStorage, etc
 });
 ```
 
@@ -123,10 +133,10 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    connectionTimeout: 30000, // 30s para conectar
-    maxConnectionAttempts: 5, // Máximo de tentativas
-    retryDelayMs: 3000, // Delay inicial entre tentativas
-    maxRetryDelayMs: 15000 // Delay máximo (backoff exponencial)
+  connectionTimeout: 30000, // 30s para conectar
+  maxConnectionAttempts: 5, // Máximo de tentativas
+  retryDelayMs: 3000, // Delay inicial entre tentativas
+  maxRetryDelayMs: 15000, // Delay máximo (backoff exponencial)
 });
 ```
 
@@ -238,7 +248,7 @@ chrome --remote-debugging-port=9224 --remote-debugging-address=0.0.0.0
 
 ```javascript
 module.exports = {
-    cacheDirectory: path.join(os.homedir(), '.cache', 'puppeteer')
+  cacheDirectory: path.join(os.homedir(), '.cache', 'puppeteer'),
 };
 ```
 
@@ -248,9 +258,9 @@ module.exports = {
 // Cada ConnectionOrchestrator cria UMA instância
 // Para pool, criar múltiplos orchestrators:
 const browsers = await Promise.all([
-    new ConnectionOrchestrator().connect(),
-    new ConnectionOrchestrator().connect(),
-    new ConnectionOrchestrator().connect()
+  new ConnectionOrchestrator().connect(),
+  new ConnectionOrchestrator().connect(),
+  new ConnectionOrchestrator().connect(),
 ]);
 ```
 
@@ -260,9 +270,9 @@ const browsers = await Promise.all([
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    mode: 'wsEndpoint',
-    hosts: ['host.docker.internal'],
-    ports: [9224]
+  mode: 'wsEndpoint',
+  hosts: ['host.docker.internal'],
+  ports: [9224],
 });
 ```
 
@@ -270,8 +280,8 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    mode: 'launcher',
-    userDataDir: '/workspace/chrome-profile'
+  mode: 'launcher',
+  userDataDir: '/workspace/chrome-profile',
 });
 ```
 
@@ -279,8 +289,12 @@ const orch = new ConnectionOrchestrator({
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    mode: 'launcher',
-    args: ['--disable-blink-features=AutomationControlled', '--disable-background-networking', '--disable-default-apps']
+  mode: 'launcher',
+  args: [
+    '--disable-blink-features=AutomationControlled',
+    '--disable-background-networking',
+    '--disable-default-apps',
+  ],
 });
 ```
 
@@ -296,21 +310,23 @@ const orch = new ConnectionOrchestrator({ headless: false });
 
 ## Integração com BrowserPoolManager
 
-O `BrowserPoolManager` usa `ConnectionOrchestrator` internamente. Exemplo de uso com o contrato `browserEndpoint` (connect-only):
+O `BrowserPoolManager` usa `ConnectionOrchestrator` internamente. Exemplo de uso com o contrato
+`browserEndpoint` (connect-only):
 
 ```javascript
 const pool = new BrowserPoolManager({
-    poolSize: 3,
-    browserEndpoint: {
-        // Endpoint HTTP do Chrome/Chromium externo em execução
-        url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224'
-    }
+  poolSize: 3,
+  browserEndpoint: {
+    // Endpoint HTTP do Chrome/Chromium externo em execução
+    url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224',
+  },
 });
 
 await pool.initialize();
 ```
 
-Observação: a arquitetura atual é "connect-only" — o processo NÃO inicia navegadores; forneça um `browserEndpoint` para um Chrome já em execução.
+Observação: a arquitetura atual é "connect-only" — o processo NÃO inicia navegadores; forneça um
+`browserEndpoint` para um Chrome já em execução.
 
 ## Performance
 

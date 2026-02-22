@@ -43,10 +43,10 @@ await new Promise(r => httpServer.listen(PORT, r));
 
 // ✅ DEPOIS (correto: sem retorno implícito)
 await new Promise(r => {
-    setTimeout(r, 100);
+  setTimeout(r, 100);
 });
 await new Promise(r => {
-    httpServer.listen(PORT, r);
+  httpServer.listen(PORT, r);
 });
 ```
 
@@ -80,29 +80,29 @@ sed -i 's/new Promise(r => setTimeout(r,/new Promise(r => { setTimeout(r,/g'
 ```javascript
 // ❌ ANTES (erro: no-empty)
 try {
-    fetchData();
+  fetchData();
 } catch (e) {}
 
 // ✅ DEPOIS (correto: comentário explicativo)
 try {
-    fetchData();
+  fetchData();
 } catch (_e) {
-    // Ignore fetch errors - UI will retry
+  // Ignore fetch errors - UI will retry
 }
 ```
 
 **Arquivos corrigidos:**
 
 - [public/js/app.js](public/js/app.js)
-    - updateStatus catch
-    - loadTasks catch
-    - loadLogs catch
+  - updateStatus catch
+  - loadTasks catch
+  - loadLogs catch
 - [src/core/logger.js](src/core/logger.js)
-    - File rotation cleanup catch
-    - Log append catch
-    - Metrics append catch
+  - File rotation cleanup catch
+  - Log append catch
+  - Metrics append catch
 - [tests/test_control_pause.js](tests/test_control_pause.js)
-    - Control file write catch
+  - Control file write catch
 
 **Pattern aplicado:**
 
@@ -117,18 +117,18 @@ try {
 // ❌ ANTES (warning: no-unused-vars)
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 try {
-    doSomething();
+  doSomething();
 } catch (e) {}
 
 // ✅ DEPOIS (correto: prefixo _ indica intencional)
 const sleep = ms =>
-    new Promise(r => {
-        setTimeout(r, ms);
-    });
+  new Promise(r => {
+    setTimeout(r, ms);
+  });
 try {
-    doSomething();
+  doSomething();
 } catch (_e) {
-    /* Ignored */
+  /* Ignored */
 }
 ```
 
@@ -219,51 +219,51 @@ npx eslint . --quiet
 ### Curto Prazo (1-2 dias)
 
 1. **Corrigir no-empty em src/** (20 casos)
-    - Adicionar comentários explicativos
-    - Ou implementar logging apropriado
+   - Adicionar comentários explicativos
+   - Ou implementar logging apropriado
 
 2. **Corrigir no-return-await** (3 casos)
 
-    ```javascript
-    // Antes: return await somePromise();
-    // Depois: return somePromise();
-    ```
+   ```javascript
+   // Antes: return await somePromise();
+   // Depois: return somePromise();
+   ```
 
 3. **Revisar no-unused-vars** (80 warnings)
-    - Remover variáveis realmente não utilizadas
-    - Ou prefixar com `_` se intencional
+   - Remover variáveis realmente não utilizadas
+   - Ou prefixar com `_` se intencional
 
 ### Médio Prazo (1 semana)
 
 1. **Corrigir promise executors em src/** (~60 casos)
-    - Aplicar mesmo padrão usado em tests
-    - Automatizar com script
+   - Aplicar mesmo padrão usado em tests
+   - Automatizar com script
 
 2. **Reduzir complexity warnings** (~20 casos)
-    - Refatorar funções muito complexas
-    - Extrair sub-funções
+   - Refatorar funções muito complexas
+   - Extrair sub-funções
 
 3. **Considerar ESLint plugins adicionais**
-    - `eslint-plugin-security` (segurança)
-    - `eslint-plugin-jsdoc` (documentação)
-    - `eslint-plugin-promise` (async best practices)
+   - `eslint-plugin-security` (segurança)
+   - `eslint-plugin-jsdoc` (documentação)
+   - `eslint-plugin-promise` (async best practices)
 
 ### Longo Prazo (1 mês)
 
 1. **Migrar para regras mais estritas**
-    - Aumentar `max-complexity` de 20 para 15
-    - Habilitar `require-await`
-    - Habilitar `no-console` (com exceções)
+   - Aumentar `max-complexity` de 20 para 15
+   - Habilitar `require-await`
+   - Habilitar `no-console` (com exceções)
 
 2. **Configurar ESLint no CI/CD**
-    - Falhar build em errors
-    - Reportar warnings mas não falhar
-    - Gerar relatórios de qualidade
+   - Falhar build em errors
+   - Reportar warnings mas não falhar
+   - Gerar relatórios de qualidade
 
 3. **Documentar guia de estilo**
-    - Atualizar CONTRIBUTING.md
-    - Adicionar exemplos de código correto
-    - Integrar com prettier/editorconfig
+   - Atualizar CONTRIBUTING.md
+   - Adicionar exemplos de código correto
+   - Integrar com prettier/editorconfig
 
 ## Referências
 
@@ -276,7 +276,8 @@ npx eslint . --quiet
 
 ✅ **Sucesso**: Redução de 98.6% nos problemas ESLint (25,930 → 369)
 
-O projeto agora tem uma base de código muito mais limpa e manutenível. As correções aplicadas focaram em:
+O projeto agora tem uma base de código muito mais limpa e manutenível. As correções aplicadas
+focaram em:
 
 1. Padrões anti-pattern (promise executors)
 2. Formatação automática (CRLF → LF)

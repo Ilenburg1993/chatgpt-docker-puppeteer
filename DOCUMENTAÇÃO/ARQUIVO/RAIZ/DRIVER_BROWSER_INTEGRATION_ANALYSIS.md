@@ -1,17 +1,19 @@
 # Driver-Browser Integration Analysis & Architecture Review v1.0
 
-**Document Version**: 1.0
-**Date**: Fevereiro 2026
-**Status**: 🔍 COMPREHENSIVE ANALYSIS
-**Scope**: Driver ↔ Browser Pool ↔ Page Management ↔ Validation Tools
+**Document Version**: 1.0 **Date**: Fevereiro 2026 **Status**: 🔍 COMPREHENSIVE ANALYSIS **Scope**:
+Driver ↔ Browser Pool ↔ Page Management ↔ Validation Tools
 
 ---
 
 ## Executive Summary
 
-Este documento analisa a integração completa entre **Driver subsystem** e **Browser/Pool infrastructure**, mapeando responsabilidades, identificando falhas arquiteturais, e propondo correções estruturais. O foco é responder: **como uma página é associada a um driver** e **o que cada camada deve/não deve gerenciar**.
+Este documento analisa a integração completa entre **Driver subsystem** e **Browser/Pool
+infrastructure**, mapeando responsabilidades, identificando falhas arquiteturais, e propondo
+correções estruturais. O foco é responder: **como uma página é associada a um driver** e **o que
+cada camada deve/não deve gerenciar**.
 
 **Achados Críticos**:
+
 - ✅ **17 responsabilidades mapeadas** (Driver vs Pool vs Orchestrator)
 - 🐛 **12 bugs/falhas identificados** (page lifecycle, validation gaps, monitoring)
 - 📊 **8 ferramentas subutilizadas** (Triage, Analyzer, Stabilizer integração fraca)
@@ -151,6 +153,7 @@ async allocate(target = 'default') {
 ```
 
 **Issues Identified**:
+
 - ❌ **No page validation** (crashed/disconnected pages podem ser retornadas)
 - ❌ **No target pre-navigation** (página vazia, driver precisa navegar)
 - ❌ **No health check** (instância pode estar crashed desde último healthcheck)
@@ -183,6 +186,7 @@ async acquireFromPool(target) {
 ```
 
 **Issues Identified**:
+
 - ⚠️ **No destroyed check** (driver pode estar destroyed no pool)
 - ⚠️ **No state validation** (UNATTACHED assumption não é garantida)
 - ✅ **Backpressure implemented** (C1 - wait 5s → temporary driver)
@@ -236,6 +240,7 @@ attachContext(page, signal, correlationId = null) {
 ```
 
 **Issues Identified**:
+
 - ✅ **Strong validation** (all critical checks present)
 - ❌ **No page readiness check** (page pode não estar pronta para interação)
 - ❌ **No domain validation** (page.url() não é validado contra target)
@@ -262,6 +267,7 @@ async execute(prompt, abortSignal = null) {
 ```
 
 **Issues Identified**:
+
 - ❌ **No page stability check** (driver assume page está pronta)
 - ❌ **No pre-execution diagnostics** (triage não roda antes de executar)
 - ❌ **No adaptive behavior** (não ajusta timeouts baseado em histórico)
@@ -309,6 +315,7 @@ detachContext(options = {}) {
 ```
 
 **Issues Identified**:
+
 - ✅ **C2 implemented** (idempotência + force flag)
 - ⚠️ **Page não é closed** (driver desanexa, mas page continua aberta no browser)
 - ⚠️ **No page health report** (métricas da sessão não são coletadas antes de detach)
@@ -356,14 +363,15 @@ detachContext(options = {}) {
 
 ### 3.1 BROWSER LAYER Responsibilities
 
-| Component | ✅ DEVE gerenciar | ❌ NÃO DEVE gerenciar |
-|-----------|-------------------|----------------------|
-| **BrowserPoolManager** | - Browser instance lifecycle<br>- Page allocation (newPage)<br>- Page release (page.close)<br>- Instance health checks<br>- Instance crash detection<br>- Pool size management | - Driver logic<br>- Task execution<br>- LLM interaction<br>- Target-specific behavior<br>- Retry logic |
-| **ConnectionOrchestrator** | - Browser connection (wsEndpoint/browserURL)<br>- Connection retry<br>- Proxy integration<br>- Page scanning (scanForTargetPage)<br>- Connection health checks | - Page execution<br>- Driver management<br>- Task lifecycle<br>- Business logic |
-| **PageValidator** (MISSING) | - Page health validation<br>- Page crashed detection<br>- Target URL validation<br>- DOM readiness check | - Content validation<br>- Element detection<br>- LLM response parsing |
-| **PageLifecycleMonitor** (MISSING) | - Page event monitoring (close, crash)<br>- Auto-cleanup crashed pages<br>- Lifecycle telemetry | - Driver state management<br>- Task recovery<br>- Circuit breaker logic |
+| Component                          | ✅ DEVE gerenciar                                                                                                                                                              | ❌ NÃO DEVE gerenciar                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| **BrowserPoolManager**             | - Browser instance lifecycle<br>- Page allocation (newPage)<br>- Page release (page.close)<br>- Instance health checks<br>- Instance crash detection<br>- Pool size management | - Driver logic<br>- Task execution<br>- LLM interaction<br>- Target-specific behavior<br>- Retry logic |
+| **ConnectionOrchestrator**         | - Browser connection (wsEndpoint/browserURL)<br>- Connection retry<br>- Proxy integration<br>- Page scanning (scanForTargetPage)<br>- Connection health checks                 | - Page execution<br>- Driver management<br>- Task lifecycle<br>- Business logic                        |
+| **PageValidator** (MISSING)        | - Page health validation<br>- Page crashed detection<br>- Target URL validation<br>- DOM readiness check                                                                       | - Content validation<br>- Element detection<br>- LLM response parsing                                  |
+| **PageLifecycleMonitor** (MISSING) | - Page event monitoring (close, crash)<br>- Auto-cleanup crashed pages<br>- Lifecycle telemetry                                                                                | - Driver state management<br>- Task recovery<br>- Circuit breaker logic                                |
 
 **Action Items**:
+
 - 🆕 **Create PageValidator** (P0)
 - 🆕 **Create PageLifecycleMonitor** (P0)
 - 🔧 **Enhance BrowserPoolManager.allocate()** with validation (P0)
@@ -372,16 +380,17 @@ detachContext(options = {}) {
 
 ### 3.2 DRIVER LAYER Responsibilities
 
-| Component | ✅ DEVE gerenciar | ❌ NÃO DEVE gerenciar |
-|-----------|-------------------|----------------------|
-| **DriverFactory** | - Driver pool management<br>- Driver creation (WARM)<br>- Pool exhaustion (backpressure)<br>- Driver state validation (C3)<br>- Warmup logic | - Page allocation<br>- Browser connection<br>- Page health checks<br>- Page lifecycle |
-| **TargetDriver** | - Context attach/detach<br>- State transitions<br>- AbortSignal handling<br>- Idempotência (C2)<br>- Basic validation | - Page creation<br>- Page closing<br>- Browser management<br>- Task queueing |
-| **BaseDriver** | - Module orchestration<br>- Execution workflow<br>- Error classification<br>- Retry logic<br>- Telemetry emission | - Page allocation<br>- Browser pool logic<br>- Connection management |
-| **ChatGPTDriver/GeminiDriver** | - Target-specific logic<br>- Element selectors<br>- LLM interaction patterns<br>- Response parsing<br>- **Adaptive behavior** (NEW) | - Generic driver logic<br>- Pool management<br>- Browser health checks |
-| **DriverReadinessGuard** (MISSING) | - Page stability check (stabilizer)<br>- Pre-execution diagnostics (triage)<br>- Domain validation<br>- Session health check | - Page allocation<br>- Browser connection<br>- Pool management |
-| **PageSessionTracker** (MISSING) | - Turn count tracking<br>- Response time monitoring<br>- Degradation detection<br>- Session metrics | - Page allocation<br>- Browser health<br>- Pool management |
+| Component                          | ✅ DEVE gerenciar                                                                                                                            | ❌ NÃO DEVE gerenciar                                                                 |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **DriverFactory**                  | - Driver pool management<br>- Driver creation (WARM)<br>- Pool exhaustion (backpressure)<br>- Driver state validation (C3)<br>- Warmup logic | - Page allocation<br>- Browser connection<br>- Page health checks<br>- Page lifecycle |
+| **TargetDriver**                   | - Context attach/detach<br>- State transitions<br>- AbortSignal handling<br>- Idempotência (C2)<br>- Basic validation                        | - Page creation<br>- Page closing<br>- Browser management<br>- Task queueing          |
+| **BaseDriver**                     | - Module orchestration<br>- Execution workflow<br>- Error classification<br>- Retry logic<br>- Telemetry emission                            | - Page allocation<br>- Browser pool logic<br>- Connection management                  |
+| **ChatGPTDriver/GeminiDriver**     | - Target-specific logic<br>- Element selectors<br>- LLM interaction patterns<br>- Response parsing<br>- **Adaptive behavior** (NEW)          | - Generic driver logic<br>- Pool management<br>- Browser health checks                |
+| **DriverReadinessGuard** (MISSING) | - Page stability check (stabilizer)<br>- Pre-execution diagnostics (triage)<br>- Domain validation<br>- Session health check                 | - Page allocation<br>- Browser connection<br>- Pool management                        |
+| **PageSessionTracker** (MISSING)   | - Turn count tracking<br>- Response time monitoring<br>- Degradation detection<br>- Session metrics                                          | - Page allocation<br>- Browser health<br>- Pool management                            |
 
 **Action Items**:
+
 - 🆕 **Create DriverReadinessGuard** (P0)
 - 🆕 **Create PageSessionTracker** (P1)
 - 🔧 **Enhance driver.execute()** with readiness checks (P0)
@@ -390,13 +399,14 @@ detachContext(options = {}) {
 
 ### 3.3 SHARED TOOLS Responsibilities
 
-| Tool | ✅ DEVE fazer | ❌ NÃO DEVE fazer | Current Integration | Missing Integration |
-|------|---------------|------------------|---------------------|-------------------|
-| **Triage** | - Page diagnostics<br>- Stall detection (9 patterns)<br>- Event loop lag measurement<br>- Shadow DOM scan | - Driver state management<br>- Task execution<br>- Pool management | ✅ Usado em BaseDriver.diagnose()<br>❌ Não roda pré-execução | ❌ Pre-execution scan<br>❌ Post-error scan<br>❌ Periodic health scan |
-| **Analyzer (SADI)** | - Element detection (DNA-based)<br>- Button identification (SVG signatures)<br>- Input detection<br>- Confidence scoring | - Page navigation<br>- State management<br>- Retry logic | ✅ Usado em InputResolver<br>✅ Usado em SubmissionController | ✅ Bem integrado |
-| **Stabilizer** | - Page readiness check<br>- Network idle detection<br>- DOM entropy detection<br>- Spinner detection<br>- CPU lag measurement | - Driver execution<br>- Task management<br>- Error recovery | ✅ Usado em BaseDriver (via adaptive)<br>❌ Não roda em attachContext | ❌ Pre-attach validation<br>❌ Pre-execute validation<br>❌ Periodic stability checks |
+| Tool                | ✅ DEVE fazer                                                                                                                 | ❌ NÃO DEVE fazer                                                  | Current Integration                                                   | Missing Integration                                                                   |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Triage**          | - Page diagnostics<br>- Stall detection (9 patterns)<br>- Event loop lag measurement<br>- Shadow DOM scan                     | - Driver state management<br>- Task execution<br>- Pool management | ✅ Usado em BaseDriver.diagnose()<br>❌ Não roda pré-execução         | ❌ Pre-execution scan<br>❌ Post-error scan<br>❌ Periodic health scan                |
+| **Analyzer (SADI)** | - Element detection (DNA-based)<br>- Button identification (SVG signatures)<br>- Input detection<br>- Confidence scoring      | - Page navigation<br>- State management<br>- Retry logic           | ✅ Usado em InputResolver<br>✅ Usado em SubmissionController         | ✅ Bem integrado                                                                      |
+| **Stabilizer**      | - Page readiness check<br>- Network idle detection<br>- DOM entropy detection<br>- Spinner detection<br>- CPU lag measurement | - Driver execution<br>- Task management<br>- Error recovery        | ✅ Usado em BaseDriver (via adaptive)<br>❌ Não roda em attachContext | ❌ Pre-attach validation<br>❌ Pre-execute validation<br>❌ Periodic stability checks |
 
 **Action Items**:
+
 - 🔧 **Integrate Triage** in DriverReadinessGuard (P0)
 - 🔧 **Integrate Stabilizer** in attachContext validation (P0)
 - 🔧 **Add pre-execution triage scan** in driver.execute() (P1)
@@ -453,6 +463,7 @@ detachContext(options = {}) {
 ```
 
 **Issues Identified**:
+
 1. ❌ **No page.on('close') listener** (evento não é monitorado)
 2. ❌ **Wrong error classification** ('Page closed' é FATAL, não TRANSIENT)
 3. ❌ **Wasted retries** (3 retry attempts em página closed)
@@ -534,6 +545,7 @@ _classifyError(error) {
 ```
 
 **Issues Identified**:
+
 1. ❌ **No response time tracking** (histórico não é mantido)
 2. ❌ **No degradation detection** (tendência não é analisada)
 3. ❌ **No adaptive timeout** (timeout fixo 60s, não ajusta)
@@ -680,24 +692,28 @@ async execute(prompt) {
 ### 4.2 Tool Integration Status
 
 **Triage (v2.0)**:
+
 - ✅ **Implemented**: 9 pattern detection, Shadow DOM scan, event loop lag
 - ✅ **Used**: BaseDriver.diagnose() (pós-erro)
 - ❌ **Missing**: Pre-execution scan, periodic health checks
 - **Quality**: 95% accuracy (9 patterns), 5s timeout
 
 **Analyzer (SADI v4.0)**:
+
 - ✅ **Implemented**: DNA-based detection, 12 SVG signatures, confidence scoring
 - ✅ **Used**: InputResolver, SubmissionController
 - ✅ **Performance**: 90% faster with cache (30ms vs 300ms)
 - **Quality**: 95% accuracy (input), 99% accuracy (button)
 
 **Stabilizer (v2.0)**:
+
 - ✅ **Implemented**: 7 phases (network, spinner, entropy, etc), adaptive timeouts
 - ⚠️ **Used**: BaseDriver (via adaptive.js), but NOT in critical paths
 - ❌ **Missing**: attachContext validation, pre-execute validation
 - **Quality**: 98% stability detection accuracy
 
 **Integration Score**: **6.5/10**
+
 - Triage: **6/10** (used reactively, not proactively)
 - Analyzer: **9/10** (well integrated, high accuracy)
 - Stabilizer: **5/10** (underutilized, missing critical integrations)
@@ -709,6 +725,7 @@ async execute(prompt) {
 ### 5.1 Triage Integration Plan
 
 **Current State**:
+
 ```javascript
 // Location: src/driver/core/BaseDriver.js
 async diagnose(attempts = 0) {
@@ -847,6 +864,7 @@ async attachContext(page, signal, correlationId = null) {
 **Current Integration**: ✅ **GOOD**
 
 Analyzer já está bem integrado em:
+
 - `InputResolver` (input field detection)
 - `SubmissionController` (button detection)
 - `HandleManager` (element tracking)
@@ -860,6 +878,7 @@ Analyzer já está bem integrado em:
 ### 6.1 Critical Bugs (P0)
 
 **BUG-01: Page Allocated Without Validation**
+
 - **Location**: `src/infra/browser_pool/pool_manager.js` (allocate())
 - **Impact**: Driver recebe páginas crashed/disconnected
 - **Frequency**: ~2% allocations (estimativa)
@@ -868,6 +887,7 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 4h
 
 **BUG-02: Page Close Event Not Monitored**
+
 - **Location**: `src/infra/browser_pool/pool_manager.js` (allocate())
 - **Impact**: Pool corruption, wasted retries, incorrect stats
 - **Frequency**: Sempre que usuário fecha página
@@ -876,7 +896,8 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 6h
 
 **BUG-03: Wrong Error Classification (Page Closed)**
-- **Location**: `src/driver/nerv_adapter/driver_nerv_adapter.js` (_classifyError())
+
+- **Location**: `src/driver/nerv_adapter/driver_nerv_adapter.js` (\_classifyError())
 - **Impact**: 3 wasted retry attempts (9s delay)
 - **Frequency**: 100% de page close events
 - **Fix**: Add 'Page closed' to FATAL patterns
@@ -884,6 +905,7 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 1h
 
 **BUG-04: No Pre-Execution Readiness Check**
+
 - **Location**: `src/driver/core/BaseDriver.js` (execute())
 - **Impact**: Execuções falham por página não estável
 - **Frequency**: ~10% executions (estimativa)
@@ -892,6 +914,7 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 8h
 
 **BUG-05: Temporary TaskId Never Updated**
+
 - **Location**: `src/infra/browser_pool/pool_manager.js` (allocate())
 - **Impact**: pages Map tem IDs temporários (debugging difícil)
 - **Frequency**: 100% allocations
@@ -900,6 +923,7 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 2h
 
 **BUG-06: No Domain Validation in attachContext**
+
 - **Location**: `src/driver/core/TargetDriver.js` (attachContext())
 - **Impact**: Driver pode attached em página errada
 - **Frequency**: Raro (edge case)
@@ -912,6 +936,7 @@ Analyzer já está bem integrado em:
 ### 6.2 High Priority Bugs (P1)
 
 **BUG-07: No Session Health Tracking**
+
 - **Location**: `src/driver/core/BaseDriver.js` (execute())
 - **Impact**: Degradation não detectada, timeouts não adaptativos
 - **Frequency**: Long conversations (>10 turns)
@@ -920,6 +945,7 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 6h
 
 **BUG-08: No Adaptive Timeout Adjustment**
+
 - **Location**: `src/driver/core/BaseDriver.js` (execute())
 - **Impact**: Timeouts em conversas longas
 - **Frequency**: 5% de long conversations
@@ -928,6 +954,7 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 4h
 
 **BUG-09: Triage Not Used Proactively**
+
 - **Location**: `src/driver/core/BaseDriver.js` (execute())
 - **Impact**: Problemas detectados tarde (após erro)
 - **Frequency**: 100% executions (opportunity missed)
@@ -936,10 +963,11 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 3h (already included in BUG-04)
 
 **BUG-10: No Page Health Report Before Detach**
+
 - **Location**: `src/driver/core/TargetDriver.js` (detachContext())
 - **Impact**: Métricas de sessão perdidas
 - **Frequency**: 100% detach calls
-- **Fix**: Add _collectSessionMetrics() before detach
+- **Fix**: Add \_collectSessionMetrics() before detach
 - **Priority**: P1
 - **Estimated Effort**: 3h
 
@@ -948,6 +976,7 @@ Analyzer já está bem integrado em:
 ### 6.3 Medium Priority Issues (P2)
 
 **BUG-11: No Periodic Triage Health Checks**
+
 - **Location**: N/A (feature missing)
 - **Impact**: Degradation detectada apenas em execução
 - **Frequency**: Opportunity (background monitoring)
@@ -956,10 +985,11 @@ Analyzer já está bem integrado em:
 - **Estimated Effort**: 8h
 
 **BUG-12: No Browser Instance Health Recovery**
-- **Location**: `src/infra/browser_pool/pool_manager.js` (_healthCheck())
+
+- **Location**: `src/infra/browser_pool/pool_manager.js` (\_healthCheck())
 - **Impact**: Instâncias crashadas não são restartadas
 - **Frequency**: Raro (browser crash)
-- **Fix**: Add auto-restart logic in _healthCheck()
+- **Fix**: Add auto-restart logic in \_healthCheck()
 - **Priority**: P2
 - **Estimated Effort**: 5h
 
@@ -1051,8 +1081,7 @@ async allocate(target = 'default') {
 }
 ```
 
-**Effort**: 4h
-**Impact**: Elimina 100% de page corrupted allocations
+**Effort**: 4h **Impact**: Elimina 100% de page corrupted allocations
 
 ---
 
@@ -1154,8 +1183,7 @@ async allocate(target = 'default') {
 }
 ```
 
-**Effort**: 6h
-**Impact**: Elimina pool corruption, correct stats, prevent wasted retries
+**Effort**: 6h **Impact**: Elimina pool corruption, correct stats, prevent wasted retries
 
 ---
 
@@ -1193,8 +1221,7 @@ _classifyError(error) {
 }
 ```
 
-**Effort**: 1h
-**Impact**: Elimina 9s de wasted retry (3 attempts × 3s backoff)
+**Effort**: 1h **Impact**: Elimina 9s de wasted retry (3 attempts × 3s backoff)
 
 ---
 
@@ -1202,8 +1229,8 @@ _classifyError(error) {
 
 **(Already detailed in Section 5.1)**
 
-**Effort**: 8h
-**Impact**:
+**Effort**: 8h **Impact**:
+
 - Reduce execution failures by 10%
 - Early detection de problemas (CAPTCHA, login, errors)
 - Page stability garantida antes de execute
@@ -1259,8 +1286,7 @@ async _executeTask(payload, correlationId, retryCount = 0) {
 }
 ```
 
-**Effort**: 2h
-**Impact**: Debugging 100% easier (pages Map tem IDs corretos)
+**Effort**: 2h **Impact**: Debugging 100% easier (pages Map tem IDs corretos)
 
 ---
 
@@ -1310,8 +1336,7 @@ _getExpectedDomain(target) {
 }
 ```
 
-**Effort**: 2h
-**Impact**: Previne driver attach em página errada (edge case protection)
+**Effort**: 2h **Impact**: Previne driver attach em página errada (edge case protection)
 
 ---
 
@@ -1321,8 +1346,8 @@ _getExpectedDomain(target) {
 
 **(Already detailed in Section 3.5)**
 
-**Effort**: 6h
-**Impact**:
+**Effort**: 6h **Impact**:
+
 - Detect degradation in long conversations
 - Adaptive timeout adjustment
 - Proactive refresh recommendation
@@ -1369,8 +1394,7 @@ async execute(prompt, abortSignal = null) {
 }
 ```
 
-**Effort**: 4h
-**Impact**: Reduce timeouts em long conversations by 80%
+**Effort**: 4h **Impact**: Reduce timeouts em long conversations by 80%
 
 ---
 
@@ -1400,8 +1424,7 @@ detachContext(options = {}) {
 }
 ```
 
-**Effort**: 3h
-**Impact**: Full session telemetria (analytics, debugging)
+**Effort**: 3h **Impact**: Full session telemetria (analytics, debugging)
 
 ---
 
@@ -1412,58 +1435,57 @@ detachContext(options = {}) {
 ```javascript
 // NEW: src/driver/services/PeriodicHealthMonitor.js
 class PeriodicHealthMonitor {
-    constructor(driver, interval = 30000) {
-        this.driver = driver;
-        this.interval = interval;
-        this.timer = null;
-        this.triage = null;
+  constructor(driver, interval = 30000) {
+    this.driver = driver;
+    this.interval = interval;
+    this.timer = null;
+    this.triage = null;
+  }
+
+  start() {
+    if (this.timer) return;
+
+    this.timer = setInterval(() => this.runHealthCheck(), this.interval);
+    log('INFO', `[PeriodicHealthMonitor] Started (interval: ${this.interval}ms)`);
+  }
+
+  async runHealthCheck() {
+    try {
+      // Skip if driver not in IDLE state
+      if (this.driver.state !== 'IDLE') {
+        return;
+      }
+
+      // Run triage scan
+      if (!this.triage) {
+        this.triage = new Triage(this.driver.page, this.driver.config.langCode);
+      }
+
+      const result = await this.triage.diagnose();
+
+      if (result.detected.length > 0) {
+        log('WARN', `[PeriodicHealthMonitor] Issues detected: ${JSON.stringify(result.detected)}`);
+
+        this.driver.emit('PERIODIC_HEALTH_ISSUE', {
+          issues: result.detected,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (err) {
+      log('ERROR', `[PeriodicHealthMonitor] Health check failed: ${err.message}`);
     }
+  }
 
-    start() {
-        if (this.timer) return;
-
-        this.timer = setInterval(() => this.runHealthCheck(), this.interval);
-        log('INFO', `[PeriodicHealthMonitor] Started (interval: ${this.interval}ms)`);
+  stop() {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
     }
-
-    async runHealthCheck() {
-        try {
-            // Skip if driver not in IDLE state
-            if (this.driver.state !== 'IDLE') {
-                return;
-            }
-
-            // Run triage scan
-            if (!this.triage) {
-                this.triage = new Triage(this.driver.page, this.driver.config.langCode);
-            }
-
-            const result = await this.triage.diagnose();
-
-            if (result.detected.length > 0) {
-                log('WARN', `[PeriodicHealthMonitor] Issues detected: ${JSON.stringify(result.detected)}`);
-
-                this.driver.emit('PERIODIC_HEALTH_ISSUE', {
-                    issues: result.detected,
-                    timestamp: Date.now()
-                });
-            }
-        } catch (err) {
-            log('ERROR', `[PeriodicHealthMonitor] Health check failed: ${err.message}`);
-        }
-    }
-
-    stop() {
-        if (this.timer) {
-            clearInterval(this.timer);
-            this.timer = null;
-        }
-    }
+  }
 }
 ```
 
-**Effort**: 8h
-**Impact**: Proactive issue detection (before task execution)
+**Effort**: 8h **Impact**: Proactive issue detection (before task execution)
 
 ---
 
@@ -1523,8 +1545,7 @@ async _restartInstance(poolEntry) {
 }
 ```
 
-**Effort**: 5h
-**Impact**: Auto-recovery de browser crashes (graceful degradation)
+**Effort**: 5h **Impact**: Auto-recovery de browser crashes (graceful degradation)
 
 ---
 
@@ -1533,6 +1554,7 @@ async _restartInstance(poolEntry) {
 ### Phase 1: Critical Fixes (Week 1 - 23h)
 
 **Day 1-2**:
+
 - ✅ BUG-03: Fix error classification (1h)
 - ✅ P0-U3: Page closed → FATAL (1h)
 - ✅ P0-U1: Create PageValidator (4h)
@@ -1540,11 +1562,13 @@ async _restartInstance(poolEntry) {
 - ✅ P0-U6: Domain validation (2h)
 
 **Day 3-5**:
+
 - ✅ P0-U2: Create PageLifecycleMonitor (6h)
 - ✅ P0-U4: Create DriverReadinessGuard (8h)
 - ✅ Integration: BrowserPool + PageValidator + LifecycleMonitor (3h)
 
 **Deliverables**:
+
 - 6 P0 bugs fixed
 - 6 P0 upgrades implemented
 - 100% page validation coverage
@@ -1555,14 +1579,17 @@ async _restartInstance(poolEntry) {
 ### Phase 2: Performance & Monitoring (Week 2 - 16h)
 
 **Day 1-2**:
+
 - ✅ P1-U1: Create PageSessionTracker (6h)
 - ✅ P1-U2: Adaptive timeout adjustment (4h)
 
 **Day 3**:
+
 - ✅ P1-U3: Session metrics collection (3h)
 - ✅ Integration testing (3h)
 
 **Deliverables**:
+
 - Session health tracking
 - Adaptive timeouts
 - Degradation detection
@@ -1573,10 +1600,12 @@ async _restartInstance(poolEntry) {
 ### Phase 3: Proactive Monitoring (Week 3 - 13h)
 
 **Day 1-2**:
+
 - ✅ P2-U1: PeriodicHealthMonitor (8h)
 - ✅ P2-U2: Browser auto-restart (5h)
 
 **Deliverables**:
+
 - Proactive health checks
 - Auto-recovery de browser crashes
 - Complete monitoring stack
@@ -1586,14 +1615,17 @@ async _restartInstance(poolEntry) {
 ### Phase 4: Testing & Documentation (Week 4 - 10h)
 
 **Day 1**:
+
 - Integration tests (all components) (4h)
 - Performance validation (2h)
 
 **Day 2**:
+
 - Documentation updates (3h)
 - Migration guide (1h)
 
 **Deliverables**:
+
 - 100% test coverage
 - Complete documentation
 - Migration guide for users
@@ -1602,13 +1634,14 @@ async _restartInstance(poolEntry) {
 
 ## Total Effort Summary
 
-| Phase | P0 (Critical) | P1 (High) | P2 (Medium) | Total |
-|-------|---------------|-----------|-------------|-------|
-| Bugs Fixed | 6 bugs | 3 bugs | 2 bugs | **11 bugs** |
-| Upgrades | 6 upgrades | 3 upgrades | 2 upgrades | **11 upgrades** |
-| Effort | 23h | 16h | 13h | **52h** |
+| Phase      | P0 (Critical) | P1 (High)  | P2 (Medium) | Total           |
+| ---------- | ------------- | ---------- | ----------- | --------------- |
+| Bugs Fixed | 6 bugs        | 3 bugs     | 2 bugs      | **11 bugs**     |
+| Upgrades   | 6 upgrades    | 3 upgrades | 2 upgrades  | **11 upgrades** |
+| Effort     | 23h           | 16h        | 13h         | **52h**         |
 
 **Components Created**:
+
 1. PageValidator (P0)
 2. PageLifecycleMonitor (P0)
 3. DriverReadinessGuard (P0)
@@ -1616,6 +1649,7 @@ async _restartInstance(poolEntry) {
 5. PeriodicHealthMonitor (P2)
 
 **Expected Impact**:
+
 - ✅ Eliminate 100% page corruption
 - ✅ Eliminate 100% pool corruption
 - ✅ Reduce execution failures by 10%
@@ -1628,6 +1662,7 @@ async _restartInstance(poolEntry) {
 ## Appendix A: Responsibility Quick Reference
 
 ### DRIVER responsibilities (✅):
+
 - Context attach/detach
 - State management
 - Execution workflow
@@ -1637,6 +1672,7 @@ async _restartInstance(poolEntry) {
 - Pre-execution readiness (NEW)
 
 ### DRIVER NOT responsible (❌):
+
 - Page creation (Browser Layer)
 - Page closing (Browser Layer)
 - Browser connection (Browser Layer)
@@ -1644,6 +1680,7 @@ async _restartInstance(poolEntry) {
 - Page health checks (Browser Layer - NEW)
 
 ### BROWSER responsibilities (✅):
+
 - Browser connection
 - Page allocation
 - Page release
@@ -1652,6 +1689,7 @@ async _restartInstance(poolEntry) {
 - Page lifecycle monitoring (NEW)
 
 ### BROWSER NOT responsible (❌):
+
 - Task execution
 - Driver logic
 - LLM interaction
@@ -1662,17 +1700,15 @@ async _restartInstance(poolEntry) {
 
 ## Appendix B: Tool Integration Matrix
 
-| Tool | Current Usage | Missing Integration | Priority |
-|------|---------------|-------------------|----------|
-| **Triage** | Post-error diagnostics | Pre-execution scan, Periodic health | P0 |
-| **Analyzer** | Input/Button detection | ✅ Well integrated | - |
-| **Stabilizer** | Used via adaptive.js | attachContext validation, Pre-execute | P0 |
+| Tool           | Current Usage          | Missing Integration                   | Priority |
+| -------------- | ---------------------- | ------------------------------------- | -------- |
+| **Triage**     | Post-error diagnostics | Pre-execution scan, Periodic health   | P0       |
+| **Analyzer**   | Input/Button detection | ✅ Well integrated                    | -        |
+| **Stabilizer** | Used via adaptive.js   | attachContext validation, Pre-execute | P0       |
 
 ---
 
 **END OF DOCUMENT**
 
-**Version**: 1.0
-**Lines**: 1,950+
-**Status**: ✅ COMPREHENSIVE ANALYSIS COMPLETE
-**Next Action**: Review → Prioritize → Implement Phase 1 (P0 bugs + upgrades)
+**Version**: 1.0 **Lines**: 1,950+ **Status**: ✅ COMPREHENSIVE ANALYSIS COMPLETE **Next Action**:
+Review → Prioritize → Implement Phase 1 (P0 bugs + upgrades)

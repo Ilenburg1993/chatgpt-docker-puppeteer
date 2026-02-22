@@ -28,8 +28,8 @@ qualidade.
 
 ### 1.1 Segurança (SEC) - 4 Issues Resolvidas
 
-| ID     | Descrição                                                | Severidade  | Status      |
-| ------ | -------------------------------------------------------- | ----------- | ----------- |
+| ID     | Descrição                                                | Severidade  | Status       |
+| ------ | -------------------------------------------------------- | ----------- | ------------ |
 | SEC-01 | Remover JWT_SECRET hardcoded e criar módulo centralizado | **Crítico** | ✅ Resolvido |
 | SEC-02 | Implementar blocklist de tokens JWT para logout real     | **Alto**    | ✅ Resolvido |
 | SEC-03 | Configurar CSP adequada no Helmet                        | **Alto**    | ✅ Resolvido |
@@ -37,8 +37,8 @@ qualidade.
 
 ### 1.2 Bugs (BUG) - 4 Issues Resolvidas
 
-| ID     | Descrição                                                   | Severidade  | Status      |
-| ------ | ----------------------------------------------------------- | ----------- | ----------- |
+| ID     | Descrição                                                   | Severidade  | Status       |
+| ------ | ----------------------------------------------------------- | ----------- | ------------ |
 | BUG-01 | Corrigir `\n`escapado no arquivo de métricas do logger      | **Crítico** | ✅ Resolvido |
 | BUG-02 | Refatorar log() para ser síncrona e evitar Promise warnings | **Alto**    | ✅ Resolvido |
 | BUG-03 | Migrar console.log do ResilientLockManager para logger      | **Médio**   | ✅ Resolvido |
@@ -46,20 +46,20 @@ qualidade.
 
 ### 1.3 Funcionalidade (FUNC) - 1 Issue Resolvida
 
-| ID      | Descrição                                                            | Severidade | Status      |
-| ------- | -------------------------------------------------------------------- | ---------- | ----------- |
+| ID      | Descrição                                                            | Severidade | Status       |
+| ------- | -------------------------------------------------------------------- | ---------- | ------------ |
 | FUNC-01 | Substituir score aleatório no ValidationService por bypass explícito | **Alto**   | ✅ Resolvido |
 
 ### 1.4 Performance (PERF) - 1 Issue Resolvida
 
-| ID      | Descrição                                                                        | Severidade | Status      |
-| ------- | -------------------------------------------------------------------------------- | ---------- | ----------- |
+| ID      | Descrição                                                                        | Severidade | Status       |
+| ------- | -------------------------------------------------------------------------------- | ---------- | ------------ |
 | PERF-01 | Adicionar paginação em GET /api/tasks para evitar carregamento de 20k+ registros | **Médio**  | ✅ Resolvido |
 
 ### 1.5 Qualidade (QUAL) - 2 Issues Resolvidas
 
-| ID      | Descrição                                    | Severidade | Status      |
-| ------- | -------------------------------------------- | ---------- | ----------- |
+| ID      | Descrição                                    | Severidade | Status       |
+| ------- | -------------------------------------------- | ---------- | ------------ |
 | QUAL-01 | Remover JSDoc duplicado na função rotateFile | **Baixo**  | ✅ Resolvido |
 | QUAL-02 | Corrigir indentação nos exports do logger    | **Baixo**  | ✅ Resolvido |
 

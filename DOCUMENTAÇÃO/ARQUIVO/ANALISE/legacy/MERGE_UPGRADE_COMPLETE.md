@@ -6,7 +6,8 @@
 
 ## Resumo Executivo
 
-Merge bem-sucedido de todos os upgrades de dependências e otimizações de configuração na branch principal. Todas as mudanças foram consolidadas em um único merge commit com validação completa.
+Merge bem-sucedido de todos os upgrades de dependências e otimizações de configuração na branch
+principal. Todas as mudanças foram consolidadas em um único merge commit com validação completa.
 
 ## Dependências Atualizadas
 
@@ -23,49 +24,49 @@ Merge bem-sucedido de todos os upgrades de dependências e otimizações de conf
 ### Novos Arquivos
 
 1. **[.vscode/extensions.json](.vscode/extensions.json)**
-    - 20 extensões recomendadas para o projeto
-    - 3 extensões indesejadas bloqueadas (Prettier, Beautify)
-    - Facilita onboarding de novos desenvolvedores
+   - 20 extensões recomendadas para o projeto
+   - 3 extensões indesejadas bloqueadas (Prettier, Beautify)
+   - Facilita onboarding de novos desenvolvedores
 
 2. **[.vscode/launch.json](.vscode/launch.json)**
-    - 8 configurações de debug:
-        - Debug Agente (index.js)
-        - Debug Dashboard (src/server/main.js)
-        - Debug Current Test File
-        - Debug All Tests
-        - Debug P1 Tests
-        - Debug Driver Integration
-        - Attach to PM2 Process (port 9229)
-        - Attach to Docker Container (remote debug)
+   - 8 configurações de debug:
+     - Debug Agente (index.js)
+     - Debug Dashboard (src/server/main.js)
+     - Debug Current Test File
+     - Debug All Tests
+     - Debug P1 Tests
+     - Debug Driver Integration
+     - Attach to PM2 Process (port 9229)
+     - Attach to Docker Container (remote debug)
 
 3. **[.editorconfig](.editorconfig)**
-    - Consistência cross-editor (VS Code, IntelliJ, Vim, etc.)
-    - Regras específicas por tipo de arquivo
-    - Indentação: 4 espaços (default), 2 espaços (JSON/YAML), tabs (Makefile)
+   - Consistência cross-editor (VS Code, IntelliJ, Vim, etc.)
+   - Regras específicas por tipo de arquivo
+   - Indentação: 4 espaços (default), 2 espaços (JSON/YAML), tabs (Makefile)
 
 4. **[.npmrc](.npmrc)**
-    - `engine-strict=true` - força Node.js correto
-    - `save-exact=true` - sem ^ ou ~ em package.json
-    - `audit-level=moderate` - segurança
-    - `prefer-offline=true` - performance
-    - `cache-min=86400` - cache de 24h
+   - `engine-strict=true` - força Node.js correto
+   - `save-exact=true` - sem ^ ou ~ em package.json
+   - `audit-level=moderate` - segurança
+   - `prefer-offline=true` - performance
+   - `cache-min=86400` - cache de 24h
 
 ### Arquivos Atualizados
 
 5. **[.vscode/settings.json](.vscode/settings.json)**
-    - Adicionadas associações de arquivo (ecosystem.config.js, Dockerfile)
-    - Exclusões otimizadas (fila/, respostas/, profile/)
-    - Melhor integração com ferramentas do projeto
+   - Adicionadas associações de arquivo (ecosystem.config.js, Dockerfile)
+   - Exclusões otimizadas (fila/, respostas/, profile/)
+   - Melhor integração com ferramentas do projeto
 
 6. **[jsconfig.json](jsconfig.json)**
-    - Adicionados path mappings para imports limpos:
-        - `@core/*` → `src/core/*`
-        - `@driver/*` → `src/driver/*`
-        - `@infra/*` → `src/infra/*`
-        - `@kernel/*` → `src/kernel/*`
-        - `@logic/*` → `src/logic/*`
-        - `@server/*` → `src/server/*`
-    - Inclui `tests/**/*` no escopo do projeto
+   - Adicionados path mappings para imports limpos:
+     - `@core/*` → `src/core/*`
+     - `@driver/*` → `src/driver/*`
+     - `@infra/*` → `src/infra/*`
+     - `@kernel/*` → `src/kernel/*`
+     - `@logic/*` → `src/logic/*`
+     - `@server/*` → `src/server/*`
+   - Inclui `tests/**/*` no escopo do projeto
 
 ## Estratégia de Merge
 
@@ -164,22 +165,22 @@ main (731cea2) ✅ MERGED
 ### Curto Prazo
 
 1. **ESLint Improvements**: Corrigir 116 warnings restantes
-    - `no-promise-executor-return`: 69 ocorrências
-    - `no-empty`: 33 ocorrências
-    - `no-return-await`: 9 ocorrências
+   - `no-promise-executor-return`: 69 ocorrências
+   - `no-empty`: 33 ocorrências
+   - `no-return-await`: 9 ocorrências
 
 2. **Cleanup de Branches**: Remover branches de upgrade já mergeadas
 
-    ```bash
-    git branch -d upgrade/puppeteer-24
-    git branch -d upgrade/pm2-6
-    git branch -d upgrade/low-risk-deps
-    ```
+   ```bash
+   git branch -d upgrade/puppeteer-24
+   git branch -d upgrade/pm2-6
+   git branch -d upgrade/low-risk-deps
+   ```
 
 3. **Documentação**: Atualizar README.md com:
-    - Novas versões de dependências
-    - Requisitos de Node.js (20.x+)
-    - Path aliases disponíveis
+   - Novas versões de dependências
+   - Requisitos de Node.js (20.x+)
+   - Path aliases disponíveis
 
 ### Médio Prazo
 
@@ -213,7 +214,8 @@ npm ci
 
 ✅ **Merge concluído com sucesso**
 
-Todas as dependências foram atualizadas, configurações otimizadas, e o projeto está pronto para desenvolvimento moderno com melhor DX e segurança aprimorada.
+Todas as dependências foram atualizadas, configurações otimizadas, e o projeto está pronto para
+desenvolvimento moderno com melhor DX e segurança aprimorada.
 
 ---
 

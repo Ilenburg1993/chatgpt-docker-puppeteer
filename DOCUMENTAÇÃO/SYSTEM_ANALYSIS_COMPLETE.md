@@ -1,19 +1,17 @@
 # Análise Completa dos Módulos do Sistema
 
-**Data:** 2026-01-20
-**Versão:** 1.0.0 (pre-release)
-**Propósito:** Análise profunda de TODOS os módulos para documentação canônica
+**Data:** 2026-01-20 **Versão:** 1.0.0 (pre-release) **Propósito:** Análise profunda de TODOS os
+módulos para documentação canônica
 
 ---
 
 ## 📊 Resumo Executivo
 
-**Versão:** 1.0.0 (pre-release, UNSTABLE)
-**Testes:** 38/38 ✅
-**Data Análise:** 2026-01-20
+**Versão:** 1.0.0 (pre-release, UNSTABLE) **Testes:** 38/38 ✅ **Data Análise:** 2026-01-20
 **Subsistemas:** 7 principais + NERV como backbone
 
-Sistema composto por **7 subsistemas principais** com **NERV** como canal universal de comunicação (IPC 2.0):
+Sistema composto por **7 subsistemas principais** com **NERV** como canal universal de comunicação
+(IPC 2.0):
 
 ```
                     NERV (IPC 2.0)
@@ -37,10 +35,9 @@ Sistema composto por **7 subsistemas principais** com **NERV** como canal univer
 
 ## 📚 Uso deste Documento
 
-**Propósito:** Base técnica para criação de ARCHITECTURE.md
-**Público:** Desenvolvedores criando documentação canônica
-**Status:** Análise completa validada em 2026-01-20
-**Nota:** Este documento reflete o código **real implementado**, não planos ou especificações antigas
+**Propósito:** Base técnica para criação de ARCHITECTURE.md **Público:** Desenvolvedores criando
+documentação canônica **Status:** Análise completa validada em 2026-01-20 **Nota:** Este documento
+reflete o código **real implementado**, não planos ou especificações antigas
 
 ---
 
@@ -147,13 +144,13 @@ NERV
 ### Modos de Operação (ONDA 2.6)
 
 1. **Local Mode** (default)
-    - Transport: EventEmitter puro (in-process)
-    - Uso: Single process, sem comunicação remota
+   - Transport: EventEmitter puro (in-process)
+   - Uso: Single process, sem comunicação remota
 
 2. **Hybrid Mode**
-    - Transport: EventEmitter + Socket.io adapter
-    - Uso: Multi-process com dashboard remoto
-    - Socket.io adapter: `src/infra/transport/socket_io_adapter.js`
+   - Transport: EventEmitter + Socket.io adapter
+   - Uso: Multi-process com dashboard remoto
+   - Socket.io adapter: `src/infra/transport/socket_io_adapter.js`
 
 ### APIs Públicas
 
@@ -481,21 +478,21 @@ INFRA
 
 ```json
 {
-    "_meta": {
-        "version": 1,
-        "last_updated": "ISO-8601",
-        "updated_by": "system|SADI_V19|...",
-        "evolution_count": 0
-    },
-    "targets": {
-        "chatgpt.com": {
-            "selectors": { "input": "...", "send": "..." }
-        }
-    },
-    "global_selectors": {
-        "input_box": ["textarea", "div[contenteditable='true']"],
-        "send_button": ["button[type='submit']"]
+  "_meta": {
+    "version": 1,
+    "last_updated": "ISO-8601",
+    "updated_by": "system|SADI_V19|...",
+    "evolution_count": 0
+  },
+  "targets": {
+    "chatgpt.com": {
+      "selectors": { "input": "...", "send": "..." }
     }
+  },
+  "global_selectors": {
+    "input_box": ["textarea", "div[contenteditable='true']"],
+    "send_button": ["button[type='submit']"]
+  }
 }
 ```
 
@@ -642,7 +639,8 @@ Clientes conectados (Dashboard)
 - ✅ Schema validation (Zod)
 - ✅ Error boundary (error_handler)
 - ✅ Comunicação via NERV (ServerNERVAdapter)
-- ✅ State persistence (estado.json para IPC discovery) — DEPRECATED: usar NERV `SERVER_READY` (ver DOCUMENTAÇÃO/DEPRECATIONS/estado-json-deprecated.md)
+- ✅ State persistence (estado.json para IPC discovery) — DEPRECATED: usar NERV `SERVER_READY` (ver
+  DOCUMENTAÇÃO/DEPRECATIONS/estado-json-deprecated.md)
 - ⚠️ Dashboard UI (arquivos em `public/`)
 
 ---
@@ -906,34 +904,34 @@ DRIVER  ⃠  SERVER (direto)
 ### Documentar com Ênfase:
 
 1. **NERV como canal universal** (IPC 2.0)
-    - Protocol specification completa
-    - Modos de operação (local/hybrid)
-    - Buffering e backpressure
+   - Protocol specification completa
+   - Modos de operação (local/hybrid)
+   - Buffering e backpressure
 
 2. **Zero-coupling principle**
-    - Validado com testes
-    - Diagramas de fluxo
-    - Comunicação permitida vs proibida
+   - Validado com testes
+   - Diagramas de fluxo
+   - Comunicação permitida vs proibida
 
 3. **INFRA como camada de persistência**
-    - io.js como unified facade
-    - Lock manager (two-phase commit)
-    - Queue cache reativo
-    - DNA hot-reload
+   - io.js como unified facade
+   - Lock manager (two-phase commit)
+   - Queue cache reativo
+   - DNA hot-reload
 
 4. **Driver extensibility**
-    - Factory pattern
-    - NERV adapter
-    - Sovereign interruption (AbortController)
+   - Factory pattern
+   - NERV adapter
+   - Sovereign interruption (AbortController)
 
 5. **CONFIG hot-reload**
-    - Reactive configuration
-    - Zod validation
-    - EventEmitter pattern
+   - Reactive configuration
+   - Zod validation
+   - EventEmitter pattern
 
 6. **BrowserPool** (pendente validação)
-    - Estrutura básica documentada
-    - Comportamento detalhado TBD (Fase 1)
+   - Estrutura básica documentada
+   - Comportamento detalhado TBD (Fase 1)
 
 ---
 
@@ -956,5 +954,4 @@ DRIVER  ⃠  SERVER (direto)
 
 ---
 
-**Análise Completa.**
-**Pronto para criar ARCHITECTURE.md canônico.**
+**Análise Completa.** **Pronto para criar ARCHITECTURE.md canônico.**

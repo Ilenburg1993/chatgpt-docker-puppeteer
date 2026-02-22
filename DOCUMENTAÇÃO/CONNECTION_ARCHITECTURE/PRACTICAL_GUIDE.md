@@ -1,7 +1,6 @@
 # Guia Prático: Arquitetura de Conexão
 
-**Complemento ao**: [README.md](./README.md)
-**Foco**: Exemplos práticos, comandos, debugging
+**Complemento ao**: [README.md](./README.md) **Foco**: Exemplos práticos, comandos, debugging
 
 ---
 
@@ -10,12 +9,14 @@
 ### Windows Host
 
 - [ ] **Chrome instalado** (v144+)
+
   ```powershell
   # Verificar versão
   chrome.exe --version
   ```
 
 - [ ] **START-CHROME-SIMPLE.bat configurado**
+
   ```powershell
   # Verificar conteúdo
   type START-CHROME-SIMPLE.bat | findstr "remote-debugging-address"
@@ -32,6 +33,7 @@
 ### Docker Container
 
 - [ ] **config.json correto**
+
   ```bash
   cat config.json | grep -A4 "CHROME_PROXY"
   # Deve ter:
@@ -42,6 +44,7 @@
   ```
 
 - [ ] **Proxy rodando em localhost:9224**
+
   ```bash
   curl http://localhost:9224/health
   # Deve retornar: {"status":"ok",...}
@@ -66,6 +69,7 @@ START-CHROME-SIMPLE.bat
 ```
 
 **Saída Esperada**:
+
 ```
 Starting Chrome for Docker Desktop access (Port 9225)...
 
@@ -84,6 +88,7 @@ Press any key to close Chrome...
 ```
 
 **Validação Windows**:
+
 ```powershell
 # Testar localmente
 curl http://localhost:9225/json/version
@@ -100,6 +105,7 @@ bash wsl-chrome-integration.sh validate
 ```
 
 **Saída Esperada**:
+
 ```
 ═══════════════════════════════════════════════════════════
   VALIDATING CHROME ON WINDOWS HOST
@@ -121,6 +127,7 @@ bash wsl-chrome-integration.sh validate
 ### 3. Iniciar Proxy no Container
 
 **Opção A: Direto (desenvolvimento)**:
+
 ```bash
 # Container
 unset NODE_OPTIONS  # Evitar flags duplicadas
@@ -131,6 +138,7 @@ tail -f /tmp/proxy.log
 ```
 
 **Opção B: Via PM2 (produção)**:
+
 ```bash
 # Container
 npm run daemon:start
@@ -142,6 +150,7 @@ pm2 logs
 ```
 
 **Validação**:
+
 ```bash
 # Container
 curl http://localhost:9224/health
@@ -160,6 +169,7 @@ node test-proxy-simple.js
 ```
 
 **Saída Esperada**:
+
 ```
 🧪 CHROME PROXY INTEGRATION TEST (Docker Desktop Edition)
 
@@ -191,12 +201,14 @@ node test-proxy-simple.js
 ### Cenário 1: "Connection refused" ao acessar Chrome
 
 **Erro**:
+
 ```bash
 $ curl http://host.docker.internal:9225/json/version
 curl: (7) Failed to connect to host.docker.internal port 9225
 ```
 
 **Diagnóstico**:
+
 ```powershell
 # Windows: Verificar se Chrome está rodando
 tasklist | findstr chrome
@@ -208,12 +220,14 @@ netstat -an | findstr :9225
 **Possíveis Causas**:
 
 1. **Chrome não está rodando**
+
    ```powershell
    # Solução: Iniciar Chrome
    START-CHROME-SIMPLE.bat
    ```
 
 2. **Chrome fez bind em 127.0.0.1 (não 0.0.0.0)**
+
    ```powershell
    # Problema: netstat mostra
    TCP    127.0.0.1:9225    ...  ❌ ERRADO
@@ -227,6 +241,7 @@ netstat -an | findstr :9225
    ```
 
 3. **Porta 9225 em uso por outro processo**
+
    ```powershell
    # Identificar processo
    netstat -ano | findstr :9225
@@ -239,6 +254,7 @@ netstat -an | findstr :9225
 ### Cenário 2: "Host header" error
 
 **Erro**:
+
 ```
 Error: Unexpected server response: 400
 Host header is specified and is not an IP address or localhost.
@@ -247,27 +263,30 @@ Host header is specified and is not an IP address or localhost.
 **Causa**: Tentativa de conectar **direto** ao Chrome, sem proxy
 
 **Diagnóstico**:
+
 ```javascript
 // ❌ CÓDIGO ERRADO
 const browser = await puppeteer.connect({
-  browserWSEndpoint: 'ws://host.docker.internal:9225/devtools/...'
+  browserWSEndpoint: 'ws://host.docker.internal:9225/devtools/...',
   //                       ^^^^^^^^^^^^^^^^^^^^^^^^ Direto ao Chrome
 });
 ```
 
 **Solução**:
+
 ```javascript
 // ✅ CÓDIGO CORRETO
 const browser = await puppeteer.connect({
-  browserWSEndpoint: 'ws://localhost:9224/devtools/...'
+  browserWSEndpoint: 'ws://localhost:9224/devtools/...',
   //                       ^^^^^^^^^^^^^^^^ Via Proxy
 });
 ```
 
 **Ou verificar config.json**:
+
 ```json
 {
-  "CHROME_PROXY_ENABLED": true,  // ← Deve ser true
+  "CHROME_PROXY_ENABLED": true, // ← Deve ser true
   "CHROME_PROXY_HOST": "host.docker.internal",
   "CHROME_PROXY_PORT": 9224
 }
@@ -276,12 +295,14 @@ const browser = await puppeteer.connect({
 ### Cenário 3: Proxy não inicia
 
 **Erro**:
+
 ```bash
 $ curl http://localhost:9224/health
 curl: (7) Failed to connect to localhost port 9224
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Container: Verificar se proxy está rodando
 ps aux | grep chrome-proxy-service
@@ -292,6 +313,7 @@ pm2 list | grep proxy
 **Possíveis Causas**:
 
 1. **NODE_OPTIONS com flags duplicadas**
+
    ```bash
    # Erro típico
    Error: illegal value for flag --max-old-space-size=6144--max-old-space-size=6144
@@ -302,6 +324,7 @@ pm2 list | grep proxy
    ```
 
 2. **Porta 9224 em uso**
+
    ```bash
    # Verificar
    lsof -i :9224
@@ -313,6 +336,7 @@ pm2 list | grep proxy
    ```
 
 3. **Módulo axios faltando** (se teste direto)
+
    ```bash
    # Erro
    Error: Cannot find module 'axios'
@@ -324,6 +348,7 @@ pm2 list | grep proxy
 ### Cenário 4: WebSocket fecha inesperadamente
 
 **Sintoma**:
+
 ```
 WebSocket connection closed unexpectedly
 Target closed.
@@ -332,6 +357,7 @@ Target closed.
 **Causas Comuns**:
 
 1. **Chrome crashou**
+
    ```powershell
    # Windows: Verificar se Chrome ainda está rodando
    tasklist | findstr chrome
@@ -341,6 +367,7 @@ Target closed.
    ```
 
 2. **Timeout de idle**
+
    ```javascript
    // ChromeProxyService tem timeout de 60s por padrão
    // Ver em src/infra/proxy/chromeProxyService.js:
@@ -351,6 +378,7 @@ Target closed.
    ```
 
 3. **Rede Docker instável**
+
    ```bash
    # Container: Testar latência
    ping -c 5 host.docker.internal
@@ -361,6 +389,7 @@ Target closed.
 ### Cenário 5: URLs não reescritas
 
 **Sintoma**:
+
 ```javascript
 // Puppeteer recebe
 {
@@ -375,6 +404,7 @@ Target closed.
 **Causa**: Proxy não está fazendo reescrita correta
 
 **Diagnóstico**:
+
 ```bash
 # Container: Testar endpoint /json/version
 curl -s http://localhost:9224/json/version | jq .webSocketDebuggerUrl
@@ -384,6 +414,7 @@ curl -s http://localhost:9224/json/version | jq .webSocketDebuggerUrl
 ```
 
 **Solução**:
+
 ```bash
 # 1. Verificar IP público do proxy
 docker exec -it <container_id> hostname -I
@@ -402,6 +433,7 @@ PUBLIC_IP=172.17.0.2 node scripts/chrome-proxy-service.js &
 **Localização**: `/tmp/proxy.log` (se iniciado manualmente) ou PM2 logs
 
 **Ver logs em tempo real**:
+
 ```bash
 # Manual
 tail -f /tmp/proxy.log
@@ -411,6 +443,7 @@ pm2 logs chrome-proxy-service --lines 100
 ```
 
 **Formato de log** (JSON estruturado):
+
 ```json
 {
   "level": 30,
@@ -422,6 +455,7 @@ pm2 logs chrome-proxy-service --lines 100
 ```
 
 **Filtrar erros**:
+
 ```bash
 # PM2
 pm2 logs chrome-proxy-service --err
@@ -433,6 +467,7 @@ tail -f /tmp/proxy.log | grep '"level":50'  # Level 50 = ERROR
 ### Health Checks Automatizados
 
 **Script de monitoramento**:
+
 ```bash
 #!/bin/bash
 # monitor-chrome-stack.sh
@@ -456,6 +491,7 @@ done
 ```
 
 **Executar**:
+
 ```bash
 chmod +x monitor-chrome-stack.sh
 ./monitor-chrome-stack.sh
@@ -466,6 +502,7 @@ chmod +x monitor-chrome-stack.sh
 **Endpoint**: `GET /health`
 
 **Resposta**:
+
 ```json
 {
   "status": "ok",
@@ -484,6 +521,7 @@ chmod +x monitor-chrome-stack.sh
 ```
 
 **Alertas via curl**:
+
 ```bash
 # Script de alerta
 STATUS=$(curl -sf http://localhost:9224/health | jq -r .status)
@@ -514,11 +552,13 @@ wscat -c ws://localhost:9224/devtools/browser/<ID>
 ```
 
 **Enviar comando CDP**:
+
 ```json
-{"id":1,"method":"Browser.getVersion"}
+{ "id": 1, "method": "Browser.getVersion" }
 ```
 
 **Resposta esperada**:
+
 ```json
 {
   "id": 1,
@@ -550,6 +590,7 @@ DEBUG=puppeteer:* node test-proxy-simple.js
 ```
 
 **Saída** (verbose):
+
 ```
 puppeteer:protocol:SEND ► {"method":"Target.getBrowserContexts","id":1}
 puppeteer:protocol:RECV ◀ {"id":1,"result":{"browserContextIds":[]}}
@@ -560,6 +601,7 @@ puppeteer:protocol:SEND ► {"method":"Page.navigate","params":{...}}
 ### Testar Componentes Isoladamente
 
 **1. Apenas Chrome (Windows)**:
+
 ```powershell
 # Windows PowerShell
 $response = Invoke-RestMethod -Uri http://localhost:9225/json/version
@@ -567,6 +609,7 @@ $response | ConvertTo-Json
 ```
 
 **2. Apenas Proxy (Container)**:
+
 ```bash
 # Container
 curl http://localhost:9224/health
@@ -574,6 +617,7 @@ curl http://localhost:9224/json/version
 ```
 
 **3. Apenas Puppeteer (Container)**:
+
 ```javascript
 // test-puppeteer-direct.js
 const puppeteer = require('puppeteer');
@@ -582,7 +626,7 @@ const puppeteer = require('puppeteer');
   // Conectar via proxy
   const version = await fetch('http://localhost:9224/json/version').then(r => r.json());
   const browser = await puppeteer.connect({
-    browserWSEndpoint: version.webSocketDebuggerUrl
+    browserWSEndpoint: version.webSocketDebuggerUrl,
   });
 
   console.log('✅ Conectado');
@@ -597,6 +641,7 @@ const puppeteer = require('puppeteer');
 ### Comandos Úteis
 
 **Windows**:
+
 ```powershell
 # Listar processos Chrome
 tasklist | findstr chrome
@@ -614,6 +659,7 @@ Invoke-RestMethod -Uri http://localhost:9225/json/version
 ```
 
 **Container**:
+
 ```bash
 # Validação completa
 bash wsl-chrome-integration.sh all
@@ -634,6 +680,7 @@ pm2 status
 ### Variáveis de Ambiente
 
 **Proxy** (`scripts/chrome-proxy-service.js`):
+
 ```bash
 CHROME_HOST=host.docker.internal  # Host do Chrome
 CHROME_PORT=9225                  # Porta do Chrome
@@ -644,6 +691,7 @@ WS_IDLE_TIMEOUT_MS=60000          # Timeout WebSocket idle (ms)
 ```
 
 **Puppeteer** (debug):
+
 ```bash
 DEBUG=puppeteer:*                 # Logs detalhados
 PUPPETEER_PRODUCT=chrome          # chrome | firefox
@@ -653,6 +701,7 @@ PUPPETEER_SKIP_DOWNLOAD=true      # Não baixar Chromium bundled
 ### Arquivos de Configuração
 
 **Localizações**:
+
 ```
 /workspaces/chatgpt-docker-puppeteer/
 ├── config.json                              # Config principal
@@ -666,6 +715,7 @@ PUPPETEER_SKIP_DOWNLOAD=true      # Não baixar Chromium bundled
 ```
 
 **Editar configuração**:
+
 ```bash
 # Container
 nano config.json
@@ -681,22 +731,24 @@ pm2 restart chrome-proxy-service
 
 ## ✅ Conclusão
 
-Este guia cobre os **cenários práticos mais comuns** de uso, debug e troubleshooting da arquitetura de conexão.
+Este guia cobre os **cenários práticos mais comuns** de uso, debug e troubleshooting da arquitetura
+de conexão.
 
 **Para aprofundamento teórico**: Veja [README.md](./README.md)
 
 **Próximos Passos**:
+
 1. Executar checklist de setup completo
 2. Validar com teste de integração
 3. Configurar monitoramento contínuo
 4. Documentar casos específicos do seu projeto
 
 **Suporte**:
+
 - Logs detalhados: `pm2 logs --lines 200`
 - Debug interativo: `DEBUG=puppeteer:* node <script>`
 - Community: Veja issues do Puppeteer (https://github.com/puppeteer/puppeteer/issues)
 
 ---
 
-**Última Atualização**: 01 de Fevereiro de 2026
-**Versão**: 3.0 Docker Desktop Edition
+**Última Atualização**: 01 de Fevereiro de 2026 **Versão**: 3.0 Docker Desktop Edition

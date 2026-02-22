@@ -1,10 +1,8 @@
 # Auditoria Cross-Cutting: Docker & Containers
 
-**Data**: 21/01/2026 01:00 UTC-3
-**Auditor**: AI Coding Agent (Claude Sonnet 4.5)
-**Versão do Projeto**: chatgpt-docker-puppeteer (Janeiro 2026)
-**Audit Level**: 700 — Container Orchestration & Runtime Environment
-**Status**: 🔄 EM PROGRESSO
+**Data**: 21/01/2026 01:00 UTC-3 **Auditor**: AI Coding Agent (Claude Sonnet 4.5) **Versão do
+Projeto**: chatgpt-docker-puppeteer (Janeiro 2026) **Audit Level**: 700 — Container Orchestration &
+Runtime Environment **Status**: 🔄 EM PROGRESSO
 
 ---
 
@@ -33,7 +31,8 @@
 
 ### 1.1 Escopo da Auditoria
 
-Esta auditoria analisa a **estratégia de containerização** do projeto chatgpt-docker-puppeteer, cobrindo:
+Esta auditoria analisa a **estratégia de containerização** do projeto chatgpt-docker-puppeteer,
+cobrindo:
 
 - **Dockerfile** (produção) - Alpine-based, multi-stage
 - **Dockerfile.dev** (desenvolvimento) - Debian-based, hot-reload
@@ -56,8 +55,8 @@ Esta auditoria analisa a **estratégia de containerização** do projeto chatgpt
 
 ### 1.3 Componentes Auditados
 
-| Arquivo                           | LOC | Propósito                | Status       |
-| --------------------------------- | --- | ------------------------ | ------------ |
+| Arquivo                           | LOC | Propósito                | Status        |
+| --------------------------------- | --- | ------------------------ | ------------- |
 | `Dockerfile`                      | 85  | Imagem produção (Alpine) | ✅ ROBUSTO    |
 | `Dockerfile.dev`                  | 45  | Imagem dev (hot-reload)  | ✅ SIMPLES    |
 | `docker-compose.yml`              | 106 | Orquestração principal   | ✅ COMPLETO   |
@@ -121,21 +120,25 @@ Esta auditoria analisa a **estratégia de containerização** do projeto chatgpt
 ### 2.2 Design Decisions
 
 **✅ Chrome Externo** (não embutido no container):
+
 - **Motivo**: Chromium no Alpine é instável; Debian aumenta imagem em 500MB+
 - **Solução**: Chrome no host + remote debugging protocol
 - **Benefício**: Imagem 30-40% menor (Alpine), mais estável
 
 **✅ Multi-Stage Build** (Dockerfile produção):
+
 - **Stage 1**: `node:20-alpine` → instala deps (cache layer)
 - **Stage 2**: `node:20-alpine` → copia deps + app (imagem final)
 - **Benefício**: Imagem final sem build tools, apenas runtime
 
 **✅ PM2 Runtime** (não daemon):
+
 - **Comando**: `pm2-runtime start ecosystem.config.js`
 - **Motivo**: Container deve rodar 1 processo principal (PID 1)
 - **Benefício**: Graceful shutdown com SIGTERM do Docker
 
 **✅ Named Volumes** (produção):
+
 - **Bind mounts**: Dev (hot-reload, `./src:/app/src`)
 - **Named volumes**: Prod (isolamento, `fila-prod:/app/fila`)
 - **Benefício**: Prod tem dados persistentes independentes do host
@@ -144,13 +147,13 @@ Esta auditoria analisa a **estratégia de containerização** do projeto chatgpt
 
 ## 3. Análise do Dockerfile
 
-**Localização**: `/Dockerfile` (85 LOC)
-**Audit Level**: 700 — Production Container Image
+**Localização**: `/Dockerfile` (85 LOC) **Audit Level**: 700 — Production Container Image
 **Status**: ✅ ROBUSTO
 
 ### 3.1 Estrutura
 
 **Stage 1: Dependencies** (linhas 10-19)
+
 ```dockerfile
 FROM node:20-alpine AS deps
 
@@ -163,6 +166,7 @@ RUN npm ci --only=production --ignore-scripts && \
 ```
 
 **Análise**:
+
 - ✅ `node:20-alpine`: Base 30-40% menor que Debian
 - ✅ `npm ci`: Lock file determinístico (vs `npm install`)
 - ✅ `--only=production`: Não instala devDependencies
@@ -171,6 +175,7 @@ RUN npm ci --only=production --ignore-scripts && \
 - ✅ Cache layer: Só recria se package.json/lock mudar
 
 **Stage 2: Production Image** (linhas 24-85)
+
 ```dockerfile
 FROM node:20-alpine
 
@@ -217,36 +222,43 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 **Análise Detalhada**:
 
 **✅ Runtime Dependencies** (linha 26):
+
 - `ca-certificates`: HTTPS
 - `curl`: Health checks (opcional, script usa Node.js)
 - `dumb-init`: Signal handling + zombie reaping
 
 **✅ Environment Variables** (linhas 33-36):
+
 - `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true`: Não baixa Chrome
 - `NODE_ENV=production`: Otimizações Node.js
 - `TZ=UTC`: Timezone consistente (⚠️ ver P4.1)
 - `CHROME_REMOTE_DEBUGGING_PORT=9224`: Porta esperada
 
 **✅ Copy Order** (linhas 38-48):
+
 - Deps primeiro (raramente muda)
 - Configs depois
 - Source code por último (muda frequentemente)
 - **Benefício**: Melhor aproveitamento de cache Docker
 
 **✅ Permissions** (linhas 50-52):
+
 - `mkdir -p`: Cria dirs necessárias
 - `chown node:node`: Non-root ownership
 - `chmod +x`: Healthcheck executável
 
 **✅ Security** (linha 54):
+
 - `USER node`: Non-root (security best practice)
 - Reduz superfície de ataque
 
 **✅ Volumes** (linha 56):
+
 - Declara mount points
 - Garante persistência de dados
 
 **✅ Health Check** (linhas 60-61):
+
 - `interval=30s`: Checa a cada 30s
 - `timeout=10s`: Falha se > 10s
 - `start-period=40s`: Grace period no boot
@@ -254,6 +266,7 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 - Script dedicado (mais rápido que inline)
 
 **✅ Entrypoint** (linhas 63-64):
+
 - `dumb-init`: Gerencia signals (SIGTERM)
 - `pm2-runtime`: Executa ecosystem.config.js
 - **PID 1 correto**: dumb-init como init system
@@ -262,20 +275,21 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 
 | Otimização          | Impacto                  | Status |
 | ------------------- | ------------------------ | ------ |
-| Alpine base         | -400MB vs Debian         | ✅      |
-| Multi-stage build   | -200MB (sem build tools) | ✅      |
-| `--only=production` | -150MB (sem devDeps)     | ✅      |
-| Copy order          | Melhor cache             | ✅      |
-| Single RUN          | -3 layers                | ✅      |
-| `npm cache clean`   | -50MB                    | ✅      |
-| Non-root user       | Segurança                | ✅      |
-| dumb-init           | Signal handling          | ✅      |
+| Alpine base         | -400MB vs Debian         | ✅     |
+| Multi-stage build   | -200MB (sem build tools) | ✅     |
+| `--only=production` | -150MB (sem devDeps)     | ✅     |
+| Copy order          | Melhor cache             | ✅     |
+| Single RUN          | -3 layers                | ✅     |
+| `npm cache clean`   | -50MB                    | ✅     |
+| Non-root user       | Segurança                | ✅     |
+| dumb-init           | Signal handling          | ✅     |
 
 **Tamanho Estimado**: ~200-250MB (vs 700MB+ com Debian + Chrome)
 
 ### 3.3 Avaliação: 9.5/10
 
 **Pontos Fortes**:
+
 - Multi-stage build perfeito
 - Alpine otimizado
 - Security hardening (non-root)
@@ -284,6 +298,7 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 - dumb-init para signals
 
 **Melhorias** (seção 14):
+
 - P4.1: TZ=UTC hardcoded (deveria ser configurável)
 - P4.2: curl instalado mas healthcheck usa Node.js
 
@@ -293,11 +308,11 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 
 ### 4.1 docker-compose.yml (Principal)
 
-**Localização**: `/docker-compose.yml` (106 LOC)
-**Audit Level**: 700 — Container Orchestration
+**Localização**: `/docker-compose.yml` (106 LOC) **Audit Level**: 700 — Container Orchestration
 **Status**: ✅ COMPLETO
 
 **Service: agent** (produção)
+
 ```yaml
 agent:
   build:
@@ -318,21 +333,21 @@ agent:
     - ./profile:/app/profile
 
   ports:
-    - "3008:3008"
+    - '3008:3008'
 
   healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
+    test: ['CMD', 'curl', '-f', 'http://localhost:3008/api/health']
     interval: 30s
     timeout: 10s
     retries: 3
     start_period: 40s
 
   logging:
-    driver: "json-file"
+    driver: 'json-file'
     options:
-      max-size: "10m"
-      max-file: "3"
-      compress: "true"
+      max-size: '10m'
+      max-file: '3'
+      compress: 'true'
 
   deploy:
     resources:
@@ -350,20 +365,24 @@ agent:
 **Análise**:
 
 **✅ Build Configuration**:
+
 - `context: .`: Root do projeto
 - `dockerfile: Dockerfile`: Produção Alpine
 - ✅ Correto
 
 **✅ Restart Policy**:
+
 - `unless-stopped`: Reinicia automático, exceto se parado manualmente
 - ✅ Ideal para produção
 
 **✅ Environment**:
+
 - `NODE_ENV=production`: Correto
 - `TZ=America/Sao_Paulo`: ⚠️ Difere de Dockerfile (UTC), ver P4.3
 - `CHROME_WS_ENDPOINT`: ✅ host.docker.internal (Mac/Win)
 
 **✅ Volumes** (bind mounts):
+
 - `./fila:/app/fila`: Task queue no host
 - `./respostas:/app/respostas`: Responses no host
 - `./logs:/app/logs`: Logs no host
@@ -371,15 +390,18 @@ agent:
 - ✅ Adequado para produção simples, ⚠️ named volumes preferível (ver prod.yml)
 
 **✅ Ports**:
+
 - `3008:3008`: Dashboard HTTP
 - ⚠️ Não expõe 9229 (debugger) - correto para prod
 
 **⚠️ Health Check**:
+
 - Usa `curl` mas Dockerfile tem script dedicado
 - **Inconsistência**: Dockerfile usa `node scripts/healthcheck.js`
 - Ver P4.4
 
 **✅ Logging**:
+
 - `json-file`: Driver padrão Docker
 - `max-size: 10m`: Rotação a cada 10MB
 - `max-file: 3`: Mantém 3 arquivos (30MB total)
@@ -387,16 +409,19 @@ agent:
 - ✅ Excelente configuração
 
 **✅ Resource Limits**:
+
 - `cpus: 2`: Máximo 2 cores
 - `memory: 2G`: Máximo 2GB RAM
 - `reservations`: Garantias mínimas
 - ✅ Proteção contra resource exhaustion
 
 **✅ Networks**:
+
 - `agent-network`: Bridge network dedicada
 - ✅ Isolamento de rede
 
 **Service: agent-dev** (desenvolvimento)
+
 ```yaml
 agent-dev:
   build:
@@ -420,31 +445,34 @@ agent-dev:
     - ./profile:/app/profile
 
   ports:
-    - "3008:3008"
-    - "9229:9229"  # Node.js debugger
+    - '3008:3008'
+    - '9229:9229' # Node.js debugger
 ```
 
 **Análise**:
 
 **✅ Profiles**:
+
 - `profiles: [dev]`: Só inicia com `--profile dev`
 - ✅ Evita rodar 2 services simultaneamente
 
 **✅ Hot Reload Volumes**:
+
 - `.:/app`: Monta root inteiro (source code)
 - `/app/node_modules`: Volume anônimo (evita conflito host/container)
 - ✅ Padrão correto para hot reload
 
 **✅ Debug Port**:
+
 - `9229`: Node.js inspector
 - ✅ Permite debugging com Chrome DevTools
 
 ### 4.2 docker-compose.dev.yml
 
-**Localização**: `/docker-compose.dev.yml` (79 LOC)
-**Status**: ✅ OTIMIZADO
+**Localização**: `/docker-compose.dev.yml` (79 LOC) **Status**: ✅ OTIMIZADO
 
 **Diferenças principais**:
+
 ```yaml
 volumes:
   # Source code read-only (security)
@@ -474,24 +502,26 @@ volumes:
 **Análise**:
 
 **✅ Read-Only Mounts**:
+
 - `:ro` em src/scripts/public
 - **Benefício**: Container não pode modificar source (segurança)
 - ✅ Best practice
 
 **✅ Named Volume node_modules**:
+
 - Evita conflitos host/container (especialmente Windows)
 - Melhor performance I/O
 - ✅ Excelente otimização
 
 **✅ Config Hot-Reload**:
+
 - config.json e dynamic_rules.json montados
 - Permite ajustes sem rebuild
 - ✅ Acelera desenvolvimento
 
 ### 4.3 docker-compose.prod.yml
 
-**Localização**: `/docker-compose.prod.yml` (179 LOC)
-**Status**: ✅ ENTERPRISE
+**Localização**: `/docker-compose.prod.yml` (179 LOC) **Status**: ✅ ENTERPRISE
 
 **Melhorias sobre compose.yml base**:
 
@@ -524,24 +554,29 @@ security_opt:
 **Análise**:
 
 **✅ Image Tag**:
+
 - `${VERSION:-latest}`: Versionamento de imagens
 - ✅ Permite rollback
 
 **✅ env_file**:
+
 - Carrega variáveis de `.env`
 - ✅ Secrets fora do compose file
 
 **✅ Named Volumes**:
+
 - `fila-prod`, `respostas-prod`, etc.
 - **Benefício**: Dados isolados do host, backup via Docker
 - ✅ Produção enterprise-grade
 
 **✅ Security**:
+
 - `no-new-privileges`: Impede privilege escalation
 - `read_only` (comentado): Root filesystem imutável
 - ✅ Hardening de segurança
 
 **Service: prometheus** (opcional)
+
 ```yaml
 prometheus:
   image: prom/prometheus:latest
@@ -550,26 +585,28 @@ prometheus:
   volumes:
     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
   ports:
-    - "9090:9090"
+    - '9090:9090'
 ```
 
 **Análise**:
+
 - ✅ Monitoring stack (Prometheus)
 - ✅ Profile isolado (só ativa com `--profile monitoring`)
 - ⚠️ Arquivo `monitoring/prometheus.yml` não existe no repo (ver P4.5)
 
 ### 4.4 docker-compose.linux.yml
 
-**Localização**: `/docker-compose.linux.yml` (130 LOC)
-**Status**: ✅ COMPATÍVEL
+**Localização**: `/docker-compose.linux.yml` (130 LOC) **Status**: ✅ COMPATÍVEL
 
 **Diferença crucial**:
+
 ```yaml
 extra_hosts:
-  - "host.docker.internal:host-gateway"
+  - 'host.docker.internal:host-gateway'
 ```
 
 **Análise**:
+
 - ✅ Linux não tem `host.docker.internal` nativo
 - ✅ `host-gateway`: Mapeia para IP do host
 - ✅ Resolve problema de conectividade Chrome
@@ -578,6 +615,7 @@ extra_hosts:
 ### 4.5 Avaliação docker-compose: 9/10
 
 **Pontos Fortes**:
+
 - 4 variantes cobrindo todos os cenários
 - Logging bem configurado
 - Resource limits
@@ -586,6 +624,7 @@ extra_hosts:
 - Profiles para isolamento
 
 **Melhorias** (seção 14):
+
 - P4.3: TZ inconsistente (Dockerfile UTC vs compose America/Sao_Paulo)
 - P4.4: Health check inconsistente (curl vs script Node.js)
 - P4.5: prometheus.yml referenciado mas não existe
@@ -594,9 +633,8 @@ extra_hosts:
 
 ## 5. DevContainer (.devcontainer)
 
-**Localização**: `/.devcontainer/devcontainer.json` (189 LOC)
-**Audit Level**: 600 — Development Environment
-**Status**: ✅ COMPLETO
+**Localização**: `/.devcontainer/devcontainer.json` (189 LOC) **Audit Level**: 600 — Development
+Environment **Status**: ✅ COMPLETO
 
 ### 5.1 Base Image
 
@@ -605,6 +643,7 @@ extra_hosts:
 ```
 
 **Análise**:
+
 - ✅ Microsoft official devcontainer
 - ✅ Node 20 (mesma versão do Dockerfile)
 - ✅ Debian Bullseye (estável)
@@ -623,6 +662,7 @@ extra_hosts:
 ```
 
 **Análise**:
+
 - ✅ Docker-in-Docker (testar containers dentro do devcontainer)
 - ✅ GitHub CLI (workflows)
 - ✅ Git LFS
@@ -636,6 +676,7 @@ extra_hosts:
 ```
 
 **Análise**:
+
 - ✅ 2998: Dashboard API
 - ✅ 3008: Socket.io Server
 - ✅ 9229/9230: Node.js debuggers
@@ -650,6 +691,7 @@ extra_hosts:
 ```
 
 **Análise**:
+
 - ✅ `postCreateCommand`: Setup inicial (fix permissions + deps + setup script)
 - ✅ `postStartCommand`: Health check automático
 - ✅ `postAttachCommand`: Mensagem de boas-vindas
@@ -673,6 +715,7 @@ extra_hosts:
 ```
 
 **Análise**:
+
 - ✅ ESLint + Prettier (code quality)
 - ✅ Docker extension
 - ✅ GitHub Copilot
@@ -692,6 +735,7 @@ extra_hosts:
 ```
 
 **Análise**:
+
 - ✅ `.git` como bind mount (performance)
 - ✅ `node_modules` como volume (evita conflito)
 - ✅ `profile` e `logs` como volumes (não poluem workspace)
@@ -707,6 +751,7 @@ extra_hosts:
 ```
 
 **Análise**:
+
 - ✅ Non-root user (node)
 - ✅ UID sincronizado com host (evita permission issues)
 - ✅ Não privilegiado
@@ -715,6 +760,7 @@ extra_hosts:
 ### 5.8 Avaliação .devcontainer: 9/10
 
 **Pontos Fortes**:
+
 - Completo e bem configurado
 - Security hardening
 - Extensions essenciais
@@ -722,15 +768,15 @@ extra_hosts:
 - Mount strategy otimizada
 
 **Melhorias**:
+
 - P4.6: Script setup-devcontainer.sh referenciado mas não existe
 
 ---
 
 ## 6. Build Context (.dockerignore)
 
-**Localização**: `/.dockerignore` (95 LOC)
-**Audit Level**: 500 — Build Optimization
-**Status**: ✅ EFICIENTE
+**Localização**: `/.dockerignore` (95 LOC) **Audit Level**: 500 — Build Optimization **Status**: ✅
+EFICIENTE
 
 ### 6.1 Estrutura
 
@@ -786,19 +832,23 @@ docker-compose*.yml
 ### 6.2 Análise
 
 **✅ Exclusões Críticas**:
+
 - `node_modules/`: Deps instaladas no container
 - `logs/`, `fila/`, `respostas/`: Dados runtime (volumes)
 - `.git/`: 500MB+ de histórico desnecessário
 - `DOCUMENTAÇÃO/`: 2MB+ de docs
 
 **✅ Whitelist**:
+
 - `!README.md`: Mantém README na imagem
 
 **✅ Recursão**:
+
 - `Dockerfile*`, `docker-compose*.yml`: Evita recursão
 - `.dockerignore`: Evita recursão
 
 **Impacto**:
+
 - **Antes**: ~800MB build context
 - **Depois**: ~50MB build context
 - **Redução**: 93% + build 10-20x mais rápido
@@ -814,6 +864,7 @@ docker-compose*.yml
 ### 7.1 Estratégia
 
 **pm2-runtime vs pm2 daemon**:
+
 ```bash
 # ❌ NÃO usar em container
 pm2 start ecosystem.config.js
@@ -823,6 +874,7 @@ pm2-runtime start ecosystem.config.js
 ```
 
 **Motivo**:
+
 - Container deve ter 1 processo principal (PID 1)
 - `pm2` daemon cria processo background (PID 2+)
 - `pm2-runtime` roda em foreground (PID 1)
@@ -836,6 +888,7 @@ CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
 ```
 
 **Análise**:
+
 - ✅ `dumb-init` como PID 1 (init system)
 - ✅ `pm2-runtime` como PID 2 (process manager)
 - ✅ Graceful shutdown funciona
@@ -859,6 +912,7 @@ Container para limpo
 ```
 
 **Teste**:
+
 ```bash
 docker-compose up -d
 docker-compose stop  # SIGTERM
@@ -870,6 +924,7 @@ docker-compose stop  # SIGTERM
 **Problema**: PM2 logs vão para `logs/` dentro do container
 
 **Solução**: Volume mount
+
 ```yaml
 volumes:
   - ./logs:/app/logs
@@ -914,10 +969,12 @@ volumes:
 ### 8.2 host.docker.internal
 
 **Windows/macOS Docker Desktop**:
+
 - `host.docker.internal` → Resolve para host IP automaticamente
 - ✅ Funciona out-of-the-box
 
 **Linux Docker**:
+
 - `host.docker.internal` não existe nativamente
 - ✅ **Solução**: `extra_hosts: ["host.docker.internal:host-gateway"]`
 - Docker 20.10+ suporta `host-gateway` magic value
@@ -928,13 +985,14 @@ volumes:
 
 ```javascript
 const MULTI_HOST_DISCOVERY = [
-    'ws://localhost:9224',              // Dev local (host = container)
-    'ws://host.docker.internal:9224',   // Docker Desktop (Win/Mac)
-    'ws://172.17.0.1:9224'              // Linux bridge network
+  'ws://localhost:9224', // Dev local (host = container)
+  'ws://host.docker.internal:9224', // Docker Desktop (Win/Mac)
+  'ws://172.17.0.1:9224', // Linux bridge network
 ];
 ```
 
 **Análise**:
+
 - ✅ Tenta múltiplos endpoints
 - ✅ Fallback automático
 - ✅ Funciona em Windows, Linux, macOS
@@ -943,6 +1001,7 @@ const MULTI_HOST_DISCOVERY = [
 ### 8.4 Chrome Startup no Host
 
 **Windows** (PowerShell):
+
 ```powershell
 & "C:\Program Files\Google\Chrome\Application\chrome.exe" `
   --remote-debugging-port=9224 `
@@ -950,6 +1009,7 @@ const MULTI_HOST_DISCOVERY = [
 ```
 
 **Linux**:
+
 ```bash
 google-chrome \
   --remote-debugging-port=9224 \
@@ -957,6 +1017,7 @@ google-chrome \
 ```
 
 **macOS**:
+
 ```bash
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --remote-debugging-port=9224 \
@@ -966,12 +1027,14 @@ google-chrome \
 ### 8.5 Validação
 
 **Teste 1**: Chrome rodando?
+
 ```bash
 curl http://localhost:9224/json/version
 # Deve retornar JSON com versão do Chrome
 ```
 
 **Teste 2**: Container acessa?
+
 ```bash
 docker exec chatgpt-agent curl http://host.docker.internal:9224/json/version
 # Deve retornar mesmo JSON
@@ -980,11 +1043,13 @@ docker exec chatgpt-agent curl http://host.docker.internal:9224/json/version
 ### 8.6 Avaliação: 9/10
 
 **Pontos Fortes**:
+
 - Multi-host discovery
 - Cross-platform
 - Documentado
 
 **Melhorias**:
+
 - P4.7: IP Linux hardcoded (deveria detectar gateway dinamicamente)
 
 ---
@@ -993,8 +1058,8 @@ docker exec chatgpt-agent curl http://host.docker.internal:9224/json/version
 
 ### 9.1 Ports Expostos
 
-| Porta | Serviço                | Usado por           | Externo?   |
-| ----- | ---------------------- | ------------------- | ---------- |
+| Porta | Serviço                | Usado por           | Externo?    |
+| ----- | ---------------------- | ------------------- | ----------- |
 | 3008  | Dashboard HTTP         | Express + Socket.io | ✅ Host     |
 | 9224  | Chrome CDP             | Puppeteer → Chrome  | ❌ Interno  |
 | 9229  | Node.js debugger       | Chrome DevTools     | ✅ Dev only |
@@ -1002,6 +1067,7 @@ docker exec chatgpt-agent curl http://host.docker.internal:9224/json/version
 | 2998  | Dashboard API (antigo) | Descontinuado?      | ⚠️ P4.8     |
 
 **Análise**:
+
 - ✅ 3008: Único porto necessário em produção
 - ✅ 9229/9230: Apenas dev (não exposto em prod)
 - ⚠️ 2998: Referenciado em devcontainer.json mas não usado
@@ -1009,6 +1075,7 @@ docker exec chatgpt-agent curl http://host.docker.internal:9224/json/version
 ### 9.2 Network Modes
 
 **docker-compose.yml**:
+
 ```yaml
 networks:
   - agent-network
@@ -1019,36 +1086,41 @@ networks:
 ```
 
 **Análise**:
+
 - ✅ Bridge network dedicada (isolamento)
 - ✅ Containers podem se comunicar via nome (se múltiplos services)
 - ✅ Correto
 
 **Alternativa**: `network_mode: host` (Linux)
+
 ```yaml
 network_mode: host
 ```
 
-**Prós**: Chrome em `localhost:9224` acessível diretamente
-**Contras**: Perde isolamento de rede, conflito de portas
-**Recomendação**: ❌ Não usar, `extra_hosts` é melhor
+**Prós**: Chrome em `localhost:9224` acessível diretamente **Contras**: Perde isolamento de rede,
+conflito de portas **Recomendação**: ❌ Não usar, `extra_hosts` é melhor
 
 ### 9.3 Firewall Considerations
 
 **Host Firewall**:
+
 - Porta 9224 deve estar acessível para container
 - Windows Defender: Pode bloquear primeira vez (permitir)
 - Linux iptables: Geralmente OK com Docker
 
 **Container Firewall**:
+
 - Alpine não tem firewall ativo (correto)
 
 ### 9.4 Avaliação: 8.5/10
 
 **Pontos Fortes**:
+
 - Isolamento de rede
 - Ports bem definidos
 
 **Melhorias**:
+
 - P4.8: Porta 2998 referenciada mas não usada
 - P4.9: Documentar firewall Windows (primeiro uso)
 
@@ -1059,6 +1131,7 @@ network_mode: host
 ### 10.1 Tipos de Volumes
 
 **Bind Mounts** (desenvolvimento):
+
 ```yaml
 volumes:
   - ./fila:/app/fila
@@ -1066,15 +1139,18 @@ volumes:
 ```
 
 **Prós**:
+
 - Hot-reload funciona
 - Acesso direto no host
 - Fácil debug
 
 **Contras**:
+
 - Performance I/O inferior (Windows/macOS)
 - Permissions issues (UIDs diferentes)
 
 **Named Volumes** (produção):
+
 ```yaml
 volumes:
   - fila-prod:/app/fila
@@ -1085,23 +1161,27 @@ volumes:
 ```
 
 **Prós**:
+
 - Performance superior
 - Gerenciado pelo Docker
 - Backup via `docker volume`
 
 **Contras**:
+
 - Acesso indireto (`docker volume inspect`)
 
 ### 10.2 Volumes por Ambiente
 
 **Dev** (docker-compose.dev.yml):
+
 ```yaml
-- ./src:/app/src:ro              # Source code
-- ./config.json:/app/config.json:ro  # Configs
+- ./src:/app/src:ro # Source code
+- ./config.json:/app/config.json:ro # Configs
 - node_modules_dev:/app/node_modules # Deps isoladas
 ```
 
 **Prod** (docker-compose.prod.yml):
+
 ```yaml
 - fila-prod:/app/fila
 - respostas-prod:/app/respostas
@@ -1116,12 +1196,14 @@ volumes:
 **Problema**: Container roda como `USER node` (UID 1000)
 
 **Solução Dev**:
+
 ```json
 // .devcontainer/devcontainer.json
 "updateRemoteUserUID": true
 ```
 
 **Solução Prod**:
+
 ```dockerfile
 # Dockerfile
 RUN chown -R node:node /app
@@ -1132,6 +1214,7 @@ RUN chown -R node:node /app
 ### 10.4 Backup Strategy
 
 **Named Volumes**:
+
 ```bash
 # Backup
 docker run --rm \
@@ -1151,6 +1234,7 @@ docker run --rm \
 ### 10.5 Avaliação: 9.5/10
 
 **Pontos Fortes**:
+
 - Estratégia diferenciada (dev vs prod)
 - Named volumes em produção
 - Permissions corretas
@@ -1164,39 +1248,39 @@ docker run --rm \
 
 ### 11.1 scripts/healthcheck.js
 
-**Localização**: `/scripts/healthcheck.js` (38 LOC)
-**Audit Level**: 500 — Container Health Monitoring
-**Status**: ✅ DEDICADO
+**Localização**: `/scripts/healthcheck.js` (38 LOC) **Audit Level**: 500 — Container Health
+Monitoring **Status**: ✅ DEDICADO
 
 ```javascript
 const http = require('http');
 
 const options = {
-    hostname: 'localhost',
-    port: 3008,
-    path: '/api/health',
-    method: 'GET',
-    timeout: 5000
+  hostname: 'localhost',
+  port: 3008,
+  path: '/api/health',
+  method: 'GET',
+  timeout: 5000,
 };
 
 const req = http.request(options, res => {
-    if (res.statusCode === 200) {
-        process.exit(0);
-    } else {
-        process.exit(1);
-    }
+  if (res.statusCode === 200) {
+    process.exit(0);
+  } else {
+    process.exit(1);
+  }
 });
 
 req.on('error', () => process.exit(1));
 req.on('timeout', () => {
-    req.destroy();
-    process.exit(1);
+  req.destroy();
+  process.exit(1);
 });
 
 req.end();
 ```
 
 **Análise**:
+
 - ✅ Timeout de 5s (evita hang)
 - ✅ Exit codes corretos (0 = healthy, 1 = unhealthy)
 - ✅ Trata erros de conexão
@@ -1210,6 +1294,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ```
 
 **Análise**:
+
 - ✅ `interval=30s`: Checa a cada 30s
 - ✅ `timeout=10s`: Falha se healthcheck > 10s
 - ✅ `start-period=40s`: Grace period (PM2 boot leva ~20-30s)
@@ -1218,12 +1303,14 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ### 11.3 docker-compose Overrides
 
 **compose.yml**:
+
 ```yaml
 healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
+  test: ['CMD', 'curl', '-f', 'http://localhost:3008/api/health']
 ```
 
 **Análise**:
+
 - ⚠️ **Inconsistência**: Usa `curl` mas Dockerfile usa `node scripts/healthcheck.js`
 - **Problema**: Confia que `curl` está instalado (está, mas redundante)
 - **Recomendação**: Alinhar com Dockerfile (P4.4)
@@ -1234,15 +1321,16 @@ healthcheck:
 
 ```javascript
 router.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime()
-    });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
 });
 ```
 
 **Análise**:
+
 - ✅ Endpoint simples e rápido
 - ⚠️ Não valida dependências (PM2, NERV, ConnectionOrchestrator)
 - **Recomendação**: Health check mais profundo (P4.10)
@@ -1250,11 +1338,13 @@ router.get('/api/health', (req, res) => {
 ### 11.5 Avaliação: 8.5/10
 
 **Pontos Fortes**:
+
 - Script dedicado
 - Configuração robusta
 - Timeout protection
 
 **Melhorias**:
+
 - P4.4: Alinhar compose com Dockerfile (curl vs script)
 - P4.10: Health endpoint deveria validar subsistemas críticos
 
@@ -1265,11 +1355,13 @@ router.get('/api/health', (req, res) => {
 ### 12.1 Non-Root User
 
 **Dockerfile**:
+
 ```dockerfile
 USER node
 ```
 
 **Análise**:
+
 - ✅ Container roda como `node:node` (UID 1000)
 - ✅ Mitiga privilege escalation
 - ✅ Best practice
@@ -1277,16 +1369,19 @@ USER node
 ### 12.2 Security Options
 
 **docker-compose.prod.yml**:
+
 ```yaml
 security_opt:
   - no-new-privileges:true
 ```
 
 **Análise**:
+
 - ✅ Impede container ganhar novos privilégios
 - ✅ Defesa em profundidade
 
 **Optional** (comentado):
+
 ```yaml
 read_only: true
 tmpfs:
@@ -1294,6 +1389,7 @@ tmpfs:
 ```
 
 **Análise**:
+
 - 🟡 Root filesystem read-only é excelente
 - ⚠️ Comentado porque `/app/fila`, `/app/logs` precisam write
 - **Solução**: Usar tmpfs ou volumes (já feito)
@@ -1301,12 +1397,14 @@ tmpfs:
 ### 12.3 Secrets Management
 
 **docker-compose.prod.yml**:
+
 ```yaml
 env_file:
   - .env
 ```
 
 **Análise**:
+
 - ✅ Secrets fora do compose file
 - ⚠️ `.env` deve estar em `.gitignore` (está)
 - ⚠️ `.env.example` deve existir para template (P4.11)
@@ -1314,6 +1412,7 @@ env_file:
 ### 12.4 Image Scanning
 
 **Recomendação**:
+
 ```bash
 # Docker Hub scanning
 docker scan chatgpt-agent:latest
@@ -1326,12 +1425,14 @@ snyk container test chatgpt-agent:latest
 ```
 
 **Análise**:
+
 - 🟡 Não há CI/CD pipeline com scanning automático
 - **Recomendação**: GitHub Actions com Trivy (P4.12)
 
 ### 12.5 Network Isolation
 
 **Análise**:
+
 - ✅ Bridge network dedicada
 - ✅ Container não expõe 9224 (Chrome)
 - ✅ Apenas 3008 público
@@ -1347,12 +1448,14 @@ deploy:
 ```
 
 **Análise**:
+
 - ✅ Proteção contra DoS (resource exhaustion)
 - ✅ Valores adequados
 
 ### 12.7 Avaliação Security: 8/10
 
 **Pontos Fortes**:
+
 - Non-root user
 - no-new-privileges
 - Network isolation
@@ -1360,6 +1463,7 @@ deploy:
 - Secrets via env_file
 
 **Melhorias**:
+
 - P4.11: Criar .env.example
 - P4.12: CI/CD com image scanning
 
@@ -1369,60 +1473,71 @@ deploy:
 
 ### 13.1 Suporte
 
-| OS                    | Docker Desktop | Native Docker | Status    |
-| --------------------- | -------------- | ------------- | --------- |
-| Windows 10/11         | ✅              | N/A           | ✅ TESTADO |
-| macOS 10.15+          | ✅              | N/A           | ✅ TESTADO |
-| Linux (Ubuntu 20.04+) | ✅              | ✅             | ✅ TESTADO |
+| OS                    | Docker Desktop | Native Docker | Status     |
+| --------------------- | -------------- | ------------- | ---------- |
+| Windows 10/11         | ✅             | N/A           | ✅ TESTADO |
+| macOS 10.15+          | ✅             | N/A           | ✅ TESTADO |
+| Linux (Ubuntu 20.04+) | ✅             | ✅            | ✅ TESTADO |
 
 ### 13.2 host.docker.internal
 
 **Windows/macOS Docker Desktop**:
+
 - ✅ Funciona automaticamente
 
 **Linux Docker 20.10+**:
+
 ```yaml
 extra_hosts:
-  - "host.docker.internal:host-gateway"
+  - 'host.docker.internal:host-gateway'
 ```
+
 - ✅ Implementado em docker-compose.linux.yml
 
 ### 13.3 Volume Paths
 
 **Windows**:
+
 ```yaml
 volumes:
-  - ./fila:/app/fila  # Docker converte C:\... para /c/...
+  - ./fila:/app/fila # Docker converte C:\... para /c/...
 ```
+
 - ✅ Docker Desktop normaliza paths automaticamente
 
 **Linux/macOS**:
+
 - ✅ Paths POSIX nativos
 
 ### 13.4 Line Endings
 
 **.dockerignore**, **Dockerfile**:
+
 - ✅ LF line endings (Unix-style)
 - ⚠️ `.gitattributes` deveria forçar LF (P4.13)
 
 ### 13.5 Performance
 
 **Windows/macOS**:
+
 - ⚠️ Bind mounts são lentos (VM layer)
 - ✅ Named volumes são rápidos
 - ✅ docker-compose.prod.yml usa named volumes
 
 **Linux**:
+
 - ✅ Bind mounts são nativos (rápidos)
 
 ### 13.6 Avaliação Cross-Platform: 9/10
 
 **Pontos Fortes**:
+
 - Funciona em Windows, Linux, macOS
 - docker-compose.linux.yml resolve issues Linux
 - Named volumes em produção (performance)
 
 **Melhorias**:
+
 - P4.13: .gitattributes para LF forçado em Dockerfile
 
 ---
@@ -1434,15 +1549,18 @@ volumes:
 **Localização**: `Dockerfile:35`
 
 **Problema**:
+
 ```dockerfile
 ENV TZ=UTC
 ```
 
 **Impacto**: 🟡 Médio
+
 - Não customizável sem rebuild
 - Compose files usam `TZ=America/Sao_Paulo` (inconsistência)
 
 **Correção**:
+
 ```dockerfile
 # Dockerfile (remover linha 35)
 # ENV TZ=UTC  ← Remover
@@ -1461,6 +1579,7 @@ environment:
 **Localização**: `Dockerfile:27`
 
 **Problema**:
+
 ```dockerfile
 RUN apk add --no-cache \
     ca-certificates \
@@ -1469,12 +1588,14 @@ RUN apk add --no-cache \
 ```
 
 **Análise**:
+
 - Dockerfile HEALTHCHECK usa `node scripts/healthcheck.js`
 - `curl` não é necessário
 
 **Impacto**: 🟢 Baixo (~2MB imagem)
 
 **Correção**:
+
 ```dockerfile
 RUN apk add --no-cache \
     ca-certificates \
@@ -1491,6 +1612,7 @@ RUN apk add --no-cache \
 **Localização**: `Dockerfile:35` vs `docker-compose*.yml:environment`
 
 **Problema**:
+
 - Dockerfile: `ENV TZ=UTC`
 - Compose files: `TZ=America/Sao_Paulo`
 - Compose override ganha, mas é confuso
@@ -1506,6 +1628,7 @@ RUN apk add --no-cache \
 **Localização**: `Dockerfile:60` vs `docker-compose.yml:43`
 
 **Problema**:
+
 ```dockerfile
 # Dockerfile
 HEALTHCHECK ... CMD node scripts/healthcheck.js
@@ -1516,14 +1639,16 @@ healthcheck:
 ```
 
 **Impacto**: 🟡 Médio
+
 - Compose override usa `curl` (menos eficiente)
 - Inconsistência entre Dockerfile e Compose
 
 **Correção**:
+
 ```yaml
 # docker-compose*.yml (alinhar com Dockerfile)
 healthcheck:
-  test: ["CMD", "node", "/app/scripts/healthcheck.js"]
+  test: ['CMD', 'node', '/app/scripts/healthcheck.js']
   interval: 30s
   timeout: 10s
   retries: 3
@@ -1539,19 +1664,23 @@ healthcheck:
 **Localização**: `docker-compose.prod.yml:104`
 
 **Problema**:
+
 ```yaml
 volumes:
   - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 ```
 
 **Análise**:
+
 - Arquivo `monitoring/prometheus.yml` não existe no repo
 - Service prometheus tem `profiles: [monitoring]` (opcional)
 
 **Impacto**: 🟢 Baixo (service não usado por padrão)
 
 **Correção**:
+
 1. Criar `monitoring/prometheus.yml`:
+
 ```yaml
 global:
   scrape_interval: 15s
@@ -1559,7 +1688,7 @@ global:
 scrape_configs:
   - job_name: 'chatgpt-agent'
     static_configs:
-      - targets: ['agent:9090']  # Se /metrics existir
+      - targets: ['agent:9090'] # Se /metrics existir
 ```
 
 2. OU comentar service prometheus
@@ -1573,18 +1702,22 @@ scrape_configs:
 **Localização**: `.devcontainer/devcontainer.json:81`
 
 **Problema**:
+
 ```json
 "postCreateCommand": "... && bash scripts/setup-devcontainer.sh"
 ```
 
 **Análise**:
+
 - Script referenciado não existe
 - postCreateCommand falhará
 
 **Impacto**: 🔴 Alto (devcontainer não inicia)
 
 **Correção**:
+
 1. Criar `scripts/setup-devcontainer.sh`:
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -1603,6 +1736,7 @@ echo "[DEVCONTAINER] Setup completo ✓"
 ```
 
 2. Dar permissão:
+
 ```bash
 chmod +x scripts/setup-devcontainer.sh
 ```
@@ -1616,27 +1750,30 @@ chmod +x scripts/setup-devcontainer.sh
 **Localização**: `src/infra/browser/orchestrator.js` (referenciado em seção 8.3)
 
 **Problema**:
+
 ```javascript
 const MULTI_HOST_DISCOVERY = [
-    'ws://localhost:9224',
-    'ws://host.docker.internal:9224',
-    'ws://172.17.0.1:9224'  // ← Hardcoded (pode variar)
+  'ws://localhost:9224',
+  'ws://host.docker.internal:9224',
+  'ws://172.17.0.1:9224', // ← Hardcoded (pode variar)
 ];
 ```
 
 **Impacto**: 🟡 Médio
+
 - `172.17.0.1` é gateway padrão Docker, mas pode ser customizado
 - Redes custom têm IPs diferentes
 
 **Correção**:
+
 ```javascript
 // Detectar gateway dinamicamente (Linux)
 const gateway = process.env.DOCKER_GATEWAY || '172.17.0.1';
 
 const MULTI_HOST_DISCOVERY = [
-    'ws://localhost:9224',
-    'ws://host.docker.internal:9224',
-    `ws://${gateway}:9224`
+  'ws://localhost:9224',
+  'ws://host.docker.internal:9224',
+  `ws://${gateway}:9224`,
 ];
 ```
 
@@ -1649,6 +1786,7 @@ const MULTI_HOST_DISCOVERY = [
 **Localização**: `.devcontainer/devcontainer.json:56`
 
 **Problema**:
+
 ```json
 "forwardPorts": [2998, 3008, 9229, 9230],
 "portsAttributes": {
@@ -1660,12 +1798,14 @@ const MULTI_HOST_DISCOVERY = [
 ```
 
 **Análise**:
+
 - Porta 2998 não é usada no projeto (3008 é a porta ativa)
 - Referência obsoleta
 
 **Impacto**: 🟢 Baixo (não causa erro, apenas confusão)
 
 **Correção**:
+
 ```json
 // Remover 2998
 "forwardPorts": [3008, 9229, 9230],
@@ -1683,12 +1823,14 @@ const MULTI_HOST_DISCOVERY = [
 **Localização**: Documentação faltante
 
 **Problema**:
+
 - Primeira vez rodando Docker no Windows, firewall pode bloquear 9224
 - Usuário não sabe permitir acesso
 
 **Impacto**: 🟡 Médio (experiência do usuário)
 
 **Correção**: Adicionar em DOCKER_SETUP.md:
+
 ```markdown
 ### Firewall Windows (Primeira Execução)
 
@@ -1699,6 +1841,7 @@ Windows Defender pode bloquear Chrome na porta 9224:
 3. Clicar "Permitir acesso"
 
 Alternativa (manual):
+
 - Painel de Controle → Firewall → Permitir app
 - Adicionar Chrome: `C:\Program Files\Google\Chrome\Application\chrome.exe`
 - Permitir porta: 9224 (TCP entrada)
@@ -1713,6 +1856,7 @@ Alternativa (manual):
 **Localização**: `src/server/api/router.js:~50` (referenciado em seção 11.4)
 
 **Problema**:
+
 ```javascript
 router.get('/api/health', (req, res) => {
     res.json({ status: 'ok', ... });  // ← Não valida dependências
@@ -1720,44 +1864,46 @@ router.get('/api/health', (req, res) => {
 ```
 
 **Impacto**: 🟡 Médio
+
 - Health check retorna OK mesmo se:
   - PM2 não está rodando agente
   - NERV não está conectado
   - ConnectionOrchestrator não consegue acessar Chrome
 
 **Correção**: Health check profundo
+
 ```javascript
 router.get('/api/health', async (req, res) => {
-    const checks = {
-        pm2: false,
-        nerv: false,
-        chrome: false
-    };
+  const checks = {
+    pm2: false,
+    nerv: false,
+    chrome: false,
+  };
 
-    try {
-        // Check PM2
-        const pm2Status = await system.getStatus();
-        checks.pm2 = pm2Status.agent === 'online';
+  try {
+    // Check PM2
+    const pm2Status = await system.getStatus();
+    checks.pm2 = pm2Status.agent === 'online';
 
-        // Check NERV
-        checks.nerv = NERV.isHealthy();
+    // Check NERV
+    checks.nerv = NERV.isHealthy();
 
-        // Check Chrome (opcional, pode ser lento)
-        checks.chrome = await orchestrator.testConnection();
+    // Check Chrome (opcional, pode ser lento)
+    checks.chrome = await orchestrator.testConnection();
 
-        const allHealthy = Object.values(checks).every(v => v);
+    const allHealthy = Object.values(checks).every(v => v);
 
-        res.status(allHealthy ? 200 : 503).json({
-            status: allHealthy ? 'healthy' : 'degraded',
-            checks,
-            timestamp: new Date().toISOString()
-        });
-    } catch (err) {
-        res.status(503).json({
-            status: 'unhealthy',
-            error: err.message
-        });
-    }
+    res.status(allHealthy ? 200 : 503).json({
+      status: allHealthy ? 'healthy' : 'degraded',
+      checks,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: err.message,
+    });
+  }
 });
 ```
 
@@ -1770,12 +1916,14 @@ router.get('/api/health', async (req, res) => {
 **Localização**: Raiz do projeto
 
 **Problema**:
+
 - `docker-compose.prod.yml` usa `env_file: .env`
 - Não há `.env.example` para template
 
 **Impacto**: 🟡 Médio (experiência do usuário)
 
 **Correção**: Criar `.env.example`
+
 ```bash
 # Chrome Remote Debugging
 CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
@@ -1809,11 +1957,13 @@ VERSION=latest
 **Localização**: `.github/workflows/` (faltante)
 
 **Problema**:
+
 - Não há scanning automático de vulnerabilidades
 
 **Impacto**: 🟡 Médio (segurança)
 
 **Correção**: Criar `.github/workflows/docker-scan.yml`
+
 ```yaml
 name: Docker Image Scan
 
@@ -1853,12 +2003,14 @@ jobs:
 **Localização**: Raiz do projeto (faltante)
 
 **Problema**:
+
 - Dockerfile pode ter CRLF no Windows
 - Quebra scripts no container
 
 **Impacto**: 🟡 Médio (cross-platform)
 
 **Correção**: Criar `.gitattributes`
+
 ```
 # Force LF line endings
 Dockerfile* text eol=lf
@@ -1876,17 +2028,20 @@ scripts/*.sh text eol=lf
 ### 15.1 Priorização
 
 **FASE 1 - Crítico (30 min)**:
+
 1. ✅ P4.6: Criar setup-devcontainer.sh (blocker)
 2. ✅ P4.4: Alinhar health checks (4 arquivos)
 3. ✅ P4.13: Criar .gitattributes (cross-platform)
 
 **FASE 2 - Importante (45 min)**:
+
 1. ✅ P4.1/P4.3: Remover TZ do Dockerfile
 2. ✅ P4.7: IP Linux dinâmico
 3. ✅ P4.10: Health check profundo
 4. ✅ P4.11: Criar .env.example
 
 **FASE 3 - Melhorias (40 min)**:
+
 1. ✅ P4.2: Remover curl desnecessário
 2. ✅ P4.5: Criar prometheus.yml OU comentar service
 3. ✅ P4.8: Remover porta 2998
@@ -1898,6 +2053,7 @@ scripts/*.sh text eol=lf
 ### 15.2 Documentação Adicional
 
 Criar `DOCKER_SETUP.md` com:
+
 1. **Pré-requisitos**: Docker Desktop, Chrome setup
 2. **Instalação**: docker-compose up -d
 3. **Troubleshooting**: Firewall, host.docker.internal, permissions
@@ -1908,27 +2064,28 @@ Criar `DOCKER_SETUP.md` com:
 ### 15.3 Testes Automatizados
 
 Criar `tests/integration/docker_health.spec.js`:
+
 ```javascript
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
 
 describe('Docker Health Checks', () => {
-    it('should respond to /api/health', (done) => {
-        http.get('http://localhost:3008/api/health', res => {
-            assert.strictEqual(res.statusCode, 200);
-            done();
-        });
+  it('should respond to /api/health', done => {
+    http.get('http://localhost:3008/api/health', res => {
+      assert.strictEqual(res.statusCode, 200);
+      done();
     });
+  });
 
-    it('should validate all subsystems', async () => {
-        const res = await fetch('http://localhost:3008/api/health');
-        const health = await res.json();
+  it('should validate all subsystems', async () => {
+    const res = await fetch('http://localhost:3008/api/health');
+    const health = await res.json();
 
-        assert.strictEqual(health.checks.pm2, true);
-        assert.strictEqual(health.checks.nerv, true);
-        assert.strictEqual(health.checks.chrome, true);
-    });
+    assert.strictEqual(health.checks.pm2, true);
+    assert.strictEqual(health.checks.nerv, true);
+    assert.strictEqual(health.checks.chrome, true);
+  });
 });
 ```
 
@@ -1939,6 +2096,7 @@ describe('Docker Health Checks', () => {
 ### Resumo das Descobertas
 
 **✅ Pontos Fortes Magníficos**:
+
 1. Multi-stage build otimizado (Alpine, -400MB vs Debian)
 2. 4 variantes docker-compose (dev/prod/Linux/principal)
 3. PM2 runtime integrado perfeitamente
@@ -1951,6 +2109,7 @@ describe('Docker Health Checks', () => {
 10. Resource limits e logging configurados
 
 **⚠️ Issues Identificados (13 P4s)**:
+
 1. P4.1: TZ hardcoded no Dockerfile
 2. P4.2: curl instalado mas não usado
 3. P4.3: TZ inconsistente (Dockerfile vs Compose)
@@ -1984,6 +2143,7 @@ describe('Docker Health Checks', () => {
 ### Comparação com Melhores Práticas
 
 **✅ Implementado Corretamente**:
+
 1. Multi-stage build
 2. Alpine base image
 3. Non-root user
@@ -1998,6 +2158,7 @@ describe('Docker Health Checks', () => {
 12. Cross-platform (Windows/Linux/macOS)
 
 **🟡 Pode Melhorar**:
+
 1. TZ configurável
 2. Health check profundo
 3. Image scanning automático
@@ -2013,7 +2174,7 @@ describe('Docker Health Checks', () => {
 
 ---
 
-**Próxima Auditoria**: Validar se todas as cross-cutting audits estão completas (PM2✅, Docker✅, outros?)
+**Próxima Auditoria**: Validar se todas as cross-cutting audits estão completas (PM2✅, Docker✅,
+outros?)
 
-**Data de Conclusão**: 21/01/2026 02:30 UTC-3
-**Status**: ✅ AUDITORIA CONCLUÍDA
+**Data de Conclusão**: 21/01/2026 02:30 UTC-3 **Status**: ✅ AUDITORIA CONCLUÍDA

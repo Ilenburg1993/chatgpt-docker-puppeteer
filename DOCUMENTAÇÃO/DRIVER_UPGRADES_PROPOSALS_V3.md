@@ -1,16 +1,14 @@
 # 🚀 Driver Subsystem - Upgrade Proposals v3.0
 
-> **Data**: 2026-02-03
-> **Status**: 63% completo (13.5h/21.5h)
-> **Objetivo**: Propor correções críticas + melhorias arquiteturais baseadas em análise completa do fluxo
+> **Data**: 2026-02-03 **Status**: 63% completo (13.5h/21.5h) **Objetivo**: Propor correções
+> críticas + melhorias arquiteturais baseadas em análise completa do fluxo
 
 ---
 
 ## 📋 Executive Summary
 
-**Propostas Total**: 15 items (4 correções, 11 upgrades)
-**Impacto Estimado**: +20% throughput, -50% error rate, -30% latency (cold start)
-**Esforço Total**: ~20h implementação + 8h testes
+**Propostas Total**: 15 items (4 correções, 11 upgrades) **Impacto Estimado**: +20% throughput, -50%
+error rate, -30% latency (cold start) **Esforço Total**: ~20h implementação + 8h testes
 **Prioridade**: 4 críticas, 7 altas, 4 médias
 
 ---
@@ -20,19 +18,22 @@
 ### **C1: Pool Exhaustion - Implementar Backpressure Strategy**
 
 **Problema Identificado**:
+
 ```javascript
 // factory.js:610 - POOL EXHAUSTED lança erro imediatamente
 if (pool.length >= MAX_POOL_SIZE) {
-    throw new Error('POOL_EXHAUSTED');
+  throw new Error('POOL_EXHAUSTED');
 }
 ```
 
 **Impacto**:
+
 - ❌ Task rejeitada mesmo que driver seja liberado em 100ms
 - ❌ Throughput limitado artificialmente (MAX_POOL_SIZE = 5)
 - ❌ Circuit breaker pode abrir por pool exhaustion (falso positivo)
 
 **Solução Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE C1: Backpressure strategy com retry automático
@@ -114,32 +115,35 @@ _waitForDriverRelease(target, timeout) {
 ```
 
 **Benefícios**:
+
 - ✅ +20% throughput (elimina rejeições desnecessárias)
 - ✅ -90% pool exhaustion errors (backpressure absorve picos)
 - ✅ Circuit breaker não abre por pool exhaustion
 
-**Esforço**: 3h implementação + 1h testes
-**Prioridade**: P0 (CRÍTICA)
+**Esforço**: 3h implementação + 1h testes **Prioridade**: P0 (CRÍTICA)
 
 ---
 
 ### **C2: Adapter - Detach Context SEMPRE (Idempotência)**
 
 **Problema Identificado**:
+
 ```javascript
 // driver_nerv_adapter.js:_finallyCleanup()
 // driver.detachContext() pode lançar erro se driver.state !== 'IDLE'
 if (driver) {
-    driver.detachContext();  // ❌ Pode falhar se task incomplete
+  driver.detachContext(); // ❌ Pode falhar se task incomplete
 }
 ```
 
 **Impacto**:
+
 - ❌ Driver fica "stuck" com context attached
 - ❌ Próximo acquireFromPool() falha (driver não UNATTACHED)
 - ❌ Pool leak (driver inutilizável permanentemente)
 
 **Solução Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE C2: detachContext() idempotente
@@ -205,30 +209,33 @@ async _finallyCleanup(taskId, page, driver, listeners) {
 ```
 
 **Benefícios**:
+
 - ✅ Pool leak elimination (drivers sempre retornam para pool)
 - ✅ Idempotência (detach múltiplas vezes não quebra)
 - ✅ Error recovery (driver sempre cleanup mesmo com falhas)
 
-**Esforço**: 1h implementação + 30min testes
-**Prioridade**: P0 (CRÍTICA)
+**Esforço**: 1h implementação + 30min testes **Prioridade**: P0 (CRÍTICA)
 
 ---
 
 ### **C3: Factory - Validate Driver State ANTES de Release**
 
 **Problema Identificado**:
+
 ```javascript
 // factory.js::releaseToPool()
 // Não valida se driver está realmente UNATTACHED antes de marcar busy=false
-entry.busy = false;  // ❌ Libera mesmo se driver.state !== UNATTACHED
+entry.busy = false; // ❌ Libera mesmo se driver.state !== UNATTACHED
 ```
 
 **Impacto**:
+
 - ❌ Driver "disponível" no pool mas com context attached
 - ❌ Próximo acquireFromPool() retorna driver inválido
 - ❌ Task execution failure (context já attached)
 
 **Solução Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE C3: Strict validation no releaseToPool()
@@ -270,37 +277,40 @@ releaseToPool(driver) {
 ```
 
 **Benefícios**:
+
 - ✅ Pool integrity (100% drivers disponíveis são válidos)
 - ✅ Fail-fast (erro detectado no release, não no próximo acquire)
 - ✅ Debug visibility (logs mostram exatamente onde detach faltou)
 
-**Esforço**: 1h implementação + 30min testes
-**Prioridade**: P0 (CRÍTICA)
+**Esforço**: 1h implementação + 30min testes **Prioridade**: P0 (CRÍTICA)
 
 ---
 
 ### **C4: Adapter - Queue Processing Race Condition**
 
 **Problema Identificado**:
+
 ```javascript
 // driver_nerv_adapter.js::_finallyCleanup()
 if (this.taskQueue.length > 0 && this.activeDrivers.size < MAX_ACTIVE_DRIVERS) {
-    const next = this.taskQueue.shift();
+  const next = this.taskQueue.shift();
 
-    setImmediate(() => {
-        this._executeTask(next.payload, next.correlationId).catch(err => {
-            log('ERROR', `Error executing queued task: ${err.message}`);
-        });
+  setImmediate(() => {
+    this._executeTask(next.payload, next.correlationId).catch(err => {
+      log('ERROR', `Error executing queued task: ${err.message}`);
     });
+  });
 }
 ```
 
 **Impacto**:
+
 - ❌ Race condition: Queue processed ANTES de activeDrivers.delete()
 - ❌ activeDrivers.size pode estar errado (conta driver que será removido)
 - ❌ Task queued pode ser executada quando MAX atingido
 
 **Solução Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE C4: Atomic cleanup + queue processing
@@ -347,12 +357,12 @@ _processNextQueuedTask() {
 ```
 
 **Benefícios**:
+
 - ✅ Race condition eliminada (cleanup atômico)
 - ✅ MAX_ACTIVE_DRIVERS respeitado (100% accuracy)
 - ✅ Queue processing previsível (FIFO garantido)
 
-**Esforço**: 2h implementação + 1h testes
-**Prioridade**: P0 (CRÍTICA)
+**Esforço**: 2h implementação + 1h testes **Prioridade**: P0 (CRÍTICA)
 
 ---
 
@@ -361,10 +371,12 @@ _processNextQueuedTask() {
 ### **U1: Pool Warmup Inteligente (Adaptive)**
 
 **Motivação**:
+
 - Pool warmup atual: MIN_POOL_SIZE drivers criados no boot (fixo)
 - Problema: Pode ser insuficiente (cold start em picos) ou excessivo (waste em idle)
 
 **Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE U1: Adaptive warmup baseado em histórico
@@ -424,22 +436,24 @@ _trackUsage(target) {
 ```
 
 **Benefícios**:
+
 - ✅ -30% cold start latency (warmup otimizado)
 - ✅ -50% memory waste (não cria drivers desnecessários)
 - ✅ Auto-scaling (adapta a carga real)
 
-**Esforço**: 4h implementação + 2h testes
-**Prioridade**: P1 (ALTA)
+**Esforço**: 4h implementação + 2h testes **Prioridade**: P1 (ALTA)
 
 ---
 
 ### **U2: Circuit Breaker - Per-Target Isolation**
 
 **Motivação**:
+
 - Circuit breaker atual: Global (um target falha, todos rejeitados)
 - Problema: ChatGPT down → Gemini também rejeita tasks
 
 **Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE U2: Circuit breaker isolado por target
@@ -485,22 +499,24 @@ _recordFailure(target) {
 ```
 
 **Benefícios**:
+
 - ✅ Fault isolation (um target falha, outros continuam)
 - ✅ +50% availability (targets independentes)
 - ✅ Selective recovery (cada target recupera individualmente)
 
-**Esforço**: 3h implementação + 1h testes
-**Prioridade**: P1 (ALTA)
+**Esforço**: 3h implementação + 1h testes **Prioridade**: P1 (ALTA)
 
 ---
 
 ### **U3: Driver Health Checks (Proactive)**
 
 **Motivação**:
+
 - Pool GC atual: Apenas remove drivers idle > 5min
 - Problema: Driver pode estar "vivo" mas broken (page crashed, DOM mudou)
 
 **Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE U3: Health checks proativos
@@ -570,22 +586,24 @@ async _healthCheckDriver(entry) {
 ```
 
 **Benefícios**:
+
 - ✅ -80% broken driver reuse (detecção proativa)
 - ✅ Pool quality guaranteed (100% healthy drivers)
 - ✅ Fail-fast (erro detectado antes de acquire)
 
-**Esforço**: 4h implementação + 2h testes
-**Prioridade**: P1 (ALTA)
+**Esforço**: 4h implementação + 2h testes **Prioridade**: P1 (ALTA)
 
 ---
 
 ### **U4: Telemetria Expandida - Performance Metrics**
 
 **Motivação**:
+
 - Metrics atuais: Básicas (poolHits, poolMisses, tasksExecuted)
 - Problema: Difícil identificar bottlenecks (onde está lento?)
 
 **Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE U4: Performance profiling granular
@@ -712,23 +730,25 @@ _updatePerformanceMetrics(target, timings, totalTime, success) {
 ```
 
 **Benefícios**:
+
 - ✅ Bottleneck identification (timing breakdown granular)
 - ✅ Per-target observability (métricas isoladas)
 - ✅ Percentile analysis (P95/P99 latency tracking)
 - ✅ Dashboard-ready (estrutura para visualização)
 
-**Esforço**: 3h implementação + 1h dashboard integration
-**Prioridade**: P1 (ALTA)
+**Esforço**: 3h implementação + 1h dashboard integration **Prioridade**: P1 (ALTA)
 
 ---
 
 ### **U5: Retry Logic - Smart Backoff**
 
 **Motivação**:
+
 - Retry atual: Adapter não faz retry (delega para Kernel)
 - Problema: Erros transientes (network blip) rejeitam task imediatamente
 
 **Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE U5: Retry automático com exponential backoff
@@ -819,22 +839,24 @@ _classifyError(error) {
 ```
 
 **Benefícios**:
+
 - ✅ -50% error rate (retry absorve transientes)
 - ✅ +15% success rate (recuperação automática)
 - ✅ User experience (não precisa reenviar task)
 
-**Esforço**: 3h implementação + 2h testes
-**Prioridade**: P1 (ALTA)
+**Esforço**: 3h implementação + 2h testes **Prioridade**: P1 (ALTA)
 
 ---
 
 ### **U6: Factory - Driver Versioning**
 
 **Motivação**:
+
 - Pool atual: Drivers criados em boot persistem indefinidamente
 - Problema: Code update → Drivers antigos no pool (behavior inconsistente)
 
 **Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE U6: Driver versioning com invalidation
@@ -886,22 +908,24 @@ acquireFromPool(targetName) {
 ```
 
 **Benefícios**:
+
 - ✅ Hot reload safety (drivers old invalidados)
 - ✅ Behavior consistency (100% drivers mesma versão)
 - ✅ Zero downtime upgrade (gradual pool refresh)
 
-**Esforço**: 2h implementação + 1h testes
-**Prioridade**: P1 (ALTA)
+**Esforço**: 2h implementação + 1h testes **Prioridade**: P1 (ALTA)
 
 ---
 
 ### **U7: Adapter - Task Priority Queue**
 
 **Motivação**:
+
 - Queue atual: FIFO simples (first in, first out)
 - Problema: Tasks críticas aguardam atrás de tasks low-priority
 
 **Proposta**:
+
 ```javascript
 /**
  * ✅ UPGRADE U7: Priority queue com 3 níveis
@@ -978,13 +1002,13 @@ _getTotalQueueSize() {
 ```
 
 **Benefícios**:
+
 - ✅ Mission-critical prioritization (tasks críticas primeiro)
 - ✅ Fair scheduling (normal tasks não starved)
 - ✅ Background processing (low priority não bloqueia)
 - ✅ Queue time tracking (latency observability)
 
-**Esforço**: 3h implementação + 1h testes
-**Prioridade**: P1 (ALTA)
+**Esforço**: 3h implementação + 1h testes **Prioridade**: P1 (ALTA)
 
 ---
 
@@ -993,10 +1017,12 @@ _getTotalQueueSize() {
 ### **U8: Pool Metrics Dashboard (REST API)**
 
 **Motivação**:
+
 - Metrics atuais: Apenas logs
 - Problema: Difícil monitorar pool health em produção
 
 **Proposta**:
+
 ```javascript
 // Endpoint REST: GET /api/driver/metrics
 {
@@ -1020,18 +1046,19 @@ _getTotalQueueSize() {
 }
 ```
 
-**Esforço**: 4h (REST endpoint + JSON serialization)
-**Prioridade**: P2 (MÉDIA)
+**Esforço**: 4h (REST endpoint + JSON serialization) **Prioridade**: P2 (MÉDIA)
 
 ---
 
 ### **U9: Driver DNA Hot Reload**
 
 **Motivação**:
+
 - DNA (SADI selectors) hardcoded em código
 - Problema: Interface LLM muda → Precisa redeploy
 
 **Proposta**:
+
 ```javascript
 // DNA external (JSON file + hot reload)
 // drivers/dna/chatgpt.json
@@ -1051,49 +1078,50 @@ async sendPrompt(prompt) {
 }
 ```
 
-**Esforço**: 5h (DNA loader + hot reload watcher)
-**Prioridade**: P2 (MÉDIA)
+**Esforço**: 5h (DNA loader + hot reload watcher) **Prioridade**: P2 (MÉDIA)
 
 ---
 
 ### **U10: Factory - Pool Auto-Scaling**
 
 **Motivação**:
+
 - Pool size fixo: MAX_POOL_SIZE = 5
 - Problema: Picos de carga → Pool exhaustion frequente
 
 **Proposta**:
+
 ```javascript
 // Dynamic pool size: 2-10 drivers (escala com carga)
 const pool_size = Math.min(10, Math.max(2, avgTasksPerMinute / 2));
 ```
 
-**Esforço**: 3h (scaling logic + metrics)
-**Prioridade**: P2 (MÉDIA)
+**Esforço**: 3h (scaling logic + metrics) **Prioridade**: P2 (MÉDIA)
 
 ---
 
 ### **U11: Adapter - Task Timeout Customizado**
 
 **Motivação**:
+
 - Timeout atual: Global 10min (EXECUTE_TASK_TIMEOUT_MS)
 - Problema: Tasks simples aguardam 10min para timeout
 
 **Proposta**:
+
 ```javascript
 // Task metadata com timeout customizado
-task.meta.timeout = 30000;  // 30s para task simples
+task.meta.timeout = 30000; // 30s para task simples
 
 // Adapter respeita timeout customizado
 const timeout = task.meta.timeout || ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS;
 const response = await Promise.race([
-    driver.execute(prompt),
-    this._timeout(timeout, 'driver.execute')
+  driver.execute(prompt),
+  this._timeout(timeout, 'driver.execute'),
 ]);
 ```
 
-**Esforço**: 2h (validation + testing)
-**Prioridade**: P2 (MÉDIA)
+**Esforço**: 2h (validation + testing) **Prioridade**: P2 (MÉDIA)
 
 ---
 
@@ -1110,8 +1138,8 @@ const response = await Promise.race([
 
 ### **Impacto Esperado (Após Implementação)**
 
-| Métrica                | Antes (v3.0) | Depois (v3.1) | Delta      |
-| ---------------------- | ------------ | ------------- | ---------- |
+| Métrica                | Antes (v3.0) | Depois (v3.1) | Delta       |
+| ---------------------- | ------------ | ------------- | ----------- |
 | **Throughput**         | 13 tasks/min | 16 tasks/min  | **+23%** ✅ |
 | **Error Rate**         | 5%           | 2.5%          | **-50%** ✅ |
 | **Pool Exhaustion**    | 10/100 tasks | 1/100 tasks   | **-90%** ✅ |
@@ -1122,6 +1150,7 @@ const response = await Promise.race([
 ### **Roadmap Recomendado**
 
 #### **Sprint 1 (1 semana)**: Correções Críticas
+
 - ✅ C1: Pool Exhaustion Backpressure
 - ✅ C2: Detach Context Idempotência
 - ✅ C3: Release State Validation
@@ -1132,6 +1161,7 @@ const response = await Promise.race([
 ---
 
 #### **Sprint 2 (2 semanas)**: Upgrades Essenciais
+
 - ✅ U1: Adaptive Pool Warmup
 - ✅ U2: Per-Target Circuit Breaker
 - ✅ U3: Proactive Health Checks
@@ -1142,6 +1172,7 @@ const response = await Promise.race([
 ---
 
 #### **Sprint 3 (1 semana)**: Melhorias Avançadas
+
 - ✅ U5: Smart Retry Logic
 - ✅ U6: Driver Versioning
 - ✅ U7: Priority Queue
@@ -1151,6 +1182,7 @@ const response = await Promise.race([
 ---
 
 #### **Sprint 4 (1 semana)**: Polimento
+
 - ✅ U8: Metrics Dashboard API
 - ✅ U9: DNA Hot Reload
 - ✅ U10: Auto-Scaling
@@ -1173,7 +1205,5 @@ Se tempo limitado, priorize:
 
 ---
 
-**Documento**: DRIVER_UPGRADES_PROPOSALS_V3.md
-**Versão**: 1.0
-**Data**: 2026-02-03
-**Status**: ✅ PRONTO PARA REVIEW
+**Documento**: DRIVER_UPGRADES_PROPOSALS_V3.md **Versão**: 1.0 **Data**: 2026-02-03 **Status**: ✅
+PRONTO PARA REVIEW

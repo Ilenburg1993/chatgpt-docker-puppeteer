@@ -1,9 +1,7 @@
 # 🎯 Driver Subsystem Consolidation Plan
 
-**Data**: 3 de Fevereiro de 2026
-**Sprint**: Sprint 2 + Upgrade (Driver Pool)
-**Status**: 📋 **PLANEJAMENTO**
-**Objetivo**: Consolidar subsistema Driver com foco ontológico
+**Data**: 3 de Fevereiro de 2026 **Sprint**: Sprint 2 + Upgrade (Driver Pool) **Status**: 📋
+**PLANEJAMENTO** **Objetivo**: Consolidar subsistema Driver com foco ontológico
 
 ---
 
@@ -46,6 +44,7 @@
 ### Metáfora: Driver = Motorista de Táxi
 
 **O que motorista faz**:
+
 - ✅ Dirige do ponto A ao ponto B (executa trajeto)
 - ✅ Valida pré-requisitos (combustível, pneus)
 - ✅ Navega com GPS (interface do LLM)
@@ -53,6 +52,7 @@
 - ✅ Lida com problemas técnicos (trânsito, desvio)
 
 **O que motorista NÃO faz**:
+
 - ❌ Decide o destino (MissionManager decide)
 - ❌ Interpreta por que passageiro vai lá (não precisa saber)
 - ❌ Valida se destino é correto (LLM-as-judge)
@@ -68,11 +68,10 @@
 
 #### P1 Bug #4: AbortSignal Race Condition
 
-**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js`
-**Linhas**: ~520-550
-**Esforço**: 1.5h
+**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js` **Linhas**: ~520-550 **Esforço**: 1.5h
 
 **Problema Identificado**:
+
 ```javascript
 // ❌ ANTES (race condition):
 async _executeTask(payload, correlationId) {
@@ -95,6 +94,7 @@ async _executeTask(payload, correlationId) {
 ```
 
 **Solução Implementada**:
+
 ```javascript
 // ✅ DEPOIS (abort-aware execution):
 async _executeTask(payload, correlationId) {
@@ -176,43 +176,44 @@ async _executeTask(payload, correlationId) {
 ```
 
 **Validações Adicionadas**:
+
 - ✅ Verifica signal ANTES de executar (fail-fast se já abortado)
 - ✅ Listener de abort durante execução (marca como aborting)
 - ✅ Cleanup sabe se foi abort vs erro (telemetria correta)
 - ✅ Remove listener no finally (sem memory leak)
 
 **Testes de Validação**:
+
 ```javascript
 // tests/reliability/test_driver_abort_scenarios.js
 
 describe('AbortSignal Race Condition', () => {
-    it('should abort task BEFORE execution starts', async () => {
-        // Pre-abort
-        const controller = new AbortController();
-        controller.abort();
+  it('should abort task BEFORE execution starts', async () => {
+    // Pre-abort
+    const controller = new AbortController();
+    controller.abort();
 
-        // Submit task
-        await adapter._executeTask({ task, signal: controller.signal });
+    // Submit task
+    await adapter._executeTask({ task, signal: controller.signal });
 
-        // Expect: TASK_ABORTED emitido, task não executada
-    });
+    // Expect: TASK_ABORTED emitido, task não executada
+  });
 
-    it('should abort task DURING execution', async () => {
-        // Submit task
-        const promise = adapter._executeTask({ task, signal });
+  it('should abort task DURING execution', async () => {
+    // Submit task
+    const promise = adapter._executeTask({ task, signal });
 
-        // Abort after 1s
-        setTimeout(() => signal.abort(), 1000);
+    // Abort after 1s
+    setTimeout(() => signal.abort(), 1000);
 
-        // Expect: TASK_ABORTED emitido, driver cleanup correto
-    });
+    // Expect: TASK_ABORTED emitido, driver cleanup correto
+  });
 
-    it('should abort task DURING cleanup', async () => {
-        // Execute task normalmente
-        // Abort DURANTE finally block
-
-        // Expect: Cleanup completa, TASK_COMPLETED OU TASK_ABORTED emitido
-    });
+  it('should abort task DURING cleanup', async () => {
+    // Execute task normalmente
+    // Abort DURANTE finally block
+    // Expect: Cleanup completa, TASK_COMPLETED OU TASK_ABORTED emitido
+  });
 });
 ```
 
@@ -220,11 +221,11 @@ describe('AbortSignal Race Condition', () => {
 
 #### P1 Bug #5: Error Emission Missing
 
-**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js`
-**Linhas**: Múltiplas (~480, ~516, ~545, ~590)
-**Esforço**: 2h
+**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js` **Linhas**: Múltiplas (~480, ~516,
+~545, ~590) **Esforço**: 2h
 
 **Problema Identificado**:
+
 ```javascript
 // ❌ ANTES (silent failures):
 
@@ -263,6 +264,7 @@ try {
 ```
 
 **Solução Implementada**:
+
 ```javascript
 // ✅ DEPOIS (telemetria completa):
 
@@ -331,6 +333,7 @@ try {
 ```
 
 **Validações Adicionadas**:
+
 - ✅ Todos os erros emitidos via `_emitBoth()` (local + NERV)
 - ✅ Stack trace incluído em telemetria
 - ✅ Phase identificada ('allocate', 'acquire', 'execute', 'release')
@@ -338,48 +341,51 @@ try {
 - ✅ Circuit breaker check (optional - pausa sistema se muitos erros)
 
 **Testes de Validação**:
+
 ```javascript
 // tests/reliability/test_driver_error_telemetry.js
 
 describe('Error Emission Complete', () => {
-    it('should emit error when page allocation fails', async () => {
-        // Mock BrowserPool.allocate() para falhar
-        browserPool.allocate = () => Promise.reject(new Error('POOL_EXHAUSTED'));
+  it('should emit error when page allocation fails', async () => {
+    // Mock BrowserPool.allocate() para falhar
+    browserPool.allocate = () => Promise.reject(new Error('POOL_EXHAUSTED'));
 
-        // Spy em _emitBoth
-        const spy = sinon.spy(adapter, '_emitBoth');
+    // Spy em _emitBoth
+    const spy = sinon.spy(adapter, '_emitBoth');
 
-        // Execute task
-        await adapter._executeTask({ task, signal });
+    // Execute task
+    await adapter._executeTask({ task, signal });
 
-        // Expect: ADAPTER_EVENTS.ERROR emitido com phase='allocate'
-        expect(spy.calledWith(
-            ADAPTER_EVENTS.ERROR,
-            ActionCode.DRIVER_ERROR,
-            sinon.match({ phase: 'allocate' })
-        )).to.be.true;
-    });
+    // Expect: ADAPTER_EVENTS.ERROR emitido com phase='allocate'
+    expect(
+      spy.calledWith(
+        ADAPTER_EVENTS.ERROR,
+        ActionCode.DRIVER_ERROR,
+        sinon.match({ phase: 'allocate' })
+      )
+    ).to.be.true;
+  });
 
-    it('should emit error when driver acquire fails', async () => {
-        // Mock lifecycle.acquire() para falhar
-        lifecycle.acquire = () => Promise.reject(new Error('DRIVER_NOT_FOUND'));
+  it('should emit error when driver acquire fails', async () => {
+    // Mock lifecycle.acquire() para falhar
+    lifecycle.acquire = () => Promise.reject(new Error('DRIVER_NOT_FOUND'));
 
-        // Execute task
-        await adapter._executeTask({ task, signal });
+    // Execute task
+    await adapter._executeTask({ task, signal });
 
-        // Expect: ADAPTER_EVENTS.ERROR emitido com phase='acquire'
-    });
+    // Expect: ADAPTER_EVENTS.ERROR emitido com phase='acquire'
+  });
 
-    it('should include stack trace in error telemetry', async () => {
-        // Force error
-        // Expect: payload.stack existe e tem stack trace completo
-    });
+  it('should include stack trace in error telemetry', async () => {
+    // Force error
+    // Expect: payload.stack existe e tem stack trace completo
+  });
 
-    it('should update stats.tasksRejected on error', async () => {
-        // Initial: stats.tasksRejected = 0
-        // Force error
-        // Expect: stats.tasksRejected = 1
-    });
+  it('should update stats.tasksRejected on error', async () => {
+    // Initial: stats.tasksRejected = 0
+    // Force error
+    // Expect: stats.tasksRejected = 1
+  });
 });
 ```
 
@@ -392,6 +398,7 @@ describe('Error Emission Complete', () => {
 #### Upgrade Specs
 
 **Problema Atual**:
+
 ```
 Task 1 → Create driver → Execute → Destroy → [100ms latency]
 Task 2 → Create driver → Execute → Destroy → [100ms latency]
@@ -402,6 +409,7 @@ Total overhead: 100ms × 10 tasks = 1s
 ```
 
 **Solução com Driver Pool**:
+
 ```
 Boot:
 ├─ Pre-create 5 warm drivers (ChatGPT, Gemini)
@@ -440,288 +448,294 @@ const DriverFactory = require('./factory');
 const { DRIVER_POOL_CONFIG } = require('@core/constants/driver');
 
 class DriverPoolManager extends EventEmitter {
-    constructor(config = {}) {
-        super();
+  constructor(config = {}) {
+    super();
 
-        this.config = {
-            MAX_POOL_SIZE: config.maxPoolSize || DRIVER_POOL_CONFIG.MAX_POOL_SIZE, // 5
-            MIN_POOL_SIZE: config.minPoolSize || DRIVER_POOL_CONFIG.MIN_POOL_SIZE, // 2
-            IDLE_TIMEOUT_MS: config.idleTimeoutMs || DRIVER_POOL_CONFIG.IDLE_TIMEOUT_MS, // 5min
-            HEALTH_CHECK_INTERVAL_MS: config.healthCheckIntervalMs || 30000,
-            TARGETS: config.targets || ['chatgpt', 'gemini']
+    this.config = {
+      MAX_POOL_SIZE: config.maxPoolSize || DRIVER_POOL_CONFIG.MAX_POOL_SIZE, // 5
+      MIN_POOL_SIZE: config.minPoolSize || DRIVER_POOL_CONFIG.MIN_POOL_SIZE, // 2
+      IDLE_TIMEOUT_MS: config.idleTimeoutMs || DRIVER_POOL_CONFIG.IDLE_TIMEOUT_MS, // 5min
+      HEALTH_CHECK_INTERVAL_MS: config.healthCheckIntervalMs || 30000,
+      TARGETS: config.targets || ['chatgpt', 'gemini'],
+    };
+
+    // Pool structure: Map<target, DriverEntry[]>
+    this.pools = new Map();
+
+    // Initialize pools for each target
+    for (const target of this.config.TARGETS) {
+      this.pools.set(target, []);
+    }
+
+    // Factory for driver creation
+    this.factory = new DriverFactory();
+
+    // Stats
+    this.stats = {
+      totalAcquired: 0,
+      totalReleased: 0,
+      totalCreated: 0,
+      totalDestroyed: 0,
+      poolHits: 0, // Reused from pool
+      poolMisses: 0, // Created new
+    };
+
+    // Health check timer
+    this._startHealthChecks();
+  }
+
+  /**
+   * ✅ RESPONSABILIDADE: Inicializar pool (warm instances)
+   */
+  async initialize() {
+    log('INFO', '[DriverPool] Initializing pools...');
+
+    for (const target of this.config.TARGETS) {
+      // Create MIN_POOL_SIZE drivers for each target
+      for (let i = 0; i < this.config.MIN_POOL_SIZE; i++) {
+        try {
+          const driver = await this._createWarmDriver(target);
+          this.pools.get(target).push({
+            driver,
+            target,
+            busy: false,
+            createdAt: Date.now(),
+            lastUsedAt: null,
+            totalUses: 0,
+          });
+
+          this.stats.totalCreated++;
+          log('DEBUG', `[DriverPool] Warm driver created: ${target} (#${i + 1})`);
+        } catch (err) {
+          log('ERROR', `[DriverPool] Failed to create warm driver for ${target}: ${err.message}`);
+        }
+      }
+    }
+
+    log(
+      'INFO',
+      `[DriverPool] Initialized: ${this._getTotalDrivers()} drivers across ${this.config.TARGETS.length} targets`
+    );
+  }
+
+  /**
+   * ✅ RESPONSABILIDADE: Criar driver sem page (warm instance)
+   */
+  async _createWarmDriver(target) {
+    // Driver criado SEM page (apenas structure + DNA loaded)
+    // Page será attachada no acquire()
+
+    const warmDriver = await this.factory.getDriver(target, null, {
+      warmInstance: true, // Flag para Factory saber que é warm
+    });
+
+    // Warm driver fica em estado IDLE
+    warmDriver.setState('IDLE');
+
+    return warmDriver;
+  }
+
+  /**
+   * ✅ RESPONSABILIDADE: Alocar driver do pool
+   */
+  async acquire(target, page, signal) {
+    const pool = this.pools.get(target);
+
+    if (!pool) {
+      throw new Error(`[DriverPool] Invalid target: ${target}`);
+    }
+
+    // 1. Busca driver disponível no pool
+    let entry = pool.find(e => !e.busy && e.driver.state === 'IDLE');
+
+    if (entry) {
+      // Pool HIT - reusa driver existente
+      this.stats.poolHits++;
+      log('DEBUG', `[DriverPool] Pool HIT: Reusing driver for ${target}`);
+    } else {
+      // Pool MISS - cria novo driver (se não atingiu MAX_POOL_SIZE)
+      this.stats.poolMisses++;
+
+      if (pool.length < this.config.MAX_POOL_SIZE) {
+        log('DEBUG', `[DriverPool] Pool MISS: Creating new driver for ${target}`);
+
+        const driver = await this._createWarmDriver(target);
+        entry = {
+          driver,
+          target,
+          busy: false,
+          createdAt: Date.now(),
+          lastUsedAt: null,
+          totalUses: 0,
         };
 
-        // Pool structure: Map<target, DriverEntry[]>
-        this.pools = new Map();
+        pool.push(entry);
+        this.stats.totalCreated++;
+      } else {
+        // Pool exhausted - aguardar release OU criar temporário
+        log(
+          'WARN',
+          `[DriverPool] Pool exhausted for ${target} (max: ${this.config.MAX_POOL_SIZE})`
+        );
 
-        // Initialize pools for each target
-        for (const target of this.config.TARGETS) {
-            this.pools.set(target, []);
-        }
-
-        // Factory for driver creation
-        this.factory = new DriverFactory();
-
-        // Stats
-        this.stats = {
-            totalAcquired: 0,
-            totalReleased: 0,
-            totalCreated: 0,
-            totalDestroyed: 0,
-            poolHits: 0,    // Reused from pool
-            poolMisses: 0   // Created new
-        };
-
-        // Health check timer
-        this._startHealthChecks();
+        throw new Error(
+          `POOL_EXHAUSTED: All ${this.config.MAX_POOL_SIZE} drivers for ${target} are busy`
+        );
+      }
     }
 
-    /**
-     * ✅ RESPONSABILIDADE: Inicializar pool (warm instances)
-     */
-    async initialize() {
-        log('INFO', '[DriverPool] Initializing pools...');
+    // 2. Marca driver como busy
+    entry.busy = true;
+    entry.lastUsedAt = Date.now();
+    entry.totalUses++;
 
-        for (const target of this.config.TARGETS) {
-            // Create MIN_POOL_SIZE drivers for each target
-            for (let i = 0; i < this.config.MIN_POOL_SIZE; i++) {
-                try {
-                    const driver = await this._createWarmDriver(target);
-                    this.pools.get(target).push({
-                        driver,
-                        target,
-                        busy: false,
-                        createdAt: Date.now(),
-                        lastUsedAt: null,
-                        totalUses: 0
-                    });
-
-                    this.stats.totalCreated++;
-                    log('DEBUG', `[DriverPool] Warm driver created: ${target} (#${i + 1})`);
-
-                } catch (err) {
-                    log('ERROR', `[DriverPool] Failed to create warm driver for ${target}: ${err.message}`);
-                }
-            }
-        }
-
-        log('INFO', `[DriverPool] Initialized: ${this._getTotalDrivers()} drivers across ${this.config.TARGETS.length} targets`);
+    // 3. Attach page + signal ao driver
+    entry.driver.attachPage(page);
+    if (signal) {
+      entry.driver.attachSignal(signal);
     }
 
-    /**
-     * ✅ RESPONSABILIDADE: Criar driver sem page (warm instance)
-     */
-    async _createWarmDriver(target) {
-        // Driver criado SEM page (apenas structure + DNA loaded)
-        // Page será attachada no acquire()
-
-        const warmDriver = await this.factory.getDriver(target, null, {
-            warmInstance: true // Flag para Factory saber que é warm
-        });
-
-        // Warm driver fica em estado IDLE
-        warmDriver.setState('IDLE');
-
-        return warmDriver;
+    // 4. Valida estado do driver
+    if (entry.driver.destroyed) {
+      throw new Error(`[DriverPool] Driver was destroyed (should not happen)`);
     }
 
-    /**
-     * ✅ RESPONSABILIDADE: Alocar driver do pool
-     */
-    async acquire(target, page, signal) {
-        const pool = this.pools.get(target);
+    this.stats.totalAcquired++;
 
-        if (!pool) {
-            throw new Error(`[DriverPool] Invalid target: ${target}`);
-        }
+    log('DEBUG', `[DriverPool] Acquired driver: ${target} (uses: ${entry.totalUses})`);
 
-        // 1. Busca driver disponível no pool
-        let entry = pool.find(e => !e.busy && e.driver.state === 'IDLE');
+    return entry.driver;
+  }
 
-        if (entry) {
-            // Pool HIT - reusa driver existente
-            this.stats.poolHits++;
-            log('DEBUG', `[DriverPool] Pool HIT: Reusing driver for ${target}`);
+  /**
+   * ✅ RESPONSABILIDADE: Liberar driver de volta ao pool
+   */
+  async release(driver) {
+    // 1. Encontra entry no pool
+    let entry = null;
+    let pool = null;
 
-        } else {
-            // Pool MISS - cria novo driver (se não atingiu MAX_POOL_SIZE)
-            this.stats.poolMisses++;
-
-            if (pool.length < this.config.MAX_POOL_SIZE) {
-                log('DEBUG', `[DriverPool] Pool MISS: Creating new driver for ${target}`);
-
-                const driver = await this._createWarmDriver(target);
-                entry = {
-                    driver,
-                    target,
-                    busy: false,
-                    createdAt: Date.now(),
-                    lastUsedAt: null,
-                    totalUses: 0
-                };
-
-                pool.push(entry);
-                this.stats.totalCreated++;
-
-            } else {
-                // Pool exhausted - aguardar release OU criar temporário
-                log('WARN', `[DriverPool] Pool exhausted for ${target} (max: ${this.config.MAX_POOL_SIZE})`);
-
-                throw new Error(`POOL_EXHAUSTED: All ${this.config.MAX_POOL_SIZE} drivers for ${target} are busy`);
-            }
-        }
-
-        // 2. Marca driver como busy
-        entry.busy = true;
-        entry.lastUsedAt = Date.now();
-        entry.totalUses++;
-
-        // 3. Attach page + signal ao driver
-        entry.driver.attachPage(page);
-        if (signal) {
-            entry.driver.attachSignal(signal);
-        }
-
-        // 4. Valida estado do driver
-        if (entry.driver.destroyed) {
-            throw new Error(`[DriverPool] Driver was destroyed (should not happen)`);
-        }
-
-        this.stats.totalAcquired++;
-
-        log('DEBUG', `[DriverPool] Acquired driver: ${target} (uses: ${entry.totalUses})`);
-
-        return entry.driver;
+    for (const [target, targetPool] of this.pools.entries()) {
+      entry = targetPool.find(e => e.driver === driver);
+      if (entry) {
+        pool = targetPool;
+        break;
+      }
     }
 
-    /**
-     * ✅ RESPONSABILIDADE: Liberar driver de volta ao pool
-     */
-    async release(driver) {
-        // 1. Encontra entry no pool
-        let entry = null;
-        let pool = null;
-
-        for (const [target, targetPool] of this.pools.entries()) {
-            entry = targetPool.find(e => e.driver === driver);
-            if (entry) {
-                pool = targetPool;
-                break;
-            }
-        }
-
-        if (!entry) {
-            log('WARN', `[DriverPool] Driver not found in pool (might be temporary)`);
-            // Destrói driver temporário
-            await driver.destroy();
-            return;
-        }
-
-        // 2. Detach page + signal
-        driver.detachPage();
-        driver.detachSignal();
-
-        // 3. Reset driver para IDLE
-        driver.setState('IDLE');
-
-        // 4. Marca como disponível
-        entry.busy = false;
-
-        this.stats.totalReleased++;
-
-        log('DEBUG', `[DriverPool] Released driver: ${entry.target} (idle again)`);
-
-        // 5. Emite evento
-        this.emit('driver_released', {
-            target: entry.target,
-            totalUses: entry.totalUses
-        });
+    if (!entry) {
+      log('WARN', `[DriverPool] Driver not found in pool (might be temporary)`);
+      // Destrói driver temporário
+      await driver.destroy();
+      return;
     }
 
-    /**
-     * ✅ RESPONSABILIDADE: Health check periódico
-     */
-    _startHealthChecks() {
-        this.healthCheckTimer = setInterval(() => {
-            for (const [target, pool] of this.pools.entries()) {
-                // Remove drivers idle por muito tempo (garbage collection)
-                const now = Date.now();
+    // 2. Detach page + signal
+    driver.detachPage();
+    driver.detachSignal();
 
-                for (let i = pool.length - 1; i >= 0; i--) {
-                    const entry = pool[i];
+    // 3. Reset driver para IDLE
+    driver.setState('IDLE');
 
-                    // Se idle há mais de IDLE_TIMEOUT_MS e pool > MIN_POOL_SIZE
-                    const idleTime = now - (entry.lastUsedAt || entry.createdAt);
-                    const shouldRemove = !entry.busy &&
-                                        idleTime > this.config.IDLE_TIMEOUT_MS &&
-                                        pool.length > this.config.MIN_POOL_SIZE;
+    // 4. Marca como disponível
+    entry.busy = false;
 
-                    if (shouldRemove) {
-                        log('DEBUG', `[DriverPool] Removing idle driver: ${target} (idle: ${idleTime}ms)`);
+    this.stats.totalReleased++;
 
-                        // Destrói driver
-                        entry.driver.destroy();
+    log('DEBUG', `[DriverPool] Released driver: ${entry.target} (idle again)`);
 
-                        // Remove do pool
-                        pool.splice(i, 1);
+    // 5. Emite evento
+    this.emit('driver_released', {
+      target: entry.target,
+      totalUses: entry.totalUses,
+    });
+  }
 
-                        this.stats.totalDestroyed++;
-                    }
-                }
-            }
-        }, this.config.HEALTH_CHECK_INTERVAL_MS);
-    }
+  /**
+   * ✅ RESPONSABILIDADE: Health check periódico
+   */
+  _startHealthChecks() {
+    this.healthCheckTimer = setInterval(() => {
+      for (const [target, pool] of this.pools.entries()) {
+        // Remove drivers idle por muito tempo (garbage collection)
+        const now = Date.now();
 
-    /**
-     * ✅ RESPONSABILIDADE: Destruir todos os drivers (shutdown)
-     */
-    async shutdown() {
-        log('INFO', '[DriverPool] Shutting down...');
+        for (let i = pool.length - 1; i >= 0; i--) {
+          const entry = pool[i];
 
-        // Stop health checks
-        if (this.healthCheckTimer) {
-            clearInterval(this.healthCheckTimer);
+          // Se idle há mais de IDLE_TIMEOUT_MS e pool > MIN_POOL_SIZE
+          const idleTime = now - (entry.lastUsedAt || entry.createdAt);
+          const shouldRemove =
+            !entry.busy &&
+            idleTime > this.config.IDLE_TIMEOUT_MS &&
+            pool.length > this.config.MIN_POOL_SIZE;
+
+          if (shouldRemove) {
+            log('DEBUG', `[DriverPool] Removing idle driver: ${target} (idle: ${idleTime}ms)`);
+
+            // Destrói driver
+            entry.driver.destroy();
+
+            // Remove do pool
+            pool.splice(i, 1);
+
+            this.stats.totalDestroyed++;
+          }
         }
+      }
+    }, this.config.HEALTH_CHECK_INTERVAL_MS);
+  }
 
-        // Destroy all drivers
-        for (const [target, pool] of this.pools.entries()) {
-            for (const entry of pool) {
-                try {
-                    await entry.driver.destroy();
-                    this.stats.totalDestroyed++;
-                } catch (err) {
-                    log('ERROR', `[DriverPool] Failed to destroy driver: ${err.message}`);
-                }
-            }
+  /**
+   * ✅ RESPONSABILIDADE: Destruir todos os drivers (shutdown)
+   */
+  async shutdown() {
+    log('INFO', '[DriverPool] Shutting down...');
 
-            pool.length = 0; // Clear pool
+    // Stop health checks
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+    }
+
+    // Destroy all drivers
+    for (const [target, pool] of this.pools.entries()) {
+      for (const entry of pool) {
+        try {
+          await entry.driver.destroy();
+          this.stats.totalDestroyed++;
+        } catch (err) {
+          log('ERROR', `[DriverPool] Failed to destroy driver: ${err.message}`);
         }
+      }
 
-        log('INFO', '[DriverPool] Shutdown complete');
+      pool.length = 0; // Clear pool
     }
 
-    /**
-     * Stats & Monitoring
-     */
-    getStats() {
-        return {
-            ...this.stats,
-            pools: Array.from(this.pools.entries()).map(([target, pool]) => ({
-                target,
-                total: pool.length,
-                busy: pool.filter(e => e.busy).length,
-                idle: pool.filter(e => !e.busy).length
-            }))
-        };
-    }
+    log('INFO', '[DriverPool] Shutdown complete');
+  }
 
-    _getTotalDrivers() {
-        let total = 0;
-        for (const pool of this.pools.values()) {
-            total += pool.length;
-        }
-        return total;
+  /**
+   * Stats & Monitoring
+   */
+  getStats() {
+    return {
+      ...this.stats,
+      pools: Array.from(this.pools.entries()).map(([target, pool]) => ({
+        target,
+        total: pool.length,
+        busy: pool.filter(e => e.busy).length,
+        idle: pool.filter(e => !e.busy).length,
+      })),
+    };
+  }
+
+  _getTotalDrivers() {
+    let total = 0;
+    for (const pool of this.pools.values()) {
+      total += pool.length;
     }
+    return total;
+  }
 }
 
 module.exports = DriverPoolManager;
@@ -794,9 +808,9 @@ this.factory = new DriverFactory();
 // DEPOIS:
 const DriverPoolManager = require('../driver_pool_manager');
 this.driverPool = new DriverPoolManager({
-    maxPoolSize: 5,
-    minPoolSize: 2,
-    targets: ['chatgpt', 'gemini']
+  maxPoolSize: 5,
+  minPoolSize: 2,
+  targets: ['chatgpt', 'gemini'],
 });
 
 // No boot:
@@ -892,33 +906,34 @@ async _validatePrerequisites() {
 
 ### Antes das Mudanças
 
-| Métrica                  | Valor Atual                      |
-| ------------------------ | -------------------------------- |
-| Acquire Latency          | 100ms (cache miss)               |
-| Driver Creation Time     | 150ms (lazy-load + DNA load)     |
-| Throughput               | 10 tasks/min                     |
-| Pool Reuse               | 0% (sempre cria novo)            |
-| Abort Reliability        | 85% (race condition P1 #4)       |
-| Error Telemetry Coverage | 80% (P1 #5 missing)              |
-| Lifecycle Validation     | 70% (sem _validatePrerequisites) |
+| Métrica                  | Valor Atual                       |
+| ------------------------ | --------------------------------- |
+| Acquire Latency          | 100ms (cache miss)                |
+| Driver Creation Time     | 150ms (lazy-load + DNA load)      |
+| Throughput               | 10 tasks/min                      |
+| Pool Reuse               | 0% (sempre cria novo)             |
+| Abort Reliability        | 85% (race condition P1 #4)        |
+| Error Telemetry Coverage | 80% (P1 #5 missing)               |
+| Lifecycle Validation     | 70% (sem \_validatePrerequisites) |
 
 ### Depois das Mudanças
 
-| Métrica                  | Valor Esperado                    |
-| ------------------------ | --------------------------------- |
-| Acquire Latency          | **10ms (-90%)** (pool hit)        |
-| Driver Creation Time     | 150ms (inalterado - boot only)    |
-| Throughput               | **13 tasks/min (+30%)**           |
-| Pool Reuse               | **80%** (4/5 tasks reusam)        |
-| Abort Reliability        | **100%** (P1 #4 fixed)            |
-| Error Telemetry Coverage | **100%** (P1 #5 fixed)            |
-| Lifecycle Validation     | **100%** (_validatePrerequisites) |
+| Métrica                  | Valor Esperado                     |
+| ------------------------ | ---------------------------------- |
+| Acquire Latency          | **10ms (-90%)** (pool hit)         |
+| Driver Creation Time     | 150ms (inalterado - boot only)     |
+| Throughput               | **13 tasks/min (+30%)**            |
+| Pool Reuse               | **80%** (4/5 tasks reusam)         |
+| Abort Reliability        | **100%** (P1 #4 fixed)             |
+| Error Telemetry Coverage | **100%** (P1 #5 fixed)             |
+| Lifecycle Validation     | **100%** (\_validatePrerequisites) |
 
 ---
 
 ## 🧪 PLANO DE TESTES
 
 ### Teste 1: P1 Bug #4 (AbortSignal Race)
+
 ```bash
 # Scenario: Abort DURANTE execute
 node tests/reliability/test_driver_abort_scenarios.js
@@ -930,6 +945,7 @@ node tests/reliability/test_driver_abort_scenarios.js
 ```
 
 ### Teste 2: P1 Bug #5 (Error Emission)
+
 ```bash
 # Scenario: Todos os 4 pontos de erro
 node tests/reliability/test_driver_error_telemetry.js
@@ -941,6 +957,7 @@ node tests/reliability/test_driver_error_telemetry.js
 ```
 
 ### Teste 3: Driver Pool Reuse
+
 ```bash
 # Scenario: 10 tasks consecutivas
 node tests/performance/test_driver_pool_throughput.js
@@ -952,6 +969,7 @@ node tests/performance/test_driver_pool_throughput.js
 ```
 
 ### Teste 4: Lifecycle Validation
+
 ```bash
 # Scenario: Execute com prerequisites inválidos
 node tests/integration/test_driver_lifecycle_validation.js
@@ -967,17 +985,20 @@ node tests/integration/test_driver_lifecycle_validation.js
 ## 📅 CRONOGRAMA
 
 ### Sprint 2 (1 dia)
+
 - **Manhã** (4h): Implementar P1 #4 (AbortSignal) + P1 #5 (Error Emission)
 - **Tarde** (4h): Testes de reliability + Commit
 
 ### Driver Pool Upgrade (2 dias)
+
 - **Dia 1 Manhã** (4h): Implementar DriverPoolManager.js
 - **Dia 1 Tarde** (4h): Modificar TargetDriver (attach/detach) + Adapter (usar pool)
 - **Dia 2 Manhã** (4h): Testes de performance + Benchmarks
 - **Dia 2 Tarde** (2h): Documentação + Commit
 
 ### Lifecycle Consolidation (meio dia)
-- **Manhã** (4h): Adicionar _validatePrerequisites() + Testes
+
+- **Manhã** (4h): Adicionar \_validatePrerequisites() + Testes
 
 ---
 
@@ -993,9 +1014,9 @@ node tests/integration/test_driver_lifecycle_validation.js
 ### Próximo Sprint
 
 **Sprint 3**: Mission System MVP (LLM-as-judge + Checkpoint Recovery)
+
 - FeedbackProcessor completo
 - CheckpointManager completo
 - Dashboard integration end-to-end
 
-**Aprovador**: @Ilenburg1993
-**Status**: 📋 **AGUARDANDO APROVAÇÃO**
+**Aprovador**: @Ilenburg1993 **Status**: 📋 **AGUARDANDO APROVAÇÃO**

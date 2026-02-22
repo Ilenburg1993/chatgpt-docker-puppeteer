@@ -1,7 +1,6 @@
 # 🎯 Driver Consolidation - Checklist Completo
 
-**Data**: 3 de Fevereiro de 2026
-**Objetivo**: Consolidar arquitetura pool-ready do Driver System
+**Data**: 3 de Fevereiro de 2026 **Objetivo**: Consolidar arquitetura pool-ready do Driver System
 **Status**: 🔄 Em Andamento
 
 ---
@@ -19,9 +18,8 @@
 - ✅ State transitions: UNATTACHED ↔ IDLE
 - ✅ Telemetria: Eventos `CONTEXT_ATTACHED`, `CONTEXT_DETACHED`
 
-**Arquivo**: `src/driver/core/TargetDriver.js` (v3.0)
-**Linhas modificadas**: ~200 linhas
-**Breaking Changes**: ✅ Sim - Constructor signature mudou
+**Arquivo**: `src/driver/core/TargetDriver.js` (v3.0) **Linhas modificadas**: ~200 linhas **Breaking
+Changes**: ✅ Sim - Constructor signature mudou
 
 ---
 
@@ -39,8 +37,7 @@
 - ✅ Removed: Cache WeakMap (replaced by pool Map)
 - ✅ Removed: `getDriver(page, config, signal)` method (deprecated)
 
-**Arquivo**: `src/driver/factory.js` (v3.0)
-**Linhas modificadas**: ~850 linhas (reescrita completa)
+**Arquivo**: `src/driver/factory.js` (v3.0) **Linhas modificadas**: ~850 linhas (reescrita completa)
 **Breaking Changes**: ✅ Sim - API completamente diferente
 
 ---
@@ -59,7 +56,7 @@ const response = await adapter.executeTask(task);
 - [ ] **Remove import**: `DriverLifecycleManager` (linha ~10)
 - [ ] **Remove import**: Qualquer referência a LifecycleManager
 - [ ] **activeDrivers Map**: `Map<taskId, LifecycleManager>` → `Map<taskId, Driver>`
-- [ ] **_executeTask()**: Refatorar para usar pool diretamente
+- [ ] **\_executeTask()**: Refatorar para usar pool diretamente
   - [ ] Remove: `new DriverLifecycleManager(page, task, config)`
   - [ ] Remove: `await lifecycleManager.acquire()`
   - [ ] Remove: `await lifecycleManager.release()`
@@ -72,7 +69,7 @@ const response = await adapter.executeTask(task);
 - [ ] **Telemetria**: Manter eventos NERV (TASK_STARTED, TASK_COMPLETED, etc)
 - [ ] **Métricas**: Manter stats (activeDrivers count, etc)
 
-### Pseudocódigo (Novo _executeTask)
+### Pseudocódigo (Novo \_executeTask)
 
 ```javascript
 async _executeTask(task) {
@@ -132,9 +129,9 @@ async _executeTask(task) {
 }
 ```
 
-**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js` (v3.0)
-**Linhas modificadas**: ~100 linhas (método _executeTask principalmente)
-**Breaking Changes**: ❌ Não - API pública mantém compatibilidade
+**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js` (v3.0) **Linhas modificadas**: ~100
+linhas (método \_executeTask principalmente) **Breaking Changes**: ❌ Não - API pública mantém
+compatibilidade
 
 ---
 
@@ -157,8 +154,8 @@ grep -r "DriverLifecycleManager" src/ tests/
 grep -r "lifecycleManager" src/ tests/
 ```
 
-**Impacto**: 490 linhas removidas
-**Breaking Changes**: ✅ Sim - Mas apenas internamente (API pública não afetada)
+**Impacto**: 490 linhas removidas **Breaking Changes**: ✅ Sim - Mas apenas internamente (API
+pública não afetada)
 
 ---
 
@@ -167,36 +164,38 @@ grep -r "lifecycleManager" src/ tests/
 ### ⚠️ CRÍTICO: Drivers precisam adaptar constructor
 
 **Antes (v2.0)**:
+
 ```javascript
 class ChatGPTDriver extends TargetDriver {
-    constructor(page, config, signal) {
-        super(page, config, signal);
-        // ... DNA loading ...
-    }
+  constructor(page, config, signal) {
+    super(page, config, signal);
+    // ... DNA loading ...
+  }
 }
 ```
 
 **Depois (v3.0)**:
+
 ```javascript
 class ChatGPTDriver extends TargetDriver {
-    constructor(config) {
-        super(config); // ✅ Apenas config
-        // ❌ NÃO carrega DNA aqui (page ainda é null)
+  constructor(config) {
+    super(config); // ✅ Apenas config
+    // ❌ NÃO carrega DNA aqui (page ainda é null)
+  }
+
+  // ✅ DNA loading deve ser lazy (em execute ou attachContext)
+  async execute(prompt) {
+    if (!this.isContextAttached()) {
+      throw new Error('Context not attached');
     }
 
-    // ✅ DNA loading deve ser lazy (em execute ou attachContext)
-    async execute(prompt) {
-        if (!this.isContextAttached()) {
-            throw new Error('Context not attached');
-        }
-
-        // ✅ Carregar DNA se necessário (lazy)
-        if (!this.dnaRules) {
-            await this._loadDNA();
-        }
-
-        // ... execução normal ...
+    // ✅ Carregar DNA se necessário (lazy)
+    if (!this.dnaRules) {
+      await this._loadDNA();
     }
+
+    // ... execução normal ...
+  }
 }
 ```
 
@@ -318,39 +317,39 @@ class ChatGPTDriver extends TargetDriver {
 
 ### Risco 1: Drivers Herdeiros Quebram
 
-**Problema**: ChatGPTDriver, GeminiDriver usam constructor(page, config, signal)
-**Impacto**: ❌ Sistema não inicia (constructor mismatch)
-**Mitigação**:
+**Problema**: ChatGPTDriver, GeminiDriver usam constructor(page, config, signal) **Impacto**: ❌
+Sistema não inicia (constructor mismatch) **Mitigação**:
+
 - ✅ Criar wrapper temporário em TargetDriver v3.0 (backward compat)
 - ✅ Migrar drivers um por um
 - ✅ Remover wrapper após migração completa
 
 ### Risco 2: DNA Loading Falha (Lazy)
 
-**Problema**: DNA carregado no constructor (page existe), agora page=null
-**Impacto**: ⚠️ DNA não carrega, execute() falha
-**Mitigação**:
+**Problema**: DNA carregado no constructor (page existe), agora page=null **Impacto**: ⚠️ DNA não
+carrega, execute() falha **Mitigação**:
+
 - ✅ Mover DNA loading para método lazy (chamado em execute)
 - ✅ Cache DNA rules (não recarregar a cada execute)
 - ✅ Validar DNA loaded antes de executar
 
 ### Risco 3: Pool Exhaustion Frequente
 
-**Problema**: MAX_POOL_SIZE=5 pode ser insuficiente sob carga
-**Impacto**: ⚠️ Tasks falham com POOL_EXHAUSTED
-**Mitigação**:
+**Problema**: MAX_POOL_SIZE=5 pode ser insuficiente sob carga **Impacto**: ⚠️ Tasks falham com
+POOL_EXHAUSTED **Mitigação**:
+
 - ✅ Config via env vars (DRIVER_POOL_MAX_SIZE)
 - ✅ Telemetria: Alert se poolExhausted > 5% das requests
 - ✅ Auto-scale: Aumentar MAX_POOL_SIZE dinamicamente (futuro)
 
 ### Risco 4: Memory Leak (Pool)
 
-**Problema**: Drivers não destruídos, pool cresce indefinidamente
-**Impacto**: ❌ OOM (Out of Memory)
-**Mitigação**:
+**Problema**: Drivers não destruídos, pool cresce indefinidamente **Impacto**: ❌ OOM (Out of
+Memory) **Mitigação**:
+
 - ✅ Health checks & GC (evict idle > 5min)
 - ✅ MAX_POOL_SIZE hard limit
-- ✅ Monitoring: Alert se pool size > MAX_POOL_SIZE * 1.5
+- ✅ Monitoring: Alert se pool size > MAX_POOL_SIZE \* 1.5
 
 ---
 
@@ -372,14 +371,13 @@ class ChatGPTDriver extends TargetDriver {
 - ⏳ **Fase 6**: Testes (Unit + Integration) (4h)
 - ⏳ **Fase 7**: Documentação (CHANGELOG, MIGRATION_GUIDE) (3h)
 
-**Total Estimado**: 22h (8h completo, 14h restante)
-**Status**: 36% completo (8/22h)
+**Total Estimado**: 22h (8h completo, 14h restante) **Status**: 36% completo (8/22h)
 
 ---
 
 ## ✅ PRÓXIMOS PASSOS IMEDIATOS
 
-1. ✅ **Continuar Fase 3**: Refatorar Adapter._executeTask() (30min)
+1. ✅ **Continuar Fase 3**: Refatorar Adapter.\_executeTask() (30min)
 2. ✅ **Testar Adapter**: Validar sintaxe + basic execution (15min)
 3. ✅ **Fase 4**: Remover DriverLifecycleManager (30min)
 4. ⏳ **Fase 5**: Adaptar ChatGPTDriver constructor (2h)
@@ -387,6 +385,5 @@ class ChatGPTDriver extends TargetDriver {
 
 ---
 
-**Última Atualização**: 3 Fev 2026 - Fases 1-2 completas, Fase 3 em andamento
-**Responsável**: Sistema autônomo de consolidação
-**Aprovação**: @Ilenburg1993
+**Última Atualização**: 3 Fev 2026 - Fases 1-2 completas, Fase 3 em andamento **Responsável**:
+Sistema autônomo de consolidação **Aprovação**: @Ilenburg1993

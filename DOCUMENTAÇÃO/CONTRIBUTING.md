@@ -1,15 +1,14 @@
 # 🤝 Guia de Contribuição
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Contribuidores externos e internos
-**Tempo de Leitura**: ~15 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Contribuidores externos e
+internos **Tempo de Leitura**: ~15 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento detalha **como contribuir** para o projeto `chatgpt-docker-puppeteer`: Git workflow, conventional commits, code standards, PR process.
+Este documento detalha **como contribuir** para o projeto `chatgpt-docker-puppeteer`: Git workflow,
+conventional commits, code standards, PR process.
 
 ---
 
@@ -18,6 +17,7 @@ Este documento detalha **como contribuir** para o projeto `chatgpt-docker-puppet
 ### Tipos de Contribuições
 
 ✅ **Bem-vindos**:
+
 - 🐛 **Bug fixes**: Correções de bugs reportados em issues
 - ✨ **Features**: Novos drivers (LLMs), endpoints, melhorias
 - 📝 **Documentação**: Typos, clarificação, exemplos
@@ -26,6 +26,7 @@ Este documento detalha **como contribuir** para o projeto `chatgpt-docker-puppet
 - 🔒 **Security**: Fixes de vulnerabilidades
 
 ⚠️ **Discutir antes**:
+
 - 🏗️ **Arquitetura**: Mudanças estruturais (criar RFC issue)
 - 💥 **Breaking changes**: Incompatibilidades com versões anteriores
 - 📦 **Dependências**: Adicionar/remover libs (justificar)
@@ -74,6 +75,7 @@ git checkout -b test # Não descritivo
 ```
 
 **Convenção de nomes**:
+
 - `feature/description` - Nova funcionalidade
 - `fix/description` - Correção de bug
 - `docs/description` - Documentação
@@ -111,6 +113,7 @@ git commit -m "test(driver): add Claude driver tests"
 **Formato**: `type(scope): subject`
 
 **Types**:
+
 - `feat`: Nova feature
 - `fix`: Bug fix
 - `docs`: Documentação
@@ -123,6 +126,7 @@ git commit -m "test(driver): add Claude driver tests"
 - `revert`: Reverter commit anterior
 
 **Scopes** (opcionais):
+
 - `kernel`, `driver`, `nerv`, `infra`, `server`, `logic`, `core`, `docs`, `tests`
 
 **Exemplos**:
@@ -214,41 +218,45 @@ git pull upstream main
 
 ```javascript
 export default [
-    {
-        files: ['src/**/*.js', 'tests/**/*.js'],
-        languageOptions: {
-            ecmaVersion: 2024,
-            sourceType: 'module',
-            globals: {
-                require: 'readonly',
-                module: 'readonly',
-                process: 'readonly',
-                __dirname: 'readonly'
-            }
+  {
+    files: ['src/**/*.js', 'tests/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: {
+        require: 'readonly',
+        module: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+      },
+    },
+    rules: {
+      // Errors
+      'no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
         },
-        rules: {
-            // Errors
-            'no-unused-vars': ['error', {
-                argsIgnorePattern: '^_',
-                varsIgnorePattern: '^_'
-            }],
-            'no-undef': 'error',
-            'no-redeclare': 'error',
+      ],
+      'no-undef': 'error',
+      'no-redeclare': 'error',
 
-            // Warnings
-            'no-console': 'warn',  // Use logger instead
+      // Warnings
+      'no-console': 'warn', // Use logger instead
 
-            // Style
-            'prefer-const': 'error',
-            'quotes': ['error', 'single', { avoidEscape: true }],
-            'semi': ['error', 'always'],
-            'indent': ['error', 4]
-        }
-    }
+      // Style
+      'prefer-const': 'error',
+      quotes: ['error', 'single', { avoidEscape: true }],
+      semi: ['error', 'always'],
+      indent: ['error', 4],
+    },
+  },
 ];
 ```
 
 **Run**:
+
 ```bash
 # Check
 make lint  # ou npm run lint
@@ -275,6 +283,7 @@ make format-code  # ou npx eslint . --fix
 ```
 
 **VS Code** (auto-format on save):
+
 ```json
 // .vscode/settings.json
 {
@@ -320,18 +329,18 @@ if (task.state === STATUS_VALUES.PENDING) { ... }
 ```javascript
 // ❌ Callbacks
 fs.readFile('file.txt', (err, data) => {
-    if (err) return callback(err);
-    callback(null, data);
+  if (err) return callback(err);
+  callback(null, data);
 });
 
 // ✅ Async/await
 const fs = require('fs-extra');
 try {
-    const data = await fs.readFile('file.txt', 'utf8');
-    return data;
+  const data = await fs.readFile('file.txt', 'utf8');
+  return data;
 } catch (err) {
-    logger.log('ERROR', 'Failed to read file', null, err);
-    throw err;
+  logger.log('ERROR', 'Failed to read file', null, err);
+  throw err;
 }
 ```
 
@@ -342,17 +351,17 @@ try {
 ```javascript
 // ❌ Silent failures
 try {
-    await riskyOperation();
+  await riskyOperation();
 } catch (err) {
-    // Silently ignored
+  // Silently ignored
 }
 
 // ✅ Log + propagate
 try {
-    await riskyOperation();
+  await riskyOperation();
 } catch (err) {
-    logger.log('ERROR', '[COMPONENT] Operation failed', taskId, err);
-    throw err;  // Propagate to caller
+  logger.log('ERROR', '[COMPONENT] Operation failed', taskId, err);
+  throw err; // Propagate to caller
 }
 ```
 
@@ -366,9 +375,9 @@ logger.log('INFO', 'Task abc123 completed in 45s');
 
 // ✅ Structured (easier to parse)
 logger.log('INFO', '[TASK] Completed', taskId, {
-    duration: 45000,
-    responseLength: 1234,
-    retries: 2
+  duration: 45000,
+  responseLength: 1234,
+  retries: 2,
 });
 ```
 
@@ -382,11 +391,13 @@ Ao abrir PR, use este template (`.github/PULL_REQUEST_TEMPLATE.md`):
 
 ```markdown
 ## Description
+
 <!-- Brief description of changes (what and why) -->
 
-Closes #123  <!-- Link related issues -->
+Closes #123 <!-- Link related issues -->
 
 ## Type of Change
+
 <!-- Mark with [x] -->
 
 - [ ] 🐛 Bug fix (non-breaking)
@@ -399,6 +410,7 @@ Closes #123  <!-- Link related issues -->
 ## Testing
 
 **How was this tested?**
+
 <!-- Describe tests performed -->
 
 - [ ] Unit tests added/updated
@@ -420,9 +432,11 @@ Closes #123  <!-- Link related issues -->
 - [ ] Related issues linked
 
 ## Screenshots (if applicable)
+
 <!-- Add screenshots for UI changes -->
 
 ## Additional Notes
+
 <!-- Any extra context, concerns, or questions -->
 ```
 
@@ -473,28 +487,33 @@ Closes #123  <!-- Link related issues -->
 **Como revisar**:
 
 ✅ **Ser construtivo**:
+
 ```
 ❌ "This code is bad"
 ✅ "Consider using async/await here for better error handling"
 ```
 
 ✅ **Sugerir alternativas**:
+
 ```
 ❌ "Wrong pattern"
 ✅ "Instead of direct access, consider using the NERV event bus for decoupling"
 ```
 
 ✅ **Aprovar quando satisfeito**:
+
 - Se mudanças menores: "LGTM, minor suggestions" + Approve
 - Se críticas: "Request changes" + explicar blockers
 
 ✅ **Use GitHub suggestions** para fixes pequenos:
+
 ```diff
 - console.log('Debug');
 + logger.log('DEBUG', 'Debug message');
 ```
 
 ❌ **Evitar**:
+
 - Criticar estilo (Prettier auto-formata)
 - Exigir perfeição (prefer progress over perfection)
 - Bloquear por gostos pessoais (use team standards)
@@ -506,6 +525,7 @@ Closes #123  <!-- Link related issues -->
 **Preferência**: **Squash merge**
 
 **Por quê?**:
+
 - Limpa histórico (1 commit por PR)
 - Preserva conventional commits
 - Facilita `git revert` se necessário
@@ -547,6 +567,7 @@ Closes #123  <!-- Link related issues -->
 ### Features Novas
 
 **Devem atualizar**:
+
 - [ ] `README.md` - Quick Start (se aplicável)
 - [ ] `API_REFERENCE.md` - Novos endpoints/eventos
 - [ ] `CONFIGURATION.md` - Novos parâmetros
@@ -565,32 +586,38 @@ Closes #123  <!-- Link related issues -->
 ### Breaking Changes
 
 **Devem incluir**:
+
 - [ ] `CHANGELOG.md` - Entrada na seção `## [Unreleased]`
 - [ ] **Migration guide** no corpo do PR
 - [ ] Atualizar `package.json` version (major bump)
 
 **Exemplo**: Mudar task state enum (uppercase → lowercase)
 
-```markdown
+````markdown
 ## Migration Guide: Task State Enum
 
 **Breaking Change**: Task states agora usam lowercase.
 
 **Before** (v1.x):
+
 ```javascript
 if (task.state === 'PENDING') { ... }
 ```
+````
 
 **After** (v2.0):
+
 ```javascript
 if (task.state === 'pending') { ... }
 ```
 
 **Action Required**:
+
 1. Update all `task.state` checks to lowercase
 2. Update schemas in `src/core/schemas.js`
 3. Re-run tests: `make test-all`
-```
+
+````
 
 ---
 
@@ -651,7 +678,7 @@ Contribuidores são reconhecidos em:
 1. @johndoe (25 commits, 10 PRs)
 2. @janedoe (18 commits, 8 PRs)
 3. @aiarchitect (50 commits, canonical docs)
-```
+````
 
 ---
 
@@ -665,4 +692,4 @@ Contribuidores são reconhecidos em:
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, Community Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, Community Team_

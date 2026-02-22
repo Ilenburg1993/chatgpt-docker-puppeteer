@@ -1,10 +1,7 @@
 # 🔍 Auditoria Completa: NERV (IPC 2.0 Protocol)
 
-**Data**: 2026-01-21
-**Auditor**: Sistema de Auditoria Automatizada
-**Subsistema**: NERV — Neural Event Relay Vector
-**Versão do Protocolo**: 2.0.0
-**Status**: ✅ COMPLETO
+**Data**: 2026-01-21 **Auditor**: Sistema de Auditoria Automatizada **Subsistema**: NERV — Neural
+Event Relay Vector **Versão do Protocolo**: 2.0.0 **Status**: ✅ COMPLETO
 
 ---
 
@@ -12,7 +9,10 @@
 
 ### Visão Geral
 
-O **NERV** (Neural Event Relay Vector) é o sistema de comunicação IPC 2.0 que implementa **zero-coupling architecture** entre todos os subsistemas (KERNEL, DRIVER, SERVER, INFRA). Utiliza padrão pub/sub com envelopes imutáveis, validação constitucional e transporte híbrido (local + remoto).
+O **NERV** (Neural Event Relay Vector) é o sistema de comunicação IPC 2.0 que implementa
+**zero-coupling architecture** entre todos os subsistemas (KERNEL, DRIVER, SERVER, INFRA). Utiliza
+padrão pub/sub com envelopes imutáveis, validação constitucional e transporte híbrido (local +
+remoto).
 
 ### Status Geral: 🟢 SAUDÁVEL
 
@@ -25,15 +25,15 @@ O **NERV** (Neural Event Relay Vector) é o sistema de comunicação IPC 2.0 que
 
 ### Números
 
-| Métrica | Valor |
-|---------|-------|
-| **Arquivos NERV** | 17 arquivos (shared: 3, src/nerv: 14) |
-| **Linhas de Código** | ~2.400 LOC total |
-| **Audit Levels** | 500 (constants), 510 (envelope), 520 (schemas), 800 (adapters) |
-| **ActionCodes** | 33 definidos (extensível) |
-| **ActorRoles** | 6 (KERNEL, SERVER, INFRA, OBSERVER, MAESTRO, DRIVER) |
-| **Testes** | 14 testes unitários (test_nerv_core.spec.js) |
-| **Cobertura Estimada** | ~85% (protocolo + adapters + transport) |
+| Métrica                | Valor                                                          |
+| ---------------------- | -------------------------------------------------------------- |
+| **Arquivos NERV**      | 17 arquivos (shared: 3, src/nerv: 14)                          |
+| **Linhas de Código**   | ~2.400 LOC total                                               |
+| **Audit Levels**       | 500 (constants), 510 (envelope), 520 (schemas), 800 (adapters) |
+| **ActionCodes**        | 33 definidos (extensível)                                      |
+| **ActorRoles**         | 6 (KERNEL, SERVER, INFRA, OBSERVER, MAESTRO, DRIVER)           |
+| **Testes**             | 14 testes unitários (test_nerv_core.spec.js)                   |
+| **Cobertura Estimada** | ~85% (protocolo + adapters + transport)                        |
 
 ### Descobertas Principais
 
@@ -55,7 +55,8 @@ O **NERV** (Neural Event Relay Vector) é o sistema de comunicação IPC 2.0 que
 #### ⚠️ Pontos de Atenção (8)
 
 1. **TODOs ONDA 2**: 4 pendentes (forensics, infra_failure_policy não usam NERV ainda)
-2. **KernelNERVBridge envelope format**: Usa formato legado (header/ids/kind) em vez do novo (protocol/identity/causality/type)
+2. **KernelNERVBridge envelope format**: Usa formato legado (header/ids/kind) em vez do novo
+   (protocol/identity/causality/type)
 3. **Imports não utilizados**: `_MessageType`, `_ActionCode`, `_ActorRole` com underscore em nerv.js
 4. **ActionCodes planejados**: 6 códigos com comentário "(Planned for future use)" não implementados
 5. **FORBIDDEN_FIELDS check**: String search em JSON serializado (performance)
@@ -74,76 +75,81 @@ O **NERV** (Neural Event Relay Vector) é o sistema de comunicação IPC 2.0 que
 
 ### 1. Protocolo Universal (`src/shared/nerv/`)
 
-| Arquivo | LOC | Audit Level | Responsabilidade |
-|---------|-----|-------------|------------------|
-| `README.md` | 282 | 500-520 (doc) | Documentação do protocolo |
-| `constants.js` | 173 | 500 | Vocabulário canônico (MessageType, ActionCode, ActorRole) |
-| `envelope.js` | 166 | 510 | Factory de envelopes imutáveis |
-| `schemas.js` | 193 | 520 | Validação constitucional |
+| Arquivo        | LOC | Audit Level   | Responsabilidade                                          |
+| -------------- | --- | ------------- | --------------------------------------------------------- |
+| `README.md`    | 282 | 500-520 (doc) | Documentação do protocolo                                 |
+| `constants.js` | 173 | 500           | Vocabulário canônico (MessageType, ActionCode, ActorRole) |
+| `envelope.js`  | 166 | 510           | Factory de envelopes imutáveis                            |
+| `schemas.js`   | 193 | 520           | Validação constitucional                                  |
 
 **Total: 814 LOC (protocolo)**
 
 ### 2. Transporte e Infraestrutura (`src/nerv/`)
 
 #### Core
-| Arquivo | LOC | Responsabilidade |
-|---------|-----|------------------|
+
+| Arquivo   | LOC | Responsabilidade                          |
+| --------- | --- | ----------------------------------------- |
 | `nerv.js` | 250 | Compositor estrutural (cria e expõe NERV) |
 
 #### Transport
-| Arquivo | LOC | Responsabilidade |
-|---------|-----|------------------|
-| `transport/hybrid_transport.js` | 223 | Transporte híbrido (local + Socket.io) |
-| `transport/transport.js` | ~150 | Transporte base (customizado) |
-| `transport/connection.js` | ~100 | Gerenciamento de conexão |
-| `transport/framing.js` | ~80 | Serialização/deserialização |
-| `transport/reconnect.js` | ~120 | Lógica de reconexão |
+
+| Arquivo                         | LOC  | Responsabilidade                       |
+| ------------------------------- | ---- | -------------------------------------- |
+| `transport/hybrid_transport.js` | 223  | Transporte híbrido (local + Socket.io) |
+| `transport/transport.js`        | ~150 | Transporte base (customizado)          |
+| `transport/connection.js`       | ~100 | Gerenciamento de conexão               |
+| `transport/framing.js`          | ~80  | Serialização/deserialização            |
+| `transport/reconnect.js`        | ~120 | Lógica de reconexão                    |
 
 #### Buffers
-| Arquivo | LOC | Responsabilidade |
-|---------|-----|------------------|
-| `buffers/buffers.js` | 120 | Compositor de filas (inbound/outbound) |
-| `buffers/inbound_queue.js` | ~100 | Fila de entrada FIFO |
-| `buffers/outbound_queue.js` | ~100 | Fila de saída FIFO |
-| `buffers/backpressure.js` | ~80 | Sinalização de pressão |
+
+| Arquivo                     | LOC  | Responsabilidade                       |
+| --------------------------- | ---- | -------------------------------------- |
+| `buffers/buffers.js`        | 120  | Compositor de filas (inbound/outbound) |
+| `buffers/inbound_queue.js`  | ~100 | Fila de entrada FIFO                   |
+| `buffers/outbound_queue.js` | ~100 | Fila de saída FIFO                     |
+| `buffers/backpressure.js`   | ~80  | Sinalização de pressão                 |
 
 #### Emission/Reception
-| Arquivo | LOC | Responsabilidade |
-|---------|-----|------------------|
-| `emission/emission.js` | 90 | Compositor de emissores |
-| `emission/emit_command.js` | ~100 | Emissor de COMMANDs |
-| `emission/emit_event.js` | ~100 | Emissor de EVENTs |
-| `emission/emit_ack.js` | ~80 | Emissor de ACKs |
-| `reception/reception.js` | 80 | Compositor de receptor |
-| `reception/receive.js` | ~120 | Receptor de envelopes |
+
+| Arquivo                    | LOC  | Responsabilidade        |
+| -------------------------- | ---- | ----------------------- |
+| `emission/emission.js`     | 90   | Compositor de emissores |
+| `emission/emit_command.js` | ~100 | Emissor de COMMANDs     |
+| `emission/emit_event.js`   | ~100 | Emissor de EVENTs       |
+| `emission/emit_ack.js`     | ~80  | Emissor de ACKs         |
+| `reception/reception.js`   | 80   | Compositor de receptor  |
+| `reception/receive.js`     | ~120 | Receptor de envelopes   |
 
 #### Correlation/Telemetry/Health
-| Arquivo | LOC | Responsabilidade |
-|---------|-----|------------------|
-| `correlation/correlation_store.js` | 190 | Armazenamento histórico de correlações |
-| `correlation/correlation_context.js` | ~80 | Contexto de correlação |
-| `telemetry/ipc_telemetry.js` | 189 | Observabilidade técnica |
-| `health/health.js` | 239 | Monitor de saúde do canal |
+
+| Arquivo                              | LOC | Responsabilidade                       |
+| ------------------------------------ | --- | -------------------------------------- |
+| `correlation/correlation_store.js`   | 190 | Armazenamento histórico de correlações |
+| `correlation/correlation_context.js` | ~80 | Contexto de correlação                 |
+| `telemetry/ipc_telemetry.js`         | 189 | Observabilidade técnica                |
+| `health/health.js`                   | 239 | Monitor de saúde do canal              |
 
 **Total: ~2.400 LOC (transporte + infra)**
 
 ### 3. Adapters NERV (`src/*/nerv_adapter/`, `src/kernel/nerv_bridge/`)
 
-| Arquivo | LOC | Audit Level | Responsabilidade |
-|---------|-----|-------------|------------------|
-| `driver/nerv_adapter/driver_nerv_adapter.js` | 365 | 800 | Adapter DRIVER ↔ NERV |
-| `server/nerv_adapter/server_nerv_adapter.js` | 323 | 800 | Adapter SERVER ↔ NERV |
-| `kernel/nerv_bridge/kernel_nerv_bridge.js` | 369 | - | Bridge KERNEL ↔ NERV |
+| Arquivo                                      | LOC | Audit Level | Responsabilidade      |
+| -------------------------------------------- | --- | ----------- | --------------------- |
+| `driver/nerv_adapter/driver_nerv_adapter.js` | 365 | 800         | Adapter DRIVER ↔ NERV |
+| `server/nerv_adapter/server_nerv_adapter.js` | 323 | 800         | Adapter SERVER ↔ NERV |
+| `kernel/nerv_bridge/kernel_nerv_bridge.js`   | 369 | -           | Bridge KERNEL ↔ NERV  |
 
 **Total: 1.057 LOC (adapters)**
 
 ### 4. Testes
 
-| Arquivo | LOC | Cobertura |
-|---------|-----|-----------|
-| `tests/unit/nerv/test_nerv_core.spec.js` | 298 | Protocolo, pub/sub, correlação |
-| `tests/integration/driver/test_driver_nerv.spec.js` | ~200 | Integração Driver-NERV |
-| `tests/mocks/mock_nerv.js` | ~150 | Mock para testes |
+| Arquivo                                             | LOC  | Cobertura                      |
+| --------------------------------------------------- | ---- | ------------------------------ |
+| `tests/unit/nerv/test_nerv_core.spec.js`            | 298  | Protocolo, pub/sub, correlação |
+| `tests/integration/driver/test_driver_nerv.spec.js` | ~200 | Integração Driver-NERV         |
+| `tests/mocks/mock_nerv.js`                          | ~150 | Mock para testes               |
 
 **Total: ~650 LOC (testes)**
 
@@ -158,6 +164,7 @@ O **NERV** (Neural Event Relay Vector) é o sistema de comunicação IPC 2.0 que
 **Responsabilidade**: Vocabulário canônico do protocolo
 
 **Estrutura**:
+
 ```javascript
 PROTOCOL_VERSION = '2.0.0'
 
@@ -215,16 +222,20 @@ TechnicalCode (diagnóstico):
 ```
 
 **✅ Pontos Fortes**:
+
 - Vocabulário bem definido e extensível
 - Separação clara: ontológico (fechado) vs referencial (extensível)
 - Object.freeze para imutabilidade
 - Comentários explicativos em cada grupo
 
 **⚠️ Issues**:
-1. **6 ActionCodes planejados mas não implementados**: Comentário "(Planned for future use)" - considerar remover ou implementar
+
+1. **6 ActionCodes planejados mas não implementados**: Comentário "(Planned for future use)" -
+   considerar remover ou implementar
 2. **ChannelState e TechnicalCode**: Não utilizados no código atual (grep confirma)
 
 **Recomendações**:
+
 - P2: Implementar ou remover ActionCodes planejados
 - P3: Adicionar testes para validação de constantes
 
@@ -235,6 +246,7 @@ TechnicalCode (diagnóstico):
 **Responsabilidade**: Factory de envelopes imutáveis
 
 **Estrutura do Envelope** (5 blocos):
+
 ```javascript
 {
   protocol: {
@@ -264,6 +276,7 @@ TechnicalCode (diagnóstico):
 ```
 
 **Validações Constitucionais** (assertions):
+
 - Protocol version obrigatório
 - ActorRole e target válidos (se não null)
 - UUIDs v4 válidos (regex)
@@ -274,6 +287,7 @@ TechnicalCode (diagnóstico):
 **deepFreeze**: Imutabilidade total recursiva
 
 **✅ Pontos Fortes**:
+
 - Estrutura clara em 5 blocos semânticos
 - Validação antecipada na criação
 - Imutabilidade garantida
@@ -289,33 +303,41 @@ TechnicalCode (diagnóstico):
 **Responsabilidade**: Validação constitucional de envelopes
 
 **Funções**:
+
 ```javascript
-validateStructure(envelope)     // Blocos obrigatórios
-validateOntology(envelope)      // MessageType/ActionCode/ActorRole
-validateProhibitions(envelope)  // Campos proibidos
-validateEnvelope(envelope)      // Completa
-isEnvelopeValid(envelope)       // Boolean (sem throw)
-validateRobotIdentity(identity) // Identidade DNA
+validateStructure(envelope); // Blocos obrigatórios
+validateOntology(envelope); // MessageType/ActionCode/ActorRole
+validateProhibitions(envelope); // Campos proibidos
+validateEnvelope(envelope); // Completa
+isEnvelopeValid(envelope); // Boolean (sem throw)
+validateRobotIdentity(identity); // Identidade DNA
 ```
 
 **Validações**:
+
 1. **Estrutural**: protocol/identity/causality/type/payload existem e são objetos
 2. **Ontológica**: ActorRole, MessageType, ActionCode válidos; UUIDs válidos
 3. **Regras específicas**:
    - ACK sem payload semântico
    - EVENT sem target explícito (broadcast only)
-4. **Proibições**: Campos semânticos proibidos (status, result, success, error, response, return_value, exception, completed)
+4. **Proibições**: Campos semânticos proibidos (status, result, success, error, response,
+   return_value, exception, completed)
 
 **✅ Pontos Fortes**:
+
 - Validação multicamadas
 - Erros descritivos
 - Separação validação/verificação booleana
 
 **⚠️ Issues**:
-1. **FORBIDDEN_FIELDS check linha 135**: String search em JSON serializado - ineficiente para payloads grandes
-2. **validateRobotIdentity linha 150+**: Função incompleta (arquivo cortado - possível bug de truncamento)
+
+1. **FORBIDDEN_FIELDS check linha 135**: String search em JSON serializado - ineficiente para
+   payloads grandes
+2. **validateRobotIdentity linha 150+**: Função incompleta (arquivo cortado - possível bug de
+   truncamento)
 
 **Recomendações**:
+
 - P2: Otimizar FORBIDDEN_FIELDS (recursive object walk em vez de JSON.stringify)
 - P1: Verificar se validateRobotIdentity está completa
 
@@ -328,6 +350,7 @@ validateRobotIdentity(identity) // Identidade DNA
 **Responsabilidade**: Construir e expor o NERV (não executa fluxo)
 
 **Estatuto**:
+
 - NÃO executa fluxo
 - NÃO registra callbacks internos
 - NÃO drena buffers
@@ -336,6 +359,7 @@ validateRobotIdentity(identity) // Identidade DNA
 - NÃO interpreta
 
 **Composição**:
+
 ```javascript
 createNERV(config) {
   // 1. Telemetria (base observacional)
@@ -371,21 +395,27 @@ createNERV(config) {
 ```
 
 **Modos de Operação**:
+
 - `LOCAL`: EventEmitter puro (in-process, zero latência)
 - `HYBRID`: EventEmitter + Socket.io (ONDA 2.6)
 
 **✅ Pontos Fortes**:
+
 - Compositor puro (não executa lógica)
 - Separação clara de responsabilidades
 - API pública bem definida
 - Suporte a shutdown gracioso
 
 **⚠️ Issues**:
-1. **Imports não utilizados linha 29**: `_MessageType`, `_ActionCode`, `_ActorRole` com underscore (importados mas não usados)
-2. **Complexidade ESLint disabled linha 66**: Comentário `// eslint-disable-next-line complexity` - função createNERV com muitas responsabilidades
+
+1. **Imports não utilizados linha 29**: `_MessageType`, `_ActionCode`, `_ActorRole` com underscore
+   (importados mas não usados)
+2. **Complexidade ESLint disabled linha 66**: Comentário `// eslint-disable-next-line complexity` -
+   função createNERV com muitas responsabilidades
 
 **Recomendações**:
-- P3: Remover imports não utilizados (já prefixados com _ para indicar "não usado")
+
+- P3: Remover imports não utilizados (já prefixados com \_ para indicar "não usado")
 - P3: Refatorar createNERV em funções menores (bootstrapTelemetry, bootstrapTransport, etc.)
 
 ---
@@ -395,6 +425,7 @@ createNERV(config) {
 **Responsabilidade**: Transporte híbrido local + remoto
 
 **Modos**:
+
 ```javascript
 LOCAL mode:
   - EventEmitter puro
@@ -408,6 +439,7 @@ HYBRID mode:
 ```
 
 **Fluxo de Envio**:
+
 ```javascript
 send(envelope) {
   // 1. SEMPRE emite local (fast-path)
@@ -421,29 +453,33 @@ send(envelope) {
 ```
 
 **Fluxo de Recepção**:
+
 ```javascript
 socketAdapter.onReceive(frame => {
-  envelope = JSON.parse(frame)
+  envelope = JSON.parse(frame);
 
   // Emite no bus local
-  localBus.emit('message', envelope)
+  localBus.emit('message', envelope);
 
   // Notifica handlers registrados
-  handlers.forEach(h => h(envelope))
-})
+  handlers.forEach(h => h(envelope));
+});
 ```
 
 **✅ Pontos Fortes**:
+
 - Fast-path local (zero overhead para mesmos processo)
 - Reconexão automática (via socketAdapter)
 - Separação clara local vs remoto
 - Telemetria de todos os eventos
 
 **⚠️ Issues**:
+
 1. **Error logging linha 70**: Telemetria de erro sem context (correlationId, msg_id)
 2. **JSON.parse sem try-catch**: Linha 62 - parsing pode falhar
 
 **Recomendações**:
+
 - P2: Adicionar correlationId em telemetria de erro
 - P2: Wrap JSON.parse em try-catch (já existe em linha 72, falta em linha 62)
 
@@ -452,12 +488,14 @@ socketAdapter.onReceive(frame => {
 #### 2.3 buffers/ (FIFO + Backpressure)
 
 **Componentes**:
+
 - `buffers.js`: Compositor (inbound + outbound + backpressure)
 - `inbound_queue.js`: Fila de entrada FIFO
 - `outbound_queue.js`: Fila de saída FIFO
 - `backpressure.js`: Sinalização de pressão
 
 **Operações**:
+
 ```javascript
 // Enfileiramento
 enqueueOutbound(item) {
@@ -476,16 +514,19 @@ clear()           // Limpa ambas filas
 ```
 
 **✅ Pontos Fortes**:
+
 - FIFO garantido (ordem preservada)
 - Limites configuráveis (maxSize opcional)
 - Backpressure sinalizado via telemetria
 - API simples e clara
 
 **⚠️ Issues**:
+
 1. **Backpressure sem enforcement**: Apenas sinaliza, não bloqueia emissão (emitter pode ignorar)
 2. **Sem persistência**: Mensagens perdidas em crash
 
 **Recomendações**:
+
 - P2: Considerar backpressure blocking (reject ou delay emission)
 - P3: Persistência opcional para mensagens críticas
 
@@ -496,15 +537,17 @@ clear()           // Limpa ambas filas
 **Responsabilidade**: Armazenar histórico correlacionado por correlation_id
 
 **Operações**:
+
 ```javascript
-register(envelope)                    // Registra envelope na correlação
-getHistory(correlationId)            // Retorna histórico completo
-hasCorrelation(correlationId)        // Verifica se existe
-listCorrelations()                   // Lista todos correlation_ids
-clear(correlationId)                 // Limpa correlação específica
+register(envelope); // Registra envelope na correlação
+getHistory(correlationId); // Retorna histórico completo
+hasCorrelation(correlationId); // Verifica se existe
+listCorrelations(); // Lista todos correlation_ids
+clear(correlationId); // Limpa correlação específica
 ```
 
 **Armazenamento**:
+
 ```javascript
 store = {
   'correlation-001': [
@@ -517,21 +560,25 @@ store = {
 ```
 
 **Características**:
+
 - Ordem cronológica preservada
 - Payload opaco (não armazenado integralmente - apenas kind/msg_id)
 - Crescimento ilimitado (sem TTL)
 - Telemetria de criação/crescimento
 
 **✅ Pontos Fortes**:
+
 - Rastreamento causal completo
 - API simples
 - Telemetria integrada
 
 **⚠️ Issues**:
+
 1. **Crescimento ilimitado**: Sem TTL ou max entries global (risk memory leak)
 2. **Payload não armazenado**: Histórico incompleto para debugging
 
 **Recomendações**:
+
 - P2: Adicionar TTL ou max entries global para evitar memory leak
 - P3: Considerar armazenar payload completo (opcional, para debug)
 
@@ -542,14 +589,16 @@ store = {
 **Responsabilidade**: Observabilidade técnica sem interferir no fluxo
 
 **Operações**:
+
 ```javascript
-emit(type, meta)      // Emite evento técnico
-on(handler)           // Subscrição passiva
-getMetrics()          // Snapshot de métricas
-reset()               // Reseta métricas
+emit(type, meta); // Emite evento técnico
+on(handler); // Subscrição passiva
+getMetrics(); // Snapshot de métricas
+reset(); // Reseta métricas
 ```
 
 **Métricas Coletadas**:
+
 ```javascript
 {
   counters: {
@@ -569,21 +618,25 @@ reset()               // Reseta métricas
 ```
 
 **Garantias**:
+
 - NÃO altera fluxo
 - NÃO bloqueia execução
 - Falhas internas isoladas (silent fail)
 - Handlers executados de forma segura (safeCall)
 
 **✅ Pontos Fortes**:
+
 - Observabilidade sem side effects
 - Métricas técnicas úteis
 - Snapshot defensivo (clone)
 
 **⚠️ Issues**:
+
 1. **Subscribers sem limit**: Set pode crescer indefinidamente (risk memory leak)
 2. **Counters ilimitados**: Sem reset automático
 
 **Recomendações**:
+
 - P2: Adicionar maxListeners para subscribers
 - P3: Auto-reset de counters periodicamente
 
@@ -594,6 +647,7 @@ reset()               // Reseta métricas
 **Responsabilidade**: Snapshot observável do estado operacional
 
 **Estado Monitorado**:
+
 ```javascript
 {
   timestamp,
@@ -614,17 +668,20 @@ reset()               // Reseta métricas
 ```
 
 **Operações**:
+
 ```javascript
-report(type, data)    // Ingestão de eventos técnicos
-getSnapshot()         // Retorna estado atual
-on(handler)           // Subscrição a mudanças
+report(type, data); // Ingestão de eventos técnicos
+getSnapshot(); // Retorna estado atual
+on(handler); // Subscrição a mudanças
 ```
 
 **Limiares Opcionais**:
+
 - `maxOutboundBuffer`: Emite anomalia se ultrapassado
 - `maxInboundBuffer`: Emite anomalia se ultrapassado
 
 **✅ Pontos Fortes**:
+
 - Estado técnico completo
 - Detecção de anomalias
 - Snapshot defensivo (clone)
@@ -640,12 +697,14 @@ on(handler)           // Subscrição a mudanças
 **Responsabilidade**: Adaptar NERV para domínio DRIVER
 
 **Garantias de Zero-Coupling**:
+
 - ✅ NÃO importa KERNEL
 - ✅ NÃO importa SERVER
 - ✅ NÃO acessa filesystem diretamente
 - ✅ Comunicação 100% via `nerv.onReceive()` e `nerv.emit()`
 
 **Comandos Escutados** (via NERV):
+
 ```javascript
 DRIVER_EXECUTE_TASK   → _executeTask()
 DRIVER_ABORT          → _abortTask()
@@ -653,16 +712,18 @@ DRIVER_HEALTH_CHECK   → _performHealthCheck()
 ```
 
 **Eventos Emitidos** (via NERV):
+
 ```javascript
-DRIVER_TASK_STARTED
-DRIVER_TASK_COMPLETED
-DRIVER_TASK_FAILED
-DRIVER_TASK_ABORTED
-DRIVER_ERROR
-DRIVER_VITAL
+DRIVER_TASK_STARTED;
+DRIVER_TASK_COMPLETED;
+DRIVER_TASK_FAILED;
+DRIVER_TASK_ABORTED;
+DRIVER_ERROR;
+DRIVER_VITAL;
 ```
 
 **Fluxo de Execução**:
+
 ```javascript
 1. KERNEL emite COMMAND: DRIVER_EXECUTE_TASK
    ↓
@@ -680,6 +741,7 @@ DRIVER_VITAL
 ```
 
 **✅ Pontos Fortes**:
+
 - Zero-coupling perfeito
 - Telemetria detalhada de cada driver
 - Gerenciamento de lifecycle completo
@@ -695,17 +757,20 @@ DRIVER_VITAL
 **Responsabilidade**: Adaptar NERV para domínio SERVER (Dashboard/API)
 
 **Garantias de Zero-Coupling**:
+
 - ✅ NÃO importa KERNEL
 - ✅ NÃO importa DRIVER
 - ✅ NÃO acessa filesystem diretamente
 - ✅ Comunicação 100% via `nerv.onReceive()` e `nerv.emit()`
 
 **Fluxo Bidirecional**:
+
 ```
 Dashboard (Socket.io) ←→ ServerNERVAdapter ←→ NERV ←→ KERNEL/DRIVER
 ```
 
 **Comandos do Dashboard** → NERV:
+
 ```javascript
 'dashboard:command' → Traduz para ActionCode:
   - task:start      → TASK_START
@@ -718,6 +783,7 @@ Dashboard (Socket.io) ←→ ServerNERVAdapter ←→ NERV ←→ KERNEL/DRIVER
 ```
 
 **Eventos NERV** → Dashboard:
+
 ```javascript
 nerv.onReceive(envelope) {
   if (envelope.messageType === EVENT) {
@@ -727,10 +793,12 @@ nerv.onReceive(envelope) {
 ```
 
 **Filtros Aplicados**:
+
 - Apenas EVENTs vão para dashboard (COMMANDs são internos)
 - ACKs são ignorados
 
 **✅ Pontos Fortes**:
+
 - Zero-coupling perfeito
 - Tradução bidirecional limpa
 - ACK imediato para comandos dashboard
@@ -746,12 +814,14 @@ nerv.onReceive(envelope) {
 **Responsabilidade**: Ponte KERNEL ↔ NERV
 
 **Papel**:
+
 - NÃO decide nada
 - NÃO interpreta payload
 - NÃO valida verdade semântica
 - Apenas ponte estrutural
 
 **Fluxo Inbound** (NERV → KERNEL):
+
 ```javascript
 nerv.onReceive(envelope) {
   if (envelope.kind === EVENT) {
@@ -765,6 +835,7 @@ nerv.onReceive(envelope) {
 ```
 
 **Fluxo Outbound** (KERNEL → NERV):
+
 ```javascript
 emitEvent({ target, correlationId, payload }) {
   envelope = {
@@ -779,15 +850,19 @@ emitEvent({ target, correlationId, payload }) {
 ```
 
 **✅ Pontos Fortes**:
+
 - Separação clara inbound/outbound
 - Telemetria de anomalias
 - Validação de envelope
 
 **⚠️ Issues**:
-1. **Envelope format legado linhas 323-335**: Usa formato antigo (`header/ids/kind`) em vez do novo (`protocol/identity/causality/type`)
+
+1. **Envelope format legado linhas 323-335**: Usa formato antigo (`header/ids/kind`) em vez do novo
+   (`protocol/identity/causality/type`)
 2. **Inconsistência com createEnvelope**: Não usa factory canônico de envelope.js
 
 **Recomendações**:
+
 - P1: Migrar para formato de envelope canônico (usar `createEnvelope()`)
 - P1: Remover construção manual de envelope
 
@@ -800,6 +875,7 @@ emitEvent({ target, correlationId, payload }) {
 **Localização**: `src/core/forensics.js`
 
 **TODOs**:
+
 ```javascript
 // Linha 17
 // TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter
@@ -827,6 +903,7 @@ emitEvent({ target, correlationId, payload }) {
 **Localização**: `src/core/infra_failure_policy.js`
 
 **TODOs**:
+
 ```javascript
 // Linha 11
 // TODO [ONDA 2]: Refatorar para usar NERV após DriverNERVAdapter
@@ -853,6 +930,7 @@ emitEvent({ target, correlationId, payload }) {
 ### test_nerv_core.spec.js (298 LOC)
 
 **Cobertura**:
+
 - ✅ Criação e inicialização do NERV
 - ✅ Publicação de eventos (emit)
 - ✅ Assinatura de eventos (on/once/off)
@@ -862,6 +940,7 @@ emitEvent({ target, correlationId, payload }) {
 - ✅ Payload preservation
 
 **Casos de Teste** (14):
+
 1. deve criar instância do NERV
 2. deve inicializar sem erros
 3. deve emitir evento simples
@@ -887,19 +966,20 @@ emitEvent({ target, correlationId, payload }) {
 
 #### 1. ✅ Migrar KernelNERVBridge para envelope canônico
 
-**Arquivo**: `src/kernel/nerv_bridge/kernel_nerv_bridge.js`
-**Linhas**: 323-335 (função emitEvent)
+**Arquivo**: `src/kernel/nerv_bridge/kernel_nerv_bridge.js` **Linhas**: 323-335 (função emitEvent)
 
-**Problema**: Usa formato legado de envelope (`header/ids/kind`) em vez do canônico (`protocol/identity/causality/type`)
+**Problema**: Usa formato legado de envelope (`header/ids/kind`) em vez do canônico
+(`protocol/identity/causality/type`)
 
 **Solução**:
+
 ```javascript
 // ANTES (legado)
 const envelope = {
   header: { version: 1, timestamp: Date.now(), source: 'kernel', target },
   ids: { msg_id: msgId, correlation_id: correlationId },
   kind: MessageType.EVENT,
-  payload
+  payload,
 };
 
 // DEPOIS (canônico)
@@ -910,13 +990,14 @@ const envelope = createEnvelope({
   actor: ActorRole.KERNEL,
   target: target ? ActorRole[target.toUpperCase()] : null,
   messageType: MessageType.EVENT,
-  actionCode: payload.actionCode || 'KERNEL_EVENT',  // Extrair do payload
+  actionCode: payload.actionCode || 'KERNEL_EVENT', // Extrair do payload
   payload: payload,
-  correlationId: correlationId
+  correlationId: correlationId,
 });
 ```
 
 **Impacto**:
+
 - ✅ Consistência com protocolo canônico
 - ✅ Validação automática
 - ✅ Imutabilidade garantida
@@ -927,14 +1008,14 @@ const envelope = createEnvelope({
 
 #### 2. ⚠️ Verificar se validateRobotIdentity está completa
 
-**Arquivo**: `src/shared/nerv/schemas.js`
-**Linha**: 150+
+**Arquivo**: `src/shared/nerv/schemas.js` **Linha**: 150+
 
 **Problema**: Função parece truncada (arquivo lido até linha 150, função começa mas não termina)
 
 **Ação**: Ler arquivo completo e verificar se função está implementada corretamente
 
 **Solução**: Se incompleta, implementar validação:
+
 ```javascript
 function validateRobotIdentity(identity) {
   if (!identity || typeof identity !== 'object') {
@@ -962,21 +1043,24 @@ function validateRobotIdentity(identity) {
 
 #### 3. Migrar forensics.js para NERV
 
-**Arquivo**: `src/core/forensics.js`
-**Linhas**: 17, 81
+**Arquivo**: `src/core/forensics.js` **Linhas**: 17, 81
 
 **Ação**: Descomentar código NERV e adaptar:
+
 ```javascript
 // Descomentar linha 81
-nerv.emit(createEnvelope({
-  actor: ActorRole.INFRA,
-  messageType: MessageType.EVENT,
-  actionCode: 'FORENSICS_DUMP_CREATED',  // Adicionar ao ActionCode
-  payload: { dumpId, taskId, path: dumpPath }
-}));
+nerv.emit(
+  createEnvelope({
+    actor: ActorRole.INFRA,
+    messageType: MessageType.EVENT,
+    actionCode: 'FORENSICS_DUMP_CREATED', // Adicionar ao ActionCode
+    payload: { dumpId, taskId, path: dumpPath },
+  })
+);
 ```
 
 **Pré-requisitos**:
+
 - Adicionar `FORENSICS_DUMP_CREATED` a ActionCode em constants.js
 - Configurar ServerNERVAdapter para broadcast ao dashboard
 
@@ -986,22 +1070,25 @@ nerv.emit(createEnvelope({
 
 #### 4. Migrar infra_failure_policy.js para NERV
 
-**Arquivo**: `src/core/infra_failure_policy.js`
-**Linhas**: 11, 85
+**Arquivo**: `src/core/infra_failure_policy.js` **Linhas**: 11, 85
 
 **Ação**: Descomentar código NERV e adaptar:
+
 ```javascript
 // Descomentar linha 85
-nerv.emit(createEnvelope({
-  actor: ActorRole.INFRA,
-  messageType: MessageType.EVENT,
-  actionCode: 'INFRA_EMERGENCY',  // Adicionar ao ActionCode
-  payload: { type, pid, action, severity: 'CRITICAL' },
-  correlationId: correlationId
-}));
+nerv.emit(
+  createEnvelope({
+    actor: ActorRole.INFRA,
+    messageType: MessageType.EVENT,
+    actionCode: 'INFRA_EMERGENCY', // Adicionar ao ActionCode
+    payload: { type, pid, action, severity: 'CRITICAL' },
+    correlationId: correlationId,
+  })
+);
 ```
 
 **Pré-requisitos**:
+
 - Adicionar `INFRA_EMERGENCY` a ActionCode em constants.js
 - Configurar ServerNERVAdapter para broadcast ao dashboard
 
@@ -1011,12 +1098,12 @@ nerv.emit(createEnvelope({
 
 #### 5. Otimizar FORBIDDEN_FIELDS check
 
-**Arquivo**: `src/shared/nerv/schemas.js`
-**Linha**: 135
+**Arquivo**: `src/shared/nerv/schemas.js` **Linha**: 135
 
 **Problema**: String search em JSON serializado é ineficiente
 
 **Solução**:
+
 ```javascript
 // ANTES
 function validateProhibitions(envelope) {
@@ -1054,16 +1141,16 @@ function validateProhibitions(envelope) {
 
 #### 6. Adicionar correlationId em hybrid_transport errors
 
-**Arquivo**: `src/nerv/transport/hybrid_transport.js`
-**Linha**: 70
+**Arquivo**: `src/nerv/transport/hybrid_transport.js` **Linha**: 70
 
 **Problema**: Error logging sem context
 
 **Solução**:
+
 ```javascript
 // ANTES
 telemetry.emit('hybrid_transport_handler_error', {
-  error: err.message
+  error: err.message,
 });
 
 // DEPOIS
@@ -1071,7 +1158,7 @@ telemetry.emit('hybrid_transport_handler_error', {
   error: err.message,
   correlationId: envelope.causality?.correlation_id,
   msgId: envelope.causality?.msg_id,
-  actionCode: envelope.type?.action_code
+  actionCode: envelope.type?.action_code,
 });
 ```
 
@@ -1086,6 +1173,7 @@ telemetry.emit('hybrid_transport_handler_error', {
 **Problema**: Crescimento ilimitado (risk memory leak)
 
 **Solução**:
+
 ```javascript
 // Adicionar configuração
 const TTL = limits.ttl || 3600000; // 1 hora default
@@ -1093,7 +1181,7 @@ const TTL = limits.ttl || 3600000; // 1 hora default
 // Adicionar timestamp de criação
 store[correlationId] = {
   createdAt: now(),
-  entries: []
+  entries: [],
 };
 
 // Cleanup periódico
@@ -1119,6 +1207,7 @@ setInterval(() => {
 **Problema**: Subscribers sem limit (risk memory leak)
 
 **Solução**:
+
 ```javascript
 const MAX_LISTENERS = config.maxListeners || 100;
 
@@ -1128,7 +1217,9 @@ function on(handler) {
   }
 
   subscribers.add(handler);
-  return () => { subscribers.delete(handler); };
+  return () => {
+    subscribers.delete(handler);
+  };
 }
 ```
 
@@ -1140,10 +1231,10 @@ function on(handler) {
 
 #### 9. Remover imports não utilizados em nerv.js
 
-**Arquivo**: `src/nerv/nerv.js`
-**Linha**: 29
+**Arquivo**: `src/nerv/nerv.js` **Linha**: 29
 
-**Ação**: Remover `_MessageType`, `_ActionCode`, `_ActorRole` (já prefixados com _ para indicar "não usado")
+**Ação**: Remover `_MessageType`, `_ActionCode`, `_ActorRole` (já prefixados com \_ para indicar
+"não usado")
 
 **Estimativa**: 15 minutos
 
@@ -1154,6 +1245,7 @@ function on(handler) {
 **Arquivo**: `src/shared/nerv/constants.js`
 
 **ActionCodes com "(Planned for future use)"**:
+
 - `TASK_OBSERVED`
 - `TASK_FAILED_OBSERVED`
 - `TRANSPORT_TIMEOUT`
@@ -1169,10 +1261,10 @@ function on(handler) {
 
 #### 11. Refatorar createNERV (reduzir complexidade)
 
-**Arquivo**: `src/nerv/nerv.js`
-**Linha**: 66
+**Arquivo**: `src/nerv/nerv.js` **Linha**: 66
 
 **Ação**: Extrair funções:
+
 ```javascript
 function bootstrapTelemetry(config) { ... }
 function bootstrapTransport(config, telemetry) { ... }
@@ -1192,6 +1284,7 @@ function bootstrapEmission(deps) { ... }
 **Problema**: Backpressure apenas sinaliza, não bloqueia
 
 **Solução**:
+
 ```javascript
 async enqueueOutbound(item) {
   if (outbound.size() >= maxSize) {
@@ -1214,38 +1307,38 @@ async enqueueOutbound(item) {
 
 ### Audit Levels
 
-| Componente | Audit Level | Status |
-|------------|-------------|--------|
-| constants.js | 500 | ✅ Constitutional |
-| envelope.js | 510 | ✅ Constitutional |
-| schemas.js | 520 | ✅ Constitutional |
-| DriverNERVAdapter | 800 | ✅ Critical Decoupling |
-| ServerNERVAdapter | 800 | ✅ Critical Decoupling |
-| KernelNERVBridge | - | ⚠️ Needs format migration |
+| Componente        | Audit Level | Status                    |
+| ----------------- | ----------- | ------------------------- |
+| constants.js      | 500         | ✅ Constitutional         |
+| envelope.js       | 510         | ✅ Constitutional         |
+| schemas.js        | 520         | ✅ Constitutional         |
+| DriverNERVAdapter | 800         | ✅ Critical Decoupling    |
+| ServerNERVAdapter | 800         | ✅ Critical Decoupling    |
+| KernelNERVBridge  | -           | ⚠️ Needs format migration |
 
 ### Cobertura de Testes
 
-| Área | Cobertura Estimada |
-|------|-------------------|
-| Protocolo (constants/envelope/schemas) | 90% |
-| Adapters (Driver/Server) | 75% |
-| Transport (hybrid) | 70% |
-| Buffers | 80% |
-| Correlation | 60% |
-| Telemetry | 50% |
-| Health | 40% |
-| **TOTAL** | **~70%** |
+| Área                                   | Cobertura Estimada |
+| -------------------------------------- | ------------------ |
+| Protocolo (constants/envelope/schemas) | 90%                |
+| Adapters (Driver/Server)               | 75%                |
+| Transport (hybrid)                     | 70%                |
+| Buffers                                | 80%                |
+| Correlation                            | 60%                |
+| Telemetry                              | 50%                |
+| Health                                 | 40%                |
+| **TOTAL**                              | **~70%**           |
 
 ### Complexidade
 
-| Arquivo | Funções | Complexidade Média |
-|---------|---------|-------------------|
-| envelope.js | 3 | Baixa |
-| schemas.js | 5 | Média |
-| nerv.js | 1 (grande) | Alta ⚠️ |
-| hybrid_transport.js | 5 | Média |
-| driver_nerv_adapter.js | 12 | Média |
-| server_nerv_adapter.js | 10 | Média |
+| Arquivo                | Funções    | Complexidade Média |
+| ---------------------- | ---------- | ------------------ |
+| envelope.js            | 3          | Baixa              |
+| schemas.js             | 5          | Média              |
+| nerv.js                | 1 (grande) | Alta ⚠️            |
+| hybrid_transport.js    | 5          | Média              |
+| driver_nerv_adapter.js | 12         | Média              |
+| server_nerv_adapter.js | 10         | Média              |
 
 ---
 
@@ -1253,19 +1346,19 @@ async enqueueOutbound(item) {
 
 ### Inline (Código)
 
-| Arquivo | Documentação |
-|---------|--------------|
+| Arquivo               | Documentação                       |
+| --------------------- | ---------------------------------- |
 | shared/nerv/README.md | ✅ 282 linhas - Protocolo completo |
-| *.js (headers) | ✅ Todos com cabeçalhos detalhados |
+| \*.js (headers)       | ✅ Todos com cabeçalhos detalhados |
 
 ### Externa
 
-| Documento | Status |
-|-----------|--------|
-| ARCHITECTURE.md | ✅ Seção NERV presente |
-| SYSTEM_ANALYSIS_COMPLETE.md | ✅ NERV documentado |
+| Documento                    | Status                    |
+| ---------------------------- | ------------------------- |
+| ARCHITECTURE.md              | ✅ Seção NERV presente    |
+| SYSTEM_ANALYSIS_COMPLETE.md  | ✅ NERV documentado       |
 | DRIVER_INTEGRATION_REPORT.md | ✅ Integração Driver-NERV |
-| ONDA2_NERV_MIGRATION.md | ✅ Plano de migração |
+| ONDA2_NERV_MIGRATION.md      | ✅ Plano de migração      |
 
 ---
 
@@ -1293,6 +1386,7 @@ async enqueueOutbound(item) {
 - [ ] 12. Adicionar backpressure blocking (6h)
 
 **Total Estimado**:
+
 - P1: 3 horas
 - P2: 13 horas
 - P3: 14 horas
@@ -1302,7 +1396,9 @@ async enqueueOutbound(item) {
 
 ## 📝 Conclusão
 
-O subsistema **NERV** está **bem implementado e saudável**, com arquitetura zero-coupling funcionando corretamente. Os adapters (Driver, Server, Kernel) garantem desacoplamento total entre subsistemas, e o protocolo IPC 2.0 é robusto e extensível.
+O subsistema **NERV** está **bem implementado e saudável**, com arquitetura zero-coupling
+funcionando corretamente. Os adapters (Driver, Server, Kernel) garantem desacoplamento total entre
+subsistemas, e o protocolo IPC 2.0 é robusto e extensível.
 
 ### Principais Forças
 
@@ -1327,9 +1423,10 @@ O subsistema **NERV** está **bem implementado e saudável**, com arquitetura ze
 4. Concluir ONDA 2 (TODOs restantes)
 5. Considerar correções P3 conforme necessidade
 
-**Recomendação Final**: ✅ **Prosseguir com correções P1 imediatamente** para garantir consistência completa do protocolo.
+**Recomendação Final**: ✅ **Prosseguir com correções P1 imediatamente** para garantir consistência
+completa do protocolo.
 
 ---
 
-**Auditoria concluída em**: 2026-01-21
-**Próxima auditoria recomendada**: Após implementação de correções P1/P2
+**Auditoria concluída em**: 2026-01-21 **Próxima auditoria recomendada**: Após implementação de
+correções P1/P2

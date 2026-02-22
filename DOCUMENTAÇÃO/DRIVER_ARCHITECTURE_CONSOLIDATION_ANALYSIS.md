@@ -1,21 +1,26 @@
 # 🏗️ Driver Architecture - Análise de Consolidação
 
-**Data**: 3 de Fevereiro de 2026
-**Objetivo**: Avaliar arquitetura atual e propor design desacoplado Task ↔ Driver
-**Status**: 📊 Análise em Andamento
+**Data**: 3 de Fevereiro de 2026 **Objetivo**: Avaliar arquitetura atual e propor design desacoplado
+Task ↔ Driver **Status**: 📊 Análise em Andamento
 
 ---
 
 ## 🎯 QUESTÕES FUNDAMENTAIS
 
 ### 1. API Clara
-> "Precisamos ter uma API clara, de modo que outras partes do programa consigam chamar o driver com facilidade, sem entrar em seus detalhes"
+
+> "Precisamos ter uma API clara, de modo que outras partes do programa consigam chamar o driver com
+> facilidade, sem entrar em seus detalhes"
 
 ### 2. Lifecycle vs Task
-> "A criação/exclusão do driver precisa necessariamente estar associada a uma tarefa ou conjunto de tarefas? Ou devemos criar de outra forma?"
+
+> "A criação/exclusão do driver precisa necessariamente estar associada a uma tarefa ou conjunto de
+> tarefas? Ou devemos criar de outra forma?"
 
 ### 3. Ontologia Driver
-> "O papel essencial dos drivers é executar as tarefas e devolver a resposta, mas isso não necessariamente significa que devam estar umbilicalmente ligados a uma tarefa"
+
+> "O papel essencial dos drivers é executar as tarefas e devolver a resposta, mas isso não
+> necessariamente significa que devam estar umbilicalmente ligados a uma tarefa"
 
 ---
 
@@ -48,6 +53,7 @@ DriverNERVAdapter (NERV bridge - 1629 linhas)
 #### ❌ ACOPLAMENTO 1: DriverLifecycleManager ↔ Task
 
 **Onde acontece**:
+
 ```javascript
 // src/driver/DriverLifecycleManager.js - linha 79
 constructor(page, task, config) {
@@ -70,11 +76,13 @@ this.driver = driverFactory.getDriver(
 ```
 
 **Problema**:
+
 - DriverLifecycleManager existe APENAS para orquestrar 1 task
 - 1 LifecycleManager = 1 Task = 1 Driver (vida curta)
 - Driver pode executar múltiplas tasks, mas LifecycleManager não permite isso
 
 **Consequência**:
+
 - Driver Pool não funciona bem: cada task cria novo LifecycleManager → novo AbortController
 - Reuse é artificial: LifecycleManager morre, mas Driver poderia continuar vivo
 
@@ -83,6 +91,7 @@ this.driver = driverFactory.getDriver(
 #### ❌ ACOPLAMENTO 2: Factory.getDriver() ↔ Page + Signal
 
 **Onde acontece**:
+
 ```javascript
 // src/driver/factory.js - linha 290
 getDriver(target, page, config, signal) {
@@ -103,11 +112,13 @@ getDriver(target, page, config, signal) {
 ```
 
 **Problema**:
+
 - Driver é criado JÁ attached a uma page específica
 - Signal é injetado no constructor (não pode trocar depois)
 - Cache usa Page como chave → 1 Driver = 1 Page (não permite reuse)
 
 **Consequência**:
+
 - Pool precisa criar "mock page" para warm drivers (gambiarra)
 - Não dá para ter "driver disponível" sem page
 
@@ -116,6 +127,7 @@ getDriver(target, page, config, signal) {
 #### ❌ ACOPLAMENTO 3: TargetDriver Constructor ↔ Page + Signal
 
 **Onde acontece**:
+
 ```javascript
 // src/driver/core/TargetDriver.js
 // src/driver/chatgpt/ChatGPTDriver.js - linha 45
@@ -130,11 +142,13 @@ constructor(page, config, signal) {
 ```
 
 **Problema**:
+
 - Driver NÃO pode existir sem page
 - Signal imutável (não pode trocar entre tasks)
 - DNA loading assume page já está navegada
 
 **Consequência**:
+
 - Warm driver precisa de "mock page" (hack)
 - Não dá para criar "pool de drivers ociosos"
 
@@ -143,6 +157,7 @@ constructor(page, config, signal) {
 #### ❌ ACOPLAMENTO 4: DriverNERVAdapter.activeDrivers ↔ TaskId
 
 **Onde acontece**:
+
 ```javascript
 // src/driver/nerv_adapter/driver_nerv_adapter.js - linha 520
 async _executeTask(task) {
@@ -163,10 +178,12 @@ async _executeTask(task) {
 ```
 
 **Problema**:
+
 - activeDrivers é Map<taskId, LifecycleManager> → 1:1 task-driver
 - Quando task termina, driver é destruído (não fica disponível)
 
 **Consequência**:
+
 - Não há "pool de drivers disponíveis"
 - Driver não sobrevive além da task
 
@@ -177,17 +194,20 @@ async _executeTask(task) {
 ### Opção A: ❌ Status Quo (Atual)
 
 **Estrutura**:
+
 ```
 Task → LifecycleManager → Factory → Driver
        (1:1)              (cache)   (attached to page)
 ```
 
 **Prós**:
+
 - ✅ Implementado e funcionando
 - ✅ AbortSignal por task (isolamento)
 - ✅ Telemetria granular (lifecycle events)
 
 **Contras**:
+
 - ❌ Driver acoplado a task (via LifecycleManager)
 - ❌ Driver acoplado a page (via constructor)
 - ❌ Driver acoplado a signal (via constructor)
@@ -202,6 +222,7 @@ Task → LifecycleManager → Factory → Driver
 ### Opção B: ✅ Driver Pool Agnóstico de Task
 
 **Estrutura Proposta**:
+
 ```
 DriverPool (Pool de drivers IDLE)
   ├─> drivers: Map<target, Driver[]>  (drivers disponíveis)
@@ -231,72 +252,72 @@ Task → Adapter → DriverPool.acquire() → Driver IDLE
 // src/driver/core/TargetDriver.js
 
 class TargetDriver extends EventEmitter {
-    constructor(config) {
-        super();
-        this.config = config;
+  constructor(config) {
+    super();
+    this.config = config;
 
-        // ✅ Page e Signal são NULL inicialmente
-        this.page = null;
-        this.signal = null;
+    // ✅ Page e Signal são NULL inicialmente
+    this.page = null;
+    this.signal = null;
 
-        this.state = 'IDLE';
-        this.destroyed = false;
+    this.state = 'IDLE';
+    this.destroyed = false;
+  }
+
+  /**
+   * Attach context (page + signal) antes de executar task
+   * @param {Page} page - Puppeteer page
+   * @param {AbortSignal} signal - AbortSignal da task
+   */
+  attachContext(page, signal) {
+    if (this.state !== 'IDLE') {
+      throw new Error('[DRIVER] Cannot attach: driver not IDLE');
     }
 
-    /**
-     * Attach context (page + signal) antes de executar task
-     * @param {Page} page - Puppeteer page
-     * @param {AbortSignal} signal - AbortSignal da task
-     */
-    attachContext(page, signal) {
-        if (this.state !== 'IDLE') {
-            throw new Error('[DRIVER] Cannot attach: driver not IDLE');
-        }
+    this.page = page;
+    this.signal = signal;
 
-        this.page = page;
-        this.signal = signal;
+    log('DEBUG', `[DRIVER] Context attached: ${this.name}`);
+  }
 
-        log('DEBUG', `[DRIVER] Context attached: ${this.name}`);
+  /**
+   * Detach context (page + signal) após executar task
+   */
+  detachContext() {
+    this.page = null;
+    this.signal = null;
+    this.state = 'IDLE';
+
+    log('DEBUG', `[DRIVER] Context detached: ${this.name}`);
+  }
+
+  /**
+   * Executa task (assume context attached)
+   * @param {object} task - Task object
+   * @returns {object} Response
+   */
+  async executeTask(task) {
+    if (!this.page || !this.signal) {
+      throw new Error('[DRIVER] Cannot execute: context not attached');
     }
 
-    /**
-     * Detach context (page + signal) após executar task
-     */
-    detachContext() {
-        this.page = null;
-        this.signal = null;
-        this.state = 'IDLE';
-
-        log('DEBUG', `[DRIVER] Context detached: ${this.name}`);
+    if (this.state !== 'IDLE') {
+      throw new Error('[DRIVER] Cannot execute: driver busy');
     }
 
-    /**
-     * Executa task (assume context attached)
-     * @param {object} task - Task object
-     * @returns {object} Response
-     */
-    async executeTask(task) {
-        if (!this.page || !this.signal) {
-            throw new Error('[DRIVER] Cannot execute: context not attached');
-        }
+    this.state = 'EXECUTING';
 
-        if (this.state !== 'IDLE') {
-            throw new Error('[DRIVER] Cannot execute: driver busy');
-        }
+    try {
+      // ... execução atual (prepareContext, execute, extractResponse) ...
+      const response = await this._execute(task);
 
-        this.state = 'EXECUTING';
-
-        try {
-            // ... execução atual (prepareContext, execute, extractResponse) ...
-            const response = await this._execute(task);
-
-            this.state = 'IDLE';
-            return response;
-        } catch (error) {
-            this.state = 'ERROR';
-            throw error;
-        }
+      this.state = 'IDLE';
+      return response;
+    } catch (error) {
+      this.state = 'ERROR';
+      throw error;
     }
+  }
 }
 ```
 
@@ -306,82 +327,82 @@ class TargetDriver extends EventEmitter {
 // src/driver/factory.js
 
 class DriverFactory {
-    constructor() {
-        this.registry = new Map();
-        this.pool = new Map();  // Map<target, Driver[]>
+  constructor() {
+    this.registry = new Map();
+    this.pool = new Map(); // Map<target, Driver[]>
 
-        // ✅ Remove cache WeakMap (não precisa mais)
+    // ✅ Remove cache WeakMap (não precisa mais)
+  }
+
+  /**
+   * Cria driver SEM context (IDLE)
+   * @param {string} target - Target name (chatgpt, gemini)
+   * @param {object} config - Driver config
+   * @returns {TargetDriver} Driver IDLE
+   */
+  createDriver(target, config) {
+    const DriverClass = this.registry.get(target);
+
+    if (!DriverClass) {
+      throw new Error(`[FACTORY] Driver not found: ${target}`);
     }
 
-    /**
-     * Cria driver SEM context (IDLE)
-     * @param {string} target - Target name (chatgpt, gemini)
-     * @param {object} config - Driver config
-     * @returns {TargetDriver} Driver IDLE
-     */
-    createDriver(target, config) {
-        const DriverClass = this.registry.get(target);
+    // ✅ Driver criado SEM page/signal
+    const driver = new DriverClass(config);
 
-        if (!DriverClass) {
-            throw new Error(`[FACTORY] Driver not found: ${target}`);
-        }
+    log('DEBUG', `[FACTORY] Driver created: ${target} (IDLE)`);
 
-        // ✅ Driver criado SEM page/signal
-        const driver = new DriverClass(config);
+    return driver;
+  }
 
-        log('DEBUG', `[FACTORY] Driver created: ${target} (IDLE)`);
+  /**
+   * Acquire driver do pool (ou cria novo)
+   * @param {string} target - Target name
+   * @returns {TargetDriver} Driver IDLE
+   */
+  acquireFromPool(target) {
+    let pool = this.pool.get(target);
 
-        return driver;
+    if (!pool || pool.length === 0) {
+      // Pool miss: cria novo driver
+      log('DEBUG', `[FACTORY] Pool MISS: creating new driver for ${target}`);
+      return this.createDriver(target, this.config);
     }
 
-    /**
-     * Acquire driver do pool (ou cria novo)
-     * @param {string} target - Target name
-     * @returns {TargetDriver} Driver IDLE
-     */
-    acquireFromPool(target) {
-        let pool = this.pool.get(target);
+    // Pool hit: reusa driver IDLE
+    const driver = pool.shift();
+    log('DEBUG', `[FACTORY] Pool HIT: reusing driver for ${target}`);
 
-        if (!pool || pool.length === 0) {
-            // Pool miss: cria novo driver
-            log('DEBUG', `[FACTORY] Pool MISS: creating new driver for ${target}`);
-            return this.createDriver(target, this.config);
-        }
+    return driver;
+  }
 
-        // Pool hit: reusa driver IDLE
-        const driver = pool.shift();
-        log('DEBUG', `[FACTORY] Pool HIT: reusing driver for ${target}`);
-
-        return driver;
+  /**
+   * Release driver de volta ao pool
+   * @param {TargetDriver} driver - Driver para liberar
+   */
+  releaseToPool(driver) {
+    if (driver.state !== 'IDLE') {
+      log('WARN', `[FACTORY] Driver not IDLE, destroying: ${driver.name}`);
+      driver.destroy();
+      return;
     }
 
-    /**
-     * Release driver de volta ao pool
-     * @param {TargetDriver} driver - Driver para liberar
-     */
-    releaseToPool(driver) {
-        if (driver.state !== 'IDLE') {
-            log('WARN', `[FACTORY] Driver not IDLE, destroying: ${driver.name}`);
-            driver.destroy();
-            return;
-        }
+    const target = driver.constructor.target; // Ex: 'chatgpt'
 
-        const target = driver.constructor.target;  // Ex: 'chatgpt'
-
-        if (!this.pool.has(target)) {
-            this.pool.set(target, []);
-        }
-
-        const pool = this.pool.get(target);
-
-        if (pool.length >= POOL_CONFIG.MAX_POOL_SIZE) {
-            log('DEBUG', `[FACTORY] Pool full, destroying driver: ${target}`);
-            driver.destroy();
-        } else {
-            pool.push(driver);
-            log('DEBUG', `[FACTORY] Driver released to pool: ${target}`);
-        }
+    if (!this.pool.has(target)) {
+      this.pool.set(target, []);
     }
+
+    const pool = this.pool.get(target);
+
+    if (pool.length >= POOL_CONFIG.MAX_POOL_SIZE) {
+      log('DEBUG', `[FACTORY] Pool full, destroying driver: ${target}`);
+      driver.destroy();
+    } else {
+      pool.push(driver);
+      log('DEBUG', `[FACTORY] Driver released to pool: ${target}`);
+    }
+  }
 }
 ```
 
@@ -391,51 +412,52 @@ class DriverFactory {
 // src/driver/nerv_adapter/driver_nerv_adapter.js
 
 class DriverNERVAdapter {
-    constructor() {
-        this.factory = driverFactory;
+  constructor() {
+    this.factory = driverFactory;
 
-        // ✅ activeDrivers agora mapeia taskId → Driver (não LifecycleManager)
-        this.activeDrivers = new Map();  // Map<taskId, Driver>
+    // ✅ activeDrivers agora mapeia taskId → Driver (não LifecycleManager)
+    this.activeDrivers = new Map(); // Map<taskId, Driver>
+  }
+
+  async _executeTask(task) {
+    let driver = null;
+    const signal = new AbortController().signal; // ✅ Signal por task
+
+    try {
+      // 1. Acquire driver do pool (IDLE)
+      driver = await this.factory.acquireFromPool(task.spec.target);
+
+      // 2. Attach context (page + signal)
+      driver.attachContext(page, signal);
+
+      // 3. Registra driver ativo
+      this.activeDrivers.set(task.meta.id, driver);
+
+      // 4. Executa task
+      const response = await driver.executeTask(task);
+
+      return response;
+    } catch (error) {
+      log('ERROR', `[Adapter] Task execution failed: ${error.message}`);
+      throw error;
+    } finally {
+      // 5. Cleanup
+      this.activeDrivers.delete(task.meta.id);
+
+      if (driver) {
+        // 6. Detach context
+        driver.detachContext();
+
+        // 7. Release de volta ao pool
+        this.factory.releaseToPool(driver);
+      }
     }
-
-    async _executeTask(task) {
-        let driver = null;
-        const signal = new AbortController().signal;  // ✅ Signal por task
-
-        try {
-            // 1. Acquire driver do pool (IDLE)
-            driver = await this.factory.acquireFromPool(task.spec.target);
-
-            // 2. Attach context (page + signal)
-            driver.attachContext(page, signal);
-
-            // 3. Registra driver ativo
-            this.activeDrivers.set(task.meta.id, driver);
-
-            // 4. Executa task
-            const response = await driver.executeTask(task);
-
-            return response;
-        } catch (error) {
-            log('ERROR', `[Adapter] Task execution failed: ${error.message}`);
-            throw error;
-        } finally {
-            // 5. Cleanup
-            this.activeDrivers.delete(task.meta.id);
-
-            if (driver) {
-                // 6. Detach context
-                driver.detachContext();
-
-                // 7. Release de volta ao pool
-                this.factory.releaseToPool(driver);
-            }
-        }
-    }
+  }
 }
 ```
 
 **Prós**:
+
 - ✅ **API Clara**: `acquire() → attach → execute → detach → release`
 - ✅ **Desacoplamento Total**: Driver não conhece task (só executa quando attached)
 - ✅ **Reuse Verdadeiro**: Driver executa N tasks sequencialmente
@@ -444,6 +466,7 @@ class DriverNERVAdapter {
 - ✅ **Menos Código**: Remove DriverLifecycleManager (490 linhas)
 
 **Contras**:
+
 - ⚠️ **Breaking Change**: Requer refatoração de TargetDriver (attach/detach)
 - ⚠️ **DNA Loading**: DNA precisa ser lazy (carrega em attach, não no constructor)
 
@@ -454,6 +477,7 @@ class DriverNERVAdapter {
 ### Opção C: 🔀 Híbrido (LifecycleManager + Pool)
 
 **Estrutura**:
+
 ```
 Task → LifecycleManager → DriverPool.acquire() → Driver IDLE
        (orchestrator)                            ├─> attachContext()
@@ -465,11 +489,13 @@ Task → LifecycleManager → DriverPool.acquire() → Driver IDLE
 **Conceito**: Mantém LifecycleManager como orchestrator, mas Pool é agnóstico
 
 **Prós**:
+
 - ✅ API Clara (via LifecycleManager)
 - ✅ Telemetria granular (lifecycle events)
 - ✅ Pool desacoplado (drivers IDLE)
 
 **Contras**:
+
 - ⚠️ Mantém camada extra (LifecycleManager)
 - ⚠️ Não remove acoplamento task ↔ LifecycleManager
 
@@ -519,6 +545,7 @@ Task → LifecycleManager → DriverPool.acquire() → Driver IDLE
 #### 1. ✅ API Clara e Simples
 
 **ANTES (3 camadas)**:
+
 ```javascript
 // Código cliente precisa conhecer 3 abstrações
 const lifecycleManager = new DriverLifecycleManager(page, task, config);
@@ -528,6 +555,7 @@ await lifecycleManager.release();
 ```
 
 **DEPOIS (1 camada)**:
+
 ```javascript
 // Código cliente só conhece Pool
 const driver = await pool.acquire('chatgpt');
@@ -539,17 +567,18 @@ pool.release(driver);
 
 #### 2. ✅ Desacoplamento Total
 
-| Componente       | Antes (v2.1)                        | Depois (v3.0)                    |
-| ---------------- | ----------------------------------- | -------------------------------- |
-| **Driver**       | Acoplado a page (constructor)       | ✅ page = null (attach on demand) |
-| **Driver**       | Acoplado a signal (constructor)     | ✅ signal = null (attach on demand) |
-| **Driver**       | Acoplado a task (via LifecycleManager) | ✅ Não conhece task (só executa) |
-| **Pool**         | Precisa "mock page" (hack)          | ✅ Drivers IDLE sem context      |
-| **LifecycleManager** | 1:1 com task (vida curta)        | ✅ Removido (desnecessário)      |
+| Componente           | Antes (v2.1)                           | Depois (v3.0)                       |
+| -------------------- | -------------------------------------- | ----------------------------------- |
+| **Driver**           | Acoplado a page (constructor)          | ✅ page = null (attach on demand)   |
+| **Driver**           | Acoplado a signal (constructor)        | ✅ signal = null (attach on demand) |
+| **Driver**           | Acoplado a task (via LifecycleManager) | ✅ Não conhece task (só executa)    |
+| **Pool**             | Precisa "mock page" (hack)             | ✅ Drivers IDLE sem context         |
+| **LifecycleManager** | 1:1 com task (vida curta)              | ✅ Removido (desnecessário)         |
 
 #### 3. ✅ Reuse Verdadeiro
 
 **ANTES**:
+
 ```
 Task 1 → LifecycleManager 1 → Driver 1 (destruído)
 Task 2 → LifecycleManager 2 → Driver 2 (destruído)
@@ -559,6 +588,7 @@ Resultado: 3 drivers criados, 0 reuse
 ```
 
 **DEPOIS**:
+
 ```
 Task 1 → Driver A (attach → execute → detach → IDLE)
 Task 2 → Driver A (attach → execute → detach → IDLE)  ← Reuse!
@@ -569,18 +599,21 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 
 #### 4. ✅ Menos Código
 
-| Arquivo                   | Antes (v2.1) | Depois (v3.0) | Δ        |
-| ------------------------- | ------------ | ------------- | -------- |
-| DriverLifecycleManager.js | 490 linhas   | **0 linhas**  | -490 🎉  |
-| factory.js                | 852 linhas   | 950 linhas    | +98      |
-| TargetDriver.js           | 200 linhas   | 250 linhas    | +50      |
-| driver_nerv_adapter.js    | 1629 linhas  | 1550 linhas   | -79      |
+| Arquivo                   | Antes (v2.1) | Depois (v3.0) | Δ           |
+| ------------------------- | ------------ | ------------- | ----------- |
+| DriverLifecycleManager.js | 490 linhas   | **0 linhas**  | -490 🎉     |
+| factory.js                | 852 linhas   | 950 linhas    | +98         |
+| TargetDriver.js           | 200 linhas   | 250 linhas    | +50         |
+| driver_nerv_adapter.js    | 1629 linhas  | 1550 linhas   | -79         |
 | **TOTAL**                 | 3171 linhas  | 2750 linhas   | **-421** 🚀 |
 
 #### 5. ✅ Alinhamento com Ontologia
 
 **Princípio Original**:
-> "Driver deve saber executar a tarefa e devolver a resposta, no momento certo, do jeito certo. O driver não precisa necessariamente saber qual é missão, ou saber por que algo está sendo digitado ou saber interpretar qualquer coisa"
+
+> "Driver deve saber executar a tarefa e devolver a resposta, no momento certo, do jeito certo. O
+> driver não precisa necessariamente saber qual é missão, ou saber por que algo está sendo digitado
+> ou saber interpretar qualquer coisa"
 
 **Violação Atual**: Driver está **umbilicalmente ligado** a uma tarefa (via LifecycleManager)
 
@@ -595,6 +628,7 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 **Arquivo**: `src/driver/core/TargetDriver.js`
 
 **Mudanças**:
+
 1. Constructor: Remove `page` e `signal` (config apenas)
 2. Novo método: `attachContext(page, signal)`
 3. Novo método: `detachContext()`
@@ -602,6 +636,7 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 5. DNA Loading: Lazy (em `attachContext`, não no constructor)
 
 **Breaking Changes**:
+
 - ✅ Todos os drivers herdeiros (ChatGPTDriver, GeminiDriver) herdam automaticamente
 - ⚠️ DNA loading precisa ser refatorado (lazy load)
 
@@ -610,6 +645,7 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 **Arquivo**: `src/driver/factory.js`
 
 **Mudanças**:
+
 1. Remove cache WeakMap (não precisa mais)
 2. Novo método: `createDriver(target, config)` (sem page/signal)
 3. Pool structure: `Map<target, Driver[]>` (drivers IDLE)
@@ -617,6 +653,7 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 5. Método: `releaseToPool(driver)`
 
 **Breaking Changes**:
+
 - ✅ `getDriver()` pode ser mantido como wrapper legacy (deprecated)
 
 ### Fase 3: Refatorar Adapter (2h)
@@ -624,12 +661,14 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 **Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js`
 
 **Mudanças**:
+
 1. Remove import de DriverLifecycleManager
 2. activeDrivers: `Map<taskId, DriverLifecycleManager>` → `Map<taskId, Driver>`
 3. `_executeTask()`: Usa `pool.acquire()` + `attach/detach`
 4. Remove `await lifecycleManager.acquire/release()`
 
 **Breaking Changes**:
+
 - ✅ API interna do Adapter muda, mas API NERV (eventos) mantém compatibilidade
 
 ### Fase 4: Remover DriverLifecycleManager (30min)
@@ -637,21 +676,25 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 **Arquivo**: `src/driver/DriverLifecycleManager.js`
 
 **Mudanças**:
+
 1. ❌ **DELETE ARQUIVO** (490 linhas removidas)
 2. Update imports em todos os arquivos que usam LifecycleManager
 
 **Breaking Changes**:
+
 - ✅ Apenas Adapter usava LifecycleManager (impacto controlado)
 
 ### Fase 5: Testes & Documentação (3h)
 
 **Testes**:
+
 1. Test: Driver attach/detach/execute cycle
 2. Test: Pool acquire/release (HIT/MISS)
 3. Test: Driver reuse (10 tasks → 2 drivers criados)
 4. Test: AbortSignal per task (isolation)
 
 **Documentação**:
+
 1. Update: ARCHITECTURE.md (nova hierarquia)
 2. Update: CHANGELOG.md (v3.0 - Breaking changes)
 3. Create: MIGRATION_GUIDE_V3.md (guia de migração)
@@ -663,6 +706,7 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 ### ✅ Recomendação: **Opção B - Driver Pool Agnóstico de Task**
 
 **Justificativa**:
+
 1. ✅ **API Clara**: 5 métodos simples (create, acquire, attach, execute, detach, release)
 2. ✅ **Desacoplamento Total**: Driver não conhece task, só executa quando contexto attached
 3. ✅ **Reuse Verdadeiro**: Driver sobrevive a múltiplas tasks (não destruído após cada task)
@@ -671,11 +715,11 @@ Resultado: 1 driver criado, 2 reuses (67% reuse rate)
 6. ✅ **Alinhamento Ontológico**: "Driver executa" ≠ "Driver umbilicalmente ligado a task"
 
 **Trade-offs Aceitáveis**:
+
 - ⚠️ Breaking Changes (refatoração de TargetDriver)
 - ⚠️ DNA Loading precisa ser lazy (não no constructor)
 - ⚠️ Migração de código existente (Adapter)
 
 **Próximo Passo**: Aprovar refatoração arquitetural e iniciar Fase 1
 
-**Aprovador**: @Ilenburg1993
-**Status**: 📋 **AGUARDANDO APROVAÇÃO**
+**Aprovador**: @Ilenburg1993 **Status**: 📋 **AGUARDANDO APROVAÇÃO**

@@ -8,7 +8,8 @@
 [![Documentation](https://img.shields.io/badge/docs-canonical%2016%2F16-success)](DOCUMENTAÇÃO/)
 [![Rating](https://img.shields.io/badge/audit%20rating-9.2%2F10-brightgreen)](AUDITORIA_STATUS_ATUAL.md)
 
-**Sistema autônomo de automação de LLMs (ChatGPT, Gemini) via browser com arquitetura event-driven (NERV), queue-based processing e browser pool management.**
+**Sistema autônomo de automação de LLMs (ChatGPT, Gemini) via browser com arquitetura event-driven
+(NERV), queue-based processing e browser pool management.**
 
 ---
 
@@ -25,8 +26,7 @@ make start
 make health
 ```
 
-**Dashboard**: http://localhost:3008
-**Documentação Completa**: [DOCUMENTAÇÃO/](DOCUMENTAÇÃO/)
+**Dashboard**: http://localhost:3008 **Documentação Completa**: [DOCUMENTAÇÃO/](DOCUMENTAÇÃO/)
 
 ---
 
@@ -91,6 +91,7 @@ const io = require('@infra/io');
 ```
 
 **Aliases disponíveis:**
+
 - `@` → `src/`
 - `@core` → `src/core/`
 - `@shared` → `src/shared/`
@@ -151,17 +152,21 @@ const io = require('@infra/io');
 ## 📚 Documentação Canônica (16 docs)
 
 ### FASE 1 - Fundação
-- 📖 [PHILOSOPHY.md](DOCUMENTAÇÃO/PHILOSOPHY.md) - Princípios de design (DDD, Event-Driven, Zero-Coupling)
+
+- 📖 [PHILOSOPHY.md](DOCUMENTAÇÃO/PHILOSOPHY.md) - Princípios de design (DDD, Event-Driven,
+  Zero-Coupling)
 - 🏗️ [ARCHITECTURE_v2.md](DOCUMENTAÇÃO/ARCHITECTURE_v2.md) - Arquitetura NERV-centric
 - 🎨 [SYSTEM_DESIGN.md](DOCUMENTAÇÃO/SYSTEM_DESIGN.md) - Design patterns e decisões
 
 ### FASE 2 - Estrutural
+
 - 🔄 [DATA_FLOW.md](DOCUMENTAÇÃO/DATA_FLOW.md) - Fluxos de dados end-to-end
 - 🧩 [SUBSYSTEMS.md](DOCUMENTAÇÃO/SUBSYSTEMS.md) - 13 componentes detalhados
 - 🎯 [PATTERNS.md](DOCUMENTAÇÃO/PATTERNS.md) - 15 patterns catalogados
 - 📖 [GLOSSARY.md](DOCUMENTAÇÃO/GLOSSARY.md) - 42 termos técnicos
 
 ### FASE 3 - Operacional
+
 - ⚙️ [CONFIGURATION.md](DOCUMENTAÇÃO/CONFIGURATION.md) - 22 params + 50+ env vars
 - 🌐 [API_REFERENCE.md](DOCUMENTAÇÃO/API_REFERENCE.md) - 10 REST + 7 WebSocket endpoints
 - 🚀 [DEPLOYMENT.md](DOCUMENTAÇÃO/DEPLOYMENT.md) - Docker, PM2, HTTPS, scaling
@@ -170,6 +175,7 @@ const io = require('@infra/io');
 - 🤝 [CONTRIBUTING.md](DOCUMENTAÇÃO/CONTRIBUTING.md) - Git workflow, conventional commits
 
 ### FASE 4 - Referência
+
 - 🔧 [TROUBLESHOOTING.md](DOCUMENTAÇÃO/TROUBLESHOOTING.md) - 10 categorias de problemas + soluções
 - ❓ [FAQ.md](DOCUMENTAÇÃO/FAQ.md) - 30 perguntas frequentes
 - 🔒 [SECURITY.md](DOCUMENTAÇÃO/SECURITY.md) - Políticas, rotation, hardening
@@ -196,21 +202,26 @@ const io = require('@infra/io');
 ```
 
 **Componentes**:
+
 - **CORE** (`src/core/`): Config, Logger, Schemas, Identity (DNA), Constants
-- **NERV** (`src/nerv/`): Event bus (buffers, correlation, emission, reception, transport, telemetry)
-- **KERNEL** (`src/kernel/`): Task execution (maestro, loop, policy engine, task runtime, observation store)
+- **NERV** (`src/nerv/`): Event bus (buffers, correlation, emission, reception, transport,
+  telemetry)
+- **KERNEL** (`src/kernel/`): Task execution (maestro, loop, policy engine, task runtime,
+  observation store)
 - **DRIVER** (`src/driver/`): Target automation (DriverFactory, ChatGPT, Gemini, BaseLLM)
 - **INFRA** (`src/infra/`): Browser pool, lock manager, queue cache, file watcher, storage (io.js)
 - **SERVER** (`src/server/`): Dashboard + API (Express routes, Socket.io, middleware)
 - **LOGIC** (`src/logic/`): Dynamic rules, adaptive delay
 
 **P-Level Fixes** (14 auditorias, 9.2/10 rating):
+
 - **P1-P3**: NERV foundation (envelope canonicalization, identity validation, MessageType enum)
 - **P4**: Kernel stability (shutdown race, timeout propagation)
 - **P5**: Data integrity (optimistic locking P5.1, cache invalidation P5.2)
 - **P6-P7**: Observability (state history, audit trail)
 - **P8**: Security (auth bypass P8.4, path traversal P8.7, symlink P8.8)
-- **P9**: Performance (heap monitoring P9.1, circuit breaker P9.2, NERV buffers P9.3, cache P9.4, memoization P9.5, metrics P9.6, concurrency P9.7, debounce P9.8, configurable workers P9.9)
+- **P9**: Performance (heap monitoring P9.1, circuit breaker P9.2, NERV buffers P9.3, cache P9.4,
+  memoization P9.5, metrics P9.6, concurrency P9.7, debounce P9.8, configurable workers P9.9)
 
 ---
 
@@ -257,7 +268,7 @@ chatgpt-docker-puppeteer/
 └── public/                # Arquivos estáticos do dashboard
 ```
 
-```
+````
 
 ---
 
@@ -277,9 +288,10 @@ make test-watch
 
 # Coverage report
 make test-coverage
-```
+````
 
 **Test pyramid**:
+
 - **Unit tests** (8): Core, NERV, Kernel - Pure functions, no I/O
 - **Integration tests** (4): Kernel+NERV, Driver+Browser, Server+API, Infra+Filesystem
 - **E2E tests** (2): Full flow (add task → execute → verify response)
@@ -359,16 +371,16 @@ pm2 logs --lines 100
 
 ```json
 {
-  "browserMode": "launcher",        // launcher | external | hybrid
-  "maxWorkers": 3,                 // 1-20 workers (P9.9 configurable)
-  "kernelCycleMs": 50,             // Kernel loop frequency (20Hz)
-  "browserPoolSize": 3,            // Browser instances
-  "dashboardPort": 3008,           // API/Dashboard port
-  "dashboardPassword": null,       // null = no auth (P8.4)
-  "taskTimeout": 300000,           // Task timeout (5min)
-  "lockTimeout": 60000,            // Lock timeout (1min)
-  "queueConcurrency": 10,          // Queue concurrency (P9.7)
-  "nervBufferMaxSize": 10000       // NERV buffer (P9.3)
+  "browserMode": "launcher", // launcher | external | hybrid
+  "maxWorkers": 3, // 1-20 workers (P9.9 configurable)
+  "kernelCycleMs": 50, // Kernel loop frequency (20Hz)
+  "browserPoolSize": 3, // Browser instances
+  "dashboardPort": 3008, // API/Dashboard port
+  "dashboardPassword": null, // null = no auth (P8.4)
+  "taskTimeout": 300000, // Task timeout (5min)
+  "lockTimeout": 60000, // Lock timeout (1min)
+  "queueConcurrency": 10, // Queue concurrency (P9.7)
+  "nervBufferMaxSize": 10000 // NERV buffer (P9.3)
 }
 ```
 
@@ -405,7 +417,8 @@ LOG_TO_FILE=true
 
 ## 🤝 Como Contribuir
 
-Contribuições são bem-vindas! Este projeto segue **Conventional Commits** e **Git workflow** estruturado.
+Contribuições são bem-vindas! Este projeto segue **Conventional Commits** e **Git workflow**
+estruturado.
 
 ### Workflow
 
@@ -442,8 +455,8 @@ git push origin feature/my-feature
 
 ### Auditorias Concluídas
 
-| Auditoria | Foco             | Status     | Rating |
-| --------- | ---------------- | ---------- | ------ |
+| Auditoria | Foco             | Status      | Rating |
+| --------- | ---------------- | ----------- | ------ |
 | P1-P3     | NERV foundation  | ✅ COMPLETE | 9.5/10 |
 | P4        | Kernel stability | ✅ COMPLETE | 9.0/10 |
 | P5        | Data integrity   | ✅ COMPLETE | 9.2/10 |
@@ -456,6 +469,7 @@ git push origin feature/my-feature
 ### Roadmap
 
 **Q1 2026**:
+
 - ✅ NERV architecture (P1-P3)
 - ✅ Security hardening (P8)
 - ✅ Performance optimization (P9)
@@ -464,6 +478,7 @@ git push origin feature/my-feature
 - ⏳ v1.0 stable release
 
 **Q2 2026**:
+
 - Claude support (driver implementation)
 - Horizontal scaling (Redis coordination)
 - Kubernetes deployment
@@ -511,4 +526,4 @@ Quer contribuir? Ver [CONTRIBUTING.md](DOCUMENTAÇÃO/CONTRIBUTING.md)
 
 ---
 
-*Última atualização: 21/01/2026 | v1.0-rc | 16 documentos canônicos completos*
+_Última atualização: 21/01/2026 | v1.0-rc | 16 documentos canônicos completos_

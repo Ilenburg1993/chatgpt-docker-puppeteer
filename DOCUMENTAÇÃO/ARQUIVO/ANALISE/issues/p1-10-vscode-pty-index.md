@@ -10,5 +10,4 @@ Recommended actions:
 1. Inspect mentioned pty logs and sanitize.
 2. Exclude pty host logs from scanning workflows and .gitignore.
 
-Owner: @owner-placeholder
-Labels: security, P1, logs
+Owner: @owner-placeholder Labels: security, P1, logs

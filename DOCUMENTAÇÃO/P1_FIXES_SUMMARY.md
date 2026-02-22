@@ -9,7 +9,8 @@
 
 ## 📋 Resumo Executivo
 
-Implementadas com sucesso as **3 correções de Prioridade 1** identificadas na análise de casos críticos:
+Implementadas com sucesso as **3 correções de Prioridade 1** identificadas na análise de casos
+críticos:
 
 1. ✅ **Lock Manager - Two-Phase Commit** (atomicidade completa)
 2. ✅ **BrowserPool - Promise Memoization** (previne init race)
@@ -84,9 +85,9 @@ Resultados: 1 sucesso, 9 falhas
 ### Arquivos Modificados
 
 - `src/infra/locks/lock_manager.js` (141 → 148 linhas)
-    - Alteração: função `acquireLock()` (linhas 38-113)
-    - Adicionado: comentário explicativo sobre link() vs rename()
-    - Lógica de retry preservada (orphan recovery)
+  - Alteração: função `acquireLock()` (linhas 38-113)
+  - Adicionado: comentário explicativo sobre link() vs rename()
+  - Lógica de retry preservada (orphan recovery)
 
 ---
 
@@ -174,9 +175,9 @@ Contador de inicializações reais: 1  ✅
 ### Arquivos Modificados
 
 - `src/infra/browser_pool/pool_manager.js` (394 → 422 linhas)
-    - Alteração: método `initialize()` (linhas 68-96)
-    - Adicionado: método `_doInitialize()` interno (linhas 98-148)
-    - Adicionado: propriedade `_initPromise` no constructor (linha 65)
+  - Alteração: método `initialize()` (linhas 68-96)
+  - Adicionado: método `_doInitialize()` interno (linhas 98-148)
+  - Adicionado: propriedade `_initPromise` no constructor (linha 65)
 
 ---
 
@@ -257,10 +258,10 @@ async _processCommand(envelope) {
 ### Arquivos Criados
 
 - `src/infra/ipc_client_v800_patch.js` (240 linhas)
-    - Documentação completa do problema
-    - Código antes/depois
-    - Testes sugeridos
-    - Integração NERV
+  - Documentação completa do problema
+  - Código antes/depois
+  - Testes sugeridos
+  - Integração NERV
 
 ---
 
@@ -301,31 +302,31 @@ async _processCommand(envelope) {
 ### Modificados (2 arquivos)
 
 1. **src/infra/locks/lock_manager.js**
-    - Linhas: 141 → 148 (+7 linhas)
-    - Função: `acquireLock()` refatorada
-    - Mudança: `fs.writeFile(wx)` → `fs.link()` (two-phase commit)
+   - Linhas: 141 → 148 (+7 linhas)
+   - Função: `acquireLock()` refatorada
+   - Mudança: `fs.writeFile(wx)` → `fs.link()` (two-phase commit)
 
 2. **src/infra/browser_pool/pool_manager.js**
-    - Linhas: 394 → 422 (+28 linhas)
-    - Método: `initialize()` → `initialize()` + `_doInitialize()`
-    - Mudança: Adicionado promise memoization
+   - Linhas: 394 → 422 (+28 linhas)
+   - Método: `initialize()` → `initialize()` + `_doInitialize()`
+   - Mudança: Adicionado promise memoization
 
 ### Criados (3 arquivos)
 
 1. **src/infra/ipc_client_v800_patch.js** (240 linhas)
-    - Documentação técnica da correção IPC
-    - Código antes/depois
-    - Testes sugeridos
+   - Documentação técnica da correção IPC
+   - Código antes/depois
+   - Testes sugeridos
 
 2. **tests/test_p1_fixes.js** (360 linhas)
-    - Suite completa de validação
-    - 5 testes automatizados
-    - Mock de BrowserPool para validação
+   - Suite completa de validação
+   - 5 testes automatizados
+   - Mock de BrowserPool para validação
 
 3. **DOCUMENTAÇÃO/CRITICAL_CASES_ANALYSIS.md** (900+ linhas)
-    - Análise completa de casos críticos
-    - Matriz de riscos
-    - Recomendações P1, P2, P3
+   - Análise completa de casos críticos
+   - Matriz de riscos
+   - Recomendações P1, P2, P3
 
 ---
 
@@ -418,21 +419,21 @@ await testLockTwoPhaseCommit();
 ### Prioridade 2 (Considerar)
 
 1. **Shutdown - Try-Catch Per Phase** (1h esforço)
-    - Arquivo: `src/main.js`
-    - Mudança: Loop de fases com isolamento
-    - Impacto: Garante limpeza parcial em falhas
+   - Arquivo: `src/main.js`
+   - Mudança: Loop de fases com isolamento
+   - Impacto: Garante limpeza parcial em falhas
 
 2. **HandleManager - AbortController** (45min)
-    - Arquivo: `src/driver/modules/handle_manager.js`
-    - Mudança: Cancela cleanup em timeout
-    - Impacto: Reduz overhead de promises órfãs
+   - Arquivo: `src/driver/modules/handle_manager.js`
+   - Mudança: Cancela cleanup em timeout
+   - Impacto: Reduz overhead de promises órfãs
 
 ### Prioridade 3 (Monitorar)
 
 1. **RecoverySystem - Kill Timeout** (20min)
-    - Arquivo: `src/driver/modules/recovery_system.js`
-    - Mudança: Promise.race em killProcess()
-    - Impacto: Previne travamento (edge case raro)
+   - Arquivo: `src/driver/modules/recovery_system.js`
+   - Mudança: Promise.race em killProcess()
+   - Impacto: Previne travamento (edge case raro)
 
 ### Integração Contínua
 
@@ -449,8 +450,8 @@ await testLockTwoPhaseCommit();
 2. **test_p1_fixes.js** - Suite de validação
 3. **ipc_client_v800_patch.js** - Documentação IPC resilience
 4. **Linux man pages**:
-    - `man 2 link` - Hard link atomicity guarantees
-    - `man 2 rename` - Behavior differences across filesystems
+   - `man 2 link` - Hard link atomicity guarantees
+   - `man 2 rename` - Behavior differences across filesystems
 
 ---
 

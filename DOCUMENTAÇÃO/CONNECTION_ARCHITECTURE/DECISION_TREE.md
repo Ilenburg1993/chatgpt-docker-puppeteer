@@ -1,7 +1,6 @@
 # Diagrama de Decisão: Arquitetura de Conexão
 
-**Versão**: 3.0
-**Propósito**: Árvore de decisões arquiteturais
+**Versão**: 3.0 **Propósito**: Árvore de decisões arquiteturais
 
 ---
 
@@ -99,33 +98,33 @@
 
 ## 🔀 Matriz de Decisões
 
-| Critério            | Chrome Container | Chrome Windows   | Decisão     |
-| ------------------- | ---------------- | ---------------- | ----------- |
-| **Anti-Bot**        | ❌ Detectado      | ✅ Não detectado  | Windows     |
-| **Performance GPU** | ❌ Limitado       | ✅ Full           | Windows     |
-| **Deploy**          | ✅ Simples        | ⚠️ Requer Windows | Windows     |
-| **Manutenção**      | ✅ Fácil          | ⚠️ 2 ambientes    | Windows     |
-| **Custo**           | ✅ Baixo (CPU)    | ⚠️ Alto (Windows) | Windows     |
-| **Portabilidade**   | ✅ Alta           | ❌ Baixa          | Windows     |
+| Critério            | Chrome Container | Chrome Windows    | Decisão     |
+| ------------------- | ---------------- | ----------------- | ----------- |
+| **Anti-Bot**        | ❌ Detectado     | ✅ Não detectado  | Windows     |
+| **Performance GPU** | ❌ Limitado      | ✅ Full           | Windows     |
+| **Deploy**          | ✅ Simples       | ⚠️ Requer Windows | Windows     |
+| **Manutenção**      | ✅ Fácil         | ⚠️ 2 ambientes    | Windows     |
+| **Custo**           | ✅ Baixo (CPU)   | ⚠️ Alto (Windows) | Windows     |
+| **Portabilidade**   | ✅ Alta          | ❌ Baixa          | Windows     |
 | **Decisão Final**   | -                | ✅                | **Windows** |
 
-| Critério           | Conexão Direta | Via Proxy    | Decisão   |
-| ------------------ | -------------- | ------------ | --------- |
-| **Host Header**    | ❌ Rejeitado    | ✅ Corrigido  | Proxy     |
-| **URL Rewriting**  | ❌ Manual       | ✅ Automático | Proxy     |
-| **Latência**       | ✅ ~1ms         | ⚠️ ~3ms       | Proxy     |
-| **Complexidade**   | ✅ Baixa        | ⚠️ Média      | Proxy     |
-| **Funcionalidade** | ❌ Quebrado     | ✅ Completo   | Proxy     |
+| Critério           | Conexão Direta | Via Proxy     | Decisão   |
+| ------------------ | -------------- | ------------- | --------- |
+| **Host Header**    | ❌ Rejeitado   | ✅ Corrigido  | Proxy     |
+| **URL Rewriting**  | ❌ Manual      | ✅ Automático | Proxy     |
+| **Latência**       | ✅ ~1ms        | ⚠️ ~3ms       | Proxy     |
+| **Complexidade**   | ✅ Baixa       | ⚠️ Média      | Proxy     |
+| **Funcionalidade** | ❌ Quebrado    | ✅ Completo   | Proxy     |
 | **Decisão Final**  | -              | ✅            | **Proxy** |
 
-| Critério          | Proxy Windows | Proxy Container | Decisão       |
-| ----------------- | ------------- | --------------- | ------------- |
-| **Gerenciamento** | ❌ 2x PM2      | ✅ 1x PM2        | Container     |
-| **Logs**          | ❌ Separados   | ✅ Unificados    | Container     |
-| **Deploy**        | ❌ Complexo    | ✅ Simples       | Container     |
-| **Latência**      | ✅ ~1ms        | ⚠️ ~2ms          | Container     |
-| **Manutenção**    | ❌ 2 ambientes | ✅ 1 ambiente    | Container     |
-| **Decisão Final** | -             | ✅               | **Container** |
+| Critério          | Proxy Windows  | Proxy Container | Decisão       |
+| ----------------- | -------------- | --------------- | ------------- |
+| **Gerenciamento** | ❌ 2x PM2      | ✅ 1x PM2       | Container     |
+| **Logs**          | ❌ Separados   | ✅ Unificados   | Container     |
+| **Deploy**        | ❌ Complexo    | ✅ Simples      | Container     |
+| **Latência**      | ✅ ~1ms        | ⚠️ ~2ms         | Container     |
+| **Manutenção**    | ❌ 2 ambientes | ✅ 1 ambiente   | Container     |
+| **Decisão Final** | -              | ✅              | **Container** |
 
 ---
 
@@ -234,6 +233,7 @@ PRONTO   Chrome GUI + Agente    Puppeteer conectado    PRODUÇÃO ✅
 ```
 
 **Transições de Erro**:
+
 ```
 [CHROME_READY] ─┬─ Chrome crash ───────────▶ [DEGRADED]
                 └─ Bind errado ────────────▶ [FAILED]
@@ -316,6 +316,7 @@ PRONTO   Chrome GUI + Agente    Puppeteer conectado    PRODUÇÃO ✅
 ```
 
 **Legenda**:
+
 - **Dependência Forte**: Componente A não funciona sem B
 - **Dependência Configurável**: Via environment vars ou config.json
 - **Dependência Externa**: Fora do controle do código (Docker, Windows)
@@ -392,7 +393,8 @@ PRONTO   Chrome GUI + Agente    Puppeteer conectado    PRODUÇÃO ✅
 - [ ] **Windows**: Porta 9225 aberta (`netstat -an | findstr :9225`)
 - [ ] **Windows**: Bind em 0.0.0.0 (não 127.0.0.1)
 - [ ] **Container**: Ping `host.docker.internal` funciona
-- [ ] **Container**: `curl -H "Host: localhost" http://host.docker.internal:9225/json/version` retorna JSON
+- [ ] **Container**: `curl -H "Host: localhost" http://host.docker.internal:9225/json/version`
+      retorna JSON
 - [ ] **Container**: Proxy iniciado (PM2 ou manual)
 - [ ] **Container**: `curl http://localhost:9224/health` retorna `{"status":"ok"}`
 - [ ] **Container**: `curl http://localhost:9224/json/version` retorna JSON com URLs reescritas
@@ -411,11 +413,11 @@ PRONTO   Chrome GUI + Agente    Puppeteer conectado    PRODUÇÃO ✅
 
 Este diagrama documenta **todas as decisões arquiteturais** que levaram à solução atual.
 
-**Princípio Fundamental**: Cada decisão foi tomada para resolver um bloqueador técnico real, não por preferência.
+**Princípio Fundamental**: Cada decisão foi tomada para resolver um bloqueador técnico real, não por
+preferência.
 
 **Resultado**: Arquitetura necessária e mínima para funcionar em produção.
 
 ---
 
-**Última Atualização**: 01 de Fevereiro de 2026
-**Versão**: 3.0 Docker Desktop Edition
+**Última Atualização**: 01 de Fevereiro de 2026 **Versão**: 3.0 Docker Desktop Edition

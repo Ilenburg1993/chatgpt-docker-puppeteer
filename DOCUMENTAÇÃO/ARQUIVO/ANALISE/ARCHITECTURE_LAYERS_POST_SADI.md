@@ -152,10 +152,10 @@ const isInteractive = await analyzer.validateCandidateInteractivity(page, protoc
 
 // Driver execution
 class ChatGPTDriver {
-    async validatePage() {
-        const analyzer = require('@shared/sadi/analyzer');
-        return await analyzer.findChatInputSelector(this.page);
-    }
+  async validatePage() {
+    const analyzer = require('@shared/sadi/analyzer');
+    return await analyzer.findChatInputSelector(this.page);
+  }
 }
 ```
 
@@ -164,19 +164,19 @@ class ChatGPTDriver {
 ```javascript
 // Testa percepção isoladamente
 describe('SADI', () => {
-    it('detecta textarea ChatGPT', async () => {
-        const analyzer = require('@shared/sadi/analyzer');
-        const result = await analyzer.findChatInputSelector(page);
-        expect(result).toBeDefined();
-    });
+  it('detecta textarea ChatGPT', async () => {
+    const analyzer = require('@shared/sadi/analyzer');
+    const result = await analyzer.findChatInputSelector(page);
+    expect(result).toBeDefined();
+  });
 });
 
 // Testa validação isoladamente
 describe('PrerequisiteValidator', () => {
-    it('rejeita interface inválida', async () => {
-        const result = await validateLLMInterface(page);
-        expect(result.valid).toBe(false);
-    });
+  it('rejeita interface inválida', async () => {
+    const result = await validateLLMInterface(page);
+    expect(result.valid).toBe(false);
+  });
 });
 ```
 
@@ -227,6 +227,7 @@ Depende de:
 **Arquitetura Pós-Migração**: Hierarquia limpa com camada compartilhada para utilitários standalone.
 
 **Princípios Respeitados**:
+
 - ✅ Separation of Concerns
 - ✅ Dependency Inversion (camadas dependem de abstrações)
 - ✅ Single Responsibility (SADI = percepção, Driver = execução)

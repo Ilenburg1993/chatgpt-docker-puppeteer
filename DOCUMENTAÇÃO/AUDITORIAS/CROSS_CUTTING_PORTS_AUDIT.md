@@ -1,15 +1,13 @@
 # 🔌 Auditoria Transversal: Portas e Networking
 
-> **⚠️ AVISO HISTÓRICO (2026-02-07)**: Sistema de port-manager mencionado neste documento foi **REMOVIDO**.
-> Arquivos deletados: `config/ports.json`, `scripts/port-manager.js` (código morto, nunca integrado).
-> Sistema atual: **Port hunting nativo** em `src/main.js`.
-> Documento preservado para referência histórica.
+> **⚠️ AVISO HISTÓRICO (2026-02-07)**: Sistema de port-manager mencionado neste documento foi
+> **REMOVIDO**. Arquivos deletados: `config/ports.json`, `scripts/port-manager.js` (código morto,
+> nunca integrado). Sistema atual: **Port hunting nativo** em `src/main.js`. Documento preservado
+> para referência histórica.
 
 ---
 
-**Data**: 2026-01-21
-**Tipo**: Auditoria Cross-Cutting (Transversal)
-**Status**: ✅ Completa
+**Data**: 2026-01-21 **Tipo**: Auditoria Cross-Cutting (Transversal) **Status**: ✅ Completa
 **Prioridade**: P1 (Crítica - configuração fundamental)
 
 ---
@@ -18,16 +16,20 @@
 
 ### Status Geral: ⚠️ **PRECISA CORREÇÕES**
 
-O sistema utiliza **2 portas principais** (3008 e 9224) mas apresenta **inconsistências de configuração** e **falta de documentação centralizada**.
+O sistema utiliza **2 portas principais** (3008 e 9224) mas apresenta **inconsistências de
+configuração** e **falta de documentação centralizada**.
 
 ### Métricas:
+
 - **Portas em uso**: 2 principais + 1 desenvolvimento
 - **Inconsistências encontradas**: 3 críticas
 - **Arquivos afetados**: 40+ arquivos
 - **Documentação**: ⚠️ Parcialmente desatualizada
 
 ### Veredicto:
+
 ⚠️ **REQUER CORREÇÕES IMEDIATAS**:
+
 1. Unificar porta padrão (3000 vs 3008)
 2. Documentar estratégia de port hunting
 3. Adicionar variáveis de ambiente faltantes
@@ -39,12 +41,12 @@ O sistema utiliza **2 portas principais** (3008 e 9224) mas apresenta **inconsis
 
 ### 1.1. Portas do Sistema
 
-| Porta | Propósito | Componente | Configurável | Status |
-|-------|-----------|------------|--------------|--------|
-| **3008** | Dashboard Web (HTTP) | Server/Express | ✅ Sim (PORT env) | ✅ PRODUÇÃO |
-| **9224** | Chrome Remote Debugging | Chrome/CDP | ✅ Sim (CHROME_REMOTE_DEBUGGING_PORT) | ✅ PRODUÇÃO |
-| **9229** | Node.js Inspector (Dev) | Node Debug | ✅ Sim (--inspect) | 🟡 DEV ONLY |
-| **3000** | Fallback Server (Legacy) | Server/Express | ❌ Hardcoded em testes | ⚠️ INCONSISTENTE |
+| Porta    | Propósito                | Componente     | Configurável                          | Status           |
+| -------- | ------------------------ | -------------- | ------------------------------------- | ---------------- |
+| **3008** | Dashboard Web (HTTP)     | Server/Express | ✅ Sim (PORT env)                     | ✅ PRODUÇÃO      |
+| **9224** | Chrome Remote Debugging  | Chrome/CDP     | ✅ Sim (CHROME_REMOTE_DEBUGGING_PORT) | ✅ PRODUÇÃO      |
+| **9229** | Node.js Inspector (Dev)  | Node Debug     | ✅ Sim (--inspect)                    | 🟡 DEV ONLY      |
+| **3000** | Fallback Server (Legacy) | Server/Express | ❌ Hardcoded em testes                | ⚠️ INCONSISTENTE |
 
 ---
 
@@ -53,6 +55,7 @@ O sistema utiliza **2 portas principais** (3008 e 9224) mas apresenta **inconsis
 ### 2.1. Porta 3008 - Dashboard Web (HTTP Server)
 
 #### Configuração Atual:
+
 ```javascript
 // src/server/engine/server.js
 const port = process.env.PORT || 3008; // Default: 3008
@@ -69,28 +72,31 @@ PORT=3008
 ```
 
 #### Port Hunting Strategy:
+
 ```javascript
 // src/server/engine/server.js (lines 21-61)
 function start(port) {
-    return new Promise(resolve => {
-        httpServer.listen(port, () => {
-            resolve({ server: httpServer, port });
-        });
-
-        httpServer.on('error', e => {
-            if (e.code === 'EADDRINUSE') {
-                log('WARN', `Porta ${port} ocupada. Escalando para ${port + 1}...`);
-                resolve(start(port + 1)); // Recursivo: 3008 → 3009 → 3010...
-            }
-        });
+  return new Promise(resolve => {
+    httpServer.listen(port, () => {
+      resolve({ server: httpServer, port });
     });
+
+    httpServer.on('error', e => {
+      if (e.code === 'EADDRINUSE') {
+        log('WARN', `Porta ${port} ocupada. Escalando para ${port + 1}...`);
+        resolve(start(port + 1)); // Recursivo: 3008 → 3009 → 3010...
+      }
+    });
+  });
 }
 ```
 
 **Comportamento**: Se 3008 estiver ocupada, tenta 3009, 3010, etc. até encontrar porta livre.
 
 #### Arquivos Referenciando 3008:
+
 ✅ **Corretos** (25 arquivos):
+
 - `ecosystem.config.js` - PM2 config
 - `docker-compose.yml` - Port mapping
 - `docker-compose.dev.yml` - Dev port mapping
@@ -102,17 +108,22 @@ function start(port) {
 - `fila.example.json` - Queue example
 
 ❌ **Inconsistentes** (3 arquivos):
+
 1. **server.js.old** (OBSOLETO):
+
    ```javascript
    const PORT = process.env.PORT || 3000; // ❌ ERRADO: 3000 ao invés de 3008
    ```
+
    **Problema**: Arquivo obsoleto com porta errada (nunca deveria existir)
 
 2. **test_nerv_pulse.js**:
+
    ```javascript
    const SERVER_URL = 'http://localhost:3000'; // ❌ ERRADO
    // Deveria ser: const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3008';
    ```
+
    **Problema**: Teste usa porta 3000 hardcoded
 
 3. **src/main.js** (linha 94):
@@ -123,6 +134,7 @@ function start(port) {
    **Problema**: Fallback inconsistente com resto do sistema
 
 #### ✅ **Documentação Completa**:
+
 - README.md menciona 3008 corretamente
 - INICIAR_TUDO.BAT abre navegador em 3008
 - Dashboard healthcheck em /api/health funciona
@@ -132,6 +144,7 @@ function start(port) {
 ### 2.2. Porta 9224 - Chrome Remote Debugging Protocol (CDP)
 
 #### Configuração Atual:
+
 ```bash
 # Windows
 "C:\Program Files\Google\Chrome\Application\chrome.exe" \
@@ -144,6 +157,7 @@ google-chrome --remote-debugging-port=9224 \
 ```
 
 #### Variáveis de Ambiente:
+
 ```dotenv
 # .env.example
 CHROME_REMOTE_DEBUGGING_PORT=9224
@@ -154,21 +168,25 @@ DEBUG_PORT: "http://localhost:9224"
 ```
 
 #### Uso no Código:
+
 ```javascript
 // src/infra/ConnectionOrchestrator.js
 const DEFAULT_PORTS = [9224, 9223, 9224]; // Multi-instance support
 
 // Tenta conectar em múltiplas portas para suportar pool
 for (const port of this.config.ports) {
-    const browserURL = `http://${host}:${port}`;
-    browser = await puppeteer.connect({ browserURL });
+  const browserURL = `http://${host}:${port}`;
+  browser = await puppeteer.connect({ browserURL });
 }
 ```
 
-**Estratégia Multi-Port**: Sistema suporta múltiplas instâncias Chrome em portas sequenciais (9224, 9223, 9224) para browser pool.
+**Estratégia Multi-Port**: Sistema suporta múltiplas instâncias Chrome em portas sequenciais (9224,
+9223, 9224) para browser pool.
 
 #### Arquivos Referenciando 9224:
+
 ✅ **Corretos** (30+ arquivos):
+
 - `README.md` - Instruções de inicialização
 - `INICIAR_TUDO.BAT` - Lança Chrome com 9224
 - `scripts/setup.sh` - Setup automático
@@ -177,28 +195,32 @@ for (const port of this.config.ports) {
 - `src/infra/ConnectionOrchestrator.js` - Connection manager
 - `tests/manual/test_chrome_connection.js` - Teste de conexão
 
-⚠️ **Dependência Externa**: Sistema **NÃO** lança Chrome automaticamente, assume Chrome já rodando com `--remote-debugging-port=9224`.
+⚠️ **Dependência Externa**: Sistema **NÃO** lança Chrome automaticamente, assume Chrome já rodando
+com `--remote-debugging-port=9224`.
 
 ---
 
 ### 2.3. Porta 9229 - Node.js Inspector (Desenvolvimento)
 
 #### Configuração:
+
 ```yaml
 # docker-compose.dev.yml
 environment:
   - NODE_OPTIONS=--inspect=0.0.0.0:9229
 ports:
-  - "9229:9229"    # Node.js inspector (Chrome DevTools)
+  - '9229:9229' # Node.js inspector (Chrome DevTools)
 ```
 
 #### Propósito:
+
 - Debugging com Chrome DevTools
 - Performance profiling
 - Memory snapshots
 - **USO**: Apenas em desenvolvimento (não exposto em produção)
 
 #### Como Usar:
+
 ```bash
 # 1. Inicie container dev
 docker-compose -f docker-compose.dev.yml up
@@ -209,27 +231,33 @@ chrome://inspect
 # 3. Connect to localhost:9229
 ```
 
-✅ **Isolado corretamente**: Não presente em `docker-compose.yml` (produção), apenas em `docker-compose.dev.yml`.
+✅ **Isolado corretamente**: Não presente em `docker-compose.yml` (produção), apenas em
+`docker-compose.dev.yml`.
 
 ---
 
 ### 2.4. Porta 3000 - Inconsistência Legacy
 
 #### ❌ **PROBLEMA CRÍTICO**:
+
 **Descoberta**: Porta 3000 aparece em 3 contextos diferentes como **fallback inconsistente**.
 
 #### Locais do Problema:
 
 1. **src/main.js (linha 94)**:
+
    ```javascript
    const instance = await server.start(process.env.PORT || 3000); // ❌ ERRADO
    ```
+
    **Impacto**: Se `PORT` não estiver definida, servidor sobe em 3000 ao invés de 3008.
 
 2. **server.js.old (linha 27)**:
+
    ```javascript
    const PORT = process.env.PORT || 3000; // ❌ ARQUIVO OBSOLETO
    ```
+
    **Impacto**: Arquivo nunca deveria existir (obsoleto desde auditoria ROOT).
 
 3. **test_nerv_pulse.js (linha 15)**:
@@ -239,7 +267,9 @@ chrome://inspect
    **Impacto**: Teste sempre falha se servidor estiver em 3008.
 
 #### Por Que 3000?
-**Hipótese**: Porta 3000 era o padrão original do Express, mudou para 3008 em algum momento mas nem todos os arquivos foram atualizados.
+
+**Hipótese**: Porta 3000 era o padrão original do Express, mudou para 3008 em algum momento mas nem
+todos os arquivos foram atualizados.
 
 ---
 
@@ -248,22 +278,24 @@ chrome://inspect
 ### 3.1. Implementação Atual
 
 **Algoritmo** (src/server/engine/server.js):
+
 ```javascript
 function start(port) {
-    httpServer.listen(port, () => {
-        resolve({ server, port });
-    });
+  httpServer.listen(port, () => {
+    resolve({ server, port });
+  });
 
-    httpServer.on('error', e => {
-        if (e.code === 'EADDRINUSE') {
-            // Tenta próxima porta recursivamente
-            resolve(start(port + 1));
-        }
-    });
+  httpServer.on('error', e => {
+    if (e.code === 'EADDRINUSE') {
+      // Tenta próxima porta recursivamente
+      resolve(start(port + 1));
+    }
+  });
 }
 ```
 
 **Comportamento**:
+
 - Porta inicial: `process.env.PORT || 3008`
 - Se ocupada: tenta 3009, 3010, 3011...
 - Sem limite máximo (pode escalar infinitamente)
@@ -271,11 +303,13 @@ function start(port) {
 ### 3.2. Prós e Contras
 
 ✅ **Vantagens**:
+
 - Zero downtime em conflitos de porta
 - Útil em desenvolvimento (múltiplos devs)
 - Automático e transparente
 
 ⚠️ **Riscos**:
+
 1. **Sem limite de escalonamento**: Pode tentar portas até 65535
 2. **Sem persistência**: Porta pode mudar entre reinicializações
 3. **Docker port mapping quebra**: Se container mapeia 3008:3008 mas app sobe em 3009, não funciona
@@ -284,34 +318,39 @@ function start(port) {
 ### 3.3. Recomendação
 
 **Opção A - Port Hunting com Limite** (Recomendado):
+
 ```javascript
 function start(port, maxAttempts = 5) {
-    if (maxAttempts <= 0) {
-        throw new Error('PORT_EXHAUSTED: Todas as portas tentadas estão ocupadas');
+  if (maxAttempts <= 0) {
+    throw new Error('PORT_EXHAUSTED: Todas as portas tentadas estão ocupadas');
+  }
+
+  httpServer.listen(port, () => {
+    resolve({ server, port });
+  });
+
+  httpServer.on('error', e => {
+    if (e.code === 'EADDRINUSE') {
+      log(
+        'WARN',
+        `Porta ${port} ocupada, tentando ${port + 1} (${maxAttempts - 1} tentativas restantes)`
+      );
+      resolve(start(port + 1, maxAttempts - 1));
     }
-
-    httpServer.listen(port, () => {
-        resolve({ server, port });
-    });
-
-    httpServer.on('error', e => {
-        if (e.code === 'EADDRINUSE') {
-            log('WARN', `Porta ${port} ocupada, tentando ${port + 1} (${maxAttempts - 1} tentativas restantes)`);
-            resolve(start(port + 1, maxAttempts - 1));
-        }
-    });
+  });
 }
 ```
 
 **Opção B - Port Hunting Desabilitável** (Para produção):
+
 ```javascript
 const ENABLE_PORT_HUNTING = process.env.ENABLE_PORT_HUNTING !== 'false';
 
 if (error.code === 'EADDRINUSE' && ENABLE_PORT_HUNTING) {
-    // Tenta próxima porta
+  // Tenta próxima porta
 } else {
-    // Falha imediatamente em produção
-    throw new Error(`Porta ${port} ocupada e port hunting desabilitado`);
+  // Falha imediatamente em produção
+  throw new Error(`Porta ${port} ocupada e port hunting desabilitado`);
 }
 ```
 
@@ -322,6 +361,7 @@ if (error.code === 'EADDRINUSE' && ENABLE_PORT_HUNTING) {
 ### 4.1. Variáveis de Ambiente
 
 #### ✅ **Definidas Corretamente**:
+
 ```dotenv
 # .env.example (completo)
 PORT=3008
@@ -330,6 +370,7 @@ CHROME_REMOTE_DEBUGGING_PORT=9224
 ```
 
 #### ⚠️ **Faltando**:
+
 ```dotenv
 # Sugestões para adicionar a .env.example:
 
@@ -355,21 +396,21 @@ CHROME_CONNECTION_RETRIES=3
 ```javascript
 // Valida se PORT é número
 if (process.env.PORT && isNaN(parseInt(process.env.PORT))) {
-    this.errors.push('PORT must be a valid number');
+  this.errors.push('PORT must be a valid number');
 }
 ```
 
-✅ **BOM**: Validação existe
-⚠️ **FALTA**: Validar range (1024-65535) e conflitos conhecidos
+✅ **BOM**: Validação existe ⚠️ **FALTA**: Validar range (1024-65535) e conflitos conhecidos
 
 **Sugestão**:
+
 ```javascript
 const port = parseInt(process.env.PORT);
 if (port < 1024 || port > 65535) {
-    this.errors.push('PORT must be between 1024-65535');
+  this.errors.push('PORT must be between 1024-65535');
 }
 if ([80, 443, 8080].includes(port)) {
-    this.warnings.push('PORT conflicts with common web servers');
+  this.warnings.push('PORT conflicts with common web servers');
 }
 ```
 
@@ -380,6 +421,7 @@ if ([80, 443, 8080].includes(port)) {
 ### 5.1. Documentos com Porta Correta (3008)
 
 ✅ **Atualizados** (18 docs):
+
 1. README.md - Seção Quick Start
 2. DOCUMENTAÇÃO/SCRIPTS.md - Referência completa
 3. INICIAR_TUDO.BAT - Launcher Windows
@@ -418,19 +460,20 @@ if ([80, 443, 8080].includes(port)) {
 
 ### 6.1. Mapeamento de Dependências
 
-| Subsistema | Depende de Porta | Como Usa | Crítico? |
-|------------|------------------|----------|----------|
-| **SERVER** | 3008 (HTTP) | Express.listen() | ✅ SIM |
-| **DASHBOARD** | 3008 (HTTP) | Socket.io attach | ✅ SIM |
-| **INFRA** | 9224 (CDP) | Puppeteer.connect() | ✅ SIM |
-| **KERNEL** | - | Não usa diretamente | ❌ NÃO |
-| **DRIVER** | 9224 (CDP) | Via ConnectionOrchestrator | ✅ SIM |
-| **CORE** | - | Não usa diretamente | ❌ NÃO |
-| **NERV** | 3008 (WS) | Via ServerNERVAdapter | ✅ SIM |
+| Subsistema    | Depende de Porta | Como Usa                   | Crítico? |
+| ------------- | ---------------- | -------------------------- | -------- |
+| **SERVER**    | 3008 (HTTP)      | Express.listen()           | ✅ SIM   |
+| **DASHBOARD** | 3008 (HTTP)      | Socket.io attach           | ✅ SIM   |
+| **INFRA**     | 9224 (CDP)       | Puppeteer.connect()        | ✅ SIM   |
+| **KERNEL**    | -                | Não usa diretamente        | ❌ NÃO   |
+| **DRIVER**    | 9224 (CDP)       | Via ConnectionOrchestrator | ✅ SIM   |
+| **CORE**      | -                | Não usa diretamente        | ❌ NÃO   |
+| **NERV**      | 3008 (WS)        | Via ServerNERVAdapter      | ✅ SIM   |
 
 ### 6.2. Fluxos de Porta
 
 #### Fluxo 1: Dashboard Startup
+
 ```
 1. src/main.js → Lê process.env.PORT || CONFIG.SERVER_PORT || 3008
 2. server.start(port) → Port hunting se necessário
@@ -440,6 +483,7 @@ if ([80, 443, 8080].includes(port)) {
 ```
 
 #### Fluxo 2: Chrome Connection
+
 ```
 1. ConnectionOrchestrator → Lê config.DEBUG_PORT ou env.CHROME_WS_ENDPOINT
 2. Tenta portas em ordem: [9224, 9223, 9224]
@@ -485,28 +529,25 @@ if ([80, 443, 8080].includes(port)) {
 ```javascript
 // tests/unit/server/test_port_hunting.spec.js
 describe('Port Hunting Algorithm', () => {
-    it('deve escalar de 3008 para 3009 se ocupada', async () => {
-        // Mock port 3008 busy
-        const result = await server.start(3008);
-        assert.strictEqual(result.port, 3009);
-    });
+  it('deve escalar de 3008 para 3009 se ocupada', async () => {
+    // Mock port 3008 busy
+    const result = await server.start(3008);
+    assert.strictEqual(result.port, 3009);
+  });
 
-    it('deve falhar após MAX_PORT_ATTEMPTS tentativas', async () => {
-        // Mock all ports busy
-        await assert.rejects(
-            server.start(3008, { maxAttempts: 3 }),
-            /PORT_EXHAUSTED/
-        );
-    });
+  it('deve falhar após MAX_PORT_ATTEMPTS tentativas', async () => {
+    // Mock all ports busy
+    await assert.rejects(server.start(3008, { maxAttempts: 3 }), /PORT_EXHAUSTED/);
+  });
 });
 
 // tests/integration/ports/test_docker_port_mapping.spec.js
 describe('Docker Port Mapping', () => {
-    it('deve respeitar port mapping 3008:3008', async () => {
-        // Test inside container
-        const port = await server.getActualPort();
-        assert.strictEqual(port, 3008);
-    });
+  it('deve respeitar port mapping 3008:3008', async () => {
+    // Test inside container
+    const port = await server.getActualPort();
+    assert.strictEqual(port, 3008);
+  });
 });
 ```
 
@@ -519,6 +560,7 @@ describe('Docker Port Mapping', () => {
 1. **✅ CORRIGIR Inconsistências de Porta 3000**:
 
    **Arquivo**: `src/main.js` (linha 94)
+
    ```javascript
    // ANTES (errado):
    const instance = await server.start(process.env.PORT || 3000);
@@ -528,6 +570,7 @@ describe('Docker Port Mapping', () => {
    ```
 
    **Arquivo**: `test_nerv_pulse.js` (linha 15)
+
    ```javascript
    // ANTES (errado):
    const SERVER_URL = 'http://localhost:3000';
@@ -542,6 +585,7 @@ describe('Docker Port Mapping', () => {
 2. **✅ ADICIONAR Variáveis de Ambiente Faltando**:
 
    **Arquivo**: `.env.example` (adicionar no final)
+
    ```dotenv
    # =============================================================================
    # NETWORKING & PORTS
@@ -574,26 +618,27 @@ describe('Docker Port Mapping', () => {
 ### 🔵 Médio Prazo (1 semana) - P2
 
 4. **Implementar Port Hunting com Limite**:
+
    ```javascript
    // src/server/engine/server.js
    function start(port, options = {}) {
-       const maxAttempts = options.maxAttempts ||
-           parseInt(process.env.MAX_PORT_ATTEMPTS) || 5;
-       const enableHunting = process.env.ENABLE_PORT_HUNTING !== 'false';
+     const maxAttempts = options.maxAttempts || parseInt(process.env.MAX_PORT_ATTEMPTS) || 5;
+     const enableHunting = process.env.ENABLE_PORT_HUNTING !== 'false';
 
-       // Implementar lógica com contador
+     // Implementar lógica com contador
    }
    ```
 
 5. **Adicionar Validação de Porta Avançada**:
+
    ```javascript
    // scripts/validate_config.js
    function validatePort(port) {
-       if (port < 1024) throw new Error('PORT < 1024 requires root');
-       if (port > 65535) throw new Error('PORT > 65535 invalid');
-       if ([80, 443, 8080, 5432, 3306].includes(port)) {
-           warn('PORT conflicts with common services');
-       }
+     if (port < 1024) throw new Error('PORT < 1024 requires root');
+     if (port > 65535) throw new Error('PORT > 65535 invalid');
+     if ([80, 443, 8080, 5432, 3306].includes(port)) {
+       warn('PORT conflicts with common services');
+     }
    }
    ```
 
@@ -605,14 +650,15 @@ describe('Docker Port Mapping', () => {
 ### 🟡 Longo Prazo (futuro) - P3
 
 7. **Health Check com Descoberta de Porta**:
+
    ```javascript
    // scripts/healthcheck.js
    async function discoverPort() {
-    // Lê estado.json para porta atual (LEGADO — DEPRECATED: use NERV `SERVER_READY` para descoberta)
-    // LEGADO: leitura direta de arquivo. DEPRECATED — use NERV `SERVER_READY`.
-    // Ex: waitForServerReady(nerv, { timeoutMs })
-    // const state = JSON.parse(fs.readFileSync('estado.json'));
-       return state.server_port || 3008;
+     // Lê estado.json para porta atual (LEGADO — DEPRECATED: use NERV `SERVER_READY` para descoberta)
+     // LEGADO: leitura direta de arquivo. DEPRECATED — use NERV `SERVER_READY`.
+     // Ex: waitForServerReady(nerv, { timeoutMs })
+     // const state = JSON.parse(fs.readFileSync('estado.json'));
+     return state.server_port || 3008;
    }
    ```
 
@@ -693,33 +739,39 @@ describe('Docker Port Mapping', () => {
    - Porta ocupada: Port hunting ou erro
    - Chrome não conecta: Verificar 9224
    - Docker não acessa: Check port mapping
-    - Logs inconsistentes: Ver estado.json (DEPRECATED — use NERV `SERVER_READY` para descoberta de porta)
+   - Logs inconsistentes: Ver estado.json (DEPRECATED — use NERV `SERVER_READY` para descoberta de
+     porta)
 
 ---
 
 ## 11. CONCLUSÃO
 
 ### Status Final:
+
 ⚠️ **PRECISA CORREÇÕES IMEDIATAS**
 
 ### Problemas Identificados:
+
 1. ❌ **3 arquivos com porta 3000 inconsistente**
 2. ⚠️ **Port hunting sem limite pode escalar infinitamente**
 3. ⚠️ **Faltam 7 variáveis de ambiente para networking**
 4. ⚠️ **Documentação de port hunting inexistente**
 
 ### Impacto se Não Corrigir:
+
 - ❌ Servidor pode subir em porta errada (3000 vs 3008)
 - ❌ Testes falham em CI/CD
 - ❌ Docker port mapping quebra
 - ❌ Operadores confusos com logs de escalonamento
 
 ### Tempo Estimado de Correção:
+
 - **P1 (Crítico)**: 2 horas
 - **P2 (Médio)**: 1 semana
 - **P3 (Futuro)**: 2-3 semanas
 
 ### Próximos Passos:
+
 1. ✅ Implementar correções P1 (3 arquivos + .env.example)
 2. ✅ Criar NETWORKING.md
 3. ✅ Atualizar auditoria ROOT com correções
@@ -727,7 +779,5 @@ describe('Docker Port Mapping', () => {
 
 ---
 
-**Assinado**: Sistema de Auditorias Transversais
-**Data**: 2026-01-21
-**Versão**: 1.0
-**Próxima Revisão**: Após correções P1
+**Assinado**: Sistema de Auditorias Transversais **Data**: 2026-01-21 **Versão**: 1.0 **Próxima
+Revisão**: Após correções P1

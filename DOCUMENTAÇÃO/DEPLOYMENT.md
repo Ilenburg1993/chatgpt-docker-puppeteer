@@ -1,15 +1,14 @@
 # 🚀 Guia de Deploy
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: DevOps, SRE
-**Tempo de Leitura**: ~25 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: DevOps, SRE **Tempo de
+Leitura**: ~25 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento detalha **estratégias de deployment** do sistema `chatgpt-docker-puppeteer`: Docker, PM2, HTTPS/TLS, reverse proxy, scaling horizontal, monitoring e backup.
+Este documento detalha **estratégias de deployment** do sistema `chatgpt-docker-puppeteer`: Docker,
+PM2, HTTPS/TLS, reverse proxy, scaling horizontal, monitoring e backup.
 
 ---
 
@@ -88,7 +87,7 @@ services:
     container_name: agente-gpt-prod
     restart: unless-stopped
     ports:
-      - "3008:3008"
+      - '3008:3008'
     environment:
       - NODE_ENV=production
       - MAX_WORKERS=10
@@ -105,16 +104,16 @@ services:
     mem_reservation: 512m
     cpus: 2
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:3008/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
 networks:
   default:
@@ -136,8 +135,8 @@ services:
     container_name: agente-gpt-dev
     restart: unless-stopped
     ports:
-      - "3008:3008"
-      - "9224:9224"  # Chrome DevTools
+      - '3008:3008'
+      - '9224:9224' # Chrome DevTools
     environment:
       - NODE_ENV=development
       - MAX_WORKERS=1
@@ -253,6 +252,7 @@ pm2 link <secret_key> <public_key>
 ### 1. Nginx Reverse Proxy
 
 **Install Nginx**:
+
 ```bash
 sudo apt update
 sudo apt install nginx
@@ -327,6 +327,7 @@ server {
 ```
 
 **Enable site**:
+
 ```bash
 sudo ln -s /etc/nginx/sites-available/agente-gpt /etc/nginx/sites-enabled/
 sudo nginx -t
@@ -358,6 +359,7 @@ sudo certbot certificates
 ### Estratégia: Load Balancer + Múltiplas Instâncias
 
 **Arquitetura**:
+
 ```
          ┌─────────────┐
          │ Load Balancer│ (Nginx/HAProxy)
@@ -408,6 +410,7 @@ server {
 ### Shared Storage (NFS)
 
 **Server** (192.168.1.100):
+
 ```bash
 # Install NFS
 sudo apt install nfs-kernel-server
@@ -421,6 +424,7 @@ sudo systemctl restart nfs-kernel-server
 ```
 
 **Clients** (PM2 instances):
+
 ```bash
 # Install NFS client
 sudo apt install nfs-common
@@ -450,28 +454,29 @@ sudo systemctl restart redis
 ```
 
 **Node.js Integration**:
+
 ```javascript
 const Redis = require('ioredis');
 const redis = new Redis({
-    host: '192.168.1.100',
-    port: 6379,
-    password: 'YOUR_PASSWORD'
+  host: '192.168.1.100',
+  port: 6379,
+  password: 'YOUR_PASSWORD',
 });
 
 // Distributed lock
 async function acquireDistributedLock(taskId) {
-    const lockKey = `lock:${taskId}`;
-    const lockValue = `${agentDNA}:${process.pid}`;
+  const lockKey = `lock:${taskId}`;
+  const lockValue = `${agentDNA}:${process.pid}`;
 
-    const result = await redis.set(
-        lockKey,
-        lockValue,
-        'NX',  // Only if not exists
-        'EX',  // Expiry
-        60     // 60 seconds
-    );
+  const result = await redis.set(
+    lockKey,
+    lockValue,
+    'NX', // Only if not exists
+    'EX', // Expiry
+    60 // 60 seconds
+  );
 
-    return result === 'OK';
+  return result === 'OK';
 }
 ```
 
@@ -520,6 +525,7 @@ fi
 ```
 
 **Cron** (every 5 min):
+
 ```bash
 */5 * * * * /usr/local/bin/health-check.sh >> /var/log/agente-health.log 2>&1
 ```
@@ -569,6 +575,7 @@ find /backups -name "agente-*.tar.gz" -mtime +7 -delete
 ```
 
 **Cron** (daily at 2am):
+
 ```bash
 0 2 * * * /usr/local/bin/backup.sh >> /var/log/agente-backup.log 2>&1
 ```
@@ -689,11 +696,13 @@ pm2 restart agente-gpt-green --name agente-gpt-blue
 ### Problema: Container não inicia
 
 **Logs**:
+
 ```bash
 docker logs agente-gpt-prod
 ```
 
 **Causas comuns**:
+
 - Porta 3008 ocupada
 - Volume mounts incorretos
 - Variáveis de ambiente faltando
@@ -703,16 +712,19 @@ docker logs agente-gpt-prod
 ### Problema: PM2 restart loop
 
 **Debug**:
+
 ```bash
 pm2 logs agente-gpt --err --lines 100
 ```
 
 **Causas**:
+
 - Error no boot (syntax, missing files)
 - Port already in use
 - max_restarts atingido
 
 **Solução**:
+
 ```bash
 pm2 reset agente-gpt  # Reset restart counter
 ```
@@ -722,11 +734,13 @@ pm2 reset agente-gpt  # Reset restart counter
 ### Problema: High memory usage
 
 **Monitor**:
+
 ```bash
 pm2 monit
 ```
 
 **Solução**:
+
 ```javascript
 // ecosystem.config.js
 max_memory_restart: '600M',  // Auto-restart on high memory
@@ -743,4 +757,4 @@ node_args: '--max-old-space-size=512'
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, DevOps Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, DevOps Team_

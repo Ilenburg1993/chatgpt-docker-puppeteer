@@ -2,9 +2,7 @@
 
 ## ✅ Status: CONCLUÍDO
 
-**Data**: 2026-02-01
-**Arquivos modificados**: 1 (`src/main.js`)
-**Linhas adicionadas**: +85
+**Data**: 2026-02-01 **Arquivos modificados**: 1 (`src/main.js`) **Linhas adicionadas**: +85
 **Testes**: 6/6 passaram ✅
 
 ---
@@ -12,6 +10,7 @@
 ## 🔧 O que foi implementado
 
 ### 1️⃣ **Validação PM2 + integrated** (CRÍTICO)
+
 - ✅ Detecta conflito antes de iniciar subsistemas
 - ✅ Mensagem de erro clara com 2 soluções práticas
 - ✅ Exit code 1 (fail-fast)
@@ -19,6 +18,7 @@
 **Código**: `src/main.js` linhas 189-221
 
 ### 2️⃣ **Timeout Discovery 5s → 30s** (IMPORTANTE)
+
 - ✅ Permite server boot lento (cold start, migrations)
 - ✅ Configurável via `SERVER_DISCOVERY_TIMEOUT`
 - ✅ Reduz falsos negativos em 70%
@@ -26,6 +26,7 @@
 **Código**: `src/main.js` linha 352
 
 ### 3️⃣ **Detecção Proxy Duplicado** (IMPORTANTE)
+
 - ✅ Verifica porta 9224 antes de iniciar
 - ✅ Graceful skip se proxy externo rodando
 - ✅ Função helper `checkPortInUse()` reutilizável
@@ -37,6 +38,7 @@
 ## 🧪 Como Testar
 
 ### Teste Rápido (Sintaxe + Lógica)
+
 ```bash
 bash scripts/validate-boot-fixes.sh
 ```
@@ -44,6 +46,7 @@ bash scripts/validate-boot-fixes.sh
 ### Teste Manual (Cenários Reais)
 
 #### ✅ Cenário 1: PM2 + split (DEVE FUNCIONAR)
+
 ```bash
 export SERVER_MODE=split
 pm2 start ecosystem.config.js
@@ -51,6 +54,7 @@ pm2 logs
 ```
 
 #### ❌ Cenário 2: PM2 + integrated (DEVE FALHAR)
+
 ```bash
 export SERVER_MODE=integrated
 pm2 start ecosystem.config.js
@@ -58,6 +62,7 @@ pm2 start ecosystem.config.js
 ```
 
 #### ✅ Cenário 3: Standalone (DEVE FUNCIONAR)
+
 ```bash
 export SERVER_MODE=integrated
 node index.js
@@ -68,8 +73,8 @@ node index.js
 
 ## 📊 Impacto Esperado
 
-| Problema               | Antes            | Depois               |
-| ---------------------- | ---------------- | -------------------- |
+| Problema               | Antes            | Depois                |
+| ---------------------- | ---------------- | --------------------- |
 | **Crashes EADDRINUSE** | Comum            | Zero ✅               |
 | **Discovery falha**    | 30% (5s timeout) | <10% (30s timeout) ✅ |
 | **Proxy duplicado**    | Crash            | Graceful skip ✅      |
@@ -89,16 +94,19 @@ node index.js
 ## 🚀 Próximos Passos
 
 ### Imediato (fazer agora)
+
 - [ ] Testar em ambiente real (PM2 + 3 processos)
 - [ ] Validar logs em produção
 - [ ] Commit + push das alterações
 
 ### Curto prazo (próxima sprint)
+
 - [ ] Documentar modos no README.md principal
 - [ ] Health check consolidado `/api/health/full`
 - [ ] Testes E2E de boot sequences
 
 ### Médio prazo (backlog)
+
 - [ ] Authority Pattern completo no Maestro
 - [ ] Discovery com retry exponencial
 - [ ] Telemetria de boot duration

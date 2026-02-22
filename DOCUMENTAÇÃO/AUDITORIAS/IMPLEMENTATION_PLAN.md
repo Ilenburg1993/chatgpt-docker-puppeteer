@@ -1,20 +1,21 @@
 # Plano de Implementação - Constantes & Type Safety
 
-**Data**: 2026-01-20
-**Status**: 📋 PLANEJAMENTO
-**Baseado em**: Mapeamento completo de constantes + Análise TS
+**Data**: 2026-01-20 **Status**: 📋 PLANEJAMENTO **Baseado em**: Mapeamento completo de constantes +
+Análise TS
 
 ---
 
 ## 🎯 OBJETIVO GERAL
 
-Implementar sistema completo de gestão, validação e documentação de constantes com máximo type safety possível em JavaScript.
+Implementar sistema completo de gestão, validação e documentação de constantes com máximo type
+safety possível em JavaScript.
 
 ---
 
 ## 📊 ESCOPO TOTAL
 
 **Funcionalidades a Implementar:**
+
 1. ✅ TypeScript Definitions (.d.ts)
 2. ✅ Validador AST Automático
 3. ✅ CI/CD Integration
@@ -35,6 +36,7 @@ Implementar sistema completo de gestão, validação e documentação de constan
 **Objetivo**: Estabelecer base de type safety sem disrupção
 
 #### 1.1. TypeScript Definitions (4-6h)
+
 ```bash
 Criar .d.ts para:
 ✅ src/core/constants/*.d.ts
@@ -47,6 +49,7 @@ Criar .d.ts para:
 **Entregável**: Autocomplete perfeito para APIs principais
 
 **Arquivos**:
+
 - `src/core/constants/tasks.d.ts`
 - `src/core/constants/browser.d.ts`
 - `src/core/constants/logging.d.ts`
@@ -56,6 +59,7 @@ Criar .d.ts para:
 ---
 
 #### 1.2. JSDoc Enforcement via ESLint (2-3h)
+
 ```javascript
 // eslint.config.mjs
 Adicionar regras:
@@ -68,12 +72,14 @@ Adicionar regras:
 **Entregável**: JSDoc obrigatório em funções públicas
 
 **Arquivos**:
+
 - `eslint.config.mjs` (atualizar)
 - `.vscode/settings.json` (sugestões JSDoc)
 
 ---
 
 #### 1.3. Type Checking no CI (2-3h)
+
 ```json
 // package.json
 "scripts": {
@@ -85,6 +91,7 @@ Adicionar regras:
 **Entregável**: Validação automática de tipos
 
 **Arquivos**:
+
 - `tsconfig.json` (criar para type checking)
 - `package.json` (adicionar scripts)
 - `.github/workflows/ci.yml` (se existir)
@@ -96,6 +103,7 @@ Adicionar regras:
 **Objetivo**: Detectar problemas automaticamente via AST parsing
 
 #### 2.1. Validador AST de Constantes (8-10h)
+
 ```javascript
 scripts/validators/ast-constants-validator.js
 
@@ -110,12 +118,14 @@ Funcionalidades:
 **Entregável**: Script que valida 100% automaticamente
 
 **Features**:
+
 - Detecta `ActionCode.TYPO` (não existe)
 - Detecta strings hardcoded que deveriam ser constantes
 - Encontra constantes definidas mas nunca usadas
 - Valida imports de constantes
 
 **Arquivos**:
+
 - `scripts/validators/ast-constants-validator.js`
 - `scripts/validators/ast-parser.js` (helper)
 - `scripts/validators/constants-rules.json` (config)
@@ -123,6 +133,7 @@ Funcionalidades:
 ---
 
 #### 2.2. Gerador de Testes Automáticos (4-6h)
+
 ```javascript
 scripts/generators/generate-constants-tests.js
 
@@ -137,6 +148,7 @@ Gera testes para:
 **Entregável**: Testes automáticos para todas as constantes
 
 **Arquivos**:
+
 - `scripts/generators/generate-constants-tests.js`
 - `tests/generated/constants-validation.spec.js` (auto-gerado)
 - `tests/generated/constants-naming.spec.js` (auto-gerado)
@@ -148,6 +160,7 @@ Gera testes para:
 **Objetivo**: Documentação que se atualiza sozinha
 
 #### 3.1. Gerador de Docs HTML (6-8h)
+
 ```javascript
 scripts/docs/generate-constants-docs.js
 
@@ -162,6 +175,7 @@ Gera site HTML com:
 **Entregável**: Site de documentação estático
 
 **Arquivos**:
+
 - `scripts/docs/generate-constants-docs.js`
 - `scripts/docs/templates/` (HTML templates)
 - `docs/constants/index.html` (gerado)
@@ -170,6 +184,7 @@ Gera site HTML com:
 ---
 
 #### 3.2. Sistema de Versionamento (4-6h)
+
 ```javascript
 scripts/versioning/constants-changelog.js
 
@@ -183,6 +198,7 @@ Funcionalidades:
 **Entregável**: CHANGELOG.md automático para constantes
 
 **Arquivos**:
+
 - `scripts/versioning/constants-changelog.js`
 - `scripts/versioning/semver-analyzer.js`
 - `CONSTANTS_CHANGELOG.md` (auto-gerado)
@@ -194,6 +210,7 @@ Funcionalidades:
 **Objetivo**: Ferramentas para facilitar vida do desenvolvedor
 
 #### 4.1. Migration Assistant (4-6h)
+
 ```bash
 npm run add-constant
 
@@ -215,6 +232,7 @@ Interactive CLI:
 **Entregável**: CLI interativo para adicionar constantes
 
 **Arquivos**:
+
 - `scripts/cli/add-constant.js`
 - `scripts/cli/remove-constant.js`
 - `scripts/cli/rename-constant.js`
@@ -223,6 +241,7 @@ Interactive CLI:
 ---
 
 #### 4.2. Pre-commit Hooks (2-3h)
+
 ```bash
 # .husky/pre-commit
 npm run typecheck
@@ -233,12 +252,14 @@ npm run validate:constants
 **Entregável**: Validação automática antes de commit
 
 **Arquivos**:
+
 - `.husky/pre-commit` (criar)
 - `package.json` (adicionar husky)
 
 ---
 
 #### 4.3. VS Code Snippets (2-3h)
+
 ```json
 // .vscode/constants.code-snippets
 {
@@ -261,12 +282,14 @@ npm run validate:constants
 **Entregável**: Snippets para criar constantes
 
 **Arquivos**:
+
 - `.vscode/constants.code-snippets`
 - `.vscode/jsdoc.code-snippets`
 
 ---
 
 #### 4.4. ESLint Plugin Custom (4-6h)
+
 ```javascript
 // eslint-plugin-constants/index.js
 
@@ -279,6 +302,7 @@ Regras customizadas:
 **Entregável**: Plugin ESLint customizado
 
 **Arquivos**:
+
 - `eslint-plugin-constants/index.js`
 - `eslint-plugin-constants/rules/*.js`
 - `eslint.config.mjs` (usar plugin)
@@ -290,6 +314,7 @@ Regras customizadas:
 **Objetivo**: Validação automática em pipeline
 
 #### 5.1. GitHub Actions Workflow (4-6h)
+
 ```yaml
 # .github/workflows/constants-validation.yml
 name: Constants Validation
@@ -308,12 +333,14 @@ jobs:
 **Entregável**: Workflow completo de validação
 
 **Arquivos**:
+
 - `.github/workflows/constants-validation.yml`
 - `.github/workflows/constants-docs.yml` (deploy docs)
 
 ---
 
 #### 5.2. PR Comments Bot (4-6h)
+
 ```javascript
 // .github/scripts/pr-comment-constants.js
 
@@ -327,6 +354,7 @@ Comenta em PRs:
 **Entregável**: Bot que comenta em PRs
 
 **Arquivos**:
+
 - `.github/scripts/pr-comment-constants.js`
 - `.github/workflows/pr-comment.yml`
 
@@ -337,6 +365,7 @@ Comenta em PRs:
 **Objetivo**: Medir e melhorar uso de constantes
 
 #### 6.1. Dashboard de Métricas (6-8h)
+
 ```javascript
 scripts/analytics/constants-metrics.js
 
@@ -351,6 +380,7 @@ Métricas:
 **Entregável**: Dashboard HTML com métricas
 
 **Arquivos**:
+
 - `scripts/analytics/constants-metrics.js`
 - `docs/metrics/constants-dashboard.html`
 - `docs/metrics/trends.json`
@@ -358,6 +388,7 @@ Métricas:
 ---
 
 #### 6.2. Alertas Automáticos (2-4h)
+
 ```javascript
 // Slack/Discord webhook
 Alertas quando:
@@ -369,6 +400,7 @@ Alertas quando:
 **Entregável**: Sistema de alertas
 
 **Arquivos**:
+
 - `scripts/alerts/constants-alerts.js`
 - `.github/workflows/alerts.yml`
 
@@ -377,42 +409,50 @@ Alertas quando:
 ## 📅 CRONOGRAMA SUGERIDO
 
 ### **Sprint 1 (Semana 1): Fase 1 + Fase 2.1**
+
 ```
 Dias 1-2: TypeScript Definitions
 Dias 3-4: JSDoc Enforcement + Type Checking
 Dia 5: Validador AST
 ```
+
 **Entrega**: Type safety básico + validação automática
 
 ---
 
 ### **Sprint 2 (Semana 2): Fase 2.2 + Fase 3**
+
 ```
 Dia 1: Gerador de testes
 Dias 2-3: Gerador de docs HTML
 Dias 4-5: Sistema de versionamento
 ```
+
 **Entrega**: Documentação automática + testes
 
 ---
 
 ### **Sprint 3 (Semana 3): Fase 4**
+
 ```
 Dias 1-2: Migration Assistant
 Dia 3: Pre-commit hooks
 Dia 4: VS Code snippets
 Dia 5: ESLint plugin custom
 ```
+
 **Entrega**: Ferramentas de desenvolvedor
 
 ---
 
 ### **Sprint 4 (Semana 4): Fase 5 + Fase 6**
+
 ```
 Dias 1-2: GitHub Actions
 Dia 3: PR Comments Bot
 Dias 4-5: Dashboard + Alertas
 ```
+
 **Entrega**: CI/CD completo + monitoramento
 
 ---
@@ -420,6 +460,7 @@ Dias 4-5: Dashboard + Alertas
 ## 🎯 PRIORIZAÇÃO (Se tempo limitado)
 
 ### **Crítico (Must Have)** - Fazer SEMPRE
+
 1. ✅ TypeScript Definitions (Fase 1.1)
 2. ✅ Type Checking CI (Fase 1.3)
 3. ✅ Validador AST (Fase 2.1)
@@ -430,6 +471,7 @@ Dias 4-5: Dashboard + Alertas
 ---
 
 ### **Importante (Should Have)** - Fazer se possível
+
 5. ✅ JSDoc Enforcement (Fase 1.2)
 6. ✅ Gerador de Testes (Fase 2.2)
 7. ✅ Migration Assistant (Fase 4.1)
@@ -440,6 +482,7 @@ Dias 4-5: Dashboard + Alertas
 ---
 
 ### **Desejável (Nice to Have)** - Fazer depois
+
 9. ✅ Gerador de Docs (Fase 3.1)
 10. ✅ Sistema de Versionamento (Fase 3.2)
 11. ✅ ESLint Plugin (Fase 4.4)
@@ -450,6 +493,7 @@ Dias 4-5: Dashboard + Alertas
 ---
 
 ### **Opcional (Could Have)** - Luxo
+
 13. ✅ VS Code Snippets (Fase 4.3)
 14. ✅ PR Comments Bot (Fase 5.2)
 15. ✅ Alertas (Fase 6.2)
@@ -460,16 +504,16 @@ Dias 4-5: Dashboard + Alertas
 
 ## 📊 MATRIZ DE DECISÃO
 
-| Fase | Esforço | Impacto | ROI | Prioridade |
-|------|---------|---------|-----|------------|
-| **Fase 1** | 8-12h | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 🔴 CRÍTICO |
-| **Fase 2.1** | 8-10h | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 🔴 CRÍTICO |
-| **Fase 2.2** | 4-6h | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🟡 ALTO |
-| **Fase 3** | 10-14h | ⭐⭐⭐ | ⭐⭐⭐ | 🟢 MÉDIO |
-| **Fase 4.1-4.2** | 6-9h | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🟡 ALTO |
-| **Fase 4.3-4.4** | 6-9h | ⭐⭐ | ⭐⭐ | ⚪ BAIXO |
-| **Fase 5** | 8-12h | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 🟡 ALTO |
-| **Fase 6** | 8-12h | ⭐⭐⭐ | ⭐⭐ | 🟢 MÉDIO |
+| Fase             | Esforço | Impacto    | ROI        | Prioridade |
+| ---------------- | ------- | ---------- | ---------- | ---------- |
+| **Fase 1**       | 8-12h   | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 🔴 CRÍTICO |
+| **Fase 2.1**     | 8-10h   | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 🔴 CRÍTICO |
+| **Fase 2.2**     | 4-6h    | ⭐⭐⭐⭐   | ⭐⭐⭐⭐   | 🟡 ALTO    |
+| **Fase 3**       | 10-14h  | ⭐⭐⭐     | ⭐⭐⭐     | 🟢 MÉDIO   |
+| **Fase 4.1-4.2** | 6-9h    | ⭐⭐⭐⭐   | ⭐⭐⭐⭐   | 🟡 ALTO    |
+| **Fase 4.3-4.4** | 6-9h    | ⭐⭐       | ⭐⭐       | ⚪ BAIXO   |
+| **Fase 5**       | 8-12h   | ⭐⭐⭐⭐   | ⭐⭐⭐⭐   | 🟡 ALTO    |
+| **Fase 6**       | 8-12h   | ⭐⭐⭐     | ⭐⭐       | 🟢 MÉDIO   |
 
 ---
 
@@ -478,16 +522,19 @@ Dias 4-5: Dashboard + Alertas
 Se tiver **apenas 1 semana (40h)**:
 
 ### **Dia 1-2 (16h): Fundação**
+
 - TypeScript Definitions
 - JSDoc Enforcement
 - Type Checking CI
 
 ### **Dia 3-4 (16h): Validação**
+
 - Validador AST
 - Gerador de Testes
 - Pre-commit Hooks
 
 ### **Dia 5 (8h): CI/CD**
+
 - GitHub Actions básico
 - Magic strings scan automático
 
@@ -498,18 +545,21 @@ Se tiver **apenas 1 semana (40h)**:
 ## 📋 CHECKLIST DE IMPLEMENTAÇÃO
 
 ### **Antes de Começar**
+
 - [ ] Backup do código atual
 - [ ] Branch dedicada (`feature/constants-tooling`)
 - [ ] Definir prioridades (MVP vs Full)
 - [ ] Preparar ambiente de testes
 
 ### **Durante Implementação**
+
 - [ ] Commit após cada fase
 - [ ] Testar cada ferramenta isoladamente
 - [ ] Atualizar documentação progressivamente
 - [ ] Validar com testes reais
 
 ### **Após Conclusão**
+
 - [ ] Documentar uso de cada ferramenta
 - [ ] Treinar time (se aplicável)
 - [ ] Configurar CI/CD
@@ -522,10 +572,10 @@ Se tiver **apenas 1 semana (40h)**:
 Aguardando sua checagem antes de prosseguir.
 
 **Quando pronto, começamos por:**
+
 1. **Fase 1.1**: TypeScript Definitions (4-6h)
 2. Ou outro ponto que considerar prioritário
 
 ---
 
-**Status**: ⏸️ AGUARDANDO APROVAÇÃO
-**Última atualização**: 2026-01-20
+**Status**: ⏸️ AGUARDANDO APROVAÇÃO **Última atualização**: 2026-01-20

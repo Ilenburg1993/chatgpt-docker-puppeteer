@@ -1,16 +1,14 @@
 # 🚀 GUIA RÁPIDO - Iniciar Chrome para Testes
 
-**Data**: 2026-02-01
-**Objetivo**: Iniciar Chrome no Windows Host para integração com Chrome Proxy Service
+**Data**: 2026-02-01 **Objetivo**: Iniciar Chrome no Windows Host para integração com Chrome Proxy
+Service
 
 ---
 
 ## 📋 Pré-Requisitos
 
-✅ Chrome instalado no Windows
-✅ Terminal com permissões adequadas
-✅ Porta 9225 livre (Chrome)
-✅ Porta 9224 livre (Proxy - iniciado depois)
+✅ Chrome instalado no Windows ✅ Terminal com permissões adequadas ✅ Porta 9225 livre (Chrome) ✅
+Porta 9224 livre (Proxy - iniciado depois)
 
 ---
 
@@ -19,6 +17,7 @@
 ### Arquivo: `START-CHROME-FOR-PROXY.BAT`
 
 **Vantagens**:
+
 - ✅ Interface interativa com feedback visual
 - ✅ Validações automáticas (porta, processo, DevTools)
 - ✅ Kill automático se porta ocupada (com confirmação)
@@ -33,6 +32,7 @@ START-CHROME-FOR-PROXY.BAT
 ```
 
 **Output esperado**:
+
 ```
 ═══════════════════════════════════════════════════════════
   CHROME LAUNCHER - Proxy Integration Ready
@@ -92,6 +92,7 @@ Validação (JSON):
 ### Arquivo: `start-chrome-windows.ps1`
 
 **Vantagens**:
+
 - ✅ Output estruturado (JSON)
 - ✅ Melhor para automação
 - ✅ Suporta modo headless
@@ -109,6 +110,7 @@ Validação (JSON):
 ```
 
 **Parâmetros**:
+
 - `-Port 9225` - Porta do DevTools (padrão: 9225)
 - `-ForceKill` - Mata processos Chrome existentes antes
 - `-Headless` - Modo sem interface gráfica
@@ -120,11 +122,13 @@ Validação (JSON):
 ## 🔍 Validação Manual
 
 ### 1. Chrome Online?
+
 ```bash
 curl http://localhost:9225/json/version
 ```
 
 **Esperado**:
+
 ```json
 {
   "Browser": "Chrome/131.0.6778.86",
@@ -137,21 +141,25 @@ curl http://localhost:9225/json/version
 ```
 
 ### 2. Verificar Porta
+
 ```cmd
 netstat -ano | findstr ":9225"
 ```
 
 **Esperado**:
+
 ```
 TCP    127.0.0.1:9225    0.0.0.0:0    LISTENING    12345
 ```
 
 ### 3. Verificar Processo
+
 ```cmd
 tasklist | findstr "chrome.exe"
 ```
 
 **Esperado**:
+
 ```
 chrome.exe    12345    Console    1    123,456 K
 ```
@@ -163,6 +171,7 @@ chrome.exe    12345    Console    1    123,456 K
 ### Problema: "Porta 9225 ocupada"
 
 **Solução 1** (Script faz automaticamente):
+
 ```cmd
 REM Identificar processo
 netstat -ano | findstr ":9225"
@@ -172,6 +181,7 @@ taskkill /PID 12345 /F
 ```
 
 **Solução 2** (Porta alternativa):
+
 ```cmd
 set CHROME_PORT=9226
 START-CHROME-FOR-PROXY.BAT
@@ -182,6 +192,7 @@ START-CHROME-FOR-PROXY.BAT
 ### Problema: "Chrome não encontrado"
 
 **Solução**:
+
 ```cmd
 REM Verificar instalação
 dir "C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -200,20 +211,24 @@ START-CHROME-FOR-PROXY.BAT
 **Verificações**:
 
 1. **Firewall bloqueando?**
+
 ```cmd
 REM Windows Defender Firewall
 netsh advfirewall firewall show rule name=all | findstr "9225"
 ```
 
 2. **Antivírus interferindo?**
+
 - Desabilite temporariamente ou adicione exceção para Chrome
 
 3. **Porta realmente aberta?**
+
 ```cmd
 Test-NetConnection -ComputerName localhost -Port 9225
 ```
 
 4. **Logs do Chrome**:
+
 ```
 C:\Users\<USER>\AppData\Local\Temp\chrome-debug-9225\chrome_debug.log
 ```
@@ -223,6 +238,7 @@ C:\Users\<USER>\AppData\Local\Temp\chrome-debug-9225\chrome_debug.log
 ## 📊 Workflow Completo (3 Terminais)
 
 ### Terminal 1: Chrome (Windows Host)
+
 ```bat
 START-CHROME-FOR-PROXY.BAT
 REM Aguarde: ✅ CHROME INICIADO COM SUCESSO
@@ -230,6 +246,7 @@ REM Deixe rodando (não feche)
 ```
 
 ### Terminal 2: Proxy (Container ou Host)
+
 ```bash
 node scripts/chrome-proxy-service.js
 # Aguarde: ✅ Chrome Proxy Service online (porta 9224)
@@ -237,17 +254,20 @@ node scripts/chrome-proxy-service.js
 ```
 
 ### Terminal 3: Sistema (Container)
+
 ```bash
 npm run daemon:start
 # Aguarde: ✅ Browser Pool online (3/3 instâncias saudáveis)
 ```
 
 ### Validação Final
+
 ```bash
 make health
 ```
 
 **Output esperado**:
+
 ```
 [HEALTH] Core endpoint: ✅ OK
 [HEALTH] Server endpoint: ✅ OK
@@ -271,16 +291,18 @@ make health
 ## 📞 Próximo Passo
 
 Após Chrome iniciado e validado, volte aqui e informe:
+
 ```
 ✅ Chrome rodando - pronto para iniciar proxy
 ```
 
 Então prosseguiremos com:
+
 1. Iniciar Chrome Proxy Service
 2. Executar teste de integração
 3. Validar sistema completo
 
 ---
 
-**Status**: Aguardando Chrome iniciar no Windows Host
-**Ação**: Execute `START-CHROME-FOR-PROXY.BAT` e reporte resultado
+**Status**: Aguardando Chrome iniciar no Windows Host **Ação**: Execute `START-CHROME-FOR-PROXY.BAT`
+e reporte resultado

@@ -1,18 +1,20 @@
 # driver_nerv_adapter.js - Análise v2.0
 
-**Data**: 2026-02-01
-**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js`
-**Versão Atual**: v1.1 (415 linhas)
-**Audit Level**: 800 — Critical Decoupling Layer
+**Data**: 2026-02-01 **Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js` **Versão Atual**:
+v1.1 (415 linhas) **Audit Level**: 800 — Critical Decoupling Layer
 
 ---
 
 ## 📋 RESUMO EXECUTIVO
 
 ### Responsabilidade
-**Adapter crítico** que conecta NERV (pub/sub IPC) ao domínio DRIVER. Gerencia instâncias de DriverLifecycleManager, escuta COMMANDS do KERNEL, emite EVENTS de telemetria. **Zero acoplamento direto** com outros subsistemas.
+
+**Adapter crítico** que conecta NERV (pub/sub IPC) ao domínio DRIVER. Gerencia instâncias de
+DriverLifecycleManager, escuta COMMANDS do KERNEL, emite EVENTS de telemetria. **Zero acoplamento
+direto** com outros subsistemas.
 
 ### Hierarquia na Arquitetura
+
 ```
 KERNEL
   ↓ (NERV commands)
@@ -30,9 +32,10 @@ TargetDriver v2.0 (658 linhas)
 ```
 
 ### Estado Atual
+
 - **Tipo**: Class (non-EventEmitter)
 - **Linhas**: 415 (v1.1)
-- **Métodos Públicos**: 4 (shutdown, getStats, constructor, _handleDriverCommand)
+- **Métodos Públicos**: 4 (shutdown, getStats, constructor, \_handleDriverCommand)
 - **Métodos Privados**: 6
 - **Eventos Emitidos**: 0 (usa HighLevelNERV.sendEvent)
 - **Validações**: 5 (básicas)
@@ -40,8 +43,9 @@ TargetDriver v2.0 (658 linhas)
 - **JSDoc**: Parcial (~30%)
 
 ### Métricas de Qualidade
-| Métrica                  | Status    | Nota |
-| ------------------------ | --------- | ---- |
+
+| Métrica                  | Status     | Nota |
+| ------------------------ | ---------- | ---- |
 | EventEmitter Inheritance | ❌ Não     | 3/10 |
 | Constants Centralizados  | ⚠️ Parcial | 6/10 |
 | JSDoc Completo           | ⚠️ Parcial | 5/10 |
@@ -57,49 +61,54 @@ TargetDriver v2.0 (658 linhas)
 ## 🐛 BUGS IDENTIFICADOS (8 Total)
 
 ### BUG #1: Classe Não Herda EventEmitter - CRÍTICO (P0)
-**Severidade**: P0 (Inconsistência arquitetural)
-**Linha**: 29
-**Impacto**: Adapter não segue padrão v2.0 de EventEmitter. Não pode emitir eventos locais.
+
+**Severidade**: P0 (Inconsistência arquitetural) **Linha**: 29 **Impacto**: Adapter não segue padrão
+v2.0 de EventEmitter. Não pode emitir eventos locais.
 
 **Código Atual**:
+
 ```javascript
 class DriverNERVAdapter {
-    constructor(nerv, browserPool, config) {
-        // ...
-    }
+  constructor(nerv, browserPool, config) {
+    // ...
+  }
 }
 ```
 
 **Problema**:
-- Não herda EventEmitter (inconsistente com TargetDriver v2.0, BaseDriver v2.0, ChatGPTDriver v2.0, DriverLifecycleManager v2.0, factory v2.0)
+
+- Não herda EventEmitter (inconsistente com TargetDriver v2.0, BaseDriver v2.0, ChatGPTDriver v2.0,
+  DriverLifecycleManager v2.0, factory v2.0)
 - Não pode emitir eventos locais (só via NERV)
 - Não pode ser escutado localmente (server, monitoring)
 - Viola padrão arquitetural v2.0
 
 **Solução Proposta**:
+
 ```javascript
 const EventEmitter = require('events');
 
 class DriverNERVAdapter extends EventEmitter {
-    constructor(nerv, browserPool, config) {
-        super(); // ✅ EventEmitter constructor
+  constructor(nerv, browserPool, config) {
+    super(); // ✅ EventEmitter constructor
 
-        if (!nerv) {
-            throw new Error('[DriverNERVAdapter] NERV instance required');
-        }
-
-        // ...
+    if (!nerv) {
+      throw new Error('[DriverNERVAdapter] NERV instance required');
     }
 
-    // ✅ Emitir eventos locais + NERV
-    _emitLocalEvent(eventName, data) {
-        this.emit(eventName, data); // Local
-        // NERV emit também (duplo canal)
-    }
+    // ...
+  }
+
+  // ✅ Emitir eventos locais + NERV
+  _emitLocalEvent(eventName, data) {
+    this.emit(eventName, data); // Local
+    // NERV emit também (duplo canal)
+  }
 }
 ```
 
 **Benefícios**:
+
 - Consistência arquitetural (100% dos módulos v2.0 herdam EventEmitter)
 - Duplo canal (local + NERV)
 - Pode ser escutado por server/monitoring
@@ -108,11 +117,12 @@ class DriverNERVAdapter extends EventEmitter {
 ---
 
 ### BUG #2: Faltam ADAPTER_CONFIG e ADAPTER_EVENTS - ALTO (P1)
-**Severidade**: P1 (Magic numbers e strings)
-**Linhas**: 0 (não existe)
-**Impacto**: Magic numbers em timeout, magic strings em eventos.
+
+**Severidade**: P1 (Magic numbers e strings) **Linhas**: 0 (não existe) **Impacto**: Magic numbers
+em timeout, magic strings em eventos.
 
 **Código Atual**:
+
 ```javascript
 // ❌ Nenhuma constante de config
 class DriverNERVAdapter {
@@ -136,6 +146,7 @@ this._emitEvent(ActionCode.DRIVER_TASK_STARTED, { ... });
 ```
 
 **Problema**:
+
 - Nenhum timeout configurável (executeTask, shutdown, health check)
 - Nenhuma constante ADAPTER_CONFIG
 - Nenhuma constante ADAPTER_EVENTS (local events)
@@ -143,33 +154,35 @@ this._emitEvent(ActionCode.DRIVER_TASK_STARTED, { ... });
 - Stats structure hardcoded
 
 **Solução Proposta**:
+
 ```javascript
 // ✅ ADAPTER_CONFIG
 const ADAPTER_CONFIG = {
-    EXECUTE_TASK_TIMEOUT_MS: process.env.ADAPTER_EXECUTE_TIMEOUT || 300000, // 5min
-    SHUTDOWN_TIMEOUT_MS: process.env.ADAPTER_SHUTDOWN_TIMEOUT || 30000, // 30s
-    HEALTH_CHECK_INTERVAL_MS: process.env.ADAPTER_HEALTH_INTERVAL || 60000, // 1min
-    MAX_ACTIVE_DRIVERS: process.env.ADAPTER_MAX_DRIVERS || 10,
-    TELEMETRY_BUFFER_SIZE: 1000,
-    DEGRADED_MODE_WARNING_INTERVAL_MS: 60000 // 1min
+  EXECUTE_TASK_TIMEOUT_MS: process.env.ADAPTER_EXECUTE_TIMEOUT || 300000, // 5min
+  SHUTDOWN_TIMEOUT_MS: process.env.ADAPTER_SHUTDOWN_TIMEOUT || 30000, // 30s
+  HEALTH_CHECK_INTERVAL_MS: process.env.ADAPTER_HEALTH_INTERVAL || 60000, // 1min
+  MAX_ACTIVE_DRIVERS: process.env.ADAPTER_MAX_DRIVERS || 10,
+  TELEMETRY_BUFFER_SIZE: 1000,
+  DEGRADED_MODE_WARNING_INTERVAL_MS: 60000, // 1min
 };
 
 // ✅ ADAPTER_EVENTS (local EventEmitter events)
 const ADAPTER_EVENTS = {
-    TASK_STARTED: 'adapter:task_started',
-    TASK_COMPLETED: 'adapter:task_completed',
-    TASK_FAILED: 'adapter:task_failed',
-    TASK_ABORTED: 'adapter:task_aborted',
-    DRIVER_ATTACHED: 'adapter:driver_attached',
-    DRIVER_DETACHED: 'adapter:driver_detached',
-    HEALTH_CHECK: 'adapter:health_check',
-    ERROR: 'adapter:error',
-    DEGRADED_MODE: 'adapter:degraded_mode',
-    SHUTDOWN: 'adapter:shutdown'
+  TASK_STARTED: 'adapter:task_started',
+  TASK_COMPLETED: 'adapter:task_completed',
+  TASK_FAILED: 'adapter:task_failed',
+  TASK_ABORTED: 'adapter:task_aborted',
+  DRIVER_ATTACHED: 'adapter:driver_attached',
+  DRIVER_DETACHED: 'adapter:driver_detached',
+  HEALTH_CHECK: 'adapter:health_check',
+  ERROR: 'adapter:error',
+  DEGRADED_MODE: 'adapter:degraded_mode',
+  SHUTDOWN: 'adapter:shutdown',
 };
 ```
 
 **Benefícios**:
+
 - Zero magic numbers
 - Config via env vars
 - Eventos locais documentados
@@ -177,12 +190,13 @@ const ADAPTER_EVENTS = {
 
 ---
 
-### BUG #3: _executeTask Sem Timeout Protection - ALTO (P1)
-**Severidade**: P1 (Hang possível)
-**Linha**: 193-265
-**Impacto**: Task pode hang indefinidamente (driver.execute sem timeout).
+### BUG #3: \_executeTask Sem Timeout Protection - ALTO (P1)
+
+**Severidade**: P1 (Hang possível) **Linha**: 193-265 **Impacto**: Task pode hang indefinidamente
+(driver.execute sem timeout).
 
 **Código Atual**:
+
 ```javascript
 async _executeTask(payload, correlationId) {
     // ...
@@ -219,6 +233,7 @@ async _executeTask(payload, correlationId) {
 ```
 
 **Problema**:
+
 - `driver.execute()` pode hang indefinidamente
 - `lifecycleManager.acquire()` pode hang se factory falhar
 - `browserPool.allocate()` pode hang se pool travado
@@ -226,6 +241,7 @@ async _executeTask(payload, correlationId) {
 - Nenhum timeout em nenhuma fase
 
 **Solução Proposta**:
+
 ```javascript
 async _executeTask(payload, correlationId) {
     const { task } = payload;
@@ -314,6 +330,7 @@ _timeout(ms, operation) {
 ```
 
 **Benefícios**:
+
 - Timeout em todas as fases (allocate, acquire, execute, release)
 - Previne hangs indefinidos
 - Cleanup garantido (even on timeout)
@@ -322,11 +339,12 @@ _timeout(ms, operation) {
 ---
 
 ### BUG #4: shutdown() Sem Timeout Protection - MÉDIO (P2)
-**Severidade**: P2 (Shutdown pode hang)
-**Linha**: 392-414
-**Impacto**: Shutdown pode hang se driver.release() travar.
+
+**Severidade**: P2 (Shutdown pode hang) **Linha**: 392-414 **Impacto**: Shutdown pode hang se
+driver.release() travar.
 
 **Código Atual**:
+
 ```javascript
 async shutdown() {
     log('INFO', `[DriverNERVAdapter] Iniciando shutdown (${this.activeDrivers.size} drivers ativos)`);
@@ -349,11 +367,13 @@ async shutdown() {
 ```
 
 **Problema**:
+
 - `lifecycleManager.release()` pode hang indefinidamente
 - `Promise.all()` espera todas as promises (sem timeout)
 - Shutdown pode nunca completar
 
 **Solução Proposta**:
+
 ```javascript
 async shutdown(options = {}) {
     const timeout = options.timeout || ADAPTER_CONFIG.SHUTDOWN_TIMEOUT_MS;
@@ -408,6 +428,7 @@ async shutdown(options = {}) {
 ```
 
 **Benefícios**:
+
 - Timeout de 30s por driver (configurável)
 - Promise.allSettled (não falha se um driver falhar)
 - Retorna resultado detalhado (success/failed counts)
@@ -415,12 +436,13 @@ async shutdown(options = {}) {
 
 ---
 
-### BUG #5: _attachDriverTelemetry Sem Detach - MÉDIO (P2)
-**Severidade**: P2 (Memory leak)
-**Linha**: 338-381
-**Impacto**: Listeners não removidos após task completar (memory leak).
+### BUG #5: \_attachDriverTelemetry Sem Detach - MÉDIO (P2)
+
+**Severidade**: P2 (Memory leak) **Linha**: 338-381 **Impacto**: Listeners não removidos após task
+completar (memory leak).
 
 **Código Atual**:
+
 ```javascript
 _attachDriverTelemetry(driver, taskId, correlationId) {
     // Listener para mudanças de estado
@@ -444,12 +466,14 @@ _attachDriverTelemetry(driver, taskId, correlationId) {
 ```
 
 **Problema**:
+
 - Listeners adicionados com `on()` (permanentes)
 - Nunca removidos após task completar
 - Memory leak se muitas tasks executarem
 - Listener duplicados se task re-executar (improvável, mas possível)
 
 **Solução Proposta**:
+
 ```javascript
 _attachDriverTelemetry(driver, taskId, correlationId) {
     // ✅ Map de listeners para cleanup
@@ -520,6 +544,7 @@ _detachDriverTelemetry(driver, listeners) {
 ```
 
 **Benefícios**:
+
 - Listeners removidos automaticamente (via driver.once('destroyed'))
 - Previne memory leak
 - Listeners salvos para detach manual se necessário
@@ -527,12 +552,13 @@ _detachDriverTelemetry(driver, listeners) {
 
 ---
 
-### BUG #6: _performHealthCheck Sem Error Handling - MÉDIO (P2)
-**Severidade**: P2 (Health check pode crashar)
-**Linha**: 320-336
-**Impacto**: browserPool.getHealth() pode lançar erro e crashar health check.
+### BUG #6: \_performHealthCheck Sem Error Handling - MÉDIO (P2)
+
+**Severidade**: P2 (Health check pode crashar) **Linha**: 320-336 **Impacto**:
+browserPool.getHealth() pode lançar erro e crashar health check.
 
 **Código Atual**:
+
 ```javascript
 async _performHealthCheck(payload, correlationId) {
     const health = {
@@ -549,11 +575,13 @@ async _performHealthCheck(payload, correlationId) {
 ```
 
 **Problema**:
+
 - `browserPool.getHealth()` pode lançar erro (pool desconectado, erro de rede)
 - Health check crasharia (uncaught exception)
 - Nenhum try-catch
 
 **Solução Proposta**:
+
 ```javascript
 async _performHealthCheck(payload, correlationId) {
     let browserPoolHealth = null;
@@ -604,6 +632,7 @@ async _performHealthCheck(payload, correlationId) {
 ```
 
 **Benefícios**:
+
 - Try-catch em browserPool.getHealth()
 - Timeout de 5s
 - Health status calculado (HEALTHY, DEGRADED, UNHEALTHY)
@@ -612,12 +641,13 @@ async _performHealthCheck(payload, correlationId) {
 
 ---
 
-### BUG #7: _emitEvent Sem Retry Logic - BAIXO (P3)
-**Severidade**: P3 (Telemetria pode falhar silenciosamente)
-**Linha**: 383-391
-**Impacto**: Se NERV falhar, evento é perdido (sem retry).
+### BUG #7: \_emitEvent Sem Retry Logic - BAIXO (P3)
+
+**Severidade**: P3 (Telemetria pode falhar silenciosamente) **Linha**: 383-391 **Impacto**: Se NERV
+falhar, evento é perdido (sem retry).
 
 **Código Atual**:
+
 ```javascript
 _emitEvent(actionCode, payload, correlationId) {
     try {
@@ -632,11 +662,13 @@ _emitEvent(actionCode, payload, correlationId) {
 ```
 
 **Problema**:
+
 - Se `HighLevelNERV.sendEvent()` falhar, evento é perdido
 - Nenhum retry logic
 - Nenhuma métrica de falhas de telemetria
 
 **Solução Proposta**:
+
 ```javascript
 async _emitEvent(actionCode, payload, correlationId) {
     const maxRetries = 3;
@@ -680,6 +712,7 @@ async _emitEvent(actionCode, payload, correlationId) {
 ```
 
 **Benefícios**:
+
 - Retry logic (3 tentativas com backoff)
 - Métricas de telemetria (eventsEmitted, eventsFailed)
 - Emit local error event
@@ -688,11 +721,12 @@ async _emitEvent(actionCode, payload, correlationId) {
 ---
 
 ### BUG #8: Falta Validação de activeDrivers Size Limit - BAIXO (P3)
-**Severidade**: P3 (Memory leak potencial)
-**Linha**: 207 (activeDrivers.set)
-**Impacto**: Se muitas tasks executarem simultaneamente, activeDrivers pode crescer indefinidamente.
+
+**Severidade**: P3 (Memory leak potencial) **Linha**: 207 (activeDrivers.set) **Impacto**: Se muitas
+tasks executarem simultaneamente, activeDrivers pode crescer indefinidamente.
 
 **Código Atual**:
+
 ```javascript
 async _executeTask(payload, correlationId) {
     // ...
@@ -706,11 +740,13 @@ async _executeTask(payload, correlationId) {
 ```
 
 **Problema**:
+
 - Nenhuma validação de `activeDrivers.size` antes de adicionar
 - Se KERNEL enviar muitas tasks simultaneamente, pode causar OOM
 - Nenhuma proteção contra DOS (denial of service)
 
 **Solução Proposta**:
+
 ```javascript
 async _executeTask(payload, correlationId) {
     const { task } = payload;
@@ -749,6 +785,7 @@ async _executeTask(payload, correlationId) {
 ```
 
 **Benefícios**:
+
 - Validação de limite (MAX_ACTIVE_DRIVERS = 10, configurável)
 - Proteção contra OOM
 - Mensagem clara de erro
@@ -760,47 +797,48 @@ async _executeTask(payload, correlationId) {
 ## 🚀 MELHORIAS SUGERIDAS (10 Total)
 
 ### IMPROVEMENT #1: EventEmitter Inheritance + Eventos Locais (P1)
-**Prioridade**: P1 (Consistência arquitetural)
-**Esforço**: 2-3 horas
-**Linhas**: +50
+
+**Prioridade**: P1 (Consistência arquitetural) **Esforço**: 2-3 horas **Linhas**: +50
 
 **Descrição**: Herdar EventEmitter e adicionar eventos locais (além de NERV events).
 
 **Implementação**:
+
 ```javascript
 const EventEmitter = require('events');
 
 const ADAPTER_EVENTS = {
-    TASK_STARTED: 'adapter:task_started',
-    TASK_COMPLETED: 'adapter:task_completed',
-    TASK_FAILED: 'adapter:task_failed',
-    TASK_ABORTED: 'adapter:task_aborted',
-    DRIVER_ATTACHED: 'adapter:driver_attached',
-    DRIVER_DETACHED: 'adapter:driver_detached',
-    HEALTH_CHECK: 'adapter:health_check',
-    ERROR: 'adapter:error',
-    DEGRADED_MODE: 'adapter:degraded_mode',
-    SHUTDOWN: 'adapter:shutdown'
+  TASK_STARTED: 'adapter:task_started',
+  TASK_COMPLETED: 'adapter:task_completed',
+  TASK_FAILED: 'adapter:task_failed',
+  TASK_ABORTED: 'adapter:task_aborted',
+  DRIVER_ATTACHED: 'adapter:driver_attached',
+  DRIVER_DETACHED: 'adapter:driver_detached',
+  HEALTH_CHECK: 'adapter:health_check',
+  ERROR: 'adapter:error',
+  DEGRADED_MODE: 'adapter:degraded_mode',
+  SHUTDOWN: 'adapter:shutdown',
 };
 
 class DriverNERVAdapter extends EventEmitter {
-    constructor(nerv, browserPool, config) {
-        super(); // ✅ EventEmitter constructor
-        // ...
-    }
+  constructor(nerv, browserPool, config) {
+    super(); // ✅ EventEmitter constructor
+    // ...
+  }
 
-    // ✅ Duplo canal (local + NERV)
-    _emitBoth(localEvent, nervActionCode, payload, correlationId) {
-        // Local event (para server/monitoring)
-        this.emit(localEvent, { ...payload, correlationId });
+  // ✅ Duplo canal (local + NERV)
+  _emitBoth(localEvent, nervActionCode, payload, correlationId) {
+    // Local event (para server/monitoring)
+    this.emit(localEvent, { ...payload, correlationId });
 
-        // NERV event (para KERNEL)
-        this._emitEvent(nervActionCode, payload, correlationId);
-    }
+    // NERV event (para KERNEL)
+    this._emitEvent(nervActionCode, payload, correlationId);
+  }
 }
 ```
 
 **Benefícios**:
+
 - Consistência com v2.0 stack (100% herdam EventEmitter)
 - Duplo canal (local subscribers + NERV IPC)
 - Server pode escutar eventos diretamente
@@ -809,25 +847,26 @@ class DriverNERVAdapter extends EventEmitter {
 ---
 
 ### IMPROVEMENT #2: ADAPTER_CONFIG - Zero Magic Numbers (P1)
-**Prioridade**: P1 (Code quality)
-**Esforço**: 1 hora
-**Linhas**: +30
+
+**Prioridade**: P1 (Code quality) **Esforço**: 1 hora **Linhas**: +30
 
 **Implementação**:
+
 ```javascript
 const ADAPTER_CONFIG = {
-    EXECUTE_TASK_TIMEOUT_MS: parseInt(process.env.ADAPTER_EXECUTE_TIMEOUT || '300000'), // 5min
-    SHUTDOWN_TIMEOUT_MS: parseInt(process.env.ADAPTER_SHUTDOWN_TIMEOUT || '30000'), // 30s
-    HEALTH_CHECK_INTERVAL_MS: parseInt(process.env.ADAPTER_HEALTH_INTERVAL || '60000'), // 1min
-    MAX_ACTIVE_DRIVERS: parseInt(process.env.ADAPTER_MAX_DRIVERS || '10'),
-    TELEMETRY_BUFFER_SIZE: parseInt(process.env.ADAPTER_TELEMETRY_BUFFER || '1000'),
-    DEGRADED_MODE_WARNING_INTERVAL_MS: parseInt(process.env.ADAPTER_DEGRADED_WARNING || '60000'),
-    EVENT_RETRY_MAX_ATTEMPTS: parseInt(process.env.ADAPTER_EVENT_RETRY || '3'),
-    EVENT_RETRY_BACKOFF_MS: parseInt(process.env.ADAPTER_EVENT_BACKOFF || '100')
+  EXECUTE_TASK_TIMEOUT_MS: parseInt(process.env.ADAPTER_EXECUTE_TIMEOUT || '300000'), // 5min
+  SHUTDOWN_TIMEOUT_MS: parseInt(process.env.ADAPTER_SHUTDOWN_TIMEOUT || '30000'), // 30s
+  HEALTH_CHECK_INTERVAL_MS: parseInt(process.env.ADAPTER_HEALTH_INTERVAL || '60000'), // 1min
+  MAX_ACTIVE_DRIVERS: parseInt(process.env.ADAPTER_MAX_DRIVERS || '10'),
+  TELEMETRY_BUFFER_SIZE: parseInt(process.env.ADAPTER_TELEMETRY_BUFFER || '1000'),
+  DEGRADED_MODE_WARNING_INTERVAL_MS: parseInt(process.env.ADAPTER_DEGRADED_WARNING || '60000'),
+  EVENT_RETRY_MAX_ATTEMPTS: parseInt(process.env.ADAPTER_EVENT_RETRY || '3'),
+  EVENT_RETRY_BACKOFF_MS: parseInt(process.env.ADAPTER_EVENT_BACKOFF || '100'),
 };
 ```
 
 **Benefícios**:
+
 - Zero magic numbers
 - Configurável via env vars
 - Valores padrão explícitos
@@ -835,13 +874,13 @@ const ADAPTER_CONFIG = {
 ---
 
 ### IMPROVEMENT #3: JSDoc Completo (P1)
-**Prioridade**: P1 (Documentation)
-**Esforço**: 2 horas
-**Linhas**: +120
+
+**Prioridade**: P1 (Documentation) **Esforço**: 2 horas **Linhas**: +120
 
 **Status Atual**: JSDoc parcial (~30%)
 
 **Métodos Que Precisam JSDoc**:
+
 ```javascript
 /**
  * Executa uma tarefa usando DriverLifecycleManager.
@@ -876,6 +915,7 @@ async _executeTask(payload, correlationId) { ... }
 ```
 
 **Benefícios**:
+
 - 100% JSDoc coverage
 - IntelliSense completo
 - API documentation automática
@@ -883,51 +923,53 @@ async _executeTask(payload, correlationId) { ... }
 ---
 
 ### IMPROVEMENT #4: Metrics Expandidos (P2)
-**Prioridade**: P2 (Observability)
-**Esforço**: 1 hora
-**Linhas**: +30
+
+**Prioridade**: P2 (Observability) **Esforço**: 1 hora **Linhas**: +30
 
 **Stats Atuais**:
+
 ```javascript
 this.stats = {
-    tasksExecuted: 0,
-    tasksAborted: 0,
-    driversCrashed: 0,
-    vitalsEmitted: 0
+  tasksExecuted: 0,
+  tasksAborted: 0,
+  driversCrashed: 0,
+  vitalsEmitted: 0,
 };
 ```
 
 **Stats v2.0 Propostos**:
+
 ```javascript
 this.stats = {
-    // Existing
-    tasksExecuted: 0,
-    tasksAborted: 0,
-    driversCrashed: 0,
-    vitalsEmitted: 0,
+  // Existing
+  tasksExecuted: 0,
+  tasksAborted: 0,
+  driversCrashed: 0,
+  vitalsEmitted: 0,
 
-    // ✅ New metrics
-    tasksRejected: 0,
-    tasksTimedOut: 0,
-    eventsEmitted: 0,
-    eventsFailed: 0,
-    driversAttached: 0,
-    driversDetached: 0,
-    healthChecksPerformed: 0,
-    degradedModeWarnings: 0,
+  // ✅ New metrics
+  tasksRejected: 0,
+  tasksTimedOut: 0,
+  eventsEmitted: 0,
+  eventsFailed: 0,
+  driversAttached: 0,
+  driversDetached: 0,
+  healthChecksPerformed: 0,
+  degradedModeWarnings: 0,
 
-    // ✅ Timing metrics
-    avgTaskDuration: 0,
-    maxTaskDuration: 0,
-    minTaskDuration: Infinity,
+  // ✅ Timing metrics
+  avgTaskDuration: 0,
+  maxTaskDuration: 0,
+  minTaskDuration: Infinity,
 
-    // ✅ Uptime
-    startTime: Date.now(),
-    uptime: () => Date.now() - this.stats.startTime
+  // ✅ Uptime
+  startTime: Date.now(),
+  uptime: () => Date.now() - this.stats.startTime,
 };
 ```
 
 **Benefícios**:
+
 - 14 métricas (+10 novas)
 - Timing metrics (avg/max/min)
 - Uptime tracking
@@ -935,13 +977,13 @@ this.stats = {
 ---
 
 ### IMPROVEMENT #5: Telemetry Buffer (P2)
-**Prioridade**: P2 (Performance)
-**Esforço**: 2-3 horas
-**Linhas**: +80
+
+**Prioridade**: P2 (Performance) **Esforço**: 2-3 horas **Linhas**: +80
 
 **Descrição**: Buffer de telemetria para batch emit (reduzir overhead de NERV).
 
 **Implementação**:
+
 ```javascript
 constructor(nerv, browserPool, config) {
     super();
@@ -991,6 +1033,7 @@ _flushTelemetry() {
 ```
 
 **Benefícios**:
+
 - Batch emit (reduz overhead)
 - Buffer configurável (TELEMETRY_BUFFER_SIZE)
 - Flush automático (1s interval + size threshold)
@@ -998,13 +1041,13 @@ _flushTelemetry() {
 ---
 
 ### IMPROVEMENT #6: Circuit Breaker Pattern (P2)
-**Prioridade**: P2 (Resilience)
-**Esforço**: 3-4 horas
-**Linhas**: +100
+
+**Prioridade**: P2 (Resilience) **Esforço**: 3-4 horas **Linhas**: +100
 
 **Descrição**: Implementar circuit breaker para proteger contra driver crashes frequentes.
 
 **Implementação**:
+
 ```javascript
 constructor(nerv, browserPool, config) {
     super();
@@ -1095,6 +1138,7 @@ _recordSuccess() {
 ```
 
 **Benefícios**:
+
 - Proteção contra driver crashes frequentes
 - Auto-recovery (timeout após 1min)
 - HALF_OPEN state (teste de recovery)
@@ -1103,13 +1147,13 @@ _recordSuccess() {
 ---
 
 ### IMPROVEMENT #7: Task Queue (P3)
-**Prioridade**: P3 (Advanced)
-**Esforço**: 4-5 horas
-**Linhas**: +150
+
+**Prioridade**: P3 (Advanced) **Esforço**: 4-5 horas **Linhas**: +150
 
 **Descrição**: Fila interna de tasks quando MAX_ACTIVE_DRIVERS atingido.
 
 **Implementação**:
+
 ```javascript
 constructor(nerv, browserPool, config) {
     super();
@@ -1170,6 +1214,7 @@ async _finallyCleanup(taskId, lifecycleManager, page) {
 ```
 
 **Benefícios**:
+
 - Fila automática (MAX_QUEUE_SIZE = 100)
 - Auto-process quando driver liberar
 - Métricas de fila (queueSize)
@@ -1178,11 +1223,11 @@ async _finallyCleanup(taskId, lifecycleManager, page) {
 ---
 
 ### IMPROVEMENT #8: Periodic Health Check (P3)
-**Prioridade**: P3 (Monitoring)
-**Esforço**: 1 hora
-**Linhas**: +40
+
+**Prioridade**: P3 (Monitoring) **Esforço**: 1 hora **Linhas**: +40
 
 **Implementação**:
+
 ```javascript
 constructor(nerv, browserPool, config) {
     super();
@@ -1219,6 +1264,7 @@ async shutdown() {
 ```
 
 **Benefícios**:
+
 - Health check automático (1min interval)
 - Detecção proativa de problemas
 - Cleanup em shutdown
@@ -1226,11 +1272,11 @@ async shutdown() {
 ---
 
 ### IMPROVEMENT #9: Degraded Mode Periodic Warning (P3)
-**Prioridade**: P3 (UX)
-**Esforço**: 30min
-**Linhas**: +30
+
+**Prioridade**: P3 (UX) **Esforço**: 30min **Linhas**: +30
 
 **Implementação**:
+
 ```javascript
 constructor(nerv, browserPool, config) {
     super();
@@ -1267,6 +1313,7 @@ async shutdown() {
 ```
 
 **Benefícios**:
+
 - Warning periódico (1min)
 - Não esquece de configurar browser pool
 - Métrica (degradedModeWarnings)
@@ -1274,28 +1321,29 @@ async shutdown() {
 ---
 
 ### IMPROVEMENT #10: Module Exports Completo (P3)
-**Prioridade**: P3 (API)
-**Esforço**: 30min
-**Linhas**: +20
+
+**Prioridade**: P3 (API) **Esforço**: 30min **Linhas**: +20
 
 **Implementação**:
+
 ```javascript
 module.exports = {
-    // ✅ Class export
-    DriverNERVAdapter,
+  // ✅ Class export
+  DriverNERVAdapter,
 
-    // ✅ Constants export
-    ADAPTER_CONFIG,
-    ADAPTER_EVENTS,
+  // ✅ Constants export
+  ADAPTER_CONFIG,
+  ADAPTER_EVENTS,
 
-    // ✅ Factory function (opcional)
-    create: (nerv, browserPool, config) => {
-        return new DriverNERVAdapter(nerv, browserPool, config);
-    }
+  // ✅ Factory function (opcional)
+  create: (nerv, browserPool, config) => {
+    return new DriverNERVAdapter(nerv, browserPool, config);
+  },
 };
 ```
 
 **Benefícios**:
+
 - Export de constantes (para testes)
 - Factory function (alternative constructor)
 - API completa
@@ -1307,10 +1355,11 @@ module.exports = {
 ### Sprints Propostos
 
 #### **SPRINT 1: P0 Bugs (CRÍTICO)**
-**Duração**: 2-3 horas
-**Linhas**: +80
+
+**Duração**: 2-3 horas **Linhas**: +80
 
 **Tarefas**:
+
 - [x] BUG #1: EventEmitter inheritance
 - [x] JSDoc mínimo (métodos públicos)
 - [x] Syntax validation
@@ -1320,12 +1369,13 @@ module.exports = {
 ---
 
 #### **SPRINT 2: P1 Bugs + Improvements (ALTO)**
-**Duração**: 4-5 horas
-**Linhas**: +120
+
+**Duração**: 4-5 horas **Linhas**: +120
 
 **Tarefas**:
+
 - [x] BUG #2: ADAPTER_CONFIG + ADAPTER_EVENTS
-- [x] BUG #3: _executeTask timeout protection
+- [x] BUG #3: \_executeTask timeout protection
 - [x] IMPROVEMENT #1: EventEmitter + eventos locais
 - [x] IMPROVEMENT #2: ADAPTER_CONFIG completo
 - [x] IMPROVEMENT #3: JSDoc completo
@@ -1335,13 +1385,14 @@ module.exports = {
 ---
 
 #### **SPRINT 3: P2 Bugs + Improvements (MÉDIO)**
-**Duração**: 3-4 horas
-**Linhas**: +100
+
+**Duração**: 3-4 horas **Linhas**: +100
 
 **Tarefas**:
+
 - [x] BUG #4: shutdown() timeout protection
-- [x] BUG #5: _attachDriverTelemetry detach
-- [x] BUG #6: _performHealthCheck error handling
+- [x] BUG #5: \_attachDriverTelemetry detach
+- [x] BUG #6: \_performHealthCheck error handling
 - [x] IMPROVEMENT #4: Metrics expandidos
 - [x] IMPROVEMENT #5: Telemetry buffer
 - [x] IMPROVEMENT #6: Circuit breaker
@@ -1351,11 +1402,12 @@ module.exports = {
 ---
 
 #### **SPRINT 4: P3 Bugs + Improvements (BAIXO)**
-**Duração**: 2-3 horas
-**Linhas**: +85
+
+**Duração**: 2-3 horas **Linhas**: +85
 
 **Tarefas**:
-- [x] BUG #7: _emitEvent retry logic
+
+- [x] BUG #7: \_emitEvent retry logic
 - [x] BUG #8: activeDrivers size limit
 - [x] IMPROVEMENT #7: Task queue (opcional)
 - [x] IMPROVEMENT #8: Periodic health check
@@ -1367,6 +1419,7 @@ module.exports = {
 ---
 
 ### **TOTAL ESTIMADO**
+
 ```
 Duração Total:   11-15 horas
 Linhas:          415 → 800 (+385, +93%)
@@ -1379,12 +1432,14 @@ Melhorias:       10 (3 P1, 3 P2, 4 P3)
 ## 🎯 PRIORIZAÇÃO RECOMENDADA
 
 ### Ordem de Implementação
+
 1. **SPRINT 1** (P0 - CRÍTICO): EventEmitter, JSDoc básico
 2. **SPRINT 2** (P1 - ALTO): Config, timeout, events
 3. **SPRINT 3** (P2 - MÉDIO): Shutdown, detach, health, metrics, buffer, circuit breaker
 4. **SPRINT 4** (P3 - BAIXO): Retry, queue, warnings
 
 ### Justificativa
+
 - P0: Consistência arquitetural (100% dos módulos v2.0 herdam EventEmitter)
 - P1: Timeout protection crítico (previne hangs)
 - P2: Error handling + resilience (circuit breaker)
@@ -1395,21 +1450,24 @@ Melhorias:       10 (3 P1, 3 P2, 4 P3)
 ## 📝 CHECKLIST DE VALIDAÇÃO
 
 ### Pré-Implementação
+
 - [ ] Ler audit completo
 - [ ] Entender hierarquia (NERV → Adapter → LifecycleManager → Factory → Drivers)
 - [ ] Revisar código atual (415 linhas)
 
 ### Durante Implementação
+
 - [ ] EventEmitter inheritance
 - [ ] ADAPTER_CONFIG (8 constantes)
 - [ ] ADAPTER_EVENTS (10 eventos)
-- [ ] Timeout protection (_executeTask, shutdown)
+- [ ] Timeout protection (\_executeTask, shutdown)
 - [ ] Error handling robusto
 - [ ] JSDoc completo (100%)
 - [ ] Metrics expandidos (14 métricas)
 - [ ] Syntax validation (node --check)
 
 ### Pós-Implementação
+
 - [ ] Relatório de implementação
 - [ ] Update todo list
 - [ ] Integration testing (Adapter → LifecycleManager → Factory → Driver)
@@ -1420,6 +1478,7 @@ Melhorias:       10 (3 P1, 3 P2, 4 P3)
 ## 🔧 ARQUIVOS RELACIONADOS
 
 ### Dependências Diretas
+
 - `src/driver/DriverLifecycleManager.js` (v2.0, 483 linhas)
 - `src/driver/factory.js` (v2.0, 791 linhas)
 - `src/nerv/adapters/high_level_adapter.js`
@@ -1427,10 +1486,12 @@ Melhorias:       10 (3 P1, 3 P2, 4 P3)
 - `src/core/validators/prerequisite_validator.js`
 
 ### Arquivos Que Importam Este Módulo
+
 - `src/main.js` (boot sequence)
-- `src/kernel/` (envia DRIVER_* commands via NERV)
+- `src/kernel/` (envia DRIVER\_\* commands via NERV)
 
 ### Testes
+
 - `tests/` (criar test_driver_nerv_adapter.js)
 
 ---
@@ -1438,6 +1499,7 @@ Melhorias:       10 (3 P1, 3 P2, 4 P3)
 ## 📚 DOCUMENTAÇÃO ADICIONAL
 
 ### Conceitos-Chave
+
 1. **NERV Adapter Pattern**: Desacoplamento total via pub/sub IPC
 2. **Duplo Canal**: Eventos locais (EventEmitter) + NERV events (IPC)
 3. **Degraded Mode**: Opera sem browserPool (rejeita tasks com mensagem clara)
@@ -1445,6 +1507,7 @@ Melhorias:       10 (3 P1, 3 P2, 4 P3)
 5. **Telemetry Buffer**: Batch emit para reduzir overhead
 
 ### Referências
+
 - `ARCHITECTURE.md` v3.0 (NERV architecture)
 - `NERV_EVENTS.md` (event catalog)
 - `analysis/driverlifecyclemanager_v2_implementation_report.md`
@@ -1454,23 +1517,28 @@ Melhorias:       10 (3 P1, 3 P2, 4 P3)
 
 ## ✅ CONCLUSÃO
 
-**driver_nerv_adapter.js** é o **adapter crítico** entre NERV (pub/sub IPC) e o domínio DRIVER. Responsável por:
-- Escutar DRIVER_* commands do KERNEL via NERV
+**driver_nerv_adapter.js** é o **adapter crítico** entre NERV (pub/sub IPC) e o domínio DRIVER.
+Responsável por:
+
+- Escutar DRIVER\_\* commands do KERNEL via NERV
 - Gerenciar DriverLifecycleManager instances
 - Emitir telemetria via NERV + EventEmitter local
 - Garantir zero acoplamento direto
 
 **Bugs Críticos** (P0-P1):
+
 1. Não herda EventEmitter (inconsistência arquitetural)
 2. Faltam ADAPTER_CONFIG + ADAPTER_EVENTS (magic numbers)
-3. _executeTask sem timeout (hang possível)
+3. \_executeTask sem timeout (hang possível)
 
 **v2.0 Transformação**:
+
 ```
 v1.1: 415 linhas  →  v2.0: 800 linhas  (+93%)
 ```
 
 **Benefícios v2.0**:
+
 - EventEmitter inheritance (100% v2.0 stack)
 - Duplo canal (local events + NERV IPC)
 - Timeout protection (execute, shutdown, health)
@@ -1482,6 +1550,6 @@ v1.1: 415 linhas  →  v2.0: 800 linhas  (+93%)
 **Status**: ✅ Pronto para implementação (sprints 1-4, 11-15h)
 
 ---
-**Versão**: v2.0 Audit
-**Data**: 2026-02-01
-**Próximo**: Implementar DriverNERVAdapter v2.0 (4 sprints)
+
+**Versão**: v2.0 Audit **Data**: 2026-02-01 **Próximo**: Implementar DriverNERVAdapter v2.0 (4
+sprints)

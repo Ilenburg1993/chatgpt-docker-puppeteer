@@ -14,18 +14,23 @@ TASKS (Individual LLM executions)
 
 ### 1.1 MISSÃO (Mission)
 
-**Definição**: Um objetivo de alto nível que o usuário deseja alcançar, independente da complexidade ou duração.
+**Definição**: Um objetivo de alto nível que o usuário deseja alcançar, independente da complexidade
+ou duração.
 
 **Características**:
-- **Objetivo final claro**: "Escrever um livro sobre Rust", "Desenvolver uma API REST", "Pesquisar impacto de IA na saúde"
+
+- **Objetivo final claro**: "Escrever um livro sobre Rust", "Desenvolver uma API REST", "Pesquisar
+  impacto de IA na saúde"
 - **Duração indeterminada**: Pode levar horas, dias, semanas
 - **Geração automática de tasks**: O sistema decompoõe a missão em centenas/milhares de tasks
 - **Supervisão contínua**: Usuário acompanha progresso, dá feedback, ajusta rumos
 - **Estado persistente**: Missão pode ser pausada, retomada, ajustada a qualquer momento
 
 **Exemplos**:
+
 - **Missão: "Escrever livro técnico de 300 páginas sobre Advanced Rust Programming"**
-  - Gera automaticamente: 1 task de outline → 15 tasks de capítulos → N tasks de revisão → 1 task de compilação = ~50-100 tasks
+  - Gera automaticamente: 1 task de outline → 15 tasks de capítulos → N tasks de revisão → 1 task de
+    compilação = ~50-100 tasks
 
 - **Missão: "Desenvolver sistema de e-commerce completo"**
   - Gera automaticamente: arquitetura → backend → frontend → testes → documentação = ~500-1000 tasks
@@ -34,6 +39,7 @@ TASKS (Individual LLM executions)
   - Gera automaticamente: coleta de fontes → análise → síntese → escrita → fact-check = ~200 tasks
 
 **NÃO é uma missão**:
+
 - ❌ "Gerar uma resposta para este prompt" (isso é uma **task**)
 - ❌ "Escrever um parágrafo" (isso é uma **task**)
 - ❌ "Validar este código" (isso é uma **task**)
@@ -43,6 +49,7 @@ TASKS (Individual LLM executions)
 **Definição**: A sequência estruturada de steps que o sistema executará para completar a missão.
 
 **Características**:
+
 - **Gerado automaticamente** ou **definido pelo usuário**
 - **Estrutura em árvore**: Steps podem ter sub-steps (hierarchical)
 - **Dependências explícitas**: Step B só executa após Step A completar
@@ -51,6 +58,7 @@ TASKS (Individual LLM executions)
 - **Context flow**: Resultados de um step fluem como input do próximo
 
 **Exemplo: Workflow para Missão "Escrever Livro"**:
+
 ```
 Step 1: Generate Outline
   ├─ Input: Missão description
@@ -93,6 +101,7 @@ Step 20: Compile Final Book
 **Definição**: Uma única chamada à LLM (ou iteração de chamadas) para executar uma ação específica.
 
 **Características**:
+
 - **Atômica**: Faz UMA coisa (gerar texto, validar código, revisar seção)
 - **Auto-suficiente**: Tem todos inputs necessários (prompt, context, parameters)
 - **Resultado definido**: Produz output mensurável (texto, JSON, código)
@@ -100,6 +109,7 @@ Step 20: Compile Final Book
 - **Pode falhar e retry**: Sistema detecta falhas e tenta novamente
 
 **Exemplos de Tasks**:
+
 ```
 Task #001: Generate book outline
   - Input: "Topic: Rust, Length: 15 chapters, Audience: experienced devs"
@@ -127,6 +137,7 @@ Task #006: Write Chapter 2 (iteration 1)
 ```
 
 **Uma missão "Escrever livro" gera ~100 tasks**:
+
 - 1 outline task
 - 15 chapters × 3 iterations average = 45 writing tasks
 - 45 validation tasks
@@ -167,18 +178,21 @@ Sistema:
 **Duas opções**:
 
 #### Opção A: Workflow Template (Pré-definido)
+
 - Sistema tem templates para tipos comuns de missões
 - Ex: "Book Writing Template", "Software Project Template", "Research Template"
 - Usuário escolhe template e preenche parâmetros
 - Template expande para workflow completo
 
 #### Opção B: Workflow Generation via LLM
+
 - Sistema usa LLM para gerar workflow customizado
 - Prompt: "Given this mission: [description], generate a workflow with steps to accomplish it"
 - LLM retorna JSON com steps estruturados
 - Sistema valida e carrega workflow
 
 **Exemplo: Template "Book Writing"**:
+
 ```json
 {
   "template_id": "book-writing-v1",
@@ -265,7 +279,7 @@ async function executeMission(mission) {
       mission_id: mission.id,
       step_id: step.id,
       progress_percent: missionState.progress_percent,
-      current_step_name: step.name
+      current_step_name: step.name,
     });
 
     // Check if user provided feedback
@@ -282,7 +296,7 @@ async function executeMission(mission) {
         mission_id: mission.id,
         step_id: step.id,
         quality_score: stepResult.quality_score,
-        threshold: mission.quality_threshold
+        threshold: mission.quality_threshold,
       });
 
       // Wait for user decision (auto-retry or manual review)
@@ -304,7 +318,7 @@ async function executeMission(mission) {
     mission_id: mission.id,
     total_duration_ms: missionState.completed_at - missionState.started_at,
     total_cost_usd: missionState.total_cost_usd,
-    total_tasks: missionState.task_count
+    total_tasks: missionState.task_count,
   });
 }
 ```
@@ -330,7 +344,7 @@ async function executeStep(step, missionState) {
       for (let i = 0; i < step.iterations; i++) {
         const loopStepResult = await executeStep(step.loop_body.steps[0], {
           ...missionState,
-          loop_index: i
+          loop_index: i,
         });
         results.push(loopStepResult);
       }
@@ -347,9 +361,7 @@ async function executeStep(step, missionState) {
 
     case 'spawn_subtasks':
       // Gera N tasks em paralelo
-      const subtasks = step.subtasks.map(subtask =>
-        executeSingleTask(subtask, missionState)
-      );
+      const subtasks = step.subtasks.map(subtask => executeSingleTask(subtask, missionState));
       return await Promise.all(subtasks);
   }
 }
@@ -364,13 +376,10 @@ async function executeIterativeStep(step, missionState) {
 
     // Cria e executa task
     const task = createTaskFromStep(step, missionState, iteration);
-    const taskResult = await executeTask(task);  // Chama LLM
+    const taskResult = await executeTask(task); // Chama LLM
 
     // Valida resultado
-    const validationResult = await validateTaskResult(
-      taskResult.output,
-      step.validation
-    );
+    const validationResult = await validateTaskResult(taskResult.output, step.validation);
 
     // Atualiza melhor resultado
     if (validationResult.score > bestScore) {
@@ -401,6 +410,7 @@ async function executeIterativeStep(step, missionState) {
 **Componente Vue**: `MissionMonitor.vue`
 
 **Exibe**:
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ MISSÃO: Livro Técnico - Advanced Rust Programming              │
@@ -440,6 +450,7 @@ async function executeIterativeStep(step, missionState) {
 ### 3.2 Intervenções do Usuário
 
 #### A. Pausar Missão
+
 ```
 Usuário clica "Pausar"
   ↓
@@ -455,6 +466,7 @@ Usuário pode retomar depois
 ```
 
 #### B. Dar Feedback em Step Específico
+
 ```
 Usuário clica "Ver Outputs" → Seleciona Chapter 11
   ↓
@@ -497,6 +509,7 @@ Orchestrator no próximo step:
 ```
 
 #### C. Ajustar Workflow em Tempo Real
+
 ```
 Usuário clica "Ajustar Workflow"
   ↓
@@ -529,6 +542,7 @@ Orchestrator no próximo loop:
 ```
 
 #### D. Aprovar/Rejeitar Output Manualmente
+
 ```
 Sistema detecta quality_score < threshold
   ↓
@@ -559,6 +573,7 @@ Opções:
 ### 3.3 Comunicação Bidirecional (Human-in-the-Loop)
 
 **NERV Events para Dashboard**:
+
 ```javascript
 // Progresso
 'MISSION_PROGRESS' → { mission_id, step_id, progress_percent }
@@ -577,6 +592,7 @@ Opções:
 ```
 
 **User Actions para Backend**:
+
 ```javascript
 // Controles
 POST /api/missions/:id/pause
@@ -725,6 +741,7 @@ PUT /api/missions/:id/steps/:stepId/output
    - Tabela `mission_events` - Event log completo
 
 **Persistence Strategy**:
+
 - **Checkpoint após cada step**: Estado salvo no disco
 - **Incremental saves**: Apenas diffs salvos (não reescreve tudo)
 - **Crash recovery**: Se sistema cair, pode retomar do último checkpoint
@@ -737,19 +754,23 @@ PUT /api/missions/:id/steps/:stepId/output
 ### 5.1 Missão: Book Writing
 
 **Input**:
+
 - Topic, target audience, length (pages/chapters), style (technical, narrative, etc.)
 
 **Workflow**:
+
 1. Generate outline
 2. For each chapter: write → validate → refine
 3. Cross-chapter consistency check
 4. Generate ToC, compile
 
 **Outputs**:
+
 - Final book (markdown/PDF)
 - Individual chapters (for review)
 
 **Métricas**:
+
 - Chapters completed
 - Avg quality score per chapter
 - Total word count
@@ -758,20 +779,24 @@ PUT /api/missions/:id/steps/:stepId/output
 ### 5.2 Missão: Software Development
 
 **Input**:
+
 - Project description, tech stack, features list
 
 **Workflow**:
+
 1. Generate project architecture
 2. For each module: design → implement → test → refine
 3. Integration tests
 4. Generate documentation
 
 **Outputs**:
+
 - Complete codebase (multi-file)
 - Test suite
 - README, API docs
 
 **Métricas**:
+
 - Files created
 - Test coverage %
 - Linting errors
@@ -780,9 +805,11 @@ PUT /api/missions/:id/steps/:stepId/output
 ### 5.3 Missão: Research & Report
 
 **Input**:
+
 - Research topic, sources (URLs, papers, APIs), output format
 
 **Workflow**:
+
 1. Fetch and parse sources
 2. Extract key information per source
 3. Synthesize findings
@@ -791,11 +818,13 @@ PUT /api/missions/:id/steps/:stepId/output
 6. Compile final report
 
 **Outputs**:
+
 - Research report (with citations)
 - Source summary table
 - Key findings list
 
 **Métricas**:
+
 - Sources processed
 - Citations count
 - Findings extracted
@@ -804,20 +833,24 @@ PUT /api/missions/:id/steps/:stepId/output
 ### 5.4 Missão: Code Refactoring
 
 **Input**:
+
 - Existing codebase, refactoring goals (reduce complexity, improve performance, etc.)
 
 **Workflow**:
+
 1. Analyze codebase structure
 2. Identify refactoring opportunities
 3. For each file: refactor → test → verify
 4. Update documentation
 
 **Outputs**:
+
 - Refactored codebase
 - Refactoring report (what changed, why)
 - Updated tests
 
 **Métricas**:
+
 - Files refactored
 - Complexity reduction (cyclomatic complexity)
 - Performance improvement %
@@ -826,19 +859,23 @@ PUT /api/missions/:id/steps/:stepId/output
 ### 5.5 Missão: Content Translation
 
 **Input**:
+
 - Source content (book, documentation, website), target language(s)
 
 **Workflow**:
+
 1. Split content into chunks (context-aware)
 2. For each chunk: translate → validate (fluency, accuracy) → refine
 3. Consistency check (terminology, style)
 4. Compile translated content
 
 **Outputs**:
+
 - Translated content
 - Glossary (term mappings)
 
 **Métricas**:
+
 - Chunks translated
 - Avg fluency score
 - Terminology consistency %
@@ -846,13 +883,16 @@ PUT /api/missions/:id/steps/:stepId/output
 ### 5.6 Missão: Custom (User-Defined)
 
 **Input**:
+
 - Mission description (free text)
 - Workflow (user defines steps manually or via LLM generation)
 
 **Workflow**:
+
 - User-defined or LLM-generated
 
 **Outputs**:
+
 - Variable (depends on mission)
 
 ---
@@ -860,6 +900,7 @@ PUT /api/missions/:id/steps/:stepId/output
 ## 6. ARQUIVOS CRÍTICOS
 
 ### Backend (Orchestration)
+
 ```
 src/missions/
 ├── mission_manager.js          # CRUD de missões
@@ -884,6 +925,7 @@ src/server/api/controllers/
 ```
 
 ### Frontend (Dashboard)
+
 ```
 src/dashboard-ui/src/
 ├── stores/
@@ -917,4 +959,5 @@ src/dashboard-ui/src/
 
 ---
 
-**Próximo documento**: `02-AUTONOMOUS_EXECUTION.md` - Detalhamento técnico de como o sistema executa missões autonomamente
+**Próximo documento**: `02-AUTONOMOUS_EXECUTION.md` - Detalhamento técnico de como o sistema executa
+missões autonomamente

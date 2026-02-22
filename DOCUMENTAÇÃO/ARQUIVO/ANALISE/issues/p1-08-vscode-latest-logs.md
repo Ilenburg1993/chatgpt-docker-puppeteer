@@ -10,5 +10,4 @@ Recommended actions:
 1. Inspect files listed and remove sensitive entries.
 2. Add exclusions to scanning workflows for VS Code runtime dirs.
 
-Owner: @owner-placeholder
-Labels: security, P1, logs
+Owner: @owner-placeholder Labels: security, P1, logs

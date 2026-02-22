@@ -1,15 +1,15 @@
 # 📋 Análise do Fluxo de Processamento de Tasks
 
-> **Autor**: Análise Arquitetural Completa
-> **Data**: 04 de Fevereiro de 2026
-> **Versão**: 1.0
+> **Autor**: Análise Arquitetural Completa **Data**: 04 de Fevereiro de 2026 **Versão**: 1.0
 > **Status do Sistema**: Response Capture V2.0 60% implementado
 
 ---
 
 ## 🎯 Objetivo Desta Análise
 
-Mapear o fluxo **completo** de processamento de tasks desde a criação até o armazenamento da resposta:
+Mapear o fluxo **completo** de processamento de tasks desde a criação até o armazenamento da
+resposta:
+
 1. Como tasks são criadas e interpretadas
 2. Como responses são capturadas e armazenadas
 3. Como task.result é preenchido
@@ -189,6 +189,7 @@ Mapear o fluxo **completo** de processamento de tasks desde a criação até o a
 ## 📊 Estado Atual: O Que Funciona
 
 ### ✅ **1. Task Schema V5 (COMPLETO)**
+
 - **Localização**: `src/core/schemas/task_schema_v5.js`
 - **Status**: ✅ 100% implementado, 56/56 testes passando
 - **Funcionalidades**:
@@ -199,6 +200,7 @@ Mapear o fluxo **completo** de processamento de tasks desde a criação até o a
   - Migração automática V4 → V5
 
 **Exemplo de Task V5**:
+
 ```javascript
 {
   meta: {
@@ -258,6 +260,7 @@ Mapear o fluxo **completo** de processamento de tasks desde a criação até o a
 ```
 
 ### ✅ **2. Task Execution Orchestrator (FUNCIONAL)**
+
 - **Localização**: `src/kernel/task_execution_orchestrator.js`
 - **Status**: ✅ Funcional, integrado com NERV + OrchestratorEngine
 - **Responsabilidades**:
@@ -268,6 +271,7 @@ Mapear o fluxo **completo** de processamento de tasks desde a criação até o a
   - Processa decisões: RETRY → reenviar, NEXT_STEP → criar nova task, DONE → finalizar
 
 **Fluxo**:
+
 ```javascript
 // 1. Kernel → Orchestrator
 kernel.executeTask(task, correlationId)
@@ -283,6 +287,7 @@ driver emits DRIVER_TASK_COMPLETED { taskId, result }
 ```
 
 ### ✅ **3. ChatGPTDriver Integration (MODIFICADO)**
+
 - **Localização**: `src/driver/targets/ChatGPTDriver.js`
 - **Status**: ✅ Modificado para Response V2.0 (60% completo)
 - **Mudanças**:
@@ -292,16 +297,18 @@ driver emits DRIVER_TASK_COMPLETED { taskId, result }
   2. **Constructor** (linhas 103-125):
      - `this.structuredExtractor = new StructuredExtractor()`
      - `this.llmJudge = new LLMJudge()`
-     - Campos de telemetria: `currentPrompt`, `executionStartTime`, `continuationCount`, `thoughtBlocksPruned`
+     - Campos de telemetria: `currentPrompt`, `executionStartTime`, `continuationCount`,
+       `thoughtBlocksPruned`
   3. **sendPrompt()** modificado (linhas 281-286):
      - Rastreia `currentPrompt`, `executionStartTime`, contadores
   4. **waitForCompletion()** modificado (linhas 537-588):
      - ❌ ANTES: retornava string `currentText`
      - ✅ AGORA: retorna `ResponseV2` object
-  5. **Método _estimateTokens()** adicionado (linhas 772-785):
+  5. **Método \_estimateTokens()** adicionado (linhas 772-785):
      - Heurística: 1 token ≈ 4 chars
 
 **Exemplo de Response V2 retornada**:
+
 ```javascript
 {
   content: {
@@ -343,6 +350,7 @@ driver emits DRIVER_TASK_COMPLETED { taskId, result }
 ### ✅ **4. Response Capture V2.0 (60% IMPLEMENTADO)**
 
 #### **4.1. StructuredExtractor** (✅ COMPLETO)
+
 - **Localização**: `src/driver/extractors/structured_extractor.js`
 - **Status**: ✅ 450 linhas, 14 funções, lint warning (linha 18)
 - **Funções principais**:
@@ -353,17 +361,19 @@ driver emits DRIVER_TASK_COMPLETED { taskId, result }
   - `_generatePreview(text, structured)`: Cria preview object
 
 **Thought Blocks Removal**:
+
 ```javascript
 // Detecta e remove blocks <thinking>...</thinking> (o1/o3 models)
 const thoughtBlockPattern = /<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi;
 let thoughtBlocksPruned = 0;
 htmlContent = htmlContent.replace(thoughtBlockPattern, match => {
-    thoughtBlocksPruned++;
-    return '';
+  thoughtBlocksPruned++;
+  return '';
 });
 ```
 
 #### **4.2. ResponseStoreV2** (✅ COMPLETO)
+
 - **Localização**: `src/infra/storage/response_store_v2.js`
 - **Status**: ✅ 270 linhas, 5 funções, sem erros
 - **Funções principais**:
@@ -374,12 +384,14 @@ htmlContent = htmlContent.replace(thoughtBlockPattern, match => {
   - `deleteResponseV2(taskId)`: Remove todos os formatos
 
 **Atomic Writes**:
+
 ```javascript
 // Garante integridade (temp file + rename)
 await atomicWrite(filepath, content);
 ```
 
 **Estrutura de arquivos**:
+
 ```
 respostas/
 ├── task-7f2a9c.txt       # Plain text
@@ -389,6 +401,7 @@ respostas/
 ```
 
 #### **4.3. LLMJudge** (✅ COMPLETO - OPCIONAL)
+
 - **Localização**: `src/validation/llm_judge.js`
 - **Status**: ✅ 460 linhas, lint warning (linha 17)
 - **Features**:
@@ -404,6 +417,7 @@ respostas/
     - `MANUAL_REVIEW`: scores 50-69
 
 **Prompts**:
+
 ```javascript
 // Exemplo: Completeness validation
 const completenessPrompt = `
@@ -417,6 +431,7 @@ Return JSON: { "score": 85, "reasoning": "...", "isComplete": true }
 ```
 
 #### **4.4. ResponseAdapter** (⚠️ CRIADO - SYNTAX ERROR)
+
 - **Localização**: `src/infra/storage/response_adapter.js`
 - **Status**: ⚠️ 220 linhas, syntax error linha 34
 - **Propósito**: Compatibilidade V1 ↔ V2
@@ -427,9 +442,10 @@ Return JSON: { "score": 85, "reasoning": "...", "isComplete": true }
   - `convertV1toV2(responseText, task)`: Migra V1 → V2
 
 **Erro atual**:
+
 ```javascript
 // Linha 34: syntax error "Unexpected token"
-const isV2 = isResponseV2(response);  // ← ERRO
+const isV2 = isResponseV2(response); // ← ERRO
 ```
 
 **Provavelmente**: Comentário não terminado ou string mal formatada nas linhas acima.
@@ -445,6 +461,7 @@ const isV2 = isResponseV2(response);  // ← ERRO
 **3 Possibilidades**:
 
 #### **Opção A: Driver salva antes de retornar** (RECOMENDADO)
+
 ```javascript
 // src/driver/nerv_adapter/driver_nerv_adapter.js
 async _executeTask(payload, correlationId, retryCount = 0) {
@@ -475,12 +492,14 @@ async _executeTask(payload, correlationId, retryCount = 0) {
 ```
 
 **Vantagens**:
+
 - ✅ Response salva **antes** de emitir evento (dados garantidos)
 - ✅ Driver tem acesso direto ao ResponseV2 (não precisa reconstruir)
 - ✅ Se salvar falhar, pode emitir `TASK_FAILED` em vez de `TASK_COMPLETED`
 - ✅ Responsabilidade clara: Driver gerencia response storage
 
 #### **Opção B: Kernel salva após receber evento**
+
 ```javascript
 // src/kernel/task_execution_orchestrator.js
 async _handleTaskCompleted(payload, correlationId) {
@@ -496,11 +515,13 @@ async _handleTaskCompleted(payload, correlationId) {
 ```
 
 **Desvantagens**:
+
 - ❌ Kernel precisa cachear tasks (não implementado)
 - ❌ Response já foi emitida via NERV (redundância)
 - ❌ Se salvar falhar, evento já foi processado (inconsistência)
 
 #### **Opção C: NERV Bridge salva após decisão**
+
 ```javascript
 // src/kernel/nerv_bridge/kernel_nerv_bridge.js
 async processOrchestrationDecision(decision, correlationId) {
@@ -515,6 +536,7 @@ async processOrchestrationDecision(decision, correlationId) {
 ```
 
 **Desvantagens**:
+
 - ❌ Response não está em `task.result` (está no payload do evento)
 - ❌ Só salva se action === 'DONE' (RETRY/NEXT_STEP perdem response)
 
@@ -525,29 +547,36 @@ async processOrchestrationDecision(decision, correlationId) {
 ### **GAP #2: Response não chega preenchida em task.result** 🟡
 
 **Problema**: `TaskExecutionOrchestrator._handleTaskCompleted()` recebe:
+
 ```javascript
-payload: { taskId, result }  // result = ResponseV2 object
+payload: {
+  (taskId, result);
+} // result = ResponseV2 object
 ```
 
 Mas **não preenche** `task.result` com os campos V5:
+
 - `task.result.storage` (paths dos 4 arquivos)
 - `task.result.generation` (model, duration, tokens)
 - `task.result.validation` (LLM-as-judge scores)
 - `task.result.preview` (primeiros 500 chars + counts)
 
-**Solução**: `responseAdapter.saveResponseV2Format()` já preenche task.result, mas precisa ser chamado!
+**Solução**: `responseAdapter.saveResponseV2Format()` já preenche task.result, mas precisa ser
+chamado!
 
 ---
 
 ### **GAP #3: ResponseAdapter não é importado em nenhum lugar** 🔴
 
 **Busca realizada**:
+
 ```bash
 grep -r "require.*response_adapter" src/
 # RESULT: 0 matches
 ```
 
 **Módulos que deveriam importar**:
+
 - ❌ `src/driver/nerv_adapter/driver_nerv_adapter.js` (NÃO IMPORTA)
 - ❌ `src/kernel/task_execution_orchestrator.js` (NÃO IMPORTA)
 - ❌ `src/kernel/nerv_bridge/kernel_nerv_bridge.js` (NÃO IMPORTA)
@@ -559,6 +588,7 @@ grep -r "require.*response_adapter" src/
 ### **GAP #4: ChatGPTDriver retorna ResponseV2, mas quem consome?** 🟡
 
 **Modificação feita**:
+
 ```javascript
 // src/driver/targets/ChatGPTDriver.js (linha 537-588)
 async waitForCompletion() {
@@ -575,40 +605,45 @@ async waitForCompletion() {
 ```
 
 **Quem chama `waitForCompletion()`?**
+
 - `ChatGPTDriver.execute()` (linha 330-450)
 - `DriverNERVAdapter._executeTask()` (linha 650-700)
 
 **Payload do evento NERV**:
+
 ```javascript
 // src/driver/nerv_adapter/driver_nerv_adapter.js (linha 710)
 this._emitBoth(
-    ADAPTER_EVENTS.TASK_COMPLETED,
-    ActionCode.DRIVER_TASK_COMPLETED,
-    {
-        taskId,
-        result: {  // ← PROBLEMA: não inclui ResponseV2 completo
-            status: STATUS_VALUES.SUCCESS,
-            outputLength: result?.length || 0,  // ← Tratando como string?
-            duration
-        }
+  ADAPTER_EVENTS.TASK_COMPLETED,
+  ActionCode.DRIVER_TASK_COMPLETED,
+  {
+    taskId,
+    result: {
+      // ← PROBLEMA: não inclui ResponseV2 completo
+      status: STATUS_VALUES.SUCCESS,
+      outputLength: result?.length || 0, // ← Tratando como string?
+      duration,
     },
-    correlationId
+  },
+  correlationId
 );
 ```
 
-**Problema**: Event payload não inclui ResponseV2 completo! Apenas `status`, `outputLength`, `duration`.
+**Problema**: Event payload não inclui ResponseV2 completo! Apenas `status`, `outputLength`,
+`duration`.
 
 **Solução**: Modificar `_emitBoth` para incluir `result` completo:
+
 ```javascript
 this._emitBoth(
-    ADAPTER_EVENTS.TASK_COMPLETED,
-    ActionCode.DRIVER_TASK_COMPLETED,
-    {
-        taskId,
-        result: result,  // ← MODIFICAR: incluir ResponseV2 completo
-        timings: { poolAcquire, contextAttach, execute, total: duration }
-    },
-    correlationId
+  ADAPTER_EVENTS.TASK_COMPLETED,
+  ActionCode.DRIVER_TASK_COMPLETED,
+  {
+    taskId,
+    result: result, // ← MODIFICAR: incluir ResponseV2 completo
+    timings: { poolAcquire, contextAttach, execute, total: duration },
+  },
+  correlationId
 );
 ```
 
@@ -621,6 +656,7 @@ this._emitBoth(
 **Alternativa**: Drivers concretos (ChatGPTDriver, GeminiDriver) implementam interface própria.
 
 **Campos V5 relevantes para drivers**:
+
 - `task.spec.prompt` ✅ (usado)
 - `task.spec.target` ✅ (usado)
 - `task.spec.execution.strategy` ❓ (ITERATIVE/MULTI_STEP - não usado por drivers?)
@@ -628,11 +664,14 @@ this._emitBoth(
 - `task.execution_context.*` ❓ (dependencies, artifacts - não usado por drivers?)
 
 **Análise**:
-- **Estratégias** (SINGLE_SHOT/ITERATIVE/MULTI_STEP): Gerenciadas pelo **Orchestrator**, não pelo Driver
+
+- **Estratégias** (SINGLE_SHOT/ITERATIVE/MULTI_STEP): Gerenciadas pelo **Orchestrator**, não pelo
+  Driver
 - **Retry**: Gerenciado pelo **Policy Engine** no Kernel, não pelo Driver
 - **Execution context**: Usado pelo **Orchestrator** para preparar task, não pelo Driver
 
 **Conclusão**: Drivers **não precisam** interpretar todos os campos V5. Apenas:
+
 - `task.spec.prompt`
 - `task.spec.target`
 - `task.meta.id` (para logging)
@@ -642,6 +681,7 @@ this._emitBoth(
 ## 🔧 Correções Necessárias (Prioridade)
 
 ### **1. Corrigir Syntax Error em ResponseAdapter** (CRÍTICO - 5 min)
+
 ```bash
 # Arquivo: src/infra/storage/response_adapter.js
 # Linha 34: syntax error
@@ -657,6 +697,7 @@ this._emitBoth(
 ```
 
 ### **2. Integrar ResponseAdapter no Driver** (URGENTE - 30 min)
+
 ```javascript
 // src/driver/nerv_adapter/driver_nerv_adapter.js
 
@@ -711,6 +752,7 @@ async _executeTask(payload, correlationId, retryCount = 0) {
 ```
 
 ### **3. Modificar Event Payload para incluir ResponseV2 completo** (URGENTE - 15 min)
+
 ```javascript
 // src/driver/nerv_adapter/driver_nerv_adapter.js (linha ~710)
 
@@ -749,98 +791,105 @@ this._emitBoth(
 ```
 
 ### **4. Cachear task em TaskExecutionOrchestrator** (IMPORTANTE - 20 min)
+
 ```javascript
 // src/kernel/task_execution_orchestrator.js
 
 class TaskExecutionOrchestrator {
-    constructor({ nerv, nervBridge }) {
-        // ... (existente)
+  constructor({ nerv, nervBridge }) {
+    // ... (existente)
 
-        // ✅ ADICIONAR: Cache de tasks (não só correlationId)
-        this.activeExecutions = new Map();  // task_id → { task, correlationId }
+    // ✅ ADICIONAR: Cache de tasks (não só correlationId)
+    this.activeExecutions = new Map(); // task_id → { task, correlationId }
+  }
+
+  async executeTask(task, correlationId) {
+    // ... (existente até preparedTask)
+
+    // ✅ MODIFICAR: Cacheia task completa (não só correlationId)
+    this.activeExecutions.set(taskId, {
+      task: preparedTask,
+      correlationId,
+      startedAt: Date.now(),
+    });
+
+    // ... (resto do código)
+  }
+
+  async _handleTaskCompleted(payload, correlationId) {
+    const { taskId, result } = payload; // result = ResponseV2 object
+
+    // ✅ MODIFICAR: Recupera task do cache
+    const cached = this.activeExecutions.get(taskId);
+    if (!cached) {
+      return; // Task não estava sendo orquestrada
     }
 
-    async executeTask(task, correlationId) {
-        // ... (existente até preparedTask)
+    const task = cached.task; // ← Agora temos a task completa
 
-        // ✅ MODIFICAR: Cacheia task completa (não só correlationId)
-        this.activeExecutions.set(taskId, {
-            task: preparedTask,
-            correlationId,
-            startedAt: Date.now()
-        });
+    logger.log('INFO', `[TaskExecutionOrchestrator] Task completada: ${taskId}`, correlationId);
 
-        // ... (resto do código)
-    }
+    // Hook: afterExecution (orchestrator decide próxima ação)
+    const decision = await this.nervBridge.afterTaskExecution(task, result);
 
-    async _handleTaskCompleted(payload, correlationId) {
-        const { taskId, result } = payload;  // result = ResponseV2 object
-
-        // ✅ MODIFICAR: Recupera task do cache
-        const cached = this.activeExecutions.get(taskId);
-        if (!cached) {
-            return;  // Task não estava sendo orquestrada
-        }
-
-        const task = cached.task;  // ← Agora temos a task completa
-
-        logger.log('INFO', `[TaskExecutionOrchestrator] Task completada: ${taskId}`, correlationId);
-
-        // Hook: afterExecution (orchestrator decide próxima ação)
-        const decision = await this.nervBridge.afterTaskExecution(task, result);
-
-        // ... (resto do código)
-    }
+    // ... (resto do código)
+  }
 }
 ```
 
 ### **5. Criar testes para ResponseAdapter** (NECESSÁRIO - 60 min)
+
 ```javascript
 // tests/test_response_adapter.js
 
 const assert = require('assert');
-const { saveResponse, loadResponse, isResponseV2, convertV1toV2 } = require('@infra/storage/response_adapter');
+const {
+  saveResponse,
+  loadResponse,
+  isResponseV2,
+  convertV1toV2,
+} = require('@infra/storage/response_adapter');
 
 describe('ResponseAdapter', () => {
-    it('should detect ResponseV2 format', () => {
-        const v2 = { content: {}, generation: {}, validation: null, preview: {} };
-        const v1 = "Plain text response";
+  it('should detect ResponseV2 format', () => {
+    const v2 = { content: {}, generation: {}, validation: null, preview: {} };
+    const v1 = 'Plain text response';
 
-        assert.strictEqual(isResponseV2(v2), true);
-        assert.strictEqual(isResponseV2(v1), false);
-    });
+    assert.strictEqual(isResponseV2(v2), true);
+    assert.strictEqual(isResponseV2(v1), false);
+  });
 
-    it('should convert V1 to V2', () => {
-        const v1 = "Test response";
-        const task = { meta: { id: 'task-123' }, spec: { target: 'chatgpt' } };
+  it('should convert V1 to V2', () => {
+    const v1 = 'Test response';
+    const task = { meta: { id: 'task-123' }, spec: { target: 'chatgpt' } };
 
-        const v2 = convertV1toV2(v1, task);
+    const v2 = convertV1toV2(v1, task);
 
-        assert.strictEqual(v2.content.text, v1);
-        assert.ok(v2.generation);
-        assert.ok(v2.preview);
-    });
+    assert.strictEqual(v2.content.text, v1);
+    assert.ok(v2.generation);
+    assert.ok(v2.preview);
+  });
 
-    it('should save and load V2 response', async () => {
-        const taskId = 'test-task-' + Date.now();
-        const response = {
-            content: { text: 'Test', markdown: '# Test', html: '<p>Test</p>', json: {} },
-            generation: { model: 'gpt-4', duration_ms: 1000 },
-            validation: null,
-            preview: { text: 'Test', sections_count: 1 }
-        };
-        const task = { meta: { id: taskId }, result: {} };
+  it('should save and load V2 response', async () => {
+    const taskId = 'test-task-' + Date.now();
+    const response = {
+      content: { text: 'Test', markdown: '# Test', html: '<p>Test</p>', json: {} },
+      generation: { model: 'gpt-4', duration_ms: 1000 },
+      validation: null,
+      preview: { text: 'Test', sections_count: 1 },
+    };
+    const task = { meta: { id: taskId }, result: {} };
 
-        await saveResponse(taskId, response, task);
+    await saveResponse(taskId, response, task);
 
-        const loaded = await loadResponse(taskId, 'text');
-        assert.strictEqual(loaded, 'Test');
+    const loaded = await loadResponse(taskId, 'text');
+    assert.strictEqual(loaded, 'Test');
 
-        // Verificar task.result preenchido
-        assert.ok(task.result.storage);
-        assert.ok(task.result.generation);
-        assert.ok(task.result.preview);
-    });
+    // Verificar task.result preenchido
+    assert.ok(task.result.storage);
+    assert.ok(task.result.generation);
+    assert.ok(task.result.preview);
+  });
 });
 ```
 
@@ -849,26 +898,31 @@ describe('ResponseAdapter', () => {
 ## 📈 Melhorias Futuras (Post-V2.0)
 
 ### **1. Response Streaming** (V2.1)
+
 - Salvar response incremental durante geração
 - Permitir retomada de tasks interrompidas
 - Preview em tempo real no dashboard
 
 ### **2. Response Compression** (V2.1)
+
 - Compactar .json e .html (gz)
 - Reduzir uso de disco (HTML pode ser grande)
 - Manter .txt e .md sem compressão (legibilidade)
 
 ### **3. Response Search Index** (V2.2)
+
 - Indexar responses em banco (SQLite/PostgreSQL)
 - Busca full-text por conteúdo
 - Aggregations (média de tokens, duration, etc.)
 
 ### **4. Response Caching** (V2.2)
+
 - Cache de responses idênticas (prompt hash)
 - Evitar re-executar tasks duplicadas
 - TTL configurável
 
 ### **5. Multi-Turn Context Management** (V2.3)
+
 - Encadear responses de múltiplas tasks
 - Context window tracking (tokens acumulados)
 - Automatic context pruning
@@ -880,6 +934,7 @@ describe('ResponseAdapter', () => {
 ### **Estado Atual** (60% Response Capture V2.0)
 
 #### ✅ **O Que Funciona**:
+
 1. **Task Schema V5**: 100% completo, 56/56 testes, PRODUCTION READY
 2. **Task Execution Orchestrator**: Integrado com NERV + OrchestratorEngine
 3. **ChatGPTDriver**: Retorna ResponseV2 object (multi-formato)
@@ -888,6 +943,7 @@ describe('ResponseAdapter', () => {
 6. **LLMJudge**: Valida qualidade (opcional, 3 scores + recommendation)
 
 #### ⚠️ **O Que Falta**:
+
 1. **ResponseAdapter**: Criado mas com syntax error (linha 34)
 2. **Integração**: `saveResponse()` não é chamado em nenhum lugar
 3. **Event Payload**: Não inclui ResponseV2 completo (só status + duration)
@@ -895,6 +951,7 @@ describe('ResponseAdapter', () => {
 5. **Testes**: 0 testes para ResponseAdapter e integração end-to-end
 
 #### 🔴 **Gaps Críticos**:
+
 - **GAP #1**: Response não é salva no fluxo (adapter não integrado)
 - **GAP #2**: `task.result` não é preenchido (storage, generation, validation)
 - **GAP #3**: Event payload não transporta ResponseV2 completo
@@ -917,20 +974,24 @@ describe('ResponseAdapter', () => {
 ## 📚 Referências
 
 ### **Arquivos Criados** (Response Capture V2.0):
+
 - `src/driver/extractors/structured_extractor.js` (450 linhas)
 - `src/infra/storage/response_store_v2.js` (270 linhas)
 - `src/validation/llm_judge.js` (460 linhas)
 - `src/infra/storage/response_adapter.js` (220 linhas) ⚠️ syntax error
 
 ### **Arquivos Modificados**:
+
 - `src/driver/targets/ChatGPTDriver.js` (5 edits, ~80 linhas modificadas)
 
 ### **Dependências Instaladas**:
+
 - `turndown` (HTML → Markdown)
 - `node-html-parser` (HTML parsing)
 - 13 packages total (4s install)
 
 ### **Documentos de Referência**:
+
 - `UPGRADE_PROPOSAL_3SYSTEMS.md` (proposta original)
 - `docs/TASK_SCHEMA_V5.md` (documentação V5, 550 linhas)
 - `DOCUMENTAÇÃO/ARCHITECTURE.md` (arquitetura completa V3.0, 3,018 linhas)
@@ -940,4 +1001,5 @@ describe('ResponseAdapter', () => {
 
 **FIM DA ANÁLISE** ✅
 
-_Esta análise mapeia 100% do fluxo de tasks atual, identifica gaps críticos e propõe soluções concretas para completar Response Capture V2.0._
+_Esta análise mapeia 100% do fluxo de tasks atual, identifica gaps críticos e propõe soluções
+concretas para completar Response Capture V2.0._

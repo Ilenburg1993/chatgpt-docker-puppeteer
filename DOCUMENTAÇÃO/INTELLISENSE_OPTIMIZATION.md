@@ -1,35 +1,33 @@
 # IntelliSense Optimization Guide
 
-**Última atualização:** 22/01/2026
-**Versão:** 1.0
+**Última atualização:** 22/01/2026 **Versão:** 1.0
 
 ## 📊 Estado Atual
 
 ### ✅ jsconfig.json v2.0 Otimizado
 
-**Configuração:** CommonJS puro com caminhos relativos
-**IntelliSense:** Totalmente funcional para autocomplete, navegação e refatoração
-**Aliases:** Removidos (não funcionais sem module-alias)
+**Configuração:** CommonJS puro com caminhos relativos **IntelliSense:** Totalmente funcional para
+autocomplete, navegação e refatoração **Aliases:** Removidos (não funcionais sem module-alias)
 
 ### 🔍 Como o IntelliSense Funciona Agora
 
 ```javascript
 // ✅ Funciona perfeitamente com jsconfig.json v2.0
-const { log } = require('../../core/logger');  // IntelliSense: ✅ autocomplete
-const io = require('../../infra/io');          // IntelliSense: ✅ go to definition
-const CONFIG = require('../../core/config');   // IntelliSense: ✅ hover info
+const { log } = require('../../core/logger'); // IntelliSense: ✅ autocomplete
+const io = require('../../infra/io'); // IntelliSense: ✅ go to definition
+const CONFIG = require('../../core/config'); // IntelliSense: ✅ hover info
 ```
 
 ### 📈 Otimizações Aplicadas
 
-| Configuração | Valor | Benefício |
-|--------------|-------|-----------|
-| `maxNodeModuleJsDepth` | 1 | +Performance em projetos grandes |
-| `assumeChangesOnlyAffectDirectDependencies` | true | +Rapidez na análise |
-| `typeRoots` | `./node_modules/@types` | Autocomplete de tipos Node.js |
-| `types` | `["node"]` | Definições de tipos nativos |
-| `exclude` expansivo | 20+ padrões | Ignora arquivos desnecessários |
-| `include` específico | Arquivos-chave | Monitora apenas código relevante |
+| Configuração                                | Valor                   | Benefício                        |
+| ------------------------------------------- | ----------------------- | -------------------------------- |
+| `maxNodeModuleJsDepth`                      | 1                       | +Performance em projetos grandes |
+| `assumeChangesOnlyAffectDirectDependencies` | true                    | +Rapidez na análise              |
+| `typeRoots`                                 | `./node_modules/@types` | Autocomplete de tipos Node.js    |
+| `types`                                     | `["node"]`              | Definições de tipos nativos      |
+| `exclude` expansivo                         | 20+ padrões             | Ignora arquivos desnecessários   |
+| `include` específico                        | Arquivos-chave          | Monitora apenas código relevante |
 
 ### 🚀 Performance Gains
 
@@ -107,12 +105,12 @@ const { log } = require('@core/logger');
 
 ### ⚠️ Trade-offs dos Aliases
 
-| Prós | Contras |
-|------|---------|
-| ✅ Imports mais limpos | ❌ Dependência extra (module-alias) |
-| ✅ Fácil refatoração de estrutura | ❌ Maior curva de aprendizado |
-| ✅ Padrão em projetos TypeScript | ❌ Debugger pode ficar confuso |
-| ✅ Evita '../../../..' | ❌ Performance levemente menor (runtime) |
+| Prós                              | Contras                                  |
+| --------------------------------- | ---------------------------------------- |
+| ✅ Imports mais limpos            | ❌ Dependência extra (module-alias)      |
+| ✅ Fácil refatoração de estrutura | ❌ Maior curva de aprendizado            |
+| ✅ Padrão em projetos TypeScript  | ❌ Debugger pode ficar confuso           |
+| ✅ Evita '../../../..'            | ❌ Performance levemente menor (runtime) |
 
 **Recomendação:** Só implementar se o projeto crescer muito (>100 arquivos).
 
@@ -123,10 +121,12 @@ const { log } = require('@core/logger');
 ### IntelliSense não funciona para require()
 
 **Sintomas:**
+
 - Autocomplete não aparece após `require('`
 - "Cannot find module" em imports válidos
 
 **Soluções:**
+
 1. Reload Window: `Ctrl+Shift+P` → "Developer: Reload Window"
 2. Deletar cache: `rm -rf ~/.vscode-server/data/User/workspaceStorage/*`
 3. Verificar exclude: Assegurar que arquivo não está em `jsconfig.json` exclude
@@ -134,11 +134,14 @@ const { log } = require('@core/logger');
 ### Hover info não mostra documentação
 
 **Sintomas:**
+
 - Hover sobre função não mostra JSDoc
 - "No quick info available"
 
 **Soluções:**
+
 1. Adicionar JSDoc nos arquivos:
+
    ```javascript
    /**
     * Salva tarefa no sistema de arquivos
@@ -153,10 +156,12 @@ const { log } = require('@core/logger');
 ### Go to Definition não funciona
 
 **Sintomas:**
+
 - F12 não navega para definição
 - "No definition found"
 
 **Soluções:**
+
 1. Verificar se arquivo está em `include` do jsconfig.json
 2. Usar caminho correto (CommonJS: `require()`, não `import`)
 3. Reload Window
@@ -164,10 +169,12 @@ const { log } = require('@core/logger');
 ### Performance ruim em arquivos grandes
 
 **Sintomas:**
+
 - Autocomplete lento (>2 segundos)
 - CPU alta ao editar
 
 **Soluções:**
+
 1. Adicionar arquivo em `exclude` se não for código principal
 2. Ajustar `maxNodeModuleJsDepth: 0` (mais agressivo)
 3. Ativar `disableSizeLimit: true` para arquivos >4MB
@@ -181,6 +188,7 @@ const { log } = require('@core/logger');
 **Arquivo:** `src/server/realtime/bus/pm2_bridge.js`
 
 **Com Caminhos Relativos (Atual):**
+
 ```javascript
 const { pm2Raw } = require('../../../infra/system');
 const { notify } = require('../../engine/socket');
@@ -189,6 +197,7 @@ const CONFIG = require('../../../core/config');
 ```
 
 **Com Aliases (Hipotético):**
+
 ```javascript
 const { pm2Raw } = require('@infra/system');
 const { notify } = require('@server/engine/socket');
@@ -198,16 +207,17 @@ const CONFIG = require('@core/config');
 
 ### Veredito
 
-| Métrica | Relativos | Aliases |
-|---------|-----------|---------|
-| Setup inicial | ⭐⭐⭐⭐⭐ Nenhum | ⭐⭐⭐ 5-10min |
-| Performance runtime | ⭐⭐⭐⭐⭐ Nativo | ⭐⭐⭐⭐ +0.5ms/require |
-| Legibilidade | ⭐⭐⭐ OK | ⭐⭐⭐⭐⭐ Excelente |
-| Refatoração | ⭐⭐⭐ Manual | ⭐⭐⭐⭐⭐ Automática |
-| IntelliSense | ⭐⭐⭐⭐⭐ Perfeito | ⭐⭐⭐⭐⭐ Perfeito |
-| Debug friendly | ⭐⭐⭐⭐⭐ Stack traces claros | ⭐⭐⭐⭐ Precisa sourcemaps |
+| Métrica             | Relativos                      | Aliases                     |
+| ------------------- | ------------------------------ | --------------------------- |
+| Setup inicial       | ⭐⭐⭐⭐⭐ Nenhum              | ⭐⭐⭐ 5-10min              |
+| Performance runtime | ⭐⭐⭐⭐⭐ Nativo              | ⭐⭐⭐⭐ +0.5ms/require     |
+| Legibilidade        | ⭐⭐⭐ OK                      | ⭐⭐⭐⭐⭐ Excelente        |
+| Refatoração         | ⭐⭐⭐ Manual                  | ⭐⭐⭐⭐⭐ Automática       |
+| IntelliSense        | ⭐⭐⭐⭐⭐ Perfeito            | ⭐⭐⭐⭐⭐ Perfeito         |
+| Debug friendly      | ⭐⭐⭐⭐⭐ Stack traces claros | ⭐⭐⭐⭐ Precisa sourcemaps |
 
-**Conclusão:** Caminhos relativos são suficientes para este projeto (tamanho médio, estrutura estável).
+**Conclusão:** Caminhos relativos são suficientes para este projeto (tamanho médio, estrutura
+estável).
 
 ---
 
@@ -219,7 +229,7 @@ Use esta lista para verificar se o IntelliSense está otimizado:
 - [x] **compilerOptions.target** = ES2022 ou superior
 - [x] **compilerOptions.module** = commonjs (projeto usa require)
 - [x] **compilerOptions.types** = ["node"] (autocomplete Node.js)
-- [x] **include** cobre src/, scripts/, tests/, *.js
+- [x] **include** cobre src/, scripts/, tests/, \*.js
 - [x] **exclude** inclui node_modules, logs, fila, respostas
 - [x] **baseUrl** = "." (resolve caminhos relativos)
 - [x] **skipLibCheck** = true (ignora erros em node_modules)
@@ -238,5 +248,4 @@ Use esta lista para verificar se o IntelliSense está otimizado:
 
 ---
 
-**Última revisão:** 22/01/2026
-**Próxima revisão:** Quando implementar TypeScript ou aliases
+**Última revisão:** 22/01/2026 **Próxima revisão:** Quando implementar TypeScript ou aliases

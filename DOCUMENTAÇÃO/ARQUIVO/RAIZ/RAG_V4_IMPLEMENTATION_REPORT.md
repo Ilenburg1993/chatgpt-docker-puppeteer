@@ -1,14 +1,14 @@
 # RAG v4.0 - Multi-LLM Integration Implementation Report
 
-**Data:** 2026-02-06
-**Status:** ✅ **COMPLETO**
-**Tempo Total:** ~4-5 horas
+**Data:** 2026-02-06 **Status:** ✅ **COMPLETO** **Tempo Total:** ~4-5 horas
 
 ---
 
 ## 📋 Resumo Executivo
 
-Implementação bem-sucedida do RAG v4.0 - sistema unificado de integração multi-LLM que expõe ferramentas de busca semântica e acesso a modelos Ollama para **todas as principais LLMs** via protocolo MCP (Model Context Protocol).
+Implementação bem-sucedida do RAG v4.0 - sistema unificado de integração multi-LLM que expõe
+ferramentas de busca semântica e acesso a modelos Ollama para **todas as principais LLMs** via
+protocolo MCP (Model Context Protocol).
 
 **Resultado:** 1 servidor Express servindo 4+ LLMs através de 2 protocolos (MCP + REST API).
 
@@ -17,9 +17,11 @@ Implementação bem-sucedida do RAG v4.0 - sistema unificado de integração mul
 ## 🎯 Objetivos Alcançados
 
 ### ✅ Objetivo Principal
+
 Transformar RAG v3.0 (backend isolado) em RAG v4.0 (integrado com TODAS as LLMs populares)
 
 ### ✅ Objetivos Secundários
+
 1. **Centralização Máxima:** 1 servidor Express (localhost:3008) em vez de múltiplos servidores
 2. **Zero Breaking Changes:** Sistema existente continua funcionando
 3. **DRY Architecture:** Tool Registry implementa cada ferramenta uma única vez
@@ -32,26 +34,32 @@ Transformar RAG v3.0 (backend isolado) em RAG v4.0 (integrado com TODAS as LLMs 
 ### FASE 1: Core Foundation ✅
 
 **1.1 Ollama Client** (`tools/ollama/client.mjs`)
+
 - HTTP client para Ollama em `host.docker.internal:11434`
 - Métodos: `generate()`, `embed()`, `listModels()`, `health()`
-- Validado: 4 modelos disponíveis (qwen2.5-coder:7b, qwen2.5-coder:3b, qwen2.5:3b-instruct, nomic-embed-text)
+- Validado: 4 modelos disponíveis (qwen2.5-coder:7b, qwen2.5-coder:3b, qwen2.5:3b-instruct,
+  nomic-embed-text)
 
 **1.2 Tool Registry** (`src/integration/tool-registry.mjs`)
+
 - Camada de abstração DRY para ferramentas
 - Compartilhado entre MCP, REST API e código direto
 - Métodos: `register()`, `execute()`, `getAllMetadata()`, `getStats()`
 
 **1.3 RAG Tools** (`src/integration/tools/rag-tools.mjs`)
+
 - `rag_search`: Hybrid semantic search (Vector + FTS + Reranking + MMR)
 - `rag_health`: System health check (LanceDB + Ollama + cache)
 - Wrappers sobre `tools/rag/lib/facade.mjs` (reusa backend existente)
 
 **1.4 Ollama Tools** (`src/integration/tools/ollama-tools.mjs`)
+
 - `ollama_generate`: Text generation (qwen2.5-coder, llama3.2, etc.)
 - `ollama_embed`: Generate embeddings (nomic-embed-text, 768D)
 - `ollama_models`: List available models on host
 
 **1.5 Environment Configuration**
+
 - `MCP_ENABLED=true` adicionado em todos os arquivos .env (development, production, test, example)
 
 **Total:** 5 ferramentas registradas
@@ -61,9 +69,11 @@ Transformar RAG v3.0 (backend isolado) em RAG v4.0 (integrado com TODAS as LLMs 
 ### FASE 2: Express Server Integration ✅
 
 **2.1 Dependências**
+
 - Instalado `@modelcontextprotocol/sdk@1.26.0`
 
 **2.2 MCP Handler** (`src/server/handlers/mcp-handler.js`)
+
 - Implementação direta do protocolo JSON-RPC 2.0 (sem dependência em SDK Server)
 - Handlers para 4 métodos MCP:
   - `tools/list` - Lista ferramentas disponíveis
@@ -75,25 +85,28 @@ Transformar RAG v3.0 (backend isolado) em RAG v4.0 (integrado com TODAS as LLMs 
   - `GET /api/mcp` - Discovery endpoint
 
 **2.3 Router Integration** (`src/server/api/router.js`)
+
 - Função `applyRoutes()` tornada async
 - MCP handler setup condicional (`if (MCP_ENABLED === 'true')`)
 - Imports dinâmicos (lazy loading)
 - Error handling robusto
 
 **2.4 Main.js Integration** (`src/server/main.js`)
+
 - `await router.applyRoutes(app)` - aguarda setup async
 
 ---
 
 ### FASE 3: Validação e Testes ✅
 
-**3.1 Testes Funcionais**
-Criado script de teste `test-mcp-endpoint.mjs` que valida:
+**3.1 Testes Funcionais** Criado script de teste `test-mcp-endpoint.mjs` que valida:
+
 - ✅ Discovery endpoint (GET /api/mcp)
 - ✅ List tools (POST /api/mcp tools/list)
 - ✅ Execute tool (POST /api/mcp tools/call ollama_models)
 
 **Resultados:**
+
 ```
 ✅ Discovery: 5 tools disponíveis
 ✅ Tools list: rag_search, rag_health, ollama_generate, ollama_embed, ollama_models
@@ -102,6 +115,7 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ```
 
 **3.2 Validação de Integração**
+
 - Tool Registry inicializa corretamente (5 tools registrados)
 - Ollama acessível em host.docker.internal:11434
 - RAG backend funcional (440 arquivos, 5,645 chunks)
@@ -111,6 +125,7 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ### FASE 4: Documentação ✅
 
 **4.1 Integration Guide** (`docs/integration/README.md`)
+
 - 400+ linhas de documentação completa
 - Setup instructions para 4 LLMs:
   1. **Claude Desktop** - MCP via HTTP
@@ -175,17 +190,20 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ## 📊 Métricas de Sucesso
 
 ### Funcionalidade
+
 - ✅ **5 ferramentas** funcionais (2 RAG + 3 Ollama)
 - ✅ **4 métodos MCP** implementados (tools/list, tools/call, resources/list, resources/read)
 - ✅ **2 endpoints HTTP** (POST /api/mcp, GET /api/mcp)
-- ✅ **6 endpoints REST** já existentes (/api/rag/*)
+- ✅ **6 endpoints REST** já existentes (/api/rag/\*)
 
 ### Performance
+
 - ✅ Latência média: **<500ms** (embedding + search + reranking)
 - ✅ Cache hit rate: **40-60%** após warm-up (100 entries LRU)
 - ✅ Indexed: **440 arquivos**, **5,645 chunks**, **133 MB** database
 
 ### Cobertura LLM
+
 - ✅ **Claude Desktop** - MCP nativo
 - ✅ **GitHub Copilot** - MCP via HTTP
 - ✅ **OpenCode** - MCP nativo
@@ -200,20 +218,18 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ### Novos Arquivos (8 arquivos)
 
 **Core:**
+
 1. `tools/ollama/client.mjs` - Ollama HTTP client
 2. `src/integration/tool-registry.mjs` - Tool Registry core
 3. `src/integration/tools/rag-tools.mjs` - RAG tool implementations
 4. `src/integration/tools/ollama-tools.mjs` - Ollama tool implementations
 
-**Server:**
-5. `src/server/handlers/mcp-handler.js` - MCP JSON-RPC handler
+**Server:** 5. `src/server/handlers/mcp-handler.js` - MCP JSON-RPC handler
 
-**Documentation:**
-6. `docs/integration/README.md` - Integration guide (400+ linhas)
-7. `RAG_V4_IMPLEMENTATION_REPORT.md` - Este relatório
+**Documentation:** 6. `docs/integration/README.md` - Integration guide (400+ linhas) 7.
+`RAG_V4_IMPLEMENTATION_REPORT.md` - Este relatório
 
-**Tests:**
-8. `test-mcp-endpoint.mjs` - Test script (removido após validação)
+**Tests:** 8. `test-mcp-endpoint.mjs` - Test script (removido após validação)
 
 ### Arquivos Modificados (4 arquivos)
 
@@ -230,6 +246,7 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ## 🔒 Zero Breaking Changes
 
 ### Sistemas Existentes Preservados
+
 - ✅ RAG v3.0 continua funcionando (REST API em `/api/rag/*`)
 - ✅ Dashboard UI não foi afetado
 - ✅ Ollama já configurado (host.docker.internal:11434)
@@ -238,6 +255,7 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 - ✅ OrchestratorEngine auto-inject RAG (linha 202) ainda funciona
 
 ### Adições Opcionais
+
 - ✅ MCP endpoint opcional (`MCP_ENABLED=true` para habilitar)
 - ✅ Graceful degradation (se MCP falhar, sistema continua sem MCP)
 - ✅ Imports dinâmicos (lazy loading, sem impacto no boot)
@@ -249,21 +267,25 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ### Arquiteturas Bem-Sucedidas
 
 **1. Tool Registry Pattern (DRY)**
+
 - Implementar cada ferramenta **uma única vez**
 - Compartilhar entre protocolos (MCP, REST, código direto)
 - Evita duplicação de código e bugs
 
 **2. Dual Use Case**
+
 - Developer tools (via MCP) + Program logic (via registry.execute())
 - Mesma implementação serve ambos os casos
 - OrchestratorEngine pode usar registry.execute('ollama_generate') para decisões inteligentes
 
 **3. Simplified Protocol Implementation**
+
 - JSON-RPC 2.0 direto é mais simples que SDK wrappers
 - Menos dependências, mais controle
 - Easier to debug e manter
 
 **4. Lazy Loading**
+
 - Imports dinâmicos (await import())
 - Só carrega se MCP_ENABLED=true
 - Sem impacto no boot time
@@ -271,16 +293,19 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ### Decisões Técnicas Chave
 
 **1. JSON-RPC 2.0 direto vs. MCP SDK Server**
+
 - Escolha: **JSON-RPC direto**
 - Razão: Mais simples, menos dependências, mais controle
 - SDK Server tinha schema issues e acessava propriedades privadas
 
 **2. 1 Servidor vs. Múltiplos Servidores**
+
 - Escolha: **1 servidor Express (3008)**
 - Razão: Centralização, eficiência de recursos, CORS/auth centralizados
 - Evita overhead de múltiplos processos Node.js
 
 **3. Ollama como First-Class Citizen**
+
 - Escolha: **Expor Ollama como ferramentas dedicadas**
 - Razão: LLMs podem gerar texto, embeddings, listar modelos diretamente
 - Não apenas uso interno do RAG
@@ -292,6 +317,7 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ### RAG v5.0 (Future Enhancements)
 
 **Melhorias Potenciais:**
+
 1. **Conversational RAG** - Manter contexto de queries anteriores
 2. **Code Graph Integration** - Buscar por relações (imports, calls, inheritance)
 3. **Multi-modal** - Indexar screenshots, diagramas, PDFs
@@ -304,6 +330,7 @@ Criado script de teste `test-mcp-endpoint.mjs` que valida:
 ### Observability
 
 **Adicionar métricas:**
+
 - Dashboard de queries (quais LLMs mais usam)
 - Latency metrics por LLM
 - Popular queries (ajustar indexação)
@@ -357,11 +384,13 @@ curl -X POST http://localhost:3008/api/mcp \
 ## 📚 Recursos Adicionais
 
 **Documentação:**
+
 - [Setup Guide](docs/integration/README.md) - Comprehensive setup for all LLMs
 - [MCP Specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)
 - [Tool Registry Pattern](src/integration/tool-registry.mjs)
 
 **Arquivos Chave:**
+
 - `src/server/handlers/mcp-handler.js` - MCP endpoint implementation
 - `src/integration/tool-registry.mjs` - Tool Registry core
 - `tools/ollama/client.mjs` - Ollama HTTP client
@@ -369,6 +398,7 @@ curl -X POST http://localhost:3008/api/mcp \
 - `src/integration/tools/ollama-tools.mjs` - Ollama tool wrappers
 
 **Related:**
+
 - RAG v3.0: `tools/rag/lib/facade.mjs`
 - Express App: `src/server/engine/app.js`
 - Router: `src/server/api/router.js`
@@ -392,10 +422,9 @@ Implementação bem-sucedida de um sistema unificado de integração multi-LLM q
 
 ---
 
-**Implementado por:** Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
-**Data:** 2026-02-06
-**Tempo Total:** ~4-5 horas
-**Commit Message Sugerido:**
+**Implementado por:** Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) **Data:** 2026-02-06 **Tempo
+Total:** ~4-5 horas **Commit Message Sugerido:**
+
 ```
 feat(rag): RAG v4.0 - Multi-LLM Integration (MCP + Ollama tools)
 

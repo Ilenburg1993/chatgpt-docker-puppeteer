@@ -1,7 +1,6 @@
 # 🏛️ Arquitetura Canônica de Tipos TypeScript
 
-**Data:** 2026-02-06
-**Status:** ✅ Implementado seguindo padrão "ouro" profissional
+**Data:** 2026-02-06 **Status:** ✅ Implementado seguindo padrão "ouro" profissional
 
 ---
 
@@ -46,6 +45,7 @@ src/types/
 ### **1. Separação de Contracts e Augmentations**
 
 **Contracts (tipos puros):**
+
 ```typescript
 // src/types/driver/contracts.d.ts
 export interface IDriver { ... }
@@ -53,6 +53,7 @@ export type DriverState = 'PENDING' | 'RUNNING' | ...
 ```
 
 **Augmentations (module declarations):**
+
 ```typescript
 // src/types/driver/augmentations.d.ts
 declare module '#driver/core/BaseDriver' {
@@ -67,12 +68,14 @@ declare module '#driver/core/BaseDriver' {
 ### **2. Sem `Function`, Sem `any`**
 
 **❌ Antes:**
+
 ```typescript
 _emitVital: Function;
 someData: any;
 ```
 
 **✅ Agora:**
+
 ```typescript
 _emitVital: (event: string, data?: unknown) => void;
 someData: unknown;
@@ -85,7 +88,7 @@ someData: unknown;
 ### **3. Branded Types para Segurança**
 
 ```typescript
-export type TimeoutMs = number & { readonly __brand?: "TimeoutMs" };
+export type TimeoutMs = number & { readonly __brand?: 'TimeoutMs' };
 ```
 
 **Benefício:** TypeScript diferencia `TimeoutMs` de `number` simples (nominal typing).
@@ -101,6 +104,7 @@ export type ElementHandleLike = unknown;
 ```
 
 **Benefício:**
+
 - Legibilidade melhor
 - Fácil refatorar depois (mudar `unknown` para tipo específico)
 - Autocomplete mostra nome significativo
@@ -110,12 +114,14 @@ export type ElementHandleLike = unknown;
 ### **5. Options Object em vez de Overloads**
 
 **❌ Antes:**
+
 ```typescript
 waitUntilReady(timeout?: number, phases?: string[]): Promise<void>;
 waitUntilReady(options: { timeout?: number }): Promise<void>; // 2 overloads!
 ```
 
 **✅ Agora:**
+
 ```typescript
 waitUntilReady(options?: {
   timeout?: TimeoutMs;
@@ -124,6 +130,7 @@ waitUntilReady(options?: {
 ```
 
 **Benefício:**
+
 - Sem ambiguidade
 - Autocomplete melhor
 - Extensível (fácil adicionar novos options)
@@ -143,17 +150,17 @@ phases?: readonly string[];
 
 ## 📊 Estrutura vs Versão Anterior
 
-| Aspecto | Versão Antiga | Versão Canônica |
-|---------|---------------|-----------------|
-| **Arquivos** | 5 misturados | 6 organizados |
-| **Separação** | ❌ Misturado | ✅ Contracts/Augmentations |
-| **`Function`** | ✅ Usado | ❌ Evitado |
-| **`any`** | ✅ Usado | ❌ `unknown` |
-| **Branded Types** | ❌ Não | ✅ `TimeoutMs` |
-| **Type Aliases** | ❌ Poucos | ✅ Sistemático |
-| **Options Object** | ⚠️ Mix | ✅ Consistente |
-| **Readonly** | ❌ Não | ✅ `ReadonlyMap` |
-| **Imports** | ⚠️ Relativos | ✅ Package paths |
+| Aspecto            | Versão Antiga | Versão Canônica            |
+| ------------------ | ------------- | -------------------------- |
+| **Arquivos**       | 5 misturados  | 6 organizados              |
+| **Separação**      | ❌ Misturado  | ✅ Contracts/Augmentations |
+| **`Function`**     | ✅ Usado      | ❌ Evitado                 |
+| **`any`**          | ✅ Usado      | ❌ `unknown`               |
+| **Branded Types**  | ❌ Não        | ✅ `TimeoutMs`             |
+| **Type Aliases**   | ❌ Poucos     | ✅ Sistemático             |
+| **Options Object** | ⚠️ Mix        | ✅ Consistente             |
+| **Readonly**       | ❌ Não        | ✅ `ReadonlyMap`           |
+| **Imports**        | ⚠️ Relativos  | ✅ Package paths           |
 
 ---
 
@@ -185,6 +192,7 @@ driver.biomechanics.  // Autocomplete mostra:
 ### **3. Go to Definition**
 
 Cmd/Ctrl + Click em `biomechanics` vai para:
+
 1. `contracts.d.ts` (interface IBiomechanicsEngine)
 2. OU `augmentations.d.ts` (class BiomechanicsEngine)
 3. OU implementação real (`biomechanics_engine.js`)
@@ -215,6 +223,7 @@ Esta arquitetura segue:
 ### **Migração Futura para TypeScript**
 
 Se um dia migrar para `.ts`:
+
 - ✅ Contracts já existem
 - ✅ Interfaces já documentadas
 - ✅ Apenas renomear `.js` → `.ts` e adicionar tipos internos
@@ -224,6 +233,7 @@ Se um dia migrar para `.ts`:
 ## 🏆 Conclusão
 
 **Arquitetura Canônica Implementada:**
+
 - ✅ Contracts separados de Augmentations
 - ✅ Sem `Function`, sem `any`
 - ✅ Branded types, semantic aliases
@@ -231,6 +241,7 @@ Se um dia migrar para `.ts`:
 - ✅ Padrão profissional seguindo melhores práticas
 
 **Resultado:**
+
 - 📚 Código JavaScript limpo e dinâmico
 - 🎯 Type safety onde importa
 - 🚀 IntelliSense 100% funcional

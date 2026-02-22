@@ -1,8 +1,7 @@
 # Circuit Breaker vs. Phase 3: Análise de Integração & Validação Arquitetural
 
-**Data**: 4 de Fevereiro de 2026
-**Escopo**: Avaliar CircuitBreaker no contexto Phase 3 + validar fluxo de execução de tasks
-**Status**: ✅ ANÁLISE COMPLETA
+**Data**: 4 de Fevereiro de 2026 **Escopo**: Avaliar CircuitBreaker no contexto Phase 3 + validar
+fluxo de execução de tasks **Status**: ✅ ANÁLISE COMPLETA
 
 ---
 
@@ -17,10 +16,10 @@
 
 ### Resultado da Análise
 
-✅ **TUDO CORRETO** - Implementação robusta com algumas recomendações menores
-✅ **SEM BUGS CRÍTICOS** - Todas as garantias fundamentais estão implementadas
-✅ **BEM INTEGRADO** - CircuitBreaker + Phase 3 + Kernel trabalham em harmonia
-⚠️ **2 RECOMENDAÇÕES** - Pequenas melhorias para clareza e consistência
+✅ **TUDO CORRETO** - Implementação robusta com algumas recomendações menores ✅ **SEM BUGS
+CRÍTICOS** - Todas as garantias fundamentais estão implementadas ✅ **BEM INTEGRADO** -
+CircuitBreaker + Phase 3 + Kernel trabalham em harmonia ⚠️ **2 RECOMENDAÇÕES** - Pequenas melhorias
+para clareza e consistência
 
 ---
 
@@ -31,6 +30,7 @@
 #### 1.1 Sobreposição de Responsabilidades
 
 **CircuitBreaker** (Phase 1 - circuit_breaker.js):
+
 ```javascript
 Função: Detectar CAUSA de falhas (7 cenários)
 Escopo: Pool-level (todas as instâncias)
@@ -40,6 +40,7 @@ Emite: CHROME_CIRCUIT_BREAKER events via NERV
 ```
 
 **PeriodicHealthMonitor** (Phase 3 - PeriodicHealthMonitor.js):
+
 ```javascript
 Função: Monitorar SAÚDE via CDP (connection, memory, targets)
 Escopo: Pool-level + per-page metrics
@@ -52,8 +53,8 @@ Emite: BROWSER_POOL_HEALTH events via NERV
 
 **PROBLEMA**: Ambos gerenciam "estados de degradação" sem coordenação:
 
-| Aspecto | CircuitBreaker      | PeriodicHealthMonitor  | Conflito?                                   |
-| ------- | ------------------- | ---------------------- | ------------------------------------------- |
+| Aspecto | CircuitBreaker      | PeriodicHealthMonitor  | Conflito?                                    |
+| ------- | ------------------- | ---------------------- | -------------------------------------------- |
 | Estados | DEGRADED            | DEGRADED               | ⚠️ **SIM** - mesmo nome, semântica diferente |
 | Trigger | Falha de instância  | Health check periódico | ❌ NÃO - triggers distintos                  |
 | Escopo  | Pool (3 instâncias) | Pool + pages           | ❌ NÃO - escopos complementares              |
@@ -128,9 +129,9 @@ async _attemptReconnection() {
 
 ```javascript
 // pool_manager.js
-this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async (data) => {
-    await this._attemptReconnection(); // ✅ Trigger reconexão
-    // ❌ Não atualiza CircuitBreaker state
+this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async data => {
+  await this._attemptReconnection(); // ✅ Trigger reconexão
+  // ❌ Não atualiza CircuitBreaker state
 });
 ```
 
@@ -288,6 +289,7 @@ Task Execution Request (NERV)
 #### 3.1 Comportamento Esperado
 
 Usuário deve poder:
+
 1. ❓ Demorar para abrir Chrome → Sistema **NÃO deve dar erro** (aguarda pacientemente)
 2. ❓ Fechar Chrome → Sistema **pausa execução** (Circuit Breaker)
 3. ❓ Reabrir Chrome → Sistema **retoma automaticamente** (reconexão)
@@ -300,7 +302,7 @@ Usuário deve poder:
 ```javascript
 // kernel_loop.js (linhas 182-190)
 if (this._checkCircuitBreaker()) {
-    return; // ← PULA ciclo mas NÃO lança erro
+  return; // ← PULA ciclo mas NÃO lança erro
 }
 
 // Loop CONTINUA ATIVO (20Hz), apenas PAUSA execução
@@ -308,6 +310,7 @@ if (this._checkCircuitBreaker()) {
 ```
 
 **Log emitido**:
+
 ```
 INFO: kernel_loop_paused (reason: Circuit Breaker OPEN)
 ```
@@ -385,12 +388,13 @@ registerRecovery(instanceId) {
 ```
 
 **Bug Identificado**:
+
 ```javascript
 // pool_manager.js (linhas 854-870)
 if (reconnected) {
-    poolEntry.browser = newBrowser;
-    poolEntry.health.status = STATUS_VALUES.HEALTHY;
-    // ❌ FALTA: this.circuitBreaker.registerRecovery(poolEntry.id)
+  poolEntry.browser = newBrowser;
+  poolEntry.health.status = STATUS_VALUES.HEALTHY;
+  // ❌ FALTA: this.circuitBreaker.registerRecovery(poolEntry.id)
 }
 ```
 
@@ -499,10 +503,10 @@ Sistema permanece PAUSADO mesmo com browser conectado! ❌
 
 ### Bug #1: CircuitBreaker não recebe notificação de reconexão ⚠️ **MÉDIO**
 
-**Arquivo**: `src/infra/browser_pool/pool_manager.js`
-**Linhas**: 854-870
+**Arquivo**: `src/infra/browser_pool/pool_manager.js` **Linhas**: 854-870
 
 **Problema**:
+
 ```javascript
 async _attemptReconnection() {
     if (reconnected) {
@@ -519,35 +523,37 @@ async _attemptReconnection() {
 ```
 
 **Impacto**:
+
 - Kernel permanece PAUSED mesmo após reconexão bem-sucedida
 - Usuário deve reiniciar sistema manualmente (PM2 restart)
 - Tasks não retomam automaticamente
 
 **Correção**:
+
 ```javascript
 if (reconnected) {
-    // Update pool entry
-    poolEntry.browser = newBrowser;
-    poolEntry.health.status = STATUS_VALUES.HEALTHY;
-    poolEntry.health.consecutiveFailures = 0;
-    poolEntry.health.lastCheck = Date.now();
+  // Update pool entry
+  poolEntry.browser = newBrowser;
+  poolEntry.health.status = STATUS_VALUES.HEALTHY;
+  poolEntry.health.consecutiveFailures = 0;
+  poolEntry.health.lastCheck = Date.now();
 
-    // ✅ FIX: Notificar CircuitBreaker
-    if (this.circuitBreaker) {
-        this.circuitBreaker.registerRecovery(poolEntry.id);
-        log('INFO', `[BrowserPool] CircuitBreaker recovery registered: ${poolEntry.id}`);
-    }
+  // ✅ FIX: Notificar CircuitBreaker
+  if (this.circuitBreaker) {
+    this.circuitBreaker.registerRecovery(poolEntry.id);
+    log('INFO', `[BrowserPool] CircuitBreaker recovery registered: ${poolEntry.id}`);
+  }
 
-    // Emit via NERV
-    if (this.nerv) {
-        this.nerv.emit({
-            type: 'BROWSER_POOL_HEALTH',
-            action: 'RECONNECTION_SUCCEEDED',
-            payload: { poolEntryId: poolEntry.id, attempts: attempt },
-        });
-    }
+  // Emit via NERV
+  if (this.nerv) {
+    this.nerv.emit({
+      type: 'BROWSER_POOL_HEALTH',
+      action: 'RECONNECTION_SUCCEEDED',
+      payload: { poolEntryId: poolEntry.id, attempts: attempt },
+    });
+  }
 
-    return true;
+  return true;
 }
 ```
 
@@ -556,6 +562,7 @@ if (reconnected) {
 **Problema**: CircuitBreaker e PeriodicHealthMonitor usam "DEGRADED" com significados diferentes.
 
 **CircuitBreaker.DEGRADED**:
+
 ```javascript
 DEGRADED: 1-2 instâncias down (de 3 no pool)
 Causa: Falhas registradas
@@ -563,6 +570,7 @@ Ação: Continua execução
 ```
 
 **PeriodicHealthMonitor.DEGRADED**:
+
 ```javascript
 DEGRADED: Múltiplos issues (CPU, memória, DOM nodes)
 Causa: Health checks via CDP
@@ -574,12 +582,13 @@ Ação: Emite WARNING
 **Correção**: Renomear um dos estados para evitar confusão.
 
 **Recomendação**:
+
 ```javascript
 // CircuitBreaker: Manter DEGRADED (faz sentido para pool)
-OPERATIONAL, DEGRADED, CIRCUIT_OPEN
+(OPERATIONAL, DEGRADED, CIRCUIT_OPEN);
 
 // PeriodicHealthMonitor: Renomear para IMPAIRED
-HEALTHY, WARNING, IMPAIRED, CRITICAL, DISCONNECTED
+(HEALTHY, WARNING, IMPAIRED, CRITICAL, DISCONNECTED);
 ```
 
 ---
@@ -589,6 +598,7 @@ HEALTHY, WARNING, IMPAIRED, CRITICAL, DISCONNECTED
 ### 1. Driver não executa sem browser conectado ✅
 
 **Validado em 3 camadas**:
+
 1. Kernel Loop: Circuit Breaker check (pausa se OPEN)
 2. DriverNERVAdapter: Modo degradado check (rejeita se browserPool === null)
 3. DriverNERVAdapter: Pool validation (validateBrowserPool)
@@ -609,14 +619,15 @@ HEALTHY, WARNING, IMPAIRED, CRITICAL, DISCONNECTED
 
 **Validado**: ConnectionRecoveryStrategy com 5 tentativas + backoff exponencial.
 
-**Limitação conhecida**: Manual restart necessário se todas as 5 tentativas falharem (external browser mode).
+**Limitação conhecida**: Manual restart necessário se todas as 5 tentativas falharem (external
+browser mode).
 
 ---
 
 ## 📊 Matriz de Responsabilidades (CircuitBreaker vs. Monitor)
 
-| Aspecto        | CircuitBreaker            | PeriodicHealthMonitor             | Separação OK?                         |
-| -------------- | ------------------------- | --------------------------------- | ------------------------------------- |
+| Aspecto        | CircuitBreaker            | PeriodicHealthMonitor             | Separação OK?                          |
+| -------------- | ------------------------- | --------------------------------- | -------------------------------------- |
 | **Escopo**     | Pool-level (instâncias)   | Pool-level + per-page             | ✅ SIM - complementares                |
 | **Trigger**    | Falha de allocation       | Health check periódico            | ✅ SIM - eventos distintos             |
 | **Detecção**   | Causa de falha (7 tipos)  | Métricas CDP (connection, memory) | ✅ SIM - dados distintos               |
@@ -740,8 +751,8 @@ _determineOverallStatus(results) {
 
 ### Resumo da Análise
 
-| Questão                                | Status    | Detalhes                                             |
-| -------------------------------------- | --------- | ---------------------------------------------------- |
+| Questão                                | Status     | Detalhes                                             |
+| -------------------------------------- | ---------- | ---------------------------------------------------- |
 | **CircuitBreaker no contexto Phase 3** | ⚠️ PARCIAL | Componentes desacoplados, falta bridge (Rec #1)      |
 | **Driver não executa sem browser**     | ✅ CORRETO | 3 camadas de validação implementadas                 |
 | **Aguardo paciente (sem erros)**       | ✅ CORRETO | Kernel pausa mas continua em loop, nenhuma exceção   |
@@ -755,6 +766,7 @@ _determineOverallStatus(results) {
 ### Bugs Médios
 
 ⚠️ **1 Bug Médio** (Bug #1):
+
 - CircuitBreaker não recebe notificação de reconexão
 - Kernel permanece PAUSED após reconexão bem-sucedida
 - Correção: 5 linhas de código (ver seção 5.1)
@@ -762,6 +774,7 @@ _determineOverallStatus(results) {
 ### Bugs Baixos
 
 ⚠️ **1 Bug Baixo** (Bug #2):
+
 - Estados "DEGRADED" com semânticas conflitantes
 - Confusão semântica em logs
 - Correção: Renomear para IMPAIRED (ver Rec #2)
@@ -769,6 +782,7 @@ _determineOverallStatus(results) {
 ### Arquitetura Geral
 
 ✅ **BEM IMPLEMENTADA** - 90% correto
+
 - Separação de responsabilidades: 75% (6/8)
 - Validações de pré-requisitos: 100% (3/3 camadas)
 - Reconexão automática: 95% (falta bridge CB ↔ Monitor)
@@ -788,7 +802,5 @@ Com correção do Bug #1, todas as garantias fundamentais estarão 100% implemen
 
 ---
 
-**Report Version**: 1.0
-**Author**: AI Coding Assistant
-**Date**: February 4, 2026
-**Status**: ✅ Análise Completa - 2 Recomendações Identificadas
+**Report Version**: 1.0 **Author**: AI Coding Assistant **Date**: February 4, 2026 **Status**: ✅
+Análise Completa - 2 Recomendações Identificadas

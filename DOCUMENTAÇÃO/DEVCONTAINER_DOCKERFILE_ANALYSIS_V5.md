@@ -1,9 +1,8 @@
 # 🔍 Análise Completa: Dockerfile + devcontainer.json v5.x
 
-**Data**: 2026-02-02
-**Versão Analisada**: Dockerfile v5.1 + devcontainer.json v5.0
-**Escopo**: Correções, Otimizações, Upgrades e Best Practices
-**Status**: 18 issues identificadas | 12 high priority | 6 medium priority
+**Data**: 2026-02-02 **Versão Analisada**: Dockerfile v5.1 + devcontainer.json v5.0 **Escopo**:
+Correções, Otimizações, Upgrades e Best Practices **Status**: 18 issues identificadas | 12 high
+priority | 6 medium priority
 
 ---
 
@@ -12,6 +11,7 @@
 **Estado Geral**: ✅ **BOM** (arquitetura sólida, documentação excelente)
 
 **Principais Achados**:
+
 - ✅ Arquitetura bem definida (3 camadas: Host → WSL2 → Container)
 - ✅ Documentação inline excepcional
 - ⚠️ Algumas redundâncias entre Dockerfile e devcontainer.json
@@ -24,9 +24,11 @@
 ## 🔴 HIGH PRIORITY ISSUES (12)
 
 ### 1. **Dockerfile: Redundância de `ca-certificates` e `curl`**
+
 **Linha**: SECTION 2 (linha ~105) e SECTION 3 (linha ~155)
 
 **Problema**:
+
 ```dockerfile
 # SECTION 2
 RUN apt-get update \
@@ -45,6 +47,7 @@ RUN apt-get update \
 **Impacto**: Build mais lento, layers desnecessárias.
 
 **Solução**:
+
 ```dockerfile
 # SECTION 2 - Remover curl (já instalado em SECTION 3)
 RUN apt-get update \
@@ -74,6 +77,7 @@ RUN apt-get update \
 ---
 
 ### 2. **Dockerfile: `libnss-wrapper` instalado 3 vezes**
+
 **Linhas**: SECTION 2, SECTION 3, SECTION 4
 
 **Problema**: Mesmo pacote instalado em 3 RUN statements diferentes.
@@ -83,11 +87,13 @@ RUN apt-get update \
 ---
 
 ### 3. **Dockerfile: Missing `apt-get clean` after installs**
+
 **Problema**: Apenas usa `rm -rf /var/lib/apt/lists/*` mas não `apt-get clean`.
 
 **Impacto**: ~5-10MB extras por layer (cache não limpo).
 
 **Solução**:
+
 ```dockerfile
 RUN apt-get update \
     && apt-get install -y --no-install-recommends <packages> \
@@ -98,15 +104,18 @@ RUN apt-get update \
 ---
 
 ### 4. **Dockerfile: PowerShell instalado mas pouco usado**
+
 **Linha**: SECTION 6.5 (linha ~450+)
 
 **Análise**:
+
 - PowerShell instalado com todo repositório Microsoft
 - Apenas usado como "instrumental" (não-canônico)
 - +50MB na imagem
 - Nenhum script .ps1 no projeto
 
 **Proposta**:
+
 - **Opção A**: Remover completamente (economia de 50MB + 10s build)
 - **Opção B**: Manter mas adicionar scripts úteis:
   ```powershell
@@ -120,7 +129,9 @@ RUN apt-get update \
 ---
 
 ### 5. **Dockerfile: Features `common-utils` + manual installs duplicados**
+
 **Problema**: devcontainer.json instala `common-utils:2` que já inclui:
+
 - git, curl, wget, zip, unzip, tree, jq
 - Dockerfile instala novamente em SECTION 6
 
@@ -131,6 +142,7 @@ RUN apt-get update \
 ---
 
 ### 6. **devcontainer.json: `github-cli` feature + manual install duplicado**
+
 **Linha**: features.github-cli (linha 108) vs Dockerfile SECTION 6 (gh)
 
 **Problema**: `gh` instalado duas vezes.
@@ -140,9 +152,11 @@ RUN apt-get update \
 ---
 
 ### 7. **devcontainer.json: Variável `${containerUserHome}` não usada**
+
 **Problema**: Muitos mounts usam `/home/node` hardcoded.
 
 **Solução**: Criar variável no containerEnv:
+
 ```json
 "containerEnv": {
   "CONTAINER_USER_HOME": "/home/node",
@@ -156,9 +170,11 @@ RUN apt-get update \
 ---
 
 ### 8. **devcontainer.json: `--group-add=docker` é root-equivalent**
+
 **Linha**: runArgs (linha ~300)
 
 **Problema**:
+
 ```json
 "--group-add=docker", // Equivale a root no host
 ```
@@ -166,6 +182,7 @@ RUN apt-get update \
 **Risco**: Acesso irrestrito ao Docker daemon do host.
 
 **Solução**: Documentar mais claramente:
+
 ```json
 "runArgs": [
   // ⚠️ SECURITY: Docker socket = root-level access to host
@@ -177,12 +194,15 @@ RUN apt-get update \
 ---
 
 ### 9. **devcontainer.json: Inconsistência de versão (3.4 vs 5.0)**
+
 **Problema**:
+
 - Header diz: v5.0
 - build.args.VERSION: "3.4.0"
 - runArgs labels: "version=3.4.0"
 
 **Solução**: Sincronizar para v5.1:
+
 ```json
 "build": {
   "args": {
@@ -192,13 +212,16 @@ RUN apt-get update \
 ---
 
 ### 10. **Dockerfile: Build ARGs não usados fora de LABEL**
+
 **Problema**: ARGs definidos mas não usados:
+
 - BUILD_DATE
 - VCS_REF
 - IMAGE_NAME
 - IMAGE_VENDOR
 
 **Solução**: Usar em mensagens de build:
+
 ```dockerfile
 RUN echo "Building ${IMAGE_NAME} v${VERSION} (${BUILD_ENV})" \
     && echo "Build date: ${BUILD_DATE}" \
@@ -208,12 +231,15 @@ RUN echo "Building ${IMAGE_NAME} v${VERSION} (${BUILD_ENV})" \
 ---
 
 ### 11. **devcontainer.json: `remoteEnv` duplica `containerEnv`**
+
 **Problema**:
+
 - remoteEnv define: NODE_ENV, SERVER_PORT, etc.
 - containerEnv redefine os mesmos
 - runArgs carrega .env.development (3ª fonte)
 
 **Solução**: Consolidar hierarquia:
+
 ```json
 // 1. Apenas containerEnv (base defaults)
 // 2. runArgs --env-file (overrides)
@@ -223,11 +249,13 @@ RUN echo "Building ${IMAGE_NAME} v${VERSION} (${BUILD_ENV})" \
 ---
 
 ### 12. **devcontainer.json: Extensions não agrupadas por categoria**
+
 **Linha**: customizations.vscode.extensions (linha ~346+)
 
 **Problema**: Lista flat, difícil de entender propósito.
 
 **Solução**: Agrupar com comentários:
+
 ```json
 "extensions": [
   // === AI & AUTOMATION ===
@@ -265,6 +293,7 @@ RUN echo "Building ${IMAGE_NAME} v${VERSION} (${BUILD_ENV})" \
 ## ⚠️ MEDIUM PRIORITY ISSUES (6)
 
 ### 13. **Dockerfile: Multi-stage build não usado**
+
 **Problema**: Imagem única, sem separação build/runtime.
 
 **Oportunidade**: Separar toolchain de build (gcc, python3-pip) do runtime.
@@ -278,14 +307,17 @@ RUN echo "Building ${IMAGE_NAME} v${VERSION} (${BUILD_ENV})" \
 ---
 
 ### 14. **Dockerfile: `gdb` e `heaptrack` raramente usados**
+
 **Linha**: SECTION 4 (linha ~280)
 
 **Análise**:
+
 - Úteis para debugging de crashes nativos
 - +30MB na imagem
 - Uso raro (apenas em investigações críticas)
 
 **Proposta**: Mover para layer separado (instalar on-demand):
+
 ```bash
 # .devcontainer/scripts/install-debug-tools.sh
 sudo apt-get update && sudo apt-get install -y gdb heaptrack
@@ -294,11 +326,13 @@ sudo apt-get update && sudo apt-get install -y gdb heaptrack
 ---
 
 ### 15. **devcontainer.json: `postStartCommand` roda `make info` (ruído)**
+
 **Linha**: postStartCommand (linha ~320)
 
 **Problema**: Imprime info toda vez que container sobe (annoying).
 
 **Solução**: Mudar para `make quick-check` (silent):
+
 ```json
 "postStartCommand": "make quick-check || true",
 ```
@@ -306,6 +340,7 @@ sudo apt-get update && sudo apt-get install -y gdb heaptrack
 ---
 
 ### 16. **devcontainer.json: `terminal.integrated.scrollback: 20000` muito alto**
+
 **Problema**: Consome memória desnecessariamente.
 
 **Solução**: Reduzir para 10000 (padrão VS Code é 1000).
@@ -313,14 +348,17 @@ sudo apt-get update && sudo apt-get install -y gdb heaptrack
 ---
 
 ### 17. **Dockerfile: Fonts podem ser otimizadas**
+
 **Linha**: SECTION 5 (linha ~345+)
 
 **Análise**:
+
 - 14 font packages instalados
 - +150MB na imagem
 - Uso: PDF rendering, screenshots, i18n
 
 **Proposta**: Manter core, remover extras:
+
 ```dockerfile
 # CORE (manter)
 fonts-dejavu-core \
@@ -338,9 +376,11 @@ fonts-noto-color-emoji \
 ---
 
 ### 18. **devcontainer.json: Mounts podem usar named volumes com labels**
+
 **Problema**: Named volumes sem metadata.
 
 **Solução**: Adicionar labels:
+
 ```json
 "mounts": [
   "source=devcontainer-cache,target=/home/node/.cache,type=volume,volume-label=project=chatgpt-docker-puppeteer,volume-label=type=cache",
@@ -384,6 +424,7 @@ fonts-noto-color-emoji \
 ## 🎯 PROPOSED UPGRADES
 
 ### Upgrade 1: **Build Cache Optimization**
+
 ```dockerfile
 # Separar deps em layers que mudam menos frequentemente
 # Layer 1: Sistema base (muda raramente)
@@ -404,6 +445,7 @@ RUN apt-get install -y gh git-lfs socat
 ---
 
 ### Upgrade 2: **Health Check no Container**
+
 ```dockerfile
 # Adicionar HEALTHCHECK
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
@@ -415,6 +457,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 ---
 
 ### Upgrade 3: **Consolidar Features do devcontainer.json**
+
 ```json
 // REMOVER features (instalar manualmente no Dockerfile)
 "features": {
@@ -428,6 +471,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 ---
 
 ### Upgrade 4: **Adicionar `.dockerignore`**
+
 ```dockerignore
 # .dockerignore
 node_modules
@@ -446,6 +490,7 @@ backups
 ---
 
 ### Upgrade 5: **Versioning & Changelog no Container**
+
 ```dockerfile
 # Criar arquivo de versão
 RUN echo "Dockerfile v${VERSION}" > /etc/container-version \
@@ -460,6 +505,7 @@ RUN echo "Dockerfile v${VERSION}" > /etc/container-version \
 ## 📋 IMPLEMENTATION CHECKLIST
 
 ### Phase 1: Quick Wins (30 min)
+
 - [ ] Remover duplicações de pacotes (`libnss-wrapper`, `curl`, `ca-certificates`)
 - [ ] Adicionar `apt-get clean` após installs
 - [ ] Sincronizar versões (5.1.0 em todos os lugares)
@@ -467,6 +513,7 @@ RUN echo "Dockerfile v${VERSION}" > /etc/container-version \
 - [ ] Ajustar scrollback para 10000
 
 ### Phase 2: Optimizations (1h)
+
 - [ ] Criar `.dockerignore`
 - [ ] Reorganizar layers para cache otimizado
 - [ ] Consolidar features (remover duplicações)
@@ -474,12 +521,14 @@ RUN echo "Dockerfile v${VERSION}" > /etc/container-version \
 - [ ] Melhorar uso de BUILD_ARGs
 
 ### Phase 3: Cleanup (30 min)
+
 - [ ] Decidir sobre PowerShell (remover ou justificar com scripts)
 - [ ] Otimizar fonts (remover CJK/árabe se não usado)
 - [ ] Remover `gdb`/`heaptrack` (ou criar script install-on-demand)
 - [ ] Consolidar remoteEnv + containerEnv (eliminar duplicação)
 
 ### Phase 4: Documentation (30 min)
+
 - [ ] Criar CHANGELOG.md (versões do Dockerfile)
 - [ ] Documentar decisões de segurança (--group-add=docker)
 - [ ] Adicionar seção "Known Issues" no README
@@ -488,33 +537,36 @@ RUN echo "Dockerfile v${VERSION}" > /etc/container-version \
 
 ## 💰 ESTIMATED SAVINGS
 
-| Otimização | Economia Build | Economia Imagem | Benefício |
-|-----------|----------------|-----------------|-----------|
-| Remover duplicações | -15s | -5MB | High |
-| apt-get clean | -5s | -30MB | High |
-| .dockerignore | -10s | 0MB | High |
-| Cache layers | -60s (incremental) | 0MB | High |
-| Remover PowerShell | -10s | -50MB | Medium |
-| Otimizar fonts | -5s | -50MB | Medium |
-| Remover gdb/heaptrack | -3s | -30MB | Low |
-| **TOTAL** | **-108s** | **-165MB** | |
+| Otimização            | Economia Build     | Economia Imagem | Benefício |
+| --------------------- | ------------------ | --------------- | --------- |
+| Remover duplicações   | -15s               | -5MB            | High      |
+| apt-get clean         | -5s                | -30MB           | High      |
+| .dockerignore         | -10s               | 0MB             | High      |
+| Cache layers          | -60s (incremental) | 0MB             | High      |
+| Remover PowerShell    | -10s               | -50MB           | Medium    |
+| Otimizar fonts        | -5s                | -50MB           | Medium    |
+| Remover gdb/heaptrack | -3s                | -30MB           | Low       |
+| **TOTAL**             | **-108s**          | **-165MB**      |           |
 
 ---
 
 ## 🚀 RECOMMENDED ACTIONS (Prioridade)
 
 ### Imediato (hoje)
+
 1. ✅ Remover duplicações de pacotes
 2. ✅ Adicionar `apt-get clean`
 3. ✅ Sincronizar versões para 5.1
 4. ✅ Criar `.dockerignore`
 
 ### Curto Prazo (esta semana)
+
 5. ✅ Reorganizar layers (cache optimization)
 6. ✅ Consolidar features
 7. ✅ Decidir sobre PowerShell
 
 ### Médio Prazo (próximas 2 semanas)
+
 8. Adicionar HEALTHCHECK
 9. Criar scripts de install-on-demand
 10. Otimizar fonts (se confirmado não uso de CJK)
@@ -523,16 +575,16 @@ RUN echo "Dockerfile v${VERSION}" > /etc/container-version \
 
 ## 📊 RISK ASSESSMENT
 
-| Issue | Risco de Regressão | Prioridade | Tempo Estimado |
-|-------|-------------------|------------|----------------|
-| Duplicações de pacotes | ZERO | HIGH | 15 min |
-| apt-get clean | ZERO | HIGH | 5 min |
-| Versão inconsistente | ZERO | HIGH | 5 min |
-| .dockerignore | ZERO | HIGH | 10 min |
-| Cache layers | LOW | HIGH | 30 min |
-| Remover PowerShell | MEDIUM | MEDIUM | 20 min |
-| Consolidar features | LOW | MEDIUM | 30 min |
-| Otimizar fonts | MEDIUM | LOW | 30 min |
+| Issue                  | Risco de Regressão | Prioridade | Tempo Estimado |
+| ---------------------- | ------------------ | ---------- | -------------- |
+| Duplicações de pacotes | ZERO               | HIGH       | 15 min         |
+| apt-get clean          | ZERO               | HIGH       | 5 min          |
+| Versão inconsistente   | ZERO               | HIGH       | 5 min          |
+| .dockerignore          | ZERO               | HIGH       | 10 min         |
+| Cache layers           | LOW                | HIGH       | 30 min         |
+| Remover PowerShell     | MEDIUM             | MEDIUM     | 20 min         |
+| Consolidar features    | LOW                | MEDIUM     | 30 min         |
+| Otimizar fonts         | MEDIUM             | LOW        | 30 min         |
 
 **Risco Geral**: **BAIXO** (mudanças são aditivas ou removem redundâncias)
 
@@ -550,18 +602,19 @@ RUN echo "Dockerfile v${VERSION}" > /etc/container-version \
 
 ## 📝 CONCLUSION
 
-O Dockerfile e devcontainer.json estão em **excelente estado** (bem acima da média). As issues identificadas são principalmente:
+O Dockerfile e devcontainer.json estão em **excelente estado** (bem acima da média). As issues
+identificadas são principalmente:
+
 - Redundâncias (fácil de corrigir)
 - Otimizações de build (ganhos incrementais)
 - Limpezas de código (manutenibilidade)
 
 **Nenhuma issue crítica** foi encontrada. Sistema está pronto para produção com melhorias opcionais.
 
-**Recomendação Final**: Implementar Phase 1 (quick wins) imediatamente, avaliar Phase 2-3 conforme necessidade.
+**Recomendação Final**: Implementar Phase 1 (quick wins) imediatamente, avaliar Phase 2-3 conforme
+necessidade.
 
 ---
 
-**Assinatura**: GitHub Copilot (Claude Sonnet 4.5)
-**Data**: 2026-02-02
-**Versão do Relatório**: 1.0
+**Assinatura**: GitHub Copilot (Claude Sonnet 4.5) **Data**: 2026-02-02 **Versão do Relatório**: 1.0
 **Próxima Revisão**: v6.0 (após implementação das melhorias)

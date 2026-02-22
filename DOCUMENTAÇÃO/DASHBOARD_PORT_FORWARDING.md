@@ -2,9 +2,11 @@
 
 ## 📋 Problema
 
-**Sintoma:** Navegador Windows mostra `ERR_CONNECTION_REFUSED` ao acessar `http://localhost:5173/dashboard/`
+**Sintoma:** Navegador Windows mostra `ERR_CONNECTION_REFUSED` ao acessar
+`http://localhost:5173/dashboard/`
 
-**Causa:** Port forwarding do VS Code não está ativo (apesar do `devcontainer.json` estar configurado corretamente)
+**Causa:** Port forwarding do VS Code não está ativo (apesar do `devcontainer.json` estar
+configurado corretamente)
 
 ---
 
@@ -17,6 +19,7 @@ bash scripts/check-dashboard-access.sh
 ```
 
 **Resultado Esperado:**
+
 - ✅ Vite rodando
 - ✅ Porta 5173 escutando
 - ✅ HTTP 200 OK
@@ -54,6 +57,7 @@ No **VS Code**, painel inferior:
 ```
 
 **Se não aparecer a aba PORTS:**
+
 1. Pressione `Ctrl + Shift + P`
 2. Digite: `Ports: Focus on Ports View`
 3. Enter
@@ -105,6 +109,7 @@ http://localhost:5173/dashboard/
 ```
 
 **Resultado Esperado:**
+
 - ✅ Dashboard aparece (tema escuro)
 - ✅ Sidebar com menu (Overview, Tasks, etc.)
 - ✅ Console (F12): `[vite] connected.`
@@ -121,6 +126,7 @@ cd C:\seu\projeto
 ```
 
 Este script testa:
+
 1. ✅ Porta 5173 acessível do Windows
 2. ✅ HTTP respondendo
 3. ✅ HTML correto carregado
@@ -153,17 +159,20 @@ bash scripts/open-dashboard-browser.sh
 ### ❌ **Porta não aparece na aba PORTS**
 
 **Solução:**
+
 1. Reload VS Code: `Ctrl + Shift + P` → `Reload Window`
 2. Reabra o DevContainer: `Ctrl + Shift + P` → `Reopen in Container`
 
 ### ❌ **Porta aparece mas navegador erra**
 
 **Possíveis causas:**
+
 - Firewall do Windows bloqueando
 - Docker Desktop não está rodando
 - VS Code precisa de reload
 
 **Soluções:**
+
 1. Limpar cache do navegador: `Ctrl + Shift + Delete`
 2. Testar outro navegador (Firefox, Edge)
 3. Verificar console do navegador (F12) para erros
@@ -172,9 +181,10 @@ bash scripts/open-dashboard-browser.sh
 ### ❌ **Simple Browser não funciona**
 
 **Solução:**
+
 - Use port forwarding manual (guia acima)
-- Ou acesse via IP do container: `http://172.17.0.2:5173/dashboard/`
-  (⚠️ Requer mudar `vite.config.js` de `127.0.0.1` para `0.0.0.0`)
+- Ou acesse via IP do container: `http://172.17.0.2:5173/dashboard/` (⚠️ Requer mudar
+  `vite.config.js` de `127.0.0.1` para `0.0.0.0`)
 
 ---
 
@@ -206,7 +216,8 @@ Windows Browser → localhost:5173
 
 Segundo a [documentação oficial do Vite](https://vite.dev/config/server-options.html#server-host):
 
-> When using VS Code DevContainers, use `host: '127.0.0.1'` instead of `'0.0.0.0'` because VS Code port forwarding does not support IPv6.
+> When using VS Code DevContainers, use `host: '127.0.0.1'` instead of `'0.0.0.0'` because VS Code
+> port forwarding does not support IPv6.
 
 ---
 
@@ -268,6 +279,5 @@ Test-NetConnection -ComputerName localhost -Port 5173
 
 ---
 
-**Versão:** 1.0
-**Última atualização:** Fevereiro 2026
-**Autor:** Sistema Autônomo chatgpt-docker-puppeteer
+**Versão:** 1.0 **Última atualização:** Fevereiro 2026 **Autor:** Sistema Autônomo
+chatgpt-docker-puppeteer

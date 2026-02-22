@@ -1,24 +1,24 @@
 # ConnectionOrchestrator.js - Análise Arquitetural & Proposta de Refatoração
 
-**Data**: 2 de Fevereiro de 2026
-**Versão Atual**: ConnectionOrchestrator v4.0
-**Status**: ✅ REFATORAÇÃO CONCLUÍDA
-**Autor**: GitHub Copilot (Claude Sonnet 4.5)
+**Data**: 2 de Fevereiro de 2026 **Versão Atual**: ConnectionOrchestrator v4.0 **Status**: ✅
+REFATORAÇÃO CONCLUÍDA **Autor**: GitHub Copilot (Claude Sonnet 4.5)
 
 ---
 
 ## ⚠️ AVISO: REFATORAÇÃO CONCLUÍDA
 
-**Esta análise foi implementada com sucesso.**
-**Veja o changelog completo em**: [CONNECTION_ORCHESTRATOR_REFACTORING_CHANGELOG.md](CONNECTION_ORCHESTRATOR_REFACTORING_CHANGELOG.md)
+**Esta análise foi implementada com sucesso.** **Veja o changelog completo em**:
+[CONNECTION_ORCHESTRATOR_REFACTORING_CHANGELOG.md](CONNECTION_ORCHESTRATOR_REFACTORING_CHANGELOG.md)
 
 **Resultado**:
+
 - ✅ Fase 1: Remoção de código morto (~185 linhas)
 - ✅ Fase 2: Simplificação de DEFAULTS (~120 linhas)
 - ✅ Fase 3: Documentação ontológica (~50 linhas adicionadas)
 - ⏸️ Fase 4: Melhorias opcionais (planejadas)
 
 **Métricas Finais**:
+
 - Redução: -204 linhas (-21.5%)
 - Violações ontológicas corrigidas: 7
 - Métodos removidos: 6
@@ -27,11 +27,15 @@
 ---
 
 ## 📋 Sumário Executivo (ANÁLISE ORIGINAL)
-O `ConnectionOrchestrator.js` contém **resquícios significativos de arquitetura antiga** que violam o princípio ontológico atual:
 
-> **PRINCÍPIO ONTOLÓGICO**: Chrome é propriedade e responsabilidade do Windows Host. DevContainer APENAS conecta, NUNCA inicia ou configura Chrome.
+O `ConnectionOrchestrator.js` contém **resquícios significativos de arquitetura antiga** que violam
+o princípio ontológico atual:
+
+> **PRINCÍPIO ONTOLÓGICO**: Chrome é propriedade e responsabilidade do Windows Host. DevContainer
+> APENAS conecta, NUNCA inicia ou configura Chrome.
 
 **Problemas Identificados**:
+
 - ❌ Código morto de modos não suportados (launcher, executablePath)
 - ❌ Configurações de Chrome em DEFAULTS (args, cache, profiles)
 - ❌ Métodos de limpeza de profiles temporários (não aplicáveis)
@@ -40,7 +44,8 @@ O `ConnectionOrchestrator.js` contém **resquícios significativos de arquitetur
 
 **Impacto**: Confusão arquitetural, código desnecessário (~300 linhas), manutenção complexa.
 
-**Solução Proposta**: Refatoração completa removendo código morto, separando responsabilidades, documentando configuração recomendada do Windows.
+**Solução Proposta**: Refatoração completa removendo código morto, separando responsabilidades,
+documentando configuração recomendada do Windows.
 
 ---
 
@@ -69,12 +74,14 @@ async tryExecutablePath() {
 ```
 
 **Análise**:
+
 - Métodos existem desde versão original (quando ConnectionOrchestrator iniciava Chrome)
 - Agora apenas lançam erros de arquitetura
 - Nunca executados com sucesso (throw imediato)
 - Ocupam espaço, confundem leitores
 
 **Impacto**:
+
 - Código morto: ~50 linhas
 - Confusão: "Por que existem se não funcionam?"
 - Manutenção: Precisa ser mantido em sincronia com tipos/constantes
@@ -90,28 +97,30 @@ async tryExecutablePath() {
 ```javascript
 // ❌ RESQUÍCIO 3: Configurações de Chrome no DEFAULTS (linhas ~76-145)
 const DEFAULTS = {
-    // ✅ CORRETO: Configs de conexão
-    mode: 'wsEndpoint',
-    ports: [9224],
-    hosts: ['localhost'],
-    connectionTimeout: 30000,
+  // ✅ CORRETO: Configs de conexão
+  mode: 'wsEndpoint',
+  ports: [9224],
+  hosts: ['localhost'],
+  connectionTimeout: 30000,
 
-    // ❌ INCORRETO: Configs de Chrome (responsabilidade do Windows)
-    headless: process.env.HEADLESS === 'false' ? false : 'new',
-    executablePath: puppeteerConfig.findChromeExecutable(),
-    userDataDir: process.env.PROFILE_DIR || null,
-    cacheDirectory: puppeteerConfig.getCacheDirectory(),
-    cacheDir: puppeteerConfig.getCacheDirectory(),
+  // ❌ INCORRETO: Configs de Chrome (responsabilidade do Windows)
+  headless: process.env.HEADLESS === 'false' ? false : 'new',
+  executablePath: puppeteerConfig.findChromeExecutable(),
+  userDataDir: process.env.PROFILE_DIR || null,
+  cacheDirectory: puppeteerConfig.getCacheDirectory(),
+  cacheDir: puppeteerConfig.getCacheDirectory(),
 
-    args: [  // ❌ 20+ linhas de Chrome args (--no-sandbox, --disable-gpu, etc.)
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        // ... 15 mais
-    ],
-}
+  args: [
+    // ❌ 20+ linhas de Chrome args (--no-sandbox, --disable-gpu, etc.)
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    // ... 15 mais
+  ],
+};
 ```
 
 **Análise Ontológica**:
+
 ```
 QUESTÃO: "Quem deve definir como Chrome inicia?"
 RESPOSTA: Windows Host (via START-CHROME-SIMPLE.bat)
@@ -124,12 +133,14 @@ RESPOSTA: Resquício de quando Puppeteer iniciava Chrome (launcher mode)
 ```
 
 **Impacto**:
+
 - Violação ontológica: Container "sabe" sobre Chrome internals
 - Dependências desnecessárias: `puppeteerConfig.findChromeExecutable()`
 - Confusão: "Devo configurar args aqui ou no .bat?"
 - Código inútil: ~80 linhas nunca usadas
 
 **Proposta**:
+
 1. **REMOVER** headless, executablePath, userDataDir, cacheDirectory, args de DEFAULTS
 2. **MANTER** apenas configs de conexão (mode, ports, hosts, timeout, retry)
 3. **DOCUMENTAR** configs recomendadas do Chrome em seção separada
@@ -162,6 +173,7 @@ static getCacheInfo() {
 ```
 
 **Análise**:
+
 - **cleanupTempProfiles()**: Puppeteer cria profiles em /tmp APENAS no launcher mode
 - No modo connect (atual), Puppeteer não cria profiles
 - Chrome no Windows gerencia seu próprio profile (user-data-dir)
@@ -169,6 +181,7 @@ static getCacheInfo() {
 - No connect mode, não há cache (Chrome já instalado no Windows)
 
 **Evidência**:
+
 ```bash
 # Container atual (connect mode)
 $ ls /tmp/puppeteer_dev_chrome_profile*
@@ -179,6 +192,7 @@ C:\Users\User\chrome-automation\  # Profile gerenciado pelo .bat
 ```
 
 **Impacto**:
+
 - Código inútil: ~50 linhas nunca executadas
 - Falsa segurança: "cleanupTempProfiles limpa tudo" (mas não há nada para limpar)
 - Dependência desnecessária: `puppeteerConfig.getCacheDirectory()`
@@ -215,6 +229,7 @@ static exportConfig(outputPath = null) {
 ```
 
 **Análise Ontológica**:
+
 ```
 QUESTÃO: "ConnectionOrchestrator deve saber como startar Chrome no Windows?"
 RESPOSTA: NÃO. Isso é responsabilidade do START-CHROME-SIMPLE.bat
@@ -227,6 +242,7 @@ RESPOSTA: Resquício de quando sistema tentava gerenciar Chrome lifecycle.
 ```
 
 **Evidência - chrome-config.json nunca usado**:
+
 ```bash
 $ grep -r "chrome-config.json" scripts/
 # Resultado: NENHUMA REFERÊNCIA
@@ -237,12 +253,14 @@ $ cat scripts/START-CHROME-SIMPLE.bat
 ```
 
 **Impacto**:
+
 - Violação ontológica severa: Container "ensina" Windows como startar Chrome
 - Código inútil: ~110 linhas
 - Falsa documentação: "use exportConfig()" mas ninguém usa
 - Dependências: `puppeteerConfig.findChromeExecutable()` (cross-platform checks)
 
 **Proposta**:
+
 1. **OPÇÃO A - Remover Completamente**: Se chrome-config.json não é usado
 2. **OPÇÃO B - Refatorar para Documentação**:
    - Renomear: `exportWindowsRecommendedConfig()`
@@ -269,11 +287,13 @@ const puppeteerConfig = require('../../.puppeteerrc.cjs');
 ```
 
 **Análise**:
+
 - **.puppeteerrc.cjs**: Configuração do Puppeteer para download de binários
 - Helpers: `findChromeExecutable()`, `isDocker()`, `getCacheDirectory()`
 - **Problema**: Usados APENAS em código de launcher (não suportado)
 
 **Evidência**:
+
 ```javascript
 // .puppeteerrc.cjs helpers são usados em:
 1. DEFAULTS.executablePath → Removido (launcher mode)
@@ -284,6 +304,7 @@ const puppeteerConfig = require('../../.puppeteerrc.cjs');
 ```
 
 **Impacto**:
+
 - Dependência desnecessária: 1 require a menos
 - Coupling: ConnectionOrchestrator acoplado a .puppeteerrc.cjs
 - Cross-platform checks inúteis: `os.platform() === 'win32'` (sempre Linux no container)
@@ -313,16 +334,19 @@ $ grep -n "USER_AGENTS" src/infra/ConnectionOrchestrator.js
 ```
 
 **Análise**:
+
 - Pool de 6 user agents preparado para rotation
 - Método `setUserAgent()` ou `rotateUserAgent()` não existe
 - Puppeteer usa user agent default do Chrome
 - exportConfig() exporta mas ninguém consome
 
 **Impacto**:
+
 - Código inútil: ~10 linhas
 - Falsa funcionalidade: "sistema tem user agent rotation" (não tem)
 
 **Proposta**:
+
 - **OPÇÃO A**: Implementar rotation real (método `getRandomUserAgent()`)
 - **OPÇÃO B**: Remover se não for prioridade
 
@@ -340,17 +364,17 @@ this.attemptedModes = []; // Rastreia modos já tentados
 
 // ensureBrowser() (linhas 490-541)
 for (const currentMode of modesToTry) {
-    // ❌ CONFUSO: Evita tentar mesmo modo múltiplas vezes
-    if (this.attemptedModes.includes(currentMode) && mode !== 'auto') {
-        continue;  // Pula se já tentou (exceto em auto mode)
-    }
+  // ❌ CONFUSO: Evita tentar mesmo modo múltiplas vezes
+  if (this.attemptedModes.includes(currentMode) && mode !== 'auto') {
+    continue; // Pula se já tentou (exceto em auto mode)
+  }
 
-    try {
-        // Tenta conectar
-        this.attemptedModes.push(currentMode);
-    } catch (error) {
-        // Falhou
-    }
+  try {
+    // Tenta conectar
+    this.attemptedModes.push(currentMode);
+  } catch (error) {
+    // Falhou
+  }
 }
 
 // ❌ PROBLEMA: Resetado antes de retry (linha 564)
@@ -359,17 +383,20 @@ return this.ensureBrowser(); // Recursão
 ```
 
 **Análise**:
+
 - Rastreamento adicionado para evitar loops em modo 'auto'
 - MAS: Após remover launcher/executablePath, só sobram 2 modos: wsEndpoint, connect
 - Lógica de "evitar mesmo modo" pouco útil (2 modos apenas)
 - Resetado antes de retry (então não persiste entre tentativas)
 
 **Impacto**:
+
 - Complexidade desnecessária: ~10 linhas de lógica
 - Confusão: "Por que resetar se é pra rastrear?"
 - Utilidade baixa: Com 2 modos, ordem fixa basta
 
 **Proposta**:
+
 - **OPÇÃO A**: Manter mas simplificar comentários
 - **OPÇÃO B**: Remover se não houver benefício claro
 
@@ -384,27 +411,29 @@ return this.ensureBrowser(); // Recursão
 ```javascript
 // tryConnectBrowserURL() (linhas 254-257)
 if (process.env.MOCK_CHROME === '1') {
-    log('INFO', '[ORCH] MOCK_CHROME enabled — returning mock browser (browserURL)');
-    return createMockBrowser();
+  log('INFO', '[ORCH] MOCK_CHROME enabled — returning mock browser (browserURL)');
+  return createMockBrowser();
 }
 
 // tryConnectWSEndpoint() (linhas 311-314)
 if (process.env.MOCK_CHROME === '1') {
-    log('INFO', '[ORCH] MOCK_CHROME enabled — returning mock browser (wsEndpoint)');
-    return createMockBrowser();
+  log('INFO', '[ORCH] MOCK_CHROME enabled — returning mock browser (wsEndpoint)');
+  return createMockBrowser();
 }
 ```
 
 **Análise**:
+
 - Lógica duplicada em 2 métodos
 - Mock check ANTES de fast path (correto)
 - MAS: poderia ser centralizado
 
 **Impacto**:
+
 - Duplicação: 2× o mesmo código
 - Risco: Esquecimento de atualizar ambos
 
-**Proposta**: **EXTRAIR** para método `_handleMockMode()` chamado no início de cada tryConnect*.
+**Proposta**: **EXTRAIR** para método `_handleMockMode()` chamado no início de cada tryConnect\*.
 
 ---
 
@@ -466,6 +495,7 @@ if (process.env.MOCK_CHROME === '1') {
 #### 3.2 Simplificação de DEFAULTS
 
 **Antes** (~70 linhas):
+
 ```javascript
 const DEFAULTS = {
     mode: 'wsEndpoint',
@@ -497,34 +527,36 @@ const DEFAULTS = {
 ```
 
 **Depois** (~25 linhas):
+
 ```javascript
 const DEFAULTS = {
-    // Connection mode
-    mode: process.env.BROWSER_MODE || 'wsEndpoint',
+  // Connection mode
+  mode: process.env.BROWSER_MODE || 'wsEndpoint',
 
-    // Connection targets (DevContainer: localhost:9224 = proxy)
-    ports: [Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT)],
-    hosts: ['localhost'],
-    connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
+  // Connection targets (DevContainer: localhost:9224 = proxy)
+  ports: [Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT)],
+  hosts: ['localhost'],
+  connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
 
-    // Retry & Timing
-    retryDelayMs: 3000,
-    maxRetryDelayMs: 15000,
-    maxConnectionAttempts: parseInt(process.env.MAX_CONNECTION_ATTEMPTS || '5'),
-    connectionTimeout: parseInt(process.env.CONNECTION_TIMEOUT || '30000'),
+  // Retry & Timing
+  retryDelayMs: 3000,
+  maxRetryDelayMs: 15000,
+  maxConnectionAttempts: parseInt(process.env.MAX_CONNECTION_ATTEMPTS || '5'),
+  connectionTimeout: parseInt(process.env.CONNECTION_TIMEOUT || '30000'),
 
-    // Page selection
-    pageScanIntervalMs: 4000,
-    allowedDomains: ['chatgpt.com', 'gemini.google.com', 'claude.ai', 'openai.com'],
-    pageSelectionPolicy: 'FIRST',
+  // Page selection
+  pageScanIntervalMs: 4000,
+  allowedDomains: ['chatgpt.com', 'gemini.google.com', 'claude.ai', 'openai.com'],
+  pageSelectionPolicy: 'FIRST',
 
-    // State & Fallback
-    stateHistorySize: 50,
-    autoFallback: true
+  // State & Fallback
+  stateHistorySize: 50,
+  autoFallback: true,
 };
 ```
 
 **Benefícios**:
+
 - Redução: ~70 → ~25 linhas (64% menor)
 - Clareza: Apenas configs de CONEXÃO
 - Ontologia: Zero menção a Chrome internals
@@ -534,6 +566,7 @@ const DEFAULTS = {
 #### 3.3 Remoção de Métodos Não Usados
 
 **Candidatos para Remoção**:
+
 ```javascript
 // ❌ REMOVER:
 tryLauncher()                    // ~10 linhas - apenas throw error
@@ -550,6 +583,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 ```
 
 **Impacto da Remoção**:
+
 - Código removido: ~185 linhas
 - Dependências removidas: `require('../../.puppeteerrc.cjs')`
 - Complexidade reduzida: -6 métodos públicos
@@ -559,6 +593,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 #### 3.4 Documentação Ontológica
 
 **Adicionar no Topo do Arquivo**:
+
 ```javascript
 /* ==========================================================================
    src/infra/ConnectionOrchestrator.js
@@ -621,8 +656,8 @@ static synchronize()             // Usado por diagnóstico/health checks
 
 ### Violações Ontológicas Corrigidas
 
-| Violação                            | Atual                   | Proposto   |
-| ----------------------------------- | ----------------------- | ---------- |
+| Violação                            | Atual                   | Proposto    |
+| ----------------------------------- | ----------------------- | ----------- |
 | **Container inicia Chrome**         | tryLauncher() existe    | ✅ Removido |
 | **Container configura Chrome**      | DEFAULTS.args, headless | ✅ Removido |
 | **Container gerencia profiles**     | cleanupTempProfiles()   | ✅ Removido |
@@ -636,6 +671,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 ### Fase 1: Remoção de Código Morto (Baixo Risco)
 
 **Tarefas**:
+
 1. ✅ Remover `tryLauncher()`
 2. ✅ Remover `tryExecutablePath()`
 3. ✅ Remover `cleanupTempProfiles()`
@@ -645,6 +681,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 7. ✅ Remover `require('../../.puppeteerrc.cjs')`
 
 **Testes**:
+
 - ✅ Verificar que tryConnectBrowserURL() e tryConnectWSEndpoint() ainda funcionam
 - ✅ Rodar health checks (make health)
 - ✅ Testar conexão via browserEndpoint
@@ -656,11 +693,13 @@ static synchronize()             // Usado por diagnóstico/health checks
 ### Fase 2: Simplificação de DEFAULTS (Médio Risco)
 
 **Tarefas**:
+
 1. ✅ Remover de DEFAULTS: headless, executablePath, userDataDir, args, cacheDirectory, cacheDir
 2. ✅ Manter apenas: mode, ports, hosts, connectionStrategies, retry/timing, page, state
 3. ✅ Atualizar comentários explicando cada config
 
 **Testes**:
+
 - ✅ Verificar que ConnectionOrchestrator instancia sem erros
 - ✅ Testar todos os modos suportados (wsEndpoint, connect, auto)
 - ✅ Validar precedência (env > options > DEFAULTS)
@@ -672,6 +711,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 ### Fase 3: Documentação & Consolidação (Baixo Risco)
 
 **Tarefas**:
+
 1. ✅ Adicionar header ontológico (responsabilidades DevContainer vs Windows)
 2. ✅ Adicionar seção "WINDOWS CHROME CONFIGURATION (Reference Only)"
 3. ✅ Documentar configuração recomendada do START-CHROME-SIMPLE.bat
@@ -680,6 +720,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 6. ✅ Criar diagrama de fluxo no comentário
 
 **Testes**:
+
 - ✅ Revisão de documentação por humano
 - ✅ Verificar que comentários estão claros
 
@@ -690,12 +731,14 @@ static synchronize()             // Usado por diagnóstico/health checks
 ### Fase 4: Melhorias Opcionais (Baixo Risco)
 
 **Tarefas**:
+
 1. ⏸️ Extrair mock check para `_handleMockMode()`
 2. ⏸️ Implementar user agent rotation (ou remover USER_AGENTS)
 3. ⏸️ Adicionar telemetria de performance (fast path vs fallback timing)
 4. ⏸️ Criar unit tests para tryConnectBrowserURL/WSEndpoint
 
 **Testes**:
+
 - Específicos de cada melhoria
 
 **Risco**: ⚠️ BAIXO-MÉDIO - Funcionalidades novas.
@@ -705,6 +748,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 ## 🔧 Checklist de Validação Pós-Refatoração
 
 ### Funcional
+
 - [ ] `ConnectionOrchestrator.connect()` retorna browser válido
 - [ ] Fast path funciona (browserEndpoint.url → direct connect)
 - [ ] Fallback funciona (hosts/ports loops)
@@ -715,6 +759,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 - [ ] Health checks passam (make health)
 
 ### Arquitetural
+
 - [ ] Zero referências a launcher mode
 - [ ] Zero referências a executablePath mode
 - [ ] Zero dependências de .puppeteerrc.cjs
@@ -724,6 +769,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 - [ ] Documentação clara sobre responsabilidades
 
 ### Código
+
 - [ ] ESLint passa sem warnings (make lint)
 - [ ] Testes passam (make test-fast)
 - [ ] Nenhum código morto (métodos não chamados)
@@ -735,16 +781,19 @@ static synchronize()             // Usado por diagnóstico/health checks
 ## 📖 Referências
 
 ### Documentação Relacionada
+
 - [CONNECTION_CONFIG.md](CONNECTION_CONFIG.md) - Configuração centralizada em config.js
 - [PORTS_TOPOLOGY.md](../.devcontainer/PORTS_TOPOLOGY.md) - Arquitetura de portas
 - [CHROME_PROXY_SETUP.md](CHROME_PROXY_SETUP.md) - Setup do proxy HTTP/WebSocket
 
 ### Scripts Relacionados
+
 - `START-CHROME-SIMPLE.bat` - Inicia Chrome no Windows (porta 9225)
 - `scripts/start-chrome-proxy-simple.bat` - Inicia proxy no container (porta 9224)
 - `wsl-chrome-integration.sh` - Testes de integração Chrome/Proxy
 
 ### Código Relacionado
+
 - `src/core/config.js` - CONFIG.BROWSER_ENDPOINT (single source of truth)
 - `src/core/boot_resilience_manager.js` - getBrowserEndpoint() helper
 - `src/infra/proxy/chromeProxyService.js` - Proxy implementation
@@ -762,6 +811,7 @@ static synchronize()             // Usado por diagnóstico/health checks
 4. **Fase 4**: Melhorias opcionais (a definir)
 
 **Estimativa Total**:
+
 - Remoção: ~230 linhas
 - Adição: ~150 linhas (documentação)
 - Saldo: **-80 linhas** (~8% menor)

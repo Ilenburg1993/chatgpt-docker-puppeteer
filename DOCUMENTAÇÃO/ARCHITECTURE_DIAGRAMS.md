@@ -1,6 +1,7 @@
 # Architecture Diagrams - Visual Reference
 
-> **Renderização**: Estes diagramas Mermaid são renderizados automaticamente no GitHub e VS Code com extensões adequadas.
+> **Renderização**: Estes diagramas Mermaid são renderizados automaticamente no GitHub e VS Code com
+> extensões adequadas.
 
 ## 📐 Visão Geral - Contexto C4
 

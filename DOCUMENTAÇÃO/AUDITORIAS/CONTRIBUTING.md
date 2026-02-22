@@ -10,7 +10,8 @@ Be respectful, inclusive, and professional in all interactions.
 
 ### Reporting Bugs
 
-1. Check if the bug has already been reported in [Issues](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/issues)
+1. Check if the bug has already been reported in
+   [Issues](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/issues)
 2. Use the Bug Report template
 3. Include detailed steps to reproduce
 4. Add relevant logs and environment information
@@ -53,7 +54,8 @@ npm run dev
 
 ### Import Conventions (IMPORTANTE)
 
-Este projeto usa **module-alias** para imports limpos. SEMPRE use aliases ao invés de caminhos relativos:
+Este projeto usa **module-alias** para imports limpos. SEMPRE use aliases ao invés de caminhos
+relativos:
 
 ```javascript
 // ❌ NUNCA fazer (caminhos relativos)
@@ -68,6 +70,7 @@ const { ActorRole } = require('@shared/nerv/constants');
 ```
 
 **Aliases disponíveis:**
+
 - `@` → `src/` (raiz do projeto)
 - `@core` → `src/core/` (config, logger, constants, schemas)
 - `@shared` → `src/shared/` (NERV constants, utilities)
@@ -78,7 +81,8 @@ const { ActorRole } = require('@shared/nerv/constants');
 - `@server` → `src/server/` (dashboard, API, Socket.io)
 - `@logic` → `src/logic/` (business rules)
 
-**IntelliSense:** Configure seu editor lendo `jsconfig.json` para autocomplete automático dos aliases.
+**IntelliSense:** Configure seu editor lendo `jsconfig.json` para autocomplete automático dos
+aliases.
 
 ### Convenções Gerais
 

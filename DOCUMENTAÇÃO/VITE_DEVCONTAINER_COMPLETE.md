@@ -2,7 +2,8 @@
 
 ## 📋 ANÁLISE COMPLETA REALIZADA
 
-Baseado em melhores práticas de Vite + DevContainer + Docker + Windows, identifiquei e corrigi **TODAS** as configurações necessárias.
+Baseado em melhores práticas de Vite + DevContainer + Docker + Windows, identifiquei e corrigi
+**TODAS** as configurações necessárias.
 
 ---
 
@@ -13,6 +14,7 @@ Baseado em melhores práticas de Vite + DevContainer + Docker + Windows, identif
 **Arquivo**: `.devcontainer/devcontainer.json`
 
 **Adicionado**:
+
 ```json
 "forwardPorts": [
   3008,
@@ -32,6 +34,7 @@ Baseado em melhores práticas de Vite + DevContainer + Docker + Windows, identif
 ```
 
 **Por que é necessário**:
+
 - VS Code só expõe portas declaradas em `forwardPorts`
 - Sem isso, Windows não consegue acessar `localhost:5173`
 
@@ -42,6 +45,7 @@ Baseado em melhores práticas de Vite + DevContainer + Docker + Windows, identif
 **Arquivo**: `src/dashboard-ui/vite.config.js`
 
 **Adicionado**:
+
 ```javascript
 server: {
   hmr: {
@@ -52,6 +56,7 @@ server: {
 ```
 
 **Por que é necessário**:
+
 - HMR usa WebSocket que precisa de configuração especial em containers
 - Sem isso: mudanças no código NÃO atualizam automaticamente no browser
 - **Crítico**: `host: 'localhost'` garante que Windows consegue conectar ao WebSocket
@@ -63,6 +68,7 @@ server: {
 **Arquivo**: `src/dashboard-ui/vite.config.js`
 
 **Adicionado**:
+
 ```javascript
 server: {
   watch: {
@@ -73,6 +79,7 @@ server: {
 ```
 
 **Por que é necessário**:
+
 - Docker volumes (bind mounts) podem não propagar eventos de file system corretamente
 - File watchers nativos (inotify) podem falhar
 - Polling garante que Vite detecta mudanças nos arquivos
@@ -113,6 +120,7 @@ proxy: {
 ## 📊 CHECKLIST COMPLETO
 
 ### DevContainer Configuration
+
 - [x] **forwardPorts**: 5173 adicionado
 - [x] **portsAttributes**: Configurado com label e notify
 - [x] **runArgs**: `--add-host=host.docker.internal` já presente
@@ -120,6 +128,7 @@ proxy: {
 - [x] **Network mode**: Default (bridge) - correto
 
 ### Vite Configuration
+
 - [x] **server.host**: `0.0.0.0` (todas as interfaces)
 - [x] **server.port**: `5173` (porta padrão)
 - [x] **server.hmr.clientPort**: `5173` (WebSocket)
@@ -129,6 +138,7 @@ proxy: {
 - [x] **proxy**: Configurado para `/api` e `/socket.io`
 
 ### Network & Firewall
+
 - [ ] **Windows Firewall**: Usuário precisa permitir conexões (se solicitado)
 - [ ] **Docker Desktop**: Deve estar rodando
 - [ ] **WSL2**: Deve estar configurado corretamente
@@ -161,6 +171,7 @@ proxy: {
 Após expor a porta (método A ou B acima):
 
 ### 1. Verificar Porta Exposta no VS Code
+
 ```
 VS Code → Aba PORTS → Deve mostrar:
 ┌─────────┬─────────────────────────────┬────────────┐
@@ -171,11 +182,13 @@ VS Code → Aba PORTS → Deve mostrar:
 ```
 
 ### 2. Testar Acesso do Windows
+
 ```
 Browser → http://localhost:5173/dashboard/
 ```
 
 ### 3. Testar HMR (Hot Reload)
+
 ```
 1. Edite qualquer arquivo .vue
 2. Salve (Ctrl+S)
@@ -183,6 +196,7 @@ Browser → http://localhost:5173/dashboard/
 ```
 
 ### 4. Verificar Console (F12)
+
 ```
 Console → Deve mostrar:
 [vite] connected.
@@ -195,13 +209,12 @@ Console → Deve mostrar:
 
 ### Problema: Porta 5173 não aparece na aba PORTS
 
-**Causa**: DevContainer não aplicou mudanças
-**Solução**: Recarregue VS Code (Opção B acima)
+**Causa**: DevContainer não aplicou mudanças **Solução**: Recarregue VS Code (Opção B acima)
 
 ### Problema: ERR_CONNECTION_REFUSED
 
-**Causa**: Vite não está rodando
-**Solução**:
+**Causa**: Vite não está rodando **Solução**:
+
 ```bash
 cd /workspaces/chatgpt-docker-puppeteer/src/dashboard-ui
 npm run dev
@@ -209,27 +222,27 @@ npm run dev
 
 ### Problema: HMR não funciona (mudanças não aparecem)
 
-**Causa**: WebSocket HMR não conectou
-**Verificação**: F12 → Console → Procure erro de WebSocket
+**Causa**: WebSocket HMR não conectou **Verificação**: F12 → Console → Procure erro de WebSocket
 **Solução**: Verifique se `hmr.host` está como `localhost` no vite.config.js
 
 ### Problema: Vite não detecta mudanças nos arquivos
 
-**Causa**: File watchers não funcionam em Docker volumes
-**Verificação**: Edite arquivo, veja se Vite recompila
-**Solução**: Verifique se `watch.usePolling: true` está no vite.config.js
+**Causa**: File watchers não funcionam em Docker volumes **Verificação**: Edite arquivo, veja se
+Vite recompila **Solução**: Verifique se `watch.usePolling: true` está no vite.config.js
 
 ---
 
 ## 📚 REFERÊNCIAS
 
 ### Documentação Oficial
+
 - [Vite Server Options](https://vitejs.dev/config/server-options.html)
 - [Vite HMR Configuration](https://vitejs.dev/guide/api-hmr.html)
 - [VS Code DevContainer Port Forwarding](https://code.visualstudio.com/docs/remote/containers#_forwarding-or-publishing-a-port)
 - [Docker Networking](https://docs.docker.com/network/)
 
 ### Práticas Recomendadas
+
 - **HMR em containers**: Sempre configurar `hmr.clientPort` e `hmr.host`
 - **Watch em Docker**: Sempre usar `usePolling: true` para volumes
 - **Port forwarding**: Sempre declarar em `forwardPorts` (não usar auto-detect)
@@ -239,8 +252,8 @@ npm run dev
 
 ## ✅ RESUMO FINAL
 
-| Configuração              | Status       | Arquivo           | Impacto                                          |
-| ------------------------- | ------------ | ----------------- | ------------------------------------------------ |
+| Configuração              | Status        | Arquivo           | Impacto                                          |
+| ------------------------- | ------------- | ----------------- | ------------------------------------------------ |
 | Port 5173 em forwardPorts | ✅ Adicionado | devcontainer.json | **Crítico** - Sem isso Windows não acessa        |
 | portsAttributes para 5173 | ✅ Adicionado | devcontainer.json | Importante - Notifica usuário                    |
 | server.hmr.clientPort     | ✅ Adicionado | vite.config.js    | **Crítico** - HMR não funciona sem isso          |
@@ -258,6 +271,4 @@ Agora só falta expor a porta 5173 no VS Code (manual ou reload).
 
 ---
 
-**Versão**: 2.0
-**Data**: 2026-02-04
-**Status**: ✅ Configuração Completa - Pronto para Uso
+**Versão**: 2.0 **Data**: 2026-02-04 **Status**: ✅ Configuração Completa - Pronto para Uso

@@ -1,7 +1,6 @@
 # ✅ Consolidação Arquitetural - Resumo Executivo
 
-> **Data**: 19 de Janeiro de 2026
-> **Status**: Fase 1 Iniciada - Fundações Estabelecidas
+> **Data**: 19 de Janeiro de 2026 **Status**: Fase 1 Iniciada - Fundações Estabelecidas
 
 ---
 
@@ -85,9 +84,8 @@ npm run analyze:deps:graph # Gerar grafo visual (SVG)
 core/config.js → infra/io.js → infra/queue/task_loader.js
 ```
 
-**Impacto**: Dificulta refactoring, pode causar race conditions
-**Prioridade**: ALTA
-**Solução**: Refatorar para injeção de dependência ou event-driven
+**Impacto**: Dificulta refactoring, pode causar race conditions **Prioridade**: ALTA **Solução**:
+Refatorar para injeção de dependência ou event-driven
 
 #### 2. **Locks Órfãos na Fila**
 
@@ -96,15 +94,13 @@ TASK-GUI-1768290824104.json.tmp.4016.1768291472697 (PID morto)
 test-lock-001.json.tmp.19100.1768200422288 (PID morto)
 ```
 
-**Impacto**: Tarefas travadas indefinidamente
-**Prioridade**: MÉDIA
-**Solução**: Script de cleanup automático ou TTL nos locks
+**Impacto**: Tarefas travadas indefinidamente **Prioridade**: MÉDIA **Solução**: Script de cleanup
+automático ou TTL nos locks
 
 #### 3. **Chrome Não Configurado**
 
-**Impacto**: Sistema não pode processar tarefas
-**Prioridade**: OPERACIONAL
-**Solução**: Documentado no doctor com comandos exatos
+**Impacto**: Sistema não pode processar tarefas **Prioridade**: OPERACIONAL **Solução**: Documentado
+no doctor com comandos exatos
 
 ---
 
@@ -381,10 +377,10 @@ npm run queue:status   # Status da fila
 1. **Limpar locks órfãos**: `rm fila/*.tmp.*` (manual por ora)
 2. **Iniciar Chrome**: Seguir comando do `npm run doctor`
 3. **Commit das mudanças**:
-    ```bash
-    git add DOCUMENTAÇÃO/ scripts/ package.json
-    git commit -m "feat: add architecture diagrams, roadmap, and diagnostic tools"
-    ```
+   ```bash
+   git add DOCUMENTAÇÃO/ scripts/ package.json
+   git commit -m "feat: add architecture diagrams, roadmap, and diagnostic tools"
+   ```
 
 ### Esta Semana
 
@@ -406,15 +402,18 @@ npm run queue:status   # Status da fila
 
 ### Q: Por onde começar?
 
-**A**: Execute `npm run doctor` para ver o estado atual, depois `npm run setup` para garantir que tudo está configurado.
+**A**: Execute `npm run doctor` para ver o estado atual, depois `npm run setup` para garantir que
+tudo está configurado.
 
 ### Q: Como contribuir com o roadmap?
 
-**A**: Abra issues no GitHub com label `enhancement`, vote com 👍 em features desejadas, ou submeta PRs seguindo o [CONTRIBUTING.md](../CONTRIBUTING.md).
+**A**: Abra issues no GitHub com label `enhancement`, vote com 👍 em features desejadas, ou submeta
+PRs seguindo o [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ### Q: O sistema está pronto para produção?
 
-**A**: Não ainda. Estamos em Pre-v1.0. Use em ambientes controlados. Production-ready estimado para Abril 2026.
+**A**: Não ainda. Estamos em Pre-v1.0. Use em ambientes controlados. Production-ready estimado para
+Abril 2026.
 
 ### Q: Como visualizar os diagramas?
 
@@ -458,7 +457,5 @@ npm run queue:status   # Status da fila
 
 ---
 
-**Criado por**: GitHub Copilot + Equipe de Desenvolvimento
-**Data**: 19 de Janeiro de 2026
-**Versão**: 1.0
-**Próxima Revisão**: 26 de Janeiro de 2026
+**Criado por**: GitHub Copilot + Equipe de Desenvolvimento **Data**: 19 de Janeiro de 2026
+**Versão**: 1.0 **Próxima Revisão**: 26 de Janeiro de 2026

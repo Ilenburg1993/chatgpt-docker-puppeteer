@@ -1,14 +1,14 @@
 # Análise: Dashboard - Compatibilidade Cross-Browser
 
-**Data**: 2 de Fevereiro de 2026
-**Questão**: Dashboard pode ser acessado de Chrome normal sem perda de funcionalidade?
-**Status**: ✅ SIM, com pequenas ressalvas de CSS
+**Data**: 2 de Fevereiro de 2026 **Questão**: Dashboard pode ser acessado de Chrome normal sem perda
+de funcionalidade? **Status**: ✅ SIM, com pequenas ressalvas de CSS
 
 ---
 
 ## 🎯 Resposta Direta
 
-**SIM**, o dashboard pode ser acessado de **qualquer browser moderno** (Chrome, Firefox, Edge, Safari) **sem perda de funcionalidade**.
+**SIM**, o dashboard pode ser acessado de **qualquer browser moderno** (Chrome, Firefox, Edge,
+Safari) **sem perda de funcionalidade**.
 
 **Compatibilidade**: ✅ Chrome, ✅ Firefox, ✅ Edge, ⚠️ Safari (95%+)
 
@@ -19,17 +19,21 @@
 ### 1. Frontend (HTML/CSS/JS)
 
 #### ✅ HTML5 Padrão
+
 **Arquivo**: `public/index.html`
 
 ```html
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+</html>
 ```
 
 **Análise**:
+
 - ✅ Sem dependências Chrome-específicas
 - ✅ Sem APIs proprietárias
 - ✅ HTML5 padrão (suportado por todos browsers modernos)
@@ -37,9 +41,11 @@
 ---
 
 #### ✅ JavaScript ES6+ Moderno
+
 **Arquivo**: `public/js/app.js`
 
 **Features usadas**:
+
 ```javascript
 // ✅ Fetch API (suportada universalmente desde 2015)
 const res = await fetch('/api/status');
@@ -64,32 +70,35 @@ const { checkChromeHealth, getBrowserEndpoint } = require(...);
 ```
 
 **Única API específica**:
+
 ```javascript
 // ⚠️ Clipboard API (linha 106)
 navigator.clipboard.writeText(text);
 ```
 
 **Compatibilidade Clipboard API**:
+
 - ✅ Chrome: Suportado desde v63 (2017)
 - ✅ Firefox: Suportado desde v63 (2018)
 - ✅ Edge: Suportado desde v79 (2020)
 - ⚠️ Safari: Suportado desde v13.1 (2020, requer HTTPS)
 
 **Fallback recomendado**:
+
 ```javascript
 function copyToClipboard(text) {
-    if (navigator.clipboard) {
-        // Método moderno (Chrome, Firefox, Edge, Safari 13.1+)
-        navigator.clipboard.writeText(text);
-    } else {
-        // Fallback (Safari antigo, IE)
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-    }
+  if (navigator.clipboard) {
+    // Método moderno (Chrome, Firefox, Edge, Safari 13.1+)
+    navigator.clipboard.writeText(text);
+  } else {
+    // Fallback (Safari antigo, IE)
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
 }
 ```
 
@@ -98,21 +107,36 @@ function copyToClipboard(text) {
 ---
 
 #### ⚠️ CSS3 com Vendor Prefixes
+
 **Arquivo**: `public/css/style.css`
 
 **Problemas Identificados**:
 
 1. **Scrollbar Customizada** (linhas 37-41):
+
 ```css
 /* ❌ WEBKIT-ONLY: Funciona apenas em Chrome/Edge/Safari */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #444; }
-::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 ```
 
 **Impacto**:
+
 - ✅ Chrome/Edge: Scrollbar customizada aparece
 - ❌ Firefox: Scrollbar customizada **NÃO aparece** (usa padrão do OS)
 - ✅ Safari: Scrollbar customizada aparece
@@ -120,33 +144,44 @@ function copyToClipboard(text) {
 **É problema?**: ❌ NÃO - Apenas estética. Firefox usa scrollbar padrão (funcional).
 
 **Solução Firefox** (opcional):
+
 ```css
 /* Firefox scrollbar (thin, dark) */
 * {
-    scrollbar-width: thin;
-    scrollbar-color: #333 transparent;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
 }
 
 /* Chrome/Edge/Safari scrollbar */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
 ```
 
 ---
 
 2. **Text Truncation** (linha 186):
+
 ```css
 /* ⚠️ WEBKIT PREFIXES: -webkit-line-clamp */
 .task-body {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 ```
 
 **Compatibilidade**:
+
 - ✅ Chrome: Suportado (webkit)
 - ⚠️ Firefox: Suportado desde v68 (2019) com `-webkit-` prefix
 - ✅ Edge: Suportado (webkit)
@@ -161,6 +196,7 @@ function copyToClipboard(text) {
 ### 2. Backend (Server Process)
 
 #### ✅ Express + Socket.io (Universal)
+
 **Arquivo**: `src/server/main.js`
 
 ```javascript
@@ -174,6 +210,7 @@ const io = socketio(server);
 ```
 
 **Análise**:
+
 - ✅ Express: HTTP server padrão (funciona com qualquer client HTTP)
 - ✅ Socket.io: Biblioteca cross-browser (suporta WebSocket + polling fallback)
 - ✅ Sem dependências de browser específico
@@ -183,6 +220,7 @@ const io = socketio(server);
 ---
 
 #### ⚠️ Health Endpoint: Chrome Check
+
 **Arquivo**: `src/server/api/controllers/health.js`
 
 ```javascript
@@ -190,18 +228,20 @@ const io = socketio(server);
 app.get('/api/health/chrome', getChromeHealth);
 
 async function getChromeHealth(req, res) {
-    const { checkChromeHealth, getBrowserEndpoint } = require('@core/boot_resilience_manager');
-    const browserEndpoint = getBrowserEndpoint();
-    const isHealthy = await checkChromeHealth(browserEndpoint.url, 3000);
-    // ...
+  const { checkChromeHealth, getBrowserEndpoint } = require('@core/boot_resilience_manager');
+  const browserEndpoint = getBrowserEndpoint();
+  const isHealthy = await checkChromeHealth(browserEndpoint.url, 3000);
+  // ...
 }
 ```
 
 **Problema**:
+
 - Nome `/api/health/chrome` sugere que **Dashboard precisa de Chrome**
 - Na verdade, checa **Puppeteer Chrome** (porta 9225) - **NÃO relacionado ao Dashboard**
 
 **Impacto no Dashboard**:
+
 - ❌ NENHUM - Dashboard apenas **exibe** o resultado do health check
 - ✅ Endpoint funciona em **qualquer browser** (é API REST)
 
@@ -216,18 +256,19 @@ async function getChromeHealth(req, res) {
 ```javascript
 const socket = io();
 
-socket.on('connect', () => els.connStatus.style.display = 'none');
-socket.on('disconnect', () => els.connStatus.style.display = 'block');
+socket.on('connect', () => (els.connStatus.style.display = 'none'));
+socket.on('disconnect', () => (els.connStatus.style.display = 'block'));
 
-socket.on('task:update', (task) => {
-    const idx = currentTasks.findIndex(t => t.meta.id === task.meta.id);
-    if (idx >= 0) currentTasks[idx] = task;
-    else currentTasks.push(task);
-    renderTasks();
+socket.on('task:update', task => {
+  const idx = currentTasks.findIndex(t => t.meta.id === task.meta.id);
+  if (idx >= 0) currentTasks[idx] = task;
+  else currentTasks.push(task);
+  renderTasks();
 });
 ```
 
 **Análise**:
+
 - ✅ Socket.io client library (cross-browser desde 2010)
 - ✅ WebSocket + polling fallback (funciona até em IE11)
 - ✅ Sem APIs proprietárias
@@ -242,14 +283,14 @@ socket.on('task:update', (task) => {
 
 | Feature                | Chrome | Firefox | Edge | Safari |
 | ---------------------- | ------ | ------- | ---- | ------ |
-| **HTML5 Structure**    | ✅      | ✅       | ✅    | ✅      |
-| **Fetch API**          | ✅      | ✅       | ✅    | ✅      |
-| **Socket.io**          | ✅      | ✅       | ✅    | ✅      |
-| **ES6+ (async/await)** | ✅      | ✅       | ✅    | ✅      |
-| **CSS Grid/Flexbox**   | ✅      | ✅       | ✅    | ✅      |
-| **Modal dialogs**      | ✅      | ✅       | ✅    | ✅      |
-| **Task management**    | ✅      | ✅       | ✅    | ✅      |
-| **Real-time updates**  | ✅      | ✅       | ✅    | ✅      |
+| **HTML5 Structure**    | ✅     | ✅      | ✅   | ✅     |
+| **Fetch API**          | ✅     | ✅      | ✅   | ✅     |
+| **Socket.io**          | ✅     | ✅      | ✅   | ✅     |
+| **ES6+ (async/await)** | ✅     | ✅      | ✅   | ✅     |
+| **CSS Grid/Flexbox**   | ✅     | ✅      | ✅   | ✅     |
+| **Modal dialogs**      | ✅     | ✅      | ✅   | ✅     |
+| **Task management**    | ✅     | ✅      | ✅   | ✅     |
+| **Real-time updates**  | ✅     | ✅      | ✅   | ✅     |
 
 **Conclusão**: ✅ **Todas funcionalidades core funcionam em todos browsers**.
 
@@ -257,13 +298,14 @@ socket.on('task:update', (task) => {
 
 ### Features Opcionais/Estéticas
 
-| Feature              | Chrome | Firefox    | Edge | Safari    |
-| -------------------- | ------ | ---------- | ---- | --------- |
-| **Clipboard API**    | ✅      | ✅          | ✅    | ⚠️ (HTTPS) |
-| **Custom Scrollbar** | ✅      | ❌ (usa OS) | ✅    | ✅         |
-| **Text truncation**  | ✅      | ✅          | ✅    | ✅         |
+| Feature              | Chrome | Firefox     | Edge | Safari     |
+| -------------------- | ------ | ----------- | ---- | ---------- |
+| **Clipboard API**    | ✅     | ✅          | ✅   | ⚠️ (HTTPS) |
+| **Custom Scrollbar** | ✅     | ❌ (usa OS) | ✅   | ✅         |
+| **Text truncation**  | ✅     | ✅          | ✅   | ✅         |
 
 **Impacto**:
+
 - ⚠️ **Clipboard**: Safari requer HTTPS (localhost funciona)
 - ⚠️ **Scrollbar**: Firefox usa scrollbar padrão (funcional, só não customizada)
 
@@ -297,6 +339,7 @@ $ grep -r "chrome\|Chrome\|webkit\|WebKit" public/
 ## 🔍 Testes Recomendados
 
 ### 1. Firefox Developer Edition
+
 ```bash
 # Abrir dashboard no Firefox
 firefox http://localhost:2998
@@ -315,6 +358,7 @@ firefox http://localhost:2998
 ---
 
 ### 2. Edge (Chromium)
+
 ```bash
 # Abrir dashboard no Edge
 msedge http://localhost:2998
@@ -327,6 +371,7 @@ msedge http://localhost:2998
 ---
 
 ### 3. Safari (macOS)
+
 ```bash
 # Abrir dashboard no Safari
 open -a Safari http://localhost:2998
@@ -347,33 +392,34 @@ open -a Safari http://localhost:2998
 **Problema**: `navigator.clipboard` falha em Safari antigo ou HTTP.
 
 **Solução**:
+
 ```javascript
 // public/js/app.js (linha 104-108)
 function copyToClipboard(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-        // Método moderno (HTTPS ou localhost)
-        navigator.clipboard.writeText(text).catch(() => {
-            fallbackCopy(text);
-        });
-    } else {
-        // Fallback universal
-        fallbackCopy(text);
-    }
+  if (navigator.clipboard && window.isSecureContext) {
+    // Método moderno (HTTPS ou localhost)
+    navigator.clipboard.writeText(text).catch(() => {
+      fallbackCopy(text);
+    });
+  } else {
+    // Fallback universal
+    fallbackCopy(text);
+  }
 }
 
 function fallbackCopy(text) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    try {
-        document.execCommand('copy');
-    } catch (e) {
-        console.error('Copy failed:', e);
-    }
-    document.body.removeChild(textarea);
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+  } catch (e) {
+    console.error('Copy failed:', e);
+  }
+  document.body.removeChild(textarea);
 }
 ```
 
@@ -386,20 +432,31 @@ function fallbackCopy(text) {
 **Problema**: Firefox ignora `::-webkit-scrollbar`.
 
 **Solução**:
+
 ```css
 /* public/css/style.css (adicionar ANTES de ::-webkit-scrollbar) */
 
 /* Firefox scrollbar (padrão W3C) */
 * {
-    scrollbar-width: thin;
-    scrollbar-color: #333 transparent;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
 }
 
 /* Chrome/Edge/Safari scrollbar */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #444; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
 ```
 
 **Benefício**: ✅ Scrollbar customizada em **Firefox também**.
@@ -411,6 +468,7 @@ function fallbackCopy(text) {
 **Problema**: `/api/health/chrome` sugere dependência de Chrome.
 
 **Solução**:
+
 ```javascript
 // src/server/api/router.js
 app.get('/api/health/puppeteer', healthController.getPuppeteerChromeHealth);
@@ -425,16 +483,17 @@ app.get('/api/health/automation', healthController.getAutomationChromeHealth);
 ### 4. Adicionar Browser Detection (Opcional)
 
 **Para telemetria/debug**:
+
 ```javascript
 // public/js/app.js (início do arquivo)
 const browserInfo = {
-    userAgent: navigator.userAgent,
-    vendor: navigator.vendor,
-    platform: navigator.platform,
-    isFirefox: navigator.userAgent.includes('Firefox'),
-    isChrome: navigator.userAgent.includes('Chrome') && !navigator.userAgent.includes('Edge'),
-    isSafari: navigator.vendor.includes('Apple'),
-    isEdge: navigator.userAgent.includes('Edg/')
+  userAgent: navigator.userAgent,
+  vendor: navigator.vendor,
+  platform: navigator.platform,
+  isFirefox: navigator.userAgent.includes('Firefox'),
+  isChrome: navigator.userAgent.includes('Chrome') && !navigator.userAgent.includes('Edge'),
+  isSafari: navigator.vendor.includes('Apple'),
+  isEdge: navigator.userAgent.includes('Edg/'),
 };
 
 console.log('Browser:', browserInfo);
@@ -451,19 +510,23 @@ console.log('Browser:', browserInfo);
 **SIM** ✅
 
 **Compatibilidade Funcional**:
+
 - ✅ Chrome: 100%
 - ✅ Firefox: 100%
 - ✅ Edge: 100%
 - ✅ Safari: 95% (clipboard fallback recomendado)
 
 **Diferenças Estéticas**:
+
 - ⚠️ Firefox: Scrollbar usa estilo padrão do OS
 - ⚠️ Safari antigo: Clipboard pode falhar (facilmente corrigível)
 
 **Dependências de Chrome no Windows?**:
+
 - ❌ **NENHUMA** - Dashboard é 100% independente
 
 **Puppeteer Chrome (porta 9225)?**:
+
 - ❌ **NÃO afeta Dashboard** - Apenas automação LLM
 
 ---
@@ -491,19 +554,16 @@ Main Process → Puppeteer → Chrome Windows (OBRIGATÓRIO)
 ## 📋 Action Items
 
 **Alta Prioridade**:
+
 1. ✅ Adicionar fallback clipboard (5 minutos)
 
-**Média Prioridade**:
-2. ⏸️ Adicionar scrollbar Firefox (2 minutos)
+**Média Prioridade**: 2. ⏸️ Adicionar scrollbar Firefox (2 minutos)
 
-**Baixa Prioridade**:
-3. ⏸️ Renomear endpoint `/api/health/chrome` → `/api/health/puppeteer`
-4. ⏸️ Adicionar browser detection para telemetria
+**Baixa Prioridade**: 3. ⏸️ Renomear endpoint `/api/health/chrome` → `/api/health/puppeteer` 4. ⏸️
+Adicionar browser detection para telemetria
 
-**Testes**:
-5. ⏸️ Testar dashboard em Firefox Developer Edition
-6. ⏸️ Testar dashboard em Edge
-7. ⏸️ Testar dashboard em Safari (se disponível)
+**Testes**: 5. ⏸️ Testar dashboard em Firefox Developer Edition 6. ⏸️ Testar dashboard em Edge 7. ⏸️
+Testar dashboard em Safari (se disponível)
 
 ---
 

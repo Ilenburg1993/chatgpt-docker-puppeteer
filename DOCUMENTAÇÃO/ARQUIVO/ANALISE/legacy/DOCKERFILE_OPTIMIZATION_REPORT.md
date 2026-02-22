@@ -2,7 +2,8 @@
 
 ## Overview
 
-Optimized the Dockerfile for a Node.js 20 Puppeteer application using remote Chrome debugging (no bundled Chromium).
+Optimized the Dockerfile for a Node.js 20 Puppeteer application using remote Chrome debugging (no
+bundled Chromium).
 
 ## Image Size Comparison
 
@@ -172,29 +173,29 @@ No changes required to `docker-compose.yml`:
 
 1. **Multi-arch builds**: Add ARM64 support for Apple Silicon/AWS Graviton
 
-    ```dockerfile
-    FROM --platform=$BUILDPLATFORM node:20-alpine
-    ```
+   ```dockerfile
+   FROM --platform=$BUILDPLATFORM node:20-alpine
+   ```
 
 2. **Security scanning**: Add to CI/CD pipeline
 
-    ```bash
-    docker scan chatgpt-agent:optimized
-    trivy image chatgpt-agent:optimized
-    ```
+   ```bash
+   docker scan chatgpt-agent:optimized
+   trivy image chatgpt-agent:optimized
+   ```
 
 3. **Layer caching in CI**: Use BuildKit cache mounts
 
-    ```dockerfile
-    RUN --mount=type=cache,target=/root/.npm \
-        npm ci --only=production
-    ```
+   ```dockerfile
+   RUN --mount=type=cache,target=/root/.npm \
+       npm ci --only=production
+   ```
 
 4. **Dependency analysis**: Consider removing unused dependencies
-    ```bash
-    npx depcheck
-    npx npm-check
-    ```
+   ```bash
+   npx depcheck
+   npx npm-check
+   ```
 
 ## Files Modified
 
@@ -213,4 +214,5 @@ If issues arise with Alpine base:
 
 ---
 
-**Summary:** Achieved 29% size reduction while improving build cache efficiency, security, and maintainability. No breaking changes to existing docker-compose setup.
+**Summary:** Achieved 29% size reduction while improving build cache efficiency, security, and
+maintainability. No breaking changes to existing docker-compose setup.

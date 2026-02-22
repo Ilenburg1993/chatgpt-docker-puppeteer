@@ -1,15 +1,15 @@
 # 🎨 Design do Sistema - Diagramas e Arquitetura Detalhada
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Arquitetos, desenvolvedores avançados
-**Tempo de Leitura**: ~20 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Arquitetos, desenvolvedores
+avançados **Tempo de Leitura**: ~20 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento complementa o [ARCHITECTURE.md](ARCHITECTURE.md) com **diagramas visuais detalhados**: C4 Component diagrams, sequence diagrams para cenários chave, e state machines para lifecycles críticos.
+Este documento complementa o [ARCHITECTURE.md](ARCHITECTURE.md) com **diagramas visuais
+detalhados**: C4 Component diagrams, sequence diagrams para cenários chave, e state machines para
+lifecycles críticos.
 
 ### Propósito
 
@@ -30,6 +30,7 @@ Ao ler este documento, você aprenderá:
 - **Padrões arquiteturais** aplicados visualmente
 
 **Pré-requisitos**:
+
 - Leitura de [ARCHITECTURE.md](ARCHITECTURE.md) (visão geral dos containers)
 - Conhecimento de C4 Model (optional, mas recomendado)
 
@@ -204,6 +205,7 @@ Ao ler este documento, você aprenderá:
 ```
 
 **Envelope Structure**:
+
 ```javascript
 {
     messageType: 'TASK_ALLOCATED',     // Event type
@@ -508,6 +510,7 @@ sequenceDiagram
 | CRASHED  | -               | -        | Terminal state          |
 
 **Circuit Breaker (P9.2)**:
+
 - HEALTHY instances: ✅ Can be allocated
 - DEGRADED instances: ❌ Skipped by circuit breaker
 - CRASHED instances: ❌ Removed from pool
@@ -533,6 +536,7 @@ sequenceDiagram
 ```
 
 **Benefícios**:
+
 - ✅ A não conhece B, B não conhece A
 - ✅ Testabilidade isolada
 - ✅ Extensibilidade (novo C só conhece NERV)
@@ -567,6 +571,7 @@ sequenceDiagram
 ```
 
 **Benefícios**:
+
 - ✅ Adicionar novo target (Claude, etc) não quebra código existente
 - ✅ Polimorfismo (interface comum)
 - ✅ Centralização de criação
@@ -602,6 +607,7 @@ Request → Circuit Breaker → Backend Service
 ```
 
 **No Sistema**:
+
 - HEALTHY = CLOSED (allocate pages)
 - DEGRADED = OPEN (block allocations)
 - Recovery = HALF-OPEN (test if healthy again)
@@ -633,6 +639,7 @@ Request → Circuit Breaker → Backend Service
 ```
 
 **Benefícios**:
+
 - ✅ Reação automática a mudanças
 - ✅ Desacoplamento (FS não conhece watcher)
 - ✅ Debounce (100ms) evita spam
@@ -652,7 +659,8 @@ Request → Circuit Breaker → Backend Service
 
 - [C4 Model](https://c4model.com/) - Context, Container, Component, Code
 - [Mermaid.js](https://mermaid.js.org/) - Diagramas em Markdown
-- [Event-Driven Architecture](https://martinfowler.com/articles/201701-event-driven.html) - Martin Fowler
+- [Event-Driven Architecture](https://martinfowler.com/articles/201701-event-driven.html) - Martin
+  Fowler
 
 ---
 
@@ -660,11 +668,13 @@ Request → Circuit Breaker → Backend Service
 
 ### 1. Por que não usar UML completo?
 
-**Resposta**: C4 Model é mais leve e pragmático. UML completo é overkill para maioria dos casos. Mermaid.js renderiza inline em Markdown (conveniente).
+**Resposta**: C4 Model é mais leve e pragmático. UML completo é overkill para maioria dos casos.
+Mermaid.js renderiza inline em Markdown (conveniente).
 
 ### 2. Diagramas ficam desatualizados?
 
 **Resposta**: Sim, é risco. Solução:
+
 - Revisar diagramas em cada major release
 - Adicionar data de última revisão
 - Automatizar onde possível (ex: dependency graphs)
@@ -672,6 +682,7 @@ Request → Circuit Breaker → Backend Service
 ### 3. Como gerar PNG dos Mermaid diagrams?
 
 **Resposta**:
+
 ```bash
 # CLI
 npm install -g @mermaid-js/mermaid-cli
@@ -683,4 +694,4 @@ https://mermaid.live/
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, Core Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, Core Team_

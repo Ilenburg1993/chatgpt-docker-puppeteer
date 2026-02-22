@@ -71,11 +71,11 @@
 
 ```javascript
 while (true) {
-    task = queue.getNext();
-    driver = factory.getDriver(task.target);
-    result = await driver.execute(task);
-    validator.validate(result);
-    queue.markComplete(task);
+  task = queue.getNext();
+  driver = factory.getDriver(task.target);
+  result = await driver.execute(task);
+  validator.validate(result);
+  queue.markComplete(task);
 }
 ```
 
@@ -283,9 +283,9 @@ const validator = new Validator(task.validation);
 ```javascript
 // BaseDriver defines flow
 class TargetDriver extends BaseDriver {
-    async execute() {
-        /* implementation */
-    }
+  async execute() {
+    /* implementation */
+  }
 }
 ```
 
@@ -294,7 +294,7 @@ class TargetDriver extends BaseDriver {
 ```javascript
 // Infra failure handling
 if (consecutiveFailures > threshold) {
-    cooldown(exponentialBackoff);
+  cooldown(exponentialBackoff);
 }
 ```
 

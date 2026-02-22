@@ -1,16 +1,14 @@
 # Module Aliases - Guia Completo
 
-**Data de implementação:** 22/01/2026
-**Versão do sistema de aliases:** 1.0
-**Package:** module-alias v2.2.3
-**Arquivos refatorados:** 60
-**Imports convertidos:** 150+
+**Data de implementação:** 22/01/2026 **Versão do sistema de aliases:** 1.0 **Package:**
+module-alias v2.2.3 **Arquivos refatorados:** 60 **Imports convertidos:** 150+
 
 ---
 
 ## 📖 O Que São Module Aliases?
 
-Module aliases são atalhos para importar módulos sem usar caminhos relativos profundos (`../../../`). Em vez de:
+Module aliases são atalhos para importar módulos sem usar caminhos relativos profundos
+(`../../../`). Em vez de:
 
 ```javascript
 const logger = require('../../../core/logger');
@@ -27,6 +25,7 @@ const logger = require('@core/logger');
 ## ✨ Benefícios
 
 ### 1. **Legibilidade** (+40%)
+
 ```javascript
 // ❌ Antes (166 caracteres)
 const { pm2Raw } = require('../../../infra/system');
@@ -42,6 +41,7 @@ const CONFIG = require('@core/config');
 ```
 
 ### 2. **Manutenção** (zero refactoring em mover arquivos)
+
 Se você move um arquivo, caminhos relativos quebram:
 
 ```javascript
@@ -57,6 +57,7 @@ const io = require('@infra/io'); // ✅ Sempre funciona
 ```
 
 ### 3. **IntelliSense** (autocomplete otimizado)
+
 O VSCode autocompleta aliases instantaneamente:
 
 1. Digite `require('@c` → Sugere `@core`, `@kernel`
@@ -64,31 +65,32 @@ O VSCode autocompleta aliases instantaneamente:
 3. **Ctrl+Click** salta direto para o arquivo
 
 ### 4. **Menos Erros** (zero path counting)
+
 Não precisa mais contar `../`:
 
 ```javascript
 // ❌ Antes: conta quantos ../ precisa
-require('../../../core/logger')  // 3 níveis? 4? Errei?
+require('../../../core/logger'); // 3 níveis? 4? Errei?
 
 // ✅ Agora: sempre o mesmo
-require('@core/logger')  // Sem contagem
+require('@core/logger'); // Sem contagem
 ```
 
 ---
 
 ## 🎯 Aliases Disponíveis
 
-| Alias | Caminho Absoluto | Quando Usar | Exemplos |
-|-------|------------------|-------------|----------|
-| `@` | `src/` | **Raramente** (use aliases específicos) | `@/main.js` |
-| `@core` | `src/core/` | Config, logger, constants, schemas | `@core/logger`, `@core/config` |
-| `@shared` | `src/shared/` | Utilities compartilhadas, NERV constants | `@shared/nerv/constants` |
-| `@nerv` | `src/nerv/` | Event bus, pub/sub, correlation | `@nerv/emitter`, `@nerv/receiver` |
-| `@kernel` | `src/kernel/` | Task execution engine, policy | `@kernel/execution_engine` |
-| `@driver` | `src/driver/` | ChatGPT, Gemini drivers | `@driver/chatgpt/driver` |
-| `@infra` | `src/infra/` | Browser pool, locks, queue, storage | `@infra/io`, `@infra/pool/pool_manager` |
-| `@server` | `src/server/` | Dashboard, API, Socket.io | `@server/engine/socket` |
-| `@logic` | `src/logic/` | Business rules, domain logic | `@logic/validation` |
+| Alias     | Caminho Absoluto | Quando Usar                              | Exemplos                                |
+| --------- | ---------------- | ---------------------------------------- | --------------------------------------- |
+| `@`       | `src/`           | **Raramente** (use aliases específicos)  | `@/main.js`                             |
+| `@core`   | `src/core/`      | Config, logger, constants, schemas       | `@core/logger`, `@core/config`          |
+| `@shared` | `src/shared/`    | Utilities compartilhadas, NERV constants | `@shared/nerv/constants`                |
+| `@nerv`   | `src/nerv/`      | Event bus, pub/sub, correlation          | `@nerv/emitter`, `@nerv/receiver`       |
+| `@kernel` | `src/kernel/`    | Task execution engine, policy            | `@kernel/execution_engine`              |
+| `@driver` | `src/driver/`    | ChatGPT, Gemini drivers                  | `@driver/chatgpt/driver`                |
+| `@infra`  | `src/infra/`     | Browser pool, locks, queue, storage      | `@infra/io`, `@infra/pool/pool_manager` |
+| `@server` | `src/server/`    | Dashboard, API, Socket.io                | `@server/engine/socket`                 |
+| `@logic`  | `src/logic/`     | Business rules, domain logic             | `@logic/validation`                     |
 
 ---
 
@@ -256,6 +258,7 @@ require('./src/main');
 ## ✅ Como Usar (Workflow)
 
 ### 1. **Novos Arquivos**
+
 Sempre use aliases desde o início:
 
 ```javascript
@@ -265,6 +268,7 @@ const io = require('@infra/io');
 ```
 
 ### 2. **Refatorar Código Antigo**
+
 Se encontrar caminhos relativos profundos, converta:
 
 ```javascript
@@ -300,28 +304,28 @@ make lint
 
 ### Scope da Refatoração (22/01/2026)
 
-| Métrica | Valor |
-|---------|-------|
-| **Arquivos processados** | 135 |
-| **Arquivos modificados** | 60 |
-| **Imports convertidos** | 150+ |
-| **Redução média de chars** | -22% |
-| **Tempo de refatoração** | 3 minutos (automatizado) |
-| **Testes passando** | 76 asserções, 7/7 regressão |
-| **ESLint errors** | 0 |
+| Métrica                    | Valor                       |
+| -------------------------- | --------------------------- |
+| **Arquivos processados**   | 135                         |
+| **Arquivos modificados**   | 60                          |
+| **Imports convertidos**    | 150+                        |
+| **Redução média de chars** | -22%                        |
+| **Tempo de refatoração**   | 3 minutos (automatizado)    |
+| **Testes passando**        | 76 asserções, 7/7 regressão |
+| **ESLint errors**          | 0                           |
 
 ### Distribuição por Subsistema
 
 | Subsistema | Imports Convertidos | % do Total |
-|------------|---------------------|------------|
-| `@core` | 54 | 36% |
-| `@infra` | 24 | 16% |
-| `@shared` | 15 | 10% |
-| `@server` | 23 | 15% |
-| `@nerv` | 12 | 8% |
-| `@kernel` | 10 | 7% |
-| `@driver` | 8 | 5% |
-| `@logic` | 4 | 3% |
+| ---------- | ------------------- | ---------- |
+| `@core`    | 54                  | 36%        |
+| `@infra`   | 24                  | 16%        |
+| `@shared`  | 15                  | 10%        |
+| `@server`  | 23                  | 15%        |
+| `@nerv`    | 12                  | 8%         |
+| `@kernel`  | 10                  | 7%         |
+| `@driver`  | 8                   | 5%         |
+| `@logic`   | 4                   | 3%         |
 
 ### Exemplo de Redução (Real)
 
@@ -439,11 +443,11 @@ export default [
             ['@core', './src/core'],
             // ... outros aliases
           ],
-          extensions: ['.js', '.json']
-        }
-      }
-    }
-  }
+          extensions: ['.js', '.json'],
+        },
+      },
+    },
+  },
 ];
 ```
 
@@ -488,5 +492,4 @@ Ao começar a trabalhar no projeto:
 
 ---
 
-**Última atualização:** 22/01/2026
-**Responsável:** Sistema de Module Aliases v1.0
+**Última atualização:** 22/01/2026 **Responsável:** Sistema de Module Aliases v1.0

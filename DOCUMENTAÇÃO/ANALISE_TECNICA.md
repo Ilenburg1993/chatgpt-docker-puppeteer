@@ -136,14 +136,14 @@ core/config.js → infra/io.js → infra/queue/task_loader.js → (volta)
 // DEPOIS (correto):
 // 1. Injeção de dependência
 class TaskLoader {
-    constructor(config) {
-        this.config = config;
-    }
+  constructor(config) {
+    this.config = config;
+  }
 }
 
 // 2. Event-driven
 configEmitter.on('config:loaded', cfg => {
-    taskLoader.updateConfig(cfg);
+  taskLoader.updateConfig(cfg);
 });
 
 // 3. Service locator
@@ -364,23 +364,23 @@ const logger = require('../infra/logger');
 ```javascript
 // ANTES (não testável):
 async function processTask(taskId) {
-    const task = await io.loadTask(taskId);
-    const driver = DriverFactory.create(task.target);
-    // ...
+  const task = await io.loadTask(taskId);
+  const driver = DriverFactory.create(task.target);
+  // ...
 }
 
 // DEPOIS (testável):
 async function processTask(taskId, { loader, driverFactory, logger } = {}) {
-    const taskLoader = loader || defaultLoader;
-    const factory = driverFactory || defaultFactory;
-    // ...
+  const taskLoader = loader || defaultLoader;
+  const factory = driverFactory || defaultFactory;
+  // ...
 }
 
 // Test:
 await processTask('task-1', {
-    loader: mockLoader,
-    driverFactory: mockFactory,
-    logger: mockLogger
+  loader: mockLoader,
+  driverFactory: mockFactory,
+  logger: mockLogger,
 });
 ```
 
@@ -420,19 +420,19 @@ await processTask('task-1', {
 ### 🔴 Problemas Críticos (Resolver Esta Semana)
 
 1. **Dependência circular** `config → io → task_loader`
-    - **Ação**: Refatorar para injeção de dependência
-    - **Prioridade**: CRÍTICA
-    - **Tempo**: 4-6 horas
+   - **Ação**: Refatorar para injeção de dependência
+   - **Prioridade**: CRÍTICA
+   - **Tempo**: 4-6 horas
 
 2. **Cobertura de testes <30%**
-    - **Ação**: Setup Jest + primeiros 20 testes
-    - **Prioridade**: ALTA
-    - **Tempo**: 2 dias
+   - **Ação**: Setup Jest + primeiros 20 testes
+   - **Prioridade**: ALTA
+   - **Tempo**: 2 dias
 
 3. **Locks órfãos** (2 detectados)
-    - **Ação**: Script de cleanup + TTL automático
-    - **Prioridade**: MÉDIA
-    - **Tempo**: 2 horas
+   - **Ação**: Script de cleanup + TTL automático
+   - **Prioridade**: MÉDIA
+   - **Tempo**: 2 horas
 
 ### 🟡 Melhorias Importantes (Próximas 2 Semanas)
 
@@ -535,7 +535,8 @@ Com v1.0:       🏰 "Fortaleza robusta e escalável"
 
 ### Probabilidade de Sucesso v1.0: **85%** 🎯
 
-Com a disciplina demonstrada no código e na documentação, o projeto tem alta chance de atingir v1.0 com qualidade.
+Com a disciplina demonstrada no código e na documentação, o projeto tem alta chance de atingir v1.0
+com qualidade.
 
 ---
 

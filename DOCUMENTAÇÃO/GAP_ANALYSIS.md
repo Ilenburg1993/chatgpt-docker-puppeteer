@@ -28,7 +28,8 @@ O projeto possui **fundações sólidas** mas está em uma **fase crítica de tr
 - Falta de plugin system para extensões
 - Dependência de file-based queue limita escala
 
-🎯 **Foco Imediato**: Consolidar arquitetura, melhorar testabilidade, criar base para extensibilidade.
+🎯 **Foco Imediato**: Consolidar arquitetura, melhorar testabilidade, criar base para
+extensibilidade.
 
 ---
 
@@ -50,30 +51,30 @@ O projeto possui **fundações sólidas** mas está em uma **fase crítica de tr
 
 1. **[CONCLUÍDO]** Criar ARCHITECTURE_DIAGRAMS.md com Mermaid
 2. **[PRÓXIMO]** Auditoria de dependências circulares:
-    ```bash
-    npm install --save-dev madge
-    npx madge --circular --extensions js src/
-    ```
+   ```bash
+   npm install --save-dev madge
+   npx madge --circular --extensions js src/
+   ```
 3. **[SEMANA 2]** Refatorar estrutura para DDD:
-    ```
-    src/
-    ├── domain/          # Business logic puro
-    │   ├── task/
-    │   ├── driver/
-    │   └── validation/
-    ├── application/     # Use cases
-    │   ├── process-task.js
-    │   └── manage-queue.js
-    ├── infrastructure/  # I/O, external
-    │   ├── queue/
-    │   ├── locks/
-    │   └── persistence/
-    ├── interfaces/      # Entry points
-    │   ├── api/
-    │   ├── cli/
-    │   └── dashboard/
-    └── shared/          # Utils cross-cutting
-    ```
+   ```
+   src/
+   ├── domain/          # Business logic puro
+   │   ├── task/
+   │   ├── driver/
+   │   └── validation/
+   ├── application/     # Use cases
+   │   ├── process-task.js
+   │   └── manage-queue.js
+   ├── infrastructure/  # I/O, external
+   │   ├── queue/
+   │   ├── locks/
+   │   └── persistence/
+   ├── interfaces/      # Entry points
+   │   ├── api/
+   │   ├── cli/
+   │   └── dashboard/
+   └── shared/          # Utils cross-cutting
+   ```
 
 ---
 
@@ -93,38 +94,38 @@ O projeto possui **fundações sólidas** mas está em uma **fase crítica de tr
 
 1. **Instalar ferramentas**:
 
-    ```bash
-    npm install --save-dev c8 nyc
-    npm install --save-dev @jest/globals jest
-    npm install --save-dev supertest # API tests
-    ```
+   ```bash
+   npm install --save-dev c8 nyc
+   npm install --save-dev @jest/globals jest
+   npm install --save-dev supertest # API tests
+   ```
 
 2. **Criar baseline de coverage**:
 
-    ```bash
-    # Adicionar ao package.json
-    "test:coverage": "c8 --reporter=lcov --reporter=text npm test"
-    "test:watch": "jest --watch"
-    ```
+   ```bash
+   # Adicionar ao package.json
+   "test:coverage": "c8 --reporter=lcov --reporter=text npm test"
+   "test:watch": "jest --watch"
+   ```
 
 3. **Estrutura de testes alvo**:
 
-    ```
-    tests/
-    ├── unit/
-    │   ├── core/
-    │   ├── driver/
-    │   └── infra/
-    ├── integration/
-    │   ├── queue.test.js
-    │   └── driver-factory.test.js
-    ├── e2e/
-    │   └── full-task-flow.test.js
-    ├── performance/
-    │   └── throughput.bench.js
-    └── fixtures/
-        └── mock-tasks.json
-    ```
+   ```
+   tests/
+   ├── unit/
+   │   ├── core/
+   │   ├── driver/
+   │   └── infra/
+   ├── integration/
+   │   ├── queue.test.js
+   │   └── driver-factory.test.js
+   ├── e2e/
+   │   └── full-task-flow.test.js
+   ├── performance/
+   │   └── throughput.bench.js
+   └── fixtures/
+       └── mock-tasks.json
+   ```
 
 4. **Target inicial**: 60% coverage até fim da Fase 1
 
@@ -146,44 +147,44 @@ O projeto possui **fundações sólidas** mas está em uma **fase crítica de tr
 
 1. **Migrar para logging estruturado**:
 
-    ```bash
-    npm install pino pino-pretty
-    ```
+   ```bash
+   npm install pino pino-pretty
+   ```
 
 2. **Adicionar correlation IDs**:
 
-    ```javascript
-    // src/shared/correlation.js
-    const { v4: uuid } = require('uuid');
+   ```javascript
+   // src/shared/correlation.js
+   const { v4: uuid } = require('uuid');
 
-    class CorrelationContext {
-        constructor() {
-            this.id = uuid();
-            this.startTime = Date.now();
-        }
+   class CorrelationContext {
+     constructor() {
+       this.id = uuid();
+       this.startTime = Date.now();
+     }
 
-        elapsed() {
-            return Date.now() - this.startTime;
-        }
-    }
-    ```
+     elapsed() {
+       return Date.now() - this.startTime;
+     }
+   }
+   ```
 
 3. **Implementar Prometheus metrics**:
 
-    ```bash
-    npm install prom-client
-    ```
+   ```bash
+   npm install prom-client
+   ```
 
-    Métricas essenciais:
-    - `tasks_processed_total` (counter)
-    - `task_duration_seconds` (histogram)
-    - `queue_size` (gauge)
-    - `active_locks` (gauge)
-    - `driver_errors_total` (counter por target)
+   Métricas essenciais:
+   - `tasks_processed_total` (counter)
+   - `task_duration_seconds` (histogram)
+   - `queue_size` (gauge)
+   - `active_locks` (gauge)
+   - `driver_errors_total` (counter por target)
 
 4. **Criar dashboard Grafana** (opcional):
-    - Template `docker-compose.monitoring.yml`
-    - Prometheus + Grafana pre-configurados
+   - Template `docker-compose.monitoring.yml`
+   - Prometheus + Grafana pre-configurados
 
 ---
 
@@ -202,51 +203,51 @@ O projeto possui **fundações sólidas** mas está em uma **fase crítica de tr
 
 1. **Design Plugin API**:
 
-    ```javascript
-    // src/interfaces/plugin-api.js
-    class Plugin {
-        constructor(name, version) {
-            this.name = name;
-            this.version = version;
-        }
+   ```javascript
+   // src/interfaces/plugin-api.js
+   class Plugin {
+     constructor(name, version) {
+       this.name = name;
+       this.version = version;
+     }
 
-        // Lifecycle hooks
-        async onLoad(context) {}
-        async onBeforeTask(task) {}
-        async onAfterTask(task, result) {}
-        async onError(error, task) {}
-        async onUnload() {}
+     // Lifecycle hooks
+     async onLoad(context) {}
+     async onBeforeTask(task) {}
+     async onAfterTask(task, result) {}
+     async onError(error, task) {}
+     async onUnload() {}
 
-        // Custom driver registration
-        registerDriver(targetName, DriverClass) {}
+     // Custom driver registration
+     registerDriver(targetName, DriverClass) {}
 
-        // Custom validators
-        registerValidator(name, fn) {}
-    }
-    ```
+     // Custom validators
+     registerValidator(name, fn) {}
+   }
+   ```
 
 2. **Plugin loader**:
 
-    ```javascript
-    // src/application/plugin-loader.js
-    const plugins = [];
+   ```javascript
+   // src/application/plugin-loader.js
+   const plugins = [];
 
-    async function loadPlugins(pluginDir = './plugins') {
-        const files = fs.readdirSync(pluginDir);
-        for (const file of files) {
-            const Plugin = require(path.join(pluginDir, file));
-            const instance = new Plugin();
-            await instance.onLoad(context);
-            plugins.push(instance);
-        }
-    }
-    ```
+   async function loadPlugins(pluginDir = './plugins') {
+     const files = fs.readdirSync(pluginDir);
+     for (const file of files) {
+       const Plugin = require(path.join(pluginDir, file));
+       const instance = new Plugin();
+       await instance.onLoad(context);
+       plugins.push(instance);
+     }
+   }
+   ```
 
 3. **CLI scaffold**:
-    ```bash
-    npm run plugin:create -- --name gemini-driver --type driver
-    # Gera: plugins/gemini-driver/index.js com template
-    ```
+   ```bash
+   npm run plugin:create -- --name gemini-driver --type driver
+   # Gera: plugins/gemini-driver/index.js com template
+   ```
 
 ---
 
@@ -266,37 +267,37 @@ O projeto possui **fundações sólidas** mas está em uma **fase crítica de tr
 
 1. **Browser pooling**:
 
-    ```javascript
-    // src/infrastructure/browser-pool.js
-    const { Pool } = require('generic-pool');
+   ```javascript
+   // src/infrastructure/browser-pool.js
+   const { Pool } = require('generic-pool');
 
-    const browserPool = Pool({
-      create: async () => await puppeteer.connect(...),
-      destroy: async (browser) => await browser.close(),
-      max: 5, // config.maxConcurrency
-      min: 1
-    });
-    ```
+   const browserPool = Pool({
+     create: async () => await puppeteer.connect(...),
+     destroy: async (browser) => await browser.close(),
+     max: 5, // config.maxConcurrency
+     min: 1
+   });
+   ```
 
 2. **Benchmark atual**:
 
-    ```bash
-    npm run benchmark -- --tasks 100 --duration 60s
-    # Estabelecer baseline antes de otimizações
-    ```
+   ```bash
+   npm run benchmark -- --tasks 100 --duration 60s
+   # Estabelecer baseline antes de otimizações
+   ```
 
 3. **Memory profiling**:
 
-    ```bash
-    node --inspect index.js
-    # Chrome DevTools > Memory > Take Heap Snapshot
-    # Identificar leaks antes de fixes
-    ```
+   ```bash
+   node --inspect index.js
+   # Chrome DevTools > Memory > Take Heap Snapshot
+   # Identificar leaks antes de fixes
+   ```
 
 4. **Opcional: Redis queue** (Fase 3):
-    ```bash
-    npm install bull redis
-    ```
+   ```bash
+   npm install bull redis
+   ```
 
 ---
 
@@ -316,44 +317,44 @@ O projeto possui **fundações sólidas** mas está em uma **fase crítica de tr
 
 1. **One-command setup**:
 
-    ```bash
-    npm run setup
-    # Verifica deps, cria dirs, valida Chrome, gera config
-    ```
+   ```bash
+   npm run setup
+   # Verifica deps, cria dirs, valida Chrome, gera config
+   ```
 
 2. **CLI moderno**:
 
-    ```bash
-    npm install --save-dev commander inquirer chalk ora
-    ```
+   ```bash
+   npm install --save-dev commander inquirer chalk ora
+   ```
 
-    Comandos alvo:
+   Comandos alvo:
 
-    ```bash
-    gpt-agent start [--daemon]
-    gpt-agent task create --interactive
-    gpt-agent task list [--status pending]
-    gpt-agent logs [--follow] [--task-id]
-    gpt-agent doctor  # Diagnostics
-    ```
+   ```bash
+   gpt-agent start [--daemon]
+   gpt-agent task create --interactive
+   gpt-agent task list [--status pending]
+   gpt-agent logs [--follow] [--task-id]
+   gpt-agent doctor  # Diagnostics
+   ```
 
 3. **Melhorar error messages**:
 
-    ```javascript
-    // src/shared/errors.js
-    class ChromeConnectionError extends Error {
-        constructor(port) {
-            super(`Cannot connect to Chrome on port ${port}.
-    
-    Troubleshooting:
-    1. Is Chrome running with --remote-debugging-port=${port}?
-    2. Check if port is accessible: curl http://localhost:${port}/json
-    3. See docs: ${DOCS_URL}/chrome-setup
-    `);
-            this.name = 'ChromeConnectionError';
-        }
-    }
-    ```
+   ```javascript
+   // src/shared/errors.js
+   class ChromeConnectionError extends Error {
+     constructor(port) {
+       super(`Cannot connect to Chrome on port ${port}.
+   
+   Troubleshooting:
+   1. Is Chrome running with --remote-debugging-port=${port}?
+   2. Check if port is accessible: curl http://localhost:${port}/json
+   3. See docs: ${DOCS_URL}/chrome-setup
+   `);
+       this.name = 'ChromeConnectionError';
+     }
+   }
+   ```
 
 ---
 
@@ -443,14 +444,14 @@ npm install --save-dev jsdoc typedoc
 
 ```json
 {
-    "recommendations": [
-        "bierner.markdown-mermaid",
-        "yzhang.markdown-all-in-one",
-        "ms-azuretools.vscode-docker",
-        "dbaeumer.vscode-eslint",
-        "orta.vscode-jest",
-        "streetsidesoftware.code-spell-checker"
-    ]
+  "recommendations": [
+    "bierner.markdown-mermaid",
+    "yzhang.markdown-all-in-one",
+    "ms-azuretools.vscode-docker",
+    "dbaeumer.vscode-eslint",
+    "orta.vscode-jest",
+    "streetsidesoftware.code-spell-checker"
+  ]
 }
 ```
 

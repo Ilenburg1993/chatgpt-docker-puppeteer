@@ -1,15 +1,15 @@
 # 🔍 Driver Flow Analysis v3.0 - Pool-Ready Architecture
 
-> **Objetivo**: Mapear COMPLETO fluxo de execução desde task entry até response return, identificando pontos de falha, validações e garantias ontológicas.
+> **Objetivo**: Mapear COMPLETO fluxo de execução desde task entry até response return,
+> identificando pontos de falha, validações e garantias ontológicas.
 
 ---
 
 ## 📋 Executive Summary
 
-**Fluxo Completo**: 12 etapas críticas (5 subsistemas)
-**Tempo Total**: 800ms - 600s (depende de LLM response time)
-**Pontos de Falha**: 23 identificados (11 críticos, 12 recuperáveis)
-**Pool Efficiency**: 67% reuse rate esperado (HIT em 10ms, MISS em 100ms)
+**Fluxo Completo**: 12 etapas críticas (5 subsistemas) **Tempo Total**: 800ms - 600s (depende de LLM
+response time) **Pontos de Falha**: 23 identificados (11 críticos, 12 recuperáveis) **Pool
+Efficiency**: 67% reuse rate esperado (HIT em 10ms, MISS em 100ms)
 
 ---
 
@@ -20,26 +20,29 @@
 **Componente**: `src/nerv/adapters/driver.js`
 
 **Input**:
+
 ```javascript
 nerv.emit({
-    type: 'DRIVER_EXECUTE',
-    action: 'EXECUTE',
-    payload: {
-        task: {
-            meta: { id: 'task-123', correlation_id: 'req-456' },
-            spec: { target: 'chatgpt', prompt: 'escreva isso no chat gpt' }
-        },
-        signal: abortSignal  // AbortController.signal
-    }
-})
+  type: 'DRIVER_EXECUTE',
+  action: 'EXECUTE',
+  payload: {
+    task: {
+      meta: { id: 'task-123', correlation_id: 'req-456' },
+      spec: { target: 'chatgpt', prompt: 'escreva isso no chat gpt' },
+    },
+    signal: abortSignal, // AbortController.signal
+  },
+});
 ```
 
 **Processamento**:
+
 1. NERV Core recebe evento (tipo: `DRIVER_EXECUTE`)
 2. Roteia para `DriverNERVAdapter` (subscriber)
 3. Invoca `adapter._executeTask(payload, correlationId)`
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Event malformado (sem task.meta.id) → REJECT imediato
 - ❌ **CRITICAL**: AbortSignal já abortado → ABORT pré-execução
 - ⚠️ **WARNING**: correlationId ausente → Gera novo ID interno
@@ -55,18 +58,22 @@ nerv.emit({
 **Validações Sequenciais**:
 
 #### 2.1. **Circuit Breaker Check**
+
 ```javascript
 if (!this._canExecute()) {
-    // Circuit breaker OPEN - too many recent failures
-    throw new Error('CIRCUIT_BREAKER_OPEN');
+  // Circuit breaker OPEN - too many recent failures
+  throw new Error('CIRCUIT_BREAKER_OPEN');
 }
 ```
+
 **Lógica**:
+
 - `failures >= threshold` (default: 5 falhas em 60s) → OPEN state
 - `OPEN` por 30s → Tenta recovery (HALF_OPEN)
 - HALF_OPEN: 1 sucesso → CLOSED | 1 falha → OPEN novamente
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Circuit breaker OPEN → Task REJECTED (evento `TASK_FAILED` emitido)
 - 📊 **METRIC**: `stats.tasksRejected++`
 
@@ -75,22 +82,26 @@ if (!this._canExecute()) {
 ---
 
 #### 2.2. **Capacity Check (MAX_ACTIVE_DRIVERS)**
+
 ```javascript
 if (this.activeDrivers.size >= ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS) {
-    // Queue task ou reject
-    if (taskQueue.length < MAX_QUEUE_SIZE) {
-        taskQueue.push({ payload, correlationId });
-        emit('TASK_QUEUED');
-    } else {
-        throw new Error('QUEUE_FULL');
-    }
+  // Queue task ou reject
+  if (taskQueue.length < MAX_QUEUE_SIZE) {
+    taskQueue.push({ payload, correlationId });
+    emit('TASK_QUEUED');
+  } else {
+    throw new Error('QUEUE_FULL');
+  }
 }
 ```
+
 **Configuração**:
+
 - `MAX_ACTIVE_DRIVERS`: 10 concurrent (default)
 - `MAX_QUEUE_SIZE`: 100 tasks (default)
 
 **Pontos de Falha**:
+
 - ⚠️ **WARNING**: Queue full → Task REJECTED
 - 📊 **METRIC**: `stats.tasksQueued++`
 
@@ -99,10 +110,11 @@ if (this.activeDrivers.size >= ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS) {
 ---
 
 #### 2.3. **Duplicate Task Check**
+
 ```javascript
 if (this.activeDrivers.has(taskId)) {
-    log('WARN', 'Task already active');
-    return;
+  log('WARN', 'Task already active');
+  return;
 }
 ```
 
@@ -117,14 +129,16 @@ if (this.activeDrivers.has(taskId)) {
 **Input**: `target = 'chatgpt'`
 
 **Processamento**:
+
 ```javascript
 const page = await Promise.race([
-    this.browserPool.allocate('chatgpt'),
-    timeout(10000, 'browserPool.allocate')
+  this.browserPool.allocate('chatgpt'),
+  timeout(10000, 'browserPool.allocate'),
 ]);
 ```
 
 **Alocação Lógica**:
+
 1. **Pool Manager** busca page IDLE no pool
 2. Se pool vazio: Cria nova page via Puppeteer
 3. Valida page: `!page.isClosed()`
@@ -132,12 +146,14 @@ const page = await Promise.race([
 5. Retorna page instance
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Timeout (10s) → Lança `TimeoutError`
 - ❌ **CRITICAL**: Browser disconnected → Lança `TargetClosedError`
 - ❌ **CRITICAL**: Page closed → Lança `PageClosedError`
 - ⚠️ **WARNING**: Pool exhausted → Aguarda release (backpressure)
 
 **Tempo**:
+
 - HIT (page IDLE): ~10ms
 - MISS (criar nova page): ~800ms (Chrome launch + navegação)
 
@@ -152,6 +168,7 @@ const page = await Promise.race([
 **Input**: `targetName = 'chatgpt'`
 
 **Processamento** (v3.0 - POOL-READY):
+
 ```javascript
 const driver = await driverFactory.acquireFromPool('chatgpt');
 // driver.state === 'UNATTACHED' (sem page/signal)
@@ -160,6 +177,7 @@ const driver = await driverFactory.acquireFromPool('chatgpt');
 ```
 
 **Pool Lookup Logic**:
+
 1. **POOL HIT**: Encontra driver IDLE (não busy, UNATTACHED, não destroyed)
    - Marca `entry.busy = true`
    - Incrementa `entry.totalUses++`
@@ -170,6 +188,7 @@ const driver = await driverFactory.acquireFromPool('chatgpt');
    - Se pool cheio: **POOL_EXHAUSTED** → Lança erro ❌
 
 **Constructor Invocation** (v3.0 - BREAKING CHANGE):
+
 ```javascript
 // ChatGPTDriver constructor(config) - SEM page/signal
 const driver = new ChatGPTDriver(config);
@@ -179,12 +198,14 @@ const driver = new ChatGPTDriver(config);
 ```
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Target inválido (não existe) → Lança erro
 - ❌ **CRITICAL**: POOL_EXHAUSTED (todos drivers busy) → Lança erro
 - ⚠️ **WARNING**: Driver destroyed no pool → Remove + recria
 - 📊 **METRIC**: `poolHits`, `poolMisses`, `poolExhausted`
 
 **Tempo**:
+
 - HIT (reuse): ~10ms (lookup + validação)
 - MISS (create): ~100ms (constructor + module initialization)
 
@@ -199,6 +220,7 @@ const driver = new ChatGPTDriver(config);
 **Input**: `(page, signal, correlationId)`
 
 **Processamento**:
+
 ```javascript
 driver.attachContext(page, signal, 'task-123');
 // PRÉ-CONDIÇÕES:
@@ -209,6 +231,7 @@ driver.attachContext(page, signal, 'task-123');
 ```
 
 **Etapas Internas**:
+
 1. **Validação de Estado**: Driver deve estar UNATTACHED
 2. **Validação de Page**: Não nulo, não closed
 3. **Validação de Signal**: AbortSignal instance
@@ -227,6 +250,7 @@ driver.attachContext(page, signal, 'task-123');
 7. **Emit Event**: `CONTEXT_ATTACHED`
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Driver não UNATTACHED → Lança erro (estado inválido)
 - ❌ **CRITICAL**: Driver destroyed → Lança erro
 - ❌ **CRITICAL**: Page closed → Lança erro
@@ -247,20 +271,22 @@ driver.attachContext(page, signal, 'task-123');
 **Workflow Interno** (ChatGPTDriver):
 
 #### 6.1. **Pre-Execution Validations**
+
 ```javascript
 // BaseDriver.execute()
 if (!this.isContextAttached()) {
-    throw new Error('Context not attached');
+  throw new Error('Context not attached');
 }
 if (this.destroyed) {
-    throw new Error('Driver destroyed');
+  throw new Error('Driver destroyed');
 }
 if (this.state !== 'IDLE') {
-    throw new Error('Driver not IDLE');
+  throw new Error('Driver not IDLE');
 }
 ```
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Context não attached → Lança erro
 - ❌ **CRITICAL**: Driver destroyed → Lança erro
 - ❌ **CRITICAL**: Estado inválido → Lança erro
@@ -268,6 +294,7 @@ if (this.state !== 'IDLE') {
 ---
 
 #### 6.2. **Validate Page (ChatGPTDriver)**
+
 ```javascript
 async validatePage() {
     const pageValidation = await validateLLMPage(this.page);
@@ -277,11 +304,13 @@ async validatePage() {
 ```
 
 **Validações**:
+
 - URL válida (chatgpt.com)
 - Interface LLM carregada (textarea existe)
 - Page não closed
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: URL inválida → Lança erro
 - ❌ **CRITICAL**: Interface não carregada → Lança erro
 - ⚠️ **WARNING**: Page em about:blank → Navega para chatgpt.com
@@ -291,6 +320,7 @@ async validatePage() {
 ---
 
 #### 6.3. **Capture Start Snapshot**
+
 ```javascript
 const startSnapshot = await this.captureConversationState();
 // Retorna: Contagem de mensagens do assistente ANTES do prompt
@@ -299,11 +329,13 @@ const startSnapshot = await this.captureConversationState();
 **Finalidade**: Detectar qual mensagem é a resposta (delta detection)
 
 **Pontos de Falha**:
+
 - ⚠️ **WARNING**: Falha ao capturar → Usa fallback (0)
 
 ---
 
 #### 6.4. **Prepare Context (Model Sync)**
+
 ```javascript
 await this.prepareContext(taskSpec);
 // Garante que modelo correto está selecionado (e.g., gpt-4o)
@@ -311,31 +343,36 @@ await this.prepareContext(taskSpec);
 ```
 
 **Navegação** (se necessário):
+
 ```javascript
 await page.goto('https://chatgpt.com/?model=gpt-4o', {
-    waitUntil: 'networkidle2',
-    timeout: 30000
+  waitUntil: 'networkidle2',
+  timeout: 30000,
 });
 await stabilizer.waitForStability(this);
 ```
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Navegação timeout (30s) → Lança erro
 - ❌ **CRITICAL**: Página não estável após navegação → Lança erro
 - ⚠️ **WARNING**: Modelo não suportado → Lança erro (validação)
 
 **Tempo**:
+
 - Sem navegação: ~10ms
 - Com navegação: ~3s (page load + stability)
 
 ---
 
 #### 6.5. **Send Prompt**
+
 ```javascript
 await this.sendPrompt(prompt, { humanTyping: true });
 ```
 
 **Etapas Internas**:
+
 1. **Find Textarea**: SADI analyzer detecta selector
 2. **Clear Textarea**: `textarea.value = ''`
 3. **Type Prompt**: Biomechanics (typing humanizado) ou direct `.type()`
@@ -343,78 +380,84 @@ await this.sendPrompt(prompt, { humanTyping: true });
 5. **Click Send**: Biomechanics (coordenadas + rect estável)
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Textarea não encontrada → Lança erro
 - ❌ **CRITICAL**: Send button não encontrado → Lança erro
 - ❌ **CRITICAL**: Rect não estável (retry limit) → Lança erro
 - ⚠️ **WARNING**: Typing interrupted (abort signal) → Aborta
 
 **Tempo**:
+
 - Human typing: ~2s (60 WPM)
 - Direct typing: ~200ms
 
 ---
 
 #### 6.6. **Wait For Completion (Perception Loop)**
+
 ```javascript
 const response = await this.waitForCompletion(startSnapshot, signal);
 ```
 
 **Perception Loop** (incremental detection):
+
 ```javascript
 while (true) {
-    // 1. Abort Check (fail-fast)
-    if (signal && signal.aborted) {
-        throw new Error('OPERATION_ABORTED');
-    }
+  // 1. Abort Check (fail-fast)
+  if (signal && signal.aborted) {
+    throw new Error('OPERATION_ABORTED');
+  }
 
-    // 2. Timeout Check (10min max)
-    if (Date.now() - startTime > MAX_WAIT_TIME_MS) {
-        throw new Error('TIMEOUT_EXCEEDED');
-    }
+  // 2. Timeout Check (10min max)
+  if (Date.now() - startTime > MAX_WAIT_TIME_MS) {
+    throw new Error('TIMEOUT_EXCEEDED');
+  }
 
-    // 3. Extract Current Text (delta detection)
-    const currentText = await this.extractLastAssistantMessage();
+  // 3. Extract Current Text (delta detection)
+  const currentText = await this.extractLastAssistantMessage();
 
-    // 4. Text Growth Detection
-    if (currentText.length > lastText.length) {
-        lastText = currentText;
-        stableCycles = 0;  // Reset watchdog
-        emit('TEXT_GROWTH', { length: currentText.length });
-    } else {
-        stableCycles++;
-    }
+  // 4. Text Growth Detection
+  if (currentText.length > lastText.length) {
+    lastText = currentText;
+    stableCycles = 0; // Reset watchdog
+    emit('TEXT_GROWTH', { length: currentText.length });
+  } else {
+    stableCycles++;
+  }
 
-    // 5. Completion Detection (STABLE_CYCLES_TARGET = 3)
-    if (stableCycles >= STABLE_CYCLES_TARGET) {
-        // Text estável por 3 ciclos → Geração completa
-        break;
-    }
+  // 5. Completion Detection (STABLE_CYCLES_TARGET = 3)
+  if (stableCycles >= STABLE_CYCLES_TARGET) {
+    // Text estável por 3 ciclos → Geração completa
+    break;
+  }
 
-    // 6. Auto-Continuation Detection
-    const continueBtn = await page.$('[data-testid="continue-btn"]');
-    if (continueBtn) {
-        await continueBtn.click();
-        continuationCount++;
-        stableCycles = 0;  // Reset
-    }
+  // 6. Auto-Continuation Detection
+  const continueBtn = await page.$('[data-testid="continue-btn"]');
+  if (continueBtn) {
+    await continueBtn.click();
+    continuationCount++;
+    stableCycles = 0; // Reset
+  }
 
-    // 7. Stall Detection (30s sem mudança)
-    if (stableCycles * PERCEPTION_INTERVAL_MS > STALL_WARNING_MS) {
-        emit('STALL_WARNING');
-    }
+  // 7. Stall Detection (30s sem mudança)
+  if (stableCycles * PERCEPTION_INTERVAL_MS > STALL_WARNING_MS) {
+    emit('STALL_WARNING');
+  }
 
-    // 8. Sleep (polling interval)
-    await new Promise(r => setTimeout(r, PERCEPTION_INTERVAL_MS));
+  // 8. Sleep (polling interval)
+  await new Promise(r => setTimeout(r, PERCEPTION_INTERVAL_MS));
 }
 ```
 
 **Thought Pruning** (o1/o3 models):
+
 ```javascript
 // Remove blocos de "thinking" (não visíveis ao usuário)
 response = response.replace(/<think>[\s\S]*?<\/think>/g, '');
 ```
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Timeout (10min) → Lança `TimeoutError`
 - ❌ **CRITICAL**: Abort signal → Lança `OPERATION_ABORTED`
 - ❌ **CRITICAL**: Empty response (após stable) → Lança `EMPTY_RESPONSE`
@@ -423,6 +466,7 @@ response = response.replace(/<think>[\s\S]*?<\/think>/g, '');
 - ⚠️ **WARNING**: Text growth stalled → Watchdog alert
 
 **Tempo**:
+
 - Resposta curta: ~2s (streaming)
 - Resposta longa: ~30s (múltiplos chunks)
 - o1 reasoning: ~60s+ (thinking + response)
@@ -432,15 +476,17 @@ response = response.replace(/<think>[\s\S]*?<\/think>/g, '');
 ---
 
 #### 6.7. **Post-Processing**
+
 ```javascript
 // Trim, cleanup, validate
 response = response.trim();
 if (!response || response.length < MIN_RESPONSE_LENGTH) {
-    throw new Error('EMPTY_RESPONSE');
+  throw new Error('EMPTY_RESPONSE');
 }
 ```
 
 **Pontos de Falha**:
+
 - ❌ **CRITICAL**: Response vazio após trim → Lança erro
 
 ---
@@ -452,6 +498,7 @@ if (!response || response.length < MIN_RESPONSE_LENGTH) {
 **Timing**: SEMPRE executado no `finally` block (garantia de cleanup)
 
 **Processamento**:
+
 ```javascript
 driver.detachContext();
 // PRÉ-CONDIÇÕES:
@@ -460,6 +507,7 @@ driver.detachContext();
 ```
 
 **Etapas Internas**:
+
 1. **Teardown AbortSignal Listener**:
    ```javascript
    signal.removeEventListener('abort', this._abortHandler);
@@ -475,6 +523,7 @@ driver.detachContext();
 4. **Emit Event**: `CONTEXT_DETACHED`
 
 **Pontos de Falha**:
+
 - ⚠️ **WARNING**: Driver não IDLE → Emite warning (incomplete task)
 - ⚠️ **WARNING**: Driver destroyed → Emite warning
 
@@ -491,6 +540,7 @@ driver.detachContext();
 **Input**: `driver` (estado UNATTACHED)
 
 **Processamento**:
+
 ```javascript
 driverFactory.releaseToPool(driver);
 // PRÉ-CONDIÇÕES:
@@ -499,6 +549,7 @@ driverFactory.releaseToPool(driver);
 ```
 
 **Etapas Internas**:
+
 1. **Find Pool Entry**: Localiza entry no `pool.get(target)`
 2. **Validate State**: `driver.state === 'UNATTACHED'`
 3. **Mark Available**:
@@ -509,6 +560,7 @@ driverFactory.releaseToPool(driver);
 4. **Emit Event**: `DRIVER_RELEASED`
 
 **Pontos de Falha**:
+
 - ⚠️ **WARNING**: Driver não UNATTACHED → Lança erro (invalid state)
 - ⚠️ **WARNING**: Driver destroyed → Remove do pool
 - ⚠️ **WARNING**: Entry não encontrado no pool → Lança erro
@@ -526,12 +578,14 @@ driverFactory.releaseToPool(driver);
 **Input**: `page` instance
 
 **Processamento**:
+
 ```javascript
 await browserPool.release(page);
 // Marca page como busy = false (disponível para próxima task)
 ```
 
 **Pontos de Falha**:
+
 - ⚠️ **WARNING**: Page closed → Remove do pool
 - ⚠️ **WARNING**: Page não encontrada → Lança erro
 
@@ -546,6 +600,7 @@ await browserPool.release(page);
 **Timing**: SEMPRE executado (finally block)
 
 **Etapas**:
+
 1. **Detach Telemetry Listeners**: Remove event listeners do driver
 2. **Remove from activeDrivers Map**:
    ```javascript
@@ -562,61 +617,65 @@ await browserPool.release(page);
 **Componente**: `src/driver/nerv_adapter/driver_nerv_adapter.js::_executeTask()`
 
 **Success Path**:
+
 ```javascript
 this._emitBoth(
-    ADAPTER_EVENTS.TASK_COMPLETED,
-    ActionCode.DRIVER_TASK_COMPLETED,
-    {
-        taskId,
-        result: {
-            status: 'SUCCESS',
-            output: response,  // LLM response text
-            duration: Date.now() - startTime
-        }
+  ADAPTER_EVENTS.TASK_COMPLETED,
+  ActionCode.DRIVER_TASK_COMPLETED,
+  {
+    taskId,
+    result: {
+      status: 'SUCCESS',
+      output: response, // LLM response text
+      duration: Date.now() - startTime,
     },
-    correlationId
+  },
+  correlationId
 );
 
 this.stats.tasksExecuted++;
-this._recordSuccess();  // Circuit breaker: reset failures
+this._recordSuccess(); // Circuit breaker: reset failures
 ```
 
 **Failure Path**:
+
 ```javascript
 this._emitBoth(
-    ADAPTER_EVENTS.TASK_FAILED,
-    ActionCode.DRIVER_TASK_FAILED,
-    {
-        taskId,
-        error: error.message,
-        errorType: error.constructor.name,
-        isTimeout: error.name === 'TimeoutError'
-    },
-    correlationId
+  ADAPTER_EVENTS.TASK_FAILED,
+  ActionCode.DRIVER_TASK_FAILED,
+  {
+    taskId,
+    error: error.message,
+    errorType: error.constructor.name,
+    isTimeout: error.name === 'TimeoutError',
+  },
+  correlationId
 );
 
 this.stats.driversCrashed++;
-this._recordFailure();  // Circuit breaker: increment failures
+this._recordFailure(); // Circuit breaker: increment failures
 ```
 
 **Abort Path** (v2.1 - P1 BUG #4 FIX):
+
 ```javascript
 const entry = this.activeDrivers.get(taskId);
 const wasAborted = entry && entry.aborting;
 
 if (wasAborted) {
-    this._emitBoth(
-        ADAPTER_EVENTS.TASK_ABORTED,
-        ActionCode.DRIVER_TASK_ABORTED,
-        { taskId, reason: entry.abortReason },
-        correlationId
-    );
-    this.stats.tasksAborted++;
-    // NÃO incrementa driversCrashed (não é falha técnica)
+  this._emitBoth(
+    ADAPTER_EVENTS.TASK_ABORTED,
+    ActionCode.DRIVER_TASK_ABORTED,
+    { taskId, reason: entry.abortReason },
+    correlationId
+  );
+  this.stats.tasksAborted++;
+  // NÃO incrementa driversCrashed (não é falha técnica)
 }
 ```
 
 **Pontos de Falha**:
+
 - ⚠️ **WARNING**: Emit fail (NERV down) → Log error
 
 ---
@@ -626,20 +685,21 @@ if (wasAborted) {
 **Componente**: `src/nerv/core.js`
 
 **Output**:
+
 ```javascript
 nerv.emit({
-    type: 'DRIVER_TASK_COMPLETED',
-    action: 'TASK_COMPLETED',
-    payload: {
-        taskId: 'task-123',
-        result: {
-            status: 'SUCCESS',
-            output: 'Resposta completa do ChatGPT aqui...',
-            duration: 3542  // ms
-        }
+  type: 'DRIVER_TASK_COMPLETED',
+  action: 'TASK_COMPLETED',
+  payload: {
+    taskId: 'task-123',
+    result: {
+      status: 'SUCCESS',
+      output: 'Resposta completa do ChatGPT aqui...',
+      duration: 3542, // ms
     },
-    correlationId: 'req-456'
-})
+  },
+  correlationId: 'req-456',
+});
 ```
 
 **Subscribers**: Kernel, Mission Manager, Dashboard (via Socket.io)
@@ -652,8 +712,8 @@ nerv.emit({
 
 ### **TIER 1: FATAL ERRORS (Stop Execution)**
 
-| #   | Fase | Componente    | Erro                           | Causa                | Recovery             |
-| --- | ---- | ------------- | ------------------------------ | -------------------- | -------------------- |
+| #   | Fase | Componente    | Erro                           | Causa                | Recovery              |
+| --- | ---- | ------------- | ------------------------------ | -------------------- | --------------------- |
 | 1   | 1    | NERV          | Event malformed                | task.meta.id ausente | ❌ Reject imediato    |
 | 2   | 2.1  | Adapter       | Circuit breaker OPEN           | 5+ falhas em 60s     | ⏳ Aguardar 30s       |
 | 3   | 3    | BrowserPool   | Timeout (10s)                  | Pool exhausted       | 🔄 Retry após release |
@@ -833,15 +893,15 @@ VALIDAÇÃO:
 
 ```javascript
 this.stats = {
-    tasksExecuted: 0,       // Sucesso total
-    tasksQueued: 0,         // Enfileiradas (backpressure)
-    tasksRejected: 0,       // Rejeitadas (circuit breaker)
-    tasksAborted: 0,        // Abortadas (user cancel)
-    tasksTimedOut: 0,       // Timeout (10min)
-    driversCrashed: 0,      // Falhas técnicas
-    totalTaskDuration: 0,   // Soma de durations
-    maxTaskDuration: 0,     // Peak latency
-    minTaskDuration: Infinity // Best case
+  tasksExecuted: 0, // Sucesso total
+  tasksQueued: 0, // Enfileiradas (backpressure)
+  tasksRejected: 0, // Rejeitadas (circuit breaker)
+  tasksAborted: 0, // Abortadas (user cancel)
+  tasksTimedOut: 0, // Timeout (10min)
+  driversCrashed: 0, // Falhas técnicas
+  totalTaskDuration: 0, // Soma de durations
+  maxTaskDuration: 0, // Peak latency
+  minTaskDuration: Infinity, // Best case
 };
 ```
 
@@ -849,14 +909,14 @@ this.stats = {
 
 ```javascript
 this.metrics = {
-    driversCreated: 0,      // Total drivers criados
-    driversDestroyed: 0,    // Total drivers destruídos
-    poolHits: 0,            // Reuse (HIT)
-    poolMisses: 0,          // Create (MISS)
-    poolExhausted: 0,       // All busy
-    driversReleased: 0,     // Release to pool
-    driversEvicted: 0,      // GC eviction (idle > 5min)
-    errors: 0               // Erros de criação
+  driversCreated: 0, // Total drivers criados
+  driversDestroyed: 0, // Total drivers destruídos
+  poolHits: 0, // Reuse (HIT)
+  poolMisses: 0, // Create (MISS)
+  poolExhausted: 0, // All busy
+  driversReleased: 0, // Release to pool
+  driversEvicted: 0, // GC eviction (idle > 5min)
+  errors: 0, // Erros de criação
 };
 ```
 
@@ -880,10 +940,12 @@ avgDuration: 3.42s         (3420ms)
 **Status**: ⚠️ NOT IMPLEMENTED
 
 **Problema**: ChatGPTDriver usa SADI analyzer (DNA) para find textarea/button
+
 - DNA loading acontece durante `execute()` (page != null)
 - v3.0: Constructor NÃO tem page (page = null inicialmente)
 
 **Solução**:
+
 ```javascript
 // ChatGPTDriver.sendPrompt() - LAZY LOAD
 const inputProtocol = await analyzer.findInputSelector(this.page);
@@ -898,18 +960,20 @@ const inputProtocol = await analyzer.findInputSelector(this.page);
 
 **Status**: ✅ FIXED (v3.0)
 
-**Problema**: BaseDriver._updateDomain() precisava de `this.page.url()`
+**Problema**: BaseDriver.\_updateDomain() precisava de `this.page.url()`
+
 - v3.0: Constructor não tem page (page = null)
 
 **Solução**:
+
 ```javascript
 // BaseDriver constructor (v3.0)
-this.currentDomain = null;  // Será atualizado em attachContext
+this.currentDomain = null; // Será atualizado em attachContext
 
 // BaseDriver._updateDomain()
 if (!this.page || this.page.url() === 'about:blank') {
-    this.currentDomain = 'initialization';
-    return;
+  this.currentDomain = 'initialization';
+  return;
 }
 ```
 
@@ -922,12 +986,14 @@ if (!this.page || this.page.url() === 'about:blank') {
 **Status**: ✅ FIXED (Fase 3)
 
 **Problema**: v2.0 usava `Map<taskId, { lifecycleManager, listeners }>`
+
 - v3.0: Deve ser `Map<taskId, Driver>`
 
 **Solução**:
+
 ```javascript
 // driver_nerv_adapter.js (v3.0)
-this.activeDrivers.set(taskId, driver);  // Driver direto, não LifecycleManager
+this.activeDrivers.set(taskId, driver); // Driver direto, não LifecycleManager
 ```
 
 **Validação**: ✅ Implementado (Fase 3 concluída)
@@ -939,19 +1005,21 @@ this.activeDrivers.set(taskId, driver);  // Driver direto, não LifecycleManager
 **Status**: ⚠️ NEEDS UPDATE
 
 **Problema**: Código de abort checa `entry.aborting`:
+
 ```javascript
 const entry = this.activeDrivers.get(taskId);
-const wasAborted = entry && entry.aborting;  // entry é Driver, não objeto
+const wasAborted = entry && entry.aborting; // entry é Driver, não objeto
 ```
 
 **Solução**:
+
 ```javascript
 // OPÇÃO A: Adicionar propriedade no Driver
 driver.aborting = true;
 driver.abortReason = 'USER_ABORT';
 
 // OPÇÃO B: Usar Map separado para tracking
-this.abortedTasks = new Map();  // Map<taskId, { aborting, reason }>
+this.abortedTasks = new Map(); // Map<taskId, { aborting, reason }>
 ```
 
 **Impacto**: Abort tracking quebrado (não detecta user abort)
@@ -964,10 +1032,9 @@ this.abortedTasks = new Map();  // Map<taskId, { aborting, reason }>
 
 ### **Status Geral**
 
-**Arquitetura**: ✅ Pool-ready (v3.0) - 63% completo
-**Syntax**: ✅ Validado (node --check passou)
-**Flow Logic**: ✅ Mapeado (12 fases, 23 pontos de falha)
-**Gaps**: ⚠️ 1 blocker identificado (abort tracking)
+**Arquitetura**: ✅ Pool-ready (v3.0) - 63% completo **Syntax**: ✅ Validado (node --check passou)
+**Flow Logic**: ✅ Mapeado (12 fases, 23 pontos de falha) **Gaps**: ⚠️ 1 blocker identificado (abort
+tracking)
 
 ### **Próximas Ações**
 
@@ -989,10 +1056,10 @@ this.abortedTasks = new Map();  // Map<taskId, { aborting, reason }>
 
 ### **Expected Outcomes (v3.0 vs v2.0)**
 
-| Métrica              | v2.0 (Atual) | v3.0 (Esperado) | Delta            |
-| -------------------- | ------------ | --------------- | ---------------- |
+| Métrica              | v2.0 (Atual) | v3.0 (Esperado) | Delta             |
+| -------------------- | ------------ | --------------- | ----------------- |
 | **Latency (HIT)**    | 100ms        | 10ms            | **-90%** ✅       |
-| **Latency (MISS)**   | 100ms        | 100ms           | 0%               |
+| **Latency (MISS)**   | 100ms        | 100ms           | 0%                |
 | **Throughput**       | 10 tasks/min | 13 tasks/min    | **+30%** ✅       |
 | **Reuse Rate**       | 0% (destroy) | 67% (pool)      | **+67%** ✅       |
 | **Memory**           | Growing      | Stable          | **Fixed** ✅      |
@@ -1000,8 +1067,5 @@ this.abortedTasks = new Map();  // Map<taskId, { aborting, reason }>
 
 ---
 
-**Documento**: DRIVER_FLOW_ANALYSIS_V3.md
-**Versão**: 1.0
-**Data**: 2026-02-03
-**Autor**: GitHub Copilot (Claude Sonnet 4.5)
-**Status**: ✅ COMPLETO (Review Ready)
+**Documento**: DRIVER_FLOW_ANALYSIS_V3.md **Versão**: 1.0 **Data**: 2026-02-03 **Autor**: GitHub
+Copilot (Claude Sonnet 4.5) **Status**: ✅ COMPLETO (Review Ready)

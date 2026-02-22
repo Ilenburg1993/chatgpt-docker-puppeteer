@@ -1,14 +1,15 @@
 # Correção de Line Endings em Arquivos .BAT
 
-> **Problema**: Scripts `.bat` criados no Linux não funcionam no Windows
-> **Causa**: Line endings LF (Linux) em vez de CRLF (Windows)
-> **Sintoma**: Comandos aparecem quebrados, partes do código executam como comandos
+> **Problema**: Scripts `.bat` criados no Linux não funcionam no Windows **Causa**: Line endings LF
+> (Linux) em vez de CRLF (Windows) **Sintoma**: Comandos aparecem quebrados, partes do código
+> executam como comandos
 
 ---
 
 ## 🐛 Problema Identificado
 
-Quando arquivos `.bat` são criados em ambiente Linux (container Docker, WSL, Git Bash), eles usam **LF** (`\n`) como quebra de linha.
+Quando arquivos `.bat` são criados em ambiente Linux (container Docker, WSL, Git Bash), eles usam
+**LF** (`\n`) como quebra de linha.
 
 Windows CMD espera **CRLF** (`\r\n`).
 
@@ -33,6 +34,7 @@ sed -i 's/$/\r/' arquivo.bat
 ```
 
 Arquivos corrigidos:
+
 - ✅ `verify-chrome-setup.bat`
 - ✅ `start-chrome-proxy.bat`
 - ✅ `verify-chrome-setup-debug.bat`
@@ -132,6 +134,7 @@ Get-Content arquivo.bat -Raw | Format-Hex
 ### Visual Studio Code
 
 Olhe no canto inferior direito:
+
 - ✅ **CRLF** - Correto para Windows
 - ❌ **LF** - Incorreto para Windows
 
@@ -164,11 +167,13 @@ verify-chrome-setup.bat
 
 ## 📚 Referências
 
-- **Microsoft Docs**: [Batch Files Line Endings](https://docs.microsoft.com/en-us/windows/win32/fileio/file-management-functions)
-- **Git Docs**: [core.autocrlf](https://git-scm.com/book/en/v2/Customizing-Git-Git-Configuration#_core_autocrlf)
+- **Microsoft Docs**:
+  [Batch Files Line Endings](https://docs.microsoft.com/en-us/windows/win32/fileio/file-management-functions)
+- **Git Docs**:
+  [core.autocrlf](https://git-scm.com/book/en/v2/Customizing-Git-Git-Configuration#_core_autocrlf)
 - **EditorConfig**: [.editorconfig for line endings](https://editorconfig.org/)
 
 ---
 
-**Última Atualização**: 2026-01-30
-**Problema Resolvido**: Line endings CRLF aplicados em todos os arquivos .bat
+**Última Atualização**: 2026-01-30 **Problema Resolvido**: Line endings CRLF aplicados em todos os
+arquivos .bat

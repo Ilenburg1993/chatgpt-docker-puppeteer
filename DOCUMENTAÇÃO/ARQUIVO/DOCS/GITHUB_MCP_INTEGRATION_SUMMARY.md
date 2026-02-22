@@ -9,6 +9,7 @@
 ### 1. Documentação Completa (6,800+ palavras)
 
 📄 **[GITHUB_MCP_INTEGRATION.md](./GITHUB_MCP_INTEGRATION.md)**
+
 - Arquitetura detalhada (2 modelos)
 - Setup passo a passo
 - Casos de uso (RAG + GitHub)
@@ -16,6 +17,7 @@
 - Segurança & Rate Limiting
 
 📄 **[GITHUB_MCP_QUICKSTART.md](./GITHUB_MCP_QUICKSTART.md)**
+
 - TL;DR executivo
 - Setup em 3 passos
 - Casos de uso práticos
@@ -24,16 +26,19 @@
 ### 2. Exemplos de Configuração
 
 ✅ **examples/claude_desktop_config_with_github.json**
+
 - Config pronta para Claude Desktop
 - Ambos os servidores MCP configurados
 
 ✅ **examples/test_github_mcp_integration.sh**
+
 - Script de teste completo (7 testes)
 - Valida: nosso MCP + GitHub MCP + upstream config
 
 ### 3. Implementação (Produção)
 
 ✅ **Proxy/Upstream via stdio + MCP SDK**
+
 - `src/integration/mcp/upstream-manager.mjs` (multi-upstream + preset GitHub)
 - `src/integration/mcp/upstream-stdio-sdk.mjs` (Client + StdioClientTransport)
 - Integração no bootstrap do Tool Registry (`src/integration/tool-registry.mjs`)
@@ -42,6 +47,7 @@
 ### 4. Configuração de Ambiente
 
 ✅ **.env.example** atualizado com:
+
 - `GITHUB_PERSONAL_ACCESS_TOKEN` (token GitHub)
 - Seção MCP Upstream documentada
 - Instruções de uso
@@ -59,6 +65,7 @@ Claude Desktop
 ```
 
 **Setup:**
+
 ```bash
 # 1. Instalar GitHub MCP
 npm install -g @modelcontextprotocol/server-github
@@ -86,6 +93,7 @@ Claude Desktop
 ```
 
 **Vantagens:**
+
 - Cliente configura apenas 1 servidor
 - Controle centralizado (audit log, rate limit)
 - Namespace claro (prefixo `mcp_github__`)
@@ -93,12 +101,14 @@ Claude Desktop
 **Status:** ✅ Pronto para uso
 
 **Como habilitar (server-side):**
+
 ```bash
 MCP_GITHUB_PROXY_ENABLED=true
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 ```
 
 **Validação rápida:**
+
 ```bash
 npm run mcp:diagnose
 curl -s http://localhost:3008/ready | jq '.mcp.upstreams'
@@ -134,15 +144,15 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 ## 📊 Comparação: Nosso MCP vs GitHub MCP
 
-| Categoria | Nosso MCP | GitHub MCP |
-|-----------|-----------|------------|
-| **Busca Codebase** | ✅ Hybrid (Vector+FTS) | ❌ |
-| **LLM Local** | ✅ Ollama (3+ modelos) | ❌ |
-| **GitHub API** | ❌ | ✅ 25+ operações |
-| **File Management** | ❌ (read-only) | ✅ CRUD completo |
-| **PR/Issue** | ❌ | ✅ Create, update, review |
-| **Transport** | HTTP | Stdio |
-| **Multi-client** | ✅ Sim | ❌ (1 client por instância) |
+| Categoria           | Nosso MCP              | GitHub MCP                  |
+| ------------------- | ---------------------- | --------------------------- |
+| **Busca Codebase**  | ✅ Hybrid (Vector+FTS) | ❌                          |
+| **LLM Local**       | ✅ Ollama (3+ modelos) | ❌                          |
+| **GitHub API**      | ❌                     | ✅ 25+ operações            |
+| **File Management** | ❌ (read-only)         | ✅ CRUD completo            |
+| **PR/Issue**        | ❌                     | ✅ Create, update, review   |
+| **Transport**       | HTTP                   | Stdio                       |
+| **Multi-client**    | ✅ Sim                 | ❌ (1 client por instância) |
 
 **Conclusão:** São **complementares**! Use ambos para máximo poder.
 
@@ -151,6 +161,7 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ## 🎓 Casos de Uso Killer
 
 ### 1. Smart Issue Creation
+
 ```
 Prompt (Claude):
 "Use rag_search para buscar TODOs no código,
@@ -159,11 +170,13 @@ com uma lista priorizada do que fazer"
 ```
 
 **Resultado:**
+
 - ✅ RAG encontra 20 TODOs em 12 arquivos
 - ✅ LLM analisa e prioriza (P0, P1, P2)
 - ✅ GitHub MCP cria issue formatado com checklist
 
 ### 2. AI-Assisted Code Review
+
 ```
 Prompt:
 "Busque PRs abertas com search_pull_requests,
@@ -172,11 +185,13 @@ sugira melhorias usando ollama_generate"
 ```
 
 **Resultado:**
+
 - ✅ Encontra 3 PRs abertas
 - ✅ RAG fornece contexto do codebase
 - ✅ Ollama sugere otimizações específicas
 
 ### 3. Auto-Documentation
+
 ```
 Prompt:
 "Para cada função em src/kernel/execution_engine.js,
@@ -185,6 +200,7 @@ depois use create_or_update_file para commitar"
 ```
 
 **Resultado:**
+
 - ✅ Ollama gera docstrings de alta qualidade
 - ✅ GitHub MCP atualiza arquivo diretamente
 - ✅ Pode criar PR automaticamente
@@ -194,16 +210,18 @@ depois use create_or_update_file para commitar"
 ## 🔒 Segurança Implementada
 
 ### Token Management
-✅ `.gitignore` cobre `.env.local`
-✅ Documentação alerta contra commit de tokens
-✅ Exemplo usa placeholder `ghp_YOUR_TOKEN_HERE`
+
+✅ `.gitignore` cobre `.env.local` ✅ Documentação alerta contra commit de tokens ✅ Exemplo usa
+placeholder `ghp_YOUR_TOKEN_HERE`
 
 ### Rate Limiting (Planejado)
+
 - GitHub API: 5,000 req/hora (auth)
 - Search API: 30 req/min
 - TODO: Cache local (5-10 min TTL)
 
 ### Audit Log (Planejado)
+
 ```javascript
 // Todas as operações GitHub auditadas
 registry.on('tool:execute', ({ name, user, params }) => {
@@ -218,6 +236,7 @@ registry.on('tool:execute', ({ name, user, params }) => {
 ## 📈 Status & Roadmap
 
 ### ✅ Concluído (TODAY)
+
 - [x] Análise de viabilidade
 - [x] Documentação completa (12+ páginas)
 - [x] Exemplos de configuração
@@ -227,10 +246,12 @@ registry.on('tool:execute', ({ name, user, params }) => {
 - [x] Observabilidade (/ready + diagnose) para upstreams
 
 ### 🚧 Em Progresso
+
 - [ ] Cache para chamadas do GitHub MCP (opcional)
 - [ ] Audit log persistente (opcional)
 
 ### 📋 Planejado (Próximos Passos)
+
 - [ ] Tools híbridas (smart_search = RAG + GitHub code search)
 - [ ] Dashboard UI para visualizar tools
 - [ ] Métricas de uso (top tools, latência)
@@ -241,14 +262,17 @@ registry.on('tool:execute', ({ name, user, params }) => {
 ## 💡 Recomendação
 
 ### Para Hoje
+
 ✅ **Use Modelo 1 (Direct)** - Funciona perfeitamente, sem código adicional necessário
 
 **Passos:**
+
 1. Siga o [GITHUB_MCP_QUICKSTART.md](./GITHUB_MCP_QUICKSTART.md)
 2. Configure Claude Desktop com ambos os servidores
 3. Teste os casos de uso documentados
 
 ### Para Amanhã
+
 ✅ **Use Modelo 2 (Proxy/Upstream)** quando quiser 1 único MCP no cliente (controle centralizado)
 
 ---
@@ -278,21 +302,22 @@ src/integration/mcp/
 ## 🎬 Conclusão
 
 ### Pergunta Original
+
 > "É possível integrar com o servidor MCP GitHub?"
 
 ### Resposta
+
 ✅ **SIM! E há 2 formas:**
 
 1. **Modelo 1 (Direct):** ✅ Funciona hoje - Setup em 3 passos
 2. **Modelo 2 (Proxy/Upstream):** ✅ Pronto - habilite via `MCP_GITHUB_PROXY_ENABLED=true`
 
 ### Próximo Passo
-👉 Leia: [GITHUB_MCP_QUICKSTART.md](./GITHUB_MCP_QUICKSTART.md)
-👉 Configure: [examples/claude_desktop_config_with_github.json](./examples/claude_desktop_config_with_github.json)
+
+👉 Leia: [GITHUB_MCP_QUICKSTART.md](./GITHUB_MCP_QUICKSTART.md) 👉 Configure:
+[examples/claude_desktop_config_with_github.json](./examples/claude_desktop_config_with_github.json)
 👉 Teste: `bash examples/test_github_mcp_integration.sh`
 
 ---
 
-**Criado:** 07/02/2026
-**Autor:** GitHub Copilot
-**Status:** ✅ Direct + Proxy/Upstream suportados
+**Criado:** 07/02/2026 **Autor:** GitHub Copilot **Status:** ✅ Direct + Proxy/Upstream suportados

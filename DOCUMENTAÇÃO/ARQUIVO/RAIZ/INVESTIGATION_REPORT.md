@@ -1,22 +1,26 @@
 # 🔍 INVESTIGAÇÃO ARQUITETURAL PROFUNDA
+
 ## Sistema de Controle Autônomo de LLMs para Missões de Longo Prazo
 
-**Data**: 1 de Fevereiro de 2026
-**Objetivo**: Mapear arquitetura completa antes de atualizar ARCHITECTURE.md
-**Foco**: Missões de longo prazo (ex: "escrever um livro") com baixa interferência humana
+**Data**: 1 de Fevereiro de 2026 **Objetivo**: Mapear arquitetura completa antes de atualizar
+ARCHITECTURE.md **Foco**: Missões de longo prazo (ex: "escrever um livro") com baixa interferência
+humana
 
 ---
 
 ## 📊 VISÃO GERAL DO SISTEMA
 
 ### Objetivo Central (Redefinido)
+
 **NÃO** executar "muitas tasks" isoladas, mas sim:
+
 - ✅ **Sustentar missões de longo prazo** (ex: escrever um livro de 15 capítulos)
 - ✅ **Baixa interferência humana** (usuário como orientador, não executor)
 - ✅ **Controle automatizado de LLM** (IA executa, humano corrige rota)
 - ✅ **Dashboard para gerenciamento** (correções, mudanças de rota, orientações)
 
 ### Hierarquia Conceitual
+
 ```
 MISSION (Missão de longo prazo)
 └── WORKFLOW (Conjunto estruturado de steps)
@@ -30,9 +34,11 @@ MISSION (Missão de longo prazo)
 ## 🏗️ COMPONENTES DESCOBERTOS (13 Módulos + Novos Sistemas)
 
 ### 1. **MISSIONS** (`src/missions/`) - **NOVO SISTEMA CENTRAL**
+
 **Responsabilidade**: Gerenciar ciclo de vida completo de missões de longo prazo
 
 #### Arquivos Chave:
+
 - `mission_manager.js` (700 linhas) - CRUD + execução + progresso
 - `mission_state_manager.js` (381 linhas) - Persistência filesystem
 - `workflow_generator.js` (306 linhas) - Templates → Workflows
@@ -40,6 +46,7 @@ MISSION (Missão de longo prazo)
 - `templates/book_writing.json` - Template exemplo (livro técnico)
 
 #### Estrutura de Persistência:
+
 ```
 missions/
 ├── mission-001/
@@ -54,6 +61,7 @@ missions/
 ```
 
 #### Estados da Missão:
+
 - `PENDING`: Criada, não iniciada
 - `RUNNING`: Em execução
 - `PAUSED`: Pausada manualmente
@@ -61,6 +69,7 @@ missions/
 - `FAILED`: Falhou criticamente
 
 #### Funcionalidades:
+
 - **createMission()**: Criar missão a partir de template + params
 - **startMission()**: Iniciar execução (gera tasks V5 para Kernel)
 - **pauseMission()**: Pausar temporariamente
@@ -71,9 +80,11 @@ missions/
 ---
 
 ### 2. **ORCHESTRATOR** (`src/orchestrator/`) - **MOTOR DE ORQUESTRAÇÃO**
+
 **Responsabilidade**: Implementar estratégias de execução (SINGLE_SHOT, ITERATIVE, MULTI_STEP)
 
 #### Arquivos Chave:
+
 - `orchestrator_engine.js` (488 linhas) - Motor central
 - `context_manager.js` - Gerenciar contexto entre steps
 - `checkpoint_manager.js` - Salvar/restaurar estado
@@ -83,11 +94,15 @@ missions/
 #### Estratégias de Execução:
 
 **1. SINGLE_SHOT**: Executa 1x, sem validação (comportamento V4 legado)
+
 ```javascript
-execution: { strategy: "SINGLE_SHOT" }
+execution: {
+  strategy: 'SINGLE_SHOT';
+}
 ```
 
 **2. ITERATIVE**: Executa → Valida → Retry com feedback (até max_iterations)
+
 ```javascript
 execution: {
     strategy: "ITERATIVE",
@@ -99,12 +114,16 @@ execution: {
 ```
 
 **3. MULTI_STEP**: Workflow com múltiplos steps interdependentes
+
 ```javascript
-execution: { strategy: "MULTI_STEP" }
+execution: {
+  strategy: 'MULTI_STEP';
+}
 // Steps executados sequencialmente com context propagation
 ```
 
 #### Validadores Disponíveis:
+
 - `schema`: Valida estrutura JSON
 - `length`: Valida tamanho (min/max characters/words)
 - `llm_judge`: LLM avalia qualidade com critérios ponderados
@@ -112,9 +131,11 @@ execution: { strategy: "MULTI_STEP" }
 ---
 
 ### 3. **KERNEL** (`src/kernel/`) - **NÚCLEO DE DECISÃO**
+
 **Responsabilidade**: Executar tasks V5 com políticas e observabilidade
 
 #### Subsistemas:
+
 - `kernel.js` (311 linhas) - Fábrica e composição
 - `execution_engine/` - Lógica de execução
 - `kernel_loop/` - Loop temporal
@@ -126,6 +147,7 @@ execution: { strategy: "MULTI_STEP" }
 - `task_execution_orchestrator.js` - Integração com OrchestratorEngine
 
 #### Fluxo de Execução:
+
 ```
 1. TaskRuntime cria task V5
 2. OrchestratorEngine verifica se precisa orquestração
@@ -138,9 +160,11 @@ execution: { strategy: "MULTI_STEP" }
 ---
 
 ### 4. **DRIVER** (`src/driver/`) - **AUTOMAÇÃO BROWSER**
+
 **Responsabilidade**: Interagir com LLMs via Puppeteer
 
 #### Estrutura:
+
 - `factory.js` (178 linhas) - Discovery + instanciação lazy
 - `targets/ChatGPTDriver.js` - Implementação ChatGPT
 - `core/TargetDriver.js` - Classe base abstrata
@@ -148,6 +172,7 @@ execution: { strategy: "MULTI_STEP" }
 - `DriverLifecycleManager.js` - Gerenciar ciclo de vida
 
 #### Pattern:
+
 ```javascript
 const driver = getDriver('chatgpt', page, config, abortSignal);
 const response = await driver.execute(task);
@@ -156,9 +181,11 @@ const response = await driver.execute(task);
 ---
 
 ### 5. **INFRA** (`src/infra/`) - **INFRAESTRUTURA**
+
 **Responsabilidade**: Browser pool, locks, queue, storage
 
 #### Componentes:
+
 - `ConnectionOrchestrator.js` (885 linhas, v3.0) - Conexão Chrome multi-modo
 - `browser_pool/pool_manager.js` - Pool de browsers
 - `proxy/chromeProxyService.js` (648 linhas) - Proxy transparente CDP
@@ -168,6 +195,7 @@ const response = await driver.execute(task);
 - `fs_watcher.js` - Observar mudanças em arquivos
 
 #### Browser Connection Modes:
+
 - `launcher`: PM2 gerencia browser
 - `external`: Conecta a Chrome externo
 - `auto`: Tenta ambos (fallback strategy)
@@ -175,9 +203,11 @@ const response = await driver.execute(task);
 ---
 
 ### 6. **SERVER** (`src/server/`) - **DASHBOARD WEB**
+
 **Responsabilidade**: Interface HTTP + WebSocket para monitoramento
 
 #### Estrutura:
+
 - `main.js` - Entry point servidor
 - `engine/server.js` - Express HTTP
 - `engine/socket.js` - Socket.io (real-time)
@@ -186,6 +216,7 @@ const response = await driver.execute(task);
 - `watchers/` - Observar filesystem
 
 #### Endpoints (Esperados):
+
 - `GET /missions` - Listar missões
 - `POST /missions` - Criar missão
 - `GET /missions/:id` - Detalhes missão
@@ -198,19 +229,22 @@ const response = await driver.execute(task);
 ---
 
 ### 7. **NERV** (`src/nerv/`) - **EVENT BUS CENTRAL**
+
 **Responsabilidade**: IPC event-driven (zero-coupling entre componentes)
 
 #### Pattern:
+
 ```javascript
 nerv.sendEvent({
-    type: MessageType.ACTION,
-    code: ActionCode.TASK_STATE_CHANGE,
-    payload: { task_id, new_state },
-    metadata: { timestamp, source: 'kernel' }
+  type: MessageType.ACTION,
+  code: ActionCode.TASK_STATE_CHANGE,
+  payload: { task_id, new_state },
+  metadata: { timestamp, source: 'kernel' },
 });
 ```
 
 #### Componentes Integrados:
+
 - Kernel → NERV → Observers
 - Driver → NERV → Telemetry
 - Server → NERV → Dashboard clients
@@ -221,6 +255,7 @@ nerv.sendEvent({
 ## 🌊 FLUXO COMPLETO: MISSÃO → TASKS → EXECUÇÃO
 
 ### FASE 1: Criação da Missão (Usuário → Dashboard)
+
 ```
 1. Usuário acessa Dashboard Web
 2. Seleciona template: "Book Writing"
@@ -241,6 +276,7 @@ nerv.sendEvent({
 ```
 
 ### FASE 2: Execução da Missão (MissionManager → Kernel)
+
 ```
 1. Usuário clica "Start Mission"
 2. Dashboard → PATCH /missions/001 { status: "running" }
@@ -257,6 +293,7 @@ nerv.sendEvent({
 ```
 
 ### FASE 3: Execução de Task Individual (Kernel → Driver)
+
 ```
 1. ExecutionEngine recebe task
 2. PolicyEngine valida limites
@@ -274,6 +311,7 @@ nerv.sendEvent({
 ```
 
 ### FASE 4: Validação Iterativa (OrchestratorEngine)
+
 ```
 Se strategy = ITERATIVE:
 1. ValidationService valida resultado
@@ -286,6 +324,7 @@ Se strategy = ITERATIVE:
 ```
 
 ### FASE 5: Progresso e Feedback (MissionManager ↔ Dashboard)
+
 ```
 1. MissionManager monitora conclusão de steps
 2. Salva outputs em missions/001/outputs/
@@ -307,6 +346,7 @@ Se strategy = ITERATIVE:
 ```
 
 ### FASE 6: Conclusão (MissionManager)
+
 ```
 1. Todos os steps concluídos
 2. MissionManager valida success_criteria:
@@ -326,6 +366,7 @@ Se strategy = ITERATIVE:
 ## 🔄 INTEGRAÇÃO ENTRE SISTEMAS
 
 ### Missões → Orchestrator → Kernel
+
 ```
 MissionManager: "Preciso executar STEP com strategy ITERATIVE"
        ↓ (gera Task V5)
@@ -349,6 +390,7 @@ MissionManager: "Recebo conclusão, passo para próximo step"
 ```
 
 ### Dashboard → MissionManager → Kernel
+
 ```
 Dashboard: "Usuário quer criar missão 'Escrever Livro'"
        ↓ POST /missions
@@ -371,6 +413,7 @@ Dashboard: "Recebo updates via WebSocket, exibo progresso"
 ```
 
 ### Feedback Loop (Humano no Loop)
+
 ```
 Dashboard: Exibe "Chapter 3 completed, quality: 68% (below threshold 75%)"
        ↓
@@ -398,6 +441,7 @@ MissionManager: "Salva output, próximo step"
 ## 🎯 TEMPLATES E WORKFLOWS
 
 ### Template book_writing.json (Exemplo Real)
+
 ```json
 {
   "id": "book_writing",
@@ -435,6 +479,7 @@ MissionManager: "Salva output, próximo step"
 ```
 
 ### Expansão de repeat_for_each
+
 ```
 Input: outline.chapters = [
   { number: 1, title: "Introduction" },
@@ -454,24 +499,28 @@ Output: 15 steps gerados:
 ## 📦 NOVOS SISTEMAS NÃO DOCUMENTADOS
 
 ### 1. Missions System (CENTRAL)
+
 - **Estado**: Production Ready (Audit Level 100)
 - **Integração**: ✅ Com Kernel, ❌ Com Dashboard (em construção)
 - **Persistência**: Filesystem (missions/)
 - **Crash Recovery**: Checkpoints automáticos
 
 ### 2. Orchestrator System (MOTOR)
+
 - **Estado**: Production Ready (Audit Level 100)
 - **Estratégias**: SINGLE_SHOT, ITERATIVE, MULTI_STEP
 - **Validadores**: schema, length, llm_judge
 - **Integração**: ✅ Com Kernel
 
 ### 3. Chrome Proxy (PM2)
+
 - **Estado**: Recém integrado (v3.0, 648 linhas)
 - **Modo**: Processo standalone PM2
 - **Função**: Proxy transparente CDP (container → Windows Chrome)
 - **Status**: ✅ 100% funcional (5/5 testes passando)
 
 ### 4. Dashboard Web (EM CONSTRUÇÃO)
+
 - **Estado**: Módulos faltando (snapshot, telemetry)
 - **Objetivo**: Interface visual para gerenciar missões
 - **Endpoints Necessários**: /missions CRUD, /feedback, WebSocket
@@ -481,38 +530,41 @@ Output: 15 steps gerados:
 ## 🔍 GAPS IDENTIFICADOS
 
 ### 1. Dashboard ↔ Missions Integration
-**Status**: ❌ Não integrado
-**Necessário**:
+
+**Status**: ❌ Não integrado **Necessário**:
+
 - Endpoints REST para Missions CRUD
 - WebSocket para progresso em tempo real
 - UI para criar/monitorar missões
 
 ### 2. Feedback System
-**Status**: ⚠️ Parcialmente implementado
-**Existente**: FeedbackProcessor, ContextManager
+
+**Status**: ⚠️ Parcialmente implementado **Existente**: FeedbackProcessor, ContextManager
 **Faltando**: Endpoint /missions/:id/feedback no Dashboard
 
 ### 3. Validation UI
-**Status**: ❌ Não implementado
-**Necessário**: Dashboard exibir:
+
+**Status**: ❌ Não implementado **Necessário**: Dashboard exibir:
+
 - Scores de validação LLM-judge
 - Histórico de iterações
 - Sugestões de melhoria
 
 ### 4. Checkpoint Recovery
-**Status**: ✅ Implementado (CheckpointManager)
-**Testado**: ❌ Não validado end-to-end
+
+**Status**: ✅ Implementado (CheckpointManager) **Testado**: ❌ Não validado end-to-end
 
 ### 5. Multi-User Support
-**Status**: ❌ Não implementado
-**Escopo Atual**: Single-user
-**Futuro**: Autenticação, permissões, isolamento
+
+**Status**: ❌ Não implementado **Escopo Atual**: Single-user **Futuro**: Autenticação, permissões,
+isolamento
 
 ---
 
 ## 🎓 CONCEITOS-CHAVE
 
 ### Task V5 (Unidade de Execução)
+
 ```javascript
 {
   meta: {
@@ -541,6 +593,7 @@ Output: 15 steps gerados:
 ```
 
 ### Workflow (Conjunto de Steps)
+
 ```javascript
 {
   id: "workflow-001",
@@ -558,6 +611,7 @@ Output: 15 steps gerados:
 ```
 
 ### Mission State
+
 ```javascript
 {
   id: "mission-001",
@@ -580,16 +634,19 @@ Output: 15 steps gerados:
 ## 📈 MÉTRICAS ESTIMADAS (Template book_writing)
 
 ### Custo (15 capítulos, 2 iterações médias)
+
 - GPT-4: ~$5-8 USD
 - GPT-3.5 Turbo: ~$0.50-1.00 USD
 - Gemini Pro: ~$0.30-0.60 USD
 
 ### Tempo de Execução
+
 - Otimista: 1-2 horas (1 iteração/capítulo)
 - Realista: 4-6 horas (2 iterações médias)
 - Pessimista: 12-24 horas (3 iterações/capítulo)
 
 ### Tokens Estimados
+
 - Outline: ~4,000 tokens
 - Por Capítulo: ~8,000 tokens × 2 iterações = 16,000
 - Validação: ~2,000 tokens × 2 iterações = 4,000
@@ -601,9 +658,11 @@ Output: 15 steps gerados:
 ## 🔍 INVESTIGAÇÃO DOS SUBSISTEMAS RESTANTES
 
 ### 7. **SERVER** (`src/server/`) - **DASHBOARD WEB + API**
+
 **Responsabilidade**: Interface externa HTTP + WebSocket + API + Telemetria
 
 #### Arquivos Descobertos:
+
 - `main.js` (376 linhas) - Bootstrap canônico (10 fases)
 - `engine/server.js` - HTTP singleton engine (Express bind)
 - `engine/socket.js` - Socket.io hub (real-time)
@@ -623,6 +682,7 @@ Output: 15 steps gerados:
 - `dashboard-api/` - API específica do dashboard (?)
 
 #### Bootstrap Sequence (10 Fases Determinísticas):
+
 ```
 1. Lifecycle / Signal Handling
 2. Fundação HTTP (bind de rede, porta única)
@@ -637,6 +697,7 @@ Output: 15 steps gerados:
 ```
 
 #### Endpoints Esperados (API):
+
 - `GET /health` - Health check
 - `GET /status` - Status geral do sistema
 - `GET /metrics` - Métricas de performance
@@ -648,14 +709,17 @@ Output: 15 steps gerados:
 - **MISSING**: Endpoints para Missions (`/missions`, `/missions/:id/feedback`)
 
 #### WebSocket Events:
+
 - Emit: `task:state`, `task:progress`, `system:metrics`
 - Listen: `task:cancel`, `queue:add`
 
 #### Authority Modes:
+
 - **STANDALONE**: Processo independente, gerencia lifecycle
 - **DELEGATED**: Gerenciado por Maestro, suprime exit/signals
 
 #### Status Atual:
+
 - ❌ **Módulos faltando**: `telemetry/snapshot` (comentado temporariamente)
 - ⏳ **Endpoints Missions**: Não implementados ainda
 - ✅ **HTTP/Socket**: Funcional (endpoints básicos)
@@ -663,9 +727,11 @@ Output: 15 steps gerados:
 ---
 
 ### 8. **NERV** (`src/nerv/`) - **EVENT BUS CENTRAL**
+
 **Responsabilidade**: IPC event-driven (zero-coupling entre componentes)
 
 #### Arquivos Descobertos:
+
 - `nerv.js` (258 linhas) - Compositor estrutural puro
 - `core.js` - Núcleo de primitivas
 - `buffers/` - Buffers de eventos (FIFO)
@@ -685,6 +751,7 @@ Output: 15 steps gerados:
   - `high_level_adapter.js` - API simplificada
 
 #### Design Philosophy:
+
 ```
 NERV é um COMPOSITOR ESTRUTURAL PURO:
 - ❌ NÃO executa fluxo
@@ -698,11 +765,13 @@ NERV é um COMPOSITOR ESTRUTURAL PURO:
 ```
 
 #### Transport Modes (ONDA 2.6):
+
 - **LOCAL**: Comunicação in-process (EventEmitter)
 - **HYBRID**: Local + Socket.io (multi-processo)
 - **CUSTOM**: Transport customizado via adapter
 
 #### Envelope Structure (Protocolo Universal):
+
 ```javascript
 {
   type: MessageType.ACTION,  // ACTION | QUERY | ACK
@@ -718,33 +787,37 @@ NERV é um COMPOSITOR ESTRUTURAL PURO:
 ```
 
 #### API Pública:
+
 ```javascript
-nerv.emit(envelope)           // Emite evento
-nerv.send(envelope)           // Alias para emit
-nerv.emitEvent(envelope)      // Evento genérico
-nerv.emitCommand(envelope)    // Comando específico
-nerv.emitAck(envelope)        // Acknowledgement
-nerv.receive(handler)         // Recebe qualquer envelope
-nerv.onReceive(handler)       // Recebe eventos
-nerv.onEvent(filter, handler) // Recebe eventos filtrados
-nerv.onCommand(filter, handler) // Recebe comandos
-nerv.onActor(role, handler)   // Recebe por actor role
+nerv.emit(envelope); // Emite evento
+nerv.send(envelope); // Alias para emit
+nerv.emitEvent(envelope); // Evento genérico
+nerv.emitCommand(envelope); // Comando específico
+nerv.emitAck(envelope); // Acknowledgement
+nerv.receive(handler); // Recebe qualquer envelope
+nerv.onReceive(handler); // Recebe eventos
+nerv.onEvent(filter, handler); // Recebe eventos filtrados
+nerv.onCommand(filter, handler); // Recebe comandos
+nerv.onActor(role, handler); // Recebe por actor role
 ```
 
 #### Correlation & Tracing:
+
 - ✅ Correlation IDs automáticos
 - ✅ Rastreamento end-to-end
 - ✅ Telemetria unificada (latências, throughput)
 - ✅ Backpressure control (buffers FIFO)
 
 #### Discovery (IPC):
+
 ```javascript
-Discovery.publishServerReady(nerv, payload)
+Discovery.publishServerReady(nerv, payload);
 // 1. Tenta via NERV (SERVER_READY event)
 // 2. Fallback: arquivo state.json (se ENABLE_STATE_FILE=true)
 ```
 
 #### Status Atual:
+
 - ✅ **Hybrid Transport**: Funcional (local + Socket.io)
 - ✅ **Adapters**: KernelNERVBridge, DriverNERVAdapter, ServerNERVAdapter
 - ✅ **Correlation**: Rastreamento completo
@@ -753,9 +826,11 @@ Discovery.publishServerReady(nerv, payload)
 ---
 
 ### 9. **CORE** (`src/core/`) - **FUNDAÇÃO**
+
 **Responsabilidade**: Configuração, logger, schemas, identidade
 
 #### Componentes:
+
 - `config.js` - Hot-reload de config.json/dynamic_rules.json
 - `logger.js` - Logger estruturado (níveis: DEBUG, INFO, WARN, ERROR)
 - `identity/` - DNA do sistema
@@ -772,9 +847,11 @@ Discovery.publishServerReady(nerv, payload)
 ---
 
 ### 10. **INFRA** (`src/infra/`) - **INFRAESTRUTURA**
+
 **Responsabilidade**: Browser pool, locks, queue, storage
 
 #### Componentes Chave:
+
 - `ConnectionOrchestrator.js` (885 linhas, v3.0) - Conexão Chrome multi-modo
 - `browser_pool/pool_manager.js` - Pool de browsers
   - Health checks (crash + degradação)
@@ -790,7 +867,7 @@ Discovery.publishServerReady(nerv, payload)
   - PID validation
   - UUID-based orphan recovery (P5.3 fix)
 - `queue.js` - Fila de tarefas
-  - Filesystem-based (fila/*.json)
+  - Filesystem-based (fila/\*.json)
   - Priority support
 - `fs_watcher.js` - File system watcher
   - 100ms debounce (P5.2 fix)
@@ -801,65 +878,72 @@ Discovery.publishServerReady(nerv, payload)
 ## 📚 COMPARAÇÃO: ARCHITECTURE.md ATUAL vs REAL
 
 ### O Que ARCHITECTURE.md v2.0 Documenta:
-✅ **13 módulos**: NERV, Kernel, Driver, Infra, Server, Core, Logic, Shared, etc.
-✅ **C4 Diagrams**: Context, Container, Component
-✅ **Fluxo de Task**: End-to-end (8 fases)
-✅ **NERV Event Bus**: Zero-coupling
-✅ **14 Auditorias**: P1-P9 (qualidade 9.2/10)
-✅ **Métricas**: Latências, throughput, resource usage
-✅ **Decisões Arquiteturais**: Event-driven, domain-driven
+
+✅ **13 módulos**: NERV, Kernel, Driver, Infra, Server, Core, Logic, Shared, etc. ✅ **C4
+Diagrams**: Context, Container, Component ✅ **Fluxo de Task**: End-to-end (8 fases) ✅ **NERV Event
+Bus**: Zero-coupling ✅ **14 Auditorias**: P1-P9 (qualidade 9.2/10) ✅ **Métricas**: Latências,
+throughput, resource usage ✅ **Decisões Arquiteturais**: Event-driven, domain-driven
 
 ### O Que ESTÁ FALTANDO:
 
 #### 1. **MISSIONS SUBSYSTEM** ❌
+
 - ✅ Implementado: MissionManager (700 linhas), WorkflowGenerator (306 linhas)
 - ❌ Não documentado em ARCHITECTURE.md
 - **Importância**: CENTRAL para objetivo do sistema (missões de longo prazo)
 - **Impacto**: Arquitetura atual não reflete sistema mission-oriented
 
 #### 2. **ORCHESTRATOR SUBSYSTEM** ❌
+
 - ✅ Implementado: OrchestratorEngine (488 linhas)
 - ❌ Não documentado em ARCHITECTURE.md
 - **Estratégias**: SINGLE_SHOT, ITERATIVE, MULTI_STEP
 - **Impacto**: Fluxo de task simplificado, não inclui orquestração avançada
 
 #### 3. **VALIDATION SYSTEM** ❌
+
 - ✅ Implementado: ValidationService (schema, length, llm_judge)
 - ❌ Não documentado em ARCHITECTURE.md
 - **Importância**: Qualidade de saídas, iteração automática
 - **Impacto**: Sistema parece não ter controle de qualidade
 
 #### 4. **TEMPLATE SYSTEM** ❌
+
 - ✅ Implementado: WorkflowGenerator + templates/
 - ❌ Não documentado em ARCHITECTURE.md
 - **Templates**: book_writing.json (200+ linhas)
 - **Impacto**: Não explica como workflows são criados
 
 #### 5. **CHECKPOINT & RECOVERY** ❌
+
 - ✅ Implementado: CheckpointManager, MissionStateManager
 - ❌ Não documentado em ARCHITECTURE.md
 - **Importância**: Crash recovery para missões longas
 - **Impacto**: Sistema parece frágil a crashes
 
 #### 6. **FEEDBACK LOOP** ❌
+
 - ✅ Implementado: FeedbackProcessor, ContextManager
 - ❌ Não documentado em ARCHITECTURE.md
 - **Importância**: Humano no loop (correções, orientações)
 - **Impacto**: Não explica como usuário guia IA
 
 #### 7. **CHROME PROXY** ⚠️
+
 - ✅ Implementado: ChromeProxyService (648 linhas, v3.0)
 - ⚠️ Mencionado brevemente, mas não detalhado
 - **Status**: PM2 standalone, 5/5 testes passing
 - **Impacto**: Arquitetura de conexão não completa
 
 #### 8. **AUTHORITY MODES** ❌
+
 - ✅ Implementado: STANDALONE vs DELEGATED
 - ❌ Não documentado em ARCHITECTURE.md
 - **Importância**: Deploy modes (single vs multi-processo)
 - **Impacto**: Não explica como sistema escala
 
 #### 9. **MISSION vs TASK DISTINCTION** ❌
+
 - ✅ Conceito implementado (hierarquia Mission → Workflow → Step → Task)
 - ❌ Não documentado em ARCHITECTURE.md
 - **Importância**: FUNDAMENTO conceitual do sistema
@@ -872,10 +956,14 @@ Discovery.publishServerReady(nerv, payload)
 ### Redefinição do Objetivo Central
 
 **ANTES (V4 - Task-Oriented)**:
+
 > "Sistema de automação de LLMs que executa tarefas automaticamente via Puppeteer"
 
 **AGORA (V5 - Mission-Oriented)**:
-> "Sistema de controle autônomo de LLMs para sustentar **missões de longo prazo** (horas/dias) com **baixa interferência humana**, onde usuário atua como **orientador** (correções de rota, feedback qualitativo) e IA executa trabalho técnico de forma iterativa com validação automática."
+
+> "Sistema de controle autônomo de LLMs para sustentar **missões de longo prazo** (horas/dias) com
+> **baixa interferência humana**, onde usuário atua como **orientador** (correções de rota, feedback
+> qualitativo) e IA executa trabalho técnico de forma iterativa com validação automática."
 
 ### Hierarquia Conceitual Completa
 
@@ -894,10 +982,10 @@ MISSION (Missão de longo prazo: "Escrever livro de 15 capítulos")
 
 ### Papel do Usuário Redefinido
 
-**NÃO**: Executor de tasks (manual)
-**SIM**: Orientador de missões (supervisor)
+**NÃO**: Executor de tasks (manual) **SIM**: Orientador de missões (supervisor)
 
 **Ações do Usuário**:
+
 1. **Criar Missão**: Seleciona template, define params (topic, num_chapters)
 2. **Iniciar Execução**: Start mission (sistema opera autonomamente)
 3. **Monitorar Progresso**: Dashboard exibe progresso (7/15 capítulos)
@@ -909,11 +997,13 @@ MISSION (Missão de longo prazo: "Escrever livro de 15 capítulos")
 6. **Extrair Outputs**: Download de outputs finais (missions/001/outputs/)
 
 **Frequência de Intervenção**:
+
 - Otimista: 0-2 intervenções (missão 100% autônoma)
 - Realista: 3-5 intervenções (correções pontuais)
 - Pessimista: 10+ intervenções (ajustes frequentes)
 
 **Tempo de Intervenção**:
+
 - Por feedback: ~30-60 segundos (ler output, escrever feedback)
 - Total missão: 5-10 minutos (em 4-6 horas de execução)
 - **Razão**: 98%+ do tempo é execução autônoma
@@ -923,9 +1013,11 @@ MISSION (Missão de longo prazo: "Escrever livro de 15 capítulos")
 ## 🏗️ ARQUITETURA ATUALIZADA (4 Camadas)
 
 ### CAMADA 1: MISSION LAYER (Nova)
+
 **Responsabilidade**: Gerenciar ciclo de vida de missões de longo prazo
 
 **Componentes**:
+
 - MissionManager (CRUD, execução, progresso)
 - WorkflowGenerator (templates → workflows)
 - MissionStateManager (persistência filesystem)
@@ -933,6 +1025,7 @@ MISSION (Missão de longo prazo: "Escrever livro de 15 capítulos")
 - Templates (book_writing, code_refactor, research, etc.)
 
 **Conceitos**:
+
 - Mission: Unidade de trabalho de longo prazo (horas/dias)
 - Workflow: Conjunto estruturado de steps
 - Step: Etapa individual com estratégia de execução
@@ -941,6 +1034,7 @@ MISSION (Missão de longo prazo: "Escrever livro de 15 capítulos")
 **Estados**: PENDING → RUNNING → PAUSED → COMPLETED/FAILED
 
 **Persistência**:
+
 ```
 missions/
 └── mission-001/
@@ -953,9 +1047,11 @@ missions/
 ---
 
 ### CAMADA 2: ORCHESTRATION LAYER (Nova)
+
 **Responsabilidade**: Implementar estratégias de execução e validação
 
 **Componentes**:
+
 - OrchestratorEngine (shouldOrchestrate, beforeExecution, afterExecution)
 - ValidationService (schema, length, llm_judge)
 - ContextManager (contexto entre steps)
@@ -963,11 +1059,13 @@ missions/
 - MemoryStore (memória de longo prazo)
 
 **Execution Strategies**:
+
 1. **SINGLE_SHOT**: 1x execução, sem validação (comportamento V4 legado)
 2. **ITERATIVE**: Loop → Execute → Validate → Retry (até max_iterations ou sucesso)
 3. **MULTI_STEP**: Workflow com steps interdependentes (context propagation)
 
 **Validators**:
+
 - `schema`: Valida estrutura JSON (Zod schema)
 - `length`: Valida tamanho (min/max chars/words)
 - `llm_judge`: LLM avalia qualidade com critérios ponderados
@@ -975,6 +1073,7 @@ missions/
   - Threshold: quality_threshold (default 75%)
 
 **Decision Tree** (afterExecution):
+
 ```
 Resultado da execução
 └── Validação passou? (quality_score >= threshold)
@@ -987,14 +1086,17 @@ Resultado da execução
 ---
 
 ### CAMADA 3: EXECUTION LAYER (Existente)
+
 **Responsabilidade**: Executar tasks V5 com políticas e observabilidade
 
 **Componentes** (já documentados):
+
 - Kernel (loop 20Hz, policy engine, task runtime)
 - Driver (Puppeteer automation, factory pattern)
 - Infra (browser pool, locks, queue, storage)
 
 **Integração com Orchestrator**:
+
 ```
 Kernel recebe Task V5 com spec.execution.strategy
     ↓
@@ -1014,14 +1116,17 @@ Kernel atualiza estado e emite NERV event
 ---
 
 ### CAMADA 4: INTERFACE LAYER (Existente)
+
 **Responsabilidade**: Interface externa (HTTP + WebSocket + API)
 
 **Componentes** (já documentados):
+
 - Server (Express + Socket.io)
 - Dashboard (HTML/JS client)
 - API (REST endpoints)
 
 **Novos Endpoints Necessários**:
+
 ```
 GET    /missions                 # Listar missões
 POST   /missions                 # Criar missão (template + params)
@@ -1035,6 +1140,7 @@ GET    /missions/:id/checkpoints # Checkpoints recovery
 ```
 
 **WebSocket Events** (novos):
+
 ```
 mission:created        # Missão criada
 mission:started        # Execução iniciada
@@ -1053,6 +1159,7 @@ mission:progress       # Update de progresso (%)
 ## 📊 COMPARAÇÃO DE COMPLEXIDADE: Task vs Mission
 
 ### Task V4 (Simple)
+
 ```json
 {
   "id": "task-001",
@@ -1062,9 +1169,11 @@ mission:progress       # Update de progresso (%)
   "timeout": 120
 }
 ```
+
 **Lifecycle**: PENDING → RUNNING → DONE (3 estados, ~2 minutos)
 
 ### Mission V5 (Complex)
+
 ```json
 {
   "id": "mission-001",
@@ -1105,14 +1214,16 @@ mission:progress       # Update de progresso (%)
   }
 }
 ```
-**Lifecycle**: PENDING → RUNNING (17 steps) → COMPLETED (4-6 horas)
-**Complexity**: 100x maior que task simples
+
+**Lifecycle**: PENDING → RUNNING (17 steps) → COMPLETED (4-6 horas) **Complexity**: 100x maior que
+task simples
 
 ---
 
 ## 🔄 FLUXO COMPLETO ATUALIZADO: MISSÃO END-TO-END
 
 ### FASE 1: Criação da Missão (Usuário → Dashboard)
+
 ```
 1. Usuário acessa Dashboard Web (localhost:3008)
 2. Navega para "Create Mission"
@@ -1144,6 +1255,7 @@ mission:progress       # Update de progresso (%)
 ```
 
 ### FASE 2: Execução da Missão (MissionManager → Orchestrator → Kernel)
+
 ```
 1. Usuário clica "Start Mission"
    ↓
@@ -1233,6 +1345,7 @@ mission:progress       # Update de progresso (%)
 ```
 
 ### FASE 3: Step ITERATIVE (Capítulo 1)
+
 ```
 1. MissionManager gera Task V5 para step-2-chapter-1:
    {
@@ -1301,6 +1414,7 @@ mission:progress       # Update de progresso (%)
 ```
 
 ### FASE 4: Feedback Humano (Usuário Intervém)
+
 ```
 1. Dashboard exibe progresso:
    "Step 8/17: Chapter 3 completed
@@ -1336,6 +1450,7 @@ mission:progress       # Update de progresso (%)
 ```
 
 ### FASE 5: Conclusão (MissionManager)
+
 ```
 1. Todos os steps concluídos (currentStepIndex == total_steps)
    ↓
@@ -1373,13 +1488,13 @@ mission:progress       # Update de progresso (%)
 ## 🚧 GAPS CRÍTICOS ENTRE CÓDIGO E ARQUITETURA
 
 ### 1. **Missions Subsystem** (❌ NÃO DOCUMENTADO)
-**Gravidade**: 🔴 **CRÍTICA**
-**Componentes**: MissionManager, WorkflowGenerator, MissionStateManager, Templates
-**Linhas de Código**: ~1,400+ (3 arquivos principais)
-**Status**: ✅ Implementado, ❌ Não documentado
-**Impacto**: Arquitetura atual NÃO explica sistema mission-oriented
+
+**Gravidade**: 🔴 **CRÍTICA** **Componentes**: MissionManager, WorkflowGenerator,
+MissionStateManager, Templates **Linhas de Código**: ~1,400+ (3 arquivos principais) **Status**: ✅
+Implementado, ❌ Não documentado **Impacto**: Arquitetura atual NÃO explica sistema mission-oriented
 
 **Precisa**:
+
 - Seção "Mission Layer" no ARCHITECTURE.md
 - Diagrama de hierarquia (Mission → Workflow → Step → Task)
 - Fluxo de criação/execução de missões
@@ -1388,13 +1503,14 @@ mission:progress       # Update de progresso (%)
 ---
 
 ### 2. **Orchestrator Subsystem** (❌ NÃO DOCUMENTADO)
-**Gravidade**: 🔴 **CRÍTICA**
-**Componentes**: OrchestratorEngine, ValidationService, ContextManager, CheckpointManager
-**Linhas de Código**: ~800+ (orchestrator/)
-**Status**: ✅ Implementado, ❌ Não documentado
-**Impacto**: Fluxo de task simplificado, não inclui orquestração avançada
+
+**Gravidade**: 🔴 **CRÍTICA** **Componentes**: OrchestratorEngine, ValidationService,
+ContextManager, CheckpointManager **Linhas de Código**: ~800+ (orchestrator/) **Status**: ✅
+Implementado, ❌ Não documentado **Impacto**: Fluxo de task simplificado, não inclui orquestração
+avançada
 
 **Precisa**:
+
 - Seção "Orchestration Layer" no ARCHITECTURE.md
 - Explicação de 3 estratégias (SINGLE_SHOT, ITERATIVE, MULTI_STEP)
 - Decision tree de validação (afterExecution)
@@ -1403,12 +1519,12 @@ mission:progress       # Update de progresso (%)
 ---
 
 ### 3. **Validation System** (❌ NÃO DOCUMENTADO)
-**Gravidade**: 🟡 **ALTA**
-**Componentes**: ValidationService, llm_judge, validators
-**Status**: ✅ Implementado, ❌ Não documentado
-**Impacto**: Sistema parece não ter controle de qualidade
+
+**Gravidade**: 🟡 **ALTA** **Componentes**: ValidationService, llm_judge, validators **Status**: ✅
+Implementado, ❌ Não documentado **Impacto**: Sistema parece não ter controle de qualidade
 
 **Precisa**:
+
 - Seção "Validation Strategies" no ARCHITECTURE.md
 - Explicação de 3 validators (schema, length, llm_judge)
 - Critérios ponderados do LLM judge
@@ -1417,12 +1533,13 @@ mission:progress       # Update de progresso (%)
 ---
 
 ### 4. **Template System** (❌ NÃO DOCUMENTADO)
-**Gravidade**: 🟡 **ALTA**
-**Componentes**: WorkflowGenerator, templates/, repeat_for_each
-**Status**: ✅ Implementado (book_writing.json), ❌ Não documentado
-**Impacto**: Não explica como workflows são criados
+
+**Gravidade**: 🟡 **ALTA** **Componentes**: WorkflowGenerator, templates/, repeat_for_each
+**Status**: ✅ Implementado (book_writing.json), ❌ Não documentado **Impacto**: Não explica como
+workflows são criados
 
 **Precisa**:
+
 - Seção "Template System" no ARCHITECTURE.md
 - Estrutura de template (params, workflow_template, success_criteria)
 - Expansão de repeat_for_each
@@ -1431,12 +1548,13 @@ mission:progress       # Update de progresso (%)
 ---
 
 ### 5. **Feedback Loop** (❌ NÃO DOCUMENTADO)
-**Gravidade**: 🟡 **ALTA**
-**Componentes**: FeedbackProcessor, ContextManager, endpoint /missions/:id/feedback
-**Status**: ⚠️ Implementado (parcial - endpoint faltando), ❌ Não documentado
+
+**Gravidade**: 🟡 **ALTA** **Componentes**: FeedbackProcessor, ContextManager, endpoint
+/missions/:id/feedback **Status**: ⚠️ Implementado (parcial - endpoint faltando), ❌ Não documentado
 **Impacto**: Não explica como usuário guia IA
 
 **Precisa**:
+
 - Seção "Human-in-the-Loop" no ARCHITECTURE.md
 - Fluxo de injeção de feedback
 - Propagação de contexto entre iterações
@@ -1445,12 +1563,12 @@ mission:progress       # Update de progresso (%)
 ---
 
 ### 6. **Checkpoint & Recovery** (❌ NÃO DOCUMENTADO)
-**Gravidade**: 🟡 **MÉDIA**
-**Componentes**: CheckpointManager, MissionStateManager (checkpoints/)
-**Status**: ✅ Implementado, ❌ Testado end-to-end
-**Impacto**: Sistema parece frágil a crashes
+
+**Gravidade**: 🟡 **MÉDIA** **Componentes**: CheckpointManager, MissionStateManager (checkpoints/)
+**Status**: ✅ Implementado, ❌ Testado end-to-end **Impacto**: Sistema parece frágil a crashes
 
 **Precisa**:
+
 - Seção "Crash Recovery" no ARCHITECTURE.md
 - Frequência de checkpoints (por step? por validação?)
 - Processo de recovery (auto vs manual)
@@ -1459,12 +1577,12 @@ mission:progress       # Update de progresso (%)
 ---
 
 ### 7. **Authority Modes** (❌ NÃO DOCUMENTADO)
-**Gravidade**: 🟢 **BAIXA**
-**Componentes**: Authority.js (STANDALONE vs DELEGATED)
-**Status**: ✅ Implementado, ❌ Não documentado
-**Impacto**: Não explica deploy modes
+
+**Gravidade**: 🟢 **BAIXA** **Componentes**: Authority.js (STANDALONE vs DELEGATED) **Status**: ✅
+Implementado, ❌ Não documentado **Impacto**: Não explica deploy modes
 
 **Precisa**:
+
 - Seção "Deployment Modes" no ARCHITECTURE.md
 - STANDALONE: Processo único, gerencia lifecycle
 - DELEGATED: Gerenciado por Maestro, suprime exit/signals
@@ -1475,10 +1593,11 @@ mission:progress       # Update de progresso (%)
 ## 📝 PRÓXIMOS PASSOS (RECOMENDAÇÕES)
 
 ### FASE 1: Atualizar ARCHITECTURE.md (URGENTE)
-**Prazo**: 1-2 dias
-**Responsável**: AI Agent (com aprovação do usuário)
+
+**Prazo**: 1-2 dias **Responsável**: AI Agent (com aprovação do usuário)
 
 **Seções a Adicionar**:
+
 1. **Mission-Oriented Design** (nova seção inicial)
    - Objetivo central redefinido
    - Hierarquia Mission → Workflow → Step → Task
@@ -1507,11 +1626,13 @@ mission:progress       # Update de progresso (%)
    - Casos de uso
 
 **Atualizar Seções Existentes**:
+
 - **Fluxo de Task**: Adicionar fluxo de missão end-to-end (6 fases)
 - **C4 Diagrams**: Incluir Mission/Orchestrator layers
 - **Métricas**: Adicionar métricas de missões (book_writing: 4-6h, $5-8)
 
 **Documentos Relacionados a Criar**:
+
 - `MISSIONS_GUIDE.md` - Guia completo para criar missões
 - `TEMPLATES_REFERENCE.md` - Referência de templates
 - `VALIDATION_STRATEGIES.md` - Deep dive em validação
@@ -1519,10 +1640,11 @@ mission:progress       # Update de progresso (%)
 ---
 
 ### FASE 2: Implementar Endpoints Missions (ALTA PRIORIDADE)
-**Prazo**: 2-3 dias
-**Responsável**: Desenvolvedor
+
+**Prazo**: 2-3 dias **Responsável**: Desenvolvedor
 
 **Endpoints a Implementar** (src/server/api/router.js):
+
 ```javascript
 GET    /missions                 # Listar missões
 POST   /missions                 # Criar missão
@@ -1536,6 +1658,7 @@ GET    /missions/:id/checkpoints # Listar checkpoints
 ```
 
 **WebSocket Events** (src/server/engine/socket.js):
+
 ```javascript
 mission:created, mission:started, mission:step:started,
 mission:step:completed, mission:step:failed, mission:paused,
@@ -1545,10 +1668,11 @@ mission:resumed, mission:completed, mission:failed, mission:progress
 ---
 
 ### FASE 3: Dashboard UI para Missions (MÉDIA PRIORIDADE)
-**Prazo**: 3-5 dias
-**Responsável**: Frontend Developer
+
+**Prazo**: 3-5 dias **Responsável**: Frontend Developer
 
 **UI Components Necessários**:
+
 1. **Mission Creator**:
    - Template selector
    - Param editor (form dinâmico)
@@ -1570,10 +1694,11 @@ mission:resumed, mission:completed, mission:failed, mission:progress
 ---
 
 ### FASE 4: Testes End-to-End (ALTA PRIORIDADE)
-**Prazo**: 1-2 dias
-**Responsável**: QA / AI Agent
+
+**Prazo**: 1-2 dias **Responsável**: QA / AI Agent
 
 **Testes Necessários**:
+
 1. **test-mission-minimal.js**:
    - Template book_writing com num_chapters=2
    - Valida criação → execução → conclusão
@@ -1589,10 +1714,11 @@ mission:resumed, mission:completed, mission:failed, mission:progress
 ---
 
 ### FASE 5: Melhorias de Qualidade (BAIXA PRIORIDADE)
-**Prazo**: 1-2 semanas
-**Responsável**: Equipe completa
+
+**Prazo**: 1-2 semanas **Responsável**: Equipe completa
 
 **Melhorias Sugeridas**:
+
 1. **Multi-User Support**:
    - Autenticação (JWT tokens)
    - Isolamento de missões por usuário
@@ -1652,17 +1778,20 @@ mission:resumed, mission:completed, mission:failed, mission:progress
 ### Recomendação Final
 
 **URGENTE**:
+
 1. ✅ Atualizar ARCHITECTURE.md com camadas Mission + Orchestration
 2. ✅ Documentar fluxo de missão end-to-end (6 fases)
 3. ⚠️ Implementar endpoints /missions (8 endpoints)
 4. ⚠️ Testar end-to-end (5 testes críticos)
 
 **IMPORTANTE**:
+
 - Criar MISSIONS_GUIDE.md (guia completo)
 - Dashboard UI para missions
 - Validar crash recovery
 
 **OPCIONAL**:
+
 - Multi-user support
 - Advanced templates
 - LLM judge customization
@@ -1670,6 +1799,7 @@ mission:resumed, mission:completed, mission:failed, mission:progress
 ### Próximo Passo Imediato
 
 **PROPOSTA**: Atualizar ARCHITECTURE.md com nova estrutura completa
+
 - Adicionar 7 novas seções (Mission Layer, Orchestration, etc.)
 - Atualizar 3 seções existentes (Fluxo, C4, Métricas)
 - Criar 3 documentos relacionados (Guides, References)

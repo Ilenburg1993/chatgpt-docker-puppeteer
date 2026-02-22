@@ -10,5 +10,4 @@ Recommended actions:
 1. Inspect and sanitize last-collect logs.
 2. Remove any accidental uploads or committed logs.
 
-Owner: @owner-placeholder
-Labels: security, P1, logs
+Owner: @owner-placeholder Labels: security, P1, logs

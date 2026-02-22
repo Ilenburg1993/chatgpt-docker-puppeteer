@@ -1,7 +1,6 @@
 # 🚀 Sistema Completo - Análise Consolidada v3.0
 
-**Data**: 3 de Fevereiro de 2026
-**Status**: ✅ **CONSOLIDADO** - Arquitetura Completa Mapeada
+**Data**: 3 de Fevereiro de 2026 **Status**: ✅ **CONSOLIDADO** - Arquitetura Completa Mapeada
 **Scope**: 6,000+ linhas analisadas (10 componentes core, 5 camadas)
 
 ---
@@ -10,7 +9,9 @@
 
 ### O Que É Este Sistema?
 
-Sistema autônomo de **Mission Orchestration** que controla LLMs (ChatGPT, Gemini, Claude) via browser automation para executar **missões longas** (4-24h). Arquitetura em **5 camadas** com **10 componentes** comunicando via **NERV Event Bus** (zero acoplamento).
+Sistema autônomo de **Mission Orchestration** que controla LLMs (ChatGPT, Gemini, Claude) via
+browser automation para executar **missões longas** (4-24h). Arquitetura em **5 camadas** com **10
+componentes** comunicando via **NERV Event Bus** (zero acoplamento).
 
 ### Hierarquia de Conceitos
 
@@ -69,7 +70,9 @@ MISSION (4-24h) → "Escrever livro de 200 páginas"
 
 ### Propósito do Sistema
 
-O sistema é uma **Mission Orchestration Platform** que permite executar workflows complexos de 4-24h em LLMs com:
+O sistema é uma **Mission Orchestration Platform** que permite executar workflows complexos de 4-24h
+em LLMs com:
+
 - ✅ Automação via Puppeteer (ChatGPT, Gemini, Claude)
 - ✅ Gerenciamento de missões multi-task (workflows dinâmicos)
 - ✅ LLM-as-judge validation (quality assurance)
@@ -113,9 +116,12 @@ O sistema é uma **Mission Orchestration Platform** que permite executar workflo
 ### Definições Ontológicas
 
 #### **Task (Tarefa)** - Unidade Atômica de Trabalho
-**Definição**: Uma **task** é a menor unidade de trabalho executável pelo sistema. Representa **1 interação completa com um LLM**.
+
+**Definição**: Uma **task** é a menor unidade de trabalho executável pelo sistema. Representa **1
+interação completa com um LLM**.
 
 **Características**:
+
 - ✅ **Atômica**: Não pode ser subdividida (1 prompt → 1 resposta)
 - ✅ **Stateless**: Cada task é independente (sem dependências de contexto)
 - ✅ **Síncrona**: Executa do início ao fim sem interrupção
@@ -123,6 +129,7 @@ O sistema é uma **Mission Orchestration Platform** que permite executar workflo
 - ✅ **Idempotente**: Pode ser retentada em caso de falha
 
 **Exemplos de Task**:
+
 ```
 Task 1: "Resuma este artigo em 3 parágrafos"
 Task 2: "Traduza este texto para francês"
@@ -131,6 +138,7 @@ Task 4: "Corrija os erros gramaticais neste parágrafo"
 ```
 
 **Anatomia de uma Task**:
+
 ```javascript
 {
     meta: {
@@ -158,6 +166,7 @@ Task 4: "Corrija os erros gramaticais neste parágrafo"
 ```
 
 **Ciclo de Vida de Task**:
+
 ```
 PENDING → RUNNING → COMPLETED
          ↓
@@ -167,9 +176,12 @@ PENDING → RUNNING → COMPLETED
 ---
 
 #### **Mission (Missão)** - Workflow Complexo Multi-Task
-**Definição**: Uma **mission** é um **workflow de alto nível** composto por **múltiplas tasks interdependentes**. Representa um objetivo complexo que requer orquestração.
+
+**Definição**: Uma **mission** é um **workflow de alto nível** composto por **múltiplas tasks
+interdependentes**. Representa um objetivo complexo que requer orquestração.
 
 **Características**:
+
 - ✅ **Composta**: Formada por N tasks (N >= 2)
 - ✅ **Stateful**: Mantém contexto entre tasks (acumulação de informação)
 - ✅ **Assíncrona**: Execução pode durar horas/dias
@@ -178,6 +190,7 @@ PENDING → RUNNING → COMPLETED
 - ✅ **LLM-validated**: Cada step pode ter validação via LLM-as-judge
 
 **Exemplos de Mission**:
+
 ```
 Mission 1: "Escrever um livro de 200 páginas"
   ├─ Task 1: Gerar outline (10 capítulos)
@@ -207,6 +220,7 @@ Mission 3: "Criar curso online completo"
 ```
 
 **Anatomia de uma Mission**:
+
 ```javascript
 {
     meta: {
@@ -265,6 +279,7 @@ Mission 3: "Criar curso online completo"
 ```
 
 **Ciclo de Vida de Mission**:
+
 ```
 CREATED → IN_PROGRESS → COMPLETED
            ↓
@@ -655,6 +670,7 @@ main.js (Boot Process)
 ### Princípio de Separação de Responsabilidades (SoC)
 
 Cada componente do sistema tem **1 responsabilidade primária**. Violações de fronteira causam:
+
 - ❌ Acoplamento desnecessário
 - ❌ Dificuldade de manutenção
 - ❌ Bugs sutis (efeitos colaterais)
@@ -665,14 +681,16 @@ Cada componente do sistema tem **1 responsabilidade primária**. Violações de 
 ### CAMADA 0: INFRASTRUCTURE
 
 ### Componente 1: **BrowserPool**
+
 **Responsabilidade Primária**: Gerenciar **navegadores Chrome** (conexão, pool, health)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Conectar a Chrome via Puppeteer
 await browserPool.initialize({
-    browserEndpoint: 'http://localhost:9224',
-    mode: 'wsEndpoint'
+  browserEndpoint: 'http://localhost:9224',
+  mode: 'wsEndpoint',
 });
 
 // 2. Gerenciar pool de instâncias (3 browsers)
@@ -689,17 +707,20 @@ await browserPool._healthCheck();
 
 // 6. Auto-restart de browsers crashed
 if (browser.crashed) {
-    await browserPool._restartBrowser(browserId);
+  await browserPool._restartBrowser(browserId);
 }
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar prompts em LLMs** → Responsabilidade do Driver
 - ❌ **Gerenciar estado de tasks** → Responsabilidade do Kernel
 - ❌ **Orquestrar workflows** → Responsabilidade do MissionManager
-- ❌ **Emitir eventos NERV de domain logic** → Apenas eventos de infra (browser_crashed, pool_exhausted)
+- ❌ **Emitir eventos NERV de domain logic** → Apenas eventos de infra (browser_crashed,
+  pool_exhausted)
 
 **Fronteira Clara**:
+
 ```
 BrowserPool aloca Page → Driver usa Page para interagir com LLM
                   ↑
@@ -711,9 +732,11 @@ BrowserPool aloca Page → Driver usa Page para interagir com LLM
 ### CAMADA 1: INTERFACE
 
 ### Componente 2: **Server (API + Socket.io)**
+
 **Responsabilidade Primária**: **Interface externa** via HTTP REST + WebSockets
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Express HTTP server (bind port 2998)
 app.listen(2998);
@@ -724,13 +747,13 @@ app.use('/api/tasks', tasksController);
 app.use('/api/system', systemController);
 
 // 3. Socket.io hub (real-time)
-io.on('connection', (socket) => {
-    socket.emit('mission_progress', data);
+io.on('connection', socket => {
+  socket.emit('mission_progress', data);
 });
 
 // 4. ServerNERVAdapter (NERV ↔ Socket)
-nervAdapter.on('TASK_COMPLETED', (event) => {
-    io.emit('task_update', event);
+nervAdapter.on('TASK_COMPLETED', event => {
+  io.emit('task_update', event);
 });
 
 // 5. Telemetria em tempo real
@@ -741,11 +764,13 @@ app.get('/api/health', healthController.getHealth);
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar lógica de negócio** → Delegue para Kernel/MissionManager
 - ❌ **Acessar Driver diretamente** → Use NERV
 - ❌ **Gerenciar estado de tasks** → Responsabilidade do Kernel
 
 **Fronteira Clara**:
+
 ```
 Server expõe API → Controller valida → Emite NERV event → Kernel processa
            ↑
@@ -755,22 +780,24 @@ Server expõe API → Controller valida → Emite NERV event → Kernel processa
 ---
 
 ### Componente 3: **Dashboard (UI)**
+
 **Responsabilidade Primária**: **Interface do usuário** (HTML + React + Socket.io client)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Conectar ao Server via Socket.io
 const socket = io('http://localhost:2998');
 
 // 2. Escutar eventos de progresso
-socket.on('mission_progress', (data) => {
-    updateProgressBar(data.currentStep, data.totalSteps);
+socket.on('mission_progress', data => {
+  updateProgressBar(data.currentStep, data.totalSteps);
 });
 
 // 3. Submeter comandos via API REST
 fetch('/api/missions', {
-    method: 'POST',
-    body: JSON.stringify(mission)
+  method: 'POST',
+  body: JSON.stringify(mission),
 });
 
 // 4. Renderizar telemetria (charts, logs)
@@ -781,6 +808,7 @@ socket.emit('mission_control', { action: 'pause', missionId });
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Acessar NERV diretamente** → Use Server como intermediário
 - ❌ **Manipular estado de tasks** → Read-only view
 - ❌ **Executar lógica de validação** → Responsabilidade do MissionManager
@@ -790,15 +818,17 @@ socket.emit('mission_control', { action: 'pause', missionId });
 ### CAMADA 2: ORCHESTRATION
 
 ### Componente 4: **MissionManager**
+
 **Responsabilidade Primária**: **Gerenciar ciclo de vida de missões** (CRUD + execução)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. CRUD de missões
 const mission = await missionManager.createMission({
-    title: 'Write Book',
-    templateId: 'book_writing',
-    params: { pages: 200 }
+  title: 'Write Book',
+  templateId: 'book_writing',
+  params: { pages: 200 },
 });
 
 // 2. Gerar workflow de tasks V5
@@ -818,17 +848,19 @@ const isValid = await feedbackProcessor.validate(output, criteria);
 await checkpointManager.save(mission.state);
 
 // 7. Escutar TASK_COMPLETED via NERV
-nerv.on('TASK_COMPLETED', (event) => {
-    this._handleTaskCompleted(event);
+nerv.on('TASK_COMPLETED', event => {
+  this._handleTaskCompleted(event);
 });
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar task individual** → Responsabilidade do Kernel
 - ❌ **Interagir com Driver** → Use Kernel como intermediário
 - ❌ **Gerenciar páginas do browser** → Responsabilidade do BrowserPool
 
 **Fronteira Clara**:
+
 ```
 MissionManager gera tasks → NERV → Kernel executa → NERV → MissionManager valida
                       ↑                                           ↑
@@ -838,9 +870,12 @@ MissionManager gera tasks → NERV → Kernel executa → NERV → MissionManage
 ---
 
 ### Componente 5: **OrchestratorEngine**
-**Responsabilidade Primária**: **Estratégias de execução de tasks** (SINGLE_SHOT, ITERATIVE, MULTI_STEP)
+
+**Responsabilidade Primária**: **Estratégias de execução de tasks** (SINGLE_SHOT, ITERATIVE,
+MULTI_STEP)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Decidir se task precisa orquestração
 const needsOrchestration = orchestrator.shouldOrchestrate(task);
@@ -865,11 +900,13 @@ workflowState.completed_steps.push(stepId);
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar task** → Responsabilidade do Kernel
 - ❌ **Gerenciar missões** → Responsabilidade do MissionManager
 - ❌ **Persistir state** → Delega para MissionStateManager
 
 **Fronteira Clara**:
+
 ```
 Kernel executa task → OrchestratorEngine valida → Decisão (RETRY/NEXT_STEP) → Kernel
                                             ↑
@@ -881,9 +918,11 @@ Kernel executa task → OrchestratorEngine valida → Decisão (RETRY/NEXT_STEP)
 ### CAMADA 3: EXECUTION
 
 ### Componente 6: **Kernel (Task Orchestrator)**
+
 **Responsabilidade Primária**: Orquestrar **execução de tasks** (scheduling, policy, retry)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Scheduling de tasks (FIFO, Priority, etc)
 const nextTask = kernel.taskQueue.dequeue();
@@ -903,11 +942,13 @@ task.state.status = 'COMPLETED';
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar automação em LLM** → Responsabilidade do Driver
 - ❌ **Conectar a Chrome** → Responsabilidade do BrowserPool
 - ❌ **Orquestrar workflows multi-task** → Responsabilidade do MissionManager
 
 **Fronteira Clara**:
+
 ```
 Kernel agenda task → NERV → Adapter → Driver executa → Resultado → Kernel persiste
         ↑                                                                ↑
@@ -917,13 +958,15 @@ Kernel agenda task → NERV → Adapter → Driver executa → Resultado → Ker
 ---
 
 ### Componente 7: **KernelLoop (Time Sovereign)**
+
 **Responsabilidade Primária**: **Main loop** do Kernel (ciclo periódico 50ms)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Main loop (50ms interval)
 setInterval(async () => {
-    await this.step();
+  await this.step();
 }, 50);
 
 // 2. Drenar buffers NERV (inbound)
@@ -940,16 +983,18 @@ this._drainOutbound(); // Envia comandos
 
 // 6. Circuit Breaker check
 if (browserPool.circuitBreaker.shouldPauseSystem()) {
-    return; // Pula ciclo
+  return; // Pula ciclo
 }
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Decidir semanticamente** → Delega para ExecutionEngine
 - ❌ **Interpretar eventos** → Delega para ObservationStore
 - ❌ **Aplicar policies** → Delega para PolicyEngine
 
 **Fronteira Clara**:
+
 ```
 KernelLoop controla TEMPO → ExecutionEngine controla DECISÃO
                       ↑
@@ -959,9 +1004,11 @@ KernelLoop controla TEMPO → ExecutionEngine controla DECISÃO
 ---
 
 ### Componente 8: **ExecutionEngine (Decision Maker)**
+
 **Responsabilidade Primária**: **Avaliar estado** e produzir **proposals** (decisões)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Avaliar estado de todas as tasks
 const tasks = taskRuntime.listTasks();
@@ -974,14 +1021,14 @@ const semanticDecisions = this._interpretObservations({ task, observations });
 
 // 4. Sintetizar proposal (combinar policy + semantic)
 const proposal = {
-    kind: 'PROPOSE_EMIT_COMMAND',
-    action: 'DRIVER_EXECUTE',
-    task
+  kind: 'PROPOSE_EMIT_COMMAND',
+  action: 'DRIVER_EXECUTE',
+  task,
 };
 
 // 5. Integração com OrchestratorEngine (hooks)
 if (orchestrator.shouldOrchestrate(task)) {
-    task = orchestrator.beforeExecution(task);
+  task = orchestrator.beforeExecution(task);
 }
 
 // 6. Retornar proposals para KernelLoop
@@ -989,11 +1036,13 @@ return proposals; // Array<Proposal>
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Aplicar decisões** → Responsabilidade do KernelLoop
 - ❌ **Controlar tempo** → Responsabilidade do KernelLoop
 - ❌ **Mutar estado diretamente** → Produz proposals, não executa
 
 **Fronteira Clara**:
+
 ```
 ExecutionEngine PRODUZ proposals → KernelLoop APLICA proposals
                              ↑
@@ -1003,12 +1052,14 @@ ExecutionEngine PRODUZ proposals → KernelLoop APLICA proposals
 ---
 
 ### Componente 9: **PolicyEngine (Normative Rules)**
+
 **Responsabilidade Primária**: **Regras normativas** (timeout, retry, limits)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Avaliar timeout
-const isTimedOut = (Date.now() - task.startedAt) > TIMEOUT_MS;
+const isTimedOut = Date.now() - task.startedAt > TIMEOUT_MS;
 
 // 2. Avaliar retry policy
 const shouldRetry = task.retryCount < MAX_RETRIES;
@@ -1018,14 +1069,15 @@ const shouldAbort = cpuUsage > CPU_LIMIT || memoryUsage > MEMORY_LIMIT;
 
 // 4. Retornar assessment
 return {
-    shouldRetry,
-    shouldAbort,
-    shouldSuspend,
-    reason: 'TIMEOUT_EXCEEDED'
+  shouldRetry,
+  shouldAbort,
+  shouldSuspend,
+  reason: 'TIMEOUT_EXCEEDED',
 };
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar ações** → Apenas retorna assessment
 - ❌ **Interpretar eventos semanticamente** → Responsabilidade do ExecutionEngine
 - ❌ **Decidir workflows** → Responsabilidade do MissionManager
@@ -1035,9 +1087,12 @@ return {
 ### CAMADA 4: DRIVER EXECUTION
 
 ### Componente 10: **Driver (ChatGPT, Gemini, Claude)**
-**Responsabilidade Primária**: **Navegar na interface do LLM** e executar **1 task** (1 prompt → 1 resposta)
+
+**Responsabilidade Primária**: **Navegar na interface do LLM** e executar **1 task** (1 prompt → 1
+resposta)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Validar página (URL, interface carregada)
 await driver.validatePage();
@@ -1062,6 +1117,7 @@ await driver.destroy();
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Conectar a Chrome** → Responsabilidade do BrowserPool
 - ❌ **Orquestrar múltiplas tasks** → Responsabilidade do MissionManager
 - ❌ **Decidir estratégias de retry** → Responsabilidade do PolicyEngine
@@ -1069,6 +1125,7 @@ await driver.destroy();
 - ❌ **Validar quality do output** → Responsabilidade do LLM-as-judge (FeedbackProcessor)
 
 **Fronteira Clara**:
+
 ```
 Driver executa 1 task → Retorna resultado → MissionManager decide próxima task
                    ↑
@@ -1076,6 +1133,7 @@ Driver executa 1 task → Retorna resultado → MissionManager decide próxima t
 ```
 
 **Exemplo de Violação (❌ ERRADO)**:
+
 ```javascript
 // ❌ Driver NÃO deve decidir se task precisa retry
 async execute(prompt) {
@@ -1099,9 +1157,11 @@ async execute(prompt) {
 ---
 
 ### Componente 3: **DriverLifecycleManager**
+
 **Responsabilidade Primária**: Gerenciar **ciclo de vida** de 1 driver para 1 task
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Adquirir driver da Factory (com retry)
 const driver = await lifecycle.acquire({ maxRetries: 3 });
@@ -1120,11 +1180,13 @@ const health = lifecycle.getHealth();
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar lógica de task** → Responsabilidade do Driver
 - ❌ **Decidir qual driver instanciar** → Responsabilidade da Factory
 - ❌ **Gerenciar pool de drivers** → Responsabilidade do DriverNERVAdapter
 
 **Fronteira Clara**:
+
 ```
 Lifecycle gerencia 1 driver → Driver executa 1 task → Lifecycle limpa recursos
                          ↑
@@ -1134,13 +1196,15 @@ Lifecycle gerencia 1 driver → Driver executa 1 task → Lifecycle limpa recurs
 ---
 
 ### Componente 4: **DriverNERVAdapter**
+
 **Responsabilidade Primária**: Adaptar **eventos NERV** para **domínio Driver**
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Escutar eventos NERV (DRIVER_EXECUTE)
-nerv.on('DRIVER_EXECUTE', async (payload) => {
-    await this._handleDriverExecute(payload);
+nerv.on('DRIVER_EXECUTE', async payload => {
+  await this._handleDriverExecute(payload);
 });
 
 // 2. Alocar página do BrowserPool
@@ -1160,11 +1224,13 @@ this.taskQueue.push({ payload, correlationId });
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Implementar lógica de execução de task** → Responsabilidade do Driver
 - ❌ **Decidir workflows** → Responsabilidade do MissionManager
 - ❌ **Conectar a Chrome** → Responsabilidade do BrowserPool
 
 **Fronteira Clara**:
+
 ```
 Adapter escuta NERV → Orquestra Lifecycle → Driver executa → Adapter emite resultado (NERV)
                  ↑                                                      ↑
@@ -1174,9 +1240,11 @@ Adapter escuta NERV → Orquestra Lifecycle → Driver executa → Adapter emite
 ---
 
 ### Componente 5: **Kernel**
+
 **Responsabilidade Primária**: Orquestrar **execução de tasks** (scheduling, policy, retry)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Scheduling de tasks (FIFO, Priority, etc)
 const nextTask = kernel.taskQueue.dequeue();
@@ -1196,11 +1264,13 @@ task.state.status = 'COMPLETED';
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar automação em LLM** → Responsabilidade do Driver
 - ❌ **Conectar a Chrome** → Responsabilidade do BrowserPool
 - ❌ **Orquestrar workflows multi-task** → Responsabilidade do MissionManager
 
 **Fronteira Clara**:
+
 ```
 Kernel agenda task → NERV → Adapter → Driver executa → Resultado → Kernel persiste
         ↑                                                                ↑
@@ -1210,9 +1280,11 @@ Kernel agenda task → NERV → Adapter → Driver executa → Resultado → Ker
 ---
 
 ### Componente 6: **MissionManager**
+
 **Responsabilidade Primária**: Orquestrar **workflows multi-task** (missions)
 
 #### ✅ O que DEVE fazer:
+
 ```javascript
 // 1. Carregar mission template
 const mission = missionManager.loadTemplate('write-book', params);
@@ -1222,9 +1294,9 @@ const workflow = missionManager.generateWorkflow(mission);
 
 // 3. Submeter tasks ao Kernel (sequencial ou paralelo)
 for (const step of workflow.steps) {
-    for (const taskId of step.tasks) {
-        await kernel.submitTask(taskId);
-    }
+  for (const taskId of step.tasks) {
+    await kernel.submitTask(taskId);
+  }
 }
 
 // 4. Validar outputs (LLM-as-judge)
@@ -1238,11 +1310,13 @@ contextManager.addToContext(task.result);
 ```
 
 #### ❌ O que NÃO DEVE fazer:
+
 - ❌ **Executar task individual** → Responsabilidade do Driver
 - ❌ **Gerenciar ciclo de vida de driver** → Responsabilidade do Lifecycle
 - ❌ **Scheduling de tasks** → Responsabilidade do Kernel
 
 **Fronteira Clara**:
+
 ```
 MissionManager gera N tasks → Kernel executa 1 task → MissionManager valida → Próxima task
                          ↑                                                 ↑
@@ -1271,36 +1345,43 @@ MissionManager gera N tasks → Kernel executa 1 task → MissionManager valida 
 ### Violações Atuais Identificadas
 
 #### ⚠️ Violação 1: **Driver pode estar fazendo retry?**
+
 **Localização**: `src/driver/core/BaseDriver.js` (linhas 400-450)
 
 **Evidência**: BaseDriver tem `RETRY_STRATEGY` configurado
+
 ```javascript
 BASEDRIVER_CONFIG = {
-    MAX_RETRY_ATTEMPTS: 4,
-    RETRY_BACKOFF_TYPE: 'exponential'
-}
+  MAX_RETRY_ATTEMPTS: 4,
+  RETRY_BACKOFF_TYPE: 'exponential',
+};
 ```
 
 **Análise**:
+
 - ✅ **Aceitável SE**: Retry é apenas para falhas técnicas (timeout, selector not found)
 - ❌ **Violação SE**: Retry é para quality (output ruim → retry prompt)
 
-**Recomendação**: Clarificar na documentação que retry do Driver é APENAS para falhas técnicas (não quality).
+**Recomendação**: Clarificar na documentação que retry do Driver é APENAS para falhas técnicas (não
+quality).
 
 ---
 
 #### ⚠️ Violação 2: **Adapter pode estar fazendo scheduling?**
+
 **Localização**: `src/driver/nerv_adapter/driver_nerv_adapter.js` (linha 480)
 
 **Evidência**: Adapter implementa fila de tasks
+
 ```javascript
 // Task Queue (se MAX_ACTIVE_DRIVERS atingido)
 if (this.activeDrivers.size >= MAX_ACTIVE_DRIVERS) {
-    this.taskQueue.push({ payload, correlationId });
+  this.taskQueue.push({ payload, correlationId });
 }
 ```
 
 **Análise**:
+
 - ✅ **Aceitável SE**: Fila é apenas buffer anti-sobrecarga (não scheduling strategy)
 - ❌ **Violação SE**: Fila decide ordem de execução (FIFO, priority, etc)
 
@@ -1309,16 +1390,19 @@ if (this.activeDrivers.size >= MAX_ACTIVE_DRIVERS) {
 ---
 
 #### ✅ Não-Violação 3: **DriverLifecycleManager faz retry em acquire()**
+
 **Localização**: `src/driver/DriverLifecycleManager.js` (linha 140)
 
 **Evidência**: Retry em acquire() com exponential backoff
+
 ```javascript
 for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    // Retry logic
+  // Retry logic
 }
 ```
 
 **Análise**:
+
 - ✅ **Aceitável**: Retry é para falha técnica (driver not found, factory timeout)
 - ✅ Não viola fronteira: Lifecycle gerencia seu próprio ciclo de vida
 
@@ -1364,9 +1448,11 @@ for (let attempt = 1; attempt <= maxRetries; attempt++) {
 ### Componentes Principais
 
 #### 1. **DriverLifecycleManager** (490 linhas)
+
 **Papel**: Orquestrador de ciclo de vida (acquire → execute → release)
 
 **Responsabilidades**:
+
 - ✅ Adquire driver da Factory com retry logic (3 tentativas)
 - ✅ Gerencia AbortController (kill switch soberano)
 - ✅ Conecta handlers de telemetria (state_change, progress)
@@ -1375,34 +1461,33 @@ for (let attempt = 1; attempt <= maxRetries; attempt++) {
 - ✅ Coleta métricas (acquireTime, releaseTime, stateChanges, etc)
 
 **Features v2.0**:
+
 ```javascript
 // EventEmitter inheritance
-class DriverLifecycleManager extends EventEmitter { }
+class DriverLifecycleManager extends EventEmitter {}
 
 // 6 Lifecycle Events
 LIFECYCLE_EVENTS = {
-    ACQUIRED: 'lifecycle:acquired',
-    RELEASED: 'lifecycle:released',
-    ERROR: 'lifecycle:error',
-    STATE_CHANGE: 'lifecycle:state_change',
-    PROGRESS: 'lifecycle:progress',
-    HEALTH: 'lifecycle:health'
-}
+  ACQUIRED: 'lifecycle:acquired',
+  RELEASED: 'lifecycle:released',
+  ERROR: 'lifecycle:error',
+  STATE_CHANGE: 'lifecycle:state_change',
+  PROGRESS: 'lifecycle:progress',
+  HEALTH: 'lifecycle:health',
+};
 
 // Retry logic com exponential backoff
 for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const backoffDelay = retryDelay * Math.pow(2, attempt - 1);
-    // ...
+  const backoffDelay = retryDelay * Math.pow(2, attempt - 1);
+  // ...
 }
 
 // Timeout protection em destroy
-await Promise.race([
-    destroyPromise,
-    timeoutPromise(5000)
-]);
+await Promise.race([destroyPromise, timeoutPromise(5000)]);
 ```
 
 **Métricas Coletadas**:
+
 - `acquireAttempts`: Tentativas de aquisição
 - `acquireTime`: Tempo de aquisição (ms)
 - `releaseTime`: Tempo de liberação (ms)
@@ -1412,9 +1497,11 @@ await Promise.race([
 ---
 
 #### 2. **DriverNERVAdapter** (1,415 linhas)
+
 **Papel**: Adapter entre NERV (pub/sub IPC) e domínio Driver
 
 **Responsabilidades**:
+
 - ✅ Escuta eventos NERV (`DRIVER_EXECUTE`)
 - ✅ Aloca página do BrowserPool
 - ✅ Cria instância de DriverLifecycleManager
@@ -1425,51 +1512,64 @@ await Promise.race([
 - ✅ Emite 13 eventos locais via EventEmitter
 
 **Features v2.0**:
+
 ```javascript
 // EventEmitter inheritance
-class DriverNERVAdapter extends EventEmitter { }
+class DriverNERVAdapter extends EventEmitter {}
 
 // 13 Adapter Events
 ADAPTER_EVENTS = {
-    TASK_STARTED, TASK_COMPLETED, TASK_FAILED,
-    TASK_ABORTED, TASK_QUEUED, DRIVER_ATTACHED,
-    DRIVER_DETACHED, HEALTH_CHECK, ERROR,
-    DEGRADED_MODE, CIRCUIT_BREAKER_OPEN,
-    CIRCUIT_BREAKER_CLOSED, SHUTDOWN
-}
+  TASK_STARTED,
+  TASK_COMPLETED,
+  TASK_FAILED,
+  TASK_ABORTED,
+  TASK_QUEUED,
+  DRIVER_ATTACHED,
+  DRIVER_DETACHED,
+  HEALTH_CHECK,
+  ERROR,
+  DEGRADED_MODE,
+  CIRCUIT_BREAKER_OPEN,
+  CIRCUIT_BREAKER_CLOSED,
+  SHUTDOWN,
+};
 
 // Task Queue (se MAX_ACTIVE_DRIVERS atingido)
 if (this.activeDrivers.size >= MAX_ACTIVE_DRIVERS) {
-    this.taskQueue.push({ payload, correlationId });
+  this.taskQueue.push({ payload, correlationId });
 }
 
 // Duplo canal de telemetria (local + NERV)
 this._emitBoth(
-    ADAPTER_EVENTS.TASK_STARTED,    // Local (EventEmitter)
-    ActionCode.DRIVER_TASK_STARTED,  // NERV (IPC)
-    payload, correlationId
+  ADAPTER_EVENTS.TASK_STARTED, // Local (EventEmitter)
+  ActionCode.DRIVER_TASK_STARTED, // NERV (IPC)
+  payload,
+  correlationId
 );
 ```
 
 **Configurações**:
+
 ```javascript
 ADAPTER_CONFIG = {
-    EXECUTE_TASK_TIMEOUT_MS: 300000,        // 5min
-    SHUTDOWN_TIMEOUT_MS: 30000,             // 30s
-    HEALTH_CHECK_INTERVAL_MS: 60000,        // 1min
-    MAX_ACTIVE_DRIVERS: 10,
-    TELEMETRY_BUFFER_SIZE: 1000,
-    CIRCUIT_BREAKER_THRESHOLD: 5,
-    MAX_QUEUE_SIZE: 100
-}
+  EXECUTE_TASK_TIMEOUT_MS: 300000, // 5min
+  SHUTDOWN_TIMEOUT_MS: 30000, // 30s
+  HEALTH_CHECK_INTERVAL_MS: 60000, // 1min
+  MAX_ACTIVE_DRIVERS: 10,
+  TELEMETRY_BUFFER_SIZE: 1000,
+  CIRCUIT_BREAKER_THRESHOLD: 5,
+  MAX_QUEUE_SIZE: 100,
+};
 ```
 
 ---
 
 #### 3. **DriverFactory** (800 linhas)
+
 **Papel**: Factory pattern para criação e cache de drivers
 
 **Responsabilidades**:
+
 - ✅ Auto-discovery de drivers no diretório `targets/`
 - ✅ Lazy-loading de classes (carrega apenas quando necessário)
 - ✅ Cache por página (WeakMap + Map)
@@ -1478,6 +1578,7 @@ ADAPTER_CONFIG = {
 - ✅ Emite 6 eventos de factory
 
 **Features v2.0**:
+
 ```javascript
 // EventEmitter inheritance
 class DriverFactory extends EventEmitter { }
@@ -1514,6 +1615,7 @@ getDriver(target, page, config, signal) {
 ```
 
 **Discovery**:
+
 ```javascript
 // Auto-discovery no boot
 _discoverDrivers() {
@@ -1536,9 +1638,11 @@ _discoverDrivers() {
 ---
 
 #### 4. **TargetDriver** (655 linhas)
+
 **Papel**: Classe abstrata master (define contrato de execução)
 
 **Responsabilidades**:
+
 - ✅ Máquina de estados validada (5 estados)
 - ✅ State transition matrix (validação de transições)
 - ✅ AbortSignal integration (cancelamento automático)
@@ -1548,6 +1652,7 @@ _discoverDrivers() {
 - ✅ Telemetria avançada (10+ eventos)
 
 **State Machine**:
+
 ```javascript
 // 5 Estados
 STATES = {
@@ -1586,6 +1691,7 @@ setState(newState) {
 ```
 
 **Capabilities Schema**:
+
 ```javascript
 CAPABILITIES_SCHEMA = [
     'text_generation',
@@ -1617,9 +1723,11 @@ updateCapabilities(newCaps) {
 ---
 
 #### 5. **BaseDriver** (676 linhas)
+
 **Papel**: Orquestrador modular de execução física
 
 **Responsabilidades**:
+
 - ✅ Integra 6 módulos de execução:
   1. `RecoverySystem` - Recuperação de falhas
   2. `HandleManager` - Gestão de handlers
@@ -1633,6 +1741,7 @@ updateCapabilities(newCaps) {
 - ✅ Signal propagation completa
 
 **Módulos Integrados**:
+
 ```javascript
 constructor(page, config, signal) {
     super(page, config, signal);
@@ -1654,6 +1763,7 @@ constructor(page, config, signal) {
 ```
 
 **Error Classification**:
+
 ```javascript
 ERROR_CLASSES = {
     ABORT: 'ABORT',           // User cancellation
@@ -1676,6 +1786,7 @@ _classifyError(err) {
 ```
 
 **Retry Strategy**:
+
 ```javascript
 BASEDRIVER_CONFIG = {
     MAX_RETRY_ATTEMPTS: 4,
@@ -1695,9 +1806,11 @@ _applyBackoff(attempt) {
 ---
 
 #### 6. **ChatGPTDriver** (707 linhas)
+
 **Papel**: Especialista em interface OpenAI
 
 **Responsabilidades**:
+
 - ✅ Implementa abstract methods (`validatePage`, `captureState`, `prepareContext`, `sendPrompt`)
 - ✅ Thought pruning (modelos o1/o3)
 - ✅ Auto-continuation (respostas longas)
@@ -1707,33 +1820,35 @@ _applyBackoff(attempt) {
 - ✅ Retry logic em stopGeneration (3 tentativas)
 
 **Supported Models**:
+
 ```javascript
 SUPPORTED_MODELS = [
-    'gpt-4o',
-    'gpt-4o-mini',
-    'gpt-4-turbo',
-    'gpt-4',
-    'gpt-3.5-turbo',
-    'o1-preview',
-    'o1-mini',
-    'o3-mini'
-]
+  'gpt-4o',
+  'gpt-4o-mini',
+  'gpt-4-turbo',
+  'gpt-4',
+  'gpt-3.5-turbo',
+  'o1-preview',
+  'o1-mini',
+  'o3-mini',
+];
 ```
 
 **Capabilities Declared**:
+
 ```javascript
 this.updateCapabilities({
-    text_generation: true,
-    image_generation: true,      // DALL-E
-    file_upload: true,            // Attachments
-    context_reset: true,          // Model switching
-    streaming_events: true,       // Incremental perception
-    vision: true,                 // GPT-4V
-    tools: true,                  // Function calling
-    code_interpreter: true,       // Data analysis
-    web_browsing: false,          // Not supported natively
-    dalle: true,                  // DALL-E 3
-    function_calling: true        // GPT-4 Turbo+
+  text_generation: true,
+  image_generation: true, // DALL-E
+  file_upload: true, // Attachments
+  context_reset: true, // Model switching
+  streaming_events: true, // Incremental perception
+  vision: true, // GPT-4V
+  tools: true, // Function calling
+  code_interpreter: true, // Data analysis
+  web_browsing: false, // Not supported natively
+  dalle: true, // DALL-E 3
+  function_calling: true, // GPT-4 Turbo+
 });
 ```
 
@@ -1743,27 +1858,29 @@ this.updateCapabilities({
 
 ### Cenário: Executar Mission "Write Book" (200 páginas)
 
-Este fluxo demonstra a jornada completa desde o **usuário clicando no Dashboard** até a **missão completada**.
+Este fluxo demonstra a jornada completa desde o **usuário clicando no Dashboard** até a **missão
+completada**.
 
 ---
 
 ### **Fase 1: Submissão da Missão (USER → SERVER → MISSIONMANAGER)**
 
 **Etapa 1.1: Usuário cria missão no Dashboard**
+
 ```javascript
 // Dashboard (React)
 const mission = {
-    title: 'Write Book: AI Revolution',
-    description: '200-page book about AI',
-    templateId: 'book_writing',
-    params: { pages: 200, chapters: 10 }
+  title: 'Write Book: AI Revolution',
+  description: '200-page book about AI',
+  templateId: 'book_writing',
+  params: { pages: 200, chapters: 10 },
 };
 
 // POST /api/missions
 fetch('/api/missions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(mission)
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(mission),
 });
 ```
 
@@ -1772,22 +1889,23 @@ fetch('/api/missions', {
 ---
 
 **Etapa 1.2: Server recebe e valida request**
+
 ```javascript
 // Server (Express router)
 app.post('/api/missions', async (req, res) => {
-    // 1. Validação básica
-    if (!req.body.title || !req.body.templateId) {
-        return res.status(400).json({ error: 'Invalid request' });
-    }
+  // 1. Validação básica
+  if (!req.body.title || !req.body.templateId) {
+    return res.status(400).json({ error: 'Invalid request' });
+  }
 
-    // 2. Delega para MissionManager (via NERV ou direto)
-    const missionState = await missionManager.createMission(req.body);
+  // 2. Delega para MissionManager (via NERV ou direto)
+  const missionState = await missionManager.createMission(req.body);
 
-    // 3. Retorna para cliente
-    res.status(201).json(missionState);
+  // 3. Retorna para cliente
+  res.status(201).json(missionState);
 
-    // 4. Emite evento Socket.io
-    io.emit('mission_created', missionState);
+  // 4. Emite evento Socket.io
+  io.emit('mission_created', missionState);
 });
 ```
 
@@ -1796,6 +1914,7 @@ app.post('/api/missions', async (req, res) => {
 ---
 
 **Etapa 1.3: MissionManager cria missão e gera workflow**
+
 ```javascript
 // MissionManager
 async createMission({ title, description, templateId, params }) {
@@ -1835,6 +1954,7 @@ async createMission({ title, description, templateId, params }) {
 ### **Fase 2: Execução da Missão (MISSIONMANAGER → KERNEL → DRIVER)**
 
 **Etapa 2.1: MissionManager submete primeira task**
+
 ```javascript
 // MissionManager.executeMission()
 async executeMission(missionId) {
@@ -1865,6 +1985,7 @@ async executeMission(missionId) {
 ---
 
 **Etapa 2.2: Kernel recebe task e registra no TaskRuntime**
+
 ```javascript
 // Kernel.submitTask()
 async submitTask(task) {
@@ -1893,6 +2014,7 @@ async submitTask(task) {
 ---
 
 **Etapa 2.3: KernelLoop processa task (ciclo 50ms)**
+
 ```javascript
 // KernelLoop.step()
 async step() {
@@ -1924,6 +2046,7 @@ async step() {
 ---
 
 **Etapa 2.4: ExecutionEngine avalia task**
+
 ```javascript
 // ExecutionEngine.evaluate()
 evaluate({ tickId, at }) {
@@ -1963,6 +2086,7 @@ evaluate({ tickId, at }) {
 ---
 
 **Etapa 2.5: KernelLoop aplica proposal → Emite DRIVER_EXECUTE**
+
 ```javascript
 // KernelLoop._applyDecisions()
 async _applyDecisions(proposals) {
@@ -1987,48 +2111,44 @@ async _applyDecisions(proposals) {
 ### **Fase 3: Execução da Task no Driver System**
 
 **Etapa 3.1: DriverNERVAdapter escuta DRIVER_EXECUTE**
+
 ```javascript
 // DriverNERVAdapter
-this.nerv.on('DRIVER_EXECUTE', async (event) => {
-    const { task, correlationId } = event.payload;
+this.nerv.on('DRIVER_EXECUTE', async event => {
+  const { task, correlationId } = event.payload;
 
-    // 1. Aloca página do BrowserPool
-    const page = await this.browserPool.allocate(task.target); // 'chatgpt.com'
+  // 1. Aloca página do BrowserPool
+  const page = await this.browserPool.allocate(task.target); // 'chatgpt.com'
 
-    // 2. Cria DriverLifecycleManager
-    const lifecycle = new DriverLifecycleManager(page, task, this.config, this.signal);
+  // 2. Cria DriverLifecycleManager
+  const lifecycle = new DriverLifecycleManager(page, task, this.config, this.signal);
 
-    // 3. Registra em activeDrivers Map
-    this.activeDrivers.set(task.meta.id, { lifecycle, page, listeners: [] });
+  // 3. Registra em activeDrivers Map
+  this.activeDrivers.set(task.meta.id, { lifecycle, page, listeners: [] });
 
-    // 4. Conecta telemetria
-    lifecycle.on('state_change', (event) => {
-        this._emitBoth(ADAPTER_EVENTS.STATE_CHANGE, ActionCode.DRIVER_STATE_CHANGED, event);
+  // 4. Conecta telemetria
+  lifecycle.on('state_change', event => {
+    this._emitBoth(ADAPTER_EVENTS.STATE_CHANGE, ActionCode.DRIVER_STATE_CHANGED, event);
+  });
+
+  // 5. Executa task
+  try {
+    const result = await lifecycle.execute();
+
+    // 6. Emite sucesso
+    this._emitBoth(ADAPTER_EVENTS.TASK_COMPLETED, ActionCode.DRIVER_TASK_COMPLETED, {
+      task,
+      result,
     });
-
-    // 5. Executa task
-    try {
-        const result = await lifecycle.execute();
-
-        // 6. Emite sucesso
-        this._emitBoth(
-            ADAPTER_EVENTS.TASK_COMPLETED,
-            ActionCode.DRIVER_TASK_COMPLETED,
-            { task, result }
-        );
-    } catch (error) {
-        // 7. Emite falha
-        this._emitBoth(
-            ADAPTER_EVENTS.TASK_FAILED,
-            ActionCode.DRIVER_TASK_FAILED,
-            { task, error }
-        );
-    } finally {
-        // 8. Cleanup
-        await lifecycle.release();
-        await this.browserPool.release(page);
-        this.activeDrivers.delete(task.meta.id);
-    }
+  } catch (error) {
+    // 7. Emite falha
+    this._emitBoth(ADAPTER_EVENTS.TASK_FAILED, ActionCode.DRIVER_TASK_FAILED, { task, error });
+  } finally {
+    // 8. Cleanup
+    await lifecycle.release();
+    await this.browserPool.release(page);
+    this.activeDrivers.delete(task.meta.id);
+  }
 });
 ```
 
@@ -2037,6 +2157,7 @@ this.nerv.on('DRIVER_EXECUTE', async (event) => {
 ---
 
 **Etapa 3.2: DriverLifecycleManager executa task**
+
 ```javascript
 // DriverLifecycleManager.execute()
 async execute() {
@@ -2056,6 +2177,7 @@ async execute() {
 ---
 
 **Etapa 3.3: Driver executa automação (ChatGPTDriver)**
+
 ```javascript
 // ChatGPTDriver.execute()
 async execute(prompt) {
@@ -2093,13 +2215,10 @@ async execute(prompt) {
 ### **Fase 4: Processamento do Resultado (KERNEL → MISSIONMANAGER)**
 
 **Etapa 4.1: DriverNERVAdapter emite TASK_COMPLETED**
+
 ```javascript
 // Já visto na Etapa 3.1 (linha 6)
-this._emitBoth(
-    ADAPTER_EVENTS.TASK_COMPLETED,
-    ActionCode.DRIVER_TASK_COMPLETED,
-    { task, result }
-);
+this._emitBoth(ADAPTER_EVENTS.TASK_COMPLETED, ActionCode.DRIVER_TASK_COMPLETED, { task, result });
 ```
 
 **Timing**: 5ms (NERV emission)
@@ -2107,18 +2226,19 @@ this._emitBoth(
 ---
 
 **Etapa 4.2: Kernel registra resultado (ObservationStore)**
+
 ```javascript
 // ObservationStore
-this.nerv.on('DRIVER_TASK_COMPLETED', (event) => {
-    // 1. Registra evento
-    this.observations.push({
-        event,
-        correlationId: event.correlationId,
-        at: Date.now()
-    });
+this.nerv.on('DRIVER_TASK_COMPLETED', event => {
+  // 1. Registra evento
+  this.observations.push({
+    event,
+    correlationId: event.correlationId,
+    at: Date.now(),
+  });
 
-    // 2. Notifica ExecutionEngine (no próximo ciclo)
-    // ExecutionEngine vai interpretar e atualizar TaskRuntime
+  // 2. Notifica ExecutionEngine (no próximo ciclo)
+  // ExecutionEngine vai interpretar e atualizar TaskRuntime
 });
 ```
 
@@ -2127,6 +2247,7 @@ this.nerv.on('DRIVER_TASK_COMPLETED', (event) => {
 ---
 
 **Etapa 4.3: ExecutionEngine interpreta resultado (próximo ciclo 50ms)**
+
 ```javascript
 // ExecutionEngine._interpretObservations()
 _interpretObservations({ task, observations }) {
@@ -2164,66 +2285,67 @@ _interpretObservations({ task, observations }) {
 ---
 
 **Etapa 4.4: MissionManager escuta TASK_COMPLETED**
+
 ```javascript
 // MissionManager
-this.nerv.on('TASK_COMPLETED', async (event) => {
-    const { task, result } = event.payload;
+this.nerv.on('TASK_COMPLETED', async event => {
+  const { task, result } = event.payload;
 
-    // 1. Busca missão associada
-    const missionId = task.meta.mission_id;
-    const mission = await this.stateManager.getMission(missionId);
+  // 1. Busca missão associada
+  const missionId = task.meta.mission_id;
+  const mission = await this.stateManager.getMission(missionId);
 
-    // 2. Valida resultado (LLM-as-judge)
-    const isValid = await this.feedbackProcessor.validate(result.text, {
-        criteria: task.spec.validation?.criteria || {}
-    });
+  // 2. Valida resultado (LLM-as-judge)
+  const isValid = await this.feedbackProcessor.validate(result.text, {
+    criteria: task.spec.validation?.criteria || {},
+  });
 
-    if (!isValid.passed) {
-        // Retry task com feedback
-        task.spec.input.prompt = isValid.feedback + '\n\n' + task.spec.input.prompt;
-        await this.kernel.submitTask(task);
-        return;
+  if (!isValid.passed) {
+    // Retry task com feedback
+    task.spec.input.prompt = isValid.feedback + '\n\n' + task.spec.input.prompt;
+    await this.kernel.submitTask(task);
+    return;
+  }
+
+  // 3. Atualiza contexto da missão
+  this.contextManager.addToContext(missionId, result.text);
+
+  // 4. Marca step como completo
+  const currentStepIndex = mission.state.current_step_index;
+  const step = mission.workflow.steps[currentStepIndex];
+  step.completed_tasks.push(task.meta.id);
+
+  // 5. Se step completo, avança para próximo step
+  if (step.completed_tasks.length === step.tasks.length) {
+    mission.state.current_step_index++;
+
+    // 5.1. Checkpoint (recovery < 5min)
+    await this.checkpointManager.save(mission.state);
+
+    // 5.2. Se há próximo step, submete tasks
+    if (mission.state.current_step_index < mission.workflow.steps.length) {
+      const nextStep = mission.workflow.steps[mission.state.current_step_index];
+      for (const nextTask of nextStep.tasks) {
+        await this.kernel.submitTask(nextTask);
+      }
+    } else {
+      // 5.3. Missão completa
+      await this.stateManager.updateMission(missionId, {
+        status: MISSION_STATUS.COMPLETED,
+        completed_at: new Date(),
+      });
+
+      // 5.4. Emite evento
+      this.nerv.emit({
+        type: 'MISSION_COMPLETED',
+        action: ActionCode.MISSION_COMPLETED,
+        payload: { missionId },
+      });
     }
+  }
 
-    // 3. Atualiza contexto da missão
-    this.contextManager.addToContext(missionId, result.text);
-
-    // 4. Marca step como completo
-    const currentStepIndex = mission.state.current_step_index;
-    const step = mission.workflow.steps[currentStepIndex];
-    step.completed_tasks.push(task.meta.id);
-
-    // 5. Se step completo, avança para próximo step
-    if (step.completed_tasks.length === step.tasks.length) {
-        mission.state.current_step_index++;
-
-        // 5.1. Checkpoint (recovery < 5min)
-        await this.checkpointManager.save(mission.state);
-
-        // 5.2. Se há próximo step, submete tasks
-        if (mission.state.current_step_index < mission.workflow.steps.length) {
-            const nextStep = mission.workflow.steps[mission.state.current_step_index];
-            for (const nextTask of nextStep.tasks) {
-                await this.kernel.submitTask(nextTask);
-            }
-        } else {
-            // 5.3. Missão completa
-            await this.stateManager.updateMission(missionId, {
-                status: MISSION_STATUS.COMPLETED,
-                completed_at: new Date()
-            });
-
-            // 5.4. Emite evento
-            this.nerv.emit({
-                type: 'MISSION_COMPLETED',
-                action: ActionCode.MISSION_COMPLETED,
-                payload: { missionId }
-            });
-        }
-    }
-
-    // 6. Emite progresso via Socket.io
-    this._emitProgress(missionId, mission);
+  // 6. Emite progresso via Socket.io
+  this._emitProgress(missionId, mission);
 });
 ```
 
@@ -2234,14 +2356,15 @@ this.nerv.on('TASK_COMPLETED', async (event) => {
 ### **Fase 5: Atualização do Dashboard (SERVER → DASHBOARD)**
 
 **Etapa 5.1: ServerNERVAdapter escuta MISSION_COMPLETED**
+
 ```javascript
 // ServerNERVAdapter
-this.nerv.on('MISSION_COMPLETED', (event) => {
-    // Emite via Socket.io
-    this.io.emit('mission_completed', {
-        missionId: event.payload.missionId,
-        completedAt: new Date()
-    });
+this.nerv.on('MISSION_COMPLETED', event => {
+  // Emite via Socket.io
+  this.io.emit('mission_completed', {
+    missionId: event.payload.missionId,
+    completedAt: new Date(),
+  });
 });
 ```
 
@@ -2250,19 +2373,20 @@ this.nerv.on('MISSION_COMPLETED', (event) => {
 ---
 
 **Etapa 5.2: Dashboard atualiza UI**
+
 ```javascript
 // Dashboard (React)
-socket.on('mission_completed', (data) => {
-    // 1. Atualiza UI
-    showNotification('Mission completed!');
-    updateMissionStatus(data.missionId, 'COMPLETED');
+socket.on('mission_completed', data => {
+  // 1. Atualiza UI
+  showNotification('Mission completed!');
+  updateMissionStatus(data.missionId, 'COMPLETED');
 
-    // 2. Busca resultado final via API
-    fetch(`/api/missions/${data.missionId}`)
-        .then(res => res.json())
-        .then(mission => {
-            displayMissionResult(mission);
-        });
+  // 2. Busca resultado final via API
+  fetch(`/api/missions/${data.missionId}`)
+    .then(res => res.json())
+    .then(mission => {
+      displayMissionResult(mission);
+    });
 });
 ```
 
@@ -2564,11 +2688,13 @@ TOTAL MISSION (52 TASKS): 1.7-4.3 horas
 ### Pontos Fortes (✅)
 
 #### 1. **Arquitetura Limpa**
+
 - ✅ Herança bem definida (EventEmitter → TargetDriver → BaseDriver → ChatGPTDriver)
 - ✅ Separação de responsabilidades (Lifecycle, Adapter, Factory, Driver)
 - ✅ Zero acoplamento direto (comunicação via NERV)
 
 #### 2. **Resiliência**
+
 - ✅ Retry logic com exponential backoff
 - ✅ Timeout protection em operações críticas
 - ✅ Error classification (5 categorias)
@@ -2576,6 +2702,7 @@ TOTAL MISSION (52 TASKS): 1.7-4.3 horas
 - ✅ Degraded mode support
 
 #### 3. **Observabilidade**
+
 - ✅ 40+ eventos NERV
 - ✅ 30+ eventos EventEmitter
 - ✅ Metrics collection (14+ métricas)
@@ -2583,6 +2710,7 @@ TOTAL MISSION (52 TASKS): 1.7-4.3 horas
 - ✅ Health check endpoints
 
 #### 4. **Modularidade**
+
 - ✅ 6 módulos especializados (BiomechanicsEngine, RecoverySystem, etc)
 - ✅ Lazy-loading de drivers
 - ✅ Cache inteligente (WeakMap GC automático)
@@ -2593,9 +2721,12 @@ TOTAL MISSION (52 TASKS): 1.7-4.3 horas
 ### Pontos Fracos (⚠️)
 
 #### 1. **Missing Abstract Method: execute()**
-**Problema**: BaseDriver não implementa `execute()`, mas ChatGPTDriver também não o sobrescreve explicitamente.
+
+**Problema**: BaseDriver não implementa `execute()`, mas ChatGPTDriver também não o sobrescreve
+explicitamente.
 
 **Evidência**:
+
 ```javascript
 // TargetDriver.js - ABSTRACT METHODS
 // ❌ execute() NÃO está declarado como abstract
@@ -2609,11 +2740,13 @@ TOTAL MISSION (52 TASKS): 1.7-4.3 horas
 ```
 
 **Impacto**:
+
 - ⚠️ Contrato ambíguo (onde está execute()?)
 - ⚠️ Documentação inexistente
 - ⚠️ Dificulta criação de novos drivers
 
 **Correção**:
+
 ```javascript
 // TargetDriver.js
 /**
@@ -2633,27 +2766,31 @@ async execute(prompt) {
 ---
 
 #### 2. **Inconsistent Error Handling (DriverNERVAdapter)**
+
 **Problema**: Alguns try-catch blocks não emitem erro via EventEmitter.
 
 **Evidência**:
+
 ```javascript
 // Line 516: No error emission
 try {
-    lifecycleManager = new DriverLifecycleManager(page, task, this.config);
+  lifecycleManager = new DriverLifecycleManager(page, task, this.config);
 } catch (err) {
-    log('ERROR', `[DriverNERVAdapter] Failed to create lifecycle: ${err.message}`);
-    // ❌ FALTA: this.emit(ADAPTER_EVENTS.ERROR, { ... });
-    // ❌ FALTA: this._emitBoth(...);
-    return;
+  log('ERROR', `[DriverNERVAdapter] Failed to create lifecycle: ${err.message}`);
+  // ❌ FALTA: this.emit(ADAPTER_EVENTS.ERROR, { ... });
+  // ❌ FALTA: this._emitBoth(...);
+  return;
 }
 ```
 
 **Impacto**:
+
 - ⚠️ Telemetria incompleta
 - ⚠️ Dashboards não detectam erros
 - ⚠️ Debugging dificultado
 
 **Correção**:
+
 ```javascript
 } catch (err) {
     log('ERROR', `[DriverNERVAdapter] Failed to create lifecycle: ${err.message}`);
@@ -2677,9 +2814,11 @@ try {
 ---
 
 #### 3. **Memory Leak Risk: activeDrivers Map**
+
 **Problema**: Se release() falhar, entry fica no Map permanentemente.
 
 **Evidência**:
+
 ```javascript
 // driver_nerv_adapter.js, line 547
 this.activeDrivers.set(taskId, { lifecycleManager, listeners });
@@ -2693,11 +2832,13 @@ this.activeDrivers.delete(taskId);
 ```
 
 **Impacto**:
+
 - 🔴 Memory leak (Map cresce infinitamente)
 - 🔴 MAX_ACTIVE_DRIVERS nunca liberado
 - 🔴 Tasks enfileiradas eternamente
 
 **Correção**:
+
 ```javascript
 async _detachDriver(taskId) {
     try {
@@ -2717,9 +2858,11 @@ async _detachDriver(taskId) {
 ---
 
 #### 4. **Timeout Missing: Factory Lazy-Load**
+
 **Problema**: Lazy-loading de drivers não tem timeout.
 
 **Evidência**:
+
 ```javascript
 // factory.js, line ~300
 const DriverClass = require(metadata.path);
@@ -2729,30 +2872,34 @@ const driver = new DriverClass(page, config, signal);
 ```
 
 **Impacto**:
+
 - ⚠️ Adapter fica stuck aguardando driver
 - ⚠️ EXECUTE_TASK_TIMEOUT_MS não cobre este cenário
 
 **Correção**:
+
 ```javascript
 const driver = await Promise.race([
-    this._lazyLoadDriver(metadata, page, config, signal),
-    this._timeout(FACTORY_CONFIG.LAZY_LOAD_TIMEOUT_MS, 'lazy-load')
+  this._lazyLoadDriver(metadata, page, config, signal),
+  this._timeout(FACTORY_CONFIG.LAZY_LOAD_TIMEOUT_MS, 'lazy-load'),
 ]);
 ```
 
 ---
 
 #### 5. **Race Condition: AbortSignal**
+
 **Problema**: Signal pode ser abortado DURANTE acquire().
 
 **Evidência**:
+
 ```javascript
 // DriverLifecycleManager.js, line 148
 this.driver = driverFactory.getDriver(
-    this.task.spec.target,
-    this.page,
-    this.config,
-    this.abortController.signal  // Signal passado
+  this.task.spec.target,
+  this.page,
+  this.config,
+  this.abortController.signal // Signal passado
 );
 
 // ⚠️ Se signal abort DURANTE getDriver():
@@ -2761,10 +2908,12 @@ this.driver = driverFactory.getDriver(
 ```
 
 **Impacto**:
+
 - ⚠️ Listeners órfãos (memory leak)
 - ⚠️ Driver em estado inconsistente
 
 **Correção**:
+
 ```javascript
 // Check signal ANTES de getDriver
 if (this.abortController.signal.aborted) {
@@ -2788,11 +2937,11 @@ if (this.abortController.signal.aborted) {
 ### P0 (CRÍTICO - Quebra sistema)
 
 #### 1. **[P0] Declarar execute() como Abstract Method**
-**Arquivo**: `src/driver/core/TargetDriver.js`
-**Linhas**: ~200-220
-**Esforço**: 30min
+
+**Arquivo**: `src/driver/core/TargetDriver.js` **Linhas**: ~200-220 **Esforço**: 30min
 
 **Mudança**:
+
 ```javascript
 /**
  * Executa prompt na LLM e retorna resposta.
@@ -2819,11 +2968,11 @@ async execute(prompt) {
 ---
 
 #### 2. **[P0] Fix Memory Leak em activeDrivers Map**
-**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js`
-**Linhas**: 575-615
-**Esforço**: 1h
+
+**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js` **Linhas**: 575-615 **Esforço**: 1h
 
 **Mudança**:
+
 ```javascript
 async _detachDriver(taskId) {
     const startTime = Date.now();
@@ -2888,11 +3037,11 @@ async _detachDriver(taskId) {
 ---
 
 #### 3. **[P0] Add Timeout em Factory Lazy-Load**
-**Arquivo**: `src/driver/factory.js`
-**Linhas**: 280-320
-**Esforço**: 2h
+
+**Arquivo**: `src/driver/factory.js` **Linhas**: 280-320 **Esforço**: 2h
 
 **Mudança**:
+
 ```javascript
 async getDriver(target, page, config, signal) {
     // ... cache check ...
@@ -2947,11 +3096,11 @@ _timeout(ms, operation) {
 ### P1 (ALTO - Impacta confiabilidade)
 
 #### 4. **[P1] Fix AbortSignal Race Condition**
-**Arquivo**: `src/driver/DriverLifecycleManager.js`
-**Linhas**: 135-155
-**Esforço**: 1.5h
+
+**Arquivo**: `src/driver/DriverLifecycleManager.js` **Linhas**: 135-155 **Esforço**: 1.5h
 
 **Mudança**:
+
 ```javascript
 async acquire(options = {}) {
     // ... setup ...
@@ -3006,16 +3155,18 @@ async acquire(options = {}) {
 ---
 
 #### 5. **[P1] Complete Error Emission (DriverNERVAdapter)**
-**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js`
-**Linhas**: Múltiplas (510-550)
+
+**Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js` **Linhas**: Múltiplas (510-550)
 **Esforço**: 2h
 
 **Mudanças**:
+
 1. Line 516 (lifecycle creation failure)
 2. Line 524 (driver acquire failure)
 3. Line 545 (page allocation failure)
 
 **Template para todas as correções**:
+
 ```javascript
 } catch (err) {
     log('ERROR', `[DriverNERVAdapter] Operation failed: ${err.message}`, correlationId);
@@ -3046,10 +3197,11 @@ async acquire(options = {}) {
 ### P2 (MÉDIO - Melhoria recomendada)
 
 #### 6. **[P2] Add Metrics Dashboard Endpoint**
-**Arquivo**: NOVO - `src/driver/metrics_collector.js`
-**Esforço**: 4h
+
+**Arquivo**: NOVO - `src/driver/metrics_collector.js` **Esforço**: 4h
 
 **Features**:
+
 - Aggregate metrics de todos os drivers ativos
 - Expose via `/api/drivers/metrics`
 - Include: activeDrivers, queueSize, avgAcquireTime, avgExecuteTime, errorRate, etc
@@ -3057,9 +3209,8 @@ async acquire(options = {}) {
 ---
 
 #### 7. **[P2] Implement Driver Warmup**
-**Arquivo**: `src/driver/factory.js`
-**Linhas**: ~120-150
-**Esforço**: 3h
+
+**Arquivo**: `src/driver/factory.js` **Linhas**: ~120-150 **Esforço**: 3h
 
 **Objetivo**: Pre-load drivers mais usados no boot
 
@@ -3091,62 +3242,65 @@ async warmup(targets = ['chatgpt', 'gemini']) {
 ## 🚀 UPGRADES PROPOSTOS
 
 ### UPGRADE 1: Driver Pool (Similar ao Browser Pool)
-**Esforço**: 8-12 horas
-**Prioridade**: Média
+
+**Esforço**: 8-12 horas **Prioridade**: Média
 
 **Motivação**:
+
 - Atualmente: 1 driver criado por task (create → use → destroy)
 - Proposta: Pool de drivers reutilizáveis (warm instances)
 - Benefício: Reduzir latência de acquire (eliminar lazy-load)
 
 **Arquitetura**:
+
 ```javascript
 class DriverPool {
-    constructor({ poolSize = 5, targets = ['chatgpt', 'gemini'] }) {
-        this.pools = new Map(); // target → driver[]
+  constructor({ poolSize = 5, targets = ['chatgpt', 'gemini'] }) {
+    this.pools = new Map(); // target → driver[]
 
-        // Pre-create drivers
-        for (const target of targets) {
-            this.pools.set(target, []);
+    // Pre-create drivers
+    for (const target of targets) {
+      this.pools.set(target, []);
 
-            for (let i = 0; i < poolSize; i++) {
-                // Create warm driver (no page yet)
-                const driver = this._createWarmDriver(target);
-                this.pools.get(target).push(driver);
-            }
-        }
+      for (let i = 0; i < poolSize; i++) {
+        // Create warm driver (no page yet)
+        const driver = this._createWarmDriver(target);
+        this.pools.get(target).push(driver);
+      }
+    }
+  }
+
+  async acquire(target, page, signal) {
+    const pool = this.pools.get(target);
+
+    // Get available driver
+    const driver = pool.find(d => !d.busy);
+
+    if (!driver) {
+      throw new Error('POOL_EXHAUSTED');
     }
 
-    async acquire(target, page, signal) {
-        const pool = this.pools.get(target);
+    // Attach page + signal
+    driver.attachPage(page);
+    driver.attachSignal(signal);
+    driver.busy = true;
 
-        // Get available driver
-        const driver = pool.find(d => !d.busy);
+    return driver;
+  }
 
-        if (!driver) {
-            throw new Error('POOL_EXHAUSTED');
-        }
+  async release(driver) {
+    // Detach page + signal
+    driver.detachPage();
+    driver.detachSignal();
+    driver.busy = false;
 
-        // Attach page + signal
-        driver.attachPage(page);
-        driver.attachSignal(signal);
-        driver.busy = true;
-
-        return driver;
-    }
-
-    async release(driver) {
-        // Detach page + signal
-        driver.detachPage();
-        driver.detachSignal();
-        driver.busy = false;
-
-        // Driver pronto para reuso
-    }
+    // Driver pronto para reuso
+  }
 }
 ```
 
 **Benefícios**:
+
 - ⚡ Latência reduzida: 100ms → 10ms (acquire)
 - 📈 Throughput aumentado: +30% tasks/min
 - 🔥 Warm instances: Sem lazy-load delay
@@ -3154,15 +3308,17 @@ class DriverPool {
 ---
 
 ### UPGRADE 2: Distributed Tracing (OpenTelemetry)
-**Esforço**: 6-8 horas
-**Prioridade**: Alta
+
+**Esforço**: 6-8 horas **Prioridade**: Alta
 
 **Motivação**:
+
 - Atualmente: Correlation ID manual (logs)
 - Proposta: OpenTelemetry spans (distributed tracing)
 - Benefício: Trace completo (NERV → Adapter → Lifecycle → Driver → Módulos)
 
 **Exemplo**:
+
 ```javascript
 const { trace } = require('@opentelemetry/api');
 
@@ -3196,6 +3352,7 @@ async acquire(options) {
 ```
 
 **Benefícios**:
+
 - 🔍 Trace end-to-end: Request → Response
 - 📊 Performance insights: Bottleneck identification
 - 🐛 Debug facilitado: Stack trace distribuído
@@ -3203,15 +3360,17 @@ async acquire(options) {
 ---
 
 ### UPGRADE 3: Driver Health Monitoring (Proactive)
-**Esforço**: 4-6 horas
-**Prioridade**: Média
+
+**Esforço**: 4-6 horas **Prioridade**: Média
 
 **Motivação**:
+
 - Atualmente: Health check reativo (getHealth())
 - Proposta: Health monitoring proativo (background checks)
 - Benefício: Detectar drivers unhealthy ANTES de falhar
 
 **Implementação**:
+
 ```javascript
 // DriverNERVAdapter
 _startHealthMonitoring() {
@@ -3253,6 +3412,7 @@ _startHealthMonitoring() {
 ```
 
 **Benefícios**:
+
 - 🚨 Alertas proativos: Detectar antes de timeout
 - 📊 Métricas em tempo real: Health dashboard
 - 🔧 Auto-recovery: Abortar drivers stuck
@@ -3262,9 +3422,11 @@ _startHealthMonitoring() {
 ## 📅 PLANO DE IMPLEMENTAÇÃO
 
 ### Sprint 1: Correções P0 (1-2 dias)
+
 **Objetivo**: Eliminar bugs críticos
 
 **Tasks**:
+
 - [ ] **Task 1.1**: Declarar execute() como abstract method (30min)
   - Arquivo: `TargetDriver.js`
   - Commit: `fix(driver): declare execute() as abstract method (P0)`
@@ -3286,9 +3448,11 @@ _startHealthMonitoring() {
 ---
 
 ### Sprint 2: Correções P1 (2-3 dias)
+
 **Objetivo**: Melhorar confiabilidade
 
 **Tasks**:
+
 - [ ] **Task 2.1**: Fix AbortSignal race condition (1.5h)
   - Arquivo: `DriverLifecycleManager.js`
   - Commit: `fix(lifecycle): prevent abort signal race condition (P1)`
@@ -3307,9 +3471,11 @@ _startHealthMonitoring() {
 ---
 
 ### Sprint 3: Upgrades (1 semana)
+
 **Objetivo**: Melhorar performance e observabilidade
 
 **Tasks**:
+
 - [ ] **Task 3.1**: Driver Pool implementation (12h)
   - Criar: `src/driver/driver_pool_manager.js`
   - Modificar: `driver_nerv_adapter.js` (usar pool)
@@ -3321,7 +3487,7 @@ _startHealthMonitoring() {
   - Commit: `feat(observability): add OpenTelemetry distributed tracing (UPGRADE 2)`
 
 - [ ] **Task 3.3**: Health monitoring proativo (6h)
-  - Modificar: `driver_nerv_adapter.js` (_startHealthMonitoring)
+  - Modificar: `driver_nerv_adapter.js` (\_startHealthMonitoring)
   - Criar: Dashboard endpoint `/api/drivers/health`
   - Commit: `feat(monitoring): add proactive driver health checks (UPGRADE 3)`
 
@@ -3337,6 +3503,7 @@ _startHealthMonitoring() {
 ## 📊 MÉTRICAS DE SUCESSO
 
 ### Antes das Correções
+
 | Métrica           | Valor Atual                    |
 | ----------------- | ------------------------------ |
 | Memory Leaks      | 1 leak crítico (activeDrivers) |
@@ -3347,6 +3514,7 @@ _startHealthMonitoring() {
 | Abort Reliability | 85% (race condition)           |
 
 ### Depois das Correções (Sprint 1+2)
+
 | Métrica           | Valor Esperado                  |
 | ----------------- | ------------------------------- |
 | Memory Leaks      | 0 leaks                         |
@@ -3357,6 +3525,7 @@ _startHealthMonitoring() {
 | Abort Reliability | 100% (race condition resolvida) |
 
 ### Depois dos Upgrades (Sprint 3)
+
 | Métrica           | Valor Esperado           |
 | ----------------- | ------------------------ |
 | Memory Leaks      | 0 leaks                  |
@@ -3423,18 +3592,21 @@ Este documento analisou **10 componentes principais** organizados em **5 camadas
 #### **Clarificação Conceitual Essencial**
 
 **Task (Tarefa)**:
+
 - Unidade atômica: **1 prompt → 1 resposta**
 - Responsabilidade: **Driver** (Camada 4)
 - Duração: Segundos a minutos (2-5min média)
 - Exemplo: "Resuma este artigo em 3 parágrafos"
 
 **Mission (Missão)**:
+
 - Workflow complexo: **N tasks interdependentes**
 - Responsabilidade: **MissionManager** (Camada 2)
 - Duração: Minutos a dias (1.7-4.3h para 52 tasks)
 - Exemplo: "Escreva um livro de 200 páginas" → 52 tasks
 
 **Fronteiras de Responsabilidade Consolidadas**:
+
 ```
 CAMADA 0: BrowserPool
 ├─ ✅ Gerencia navegadores (conexão, pool, health)
@@ -3465,6 +3637,7 @@ CAMADA 4: Driver System
 #### **Estado Técnico do Sistema**
 
 **✅ IMPLEMENTADO (Production-Ready)**:
+
 - ✅ **BrowserPool**: Conexão Chrome, pool management, health checks (v2.0)
 - ✅ **Driver System**: DriverNERVAdapter, DriverLifecycle, Factory, Drivers (v2.0)
 - ✅ **Kernel**: KernelLoop, ExecutionEngine, PolicyEngine, TaskRuntime (v2.0)
@@ -3472,6 +3645,7 @@ CAMADA 4: Driver System
 - ✅ **OrchestratorEngine**: 3 estratégias (SINGLE_SHOT, ITERATIVE, MULTI_STEP) (v2.0)
 
 **🚧 EM CONSTRUÇÃO (Parcial)**:
+
 - 🚧 **MissionManager**: CRUD missions implementado, execution parcial (v1.5)
   - ✅ MissionStateManager (filesystem persistence)
   - ✅ WorkflowGenerator (97 templates criados)
@@ -3483,6 +3657,7 @@ CAMADA 4: Driver System
 **🔴 BUGS IDENTIFICADOS**:
 
 **P0 (CRITICAL)** - 3 bugs:
+
 1. **Memory leak**: `activeDrivers` Map nunca limpa drivers após conclusão
    - Localização: `src/driver/nerv_adapter/driver_nerv_adapter.js:575`
    - Impacto: Memória cresce indefinidamente
@@ -3498,11 +3673,11 @@ CAMADA 4: Driver System
    - Impacto: Contrato indefinido, interface unclear
    - Fix: Adicionar abstract method com `throw new Error()`
 
-**P1 (HIGH)** - 2 bugs:
-4. **AbortSignal race**: Sem listener de abort durante execução
-   - Localização: `src/driver/nerv_adapter/driver_nerv_adapter.js:520`
-   - Impacto: Tasks não abortam cleanly
-   - Fix: Add `signal.addEventListener('abort')` com cleanup
+**P1 (HIGH)** - 2 bugs: 4. **AbortSignal race**: Sem listener de abort durante execução
+
+- Localização: `src/driver/nerv_adapter/driver_nerv_adapter.js:520`
+- Impacto: Tasks não abortam cleanly
+- Fix: Add `signal.addEventListener('abort')` com cleanup
 
 5. **Error emission incomplete**: Alguns erros não emitidos via NERV
    - Localização: `src/driver/nerv_adapter/driver_nerv_adapter.js:590`
@@ -3514,6 +3689,7 @@ CAMADA 4: Driver System
 #### **Violações Arquiteturais Identificadas**
 
 **⚠️ Violação 1: BaseDriver pode fazer retry de quality issues?**
+
 - **Localização**: `src/driver/core/BaseDriver.js:400-450`
 - **Evidência**: `RETRY_STRATEGY` configurado (MAX_RETRY_ATTEMPTS: 4)
 - **Análise**:
@@ -3522,6 +3698,7 @@ CAMADA 4: Driver System
 - **Recomendação**: Adicionar JSDoc clarificando que retry é APENAS técnico
 
 **⚠️ Violação 2: Adapter faz scheduling com taskQueue?**
+
 - **Localização**: `src/driver/nerv_adapter/driver_nerv_adapter.js:480`
 - **Evidência**: `taskQueue.push()` quando limite atingido
 - **Análise**:
@@ -3530,6 +3707,7 @@ CAMADA 4: Driver System
 - **Recomendação**: Renomear para `bufferQueue` e documentar propósito
 
 **✅ Não-Violação 3: DriverLifecycleManager retry em acquire()**
+
 - **Localização**: `src/driver/DriverLifecycleManager.js:140`
 - **Análise**: ✅ OK - Retry para falha técnica (driver not found, factory timeout)
 - **Recomendação**: ✅ Manter como está
@@ -3539,22 +3717,26 @@ CAMADA 4: Driver System
 ### Plano de Implementação Consolidado
 
 **Sprint 1 (2 dias)**: Correções P0
+
 - Dia 1: Fix memory leak (activeDrivers cleanup) - 2h
 - Dia 1: Fix timeout missing (Factory lazy-load) - 1h
 - Dia 2: Fix abstract method (TargetDriver.execute()) - 30min
 - Dia 2: Testes de regressão - 4h
 
 **Sprint 2 (1 dia)**: Correções P1
+
 - Fix AbortSignal race condition - 1h
 - Fix error emission incompleta - 1h
 - Testes de regressão - 2h
 
 **Sprint 3 (1 semana)**: Upgrades Driver System
+
 - Upgrade 1: Driver Pool (warm instances, +30% throughput) - 8h
 - Upgrade 2: OpenTelemetry (distributed tracing) - 16h
 - Upgrade 3: Proactive Health Monitoring - 8h
 
 **Sprint 4 (2 semanas)**: Mission System MVP
+
 - Completar FeedbackProcessor (LLM-as-judge) - 3 dias
 - Completar CheckpointManager (recovery < 5min) - 2 dias
 - Integração end-to-end (Dashboard → Mission → Tasks → Drivers) - 3 dias
@@ -3565,18 +3747,21 @@ CAMADA 4: Driver System
 ### ROI Esperado
 
 **Sprint 1-2 (Correções P0-P1)**:
+
 - ✅ **0 memory leaks** (vs 1 atual) → Estabilidade 24/7
 - ✅ **100% timeout coverage** (vs 70%) → Resiliência em edge cases
 - ✅ **100% error telemetry** (vs 80%) → Observabilidade completa
 - ✅ **+10% confiabilidade** (menos hangs e crashes)
 
 **Sprint 3 (Upgrades Driver System)**:
+
 - ✅ **+30% throughput** (13 vs 10 tasks/min) → Driver Pool
 - ✅ **-90% acquire latency** (10ms vs 100ms) → Driver Pool
 - ✅ **100% trace coverage** → OpenTelemetry
 - ✅ **-60% MTTR** (Mean Time To Recovery) → Health Monitoring
 
 **Sprint 4 (Mission System MVP)**:
+
 - ✅ **Workflows multi-task** (atualmente: apenas tasks isoladas)
 - ✅ **LLM-as-judge validation** (quality assurance automática)
 - ✅ **Checkpoint recovery < 5min** (resiliência em crashes)
@@ -3585,6 +3770,7 @@ CAMADA 4: Driver System
 - ✅ **User-facing Dashboard** (Mission Control UI)
 
 **ROI Total**:
+
 - **Técnico**: Sistema 100% confiável, 30% mais rápido, observabilidade completa
 - **Negócio**: Missões de 4-24h executáveis com quality assurance e recovery automáticos
 - **Usuário**: Interface visual para controlar missões complexas
@@ -3594,9 +3780,11 @@ CAMADA 4: Driver System
 ### Recomendações Arquiteturais
 
 #### 1. **Clarificar Retry Strategies no BaseDriver**
+
 **Arquivo**: `src/driver/core/BaseDriver.js`
 
 Adicionar JSDoc explicativo:
+
 ```javascript
 /**
  * RETRY STRATEGY - Apenas para falhas TÉCNICAS
@@ -3612,12 +3800,13 @@ Adicionar JSDoc explicativo:
  * - Abort signals → User cancellation
  */
 BASEDRIVER_CONFIG = {
-    MAX_RETRY_ATTEMPTS: 4,
-    RETRY_BACKOFF_TYPE: 'exponential'
-}
+  MAX_RETRY_ATTEMPTS: 4,
+  RETRY_BACKOFF_TYPE: 'exponential',
+};
 ```
 
 #### 2. **Renomear taskQueue → bufferQueue no DriverNERVAdapter**
+
 **Arquivo**: `src/driver/nerv_adapter/driver_nerv_adapter.js`
 
 ```javascript
@@ -3629,6 +3818,7 @@ this.bufferQueue = []; // Overflow buffer (não scheduling strategy)
 ```
 
 #### 3. **Documentar execute() como Abstract Method no TargetDriver**
+
 **Arquivo**: `src/driver/core/TargetDriver.js`
 
 ```javascript
@@ -3646,9 +3836,11 @@ async execute(prompt) {
 ```
 
 #### 4. **Criar Documento de Compliance Arquitetural**
+
 **Novo arquivo**: `DOCUMENTAÇÃO/ARCHITECTURAL_COMPLIANCE.md`
 
 Checklist de validação para cada PR:
+
 - [ ] Component respeita sua camada (0-4)?
 - [ ] Comunicação passa por NERV (exceto camada adjacente)?
 - [ ] Driver NÃO decide workflows?
@@ -3661,6 +3853,7 @@ Checklist de validação para cada PR:
 **Status**: ✅ **Análise Completa + Arquitetura Consolidada** | Aguardando Aprovação para Sprint 1
 
 **Próximos Passos**:
+
 1. ✅ **APROVAÇÃO**: Revisar este documento (30min)
 2. 🔄 **Sprint 1 Dia 1**: Fix P0 #1 (memory leak) + P0 #2 (timeout) - 3h
 3. 🔄 **Sprint 1 Dia 2**: Fix P0 #3 (abstract method) + Testes - 4.5h
@@ -3668,5 +3861,4 @@ Checklist de validação para cada PR:
 5. 🔄 **Sprint 3**: Upgrades (Driver Pool, OpenTelemetry, Health) - 1 semana
 6. 🔄 **Sprint 4**: Mission System MVP (FeedbackProcessor, CheckpointManager, Dashboard) - 2 semanas
 
-**Aprovador**: @Ilenburg1993
-**Data Esperada de Início**: Imediatamente após aprovação
+**Aprovador**: @Ilenburg1993 **Data Esperada de Início**: Imediatamente após aprovação

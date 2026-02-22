@@ -18,12 +18,14 @@ bash /workspaces/chatgpt-docker-puppeteer/scripts/dashboard-full-reset.sh
 ```
 
 **O que o script faz:**
+
 - ✅ Mata todos os processos Vite/Node
 - ✅ Limpa TODOS os caches (`node_modules/.vite`, `dist`, etc.)
 - ✅ Reinicia Vite limpo
 - ✅ Mostra URLs de acesso
 
 **Output esperado:**
+
 ```
 ✅ Vite started successfully!
 
@@ -38,6 +40,7 @@ bash /workspaces/chatgpt-docker-puppeteer/scripts/dashboard-full-reset.sh
 **CRÍTICO**: Sem isso o problema continua!
 
 #### Chrome/Edge:
+
 1. Abrir Chrome/Edge
 2. Pressionar `Ctrl + Shift + Del`
 3. Selecionar:
@@ -48,6 +51,7 @@ bash /workspaces/chatgpt-docker-puppeteer/scripts/dashboard-full-reset.sh
 6. **Fechar e reabrir** o browser
 
 #### Alternativa: Modo Incógnito
+
 ```
 Ctrl + Shift + N (Chrome)
 Ctrl + Shift + P (Edge)
@@ -58,6 +62,7 @@ Ctrl + Shift + P (Edge)
 ### PARTE 3: Acessar Dashboard
 
 1. **Copiar URL** (do output do script):
+
    ```
    http://172.17.0.2:5173/dashboard/
    ```
@@ -65,6 +70,7 @@ Ctrl + Shift + P (Edge)
 2. **Colar no browser** (Chrome/Edge)
 
 3. **Hard Refresh**:
+
    ```
    Ctrl + F5  (ou Ctrl + Shift + R)
    ```
@@ -86,12 +92,12 @@ Ctrl + Shift + P (Edge)
 
 **Erros comuns:**
 
-| Erro | Causa | Solução |
-|------|-------|---------|
-| `Failed to fetch` | Vite não está rodando | `bash dashboard-full-reset.sh` |
-| `404 Not Found` | URL errada | Usar `http://172.17.0.2:5173/dashboard/` |
-| `CORS error` | Backend não iniciado | `npx pm2 restart all` |
-| `SyntaxError` | JavaScript com erro | Ver logs do Vite |
+| Erro              | Causa                 | Solução                                  |
+| ----------------- | --------------------- | ---------------------------------------- |
+| `Failed to fetch` | Vite não está rodando | `bash dashboard-full-reset.sh`           |
+| `404 Not Found`   | URL errada            | Usar `http://172.17.0.2:5173/dashboard/` |
+| `CORS error`      | Backend não iniciado  | `npx pm2 restart all`                    |
+| `SyntaxError`     | JavaScript com erro   | Ver logs do Vite                         |
 
 ### Diagnóstico 2: Network Tab
 
@@ -101,6 +107,7 @@ Ctrl + Shift + P (Edge)
 4. Verificar se arquivos carregam:
 
 **Esperado (200 OK)**:
+
 ```
 dashboard/          200  HTML
 @vite/client        200  JS
@@ -109,6 +116,7 @@ src/App.vue         200  JS
 ```
 
 **Problema (404 ou FAIL)**:
+
 ```
 dashboard/          404  ❌ URL errada
 @vite/client        FAIL ❌ Vite parado
@@ -122,6 +130,7 @@ tail -50 /tmp/vite-clean.log
 ```
 
 **Procurar por:**
+
 - ❌ `error`
 - ❌ `ERROR`
 - ❌ `Pre-transform error`
@@ -155,26 +164,27 @@ Abrir este arquivo **localmente** no Windows:
 **Caminho**: `\\wsl$\Ubuntu\tmp\test-dashboard-complete.html`
 
 Ou criar manualmente:
+
 ```html
 <!DOCTYPE html>
 <html>
-<head><title>Test</title></head>
-<body>
+  <head>
+    <title>Test</title>
+  </head>
+  <body>
     <h1>Dashboard Test</h1>
     <div id="results"></div>
     <script>
-        fetch('http://172.17.0.2:5173/dashboard/')
-            .then(r => r.text())
-            .then(html => {
-                document.getElementById('results').innerHTML = 
-                    html ? '✅ PASS' : '❌ FAIL';
-            })
-            .catch(e => {
-                document.getElementById('results').innerHTML = 
-                    '❌ ERROR: ' + e.message;
-            });
+      fetch('http://172.17.0.2:5173/dashboard/')
+        .then(r => r.text())
+        .then(html => {
+          document.getElementById('results').innerHTML = html ? '✅ PASS' : '❌ FAIL';
+        })
+        .catch(e => {
+          document.getElementById('results').innerHTML = '❌ ERROR: ' + e.message;
+        });
     </script>
-</body>
+  </body>
 </html>
 ```
 
@@ -195,6 +205,7 @@ npx pm2 list
 ```
 
 **Esperado:**
+
 ```
 ┌─────┬──────────────┬─────────┬─────────┐
 │ id  │ name         │ status  │ cpu     │
@@ -240,11 +251,13 @@ bash scripts/dashboard-full-reset.sh
 Se reportar problema, incluir:
 
 1. **Output do script**:
+
    ```bash
    bash /workspaces/chatgpt-docker-puppeteer/scripts/dashboard-full-reset.sh
    ```
 
 2. **Logs do Vite**:
+
    ```bash
    tail -50 /tmp/vite-clean.log
    ```
@@ -252,6 +265,7 @@ Se reportar problema, incluir:
 3. **Screenshot do DevTools** (F12 → Console + Network)
 
 4. **Versões**:
+
    ```bash
    node --version
    npm --version

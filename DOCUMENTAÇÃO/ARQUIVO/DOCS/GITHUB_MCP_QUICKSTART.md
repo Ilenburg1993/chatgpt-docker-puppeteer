@@ -45,6 +45,7 @@ npm install -g @modelcontextprotocol/server-github
 ```
 
 **Pronto!** Agora você tem:
+
 - ✅ `rag_search` - Busca no codebase local
 - ✅ `ollama_generate` - Geração de código local
 - ✅ `create_or_update_file` - Criar arquivos no GitHub
@@ -59,6 +60,7 @@ npm install -g @modelcontextprotocol/server-github
 Nosso servidor importa e reexporta tools do GitHub MCP com prefixo `mcp_github__*`.
 
 **Vantagens:**
+
 - Cliente só precisa configurar 1 servidor
 - Controle centralizado (rate limiting, audit log)
 
@@ -73,11 +75,13 @@ GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 ```
 
 Opcional (retry best-effort se o upstream falhar no boot):
+
 ```bash
 MCP_UPSTREAM_RESTART_ENABLED=true
 ```
 
 **Como validar rapidamente:**
+
 ```bash
 npm run mcp:diagnose
 curl -s http://localhost:3008/ready | jq '.mcp.upstreams'
@@ -90,6 +94,7 @@ curl -s http://localhost:3008/ready | jq '.mcp.upstreams'
 ➡️ **[GITHUB_MCP_INTEGRATION.md](./GITHUB_MCP_INTEGRATION.md)** (6,800+ palavras)
 
 **Inclui:**
+
 - Arquitetura detalhada (diagramas)
 - Guia de setup passo a passo
 - Casos de uso (RAG + GitHub combo)
@@ -114,18 +119,21 @@ curl http://localhost:3008/api/mcp | jq '.toolCount'
 ## 🎓 Casos de Uso Poderosos
 
 ### 1. Buscar + Criar Issue
+
 ```
 Prompt: "Use rag_search para encontrar todos os TODOs no código,
 então crie um GitHub issue com create_issue listando todos"
 ```
 
 ### 2. Gerar + Commit
+
 ```
 Prompt: "Use ollama_generate para criar uma função de retry,
 depois use create_or_update_file para salvar em utils/retry.js"
 ```
 
 ### 3. Search + Context
+
 ```
 Prompt: "Busque issues abertas com label:bug usando search_issues,
 para cada uma use rag_search para achar código relacionado"
@@ -138,12 +146,14 @@ para cada uma use rag_search para achar código relacionado"
 **⚠️ NUNCA commite tokens no Git!**
 
 ✅ Usar `.env.local` (gitignored):
+
 ```bash
 echo "GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx" > .env.local
 echo ".env.local" >> .gitignore
 ```
 
 ✅ Ou secrets manager:
+
 ```bash
 export GITHUB_PERSONAL_ACCESS_TOKEN=$(pass show github/mcp-token)
 ```
@@ -152,13 +162,13 @@ export GITHUB_PERSONAL_ACCESS_TOKEN=$(pass show github/mcp-token)
 
 ## 📊 Status Atual
 
-| Componente | Status | Detalhes |
-|------------|--------|----------|
-| **Nosso MCP Server** | ✅ Produção | 5 tools funcionais |
-| **GitHub MCP (Direct)** | ✅ Pronto | Setup em 3 passos |
-| **GitHub MCP (Upstream/Proxy)** | ✅ Produção | Import via stdio + prefixo `mcp_github__*` |
-| **Documentação** | ✅ Completa | 6,800+ palavras |
-| **Testes** | ✅ Funcional | Script de teste pronto |
+| Componente                      | Status       | Detalhes                                   |
+| ------------------------------- | ------------ | ------------------------------------------ |
+| **Nosso MCP Server**            | ✅ Produção  | 5 tools funcionais                         |
+| **GitHub MCP (Direct)**         | ✅ Pronto    | Setup em 3 passos                          |
+| **GitHub MCP (Upstream/Proxy)** | ✅ Produção  | Import via stdio + prefixo `mcp_github__*` |
+| **Documentação**                | ✅ Completa  | 6,800+ palavras                            |
+| **Testes**                      | ✅ Funcional | Script de teste pronto                     |
 
 ---
 
@@ -170,6 +180,5 @@ export GITHUB_PERSONAL_ACCESS_TOKEN=$(pass show github/mcp-token)
 
 ---
 
-**Criado:** 07/02/2026
-**Versão:** 1.0
-**Guia Completo:** [GITHUB_MCP_INTEGRATION.md](./GITHUB_MCP_INTEGRATION.md)
+**Criado:** 07/02/2026 **Versão:** 1.0 **Guia Completo:**
+[GITHUB_MCP_INTEGRATION.md](./GITHUB_MCP_INTEGRATION.md)

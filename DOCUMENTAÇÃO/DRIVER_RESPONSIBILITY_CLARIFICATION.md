@@ -1,18 +1,20 @@
 # 🎯 Esclarecimento: Responsabilidade do Driver
 
-> **Data**: 4 de Fevereiro de 2026
-> **Contexto**: Reclassificação de BaseDriver retry como comportamento CORRETO
-> **Status**: ✅ CLARIFICADO (BaseDriver 100% conforme)
+> **Data**: 4 de Fevereiro de 2026 **Contexto**: Reclassificação de BaseDriver retry como
+> comportamento CORRETO **Status**: ✅ CLARIFICADO (BaseDriver 100% conforme)
 
 ---
 
 ## 📜 Contexto
 
-Durante auditoria arquitetural, o retry logic do BaseDriver foi **incorretamente** classificado como "violação média". Após esclarecimento das responsabilidades, ficou claro que:
+Durante auditoria arquitetural, o retry logic do BaseDriver foi **incorretamente** classificado como
+"violação média". Após esclarecimento das responsabilidades, ficou claro que:
 
-> **Cabe ao DRIVER fazer o que for necessário para a execução de uma tarefa dada na fila, partindo do pressuposto de que a tarefa esteja clara.**
+> **Cabe ao DRIVER fazer o que for necessário para a execução de uma tarefa dada na fila, partindo
+> do pressuposto de que a tarefa esteja clara.**
 
-Isso significa que o Driver **DEVE** fazer retry em falhas **TÉCNICAS** durante a execução (seletores, frames, operações DOM), respeitando cancelamentos externos (signal.aborted).
+Isso significa que o Driver **DEVE** fazer retry em falhas **TÉCNICAS** durante a execução
+(seletores, frames, operações DOM), respeitando cancelamentos externos (signal.aborted).
 
 ---
 
@@ -21,27 +23,26 @@ Isso significa que o Driver **DEVE** fazer retry em falhas **TÉCNICAS** durante
 ### 1️⃣ Retry TÁTICO (Driver - Operações Internas)
 
 **Responsável**: Driver módulos (InputResolver, SubmissionController, BiomechanicsEngine)
-**Escopo**: Operações DOM individuais (click, type, querySelector)
-**Decisão**: LOCAL (módulo sabe quando operação é recuperável)
-**Exemplo**: Seletor não encontrado → tenta 3x em 500ms (animação CSS)
+**Escopo**: Operações DOM individuais (click, type, querySelector) **Decisão**: LOCAL (módulo sabe
+quando operação é recuperável) **Exemplo**: Seletor não encontrado → tenta 3x em 500ms (animação
+CSS)
 
 ```javascript
 // input_resolver.js
 for (let retry = 0; retry < 3; retry++) {
-    try {
-        return await page.querySelector(selector);
-    } catch (err) {
-        if (retry < 2) await sleep(500);
-    }
+  try {
+    return await page.querySelector(selector);
+  } catch (err) {
+    if (retry < 2) await sleep(500);
+  }
 }
 ```
 
 ### 2️⃣ Retry de EXECUÇÃO (Driver - Task Completa)
 
-**Responsável**: BaseDriver
-**Escopo**: Completar MESMA task (execução até o fim)
-**Decisão**: LOCAL (Driver classifica erro: TRANSIENT → retry, ABORT → stop)
-**Exemplo**: Connection lost during execution → tenta 4x com backoff
+**Responsável**: BaseDriver **Escopo**: Completar MESMA task (execução até o fim) **Decisão**: LOCAL
+(Driver classifica erro: TRANSIENT → retry, ABORT → stop) **Exemplo**: Connection lost during
+execution → tenta 4x com backoff
 
 ```javascript
 // BaseDriver.js
@@ -78,10 +79,9 @@ async execute(task, signal) {
 
 ### 3️⃣ Retry ESTRATÉGICO (Kernel - Reagendar Task)
 
-**Responsável**: Kernel + PolicyEngine
-**Escopo**: Reagendar task COMPLETA na fila (próxima execução)
-**Decisão**: GLOBAL (PolicyEngine usa contexto: SLA, rate limits, CB state)
-**Exemplo**: Task falhou após 4 tentativas → PolicyEngine reagenda em 1 hora
+**Responsável**: Kernel + PolicyEngine **Escopo**: Reagendar task COMPLETA na fila (próxima
+execução) **Decisão**: GLOBAL (PolicyEngine usa contexto: SLA, rate limits, CB state) **Exemplo**:
+Task falhou após 4 tentativas → PolicyEngine reagenda em 1 hora
 
 ```javascript
 // execution_engine.js
@@ -133,21 +133,23 @@ async handleTaskFailure(task, error) {
 ### ❌ O Que Driver NÃO FAZ
 
 1. **Não Decide Retry ESTRATÉGICO**:
+
    ```javascript
    // ERRADO: Driver reagenda task
    try {
-       return await execute(task);
+     return await execute(task);
    } catch (err) {
-       await sleep(3600000); // 1 hora
-       return await execute(task); // retry estratégico
+     await sleep(3600000); // 1 hora
+     return await execute(task); // retry estratégico
    }
    ```
 
 2. **Não Ignora Cancelamento**:
+
    ```javascript
    // ERRADO: Driver ignora signal.aborted
    for (let i = 0; i < 100; i++) {
-       await doWork(); // sem checar signal
+     await doWork(); // sem checar signal
    }
    ```
 
@@ -155,7 +157,7 @@ async handleTaskFailure(task, error) {
    ```javascript
    // ERRADO: Driver tenta reconectar
    if (!page.isConnected()) {
-       await this._reconnectBrowser();
+     await this._reconnectBrowser();
    }
    ```
 
@@ -169,43 +171,44 @@ async handleTaskFailure(task, error) {
 
 | Aspecto                     | Implementação                           | Status |
 | --------------------------- | --------------------------------------- | ------ |
-| Retry de execução           | 4 tentativas, backoff exponencial       | ✅      |
-| Checkpoints de cancelamento | 6+ localizações (`signal?.aborted`)     | ✅      |
-| Classificação de erros      | 5 classes (ABORT, FATAL, TIMEOUT, etc.) | ✅      |
-| Telemetria                  | Emite RETRY_ATTEMPT, EXECUTION_ABORTED  | ✅      |
-| Relata ao Kernel            | Lança erro após esgotar tentativas      | ✅      |
-| Contexto de missão          | Executa task no contexto de workflow    | ✅      |
+| Retry de execução           | 4 tentativas, backoff exponencial       | ✅     |
+| Checkpoints de cancelamento | 6+ localizações (`signal?.aborted`)     | ✅     |
+| Classificação de erros      | 5 classes (ABORT, FATAL, TIMEOUT, etc.) | ✅     |
+| Telemetria                  | Emite RETRY_ATTEMPT, EXECUTION_ABORTED  | ✅     |
+| Relata ao Kernel            | Lança erro após esgotar tentativas      | ✅     |
+| Contexto de missão          | Executa task no contexto de workflow    | ✅     |
 
 **Checkpoints Identificados**:
+
 ```javascript
 // Linha 508: Início de cada tentativa
 if (signal?.aborted) {
-    throw new Error('OPERATION_ABORTED');
+  throw new Error('OPERATION_ABORTED');
 }
 
 // Linha 540: Após clearAll()
 if (signal?.aborted) {
-    throw new Error('OPERATION_ABORTED');
+  throw new Error('OPERATION_ABORTED');
 }
 
 // Linha 560: Após resolution
 if (signal?.aborted) {
-    throw new Error('OPERATION_ABORTED');
+  throw new Error('OPERATION_ABORTED');
 }
 
 // Linha 590: Após navigation
 if (signal?.aborted) {
-    throw new Error('OPERATION_ABORTED');
+  throw new Error('OPERATION_ABORTED');
 }
 
 // Linha 610: Durante typing
 if (signal?.aborted) {
-    throw new Error('OPERATION_ABORTED');
+  throw new Error('OPERATION_ABORTED');
 }
 
 // Linha 630: Após submission
 if (signal?.aborted) {
-    throw new Error('OPERATION_ABORTED');
+  throw new Error('OPERATION_ABORTED');
 }
 ```
 
@@ -252,31 +255,27 @@ if (signal?.aborted) {
 
 ### ✅ Cenário 1: Falha Técnica Recuperável
 
-**Input**: Task #42, Chrome fechado durante execução (erro: TARGET_CLOSED)
-**Classificação**: FATAL
-**Ação**: Driver tenta reconnect via BrowserPool (1x), falha → relata FAILED
-**Kernel**: PolicyEngine decide retry estratégico (reagenda em 5min)
+**Input**: Task #42, Chrome fechado durante execução (erro: TARGET_CLOSED) **Classificação**: FATAL
+**Ação**: Driver tenta reconnect via BrowserPool (1x), falha → relata FAILED **Kernel**:
+PolicyEngine decide retry estratégico (reagenda em 5min)
 
 ### ✅ Cenário 2: Cancelamento Externo
 
-**Input**: Task #42, usuário cancela via dashboard (signal.aborted = true)
-**Classificação**: ABORT
-**Ação**: Driver aborta imediatamente (checkpoint detecta signal.aborted)
-**Kernel**: Recebe ABORTED, não tenta retry estratégico
+**Input**: Task #42, usuário cancela via dashboard (signal.aborted = true) **Classificação**: ABORT
+**Ação**: Driver aborta imediatamente (checkpoint detecta signal.aborted) **Kernel**: Recebe
+ABORTED, não tenta retry estratégico
 
 ### ✅ Cenário 3: Selector Não Encontrado (Transient)
 
-**Input**: Task #42, querySelector falha (animação CSS)
-**Classificação**: TRANSIENT (SELECTOR)
-**Ação**: Driver tenta 4x com backoff (1s, 2s, 4s, 8s)
-**Kernel**: Recebe COMPLETED se sucesso, FAILED se esgotar tentativas
+**Input**: Task #42, querySelector falha (animação CSS) **Classificação**: TRANSIENT (SELECTOR)
+**Ação**: Driver tenta 4x com backoff (1s, 2s, 4s, 8s) **Kernel**: Recebe COMPLETED se sucesso,
+FAILED se esgotar tentativas
 
 ### ✅ Cenário 4: Timeout de LLM
 
-**Input**: Task #42, LLM não responde em 180s
-**Classificação**: TIMEOUT
-**Ação**: Driver tenta 4x (aumenta timeout: 180s, 240s, 300s)
-**Kernel**: Recebe FAILED após 4 tentativas, PolicyEngine decide retry estratégico
+**Input**: Task #42, LLM não responde em 180s **Classificação**: TIMEOUT **Ação**: Driver tenta 4x
+(aumenta timeout: 180s, 240s, 300s) **Kernel**: Recebe FAILED após 4 tentativas, PolicyEngine decide
+retry estratégico
 
 ---
 
@@ -310,12 +309,14 @@ if (signal?.aborted) {
 
 ---
 
-**Conclusão**: BaseDriver implementa corretamente retry de EXECUÇÃO. Driver tem responsabilidade legítima de completar task no contexto de missão, respeitando cancelamentos externos. Sistema 100% conforme com arquitetura.
+**Conclusão**: BaseDriver implementa corretamente retry de EXECUÇÃO. Driver tem responsabilidade
+legítima de completar task no contexto de missão, respeitando cancelamentos externos. Sistema 100%
+conforme com arquitetura.
 
-**Próxima Ação**: Adicionar JSDoc aos módulos explicando 3 tipos de retry (tático, execução, estratégico).
+**Próxima Ação**: Adicionar JSDoc aos módulos explicando 3 tipos de retry (tático, execução,
+estratégico).
 
 ---
 
-**Versão**: 1.0
-**Documentação Atualizada**: CONCEPTUAL_ARCHITECTURE.md, ARCHITECTURE_COMPLIANCE_AUDIT.md
-**Status**: ✅ CLARIFICADO (reclassificação completa)
+**Versão**: 1.0 **Documentação Atualizada**: CONCEPTUAL_ARCHITECTURE.md,
+ARCHITECTURE_COMPLIANCE_AUDIT.md **Status**: ✅ CLARIFICADO (reclassificação completa)

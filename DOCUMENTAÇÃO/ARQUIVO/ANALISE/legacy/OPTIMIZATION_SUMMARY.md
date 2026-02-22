@@ -167,19 +167,17 @@ npm run validate:pre-start # Validar antes de iniciar
 ```yaml
 # Após profiling, ajustar para:
 limits:
-    cpus: '1.5' # Puppeteer não usa muito CPU
-    memory: 1G # Baseado em pico + 20%
+  cpus: '1.5' # Puppeteer não usa muito CPU
+  memory: 1G # Baseado em pico + 20%
 reservations:
-    memory: 256M # Baseline
+  memory: 256M # Baseline
 ```
 
 ### Named Volumes (Produção)
 
 ```yaml
-volumes: fila-prod:/app/fila
-    respostas-prod:/app/respostas
-    logs-prod:/app/logs
-    profile-prod:/app/profile
+volumes:
+  fila-prod:/app/fila respostas-prod:/app/respostas logs-prod:/app/logs profile-prod:/app/profile
 ```
 
 ---
@@ -231,25 +229,25 @@ volumes: fila-prod:/app/fila
 
 1. **Criar .env e testar**
 
-    ```bash
-    cp .env.example .env
-    npm run validate
-    make build && make start
-    ```
+   ```bash
+   cp .env.example .env
+   npm run validate
+   make build && make start
+   ```
 
 2. **Rodar por 24-48h e coletar métricas**
 
-    ```bash
-    make stats
-    docker stats chatgpt-agent --no-stream
-    ```
+   ```bash
+   make stats
+   docker stats chatgpt-agent --no-stream
+   ```
 
 3. **Ajustar resource limits** baseado em dados reais
 
 4. **Implementar testes críticos**
-    - `tests/test_health_endpoint.js`
-    - `tests/test_lock.js`
-    - `tests/test_config_validation.js`
+   - `tests/test_health_endpoint.js`
+   - `tests/test_lock.js`
+   - `tests/test_config_validation.js`
 
 5. **Configurar CI/CD** (GitHub Actions)
 

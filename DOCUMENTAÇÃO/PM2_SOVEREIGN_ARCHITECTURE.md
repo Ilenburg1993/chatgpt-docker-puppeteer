@@ -2,8 +2,7 @@
 
 > **PM2 como Única Fonte de Verdade para Orquestração de Processos**
 
-**Status**: ✅ Implementado (v3.0 - Fev 2026)
-**Audit Level**: 800 (PM2 Bridge) + 500 (Enforcement)
+**Status**: ✅ Implementado (v3.0 - Fev 2026) **Audit Level**: 800 (PM2 Bridge) + 500 (Enforcement)
 **Baseline**: `ecosystem.config.js` + `pm2_bridge.js` + Scripts de Gestão
 
 ---
@@ -34,13 +33,16 @@ Antes da arquitetura PM2 Sovereign, existiam **3 modos de execução** ambíguos
 3. **`SERVER_MODE=disabled`** → Sem servidor HTTP
 
 **Conflitos Críticos**:
+
 - 🔴 **P1 (EADDRINUSE)**: PM2 + `SERVER_MODE=integrated` → 2 processos tentam usar porta 3008
 - 🔴 **Duração do Boot**: Discovery timeout de 5s insuficiente para servidor lento
-- 🔴 **Monitoramento Parcial**: `pm2_bridge.js` só monitorava `agente-gpt`, ignorando `dashboard-web` e `chrome-proxy`
+- 🔴 **Monitoramento Parcial**: `pm2_bridge.js` só monitorava `agente-gpt`, ignorando
+  `dashboard-web` e `chrome-proxy`
 
 ### Solução: PM2 Sovereign (Fev 2026)
 
-**Princípio**: PM2 é o **único** responsável por lifecycle management. Application code **nunca** inicia subprocessos.
+**Princípio**: PM2 é o **único** responsável por lifecycle management. Application code **nunca**
+inicia subprocessos.
 
 **Enforcement em 3 Camadas**:
 
@@ -110,15 +112,17 @@ PM2 Sovereign gerencia **3 processos** independentes:
 
 ### 1. `agente-gpt` (Maestro)
 
-**Script**: `index.js` → `src/main.js`
-**Papel**: Orquestrador de missões, kernel execution, drivers LLM
+**Script**: `index.js` → `src/main.js` **Papel**: Orquestrador de missões, kernel execution, drivers
+LLM
 
 **Recursos**:
+
 - Memory: 3GB (`max_memory_restart: 3072`)
 - Restarts: automáticos (`autorestart: true`)
 - Instances: 1 (single process, não cluster)
 
 **Environment Variables (Enforced)**:
+
 ```javascript
 {
   NODE_ENV: 'development',
@@ -130,6 +134,7 @@ PM2 Sovereign gerencia **3 processos** independentes:
 ```
 
 **Boot Sequence**: 6 fases
+
 1. Environment & Config
 2. NERV Core
 3. Kernel Bootstrap
@@ -139,15 +144,16 @@ PM2 Sovereign gerencia **3 processos** independentes:
 
 ### 2. `dashboard-web` (HTTP Server)
 
-**Script**: `src/server/main.js`
-**Papel**: API REST + Dashboard + Socket.io + Health endpoints
+**Script**: `src/server/main.js` **Papel**: API REST + Dashboard + Socket.io + Health endpoints
 
 **Recursos**:
+
 - Memory: 3GB (`max_memory_restart: 3072`)
 - Port: 3008 (HTTP)
 - Instances: 1
 
 **Environment Variables (Enforced)**:
+
 ```javascript
 {
   PORT: 3008,
@@ -159,6 +165,7 @@ PM2 Sovereign gerencia **3 processos** independentes:
 ```
 
 **Boot Sequence**: 10 fases
+
 1. Environment & Logger
 2. NERV + PM2 Bridge
 3. Express Core
@@ -172,14 +179,16 @@ PM2 Sovereign gerencia **3 processos** independentes:
 
 ### 3. `chrome-proxy` (Windows ↔ Container Bridge)
 
-**Script**: `scripts/chrome-proxy-service.js`
-**Papel**: Proxy HTTP + WebSocket (container:9224 → Windows:9225)
+**Script**: `scripts/chrome-proxy-service.js` **Papel**: Proxy HTTP + WebSocket (container:9224 →
+Windows:9225)
 
 **Recursos**:
+
 - Memory: 500MB (`max_memory_restart: 500`)
 - Ports: 9224 (container), 9225 (Windows)
 
 **Environment Variables**:
+
 ```javascript
 {
   CHROME_PORT: 9225,           // Chrome DevTools no Windows
@@ -210,10 +219,10 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         FORCE_COLOR: '1',
-        SERVER_MODE: 'split',              // ✅ PM2 SOBERANO
-        SERVER_AUTHORITY: 'standalone',    // ✅ Signals independentes
-        CHROME_PROXY_ENABLED: 'false'      // ✅ Sem proxy interno
-      }
+        SERVER_MODE: 'split', // ✅ PM2 SOBERANO
+        SERVER_AUTHORITY: 'standalone', // ✅ Signals independentes
+        CHROME_PROXY_ENABLED: 'false', // ✅ Sem proxy interno
+      },
     },
 
     // ───────────────────────────────────────────────────────────
@@ -230,10 +239,10 @@ module.exports = {
       env: {
         PORT: 3008,
         NODE_ENV: 'development',
-        DAEMON_MODE: 'true',               // ✅ Standalone (não integrado)
-        SERVER_AUTHORITY: 'standalone',    // ✅ Signals independentes
-        ENABLE_STATE_FILE: 'false'         // ✅ NERV-first
-      }
+        DAEMON_MODE: 'true', // ✅ Standalone (não integrado)
+        SERVER_AUTHORITY: 'standalone', // ✅ Signals independentes
+        ENABLE_STATE_FILE: 'false', // ✅ NERV-first
+      },
     },
 
     // ───────────────────────────────────────────────────────────
@@ -249,14 +258,15 @@ module.exports = {
       max_memory_restart: '500M',
       env: {
         CHROME_PORT: 9225,
-        CHROME_PROXY_PORT: 9224
-      }
-    }
-  ]
+        CHROME_PROXY_PORT: 9224,
+      },
+    },
+  ],
 };
 ```
 
 **Validação**:
+
 ```bash
 make pm2-validate
 # ✓ SERVER_MODE=split configurado
@@ -275,10 +285,10 @@ make pm2-validate
 const AGENTE_NAME = 'agente-gpt';
 
 bus.on('process:event', data => {
-    if (data.process.name === AGENTE_NAME) {
-        const payload = { event, status, ts: Date.now() };
-        notify('pm2:process', payload);
-    }
+  if (data.process.name === AGENTE_NAME) {
+    const payload = { event, status, ts: Date.now() };
+    notify('pm2:process', payload);
+  }
 });
 ```
 
@@ -290,32 +300,32 @@ const MANAGED_PROCESSES = ['agente-gpt', 'dashboard-web', 'chrome-proxy'];
 let lastProcessStates = new Map();
 
 bus.on('process:event', data => {
-    const processName = data.process.name || data.process.pm2_env?.name;
+  const processName = data.process.name || data.process.pm2_env?.name;
 
-    if (MANAGED_PROCESSES.includes(processName)) {
-        const payload = {
-            name: processName,
-            event: data.event,
-            status: data.process.pm2_env?.status,
-            pid: data.process.pid,
-            pm_id: data.process.pm_id,
-            restarts: data.process.restart_time || 0,
-            uptime: Date.now() - data.process.pm_uptime,
-            memory: data.process.monit.memory,
-            cpu: data.process.monit.cpu,
-            ts: Date.now()
-        };
+  if (MANAGED_PROCESSES.includes(processName)) {
+    const payload = {
+      name: processName,
+      event: data.event,
+      status: data.process.pm2_env?.status,
+      pid: data.process.pid,
+      pm_id: data.process.pm_id,
+      restarts: data.process.restart_time || 0,
+      uptime: Date.now() - data.process.pm_uptime,
+      memory: data.process.monit.memory,
+      cpu: data.process.monit.cpu,
+      ts: Date.now(),
+    };
 
-        lastProcessStates.set(processName, payload);
+    lastProcessStates.set(processName, payload);
 
-        // Evento principal (todos os eventos)
-        notify('pm2:process:event', payload);
+    // Evento principal (todos os eventos)
+    notify('pm2:process:event', payload);
 
-        // Evento crítico (exit, error, stop)
-        if (['exit', 'error', 'stop'].includes(data.event)) {
-            notify('pm2:process:critical', payload);
-        }
+    // Evento crítico (exit, error, stop)
+    if (['exit', 'error', 'stop'].includes(data.event)) {
+      notify('pm2:process:critical', payload);
     }
+  }
 });
 ```
 
@@ -343,24 +353,25 @@ bus.on('process:event', data => {
 
 ```javascript
 module.exports = {
-    init,
-    stop,
-    getProcessStates,      // ✅ NOVO: Retorna Map com estados
-    refreshSnapshot,       // ✅ NOVO: Force refresh from PM2
-    MANAGED_PROCESSES      // ✅ NOVO: Array de processos
+  init,
+  stop,
+  getProcessStates, // ✅ NOVO: Retorna Map com estados
+  refreshSnapshot, // ✅ NOVO: Force refresh from PM2
+  MANAGED_PROCESSES, // ✅ NOVO: Array de processos
 };
 ```
 
 **Uso em Health Endpoints**:
+
 ```javascript
 const { refreshSnapshot } = require('@server/realtime/bus/pm2_bridge');
 
 app.get('/api/health/pm2', async (req, res) => {
-    const states = await refreshSnapshot();
-    res.json({
-        status: 'ok',
-        processes: Array.from(states.values())
-    });
+  const states = await refreshSnapshot();
+  res.json({
+    status: 'ok',
+    processes: Array.from(states.values()),
+  });
 });
 ```
 
@@ -400,6 +411,7 @@ bash scripts/pm2-startup.sh
 ```
 
 **6 Validações**:
+
 1. ✅ PM2 daemon online?
 2. ✅ Todos os 3 processos rodando?
 3. ✅ Restarts < 3 (estabilidade)?
@@ -418,6 +430,7 @@ curl http://localhost:3008/api/health/pm2
 ```
 
 **Response `/api/health/pm2`**:
+
 ```json
 {
   "status": "ok",
@@ -461,21 +474,21 @@ curl http://localhost:3008/api/health/pm2
 ```javascript
 // Frontend
 socket.on('pm2:process:event', data => {
-    console.log(`${data.name} → ${data.event} (${data.status})`);
-    updateProcessCard(data);
+  console.log(`${data.name} → ${data.event} (${data.status})`);
+  updateProcessCard(data);
 });
 
 socket.on('pm2:process:critical', data => {
-    showAlert(`CRITICAL: ${data.name} ${data.event}`);
+  showAlert(`CRITICAL: ${data.name} ${data.event}`);
 });
 
 socket.on('pm2:metrics', data => {
-    updateChart(data);
+  updateChart(data);
 });
 
 // Initial state
 socket.on('pm2:snapshot', snapshot => {
-    snapshot.forEach(process => renderProcessCard(process));
+  snapshot.forEach(process => renderProcessCard(process));
 });
 ```
 
@@ -486,6 +499,7 @@ socket.on('pm2:snapshot', snapshot => {
 ### `pm2-check.sh` (Health Check)
 
 **Uso**:
+
 ```bash
 bash scripts/pm2-check.sh           # Check apenas
 bash scripts/pm2-check.sh --fix     # Check + auto-fix
@@ -493,6 +507,7 @@ make pm2-check                      # Via Makefile
 ```
 
 **6 Checks**:
+
 1. ✅ PM2 daemon respondendo?
 2. ✅ Processos esperados rodando?
 3. ✅ Restarts < 3?
@@ -501,17 +516,20 @@ make pm2-check                      # Via Makefile
 6. ✅ Logs sem erros críticos?
 
 **Auto-Fix** (com `--fix`):
+
 - Inicia processos faltantes
 - Reinicia processos com erro
 - Para processos em loop de crash
 
 **Exit Codes**:
+
 - `0` → Tudo OK
 - `1` → Problemas detectados
 
 ### `pm2-startup.sh` (Safe Startup)
 
 **Uso**:
+
 ```bash
 bash scripts/pm2-startup.sh
 make pm2-startup
@@ -545,6 +563,7 @@ make pm2-startup
    - Dashboard URL
 
 **Exemplo de Output**:
+
 ```
 ╔════════════════════════════════════════════════════════════╗
 ║  PM2 Sovereign Mode - Startup Sequence                    ║
@@ -607,12 +626,14 @@ make pm2-validate    # Valida ecosystem.config.js
 ### 1. Sempre Use PM2 (Nunca Node Direto)
 
 ❌ **ERRADO**:
+
 ```bash
 node index.js
 node src/server/main.js
 ```
 
 ✅ **CORRETO**:
+
 ```bash
 pm2 start ecosystem.config.js
 make start
@@ -622,40 +643,46 @@ bash scripts/pm2-startup.sh
 ### 2. Nunca Use `SERVER_MODE=integrated` em PM2
 
 ❌ **ERRADO** (causa EADDRINUSE):
+
 ```javascript
 // ecosystem.config.js
 env: {
-    SERVER_MODE: 'integrated'  // ❌ CONFLITO!
+  SERVER_MODE: 'integrated'; // ❌ CONFLITO!
 }
 ```
 
 ✅ **CORRETO**:
+
 ```javascript
 // ecosystem.config.js
 env: {
-    SERVER_MODE: 'split'       // ✅ PM2 SOBERANO
+  SERVER_MODE: 'split'; // ✅ PM2 SOBERANO
 }
 ```
 
 ### 3. Prefira `pm2 reload` em Produção
 
 ❌ **EVITAR** (downtime):
+
 ```bash
 pm2 restart all
 ```
 
 ✅ **PREFERIR** (zero-downtime):
+
 ```bash
 pm2 reload all
 ```
 
 **Diferença**:
+
 - `restart` → Para processo, depois inicia (downtime ~1-2s)
 - `reload` → Inicia novo processo, depois para antigo (zero-downtime)
 
 ### 4. Configure PM2 Startup (Produção)
 
 **Linux (systemd)**:
+
 ```bash
 pm2 startup systemd
 pm2 save
@@ -677,6 +704,7 @@ pm2 set pm2-logrotate:compress true
 ### 6. Cluster Mode (Produção - Escalabilidade)
 
 **Configuração** (ecosystem.config.js):
+
 ```javascript
 {
     name: 'dashboard-web',
@@ -686,7 +714,8 @@ pm2 set pm2-logrotate:compress true
 }
 ```
 
-**Cuidado**: `agente-gpt` deve permanecer em `fork` mode (1 instância) porque gerencia estado de missões.
+**Cuidado**: `agente-gpt` deve permanecer em `fork` mode (1 instância) porque gerencia estado de
+missões.
 
 ### 7. Monitoring Externo (Keymetrics)
 
@@ -695,6 +724,7 @@ pm2 link <secret> <public>
 ```
 
 Integra com [app.keymetrics.io](https://app.keymetrics.io) para:
+
 - Monitoring real-time
 - Alertas customizados
 - Dashboards avançados
@@ -707,12 +737,14 @@ Integra com [app.keymetrics.io](https://app.keymetrics.io) para:
 ### Problema 1: Processo Não Inicia
 
 **Sintomas**:
+
 ```bash
 pm2 list
 # chrome-proxy  stopped
 ```
 
 **Debug**:
+
 ```bash
 # Ver logs
 pm2 logs chrome-proxy --lines 50
@@ -728,17 +760,20 @@ pm2 start ecosystem.config.js --only chrome-proxy
 ### Problema 2: Restarts Excessivos
 
 **Sintomas**:
+
 ```bash
 pm2 list
 # agente-gpt  online  15 restarts
 ```
 
 **Causas Comuns**:
+
 - Memory leak (excede `max_memory_restart`)
 - Uncaught exception (crash loop)
 - Port conflict (EADDRINUSE)
 
 **Debug**:
+
 ```bash
 # Ver últimos crashes
 pm2 logs agente-gpt --err --lines 100
@@ -753,12 +788,14 @@ pm2 monit
 ### Problema 3: PM2 Daemon Travado
 
 **Sintomas**:
+
 ```bash
 pm2 list
 # Timeout ou resposta lenta
 ```
 
 **Solução**:
+
 ```bash
 # Kill daemon
 pm2 kill
@@ -770,11 +807,13 @@ pm2 start ecosystem.config.js
 ### Problema 4: EADDRINUSE (Porta Ocupada)
 
 **Sintomas**:
+
 ```
 Error: listen EADDRINUSE: address already in use :::3008
 ```
 
 **Debug**:
+
 ```bash
 # Verificar porta 3008
 lsof -i :3008
@@ -789,10 +828,12 @@ kill -9 <PID>
 ### Problema 5: Variables de Ambiente Incorretas
 
 **Sintomas**:
+
 - `agente-gpt` inicia servidor interno (duplicação)
 - `dashboard-web` cria estado.json (deprecated)
 
 **Validação**:
+
 ```bash
 make pm2-validate
 # ✗ SERVER_MODE não encontrado
@@ -802,6 +843,7 @@ pm2 show agente-gpt | grep SERVER_MODE
 ```
 
 **Correção**:
+
 ```bash
 # Editar ecosystem.config.js (adicionar SERVER_MODE=split)
 # Depois:
@@ -815,16 +857,19 @@ pm2 restart all
 ### Roadmap Q1 2026
 
 **v3.1 (Cluster Mode)**:
+
 - Dashboard em cluster (4 instâncias)
 - Load balancing automático
 - Session affinity (sticky sessions)
 
 **v3.2 (Health Endpoint Enhancement)**:
+
 - `/api/health/pm2/detailed` (histórico de restarts, CPU trends)
 - Alertas configuráveis (Slack, Discord, Email)
 - SLA monitoring (uptime %, response time)
 
 **v3.3 (Graceful Shutdown)**:
+
 - Shutdown hooks em todos os processos
 - Mission checkpoint save antes de exit
 - Zero-loss restart (state persistence)
@@ -832,6 +877,7 @@ pm2 restart all
 ### Roadmap Q2 2026
 
 **v4.0 (Kubernetes Migration)**:
+
 - PM2 → K8s Deployments + StatefulSets
 - Helm charts
 - Auto-scaling (HPA)
@@ -841,21 +887,25 @@ pm2 restart all
 
 ## Conclusão
 
-**PM2 Sovereign Architecture** elimina ambiguidade ao tornar PM2 a **única fonte de verdade** para lifecycle management.
+**PM2 Sovereign Architecture** elimina ambiguidade ao tornar PM2 a **única fonte de verdade** para
+lifecycle management.
 
 **Pilares**:
+
 1. ✅ **Enforcement**: `ecosystem.config.js` força `SERVER_MODE=split`
 2. ✅ **Validação**: `src/main.js` fail-fast em configuração incorreta
 3. ✅ **Monitoramento**: `pm2_bridge.js` telemetria completa dos 3 processos
 4. ✅ **Tooling**: Scripts automatizados (`pm2-check.sh`, `pm2-startup.sh`)
 
 **Benefícios**:
+
 - 🎯 Zero ambiguidade (PM2 decide tudo)
 - 🚀 Startup confiável (6 validações pre-flight)
 - 📊 Observabilidade completa (Socket.io real-time)
 - 🛡️ Fail-fast (erro claro em misconfiguration)
 
 **Next Steps**:
+
 - Integrar health endpoint (`/api/health/pm2`)
 - Cluster mode em produção
 - Alertas customizados
@@ -863,6 +913,5 @@ pm2 restart all
 
 ---
 
-**Versão**: 3.0 (PM2 Sovereign - Fev 2026)
-**Autor**: AI Agent Expert + GitHub Copilot
-**Baseline**: `ecosystem.config.js` + `pm2_bridge.js` v800 + Scripts v3.0
+**Versão**: 3.0 (PM2 Sovereign - Fev 2026) **Autor**: AI Agent Expert + GitHub Copilot **Baseline**:
+`ecosystem.config.js` + `pm2_bridge.js` v800 + Scripts v3.0

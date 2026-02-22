@@ -1,13 +1,14 @@
 # Solução Definitiva para Gerenciamento de Portas
 
-> **⚠️ AVISO HISTÓRICO (2026-02-07)**: Este documento descreve uma solução planejada mas **NUNCA IMPLEMENTADA**.
-> Os arquivos `config/ports.json` e `scripts/port-manager.js` foram **REMOVIDOS** (código morto).
-> O sistema atual usa **port hunting nativo** implementado em `src/main.js` (função `checkPortInUse()`).
-> Documento preservado para referência histórica e contexto arquitetural.
+> **⚠️ AVISO HISTÓRICO (2026-02-07)**: Este documento descreve uma solução planejada mas **NUNCA
+> IMPLEMENTADA**. Os arquivos `config/ports.json` e `scripts/port-manager.js` foram **REMOVIDOS**
+> (código morto). O sistema atual usa **port hunting nativo** implementado em `src/main.js` (função
+> `checkPortInUse()`). Documento preservado para referência histórica e contexto arquitetural.
 
 ---
 
-> **Objetivo**: Eliminar DEFINITIVAMENTE problemas de conflito de portas e criar sistema auto-suficiente
+> **Objetivo**: Eliminar DEFINITIVAMENTE problemas de conflito de portas e criar sistema
+> auto-suficiente
 
 ---
 
@@ -44,6 +45,7 @@
 ```
 
 **Benefícios**:
+
 - ✅ Único ponto de configuração
 - ✅ Portas alternativas automáticas
 - ✅ Estratégia de resolução configurável
@@ -66,6 +68,7 @@ node scripts/port-manager.js kill 9224
 ```
 
 **Funcionalidades**:
+
 - ✅ Detecção cross-platform (Windows/Linux)
 - ✅ Mostra PID + nome do processo
 - ✅ Resolução automática com portas alternativas
@@ -77,6 +80,7 @@ node scripts/port-manager.js kill 9224
 ### 3. **Startup Inteligente**
 
 Script de inicialização que:
+
 1. Verifica todas as portas automaticamente
 2. Resolve conflitos sem intervenção manual
 3. Atualiza configuração se necessário
@@ -91,7 +95,7 @@ Atualizar `.devcontainer/devcontainer.json`:
 
 ```json
 {
-  "forwardPorts": [],  // ← REMOVER 9224, 9224
+  "forwardPorts": [], // ← REMOVER 9224, 9224
   "portsAttributes": {
     "3008": {
       "label": "API Server",
@@ -102,6 +106,7 @@ Atualizar `.devcontainer/devcontainer.json`:
 ```
 
 **Por quê**:
+
 - Evita VS Code ocupar portas automaticamente
 - Deixa o sistema gerenciar as portas
 
@@ -212,15 +217,15 @@ Remover qualquer configuração que use portas 9224 ou 9224.
 
 ## 📊 Benefícios da Solução
 
-| Antes | Depois |
-|-------|--------|
-| ❌ Conflitos manuais | ✅ Resolução automática |
-| ❌ Scripts travam | ✅ Sempre mostra progresso |
-| ❌ Sem logs | ✅ Logging completo |
-| ❌ Adivinhação | ✅ Diagnóstico preciso |
-| ❌ Intervenção manual | ✅ Auto-suficiente |
-| ❌ Portas hardcoded | ✅ Configuração centralizada |
-| ❌ Sem alternativas | ✅ Portas alternativas automáticas |
+| Antes                 | Depois                             |
+| --------------------- | ---------------------------------- |
+| ❌ Conflitos manuais  | ✅ Resolução automática            |
+| ❌ Scripts travam     | ✅ Sempre mostra progresso         |
+| ❌ Sem logs           | ✅ Logging completo                |
+| ❌ Adivinhação        | ✅ Diagnóstico preciso             |
+| ❌ Intervenção manual | ✅ Auto-suficiente                 |
+| ❌ Portas hardcoded   | ✅ Configuração centralizada       |
+| ❌ Sem alternativas   | ✅ Portas alternativas automáticas |
 
 ---
 
@@ -312,7 +317,4 @@ Se encontrar qualquer problema:
 
 ---
 
-**Status**: ✅ Em Produção
-**Versão**: 1.0.0
-**Data**: 2026-01-30
-**Autor**: Claude Code Integration
+**Status**: ✅ Em Produção **Versão**: 1.0.0 **Data**: 2026-01-30 **Autor**: Claude Code Integration

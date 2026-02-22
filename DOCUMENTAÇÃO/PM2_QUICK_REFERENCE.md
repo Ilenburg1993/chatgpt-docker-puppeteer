@@ -87,6 +87,7 @@ make pm2-validate
 ## Environment Variables (Enforced)
 
 ### agente-gpt
+
 ```bash
 SERVER_MODE=split              # PM2 SOBERANO
 SERVER_AUTHORITY=standalone    # Signals independentes
@@ -94,6 +95,7 @@ CHROME_PROXY_ENABLED=false     # Sem proxy interno
 ```
 
 ### dashboard-web
+
 ```bash
 PORT=3008
 DAEMON_MODE=true               # Standalone
@@ -127,6 +129,7 @@ curl http://localhost:3008/api/health/pm2
 ```
 
 **Response** (`/api/health/pm2`):
+
 ```json
 {
   "status": "ok",
@@ -149,24 +152,28 @@ curl http://localhost:3008/api/health/pm2
 ## Troubleshooting Quick Guide
 
 ### Processo não inicia
+
 ```bash
 pm2 logs <process-name> --lines 50
 pm2 restart <process-name>
 ```
 
 ### Restarts excessivos
+
 ```bash
 pm2 logs <process-name> --err --lines 100
 pm2 monit  # Verificar memória
 ```
 
 ### PM2 daemon travado
+
 ```bash
 pm2 kill
 pm2 start ecosystem.config.js
 ```
 
 ### EADDRINUSE (porta ocupada)
+
 ```bash
 lsof -i :3008
 kill -9 <PID>
@@ -221,6 +228,7 @@ socket.on('pm2:metrics', data => { ... });
 📖 [PM2_SOVEREIGN_ARCHITECTURE.md](./PM2_SOVEREIGN_ARCHITECTURE.md) (14,000+ palavras)
 
 **Seções**:
+
 1. Por Que PM2 Soberano?
 2. Arquitetura de Enforcement
 3. Processos Gerenciados
@@ -234,5 +242,4 @@ socket.on('pm2:metrics', data => { ... });
 
 ---
 
-**Versão**: 3.0 (Fev 2026)
-**Status**: ✅ Implementado
+**Versão**: 3.0 (Fev 2026) **Status**: ✅ Implementado

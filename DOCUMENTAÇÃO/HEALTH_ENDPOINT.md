@@ -10,23 +10,23 @@
 
 ```json
 {
-    "status": "ok",
-    "timestamp": "2026-01-19T12:00:00.000Z",
-    "uptime": 3600,
-    "chrome": {
-        "connected": true,
-        "endpoint": "http://host.docker.internal:9224",
-        "version": "Chrome/120.0.0.0",
-        "latency_ms": 15
-    },
-    "queue": {
-        "pending": 5,
-        "running": 1
-    },
-    "memory": {
-        "usage_mb": 245,
-        "total_mb": 512
-    }
+  "status": "ok",
+  "timestamp": "2026-01-19T12:00:00.000Z",
+  "uptime": 3600,
+  "chrome": {
+    "connected": true,
+    "endpoint": "http://host.docker.internal:9224",
+    "version": "Chrome/120.0.0.0",
+    "latency_ms": 15
+  },
+  "queue": {
+    "pending": 5,
+    "running": 1
+  },
+  "memory": {
+    "usage_mb": 245,
+    "total_mb": 512
+  }
 }
 ```
 
@@ -34,16 +34,16 @@
 
 ```json
 {
-    "status": "degraded",
-    "timestamp": "2026-01-19T12:00:00.000Z",
-    "uptime": 3600,
-    "chrome": {
-        "connected": false,
-        "endpoint": "http://host.docker.internal:9224",
-        "version": null,
-        "latency_ms": 0
-    },
-    "total_mb": 512
+  "status": "degraded",
+  "timestamp": "2026-01-19T12:00:00.000Z",
+  "uptime": 3600,
+  "chrome": {
+    "connected": false,
+    "endpoint": "http://host.docker.internal:9224",
+    "version": null,
+    "latency_ms": 0
+  },
+  "total_mb": 512
 }
 ```
 
@@ -69,67 +69,67 @@
 
 ```json
 {
-    "meta": {
-        "version": "39.0",
-        "engine": "Universal_Physician",
-        "timestamp": "2026-01-19T12:00:00.000Z",
-        "duration_ms": 342
+  "meta": {
+    "version": "39.0",
+    "engine": "Universal_Physician",
+    "timestamp": "2026-01-19T12:00:00.000Z",
+    "duration_ms": 342
+  },
+  "health": {
+    "score": 100,
+    "status": "HEALTHY"
+  },
+  "telemetry": {
+    "network": [
+      {
+        "url": "https://www.google.com",
+        "ok": true,
+        "status": 200,
+        "ms": 45
+      },
+      {
+        "url": "https://chatgpt.com",
+        "ok": true,
+        "status": 200,
+        "ms": 120
+      }
+    ],
+    "storage": {
+      "latency_ms": 12,
+      "write_ok": true,
+      "disk_info_raw": "Filesystem /dev/sda1 78G 45G 30G 61%"
     },
-    "health": {
-        "score": 100,
-        "status": "HEALTHY"
+    "dna": {
+      "chrome": {
+        "connected": true,
+        "endpoint": "http://host.docker.internal:9224",
+        "version": "Chrome/120.0.0.0",
+        "protocol": "1.3",
+        "user_agent": "Mozilla/5.0...",
+        "ws_endpoint": "ws://host.docker.internal:9224/devtools/browser/...",
+        "latency_ms": 15
+      }
     },
-    "telemetry": {
-        "network": [
-            {
-                "url": "https://www.google.com",
-                "ok": true,
-                "status": 200,
-                "ms": 45
-            },
-            {
-                "url": "https://chatgpt.com",
-                "ok": true,
-                "status": 200,
-                "ms": 120
-            }
-        ],
-        "storage": {
-            "latency_ms": 12,
-            "write_ok": true,
-            "disk_info_raw": "Filesystem /dev/sda1 78G 45G 30G 61%"
-        },
-        "dna": {
-            "chrome": {
-            "connected": true,
-            "endpoint": "http://host.docker.internal:9224",
-            "version": "Chrome/120.0.0.0",
-            "protocol": "1.3",
-            "user_agent": "Mozilla/5.0...",
-            "ws_endpoint": "ws://host.docker.internal:9224/devtools/browser/...",
-            "latency_ms": 15
-        },
-        },
-        "queue": {
-            "pending": 5,
-            "running": 1,
-            "total": 48
-        },
-        "system": {
-            "cpu_load": "1.23",
-            "ram_usage_pct": "42.5",
-            "ram_free_gb": "3.21GB",
-            "event_loop_lag_ms": 2,
-            "uptime_seconds": 3600,
-            "ts": 1705665600000
-        }
+    "queue": {
+      "pending": 5,
+      "running": 1,
+      "total": 48
     },
-    "recovery_manifest": {
-        "detected_issues": [],
-        "suggested_steps": [],
-        "can_auto_fix": true
-    },
-    "request_id": "uuid-1234-5678"
+    "system": {
+      "cpu_load": "1.23",
+      "ram_usage_pct": "42.5",
+      "ram_free_gb": "3.21GB",
+      "event_loop_lag_ms": 2,
+      "uptime_seconds": 3600,
+      "ts": 1705665600000
+    }
+  },
+  "recovery_manifest": {
+    "detected_issues": [],
+    "suggested_steps": [],
+    "can_auto_fix": true
+  },
+  "request_id": "uuid-1234-5678"
 }
 ```
 
@@ -259,10 +259,10 @@ abc123def456   Up 5 minutes (unhealthy)
 ```yaml
 # prometheus.yml
 scrape_configs:
-    - job_name: 'chatgpt-agent'
-      metrics_path: '/api/health'
-      static_configs:
-          - targets: ['localhost:3008']
+  - job_name: 'chatgpt-agent'
+    metrics_path: '/api/health'
+    static_configs:
+      - targets: ['localhost:3008']
 ```
 
 ### Kubernetes
@@ -270,22 +270,22 @@ scrape_configs:
 ```yaml
 # deployment.yaml
 livenessProbe:
-    httpGet:
-        path: /api/health
-        port: 3008
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
+  httpGet:
+    path: /api/health
+    port: 3008
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
 readinessProbe:
-    httpGet:
-        path: /api/health
-        port: 3008
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    timeoutSeconds: 3
-    failureThreshold: 2
+  httpGet:
+    path: /api/health
+    port: 3008
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
 ```
 
 ### Docker Compose
@@ -293,11 +293,11 @@ readinessProbe:
 ```yaml
 # docker-compose.yml (already configured)
 healthcheck:
-    test: ['CMD', 'curl', '-f', 'http://localhost:3008/api/health']
-    interval: 30s
-    timeout: 10s
-    retries: 3
-    start_period: 40s
+  test: ['CMD', 'curl', '-f', 'http://localhost:3008/api/health']
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
 ```
 
 ---
@@ -311,9 +311,9 @@ healthcheck:
 **Solutions**:
 
 1. Verify Chrome is running:
-    ```bash
-    curl http://localhost:9224/json/version
-    ```
+   ```bash
+   curl http://localhost:9224/json/version
+   ```
 2. Check `CHROME_WS_ENDPOINT` in `.env`
 3. Verify firewall allows port 9224
 4. For Docker: ensure `host.docker.internal` resolves

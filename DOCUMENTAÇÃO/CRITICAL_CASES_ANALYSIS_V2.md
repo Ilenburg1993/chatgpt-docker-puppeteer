@@ -1,11 +1,9 @@
 /\* ==========================================================================
-DOCUMENTAÇÃO/CRITICAL_CASES_ANALYSIS_V2.md
-Análise Exaustiva de Casos Críticos - SEGUNDA VARREDURA
-Data: 2026-01-20
-Status: Pós-implementação P1+P2+P3
+DOCUMENTAÇÃO/CRITICAL_CASES_ANALYSIS_V2.md Análise Exaustiva de Casos Críticos - SEGUNDA VARREDURA
+Data: 2026-01-20 Status: Pós-implementação P1+P2+P3
 
-Objetivo: Identificar TODOS os casos críticos restantes após as correções
-P1, P2 e P3 para garantir 100% de cobertura antes da documentação.
+Objetivo: Identificar TODOS os casos críticos restantes após as correções P1, P2 e P3 para garantir
+100% de cobertura antes da documentação.
 ========================================================================== \*/
 
 # Análise Exaustiva de Casos Críticos V2
@@ -53,7 +51,9 @@ P1, P2 e P3 para garantir 100% de cobertura antes da documentação.
 
 ### Descrição
 
-O método `waitForStability()` cria múltiplos `MutationObserver` dentro de um `page.evaluate()`. Embora haja um `finally` block com `observers.forEach(o => o.disconnect())`, **se a promise for rejeitada por timeout ou page crash, o finally pode não executar dentro do contexto da página**.
+O método `waitForStability()` cria múltiplos `MutationObserver` dentro de um `page.evaluate()`.
+Embora haja um `finally` block com `observers.forEach(o => o.disconnect())`, **se a promise for
+rejeitada por timeout ou page crash, o finally pode não executar dentro do contexto da página**.
 
 ### Código Vulnerável
 
@@ -131,7 +131,8 @@ try {
 
 ### Descrição
 
-Três componentes criam `setInterval()` para monitoramento periódico, mas **não há garantia de cleanup em cenários de crash/shutdown brusco**.
+Três componentes criam `setInterval()` para monitoramento periódico, mas **não há garantia de
+cleanup em cenários de crash/shutdown brusco**.
 
 ### Código Vulnerável
 
@@ -156,9 +157,9 @@ stop() {
 
 ```javascript
 function init() {
-    if (pulseInterval) return; // ✅ Singleton
-    pulseInterval = setInterval(() => _pushMetrics(), PULSE_RATE_MS);
-    // ❌ Não retorna handle, difícil shutdown externo
+  if (pulseInterval) return; // ✅ Singleton
+  pulseInterval = setInterval(() => _pushMetrics(), PULSE_RATE_MS);
+  // ❌ Não retorna handle, difícil shutdown externo
 }
 ```
 
@@ -186,19 +187,19 @@ async shutdown() {
 
 ```javascript
 const shutdownPhases = [
-    {
-        name: 'ServerAdapter',
-        fn: async () => {
-            /* ... */
-        }
+  {
+    name: 'ServerAdapter',
+    fn: async () => {
+      /* ... */
     },
-    // ❌ NÃO chama reconciler.stop() explicitamente
-    {
-        name: 'BrowserPool',
-        fn: async () => {
-            await context.browserPool?.shutdown(); // ✅ CHAMADO
-        }
-    }
+  },
+  // ❌ NÃO chama reconciler.stop() explicitamente
+  {
+    name: 'BrowserPool',
+    fn: async () => {
+      await context.browserPool?.shutdown(); // ✅ CHAMADO
+    },
+  },
 ];
 ```
 
@@ -228,22 +229,22 @@ const shutdownPhases = [
 ```javascript
 // Em src/main.js, shutdown()
 const shutdownPhases = [
-    {
-        name: 'ServerAdapter',
-        order: 1,
-        fn: async () => {
-            await context.serverAdapter?.shutdown();
+  {
+    name: 'ServerAdapter',
+    order: 1,
+    fn: async () => {
+      await context.serverAdapter?.shutdown();
 
-            // [P4 FIX] Desliga componentes de monitoramento
-            if (context.reconcilier) {
-                context.reconcilier.stop();
-            }
-            if (context.hardwareTelemetry) {
-                context.hardwareTelemetry.stop(); // Assume método stop() a criar
-            }
-        }
-    }
-    // ... resto
+      // [P4 FIX] Desliga componentes de monitoramento
+      if (context.reconcilier) {
+        context.reconcilier.stop();
+      }
+      if (context.hardwareTelemetry) {
+        context.hardwareTelemetry.stop(); // Assume método stop() a criar
+      }
+    },
+  },
+  // ... resto
 ];
 ```
 
@@ -259,25 +260,26 @@ const shutdownPhases = [
 
 ### Descrição
 
-Múltiplos signal handlers registrados podem ser triggerados **simultaneamente ou em sequência rápida**, causando shutdown duplo.
+Múltiplos signal handlers registrados podem ser triggerados **simultaneamente ou em sequência
+rápida**, causando shutdown duplo.
 
 ### Código Vulnerável
 
 ```javascript
 function setupSignalHandlers(context) {
-    process.on('SIGTERM', async () => {
-        log('WARN', '[SIGNAL] SIGTERM recebido');
-        await shutdown(context); // ❌ Pode executar em paralelo
-    });
+  process.on('SIGTERM', async () => {
+    log('WARN', '[SIGNAL] SIGTERM recebido');
+    await shutdown(context); // ❌ Pode executar em paralelo
+  });
 
-    process.on('SIGINT', async () => {
-        log('WARN', '[SIGNAL] SIGINT recebido');
-        await shutdown(context); // ❌ Pode executar em paralelo
-    });
+  process.on('SIGINT', async () => {
+    log('WARN', '[SIGNAL] SIGINT recebido');
+    await shutdown(context); // ❌ Pode executar em paralelo
+  });
 
-    process.on('SIGHUP', async () => {
-        await CONFIG.reload('sys-sighup'); // ❌ Pode correr durante shutdown
-    });
+  process.on('SIGHUP', async () => {
+    await CONFIG.reload('sys-sighup'); // ❌ Pode correr durante shutdown
+  });
 }
 ```
 
@@ -305,33 +307,33 @@ function setupSignalHandlers(context) {
 let _shutdownInProgress = false;
 
 function setupSignalHandlers(context) {
-    const gracefulShutdown = async signal => {
-        // [P4 FIX] Guard contra shutdown concorrente
-        if (_shutdownInProgress) {
-            log('WARN', `[SIGNAL] ${signal} ignorado - shutdown já em andamento`);
-            return;
-        }
+  const gracefulShutdown = async signal => {
+    // [P4 FIX] Guard contra shutdown concorrente
+    if (_shutdownInProgress) {
+      log('WARN', `[SIGNAL] ${signal} ignorado - shutdown já em andamento`);
+      return;
+    }
 
-        _shutdownInProgress = true;
-        log('WARN', `[SIGNAL] ${signal} recebido - iniciando shutdown gracioso`);
+    _shutdownInProgress = true;
+    log('WARN', `[SIGNAL] ${signal} recebido - iniciando shutdown gracioso`);
 
-        try {
-            await shutdown(context);
-        } finally {
-            process.exit(0);
-        }
-    };
+    try {
+      await shutdown(context);
+    } finally {
+      process.exit(0);
+    }
+  };
 
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-    // SIGHUP isolado (não shutdown)
-    process.on('SIGHUP', async () => {
-        if (_shutdownInProgress) return; // Não recarrega durante shutdown
+  // SIGHUP isolado (não shutdown)
+  process.on('SIGHUP', async () => {
+    if (_shutdownInProgress) return; // Não recarrega durante shutdown
 
-        log('INFO', '[SIGNAL] SIGHUP recebido - recarregando configuração');
-        await CONFIG.reload('sys-sighup');
-    });
+    log('INFO', '[SIGNAL] SIGHUP recebido - recarregando configuração');
+    await CONFIG.reload('sys-sighup');
+  });
 }
 ```
 
@@ -347,7 +349,9 @@ function setupSignalHandlers(context) {
 
 ### Descrição
 
-Método `changeState()` valida transições e atualiza `task.state`, mas **não usa locking**. Se dois subsistemas chamarem `changeState()` simultaneamente (ex: PolicyEngine + ExecutionEngine), pode haver race.
+Método `changeState()` valida transições e atualiza `task.state`, mas **não usa locking**. Se dois
+subsistemas chamarem `changeState()` simultaneamente (ex: PolicyEngine + ExecutionEngine), pode
+haver race.
 
 ### Código Vulnerável
 
@@ -466,7 +470,8 @@ async _performTransition(taskId, newState, reason) {
 
 ### Descrição
 
-`saveTask()` e `deleteTask()` chamam `queueCache.markDirty()` **após** a operação de disco. Se houver crash entre o write e a invalidação, cache fica stale.
+`saveTask()` e `deleteTask()` chamam `queueCache.markDirty()` **após** a operação de disco. Se
+houver crash entre o write e a invalidação, cache fica stale.
 
 ### Código Analisado
 

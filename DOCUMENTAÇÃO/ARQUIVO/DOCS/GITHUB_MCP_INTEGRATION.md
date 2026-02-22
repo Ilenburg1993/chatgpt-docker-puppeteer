@@ -2,17 +2,22 @@
 
 ## 📋 Visão Geral
 
-Este guia explica como integrar o servidor MCP do GitHub oficial com nosso servidor MCP unificado, permitindo que todas as LLMs (Claude, Copilot, OpenCode) acessem funcionalidades do GitHub através de uma única interface.
+Este guia explica como integrar o servidor MCP do GitHub oficial com nosso servidor MCP unificado,
+permitindo que todas as LLMs (Claude, Copilot, OpenCode) acessem funcionalidades do GitHub através
+de uma única interface.
 
 ### O Que É o GitHub MCP Server?
 
-O **GitHub MCP Server** é um servidor oficial mantido pelo GitHub que expõe funcionalidades da API do GitHub como ferramentas MCP:
+O **GitHub MCP Server** é um servidor oficial mantido pelo GitHub que expõe funcionalidades da API
+do GitHub como ferramentas MCP:
+
 - 🔍 Buscar repositórios, issues, PRs, código
 - 📝 Criar/atualizar issues e PRs
 - 👥 Gerenciar colaboradores, reviews
 - 📊 Acessar estatísticas e insights
 
-**Repositório:** [modelcontextprotocol/servers/github](https://github.com/modelcontextprotocol/servers/tree/main/src/github)
+**Repositório:**
+[modelcontextprotocol/servers/github](https://github.com/modelcontextprotocol/servers/tree/main/src/github)
 
 ---
 
@@ -44,11 +49,13 @@ Cada LLM conecta diretamente aos 2 servidores MCP:
 ```
 
 **Vantagens:**
+
 - ✅ Simples de configurar
 - ✅ Sem overhead de proxy
 - ✅ Ferramentas nativas de cada servidor
 
 **Desvantagens:**
+
 - ⚠️ Cliente precisa configurar ambos os servidores
 - ⚠️ Nomenclatura de tools pode colidir (improvável)
 
@@ -83,11 +90,13 @@ Nosso servidor importa tools do GitHub MCP via upstream e reexporta tudo unifica
 ```
 
 **Vantagens:**
+
 - ✅ Cliente configura apenas 1 servidor
 - ✅ Controle centralizado (rate limiting, audit log)
 - ✅ Namespace claro (`mcp_github__*`)
 
 **Desvantagens:**
+
 - ⚠️ Mais complexo de implementar
 - ⚠️ Overhead de proxy (mínimo)
 
@@ -132,10 +141,7 @@ Edite `~/.config/Claude/claude_desktop_config.json` (Linux):
     },
     "github": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       }
@@ -144,21 +150,23 @@ Edite `~/.config/Claude/claude_desktop_config.json` (Linux):
 }
 ```
 
-**Windows:** `%AppData%/Claude/claude_desktop_config.json`
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows:** `%AppData%/Claude/claude_desktop_config.json` **macOS:**
+`~/Library/Application Support/Claude/claude_desktop_config.json`
 
 #### GitHub Copilot (VSCode)
 
 **GitHub MCP Server já está integrado nativamente!** Apenas habilite:
 
 `.vscode/settings.json`:
+
 ```json
 {
   "github.copilot.chat.githubMcpServer.enabled": true
 }
 ```
 
-⚠️ **Nota:** O GitHub MCP do Copilot usa seu token do GitHub automaticamente, sem necessidade de configuração manual.
+⚠️ **Nota:** O GitHub MCP do Copilot usa seu token do GitHub automaticamente, sem necessidade de
+configuração manual.
 
 #### OpenCode CLI
 
@@ -185,6 +193,7 @@ Edite `~/opencode/config.json`:
 ### Step 4: Reiniciar Cliente e Testar
 
 **Claude Desktop:**
+
 ```bash
 # Feche e reabra Claude Desktop
 # Teste no chat:
@@ -193,6 +202,7 @@ Edite `~/opencode/config.json`:
 ```
 
 **VSCode Copilot:**
+
 ```bash
 # Reload VSCode: Ctrl+Shift+P → "Developer: Reload Window"
 # Teste no Copilot Chat:
@@ -226,6 +236,7 @@ Este modo faz o **cliente conectar apenas no nosso MCP HTTP**, enquanto o nosso 
 - reexporta as tools no nosso MCP com um prefixo (ex.: `mcp_github__*`)
 
 A implementação é feita com o **MCP SDK oficial** e um “manager” único:
+
 - `src/integration/mcp/upstream-manager.mjs`
 - `src/integration/mcp/upstream-stdio-sdk.mjs`
 
@@ -241,8 +252,11 @@ GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 ```
 
 Notas:
-- Se `MCP_GITHUB_PROXY_ENABLED=true` e o token estiver vazio, o servidor **não cai**: o upstream fica **not-ready** e aparece em `/ready`.
-- As tools importadas aparecem como `mcp_github__<toolName>` (ex.: `mcp_github__search_repositories`).
+
+- Se `MCP_GITHUB_PROXY_ENABLED=true` e o token estiver vazio, o servidor **não cai**: o upstream
+  fica **not-ready** e aparece em `/ready`.
+- As tools importadas aparecem como `mcp_github__<toolName>` (ex.:
+  `mcp_github__search_repositories`).
 
 ### Opção B (genérico): múltiplos upstreams via `MCP_UPSTREAMS_JSON`
 
@@ -256,8 +270,10 @@ MCP_UPSTREAMS_JSON=[
 ```
 
 Notas:
+
 - Se `MCP_UPSTREAMS_JSON` estiver setado, ele **tem precedência** sobre o legado `MCP_UPSTREAM_*`.
-- Para stdio, use `envFrom` para repassar variáveis do processo (ex.: `GITHUB_PERSONAL_ACCESS_TOKEN`) sem hardcode.
+- Para stdio, use `envFrom` para repassar variáveis do processo (ex.:
+  `GITHUB_PERSONAL_ACCESS_TOKEN`) sem hardcode.
 
 ### Compatibilidade (legado): `MCP_UPSTREAM_ENABLED` (1 upstream HTTP)
 
@@ -272,17 +288,20 @@ MCP_UPSTREAM_TOOL_PREFIX=mcp_upstream__
 
 ### Diagnóstico e “defesas”
 
-1) Diagnóstico automático:
+1. Diagnóstico automático:
+
 ```bash
 npm run mcp:diagnose
 ```
 
-2) Readiness com upstreams:
+2. Readiness com upstreams:
+
 ```bash
 curl -s http://localhost:3008/ready | jq '.mcp.upstreams'
 ```
 
-3) Retry best-effort (opcional):
+3. Retry best-effort (opcional):
+
 ```bash
 MCP_UPSTREAM_RESTART_ENABLED=true
 MCP_UPSTREAM_RESTART_BACKOFF_MS=5000
@@ -296,6 +315,7 @@ MCP_UPSTREAM_RESTART_MAX=10
 ### 1. Buscar código localmente e criar issue
 
 **Prompt (Claude/Copilot):**
+
 ```
 1. Use rag_search to find all occurrences of "CHROME_PROXY_PORT" in the codebase
 2. Analyze the results
@@ -303,6 +323,7 @@ MCP_UPSTREAM_RESTART_MAX=10
 ```
 
 **Resultado:**
+
 - ✅ RAG encontra 15 ocorrências em 8 arquivos
 - ✅ LLM analisa e identifica falta de documentação
 - ✅ GitHub MCP cria issue automaticamente
@@ -310,6 +331,7 @@ MCP_UPSTREAM_RESTART_MAX=10
 ### 2. Gerar código e fazer commit
 
 **Prompt:**
+
 ```
 1. Use ollama_generate to create a new utility function for parsing Chrome URLs
 2. Save the code to a new file using create_or_update_file
@@ -317,6 +339,7 @@ MCP_UPSTREAM_RESTART_MAX=10
 ```
 
 **Resultado:**
+
 - ✅ Ollama gera código TypeScript
 - ✅ GitHub MCP cria arquivo no repo
 - ✅ GitHub MCP abre PR automático
@@ -324,6 +347,7 @@ MCP_UPSTREAM_RESTART_MAX=10
 ### 3. Buscar Issues + Context
 
 **Prompt:**
+
 ```
 1. Search for open issues with label "bug" using search_issues
 2. For each issue, use rag_search to find relevant code in our codebase
@@ -331,6 +355,7 @@ MCP_UPSTREAM_RESTART_MAX=10
 ```
 
 **Resultado:**
+
 - ✅ Encontra 5 bugs abertos
 - ✅ RAG localiza código relevante
 - ✅ Ollama sugere correções específicas
@@ -339,14 +364,14 @@ MCP_UPSTREAM_RESTART_MAX=10
 
 ## 📊 Comparação: Nosso MCP vs GitHub MCP
 
-| Feature | Nosso MCP | GitHub MCP |
-|---------|-----------|------------|
-| **Codebase Search** | ✅ Hybrid (Vector+FTS) | ❌ |
-| **Local LLM** | ✅ Ollama (3+ modelos) | ❌ |
-| **GitHub API** | ❌ | ✅ 25+ operations |
-| **File Operations** | ❌ (apenas search) | ✅ CRUD completo |
-| **PR Management** | ❌ | ✅ Create, review, merge |
-| **Transport** | HTTP (melhor para multi-client) | Stdio (mais seguro) |
+| Feature             | Nosso MCP                       | GitHub MCP               |
+| ------------------- | ------------------------------- | ------------------------ |
+| **Codebase Search** | ✅ Hybrid (Vector+FTS)          | ❌                       |
+| **Local LLM**       | ✅ Ollama (3+ modelos)          | ❌                       |
+| **GitHub API**      | ❌                              | ✅ 25+ operations        |
+| **File Operations** | ❌ (apenas search)              | ✅ CRUD completo         |
+| **PR Management**   | ❌                              | ✅ Create, review, merge |
+| **Transport**       | HTTP (melhor para multi-client) | Stdio (mais seguro)      |
 
 **Conclusão:** São **complementares**, não competidores. Use ambos!
 
@@ -357,6 +382,7 @@ MCP_UPSTREAM_RESTART_MAX=10
 ### Gerenciamento de Tokens
 
 **✅ FAZER:**
+
 ```bash
 # Usar .env.local (não commitado)
 echo "GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx" > .env.local
@@ -367,6 +393,7 @@ export GITHUB_PERSONAL_ACCESS_TOKEN=$(pass show github/mcp-token)
 ```
 
 **❌ NÃO FAZER:**
+
 ```bash
 # NUNCA commitar tokens
 git add .env.development  # Se contém token real
@@ -378,10 +405,12 @@ console.log(process.env.GITHUB_PERSONAL_ACCESS_TOKEN)
 ### Rate Limiting
 
 GitHub API tem limites:
+
 - **Authenticated:** 5,000 requests/hora
 - **Search API:** 30 requests/minuto
 
 **Implementar cache:**
+
 ```javascript
 // Cachear resultados de search_repositories por 5 minutos
 const GITHUB_CACHE_TTL = 300000; // 5 min
@@ -400,7 +429,7 @@ registry.on('tool:execute', ({ name, params, user }) => {
       user,
       tool: name,
       params: sanitize(params), // Remove tokens
-      ip: getClientIP()
+      ip: getClientIP(),
     });
   }
 });
@@ -415,6 +444,7 @@ registry.on('tool:execute', ({ name, params, user }) => {
 **Causa:** Token não foi passado para o GitHub MCP Server.
 
 **Solução:**
+
 ```bash
 # Verificar se token existe
 echo $GITHUB_PERSONAL_ACCESS_TOKEN
@@ -430,6 +460,7 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 **Causa:** Muitas requests à API do GitHub.
 
 **Soluções:**
+
 1. Implementar cache (TTL 5-10 min)
 2. Usar `conditional requests` (ETag/If-Modified-Since)
 3. Aguardar reset do rate limit (header `X-RateLimit-Reset`)
@@ -439,6 +470,7 @@ export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 **Causa:** Upstream import falhou.
 
 **Debug:**
+
 ```bash
 # Ver logs do servidor
 pm2 logs dashboard-web | grep "MCP Upstream"
@@ -472,7 +504,7 @@ app.get('/api/mcp/stats', (req, res) => {
 
   res.json({
     topTools: Object.fromEntries(sorted),
-    totalCalls: Array.from(toolUsageStats.values()).reduce((a, b) => a + b, 0)
+    totalCalls: Array.from(toolUsageStats.values()).reduce((a, b) => a + b, 0),
   });
 });
 ```
@@ -484,9 +516,11 @@ app.get('/api/mcp/stats', (req, res) => {
 ### ✅ Implementação Recomendada
 
 Para **desenvolvimento/prototipagem:**
+
 - Use **Modelo 1 (Direct)**: Simples, rápido, sem overhead
 
 Para **produção:**
+
 - Use **Modelo 2 (Upstream Proxy)**: Controle centralizado, audit log, rate limiting
 
 ### 📚 Próximos Passos
@@ -499,7 +533,4 @@ Para **produção:**
 
 ---
 
-**Versão:** 1.0
-**Data:** 07/02/2026
-**Autor:** GitHub Copilot
-**Status:** ✅ Guia Completo
+**Versão:** 1.0 **Data:** 07/02/2026 **Autor:** GitHub Copilot **Status:** ✅ Guia Completo

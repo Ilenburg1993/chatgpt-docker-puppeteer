@@ -11,6 +11,7 @@
 ### Status Geral: ⚠️ **BOM COM MELHORIAS NECESSÁRIAS**
 
 **Pontos Fortes:**
+
 - ✅ Vite 7.2.4 (latest)
 - ✅ Vue 3.5.24 (latest)
 - ✅ Tailwind CSS 4.1.18 (latest v4)
@@ -20,6 +21,7 @@
 - ✅ Proxy API/Socket.io funcional
 
 **Problemas Identificados:**
+
 - ❌ Dependências desatualizadas (4 major versions)
 - ❌ Host 127.0.0.1 incompatível com Docker (deveria ser 0.0.0.0)
 - ❌ manualChunks referenciando libs não instaladas
@@ -45,18 +47,21 @@ vue-router   4.6.4   →   5.0.2   ⚠️ Breaking changes significantes
 #### Recomendações de Upgrade
 
 **1. uuid (safe upgrade):**
+
 ```bash
 cd src/dashboard-ui
 npm install uuid@latest
 ```
 
 **2. date-fns (minor breaks):**
+
 ```bash
 npm install date-fns@latest
 # Verificar: formatRelative, parseISO (API changes)
 ```
 
 **3. pinia (requer Vue 3.4+):**
+
 ```bash
 # Vue atual: 3.5.24 ✅ OK
 npm install pinia@latest
@@ -64,6 +69,7 @@ npm install pinia@latest
 ```
 
 **4. vue-router (⚠️ MAJOR BREAKING):**
+
 ```bash
 # NÃO ATUALIZAR AINDA - Breaking changes significantes
 # Aguardar estabilização projeto antes de v5 migration
@@ -71,6 +77,7 @@ npm install pinia@latest
 ```
 
 **Prioridade:**
+
 1. ✅ uuid (imediato)
 2. ✅ date-fns (curto prazo)
 3. ⚠️ pinia (médio prazo - testar stores)
@@ -96,15 +103,18 @@ server: {
 }
 ```
 
-**Justificativa:**  
+**Justificativa:**
+
 - **127.0.0.1**: Interface de loopback (só localhost)
 - **0.0.0.0**: Todas as interfaces (permite VS Code port forwarding)
 - DevContainer PRECISA de `0.0.0.0` para funcionar
 
 **Comentário legado incorreto:**
+
 ```javascript
 // CRITICAL: VS Code port forwarding does not support IPv6
 ```
+
 ❌ **Falso**: VS Code suporta IPv6. `127.0.0.1` é IPv4 loopback, não IPv6.
 
 ---
@@ -123,6 +133,7 @@ manualChunks: {
 **Consequência**: Build warnings + chunks subotimizados
 
 **Correção:**
+
 ```javascript
 // ✅ CORRETO
 manualChunks: {
@@ -146,12 +157,14 @@ strictPort: false, // Porta flutuante se 5173 ocupada
 **Problema:** DevContainer forward **espera** porta **5173**. Se Vite usar 5174, o forward quebra.
 
 **Correção:**
+
 ```javascript
 // ✅ MELHOR
 strictPort: true, // Falha se 5173 ocupada (fail-fast behavior)
 ```
 
 **Alternativa (se usar CI/CD):**
+
 ```javascript
 strictPort: process.env.CI === 'true', // Strict em CI, flexible local
 ```
@@ -161,6 +174,7 @@ strictPort: process.env.CI === 'true', // Strict em CI, flexible local
 ### ✅ PONTOS POSITIVOS
 
 #### HMR DevContainer (✅ Correto)
+
 ```javascript
 hmr: {
     clientPort: 5173,
@@ -169,6 +183,7 @@ hmr: {
 ```
 
 #### Watch Polling (✅ Necessário)
+
 ```javascript
 watch: {
     usePolling: true, // Requerido para Docker volumes
@@ -177,6 +192,7 @@ watch: {
 ```
 
 #### Proxy API/Socket.io (✅ Funcional)
+
 ```javascript
 proxy: {
     '/api': {
@@ -199,6 +215,7 @@ proxy: {
 ### ✅ Portas Configuradas Corretamente
 
 #### devcontainer.json
+
 ```json
 "forwardPorts": [
   3008, // Dashboard Principal — Mission Control (HTTP + Socket.io + API)
@@ -218,6 +235,7 @@ proxy: {
 ```
 
 **Compatibilidade:** ✅ **100%**
+
 - Porta 5173 (Vite) está declarada
 - Porta 3008 (API) está declarada
 - Proxy `/api` e `/socket.io` apontam para 3008
@@ -231,6 +249,7 @@ proxy: {
 **Versão atual:** 4.1.18 (latest v4)
 
 **Plugins:**
+
 ```javascript
 plugins: [
     require('@tailwindcss/forms'),    // ⚠️ Considerar migrar para v4 syntax
@@ -239,17 +258,19 @@ plugins: [
 ```
 
 **Recomendação (Tailwind v4 native):**
+
 ```javascript
 // ✅ Tailwind v4 syntax (futuro)
 import forms from '@tailwindcss/forms';
 import typography from '@tailwindcss/typography';
 
 export default {
-    plugins: [forms, typography],
+  plugins: [forms, typography],
 };
 ```
 
 **PostCSS (✅ Correto):**
+
 ```javascript
 // postcss.config.js
 export default {
@@ -257,7 +278,7 @@ export default {
     '@tailwindcss/postcss': {}, // ✅ Tailwind v4
     autoprefixer: {},
   },
-}
+};
 ```
 
 ---
@@ -267,6 +288,7 @@ export default {
 ### ⚠️ Melhorias Sugeridas
 
 #### 1. Compression (Brotli + Gzip)
+
 ```bash
 npm install vite-plugin-compression2 --save-dev
 ```
@@ -276,11 +298,11 @@ npm install vite-plugin-compression2 --save-dev
 import { compression } from 'vite-plugin-compression2';
 
 export default defineConfig({
-    plugins: [
-        vue(),
-        compression({ algorithm: 'brotliCompress', exclude: [/\.(br)$/, /\.(gz)$/] }),
-        compression({ algorithm: 'gzip', exclude: [/\.(br)$/, /\.(gz)$/] }),
-    ],
+  plugins: [
+    vue(),
+    compression({ algorithm: 'brotliCompress', exclude: [/\.(br)$/, /\.(gz)$/] }),
+    compression({ algorithm: 'gzip', exclude: [/\.(br)$/, /\.(gz)$/] }),
+  ],
 });
 ```
 
@@ -289,6 +311,7 @@ export default defineConfig({
 ---
 
 #### 2. PWA (Opcional - se Dashboard for offline-capable)
+
 ```bash
 npm install vite-plugin-pwa --save-dev
 ```
@@ -298,26 +321,26 @@ npm install vite-plugin-pwa --save-dev
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-    plugins: [
-        vue(),
-        VitePWA({
-            registerType: 'autoUpdate',
-            manifest: {
-                name: 'Mission Control Dashboard',
-                short_name: 'Mission Control',
-                theme_color: '#0a0e1a',
-                background_color: '#0a0e1a',
-                display: 'standalone',
-                icons: [
-                    {
-                        src: '/logo-192.png',
-                        sizes: '192x192',
-                        type: 'image/png',
-                    },
-                ],
-            },
-        }),
-    ],
+  plugins: [
+    vue(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      manifest: {
+        name: 'Mission Control Dashboard',
+        short_name: 'Mission Control',
+        theme_color: '#0a0e1a',
+        background_color: '#0a0e1a',
+        display: 'standalone',
+        icons: [
+          {
+            src: '/logo-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+        ],
+      },
+    }),
+  ],
 });
 ```
 
@@ -326,6 +349,7 @@ export default defineConfig({
 ---
 
 #### 3. Bundle Analysis
+
 ```bash
 npm install rollup-plugin-visualizer --save-dev
 ```
@@ -335,15 +359,15 @@ npm install rollup-plugin-visualizer --save-dev
 import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
-    plugins: [
-        vue(),
-        visualizer({
-            open: false,
-            filename: 'dist/stats.html',
-            gzipSize: true,
-            brotliSize: true,
-        }),
-    ],
+  plugins: [
+    vue(),
+    visualizer({
+      open: false,
+      filename: 'dist/stats.html',
+      gzipSize: true,
+      brotliSize: true,
+    }),
+  ],
 });
 ```
 
@@ -352,6 +376,7 @@ export default defineConfig({
 ---
 
 #### 4. CSS Code Splitting
+
 ```javascript
 // vite.config.js
 build: {
@@ -390,75 +415,81 @@ import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
-    plugins: [vue()],
+  plugins: [vue()],
 
-    // Base path para servir em /dashboard
-    base: '/dashboard/',
+  // Base path para servir em /dashboard
+  base: '/dashboard/',
 
-    resolve: {
-        alias: {
-            '@': fileURLToPath(new URL('./src', import.meta.url)),
-        },
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
 
-    server: {
-        port: 5173,
-        host: '0.0.0.0', // ✅ Docker-compatible (aceita conexões externas)
-        strictPort: true, // ✅ Fail-fast se porta ocupada (DevContainer espera 5173)
-        // HMR Configuration for DevContainer
-        hmr: {
-            clientPort: 5173,
-            host: 'localhost', // ✅ Critical for Windows → Container
-        },
-        // Watch Configuration for Docker Volumes
-        watch: {
-            usePolling: true, // ✅ Required for Docker volumes
-            interval: 100,
-        },
-        proxy: {
-            '/api': {
-                target: 'http://localhost:3008',
-                changeOrigin: true,
-                secure: false,
-            },
-            '/socket.io': {
-                target: 'http://localhost:3008',
-                changeOrigin: true,
-                ws: true,
-            },
-        },
+  server: {
+    port: 5173,
+    host: '0.0.0.0', // ✅ Docker-compatible (aceita conexões externas)
+    strictPort: true, // ✅ Fail-fast se porta ocupada (DevContainer espera 5173)
+    // HMR Configuration for DevContainer
+    hmr: {
+      clientPort: 5173,
+      host: 'localhost', // ✅ Critical for Windows → Container
     },
+    // Watch Configuration for Docker Volumes
+    watch: {
+      usePolling: true, // ✅ Required for Docker volumes
+      interval: 100,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3008',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/socket.io': {
+        target: 'http://localhost:3008',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
 
-    build: {
-        outDir: 'dist',
-        sourcemap: false,
-        minify: 'esbuild',
-        chunkSizeWarningLimit: 1000,
-        cssCodeSplit: true, // ✅ Separa CSS por chunk
-        rollupOptions: {
-            output: {
-                manualChunks: {
-                    // ✅ Somente libs realmente instaladas
-                    'vue-vendor': ['vue', 'vue-router', 'pinia'],
-                    'charts': ['chart.js'],
-                    'ui': ['radix-vue', 'lucide-vue-next', 'class-variance-authority', 'clsx', 'tailwind-merge'],
-                    'vis': ['vis-timeline', 'vis-data'],
-                    'utils': ['axios', 'lodash-es', 'date-fns', 'uuid'],
-                },
-                assetFileNames: (assetInfo) => {
-                    const info = assetInfo.name.split('.');
-                    const extType = info[info.length - 1];
-                    if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(assetInfo.name)) {
-                        return `assets/images/[name]-[hash][extname]`;
-                    }
-                    if (/\.(woff2?|eot|ttf|otf)$/i.test(assetInfo.name)) {
-                        return `assets/fonts/[name]-[hash][extname]`;
-                    }
-                    return `assets/[name]-[hash][extname]`;
-                },
-            },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: 'esbuild',
+    chunkSizeWarningLimit: 1000,
+    cssCodeSplit: true, // ✅ Separa CSS por chunk
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // ✅ Somente libs realmente instaladas
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          charts: ['chart.js'],
+          ui: [
+            'radix-vue',
+            'lucide-vue-next',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge',
+          ],
+          vis: ['vis-timeline', 'vis-data'],
+          utils: ['axios', 'lodash-es', 'date-fns', 'uuid'],
         },
+        assetFileNames: assetInfo => {
+          const info = assetInfo.name.split('.');
+          const extType = info[info.length - 1];
+          if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(assetInfo.name)) {
+            return `assets/images/[name]-[hash][extname]`;
+          }
+          if (/\.(woff2?|eot|ttf|otf)$/i.test(assetInfo.name)) {
+            return `assets/fonts/[name]-[hash][extname]`;
+          }
+          return `assets/[name]-[hash][extname]`;
+        },
+      },
     },
+  },
 });
 ```
 
@@ -585,18 +616,21 @@ Time to Interactive    3.2s    <2.0s    <3.0s
 ## 📋 RESUMO FINAL
 
 **Prioridades:**
+
 1. 🔴 **P0 (Crítico)**: Corrigir `host: '0.0.0.0'` e `strictPort: true`
 2. 🔴 **P1 (Alto)**: Corrigir `manualChunks` (remover libs não instaladas)
 3. 🟡 **P2 (Médio)**: Atualizar uuid + date-fns
 4. 🟢 **P3 (Baixo)**: Adicionar compression + bundle analysis
 
 **Impacto Estimado:**
+
 - **Build time**: -15% (chunks otimizados)
 - **Bundle size**: -21% (compressão + tree-shaking)
 - **Initial load**: -29% (lazy loading + gzip)
 - **HMR reliability**: +50% (host correto + strictPort)
 
 **Risco:**
+
 - ✅ Correções P0/P1: **Baixo** (mudanças de config)
 - ⚠️ Upgrades P2: **Médio** (requer testes)
 - ❌ vue-router v5: **Alto** (breaking changes - adiar)

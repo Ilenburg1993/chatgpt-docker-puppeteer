@@ -1,9 +1,8 @@
 # 📋 Plano de Implementação de Testes - Execução Fase por Fase
 
-**Data de Início**: 2026-01-20
-**Objetivo**: Atingir 80%+ de cobertura de testes em 5 semanas
-**Metodologia**: Execução incremental, validação contínua, zero regressões
-**Status Inicial**: 14 testes funcionais | 14% cobertura | 135 arquivos fonte
+**Data de Início**: 2026-01-20 **Objetivo**: Atingir 80%+ de cobertura de testes em 5 semanas
+**Metodologia**: Execução incremental, validação contínua, zero regressões **Status Inicial**: 14
+testes funcionais | 14% cobertura | 135 arquivos fonte
 
 ---
 
@@ -29,13 +28,13 @@
 
 # ✅ FASE 0: Auditoria e Documentação [CONCLUÍDO]
 
-**Duração**: Concluída
-**Objetivo**: Mapear estado atual e planejar estratégia
+**Duração**: Concluída **Objetivo**: Mapear estado atual e planejar estratégia
 
 ## Deliverables Completados
 
 - ✅ [TESTES_MAPEAMENTO.md](TESTES_MAPEAMENTO.md) - Auditoria completa de 30 testes
-- ✅ [TESTS_AUDIT_RESULTS.md](TESTS_AUDIT_RESULTS.md) - Resultados: 14 OK | 5 Reescrever | 11 Deletar
+- ✅ [TESTS_AUDIT_RESULTS.md](TESTS_AUDIT_RESULTS.md) - Resultados: 14 OK | 5 Reescrever | 11
+  Deletar
 - ✅ [TESTS_COVERAGE_MATRIX.md](TESTS_COVERAGE_MATRIX.md) - Matriz de cobertura detalhada
 - ✅ [TESTS_STRATEGY.md](TESTS_STRATEGY.md) - Estratégia completa de organização
 
@@ -54,8 +53,7 @@ Estado Atual:
 
 # 🔵 FASE 1: Preparação e Setup
 
-**Duração**: 4 horas
-**Objetivo**: Configurar ferramentas, estrutura de diretórios e scripts
+**Duração**: 4 horas **Objetivo**: Configurar ferramentas, estrutura de diretórios e scripts
 **Status**: ⏳ PRÓXIMA FASE
 
 ## 1.1 Instalar Dependências (30 min)
@@ -200,28 +198,28 @@ npx c8 --help
 
 ```json
 {
-    "scripts": {
-        "test": "node --test tests/**/*.spec.js",
-        "test:unit": "node --test tests/unit/**/*.spec.js",
-        "test:integration": "node --test tests/integration/**/*.spec.js",
-        "test:e2e": "node --test tests/e2e/**/*.spec.js",
-        "test:regression": "node --test tests/regression/**/*.spec.js",
+  "scripts": {
+    "test": "node --test tests/**/*.spec.js",
+    "test:unit": "node --test tests/unit/**/*.spec.js",
+    "test:integration": "node --test tests/integration/**/*.spec.js",
+    "test:e2e": "node --test tests/e2e/**/*.spec.js",
+    "test:regression": "node --test tests/regression/**/*.spec.js",
 
-        "test:watch": "node --test --watch tests/**/*.spec.js",
-        "test:watch:unit": "node --test --watch tests/unit/**/*.spec.js",
+    "test:watch": "node --test --watch tests/**/*.spec.js",
+    "test:watch:unit": "node --test --watch tests/unit/**/*.spec.js",
 
-        "test:coverage": "c8 npm test",
-        "test:coverage:unit": "c8 npm run test:unit",
-        "test:coverage:report": "c8 report --reporter=html && open coverage/index.html",
+    "test:coverage": "c8 npm test",
+    "test:coverage:unit": "c8 npm run test:unit",
+    "test:coverage:report": "c8 report --reporter=html && open coverage/index.html",
 
-        "test:ci": "c8 --check-coverage npm test",
+    "test:ci": "c8 --check-coverage npm test",
 
-        "test:specific": "node --test",
-        "test:debug": "node --inspect-brk --test",
+    "test:specific": "node --test",
+    "test:debug": "node --inspect-brk --test",
 
-        "test:clean": "rm -rf tests/tmp coverage .nyc_output",
-        "test:reset": "npm run test:clean && npm test"
-    }
+    "test:clean": "rm -rf tests/tmp coverage .nyc_output",
+    "test:reset": "npm run test:clean && npm test"
+  }
 }
 ```
 
@@ -376,16 +374,13 @@ cat > tests/README.md << 'EOF'
 ## Structure
 
 ```
-tests/
-├── unit/          # Unit tests (60% - isolado, sem I/O)
-├── integration/   # Integration tests (30% - cross-component)
-├── e2e/          # End-to-end tests (10% - full stack)
-├── regression/   # Regression tests (P1-P5 fixes)
-├── fixtures/     # Test data (tasks, responses, configs)
-├── mocks/        # Reusable mocks (browser, nerv, logger)
-├── helpers/      # Test utilities
-└── manual/       # Manual test procedures
-```
+
+tests/ ├── unit/ # Unit tests (60% - isolado, sem I/O) ├── integration/ # Integration tests (30% -
+cross-component) ├── e2e/ # End-to-end tests (10% - full stack) ├── regression/ # Regression tests
+(P1-P5 fixes) ├── fixtures/ # Test data (tasks, responses, configs) ├── mocks/ # Reusable mocks
+(browser, nerv, logger) ├── helpers/ # Test utilities └── manual/ # Manual test procedures
+
+````
 
 ## Running Tests
 
@@ -410,7 +405,7 @@ npm run test:specific tests/unit/core/test_logger.spec.js
 
 # Debug mode
 npm run test:debug tests/unit/core/test_logger.spec.js
-```
+````
 
 ## Writing Tests
 
@@ -425,9 +420,9 @@ See [TESTS_STRATEGY.md](../TESTS_STRATEGY.md) for templates and conventions.
 
 ## Current Status
 
-Run `npm run test:coverage` to see current coverage.
-EOF
-```
+Run `npm run test:coverage` to see current coverage. EOF
+
+````
 
 ### Checklist
 
@@ -459,7 +454,7 @@ tests/**/*.log
 # Backup files
 *.backup
 EOF
-```
+````
 
 ### Validação
 
@@ -534,9 +529,8 @@ git status
 
 # ⏸️ FASE 2: Consolidação e Migração
 
-**Duração**: 4 horas
-**Objetivo**: Migrar 14 testes existentes para nova estrutura
-**Status**: PENDENTE (iniciar após FASE 1)
+**Duração**: 4 horas **Objetivo**: Migrar 14 testes existentes para nova estrutura **Status**:
+PENDENTE (iniciar após FASE 1)
 
 ## 2.1 Deletar Testes Obsoletos (15 min)
 
@@ -562,22 +556,22 @@ git commit -m "chore: remove 1 obsolete test (IPC refactoring)"
 
 ### Lista de Testes a Migrar
 
-| # | Teste Original | Destino | Prioridade |
-|---|---------------|---------|------------|
-| 1 | test_config_validation.js | tests/unit/core/test_config.spec.js | ✅ |
-| 2 | test_health_endpoint.js | tests/integration/api/test_health_endpoint.spec.js | ✅ |
-| 3 | test_driver_nerv_integration.js | tests/integration/driver/test_driver_nerv.spec.js | ✅ |
-| 4 | test_puppeteer_launch.js | tests/unit/infra/test_puppeteer_launcher.spec.js | ✅ |
-| 5 | test_p1_fixes.js | tests/regression/test_p1_fixes.spec.js | ✅ |
-| 6 | test_p2_fixes.js | tests/regression/test_p2_fixes.spec.js | ✅ |
-| 7 | test_p3_fixes.js | tests/regression/test_p3_fixes.spec.js | ✅ |
-| 8 | test_p4_p5_fixes.js | tests/regression/test_p4_p5_fixes.spec.js | ⚠️ P5.2 |
-| 9 | test_ariadne_thread.js | tests/e2e/test_ariadne_thread.spec.js | ✅ |
-| 10 | test_boot_sequence.js | tests/e2e/test_boot_sequence.spec.js | ✅ |
-| 11 | test_browser_pool.js | tests/unit/infra/test_browser_pool.spec.js | ✅ |
-| 12 | test_connection_orchestrator.js | tests/integration/browser/test_connection_orchestrator.spec.js | ✅ |
-| 13 | test_integration_complete.js | tests/e2e/test_integration_complete.spec.js | ✅ |
-| 14 | helpers.js | tests/helpers/test_helpers.js | ✅ |
+| #   | Teste Original                  | Destino                                                        | Prioridade |
+| --- | ------------------------------- | -------------------------------------------------------------- | ---------- |
+| 1   | test_config_validation.js       | tests/unit/core/test_config.spec.js                            | ✅         |
+| 2   | test_health_endpoint.js         | tests/integration/api/test_health_endpoint.spec.js             | ✅         |
+| 3   | test_driver_nerv_integration.js | tests/integration/driver/test_driver_nerv.spec.js              | ✅         |
+| 4   | test_puppeteer_launch.js        | tests/unit/infra/test_puppeteer_launcher.spec.js               | ✅         |
+| 5   | test_p1_fixes.js                | tests/regression/test_p1_fixes.spec.js                         | ✅         |
+| 6   | test_p2_fixes.js                | tests/regression/test_p2_fixes.spec.js                         | ✅         |
+| 7   | test_p3_fixes.js                | tests/regression/test_p3_fixes.spec.js                         | ✅         |
+| 8   | test_p4_p5_fixes.js             | tests/regression/test_p4_p5_fixes.spec.js                      | ⚠️ P5.2    |
+| 9   | test_ariadne_thread.js          | tests/e2e/test_ariadne_thread.spec.js                          | ✅         |
+| 10  | test_boot_sequence.js           | tests/e2e/test_boot_sequence.spec.js                           | ✅         |
+| 11  | test_browser_pool.js            | tests/unit/infra/test_browser_pool.spec.js                     | ✅         |
+| 12  | test_connection_orchestrator.js | tests/integration/browser/test_connection_orchestrator.spec.js | ✅         |
+| 13  | test_integration_complete.js    | tests/e2e/test_integration_complete.spec.js                    | ✅         |
+| 14  | helpers.js                      | tests/helpers/test_helpers.js                                  | ✅         |
 
 ### Estratégia de Migração
 
@@ -594,17 +588,17 @@ Para cada teste:
 ```javascript
 // ANTES (custom runner)
 function runTest(name, testFn) {
-    try {
-        testFn();
-        console.log('✅ PASSOU');
-    } catch (e) {
-        console.log('❌ FALHOU');
-    }
+  try {
+    testFn();
+    console.log('✅ PASSOU');
+  } catch (e) {
+    console.log('❌ FALHOU');
+  }
 }
 
 runTest('TEST 1: Config válido', () => {
-    const config = loadConfig();
-    assert.ok(config);
+  const config = loadConfig();
+  assert.ok(config);
 });
 
 // DEPOIS (node:test)
@@ -612,10 +606,10 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 
 describe('Config', () => {
-    it('should load valid config', () => {
-        const config = loadConfig();
-        assert.ok(config);
-    });
+  it('should load valid config', () => {
+    const config = loadConfig();
+    assert.ok(config);
+  });
 });
 ```
 
@@ -1038,9 +1032,8 @@ git status
 
 # ⏸️ FASE 3: Testes Críticos (🔴 Prioridade Máxima)
 
-**Duração**: 80 horas (2 semanas)
-**Objetivo**: Implementar 12 suites de testes críticos
-**Status**: PENDENTE (iniciar após FASE 2)
+**Duração**: 80 horas (2 semanas) **Objetivo**: Implementar 12 suites de testes críticos **Status**:
+PENDENTE (iniciar após FASE 2)
 
 ## Overview da FASE 3
 
@@ -1053,19 +1046,29 @@ git status
 ## Semana 1: KERNEL + INFRA
 
 ### 3.1 test_execution_engine.spec.js (12 tests - 8h)
+
 ### 3.2 test_task_runtime.spec.js (10 tests - 7h)
+
 ### 3.3 test_policy_engine.spec.js (9 tests - 7h)
+
 ### 3.4 test_queue.spec.js (12 tests - 8h)
+
 ### 3.5 test_lock_manager.spec.js (10 tests - 7h)
+
 ### 3.6 test_io.spec.js (8 tests - 6h) + FIX P5.2
 
 ## Semana 2: DRIVER + NERV + CORE
 
 ### 3.7 test_driver_factory.spec.js (8 tests - 6h)
+
 ### 3.8 test_driver_lifecycle.spec.js (10 tests - 7h)
+
 ### 3.9 test_chatgpt_driver.spec.js (15 tests - 10h)
+
 ### 3.10 test_nerv_core.spec.js (8 tests - 6h)
+
 ### 3.11 test_nerv_buffers.spec.js (10 tests - 7h)
+
 ### 3.12 test_logger.spec.js (5 tests - 4h)
 
 **[Detalhamento completo em documento separado]**
@@ -1074,9 +1077,8 @@ git status
 
 # ⏸️ FASE 4: Testes Altos (🟡 Alta Prioridade)
 
-**Duração**: 80 horas (2 semanas)
-**Objetivo**: Implementar 13 suites de alta prioridade
-**Status**: PENDENTE
+**Duração**: 80 horas (2 semanas) **Objetivo**: Implementar 13 suites de alta prioridade **Status**:
+PENDENTE
 
 ## Overview da FASE 4
 
@@ -1092,9 +1094,8 @@ git status
 
 # ⏸️ FASE 5: Testes Médios (🟠 Média Prioridade)
 
-**Duração**: 40 horas (1 semana)
-**Objetivo**: Implementar 16 suites de média prioridade
-**Status**: PENDENTE
+**Duração**: 40 horas (1 semana) **Objetivo**: Implementar 16 suites de média prioridade **Status**:
+PENDENTE
 
 **[Detalhamento em documento separado]**
 
@@ -1102,11 +1103,11 @@ git status
 
 # ⏸️ FASE 6: Testes Baixos (🟢 Baixa Prioridade) + CI/CD
 
-**Duração**: 20 horas (3 dias)
-**Objetivo**: Completar cobertura e integrar CI/CD
-**Status**: PENDENTE
+**Duração**: 20 horas (3 dias) **Objetivo**: Completar cobertura e integrar CI/CD **Status**:
+PENDENTE
 
 ## 6.1 Testes Baixos (8 suites - 12h)
+
 ## 6.2 CI/CD Integration (8h)
 
 **[Detalhamento em documento separado]**
@@ -1129,37 +1130,44 @@ echo "Coverage: $(c8 report --reporter=json-summary | jq '.total.lines.pct')"
 ## Checklist Geral
 
 ### ✅ FASE 0: Auditoria
+
 - [x] Documentação criada
 - [x] Estratégia definida
 
 ### 🔵 FASE 1: Setup (PRÓXIMA)
+
 - [ ] Dependências instaladas
 - [ ] Estrutura criada
 - [ ] Configuração completa
 - [ ] Validação OK
 
 ### ⏸️ FASE 2: Migração
+
 - [ ] Testes obsoletos deletados
 - [ ] 14 testes migrados
 - [ ] Fixtures criadas
 - [ ] Mocks criados
 
 ### ⏸️ FASE 3: Críticos (🔴)
+
 - [ ] 12 suites implementadas
 - [ ] 117 tests passando
 - [ ] Coverage > 40%
 
 ### ⏸️ FASE 4: Altos (🟡)
+
 - [ ] 13 suites implementadas
 - [ ] 111 tests passando
 - [ ] Coverage > 60%
 
 ### ⏸️ FASE 5: Médios (🟠)
+
 - [ ] 16 suites implementadas
 - [ ] 87 tests passando
 - [ ] Coverage > 70%
 
 ### ⏸️ FASE 6: Baixos (🟢) + CI
+
 - [ ] 8 suites implementadas
 - [ ] 34 tests passando
 - [ ] Coverage > 80%
@@ -1186,7 +1194,5 @@ echo "Coverage: $(c8 report --reporter=json-summary | jq '.total.lines.pct')"
 
 ---
 
-**Status Atual**: 📋 Plano completo criado | Aguardando início da FASE 1
-**Próxima Ação**: Executar FASE 1 (4 horas de setup)
-**Responsável**: [A definir]
-**Data de Início**: 2026-01-20
+**Status Atual**: 📋 Plano completo criado | Aguardando início da FASE 1 **Próxima Ação**: Executar
+FASE 1 (4 horas de setup) **Responsável**: [A definir] **Data de Início**: 2026-01-20

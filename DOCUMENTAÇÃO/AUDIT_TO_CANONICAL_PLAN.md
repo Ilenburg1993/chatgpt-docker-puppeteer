@@ -1,14 +1,14 @@
 # 📋 Plano de Conclusão: Auditorias → Documentação Canônica
 
-**Data:** 21/01/2026
-**Status:** 🎯 Pronto para execução
-**Progresso Atual:** ~60% (infraestrutura completa)
+**Data:** 21/01/2026 **Status:** 🎯 Pronto para execução **Progresso Atual:** ~60% (infraestrutura
+completa)
 
 ---
 
 ## 🎯 Objetivo
 
-Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para construir a **documentação canônica** profissional do projeto v1.0.0.
+Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para construir a
+**documentação canônica** profissional do projeto v1.0.0.
 
 ---
 
@@ -16,8 +16,8 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 ### ✅ Auditorias Completas (13)
 
-| Auditoria     | Arquivo                                        | Linhas | Status     |
-| ------------- | ---------------------------------------------- | ------ | ---------- |
+| Auditoria     | Arquivo                                        | Linhas | Status      |
+| ------------- | ---------------------------------------------- | ------ | ----------- |
 | **ROOT**      | 00_ROOT_FILES_AUDIT.md                         | ?      | ✅ Completo |
 | **CORE**      | 01_CORE_AUDIT.md + CORRECTIONS                 | ?      | ✅ Completo |
 | **NERV**      | 02_NERV_AUDIT.md + CORRECTIONS                 | ?      | ✅ Completo |
@@ -33,12 +33,12 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 | Tarefa              | Descrição                                     | Prioridade |
 | ------------------- | --------------------------------------------- | ---------- |
-| **1. Master Plan**  | Revisar AUDIT_COVERAGE_MASTER_PLAN.md         | 🔥 CRÍTICA  |
-| **2. Consolidação** | Consolidar CORRECTIONS_SUMMARY (7 arquivos)   | 🔥 CRÍTICA  |
-| **3. Gaps**         | Identificar gaps de documentação              | 🟡 ALTA     |
-| **4. Métricas**     | Compilar métricas de qualidade (Audit Levels) | 🟡 ALTA     |
-| **5. Checklist**    | Validar completude de cada subsistema         | 🟡 MÉDIA    |
-| **6. Arquivamento** | Mover docs obsoletos para archive/            | 🟢 BAIXA    |
+| **1. Master Plan**  | Revisar AUDIT_COVERAGE_MASTER_PLAN.md         | 🔥 CRÍTICA |
+| **2. Consolidação** | Consolidar CORRECTIONS_SUMMARY (7 arquivos)   | 🔥 CRÍTICA |
+| **3. Gaps**         | Identificar gaps de documentação              | 🟡 ALTA    |
+| **4. Métricas**     | Compilar métricas de qualidade (Audit Levels) | 🟡 ALTA    |
+| **5. Checklist**    | Validar completude de cada subsistema         | 🟡 MÉDIA   |
+| **6. Arquivamento** | Mover docs obsoletos para archive/            | 🟢 BAIXA   |
 
 ---
 
@@ -46,8 +46,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 ### 📋 FASE 1: Análise das Auditorias Existentes
 
-**Duração:** 30-45 minutos
-**Objetivo:** Consolidar conhecimento completo do sistema
+**Duração:** 30-45 minutos **Objetivo:** Consolidar conhecimento completo do sistema
 
 **Tarefas:**
 
@@ -65,6 +64,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
    - Por funcionalidade: O que foi auditado vs o que falta
 
 **Output:**
+
 - `AUDIT_CONSOLIDATED_REPORT.md` (novo arquivo)
   - Tabela de cobertura por subsistema
   - Lista de gaps críticos
@@ -75,8 +75,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 ### 📝 FASE 2: Auditorias Complementares
 
-**Duração:** 1-2 horas
-**Objetivo:** Preencher gaps identificados
+**Duração:** 1-2 horas **Objetivo:** Preencher gaps identificados
 
 **Subsistemas a Re-auditar:**
 
@@ -97,6 +96,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
    - Recomendações de hardening
 
 **Output:**
+
 - Atualizar auditorias existentes OU
 - Criar `07_GAPS_AUDIT.md` com análise complementar
 
@@ -104,68 +104,76 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 ### 🏗️ FASE 3: Construção da Documentação Canônica
 
-**Duração:** 4-6 horas
-**Objetivo:** Criar documentos principais baseados nas auditorias
+**Duração:** 4-6 horas **Objetivo:** Criar documentos principais baseados nas auditorias
 
 **Priorização (ordem de criação):**
 
 #### 1. `ARCHITECTURE.md` ⭐⭐⭐ (CRÍTICO)
 
-**Base:** SYSTEM_ANALYSIS_COMPLETE.md + Auditorias consolidadas
-**Tamanho:** 800-1000 lines
+**Base:** SYSTEM_ANALYSIS_COMPLETE.md + Auditorias consolidadas **Tamanho:** 800-1000 lines
 **Conteúdo:**
 
 ```markdown
 # Architecture
 
 ## 1. Overview
+
 - System vision (30,000 feet)
 - Core principles (NERV-first, zero-coupling)
 - Key design patterns
 
 ## 2. Subsystems (7)
+
 ### 2.1 NERV - IPC 2.0
+
 - Architecture diagram
 - Message flow
 - Envelope canonical structure
 - Adapters (KERNEL, DRIVER, SERVER)
 
 ### 2.2 KERNEL - Task Lifecycle
+
 - State machine diagram
 - Policy decisions
 - Execution engine
 - Observation store
 
 ### 2.3 DRIVER - Browser Automation
+
 - Factory pattern
 - Target-specific drivers (ChatGPT, Gemini)
 - DriverNERVAdapter integration
 - Incremental collection
 
 ### 2.4 INFRA - Infrastructure
+
 - BrowserPool (connection management)
 - Queue (file-based, PID locking)
 - Storage (DNA, responses)
 - Locks (two-phase commit)
 
 ### 2.5 SERVER - Dashboard & API
+
 - Express + Socket.io
 - ServerNERVAdapter
 - Real-time telemetry
 - Health endpoints
 
 ### 2.6 CORE - Foundations
+
 - Config hot-reload
 - Schemas (Zod)
 - Logger (audit levels)
 - Identity (DNA)
 
 ### 2.7 LOGIC - Business Rules
+
 - Validation
 - Adaptive timeouts
 - Retry strategies
 
 ## 3. Data Flow
+
 - Task lifecycle completo (PENDING → RUNNING → DONE)
 - Telemetry propagation
 - Command flow (KERNEL → Driver)
@@ -173,6 +181,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 - Event flow (pub/sub via NERV)
 
 ## 4. Design Patterns
+
 - Zero-coupling principle
 - Pub/Sub via NERV
 - Sovereign interruption (AbortController)
@@ -182,6 +191,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 - Two-phase commit locks
 
 ## 5. Scalability & Performance
+
 - Memory management (GC)
 - Connection pooling
 - Backpressure control
@@ -189,18 +199,21 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 - File watcher debounce
 
 ## 6. Security
+
 - PID-based locking
 - Input sanitization (control char removal)
 - Schema validation (Zod)
 - Process isolation
 
 ## 7. Extension Points
+
 - Creating new drivers
 - Adding ActionCodes
 - Extending NERV adapters
 - Custom validation rules
 
 ## 8. Audit Levels Explained
+
 - Level 32: Production-ready (1 review)
 - Level 64: Battle-tested (2+ reviews)
 - Level 128: Mission-critical (3+ reviews)
@@ -208,6 +221,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 ```
 
 **Fontes:**
+
 - `SYSTEM_ANALYSIS_COMPLETE.md` (estrutura base)
 - `02_NERV_AUDIT.md` (seção NERV)
 - `04_KERNEL_AUDIT.md` (seção KERNEL)
@@ -220,47 +234,69 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 #### 2. `API.md` ⭐⭐⭐ (CRÍTICO)
 
-**Base:** Auditorias de módulos + análise de exports
-**Tamanho:** 600-800 lines
-**Conteúdo:**
+**Base:** Auditorias de módulos + análise de exports **Tamanho:** 600-800 lines **Conteúdo:**
 
 ```markdown
 # API Reference
 
 ## 1. NERV Public API
+
 ### emit(envelope)
+
 ### send(envelope)
+
 ### onReceive(filter, handler)
+
 ### shutdown()
 
 ## 2. KERNEL Public API
+
 ### initialize()
+
 ### shutdown()
+
 ### nerv (reference)
 
 ## 3. BrowserPool Public API
+
 ### initialize(config)
+
 ### acquireConnection(taskId)
+
 ### releaseConnection(taskId)
+
 ### getHealth()
+
 ### shutdown()
 
 ## 4. Driver API
+
 ### Factory Pattern
+
 ### DriverFactory.create(target, config)
+
 ### Base Driver Interface
+
 ### executar({ prompt, page, signal })
+
 ### Driver Events
 
 ## 5. Queue API (IO Module)
+
 ### loadQueue()
+
 ### saveTask(task)
+
 ### acquireLock(taskId, target)
+
 ### releaseLock(taskId)
+
 ### isLockOwnerAlive(lockInfo)
 
 ## 6. Server/Dashboard API
+
 ### HTTP Endpoints
+
 - GET /api/health
 - GET /api/system/health
 - GET /api/tasks
@@ -269,24 +305,35 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 - POST /api/agents/restart
 
 ### Socket.io Events
+
 - status_update
 - task_complete
 - agent_health
 
 ## 7. Schemas (Zod)
+
 ### TaskSchema
+
 ### DnaSchema
+
 ### ConfigSchema
+
 ### ActionCode (enum)
+
 ### ActorRole (enum)
 
 ## 8. Constants
+
 ### Task Status (STATUS_VALUES)
+
 ### Connection Modes (CONNECTION_MODES)
+
 ### Browser States (BROWSER_STATES)
+
 ### Message Types (MessageType)
 
 ## 9. Examples
+
 - Creating a task
 - Listening to NERV events
 - Creating a custom driver
@@ -294,6 +341,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 ```
 
 **Fontes:**
+
 - Auditorias de cada subsistema (seções "Public API")
 - `src/core/constants/*.js` (constants)
 - `src/core/schemas.js` (schemas)
@@ -303,52 +351,70 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 #### 3. `CONFIGURATION.md` ⭐⭐ (ALTA)
 
-**Base:** `PROJECT_CONFIGURATION_AUDIT.md` + config files
-**Tamanho:** 350-400 lines
-**Conteúdo:**
+**Base:** `PROJECT_CONFIGURATION_AUDIT.md` + config files **Tamanho:** 350-400 lines **Conteúdo:**
 
 ```markdown
 # Configuration Guide
 
 ## 1. config.json (Main)
+
 ### chromeDebugUrl
+
 ### queueDir, responsesDir, logsDir
+
 ### serverPort
+
 ### maxRetries
+
 ### backoff (initial, max, multiplier)
+
 ### validation rules
+
 ### browser configuration
+
 ### telemetry settings
 
 ## 2. dynamic_rules.json (Hot-Reload)
+
 ### Target-specific selectors
+
 ### CSS selectors
+
 ### Wait strategies
+
 ### Retry policies
 
 ## 3. Environment Variables (.env)
+
 ### NODE_ENV
+
 ### CHROME_DEBUG_PORT
+
 ### SERVER_PORT
+
 ### LOG_LEVEL
 
 ## 4. Hot-Reload Behavior
+
 - Which configs hot-reload
 - How to trigger reload
 - Validation on reload
 
 ## 5. Best Practices
+
 - Development vs Production
 - Performance tuning
 - Security hardening
 
 ## 6. Configuration Examples
+
 - Minimal (quick start)
 - Production (optimized)
 - High-volume (100+ tasks/hour)
 ```
 
 **Fontes:**
+
 - `PROJECT_CONFIGURATION_AUDIT.md` (base completa)
 - `config.json` (estrutura)
 - `dynamic_rules.json` (hot-reload)
@@ -358,26 +424,27 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 #### 4. `DEPLOYMENT.md` ⭐⭐ (ALTA)
 
-**Base:** Auditorias + experiência deployment
-**Tamanho:** 400-500 lines
-**Conteúdo:**
+**Base:** Auditorias + experiência deployment **Tamanho:** 400-500 lines **Conteúdo:**
 
 ```markdown
 # Deployment Guide
 
 ## 1. Development Setup
+
 - Node.js installation
 - Chrome remote debugging
 - Environment variables
 - Running with nodemon
 
 ## 2. Docker Development
+
 - docker-compose.yml
 - Building image
 - Volume mounts
 - Debugging inside container
 
 ## 3. Production with PM2
+
 - ecosystem.config.js
 - Process management
 - Log rotation
@@ -385,6 +452,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 - Memory limits
 
 ## 4. Docker Production
+
 - Multi-stage build
 - Image optimization (~150MB)
 - docker-compose.prod.yml
@@ -392,18 +460,21 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 - Networking
 
 ## 5. Monitoring & Observability
+
 - PM2 monitoring
 - Log aggregation
 - Dashboard access
 - Health endpoints
 
 ## 6. Backup & Recovery
+
 - Queue backup
 - Response backup
 - Configuration backup
 - Disaster recovery
 
 ## 7. Troubleshooting
+
 - Chrome not connecting
 - Queue stuck
 - Memory leaks
@@ -411,6 +482,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 ```
 
 **Fontes:**
+
 - `CROSS_CUTTING_PM2_DAEMON_AUDIT.md` (PM2)
 - `CROSS_CUTTING_PORTS_AUDIT.md` (networking)
 - `ecosystem.config.js` (PM2 config)
@@ -421,10 +493,10 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 #### 5. `TESTING.md` ⭐ (MÉDIA)
 
-**Base:** Arquivos de teste + experiência
-**Tamanho:** 300-350 lines
+**Base:** Arquivos de teste + experiência **Tamanho:** 300-350 lines
 
 **Fontes:**
+
 - `tests/*.js` (estrutura de testes)
 - `TESTS_STRATEGY.md` (existente?)
 - Resultados de testes (38/38)
@@ -433,10 +505,10 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 #### 6. `CONTRIBUTING.md` ⭐ (MÉDIA)
 
-**Base:** Padrões de código + guidelines
-**Tamanho:** 250-300 lines
+**Base:** Padrões de código + guidelines **Tamanho:** 250-300 lines
 
 **Fontes:**
+
 - `.github/copilot-instructions.md` (padrões)
 - `ESLINT_GUIDE.md` (code standards)
 - Architectural principles (das auditorias)
@@ -445,10 +517,10 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 #### 7. `FAQ.md` 🟢 (BAIXA)
 
-**Base:** Issues conhecidos + troubleshooting
-**Tamanho:** 200-250 lines
+**Base:** Issues conhecidos + troubleshooting **Tamanho:** 200-250 lines
 
 **Fontes:**
+
 - Experiência de uso
 - Known issues (copilot-instructions)
 - Troubleshooting das auditorias
@@ -457,8 +529,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 ### 🗄️ FASE 4: Arquivamento de Documentação Obsoleta
 
-**Duração:** 15-30 minutos
-**Objetivo:** Limpar diretório DOCUMENTAÇÃO/
+**Duração:** 15-30 minutos **Objetivo:** Limpar diretório DOCUMENTAÇÃO/
 
 **Ações:**
 
@@ -492,30 +563,33 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 
 ### ✅ FASE 5: Validação e Publicação
 
-**Duração:** 1 hora
-**Objetivo:** Garantir qualidade antes de release
+**Duração:** 1 hora **Objetivo:** Garantir qualidade antes de release
 
 **Checklist de Validação:**
 
 #### Completude
+
 - [ ] Todos os módulos públicos documentados
 - [ ] Todos os configs explicados
 - [ ] Todos os comandos npm documentados
 - [ ] Exemplos funcionais para cada API
 
 #### Clareza
+
 - [ ] Linguagem simples e direta
 - [ ] Jargão explicado ou evitado
 - [ ] Diagramas para conceitos complexos
 - [ ] Exemplos práticos abundantes
 
 #### Correção
+
 - [ ] Links internos funcionam
 - [ ] Code examples sem erros
 - [ ] Comandos testados
 - [ ] Versões corretas mencionadas
 
 #### Consistência
+
 - [ ] Formatação Markdown uniforme
 - [ ] Terminologia consistente
 - [ ] Estrutura de seções similar
@@ -535,6 +609,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 ## 📈 Métricas de Sucesso
 
 ### Quantitativas
+
 - ✅ 100% dos subsistemas documentados
 - ✅ 7 documentos canônicos criados
 - ✅ 0 links quebrados
@@ -542,6 +617,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 - ✅ <30 documentos obsoletos arquivados
 
 ### Qualitativas
+
 - ✅ Novo desenvolvedor consegue começar em <30min
 - ✅ Todas as APIs públicas têm exemplos
 - ✅ Troubleshooting guide reduz >80% de perguntas comuns
@@ -567,6 +643,7 @@ Finalizar as **auditorias pendentes** dos subsistemas e usar os resultados para 
 **Ação:** Iniciar FASE 1 - Análise das Auditorias Existentes
 
 **Comando:**
+
 ```bash
 # Ler Master Plan
 cat DOCUMENTAÇÃO/AUDITORIAS/AUDIT_COVERAGE_MASTER_PLAN.md
@@ -591,5 +668,4 @@ wc -l DOCUMENTAÇÃO/AUDITORIAS/*.md
 
 ---
 
-**Status:** 🚀 Pronto para começar!
-**Requer aprovação:** Sim (antes de FASE 1)
+**Status:** 🚀 Pronto para começar! **Requer aprovação:** Sim (antes de FASE 1)

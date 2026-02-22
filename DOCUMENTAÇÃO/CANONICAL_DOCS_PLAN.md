@@ -1,17 +1,18 @@
 # 📚 Plano de Documentação Canônica - Chatgpt Docker Puppeteer
 
-**Status:** 🔄 **EM CONSTRUÇÃO** - Fase: Consolidação de Código
-**Versão:** 1.0.0 (pre-release)
-**Data:** 2026-01-20
-**Última Atualização:** 2026-01-20 04:00 UTC
+**Status:** 🔄 **EM CONSTRUÇÃO** - Fase: Consolidação de Código **Versão:** 1.0.0 (pre-release)
+**Data:** 2026-01-20 **Última Atualização:** 2026-01-20 04:00 UTC
 
 ---
 
 ## 🎯 Objetivo
 
-Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.0, substituindo documentação obsoleta por uma estrutura moderna, completa e profissional baseada na **arquitetura real implementada** (NERV IPC 2.0 + 7 subsistemas).
+Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.0, substituindo
+documentação obsoleta por uma estrutura moderna, completa e profissional baseada na **arquitetura
+real implementada** (NERV IPC 2.0 + 7 subsistemas).
 
-**⚠️ IMPORTANTE:** Toda documentação antiga (pré-2026) está **OBSOLETA** e será arquivada. A nova documentação reflete o sistema atual após consolidação arquitetural.
+**⚠️ IMPORTANTE:** Toda documentação antiga (pré-2026) está **OBSOLETA** e será arquivada. A nova
+documentação reflete o sistema atual após consolidação arquitetural.
 
 ---
 
@@ -73,9 +74,8 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 #### `README.md` (Principal)
 
-**Objetivo:** Porta de entrada do projeto, visão geral completa
-**Público:** Todos (desenvolvedores, usuários, curiosos)
-**Tamanho:** ~200 linhas
+**Objetivo:** Porta de entrada do projeto, visão geral completa **Público:** Todos (desenvolvedores,
+usuários, curiosos) **Tamanho:** ~200 linhas
 
 **Estrutura:**
 
@@ -158,10 +158,9 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 - Validator: validation_core, scan_engine
 - Rules: semantic, physical, format validators
 - Adaptive: adaptive.js (learns optimal timeouts: TTFT, stream, echo)
-- State persistence: logs/adaptive_state.json
-  **Objetivo:** Documentação completa da arquitetura do sistema
-  **Público:** Desenvolvedores, arquitetos, contribuidores avançados
-  **Tamanho:** ~800 linhas
+- State persistence: logs/adaptive_state.json **Objetivo:** Documentação completa da arquitetura do
+  sistema **Público:** Desenvolvedores, arquitetos, contribuidores avançados **Tamanho:** ~800
+  linhas
 
 **Estrutura:**
 
@@ -264,9 +263,8 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 #### 2. `API.md` ⭐ (CRÍTICO)
 
-**Objetivo:** Referência completa de todas as APIs públicas
-**Público:** Desenvolvedores integrando com o sistema
-**Tamanho:** ~600 linhas
+**Objetivo:** Referência completa de todas as APIs públicas **Público:** Desenvolvedores integrando
+com o sistema **Tamanho:** ~600 linhas
 
 **Estrutura:**
 
@@ -372,8 +370,7 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 #### 3. `DEPLOYMENT.md`
 
-**Objetivo:** Guia completo de deployment (dev, staging, prod)
-**Tamanho:** ~400 linhas
+**Objetivo:** Guia completo de deployment (dev, staging, prod) **Tamanho:** ~400 linhas
 
 **Estrutura:**
 
@@ -438,8 +435,7 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 #### 4. `CONFIGURATION.md`
 
-**Objetivo:** Documentação completa de todos os parâmetros
-**Tamanho:** ~350 linhas
+**Objetivo:** Documentação completa de todos os parâmetros **Tamanho:** ~350 linhas
 
 **Estrutura:**
 
@@ -513,8 +509,7 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 #### 5. `TESTING.md`
 
-**Objetivo:** Documentação do framework de testes
-**Tamanho:** ~300 linhas
+**Objetivo:** Documentação do framework de testes **Tamanho:** ~300 linhas
 
 **Estrutura:**
 
@@ -568,8 +563,7 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 #### 6. `CONTRIBUTING.md`
 
-**Objetivo:** Guia para contribuidores
-**Tamanho:** ~250 linhas
+**Objetivo:** Guia para contribuidores **Tamanho:** ~250 linhas
 
 **Estrutura:**
 
@@ -631,8 +625,7 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 #### 7. `FAQ.md`
 
-**Objetivo:** Perguntas frequentes e troubleshooting
-**Tamanho:** ~200 linhas
+**Objetivo:** Perguntas frequentes e troubleshooting **Tamanho:** ~200 linhas
 
 **Estrutura:**
 
@@ -641,50 +634,36 @@ Criar a **documentação canônica** do projeto `chatgpt-docker-puppeteer` v1.0.
 
 ## Installation & Setup
 
-Q: Chrome não conecta na porta 9224
-Q: Erro "Cannot find module"
-Q: Permissões de arquivo no Docker
+Q: Chrome não conecta na porta 9224 Q: Erro "Cannot find module" Q: Permissões de arquivo no Docker
 
 ## Queue & Tasks
 
-Q: Fila não processa tasks
-Q: Tasks ficam em estado RUNNING
-Q: Como limpar a fila?
-Q: Como adicionar uma task?
+Q: Fila não processa tasks Q: Tasks ficam em estado RUNNING Q: Como limpar a fila? Q: Como adicionar
+uma task?
 
 ## Drivers
 
-Q: Driver falha com timeout
-Q: ChatGPT não responde
-Q: Gemini retorna erro 403
-Q: Como criar um driver customizado?
+Q: Driver falha com timeout Q: ChatGPT não responde Q: Gemini retorna erro 403 Q: Como criar um
+driver customizado?
 
 ## Performance
 
-Q: Sistema lento, como otimizar?
-Q: Memory leak detectado
-Q: Como aumentar throughput?
+Q: Sistema lento, como otimizar? Q: Memory leak detectado Q: Como aumentar throughput?
 
 ## Troubleshooting
 
-Q: Processo crashando
-Q: Logs não aparecem
-Q: Dashboard não conecta
-Q: Como debugar?
+Q: Processo crashando Q: Logs não aparecem Q: Dashboard não conecta Q: Como debugar?
 
 ## Advanced
 
-Q: Como escalar horizontalmente?
-Q: Suporta múltiplos Chrome?
-Q: Como integrar com CI/CD?
+Q: Como escalar horizontalmente? Q: Suporta múltiplos Chrome? Q: Como integrar com CI/CD?
 ```
 
 ---
 
 #### 8. `QUICK_START.md`
 
-**Objetivo:** Guia rápido para começar em <10 minutos
-**Tamanho:** ~150 linhas
+**Objetivo:** Guia rápido para começar em <10 minutos **Tamanho:** ~150 linhas
 
 **Estrutura:**
 
@@ -827,9 +806,9 @@ const nerv = require('./nerv/nerv');
 
 // Enviar mensagem via NERV
 nerv.emit({
-    actor: 'KERNEL',
-    actionCode: 'TASK_START',
-    payload: { taskId: '12345' }
+  actor: 'KERNEL',
+  actionCode: 'TASK_START',
+  payload: { taskId: '12345' },
 });
 
 // Output:
@@ -1051,6 +1030,5 @@ chatgpt-docker-puppeteer/
 
 ---
 
-**Gerado por:** GitHub Copilot
-**Data:** 2026-01-20
-**Versão do Sistema:** V850 (38/38 tests passing)
+**Gerado por:** GitHub Copilot **Data:** 2026-01-20 **Versão do Sistema:** V850 (38/38 tests
+passing)

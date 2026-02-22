@@ -1,15 +1,14 @@
 # 🔧 Guia de Troubleshooting
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Desenvolvedores, DevOps, Usuários
-**Tempo de Leitura**: ~30 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Desenvolvedores, DevOps,
+Usuários **Tempo de Leitura**: ~30 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento cataloga **problemas comuns** do sistema `chatgpt-docker-puppeteer` com diagnósticos e soluções passo-a-passo.
+Este documento cataloga **problemas comuns** do sistema `chatgpt-docker-puppeteer` com diagnósticos
+e soluções passo-a-passo.
 
 ---
 
@@ -33,12 +32,14 @@ Este documento cataloga **problemas comuns** do sistema `chatgpt-docker-puppetee
 ### Problema: Sistema não inicia
 
 **Sintomas**:
+
 ```
 [ERROR] Failed to start agent
 Error: Cannot find module './src/core/config'
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check file structure
 ls -la src/core/config.js
@@ -48,11 +49,13 @@ npm list
 ```
 
 **Causas comuns**:
+
 1. ❌ `npm install` não executado
 2. ❌ Arquivos faltando (clone incompleto)
 3. ❌ Node.js version incompatível (<20.0.0)
 
 **Solução**:
+
 ```bash
 # 1. Reinstall dependencies
 rm -rf node_modules package-lock.json
@@ -74,6 +77,7 @@ make start
 ### Problema: Config validation failed
 
 **Sintomas**:
+
 ```
 [ERROR] Configuration validation failed:
   - maxWorkers: Expected number, received string
@@ -81,6 +85,7 @@ make start
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Validate config manually
 node -e "
@@ -91,11 +96,13 @@ console.log(configSchema.parse(config));
 ```
 
 **Causas**:
+
 - ❌ Valores com tipo errado (string vs number)
 - ❌ Password muito curta (<8 chars)
 - ❌ Valores fora do range
 
 **Solução**:
+
 ```json
 // ❌ Errado
 {
@@ -111,6 +118,7 @@ console.log(configSchema.parse(config));
 ```
 
 **Verificar schema**:
+
 ```javascript
 // src/core/schemas.js
 maxWorkers: z.number().int().min(1).max(20),
@@ -122,11 +130,13 @@ dashboardPassword: z.string().min(8).nullable()
 ### Problema: Port already in use
 
 **Sintomas**:
+
 ```
 [ERROR] Error: listen EADDRINUSE: address already in use :::3008
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check what's using port 3008
 lsof -i :3008  # Linux/Mac
@@ -139,6 +149,7 @@ netstat -ano | findstr :3008  # Windows
 **Solução**:
 
 **Opção A: Kill processo**:
+
 ```bash
 # Linux/Mac
 kill -9 12345
@@ -148,6 +159,7 @@ taskkill /F /PID 12345
 ```
 
 **Opção B: Mudar porta**:
+
 ```bash
 # .env
 DASHBOARD_PORT=3009
@@ -163,12 +175,14 @@ make restart
 ### Problema: Browser connection failed
 
 **Sintomas**:
+
 ```
 [ERROR] [INFRA] Failed to connect to browser
 Error: connect ECONNREFUSED 127.0.0.1:9224
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check external browser (container-facing proxy)
 curl http://localhost:9224/json/version
@@ -180,6 +194,7 @@ curl http://localhost:9224/json/version
 ```
 
 **Causas**:
+
 1. ❌ External browser não iniciado (mode: external)
 2. ❌ Porta incorreta (config: 9224, browser: 9223)
 3. ❌ Browser crashou durante execução
@@ -187,6 +202,7 @@ curl http://localhost:9224/json/version
 **Solução**:
 
 **Opção A: Start external browser**:
+
 ```bash
 # Windows
 "C:\Program Files\Google\Chrome\Application\chrome.exe" ^
@@ -203,17 +219,19 @@ curl http://localhost:9224/json/version
 ```
 
 **Opção B: Switch to launcher mode**:
+
 ```json
 // config.json
 {
-  "browserMode": "launcher"  // Agent inicia browser automaticamente
+  "browserMode": "launcher" // Agent inicia browser automaticamente
 }
 ```
 
 **Opção C: Use hybrid mode** (fallback automático):
+
 ```json
 {
-  "browserMode": "hybrid"  // Tenta external, fallback launcher
+  "browserMode": "hybrid" // Tenta external, fallback launcher
 }
 ```
 
@@ -222,11 +240,13 @@ curl http://localhost:9224/json/version
 ### Problema: Browser DEGRADED status
 
 **Sintomas**:
+
 ```
 [WARN] [POOL] Browser instance degraded (response time: 6200ms)
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check pool status
 curl http://localhost:3008/api/metrics | jq '.browserPool'
@@ -240,6 +260,7 @@ curl http://localhost:3008/api/metrics | jq '.browserPool'
 ```
 
 **Causas**:
+
 - ⚠️ Response time >5s (P9.2 circuit breaker)
 - ⚠️ Memory leak no browser
 - ⚠️ CPU throttling
@@ -247,6 +268,7 @@ curl http://localhost:3008/api/metrics | jq '.browserPool'
 **Solução**:
 
 **1. Restart browser instance**:
+
 ```javascript
 // Via API (futuro)
 POST /api/browser/restart/:instanceId
@@ -257,14 +279,16 @@ kill -9 <PID>
 ```
 
 **2. Adjust pool size**:
+
 ```json
 // config.json
 {
-  "browserPoolSize": 5  // Aumentar de 3 para 5 (mais redundância)
+  "browserPoolSize": 5 // Aumentar de 3 para 5 (mais redundância)
 }
 ```
 
 **3. Monitor memory**:
+
 ```bash
 # Check browser memory
 ps aux | grep chrome | awk '{sum+=$6} END {print sum/1024 " MB"}'
@@ -275,12 +299,14 @@ ps aux | grep chrome | awk '{sum+=$6} END {print sum/1024 " MB"}'
 ### Problema: Browser crashes frequentes
 
 **Sintomas**:
+
 ```
 [ERROR] [POOL] Browser instance crashed (exit code: -11)
 [ERROR] [POOL] Circuit breaker OPEN (5 consecutive failures)
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check crash logs
 tail -100 logs/agente-gpt-err.log | grep "Browser crash"
@@ -291,6 +317,7 @@ top      # CPU usage
 ```
 
 **Causas**:
+
 - ❌ Out of memory (OOM killer)
 - ❌ Shared memory `/dev/shm` cheio (Docker)
 - ❌ Too many tabs open
@@ -298,21 +325,24 @@ top      # CPU usage
 **Solução**:
 
 **1. Aumentar memória (Docker)**:
+
 ```yaml
 # docker-compose.yml
 services:
   agente-gpt:
-    mem_limit: 2g  # De 1g para 2g
-    shm_size: '2gb'  # Shared memory
+    mem_limit: 2g # De 1g para 2g
+    shm_size: '2gb' # Shared memory
 ```
 
 **2. Add Chrome flags**:
+
 ```bash
 # .env
 LAUNCH_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
 ```
 
 **3. Reduce pool size**:
+
 ```json
 // config.json (low-resource mode)
 {
@@ -328,12 +358,14 @@ LAUNCH_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disa
 ### Problema: Task stuck em RUNNING
 
 **Sintomas**:
+
 ```
 Task abc123 has been RUNNING for 15 minutes
 Expected: max 5 minutes (taskTimeout)
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check task status
 curl http://localhost:3008/api/task/abc123 | jq
@@ -346,6 +378,7 @@ console.log(locks.listActiveLocks());
 ```
 
 **Causas**:
+
 1. ❌ Task timeout não configurado
 2. ❌ Lock não liberado (processo morreu)
 3. ❌ Browser travado (waiting for selector)
@@ -353,6 +386,7 @@ console.log(locks.listActiveLocks());
 **Solução**:
 
 **1. Cancel task manualmente**:
+
 ```bash
 # Via API
 curl -X POST http://localhost:3008/api/task/abc123/cancel \
@@ -363,6 +397,7 @@ rm fila/abc123.json
 ```
 
 **2. Force unlock**:
+
 ```javascript
 // Break orphaned lock
 const locks = require('./src/infra/lock_manager');
@@ -370,6 +405,7 @@ locks.breakLock('abc123', 'chatgpt');
 ```
 
 **3. Restart agent** (última opção):
+
 ```bash
 make restart
 ```
@@ -379,12 +415,14 @@ make restart
 ### Problema: Task sempre falha
 
 **Sintomas**:
+
 ```
 [ERROR] [TASK] Task xyz789 failed (attempt 3/3)
 Error: Timeout waiting for selector 'textarea'
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check response file
 cat respostas/xyz789.txt
@@ -404,6 +442,7 @@ curl http://localhost:3008/api/task/xyz789 | jq '.failureHistory'
 ```
 
 **Causas**:
+
 1. ❌ Selector desatualizado (LLM mudou UI)
 2. ❌ Prompt inválido (vazio, muito longo)
 3. ❌ Network timeout
@@ -411,12 +450,13 @@ curl http://localhost:3008/api/task/xyz789 | jq '.failureHistory'
 **Solução**:
 
 **1. Update selectors** (dynamic_rules.json):
+
 ```json
 {
   "targets": {
     "chatgpt": {
       "selectors": {
-        "input": "textarea[data-id='root']",  // Verificar se mudou
+        "input": "textarea[data-id='root']", // Verificar se mudou
         "submit": "button[data-testid='send-button']"
       }
     }
@@ -425,13 +465,15 @@ curl http://localhost:3008/api/task/xyz789 | jq '.failureHistory'
 ```
 
 **2. Test selector manualmente**:
+
 ```javascript
 // Chrome DevTools Console
-document.querySelector('textarea[data-id="root"]')
+document.querySelector('textarea[data-id="root"]');
 // Se retornar null → selector errado
 ```
 
 **3. Validate prompt**:
+
 ```bash
 # Check length
 echo -n "Seu prompt" | wc -c  # Max 10000 chars
@@ -445,12 +487,14 @@ grep -i "forbidden_term" fila/xyz789.json
 ### Problema: Response vazia ou incompleta
 
 **Sintomas**:
+
 ```
 Task completed but response is empty
 File: respostas/task-123.txt (0 bytes)
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check response file
 ls -lh respostas/task-123.txt
@@ -461,6 +505,7 @@ grep "task-123" logs/agente-gpt-out.log | grep COLLECT
 ```
 
 **Causas**:
+
 - ❌ Response selector errado
 - ❌ LLM ainda processando (collection muito rápida)
 - ❌ Response em shadow DOM (não acessível)
@@ -468,22 +513,24 @@ grep "task-123" logs/agente-gpt-out.log | grep COLLECT
 **Solução**:
 
 **1. Ajustar collection timing**:
+
 ```json
 // config.json
 {
-  "collectionPollInterval": 2000,  // De 1s para 2s
-  "collectionMaxStable": 5  // De 3 para 5 iterações
+  "collectionPollInterval": 2000, // De 1s para 2s
+  "collectionMaxStable": 5 // De 3 para 5 iterações
 }
 ```
 
 **2. Update response selector**:
+
 ```json
 // dynamic_rules.json
 {
   "targets": {
     "chatgpt": {
       "selectors": {
-        "response": "div.markdown"  // Verificar no DevTools
+        "response": "div.markdown" // Verificar no DevTools
       }
     }
   }
@@ -491,11 +538,12 @@ grep "task-123" logs/agente-gpt-out.log | grep COLLECT
 ```
 
 **3. Manual collection test**:
+
 ```javascript
 // Chrome DevTools
 Array.from(document.querySelectorAll('div.markdown'))
   .map(el => el.innerText)
-  .join('\n')
+  .join('\n');
 ```
 
 ---
@@ -505,12 +553,14 @@ Array.from(document.querySelectorAll('div.markdown'))
 ### Problema: Lock timeout
 
 **Sintomas**:
+
 ```
 [WARN] [LOCK] Failed to acquire lock for task-456 (target: chatgpt)
 Reason: Lock held by agent-xyz123:12345
 ```
 
 **Diagnóstico**:
+
 ```bash
 # List active locks
 node -e "
@@ -524,6 +574,7 @@ cat fila/.lock-chatgpt
 ```
 
 **Causas**:
+
 1. ❌ Lock não liberado (processo crashou)
 2. ❌ Multiple agents sem coordenação (distributed env)
 3. ❌ Lock timeout muito curto
@@ -531,13 +582,15 @@ cat fila/.lock-chatgpt
 **Solução**:
 
 **1. Check lock owner alive** (P5.1):
+
 ```javascript
 const locks = require('./src/infra/lock_manager');
 const isAlive = locks.isLockOwnerAlive('chatgpt');
-console.log(isAlive);  // false → lock órfã
+console.log(isAlive); // false → lock órfã
 ```
 
 **2. Break orphaned lock**:
+
 ```bash
 # Remove lock file
 rm fila/.lock-chatgpt
@@ -550,10 +603,11 @@ locks.breakLock('task-456', 'chatgpt');
 ```
 
 **3. Increase lock timeout**:
+
 ```json
 // config.json
 {
-  "lockTimeout": 120000  // De 60s para 120s
+  "lockTimeout": 120000 // De 60s para 120s
 }
 ```
 
@@ -562,12 +616,14 @@ locks.breakLock('task-456', 'chatgpt');
 ### Problema: Race condition (task executado 2x)
 
 **Sintomas**:
+
 ```
 [WARN] [P5.1] Race detected: expected PENDING, got RUNNING
 Task allocated by 2 workers simultaneously
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check task state history
 curl http://localhost:3008/api/task/task-789 | jq '.stateHistory'
@@ -581,30 +637,33 @@ curl http://localhost:3008/api/task/task-789 | jq '.stateHistory'
 ```
 
 **Causa**:
+
 - ❌ Optimistic locking falhou (P5.1)
 - ❌ File system delay (NFS lento)
 
 **Solução**:
 
 **1. Verificar fix P5.1**:
+
 ```javascript
 // src/kernel/task_runtime.js
 async function allocateTask(taskId, expectedState = 'PENDING') {
-    const task = await io.getTask(taskId);
+  const task = await io.getTask(taskId);
 
-    // ✅ Race detection
-    if (task.state !== expectedState) {
-        logger.log('WARN', `[P5.1] Race detected`, taskId);
-        return null;  // Abort allocation
-    }
+  // ✅ Race detection
+  if (task.state !== expectedState) {
+    logger.log('WARN', `[P5.1] Race detected`, taskId);
+    return null; // Abort allocation
+  }
 
-    task.state = 'RUNNING';
-    await io.saveTask(task);
-    return task;
+  task.state = 'RUNNING';
+  await io.saveTask(task);
+  return task;
 }
 ```
 
 **2. Se problema persistir** (distributed env):
+
 ```bash
 # Use Redis distributed locks
 npm install ioredis
@@ -620,11 +679,13 @@ npm install ioredis
 ### Problema: Queue scan lento (>1s)
 
 **Sintomas**:
+
 ```
 [PERF] Queue scan took 1200ms (expected <500ms)
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Count files in queue
 ls -1 fila/*.json | wc -l
@@ -635,6 +696,7 @@ time ls fila/*.json
 ```
 
 **Causa**:
+
 - ⚠️ Muitos arquivos (>100)
 - ⚠️ Cache invalidado (P9.4)
 - ⚠️ Slow disk I/O
@@ -642,20 +704,22 @@ time ls fila/*.json
 **Solução**:
 
 **1. Verificar cache P9.4**:
+
 ```javascript
 // src/infra/io.js
 const queueCache = { tasks: null, lastScan: 0 };
 
 function scanQueue() {
-    const now = Date.now();
-    if (queueCache.tasks && (now - queueCache.lastScan) < 5000) {
-        return queueCache.tasks;  // ✅ Hit: 0.1ms
-    }
-    // Miss: Rebuild cache (200ms)
+  const now = Date.now();
+  if (queueCache.tasks && now - queueCache.lastScan < 5000) {
+    return queueCache.tasks; // ✅ Hit: 0.1ms
+  }
+  // Miss: Rebuild cache (200ms)
 }
 ```
 
 **2. Limpar queue antiga**:
+
 ```bash
 # Archive completed tasks
 mkdir -p fila/archive
@@ -666,10 +730,11 @@ find fila/ -name "*.json" -mtime +7 -delete
 ```
 
 **3. Reduce scan frequency**:
+
 ```json
 // config.json
 {
-  "queueScanInterval": 10000  // De 5s para 10s
+  "queueScanInterval": 10000 // De 5s para 10s
 }
 ```
 
@@ -678,12 +743,14 @@ find fila/ -name "*.json" -mtime +7 -delete
 ### Problema: Corrupted task file
 
 **Sintomas**:
+
 ```
 [ERROR] [QUEUE] Corrupted task file: task-abc.json
 Error: Unexpected token } in JSON at position 245
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Validate JSON
 cat fila/task-abc.json | jq .
@@ -695,12 +762,14 @@ cat fila/task-abc.json
 ```
 
 **Causa**:
+
 - ❌ Write interrupted (disk full, crash)
 - ❌ Manual edit (typo)
 
 **Solução**:
 
 **1. Move to corrupted dir**:
+
 ```bash
 # Automatic (schema validation)
 # Agent moves to fila/corrupted/ on boot
@@ -711,6 +780,7 @@ mv fila/task-abc.json fila/corrupted/
 ```
 
 **2. Repair JSON**:
+
 ```bash
 # Fix manually
 nano fila/corrupted/task-abc.json
@@ -724,12 +794,13 @@ mv fila/corrupted/task-abc.json fila/
 ```
 
 **3. Prevent** (atomic writes - já implementado):
+
 ```javascript
 // src/infra/io.js
 async function saveTask(task) {
-    const tmpPath = path.join(TMP_DIR, `${task.id}.tmp`);
-    await fs.writeFile(tmpPath, JSON.stringify(task, null, 2));
-    await fs.rename(tmpPath, taskPath);  // ✅ Atomic
+  const tmpPath = path.join(TMP_DIR, `${task.id}.tmp`);
+  await fs.writeFile(tmpPath, JSON.stringify(task, null, 2));
+  await fs.rename(tmpPath, taskPath); // ✅ Atomic
 }
 ```
 
@@ -740,12 +811,14 @@ async function saveTask(task) {
 ### Problema: High memory usage
 
 **Sintomas**:
+
 ```
 [WARN] [P9.1] Heap usage: 456MB / 512MB (89%)
 PM2 restarting due to max_memory_restart (800M)
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check heap metrics
 curl http://localhost:3008/api/health-metrics | jq '.heap'
@@ -764,6 +837,7 @@ pm2 describe agente-gpt | grep memory
 ```
 
 **Causas**:
+
 - ❌ Memory leak (event listeners, pages não fechadas)
 - ❌ Cache excessivo (NERV buffers, queue cache)
 - ❌ Too many workers
@@ -771,6 +845,7 @@ pm2 describe agente-gpt | grep memory
 **Solução**:
 
 **1. Force garbage collection**:
+
 ```bash
 # Manual GC (apenas debug)
 node --expose-gc index.js
@@ -780,15 +855,17 @@ curl -X POST http://localhost:3008/api/system/gc
 ```
 
 **2. Reduce buffers**:
+
 ```json
 // config.json
 {
-  "nervBufferMaxSize": 5000,  // De 10000 para 5000
-  "observationStoreSize": 500  // De 1000 para 500
+  "nervBufferMaxSize": 5000, // De 10000 para 5000
+  "observationStoreSize": 500 // De 1000 para 500
 }
 ```
 
 **3. Restart PM2 on high memory**:
+
 ```javascript
 // ecosystem.config.js
 {
@@ -798,6 +875,7 @@ curl -X POST http://localhost:3008/api/system/gc
 ```
 
 **4. Profile memory leak**:
+
 ```bash
 # Chrome DevTools
 node --inspect index.js
@@ -810,12 +888,14 @@ node --inspect index.js
 ### Problema: High CPU usage
 
 **Sintomas**:
+
 ```
 CPU constantly at 100%
 System unresponsive
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check CPU per process
 top -p $(pgrep -f "node.*index.js")
@@ -825,6 +905,7 @@ pm2 monit
 ```
 
 **Causas**:
+
 - ❌ Infinite loop (kernel cycle sem delay)
 - ❌ Too many workers (CPU oversubscribed)
 - ❌ Browser processes (Chromium multi-process)
@@ -832,21 +913,24 @@ pm2 monit
 **Solução**:
 
 **1. Reduce workers**:
+
 ```json
 // config.json
 {
-  "maxWorkers": 2  // De 10 para 2
+  "maxWorkers": 2 // De 10 para 2
 }
 ```
 
 **2. Increase kernel cycle**:
+
 ```json
 {
-  "kernelCycleMs": 100  // De 50ms (20Hz) para 100ms (10Hz)
+  "kernelCycleMs": 100 // De 50ms (20Hz) para 100ms (10Hz)
 }
 ```
 
 **3. Profile CPU**:
+
 ```bash
 # Clinic flame graph
 npm install -g clinic
@@ -863,12 +947,14 @@ clinic flame -- node index.js
 ### Problema: API retorna 503 Service Unavailable
 
 **Sintomas**:
+
 ```bash
 curl http://localhost:3008/api/health
 # 503 Service Unavailable
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check process
 ps aux | grep "node.*index.js"
@@ -879,6 +965,7 @@ lsof -i :3008
 ```
 
 **Causas**:
+
 - ❌ Agent crashou (boot error)
 - ❌ Port blocked by firewall
 - ❌ Server não iniciado
@@ -886,6 +973,7 @@ lsof -i :3008
 **Solução**:
 
 **1. Check logs**:
+
 ```bash
 tail -100 logs/agente-gpt-err.log
 
@@ -896,6 +984,7 @@ tail -100 logs/agente-gpt-err.log
 ```
 
 **2. Restart**:
+
 ```bash
 make restart
 
@@ -904,6 +993,7 @@ pm2 restart agente-gpt
 ```
 
 **3. Verify port**:
+
 ```bash
 # Test localhost
 curl http://localhost:3008/api/health
@@ -917,6 +1007,7 @@ curl http://$(hostname -I | awk '{print $1}'):3008/api/health
 ### Problema: Rate limit 429
 
 **Sintomas**:
+
 ```bash
 curl http://localhost:3008/api/queue/add -X POST -d '{...}'
 # 429 Too Many Requests
@@ -924,6 +1015,7 @@ curl http://localhost:3008/api/queue/add -X POST -d '{...}'
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check headers
 curl -I http://localhost:3008/api/queue
@@ -934,11 +1026,13 @@ curl -I http://localhost:3008/api/queue
 ```
 
 **Causa**:
+
 - ⚠️ Exceeded 100 requests/min
 
 **Solução**:
 
 **1. Wait** (60s window):
+
 ```bash
 # Wait for reset
 sleep 60
@@ -946,6 +1040,7 @@ curl http://localhost:3008/api/queue
 ```
 
 **2. Increase limit** (config):
+
 ```bash
 # .env
 RATE_LIMIT_MAX=200  # De 100 para 200
@@ -956,11 +1051,12 @@ make restart
 ```
 
 **3. Disable rate limiting** (dev only):
+
 ```javascript
 // src/server/middleware/rate_limiter.js
 const rateLimiter = {
-    enabled: process.env.NODE_ENV === 'production',  // Desabilita em dev
-    // ...
+  enabled: process.env.NODE_ENV === 'production', // Desabilita em dev
+  // ...
 };
 ```
 
@@ -971,6 +1067,7 @@ const rateLimiter = {
 ### Problema: Dashboard 401 Unauthorized
 
 **Sintomas**:
+
 ```bash
 curl http://localhost:3008/api/queue
 # 401 Unauthorized
@@ -978,6 +1075,7 @@ curl http://localhost:3008/api/queue
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check config
 cat config.json | jq '.dashboardPassword'
@@ -989,11 +1087,13 @@ grep DASHBOARD_PASSWORD .env
 ```
 
 **Causa**:
+
 - ⚠️ dashboardPassword configurado mas não enviando credenciais
 
 **Solução**:
 
 **1. Include password**:
+
 ```bash
 # Basic auth
 curl -u :my-secret-password http://localhost:3008/api/queue
@@ -1004,6 +1104,7 @@ curl -H "Authorization: Bearer my-secret-password" \
 ```
 
 **2. Disable auth** (dev only):
+
 ```json
 // config.json
 {
@@ -1019,12 +1120,14 @@ DASHBOARD_PASSWORD=
 ### Problema: CORS blocked
 
 **Sintomas**:
+
 ```
 Access to fetch at 'http://localhost:3008/api/queue' from origin 'http://localhost:3000'
 has been blocked by CORS policy
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check CORS origin
 grep CORS_ORIGIN .env
@@ -1034,6 +1137,7 @@ grep CORS_ORIGIN .env
 **Solução**:
 
 **1. Allow origin**:
+
 ```bash
 # .env
 CORS_ORIGIN=http://localhost:3000
@@ -1043,6 +1147,7 @@ CORS_ORIGIN=*
 ```
 
 **2. Restart**:
+
 ```bash
 make restart
 ```
@@ -1054,12 +1159,14 @@ make restart
 ### Problema: PM2 restart loop
 
 **Sintomas**:
+
 ```bash
 pm2 status
 # agente-gpt │ errored │ 10 │ 0s │ 50 restarts
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check error logs
 pm2 logs agente-gpt --err --lines 50
@@ -1069,6 +1176,7 @@ pm2 describe agente-gpt | grep restarts
 ```
 
 **Causas**:
+
 - ❌ Boot error (syntax, missing module)
 - ❌ Crash no startup (<10s uptime)
 - ❌ Port conflict
@@ -1076,11 +1184,13 @@ pm2 describe agente-gpt | grep restarts
 **Solução**:
 
 **1. Reset restart counter**:
+
 ```bash
 pm2 reset agente-gpt
 ```
 
 **2. Check boot error**:
+
 ```bash
 # Run directly (sem PM2)
 node index.js
@@ -1089,6 +1199,7 @@ node index.js
 ```
 
 **3. Increase min_uptime**:
+
 ```javascript
 // ecosystem.config.js
 {
@@ -1104,6 +1215,7 @@ node index.js
 ### Problema: Container não inicia
 
 **Sintomas**:
+
 ```bash
 docker ps
 # (container não aparece)
@@ -1113,6 +1225,7 @@ docker ps -a
 ```
 
 **Diagnóstico**:
+
 ```bash
 # Check logs
 docker logs agente-gpt-prod
@@ -1122,6 +1235,7 @@ docker inspect agente-gpt-prod
 ```
 
 **Causas**:
+
 - ❌ Volume mount inválido
 - ❌ Env vars faltando
 - ❌ Port conflict
@@ -1129,19 +1243,22 @@ docker inspect agente-gpt-prod
 **Solução**:
 
 **1. Check volumes**:
+
 ```yaml
 # docker-compose.yml
 volumes:
-  - ./fila:/app/fila  # ✅ Path existe?
+  - ./fila:/app/fila # ✅ Path existe?
   - ./respostas:/app/respostas
 ```
 
 **2. Create dirs**:
+
 ```bash
 mkdir -p fila respostas logs profile backups
 ```
 
 **3. Recreate container**:
+
 ```bash
 docker-compose down
 docker-compose up -d --force-recreate
@@ -1166,4 +1283,4 @@ docker-compose up -d --force-recreate
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, Support Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, Support Team_

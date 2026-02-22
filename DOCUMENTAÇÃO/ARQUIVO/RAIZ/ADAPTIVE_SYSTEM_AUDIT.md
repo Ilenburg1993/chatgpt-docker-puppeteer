@@ -1,17 +1,17 @@
 # ADAPTIVE SYSTEM V2.0 - AUDIT & CONSOLIDATION REPORT
 
-**Date**: 2026-02-04
-**File**: `src/logic/adaptive.js`
-**Current Status**: V45 (Industrial Hardening)
-**Audit Level**: CRITICAL - Statistical Engine
+**Date**: 2026-02-04 **File**: `src/logic/adaptive.js` **Current Status**: V45 (Industrial
+Hardening) **Audit Level**: CRITICAL - Statistical Engine
 
 ---
 
 ## 📊 EXECUTIVE SUMMARY
 
-O sistema adaptativo implementa aprendizado estatístico de timeouts baseado em métricas reais (TTFT, stream gaps, echo, heartbeat). Análise identificou **1 bug crítico** e **7 melhorias de produção**.
+O sistema adaptativo implementa aprendizado estatístico de timeouts baseado em métricas reais (TTFT,
+stream gaps, echo, heartbeat). Análise identificou **1 bug crítico** e **7 melhorias de produção**.
 
 **Prioridades**:
+
 - 🔴 **P0 (CRITICAL)**: Fórmula de variância incorreta (subestimação sistemática)
 - 🟡 **P1 (HIGH)**: Circuit breaker + Health check ausentes
 - 🟢 **P2 (MEDIUM)**: Decay de targets inativos + GC
@@ -54,9 +54,12 @@ O sistema adaptativo implementa aprendizado estatístico de timeouts baseado em 
 ## 🐛 BUG CRÍTICO: Variância Instável (Welford Incompleto)
 
 ### Localização
-**Linha 142**: `stats.var = Math.max(0, Math.round((1 - alpha) * (stats.var + alpha * diff * diff)));`
+
+**Linha 142**:
+`stats.var = Math.max(0, Math.round((1 - alpha) * (stats.var + alpha * diff * diff)));`
 
 ### Problema
+
 Fórmula de variância está **matematicamente incorreta**. Implementação atual:
 
 ```javascript
@@ -65,15 +68,18 @@ stats.avg = Math.round(stats.avg + alpha * diff);
 stats.var = Math.max(0, Math.round((1 - alpha) * (stats.var + alpha * diff * diff)));
 ```
 
-**Erro**: Usa `diff` (baseado na ANTIGA média) para calcular variância, mas já atualizou `stats.avg`. Isso viola o Welford's Algorithm.
+**Erro**: Usa `diff` (baseado na ANTIGA média) para calcular variância, mas já atualizou
+`stats.avg`. Isso viola o Welford's Algorithm.
 
 ### Impacto
+
 - ❌ Subestimação sistemática de variância
 - ❌ Timeouts insuficientes (mais falsos positivos)
 - ❌ Instabilidade numérica ao longo do tempo
 - ❌ P95/P99 incorretos (baseados em `sqrt(var)`)
 
 ### Solução (Welford Correto)
+
 ```javascript
 const diff = value - stats.avg;
 const oldAvg = stats.avg;
@@ -101,22 +107,24 @@ stats.var = Math.max(0, Math.round(stats.var));
 **Problema**: Sem proteção quando target fica catastroficamente lento.
 
 **Cenário**:
+
 ```javascript
 // ChatGPT avg = 180s (3min) → sistema ainda tenta usar
 // Deveria: circuit break + alerta crítico
 ```
 
 **Solução**:
+
 ```javascript
 function shouldCircuitBreak(stats) {
-    const THRESHOLD_MS = 120000; // 2min
-    return stats.count >= 5 && stats.avg > THRESHOLD_MS;
+  const THRESHOLD_MS = 120000; // 2min
+  return stats.count >= 5 && stats.avg > THRESHOLD_MS;
 }
 
 // Em getAdjustedTimeout:
 if (shouldCircuitBreak(stats)) {
-    log('ERROR', `[ADAPTIVE] Circuit breaker ativado: ${target} (avg=${stats.avg}ms)`);
-    return { timeout: 300000, circuit_broken: true };
+  log('ERROR', `[ADAPTIVE] Circuit breaker ativado: ${target} (avg=${stats.avg}ms)`);
+  return { timeout: 300000, circuit_broken: true };
 }
 ```
 
@@ -125,24 +133,25 @@ if (shouldCircuitBreak(stats)) {
 **Problema**: Se target não recebe métricas por 24h+, stats ficam obsoletas.
 
 **Solução**:
+
 ```javascript
 // Em TargetProfileSchema, adicionar:
-last_update: z.number()
+last_update: z.number();
 
 // Em recordMetric:
 profile.last_update = Date.now();
 
 // Nova função:
 function decayIfNeeded(profile, now) {
-    const age = now - profile.last_update;
-    const INACTIVE_THRESHOLD = 86400000; // 24h
+  const age = now - profile.last_update;
+  const INACTIVE_THRESHOLD = 86400000; // 24h
 
-    if (age > INACTIVE_THRESHOLD) {
-        const decayFactor = Math.max(0.1, Math.exp(-age / (7 * 86400000))); // Decay exponencial
-        profile.ttft.count = Math.floor(profile.ttft.count * decayFactor);
-        profile.stream.count = Math.floor(profile.stream.count * decayFactor);
-        profile.echo.count = Math.floor(profile.echo.count * decayFactor);
-    }
+  if (age > INACTIVE_THRESHOLD) {
+    const decayFactor = Math.max(0.1, Math.exp(-age / (7 * 86400000))); // Decay exponencial
+    profile.ttft.count = Math.floor(profile.ttft.count * decayFactor);
+    profile.stream.count = Math.floor(profile.stream.count * decayFactor);
+    profile.echo.count = Math.floor(profile.echo.count * decayFactor);
+  }
 }
 ```
 
@@ -151,23 +160,24 @@ function decayIfNeeded(profile, now) {
 **Problema**: Se criar muitos targets temporários, state file cresce infinitamente.
 
 **Solução**:
+
 ```javascript
 const MAX_TARGETS = 100;
 
 function garbageCollectTargets() {
-    const targets = Object.entries(state.targets);
+  const targets = Object.entries(state.targets);
 
-    if (targets.length > MAX_TARGETS) {
-        // Ordena por last_update (mais antigo primeiro)
-        const sorted = targets.sort((a, b) => a[1].last_update - b[1].last_update);
+  if (targets.length > MAX_TARGETS) {
+    // Ordena por last_update (mais antigo primeiro)
+    const sorted = targets.sort((a, b) => a[1].last_update - b[1].last_update);
 
-        // Remove targets mais antigos
-        const toRemove = sorted.slice(0, sorted.length - MAX_TARGETS);
-        toRemove.forEach(([key]) => {
-            delete state.targets[key];
-            log('INFO', `[ADAPTIVE] GC: removido target inativo: ${key}`);
-        });
-    }
+    // Remove targets mais antigos
+    const toRemove = sorted.slice(0, sorted.length - MAX_TARGETS);
+    toRemove.forEach(([key]) => {
+      delete state.targets[key];
+      log('INFO', `[ADAPTIVE] GC: removido target inativo: ${key}`);
+    });
+  }
 }
 ```
 
@@ -176,28 +186,29 @@ function garbageCollectTargets() {
 **Problema**: Sem forma de verificar integridade do sistema adaptativo.
 
 **Solução**:
+
 ```javascript
 async function getHealthStatus() {
-    if (!isReady) {
-        await readyPromise;
-    }
+  if (!isReady) {
+    await readyPromise;
+  }
 
-    const now = Date.now();
-    const targets = Object.entries(state.targets);
-    const staleTargets = targets.filter(([, p]) => now - p.last_update > 86400000);
+  const now = Date.now();
+  const targets = Object.entries(state.targets);
+  const staleTargets = targets.filter(([, p]) => now - p.last_update > 86400000);
 
-    return {
-        status: isReady ? 'HEALTHY' : 'NOT_READY',
-        state_file: STATE_FILE,
-        targets_count: targets.length,
-        stale_targets_count: staleTargets.length,
-        stale_targets: staleTargets.map(([k]) => k),
-        infra_health: state.infra.count >= 10 ? 'SUFFICIENT_DATA' : 'INSUFFICIENT_DATA',
-        infra_samples: state.infra.count,
-        last_adjustment: new Date(state.last_adjustment_at).toISOString(),
-        persist_locked: persistLock,
-        pending_persist: pendingPersist
-    };
+  return {
+    status: isReady ? 'HEALTHY' : 'NOT_READY',
+    state_file: STATE_FILE,
+    targets_count: targets.length,
+    stale_targets_count: staleTargets.length,
+    stale_targets: staleTargets.map(([k]) => k),
+    infra_health: state.infra.count >= 10 ? 'SUFFICIENT_DATA' : 'INSUFFICIENT_DATA',
+    infra_samples: state.infra.count,
+    last_adjustment: new Date(state.last_adjustment_at).toISOString(),
+    persist_locked: persistLock,
+    pending_persist: pendingPersist,
+  };
 }
 ```
 
@@ -208,6 +219,7 @@ async function getHealthStatus() {
 **Localização**: Linha 166, 174
 
 **Opções**:
+
 1. **Remover**: Se não é usado, remover do schema
 2. **Implementar**: Incrementar em `recordMetric` quando task é bem-sucedida
 
@@ -215,23 +227,25 @@ async function getHealthStatus() {
 
 ### P6: Falta de Percentile Support (LOW)
 
-**Problema**: Usa apenas `avg + 3*std` (≈P99.7 se distribuição normal). Para distribuições não-normais, pode ser inadequado.
+**Problema**: Usa apenas `avg + 3*std` (≈P99.7 se distribuição normal). Para distribuições
+não-normais, pode ser inadequado.
 
 **Solução**: Adicionar modo P95/P99 explícito:
+
 ```javascript
 function getPercentileTimeout(stats, percentile) {
-    const z_scores = {
-        50: 0.0,    // P50 (mediana)
-        95: 1.645,  // P95
-        99: 2.326,  // P99
-        99.7: 3.0   // P99.7 (atual)
-    };
+  const z_scores = {
+    50: 0.0, // P50 (mediana)
+    95: 1.645, // P95
+    99: 2.326, // P99
+    99.7: 3.0, // P99.7 (atual)
+  };
 
-    const avg = Math.max(1, stats.avg);
-    const std = Math.sqrt(Math.max(0, stats.var));
-    const z = z_scores[percentile] || 1.645;
+  const avg = Math.max(1, stats.avg);
+  const std = Math.sqrt(Math.max(0, stats.var));
+  const z = z_scores[percentile] || 1.645;
 
-    return Math.round(avg + z * std);
+  return Math.round(avg + z * std);
 }
 ```
 
@@ -240,11 +254,13 @@ function getPercentileTimeout(stats, percentile) {
 **Problema**: Linha 197 não explica rationale matemático.
 
 **Fórmula Atual**:
+
 ```javascript
 const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 ```
 
 **Rationale** (inferido):
+
 - `log2(n)`: Crescimento sublinear (1→0s, 2→2s, 4→4s, 8→6s, 16→8s)
 - `* 2000`: Escala para 2s por dobra de mensagens
 - `min(20000)`: Cap de 20s para conversas muito longas
@@ -258,16 +274,14 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 
 ### Fase 1: Correções Críticas (P0) ⚠️
 
-**Prioridade**: IMMEDIATE
-**Risk**: HIGH (bug em produção)
+**Prioridade**: IMMEDIATE **Risk**: HIGH (bug em produção)
 
 - [ ] Fix variância (Welford correto)
 - [ ] Adicionar testes de regressão
 
 ### Fase 2: Produção Hardening (P1) 🛡️
 
-**Prioridade**: HIGH
-**Risk**: MEDIUM
+**Prioridade**: HIGH **Risk**: MEDIUM
 
 - [ ] Circuit breaker
 - [ ] Health check API
@@ -275,8 +289,7 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 
 ### Fase 3: Manutenibilidade (P2) 🧹
 
-**Prioridade**: MEDIUM
-**Risk**: LOW
+**Prioridade**: MEDIUM **Risk**: LOW
 
 - [ ] Target GC (limite 100)
 - [ ] Decay de targets inativos
@@ -284,8 +297,7 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 
 ### Fase 4: Observability (P3) 📊
 
-**Prioridade**: LOW
-**Risk**: NONE
+**Prioridade**: LOW **Risk**: NONE
 
 - [ ] Percentile support (P95/P99)
 - [ ] Melhorar docs de context_penalty
@@ -296,6 +308,7 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 ## 🧪 TESTES NECESSÁRIOS
 
 ### test_adaptive_variance.js (NOVO)
+
 ```javascript
 // Validar que variância converge corretamente
 // Comparar com implementation de referência (lodash, numpy)
@@ -303,6 +316,7 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 ```
 
 ### test_adaptive_circuit_breaker.js (NOVO)
+
 ```javascript
 // Simular target com avg > 120s
 // Verificar que circuit breaker é ativado
@@ -310,6 +324,7 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 ```
 
 ### test_adaptive_gc.js (NOVO)
+
 ```javascript
 // Criar 150 targets
 // Verificar que apenas 100 permanecem
@@ -321,12 +336,14 @@ const context = Math.min(20000, Math.round(Math.log2(messageCount + 2) * 2000));
 ## 📊 MÉTRICAS DE SUCESSO
 
 **Antes (V45)**:
+
 - ❌ Variância subestimada (~30% error em testes)
 - ❌ Sem proteção para degradação
 - ❌ State file pode crescer indefinidamente
 - ❌ Sem health checks
 
 **Depois (V46 - Proposto)**:
+
 - ✅ Variância matematicamente correta
 - ✅ Circuit breaker ativo (>120s)
 - ✅ GC automático (max 100 targets)

@@ -10,5 +10,4 @@ Recommended actions:
 1. Revert or review trace-level settings; avoid trace in environments with sensitive data.
 2. Inspect trace logs for accidental exposures.
 
-Owner: @owner-placeholder
-Labels: security, P1, logs
+Owner: @owner-placeholder Labels: security, P1, logs

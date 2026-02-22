@@ -1,10 +1,8 @@
 # Auditoria Cross-Cutting: SECURITY & PERMISSIONS
 
-**Data**: 21/01/2026 04:30 UTC-3
-**Auditor**: AI Coding Agent (Claude Sonnet 4.5)
-**Versão do Projeto**: chatgpt-docker-puppeteer (Janeiro 2026)
-**Audit Level**: CRITICAL — Security & Data Protection
-**Status**: ✅ COMPLETO
+**Data**: 21/01/2026 04:30 UTC-3 **Auditor**: AI Coding Agent (Claude Sonnet 4.5) **Versão do
+Projeto**: chatgpt-docker-puppeteer (Janeiro 2026) **Audit Level**: CRITICAL — Security & Data
+Protection **Status**: ✅ COMPLETO
 
 ---
 
@@ -33,6 +31,7 @@
 ### 1.1 Responsabilidade
 
 Este audit cross-cutting analisa **todos os aspectos de segurança** do sistema:
+
 - **Input Validation**: Sanitização de prompts, validação de schemas
 - **Network Security**: Domain whitelist, CORS policy
 - **Authentication**: Token validation, identity verification
@@ -44,6 +43,7 @@ Este audit cross-cutting analisa **todos os aspectos de segurança** do sistema:
 ### 1.2 Contexto de Ameaças
 
 **Threat Model**:
+
 - ❌ **Injection Attacks**: Prompts maliciosos com caracteres de controle
 - ❌ **Path Traversal**: Arquivos em diretórios não autorizados
 - ❌ **Domain Hijacking**: Navegação para domínios não-whitelistados
@@ -56,15 +56,15 @@ Este audit cross-cutting analisa **todos os aspectos de segurança** do sistema:
 
 | Arquivo                                      | LOC  | Responsabilidade               | Análise |
 | -------------------------------------------- | ---- | ------------------------------ | ------- |
-| `src/core/config.js`                         | 223  | Domain whitelist, configuração | ✅       |
-| `src/driver/core/BaseDriver.js`              | 215  | Sanitização de inputs          | ✅       |
-| `src/driver/targets/ChatGPTDriver.js`        | 268  | Validação de domínio           | ✅       |
-| `src/infra/locks/lock_manager.js`            | 180  | PID validation                 | ✅       |
-| `src/infra/locks/process_guard.js`           | 43   | Zombie process detection       | ✅       |
-| `src/server/engine/socket.js`                | 256  | Token authentication           | ✅       |
-| `src/shared/nerv/schemas.js`                 | ~200 | Envelope validation            | ✅       |
-| `src/infra/fs/fs_utils.js`                   | ~100 | Filename sanitization          | ✅       |
-| `.github/workflows/docker-security-scan.yml` | 125  | Trivy + Gitleaks               | ✅       |
+| `src/core/config.js`                         | 223  | Domain whitelist, configuração | ✅      |
+| `src/driver/core/BaseDriver.js`              | 215  | Sanitização de inputs          | ✅      |
+| `src/driver/targets/ChatGPTDriver.js`        | 268  | Validação de domínio           | ✅      |
+| `src/infra/locks/lock_manager.js`            | 180  | PID validation                 | ✅      |
+| `src/infra/locks/process_guard.js`           | 43   | Zombie process detection       | ✅      |
+| `src/server/engine/socket.js`                | 256  | Token authentication           | ✅      |
+| `src/shared/nerv/schemas.js`                 | ~200 | Envelope validation            | ✅      |
+| `src/infra/fs/fs_utils.js`                   | ~100 | Filename sanitization          | ✅      |
+| `.github/workflows/docker-security-scan.yml` | 125  | Trivy + Gitleaks               | ✅      |
 
 **Total Analisado**: ~1,600 LOC críticas para segurança
 
@@ -95,6 +95,7 @@ Este audit cross-cutting analisa **todos os aspectos de segurança** do sistema:
 ### 2.2 Implementações Existentes
 
 **✅ Já Implementado**:
+
 1. **Zod Schema Validation** (Tasks, Config, DNA)
 2. **Domain Whitelist** (config.json → allowedDomains)
 3. **Filename Sanitization** (fs_utils.js → sanitizeFilename)
@@ -107,6 +108,7 @@ Este audit cross-cutting analisa **todos os aspectos de segurança** do sistema:
 10. **Non-root Container** (USER node in Dockerfile)
 
 **⚠️ Gaps Identificados**:
+
 1. ❌ Prompt sanitization (control characters) não explícito
 2. ❌ Rate limiting ausente no Dashboard
 3. ❌ CORS policy não documentada explicitamente
@@ -123,25 +125,29 @@ Este audit cross-cutting analisa **todos os aspectos de segurança** do sistema:
 **Localização**: `src/core/schemas/task_schema.js`, `src/core/schemas/dna_schema.js`
 
 **Implementação**:
+
 ```javascript
 const TaskSpecSchema = z.object({
-    target: z.enum(['chatgpt', 'gemini', 'claude', 'auto']),
-    payload: z.object({
-        type: z.enum(['prompt', 'continuation']).default('prompt'),
-        content: z.string(),  // ← Não há sanitização aqui!
-        thread_id: z.string().optional(),
-        language: z.enum(['pt', 'en', 'es']).default('pt')
-    }),
-    validation: z.object({
-        min_length: z.number().default(10),
-        required_format: z.enum(['text', 'json', 'markdown', 'code']).default('text'),
-        required_pattern: z.string().optional(),
-        forbidden_terms: z.array(z.string()).default([])
-    }).default({})
+  target: z.enum(['chatgpt', 'gemini', 'claude', 'auto']),
+  payload: z.object({
+    type: z.enum(['prompt', 'continuation']).default('prompt'),
+    content: z.string(), // ← Não há sanitização aqui!
+    thread_id: z.string().optional(),
+    language: z.enum(['pt', 'en', 'es']).default('pt'),
+  }),
+  validation: z
+    .object({
+      min_length: z.number().default(10),
+      required_format: z.enum(['text', 'json', 'markdown', 'code']).default('text'),
+      required_pattern: z.string().optional(),
+      forbidden_terms: z.array(z.string()).default([]),
+    })
+    .default({}),
 });
 ```
 
 **Análise**:
+
 - ✅ **Target validation**: Enum restrito (chatgpt, gemini, claude, auto)
 - ✅ **Type validation**: Enum restrito (prompt, continuation)
 - ✅ **Content type**: String (mas não sanitiza control characters)
@@ -153,12 +159,14 @@ const TaskSpecSchema = z.object({
 **Status**: ⚠️ **NÃO ENCONTRADO**
 
 **Busca Realizada**:
+
 ```bash
 grep -r "control.*character\|sanitize.*prompt\|\\x00" src/driver --include="*.js"
 # Resultado: NENHUMA MENÇÃO
 ```
 
 **Problema**:
+
 - Prompts podem conter `\x00` (null byte), `\x0D\x0A` (CRLF injection)
 - Puppeteer pode interpretar esses caracteres e quebrar protocolo
 - Sem sanitização explícita antes de `page.type()` ou `page.evaluate()`
@@ -170,23 +178,25 @@ grep -r "control.*character\|sanitize.*prompt\|\\x00" src/driver --include="*.js
 **Localização**: `src/infra/fs/fs_utils.js`
 
 **Implementação**:
+
 ```javascript
 function sanitizeFilename(name) {
-    if (!name || typeof name !== 'string') {
-        return 'unnamed';
-    }
-    // Remove caracteres perigosos: / \ : * ? " < > |
-    const sanitized = name
-        .replace(/[\/\\:*?"<>|]/g, '_')
-        .replace(/\s+/g, '_')
-        .replace(/^\.+/, '')  // Remove leading dots
-        .substring(0, 200);   // Limita comprimento
+  if (!name || typeof name !== 'string') {
+    return 'unnamed';
+  }
+  // Remove caracteres perigosos: / \ : * ? " < > |
+  const sanitized = name
+    .replace(/[\/\\:*?"<>|]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/^\.+/, '') // Remove leading dots
+    .substring(0, 200); // Limita comprimento
 
-    return sanitized || 'unnamed';
+  return sanitized || 'unnamed';
 }
 ```
 
 **Análise**:
+
 - ✅ Remove caracteres perigosos de path
 - ✅ Previne path traversal (`../`, `..\`)
 - ✅ Limita comprimento (DoS prevention)
@@ -198,25 +208,27 @@ function sanitizeFilename(name) {
 **Localização**: `src/logic/validation/rules/format_rules.js`
 
 **Implementação**:
+
 ```javascript
 function validateJSON(fullContent, signal) {
-    try {
-        if (signal?.aborted) {
-            return { ok: false, reason: 'VALIDATION_CANCELLED' };
-        }
-
-        JSON.parse(fullContent);  // Throws on invalid JSON
-        return { ok: true, reason: null };
-    } catch (parseErr) {
-        return {
-            ok: false,
-            reason: `INVALID_JSON: ${parseErr.message}`
-        };
+  try {
+    if (signal?.aborted) {
+      return { ok: false, reason: 'VALIDATION_CANCELLED' };
     }
+
+    JSON.parse(fullContent); // Throws on invalid JSON
+    return { ok: true, reason: null };
+  } catch (parseErr) {
+    return {
+      ok: false,
+      reason: `INVALID_JSON: ${parseErr.message}`,
+    };
+  }
 }
 ```
 
 **Análise**:
+
 - ✅ JSON.parse nativo (sem eval)
 - ✅ AbortSignal support
 - ✅ Error handling robusto
@@ -231,19 +243,18 @@ function validateJSON(fullContent, signal) {
 **Localização**: `src/core/config.js`
 
 **Schema**:
+
 ```javascript
 const ConfigSchema = z.object({
-    allowedDomains: z.array(z.string()).default([
-        'chatgpt.com',
-        'claude.ai',
-        'gemini.google.com',
-        'openai.com'
-    ]),
-    // ...
+  allowedDomains: z
+    .array(z.string())
+    .default(['chatgpt.com', 'claude.ai', 'gemini.google.com', 'openai.com']),
+  // ...
 });
 ```
 
 **Enforcement**:
+
 ```javascript
 // src/infra/ConnectionOrchestrator.js:434
 isTargetURL(url) {
@@ -253,15 +264,17 @@ isTargetURL(url) {
 ```
 
 **Análise**:
+
 - ✅ Whitelist explícita e configurável
 - ✅ Default seguro (apenas 4 domínios)
 - ✅ Enforcement em ConnectionOrchestrator
 - ⚠️ **Problema**: `url.includes(d)` é fraco (pode dar match em substrings)
 
 **Exemplo de Bypass**:
+
 ```javascript
 // URL maliciosa:
-"https://evil.com/chatgpt.com"
+'https://evil.com/chatgpt.com';
 // Match: 'chatgpt.com' está presente → PERMITIDO ❌
 ```
 
@@ -272,17 +285,19 @@ isTargetURL(url) {
 **Localização**: `docker-compose.yml`, `ecosystem.config.js`
 
 **Configuração**:
+
 ```yaml
 # docker-compose.yml
 services:
-    agent:
-        environment:
-            CHROME_REMOTE_DEBUGGING_ADDRESS: "127.0.0.1"  # ← Bind localhost only
-        ports:
-            - "9229:9229"  # Node.js inspector (apenas para dev)
+  agent:
+    environment:
+      CHROME_REMOTE_DEBUGGING_ADDRESS: '127.0.0.1' # ← Bind localhost only
+    ports:
+      - '9229:9229' # Node.js inspector (apenas para dev)
 ```
 
 **Análise**:
+
 - ✅ Remote debugging bound a 127.0.0.1 (não 0.0.0.0)
 - ✅ Não expõe Chrome DevTools Protocol para internet
 - ✅ Node inspector apenas em modo dev
@@ -295,12 +310,14 @@ services:
 **Status**: ⚠️ **NÃO VERIFICADO EXPLICITAMENTE**
 
 **Busca**:
+
 ```bash
 grep -r "cors\|CORS\|Access-Control" src/server --include="*.js"
 # Resultado: Nenhuma configuração explícita encontrada
 ```
 
 **Provável Implementação**:
+
 - Express usa CORS padrão (permite all origins)
 - Socket.io configura CORS automaticamente
 
@@ -315,30 +332,32 @@ grep -r "cors\|CORS\|Access-Control" src/server --include="*.js"
 **Localização**: `src/server/engine/socket.js`
 
 **Implementação**:
+
 ```javascript
 // socket.js:55-57
 io.on('connection', socket => {
-    const token = socket.handshake.auth?.token;
-    const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
+  const token = socket.handshake.auth?.token;
+  const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
 
-    if (!isAgentAttempt) {
-        // Usuário comum (Dashboard Web)
-        // Sem autenticação adicional
-    } else {
-        // Agente interno (NERV)
-        try {
-            validateRobotIdentity(socket.handshake.auth.identity);
-        } catch (err) {
-            log('ERROR', `[SOCKET] Identidade inválida: ${err.message}`);
-            socket.emit('auth_failed', { reason: 'INVALID_IDENTITY' });
-            socket.disconnect(true);
-            return;
-        }
+  if (!isAgentAttempt) {
+    // Usuário comum (Dashboard Web)
+    // Sem autenticação adicional
+  } else {
+    // Agente interno (NERV)
+    try {
+      validateRobotIdentity(socket.handshake.auth.identity);
+    } catch (err) {
+      log('ERROR', `[SOCKET] Identidade inválida: ${err.message}`);
+      socket.emit('auth_failed', { reason: 'INVALID_IDENTITY' });
+      socket.disconnect(true);
+      return;
     }
+  }
 });
 ```
 
 **Análise**:
+
 - ✅ Token validation para agente interno
 - ✅ Robot identity validation (Zod)
 - ✅ Disconnect em falha de autenticação
@@ -346,6 +365,7 @@ io.on('connection', socket => {
 - ❌ **Token hardcoded** ('SYSTEM_MAESTRO_PRIME')
 
 **Riscos**:
+
 1. Dashboard web sem senha → qualquer um na rede pode acessar
 2. Token estático → não pode ser rotacionado sem mudar código
 3. Sem rate limiting → possível DoS via conexões
@@ -357,34 +377,36 @@ io.on('connection', socket => {
 **Localização**: `src/shared/nerv/schemas.js`
 
 **Implementação**:
+
 ```javascript
 function validateRobotIdentity(identity) {
-    if (!identity || typeof identity !== 'object') {
-        throw new Error('IDENTITY_MISSING_OR_INVALID');
-    }
+  if (!identity || typeof identity !== 'object') {
+    throw new Error('IDENTITY_MISSING_OR_INVALID');
+  }
 
-    // Validação de campos obrigatórios
-    const required = ['uuid', 'pid', 'hostname', 'timestamp'];
-    for (const field of required) {
-        if (!identity[field]) {
-            throw new Error(`IDENTITY_FIELD_MISSING: ${field}`);
-        }
+  // Validação de campos obrigatórios
+  const required = ['uuid', 'pid', 'hostname', 'timestamp'];
+  for (const field of required) {
+    if (!identity[field]) {
+      throw new Error(`IDENTITY_FIELD_MISSING: ${field}`);
     }
+  }
 
-    // Validação de tipos
-    if (typeof identity.uuid !== 'string' || identity.uuid.length < 32) {
-        throw new Error('IDENTITY_UUID_INVALID');
-    }
+  // Validação de tipos
+  if (typeof identity.uuid !== 'string' || identity.uuid.length < 32) {
+    throw new Error('IDENTITY_UUID_INVALID');
+  }
 
-    if (!Number.isInteger(identity.pid) || identity.pid <= 0) {
-        throw new Error('IDENTITY_PID_INVALID');
-    }
+  if (!Number.isInteger(identity.pid) || identity.pid <= 0) {
+    throw new Error('IDENTITY_PID_INVALID');
+  }
 
-    return true;
+  return true;
 }
 ```
 
 **Análise**:
+
 - ✅ Validação de campos obrigatórios
 - ✅ Validação de tipos
 - ✅ UUID length check (anti-spoof)
@@ -398,18 +420,21 @@ function validateRobotIdentity(identity) {
 ### 6.1 Environment Variables
 
 **Arquivos**:
+
 - `.env.example` (template)
 - `.env` (não commitado, no `.gitignore`)
 
 **Status**: ✅ **CORRETO**
 
 **Verificação**:
+
 ```bash
 grep -E "\.env$|\.env\s" .gitignore
 # Resultado: .env está listado
 ```
 
 **Conteúdo .env.example**:
+
 ```bash
 # Node environment
 NODE_ENV=production
@@ -431,6 +456,7 @@ PM2_HOME=/app/.pm2
 ```
 
 **Análise**:
+
 - ✅ `.env` no `.gitignore`
 - ✅ `.env.example` commitado (template)
 - ✅ Nenhum secret hardcoded no código
@@ -443,14 +469,16 @@ PM2_HOME=/app/.pm2
 **Localização**: `.github/workflows/docker-security-scan.yml`
 
 **Implementação**:
+
 ```yaml
 - name: Scan for secrets (Gitleaks)
   uses: gitleaks/gitleaks-action@v2
   env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 **Análise**:
+
 - ✅ Gitleaks ativo no CI/CD
 - ✅ Scan em cada push/PR
 - ✅ Falha em detecção de secrets
@@ -459,6 +487,7 @@ PM2_HOME=/app/.pm2
 **Baseline Existente**: `.secrets.baseline` (detect-secrets)
 
 **Verificação Manual**:
+
 ```bash
 cd /workspaces/chatgpt-docker-puppeteer
 detect-secrets scan --baseline .secrets.baseline
@@ -470,10 +499,12 @@ detect-secrets scan --baseline .secrets.baseline
 **Status**: ⚠️ **NÃO DOCUMENTADO**
 
 **Arquivos Encontrados**:
+
 - `analysis/rotation-scripts/rotate_github_actions_secrets.sh`
 - `analysis/notifications/rotation-actions.md`
 
 **Conteúdo**:
+
 - Scripts de rotação de secrets GitHub Actions
 - Checklist de rotação (AWS keys, DB passwords, etc.)
 - Mas: **Não há política formal** no README ou SECURITY.md
@@ -489,6 +520,7 @@ detect-secrets scan --baseline .secrets.baseline
 **Localização**: `src/infra/fs/paths.js`
 
 **Implementação**:
+
 ```javascript
 const ROOT = path.resolve(__dirname, '../..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
@@ -496,12 +528,13 @@ const RESPONSES_DIR = path.join(ROOT, 'respostas');
 
 // Validação de path (exemplo hipotético - não encontrado explicitamente)
 function isPathSafe(filePath) {
-    const normalized = path.normalize(filePath);
-    return normalized.startsWith(ROOT);
+  const normalized = path.normalize(filePath);
+  return normalized.startsWith(ROOT);
 }
 ```
 
 **Análise**:
+
 - ✅ Todos os paths são construídos com `path.join()` (seguro)
 - ✅ ROOT definido em tempo de boot (imutável)
 - ⚠️ **Não há validação explícita** contra path traversal
@@ -514,6 +547,7 @@ function isPathSafe(filePath) {
 **Localização**: Docker context
 
 **Dockerfile**:
+
 ```dockerfile
 # Dockerfile:70
 USER node
@@ -523,14 +557,16 @@ RUN chown -R node:node /app
 ```
 
 **docker-compose.yml**:
+
 ```yaml
 volumes:
-    - ./fila:/app/fila
-    - ./respostas:/app/respostas
-    - ./logs:/app/logs
+  - ./fila:/app/fila
+  - ./respostas:/app/respostas
+  - ./logs:/app/logs
 ```
 
 **Análise**:
+
 - ✅ Container roda como `node` (não root)
 - ✅ Volumes montados com ownership correto
 - ✅ Nenhum `chmod 777` encontrado
@@ -541,19 +577,21 @@ volumes:
 **Status**: ⚠️ **NÃO IMPLEMENTADO**
 
 **Risco**:
+
 - Attacker pode criar symlink em `fila/` apontando para `/etc/passwd`
 - Task reader (`io.loadTask()`) pode seguir symlink e ler arquivo sensível
 
 **Mitigação Proposta**:
+
 ```javascript
 const fs = require('fs');
 
 async function safeReadFile(filePath) {
-    const stats = await fs.promises.lstat(filePath);
-    if (stats.isSymbolicLink()) {
-        throw new Error('SECURITY_SYMLINK_DENIED');
-    }
-    return fs.promises.readFile(filePath, 'utf-8');
+  const stats = await fs.promises.lstat(filePath);
+  if (stats.isSymbolicLink()) {
+    throw new Error('SECURITY_SYMLINK_DENIED');
+  }
+  return fs.promises.readFile(filePath, 'utf-8');
 }
 ```
 
@@ -568,24 +606,26 @@ async function safeReadFile(filePath) {
 **Localização**: `src/infra/locks/lock_manager.js` (180 LOC)
 
 **Implementação Esperada**:
+
 ```javascript
 async function isLockOwnerAlive(lock) {
-    try {
-        // Envia sinal 0 (não mata, apenas testa existência)
-        process.kill(lock.pid, 0);
-        return true;
-    } catch (err) {
-        if (err.code === 'ESRCH') {
-            // Processo não existe
-            return false;
-        }
-        // Outro erro (permissão, etc.)
-        return true; // Assume vivo por segurança
+  try {
+    // Envia sinal 0 (não mata, apenas testa existência)
+    process.kill(lock.pid, 0);
+    return true;
+  } catch (err) {
+    if (err.code === 'ESRCH') {
+      // Processo não existe
+      return false;
     }
+    // Outro erro (permissão, etc.)
+    return true; // Assume vivo por segurança
+  }
 }
 ```
 
 **Análise**:
+
 - ✅ `process.kill(pid, 0)` é método correto
 - ✅ Previne locks órfãos (zombie processes)
 - ✅ Two-phase commit lock pattern
@@ -599,11 +639,13 @@ async function isLockOwnerAlive(lock) {
 **Localização**: `src/infra/locks/process_guard.js` (43 LOC)
 
 **Responsabilidade**:
+
 - Detectar processos zumbis
 - Limpar locks órfãos
 - Prevenir deadlocks
 
 **Análise**:
+
 - ✅ Implementação consolidada
 - ✅ Integrado com lock_manager
 - ✅ **SCORE: 10/10**
@@ -617,20 +659,22 @@ async function isLockOwnerAlive(lock) {
 **Localização**: `src/infra/browser/launcher.js`, `docker-compose.yml`
 
 **Configuração**:
+
 ```javascript
 const launchOptions = {
-    headless: true,
-    args: [
-        '--no-sandbox',  // ← Necessário no Docker
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        `--remote-debugging-port=${config.CHROME_REMOTE_DEBUGGING_PORT || 9224}`,
-        `--remote-debugging-address=${config.CHROME_REMOTE_DEBUGGING_ADDRESS || '127.0.0.1'}`
-    ]
+  headless: true,
+  args: [
+    '--no-sandbox', // ← Necessário no Docker
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    `--remote-debugging-port=${config.CHROME_REMOTE_DEBUGGING_PORT || 9224}`,
+    `--remote-debugging-address=${config.CHROME_REMOTE_DEBUGGING_ADDRESS || '127.0.0.1'}`,
+  ],
 };
 ```
 
 **Análise**:
+
 - ✅ Remote debugging bound a 127.0.0.1 (não 0.0.0.0)
 - ⚠️ `--no-sandbox` necessário para Docker (trade-off conhecido)
 - ✅ Port configurável via env var
@@ -641,14 +685,16 @@ const launchOptions = {
 **Localização**: `profile/` directory
 
 **Configuração**:
+
 ```javascript
 const browserOptions = {
-    userDataDir: path.join(ROOT, 'profile'),  // Perfil persistente
-    // Cada instância do agente tem profile separado
+  userDataDir: path.join(ROOT, 'profile'), // Perfil persistente
+  // Cada instância do agente tem profile separado
 };
 ```
 
 **Análise**:
+
 - ✅ Profile isolado por instância
 - ✅ No `.gitignore` (não commita sessões)
 - ✅ Cookies e storage isolados
@@ -658,8 +704,7 @@ const browserOptions = {
 
 **Status**: ⚠️ **NÃO APLICÁVEL**
 
-O agente **não renderiza conteúdo web próprio**, apenas automatiza browsers.
-CSP não é necessário.
+O agente **não renderiza conteúdo web próprio**, apenas automatiza browsers. CSP não é necessário.
 
 ---
 
@@ -672,6 +717,7 @@ CSP não é necessário.
 **Status**: ⚠️ **NÃO CONFIGURADO EXPLICITAMENTE**
 
 **Implementação Provável**:
+
 ```javascript
 const express = require('express');
 const app = express();
@@ -681,6 +727,7 @@ const app = express();
 ```
 
 **Análise**:
+
 - ❌ CORS não configurado → Permite qualquer origin
 - ❌ Dashboard acessível de qualquer domínio
 - ❌ CSRF possível (embora improvável dado uso interno)
@@ -692,12 +739,14 @@ const app = express();
 **Status**: ❌ **AUSENTE**
 
 **Busca**:
+
 ```bash
 grep -r "rate.*limit\|express-rate-limit" src/server --include="*.js"
 # Resultado: NENHUMA MENÇÃO
 ```
 
 **Risco**:
+
 - DoS attack via múltiplas requisições ao Dashboard
 - Sem proteção contra brute-force em endpoints
 
@@ -708,13 +757,15 @@ grep -r "rate.*limit\|express-rate-limit" src/server --include="*.js"
 **Status**: ⚠️ **NÃO IMPLEMENTADO** (HTTP only)
 
 **Configuração Atual**:
+
 ```javascript
 // server.js
-const server = http.createServer(app);  // ← HTTP, não HTTPS
+const server = http.createServer(app); // ← HTTP, não HTTPS
 server.listen(3008);
 ```
 
 **Análise**:
+
 - ⚠️ Dashboard serve HTTP apenas
 - ⚠️ Tokens transmitidos em plaintext (em rede local, aceitável)
 - ✅ Documentação recomenda reverse proxy (Nginx) com SSL
@@ -730,18 +781,21 @@ server.listen(3008);
 **Status**: ✅ **ATIVO**
 
 **Verificação**:
+
 ```bash
 npm audit
 # Resultado: Nenhuma vulnerabilidade crítica ou alta
 ```
 
 **Dependências Críticas**:
+
 - `puppeteer`: v23+ (recente, sem CVEs conhecidos)
 - `express`: v4.x (estável)
 - `socket.io`: v4.x (estável)
 - `zod`: v3.x (sem CVEs)
 
 **Análise**:
+
 - ✅ Dependências atualizadas
 - ✅ Nenhuma vulnerabilidade crítica
 - ✅ Dependabot habilitado (GitHub)
@@ -752,18 +806,20 @@ npm audit
 **Localização**: `.github/workflows/docker-security-scan.yml`
 
 **Implementação**:
+
 ```yaml
 - name: Run Trivy vulnerability scan
   uses: aquasecurity/trivy-action@master
   with:
-      image-ref: chatgpt-agent:${{ github.sha }}
-      format: 'sarif'
-      severity: 'CRITICAL,HIGH,MEDIUM'
-      ignore-unfixed: false
-      vuln-type: 'os,library'
+    image-ref: chatgpt-agent:${{ github.sha }}
+    format: 'sarif'
+    severity: 'CRITICAL,HIGH,MEDIUM'
+    ignore-unfixed: false
+    vuln-type: 'os,library'
 ```
 
 **Análise**:
+
 - ✅ Scan em cada build
 - ✅ SARIF upload para GitHub Security tab
 - ✅ Detecta CVEs em OS packages (Alpine)
@@ -778,6 +834,7 @@ npm audit
 **Arquivo**: `.secrets.baseline`
 
 **Conteúdo**:
+
 ```json
 {
   "version": "1.5.0",
@@ -799,13 +856,17 @@ npm audit
   ],
   "filters_used": [
     { "path": "detect_secrets.filters.allowlist.is_line_allowlisted" },
-    { "path": "detect_secrets.filters.common.is_ignored_due_to_verification_policies", "min_level": 2 }
+    {
+      "path": "detect_secrets.filters.common.is_ignored_due_to_verification_policies",
+      "min_level": 2
+    }
   ],
-  "results": {}  // ← CLEAN
+  "results": {} // ← CLEAN
 }
 ```
 
 **Análise**:
+
 - ✅ 20+ plugins ativos
 - ✅ Entropy-based detection (Base64, Hex)
 - ✅ Specific detectors (AWS, GitHub, Slack, Stripe)
@@ -817,6 +878,7 @@ npm audit
 **Localização**: `.github/workflows/docker-security-scan.yml`
 
 **Análise**:
+
 - ✅ Scan em cada push
 - ✅ Falha em detecção de secrets
 - ✅ Complementa detect-secrets
@@ -827,6 +889,7 @@ npm audit
 **Análise Realizada**: `analysis/final-report.md`
 
 **Achados**:
+
 - ✅ Repository history scrubbed (BFG + filter-repo)
 - ✅ Legacy backups isolados
 - ✅ Nenhum secret confirmado no history atual
@@ -844,6 +907,7 @@ npm audit
 **Localização**: `src/driver/core/BaseDriver.js` (esperado)
 
 **Problema**:
+
 ```javascript
 // Nenhuma sanitização antes de page.type()
 await page.type(inputSelector, task.spec.payload.content);
@@ -851,22 +915,24 @@ await page.type(inputSelector, task.spec.payload.content);
 ```
 
 **Impacto**: 🔴 CRÍTICO
+
 - Control characters podem quebrar protocolo Puppeteer
 - CRLF injection em prompts
 - Null byte (\x00) trunca strings
 
 **Correção**:
+
 ```javascript
 function sanitizePrompt(content) {
-    if (!content || typeof content !== 'string') {
-        return '';
-    }
+  if (!content || typeof content !== 'string') {
+    return '';
+  }
 
-    // Remove control characters (exceto \n e \t)
-    return content
-        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')  // Remove \x00-\x1F, \x7F
-        .replace(/\r\n/g, '\n')  // Normaliza line endings
-        .trim();
+  // Remove control characters (exceto \n e \t)
+  return content
+    .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '') // Remove \x00-\x1F, \x7F
+    .replace(/\r\n/g, '\n') // Normaliza line endings
+    .trim();
 }
 
 // Aplicar antes de page.type()
@@ -883,6 +949,7 @@ await page.type(inputSelector, sanitized);
 **Localização**: `src/infra/ConnectionOrchestrator.js:434`
 
 **Problema**:
+
 ```javascript
 isTargetURL(url) {
     return url && url !== 'about:blank' &&
@@ -892,10 +959,12 @@ isTargetURL(url) {
 ```
 
 **Impacto**: 🟡 MÉDIO
+
 - Bypass de domain whitelist com URL crafting
 - Navegação para domínios maliciosos
 
 **Correção**:
+
 ```javascript
 isTargetURL(url) {
     if (!url || url === 'about:blank') {
@@ -923,6 +992,7 @@ isTargetURL(url) {
 **Localização**: `src/server/server.js`
 
 **Problema**:
+
 ```javascript
 const app = express();
 // Sem configuração explícita de CORS
@@ -930,21 +1000,25 @@ const app = express();
 ```
 
 **Impacto**: 🟡 MÉDIO
+
 - Dashboard acessível de qualquer origin
 - CSRF teórico (baixa probabilidade dado uso interno)
 
 **Correção**:
+
 ```javascript
 const cors = require('cors');
 
-app.use(cors({
+app.use(
+  cors({
     origin: [
-        'http://localhost:3008',
-        'http://127.0.0.1:3008',
-        process.env.DASHBOARD_ORIGIN || 'http://localhost:3008'
+      'http://localhost:3008',
+      'http://127.0.0.1:3008',
+      process.env.DASHBOARD_ORIGIN || 'http://localhost:3008',
     ],
-    credentials: true
-}));
+    credentials: true,
+  })
+);
 ```
 
 **Tempo**: 10 minutos
@@ -956,31 +1030,34 @@ app.use(cors({
 **Localização**: `src/server/engine/socket.js`
 
 **Problema**:
+
 ```javascript
 const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
 if (!isAgentAttempt) {
-    // Usuário comum (Dashboard)
-    // ↑ SEM AUTENTICAÇÃO!
+  // Usuário comum (Dashboard)
+  // ↑ SEM AUTENTICAÇÃO!
 }
 ```
 
 **Impacto**: 🟡 MÉDIO
+
 - Qualquer pessoa na rede pode acessar Dashboard
 - Pode visualizar tasks, respostas, logs
 
 **Correção**:
+
 ```javascript
 // Adicionar env var DASHBOARD_PASSWORD
 const dashboardPassword = process.env.DASHBOARD_PASSWORD || null;
 
 if (!isAgentAttempt) {
-    const userPassword = socket.handshake.auth?.password;
+  const userPassword = socket.handshake.auth?.password;
 
-    if (dashboardPassword && userPassword !== dashboardPassword) {
-        socket.emit('auth_required', { message: 'Password required' });
-        socket.disconnect(true);
-        return;
-    }
+  if (dashboardPassword && userPassword !== dashboardPassword) {
+    socket.emit('auth_required', { message: 'Password required' });
+    socket.disconnect(true);
+    return;
+  }
 }
 ```
 
@@ -993,29 +1070,28 @@ if (!isAgentAttempt) {
 **Localização**: `src/core/config.js` (boot)
 
 **Problema**:
+
 - App não valida se `.env` está presente ao iniciar
 - Pode falhar silenciosamente com valores default ruins
 
 **Impacto**: 🟢 BAIXO
+
 - Configuração incorreta não detectada precocemente
 - Debugging difícil
 
 **Correção**:
+
 ```javascript
 // src/core/config.js (init)
 function validateEnvFile() {
-    const requiredEnvVars = [
-        'NODE_ENV',
-        'SERVER_PORT',
-        'DASHBOARD_PORT'
-    ];
+  const requiredEnvVars = ['NODE_ENV', 'SERVER_PORT', 'DASHBOARD_PORT'];
 
-    const missing = requiredEnvVars.filter(v => !process.env[v]);
+  const missing = requiredEnvVars.filter(v => !process.env[v]);
 
-    if (missing.length > 0) {
-        log('WARN', `[CONFIG] Missing env vars: ${missing.join(', ')}`);
-        log('WARN', `[CONFIG] Copy .env.example to .env and configure`);
-    }
+  if (missing.length > 0) {
+    log('WARN', `[CONFIG] Missing env vars: ${missing.join(', ')}`);
+    log('WARN', `[CONFIG] Copy .env.example to .env and configure`);
+  }
 }
 
 validateEnvFile();
@@ -1030,24 +1106,28 @@ validateEnvFile();
 **Localização**: `SECURITY.md`, `README.md`
 
 **Problema**:
+
 - Scripts de rotação existem (`analysis/rotation-scripts/`)
 - Mas nenhuma documentação formal
 
 **Impacto**: 🟢 BAIXO
+
 - Desenvolvedores não sabem quando/como rotacionar credentials
 
-**Correção**:
-Adicionar seção em `SECURITY.md`:
+**Correção**: Adicionar seção em `SECURITY.md`:
+
 ```markdown
 ## Credential Rotation
 
 **Policy**: Rotate all secrets every 90 days or after suspected compromise.
 
 **Scripts**:
+
 - `analysis/rotation-scripts/rotate_github_actions_secrets.sh`: GitHub secrets
 - `analysis/rotation-scripts/rotate_aws_keys.sh`: AWS credentials
 
 **Checklist**:
+
 1. Generate new credentials
 2. Update .env and GitHub Secrets
 3. Restart services: `make restart`
@@ -1064,27 +1144,30 @@ Adicionar seção em `SECURITY.md`:
 **Localização**: `src/infra/fs/fs_utils.js`
 
 **Problema**:
+
 - `path.join()` é seguro, mas não há validação explícita
 - Defesa em profundidade recomenda validação adicional
 
 **Impacto**: 🟢 BAIXO
+
 - Risco teórico (path.join já previne)
 
 **Correção**:
+
 ```javascript
 const ROOT = path.resolve(__dirname, '../..');
 
 function isPathSafe(filePath) {
-    const normalized = path.normalize(path.resolve(filePath));
-    return normalized.startsWith(ROOT) && !normalized.includes('\0');
+  const normalized = path.normalize(path.resolve(filePath));
+  return normalized.startsWith(ROOT) && !normalized.includes('\0');
 }
 
 // Usar antes de qualquer fs operation
 function safeReadFile(filePath) {
-    if (!isPathSafe(filePath)) {
-        throw new Error('SECURITY_PATH_TRAVERSAL_DENIED');
-    }
-    return fs.promises.readFile(filePath, 'utf-8');
+  if (!isPathSafe(filePath)) {
+    throw new Error('SECURITY_PATH_TRAVERSAL_DENIED');
+  }
+  return fs.promises.readFile(filePath, 'utf-8');
 }
 ```
 
@@ -1097,24 +1180,27 @@ function safeReadFile(filePath) {
 **Localização**: `src/infra/io.js`
 
 **Problema**:
+
 - `loadTask()` não valida se arquivo é symlink
 - Attacker pode criar symlink em `fila/` apontando para arquivo sensível
 
 **Impacto**: 🟢 BAIXO
+
 - Risco teórico (requer acesso ao filesystem)
 
 **Correção**:
+
 ```javascript
 async function loadTask(taskId) {
-    const filePath = path.join(QUEUE_DIR, `${sanitizeFilename(taskId)}.json`);
+  const filePath = path.join(QUEUE_DIR, `${sanitizeFilename(taskId)}.json`);
 
-    const stats = await fs.promises.lstat(filePath);
-    if (stats.isSymbolicLink()) {
-        throw new Error('SECURITY_SYMLINK_DENIED');
-    }
+  const stats = await fs.promises.lstat(filePath);
+  if (stats.isSymbolicLink()) {
+    throw new Error('SECURITY_SYMLINK_DENIED');
+  }
 
-    const content = await fs.promises.readFile(filePath, 'utf-8');
-    return JSON.parse(content);
+  const content = await fs.promises.readFile(filePath, 'utf-8');
+  return JSON.parse(content);
 }
 ```
 
@@ -1133,24 +1219,27 @@ async function loadTask(taskId) {
 **Localização**: `src/server/server.js`
 
 **Problema**:
+
 - Nenhum rate limiting em endpoints do Dashboard
 - DoS possível via múltiplas requisições
 
 **Impacto**: 🟡 MÉDIO
+
 - DoS attack em Dashboard
 - Sem proteção contra brute-force
 
 **Correção**:
+
 ```javascript
 const rateLimit = require('express-rate-limit');
 
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,  // 15 minutes
-    max: 100,  // 100 requests per window
-    message: 'Too many requests, please try again later'
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per window
+  message: 'Too many requests, please try again later',
 });
 
-app.use('/api/', limiter);  // Aplicar a todos os endpoints /api/*
+app.use('/api/', limiter); // Aplicar a todos os endpoints /api/*
 ```
 
 **Tempo**: 15 minutos
@@ -1162,18 +1251,21 @@ app.use('/api/', limiter);  // Aplicar a todos os endpoints /api/*
 **Localização**: `DEPLOYMENT.md`
 
 **Problema**:
+
 - Dashboard serve HTTP apenas
 - Documentação não tem exemplo de Nginx + SSL
 
 **Impacto**: 🟢 BAIXO
+
 - Tokens transmitidos em plaintext (em rede local, aceitável)
 
-**Correção**:
-Adicionar seção em `DEPLOYMENT.md`:
-```markdown
+**Correção**: Adicionar seção em `DEPLOYMENT.md`:
+
+````markdown
 ## HTTPS with Nginx Reverse Proxy
 
 **nginx.conf**:
+
 ```nginx
 server {
     listen 443 ssl http2;
@@ -1192,6 +1284,7 @@ server {
     }
 }
 ```
+````
 
 **Tempo**: 30 minutos
 
@@ -1202,26 +1295,25 @@ server {
 ### 14.1 Priorização
 
 **FASE 1 - Imediato (1-2h)**:
+
 1. ✅ P8.1: Implementar `sanitizePrompt()` (30 min) 🔴
 2. ✅ P8.2: Corrigir domain whitelist (15 min) 🟡
 3. ✅ P8.4: Adicionar dashboard authentication (20 min) 🟡
 4. ✅ P8.3: Configurar CORS policy (10 min) 🟡
 5. ✅ P8.10: Adicionar rate limiting (15 min) 🟡
 
-**FASE 2 - Curto Prazo (1h)**:
-6. ✅ P8.5: Validação de .env (10 min) 🟢
-7. ✅ P8.7: Path traversal validation explícita (15 min) 🟢
-8. ✅ P8.8: Symbolic link validation (10 min) 🟢
-9. ✅ P8.6: Documentar credential rotation policy (20 min) 🟢
+**FASE 2 - Curto Prazo (1h)**: 6. ✅ P8.5: Validação de .env (10 min) 🟢 7. ✅ P8.7: Path traversal
+validation explícita (15 min) 🟢 8. ✅ P8.8: Symbolic link validation (10 min) 🟢 9. ✅ P8.6:
+Documentar credential rotation policy (20 min) 🟢
 
-**FASE 3 - Médio Prazo (30 min)**:
-10. ✅ P8.11: Documentação HTTPS/TLS (30 min) 🟢
+**FASE 3 - Médio Prazo (30 min)**: 10. ✅ P8.11: Documentação HTTPS/TLS (30 min) 🟢
 
 **Tempo Total**: ~3-4 horas para hardening completo
 
 ### 14.2 Security Checklist
 
 **Desenvolvimento**:
+
 - [ ] Sanitizar prompts antes de `page.type()`
 - [ ] Validar domínios com `URL.hostname`
 - [ ] Validar .env na inicialização
@@ -1229,6 +1321,7 @@ server {
 - [ ] Rejeitar symlinks em `fila/`
 
 **Deployment**:
+
 - [ ] Configurar DASHBOARD_PASSWORD
 - [ ] Habilitar CORS policy
 - [ ] Habilitar rate limiting
@@ -1236,6 +1329,7 @@ server {
 - [ ] Rotacionar secrets a cada 90 dias
 
 **Monitoramento**:
+
 - [ ] Revisar logs de autenticação (falhas)
 - [ ] Monitorar rate limit violations
 - [ ] Scan dependencies (npm audit monthly)
@@ -1248,6 +1342,7 @@ server {
 ### Resumo das Descobertas
 
 **✅ Pontos Fortes Magníficos**:
+
 1. **Zod Schema Validation** (Tasks, Config, DNA) - 10/10
 2. **Filename Sanitization** (fs_utils.js) - 10/10
 3. **PID Validation** (lock_manager.js) - 10/10
@@ -1260,6 +1355,7 @@ server {
 10. **Git History Clean** (BFG scrubbed) - 10/10
 
 **⚠️ Gaps Identificados (11 P8s)**:
+
 1. P8.1: Prompt sanitization ausente 🔴
 2. P8.2: Domain whitelist fraco 🟡
 3. P8.3: CORS não configurada 🟡
@@ -1310,10 +1406,10 @@ server {
 
 **Próxima Auditoria**: CROSS_CUTTING_PERFORMANCE_AUDIT.md (última pendente)
 
-**Data de Conclusão**: 21/01/2026 05:30 UTC-3
-**Status**: ✅ AUDITORIA CONCLUÍDA
+**Data de Conclusão**: 21/01/2026 05:30 UTC-3 **Status**: ✅ AUDITORIA CONCLUÍDA
 
 **Assinatura Digital**:
+
 - Auditor: AI Coding Agent (Claude Sonnet 4.5)
 - Commit: (aguardando implementações)
 - Arquivos Analisados: ~1,600 LOC críticas

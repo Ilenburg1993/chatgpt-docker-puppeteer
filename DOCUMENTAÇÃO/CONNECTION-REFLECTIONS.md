@@ -4,9 +4,11 @@ CAPÍTULO I — PRINCÍPIO DE SOBERANIA DE PROCESSOS
 
 1. Objeto do Contrato
 
-Este capítulo estabelece o Princípio de Soberania de Processos como fundamento estrutural do sistema.
+Este capítulo estabelece o Princípio de Soberania de Processos como fundamento estrutural do
+sistema.
 
-Seu objetivo é definir, de forma normativa e não ambígua, quem possui autoridade sobre o ciclo de vida de cada processo, eliminando:
+Seu objetivo é definir, de forma normativa e não ambígua, quem possui autoridade sobre o ciclo de
+vida de cada processo, eliminando:
 
 shutdowns implícitos
 
@@ -16,7 +18,8 @@ efeitos colaterais entre processos
 
 acoplamentos invisíveis de runtime
 
-Este contrato é obrigatório para todos os processos do sistema (Maestro, Server, Worker, Drivers, etc.).
+Este contrato é obrigatório para todos os processos do sistema (Maestro, Server, Worker, Drivers,
+etc.).
 
 2. Definição Fundamental
 
@@ -242,7 +245,8 @@ Este princípio é fundacional.
 
 Todos os capítulos seguintes assumem que:
 
-Nenhuma coordenação, comunicação ou boot sequence pode violar a soberania de processos aqui definida.
+Nenhuma coordenação, comunicação ou boot sequence pode violar a soberania de processos aqui
+definida.
 
 ---
 
@@ -256,7 +260,8 @@ Este capítulo estabelece o Contrato de Comunicação Única, definindo o NERV c
 
 o único substrato legítimo de comunicação entre processos, subsistemas e camadas do sistema.
 
-Seu objetivo é eliminar completamente IPC ad-hoc, comunicação implícita e acoplamentos laterais, garantindo:
+Seu objetivo é eliminar completamente IPC ad-hoc, comunicação implícita e acoplamentos laterais,
+garantindo:
 
 rastreabilidade total
 
@@ -410,11 +415,9 @@ marcado como deprecated
 
 com caminho de remoção definido
 
-Exemplo típico:
-arquivo de estado legado enquanto migração está em curso.
+Exemplo típico: arquivo de estado legado enquanto migração está em curso.
 
-7. Descoberta e Readiness
-7.1 Regra Canônica
+7. Descoberta e Readiness 7.1 Regra Canônica
 
 Readiness é um evento, não um arquivo.
 
@@ -460,8 +463,7 @@ Comunicação é assíncrona por EVENT
 
 Coordenação ocorre por policy, não por timing
 
-9. Sincronia vs Assincronia
-Regra Canônica
+9. Sincronia vs Assincronia Regra Canônica
 
 NERV é semanticamente assíncrono, mesmo quando o transporte for síncrono.
 
@@ -513,8 +515,7 @@ testes determinísticos
 
 menor custo cognitivo global
 
-12. Erros Arquiteturais vs Erros Operacionais
-Erro Arquitetural
+12. Erros Arquiteturais vs Erros Operacionais Erro Arquitetural
 
 Comunicação fora do NERV
 
@@ -560,7 +561,8 @@ CAPÍTULO III — CONTRATO DE BOOT DETERMINÍSTICO E DEGRADAÇÃO CONTROLADA
 
 1. Objeto do Contrato
 
-Este capítulo define as regras soberanas de inicialização (boot) do sistema e de seus subsistemas, estabelecendo:
+Este capítulo define as regras soberanas de inicialização (boot) do sistema e de seus subsistemas,
+estabelecendo:
 
 determinismo estrutural
 
@@ -572,12 +574,12 @@ degradação controlada como estado legítimo
 
 eliminação de deadlocks de boot
 
-O objetivo é garantir que o sistema possa iniciar, operar parcialmente e evoluir de estado sem colapsar, independentemente da ordem de subida dos processos.
+O objetivo é garantir que o sistema possa iniciar, operar parcialmente e evoluir de estado sem
+colapsar, independentemente da ordem de subida dos processos.
 
 2. Princípio Fundamental
 
-Boot não é sincronização.
-Boot é declaração de estado.
+Boot não é sincronização. Boot é declaração de estado.
 
 Nenhum subsistema pode assumir:
 
@@ -619,9 +621,7 @@ Publica evento de readiness
 
 Exemplo:
 
-EVENT: KERNEL_READY
-EVENT: SERVER_READY
-EVENT: BROWSER_POOL_READY
+EVENT: KERNEL_READY EVENT: SERVER_READY EVENT: BROWSER_POOL_READY
 
 3.4 DEGRADED
 
@@ -667,13 +667,8 @@ conter metadata suficiente para consumo tardio
 
 não assumir ouvintes ativos no momento da emissão
 
-Exemplo mínimo de payload:
-{
-  "role": "server",
-  "status": "ready",
-  "capabilities": ["http", "socket"],
-  "authority": true
-}
+Exemplo mínimo de payload: { "role": "server", "status": "ready", "capabilities": ["http",
+"socket"], "authority": true }
 
 6. Consumo de Readiness
 
@@ -693,8 +688,7 @@ travar thread aguardando evento
 
 assumir que readiness ocorrerá
 
-7. Degradação Controlada
-7.1 Definição
+7. Degradação Controlada 7.1 Definição
 
 Degradação é um estado operacional explícito, não um erro.
 
@@ -768,8 +762,7 @@ SERVER reinicia sem derrubar KERNEL
 
 Browser Pool reaparece dinamicamente
 
-11. Boot e Autoridade
-Regra Canônica
+11. Boot e Autoridade Regra Canônica
 
 Autoridade é declarada, nunca inferida.
 
@@ -875,12 +868,12 @@ regras de exposição, forwarding e binding
 
 proibições explícitas de acoplamento indevido
 
-O objetivo é garantir que a topologia de rede seja explícita, auditável e não ambígua, independentemente do ambiente (bare metal, Docker, Dev Container, VS Code, CI).
+O objetivo é garantir que a topologia de rede seja explícita, auditável e não ambígua,
+independentemente do ambiente (bare metal, Docker, Dev Container, VS Code, CI).
 
 2. Princípio Fundamental
 
-Portas não são detalhes de implementação.
-Portas são contratos.
+Portas não são detalhes de implementação. Portas são contratos.
 
 Toda porta aberta ou acessível constitui:
 
@@ -892,8 +885,7 @@ uma promessa de estabilidade semântica
 
 Logo, nenhuma porta pode existir sem contrato explícito.
 
-3. Definição de Fronteira
-3.1 Fronteira Externa
+3. Definição de Fronteira 3.1 Fronteira Externa
 
 Define-se como fronteira externa qualquer ponto pelo qual:
 
@@ -945,8 +937,7 @@ O sistema adota arquitetura por planos, cada um com regras próprias.
 
 4.1 Plano de Interface Humana (UI)
 
-Finalidade: interação humana direta
-Características:
+Finalidade: interação humana direta Características:
 
 HTTP
 
@@ -958,10 +949,7 @@ consoles visuais
 
 Portas típicas:
 
-3000 — Dashboard principal
-3001 — Playground / DEV
-3002 — Operações / observabilidade
-
+3000 — Dashboard principal 3001 — Playground / DEV 3002 — Operações / observabilidade
 
 Regras:
 
@@ -975,8 +963,7 @@ nunca devem ser usadas por automação interna
 
 4.2 Plano de Execução / API
 
-Finalidade: controle funcional do sistema
-Características:
+Finalidade: controle funcional do sistema Características:
 
 APIs REST
 
@@ -990,7 +977,6 @@ Porta canônica:
 
 3008 — API / Execução
 
-
 Regras:
 
 pode ser usada por clientes externos
@@ -1001,8 +987,7 @@ exige versionamento e compatibilidade
 
 4.3 Plano de Observabilidade
 
-Finalidade: introspecção técnica
-Características:
+Finalidade: introspecção técnica Características:
 
 métricas
 
@@ -1016,7 +1001,6 @@ Porta canônica:
 
 9100 — Métricas / Health
 
-
 Regras:
 
 leitura preferencialmente
@@ -1027,8 +1011,7 @@ pode ser forwardada silenciosamente
 
 4.4 Plano de Debug (Opt-in)
 
-Finalidade: diagnóstico local
-Características:
+Finalidade: diagnóstico local Características:
 
 ferramentas de desenvolvimento
 
@@ -1038,9 +1021,7 @@ inspeção de runtime
 
 Portas típicas:
 
-9229 — Node.js inspect
-9230 — fallback debug
-
+9229 — Node.js inspect 9230 — fallback debug
 
 Regras:
 
@@ -1054,8 +1035,7 @@ jamais dependidas em produção
 
 4.5 Plano de Controle / Infraestrutura
 
-Finalidade: controle interno e coordenação técnica
-Características:
+Finalidade: controle interno e coordenação técnica Características:
 
 não humanas
 
@@ -1067,8 +1047,7 @@ Faixa reservada:
 
 9221–9224
 
-5. O Caso Canônico: Porta 9224
-5.1 Definição
+5. O Caso Canônico: Porta 9224 5.1 Definição
 
 A porta 9224 é definida como:
 
@@ -1094,17 +1073,14 @@ façade de infraestrutura
 
 ponto de desacoplamento
 
-5.2 Distinção Crítica: 9222 vs 9224
-Porta	Significado
-9222	Porta física padrão do Chrome (volátil, local, insegura)
-9224	Porta lógica de contrato (proxyada, controlada, estável)
+5.2 Distinção Crítica: 9222 vs 9224 Porta Significado 9222 Porta física padrão do Chrome (volátil,
+local, insegura) 9224 Porta lógica de contrato (proxyada, controlada, estável)
 
 Regra absoluta:
 
 O sistema nunca depende de 9222.
 
-6. Porta Lógica vs Porta Física
-6.1 Porta Física
+6. Porta Lógica vs Porta Física 6.1 Porta Física
 
 depende do processo real
 
@@ -1138,12 +1114,9 @@ Toda porta de fronteira DEVE:
 
 escutar em 0.0.0.0
 
-
 É proibido:
 
-127.0.0.1
-localhost
-
+127.0.0.1 localhost
 
 quando o endpoint é consumido por:
 
@@ -1153,8 +1126,7 @@ processos externos
 
 múltiplos hosts
 
-8. Forwarding e Topologia
-8.1 Forwarding ≠ Arquitetura
+8. Forwarding e Topologia 8.1 Forwarding ≠ Arquitetura
 
 Port forwarding:
 
@@ -1180,11 +1152,8 @@ forwarding silencioso para portas sensíveis
 
 Exemplo canônico para 9224:
 
-"9224": {
-  "label": "Browser Endpoint — Contract Boundary",
-  "onAutoForward": "silent",
-  "requireLocalPort": true
-}
+"9224": { "label": "Browser Endpoint — Contract Boundary", "onAutoForward": "silent",
+"requireLocalPort": true }
 
 9. Proibições Arquiteturais
 
@@ -1312,7 +1281,6 @@ Toda dependência externa deve obedecer a:
 
 criação ≠ integração
 
-
 Ou seja:
 
 o sistema não depende da criação
@@ -1329,8 +1297,7 @@ Dependência indisponível
 
 Dependência aparece após o boot
 
-5. Chrome como Dependência Externa Canônica
-5.1 Status Arquitetural do Chrome
+5. Chrome como Dependência Externa Canônica 5.1 Status Arquitetural do Chrome
 
 Chrome é formalmente definido como:
 
@@ -1353,7 +1320,6 @@ Chrome nunca participa do boot soberano.
 A única forma válida de integração é:
 
 connect(browserEndpoint)
-
 
 Proibições explícitas:
 
@@ -1387,12 +1353,8 @@ Ele atua como:
 
 buffer ontológico entre o sistema e o mundo externo
 
-6.1 Estados Canônicos do Pool
-Estado	Significado
-full	Conexões ativas disponíveis
-degraded	Pool indisponível, sistema ativo
-recovering	Tentativa de reconexão
-unavailable	Dependência ausente
+6.1 Estados Canônicos do Pool Estado Significado full Conexões ativas disponíveis degraded Pool
+indisponível, sistema ativo recovering Tentativa de reconexão unavailable Dependência ausente
 
 Nenhum desses estados pode:
 
@@ -1402,8 +1364,7 @@ quebrar invariantes
 
 alterar contratos internos
 
-7. Boot Parcial como Estado Válido
-7.1 Definição
+7. Boot Parcial como Estado Válido 7.1 Definição
 
 Boot parcial é o estado em que:
 
@@ -1429,8 +1390,7 @@ logs indicam degradação
 
 reconexão pode ocorrer a qualquer momento
 
-8. Server como Dependência Opcional
-8.1 Modos Canônicos
+8. Server como Dependência Opcional 8.1 Modos Canônicos
 
 O server pode operar em:
 
@@ -1456,7 +1416,6 @@ A descoberta canônica ocorre via:
 
 NERV.EVENT.SERVER_READY
 
-
 IPC por arquivo:
 
 é permitido
@@ -1481,11 +1440,7 @@ condição de abandono
 
 Exemplo normativo:
 
-retry: exponencial
-maxRetries: N
-timeout: T ms
-onFailure: degrade
-
+retry: exponencial maxRetries: N timeout: T ms onFailure: degrade
 
 Nunca:
 
@@ -1573,14 +1528,14 @@ ADENDO CONTRATUAL — BINDING, ESCUTA E FRONTEIRAS DE REDE
 
 (Binding & Network Boundary Contract)
 
-Este adendo é parte integrante do Contrato Arquitetural v1.0 e tem precedência sobre convenções implícitas, defaults de frameworks e heurísticas de ambiente.
+Este adendo é parte integrante do Contrato Arquitetural v1.0 e tem precedência sobre convenções
+implícitas, defaults de frameworks e heurísticas de ambiente.
 
 1. O problema que o binding resolve
 
 Em sistemas distribuídos, não é a porta que define acessibilidade, mas:
 
 (interface de escuta) + (topologia de rede)
-
 
 Ou seja:
 
@@ -1598,7 +1553,8 @@ Logo, binding é um contrato de fronteira, não um detalhe técnico.
 
 Binding é definido como:
 
-O conjunto de regras que determinam em quais interfaces de rede um serviço escuta e, portanto, quem pode alcançá-lo.
+O conjunto de regras que determinam em quais interfaces de rede um serviço escuta e, portanto, quem
+pode alcançá-lo.
 
 No contexto deste sistema, binding não é opcional nem implícito.
 
@@ -1626,13 +1582,11 @@ assumir DNS mágico
 
 confiar em auto-forward implícito
 
-4. Justificativa técnica (não filosófica)
-4.1 Containers
+4. Justificativa técnica (não filosófica) 4.1 Containers
 
 Em ambiente containerizado:
 
 127.0.0.1 = namespace do container
-
 
 Logo:
 
@@ -1662,24 +1616,16 @@ ele precisa ser alcançável por múltiplas origens
 
 binding local quebra essa propriedade
 
-5. Binding no Contrato de Browser
-5.1 Regra Canônica
-browserEndpoint.url
-→ deve apontar para um serviço que escuta em 0.0.0.0
-
+5. Binding no Contrato de Browser 5.1 Regra Canônica browserEndpoint.url → deve apontar para um
+   serviço que escuta em 0.0.0.0
 
 Não importa se o Chrome “real” escuta em 127.0.0.1.
 
 O proxy é quem deve cumprir o contrato.
 
-5.2 Responsabilidade clara
-Componente	Responsabilidade
-Chrome real	Pode escutar em localhost
-Proxy DevTools	DEVE escutar em 0.0.0.0
-Sistema	Assume endpoint válido
-DevContainer	Decide forwarding
-VS Code	Meio de transporte
-6. Binding ≠ Forwarding
+5.2 Responsabilidade clara Componente Responsabilidade Chrome real Pode escutar em localhost Proxy
+DevTools DEVE escutar em 0.0.0.0 Sistema Assume endpoint válido DevContainer Decide forwarding VS
+Code Meio de transporte 6. Binding ≠ Forwarding
 
 É crucial separar:
 
@@ -1691,8 +1637,7 @@ Forwarding
 
 “Como o tráfego chega até lá”
 
-O contrato governa binding.
-O operador decide forwarding.
+O contrato governa binding. O operador decide forwarding.
 
 Misturar os dois leva a erros arquiteturais.
 
@@ -1701,19 +1646,18 @@ Misturar os dois leva a erros arquiteturais.
 Todo serviço de fronteira DEVE ser validável com:
 
 ss -lntp | grep 9224
-# ou
-netstat -an | grep 9224
 
+# ou
+
+netstat -an | grep 9224
 
 Resultado esperado:
 
 0.0.0.0:9224
 
-
 Qualquer outro resultado é violação contratual.
 
-8. Implicações diretas no Dev Container
-8.1 O que NÃO é responsabilidade do contrato
+8. Implicações diretas no Dev Container 8.1 O que NÃO é responsabilidade do contrato
 
 abrir browser
 
@@ -1759,9 +1703,7 @@ Todos são anti-contratos.
 
 A frase correta para este sistema é:
 
-Portas são contratos lógicos.
-Binding é soberania técnica.
-Forwarding é conveniência operacional.
+Portas são contratos lógicos. Binding é soberania técnica. Forwarding é conveniência operacional.
 
 Sem o binding explícito, o sistema é conceitualmente correto e operacionalmente frágil.
 

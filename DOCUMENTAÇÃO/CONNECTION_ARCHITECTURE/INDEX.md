@@ -1,8 +1,7 @@
 # 🏗️ Arquitetura de Conexão - Índice
 
-**Versão**: 3.0 Docker Desktop Edition
-**Data**: 01 de Fevereiro de 2026
-**Status**: ✅ Documentação Completa
+**Versão**: 3.0 Docker Desktop Edition **Data**: 01 de Fevereiro de 2026 **Status**: ✅ Documentação
+Completa
 
 ---
 
@@ -10,8 +9,8 @@
 
 ### 1. [README.md](./README.md) - Visão Geral e Fundamentos Teóricos
 
-**Para quem**: Desenvolvedores de todos os níveis
-**Conteúdo**: 13 seções cobrindo:
+**Para quem**: Desenvolvedores de todos os níveis **Conteúdo**: 13 seções cobrindo:
+
 - Explicação para iniciantes (analogia controle remoto + TV)
 - Decisões arquiteturais detalhadas
 - Diagramas de arquitetura completos
@@ -21,15 +20,14 @@
 - Trade-offs e limitações
 - Troubleshooting completo
 
-**Tempo de leitura**: ~45 minutos
-**Nível técnico**: Iniciante → Avançado
+**Tempo de leitura**: ~45 minutos **Nível técnico**: Iniciante → Avançado
 
 ---
 
 ### 2. [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md) - Guia Prático de Operação
 
-**Para quem**: Operadores, DevOps, desenvolvedores em onboarding
-**Conteúdo**:
+**Para quem**: Operadores, DevOps, desenvolvedores em onboarding **Conteúdo**:
+
 - Checklist de setup (Windows + Container)
 - Startup passo a passo (4 etapas)
 - 5 cenários de troubleshooting mais comuns
@@ -37,15 +35,15 @@
 - Debug avançado (tcpdump, wscat, logs)
 - Referências rápidas de comandos
 
-**Tempo de leitura**: ~30 minutos
-**Nível técnico**: Operacional (requer conhecimento básico de Docker)
+**Tempo de leitura**: ~30 minutos **Nível técnico**: Operacional (requer conhecimento básico de
+Docker)
 
 ---
 
 ### 3. [DECISION_TREE.md](./DECISION_TREE.md) - Árvore de Decisões e Diagramas
 
-**Para quem**: Arquitetos, líderes técnicos, auditores
-**Conteúdo**:
+**Para quem**: Arquitetos, líderes técnicos, auditores **Conteúdo**:
+
 - Árvore de decisão visual (por que cada escolha foi feita)
 - Matriz de comparação (Chrome container vs Windows, etc.)
 - Fluxograma de debugging
@@ -54,8 +52,7 @@
 - Glossário visual de conceitos-chave
 - Checklist de validação completa
 
-**Tempo de leitura**: ~20 minutos
-**Nível técnico**: Arquitetural (foco em decisões de design)
+**Tempo de leitura**: ~20 minutos **Nível técnico**: Arquitetural (foco em decisões de design)
 
 ---
 
@@ -64,6 +61,7 @@
 ### 👶 Iniciante (primeiro contato)
 
 **Ordem sugerida**:
+
 1. [README.md](./README.md) → **Seção "Para Iniciantes"** (analogia TV)
 2. [DECISION_TREE.md](./DECISION_TREE.md) → **Glossário Visual**
 3. [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md) → **Checklist de Setup**
@@ -75,6 +73,7 @@
 ### 💼 Operador/DevOps (já tem sistema rodando)
 
 **Ordem sugerida**:
+
 1. [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md) → **Troubleshooting Completo**
 2. [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md) → **Monitoramento e Logs**
 3. [README.md](./README.md) → **Troubleshooting (teoria)**
@@ -86,6 +85,7 @@
 ### 🏗️ Arquiteto/Tech Lead (design de sistema)
 
 **Ordem sugerida**:
+
 1. [DECISION_TREE.md](./DECISION_TREE.md) → **Árvore de Decisão**
 2. [README.md](./README.md) → **Decisões Arquiteturais**
 3. [README.md](./README.md) → **Trade-offs e Limitações**
@@ -98,6 +98,7 @@
 ### 🔬 Desenvolvedor (vai modificar código)
 
 **Ordem sugerida**:
+
 1. [README.md](./README.md) → **Arquitetura Completa** (diagramas)
 2. [README.md](./README.md) → **Componentes e Responsabilidades**
 3. [README.md](./README.md) → **Fluxo de Dados**
@@ -112,10 +113,13 @@
 
 ### Problemas de Conexão
 
-- **Erro "Connection refused"**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#cenário-1-connection-refused-ao-acessar-chrome)
-- **Host header error**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#cenário-2-host-header-error) + [README.md](./README.md#problema-1-host-header-validation)
+- **Erro "Connection refused"**:
+  [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#cenário-1-connection-refused-ao-acessar-chrome)
+- **Host header error**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#cenário-2-host-header-error) +
+  [README.md](./README.md#problema-1-host-header-validation)
 - **Proxy não inicia**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#cenário-3-proxy-não-inicia)
-- **WebSocket fecha**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#cenário-4-websocket-fecha-inesperadamente)
+- **WebSocket fecha**:
+  [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#cenário-4-websocket-fecha-inesperadamente)
 
 ### Arquitetura e Design
 
@@ -126,10 +130,12 @@
 
 ### Configuração e Setup
 
-- **Checklist completo**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#checklist-de-setup) + [DECISION_TREE.md](./DECISION_TREE.md#checklist-de-validação-completa)
+- **Checklist completo**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#checklist-de-setup) +
+  [DECISION_TREE.md](./DECISION_TREE.md#checklist-de-validação-completa)
 - **Variáveis de ambiente**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#variáveis-de-ambiente)
 - **Arquivos de configuração**: [README.md](./README.md#referências-técnicas)
-- **Startup passo a passo**: [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#startup-completo-passo-a-passo)
+- **Startup passo a passo**:
+  [PRACTICAL_GUIDE.md](./PRACTICAL_GUIDE.md#startup-completo-passo-a-passo)
 
 ### Monitoramento e Debug
 
@@ -140,7 +146,8 @@
 
 ### Conceitos Técnicos
 
-- **CDP (Chrome DevTools Protocol)**: [DECISION_TREE.md](./DECISION_TREE.md#glossário-visual) + [README.md](./README.md#referências-técnicas)
+- **CDP (Chrome DevTools Protocol)**: [DECISION_TREE.md](./DECISION_TREE.md#glossário-visual) +
+  [README.md](./README.md#referências-técnicas)
 - **Docker Desktop networking**: [README.md](./README.md#restrições-da-rede-docker-desktop)
 - **WebSocket tunneling**: [README.md](./README.md#fluxo-de-dados)
 - **Bind addresses (0.0.0.0 vs 127.0.0.1)**: [DECISION_TREE.md](./DECISION_TREE.md#glossário-visual)
@@ -201,16 +208,19 @@ TOTAL: 2,600+ linhas de documentação técnica
 Após ler a documentação, você deve conseguir responder:
 
 ### Nível Iniciante ⭐
+
 - [ ] Por que não podemos usar Chrome headless no container?
 - [ ] O que significa "0.0.0.0" em bind address?
 - [ ] Como validar se Chrome está rodando no Windows?
 
 ### Nível Intermediário ⭐⭐
+
 - [ ] Por que o proxy reescreve URLs de WebSocket?
 - [ ] Qual a diferença entre `host.docker.internal` e `localhost`?
 - [ ] Como debugar conexões WebSocket que fecham inesperadamente?
 
 ### Nível Avançado ⭐⭐⭐
+
 - [ ] Por que o proxy roda no container e não no Windows?
 - [ ] Quais são os trade-offs de latência vs manutenibilidade?
 - [ ] Como a arquitetura evoluiu da v1.0 para v3.0 e por quê?
@@ -222,12 +232,14 @@ Após ler a documentação, você deve conseguir responder:
 ## 🔄 Manutenção da Documentação
 
 **Quando atualizar**:
+
 - Mudança de versão de componente (Puppeteer, Chrome, etc.)
 - Novo cenário de troubleshooting descoberto
 - Mudança arquitetural (ex: v4.0)
 - Feedback de usuários/operadores
 
 **Como atualizar**:
+
 1. Editar documento relevante (README, PRACTICAL_GUIDE, ou DECISION_TREE)
 2. Atualizar "Última Atualização" no rodapé
 3. Se mudança significativa, incrementar versão (3.0 → 3.1)
@@ -240,12 +252,14 @@ Após ler a documentação, você deve conseguir responder:
 ## 📞 Suporte
 
 **Problemas não documentados**:
+
 1. Verificar [Issues do Puppeteer](https://github.com/puppeteer/puppeteer/issues)
 2. Consultar [Chrome DevTools Protocol Docs](https://chromedevtools.github.io/devtools-protocol/)
 3. Checar [Docker Desktop Networking Docs](https://docs.docker.com/desktop/networking/)
 4. Abrir issue no repositório do projeto
 
 **Contribuições**:
+
 - Novos cenários de troubleshooting são bem-vindos!
 - Pull requests com melhorias na documentação serão revisados
 - Sugestões de diagramas/exemplos: abrir issue com tag `documentation`
@@ -261,11 +275,10 @@ Após ler esta documentação:
 3. **Desenvolvedores**: Estude [Componentes](./README.md#componentes-e-responsabilidades)
 4. **Arquitetos**: Analise [Trade-offs](./README.md#trade-offs-e-limitações)
 
-**Dúvidas persistem?**
-Releia a seção específica no documento indicado. A documentação é modular e permite consultas rápidas.
+**Dúvidas persistem?** Releia a seção específica no documento indicado. A documentação é modular e
+permite consultas rápidas.
 
 ---
 
-**Última Atualização**: 01 de Fevereiro de 2026
-**Versão da Documentação**: 1.0
-**Cobertura**: 100% da arquitetura v3.0
+**Última Atualização**: 01 de Fevereiro de 2026 **Versão da Documentação**: 1.0 **Cobertura**: 100%
+da arquitetura v3.0

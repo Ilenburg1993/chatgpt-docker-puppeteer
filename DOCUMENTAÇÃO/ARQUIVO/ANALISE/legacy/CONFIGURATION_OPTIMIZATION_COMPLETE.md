@@ -45,9 +45,9 @@
 - **Antes**: Inline `node -e` (lento, limitado)
 - **Depois**: Script dedicado `scripts/healthcheck.js`
 - **Benefícios**:
-    - Mais rápido (pré-compilado)
-    - Extensível (fácil adicionar checks)
-    - Debugável (logs claros)
+  - Mais rápido (pré-compilado)
+  - Extensível (fácil adicionar checks)
+  - Debugável (logs claros)
 
 #### ✅ Named Volumes (Produção)
 
@@ -90,10 +90,10 @@ make ci-test         # Testes CI/CD
 
 - **Script**: `scripts/validate_config.js`
 - **Valida**:
-    - Arquivos JSON (config.json, dynamic_rules.json, package.json)
-    - Variáveis de ambiente (.env)
-    - Diretórios (fila, respostas, logs, profile)
-    - Entry point (index.js)
+  - Arquivos JSON (config.json, dynamic_rules.json, package.json)
+  - Variáveis de ambiente (.env)
+  - Diretórios (fila, respostas, logs, profile)
+  - Entry point (index.js)
 - **Uso**: `npm run validate`
 
 ---
@@ -106,20 +106,20 @@ make ci-test         # Testes CI/CD
 - **Grafana**: Integrado no `docker-compose.prod.yml`
 - **Ativação**: `make monitoring`
 - **Acesso**:
-    - Prometheus: http://localhost:9091
-    - Grafana: http://localhost:3001 (admin/admin)
+  - Prometheus: http://localhost:9091
+  - Grafana: http://localhost:3001 (admin/admin)
 
 #### ✅ Environment Template Completo
 
 - **Arquivo**: `.env.example` expandido com 100+ variáveis documentadas
 - **Categorias**:
-    - Application settings
-    - Chrome configuration
-    - Performance tuning
-    - Security
-    - Monitoring & telemetry
-    - Logging
-    - Advanced settings
+  - Application settings
+  - Chrome configuration
+  - Performance tuning
+  - Security
+  - Monitoring & telemetry
+  - Logging
+  - Advanced settings
 - **Criação automática**: `cp .env.example .env` ✅ Implementado
 
 #### ✅ Scripts Cross-Platform
@@ -201,34 +201,34 @@ make start-linux
 
 ```yaml
 deploy:
-    resources:
-        limits:
-            cpus: '1.5' # Puppeteer não é CPU-intensive
-            memory: 1G # Ajustar após 24-48h de monitoramento
-        reservations:
-            cpus: '0.5'
-            memory: 256M
+  resources:
+    limits:
+      cpus: '1.5' # Puppeteer não é CPU-intensive
+      memory: 1G # Ajustar após 24-48h de monitoramento
+    reservations:
+      cpus: '0.5'
+      memory: 256M
 ```
 
 ### Chrome Connection (Linux)
 
 ```yaml
 extra_hosts:
-    - 'host.docker.internal:host-gateway'
+  - 'host.docker.internal:host-gateway'
 
 environment:
-    - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
+  - CHROME_WS_ENDPOINT=ws://host.docker.internal:9224
 ```
 
 ### Logging (Produção)
 
 ```yaml
 logging:
-    driver: 'json-file'
-    options:
-        max-size: '10m'
-        max-file: '5'
-        compress: 'true'
+  driver: 'json-file'
+  options:
+    max-size: '10m'
+    max-file: '5'
+    compress: 'true'
 ```
 
 ---
@@ -402,6 +402,7 @@ docker-compose -f docker-compose.linux.yml up -d
 
 ---
 
-**🎊 Parabéns! Seu ambiente está otimizado para máxima compatibilidade, desempenho e flexibilidade.**
+**🎊 Parabéns! Seu ambiente está otimizado para máxima compatibilidade, desempenho e
+flexibilidade.**
 
 **Próximo comando**: `npm run validate && make build && make start`

@@ -1,19 +1,20 @@
 # TargetDriver.js v2.0 Audit Report
 
-**Data**: 2026-02-01
-**Arquivo**: `src/driver/core/TargetDriver.js`
-**Linhas Atuais**: 225
-**Versão Atual**: v1.1 (Protocol 11)
-**Objetivo**: Identificar bugs, melhorias e upgrade path para v2.0
+**Data**: 2026-02-01 **Arquivo**: `src/driver/core/TargetDriver.js` **Linhas Atuais**: 225 **Versão
+Atual**: v1.1 (Protocol 11) **Objetivo**: Identificar bugs, melhorias e upgrade path para v2.0
 
 ---
 
 ## 📊 Análise Executiva
 
 ### Responsabilidades
-TargetDriver é a **classe abstrata base** do sistema de drivers. Define o contrato de execução, gerencia a máquina de estados (5 estados), emite eventos padronizados (6 tipos) e fornece capabilities tracking.
+
+TargetDriver é a **classe abstrata base** do sistema de drivers. Define o contrato de execução,
+gerencia a máquina de estados (5 estados), emite eventos padronizados (6 tipos) e fornece
+capabilities tracking.
 
 ### Arquitetura Atual
+
 ```
 EventEmitter (Node.js)
   ↓ herda
@@ -25,6 +26,7 @@ ChatGPTDriver (implementação concreta)
 ```
 
 ### Pontos Críticos
+
 - **Estados**: 5 estados (IDLE, PREPARING, TYPING, WAITING, STALLED)
 - **Eventos**: 6 tipos (STATE_CHANGE, CAPABILITIES_CHANGED, DESTROYED, VITAL, WARNING, DEBUG)
 - **Métodos Abstratos**: 7 (devem ser implementados por subclasses)
@@ -37,9 +39,9 @@ ChatGPTDriver (implementação concreta)
 ## 🐛 BUGS IDENTIFICADOS (6 Total)
 
 ### BUG #1: setState Sem Validação de Transições (ALTO)
-**Linha**: 89 (`setState`)
-**Severidade**: ALTA
-**Sintoma**: setState permite transições inválidas (ex: IDLE → STALLED direto)
+
+**Linha**: 89 (`setState`) **Severidade**: ALTA **Sintoma**: setState permite transições inválidas
+(ex: IDLE → STALLED direto)
 
 ```javascript
 // PROBLEMA: Qualquer transição é permitida
@@ -57,6 +59,7 @@ setState(newState) {
 ```
 
 **Transições Inválidas Possíveis**:
+
 - IDLE → STALLED (deveria passar por PREPARING/TYPING)
 - TYPING → IDLE (sem passar por WAITING)
 - WAITING → PREPARING (ciclo impossível)
@@ -68,9 +71,9 @@ setState(newState) {
 ---
 
 ### BUG #2: Estado Não Sincronizado com AbortSignal (MÉDIO)
-**Linha**: 59 (`constructor`)
-**Severidade**: MÉDIA
-**Sintoma**: `this.signal` armazenado mas nunca observado para atualizar estado
+
+**Linha**: 59 (`constructor`) **Severidade**: MÉDIA **Sintoma**: `this.signal` armazenado mas nunca
+observado para atualizar estado
 
 ```javascript
 constructor(page, config, signal) {
@@ -89,9 +92,9 @@ constructor(page, config, signal) {
 ---
 
 ### BUG #3: getHealth Sem Métricas de Performance (BAIXO)
-**Linha**: 139 (`getHealth`)
-**Severidade**: BAIXA
-**Sintoma**: Health check retorna estado mas não métricas críticas
+
+**Linha**: 139 (`getHealth`) **Severidade**: BAIXA **Sintoma**: Health check retorna estado mas não
+métricas críticas
 
 ```javascript
 async getHealth() {
@@ -114,9 +117,9 @@ async getHealth() {
 ---
 
 ### BUG #4: Capabilities Sem Validação (BAIXO)
-**Linha**: 116 (`updateCapabilities`)
-**Severidade**: BAIXA
-**Sintoma**: `updateCapabilities` aceita qualquer objeto, sem schema validation
+
+**Linha**: 116 (`updateCapabilities`) **Severidade**: BAIXA **Sintoma**: `updateCapabilities` aceita
+qualquer objeto, sem schema validation
 
 ```javascript
 updateCapabilities(newCaps) {
@@ -133,9 +136,9 @@ updateCapabilities(newCaps) {
 ---
 
 ### BUG #5: Emit Override Sem Telemetria (BAIXO)
-**Linha**: 187 (`emit`)
-**Severidade**: BAIXA
-**Sintoma**: Override de `emit()` bloqueia após destroy mas não emite warning
+
+**Linha**: 187 (`emit`) **Severidade**: BAIXA **Sintoma**: Override de `emit()` bloqueia após
+destroy mas não emite warning
 
 ```javascript
 emit(event, ...args) {
@@ -153,9 +156,9 @@ emit(event, ...args) {
 ---
 
 ### BUG #6: Abstract Method Errors Genéricos (BAIXO)
-**Linha**: 161-177 (métodos abstratos)
-**Severidade**: BAIXA
-**Sintoma**: Mensagens de erro sem contexto de classe
+
+**Linha**: 161-177 (métodos abstratos) **Severidade**: BAIXA **Sintoma**: Mensagens de erro sem
+contexto de classe
 
 ```javascript
 async validatePage() {
@@ -173,10 +176,11 @@ async validatePage() {
 ## ✨ MELHORIAS IDENTIFICADAS (10 Total)
 
 ### MELHORIA #1: State Transition Matrix (ALTA PRIORIDADE)
-**Impacto**: Máquina de estados confiável
-**Esforço**: Médio
+
+**Impacto**: Máquina de estados confiável **Esforço**: Médio
 
 **Implementação**:
+
 ```javascript
 const STATE_TRANSITIONS = Object.freeze({
     [STATES.IDLE]: [STATES.PREPARING],
@@ -213,30 +217,36 @@ setState(newState) {
 ---
 
 ### MELHORIA #2: Telemetria de Estado Avançada (ALTA)
-**Impacto**: Debugging granular, performance tracking
-**Esforço**: Baixo
+
+**Impacto**: Debugging granular, performance tracking **Esforço**: Baixo
 
 **Eventos a Adicionar**:
+
 ```javascript
 // Ao entrar em estado (além de STATE_CHANGE)
 this._emitVital('STATE_ENTERED', { state: newState, from: oldState });
 
 // Ao sair de estado (antes de transição)
-this._emitVital('STATE_EXITING', { state: this._state, to: newState, duration: Date.now() - this.stateUpdated });
+this._emitVital('STATE_EXITING', {
+  state: this._state,
+  to: newState,
+  duration: Date.now() - this.stateUpdated,
+});
 
 // Timeout em estado
 if (stateAge > STATE_TIMEOUT_WARNING) {
-    this._emitVital('STATE_TIMEOUT_WARNING', { state: this._state, age: stateAge });
+  this._emitVital('STATE_TIMEOUT_WARNING', { state: this._state, age: stateAge });
 }
 ```
 
 ---
 
 ### MELHORIA #3: AbortSignal Integration (ALTA)
-**Impacto**: Cancelamento automático de estados
-**Esforço**: Baixo
+
+**Impacto**: Cancelamento automático de estados **Esforço**: Baixo
 
 **Implementação**:
+
 ```javascript
 constructor(page, config, signal) {
     super();
@@ -269,37 +279,37 @@ _handleAbort() {
 ---
 
 ### MELHORIA #4: Constants para Config (ALTA)
-**Impacto**: Configurabilidade
-**Esforço**: Baixo
+
+**Impacto**: Configurabilidade **Esforço**: Baixo
 
 ```javascript
 const TARGETDRIVER_CONFIG = Object.freeze({
-    // State Timeouts (ms)
-    STATE_TIMEOUT_WARNING_MS: 30000,     // 30s
-    STATE_TIMEOUT_ERROR_MS: 120000,      // 2min
+  // State Timeouts (ms)
+  STATE_TIMEOUT_WARNING_MS: 30000, // 30s
+  STATE_TIMEOUT_ERROR_MS: 120000, // 2min
 
-    // Health Check
-    HEALTH_CHECK_INTERVAL_MS: 5000,      // 5s
+  // Health Check
+  HEALTH_CHECK_INTERVAL_MS: 5000, // 5s
 
-    // Capabilities
-    DEFAULT_CAPABILITIES: {
-        text_generation: true,
-        image_generation: false,
-        file_upload: false,
-        context_reset: true,
-        streaming_events: false
-    },
+  // Capabilities
+  DEFAULT_CAPABILITIES: {
+    text_generation: true,
+    image_generation: false,
+    file_upload: false,
+    context_reset: true,
+    streaming_events: false,
+  },
 
-    // Memory
-    MAX_EVENT_LISTENERS: 50
+  // Memory
+  MAX_EVENT_LISTENERS: 50,
 });
 ```
 
 ---
 
 ### MELHORIA #5: Capabilities Schema Validation (MÉDIA)
-**Impacto**: Type safety
-**Esforço**: Baixo
+
+**Impacto**: Type safety **Esforço**: Baixo
 
 ```javascript
 const CAPABILITIES_SCHEMA = Object.freeze([
@@ -333,8 +343,8 @@ updateCapabilities(newCaps) {
 ---
 
 ### MELHORIA #6: Health Metrics Expandidos (MÉDIA)
-**Impacto**: Diagnóstico proativo
-**Esforço**: Baixo
+
+**Impacto**: Diagnóstico proativo **Esforço**: Baixo
 
 ```javascript
 async getHealth() {
@@ -367,8 +377,8 @@ async getHealth() {
 ---
 
 ### MELHORIA #7: State History Tracking (BAIXA)
-**Impacto**: Debugging de transições
-**Esforço**: Baixo
+
+**Impacto**: Debugging de transições **Esforço**: Baixo
 
 ```javascript
 constructor() {
@@ -402,8 +412,8 @@ getStateHistory() {
 ---
 
 ### MELHORIA #8: JSDoc Completo (BAIXA)
-**Impacto**: Developer experience
-**Esforço**: Baixo
+
+**Impacto**: Developer experience **Esforço**: Baixo
 
 ```javascript
 /**
@@ -433,8 +443,8 @@ class TargetDriver extends EventEmitter { ... }
 ---
 
 ### MELHORIA #9: Error Counter e Tracking (BAIXA)
-**Impacto**: Diagnóstico de falhas
-**Esforço**: Baixo
+
+**Impacto**: Diagnóstico de falhas **Esforço**: Baixo
 
 ```javascript
 constructor() {
@@ -469,8 +479,8 @@ getErrorStats() {
 ---
 
 ### MELHORIA #10: Readonly Properties (BAIXA)
-**Impacto**: Imutabilidade
-**Esforço**: Baixo
+
+**Impacto**: Imutabilidade **Esforço**: Baixo
 
 ```javascript
 constructor(page, config, signal) {
@@ -502,10 +512,12 @@ constructor(page, config, signal) {
 ## 📋 Checklist de Upgrade v2.0
 
 ### Fase 1: Bug Fixes Críticos (P0)
+
 - [ ] **BUG #1**: Implementar state transition matrix
 - [ ] **BUG #2**: Integrar AbortSignal listener
 
 ### Fase 2: Melhorias de Arquitetura (P1)
+
 - [ ] **MELHORIA #1**: State transition validation
 - [ ] **MELHORIA #2**: Telemetria de estado avançada
 - [ ] **MELHORIA #3**: AbortSignal integration completa
@@ -513,12 +525,14 @@ constructor(page, config, signal) {
 - [ ] **MELHORIA #5**: Capabilities schema validation
 
 ### Fase 3: Robustez e DX (P2)
+
 - [ ] **BUG #3**: Expandir getHealth com metrics
 - [ ] **BUG #4**: Validar capabilities schema
 - [ ] **MELHORIA #6**: Health metrics expandidos
 - [ ] **MELHORIA #7**: State history tracking
 
 ### Fase 4: Polish (P3)
+
 - [ ] **BUG #5**: Emit override com telemetria
 - [ ] **BUG #6**: Abstract method errors melhorados
 - [ ] **MELHORIA #8**: JSDoc completo
@@ -530,6 +544,7 @@ constructor(page, config, signal) {
 ## 📊 Métricas de Upgrade
 
 ### Antes (v1.1)
+
 - **Linhas**: 225
 - **Estados**: 5 (sem validação de transições)
 - **Eventos**: 6 tipos definidos, 2 emitidos
@@ -540,6 +555,7 @@ constructor(page, config, signal) {
 - **JSDoc**: Parcial
 
 ### Após (v2.0 Estimado)
+
 - **Linhas**: ~380 (+155, +69%)
 - **Estados**: 5 (com matriz de transições válidas)
 - **Eventos**: 6 tipos + 5 novos (STATE_ENTERED, STATE_EXITING, etc)
@@ -554,21 +570,25 @@ constructor(page, config, signal) {
 ## 🎯 Priorização de Trabalho
 
 ### Impacto Alto + Esforço Baixo (QUICK WINS)
+
 1. **MELHORIA #4**: Constants config (10 min)
 2. **MELHORIA #3**: AbortSignal listener (10 min)
 3. **BUG #6**: Abstract method errors (5 min)
 
 ### Impacto Alto + Esforço Médio (CORE WORK)
+
 1. **BUG #1 + MELHORIA #1**: State transition matrix (25 min)
 2. **MELHORIA #2**: Telemetria de estado (15 min)
 3. **MELHORIA #5**: Capabilities validation (15 min)
 
 ### Impacto Médio (ENHANCEMENT)
+
 1. **MELHORIA #6**: Health metrics (15 min)
 2. **BUG #3**: getHealth expandido (10 min)
 3. **MELHORIA #7**: State history (10 min)
 
 ### Impacto Baixo (POLISH)
+
 1. **BUG #4, #5**: Validation minor fixes (10 min)
 2. **MELHORIA #8, #9, #10**: DX improvements (20 min)
 
@@ -579,15 +599,18 @@ constructor(page, config, signal) {
 ## 🔗 Dependências de Upgrade
 
 ### Pré-requisitos
-✅ **BaseDriver.js v2.0** - COMPLETO (herda de TargetDriver)
-⏭️ **TargetDriver.js v2.0** - EM ANÁLISE (fundação)
+
+✅ **BaseDriver.js v2.0** - COMPLETO (herda de TargetDriver) ⏭️ **TargetDriver.js v2.0** - EM
+ANÁLISE (fundação)
 
 ### Impacta Diretamente
+
 - `BaseDriver.js` (herda de TargetDriver) - ✅ Já usa TargetDriver.STATES
 - `ChatGPTDriver.js` (herda de BaseDriver → TargetDriver)
 - `factory.js` (instancia drivers, usa EVENTS)
 
 ### Propagação
+
 - **State transitions**: Afeta TODA a hierarquia
 - **AbortSignal**: Sincroniza estado automaticamente
 - **Health metrics**: Melhora diagnóstico em todos os níveis
@@ -597,20 +620,22 @@ constructor(page, config, signal) {
 ## 📝 Notas de Implementação
 
 ### State Transition Matrix Pattern
+
 ```javascript
 // Validação ANTES de setState
 const validTransitions = {
-    IDLE: ['PREPARING'],
-    PREPARING: ['TYPING', 'IDLE'],
-    TYPING: ['WAITING', 'IDLE'],
-    WAITING: ['IDLE', 'STALLED'],
-    STALLED: ['IDLE']
+  IDLE: ['PREPARING'],
+  PREPARING: ['TYPING', 'IDLE'],
+  TYPING: ['WAITING', 'IDLE'],
+  WAITING: ['IDLE', 'STALLED'],
+  STALLED: ['IDLE'],
 };
 
 // Evita ciclos impossíveis e transições ilógicas
 ```
 
 ### AbortSignal Pattern
+
 ```javascript
 // Listener no constructor
 signal?.addEventListener('abort', () => {
@@ -626,6 +651,7 @@ _handleAbort() {
 ```
 
 ### Capabilities Validation Pattern
+
 ```javascript
 // Schema como lista de strings válidas
 const validKeys = ['text_generation', 'image_generation', ...];
@@ -645,6 +671,7 @@ for (const key of Object.keys(newCaps)) {
 **TargetDriver.js é funcional mas carece de validação robusta.**
 
 ### Pontos Fortes ✅
+
 - Classe abstrata bem definida
 - Máquina de estados clara (5 estados)
 - Eventos padronizados (6 tipos)
@@ -653,6 +680,7 @@ for (const key of Object.keys(newCaps)) {
 - Destroy implementado
 
 ### Gaps Críticos ❌
+
 - **Sem validação de transições**: Estados inconsistentes
 - **AbortSignal não observado**: Cancelamento manual
 - **Capabilities sem schema**: Typos silenciosos
@@ -661,7 +689,10 @@ for (const key of Object.keys(newCaps)) {
 - **Magic numbers**: Timeouts hardcoded
 
 ### Recomendação
-**Upgrade JUSTIFICADO** - TargetDriver é a **fundação de toda hierarquia de drivers**. Melhorias aqui propagam para:
+
+**Upgrade JUSTIFICADO** - TargetDriver é a **fundação de toda hierarquia de drivers**. Melhorias
+aqui propagam para:
+
 - BaseDriver (678 linhas)
 - ChatGPTDriver (implementação concreta)
 - Todos os futuros drivers (Gemini, Claude, etc)
@@ -675,18 +706,21 @@ for (const key of Object.keys(newCaps)) {
 ## 🚀 Impacto do Upgrade
 
 ### Benefícios Imediatos
+
 - ✅ **State machine confiável**: Sem transições inválidas
 - ✅ **Cancelamento automático**: AbortSignal integrado
 - ✅ **Debugging aprimorado**: State history + metrics
 - ✅ **Type safety**: Capabilities validadas
 
 ### Benefícios Propagados
+
 - ✅ **BaseDriver**: Herda state validation
 - ✅ **ChatGPTDriver**: Herda AbortSignal handling
 - ✅ **Factory**: Health checks mais precisos
 - ✅ **Dashboard**: Métricas de estado em tempo real
 
 ### ROI
+
 - **Esforço**: 2.5h desenvolvimento
 - **Retorno**: Validação em TODA hierarquia (3+ classes, 900+ linhas)
 - **Multiplicador**: 1 → N drivers (ChatGPT, Gemini, Claude, etc)
@@ -695,6 +729,5 @@ for (const key of Object.keys(newCaps)) {
 
 **Status**: ✅ **AUDIT COMPLETO - PRONTO PARA IMPLEMENTAÇÃO**
 
-**Arquitetura**: Fundação do sistema de drivers (classe abstrata)
-**Complexidade**: Média-Alta (state machine + events + abstract contract)
-**Impacto**: Altíssimo (propaga para toda hierarquia)
+**Arquitetura**: Fundação do sistema de drivers (classe abstrata) **Complexidade**: Média-Alta
+(state machine + events + abstract contract) **Impacto**: Altíssimo (propaga para toda hierarquia)

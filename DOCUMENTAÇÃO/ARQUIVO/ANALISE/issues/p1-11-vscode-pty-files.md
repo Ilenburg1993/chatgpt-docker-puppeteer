@@ -10,5 +10,4 @@ Recommended actions:
 1. Inspect the pty files for secrets and sanitize.
 2. Add pty files directories to scanning exclusions.
 
-Owner: @owner-placeholder
-Labels: security, P1, logs
+Owner: @owner-placeholder Labels: security, P1, logs

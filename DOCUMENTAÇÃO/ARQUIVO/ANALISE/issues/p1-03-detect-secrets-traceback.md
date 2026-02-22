@@ -11,5 +11,4 @@ Recommended actions:
 1. Review baseline content and remove runtime trace artifacts from baseline.
 2. Recreate baseline after cleaning environment.
 
-Owner: @owner-placeholder
-Labels: security, P1, detect-secrets
+Owner: @owner-placeholder Labels: security, P1, detect-secrets

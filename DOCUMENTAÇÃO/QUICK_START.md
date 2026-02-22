@@ -86,12 +86,12 @@ Open http://localhost:3008 in your browser
 
 ```json
 {
-    "id": "task-001",
-    "target": "chatgpt",
-    "prompt": "Hello, how are you?",
-    "validation": {
-        "minLength": 10
-    }
+  "id": "task-001",
+  "target": "chatgpt",
+  "prompt": "Hello, how are you?",
+  "validation": {
+    "minLength": 10
+  }
 }
 ```
 
@@ -198,10 +198,10 @@ make shell             # Container shell access
 
 ```json
 {
-    "target": "chatgpt",
-    "maxRetries": 3,
-    "timeout": 30000,
-    "logLevel": "info"
+  "target": "chatgpt",
+  "maxRetries": 3,
+  "timeout": 30000,
+  "logLevel": "info"
 }
 ```
 
@@ -266,7 +266,8 @@ npm run daemon:restart
 2. ✅ Review [Architecture Guide](DOCUMENTAÇÃO/ARCHITECTURE.md)
 3. ✅ Check [Configuration Guide](DOCUMENTAÇÃO/CONFIGURATION.md)
 4. ✅ See [Docker Setup](DOCKER_SETUP.md) for containerization
-5. ✅ Join discussions on [GitHub](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/discussions)
+5. ✅ Join discussions on
+   [GitHub](https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/discussions)
 
 ---
 

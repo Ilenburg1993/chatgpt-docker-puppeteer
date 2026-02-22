@@ -1,10 +1,12 @@
 # CHECKLIST 03: Cobertura Total de `@ts-check` no Backend
 
 Objetivo
+
 - Garantir que TODO o backend/core esteja sob verificacao consistente.
 - Eliminar `@ts-nocheck` (exceto casos muito justificados e temporarios).
 
 Checklist
+
 - [ ] Adicionar `// @ts-check` nos arquivos que faltam no backend.
 - [ ] Eliminar `// @ts-nocheck` em `src/main.js`.
 - [ ] Se `src/main.js` for grande/dinamico demais:
@@ -13,6 +15,7 @@ Checklist
 - [ ] Rodar `npm run typecheck` e corrigir os erros.
 
 Lista de arquivos (backend) que tipicamente faltam `@ts-check` hoje
+
 - [ ] `src/core/forensics.js`
 - [ ] `src/core/validators/prerequisite_validator.js`
 - [ ] `src/driver/extractors/structured_extractor.js`
@@ -33,12 +36,17 @@ Lista de arquivos (backend) que tipicamente faltam `@ts-check` hoje
 - [ ] `src/shared/sadi/analyzer.js`
 
 Definição de Pronto (DoD)
+
 - Zero ocorrencias de `@ts-nocheck` no backend.
-- Todos os arquivos de `src/` (exceto `src/dashboard-ui`) estao sob `@ts-check` ou sao cobertos pelo gate (`checkJs: true` no tsconfig.typecheck).
+- Todos os arquivos de `src/` (exceto `src/dashboard-ui`) estao sob `@ts-check` ou sao cobertos pelo
+  gate (`checkJs: true` no tsconfig.typecheck).
 - `npm run typecheck` verde.
 
 Riscos comuns
-- `@ts-check` revela dependencias implicitas e APIs dinamicas. Solucao preferida: tipar fronteiras com `unknown` e validar.
+
+- `@ts-check` revela dependencias implicitas e APIs dinamicas. Solucao preferida: tipar fronteiras
+  com `unknown` e validar.
 
 ---
+
 Arquivo gerado automaticamente por solicitação. Não farei commit/push sem sua autorização.

@@ -1,14 +1,15 @@
 # Developer Workflow Guide
 
-**Última atualização:** 22/01/2026
-**Versão:** 1.1 (module-alias migration)
-**Makefile:** v2.4 (573 linhas, 49+ targets)
+**Última atualização:** 22/01/2026 **Versão:** 1.1 (module-alias migration) **Makefile:** v2.4 (573
+linhas, 49+ targets)
 
 ## 📋 Filosofia: Makefile como Interface Única
 
-O **Makefile v2.4** é a interface centralizada para todas operações de desenvolvimento. Em vez de memorizar comandos npm, scripts bash, ou comandos Docker, use `make <target>`.
+O **Makefile v2.4** é a interface centralizada para todas operações de desenvolvimento. Em vez de
+memorizar comandos npm, scripts bash, ou comandos Docker, use `make <target>`.
 
 ### Benefícios
+
 - ✅ **Cross-platform**: Mesmos comandos em Windows/Linux/macOS
 - ✅ **Padronizado**: Uma forma consistente de fazer cada tarefa
 - ✅ **Documentado**: `make help` sempre disponível
@@ -21,7 +22,8 @@ O **Makefile v2.4** é a interface centralizada para todas operações de desenv
 
 ### ⚠️ IMPORTANTE: Use Aliases, Não Caminhos Relativos
 
-Este projeto migrou para **module-alias** (v2.2.3) em 22/01/2026. SEMPRE use aliases ao invés de `../../../`:
+Este projeto migrou para **module-alias** (v2.2.3) em 22/01/2026. SEMPRE use aliases ao invés de
+`../../../`:
 
 ```javascript
 // ❌ ERRADO (caminhos relativos - DEPRECATED)
@@ -52,6 +54,7 @@ const { ActorRole } = require('@shared/nerv/constants');
 ### 🎯 Como Escolher o Alias Certo
 
 **1. Config, Logger, Constants → `@core`**
+
 ```javascript
 const CONFIG = require('@core/config');
 const { log } = require('@core/logger');
@@ -59,6 +62,7 @@ const { STATUS_VALUES } = require('@core/constants/tasks');
 ```
 
 **2. Browser, Queue, Storage → `@infra`**
+
 ```javascript
 const io = require('@infra/io');
 const pool = require('@infra/pool/pool_manager');
@@ -66,12 +70,14 @@ const locks = require('@infra/locks/lock_manager');
 ```
 
 **3. NERV Events, IPC → `@shared` ou `@nerv`**
+
 ```javascript
 const { ActorRole, MessageType } = require('@shared/nerv/constants');
 const emitter = require('@nerv/emitter');
 ```
 
 **4. API, Dashboard → `@server`**
+
 ```javascript
 const socket = require('@server/engine/socket');
 const routes = require('@server/api/routes');
@@ -130,6 +136,7 @@ make logs
 ## 🔧 Development Loop (Durante o trabalho)
 
 ### Modo Development (com nodemon)
+
 ```bash
 # Inicia com hot-reload
 make dev
@@ -139,6 +146,7 @@ make queue-watch
 ```
 
 ### Fazer mudanças no código
+
 ```bash
 # 1. Editar arquivos
 
@@ -155,6 +163,7 @@ make test-all
 ```
 
 ### Verificar qualidade do código
+
 ```bash
 # Lint apenas (sem fixes)
 make lint
@@ -171,6 +180,7 @@ make format-code
 ## 🧪 Testing Strategy
 
 ### Testes Rápidos (desenvolvimento)
+
 ```bash
 # Teste de integração do Launcher
 make test-integration
@@ -183,6 +193,7 @@ node tests/test_config_validation.js
 ```
 
 ### Testes Completos (antes de commit)
+
 ```bash
 # Todos os testes
 make test-all
@@ -192,6 +203,7 @@ make full-check
 ```
 
 ### CI/CD Tests
+
 ```bash
 # Simular pipeline CI
 make ci-test
@@ -205,6 +217,7 @@ make ci-lint
 ## 📝 Commit & Push Workflow
 
 ### Fluxo Padrão
+
 ```bash
 # 1. Ver mudanças detalhadas
 make git-changed
@@ -226,6 +239,7 @@ git push
 ```
 
 ### Fluxo Seguro (com gate checks)
+
 ```bash
 # Push com lint + test + push automático
 make git-push-safe
@@ -239,6 +253,7 @@ make git-push-safe
 ```
 
 ### Commit de configurações do VS Code
+
 ```bash
 # Commit automático de .vscode/ com mensagem detalhada
 make commit-settings
@@ -249,6 +264,7 @@ make commit-settings
 ## 🛠️ Maintenance Tasks
 
 ### Atualizar dependências
+
 ```bash
 # Ver pacotes outdated
 make update-deps
@@ -262,6 +278,7 @@ make check-deps
 ```
 
 ### Limpeza
+
 ```bash
 # Limpeza básica (logs, tmp, queue)
 make clean
@@ -271,6 +288,7 @@ make workspace-clean
 ```
 
 ### Backup
+
 ```bash
 # Backup de dados (fila, respostas, perfis)
 make backup
@@ -281,6 +299,7 @@ make backup
 ## 🐛 Debugging & Diagnostics
 
 ### Ver logs
+
 ```bash
 # Logs do PM2 (follow)
 make logs
@@ -296,6 +315,7 @@ make watch
 ```
 
 ### Diagnóstico
+
 ```bash
 # Relatório completo de diagnóstico
 make diagnose
@@ -313,6 +333,7 @@ make pm2-monit
 ```
 
 ### Debug de problemas
+
 ```bash
 # 1. Ver estado atual
 make info
@@ -357,6 +378,7 @@ make status
 ## ⚡ Shortcuts Essenciais
 
 ### Comandos de 1 letra
+
 ```bash
 make s   # start
 make st  # stop
@@ -374,6 +396,7 @@ make g   # git-changed
 ```
 
 ### Quick Operations
+
 ```bash
 make quick CMD=pause     # Pausar sistema
 make quick CMD=resume    # Resume sistema
@@ -387,6 +410,7 @@ make quick CMD=backup    # Backup rápido
 ## 🎯 VS Code Integration
 
 ### Verificar configurações
+
 ```bash
 # Estatísticas do settings.json
 make vscode-info
@@ -398,6 +422,7 @@ make vscode-info
 ```
 
 ### Recarregar VS Code
+
 ```bash
 # Ver instruções de reload
 make reload-vscode
@@ -407,6 +432,7 @@ make reload-vscode
 ```
 
 ### Features do VS Code otimizadas
+
 - **Copilot**: length 1000 (2x context), temperature 0.2
 - **Inlay Hints**: Literals + return types (toggle: Ctrl+Shift+P)
 - **Terminal**: Autocomplete + persistent sessions + 1000 history
@@ -419,6 +445,7 @@ make reload-vscode
 ## 🔄 Recovery Scenarios
 
 ### Sistema não inicia
+
 ```bash
 # 1. Verificar dependências
 make check-deps
@@ -437,6 +464,7 @@ make health
 ```
 
 ### Testes falhando
+
 ```bash
 # 1. Verificar ambiente
 make info
@@ -452,6 +480,7 @@ make test-all
 ```
 
 ### Conflitos de Git
+
 ```bash
 # 1. Ver mudanças
 make git-changed
@@ -470,6 +499,7 @@ make test-integration
 ## 📊 Monitoring & Queue
 
 ### Monitorar queue
+
 ```bash
 # Status estático
 make queue
@@ -482,6 +512,7 @@ make queue-add
 ```
 
 ### Dashboard HTML
+
 ```bash
 # Abrir dashboard no browser
 make dashboard
@@ -490,6 +521,7 @@ make dashboard
 ```
 
 ### Launcher interativo
+
 ```bash
 # Menu interativo (Windows + Linux)
 make launcher
@@ -541,6 +573,7 @@ make docker-clean
 ## ✅ Best Practices Checklist
 
 ### Antes de cada commit
+
 - [ ] `make format-code` - Formatar código
 - [ ] `make lint` - Verificar lint
 - [ ] `make test-integration` - Rodar testes
@@ -548,14 +581,17 @@ make docker-clean
 - [ ] `git add` + `git commit` - Commit com mensagem clara
 
 ### Antes de cada push
+
 - [ ] `make test-all` - Todos os testes
 - [ ] `make health` - Health checks
 - [ ] `git push` - Push para remote
 
 ### Ou simplesmente
+
 - [ ] `make git-push-safe` - Faz tudo automaticamente
 
 ### Daily
+
 - [ ] `make start` - Iniciar sistema
 - [ ] `make health` - Verificar saúde
 - [ ] `make backup` - Backup ao final do dia
@@ -566,35 +602,43 @@ make docker-clean
 ## 🎓 Tips & Tricks
 
 ### 1. Múltiplos terminais
+
 - Terminal 1: `make dev` (nodemon)
 - Terminal 2: `make queue-watch` (monitoramento)
 - Terminal 3: Comandos ad-hoc
 
 ### 2. VS Code Tasks
+
 Todos os npm scripts estão disponíveis como VS Code tasks (`.vscode/tasks.json`):
+
 - `Ctrl+Shift+B` → Build tasks
 - `Ctrl+Shift+P` → Run Task
 
 ### 3. Git aliases (opcional)
+
 ```bash
 git config alias.changed "!make git-changed"
 git config alias.pushsafe "!make git-push-safe"
 ```
 
 Agora pode usar:
+
 ```bash
 git changed     # = make git-changed
 git pushsafe    # = make git-push-safe
 ```
 
 ### 4. VS Code keyboard shortcuts
+
 - `Ctrl+Shift+P` → Command Palette
 - `Ctrl+` ` → Toggle terminal
 - `Ctrl+K Ctrl+0` → Fold all
 - `Ctrl+K Ctrl+J` → Unfold all
 
 ### 5. PM2 ecosystem
+
 Configuração em `ecosystem.config.js`:
+
 - Memoria: 512MB max
 - Restart: sempre
 - Watch: false (use `make dev` para watch)
@@ -602,7 +646,5 @@ Configuração em `ecosystem.config.js`:
 
 ---
 
-**Última revisão:** 21/01/2026
-**Contribuidores:** AI Coding Agent + User
-**Versão do guia:** 1.0
+**Última revisão:** 21/01/2026 **Contribuidores:** AI Coding Agent + User **Versão do guia:** 1.0
 **Status:** ✅ Production-ready

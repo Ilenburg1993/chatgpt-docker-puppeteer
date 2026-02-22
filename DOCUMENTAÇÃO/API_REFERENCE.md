@@ -1,19 +1,17 @@
 # 🌐 Referência de API
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Desenvolvedores, integradores
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Desenvolvedores, integradores
 **Tempo de Leitura**: ~35 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento detalha **todos os endpoints REST e eventos WebSocket** do sistema `chatgpt-docker-puppeteer`, incluindo schemas, autenticação, rate limiting, e exemplos de uso.
+Este documento detalha **todos os endpoints REST e eventos WebSocket** do sistema
+`chatgpt-docker-puppeteer`, incluindo schemas, autenticação, rate limiting, e exemplos de uso.
 
-**Base URL**: `http://localhost:3008`
-**Protocol**: HTTP/1.1 + WebSocket
-**Content-Type**: `application/json`
+**Base URL**: `http://localhost:3008` **Protocol**: HTTP/1.1 + WebSocket **Content-Type**:
+`application/json`
 
 ---
 
@@ -49,6 +47,7 @@ curl -H "Authorization: Bearer my-secret" http://localhost:3008/api/health
 **Default**: 100 requests / 60 segundos (por IP)
 
 **Headers de Resposta**:
+
 ```http
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 95
@@ -56,6 +55,7 @@ X-RateLimit-Reset: 1737469350
 ```
 
 **Response 429 (Too Many Requests)**:
+
 ```json
 {
   "error": "Rate limit exceeded",
@@ -74,11 +74,13 @@ X-RateLimit-Reset: 1737469350
 **Auth**: Opcional
 
 **Request**:
+
 ```bash
 curl http://localhost:3008/api/health
 ```
 
 **Response 200**:
+
 ```json
 {
   "status": "ok",
@@ -95,6 +97,7 @@ curl http://localhost:3008/api/health
 ```
 
 **Response Schema (Zod)**:
+
 ```typescript
 {
   status: 'ok' | 'degraded' | 'offline',
@@ -111,6 +114,7 @@ curl http://localhost:3008/api/health
 ```
 
 **Status Codes**:
+
 - `200`: Sistema saudável
 - `503`: Sistema degradado/offline
 
@@ -123,12 +127,14 @@ curl http://localhost:3008/api/health
 **Auth**: Obrigatória
 
 **Request**:
+
 ```bash
 curl -H "Authorization: Bearer secret" \
   http://localhost:3008/api/health-metrics
 ```
 
 **Response 200**:
+
 ```json
 {
   "heap": {
@@ -160,6 +166,7 @@ curl -H "Authorization: Bearer secret" \
 ```
 
 **Schema**:
+
 ```typescript
 {
   heap: {
@@ -199,12 +206,14 @@ curl -H "Authorization: Bearer secret" \
 **Auth**: Obrigatória
 
 **Request**:
+
 ```bash
 curl -H "Authorization: Bearer secret" \
   http://localhost:3008/api/metrics
 ```
 
 **Response 200**:
+
 ```json
 {
   "cache": {
@@ -259,11 +268,13 @@ curl -H "Authorization: Bearer secret" \
 **Auth**: Opcional
 
 **Request**:
+
 ```bash
 curl http://localhost:3008/api/queue
 ```
 
 **Response 200**:
+
 ```json
 {
   "queue": [
@@ -296,6 +307,7 @@ curl http://localhost:3008/api/queue
 ```
 
 **Query Parameters**:
+
 - `?state=PENDING` - Filtrar por estado
 - `?target=chatgpt` - Filtrar por target
 - `?limit=10` - Limitar resultados
@@ -309,6 +321,7 @@ curl http://localhost:3008/api/queue
 **Auth**: Obrigatória
 
 **Request**:
+
 ```bash
 curl -X POST \
   -H "Authorization: Bearer secret" \
@@ -328,6 +341,7 @@ curl -X POST \
 ```
 
 **Request Body Schema**:
+
 ```typescript
 {
   target: 'chatgpt' | 'gemini',  // Required
@@ -343,6 +357,7 @@ curl -X POST \
 ```
 
 **Response 201**:
+
 ```json
 {
   "taskId": "task-a3f9c2b1",
@@ -354,6 +369,7 @@ curl -X POST \
 ```
 
 **Response 400 (Validation Error)**:
+
 ```json
 {
   "error": "Validation failed",
@@ -364,6 +380,7 @@ curl -X POST \
 ```
 
 **Response 429 (Rate Limit)**:
+
 ```json
 {
   "error": "Rate limit exceeded",
@@ -380,11 +397,13 @@ curl -X POST \
 **Auth**: Opcional
 
 **Request**:
+
 ```bash
 curl http://localhost:3008/api/task/task-abc123
 ```
 
 **Response 200**:
+
 ```json
 {
   "id": "task-abc123",
@@ -402,6 +421,7 @@ curl http://localhost:3008/api/task/task-abc123
 ```
 
 **Response 404**:
+
 ```json
 {
   "error": "Task not found",
@@ -418,6 +438,7 @@ curl http://localhost:3008/api/task/task-abc123
 **Auth**: Obrigatória
 
 **Request**:
+
 ```bash
 curl -X POST \
   -H "Authorization: Bearer secret" \
@@ -425,6 +446,7 @@ curl -X POST \
 ```
 
 **Response 200**:
+
 ```json
 {
   "taskId": "task-abc123",
@@ -435,6 +457,7 @@ curl -X POST \
 ```
 
 **Response 400 (Already Completed)**:
+
 ```json
 {
   "error": "Cannot cancel task",
@@ -452,11 +475,13 @@ curl -X POST \
 **Auth**: Opcional
 
 **Request**:
+
 ```bash
 curl http://localhost:3008/api/response/task-abc123
 ```
 
 **Response 200**:
+
 ```json
 {
   "taskId": "task-abc123",
@@ -467,6 +492,7 @@ curl http://localhost:3008/api/response/task-abc123
 ```
 
 **Response 404**:
+
 ```json
 {
   "error": "Response not found",
@@ -483,11 +509,13 @@ curl http://localhost:3008/api/response/task-abc123
 **Auth**: Opcional
 
 **Request**:
+
 ```bash
 curl http://localhost:3008/api/stats
 ```
 
 **Response 200**:
+
 ```json
 {
   "period": {
@@ -534,6 +562,7 @@ curl http://localhost:3008/api/stats
 **Auth**: Obrigatória
 
 **Request**:
+
 ```bash
 curl -X POST \
   -H "Authorization: Bearer secret" \
@@ -541,6 +570,7 @@ curl -X POST \
 ```
 
 **Response 200**:
+
 ```json
 {
   "message": "System restart initiated",
@@ -562,6 +592,7 @@ curl -X POST \
 **Descrição**: Autenticar conexão WebSocket
 
 **Payload**:
+
 ```json
 {
   "type": "authenticate",
@@ -570,6 +601,7 @@ curl -X POST \
 ```
 
 **Response**:
+
 ```json
 {
   "type": "auth:success",
@@ -584,6 +616,7 @@ curl -X POST \
 **Descrição**: Inscrever-se em eventos específicos
 
 **Payload**:
+
 ```json
 {
   "type": "subscribe",
@@ -592,6 +625,7 @@ curl -X POST \
 ```
 
 **Response**:
+
 ```json
 {
   "type": "subscribe:success",
@@ -608,6 +642,7 @@ curl -X POST \
 **Descrição**: Atualização de estado de task
 
 **Payload**:
+
 ```json
 {
   "type": "task:update",
@@ -628,6 +663,7 @@ curl -X POST \
 **Descrição**: Task concluída
 
 **Payload**:
+
 ```json
 {
   "type": "task:completed",
@@ -646,6 +682,7 @@ curl -X POST \
 **Descrição**: Status geral do sistema
 
 **Payload**:
+
 ```json
 {
   "type": "system:status",
@@ -669,6 +706,7 @@ curl -X POST \
 **Descrição**: Atualização em batch (50ms debounce)
 
 **Payload**:
+
 ```json
 {
   "type": "tasks:batch_update",
@@ -705,16 +743,16 @@ console.log(data.status);
 
 // POST add task
 const response = await fetch('http://localhost:3008/api/queue/add', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer my-secret'
-    },
-    body: JSON.stringify({
-        target: 'chatgpt',
-        prompt: 'Hello GPT',
-        priority: 5
-    })
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer my-secret',
+  },
+  body: JSON.stringify({
+    target: 'chatgpt',
+    prompt: 'Hello GPT',
+    priority: 5,
+  }),
 });
 const { taskId } = await response.json();
 
@@ -722,20 +760,24 @@ const { taskId } = await response.json();
 const ws = new WebSocket('ws://localhost:3008');
 
 ws.onopen = () => {
-    ws.send(JSON.stringify({
-        type: 'authenticate',
-        token: 'my-secret'
-    }));
+  ws.send(
+    JSON.stringify({
+      type: 'authenticate',
+      token: 'my-secret',
+    })
+  );
 
-    ws.send(JSON.stringify({
-        type: 'subscribe',
-        events: ['task:update']
-    }));
+  ws.send(
+    JSON.stringify({
+      type: 'subscribe',
+      events: ['task:update'],
+    })
+  );
 };
 
-ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    console.log(data.type, data);
+ws.onmessage = event => {
+  const data = JSON.parse(event.data);
+  console.log(data.type, data);
 };
 ```
 
@@ -859,4 +901,4 @@ curl -s "$BASE_URL/api/response/$TASK_ID" | jq -r .response
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, Backend Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, Backend Team_

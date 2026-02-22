@@ -1,13 +1,15 @@
 # Configuração Chrome Externo (Docker → Windows Host)
 
-**Data**: 2026-01-19
-**Status**: ✅ Configurado e testado
+**Data**: 2026-01-19 **Status**: ✅ Configurado e testado
 
 ---
 
 ## 📋 VISÃO GERAL
 
-Este projeto usa **Chrome EXTERNO** rodando no **Windows Host**, não no container Docker. O Puppeteer dentro do container conecta-se remotamente ao Chrome via um **Chrome Proxy** exposto pelo host. O padrão do sistema é conectar-se ao endpoint container-facing na porta `9224`, que normalmente é reencaminhada para o `--remote-debugging-port=9224` no host.
+Este projeto usa **Chrome EXTERNO** rodando no **Windows Host**, não no container Docker. O
+Puppeteer dentro do container conecta-se remotamente ao Chrome via um **Chrome Proxy** exposto pelo
+host. O padrão do sistema é conectar-se ao endpoint container-facing na porta `9224`, que
+normalmente é reencaminhada para o `--remote-debugging-port=9224` no host.
 
 **Arquitetura**:
 
@@ -91,21 +93,22 @@ curl http://localhost:9224/json/version
 
 ```yaml
 services:
-    app:
-        build: .
-        ports:
-            - '3000:3000'
-        environment:
-            # Conexão Chrome externo (Windows host) - endpoint container-facing (proxy)
-            CHROME_REMOTE_URL: 'http://host.docker.internal:9224'
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      # Conexão Chrome externo (Windows host) - endpoint container-facing (proxy)
+      CHROME_REMOTE_URL: 'http://host.docker.internal:9224'
 
-            # Alternativa (Linux host):
-            # CHROME_REMOTE_URL: "http://172.17.0.1:9224"
-        extra_hosts:
-            - 'host.docker.internal:host-gateway'
+      # Alternativa (Linux host):
+      # CHROME_REMOTE_URL: "http://172.17.0.1:9224"
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
 ```
 
-**Nota**: `host.docker.internal` resolve automaticamente para o IP do host no Docker Desktop (Windows/Mac). No Linux, use `172.17.0.1` ou configure `--add-host`.
+**Nota**: `host.docker.internal` resolve automaticamente para o IP do host no Docker Desktop
+(Windows/Mac). No Linux, use `172.17.0.1` ou configure `--add-host`.
 
 ---
 
@@ -118,13 +121,13 @@ const puppeteer = require('puppeteer-core');
 
 // Conecta ao Chrome externo (não lança processo)
 const browser = await puppeteer.connect({
-    // Conectar ao endpoint exposto pelo proxy (container-facing)
-    browserURL: process.env.CHROME_REMOTE_URL || 'http://host.docker.internal:9224',
-    defaultViewport: {
-        width: 1920,
-        height: 1080
-    },
-    ignoreHTTPSErrors: true
+  // Conectar ao endpoint exposto pelo proxy (container-facing)
+  browserURL: process.env.CHROME_REMOTE_URL || 'http://host.docker.internal:9224',
+  defaultViewport: {
+    width: 1920,
+    height: 1080,
+  },
+  ignoreHTTPSErrors: true,
 });
 ```
 
@@ -135,28 +138,28 @@ const browser = await puppeteer.connect({
 const puppeteer = require('puppeteer-core');
 
 (async () => {
-    try {
-        console.log('Conectando ao Chrome externo...');
-        const browser = await puppeteer.connect({
-            browserURL: 'http://host.docker.internal:9224'
-        });
+  try {
+    console.log('Conectando ao Chrome externo...');
+    const browser = await puppeteer.connect({
+      browserURL: 'http://host.docker.internal:9224',
+    });
 
-        console.log('✅ Conectado!');
+    console.log('✅ Conectado!');
 
-        const page = await browser.newPage();
-        await page.goto('https://example.com');
-        const title = await page.title();
+    const page = await browser.newPage();
+    await page.goto('https://example.com');
+    const title = await page.title();
 
-        console.log('Página:', title);
+    console.log('Página:', title);
 
-        await page.close();
-        await browser.disconnect();
+    await page.close();
+    await browser.disconnect();
 
-        console.log('✅ Teste bem-sucedido!');
-    } catch (error) {
-        console.error('❌ Erro:', error.message);
-        process.exit(1);
-    }
+    console.log('✅ Teste bem-sucedido!');
+  } catch (error) {
+    console.error('❌ Erro:', error.message);
+    process.exit(1);
+  }
 })();
 ```
 
@@ -174,15 +177,15 @@ node tests/test_chrome_connection.js
 
 ```json
 {
-    "browserEndpoint": {
-        "url": "http://host.docker.internal:9224",
-        "defaultViewport": {
-            "width": 1920,
-            "height": 1080
-        },
-        "ignoreHTTPSErrors": true,
-        "slowMo": 0
-    }
+  "browserEndpoint": {
+    "url": "http://host.docker.internal:9224",
+    "defaultViewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "ignoreHTTPSErrors": true,
+    "slowMo": 0
+  }
 }
 ```
 
@@ -190,25 +193,25 @@ node tests/test_chrome_connection.js
 
 ```javascript
 function detectChromeURL() {
-    // 1. Variável de ambiente (prioridade máxima)
-    if (process.env.CHROME_REMOTE_URL) {
-        return process.env.CHROME_REMOTE_URL;
-    }
+  // 1. Variável de ambiente (prioridade máxima)
+  if (process.env.CHROME_REMOTE_URL) {
+    return process.env.CHROME_REMOTE_URL;
+  }
 
-    // 2. Docker Desktop (Windows/Mac) - conecta ao proxy (9224)
-    if (process.platform !== 'linux') {
-        return 'http://host.docker.internal:9224';
-    }
+  // 2. Docker Desktop (Windows/Mac) - conecta ao proxy (9224)
+  if (process.platform !== 'linux') {
+    return 'http://host.docker.internal:9224';
+  }
 
-    // 3. Linux host (bridge network) - proxy padrão para container-facing
-    return 'http://172.17.0.1:9224';
+  // 3. Linux host (bridge network) - proxy padrão para container-facing
+  return 'http://172.17.0.1:9224';
 }
 
 module.exports = {
-    browserEndpoint: {
-        url: detectChromeURL()
-        // ...
-    }
+  browserEndpoint: {
+    url: detectChromeURL(),
+    // ...
+  },
 };
 ```
 
@@ -267,7 +270,7 @@ npm run test:chrome
 ```yaml
 # docker-compose.yml
 extra_hosts:
-    - 'host.docker.internal:172.17.0.1'
+  - 'host.docker.internal:172.17.0.1'
 ```
 
 Ou usar IP do host diretamente:
@@ -294,13 +297,13 @@ page.setDefaultTimeout(60000);
 
 // Retentar em caso de falha
 try {
-    await page.goto(url);
+  await page.goto(url);
 } catch (error) {
-    if (error.message.includes('Target closed')) {
-        // Reabrir página
-        page = await browser.newPage();
-        await page.goto(url);
-    }
+  if (error.message.includes('Target closed')) {
+    // Reabrir página
+    page = await browser.newPage();
+    await page.goto(url);
+  }
 }
 ```
 
@@ -325,7 +328,8 @@ try {
 **Recomendações**:
 
 1. **Nunca exponha porta 9224 (host) ou 9224 (proxy) para internet** (`0.0.0.0`)
-2. Use `--remote-debugging-address=127.0.0.1` (apenas localhost) e proteja o proxy com firewall/autenticação
+2. Use `--remote-debugging-address=127.0.0.1` (apenas localhost) e proteja o proxy com
+   firewall/autenticação
 3. Em produção, use proxy reverso com autenticação
 4. Rotacione `--user-data-dir` periodicamente
 5. Monitore conexões abertas: `netstat -ano | findstr :9224` e `netstat -ano | findstr :9224`
@@ -363,6 +367,5 @@ Antes de rodar o sistema:
 
 ---
 
-**Status**: ✅ Configuração validada e documentada
-**Última atualização**: 2026-01-19
+**Status**: ✅ Configuração validada e documentada **Última atualização**: 2026-01-19
 **Responsável**: Sistema NERV Singularity Edition

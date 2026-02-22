@@ -65,6 +65,7 @@ bash scripts/start-pm2-debug.sh
 ```
 
 Menu interativo permite:
+
 - Iniciar agente com debug (porta 9229)
 - Iniciar dashboard com debug (porta 9230)
 - Verificar status
@@ -101,7 +102,7 @@ Use configurações de **launch** (não attach):
 {
   "name": "🚀 Debug Agente",
   "type": "node",
-  "request": "launch",  // ← LAUNCH (inicia processo)
+  "request": "launch", // ← LAUNCH (inicia processo)
   "program": "${workspaceFolder}/index.js"
 }
 ```
@@ -114,7 +115,7 @@ Use configurações de **attach**:
 {
   "name": "📌 Attach to PM2 (9229)",
   "type": "node",
-  "request": "attach",  // ← ATTACH (conecta a existente)
+  "request": "attach", // ← ATTACH (conecta a existente)
   "port": 9229
 }
 ```
@@ -136,6 +137,7 @@ Use configurações de **attach**:
 ### **2. Anexar a Processo Existente (Attach)**
 
 1. Inicie o processo com `--inspect`:
+
    ```bash
    bash scripts/start-pm2-debug.sh
    ```
@@ -162,6 +164,7 @@ Use configurações de **attach**:
 **Causa**: Porta 9229 não está forwarded ou processo morreu
 
 **Solução**:
+
 1. Verifique port forwarding no VS Code (aba PORTS)
 2. Verifique se processo ainda está rodando: `pm2 list`
 
@@ -184,21 +187,25 @@ Use configurações de **attach**:
 ## 🎯 TL;DR (Quick Reference)
 
 **Iniciar com debug:**
+
 ```bash
 bash scripts/start-pm2-debug.sh
 ```
 
 **Verificar status:**
+
 ```bash
 curl http://127.0.0.1:9229/json/list
 ```
 
 **Anexar debugger no VS Code:**
+
 1. Ctrl+Shift+D
 2. Selecione "📌 Attach to PM2 (9229)"
 3. F5
 
 **Debug do Vue/Vite:**
+
 1. Certifique que Vite está rodando (porta 5173)
 2. Use "🌐 Debug Vue App in Chrome"
 
@@ -248,6 +255,5 @@ pkill -f "node.*inspect"
 
 ---
 
-**Versão**: 1.0
-**Última atualização**: Fevereiro 2026
-**Autor**: Sistema Autônomo chatgpt-docker-puppeteer
+**Versão**: 1.0 **Última atualização**: Fevereiro 2026 **Autor**: Sistema Autônomo
+chatgpt-docker-puppeteer

@@ -1,8 +1,6 @@
 # Relatório de Análise: Implementação de Aliases
 
-**Data:** 22/01/2026
-**Versão:** 1.0
-**Autor:** Análise Automatizada do Projeto
+**Data:** 22/01/2026 **Versão:** 1.0 **Autor:** Análise Automatizada do Projeto
 
 ---
 
@@ -10,19 +8,18 @@
 
 ### Tamanho e Complexidade
 
-| Métrica | Valor | Status |
-|---------|-------|--------|
-| **Total de arquivos JS em src/** | 135 | 🟡 Médio |
-| **Imports com 2+ níveis** (`../../`) | 120 | 🟠 Alto |
-| **Imports com 3+ níveis** (`../../../`) | 23 | 🟡 Médio |
-| **Imports de módulos core/shared** | 69 | 🟠 Alto |
+| Métrica                                  | Valor | Status        |
+| ---------------------------------------- | ----- | ------------- |
+| **Total de arquivos JS em src/**         | 135   | 🟡 Médio      |
+| **Imports com 2+ níveis** (`../../`)     | 120   | 🟠 Alto       |
+| **Imports com 3+ níveis** (`../../../`)  | 23    | 🟡 Médio      |
+| **Imports de módulos core/shared**       | 69    | 🟠 Alto       |
 | **Percentual usando caminhos profundos** | 88.9% | 🔴 Muito Alto |
 
 ### Interpretação
 
-✅ **Projeto médio-grande** (135 arquivos)
-🟠 **Alta complexidade de imports** (88.9% usa `../../` ou mais)
-🔴 **Forte candidato para aliases** (69 imports seriam simplificados)
+✅ **Projeto médio-grande** (135 arquivos) 🟠 **Alta complexidade de imports** (88.9% usa `../../`
+ou mais) 🔴 **Forte candidato para aliases** (69 imports seriam simplificados)
 
 ---
 
@@ -30,18 +27,18 @@
 
 Análise dos 15 módulos mais referenciados:
 
-| Posição | Módulo | Ocorrências | Caminho Típico | Alias Proposto |
-|---------|--------|-------------|----------------|----------------|
-| 1º | `core/logger` | 34 | `../../core/logger` | `@core/logger` |
-| 2º | `core/constants/tasks` | 14 | `../../core/constants/tasks.js` | `@core/constants/tasks` |
-| 3º | `shared/nerv/constants` | 12 | `../../shared/nerv/constants` | `@shared/nerv/constants` |
-| 4º | `infra/io` | 8 | `../../../infra/io` | `@infra/io` |
-| 5º | `logic/adaptive` | 4 | `../../logic/adaptive` | `@logic/adaptive` |
-| 6º | `infra/fs/fs_utils` | 4 | `../../infra/fs/fs_utils` | `@infra/fs/fs_utils` |
-| 7º | `shared/nerv/envelope` | 3 | `../../shared/nerv/envelope` | `@shared/nerv/envelope` |
-| 8º | `core/i18n` | 3 | `../../core/i18n` | `@core/i18n` |
-| 9º | `core/config` | 3 | `../../core/config` | `@core/config` |
-| 10º | `infra/system` | 2 | `../../infra/system` | `@infra/system` |
+| Posição | Módulo                  | Ocorrências | Caminho Típico                  | Alias Proposto           |
+| ------- | ----------------------- | ----------- | ------------------------------- | ------------------------ |
+| 1º      | `core/logger`           | 34          | `../../core/logger`             | `@core/logger`           |
+| 2º      | `core/constants/tasks`  | 14          | `../../core/constants/tasks.js` | `@core/constants/tasks`  |
+| 3º      | `shared/nerv/constants` | 12          | `../../shared/nerv/constants`   | `@shared/nerv/constants` |
+| 4º      | `infra/io`              | 8           | `../../../infra/io`             | `@infra/io`              |
+| 5º      | `logic/adaptive`        | 4           | `../../logic/adaptive`          | `@logic/adaptive`        |
+| 6º      | `infra/fs/fs_utils`     | 4           | `../../infra/fs/fs_utils`       | `@infra/fs/fs_utils`     |
+| 7º      | `shared/nerv/envelope`  | 3           | `../../shared/nerv/envelope`    | `@shared/nerv/envelope`  |
+| 8º      | `core/i18n`             | 3           | `../../core/i18n`               | `@core/i18n`             |
+| 9º      | `core/config`           | 3           | `../../core/config`             | `@core/config`           |
+| 10º     | `infra/system`          | 2           | `../../infra/system`            | `@infra/system`          |
 
 ### Conclusão dos Top 10
 
@@ -101,6 +98,7 @@ src/
 ### Arquivos com Maior Benefício
 
 **1. `src/server/realtime/bus/pm2_bridge.js`**
+
 ```javascript
 // ANTES (4 imports profundos)
 const { pm2Raw } = require('../../../infra/system');
@@ -114,9 +112,11 @@ const { notify } = require('@server/engine/socket');
 const { log } = require('@core/logger');
 const CONFIG = require('@core/config');
 ```
+
 **Redução:** 42 caracteres → 26 caracteres (-38%)
 
 **2. `src/server/api/controllers/system.js`**
+
 ```javascript
 // ANTES (5 imports profundos)
 const system = require('../../../infra/system');
@@ -132,9 +132,11 @@ const io = require('@infra/io');
 const { audit, log } = require('@core/logger');
 const { ROOT } = require('@infra/fs/fs_utils');
 ```
+
 **Redução:** 177 caracteres → 135 caracteres (-24%)
 
 **3. `src/core/context/engine/context_engine.js`**
+
 ```javascript
 // ANTES
 const io = require('../../../infra/io');
@@ -142,6 +144,7 @@ const io = require('../../../infra/io');
 // DEPOIS
 const io = require('@infra/io');
 ```
+
 **Redução:** 28 caracteres → 22 caracteres (-21%)
 
 ---
@@ -150,25 +153,25 @@ const io = require('@infra/io');
 
 ### ✅ Benefícios Quantificados
 
-| Benefício | Impacto | Quantificação |
-|-----------|---------|---------------|
-| **Redução de caracteres** | 🟢 Alto | ~2,400 caracteres economizados (20%) |
-| **Legibilidade** | 🟢 Alto | 120 imports mais claros |
-| **Refatoração** | 🟢 Muito Alto | Mover pastas sem quebrar código |
-| **Onboarding** | 🟢 Médio | Novos devs entendem estrutura mais rápido |
-| **IntelliSense** | 🟢 Alto | Autocomplete mais preciso |
-| **Manutenibilidade** | 🟢 Muito Alto | Menos erros de digitação |
+| Benefício                 | Impacto       | Quantificação                             |
+| ------------------------- | ------------- | ----------------------------------------- |
+| **Redução de caracteres** | 🟢 Alto       | ~2,400 caracteres economizados (20%)      |
+| **Legibilidade**          | 🟢 Alto       | 120 imports mais claros                   |
+| **Refatoração**           | 🟢 Muito Alto | Mover pastas sem quebrar código           |
+| **Onboarding**            | 🟢 Médio      | Novos devs entendem estrutura mais rápido |
+| **IntelliSense**          | 🟢 Alto       | Autocomplete mais preciso                 |
+| **Manutenibilidade**      | 🟢 Muito Alto | Menos erros de digitação                  |
 
 ### ❌ Custos Identificados
 
-| Custo | Impacto | Quantificação |
-|-------|---------|---------------|
-| **Setup inicial** | 🟡 Médio | ~30 minutos (1x) |
-| **Dependência extra** | 🟢 Baixo | +1 package (module-alias ~50KB) |
-| **Performance runtime** | 🟢 Baixíssimo | +0.2ms por require (~1% overhead) |
-| **Curva de aprendizado** | 🟡 Baixo | Equipe precisa conhecer aliases |
-| **Debug complexity** | 🟡 Baixo | Stack traces podem ter paths alias |
-| **Refatoração** | 🔴 Alto | 120 imports precisam ser atualizados |
+| Custo                    | Impacto       | Quantificação                        |
+| ------------------------ | ------------- | ------------------------------------ |
+| **Setup inicial**        | 🟡 Médio      | ~30 minutos (1x)                     |
+| **Dependência extra**    | 🟢 Baixo      | +1 package (module-alias ~50KB)      |
+| **Performance runtime**  | 🟢 Baixíssimo | +0.2ms por require (~1% overhead)    |
+| **Curva de aprendizado** | 🟡 Baixo      | Equipe precisa conhecer aliases      |
+| **Debug complexity**     | 🟡 Baixo      | Stack traces podem ter paths alias   |
+| **Refatoração**          | 🔴 Alto       | 120 imports precisam ser atualizados |
 
 ### 📊 Score Final
 
@@ -202,17 +205,17 @@ ROI:         ██████████  10/10  (Altamente recomendado)
 
 ### Justificativa por Alias
 
-| Alias | Diretório | Ocorrências | Prioridade | Justificativa |
-|-------|-----------|-------------|------------|---------------|
-| `@core` | `src/core` | 54 | 🔴 CRÍTICA | Módulo mais importado (45%) |
-| `@infra` | `src/infra` | 24 | 🟠 ALTA | Segundo mais importado (20%) |
-| `@shared` | `src/shared` | 15 | 🟠 ALTA | Constantes NERV centralizadas |
-| `@server` | `src/server` | 23 | 🟡 MÉDIA | Arquivos profundos (3+ níveis) |
-| `@nerv` | `src/nerv` | 12 | 🟡 MÉDIA | Arquitetura event-driven |
-| `@kernel` | `src/kernel` | 8 | 🟢 BAIXA | Menos imports mas importante |
-| `@driver` | `src/driver` | 6 | 🟢 BAIXA | Módulos isolados |
-| `@logic` | `src/logic` | 4 | 🟢 BAIXA | Validação e adaptação |
-| `@` | `src/` | 0 | 🟢 BONUS | Fallback genérico |
+| Alias     | Diretório    | Ocorrências | Prioridade | Justificativa                  |
+| --------- | ------------ | ----------- | ---------- | ------------------------------ |
+| `@core`   | `src/core`   | 54          | 🔴 CRÍTICA | Módulo mais importado (45%)    |
+| `@infra`  | `src/infra`  | 24          | 🟠 ALTA    | Segundo mais importado (20%)   |
+| `@shared` | `src/shared` | 15          | 🟠 ALTA    | Constantes NERV centralizadas  |
+| `@server` | `src/server` | 23          | 🟡 MÉDIA   | Arquivos profundos (3+ níveis) |
+| `@nerv`   | `src/nerv`   | 12          | 🟡 MÉDIA   | Arquitetura event-driven       |
+| `@kernel` | `src/kernel` | 8           | 🟢 BAIXA   | Menos imports mas importante   |
+| `@driver` | `src/driver` | 6           | 🟢 BAIXA   | Módulos isolados               |
+| `@logic`  | `src/logic`  | 4           | 🟢 BAIXA   | Validação e adaptação          |
+| `@`       | `src/`       | 0           | 🟢 BONUS   | Fallback genérico              |
 
 ---
 
@@ -262,13 +265,13 @@ ROI:         ██████████  10/10  (Altamente recomendado)
 
 ## ⚠️ Riscos e Mitigações
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|--------------|---------|-----------|
-| **Quebrar imports** | 🟡 Médio | 🔴 Alto | Refatorar incrementalmente, testar cada fase |
-| **Conflitos com ESLint** | 🟢 Baixo | 🟡 Médio | Configurar `eslint-import-resolver-alias` |
-| **Performance degradação** | 🟢 Muito Baixo | 🟢 Baixo | module-alias é otimizado (cache interno) |
-| **Equipe não adotar** | 🟡 Médio | 🟡 Médio | Documentar bem, pair programming inicial |
-| **Debug confuso** | 🟢 Baixo | 🟡 Médio | Source maps + documentação clara |
+| Risco                      | Probabilidade  | Impacto  | Mitigação                                    |
+| -------------------------- | -------------- | -------- | -------------------------------------------- |
+| **Quebrar imports**        | 🟡 Médio       | 🔴 Alto  | Refatorar incrementalmente, testar cada fase |
+| **Conflitos com ESLint**   | 🟢 Baixo       | 🟡 Médio | Configurar `eslint-import-resolver-alias`    |
+| **Performance degradação** | 🟢 Muito Baixo | 🟢 Baixo | module-alias é otimizado (cache interno)     |
+| **Equipe não adotar**      | 🟡 Médio       | 🟡 Médio | Documentar bem, pair programming inicial     |
+| **Debug confuso**          | 🟢 Baixo       | 🟡 Médio | Source maps + documentação clara             |
 
 ---
 
@@ -277,6 +280,7 @@ ROI:         ██████████  10/10  (Altamente recomendado)
 ### Exemplo Real: src/server/realtime/bus/pm2_bridge.js
 
 **ANTES (166 caracteres em imports):**
+
 ```javascript
 const { pm2Raw } = require('../../../infra/system');
 const { notify } = require('../../engine/socket');
@@ -285,6 +289,7 @@ const CONFIG = require('../../../core/config');
 ```
 
 **DEPOIS (126 caracteres em imports - 24% menor):**
+
 ```javascript
 const { pm2Raw } = require('@infra/system');
 const { notify } = require('@server/engine/socket');
@@ -341,10 +346,10 @@ Se aprovado, seguir este roteiro:
 6. ✅ **Code review** e merge
 7. ✅ **Comunicar equipe** sobre novo padrão
 
-**Tempo total estimado:** 2h 45min
-**Benefício estimado:** Permanente (toda nova feature se beneficia)
+**Tempo total estimado:** 2h 45min **Benefício estimado:** Permanente (toda nova feature se
+beneficia)
 
 ---
 
-**Análise realizada em:** 22/01/2026
-**Revisão recomendada em:** Após implementação (validar métricas reais)
+**Análise realizada em:** 22/01/2026 **Revisão recomendada em:** Após implementação (validar
+métricas reais)

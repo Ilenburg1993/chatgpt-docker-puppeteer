@@ -1,14 +1,14 @@
 # 🔄 Fluxo de Captura de Resposta da LLM
 
-> **Data**: 4 de Fevereiro de 2026
-> **Versão**: Sistema Atual (ChatGPTDriver v2.0 + SADI v4.0)
+> **Data**: 4 de Fevereiro de 2026 **Versão**: Sistema Atual (ChatGPTDriver v2.0 + SADI v4.0)
 > **Status**: ✅ PRODUÇÃO (Streaming Incremental + Thought Pruning)
 
 ---
 
 ## 📋 Visão Geral
 
-O sistema captura respostas da LLM (ChatGPT/Gemini) através de **browser automation** (Puppeteer), utilizando um loop de percepção incremental que:
+O sistema captura respostas da LLM (ChatGPT/Gemini) através de **browser automation** (Puppeteer),
+utilizando um loop de percepção incremental que:
 
 1. **Detecta** a área de resposta via SADI (growth detection)
 2. **Extrai** o texto via `innerText` (execução no browser)
@@ -88,7 +88,8 @@ async waitForCompletion(startSnapshot, signal) {
     });
 ```
 
-**Objetivo**: Preparar watchdog de mutação DOM para detectar quando LLM para de gerar texto (stall detection).
+**Objetivo**: Preparar watchdog de mutação DOM para detectar quando LLM para de gerar texto (stall
+detection).
 
 ---
 
@@ -124,7 +125,8 @@ while (true) {
     }
 ```
 
-**Objetivo**: Validar que sistema pode continuar (não foi cancelado, não atingiu timeout, não há bloqueios).
+**Objetivo**: Validar que sistema pode continuar (não foi cancelado, não atingiu timeout, não há
+bloqueios).
 
 ---
 
@@ -141,6 +143,7 @@ while (true) {
 ```
 
 **O que é `responseArea`?**
+
 ```javascript
 {
     protocol: {
@@ -157,7 +160,8 @@ while (true) {
 
 **Como SADI encontra a área?**
 
-1. **Snapshot inicial**: Captura todos os containers (`div, article, section, pre`) com texto > 5 chars
+1. **Snapshot inicial**: Captura todos os containers (`div, article, section, pre`) com texto > 5
+   chars
 2. **Aguarda 400ms**: Delay para permitir crescimento
 3. **Compara tamanhos**: `currentLen - snapshotLen` para cada container
 4. **Retorna maior crescimento**: Container que mais cresceu = área de resposta
@@ -167,66 +171,65 @@ while (true) {
 ### Fase 4: Extração de Texto + Thought Pruning
 
 ```javascript
-        // Extração com Poda de Pensamento (NASA Standard Pruning)
-        const extractionResult = await ctx.evaluate(proto => {
-            const msgs = Array.from(
-                document.querySelectorAll(proto.selector)
-            );
-            const targetMsg = msgs[msgs.length - 1]; // Última mensagem
+// Extração com Poda de Pensamento (NASA Standard Pruning)
+const extractionResult = await ctx.evaluate(proto => {
+  const msgs = Array.from(document.querySelectorAll(proto.selector));
+  const targetMsg = msgs[msgs.length - 1]; // Última mensagem
 
-            if (!targetMsg) {
-                return { text: '', pruned: 0, textLengthBefore: 0 };
-            }
+  if (!targetMsg) {
+    return { text: '', pruned: 0, textLengthBefore: 0 };
+  }
 
-            const textLengthBefore = targetMsg.innerText.length;
-            const clone = targetMsg.cloneNode(true); // Preserva original
+  const textLengthBefore = targetMsg.innerText.length;
+  const clone = targetMsg.cloneNode(true); // Preserva original
 
-            // Remove elementos de raciocínio interno (o1/o3)
-            const thoughts = clone.querySelectorAll(
-                // o1/o3 reasoning blocks
-                '[data-testid*="thought"]',      // Oficial
-                '.thought-block',                // CSS genérica
-                '[class*="thought"]',            // Qualquer classe
-                '[data-message-role="thought"]', // Role attribute
+  // Remove elementos de raciocínio interno (o1/o3)
+  const thoughts = clone.querySelectorAll(
+    // o1/o3 reasoning blocks
+    '[data-testid*="thought"]', // Oficial
+    '.thought-block', // CSS genérica
+    '[class*="thought"]', // Qualquer classe
+    '[data-message-role="thought"]', // Role attribute
 
-                // UI metadata
-                'details',                       // Collapsible sections
-                '.sr-only'                       // Screen reader only
-            );
+    // UI metadata
+    'details', // Collapsible sections
+    '.sr-only' // Screen reader only
+  );
 
-            const count = thoughts.length;
-            thoughts.forEach(t => t.remove());
+  const count = thoughts.length;
+  thoughts.forEach(t => t.remove());
 
-            return {
-                text: clone.innerText.trim(),
-                pruned: count,
-                textLengthBefore
-            };
-        }, responseArea.protocol);
+  return {
+    text: clone.innerText.trim(),
+    pruned: count,
+    textLengthBefore,
+  };
+}, responseArea.protocol);
 
-        currentText = extractionResult.text || '';
+currentText = extractionResult.text || '';
 ```
 
 **Thought Pruning** (o1/o3 Models):
+
 - **Problema**: Modelos o1/o3 exibem raciocínio interno (thought blocks) na UI
 - **Solução**: Remove elementos `[data-testid*="thought"]`, `.thought-block`, `details`, etc.
 - **Resultado**: Texto limpo (apenas resposta final, sem raciocínio)
 
 **Telemetria**:
+
 ```javascript
 if (extractionResult.pruned > 0) {
-    const textLengthAfter = currentText.length;
-    const ratio = (textLengthAfter / extractionResult.textLengthBefore * 100)
-        .toFixed(2);
+  const textLengthAfter = currentText.length;
+  const ratio = ((textLengthAfter / extractionResult.textLengthBefore) * 100).toFixed(2);
 
-    this._emitVital('THOUGHT_PRUNING', {
-        count: extractionResult.pruned,
-        textLengthBefore: extractionResult.textLengthBefore,
-        textLengthAfter,
-        retentionRatio: ratio,
-        model: this.defaultModel,
-        selector: responseArea.protocol.selector
-    });
+  this._emitVital('THOUGHT_PRUNING', {
+    count: extractionResult.pruned,
+    textLengthBefore: extractionResult.textLengthBefore,
+    textLengthAfter,
+    retentionRatio: ratio,
+    model: this.defaultModel,
+    selector: responseArea.protocol.selector,
+  });
 }
 ```
 
@@ -235,35 +238,35 @@ if (extractionResult.pruned > 0) {
 ### Fase 5: Detecção de Crescimento (Streaming)
 
 ```javascript
-        // Telemetria de Progresso
-        const textDelta = currentText.length - lastText.length;
+// Telemetria de Progresso
+const textDelta = currentText.length - lastText.length;
 
-        this._emitVital('PERCEPTION_CYCLE', {
-            cycle: loopIteration,
-            textLength: currentText.length,
-            delta: textDelta,
-            stableCycles,
-            elapsedMs: Date.now() - startTime,
-            isBusy: responseArea?.isBusy || false
-        });
+this._emitVital('PERCEPTION_CYCLE', {
+  cycle: loopIteration,
+  textLength: currentText.length,
+  delta: textDelta,
+  stableCycles,
+  elapsedMs: Date.now() - startTime,
+  isBusy: responseArea?.isBusy || false,
+});
 
-        if (textDelta > 0) {
-            // Texto cresceu - LLM ainda está gerando
-            this._emitVital('TEXT_DELTA', {
-                length: currentText.length,
-                delta: textDelta,
-                status: 'STREAMING'
-            });
-            stableCycles = 0;
-            lastText = currentText;
-
-        } else if (currentText.length > 0 && currentText === lastText) {
-            // Texto parou de crescer
-            stableCycles++;
-        }
+if (textDelta > 0) {
+  // Texto cresceu - LLM ainda está gerando
+  this._emitVital('TEXT_DELTA', {
+    length: currentText.length,
+    delta: textDelta,
+    status: 'STREAMING',
+  });
+  stableCycles = 0;
+  lastText = currentText;
+} else if (currentText.length > 0 && currentText === lastText) {
+  // Texto parou de crescer
+  stableCycles++;
+}
 ```
 
 **Lógica de Streaming**:
+
 - **textDelta > 0**: Texto cresceu → LLM ainda gerando → reset `stableCycles`
 - **textDelta === 0**: Texto estável → incrementa `stableCycles`
 - **stableCycles >= 3**: 3 ciclos sem mudança (2.4s) → resposta completa
@@ -311,6 +314,7 @@ if (extractionResult.pruned > 0) {
 **Cenário**: ChatGPT interrompe resposta longa (token limit) e exibe botão "Continue generating".
 
 **Comportamento**:
+
 1. Detecta botão via `innerText.includes('continue')`
 2. Clica automaticamente
 3. Aguarda 2s (LLM reiniciar geração)
@@ -357,6 +361,7 @@ if (extractionResult.pruned > 0) {
 ```
 
 **Condições de Conclusão**:
+
 1. ✅ `stableCycles >= 3` (2.4s sem mudança)
 2. ✅ `currentText.length > 0` (não vazio)
 3. ✅ `currentText.length >= 10` (mínimo 10 chars)
@@ -371,65 +376,67 @@ if (extractionResult.pruned > 0) {
 ```javascript
 // src/shared/sadi/analyzer.js - linha 622
 async function findResponseArea(page) {
-    const result = await page.evaluate(
-        (sadiLogicFn, config, startTs) => {
-            const SADI = sadiLogicFn([], []);
+  const result = await page.evaluate(
+    (sadiLogicFn, config, startTs) => {
+      const SADI = sadiLogicFn([], []);
 
-            // 1. Busca todos os containers
-            const containers = SADI
-                .query('div, article, section, pre')
-                .filter(c => c.innerText.length > 5);
+      // 1. Busca todos os containers
+      const containers = SADI.query('div, article, section, pre').filter(
+        c => c.innerText.length > 5
+      );
 
-            // 2. Snapshot inicial (tamanho de cada container)
-            const snapshot = containers.map(c => ({
-                el: c,
-                len: c.innerText.length
-            }));
+      // 2. Snapshot inicial (tamanho de cada container)
+      const snapshot = containers.map(c => ({
+        el: c,
+        len: c.innerText.length,
+      }));
 
-            // 3. Aguarda crescimento (400ms)
-            return new Promise(resolve => {
-                setTimeout(() => {
-                    let best = null, maxDelta = 0;
+      // 3. Aguarda crescimento (400ms)
+      return new Promise(resolve => {
+        setTimeout(() => {
+          let best = null,
+            maxDelta = 0;
 
-                    // 4. Compara tamanhos (crescimento)
-                    snapshot.forEach(snap => {
-                        if (!snap.el.isConnected) return;
+          // 4. Compara tamanhos (crescimento)
+          snapshot.forEach(snap => {
+            if (!snap.el.isConnected) return;
 
-                        const currentLen = snap.el.innerText.length;
-                        const delta = currentLen - snap.len;
+            const currentLen = snap.el.innerText.length;
+            const delta = currentLen - snap.len;
 
-                        if (delta > maxDelta) {
-                            maxDelta = delta;
-                            best = snap.el;
-                        }
-                    });
+            if (delta > maxDelta) {
+              maxDelta = delta;
+              best = snap.el;
+            }
+          });
 
-                    // 5. Fallback: maior container (se nenhum cresceu)
-                    const final = best ||
-                        containers
-                            .filter(c => c.isConnected)
-                            .sort((a, b) =>
-                                b.innerText.length - a.innerText.length
-                            )[0];
+          // 5. Fallback: maior container (se nenhum cresceu)
+          const final =
+            best ||
+            containers
+              .filter(c => c.isConnected)
+              .sort((a, b) => b.innerText.length - a.innerText.length)[0];
 
-                    resolve(
-                        final ? {
-                            protocol: SADI.generateProtocol(final),
-                            isBusy: SADI.checkSystemStatus(),
-                            growth_delta: maxDelta,
-                            detection_time_ms: Date.now() - startTs,
-                            content_length: final.innerText.length
-                        } : null
-                    );
-                }, config.RESPONSE_GROWTH_DELAY); // 400ms
-            });
-        },
-        sadiLogic,
-        SADI_CONFIG,
-        Date.now()
-    );
+          resolve(
+            final
+              ? {
+                  protocol: SADI.generateProtocol(final),
+                  isBusy: SADI.checkSystemStatus(),
+                  growth_delta: maxDelta,
+                  detection_time_ms: Date.now() - startTs,
+                  content_length: final.innerText.length,
+                }
+              : null
+          );
+        }, config.RESPONSE_GROWTH_DELAY); // 400ms
+      });
+    },
+    sadiLogic,
+    SADI_CONFIG,
+    Date.now()
+  );
 
-    return result;
+  return result;
 }
 ```
 
@@ -495,21 +502,21 @@ GENERATION_COMPLETE: {
 
 ```javascript
 const CHATGPT_CONFIG = Object.freeze({
-    // Perception Loop
-    STABLE_CYCLES_TARGET: 3,       // 3 ciclos sem mudança = completo
-    PERCEPTION_INTERVAL_MS: 800,   // 800ms entre ciclos
-    MIN_RESPONSE_LENGTH: 10,       // Mínimo 10 chars
+  // Perception Loop
+  STABLE_CYCLES_TARGET: 3, // 3 ciclos sem mudança = completo
+  PERCEPTION_INTERVAL_MS: 800, // 800ms entre ciclos
+  MIN_RESPONSE_LENGTH: 10, // Mínimo 10 chars
 
-    // Timeouts
-    MAX_WAIT_TIME_MS: 600000,      // 10min max
-    STALL_WARNING_MS: 30000,       // 30s warning
-    NAVIGATION_TIMEOUT_MS: 30000,  // 30s navigation
+  // Timeouts
+  MAX_WAIT_TIME_MS: 600000, // 10min max
+  STALL_WARNING_MS: 30000, // 30s warning
+  NAVIGATION_TIMEOUT_MS: 30000, // 30s navigation
 
-    // Auto-continuation
-    CONTINUATION_DELAY_MS: 2000,   // 2s após clicar "Continue"
+  // Auto-continuation
+  CONTINUATION_DELAY_MS: 2000, // 2s após clicar "Continue"
 
-    // Thought pruning
-    ENABLE_THOUGHT_PRUNING: true   // Remove o1/o3 reasoning
+  // Thought pruning
+  ENABLE_THOUGHT_PRUNING: true, // Remove o1/o3 reasoning
 });
 ```
 
@@ -576,9 +583,8 @@ T=5200ms: Ciclo 7
   └─> return "Quantum computing is a revolutionary..."
 ```
 
-**Tempo Total**: 5.2s (7 ciclos × 800ms - delays)
-**Resposta**: 715 chars
-**Thought blocks removidos**: 0 (GPT-4 não usa thought blocks)
+**Tempo Total**: 5.2s (7 ciclos × 800ms - delays) **Resposta**: 715 chars **Thought blocks
+removidos**: 0 (GPT-4 não usa thought blocks)
 
 ---
 
@@ -598,6 +604,7 @@ T=5200ms: Ciclo 7
 ### 1. Dependência de `innerText`
 
 **Problema**: `innerText` não captura:
+
 - Formatação (markdown, code blocks)
 - Links (apenas texto)
 - Imagens (apenas alt text)
@@ -637,7 +644,8 @@ T=5200ms: Ciclo 7
 ### 1. Extração Estruturada (HTML + Markdown)
 
 Retornar não apenas texto, mas estrutura completa:
-```javascript
+
+````javascript
 {
     text: "Quantum computing is...",
     html: "<div><p>Quantum computing is...</p><code>...</code></div>",
@@ -645,11 +653,12 @@ Retornar não apenas texto, mas estrutura completa:
     codeBlocks: [{lang: 'python', code: '...'}],
     images: [{src: '...', alt: '...'}]
 }
-```
+````
 
 ### 2. LLM-as-Judge Validation
 
 Validar resposta antes de retornar:
+
 - Coherência (resposta está relacionada ao prompt?)
 - Completude (resposta está completa ou cortada?)
 - Qualidade (resposta faz sentido?)
@@ -657,6 +666,7 @@ Validar resposta antes de retornar:
 ### 3. Adaptive Perception Interval
 
 Ajustar `PERCEPTION_INTERVAL_MS` dinamicamente:
+
 - Início (texto crescendo rápido): 400ms
 - Meio (texto crescendo devagar): 800ms
 - Final (texto estável): 1200ms
@@ -664,14 +674,15 @@ Ajustar `PERCEPTION_INTERVAL_MS` dinamicamente:
 ### 4. Cache de Response Area
 
 Reusar selector se UI não mudou:
+
 ```javascript
 // Primeira detecção: SADI growth detection (400ms)
 // Detecções subsequentes: Reusar selector (0ms)
 if (lastResponseSelector && isValidSelector(lastResponseSelector)) {
-    responseArea = { protocol: lastResponseSelector };
+  responseArea = { protocol: lastResponseSelector };
 } else {
-    responseArea = await analyzer.findResponseArea(this.page);
-    lastResponseSelector = responseArea.protocol;
+  responseArea = await analyzer.findResponseArea(this.page);
+  lastResponseSelector = responseArea.protocol;
 }
 ```
 
@@ -681,7 +692,8 @@ if (lastResponseSelector && isValidSelector(lastResponseSelector)) {
 
 ## 📚 Referências
 
-1. **[ChatGPTDriver.js](../src/driver/targets/ChatGPTDriver.js)** - Implementação completa (linhas 336-560)
+1. **[ChatGPTDriver.js](../src/driver/targets/ChatGPTDriver.js)** - Implementação completa (linhas
+   336-560)
 2. **[SADI Analyzer](../src/shared/sadi/analyzer.js)** - Growth detection (linhas 622-700)
 3. **[Triage Module](../src/driver/modules/triage.js)** - Diagnóstico de bloqueios
 4. **[BaseDriver](../src/driver/core/BaseDriver.js)** - Orquestração de execução
@@ -689,10 +701,12 @@ if (lastResponseSelector && isValidSelector(lastResponseSelector)) {
 
 ---
 
-**Conclusão**: Sistema atual captura respostas via **loop de percepção incremental** (800ms/ciclo) com **growth detection** (SADI), **thought pruning** (o1/o3), e **auto-continuation** (respostas longas). Telemetria completa via NERV events. Resiliente a mudanças de UI, mas depende de `innerText` (texto plano).
+**Conclusão**: Sistema atual captura respostas via **loop de percepção incremental** (800ms/ciclo)
+com **growth detection** (SADI), **thought pruning** (o1/o3), e **auto-continuation** (respostas
+longas). Telemetria completa via NERV events. Resiliente a mudanças de UI, mas depende de
+`innerText` (texto plano).
 
 ---
 
-**Versão**: 1.0
-**Última Atualização**: 4 de Fevereiro de 2026
-**Autor**: Análise do código fonte (ChatGPTDriver v2.0 + SADI v4.0)
+**Versão**: 1.0 **Última Atualização**: 4 de Fevereiro de 2026 **Autor**: Análise do código fonte
+(ChatGPTDriver v2.0 + SADI v4.0)

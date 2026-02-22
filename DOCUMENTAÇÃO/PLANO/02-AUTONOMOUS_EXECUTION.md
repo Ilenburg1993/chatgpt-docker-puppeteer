@@ -2,7 +2,9 @@
 
 ## 1. VISÃO GERAL
 
-A execução autônoma é o **coração** do sistema. Permite que uma missão complexa (ex: escrever um livro de 300 páginas) execute do começo ao fim com **mínima intervenção humana**, gerando automaticamente centenas de tasks subordinadas.
+A execução autônoma é o **coração** do sistema. Permite que uma missão complexa (ex: escrever um
+livro de 300 páginas) execute do começo ao fim com **mínima intervenção humana**, gerando
+automaticamente centenas de tasks subordinadas.
 
 ### Princípios Fundamentais
 
@@ -220,13 +222,13 @@ Important:
         model: 'gpt-4o',
         payload: {
           system_message: 'You are an expert workflow designer',
-          user_message: prompt
+          user_message: prompt,
         },
         parameters: {
-          temperature: 0.3,  // Lower temp for consistent structure
-          response_format: { type: 'json_object' }
-        }
-      }
+          temperature: 0.3, // Lower temp for consistent structure
+          response_format: { type: 'json_object' },
+        },
+      },
     });
 
     const workflow = JSON.parse(result.output);
@@ -299,7 +301,7 @@ class MissionExecutor {
         mission_id: mission.id,
         step_id: stepId,
         step_name: step.name,
-        progress_percent: missionState.progress_percent
+        progress_percent: missionState.progress_percent,
       });
 
       // Check user feedback
@@ -320,7 +322,7 @@ class MissionExecutor {
       graph.set(step.id, {
         step,
         dependencies: step.dependencies || [],
-        dependents: []
+        dependents: [],
       });
     });
 
@@ -652,7 +654,7 @@ class ContextManager {
       accumulated_results: {},
       user_feedback: [],
       iteration_contexts: {},
-      memory: {}
+      memory: {},
     });
   }
 
@@ -671,7 +673,7 @@ class ContextManager {
     context.user_feedback.push({
       step_id: stepId,
       feedback: feedback,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -690,14 +692,14 @@ class ContextManager {
     }
 
     // Add user feedback if applicable
-    const relevantFeedback = context.user_feedback.filter(f =>
-      !stepConfig.dependencies || stepConfig.dependencies.includes(f.step_id)
+    const relevantFeedback = context.user_feedback.filter(
+      f => !stepConfig.dependencies || stepConfig.dependencies.includes(f.step_id)
     );
 
     return {
       ...relevantContext,
       user_feedback: relevantFeedback,
-      mission_id: missionId
+      mission_id: missionId,
     };
   }
 
@@ -742,8 +744,8 @@ class ContextManager {
         target: 'chatgpt',
         model: 'gpt-4o',
         payload: { user_message: prompt },
-        parameters: { max_tokens: targetTokens }
-      }
+        parameters: { max_tokens: targetTokens },
+      },
     });
 
     return result.output;
@@ -769,8 +771,8 @@ class MemoryStore {
       mission_id: missionId,
       key: key,
       value: value,
-      source: source,  // 'user_feedback', 'llm_observation', 'validation_result'
-      stored_at: Date.now()
+      source: source, // 'user_feedback', 'llm_observation', 'validation_result'
+      stored_at: Date.now(),
     };
 
     await this.saveToDisk(`memory/${missionId}/${key}.json`, fact);
@@ -811,8 +813,8 @@ class MemoryStore {
         target: 'chatgpt',
         model: 'gpt-4o',
         payload: { user_message: prompt },
-        parameters: { response_format: { type: 'json_object' } }
-      }
+        parameters: { response_format: { type: 'json_object' } },
+      },
     });
 
     const facts = JSON.parse(result.output);
@@ -835,7 +837,7 @@ class CheckpointManager {
       mission_id: missionId,
       timestamp: Date.now(),
       state: missionState,
-      checkpoint_version: '1.0'
+      checkpoint_version: '1.0',
     };
 
     // Save to disk (atomic write)
@@ -849,7 +851,7 @@ class CheckpointManager {
     this.nerv.emit('MISSION_CHECKPOINT_SAVED', {
       mission_id: missionId,
       checkpoint_path: checkpointPath,
-      progress_percent: missionState.progress_percent
+      progress_percent: missionState.progress_percent,
     });
 
     // Cleanup old checkpoints (keep last 10)
@@ -900,7 +902,7 @@ class CheckpointManager {
     this.nerv.emit('MISSION_RECOVERED', {
       mission_id: missionId,
       recovery_point: state.current_step_id,
-      progress_percent: state.progress_percent
+      progress_percent: state.progress_percent,
     });
 
     // Resume execution
@@ -1025,7 +1027,7 @@ class CostController {
         current_spend: currentSpend,
         estimated_cost: estimatedCost,
         projected_spend: projectedSpend,
-        budget_limit: budgetLimit
+        budget_limit: budgetLimit,
       });
 
       // Pause mission
@@ -1034,13 +1036,13 @@ class CostController {
       return false; // Do not proceed
     }
 
-    if (projectedSpend > (budgetLimit * 0.8)) {
+    if (projectedSpend > budgetLimit * 0.8) {
       // Warning threshold (80%)
       this.nerv.emit('MISSION_BUDGET_WARNING', {
         mission_id: missionId,
         current_spend: currentSpend,
         budget_limit: budgetLimit,
-        percent_used: (projectedSpend / budgetLimit) * 100
+        percent_used: (projectedSpend / budgetLimit) * 100,
       });
     }
 
@@ -1068,7 +1070,7 @@ class CostController {
       input_tokens: cost.input_tokens,
       output_tokens: cost.output_tokens,
       cost_usd: cost.cost_usd,
-      model: cost.model
+      model: cost.model,
     });
   }
 }
@@ -1079,6 +1081,7 @@ class CostController {
 ## 8. ARQUIVOS CRÍTICOS
 
 ### Backend
+
 ```
 src/missions/
 ├── mission_executor.js          # Executa workflows (CORE)

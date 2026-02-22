@@ -1,16 +1,16 @@
 # 🧠 KERNEL - Resumo de Correções Aplicadas
 
-**Data**: 2026-01-21
-**Subsistema**: KERNEL (Sovereign Decision Core)
-**Total de Correções**: 5 correções (P2: 2, P3: 3)
-**Tempo Investido**: ~10 horas
-**Status**: ✅ **COMPLETO - Zero Erros ESLint**
+**Data**: 2026-01-21 **Subsistema**: KERNEL (Sovereign Decision Core) **Total de Correções**: 5
+correções (P2: 2, P3: 3) **Tempo Investido**: ~10 horas **Status**: ✅ **COMPLETO - Zero Erros
+ESLint**
 
 ---
 
 ## 📊 Resumo Executivo
 
-O subsistema KERNEL estava em **excelente estado técnico** após auditorias anteriores (P5.1 optimistic locking e P1 envelope canônico já aplicados). As correções P2 e P3 focaram em **melhorias de qualidade** e **otimizações**:
+O subsistema KERNEL estava em **excelente estado técnico** após auditorias anteriores (P5.1
+optimistic locking e P1 envelope canônico já aplicados). As correções P2 e P3 focaram em **melhorias
+de qualidade** e **otimizações**:
 
 - **P2.1**: Detecção de estagnação mais inteligente (contexto semântico)
 - **P2.2**: Implementação de contador de ciclos estagnados
@@ -18,7 +18,8 @@ O subsistema KERNEL estava em **excelente estado técnico** após auditorias ant
 - **P3.2**: Paralelização de aplicação de decisões
 - **P3.3**: Aumento de retention de telemetria
 
-**Impacto**: Redução de falsos positivos, melhor detecção de problemas reais, maior performance e observabilidade.
+**Impacto**: Redução de falsos positivos, melhor detecção de problemas reais, maior performance e
+observabilidade.
 
 ---
 
@@ -26,10 +27,11 @@ O subsistema KERNEL estava em **excelente estado técnico** após auditorias ant
 
 ### P2.1 - Melhorar Detecção de Estagnação (2h)
 
-**Arquivo**: `src/kernel/policy_engine/policy_engine.js`
-**Problema**: Heurística de gap temporal (2min) gerava falsos positivos para tarefas legitimamente lentas ou esperando input do usuário.
+**Arquivo**: `src/kernel/policy_engine/policy_engine.js` **Problema**: Heurística de gap temporal
+(2min) gerava falsos positivos para tarefas legitimamente lentas ou esperando input do usuário.
 
 **Antes**:
+
 ```javascript
 _assessStagnation(task, observations, at, alerts) {
     if (task.state === 'ACTIVE' && observations.length > 0) {
@@ -50,6 +52,7 @@ _assessStagnation(task, observations, at, alerts) {
 ```
 
 **Depois**:
+
 ```javascript
 _assessStagnation(task, observations, at, alerts) {
     if (task.state === 'ACTIVE' && observations.length > 0) {
@@ -75,6 +78,7 @@ _assessStagnation(task, observations, at, alerts) {
 ```
 
 **Impacto**:
+
 - ✅ Reduz falsos positivos em ~60% (estimativa)
 - ✅ Respeita tarefas com `waitingForInput: true` (ex: aguardando resposta do usuário)
 - ✅ Respeita tarefas com `expectedDuration > 120s` (ex: uploads, downloads longos)
@@ -87,60 +91,66 @@ _assessStagnation(task, observations, at, alerts) {
 ### P2.2 - Implementar maxStalledCycles (2h)
 
 **Arquivos**:
+
 - `src/kernel/task_runtime/task_runtime.js`
 - `src/kernel/policy_engine/policy_engine.js`
 
-**Problema**: Configuração `maxStalledCycles` definida mas não utilizada. Detecção baseada apenas em tempo (stalledMs), não em ciclos.
+**Problema**: Configuração `maxStalledCycles` definida mas não utilizada. Detecção baseada apenas em
+tempo (stalledMs), não em ciclos.
 
 **Antes (task_runtime.js)**:
+
 ```javascript
 const task = {
-    taskId,
-    state: TaskState.CREATED,
-    createdAt: now,
-    updatedAt: now,
-    history: [],
-    metadata: { ...metadata }
+  taskId,
+  state: TaskState.CREATED,
+  createdAt: now,
+  updatedAt: now,
+  history: [],
+  metadata: { ...metadata },
 };
 ```
 
 **Depois (task_runtime.js)**:
+
 ```javascript
 const task = {
-    taskId,
-    state: TaskState.CREATED,
-    createdAt: now,
-    updatedAt: now,
-    history: [],
+  taskId,
+  state: TaskState.CREATED,
+  createdAt: now,
+  updatedAt: now,
+  history: [],
 
-    /**
-     * [P2.2 FIX] Contador de ciclos sem progresso.
-     * Usado pelo PolicyEngine para detecção de estagnação.
-     */
-    stalledCycleCount: 0,
+  /**
+   * [P2.2 FIX] Contador de ciclos sem progresso.
+   * Usado pelo PolicyEngine para detecção de estagnação.
+   */
+  stalledCycleCount: 0,
 
-    metadata: { ...metadata }
+  metadata: { ...metadata },
 };
 ```
 
 **Depois (policy_engine.js)**:
+
 ```javascript
 // [P2.2 FIX] Usa contador de ciclos estagnados (maxStalledCycles)
 if (task.state === 'ACTIVE' && task.stalledCycleCount !== undefined) {
-    if (task.stalledCycleCount > this.limits.maxStalledCycles) {
-        alerts.push(
-            Object.freeze({
-                type: PolicyAlertType.TASK_STAGNATION,
-                message: 'Tarefa excedeu máximo de ciclos sem progresso',
-                value: task.stalledCycleCount,
-                severity: 'CRITICAL'
-            })
-        );
-    }
+  if (task.stalledCycleCount > this.limits.maxStalledCycles) {
+    alerts.push(
+      Object.freeze({
+        type: PolicyAlertType.TASK_STAGNATION,
+        message: 'Tarefa excedeu máximo de ciclos sem progresso',
+        value: task.stalledCycleCount,
+        severity: 'CRITICAL',
+      })
+    );
+  }
 }
 ```
 
 **Impacto**:
+
 - ✅ Implementa detecção baseada em ciclos (complementar ao tempo)
 - ✅ Configuração `maxStalledCycles` agora funcional (padrão: 10 ciclos)
 - ✅ Detecta estagnação mesmo com observações esporádicas (que resetariam stalledMs)
@@ -153,70 +163,81 @@ if (task.state === 'ACTIVE' && task.stalledCycleCount !== undefined) {
 ### P3.1 - Deprecar state/ Legacy (3h)
 
 **Arquivos**:
+
 - `src/kernel/state/task_store.js`
 - `src/kernel/state/observation_store.js`
 
-**Problema**: Duplicação de responsabilidades entre `state/` (legacy) e `task_runtime/` + `observation_store/` (novos). Confusão sobre qual módulo usar.
+**Problema**: Duplicação de responsabilidades entre `state/` (legacy) e `task_runtime/` +
+`observation_store/` (novos). Confusão sobre qual módulo usar.
 
 **Antes (task_store.js)**:
+
 ```javascript
 class TaskStore {
-    constructor() {
-        this.activeTask = null;
-        this.failureCount = 0;
-        this.lastError = null;
-        this.status = STATUS_VALUES.IDLE;
-    }
-    // ...
+  constructor() {
+    this.activeTask = null;
+    this.failureCount = 0;
+    this.lastError = null;
+    this.status = STATUS_VALUES.IDLE;
+  }
+  // ...
 }
 ```
 
 **Depois (task_store.js)**:
+
 ```javascript
 class TaskStore {
-    constructor() {
-        // [P3.1 DEPRECATION WARNING]
-        console.warn('[DEPRECATED] TaskStore is deprecated. Use TaskRuntime (src/kernel/task_runtime/) instead.');
-        console.warn('[DEPRECATED] This class will be removed in a future version.');
+  constructor() {
+    // [P3.1 DEPRECATION WARNING]
+    console.warn(
+      '[DEPRECATED] TaskStore is deprecated. Use TaskRuntime (src/kernel/task_runtime/) instead.'
+    );
+    console.warn('[DEPRECATED] This class will be removed in a future version.');
 
-        this.activeTask = null;
-        this.failureCount = 0;
-        this.lastError = null;
-        this.status = STATUS_VALUES.IDLE;
-    }
-    // ...
+    this.activeTask = null;
+    this.failureCount = 0;
+    this.lastError = null;
+    this.status = STATUS_VALUES.IDLE;
+  }
+  // ...
 }
 ```
 
 **Antes (observation_store.js - state/)**:
+
 ```javascript
 class ObservationStore {
-    constructor(config = {}) {
-        this.limit = config.HISTORY_LIMIT || 100;
-        this.pending = [];
-        this.history = [];
-    }
-    // ...
+  constructor(config = {}) {
+    this.limit = config.HISTORY_LIMIT || 100;
+    this.pending = [];
+    this.history = [];
+  }
+  // ...
 }
 ```
 
 **Depois (observation_store.js - state/)**:
+
 ```javascript
 class ObservationStore {
-    constructor(config = {}) {
-        // [P3.1 DEPRECATION WARNING]
-        console.warn('[DEPRECATED] ObservationStore (state/) is deprecated. Use ObservationStore (src/kernel/observation_store/) instead.');
-        console.warn('[DEPRECATED] This class will be removed in a future version.');
+  constructor(config = {}) {
+    // [P3.1 DEPRECATION WARNING]
+    console.warn(
+      '[DEPRECATED] ObservationStore (state/) is deprecated. Use ObservationStore (src/kernel/observation_store/) instead.'
+    );
+    console.warn('[DEPRECATED] This class will be removed in a future version.');
 
-        this.limit = config.HISTORY_LIMIT || 100;
-        this.pending = [];
-        this.history = [];
-    }
-    // ...
+    this.limit = config.HISTORY_LIMIT || 100;
+    this.pending = [];
+    this.history = [];
+  }
+  // ...
 }
 ```
 
 **Impacto**:
+
 - ✅ Developers alertados sobre uso de código legacy
 - ✅ Clara indicação de caminho de migração
 - ✅ Preparação para remoção futura dos módulos
@@ -230,9 +251,11 @@ class ObservationStore {
 
 **Arquivo**: `src/kernel/kernel_loop/kernel_loop.js`
 
-**Problema**: Propostas aplicadas sequencialmente (loop for), acumulando latência quando múltiplas decisões.
+**Problema**: Propostas aplicadas sequencialmente (loop for), acumulando latência quando múltiplas
+decisões.
 
 **Antes**:
+
 ```javascript
 _applyDecisions(proposals, context) {
     if (!Array.isArray(proposals) || proposals.length === 0) {
@@ -260,6 +283,7 @@ _applyDecisions(proposals, context) {
 ```
 
 **Depois**:
+
 ```javascript
 /**
  * [P3.2 CORREÇÃO] Aplica propostas em paralelo quando possível
@@ -293,6 +317,7 @@ async _applyDecisions(proposals, context) {
 ```
 
 **Mudanças Relacionadas**:
+
 ```javascript
 // step() agora async para suportar _applyDecisions async
 async step() {
@@ -303,7 +328,9 @@ async step() {
 ```
 
 **Impacto**:
-- ✅ Redução de latência do loop quando múltiplas decisões (exemplo: 5 decisões x 10ms = 50ms → 10ms)
+
+- ✅ Redução de latência do loop quando múltiplas decisões (exemplo: 5 decisões x 10ms = 50ms →
+  10ms)
 - ✅ Melhor uso de I/O assíncrono
 - ✅ Mantém isolamento de erros (Promise.all com try-catch por proposal)
 - ✅ Zero quebra de compatibilidade (async é transparente para caller)
@@ -319,6 +346,7 @@ async step() {
 **Problema**: Buffer padrão de retention era `null` (sem retenção), limitando análise pós-mortem.
 
 **Antes**:
+
 ```javascript
 /**
  * @param {number|null} [config.retention]
@@ -332,6 +360,7 @@ constructor({ nerv = null, source = 'kernel', retention = null, enabled = true }
 ```
 
 **Depois**:
+
 ```javascript
 /**
  * @param {number|null} [config.retention]
@@ -346,6 +375,7 @@ constructor({ nerv = null, source = 'kernel', retention = 5000, enabled = true }
 ```
 
 **Impacto**:
+
 - ✅ Buffer padrão de 5000 eventos (vs null anterior)
 - ✅ Melhor análise de crashes (últimos 5000 eventos disponíveis)
 - ✅ Debugging facilitado (histórico maior)
@@ -358,14 +388,14 @@ constructor({ nerv = null, source = 'kernel', retention = 5000, enabled = true }
 
 ## 📈 Métricas de Impacto
 
-| Métrica | Antes | Depois | Melhoria |
-|---------|-------|--------|----------|
-| **Falsos Positivos (Stagnation)** | ~40% | ~15% | -62.5% |
-| **Detecção de Estagnação** | Tempo apenas | Tempo + Ciclos | +100% |
-| **Latência Loop (5 decisões)** | ~50ms | ~10ms | -80% |
-| **Telemetry Retention** | null (0 eventos) | 5000 eventos | +∞ |
-| **Erros ESLint** | 0 | 0 | ✅ Mantido |
-| **Legacy Warnings** | 0 | 4 avisos/boot | ✅ Visibilidade |
+| Métrica                           | Antes            | Depois         | Melhoria        |
+| --------------------------------- | ---------------- | -------------- | --------------- |
+| **Falsos Positivos (Stagnation)** | ~40%             | ~15%           | -62.5%          |
+| **Detecção de Estagnação**        | Tempo apenas     | Tempo + Ciclos | +100%           |
+| **Latência Loop (5 decisões)**    | ~50ms            | ~10ms          | -80%            |
+| **Telemetry Retention**           | null (0 eventos) | 5000 eventos   | +∞              |
+| **Erros ESLint**                  | 0                | 0              | ✅ Mantido      |
+| **Legacy Warnings**               | 0                | 4 avisos/boot  | ✅ Visibilidade |
 
 ---
 
@@ -389,28 +419,31 @@ npx eslint src/kernel/policy_engine/policy_engine.js \
 ### Testes Manuais
 
 #### Teste 1: P2.1 - Contexto Semântico
+
 ```javascript
 // Tarefa aguardando input do usuário (NÃO deve alertar)
 const task = {
-    state: 'ACTIVE',
-    metadata: { waitingForInput: true },
-    // ...
+  state: 'ACTIVE',
+  metadata: { waitingForInput: true },
+  // ...
 };
 // ✅ Nenhum alerta TASK_STAGNATION gerado após 2min
 ```
 
 #### Teste 2: P2.2 - Contador de Ciclos
+
 ```javascript
 // Tarefa com stalledCycleCount = 15 (> maxStalledCycles: 10)
 const task = {
-    state: 'ACTIVE',
-    stalledCycleCount: 15,
-    // ...
+  state: 'ACTIVE',
+  stalledCycleCount: 15,
+  // ...
 };
 // ✅ Alerta CRITICAL gerado corretamente
 ```
 
 #### Teste 3: P3.1 - Deprecation Warnings
+
 ```bash
 node -e "const TaskStore = require('./src/kernel/state/task_store'); new TaskStore();"
 # ✅ Output:
@@ -419,19 +452,21 @@ node -e "const TaskStore = require('./src/kernel/state/task_store'); new TaskSto
 ```
 
 #### Teste 4: P3.2 - Paralelização
+
 ```javascript
 // 5 propostas de decisão
 const proposals = [
-    { kind: 'PROPOSE_SUSPEND_TASK', taskId: 'task-1' },
-    { kind: 'PROPOSE_EMIT_EVENT', taskId: 'task-2' },
-    { kind: 'PROPOSE_ACTIVATE_TASK', taskId: 'task-3' },
-    { kind: 'PROPOSE_TERMINATE_TASK', taskId: 'task-4' },
-    { kind: 'PROPOSE_EMIT_COMMAND', taskId: 'task-5' }
+  { kind: 'PROPOSE_SUSPEND_TASK', taskId: 'task-1' },
+  { kind: 'PROPOSE_EMIT_EVENT', taskId: 'task-2' },
+  { kind: 'PROPOSE_ACTIVATE_TASK', taskId: 'task-3' },
+  { kind: 'PROPOSE_TERMINATE_TASK', taskId: 'task-4' },
+  { kind: 'PROPOSE_EMIT_COMMAND', taskId: 'task-5' },
 ];
 // ✅ Latência: ~10ms (antes: ~50ms) - Medido via telemetria
 ```
 
 #### Teste 5: P3.3 - Telemetry Retention
+
 ```javascript
 const telemetry = new KernelTelemetry({ nerv });
 console.log(telemetry.retention); // ✅ Output: 5000 (antes: null)
@@ -450,24 +485,25 @@ Para evitar falsos positivos de estagnação, use metadados:
 ```javascript
 // Tarefa aguardando input do usuário
 await kernel.createTask({
-    taskId: 'user-prompt-123',
-    metadata: {
-        waitingForInput: true  // ✅ PolicyEngine respeitará
-    }
+  taskId: 'user-prompt-123',
+  metadata: {
+    waitingForInput: true, // ✅ PolicyEngine respeitará
+  },
 });
 
 // Tarefa com operação longa
 await kernel.createTask({
-    taskId: 'large-upload-456',
-    metadata: {
-        expectedDuration: 300000  // 5 minutos - ✅ PolicyEngine respeitará
-    }
+  taskId: 'large-upload-456',
+  metadata: {
+    expectedDuration: 300000, // 5 minutos - ✅ PolicyEngine respeitará
+  },
 });
 ```
 
 #### 2. Migração de state/ para task_runtime/
 
 **Antes**:
+
 ```javascript
 const TaskStore = require('./src/kernel/state/task_store');
 const store = new TaskStore();
@@ -475,6 +511,7 @@ const store = new TaskStore();
 ```
 
 **Depois**:
+
 ```javascript
 const { TaskRuntime } = require('./src/kernel/task_runtime/task_runtime');
 const runtime = new TaskRuntime({ telemetry });
@@ -512,16 +549,17 @@ console.log(task.stalledCycleCount); // ✅ Quantos ciclos sem progresso
 
 ## 📊 Comparativo com Outras Auditorias
 
-| Subsistema | Correções P1 | Correções P2 | Correções P3 | Total | Status |
-|------------|--------------|--------------|--------------|-------|--------|
-| **NERV** | 13 | 0 | 0 | 13 | ✅ Completo |
-| **INFRA** | 0 | 1 | 3 | 4 | ✅ Completo |
-| **KERNEL** | 0 | 2 | 3 | 5 | ✅ Completo |
-| **DRIVER** | - | - | - | - | ⏳ Próximo |
-| **SERVER** | - | - | - | - | ⏳ Pendente |
-| **CORE** | - | - | - | - | ⏳ Pendente |
+| Subsistema | Correções P1 | Correções P2 | Correções P3 | Total | Status      |
+| ---------- | ------------ | ------------ | ------------ | ----- | ----------- |
+| **NERV**   | 13           | 0            | 0            | 13    | ✅ Completo |
+| **INFRA**  | 0            | 1            | 3            | 4     | ✅ Completo |
+| **KERNEL** | 0            | 2            | 3            | 5     | ✅ Completo |
+| **DRIVER** | -            | -            | -            | -     | ⏳ Próximo  |
+| **SERVER** | -            | -            | -            | -     | ⏳ Pendente |
+| **CORE**   | -            | -            | -            | -     | ⏳ Pendente |
 
-**Observação**: KERNEL tinha **P5.1** (optimistic locking) e **P1** (envelope canônico) já aplicados em auditorias anteriores.
+**Observação**: KERNEL tinha **P5.1** (optimistic locking) e **P1** (envelope canônico) já aplicados
+em auditorias anteriores.
 
 ---
 
@@ -539,7 +577,5 @@ O subsistema KERNEL recebeu **5 melhorias de qualidade** focadas em:
 
 ---
 
-**Assinado**: Sistema de Auditoria de Código
-**Data**: 2026-01-21
-**Versão**: 1.0
-**Próxima Auditoria**: 05_DRIVER_AUDIT.md (Drivers ChatGPT/Gemini)
+**Assinado**: Sistema de Auditoria de Código **Data**: 2026-01-21 **Versão**: 1.0 **Próxima
+Auditoria**: 05_DRIVER_AUDIT.md (Drivers ChatGPT/Gemini)

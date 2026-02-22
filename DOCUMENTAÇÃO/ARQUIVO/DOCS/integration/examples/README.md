@@ -1,18 +1,22 @@
 # MCP Integration - Configuration Examples
 
-This directory contains ready-to-use configuration files for integrating the chatgpt-docker-puppeteer MCP server with various LLMs.
+This directory contains ready-to-use configuration files for integrating the
+chatgpt-docker-puppeteer MCP server with various LLMs.
 
 ## 📁 Files
 
 ### 1. `claude_desktop_config.json`
+
 Configuration for Claude Desktop app.
 
 **Location:**
+
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `%AppData%\Claude\claude_desktop_config.json`
 - **Linux:** `~/.config/Claude/claude_desktop_config.json`
 
 **Usage:**
+
 ```bash
 # Copy to Claude config location
 cp claude_desktop_config.json ~/Library/Application\ Support/Claude/claude_desktop_config.json
@@ -23,11 +27,14 @@ cp claude_desktop_config.json ~/Library/Application\ Support/Claude/claude_deskt
 ---
 
 ### 2. `vscode_settings_copilot.json`
+
 Configuration for GitHub Copilot in VS Code.
 
-**Location:** `.vscode/settings.json` (workspace) or `~/Library/Application Support/Code/User/settings.json` (global)
+**Location:** `.vscode/settings.json` (workspace) or
+`~/Library/Application Support/Code/User/settings.json` (global)
 
 **Usage:**
+
 ```bash
 # Merge into your existing VS Code settings.json
 # Add the "github.copilot.chat.mcpServers" section
@@ -37,6 +44,7 @@ Configuration for GitHub Copilot in VS Code.
 ```
 
 **Alternative:** Add via UI:
+
 1. Open Copilot Chat panel
 2. Click Tools button (🔧)
 3. Select "Add MCP Server"
@@ -46,13 +54,16 @@ Configuration for GitHub Copilot in VS Code.
 ---
 
 ### 3. `opencode_config.json`
+
 Configuration for OpenCode CLI.
 
 **Location:**
+
 - **Linux/macOS:** `~/.config/opencode/config.json`
 - **Windows:** `%AppData%/opencode/config.json`
 
 **Usage:**
+
 ```bash
 # Copy to OpenCode config location
 mkdir -p ~/.config/opencode
@@ -65,9 +76,11 @@ opencode
 ---
 
 ### 4. `test_mcp_endpoint.sh`
+
 Comprehensive test script for MCP endpoint.
 
 **Tests:**
+
 1. Discovery endpoint (GET /api/mcp)
 2. tools/list (list all available tools)
 3. ollama_models tool
@@ -76,6 +89,7 @@ Comprehensive test script for MCP endpoint.
 6. resources/read (rag://stats)
 
 **Usage:**
+
 ```bash
 # Ensure server is running on localhost:3008
 pm2 status | grep dashboard-web
@@ -88,6 +102,7 @@ bash -x test_mcp_endpoint.sh
 ```
 
 **Expected Output:**
+
 ```
 =========================================
 MCP Endpoint Test Script
@@ -119,6 +134,7 @@ MCP Endpoint Test Script
 ### Prerequisites
 
 1. **Express server running:**
+
    ```bash
    pm2 start ecosystem.config.cjs --only dashboard-web
    # OR
@@ -126,6 +142,7 @@ MCP Endpoint Test Script
    ```
 
 2. **Ollama accessible:**
+
    ```bash
    # On host (outside container)
    ollama list
@@ -151,6 +168,7 @@ cd docs/integration/examples
 ### Configure Your LLM
 
 Choose your LLM and follow the instructions above:
+
 - 🤖 Claude Desktop → `claude_desktop_config.json`
 - 💻 GitHub Copilot → `vscode_settings_copilot.json`
 - ⌨️ OpenCode CLI → `opencode_config.json`
@@ -161,6 +179,7 @@ Choose your LLM and follow the instructions above:
 ## 🔧 Troubleshooting
 
 ### Server not responding
+
 ```bash
 # Check if server is running
 pm2 status | grep dashboard-web
@@ -174,6 +193,7 @@ pm2 logs dashboard-web --lines 50
 ```
 
 ### Ollama tools failing
+
 ```bash
 # Check Ollama connectivity from container
 curl http://host.docker.internal:11434/api/tags
@@ -183,6 +203,7 @@ ollama list
 ```
 
 ### LLM not discovering tools
+
 - **Claude Desktop:** Completely quit and reopen the app
 - **Copilot:** Reload VS Code window (Ctrl/Cmd + Shift + P → "Reload Window")
 - **OpenCode:** Restart OpenCode CLI
@@ -192,8 +213,10 @@ ollama list
 ## 📚 Additional Resources
 
 - **Main Integration Guide:** [../README.md](../README.md)
-- **Implementation Report:** [../../../RAG_V4_IMPLEMENTATION_REPORT.md](../../../RAG_V4_IMPLEMENTATION_REPORT.md)
-- **Test Suite:** [../../../tests/integration/rag/test_multi_llm_integration.spec.js](../../../tests/integration/rag/test_multi_llm_integration.spec.js)
+- **Implementation Report:**
+  [../../../RAG_V4_IMPLEMENTATION_REPORT.md](../../../RAG_V4_IMPLEMENTATION_REPORT.md)
+- **Test Suite:**
+  [../../../tests/integration/rag/test_multi_llm_integration.spec.js](../../../tests/integration/rag/test_multi_llm_integration.spec.js)
 
 ---
 

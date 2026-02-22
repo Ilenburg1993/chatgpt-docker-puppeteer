@@ -2,7 +2,9 @@
 
 ## 📋 Resumo Executivo
 
-O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para suportar **todos os métodos de conexão Puppeteer**, com fallback automático, cache persistente e limpeza inteligente de recursos.
+O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para suportar **todos os
+métodos de conexão Puppeteer**, com fallback automático, cache persistente e limpeza inteligente de
+recursos.
 
 ---
 
@@ -54,70 +56,70 @@ O `ConnectionOrchestrator` foi **exaustivamente revisado e aprimorado** para sup
 
 1. **launcher** (Padrão - Recomendado)
 
-    ```javascript
-    {
-        mode: 'launcher';
-    }
-    ```
+   ```javascript
+   {
+     mode: 'launcher';
+   }
+   ```
 
-    - Puppeteer inicia Chrome automaticamente
-    - Zero configuração externa
-    - Funciona em qualquer ambiente
+   - Puppeteer inicia Chrome automaticamente
+   - Zero configuração externa
+   - Funciona em qualquer ambiente
 
 2. **connect** (Chrome externo via browserURL)
 
-    ```javascript
-    {
-      mode: 'connect',
-      hosts: ['127.0.0.1', 'host.docker.internal'],
-      ports: [9224, 9223, 9224]
-    }
-    ```
+   ```javascript
+   {
+     mode: 'connect',
+     hosts: ['127.0.0.1', 'host.docker.internal'],
+     ports: [9224, 9223, 9224]
+   }
+   ```
 
-    - Conecta via `http://host:port`
-    - Testa múltiplos hosts/portas
-    - Logs detalhados de falhas
+   - Conecta via `http://host:port`
+   - Testa múltiplos hosts/portas
+   - Logs detalhados de falhas
 
 3. **wsEndpoint** (Chrome externo via WebSocket)
 
-    ```javascript
-    {
-      mode: 'wsEndpoint',
-      hosts: ['localhost', 'host.docker.internal'],
-      ports: [9224]
-    }
-    ```
+   ```javascript
+   {
+     mode: 'wsEndpoint',
+     hosts: ['localhost', 'host.docker.internal'],
+     ports: [9224]
+   }
+   ```
 
-    - Mais estável que browserURL
-    - Fetch de `/json/version` primeiro
-    - Conecta via WebSocket Debugger URL
+   - Mais estável que browserURL
+   - Fetch de `/json/version` primeiro
+   - Conecta via WebSocket Debugger URL
 
 4. **executablePath** (Chrome customizado)
 
-    ```javascript
-    {
-      mode: 'executablePath',
-      executablePath: '/usr/bin/google-chrome-stable'
-    }
-    ```
+   ```javascript
+   {
+     mode: 'executablePath',
+     executablePath: '/usr/bin/google-chrome-stable'
+   }
+   ```
 
-    - Usa Chrome instalado no sistema
-    - Validação de path (fs.existsSync)
-    - Suporta extensões customizadas
+   - Usa Chrome instalado no sistema
+   - Validação de path (fs.existsSync)
+   - Suporta extensões customizadas
 
 5. **auto** (Fallback inteligente)
 
-    ```javascript
-    {
-      mode: 'auto',
-      autoFallback: true
-    }
-    ```
+   ```javascript
+   {
+     mode: 'auto',
+     autoFallback: true
+   }
+   ```
 
-    - Tenta todos os modos em ordem de prioridade
-    - Ordem: launcher → wsEndpoint → connect → executablePath
-    - Logs de cada tentativa
-    - Retry com backoff exponencial
+   - Tenta todos os modos em ordem de prioridade
+   - Ordem: launcher → wsEndpoint → connect → executablePath
+   - Logs de cada tentativa
+   - Retry com backoff exponencial
 
 **Melhorias de Configuração:**
 
@@ -205,10 +207,10 @@ const status = orch.getStatus();
 ```javascript
 // BrowserPoolManager agora usa ConnectionOrchestrator (connect-only)
 const pool = new BrowserPoolManager({
-    poolSize: 3,
-    browserEndpoint: {
-        url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224'
-    }
+  poolSize: 3,
+  browserEndpoint: {
+    url: process.env.CHROME_WS_ENDPOINT || 'http://localhost:9224',
+  },
 });
 ```
 
@@ -219,26 +221,26 @@ const pool = new BrowserPoolManager({
 ### Testes Executados (100% Passou):
 
 1. ✅ **test_connection_orchestrator.js**
-    - 6 testes (launcher, auto, cache, cleanup, reuso, args)
-    - Todos passaram
+   - 6 testes (launcher, auto, cache, cleanup, reuso, args)
+   - Todos passaram
 
 2. ✅ **test_browser_pool.js**
-    - Pool de 2 instâncias
-    - Alocação, navegação, liberação, shutdown
-    - Passou
+   - Pool de 2 instâncias
+   - Alocação, navegação, liberação, shutdown
+   - Passou
 
 3. ✅ **test_boot_sequence.js**
-    - 6 fases (Config, Identity, NERV, BrowserPool, Integração, Shutdown)
-    - Passou
+   - 6 fases (Config, Identity, NERV, BrowserPool, Integração, Shutdown)
+   - Passou
 
 4. ✅ **test_integration_complete.js**
-    - Integração completa (pool + navegação + limpeza)
-    - Passou
+   - Integração completa (pool + navegação + limpeza)
+   - Passou
 
 5. ✅ **puppeteer_maintenance.js**
-    - Cache: 536MB em ~/.cache/puppeteer
-    - Profiles temporários: 0
-    - Passou
+   - Cache: 536MB em ~/.cache/puppeteer
+   - Profiles temporários: 0
+   - Passou
 
 ---
 
@@ -269,24 +271,24 @@ const pool = new BrowserPoolManager({
 ### Modificados:
 
 1. ✅ `src/infra/ConnectionOrchestrator.js` (210 linhas → 380 linhas)
-    - 5 modos de conexão
-    - Fallback automático
-    - Cache persistente
-    - Limpeza de temporários
+   - 5 modos de conexão
+   - Fallback automático
+   - Cache persistente
+   - Limpeza de temporários
 
 2. ✅ `src/infra/browser_pool/pool_manager.js`
-    - Import de puppeteer (não puppeteer-core)
-    - Usa ConnectionOrchestrator internamente
+   - Import de puppeteer (não puppeteer-core)
+   - Usa ConnectionOrchestrator internamente
 
 3. ✅ `src/main.js`
-    - Fase 6/6 de shutdown: limpeza de profiles
-    - Import de ConnectionOrchestrator
+   - Fase 6/6 de shutdown: limpeza de profiles
+   - Import de ConnectionOrchestrator
 
 4. ✅ `config.json`
-    - Adicionado `BROWSER_MODE: "launcher"`
+   - Adicionado `BROWSER_MODE: "launcher"`
 
 5. ✅ `package.json`
-    - Scripts: `maintenance`, `maintenance:clean-cache`
+   - Scripts: `maintenance`, `maintenance:clean-cache`
 
 ### Criados:
 
@@ -320,9 +322,9 @@ const browser = await orch.connect();
 
 ```javascript
 const orch = new ConnectionOrchestrator({
-    mode: 'wsEndpoint',
-    hosts: ['host.docker.internal'],
-    ports: [9224]
+  mode: 'wsEndpoint',
+  hosts: ['host.docker.internal'],
+  ports: [9224],
 });
 ```
 
@@ -381,6 +383,8 @@ npm run maintenance:clean-cache  # Remove cache completo
 
 ## 🎉 Conclusão
 
-O ConnectionOrchestrator agora é um **gerenciador universal de conexões Puppeteer** com suporte completo a todos os métodos, fallback inteligente e gestão otimizada de recursos. **Zero lixo em /tmp**, cache persistente de 536MB reutilizado entre execuções, e limpeza automática no shutdown.
+O ConnectionOrchestrator agora é um **gerenciador universal de conexões Puppeteer** com suporte
+completo a todos os métodos, fallback inteligente e gestão otimizada de recursos. **Zero lixo em
+/tmp**, cache persistente de 536MB reutilizado entre execuções, e limpeza automática no shutdown.
 
 **Status: PRODUCTION-READY** ✅

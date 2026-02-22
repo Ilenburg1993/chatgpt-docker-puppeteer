@@ -1,15 +1,14 @@
 # 💻 Guia de Desenvolvimento
 
-**Versão**: 1.0
-**Última Atualização**: 21/01/2026
-**Público-Alvo**: Desenvolvedores
-**Tempo de Leitura**: ~30 min
+**Versão**: 1.0 **Última Atualização**: 21/01/2026 **Público-Alvo**: Desenvolvedores **Tempo de
+Leitura**: ~30 min
 
 ---
 
 ## 📖 Visão Geral
 
-Este documento detalha **como desenvolver** no projeto `chatgpt-docker-puppeteer`: setup local, Makefile, debugging, profiling, hot reload, e tarefas comuns.
+Este documento detalha **como desenvolver** no projeto `chatgpt-docker-puppeteer`: setup local,
+Makefile, debugging, profiling, hot reload, e tarefas comuns.
 
 ---
 
@@ -18,12 +17,14 @@ Este documento detalha **como desenvolver** no projeto `chatgpt-docker-puppeteer
 ### 1. Pré-requisitos
 
 **Obrigatório**:
+
 - **Node.js**: ≥20.0.0 LTS ([Download](https://nodejs.org/))
 - **npm**: ≥10.0.0 (incluído com Node.js)
 - **Git**: ≥2.40.0 ([Download](https://git-scm.com/))
 - **Chrome/Edge**: Browser instalado no sistema
 
 **Opcional**:
+
 - **PM2**: `npm install -g pm2` (process manager)
 - **GNU Make**: Já disponível (Linux/macOS) ou via Git Bash (Windows)
 - **VS Code**: Editor recomendado ([Download](https://code.visualstudio.com/))
@@ -56,6 +57,7 @@ pm2 -v   # 5.3.0 (if installed)
 ```
 
 **Dependências principais** (package.json):
+
 - `puppeteer-extra` + `puppeteer-extra-plugin-stealth` (browser automation)
 - `express` + `socket.io` (server + WebSocket)
 - `zod` (schema validation)
@@ -90,6 +92,7 @@ nano .env
 ```
 
 **Desenvolvimento** (.env):
+
 ```bash
 # Environment
 NODE_ENV=development
@@ -134,6 +137,7 @@ google-chrome \
 ```
 
 **Verificar conexão**:
+
 ```bash
 curl http://localhost:9224/json/version  # container-facing endpoint (proxy)
 # {"Browser":"Chrome/120.0.6099.109", ...}
@@ -144,6 +148,7 @@ curl http://localhost:9224/json/version  # container-facing endpoint (proxy)
 ### 7. Iniciar Sistema
 
 **Opção A: Dev Mode (Nodemon)**:
+
 ```bash
 # Start with auto-reload
 npm run dev
@@ -157,6 +162,7 @@ npm run dev
 ```
 
 **Opção B: PM2 (Production-like)**:
+
 ```bash
 # Start
 make start  # ou npm run daemon:start
@@ -224,6 +230,7 @@ chatgpt-docker-puppeteer/
 ### Categorias de Comandos (58+ targets)
 
 #### Lifecycle
+
 ```bash
 make start              # Start PM2 agent + dashboard
 make stop               # Stop all processes
@@ -233,6 +240,7 @@ make pm2-status         # PM2 status table
 ```
 
 #### Health & Testing
+
 ```bash
 make health             # Full health (4 endpoints + PM2)
 make health-core        # Quick check (core endpoint only)
@@ -243,6 +251,7 @@ make ci-test            # CI/CD mode (strict)
 ```
 
 #### Monitoring
+
 ```bash
 make logs               # PM2 logs (last 100 lines)
 make logs-follow        # Tail logs in real-time
@@ -252,6 +261,7 @@ make dashboard          # Open HTML dashboard
 ```
 
 #### Queue Operations
+
 ```bash
 make queue-status       # Show queue summary
 make queue-add          # Add test task
@@ -259,6 +269,7 @@ make queue-watch        # Watch queue (live update)
 ```
 
 #### Code Quality
+
 ```bash
 make lint               # ESLint check (--max-warnings 0)
 make format-code        # ESLint + Prettier (auto-fix)
@@ -267,6 +278,7 @@ make git-changed        # Show modified files
 ```
 
 #### Dependencies
+
 ```bash
 make check-deps         # Verify tool availability
 make install-deps       # npm install
@@ -275,6 +287,7 @@ make deps-consistency   # Validate package-lock.json
 ```
 
 #### Maintenance
+
 ```bash
 make clean              # Remove logs/tmp/queue
 make workspace-clean    # Deep clean (with confirmation)
@@ -283,6 +296,7 @@ make diagnose           # Full diagnostic report
 ```
 
 #### Info
+
 ```bash
 make help               # Show all targets
 make version            # Show versions (Makefile, Launcher, Scripts)
@@ -359,6 +373,7 @@ make quick CMD=status
 ```
 
 **Uso**:
+
 1. Start com inspect: `node --inspect index.js`
 2. VS Code: Run → Attach to Node Process
 3. Set breakpoints (F9)
@@ -369,12 +384,14 @@ make quick CMD=status
 ### 2. Chrome DevTools (Browser Debugging)
 
 **Connect**:
+
 1. Browser aberto com `--remote-debugging-port=9224`
 2. Abra Chrome: `chrome://inspect`
 3. Click "Open dedicated DevTools for Node"
 4. Navigate to `localhost:9224`
 
 **Debugging**:
+
 - **Console**: Execute JavaScript no contexto da page
 - **Network**: Monitor requests (API calls, XHR)
 - **Performance**: Record profile, analyze flame graph
@@ -385,6 +402,7 @@ make quick CMD=status
 ### 3. NERV Debugging (Event Tracing)
 
 **Log all events**:
+
 ```bash
 # .env
 LOG_LEVEL=DEBUG
@@ -397,11 +415,13 @@ make watch-logs
 ```
 
 **Filter by correlationId**:
+
 ```bash
 grep "correlation-abc123" logs/agente-gpt-out.log
 ```
 
 **Trace event chain**:
+
 ```javascript
 const { correlation } = require('./src/nerv/correlation');
 
@@ -420,6 +440,7 @@ console.log(chain);
 ### 4. Task Debugging
 
 **Check task state**:
+
 ```bash
 # Via API
 curl http://localhost:3008/api/task/task-abc123
@@ -429,16 +450,19 @@ cat fila/task-abc123.json
 ```
 
 **View logs for task**:
+
 ```bash
 grep "task-abc123" logs/agente-gpt-out.log | tail -50
 ```
 
 **Inspect response**:
+
 ```bash
 cat respostas/task-abc123.txt
 ```
 
 **Manual task execution**:
+
 ```javascript
 // In VS Code Debug Console or Node REPL
 const { executeTask } = require('./src/kernel/execution_engine');
@@ -511,6 +535,7 @@ node --inspect index.js
 ```
 
 **Common leaks**:
+
 - Event listeners not removed (`nerv.off()`)
 - Browser pages not closed (`page.close()`)
 - Timers not cleared (`clearInterval()`)
@@ -561,6 +586,7 @@ curl http://localhost:3008/api/health-metrics
 ```
 
 **Uso**:
+
 ```bash
 npm run dev
 # [nodemon] starting `node index.js`
@@ -568,6 +594,7 @@ npm run dev
 ```
 
 **On change**:
+
 - Save file → Nodemon detecta → Restart automático
 
 ---
@@ -578,17 +605,19 @@ npm run dev
 
 ```javascript
 module.exports = {
-  apps: [{
-    name: 'agente-gpt',
-    script: './index.js',
-    watch: true,
-    watch_options: {
-      followSymlinks: false,
-      usePolling: false,
-      interval: 1000,
-      ignored: ['logs', 'fila', 'respostas', 'tmp']
-    }
-  }]
+  apps: [
+    {
+      name: 'agente-gpt',
+      script: './index.js',
+      watch: true,
+      watch_options: {
+        followSymlinks: false,
+        usePolling: false,
+        interval: 1000,
+        ignored: ['logs', 'fila', 'respostas', 'tmp'],
+      },
+    },
+  ],
 };
 ```
 
@@ -599,6 +628,7 @@ module.exports = {
 ### 3. Config Hot-Reload (Runtime)
 
 **API**:
+
 ```javascript
 const CONFIG = require('./src/core/config');
 
@@ -607,10 +637,11 @@ CONFIG.reload();
 // [INFO] Configuration reloaded from config.json
 
 // Access updated value
-console.log(CONFIG.maxWorkers);  // Novo valor
+console.log(CONFIG.maxWorkers); // Novo valor
 ```
 
 **Trigger via API**:
+
 ```bash
 # Endpoint (futuro)
 curl -X POST http://localhost:3008/api/config/reload \
@@ -630,32 +661,32 @@ curl -X POST http://localhost:3008/api/config/reload \
 const BaseDriver = require('../base_driver');
 
 class ClaudeDriver extends BaseDriver {
-    constructor(opts) {
-        super(opts);
-        this.targetName = 'claude';
-    }
+  constructor(opts) {
+    super(opts);
+    this.targetName = 'claude';
+  }
 
-    async execute(page, prompt) {
-        // Navigate
-        await page.goto('https://claude.ai/chats', { waitUntil: 'networkidle2' });
+  async execute(page, prompt) {
+    // Navigate
+    await page.goto('https://claude.ai/chats', { waitUntil: 'networkidle2' });
 
-        // Type prompt
-        const inputSelector = 'div[contenteditable="true"]';
-        await page.waitForSelector(inputSelector, { timeout: 10000 });
-        await page.type(inputSelector, prompt);
+    // Type prompt
+    const inputSelector = 'div[contenteditable="true"]';
+    await page.waitForSelector(inputSelector, { timeout: 10000 });
+    await page.type(inputSelector, prompt);
 
-        // Submit
-        await page.keyboard.press('Enter');
+    // Submit
+    await page.keyboard.press('Enter');
 
-        // Collect response
-        const responseSelector = '.message-content';
-        await page.waitForSelector(responseSelector, { timeout: 60000 });
-        const response = await page.evaluate((sel) => {
-            return document.querySelector(sel)?.innerText || '';
-        }, responseSelector);
+    // Collect response
+    const responseSelector = '.message-content';
+    await page.waitForSelector(responseSelector, { timeout: 60000 });
+    const response = await page.evaluate(sel => {
+      return document.querySelector(sel)?.innerText || '';
+    }, responseSelector);
 
-        return response;
-    }
+    return response;
+  }
 }
 
 module.exports = ClaudeDriver;
@@ -668,14 +699,18 @@ module.exports = ClaudeDriver;
 const ClaudeDriver = require('./targets/claude');
 
 class DriverFactory {
-    static createDriver(target, opts) {
-        switch (target) {
-            case 'chatgpt': return new ChatGPTDriver(opts);
-            case 'gemini': return new GeminiDriver(opts);
-            case 'claude': return new ClaudeDriver(opts);  // ← Add
-            default: throw new Error(`Unknown target: ${target}`);
-        }
+  static createDriver(target, opts) {
+    switch (target) {
+      case 'chatgpt':
+        return new ChatGPTDriver(opts);
+      case 'gemini':
+        return new GeminiDriver(opts);
+      case 'claude':
+        return new ClaudeDriver(opts); // ← Add
+      default:
+        throw new Error(`Unknown target: ${target}`);
     }
+  }
 }
 ```
 
@@ -732,15 +767,15 @@ const logger = require('../../core/logger');
  * Custom status endpoint
  */
 router.get('/status', (req, res) => {
-    logger.log('INFO', '[API] GET /api/custom/status');
+  logger.log('INFO', '[API] GET /api/custom/status');
 
-    res.json({
-        status: 'ok',
-        customData: {
-            foo: 'bar',
-            timestamp: Date.now()
-        }
-    });
+  res.json({
+    status: 'ok',
+    customData: {
+      foo: 'bar',
+      timestamp: Date.now(),
+    },
+  });
 });
 
 module.exports = router;
@@ -753,9 +788,9 @@ module.exports = router;
 const customRoutes = require('./custom');
 
 function setupRoutes(app) {
-    app.use('/api/queue', queueRoutes);
-    app.use('/api/health', healthRoutes);
-    app.use('/api/custom', customRoutes);  // ← Add
+  app.use('/api/queue', queueRoutes);
+  app.use('/api/health', healthRoutes);
+  app.use('/api/custom', customRoutes); // ← Add
 }
 ```
 
@@ -781,7 +816,8 @@ curl http://localhost:3008/api/custom/status
 **Passo 4**: Documentar
 
 Atualizar [API_REFERENCE.md](API_REFERENCE.md):
-```markdown
+
+````markdown
 ### GET /api/custom/status
 
 **Descrição**: Retorna status customizado
@@ -789,13 +825,16 @@ Atualizar [API_REFERENCE.md](API_REFERENCE.md):
 **Autenticação**: Não requerida
 
 **Response** (200 OK):
+
 ```json
 {
   "status": "ok",
   "customData": { "foo": "bar", "timestamp": 1737450000 }
 }
 ```
-```
+````
+
+````
 
 ---
 
@@ -817,7 +856,7 @@ node -e "
 const locks = require('./src/infra/lock_manager');
 console.log(locks.listActiveLocks());
 "
-```
+````
 
 **Solução**:
 
@@ -826,24 +865,29 @@ console.log(locks.listActiveLocks());
 
 // ✅ Optimistic locking (P5.1)
 async function allocateTask(taskId, expectedState = 'PENDING') {
-    const task = await io.getTask(taskId);
+  const task = await io.getTask(taskId);
 
-    // Race detection
-    if (task.state !== expectedState) {
-        logger.log('WARN', `[P5.1] Race detected: expected ${expectedState}, got ${task.state}`, taskId);
-        return null;  // Abort allocation
-    }
+  // Race detection
+  if (task.state !== expectedState) {
+    logger.log(
+      'WARN',
+      `[P5.1] Race detected: expected ${expectedState}, got ${task.state}`,
+      taskId
+    );
+    return null; // Abort allocation
+  }
 
-    // Atomic state transition
-    task.state = 'RUNNING';
-    task.allocatedAt = Date.now();
-    await io.saveTask(task);
+  // Atomic state transition
+  task.state = 'RUNNING';
+  task.allocatedAt = Date.now();
+  await io.saveTask(task);
 
-    return task;
+  return task;
 }
 ```
 
 **Validar fix**:
+
 ```bash
 # Run test
 node tests/test_p5_fixes.js
@@ -873,44 +917,45 @@ clinic flame -- node index.js
 
 // Before (slow)
 function scanQueue() {
-    const files = fs.readdirSync(queueDir);
-    const tasks = files.map(f => JSON.parse(fs.readFileSync(path.join(queueDir, f))));
-    return tasks;
+  const files = fs.readdirSync(queueDir);
+  const tasks = files.map(f => JSON.parse(fs.readFileSync(path.join(queueDir, f))));
+  return tasks;
 }
 
 // After (fast) - Cache with invalidation
 const queueCache = { tasks: null, lastScan: 0 };
 
 function scanQueue() {
-    const now = Date.now();
-    if (queueCache.tasks && (now - queueCache.lastScan) < 5000) {
-        return queueCache.tasks;  // Hit: 0.1ms
-    }
+  const now = Date.now();
+  if (queueCache.tasks && now - queueCache.lastScan < 5000) {
+    return queueCache.tasks; // Hit: 0.1ms
+  }
 
-    // Miss: Rebuild cache (200ms)
-    const files = fs.readdirSync(queueDir);
-    const tasks = files.map(f => JSON.parse(fs.readFileSync(path.join(queueDir, f))));
+  // Miss: Rebuild cache (200ms)
+  const files = fs.readdirSync(queueDir);
+  const tasks = files.map(f => JSON.parse(fs.readFileSync(path.join(queueDir, f))));
 
-    queueCache.tasks = tasks;
-    queueCache.lastScan = now;
-    return tasks;
+  queueCache.tasks = tasks;
+  queueCache.lastScan = now;
+  return tasks;
 }
 
 // Invalidate on write
 function markDirty() {
-    queueCache.tasks = null;  // Force next scan to rebuild
+  queueCache.tasks = null; // Force next scan to rebuild
 }
 ```
 
 **Test**:
+
 ```bash
 node tests/test_p9_fixes.js
 
 # ✅ P9.4: Queue cache reduces scan time (1200ms → 200ms)
 ```
 
-**Document**:
-Atualizar `AUDITORIA_STATUS_ATUAL.md`:
+**Document**: Atualizar `AUDITORIA_STATUS_ATUAL.md`:
+
 ```markdown
 | P9.4 | Queue Cache | ... | ✅ FIXED | Added 5s cache with markDirty() invalidation |
 ```
@@ -941,21 +986,22 @@ Atualizar `AUDITORIA_STATUS_ATUAL.md`:
 
 ```javascript
 export default [
-    {
-        languageOptions: {
-            ecmaVersion: 2024,
-            sourceType: 'module'
-        },
-        rules: {
-            'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-            'no-console': 'warn',
-            'prefer-const': 'error'
-        }
-    }
+  {
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-console': 'warn',
+      'prefer-const': 'error',
+    },
+  },
 ];
 ```
 
 **Uso**:
+
 ```bash
 # Check
 make lint
@@ -981,6 +1027,7 @@ make format-code
 ```
 
 **VS Code** (auto-format on save):
+
 ```json
 // .vscode/settings.json
 {
@@ -1002,4 +1049,4 @@ make format-code
 
 ---
 
-*Última revisão: 21/01/2026 | Contribuidores: AI Architect, Dev Team*
+_Última revisão: 21/01/2026 | Contribuidores: AI Architect, Dev Team_

@@ -1,25 +1,29 @@
 # 🔧 Plano de Consolidação: Chrome Proxy + ConnectionOrchestrator + BrowserPoolManager
 
-**Data**: 2026-02-01
-**Status**: 🔴 **CRÍTICO - Sistema não operacional**
-**Versão**: 1.0 (Pré-Consolidação)
-**Autores**: Análise técnica profunda + auditoria de 1.787 linhas
+**Data**: 2026-02-01 **Status**: 🔴 **CRÍTICO - Sistema não operacional** **Versão**: 1.0
+(Pré-Consolidação) **Autores**: Análise técnica profunda + auditoria de 1.787 linhas
 
 ---
 
 ## 📋 Sumário Executivo
 
 ### Situação Atual
-O sistema possui **implementação completa** de todos os componentes necessários para conexão Chrome via proxy, mas **nunca foram integrados**. Resultado: **0% de funcionalidade** para automação browser.
+
+O sistema possui **implementação completa** de todos os componentes necessários para conexão Chrome
+via proxy, mas **nunca foram integrados**. Resultado: **0% de funcionalidade** para automação
+browser.
 
 ### Impacto
+
 - 🔴 **ChromeProxyService**: Implementado (643 linhas) mas **NUNCA iniciado**
 - 🔴 **BrowserPoolManager**: Usa método inexistente (`.connect()` em vez de `.ensureBrowser()`)
 - 🔴 **Boot Sequence**: Ordem incorreta (tenta conectar browser antes de proxy existir)
 - 🔴 **Validação**: Zero verificação de proxy disponível antes de tentativas de conexão
 
 ### Resultado
-**Sistema crasheia 100% das vezes** ao tentar usar browser automation. Nenhuma task pode ser executada.
+
+**Sistema crasheia 100% das vezes** ao tentar usar browser automation. Nenhuma task pode ser
+executada.
 
 ---
 
@@ -27,8 +31,8 @@ O sistema possui **implementação completa** de todos os componentes necessári
 
 ### Arquivos Analisados (7 arquivos, 2.593 linhas)
 
-| Arquivo                                  | Linhas | Status       | Bugs Críticos                      |
-| ---------------------------------------- | ------ | ------------ | ---------------------------------- |
+| Arquivo                                  | Linhas | Status        | Bugs Críticos                      |
+| ---------------------------------------- | ------ | ------------- | ---------------------------------- |
 | `src/main.js`                            | 1055   | 🟡 Incompleto | 2 (proxy não inicia, ordem errada) |
 | `src/server/main.js`                     | 376    | ✅ OK         | 0 (server não usa browser)         |
 | `src/infra/ConnectionOrchestrator.js`    | 886    | ✅ v3.0       | 0 (código consolidado)             |
@@ -44,11 +48,12 @@ O sistema possui **implementação completa** de todos os componentes necessári
 ## 🚨 Bugs Críticos (Detalhamento Técnico)
 
 ### BUG #1: ChromeProxyService Nunca É Iniciado
-**Severidade**: 🔴 **BLOCKER ABSOLUTO**
-**Localização**: `src/main.js` - Ausência de código
+
+**Severidade**: 🔴 **BLOCKER ABSOLUTO** **Localização**: `src/main.js` - Ausência de código
 **Tipo**: Missing Implementation
 
 **Evidência**:
+
 ```bash
 $ grep -r "new ChromeProxyService" src/
 # 0 resultados
@@ -61,12 +66,14 @@ $ grep -r "chromeProxyService" src/main.js
 ```
 
 **Problema**:
+
 1. Sistema tem implementação completa em `src/infra/proxy/chromeProxyService.js` (643 linhas)
 2. Configuração correta em `config.json` (`CHROME_PROXY_ENABLED: true`)
 3. ConnectionOrchestrator prioriza proxy (192.168.0.2:9224)
 4. Mas **NENHUM LUGAR NO BOOT INICIA O PROXY**
 
 **Consequência**:
+
 ```
 Boot Sequence (ATUAL - ERRADO):
 1. NERV iniciado ✅
@@ -77,6 +84,7 @@ Boot Sequence (ATUAL - ERRADO):
 ```
 
 **Fluxo Correto**:
+
 ```
 Boot Sequence (DESEJADO):
 1. NERV iniciado ✅
@@ -87,6 +95,7 @@ Boot Sequence (DESEJADO):
 ```
 
 **Workaround Manual Atual**:
+
 ```bash
 # Terminal 1 (manual):
 node scripts/chrome-proxy-service.js
@@ -98,11 +107,12 @@ npm run daemon:start
 ---
 
 ### BUG #2: BrowserPoolManager Usa Método Inexistente
-**Severidade**: 🔴 **CRASH GARANTIDO**
-**Localização**: `src/infra/browser_pool/pool_manager.js:119`
+
+**Severidade**: 🔴 **CRASH GARANTIDO** **Localização**: `src/infra/browser_pool/pool_manager.js:119`
 **Tipo**: Method Not Found
 
 **Código Errado**:
+
 ```javascript
 async _doInitialize() {
     const orchestrator = new ConnectionOrchestrator({
@@ -117,6 +127,7 @@ async _doInitialize() {
 ```
 
 **Métodos Disponíveis no ConnectionOrchestrator**:
+
 ```javascript
 class ConnectionOrchestrator {
     ✅ ensureBrowser()           // Conecta com retry automático
@@ -133,6 +144,7 @@ class ConnectionOrchestrator {
 ```
 
 **Correção**:
+
 ```javascript
 async _doInitialize() {
     const orchestrator = new ConnectionOrchestrator({
@@ -145,6 +157,7 @@ async _doInitialize() {
 ```
 
 **Por que isso importa**:
+
 - `ensureBrowser()` implementa retry logic (até 5 tentativas)
 - `ensureBrowser()` detecta modo (wsEndpoint/connect/auto)
 - `ensureBrowser()` emite telemetria via NERV
@@ -153,11 +166,12 @@ async _doInitialize() {
 ---
 
 ### BUG #3: Pool Não Valida Proxy Antes de Conectar
-**Severidade**: 🟠 **HIGH** (Falhas silenciosas)
-**Localização**: `src/infra/browser_pool/pool_manager.js:107-125`
-**Tipo**: Missing Validation
+
+**Severidade**: 🟠 **HIGH** (Falhas silenciosas) **Localização**:
+`src/infra/browser_pool/pool_manager.js:107-125` **Tipo**: Missing Validation
 
 **Problema**:
+
 ```javascript
 async _doInitialize() {
     // ❌ NÃO valida se proxy está disponível
@@ -167,12 +181,14 @@ async _doInitialize() {
 ```
 
 **Consequência**:
+
 1. Pool tenta conectar a proxy que não existe
 2. ConnectionOrchestrator tenta 5x com backoff (15+ segundos desperdiçados)
 3. Erro genérico: "WS endpoint unreachable: 192.168.0.2:9224 - fetch failed"
 4. Usuário não sabe que proxy não está rodando
 
 **Correção**:
+
 ```javascript
 async _doInitialize() {
     // ✅ Valida proxy PRIMEIRO
@@ -204,83 +220,86 @@ async _validateProxyAvailability() {
 ---
 
 ### BUG #4: Ordem de Inicialização Incorreta
-**Severidade**: 🟠 **HIGH** (Race Condition)
-**Localização**: `src/main.js:199-280`
-**Tipo**: Boot Sequence Order
+
+**Severidade**: 🟠 **HIGH** (Race Condition) **Localização**: `src/main.js:199-280` **Tipo**: Boot
+Sequence Order
 
 **Ordem Atual (ERRADA)**:
+
 ```javascript
 async function boot() {
-    // Fase 1: Config + Identity
-    await CONFIG.reload();
-    await identityManager.initialize();
+  // Fase 1: Config + Identity
+  await CONFIG.reload();
+  await identityManager.initialize();
 
-    // Fase 2: NERV
-    const nerv = await createNERV();
+  // Fase 2: NERV
+  const nerv = await createNERV();
 
-    // Fase 3: Browser Pool
-    const browserPool = await initializeBrowserPoolResilient({
-        browserEndpoint: { url: chromeEndpoint }
-    });
-    // ❌ PROBLEMA: Proxy não existe, conexão falha
+  // Fase 3: Browser Pool
+  const browserPool = await initializeBrowserPoolResilient({
+    browserEndpoint: { url: chromeEndpoint },
+  });
+  // ❌ PROBLEMA: Proxy não existe, conexão falha
 }
 ```
 
 **Ordem Correta**:
+
 ```javascript
 async function boot() {
-    // Fase 1: Config + Identity
-    await CONFIG.reload();
-    await identityManager.initialize();
+  // Fase 1: Config + Identity
+  await CONFIG.reload();
+  await identityManager.initialize();
 
-    // Fase 2: NERV
-    const nerv = await createNERV();
+  // Fase 2: NERV
+  const nerv = await createNERV();
 
-    // ✅ FASE 2.5: Chrome Proxy Service (NOVO)
-    if (CONFIG.CHROME_PROXY_ENABLED) {
-        const ChromeProxyService = require('./infra/proxy/chromeProxyService');
-        global.chromeProxy = new ChromeProxyService({
-            PUBLIC_IP: CONFIG.CHROME_PROXY_HOST,
-            CHROME_PORT: CONFIG.CHROME_PORT,
-            PROXY_PORT: CONFIG.CHROME_PROXY_PORT,
-            LOG_LEVEL: CONFIG.LOG_LEVEL
-        });
-        await global.chromeProxy.start();
-        log('INFO', '[BOOT] ✅ Chrome Proxy Service online');
-    }
-
-    // Fase 3: Browser Pool (agora proxy está disponível)
-    const browserPool = await initializeBrowserPoolResilient({
-        browserEndpoint: { url: chromeEndpoint }
+  // ✅ FASE 2.5: Chrome Proxy Service (NOVO)
+  if (CONFIG.CHROME_PROXY_ENABLED) {
+    const ChromeProxyService = require('./infra/proxy/chromeProxyService');
+    global.chromeProxy = new ChromeProxyService({
+      PUBLIC_IP: CONFIG.CHROME_PROXY_HOST,
+      CHROME_PORT: CONFIG.CHROME_PORT,
+      PROXY_PORT: CONFIG.CHROME_PROXY_PORT,
+      LOG_LEVEL: CONFIG.LOG_LEVEL,
     });
+    await global.chromeProxy.start();
+    log('INFO', '[BOOT] ✅ Chrome Proxy Service online');
+  }
+
+  // Fase 3: Browser Pool (agora proxy está disponível)
+  const browserPool = await initializeBrowserPoolResilient({
+    browserEndpoint: { url: chromeEndpoint },
+  });
 }
 ```
 
 ---
 
 ### BUG #5: Configuração Duplicada (DRY Violation)
-**Severidade**: 🟡 **MEDIUM** (Maintainability)
-**Localização**: `src/infra/ConnectionOrchestrator.js`
-**Tipo**: Code Duplication
+
+**Severidade**: 🟡 **MEDIUM** (Maintainability) **Localização**:
+`src/infra/ConnectionOrchestrator.js` **Tipo**: Code Duplication
 
 **Problema**: Lógica de resolução de porta proxy **repetida 4 vezes** no mesmo arquivo:
 
 ```javascript
 // Linha 84-90 (DEFAULTS.ports)
 ports: [
-    Number(
-        process.env.CHROME_PROXY_PORT ||
-        (function () {
-            try {
-                const debugUrl = CONFIG.DEBUG_PORT || `http://localhost:${CONFIG.CHROME_PROXY_PORT || 9224}`;
-                return new URL(debugUrl).port || CONFIG.CHROME_PROXY_PORT || 9224;
-            } catch (e) {
-                return CONFIG.CHROME_PROXY_PORT || 9224;
-            }
-        })()
-    ),
-    // ...
-]
+  Number(
+    process.env.CHROME_PROXY_PORT ||
+      (function () {
+        try {
+          const debugUrl =
+            CONFIG.DEBUG_PORT || `http://localhost:${CONFIG.CHROME_PROXY_PORT || 9224}`;
+          return new URL(debugUrl).port || CONFIG.CHROME_PROXY_PORT || 9224;
+        } catch (e) {
+          return CONFIG.CHROME_PROXY_PORT || 9224;
+        }
+      })()
+  ),
+  // ...
+];
 
 // Linha 151 (PROXY_PORT const)
 const PROXY_PORT = Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224);
@@ -293,6 +312,7 @@ const proxyPort = process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9
 ```
 
 **Correção (DRY)**:
+
 ```javascript
 // TOPO DO ARQUIVO (após imports)
 const PROXY_CONFIG = Object.freeze({
@@ -309,11 +329,12 @@ const url = `http://${host}:${PROXY_CONFIG.PORT}/json/version`;
 ---
 
 ### BUG #6: Shutdown Não Para Proxy
-**Severidade**: 🟡 **MEDIUM** (Resource Leak)
-**Localização**: `src/main.js:697-838` (shutdown function)
-**Tipo**: Missing Cleanup
+
+**Severidade**: 🟡 **MEDIUM** (Resource Leak) **Localização**: `src/main.js:697-838` (shutdown
+function) **Tipo**: Missing Cleanup
 
 **Problema**:
+
 ```javascript
 async function shutdown(context) {
     const shutdownPhases = [
@@ -331,11 +352,13 @@ async function shutdown(context) {
 ```
 
 **Consequência**:
+
 - Proxy continua rodando em background após shutdown
 - Porta 9224 permanece ocupada
 - Próximo boot pode falhar com EADDRINUSE
 
 **Correção**:
+
 ```javascript
 const shutdownPhases = [
     // ... outras fases ...
@@ -359,50 +382,52 @@ const shutdownPhases = [
 ---
 
 ### BUG #7: boot_resilience_manager Não Menciona Proxy
-**Severidade**: 🟡 **LOW** (Documentation)
-**Localização**: `src/core/boot_resilience_manager.js`
+
+**Severidade**: 🟡 **LOW** (Documentation) **Localização**: `src/core/boot_resilience_manager.js`
 **Tipo**: Incomplete Error Guidance
 
-**Problema**: Quando Chrome não está acessível, sistema mostra instruções para iniciar Chrome, mas **não menciona proxy**:
+**Problema**: Quando Chrome não está acessível, sistema mostra instruções para iniciar Chrome, mas
+**não menciona proxy**:
 
 ```javascript
 function getChromeInstructions(errorMessage) {
-    return [
-        'SOLUÇÃO RÁPIDA (Execute em outro terminal):',
-        '  Windows:',
-        '    scripts\\start-chrome.bat',  // ❌ Só Chrome, esquece proxy
-        '',
-        '  Linux/WSL/Mac:',
-        '    bash scripts/start-chrome.sh',  // ❌ Só Chrome, esquece proxy
-    ];
+  return [
+    'SOLUÇÃO RÁPIDA (Execute em outro terminal):',
+    '  Windows:',
+    '    scripts\\start-chrome.bat', // ❌ Só Chrome, esquece proxy
+    '',
+    '  Linux/WSL/Mac:',
+    '    bash scripts/start-chrome.sh', // ❌ Só Chrome, esquece proxy
+  ];
 }
 ```
 
 **Correção**:
+
 ```javascript
 function getChromeInstructions(errorMessage) {
-    const cfg = require('./config');
-    const proxyEnabled = cfg.CHROME_PROXY_ENABLED !== false;
+  const cfg = require('./config');
+  const proxyEnabled = cfg.CHROME_PROXY_ENABLED !== false;
 
-    const lines = [
-        'SOLUÇÃO RÁPIDA (Execute em DOIS terminais):',
-        '',
-        '  Terminal 1 - Inicie o Chrome:',
-        '    Windows: scripts\\start-chrome.bat',
-        '    Linux:   bash scripts/start-chrome.sh',
-    ];
+  const lines = [
+    'SOLUÇÃO RÁPIDA (Execute em DOIS terminais):',
+    '',
+    '  Terminal 1 - Inicie o Chrome:',
+    '    Windows: scripts\\start-chrome.bat',
+    '    Linux:   bash scripts/start-chrome.sh',
+  ];
 
-    if (proxyEnabled) {
-        lines.push(
-            '',
-            '  Terminal 2 - Inicie o Chrome Proxy Service:',
-            '    node scripts/chrome-proxy-service.js',
-            '',
-            '  ⚠️ O proxy é OBRIGATÓRIO para conexão Docker ↔ Windows'
-        );
-    }
+  if (proxyEnabled) {
+    lines.push(
+      '',
+      '  Terminal 2 - Inicie o Chrome Proxy Service:',
+      '    node scripts/chrome-proxy-service.js',
+      '',
+      '  ⚠️ O proxy é OBRIGATÓRIO para conexão Docker ↔ Windows'
+    );
+  }
 
-    return lines;
+  return lines;
 }
 ```
 
@@ -411,9 +436,11 @@ function getChromeInstructions(errorMessage) {
 ## 🎯 Plano de Consolidação
 
 ### Filosofia
+
 **Minimal Viable Integration** - Fazer o sistema funcionar **PRIMEIRO**, otimizar **DEPOIS**.
 
 ### Princípios
+
 1. ✅ **Correções Cirúrgicas** - Mudanças mínimas e testáveis
 2. ✅ **Zero Regressões** - Não quebrar código existente
 3. ✅ **NERV-First** - Todas integrações via event bus
@@ -429,61 +456,58 @@ function getChromeInstructions(errorMessage) {
 **Objetivo**: Sistema **LIGA** e **NÃO CRASHA**
 
 #### 1.1 - Corrigir BrowserPoolManager.connect() → ensureBrowser()
-**Arquivo**: `src/infra/browser_pool/pool_manager.js`
-**Linha**: 119
-**Mudança**:
+
+**Arquivo**: `src/infra/browser_pool/pool_manager.js` **Linha**: 119 **Mudança**:
+
 ```diff
 - const browser = await orchestrator.connect();
 + const browser = await orchestrator.ensureBrowser();
 ```
-**Impacto**: 🔴 **BLOCKER** - Sem isso, pool SEMPRE crasheia
-**Tempo**: 2 minutos
-**Testes**: Boot sequence deve completar Fase 3
+
+**Impacto**: 🔴 **BLOCKER** - Sem isso, pool SEMPRE crasheia **Tempo**: 2 minutos **Testes**: Boot
+sequence deve completar Fase 3
 
 ---
 
 #### 1.2 - Adicionar Boot de ChromeProxyService
-**Arquivo**: `src/main.js`
-**Linha**: Após 199 (depois de createNERV, antes de initializeBrowserPoolResilient)
-**Mudança**: Inserir fase 2.5 completa (ver código na seção Bug #4)
-**Impacto**: 🔴 **BLOCKER** - Sem isso, conexões via proxy falham 100%
-**Tempo**: 10 minutos
+
+**Arquivo**: `src/main.js` **Linha**: Após 199 (depois de createNERV, antes de
+initializeBrowserPoolResilient) **Mudança**: Inserir fase 2.5 completa (ver código na seção Bug #4)
+**Impacto**: 🔴 **BLOCKER** - Sem isso, conexões via proxy falham 100% **Tempo**: 10 minutos
 **Testes**:
+
 - `curl http://localhost:9224/health` deve retornar `{"status":"ok"}`
 - Logs devem mostrar: `[BOOT] ✅ Chrome Proxy Service online`
 
 ---
 
 #### 1.3 - Adicionar Validação de Proxy no Pool
-**Arquivo**: `src/infra/browser_pool/pool_manager.js`
-**Linhas**:
+
+**Arquivo**: `src/infra/browser_pool/pool_manager.js` **Linhas**:
+
 - Linha 107: Adicionar validação no início de `_doInitialize()`
-- Linha 450: Adicionar método `_validateProxyAvailability()`
-**Mudança**: Ver código na seção Bug #3
-**Impacto**: 🟠 **HIGH** - Fail-fast com mensagem clara
-**Tempo**: 8 minutos
-**Testes**: Boot com proxy offline deve falhar com mensagem útil
+- Linha 450: Adicionar método `_validateProxyAvailability()` **Mudança**: Ver código na seção Bug #3
+  **Impacto**: 🟠 **HIGH** - Fail-fast com mensagem clara **Tempo**: 8 minutos **Testes**: Boot com
+  proxy offline deve falhar com mensagem útil
 
 ---
 
 #### 1.4 - Adicionar Shutdown de Proxy
-**Arquivo**: `src/main.js`
-**Linha**: 697 (dentro de shutdownPhases array)
-**Mudança**: Ver código na seção Bug #6
-**Impacto**: 🟡 **MEDIUM** - Cleanup correto
-**Tempo**: 5 minutos
-**Testes**: Shutdown gracioso deve fechar proxy
+
+**Arquivo**: `src/main.js` **Linha**: 697 (dentro de shutdownPhases array) **Mudança**: Ver código
+na seção Bug #6 **Impacto**: 🟡 **MEDIUM** - Cleanup correto **Tempo**: 5 minutos **Testes**:
+Shutdown gracioso deve fechar proxy
 
 ---
 
 **Resultado Fase 1**: Sistema **FUNCIONA** em modo básico
+
 - ✅ Proxy inicia automaticamente no boot
 - ✅ Pool conecta via proxy sem crashes
 - ✅ Falhas têm mensagens claras
 - ✅ Shutdown limpa recursos
 
-**Tempo Total**: 25-30 minutos
-**Risco**: **Baixo** (mudanças cirúrgicas)
+**Tempo Total**: 25-30 minutos **Risco**: **Baixo** (mudanças cirúrgicas)
 
 ---
 
@@ -492,47 +516,44 @@ function getChromeInstructions(errorMessage) {
 **Objetivo**: Sistema **ROBUSTO** e **MANUTENÍVEL**
 
 #### 2.1 - Refatorar PROXY_CONFIG (DRY)
-**Arquivo**: `src/infra/ConnectionOrchestrator.js`
-**Mudança**: Centralizar configuração de proxy (Bug #5)
-**Impacto**: 🟡 **MEDIUM** - Facilita manutenção
-**Tempo**: 15 minutos
+
+**Arquivo**: `src/infra/ConnectionOrchestrator.js` **Mudança**: Centralizar configuração de proxy
+(Bug #5) **Impacto**: 🟡 **MEDIUM** - Facilita manutenção **Tempo**: 15 minutos
 
 ---
 
 #### 2.2 - Health Check Cross-Component
+
 **Arquivos**:
+
 - `src/infra/browser_pool/pool_manager.js` (método `_performHealthCheck`)
-- `src/infra/proxy/chromeProxyService.js` (endpoint `/health`)
-**Mudança**: Pool valida proxy health periodicamente
-**Impacto**: 🟡 **MEDIUM** - Detecta proxy offline em runtime
-**Tempo**: 20 minutos
+- `src/infra/proxy/chromeProxyService.js` (endpoint `/health`) **Mudança**: Pool valida proxy health
+  periodicamente **Impacto**: 🟡 **MEDIUM** - Detecta proxy offline em runtime **Tempo**: 20 minutos
 
 ---
 
 #### 2.3 - Melhorar Instruções de Erro
-**Arquivo**: `src/core/boot_resilience_manager.js`
-**Mudança**: Incluir proxy nas instruções (Bug #7)
-**Impacto**: 🟢 **LOW** - UX melhor
-**Tempo**: 10 minutos
+
+**Arquivo**: `src/core/boot_resilience_manager.js` **Mudança**: Incluir proxy nas instruções (Bug
+#7) **Impacto**: 🟢 **LOW** - UX melhor **Tempo**: 10 minutos
 
 ---
 
 #### 2.4 - NERV Events para Proxy
-**Arquivo**: `src/infra/proxy/chromeProxyService.js`
-**Mudança**: Emitir eventos NERV quando proxy inicia/para/falha
-**Impacto**: 🟡 **MEDIUM** - Telemetria completa
-**Tempo**: 15 minutos
+
+**Arquivo**: `src/infra/proxy/chromeProxyService.js` **Mudança**: Emitir eventos NERV quando proxy
+inicia/para/falha **Impacto**: 🟡 **MEDIUM** - Telemetria completa **Tempo**: 15 minutos
 
 ---
 
 **Resultado Fase 2**: Sistema **PRODUCTION-READY**
+
 - ✅ Código limpo e manutenível
 - ✅ Monitoramento em tempo real
 - ✅ Erros diagnosticáveis
 - ✅ Telemetria via NERV
 
-**Tempo Total**: 60 minutos
-**Risco**: **Médio** (refatorações)
+**Tempo Total**: 60 minutos **Risco**: **Médio** (refatorações)
 
 ---
 
@@ -541,8 +562,9 @@ function getChromeInstructions(errorMessage) {
 **Objetivo**: Sistema **DOCUMENTADO** e **TESTÁVEL**
 
 #### 3.1 - Testes de Integração
-**Arquivo**: `tests/integration/test_chrome_proxy_pool.spec.js` (NOVO)
-**Cobertura**:
+
+**Arquivo**: `tests/integration/test_chrome_proxy_pool.spec.js` (NOVO) **Cobertura**:
+
 - Pool conecta via proxy (cenário happy path)
 - Pool falha graciosamente se proxy offline
 - Proxy reescreve URLs corretamente
@@ -551,8 +573,9 @@ function getChromeInstructions(errorMessage) {
 ---
 
 #### 3.2 - Documentação Canônica
-**Arquivo**: `DOCUMENTAÇÃO/CHROME_PROXY_ARCHITECTURE.md` (NOVO)
-**Conteúdo**:
+
+**Arquivo**: `DOCUMENTAÇÃO/CHROME_PROXY_ARCHITECTURE.md` (NOVO) **Conteúdo**:
+
 - Diagrama de arquitetura (Windows ↔ Proxy ↔ Container)
 - Fluxo de boot completo
 - Troubleshooting guide
@@ -561,25 +584,26 @@ function getChromeInstructions(errorMessage) {
 ---
 
 #### 3.3 - README Updates
-**Arquivo**: `README.md`
-**Seção**: "Getting Started"
-**Mudança**: Instruções claras sobre proxy obrigatório
+
+**Arquivo**: `README.md` **Seção**: "Getting Started" **Mudança**: Instruções claras sobre proxy
+obrigatório
 
 ---
 
 **Resultado Fase 3**: Sistema **ENTERPRISE-GRADE**
+
 - ✅ Testes automatizados (CI/CD ready)
 - ✅ Documentação completa
 - ✅ Onboarding fácil
 
-**Tempo Total**: 90 minutos
-**Risco**: **Baixo** (apenas docs/testes)
+**Tempo Total**: 90 minutos **Risco**: **Baixo** (apenas docs/testes)
 
 ---
 
 ## ✅ Critérios de Sucesso
 
 ### Fase 1 (Mínimo Viável)
+
 - [ ] Sistema inicia sem crashes
 - [ ] `curl http://localhost:9224/health` retorna 200
 - [ ] `make health` mostra todos componentes OK
@@ -587,12 +611,14 @@ function getChromeInstructions(errorMessage) {
 - [ ] Shutdown limpa proxy
 
 ### Fase 2 (Production Ready)
+
 - [ ] Zero duplicação de config
 - [ ] Health checks periódicos funcionam
 - [ ] Eventos NERV emitidos corretamente
 - [ ] Erros têm instruções úteis
 
 ### Fase 3 (Enterprise Grade)
+
 - [ ] Testes de integração passam
 - [ ] Documentação atualizada
 - [ ] CI/CD validado
@@ -602,6 +628,7 @@ function getChromeInstructions(errorMessage) {
 ## 🔬 Plano de Testes
 
 ### Teste 1: Boot Completo (Happy Path)
+
 ```bash
 # Pré-requisitos:
 # - Chrome rodando: scripts/start-chrome.bat (Windows)
@@ -628,6 +655,7 @@ make health  # Todos OK
 ---
 
 ### Teste 2: Boot Sem Proxy (Fail-Fast)
+
 ```bash
 # Desabilitar proxy:
 # config.json: CHROME_PROXY_ENABLED=false
@@ -645,6 +673,7 @@ npm run daemon:start
 ---
 
 ### Teste 3: Boot Com Proxy Offline (Error Handling)
+
 ```bash
 # Proxy habilitado mas não rodando
 
@@ -663,6 +692,7 @@ npm run daemon:start
 ---
 
 ### Teste 4: Shutdown Gracioso
+
 ```bash
 # Sistema rodando OK
 
@@ -686,6 +716,7 @@ pm2 stop agente-gpt
 ---
 
 ### Teste 5: Health Check Contínuo
+
 ```bash
 # Sistema rodando
 
@@ -711,16 +742,19 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 ## 📊 Métricas de Sucesso
 
 ### Performance
+
 - **Boot Time**: < 10 segundos (incluindo proxy)
 - **Health Check**: < 500ms por instância
 - **Proxy Latency**: < 10ms (overhead WebSocket)
 
 ### Reliability
+
 - **Uptime Target**: 99.9% (sem crashes no boot)
 - **MTTR (Mean Time To Recovery)**: < 2 minutos (modo degradado automático)
 - **False Positive Rate**: 0% (validações corretas)
 
 ### Maintainability
+
 - **Code Duplication**: 0 (DRY aplicado)
 - **Test Coverage**: > 80% (após Fase 3)
 - **Documentation**: 100% (README + Canônica)
@@ -730,9 +764,9 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 ## 🚧 Riscos e Mitigações
 
 ### Risco 1: Porta 9224 Ocupada
-**Probabilidade**: Média
-**Impacto**: Baixo (EADDRINUSE no boot)
-**Mitigação**:
+
+**Probabilidade**: Média **Impacto**: Baixo (EADDRINUSE no boot) **Mitigação**:
+
 - Validar porta livre antes de iniciar proxy
 - Oferecer porta alternativa via env var
 - Kill processo antigo automaticamente
@@ -740,9 +774,9 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 ---
 
 ### Risco 2: Proxy Crasheia em Runtime
-**Probabilidade**: Baixa
-**Impacto**: Alto (todas conexões browser falham)
-**Mitigação**:
+
+**Probabilidade**: Baixa **Impacto**: Alto (todas conexões browser falham) **Mitigação**:
+
 - Health checks periódicos
 - Auto-restart via PM2 ecosystem
 - Fallback para modo direto se configurado
@@ -750,9 +784,9 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 ---
 
 ### Risco 3: Ordem de Shutdown Errada
-**Probabilidade**: Baixa
-**Impacto**: Médio (resources leak)
-**Mitigação**:
+
+**Probabilidade**: Baixa **Impacto**: Médio (resources leak) **Mitigação**:
+
 - Documentar ordem explicitamente
 - Testes de shutdown
 - Timeouts em cada fase
@@ -760,9 +794,9 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 ---
 
 ### Risco 4: NERV Overhead
-**Probabilidade**: Baixa
-**Impacto**: Baixo (latência)
-**Mitigação**:
+
+**Probabilidade**: Baixa **Impacto**: Baixo (latência) **Mitigação**:
+
 - Eventos assíncronos
 - Buffer de eventos
 - Telemetria opcional
@@ -772,18 +806,21 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 ## 🎓 Lições Aprendidas (Pré-Implementação)
 
 ### O Que Funcionou
+
 1. ✅ **Arquitetura Modular**: ChromeProxyService isolado facilitou análise
 2. ✅ **Código Existente Robusto**: ConnectionOrchestrator v3.0 está sólido
 3. ✅ **Configuração Centralizada**: config.json tem tudo necessário
 4. ✅ **Boot Sequence Estruturada**: Fases numeradas facilitam inserção
 
 ### O Que Faltou
+
 1. ❌ **Integração End-to-End**: Componentes nunca foram conectados
 2. ❌ **Testes de Boot**: Nenhum teste valida boot completo
 3. ❌ **Validações Early**: Pool tenta conectar sem verificar proxy
 4. ❌ **Documentação Operacional**: README não menciona proxy
 
 ### Próximas Vezes
+
 1. ✅ **TDD para Boot**: Escrever testes de integração ANTES de features
 2. ✅ **Contract Testing**: Validar interfaces entre módulos
 3. ✅ **Health Checks First**: Implementar validações antes de features
@@ -794,6 +831,7 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 ## 📚 Referências
 
 ### Código Fonte
+
 - `src/main.js` - Boot sequence principal
 - `src/infra/ConnectionOrchestrator.js` - Gerenciador de conexões
 - `src/infra/browser_pool/pool_manager.js` - Pool de browsers
@@ -801,12 +839,14 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 - `src/core/boot_resilience_manager.js` - Resiliência de boot
 
 ### Documentação Existente
+
 - `DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md` - Configuração do proxy
 - `DOCUMENTAÇÃO/CHROME_PROXY_INTEGRATION_GUIDE.md` - Guia de integração
 - `DOCUMENTAÇÃO/CONNECTION_ORCHESTRATOR_ANALYSIS.md` - Análise detalhada
 - `DOCUMENTAÇÃO/ARCHITECTURE.md` - Arquitetura geral
 
 ### Scripts Relacionados
+
 - `scripts/chrome-proxy-service.js` - CLI wrapper
 - `scripts/start-chrome.bat` - Inicia Chrome no Windows
 - `scripts/start-chrome.sh` - Inicia Chrome no Linux
@@ -817,24 +857,28 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 ## 🔄 Changelog
 
 ### v1.0 (2026-02-01) - Análise Inicial
+
 - ✅ Auditoria completa de 2.593 linhas
 - ✅ Identificação de 7 bugs críticos
 - ✅ Plano de 3 fases elaborado
 - ✅ Critérios de sucesso definidos
 
 ### v1.1 (Pendente) - Fase 1 Implementada
+
 - [ ] BrowserPoolManager corrigido
 - [ ] ChromeProxyService integrado ao boot
 - [ ] Validações adicionadas
 - [ ] Shutdown atualizado
 
 ### v2.0 (Pendente) - Fase 2 Implementada
+
 - [ ] Código refatorado (DRY)
 - [ ] Health checks implementados
 - [ ] NERV integration completa
 - [ ] Erros melhorados
 
 ### v3.0 (Pendente) - Fase 3 Implementada
+
 - [ ] Testes de integração
 - [ ] Documentação canônica
 - [ ] CI/CD validado
@@ -843,10 +887,8 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 
 ## ✍️ Assinaturas
 
-**Análise Técnica**: Claude Code v2.1.29 + Copilot
-**Revisão de Código**: 7 arquivos (2.593 linhas)
-**Data**: 2026-02-01
-**Status**: Pronto para implementação Fase 1
+**Análise Técnica**: Claude Code v2.1.29 + Copilot **Revisão de Código**: 7 arquivos (2.593 linhas)
+**Data**: 2026-02-01 **Status**: Pronto para implementação Fase 1
 
 ---
 

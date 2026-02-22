@@ -1,8 +1,7 @@
 # ESLint - Relatório de Correção de Erros Críticos
 
-**Data:** 2026-01-20
-**Ação:** Correção dos 78 erros críticos (prioridade alta)
-**Status:** EM ANDAMENTO
+**Data:** 2026-01-20 **Ação:** Correção dos 78 erros críticos (prioridade alta) **Status:** EM
+ANDAMENTO
 
 ---
 
@@ -47,9 +46,9 @@
 **2. `no-undef` (2 ocorrências)** - 🐛 BUG
 
 - `public/js/app.js:2` - `'io' is not defined`
-    - Solução: Adicionar `/* global io */` no topo do arquivo
+  - Solução: Adicionar `/* global io */` no topo do arquivo
 - `scripts/puppeteer_maintenance.js:57` - `'execSync' is not defined`
-    - Solução: `const { execSync } = require('child_process');`
+  - Solução: `const { execSync } = require('child_process');`
 
 #### 🟡 Prioridade ALTA (recomendado corrigir):
 
@@ -58,9 +57,9 @@
 - Padrão comum: `new Promise(r => setTimeout(r, 100))`
 - Solução: `new Promise(r => { setTimeout(r, 100); })`
 - **Arquivos principais:**
-    - `src/driver/modules/human.js` (8 ocorrências)
-    - `src/driver/modules/stabilizer.js` (10 ocorrências)
-    - `src/driver/modules/biomechanics_engine.js` (5 ocorrências)
+  - `src/driver/modules/human.js` (8 ocorrências)
+  - `src/driver/modules/stabilizer.js` (10 ocorrências)
+  - `src/driver/modules/biomechanics_engine.js` (5 ocorrências)
 
 **4. `no-alert` (8 ocorrências)** - 📱 FRONTEND
 
