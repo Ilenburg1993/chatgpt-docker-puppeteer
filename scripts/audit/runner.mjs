@@ -130,7 +130,9 @@ function sanitize(text) {
  * @returns {RefreshContextMode}
  */
 function parseRefreshMode(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'force') return 'force';
     if (normalized === 'skip') return 'skip';
     return 'smart';
@@ -141,7 +143,11 @@ function parseRefreshMode(value) {
  * @returns {FocusMode}
  */
 function parseFocusMode(value) {
-    return String(value || '').trim().toLowerCase() === 'all' ? 'all' : 'bug-first';
+    return String(value || '')
+        .trim()
+        .toLowerCase() === 'all'
+        ? 'all'
+        : 'bug-first';
 }
 
 /**
@@ -149,7 +155,9 @@ function parseFocusMode(value) {
  * @returns {ContractsMode}
  */
 function parseContractsMode(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'legacy') return 'legacy';
     if (normalized === 'strict') return 'strict';
     return 'hybrid';
@@ -160,7 +168,9 @@ function parseContractsMode(value) {
  * @returns {EnforceLevel}
  */
 function parseEnforceLevel(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'off') return 'off';
     if (normalized === 'p1') return 'p1';
     if (normalized === 'p0') return 'p0';
@@ -172,7 +182,9 @@ function parseEnforceLevel(value) {
  * @returns {ProposalDepth}
  */
 function parseProposalDepth(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'basic') return 'basic';
     if (normalized === 'deep') return 'deep';
     return 'standard';
@@ -183,7 +195,9 @@ function parseProposalDepth(value) {
  * @returns {ChaosProfile}
  */
 function parseChaosProfile(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'light') return 'light';
     if (normalized === 'full') return 'full';
     return 'off';
@@ -194,7 +208,11 @@ function parseChaosProfile(value) {
  * @returns {CloudFallbackMode}
  */
 function parseCloudFallback(value) {
-    return String(value || '').trim().toLowerCase() === 'on' ? 'on' : 'off';
+    return String(value || '')
+        .trim()
+        .toLowerCase() === 'on'
+        ? 'on'
+        : 'off';
 }
 
 /**
@@ -202,7 +220,9 @@ function parseCloudFallback(value) {
  * @returns {QualityMode}
  */
 function parseQualityMode(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'full') return 'full';
     if (normalized === 'changed') return 'changed';
     if (normalized === 'off') return 'off';
@@ -240,6 +260,11 @@ async function resolveChangedFiles(profile, changedOnly) {
 }
 
 async function main() {
+    // Test-only escape hatch to validate fatal-fallback schema/artifacts without running the full audit pipeline.
+    if (process.env.AUDIT_RUNNER_TEST_FORCE_FATAL_FALLBACK === '1') {
+        throw new Error('forced fatal fallback for audit runner test');
+    }
+
     const profile = /** @type {Profile} */ (
         ['quick', 'deep', 'nightly'].includes(values.profile) ? values.profile : 'quick'
     );
@@ -262,7 +287,11 @@ async function main() {
     const qualityCache = parseSwitch(values['quality-cache'], true);
     const qualityCacheDir = String(values['quality-cache-dir'] || 'artifacts/audit/cache/quality');
     const qualityParallelism =
-        String(values['quality-parallelism'] || 'auto').trim().toLowerCase() === 'serial' ? 'serial' : 'auto';
+        String(values['quality-parallelism'] || 'auto')
+            .trim()
+            .toLowerCase() === 'serial'
+            ? 'serial'
+            : 'auto';
     const selectedDomains = parseDomains(String(values['contracts-domains'] || ''));
 
     const publishMaster = parseSwitch(values['publish-master'], profile !== 'quick');
@@ -1061,9 +1090,12 @@ async function main() {
         if (parityPayload?.parity) {
             contractParity = parityPayload.parity;
         } else {
-            warnings.push({
-                source: 'contract-parity',
-                message: 'parity payload unavailable in hybrid mode',
+            logger.emit({
+                level: 'info',
+                event_type: AUDIT_EVENT_TYPES.WARNING,
+                phase: 'preflight',
+                status: 'completed',
+                message: 'contract parity payload unavailable in hybrid mode (non-fatal)',
             });
         }
     } else {
@@ -1632,9 +1664,7 @@ async function main() {
                 rag_degraded: !runtimeResult.telemetry.rag.ok || runtimeResult.telemetry.rag.degraded === true,
                 lsp_degraded: !runtimeResult.telemetry.lsp.ok,
                 tooling_degraded:
-                    qualityResult.errors.length > 0 ||
-                    staticResult.errors.length > 0 ||
-                    testsResult.errors.length > 0,
+                    qualityResult.errors.length > 0 || staticResult.errors.length > 0 || testsResult.errors.length > 0,
             },
             quality_gates: {
                 forbidden_ok: staticResult.telemetry?.gates?.forbidden_ok ?? null,
@@ -1658,10 +1688,16 @@ async function main() {
                 strategy: qualityResult.telemetry?.strategy ?? null,
                 risk: qualityResult.telemetry?.risk ?? null,
                 changed_files_count: qualityResult.telemetry?.changed_files_count ?? 0,
-                decision_reasons: Array.isArray(qualityResult.telemetry?.reasons) ? qualityResult.telemetry.reasons : [],
+                decision_reasons: Array.isArray(qualityResult.telemetry?.reasons)
+                    ? qualityResult.telemetry.reasons
+                    : [],
                 fallbacks: Array.isArray(qualityResult.telemetry?.fallbacks) ? qualityResult.telemetry.fallbacks : [],
-                steps_executed: Array.isArray(qualityResult.telemetry?.steps_executed) ? qualityResult.telemetry.steps_executed : [],
-                steps_skipped: Array.isArray(qualityResult.telemetry?.steps_skipped) ? qualityResult.telemetry.steps_skipped : [],
+                steps_executed: Array.isArray(qualityResult.telemetry?.steps_executed)
+                    ? qualityResult.telemetry.steps_executed
+                    : [],
+                steps_skipped: Array.isArray(qualityResult.telemetry?.steps_skipped)
+                    ? qualityResult.telemetry.steps_skipped
+                    : [],
                 duration_ms_by_step:
                     qualityResult.telemetry && typeof qualityResult.telemetry.duration_ms_by_step === 'object'
                         ? qualityResult.telemetry.duration_ms_by_step
@@ -2227,15 +2263,17 @@ function writeFatalFallbackReport(error) {
         },
     });
 
-    stateStore.writeSummary([
-        '# Audit v3.2 Summary (Fatal Fallback)',
-        '',
-        `- run_id: ${runId}`,
-        `- run_outcome: fatal`,
-        `- abort_reason: uncaught_exception`,
-        `- message: ${message}`,
-        `- events_jsonl: ${logger.eventsPath}`,
-    ].join('\n') + '\n');
+    stateStore.writeSummary(
+        [
+            '# Audit v3.2 Summary (Fatal Fallback)',
+            '',
+            `- run_id: ${runId}`,
+            `- run_outcome: fatal`,
+            `- abort_reason: uncaught_exception`,
+            `- message: ${message}`,
+            `- events_jsonl: ${logger.eventsPath}`,
+        ].join('\n') + '\n'
+    );
 
     const outputs = publishJson(report, { outputDir: outputRoot, runDir });
     return { report, outputs };

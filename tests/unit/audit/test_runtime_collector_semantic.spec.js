@@ -100,6 +100,12 @@ test('runtime collector ignores noisy warning when rag health JSON is healthy', 
     });
 
     assert.equal(result.telemetry.rag.ok, true);
-    assert.equal(result.findings.some(item => item.rule === 'runtime.rag_health.failed'), false);
-    assert.equal(result.findings.some(item => item.rule === 'runtime.lsp_functional.failed'), true);
+    assert.equal(
+        result.findings.some(item => item.rule === 'runtime.rag_health.failed'),
+        false
+    );
+    assert.equal(
+        result.findings.some(item => item.rule === 'runtime.lsp_functional.failed'),
+        true
+    );
 });

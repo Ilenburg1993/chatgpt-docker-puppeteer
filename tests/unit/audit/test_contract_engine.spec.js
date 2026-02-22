@@ -65,5 +65,8 @@ test('evidence graph correlates findings into clusters', () => {
     const out = buildEvidenceGraph(findings);
     assert.ok(Array.isArray(out.graph.nodes));
     assert.ok(out.graph.nodes.length >= 2);
-    assert.ok(out.findings.every(item => item.evidence_graph_id), 'all findings should receive evidence_graph_id');
+    assert.ok(
+        out.findings.every(item => item.evidence_graph_id),
+        'all findings should receive evidence_graph_id'
+    );
 });

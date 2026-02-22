@@ -12,7 +12,9 @@ export function renderContractCoverage(coverage, drift = {}) {
             const row = coverage[domain] || { total: 0, violated: 0, covered: 0 };
             const coveredByRun = Number.isFinite(row.covered_by_run) ? row.covered_by_run : row.covered;
             const coveredByTests = Number.isFinite(row.covered_by_tests) ? row.covered_by_tests : 0;
-            lines.push(`- ${domain}: total=${row.total}, cobertos_run=${coveredByRun}, cobertos_testes=${coveredByTests}, violados=${row.violated}`);
+            lines.push(
+                `- ${domain}: total=${row.total}, cobertos_run=${coveredByRun}, cobertos_testes=${coveredByTests}, violados=${row.violated}`
+            );
         }
     }
 

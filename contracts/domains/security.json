@@ -20,9 +20,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run check:forbidden"
-      ],
+      "test_recipe": ["npm run check:forbidden"],
       "owner": "security-core",
       "status": "active",
       "version": 1,
@@ -49,9 +47,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run check:forbidden"
-      ],
+      "test_recipe": ["npm run check:forbidden"],
       "owner": "security-db",
       "status": "active",
       "version": 1,

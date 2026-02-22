@@ -46,9 +46,7 @@ export async function collectTestFindings(options) {
     /** @type {Array<{source:string,message:string}>} */
     const warnings = [];
 
-    const exec =
-        options.exec ||
-        (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
+    const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
 
     /** @type {Array<{stepId:string,name:string,command:'node'|'npm',args:string[],timeoutMs:number,contractId:string|null}>} */
     const plan = [];
@@ -65,11 +63,25 @@ export async function collectTestFindings(options) {
     }
 
     if (options.profile === 'deep') {
-        plan.push({ stepId: 'tests.unit', name: 'test:unit', command: 'npm', args: ['run', 'test:unit'], timeoutMs: 600000, contractId: null });
+        plan.push({
+            stepId: 'tests.unit',
+            name: 'test:unit',
+            command: 'npm',
+            args: ['run', 'test:unit'],
+            timeoutMs: 600000,
+            contractId: null,
+        });
     }
 
     if (options.profile === 'nightly') {
-        plan.push({ stepId: 'tests.unit', name: 'test:unit', command: 'npm', args: ['run', 'test:unit'], timeoutMs: 600000, contractId: null });
+        plan.push({
+            stepId: 'tests.unit',
+            name: 'test:unit',
+            command: 'npm',
+            args: ['run', 'test:unit'],
+            timeoutMs: 600000,
+            contractId: null,
+        });
         plan.push({
             stepId: 'tests.integration',
             name: 'test:integration',
@@ -78,7 +90,14 @@ export async function collectTestFindings(options) {
             timeoutMs: 900000,
             contractId: 'CONTRACT-NETWORK-SPLIT-HANDSHAKE',
         });
-        plan.push({ stepId: 'tests.regression', name: 'test:regression', command: 'npm', args: ['run', 'test:regression'], timeoutMs: 900000, contractId: null });
+        plan.push({
+            stepId: 'tests.regression',
+            name: 'test:regression',
+            command: 'npm',
+            args: ['run', 'test:regression'],
+            timeoutMs: 900000,
+            contractId: null,
+        });
     }
 
     for (const task of plan) {

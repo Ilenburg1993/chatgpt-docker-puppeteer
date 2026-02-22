@@ -82,7 +82,8 @@ function deterministicFallback(finding, options) {
     }
 
     if (!finding.suggested_patch) {
-        finding.suggested_patch = 'Aplicar correção localizada no arquivo/regra apontado e validar com runner de auditoria.';
+        finding.suggested_patch =
+            'Aplicar correção localizada no arquivo/regra apontado e validar com runner de auditoria.';
     }
 
     if (!finding.test_strategy) {
@@ -120,16 +121,19 @@ function deterministicFallback(finding, options) {
     finding.root_cause_candidates = enriched.root_cause_candidates;
     finding.confidence_score = Math.max(Number(finding.confidence_score || 0), Number(enriched.confidence_score || 0));
     finding.proposal.depth = enriched.proposal.depth;
-    finding.proposal.summary = enriched.proposal.summary || finding.proposal.summary || 'Correção local orientada por evidência automatizada.';
+    finding.proposal.summary =
+        enriched.proposal.summary || finding.proposal.summary || 'Correção local orientada por evidência automatizada.';
     finding.proposal.suggested_diff = enriched.proposal.suggested_diff || finding.proposal.suggested_diff;
     finding.proposal.files_touched = enriched.proposal.files_touched || finding.proposal.files_touched;
-    finding.proposal.test_plan = Array.isArray(enriched.proposal.test_plan) && enriched.proposal.test_plan.length > 0
-        ? enriched.proposal.test_plan
-        : buildTestPlan(finding);
+    finding.proposal.test_plan =
+        Array.isArray(enriched.proposal.test_plan) && enriched.proposal.test_plan.length > 0
+            ? enriched.proposal.test_plan
+            : buildTestPlan(finding);
     finding.proposal.rollback_hint = enriched.proposal.rollback_hint || finding.proposal.rollback_hint;
-    finding.proposal.validation_commands = Array.isArray(enriched.proposal.validation_commands) && enriched.proposal.validation_commands.length > 0
-        ? enriched.proposal.validation_commands
-        : ['npm run audit:quick -- --focus bug-first'];
+    finding.proposal.validation_commands =
+        Array.isArray(enriched.proposal.validation_commands) && enriched.proposal.validation_commands.length > 0
+            ? enriched.proposal.validation_commands
+            : ['npm run audit:quick -- --focus bug-first'];
     finding.proposal_context = enriched.proposal_context || {
         code_context_used: false,
         rag_scope: null,
@@ -164,7 +168,9 @@ export async function triageFindings(findings, options = {}) {
     const maxMcpFindings = Number.isFinite(options.maxMcpFindings) ? Number(options.maxMcpFindings) : 80;
     const proposeDiffs = options.proposeDiffs === true;
     const focusMode = options.focusMode === 'all' ? 'all' : 'bug-first';
-    const proposalDepth = ['basic', 'standard', 'deep'].includes(options.proposalDepth || '') ? options.proposalDepth : 'standard';
+    const proposalDepth = ['basic', 'standard', 'deep'].includes(options.proposalDepth || '')
+        ? options.proposalDepth
+        : 'standard';
     const cloudFallback = options.cloudFallback === 'on' ? 'on' : 'off';
     const maxDurationMs = Number.isFinite(options.maxDurationMs) ? Number(options.maxDurationMs) : 0;
     const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
@@ -202,7 +208,9 @@ export async function triageFindings(findings, options = {}) {
     if (!mcpAvailable) {
         warnings.push('MCP unavailable for LLM triage; deterministic fallback used.');
         if (cloudFallback === 'on') {
-            warnings.push('cloud-fallback=on configurado, mas fallback cloud não foi executado (sem cliente remoto configurado).');
+            warnings.push(
+                'cloud-fallback=on configurado, mas fallback cloud não foi executado (sem cliente remoto configurado).'
+            );
         }
         const enriched = findings.map(finding => {
             const working = { ...finding };
@@ -234,7 +242,9 @@ export async function triageFindings(findings, options = {}) {
     for (let index = 0; index < findings.length; index += 1) {
         if (maxDurationMs > 0 && Date.now() - startedAt >= maxDurationMs) {
             timedOut = true;
-            warnings.push(`Triage timeout atingido (${maxDurationMs}ms); fallback determinístico aplicado no restante.`);
+            warnings.push(
+                `Triage timeout atingido (${maxDurationMs}ms); fallback determinístico aplicado no restante.`
+            );
             for (let rest = index; rest < findings.length; rest += 1) {
                 const pending = { ...findings[rest] };
                 deterministicFallback(pending, {
@@ -242,13 +252,15 @@ export async function triageFindings(findings, options = {}) {
                     proposalDepth,
                     masterPath: options.masterPath,
                 });
-                const criticalType = pending.type === 'bug' || pending.type === 'gap' || pending.type === 'falha de contrato';
+                const criticalType =
+                    pending.type === 'bug' || pending.type === 'gap' || pending.type === 'falha de contrato';
                 const criticalSeverity = pending.severity === 'P0' || pending.severity === 'P1';
-                pending.finding_channel = focusMode === 'bug-first'
-                    ? criticalType && criticalSeverity
-                        ? 'primary'
-                        : 'backlog'
-                    : pending.finding_channel || 'primary';
+                pending.finding_channel =
+                    focusMode === 'bug-first'
+                        ? criticalType && criticalSeverity
+                            ? 'primary'
+                            : 'backlog'
+                        : pending.finding_channel || 'primary';
                 enriched.push(pending);
                 if (onProgress) {
                     const processed = enriched.length;
@@ -274,10 +286,14 @@ export async function triageFindings(findings, options = {}) {
                 depth: finding.proposal?.depth || 'standard',
                 summary: finding.proposal?.summary || null,
                 suggested_diff: finding.proposal?.suggested_diff || null,
-                files_touched: Array.isArray(finding.proposal?.files_touched) ? [...finding.proposal.files_touched] : [],
+                files_touched: Array.isArray(finding.proposal?.files_touched)
+                    ? [...finding.proposal.files_touched]
+                    : [],
                 test_plan: Array.isArray(finding.proposal?.test_plan) ? [...finding.proposal.test_plan] : [],
                 rollback_hint: finding.proposal?.rollback_hint || null,
-                validation_commands: Array.isArray(finding.proposal?.validation_commands) ? [...finding.proposal.validation_commands] : [],
+                validation_commands: Array.isArray(finding.proposal?.validation_commands)
+                    ? [...finding.proposal.validation_commands]
+                    : [],
             },
         };
 
@@ -322,7 +338,9 @@ export async function triageFindings(findings, options = {}) {
                     lspData = lspDiag?.result?.structuredContent?.data || null;
                 }
             } else if (index === maxMcpFindings) {
-                warnings.push(`MCP triage limitado aos primeiros ${maxMcpFindings} achados; fallback determinístico aplicado no restante.`);
+                warnings.push(
+                    `MCP triage limitado aos primeiros ${maxMcpFindings} achados; fallback determinístico aplicado no restante.`
+                );
             }
 
             const contextPack = buildContextPack(working, {
@@ -358,11 +376,12 @@ export async function triageFindings(findings, options = {}) {
 
         const criticalType = working.type === 'bug' || working.type === 'gap' || working.type === 'falha de contrato';
         const criticalSeverity = working.severity === 'P0' || working.severity === 'P1';
-        working.finding_channel = focusMode === 'bug-first'
-            ? criticalType && criticalSeverity
-                ? 'primary'
-                : 'backlog'
-            : working.finding_channel || 'primary';
+        working.finding_channel =
+            focusMode === 'bug-first'
+                ? criticalType && criticalSeverity
+                    ? 'primary'
+                    : 'backlog'
+                : working.finding_channel || 'primary';
 
         deterministicFallback(working, {
             proposeDiffs,

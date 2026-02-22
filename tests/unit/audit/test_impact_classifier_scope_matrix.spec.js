@@ -58,4 +58,3 @@ test('impact classifier: package.json forces full quality strategy with fallback
     assert.equal(plan.steps.typecheck_node.mode, 'full');
     assert.equal(plan.steps.typecheck_browser.mode, 'full');
 });
-

@@ -48,11 +48,12 @@ async function main() {
         },
         rag: {
             ok: ragHealth.ok && Boolean(ragJson?.ok || ragOkFromText),
-            available: ragJson && Object.prototype.hasOwnProperty.call(ragJson, 'available')
-                ? Boolean(ragJson.available)
-                : ragAvailableFromText
-                    ? true
-                    : null,
+            available:
+                ragJson && Object.prototype.hasOwnProperty.call(ragJson, 'available')
+                    ? Boolean(ragJson.available)
+                    : ragAvailableFromText
+                      ? true
+                      : null,
             details: ragHealth.ok ? 'rag-health-command-ok' : 'rag-health-command-failed',
             ...summarizeResult(ragHealth),
         },
@@ -92,7 +93,9 @@ async function main() {
     } else {
         console.log('[SEMANTIC PREFLIGHT]');
         console.log(`ok=${report.ok}`);
-        console.log(`pm2=${components.pm2.ok} mcp=${components.mcp.ok} rag=${components.rag.ok} lsp=${components.lsp.ok}`);
+        console.log(
+            `pm2=${components.pm2.ok} mcp=${components.mcp.ok} rag=${components.rag.ok} lsp=${components.lsp.ok}`
+        );
         if (issues.length > 0) {
             console.log(`issues=${issues.join(' | ')}`);
         }

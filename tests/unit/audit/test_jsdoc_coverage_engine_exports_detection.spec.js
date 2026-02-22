@@ -71,3 +71,58 @@ test('collectJsSourceFiles skips nested dist directories and collects js/mjs/cjs
         process.chdir(prevCwd);
     }
 });
+
+test('jsdoc engine resolves local reexports to declaration JSDoc', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-engine-reexport-'));
+    const file = path.join(tmpDir, 'reexport.js');
+
+    fs.writeFileSync(
+        file,
+        [
+            '/**',
+            ' * Classe documentada localmente.',
+            ' */',
+            'class LocalThing {}',
+            '',
+            '/**',
+            ' * Soma com retorno documentado.',
+            ' * @returns {number}',
+            ' */',
+            'function sum() { return 1; }',
+            '',
+            'export { LocalThing, sum as add };',
+            '',
+        ].join('\n'),
+        'utf8'
+    );
+
+    const report = analyzeJSDocCoverage({ files: [file], scope: 'full' });
+    assert.equal(report.exports_total, 2);
+    assert.equal(report.exports_with_jsdoc, 2);
+
+    const names = report.files[0].exported_symbols.map(s => [s.export_name, s.has_jsdoc, s.kind]).sort();
+    assert.deepEqual(names, [
+        ['LocalThing', true, 'class'],
+        ['add', true, 'function'],
+    ]);
+});
+
+test('jsdoc engine resolves export default identifier to local declaration JSDoc', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-engine-default-'));
+    const file = path.join(tmpDir, 'default.js');
+
+    fs.writeFileSync(
+        file,
+        ['/** Config exportado por default. */', 'const CONFIG = { ok: true };', 'export default CONFIG;', ''].join(
+            '\n'
+        ),
+        'utf8'
+    );
+
+    const report = analyzeJSDocCoverage({ files: [file], scope: 'full' });
+    assert.equal(report.exports_total, 1);
+    const sym = report.files[0].exported_symbols[0];
+    assert.equal(sym.export_name, 'default');
+    assert.equal(sym.has_jsdoc, true);
+    assert.equal(sym.kind, 'const');
+});

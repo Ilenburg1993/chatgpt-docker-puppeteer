@@ -36,14 +36,7 @@ test('jsdoc engine marks exported function with returns tag as complete', () => 
     const file = path.join(tmpDir, 'fn.js');
     fs.writeFileSync(
         file,
-        [
-            '/**',
-            ' * descricao',
-            ' * @returns {number}',
-            ' */',
-            'export function f() { return 1; }',
-            '',
-        ].join('\n'),
+        ['/**', ' * descricao', ' * @returns {number}', ' */', 'export function f() { return 1; }', ''].join('\n'),
         'utf8'
     );
 

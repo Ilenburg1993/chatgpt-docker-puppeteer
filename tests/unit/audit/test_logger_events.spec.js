@@ -28,7 +28,11 @@ test('audit logger emits monotonic seq and validates payload shape', () => {
     });
 
     const eventsPath = path.join(runDir, 'events.jsonl');
-    const lines = fs.readFileSync(eventsPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    const lines = fs
+        .readFileSync(eventsPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
     assert.equal(lines.length, 2);
     assert.equal(lines[0].seq, 1);
     assert.equal(lines[1].seq, 2);

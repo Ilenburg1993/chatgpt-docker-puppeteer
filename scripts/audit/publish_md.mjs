@@ -32,7 +32,13 @@ function coverageLines(coverage) {
     }
     return domains
         .map(domain => {
-            const item = coverage[domain] || { total: 0, violated: 0, covered: 0, covered_by_run: 0, covered_by_tests: 0 };
+            const item = coverage[domain] || {
+                total: 0,
+                violated: 0,
+                covered: 0,
+                covered_by_run: 0,
+                covered_by_tests: 0,
+            };
             const coveredByRun = Number.isFinite(item.covered_by_run) ? item.covered_by_run : item.covered;
             const coveredByTests = Number.isFinite(item.covered_by_tests) ? item.covered_by_tests : 0;
             return `- ${domain}: total=${item.total}, cobertos_run=${coveredByRun}, cobertos_testes=${coveredByTests}, violados=${item.violated}`;
@@ -68,7 +74,10 @@ function findingLines(report) {
 function buildAutomationSection(report) {
     const modules = topModules(report);
     const findings = findingLines(report);
-    const modulesText = modules.length > 0 ? modules.map(item => `- ${item.module}: ${item.count}`).join('\n') : '- Sem concentração de risco.';
+    const modulesText =
+        modules.length > 0
+            ? modules.map(item => `- ${item.module}: ${item.count}`).join('\n')
+            : '- Sem concentração de risco.';
     const staleContracts = report.contract_drift.stale_contracts || [];
     const unowned = report.contract_drift.unowned_critical || [];
     const testsWithoutContract = report.contract_drift.tests_without_contract || [];

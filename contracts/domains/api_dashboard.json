@@ -11,16 +11,12 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "api.health.failed"
-        ]
+        "signals": ["api.health.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/integration/api/test_health_endpoint.spec.js"
-      ],
+      "test_recipe": ["node --test tests/integration/api/test_health_endpoint.spec.js"],
       "owner": "server-api",
       "status": "active",
       "version": 1,

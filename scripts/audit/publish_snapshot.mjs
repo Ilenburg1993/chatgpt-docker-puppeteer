@@ -29,16 +29,16 @@ export function publishSnapshot(options) {
 
     const header = options.report
         ? [
-            '<!-- SNAPSHOT_METADATA_START -->',
-            `- schema_version: ${options.report.schema_version}`,
-            `- run_id: ${options.report.run_id}`,
-            `- focus_mode: ${options.report.focus_mode}`,
-            `- partial: ${options.report.summary.partial}`,
-            `- eta_final_ms: ${options.report.eta.eta_ms}`,
-            `- generated_at: ${now.toISOString()}`,
-            '<!-- SNAPSHOT_METADATA_END -->',
-            '',
-        ].join('\n')
+              '<!-- SNAPSHOT_METADATA_START -->',
+              `- schema_version: ${options.report.schema_version}`,
+              `- run_id: ${options.report.run_id}`,
+              `- focus_mode: ${options.report.focus_mode}`,
+              `- partial: ${options.report.summary.partial}`,
+              `- eta_final_ms: ${options.report.eta.eta_ms}`,
+              `- generated_at: ${now.toISOString()}`,
+              '<!-- SNAPSHOT_METADATA_END -->',
+              '',
+          ].join('\n')
         : '';
 
     fs.writeFileSync(snapshotPath, `${header}${content}`, 'utf8');

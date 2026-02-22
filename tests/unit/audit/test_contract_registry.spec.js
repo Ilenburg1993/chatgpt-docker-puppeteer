@@ -76,5 +76,8 @@ test('contract registry rejects duplicate ids', () => {
     );
 
     const result = loadContractRegistry({ registryPath });
-    assert.equal(result.errors.some(message => message.includes('duplicado')), true);
+    assert.equal(
+        result.errors.some(message => message.includes('duplicado')),
+        true
+    );
 });

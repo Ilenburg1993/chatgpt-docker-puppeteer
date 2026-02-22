@@ -11,16 +11,12 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.node_check.failed"
-        ]
+        "signals": ["quality.node_check.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run audit:quick -- --quality-mode smart --triage false"
-      ],
+      "test_recipe": ["npm run audit:quick -- --quality-mode smart --triage false"],
       "owner": "audit-quality",
       "status": "active",
       "version": 1,
@@ -38,9 +34,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.entrypoint_import_smoke.failed"
-        ]
+        "signals": ["quality.entrypoint_import_smoke.failed"]
       },
       "allowlist": {
         "files": []
@@ -66,16 +60,12 @@
       "type_default": "incompletude",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.lint.failed"
-        ]
+        "signals": ["quality.lint.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run lint -- --quiet"
-      ],
+      "test_recipe": ["npm run lint -- --quiet"],
       "owner": "quality-lint",
       "status": "active",
       "version": 1,
@@ -93,16 +83,12 @@
       "type_default": "falha de contrato",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.typecheck_node.failed"
-        ]
+        "signals": ["quality.typecheck_node.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run typecheck:node"
-      ],
+      "test_recipe": ["npm run typecheck:node"],
       "owner": "typing-node",
       "status": "active",
       "version": 1,
@@ -120,16 +106,12 @@
       "type_default": "falha de contrato",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.typecheck_browser.failed"
-        ]
+        "signals": ["quality.typecheck_browser.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run typecheck:browser"
-      ],
+      "test_recipe": ["npm run typecheck:browser"],
       "owner": "typing-browser",
       "status": "active",
       "version": 1,
@@ -147,16 +129,12 @@
       "type_default": "incompletude",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.prettier_check.failed"
-        ]
+        "signals": ["quality.prettier_check.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run format:check"
-      ],
+      "test_recipe": ["npm run format:check"],
       "owner": "quality-format",
       "status": "active",
       "version": 1,
@@ -174,16 +152,12 @@
       "type_default": "falha de contrato",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.ts_ignore_scan.failed"
-        ]
+        "signals": ["quality.ts_ignore_scan.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "rg -n '@ts-ignore' src scripts tests --glob '!**/dist/**'"
-      ],
+      "test_recipe": ["rg -n '@ts-ignore' src scripts tests --glob '!**/dist/**'"],
       "owner": "typing-governance",
       "status": "active",
       "version": 1,
@@ -201,16 +175,12 @@
       "type_default": "incompletude",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.jsdoc_delta.failed"
-        ]
+        "signals": ["quality.jsdoc_delta.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run jsdoc:delta"
-      ],
+      "test_recipe": ["npm run jsdoc:delta"],
       "owner": "docs-jsdoc",
       "status": "active",
       "version": 1,
@@ -228,16 +198,12 @@
       "type_default": "incompletude",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.jsdoc_full.exports_missing"
-        ]
+        "signals": ["quality.jsdoc_full.exports_missing"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run jsdoc:coverage"
-      ],
+      "test_recipe": ["npm run jsdoc:coverage"],
       "owner": "docs-jsdoc",
       "status": "active",
       "version": 1,
@@ -255,16 +221,12 @@
       "type_default": "incompletude",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "quality.jsdoc_full.coverage_below_threshold"
-        ]
+        "signals": ["quality.jsdoc_full.coverage_below_threshold"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run audit:deep -- --quality-jsdoc true --triage false"
-      ],
+      "test_recipe": ["npm run audit:deep -- --quality-jsdoc true --triage false"],
       "owner": "docs-jsdoc",
       "status": "active",
       "version": 1,

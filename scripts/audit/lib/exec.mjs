@@ -26,9 +26,7 @@ export async function runCommand(command, args = [], options = {}) {
     const maxStderrBytes = Math.max(65536, Number(options.maxStderrBytes || 1024 * 1024));
     const headRatio = Math.max(0.2, Math.min(0.8, Number(options.truncationHeadRatio || 0.6)));
     const acceptExitCodes = Array.isArray(options.acceptExitCodes)
-        ? options.acceptExitCodes
-            .map(value => Number(value))
-            .filter(Number.isInteger)
+        ? options.acceptExitCodes.map(value => Number(value)).filter(Number.isInteger)
         : [];
 
     return new Promise(resolve => {
@@ -313,7 +311,8 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
             parsedCandidates.push(parsed);
             if (
                 !Array.isArray(parsed) &&
-                (Object.prototype.hasOwnProperty.call(parsed, 'ok') || Object.prototype.hasOwnProperty.call(parsed, 'result'))
+                (Object.prototype.hasOwnProperty.call(parsed, 'ok') ||
+                    Object.prototype.hasOwnProperty.call(parsed, 'result'))
             ) {
                 return parsed;
             }
@@ -333,7 +332,11 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
         ? Array.from({ length: lines.length }, (_item, idx) => lines.length - idx - 1)
         : Array.from({ length: lines.length }, (_item, idx) => idx);
     for (const start of indexes) {
-        if (!String(lines[start] || '').trim().startsWith('{')) {
+        if (
+            !String(lines[start] || '')
+                .trim()
+                .startsWith('{')
+        ) {
             continue;
         }
         const candidate = lines.slice(start).join('\n').trim();

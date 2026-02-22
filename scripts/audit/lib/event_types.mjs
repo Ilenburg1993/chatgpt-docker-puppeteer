@@ -1,3 +1,7 @@
+/**
+ * Enum canônico de eventos emitidos pelo runner de auditoria.
+ * Consumido por logger, timeline de fases e análise posterior de artefatos.
+ */
 export const AUDIT_EVENT_TYPES = Object.freeze({
     RUN_STARTED: 'run_started',
     RUN_FINISHED: 'run_finished',
@@ -24,6 +28,10 @@ export const AUDIT_EVENT_TYPES = Object.freeze({
     ARCHITECTURE_ANALYSIS_COMPLETED: 'architecture_analysis_completed',
 });
 
+/**
+ * Enum canônico de fases do pipeline de auditoria.
+ * Mantém estabilidade de nomes para progress, schema e contratos.
+ */
 export const AUDIT_PHASES = Object.freeze({
     PREFLIGHT: 'preflight',
     CONTEXT_REFRESH: 'context-refresh',

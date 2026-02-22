@@ -11,16 +11,12 @@
       "type_default": "falha de contrato",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "static.typecheck.failed"
-        ]
+        "signals": ["static.typecheck.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run typecheck"
-      ],
+      "test_recipe": ["npm run typecheck"],
       "owner": "core-schema",
       "status": "active",
       "version": 1,
@@ -38,16 +34,12 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "schemas.task_v5.failed"
-        ]
+        "signals": ["schemas.task_v5.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/unit/core/test_schema_v5.spec.js"
-      ],
+      "test_recipe": ["node --test tests/unit/core/test_schema_v5.spec.js"],
       "owner": "core-schema",
       "status": "active",
       "version": 1,

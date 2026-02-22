@@ -12,7 +12,7 @@ test('quality collector records warning when lint fails without parseable JSON',
         qualityJsdoc: false,
         qualityCache: false,
         qualityParallelism: 'serial',
-        exec: async (stepId) => {
+        exec: async stepId => {
             calls.push(stepId);
             switch (stepId) {
                 case 'quality.lint':
@@ -34,4 +34,3 @@ test('quality collector records warning when lint fails without parseable JSON',
     assert.equal(result.findings.filter(f => f.source_tool === 'quality:eslint').length, 0);
     assert.ok(result.warnings.some(w => w.source === 'quality:lint' && /eslint/i.test(w.message)));
 });
-

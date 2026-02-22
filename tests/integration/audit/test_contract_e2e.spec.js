@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import { runCommand } from '../../../scripts/audit/lib/exec.mjs';
 
 test('check:forbidden emits structured contract payload in hybrid mode', async () => {
-    const result = await runCommand('node', ['scripts/check_forbidden_patterns.js', '--json', '--contracts-mode', 'hybrid'], {
-        timeoutMs: 180000,
-    });
+    const result = await runCommand(
+        'node',
+        ['scripts/check_forbidden_patterns.js', '--json', '--contracts-mode', 'hybrid'],
+        {
+            timeoutMs: 180000,
+        }
+    );
     assert.ok(result.exitCode === 0 || result.exitCode === 2, `unexpected exit code ${result.exitCode}`);
     const payload = JSON.parse(result.stdout);
     assert.equal(typeof payload.ok, 'boolean');

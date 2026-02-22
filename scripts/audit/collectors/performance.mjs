@@ -416,10 +416,7 @@ async function analyzeKernelDispatchOwnership(rootDir) {
     try {
         const srcDir = path.join(rootDir, 'src');
         const files = await findJsFiles(srcDir);
-        const allowDirectDispatch = new Set([
-            'src/agent/queue_worker.js',
-            'src/missions/mission_manager.js',
-        ]);
+        const allowDirectDispatch = new Set(['src/agent/queue_worker.js', 'src/missions/mission_manager.js']);
         const pattern = /\b(?:this\.)?kernel\.executeTask\s*\(/g;
 
         for (const file of files) {
@@ -441,7 +438,8 @@ async function analyzeKernelDispatchOwnership(rootDir) {
                     type: 'bug',
                     impact: 'Dispatch direto fora do QueueWorker viola ownership SSOT e aumenta risco de execução paralela.',
                     root_cause: 'Chamada direta para kernel.executeTask em caminho não autorizado.',
-                    suggested_patch: 'Enfileirar via insertTask + QueueWorker, mantendo Kernel como executor único por fila.',
+                    suggested_patch:
+                        'Enfileirar via insertTask + QueueWorker, mantendo Kernel como executor único por fila.',
                     test_strategy: 'Executar lint de ownership + testes de integração de missão/fila.',
                     regression_risk: 'Alto',
                 });
@@ -468,10 +466,7 @@ async function analyzeLockReleaseCausality(rootDir) {
     const errors = [];
     const warnings = [];
 
-    const targets = [
-        'src/agent/queue_worker.js',
-        'src/agent/task_state_projector.js',
-    ];
+    const targets = ['src/agent/queue_worker.js', 'src/agent/task_state_projector.js'];
 
     const pattern = /releaseTaskLock\s*\(\s*\{\s*taskId\s*\}\s*\)/g;
 
@@ -520,10 +515,7 @@ async function analyzeMissionTransitionBypass(rootDir) {
     const findings = [];
     const errors = [];
     const warnings = [];
-    const targets = [
-        'src/server/api/controllers/missions.js',
-        'src/agent/mission_runner.js',
-    ];
+    const targets = ['src/server/api/controllers/missions.js', 'src/agent/mission_runner.js'];
 
     try {
         for (const relPath of targets) {
@@ -551,7 +543,8 @@ async function analyzeMissionTransitionBypass(rootDir) {
                     type: 'bug',
                     impact: 'Mutação de status fora do serviço único pode causar drift de regras entre controller/runner.',
                     root_cause: 'updateMission(status=...) chamado diretamente sem mission_execution_service.',
-                    suggested_patch: 'Encaminhar transição para mission_execution_service com precondições e evento padronizado.',
+                    suggested_patch:
+                        'Encaminhar transição para mission_execution_service com precondições e evento padronizado.',
                     test_strategy: 'Executar regressão wave17 de serviço único de transição.',
                     regression_risk: 'Alto',
                 });
@@ -674,10 +667,7 @@ async function analyzeControlSingleEntrypoint(rootDir) {
     const errors = [];
     const warnings = [];
 
-    const targets = [
-        'src/server/api/controllers/missions.js',
-        'src/server/api/controllers/tasks.js',
-    ];
+    const targets = ['src/server/api/controllers/missions.js', 'src/server/api/controllers/tasks.js'];
     const directMutationPattern = /updateTask\s*\(|updateMission\s*\(|insertTask\s*\(/g;
 
     try {
@@ -888,7 +878,9 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
 
     try {
         const taskControlContent = fs.existsSync(taskControlPath) ? fs.readFileSync(taskControlPath, 'utf8') : '';
-        const controlServiceContent = fs.existsSync(controlServicePath) ? fs.readFileSync(controlServicePath, 'utf8') : '';
+        const controlServiceContent = fs.existsSync(controlServicePath)
+            ? fs.readFileSync(controlServicePath, 'utf8')
+            : '';
 
         const hasStateGuard = /TASK_REASSIGN_REQUIRES_PAUSED_OR_READY_NOT_STARTED/.test(taskControlContent);
         const hasPatchGuard = /TASK_MISSION_REASSIGN_USE_COMMAND/.test(taskControlContent);
@@ -899,7 +891,9 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
                 source_tool: 'performance-task-reassign',
                 contract_id: 'CONTRACT-RUNTIME-TASK-REASSIGN-STATE-GUARD',
                 domain: 'runtime',
-                file: !hasCommand ? 'src/server/domain/control_command_service.js' : 'src/server/domain/task_control_service.js',
+                file: !hasCommand
+                    ? 'src/server/domain/control_command_service.js'
+                    : 'src/server/domain/task_control_service.js',
                 line: null,
                 evidence: 'Guardas/command de TASK_REASSIGN_MISSION incompletos.',
                 severity_hint: 'P1',
@@ -919,7 +913,9 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
     }
 
     try {
-        const dashboardTasksContent = fs.existsSync(dashboardTasksPath) ? fs.readFileSync(dashboardTasksPath, 'utf8') : '';
+        const dashboardTasksContent = fs.existsSync(dashboardTasksPath)
+            ? fs.readFileSync(dashboardTasksPath, 'utf8')
+            : '';
         const taskViewsContent = fs.existsSync(taskViewsPath) ? fs.readFileSync(taskViewsPath, 'utf8') : '';
         const hasJoin = /LEFT JOIN missions/.test(dashboardTasksContent);
         const hasMissionContext = /include\.has\('mission_context'\)/.test(dashboardTasksContent);
@@ -931,9 +927,10 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
                 source_tool: 'performance-task-mission-context',
                 contract_id: 'CONTRACT-RUNTIME-TASK-MISSION-CONTEXT-DRIFT',
                 domain: 'runtime',
-                file: !hasJoin || !hasMissionContext
-                    ? 'src/server/api/controllers/dashboard_tasks.js'
-                    : 'src/server/api/utils/task_views.js',
+                file:
+                    !hasJoin || !hasMissionContext
+                        ? 'src/server/api/controllers/dashboard_tasks.js'
+                        : 'src/server/api/utils/task_views.js',
                 line: null,
                 evidence: 'Enriquecimento de contexto task↔mission incompleto.',
                 severity_hint: 'P2',
@@ -993,7 +990,10 @@ async function analyzeBootImportSafetyAndSignalOwnership(rootDir) {
             });
         }
 
-        if (/removeAllListeners\s*\(/.test(proxyScriptContent) || /AUTO_HANDLE_SIGNALS\s*:\s*true/.test(proxyScriptContent)) {
+        if (
+            /removeAllListeners\s*\(/.test(proxyScriptContent) ||
+            /AUTO_HANDLE_SIGNALS\s*:\s*true/.test(proxyScriptContent)
+        ) {
             findings.push({
                 source_tool: 'performance-signal-ownership',
                 contract_id: 'CONTRACT-RUNTIME-SIGNAL-OWNERSHIP-CONFLICT',
@@ -1053,9 +1053,10 @@ async function analyzeRuntimeResourceShutdownContracts(rootDir) {
                 source_tool: 'performance-runtime-resource-registry',
                 contract_id: 'CONTRACT-RUNTIME-RESOURCE-SHUTDOWN-TIMEOUT',
                 domain: 'runtime',
-                file: !hasRegistryShutdown || !hasTimeoutSignalization
-                    ? 'src/server/engine/lifecycle.js'
-                    : 'src/core/runtime_resource_registry.js',
+                file:
+                    !hasRegistryShutdown || !hasTimeoutSignalization
+                        ? 'src/server/engine/lifecycle.js'
+                        : 'src/core/runtime_resource_registry.js',
                 line: null,
                 evidence: 'Contrato de shutdown por recurso com timeout/telemetria está incompleto.',
                 severity_hint: 'P1',
@@ -1138,8 +1139,7 @@ function findPromiseRaceTimeoutWithoutCleanup(content) {
  */
 function findPotentialNPlusOneLoops(content) {
     const loopBlocks = [];
-    const loopPattern =
-        /\bfor\s*\([^)]*\)\s*{[\s\S]{0,1200}?}|\bforEach\s*\([^)]*\)\s*=>\s*{[\s\S]{0,1200}?}/g;
+    const loopPattern = /\bfor\s*\([^)]*\)\s*{[\s\S]{0,1200}?}|\bforEach\s*\([^)]*\)\s*=>\s*{[\s\S]{0,1200}?}/g;
 
     const dataQueryPatterns = [
         /\b(?:db|repo|repository|model|collection|client|prisma|sequelize|mongoose|knex)\b[\w$.[\]'"]{0,120}\.\s*(?:query|find(?:One|Many|All)?|select|aggregate|count|execute|get)\s*\(/i,
@@ -1162,7 +1162,10 @@ function findPotentialNPlusOneLoops(content) {
         }
 
         const hasOnlyDomSignals = domQueryPatterns.some(re => re.test(loopBlock));
-        if (hasOnlyDomSignals && !/\b(?:db|repo|repository|model|collection|client|prisma|sequelize|mongoose|knex)\b/i.test(loopBlock)) {
+        if (
+            hasOnlyDomSignals &&
+            !/\b(?:db|repo|repository|model|collection|client|prisma|sequelize|mongoose|knex)\b/i.test(loopBlock)
+        ) {
             continue;
         }
 

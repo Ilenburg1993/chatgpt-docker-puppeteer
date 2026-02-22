@@ -31,43 +31,58 @@ export function buildPhasePlan(options) {
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_QUALITY,
-        planned_steps: options.profile === 'quick'
-            ? [
-                'quality.plan_resolution',
-                'quality.fallback_resolution',
-                'quality.node_check',
-                'quality.entrypoint_import_smoke',
-                'quality.lint',
-                'quality.typecheck_node',
-                'quality.typecheck_browser',
-                'quality.prettier_check',
-                'quality.jsdoc_delta',
-                'quality.ts_ignore_scan',
-            ]
-            : [
-                'quality.plan_resolution',
-                'quality.fallback_resolution',
-                'quality.node_check',
-                'quality.entrypoint_import_smoke',
-                'quality.lint',
-                'quality.typecheck_node',
-                'quality.typecheck_browser',
-                'quality.prettier_check',
-                'quality.jsdoc_full',
-                'quality.ts_ignore_scan',
-            ],
+        planned_steps:
+            options.profile === 'quick'
+                ? [
+                      'quality.plan_resolution',
+                      'quality.fallback_resolution',
+                      'quality.node_check',
+                      'quality.entrypoint_import_smoke',
+                      'quality.lint',
+                      'quality.typecheck_node',
+                      'quality.typecheck_browser',
+                      'quality.prettier_check',
+                      'quality.jsdoc_delta',
+                      'quality.ts_ignore_scan',
+                  ]
+                : [
+                      'quality.plan_resolution',
+                      'quality.fallback_resolution',
+                      'quality.node_check',
+                      'quality.entrypoint_import_smoke',
+                      'quality.lint',
+                      'quality.typecheck_node',
+                      'quality.typecheck_browser',
+                      'quality.prettier_check',
+                      'quality.jsdoc_full',
+                      'quality.ts_ignore_scan',
+                  ],
     });
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_STATIC,
-        planned_steps: options.profile === 'quick'
-            ? ['static.syntax', 'static.forbidden']
-            : ['static.forbidden', 'static.lint', 'static.typecheck', 'static.madge', 'static.depcruise', 'static.jscpd', 'static.semgrep'],
+        planned_steps:
+            options.profile === 'quick'
+                ? ['static.syntax', 'static.forbidden']
+                : [
+                      'static.forbidden',
+                      'static.lint',
+                      'static.typecheck',
+                      'static.madge',
+                      'static.depcruise',
+                      'static.jscpd',
+                      'static.semgrep',
+                  ],
     });
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_RUNTIME,
-        planned_steps: ['runtime.mcp_diagnose', 'runtime.rag_health', 'runtime.lsp_health', ...(options.profile === 'quick' ? [] : ['runtime.smoke'])],
+        planned_steps: [
+            'runtime.mcp_diagnose',
+            'runtime.rag_health',
+            'runtime.lsp_health',
+            ...(options.profile === 'quick' ? [] : ['runtime.smoke']),
+        ],
     });
 
     phases.push({
@@ -76,8 +91,8 @@ export function buildPhasePlan(options) {
             options.profile === 'quick'
                 ? ['tests.smoke']
                 : options.profile === 'deep'
-                    ? ['tests.unit']
-                    : ['tests.unit', 'tests.integration', 'tests.regression'],
+                  ? ['tests.unit']
+                  : ['tests.unit', 'tests.integration', 'tests.regression'],
     });
 
     phases.push({
@@ -95,9 +110,15 @@ export function buildPhasePlan(options) {
         planned_steps: [],
     });
 
-    phases.push({ id: AUDIT_PHASES.NORMALIZE_CORRELATE, planned_steps: ['normalize.findings', 'normalize.evidence_graph'] });
+    phases.push({
+        id: AUDIT_PHASES.NORMALIZE_CORRELATE,
+        planned_steps: ['normalize.findings', 'normalize.evidence_graph'],
+    });
     phases.push({ id: AUDIT_PHASES.TRIAGE_INTELLIGENCE, planned_steps: ['triage.enrich'] });
-    phases.push({ id: AUDIT_PHASES.PUBLISH, planned_steps: ['publish.json', 'publish.master', 'publish.snapshot', 'publish.contract_reports'] });
+    phases.push({
+        id: AUDIT_PHASES.PUBLISH,
+        planned_steps: ['publish.json', 'publish.master', 'publish.snapshot', 'publish.contract_reports'],
+    });
 
     return phases;
 }

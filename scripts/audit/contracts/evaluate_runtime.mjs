@@ -49,7 +49,8 @@ export function evaluateRuntimeSignals(options) {
             root_cause: `Invariante de runtime violada (${contract.id}).`,
             suggested_patch: `Corrigir fluxo associado ao sinal ${entry.signal} para restabelecer ${contract.title}.`,
             test_strategy: contract.test_recipe.join(' ; '),
-            regression_risk: contract.severity_default === 'P0' || contract.severity_default === 'P1' ? 'Alto' : 'Médio',
+            regression_risk:
+                contract.severity_default === 'P0' || contract.severity_default === 'P1' ? 'Alto' : 'Médio',
             owner: contract.owner,
             enforcement_state: contract.enforcement?.level || 'warn',
         });

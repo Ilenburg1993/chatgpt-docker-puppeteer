@@ -11,7 +11,7 @@ test('quality collector smart plan resolves docs-only run with selective executi
         changedFiles: ['README.md'],
         qualityMode: 'smart',
         qualityJsdoc: false,
-        exec: async (stepId) => {
+        exec: async stepId => {
             calledSteps.push(stepId);
             return { ok: true, exitCode: 0, stdout: '', stderr: '' };
         },
@@ -31,4 +31,3 @@ test('quality collector smart plan resolves docs-only run with selective executi
     assert.ok(calledSteps.includes('quality.prettier_check'));
     assert.ok(calledSteps.includes('quality.ts_ignore_scan'));
 });
-

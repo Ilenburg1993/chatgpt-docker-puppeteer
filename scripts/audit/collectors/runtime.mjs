@@ -23,9 +23,7 @@ export async function collectRuntimeFindings(options) {
     /** @type {Array<{source:string,message:string}>} */
     const warnings = [];
 
-    const exec =
-        options.exec ||
-        (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
+    const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
 
     const telemetry = {
         mcp: { ok: false, details: '' },
@@ -35,8 +33,11 @@ export async function collectRuntimeFindings(options) {
     /** @type {Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>} */
     const signals = [];
 
-    const mcpDiag = await exec('runtime.mcp_diagnose', 'npm', ['run', 'mcp:diagnose', '--', '--json'], { timeoutMs: 180000 });
-    const mcpJson = parseJsonFromMixedOutput(mcpDiag.stdout) || parseJsonFromMixedOutput(`${mcpDiag.stdout}\n${mcpDiag.stderr}`);
+    const mcpDiag = await exec('runtime.mcp_diagnose', 'npm', ['run', 'mcp:diagnose', '--', '--json'], {
+        timeoutMs: 180000,
+    });
+    const mcpJson =
+        parseJsonFromMixedOutput(mcpDiag.stdout) || parseJsonFromMixedOutput(`${mcpDiag.stdout}\n${mcpDiag.stderr}`);
     telemetry.mcp.ok = Boolean(mcpDiag.ok && mcpJson?.ok !== false);
     telemetry.mcp.details = telemetry.mcp.ok ? 'diagnose-ok' : 'diagnose-failed';
 
@@ -52,17 +53,22 @@ export async function collectRuntimeFindings(options) {
         });
     }
 
-    const ragHealth = await exec('runtime.rag_health', 'npm', ['run', 'rag:health', '--', '--json'], { timeoutMs: 180000 });
-    const ragJson = parseJsonFromMixedOutput(ragHealth.stdout) || parseJsonFromMixedOutput(`${ragHealth.stdout}\n${ragHealth.stderr}`);
+    const ragHealth = await exec('runtime.rag_health', 'npm', ['run', 'rag:health', '--', '--json'], {
+        timeoutMs: 180000,
+    });
+    const ragJson =
+        parseJsonFromMixedOutput(ragHealth.stdout) ||
+        parseJsonFromMixedOutput(`${ragHealth.stdout}\n${ragHealth.stderr}`);
     const ragOkFromText = /"ok"\s*:\s*true/.test(String(ragHealth.stdout || ''));
     const ragAvailableFromText = /"available"\s*:\s*true/.test(String(ragHealth.stdout || ''));
 
     telemetry.rag.ok = Boolean(ragHealth.ok && (ragJson?.ok === true || ragOkFromText));
-    telemetry.rag.available = ragJson && Object.prototype.hasOwnProperty.call(ragJson, 'available')
-        ? Boolean(ragJson.available)
-        : ragAvailableFromText
-            ? true
-            : null;
+    telemetry.rag.available =
+        ragJson && Object.prototype.hasOwnProperty.call(ragJson, 'available')
+            ? Boolean(ragJson.available)
+            : ragAvailableFromText
+              ? true
+              : null;
     telemetry.rag.degraded = ragJson && ragJson.ok === false ? true : null;
 
     if (!telemetry.rag.ok) {
@@ -77,21 +83,29 @@ export async function collectRuntimeFindings(options) {
         });
     }
 
-    const lspHealth = await exec('runtime.lsp_health', 'npm', ['run', 'lsp:health', '--', '--json'], { timeoutMs: 180000 });
-    const lspJson = parseJsonFromMixedOutput(lspHealth.stdout) || parseJsonFromMixedOutput(`${lspHealth.stdout}\n${lspHealth.stderr}`);
+    const lspHealth = await exec('runtime.lsp_health', 'npm', ['run', 'lsp:health', '--', '--json'], {
+        timeoutMs: 180000,
+    });
+    const lspJson =
+        parseJsonFromMixedOutput(lspHealth.stdout) ||
+        parseJsonFromMixedOutput(`${lspHealth.stdout}\n${lspHealth.stderr}`);
     const hasLspTools = Boolean(
-        (lspJson && Object.prototype.hasOwnProperty.call(lspJson, 'lsp_tools_present')) ? lspJson.lsp_tools_present : mcpJson?.lsp_tools_present
+        lspJson && Object.prototype.hasOwnProperty.call(lspJson, 'lsp_tools_present')
+            ? lspJson.lsp_tools_present
+            : mcpJson?.lsp_tools_present
     );
     const lspFunctionalOk = Boolean(
-        (lspJson && Object.prototype.hasOwnProperty.call(lspJson, 'lsp_functional_ok')) ? lspJson.lsp_functional_ok : mcpJson?.lsp_functional_ok
+        lspJson && Object.prototype.hasOwnProperty.call(lspJson, 'lsp_functional_ok')
+            ? lspJson.lsp_functional_ok
+            : mcpJson?.lsp_functional_ok
     );
 
     telemetry.lsp.ok = Boolean(hasLspTools && lspFunctionalOk);
     telemetry.lsp.details = telemetry.lsp.ok
         ? 'lsp-functional-ok'
         : !hasLspTools
-            ? 'lsp-tools-missing'
-            : 'lsp-functional-failed';
+          ? 'lsp-tools-missing'
+          : 'lsp-functional-failed';
 
     if (!hasLspTools) {
         signals.push({
@@ -152,7 +166,11 @@ export async function collectRuntimeFindings(options) {
         const smoke = await exec(
             'runtime.smoke',
             'node',
-            ['--test', 'tests/regression/test_wave10_lifecycle_signal_matrix.spec.js', 'tests/regression/test_wave11_main_server_bootstrap_unification.spec.js'],
+            [
+                '--test',
+                'tests/regression/test_wave10_lifecycle_signal_matrix.spec.js',
+                'tests/regression/test_wave11_main_server_bootstrap_unification.spec.js',
+            ],
             { timeoutMs: 300000 }
         );
 
@@ -166,10 +184,12 @@ export async function collectRuntimeFindings(options) {
         }
     }
 
-    const runtimeFindings = /** @type {RawFinding[]} */ (evaluateRuntimeSignals({
-        contracts: options.contracts || [],
-        signals,
-    }));
+    const runtimeFindings = /** @type {RawFinding[]} */ (
+        evaluateRuntimeSignals({
+            contracts: options.contracts || [],
+            signals,
+        })
+    );
     if (runtimeFindings.length > 0) {
         findings.push(...runtimeFindings);
     }
@@ -223,10 +243,7 @@ export async function collectRuntimeFindings(options) {
 }
 
 function detectLockReleaseCausalityIssues(rootDir) {
-    const targets = [
-        'src/agent/queue_worker.js',
-        'src/agent/task_state_projector.js',
-    ];
+    const targets = ['src/agent/queue_worker.js', 'src/agent/task_state_projector.js'];
     const pattern = /releaseTaskLock\s*\(\s*\{\s*taskId\s*\}\s*\)/g;
     const issues = [];
 
@@ -294,7 +311,8 @@ function detectDashboardRuntimePolicySignals(rootDir) {
             const hasLegacyBridgeInit = /taskSyncBridge\s*&&\s*typeof\s+taskSyncBridge\.initialize/.test(content);
             const hasLegacyModeGate = /dashboardTaskSyncMode\s*===\s*['"]legacy_bridge['"]/.test(content);
             const hasContingencyGate = /DASHBOARD_LEGACY_BRIDGE_CONTINGENCY/.test(content);
-            const startsLegacyBridgeWithoutContingency = hasLegacyBridgeInit && hasLegacyModeGate && !hasContingencyGate;
+            const startsLegacyBridgeWithoutContingency =
+                hasLegacyBridgeInit && hasLegacyModeGate && !hasContingencyGate;
 
             if (startsSsotFeed && startsLegacyBridgeWithoutContingency) {
                 results.push({
@@ -313,10 +331,7 @@ function detectDashboardRuntimePolicySignals(rootDir) {
 
 function detectMissionTransitionBypass(rootDir) {
     const results = [];
-    const targets = [
-        'src/server/api/controllers/missions.js',
-        'src/agent/mission_runner.js',
-    ];
+    const targets = ['src/server/api/controllers/missions.js', 'src/agent/mission_runner.js'];
     const statusMutationPattern = /updateMission\s*\([^)]*$/gm;
 
     for (const relPath of targets) {
@@ -393,7 +408,10 @@ function detectControlPlaneSignals(rootDir) {
                     line: null,
                 });
             }
-            if (!/CONTROL_REQUIRE_REASON/.test(controlContent) || !/CONTROL_REQUIRE_IDEMPOTENCY_KEY/.test(controlContent)) {
+            if (
+                !/CONTROL_REQUIRE_REASON/.test(controlContent) ||
+                !/CONTROL_REQUIRE_IDEMPOTENCY_KEY/.test(controlContent)
+            ) {
                 results.push({
                     signal: 'runtime.control.reason_idempotency.failed',
                     evidence: 'Guarda de reason/idempotency não detectada no control_command_service.',
@@ -409,7 +427,9 @@ function detectControlPlaneSignals(rootDir) {
         const missionControllerContent = fs.existsSync(missionControllerPath)
             ? fs.readFileSync(missionControllerPath, 'utf8')
             : '';
-        const taskControllerContent = fs.existsSync(taskControllerPath) ? fs.readFileSync(taskControllerPath, 'utf8') : '';
+        const taskControllerContent = fs.existsSync(taskControllerPath)
+            ? fs.readFileSync(taskControllerPath, 'utf8')
+            : '';
         const missionUsesControl = /executeCommand/.test(missionControllerContent);
         const taskUsesControl = /executeCommand/.test(taskControllerContent);
         if (!missionUsesControl || !taskUsesControl) {
@@ -417,14 +437,18 @@ function detectControlPlaneSignals(rootDir) {
                 signal: 'runtime.control.single_entrypoint.failed',
                 evidence: 'Controllers de missão/task não delegam integralmente ao control_command_service.',
                 source_tool: 'runtime-control-plane',
-                file: !missionUsesControl ? 'src/server/api/controllers/missions.js' : 'src/server/api/controllers/tasks.js',
+                file: !missionUsesControl
+                    ? 'src/server/api/controllers/missions.js'
+                    : 'src/server/api/controllers/tasks.js',
                 line: null,
             });
         }
     } catch {}
 
     try {
-        const missionControlContent = fs.existsSync(missionControlPath) ? fs.readFileSync(missionControlPath, 'utf8') : '';
+        const missionControlContent = fs.existsSync(missionControlPath)
+            ? fs.readFileSync(missionControlPath, 'utf8')
+            : '';
         const taskControlContent = fs.existsSync(taskControlPath) ? fs.readFileSync(taskControlPath, 'utf8') : '';
         const hasMissionPauseGuard = /MISSION_EDIT_REQUIRES_PAUSED|EDITABLE_MISSION/.test(missionControlContent);
         const hasTaskPauseGuard = /TASK_EDIT_REQUIRES_PAUSED|_assertPauseToEditTask/.test(taskControlContent);
@@ -518,9 +542,10 @@ function detectControlPlaneSignals(rootDir) {
                 signal: 'runtime.task_mission_drift.failed',
                 evidence: 'Contrato de contexto enriquecido task↔mission não detectado por completo.',
                 source_tool: 'runtime-dashboard-task-mission-context',
-                file: !hasMissionJoin || !hasMissionContext
-                    ? 'src/server/api/controllers/dashboard_tasks.js'
-                    : 'src/server/api/utils/task_views.js',
+                file:
+                    !hasMissionJoin || !hasMissionContext
+                        ? 'src/server/api/controllers/dashboard_tasks.js'
+                        : 'src/server/api/utils/task_views.js',
                 line: null,
             });
         }
@@ -650,9 +675,10 @@ async function detectBootAndLifecycleSignals(rootDir, exec) {
                 signal: 'resource_shutdown_timeout',
                 evidence: 'Contrato de shutdown por recurso com timeout/telemetria não detectado integralmente.',
                 source_tool: 'runtime-wave20b-resource-shutdown',
-                file: !hasRegistryStop || !hasTimeoutSignal
-                    ? 'src/server/engine/lifecycle.js'
-                    : 'src/core/runtime_resource_registry.js',
+                file:
+                    !hasRegistryStop || !hasTimeoutSignal
+                        ? 'src/server/engine/lifecycle.js'
+                        : 'src/core/runtime_resource_registry.js',
                 line: null,
             });
         }

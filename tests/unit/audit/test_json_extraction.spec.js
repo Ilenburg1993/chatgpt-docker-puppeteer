@@ -30,12 +30,9 @@ test('parseJsonFromMixedOutput returns null for invalid payload', () => {
 });
 
 test('parseJsonFromMixedOutput parses JSON array blocks from noisy output', () => {
-    const mixed = [
-        '(node:1) warning',
-        'random log',
-        '[["src/a.js","src/b.js"],["src/c.js","src/d.js"]]',
-        'tail',
-    ].join('\n');
+    const mixed = ['(node:1) warning', 'random log', '[["src/a.js","src/b.js"],["src/c.js","src/d.js"]]', 'tail'].join(
+        '\n'
+    );
 
     const parsed = parseJsonFromMixedOutput(mixed);
     assert.ok(Array.isArray(parsed));

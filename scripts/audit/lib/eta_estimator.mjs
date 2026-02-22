@@ -42,9 +42,8 @@ export function createEtaEstimator(options) {
         const durationMs = Date.now() - start;
         const prev = history[scoped] || { avg_ms: 0, count: 0 };
         const nextCount = prev.count + 1;
-        const nextAvg = prev.count === 0
-            ? durationMs
-            : Math.round(prev.avg_ms * (1 - ewmaAlpha) + durationMs * ewmaAlpha);
+        const nextAvg =
+            prev.count === 0 ? durationMs : Math.round(prev.avg_ms * (1 - ewmaAlpha) + durationMs * ewmaAlpha);
         history[scoped] = { avg_ms: nextAvg, count: nextCount };
         return durationMs;
     }
@@ -54,7 +53,12 @@ export function createEtaEstimator(options) {
      */
     function estimateRemaining(remainingStepKeys) {
         if (!Array.isArray(remainingStepKeys) || remainingStepKeys.length === 0) {
-            return { eta_ms: 0, eta_confidence: 0.95, model: 'history+online', confidence_reason: 'no-remaining-steps' };
+            return {
+                eta_ms: 0,
+                eta_confidence: 0.95,
+                model: 'history+online',
+                confidence_reason: 'no-remaining-steps',
+            };
         }
 
         let total = 0;
@@ -81,8 +85,8 @@ export function createEtaEstimator(options) {
                 known === remainingStepKeys.length
                     ? 'all-steps-from-history'
                     : known > 0
-                        ? `partial-history:${known}/${remainingStepKeys.length}`
-                        : 'fallback-average-only',
+                      ? `partial-history:${known}/${remainingStepKeys.length}`
+                      : 'fallback-average-only',
         };
     }
 

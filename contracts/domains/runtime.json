@@ -11,16 +11,12 @@
       "type_default": "falha de contrato",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.mcp_diagnose.failed"
-        ]
+        "signals": ["runtime.mcp_diagnose.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run mcp:diagnose"
-      ],
+      "test_recipe": ["npm run mcp:diagnose"],
       "owner": "infra-runtime",
       "status": "active",
       "version": 1,
@@ -38,16 +34,12 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.rag_health.failed"
-        ]
+        "signals": ["runtime.rag_health.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run rag:health -- --json"
-      ],
+      "test_recipe": ["npm run rag:health -- --json"],
       "owner": "infra-rag",
       "status": "active",
       "version": 1,
@@ -65,16 +57,12 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.lsp_tools.missing"
-        ]
+        "signals": ["runtime.lsp_tools.missing"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run mcp:diagnose"
-      ],
+      "test_recipe": ["npm run mcp:diagnose"],
       "owner": "infra-lsp",
       "status": "active",
       "version": 1,
@@ -92,16 +80,12 @@
       "type_default": "falha de contrato",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.lsp_functional.failed"
-        ]
+        "signals": ["runtime.lsp_functional.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run lsp:health -- --json"
-      ],
+      "test_recipe": ["npm run lsp:health -- --json"],
       "owner": "infra-lsp",
       "status": "active",
       "version": 1,
@@ -119,9 +103,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.smoke.failed"
-        ]
+        "signals": ["runtime.smoke.failed"]
       },
       "allowlist": {
         "files": []
@@ -155,9 +137,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave14_task_control_watcher_abort_await.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave14_task_control_watcher_abort_await.spec.js"],
       "owner": "runtime-task-control",
       "status": "active",
       "version": 1,
@@ -214,9 +194,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave14_hot_pool_monitor_taskid_rebind.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave14_hot_pool_monitor_taskid_rebind.spec.js"],
       "owner": "runtime-browserpool",
       "status": "active",
       "version": 1,
@@ -234,9 +212,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.lock_release_causality.failed"
-        ]
+        "signals": ["runtime.lock_release_causality.failed"]
       },
       "allowlist": {
         "files": []
@@ -262,16 +238,12 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "dashboard_auth_insecure"
-        ]
+        "signals": ["dashboard_auth_insecure"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave16r_dashboard_auth_no_hardcoded.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave16r_dashboard_auth_no_hardcoded.spec.js"],
       "owner": "runtime-dashboard-security",
       "status": "active",
       "version": 1,
@@ -289,9 +261,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "dashboard_socket_command_unsafe"
-        ]
+        "signals": ["dashboard_socket_command_unsafe"]
       },
       "allowlist": {
         "files": []
@@ -316,16 +286,12 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "dashboard_dual_feed"
-        ]
+        "signals": ["dashboard_dual_feed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave16r_ssot_feed_single_source.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave16r_ssot_feed_single_source.spec.js"],
       "owner": "runtime-dashboard-realtime",
       "status": "active",
       "version": 1,
@@ -343,9 +309,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.mission_transition_bypass.detected"
-        ]
+        "signals": ["runtime.mission_transition_bypass.detected"]
       },
       "allowlist": {
         "files": []
@@ -371,9 +335,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.control.single_entrypoint.failed"
-        ]
+        "signals": ["runtime.control.single_entrypoint.failed"]
       },
       "allowlist": {
         "files": []
@@ -399,17 +361,12 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.control.pause_to_edit.failed"
-        ]
+        "signals": ["runtime.control.pause_to_edit.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave18_pause_to_edit_enforced.spec.js",
-        "npm run audit:quick"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave18_pause_to_edit_enforced.spec.js", "npm run audit:quick"],
       "owner": "runtime-control-plane",
       "status": "active",
       "version": 1,
@@ -427,9 +384,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.control.reason_idempotency.failed"
-        ]
+        "signals": ["runtime.control.reason_idempotency.failed"]
       },
       "allowlist": {
         "files": []
@@ -455,9 +410,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.control.rbac_deny_default.failed"
-        ]
+        "signals": ["runtime.control.rbac_deny_default.failed"]
       },
       "allowlist": {
         "files": []
@@ -483,9 +436,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.task_reassign.state_guard.failed"
-        ]
+        "signals": ["runtime.task_reassign.state_guard.failed"]
       },
       "allowlist": {
         "files": []
@@ -511,9 +462,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.dashboard_vnext.direct_tasks_mutation.failed"
-        ]
+        "signals": ["runtime.dashboard_vnext.direct_tasks_mutation.failed"]
       },
       "allowlist": {
         "files": []
@@ -539,9 +488,7 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.task_mission_drift.failed"
-        ]
+        "signals": ["runtime.task_mission_drift.failed"]
       },
       "allowlist": {
         "files": []
@@ -567,9 +514,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.dashboard_vnext.direct_missions_mutation.failed"
-        ]
+        "signals": ["runtime.dashboard_vnext.direct_missions_mutation.failed"]
       },
       "allowlist": {
         "files": []
@@ -595,9 +540,7 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "runtime.realtime.cursor_dedup.failed"
-        ]
+        "signals": ["runtime.realtime.cursor_dedup.failed"]
       },
       "allowlist": {
         "files": []
@@ -623,9 +566,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "boot_import_side_effect"
-        ]
+        "signals": ["boot_import_side_effect"]
       },
       "allowlist": {
         "files": []
@@ -650,9 +591,7 @@
       "type_default": "bug",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "signal_ownership_conflict"
-        ]
+        "signals": ["signal_ownership_conflict"]
       },
       "allowlist": {
         "files": []
@@ -678,9 +617,7 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "resource_shutdown_timeout"
-        ]
+        "signals": ["resource_shutdown_timeout"]
       },
       "allowlist": {
         "files": []

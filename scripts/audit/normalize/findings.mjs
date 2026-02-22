@@ -33,7 +33,9 @@ const DEFAULT_TYPE = /** @type {const} */ ('bug');
  * @returns {'P0'|'P1'|'P2'|'P3'}
  */
 function mapSeverity(severityHint, sourceTool) {
-    const hint = String(severityHint || '').toUpperCase().trim();
+    const hint = String(severityHint || '')
+        .toUpperCase()
+        .trim();
     if (SEVERITIES.includes(hint)) {
         return /** @type {'P0'|'P1'|'P2'|'P3'} */ (hint);
     }
@@ -107,13 +109,7 @@ export function normalizeFindings(rawFindings, options) {
             continue;
         }
 
-        const fingerprint = makeFingerprint([
-            sourceTool,
-            fileKey,
-            String(line || 0),
-            rule,
-            evidence,
-        ]);
+        const fingerprint = makeFingerprint([sourceTool, fileKey, String(line || 0), rule, evidence]);
 
         if (deduped.has(fingerprint)) {
             continue;

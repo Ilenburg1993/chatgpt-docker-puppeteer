@@ -3,11 +3,9 @@ import assert from 'node:assert/strict';
 import { runCommand } from '../../../scripts/audit/lib/exec.mjs';
 
 test('semantic preflight returns structured readiness report', async () => {
-    const result = await runCommand(
-        'node',
-        ['scripts/audit/preflight_semantic.mjs', '--json', '--no-fail'],
-        { timeoutMs: 600000 }
-    );
+    const result = await runCommand('node', ['scripts/audit/preflight_semantic.mjs', '--json', '--no-fail'], {
+        timeoutMs: 600000,
+    });
 
     assert.equal(result.ok, true, result.stderr || result.stdout);
     const payload = JSON.parse(result.stdout);

@@ -27,6 +27,7 @@ tmp/
 # Coverage
 coverage/
 .nyc_output/
+artifacts/
 
 # Docker
 .dockerignore

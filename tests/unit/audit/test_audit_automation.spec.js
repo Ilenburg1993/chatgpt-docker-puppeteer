@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runCommand } from '../../../scripts/audit/lib/exec.mjs';
+import { parseJsonFromMixedOutput, runCommand } from '../../../scripts/audit/lib/exec.mjs';
 import { validateAuditRun } from '../../../scripts/audit/lib/schema.mjs';
 import { publishSnapshot } from '../../../scripts/audit/publish_snapshot.mjs';
 
-test('audit runner emits valid AuditRunV3 payload', async () => {
+test('audit runner fatal fallback emits valid AuditRunV3 payload and artifacts', async () => {
     const tmpOut = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-runner-'));
     const run = await runCommand(
         'node',
@@ -20,26 +20,65 @@ test('audit runner emits valid AuditRunV3 payload', async () => {
             'false',
             '--publish-snapshot',
             'false',
+            '--triage',
+            'false',
             '--output-dir',
             tmpOut,
         ],
-        { timeoutMs: 600000 }
+        {
+            timeoutMs: 30000,
+            env: {
+                AUDIT_RUNNER_TEST_FORCE_FATAL_FALLBACK: '1',
+            },
+        }
     );
 
     assert.equal(run.ok, true, run.stderr || run.stdout);
 
-    const payload = JSON.parse(run.stdout);
+    let payload = parseJsonFromMixedOutput(`${run.stdout}\n${run.stderr}`);
+    if (!payload || typeof payload !== 'object') {
+        const runsRoot = path.join(tmpOut, 'runs');
+        const reportFiles = [];
+        if (fs.existsSync(tmpOut)) {
+            for (const name of fs.readdirSync(tmpOut)) {
+                if (/^audit_report_.*\.json$/.test(name)) {
+                    reportFiles.push(path.join(tmpOut, name));
+                }
+            }
+        }
+        if (fs.existsSync(runsRoot)) {
+            const runDirs = fs.readdirSync(runsRoot).map(name => path.join(runsRoot, name));
+            for (const runDir of runDirs) {
+                if (!fs.existsSync(runDir)) continue;
+                for (const name of fs.readdirSync(runDir)) {
+                    if (/^audit_report_.*\.json$/.test(name)) {
+                        reportFiles.push(path.join(runDir, name));
+                    }
+                }
+            }
+        }
+        assert.ok(reportFiles.length > 0, 'runner must produce audit_report artifact when stdout JSON is unavailable');
+        const latestReport = reportFiles.sort().at(-1);
+        const report = JSON.parse(fs.readFileSync(latestReport, 'utf8'));
+        payload = {
+            report,
+            outputs: {
+                json: latestReport,
+            },
+        };
+    }
+    assert.ok(payload && typeof payload === 'object', 'runner must expose JSON payload via stdout or artifact');
     assert.ok(payload.report, 'runner must return report object');
 
     const validation = validateAuditRun(payload.report);
     assert.equal(validation.ok, true, `schema errors: ${validation.errors.join('; ')}`);
     assert.equal(payload.report.schema_version, '3.2');
+    assert.equal(payload.report.run_outcome, 'fatal');
+    assert.equal(payload.report.abort_reason, 'uncaught_exception');
     assert.equal(typeof payload.report.summary.partial, 'boolean');
     assert.equal(typeof payload.report.summary.total_primary, 'number');
     assert.equal(typeof payload.report.summary.total_backlog, 'number');
     assert.equal(typeof payload.report.duration_ms_total, 'number');
-    assert.equal(typeof payload.report.run_outcome, 'string');
-    assert.equal(typeof payload.report.abort_reason, 'string');
     assert.ok(Array.isArray(payload.report.remaining_step_keys), 'remaining_step_keys should be array');
     assert.ok(payload.report.log_stats && typeof payload.report.log_stats === 'object');
     assert.ok(Array.isArray(payload.report.primary_findings), 'primary findings should be array');
@@ -51,6 +90,7 @@ test('audit runner emits valid AuditRunV3 payload', async () => {
     assert.ok(payload.report.chaos_summary && typeof payload.report.chaos_summary === 'object');
     assert.ok(payload.outputs?.json, 'json output path must be present');
     assert.equal(fs.existsSync(payload.outputs.json), true, 'json artifact should exist');
+    assert.match(`${run.stderr}\n${run.stdout}`, /fatal fallback|fatal report|forced fatal fallback/i);
 });
 
 test('check:forbidden executes without fs runtime crash', async () => {

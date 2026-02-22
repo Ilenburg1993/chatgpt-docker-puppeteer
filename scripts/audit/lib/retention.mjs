@@ -17,7 +17,8 @@ export function pruneAuditRuns(options) {
         return { pruned: [], kept: [] };
     }
 
-    const entries = fs.readdirSync(runsRoot, { withFileTypes: true })
+    const entries = fs
+        .readdirSync(runsRoot, { withFileTypes: true })
         .filter(entry => entry.isDirectory())
         .map(entry => {
             const full = path.join(runsRoot, entry.name);

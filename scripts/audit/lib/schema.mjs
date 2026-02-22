@@ -167,7 +167,7 @@
  * @property {ChaosSummary} chaos_summary
  * @property {{
  *   run_dir: string,
-  *   events_jsonl: string,
+ *   events_jsonl: string,
  *   progress_json: string,
  *   phase_timeline_json: string,
  *   findings_raw_json: string,
@@ -195,13 +195,28 @@
  */
 
 export const SCHEMA_VERSION = /** @type {'3.2'} */ ('3.2');
+/** Severidades canônicas aceitas no schema de findings da auditoria. */
 export const SEVERITIES = Object.freeze(['P0', 'P1', 'P2', 'P3']);
-export const FINDING_STATUS = Object.freeze(['novo', 'confirmado', 'patch-proposto', 'corrigido', 'validado', 'descartado']);
+/** Estados de ciclo de vida suportados para findings no tracker/report. */
+export const FINDING_STATUS = Object.freeze([
+    'novo',
+    'confirmado',
+    'patch-proposto',
+    'corrigido',
+    'validado',
+    'descartado',
+]);
+/** Tipos canônicos de finding usados no pipeline de auditoria. */
 export const FINDING_TYPES = Object.freeze(['bug', 'gap', 'falha de contrato', 'incompletude', 'upgrade']);
+/** Classificação de blast radius exibida em findings normalizados. */
 export const BLAST_RADIUS = Object.freeze(['baixo', 'medio', 'alto']);
+/** Níveis de enforcement reconhecidos pelos gates/contratos v3. */
 export const ENFORCE_LEVELS = Object.freeze(['off', 'warn', 'p1', 'p0']);
+/** Profundidades suportadas para geração de propostas/diffs automáticos. */
 export const PROPOSAL_DEPTHS = Object.freeze(['basic', 'standard', 'deep']);
+/** Resultados terminais possíveis do runner de auditoria. */
 export const RUN_OUTCOMES = Object.freeze(['success', 'partial', 'aborted', 'fatal']);
+/** Motivos canônicos de aborto/finalização antecipada do runner. */
 export const ABORT_REASONS = Object.freeze(['signal', 'uncaught_exception', 'unhandled_rejection', 'manual', 'none']);
 
 /**
@@ -232,13 +247,16 @@ export function validateAuditRun(run) {
     if (!Array.isArray(run.errors)) errors.push('errors must be an array');
     if (!Array.isArray(run.warnings)) errors.push('warnings must be an array');
     if (run.errors_count != null && typeof run.errors_count !== 'number') errors.push('errors_count must be a number');
-    if (run.warnings_count != null && typeof run.warnings_count !== 'number') errors.push('warnings_count must be a number');
+    if (run.warnings_count != null && typeof run.warnings_count !== 'number')
+        errors.push('warnings_count must be a number');
     if (!Array.isArray(run.phase_status)) errors.push('phase_status must be an array');
-    if (!run.contract_coverage || typeof run.contract_coverage !== 'object') errors.push('contract_coverage is required');
+    if (!run.contract_coverage || typeof run.contract_coverage !== 'object')
+        errors.push('contract_coverage is required');
     if (!run.contract_drift || typeof run.contract_drift !== 'object') errors.push('contract_drift is required');
     if (!run.gate_decision || typeof run.gate_decision !== 'object') errors.push('gate_decision is required');
     if (!run.chaos_summary || typeof run.chaos_summary !== 'object') errors.push('chaos_summary is required');
-    if (!run.semantic_preflight || typeof run.semantic_preflight !== 'object') errors.push('semantic_preflight is required');
+    if (!run.semantic_preflight || typeof run.semantic_preflight !== 'object')
+        errors.push('semantic_preflight is required');
     if (!run.shadow_gate || typeof run.shadow_gate !== 'object') errors.push('shadow_gate is required');
     if (!run.telemetry_noise || typeof run.telemetry_noise !== 'object') errors.push('telemetry_noise is required');
     if (!run.log_stats || typeof run.log_stats !== 'object') errors.push('log_stats is required');
@@ -260,15 +278,23 @@ export function validateAuditRun(run) {
             if (!finding?.fingerprint) errors.push(`findings[${index}].fingerprint is required`);
             if (!finding?.created_at) errors.push(`findings[${index}].created_at is required`);
             if (!finding?.updated_at) errors.push(`findings[${index}].updated_at is required`);
-            if (typeof finding?.confidence_score !== 'number') errors.push(`findings[${index}].confidence_score is required`);
+            if (typeof finding?.confidence_score !== 'number')
+                errors.push(`findings[${index}].confidence_score is required`);
             if (!BLAST_RADIUS.includes(finding?.blast_radius)) errors.push(`findings[${index}].blast_radius invalid`);
-            if (!finding?.proposal || typeof finding.proposal !== 'object') errors.push(`findings[${index}].proposal is required`);
-            if (!finding?.proposal_context || typeof finding.proposal_context !== 'object') errors.push(`findings[${index}].proposal_context is required`);
-            if (!['primary', 'backlog'].includes(finding?.finding_channel)) errors.push(`findings[${index}].finding_channel invalid`);
-            if (!ENFORCE_LEVELS.includes(finding?.enforcement_state)) errors.push(`findings[${index}].enforcement_state invalid`);
-            if (!Array.isArray(finding?.root_cause_candidates)) errors.push(`findings[${index}].root_cause_candidates must be an array`);
-            if (!PROPOSAL_DEPTHS.includes(finding?.proposal?.depth)) errors.push(`findings[${index}].proposal.depth invalid`);
-            if (!Array.isArray(finding?.proposal?.validation_commands)) errors.push(`findings[${index}].proposal.validation_commands must be an array`);
+            if (!finding?.proposal || typeof finding.proposal !== 'object')
+                errors.push(`findings[${index}].proposal is required`);
+            if (!finding?.proposal_context || typeof finding.proposal_context !== 'object')
+                errors.push(`findings[${index}].proposal_context is required`);
+            if (!['primary', 'backlog'].includes(finding?.finding_channel))
+                errors.push(`findings[${index}].finding_channel invalid`);
+            if (!ENFORCE_LEVELS.includes(finding?.enforcement_state))
+                errors.push(`findings[${index}].enforcement_state invalid`);
+            if (!Array.isArray(finding?.root_cause_candidates))
+                errors.push(`findings[${index}].root_cause_candidates must be an array`);
+            if (!PROPOSAL_DEPTHS.includes(finding?.proposal?.depth))
+                errors.push(`findings[${index}].proposal.depth invalid`);
+            if (!Array.isArray(finding?.proposal?.validation_commands))
+                errors.push(`findings[${index}].proposal.validation_commands must be an array`);
         });
     }
 

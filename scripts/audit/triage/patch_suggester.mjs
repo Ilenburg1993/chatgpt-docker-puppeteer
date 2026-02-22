@@ -12,11 +12,11 @@ export function suggestPatch(finding, rankedCauses, options) {
 
     const suggestedDiff = options.proposeDiffs
         ? [
-            `diff --git a/${file} b/${file}`,
-            `@@ -${line},1 +${line},1 @@`,
-            `- // TODO: comportamento atual associado ao achado ${finding.id}`,
-            `+ // FIX(${finding.id}): ${topCause}`,
-        ].join('\n')
+              `diff --git a/${file} b/${file}`,
+              `@@ -${line},1 +${line},1 @@`,
+              `- // TODO: comportamento atual associado ao achado ${finding.id}`,
+              `+ // FIX(${finding.id}): ${topCause}`,
+          ].join('\n')
         : null;
 
     return {

@@ -11,16 +11,12 @@
       "type_default": "falha de contrato",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "config.env_precedence.failed"
-        ]
+        "signals": ["config.env_precedence.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave4_runtime_resilience.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave4_runtime_resilience.spec.js"],
       "owner": "core-config",
       "status": "active",
       "version": 1,
@@ -49,9 +45,7 @@
         "allowlist_key": "CONTRACT-STATIC-HARDCODED-PORTS",
         "files": []
       },
-      "test_recipe": [
-        "npm run check:forbidden"
-      ],
+      "test_recipe": ["npm run check:forbidden"],
       "owner": "core-config",
       "status": "active",
       "version": 1,

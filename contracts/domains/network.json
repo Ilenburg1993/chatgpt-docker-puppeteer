@@ -11,16 +11,12 @@
       "type_default": "falha de contrato",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "network.split_handshake.failed"
-        ]
+        "signals": ["network.split_handshake.failed"]
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/integration/server/test_socket_split_handshake.spec.js"
-      ],
+      "test_recipe": ["node --test tests/integration/server/test_socket_split_handshake.spec.js"],
       "owner": "server-network",
       "status": "active",
       "version": 1,
@@ -38,9 +34,7 @@
       "type_default": "gap",
       "matcher": {
         "engine": "signal",
-        "signals": [
-          "network.split_reconnect.failed"
-        ]
+        "signals": ["network.split_reconnect.failed"]
       },
       "allowlist": {
         "files": []

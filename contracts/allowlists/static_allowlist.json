@@ -2,11 +2,7 @@
   "id": "allowlist-static-core",
   "description": "Allowlist canônica para regras estáticas de contrato.",
   "items": {
-    "CONTRACT-STATIC-PROCESS-EXIT": [
-      "src/main.js",
-      "src/server/main.js",
-      "src/server/engine/lifecycle.js"
-    ],
+    "CONTRACT-STATIC-PROCESS-EXIT": ["src/main.js", "src/server/main.js", "src/server/engine/lifecycle.js"],
     "CONTRACT-STATIC-HARDCODED-PORTS": [
       "src/core/config.js",
       "src/core/boot_resilience_manager.js",

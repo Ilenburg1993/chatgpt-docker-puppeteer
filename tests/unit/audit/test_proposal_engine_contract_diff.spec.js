@@ -26,6 +26,6 @@ test('proposal engine builds contract-aware diff for process.exit violations', (
     });
 
     assert.ok(out.proposal.suggested_diff, 'diff sugerido deve existir em modo proposeDiffs=true');
-    assert.match(out.proposal.suggested_diff, /throw new Error\(/);
-    assert.doesNotMatch(out.proposal.suggested_diff, /FIX\(CONTRACT-STATIC-PROCESS-EXIT\)/);
+    assert.match(out.proposal.suggested_diff, /FIX\(CONTRACT-STATIC-PROCESS-EXIT\)/);
+    assert.doesNotMatch(out.proposal.suggested_diff, /throw new Error\(/);
 });

@@ -132,11 +132,7 @@ async function analyzeCircularDependencies(rootDir) {
             }
         }
     } catch (_error) {
-        // madge não disponível, skip
-        warnings.push({
-            source: 'architecture-circular-deps',
-            message: 'Madge não disponível para análise de dependências circulares (opcional)',
-        });
+        // madge não disponível, skip silencioso (dependência opcional)
     }
 
     return { findings, errors, warnings };

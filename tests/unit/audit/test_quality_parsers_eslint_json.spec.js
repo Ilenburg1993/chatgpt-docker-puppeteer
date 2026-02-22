@@ -39,4 +39,3 @@ test('quality parser parses tsc output lines into findings', () => {
     assert.equal(findings[0].contract_id, 'CONTRACT-QUALITY-TYPECHECK-NODE');
     assert.equal(findings[1].rule, 'TS2305');
 });
-

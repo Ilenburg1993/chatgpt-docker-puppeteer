@@ -11,7 +11,9 @@ import { commandExists, parseJsonFromMixedOutput, runCommand } from '../lib/exec
  * @returns {'off'|'warn'|'p1'|'p0'}
  */
 function normalizeEnforcementState(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     if (normalized === 'off') return 'off';
     if (normalized === 'p1') return 'p1';
     if (normalized === 'p0') return 'p0';
@@ -56,7 +58,8 @@ function parseForbiddenOutput(stdoutOrStderr) {
             type: item.type || 'falha de contrato',
             impact: item.message || 'Violação de contrato arquitetural detectada por política de padrões proibidos.',
             root_cause: 'Uso de padrão proibido sem exceção explícita no gate arquitetural.',
-            suggested_patch: 'Substituir o padrão proibido por alternativa canônica do projeto ou justificar em allowlist controlada.',
+            suggested_patch:
+                'Substituir o padrão proibido por alternativa canônica do projeto ou justificar em allowlist controlada.',
             test_strategy: 'Executar `npm run check:forbidden -- --json` e validar ausência de ocorrências.',
             regression_risk: 'Médio',
         }));
@@ -79,7 +82,8 @@ function parseForbiddenOutput(stdoutOrStderr) {
             type: 'falha de contrato',
             impact: 'Violação de contrato arquitetural detectada por política de padrões proibidos.',
             root_cause: 'Uso de padrão proibido sem exceção explícita no gate arquitetural.',
-            suggested_patch: 'Substituir o padrão proibido por alternativa canônica do projeto ou justificar em allowlist controlada.',
+            suggested_patch:
+                'Substituir o padrão proibido por alternativa canônica do projeto ou justificar em allowlist controlada.',
             test_strategy: 'Executar `npm run check:forbidden` e validar ausência de ocorrências.',
             regression_risk: 'Médio',
         });
@@ -173,9 +177,7 @@ function parseMadgeOutput(output) {
             if (!Array.isArray(item) || item.length < 2) {
                 continue;
             }
-            const cycle = item
-                .map(token => normalizePathLike(String(token || '')))
-                .filter(Boolean);
+            const cycle = item.map(token => normalizePathLike(String(token || ''))).filter(Boolean);
             if (cycle.length >= 2) {
                 cycles.push(cycle);
             }
@@ -235,9 +237,7 @@ function parseMadgeOutput(output) {
  */
 function parseDepCruiseOutput(depcruiseJson) {
     const findings = [];
-    const violations = Array.isArray(depcruiseJson?.summary?.violations)
-        ? depcruiseJson.summary.violations
-        : [];
+    const violations = Array.isArray(depcruiseJson?.summary?.violations) ? depcruiseJson.summary.violations : [];
 
     for (const violation of violations) {
         const severity = String(violation?.severity || '').toLowerCase();
@@ -337,12 +337,8 @@ export async function collectStaticFindings(options) {
     /** @type {Array<{source:string,message:string}>} */
     const warnings = [];
 
-    const exec =
-        options.exec ||
-        (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
-    const exists =
-        options.commandExistsFn ||
-        (async binary => commandExists(binary));
+    const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
+    const exists = options.commandExistsFn || (async binary => commandExists(binary));
 
     const telemetry = {
         profile: options.profile,
@@ -407,7 +403,10 @@ export async function collectStaticFindings(options) {
     }
 
     if (options.profile !== 'quick' && !options.skipLintTypecheck) {
-        const lint = await exec('static.lint', 'npm', ['run', 'lint:quiet'], { timeoutMs: 300000, acceptExitCodes: [0, 1, 2] });
+        const lint = await exec('static.lint', 'npm', ['run', 'lint:quiet'], {
+            timeoutMs: 300000,
+            acceptExitCodes: [0, 1, 2],
+        });
         const lintFindings = parseEslintOutput(`${lint.stdout}\n${lint.stderr}`);
         telemetry.gates.lint_ok = lintFindings.length === 0 && lint.ok;
         if (lintFindings.length > 0) {
@@ -425,7 +424,8 @@ export async function collectStaticFindings(options) {
                     type: 'incompletude',
                     impact: 'Lint retornou saída não parseável; possível violação de qualidade pendente.',
                     root_cause: 'Formato de output do lint divergente do parser atual.',
-                    suggested_patch: 'Ajustar parser de lint ou executar lint com formatter JSON para extração confiável.',
+                    suggested_patch:
+                        'Ajustar parser de lint ou executar lint com formatter JSON para extração confiável.',
                     test_strategy: 'Executar `npm run lint:quiet` e validar parser com saída estável.',
                     regression_risk: 'Baixo',
                 });
@@ -434,7 +434,10 @@ export async function collectStaticFindings(options) {
             }
         }
 
-        const typecheck = await exec('static.typecheck', 'npm', ['run', 'typecheck'], { timeoutMs: 300000, acceptExitCodes: [0, 1, 2] });
+        const typecheck = await exec('static.typecheck', 'npm', ['run', 'typecheck'], {
+            timeoutMs: 300000,
+            acceptExitCodes: [0, 1, 2],
+        });
         const typecheckFindings = parseTypecheckOutput(`${typecheck.stdout}\n${typecheck.stderr}`);
         telemetry.gates.typecheck_ok = typecheckFindings.length === 0 && typecheck.ok;
         if (typecheckFindings.length > 0) {
@@ -456,7 +459,8 @@ export async function collectStaticFindings(options) {
                     type: 'falha de contrato',
                     impact: 'Typecheck falhou sem diagnóstico parseável no formato esperado.',
                     root_cause: 'Formato de saída do TypeScript divergiu do parser.',
-                    suggested_patch: 'Padronizar formatter/flags do tsc para extração estruturada e corrigir os erros reportados.',
+                    suggested_patch:
+                        'Padronizar formatter/flags do tsc para extração estruturada e corrigir os erros reportados.',
                     test_strategy: 'Executar `npm run typecheck` e validar parsing consistente.',
                     regression_risk: 'Médio',
                 });
@@ -477,7 +481,10 @@ export async function collectStaticFindings(options) {
             findings.push(...madgeFindings);
         }
         if (!madge.ok && madgeFindings.length === 0) {
-            errors.push({ source: 'madge', message: madge.stderr || madge.stdout || 'madge failed sem saída parseável' });
+            errors.push({
+                source: 'madge',
+                message: madge.stderr || madge.stdout || 'madge failed sem saída parseável',
+            });
         }
 
         const depCruiserAvailable = await exists('depcruise');
@@ -489,7 +496,10 @@ export async function collectStaticFindings(options) {
                 { timeoutMs: 300000, acceptExitCodes: [0, 2] }
             );
             if (!depcruise.ok) {
-                warnings.push({ source: 'dependency-cruiser', message: depcruise.stderr || depcruise.stdout || 'depcruise execution failed' });
+                warnings.push({
+                    source: 'dependency-cruiser',
+                    message: depcruise.stderr || depcruise.stdout || 'depcruise execution failed',
+                });
             }
             if (!depcruise.stdout && !depcruise.stderr) {
                 warnings.push({ source: 'dependency-cruiser', message: 'depcruise did not return JSON output' });
@@ -501,7 +511,10 @@ export async function collectStaticFindings(options) {
                 warnings.push({ source: 'dependency-cruiser', message: 'Unable to parse depcruise JSON output' });
             }
         } else {
-            warnings.push({ source: 'dependency-cruiser', message: 'depcruise not installed (optional collector skipped)' });
+            warnings.push({
+                source: 'dependency-cruiser',
+                message: 'depcruise not installed (optional collector skipped)',
+            });
         }
 
         const jscpdOutputDir = path.join(options.artifactsDir || path.join('artifacts', 'audit'), 'jscpd');
@@ -527,13 +540,19 @@ export async function collectStaticFindings(options) {
             { timeoutMs: 300000, acceptExitCodes: [0, 1] }
         );
         if (!jscpd.ok) {
-            warnings.push({ source: 'jscpd', message: jscpd.stderr || jscpd.stdout || 'jscpd reported duplicates/errors' });
+            warnings.push({
+                source: 'jscpd',
+                message: jscpd.stderr || jscpd.stdout || 'jscpd reported duplicates/errors',
+            });
         }
         findings.push(...parseJscpdReport(jscpdJsonPath));
 
         const semgrepAvailable = await exists('semgrep');
         if (semgrepAvailable) {
-            const semgrep = await exec('static.semgrep', 'semgrep', ['--config', 'auto', 'src', '--json'], { timeoutMs: 300000, acceptExitCodes: [0, 1] });
+            const semgrep = await exec('static.semgrep', 'semgrep', ['--config', 'auto', 'src', '--json'], {
+                timeoutMs: 300000,
+                acceptExitCodes: [0, 1],
+            });
             if (!semgrep.ok) {
                 warnings.push({ source: 'semgrep', message: semgrep.stderr || 'semgrep execution failed' });
             }

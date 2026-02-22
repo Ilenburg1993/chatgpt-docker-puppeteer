@@ -11,7 +11,9 @@ export function printProgress(payload) {
         ? payload.progress.remaining_step_keys.slice(0, 4).join(', ')
         : '';
     const pendingText = remainingKeys ? ` pendentes=[${remainingKeys}]` : '';
-    console.log(`[audit][${payload.profile}] ${pct}% fase=${payload.phase} restantes=${remaining} eta=${etaSec}s${activeText}${pendingText} ${payload.message}`);
+    console.log(
+        `[audit][${payload.profile}] ${pct}% fase=${payload.phase} restantes=${remaining} eta=${etaSec}s${activeText}${pendingText} ${payload.message}`
+    );
 }
 
 /**

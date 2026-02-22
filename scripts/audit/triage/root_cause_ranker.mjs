@@ -17,7 +17,10 @@ export function rankRootCauses(contextPack) {
     }
 
     if (src.includes('check:forbidden')) {
-        candidates.push({ cause: 'Violação de política arquitetural definida no gate de padrões proibidos.', score: 0.84 });
+        candidates.push({
+            cause: 'Violação de política arquitetural definida no gate de padrões proibidos.',
+            score: 0.84,
+        });
     }
 
     if (contextPack.finding?.contract_id) {
@@ -36,7 +39,10 @@ export function rankRootCauses(contextPack) {
     }
 
     if (candidates.length === 0) {
-        candidates.push({ cause: 'Divergência entre comportamento esperado e implementação atual no trecho apontado.', score: 0.61 });
+        candidates.push({
+            cause: 'Divergência entre comportamento esperado e implementação atual no trecho apontado.',
+            score: 0.61,
+        });
     }
 
     return candidates.sort((a, b) => b.score - a.score).slice(0, 3);

@@ -12,20 +12,13 @@
       "matcher": {
         "engine": "tool",
         "tool": "madge",
-        "args": [
-          "--circular",
-          "--format",
-          "json",
-          "src/"
-        ],
+        "args": ["--circular", "--format", "json", "src/"],
         "scope": "src"
       },
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npx madge --circular src/"
-      ],
+      "test_recipe": ["npx madge --circular src/"],
       "owner": "architecture-core",
       "status": "active",
       "version": 1,
@@ -52,9 +45,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "npm run check:forbidden"
-      ],
+      "test_recipe": ["npm run check:forbidden"],
       "owner": "architecture-maintainability",
       "status": "active",
       "version": 1,
@@ -78,9 +69,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node scripts/audit/collectors/architecture.mjs"
-      ],
+      "test_recipe": ["node scripts/audit/collectors/architecture.mjs"],
       "owner": "architecture-coupling",
       "status": "active",
       "version": 1,
@@ -105,14 +94,9 @@
         "ignore_string_like": true
       },
       "allowlist": {
-        "files": [
-          "src/agent/queue_worker.js",
-          "src/missions/mission_manager.js"
-        ]
+        "files": ["src/agent/queue_worker.js", "src/missions/mission_manager.js"]
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave15_arch_contract_ssot_execution_owner.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave15_arch_contract_ssot_execution_owner.spec.js"],
       "owner": "architecture-kernel-ssot",
       "status": "active",
       "version": 1,
@@ -139,9 +123,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave16r_dashboard_auth_no_hardcoded.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave16r_dashboard_auth_no_hardcoded.spec.js"],
       "owner": "architecture-dashboard-security",
       "status": "active",
       "version": 1,
@@ -168,9 +150,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave16r_dashboard_import_no_timer_side_effect.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave16r_dashboard_import_no_timer_side_effect.spec.js"],
       "owner": "architecture-dashboard-runtime",
       "status": "active",
       "version": 1,
@@ -197,9 +177,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave17_mission_transition_service_single_entrypoint.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave17_mission_transition_service_single_entrypoint.spec.js"],
       "owner": "architecture-mission-domain",
       "status": "active",
       "version": 1,
@@ -226,9 +204,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave18_control_commands_single_entrypoint.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave18_control_commands_single_entrypoint.spec.js"],
       "owner": "architecture-control-plane",
       "status": "active",
       "version": 1,
@@ -284,9 +260,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave19_frontend_hard_cutover_no_legacy_mutations.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave19_frontend_hard_cutover_no_legacy_mutations.spec.js"],
       "owner": "architecture-dashboard-ssot-cutover",
       "status": "active",
       "version": 1,
@@ -342,9 +316,7 @@
       "allowlist": {
         "files": []
       },
-      "test_recipe": [
-        "node --test tests/regression/test_wave20b_signal_ownership_single_owner.spec.js"
-      ],
+      "test_recipe": ["node --test tests/regression/test_wave20b_signal_ownership_single_owner.spec.js"],
       "owner": "architecture-runtime-lifecycle",
       "status": "active",
       "version": 1,
