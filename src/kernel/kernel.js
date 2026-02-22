@@ -44,14 +44,11 @@ import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
 
 function _makeRetryableEmitError(err) {
     const message = err?.message || String(err);
+    /** @type {Error & { retryable?: boolean, delayMs?: number, reason?: string, nextAction?: string }} */
     const error = new Error(`emitCommand failed: ${message}`);
-    // @ts-ignore - structured metadata for SSOT workers
     error.retryable = true;
-    // @ts-ignore
     error.delayMs = 250;
-    // @ts-ignore
     error.reason = 'EMIT_COMMAND_FAILED';
-    // @ts-ignore
     error.nextAction = 'RETRY_LATER';
     return error;
 }
@@ -542,17 +539,17 @@ function createLegacyKernel({
      9. KERNEL LOOP — Tempo soberano e ciclo executivo
   ========================================================= */
 
-    const kernelLoop = new KernelLoop({
+    const kernelLoopOptions = /** @type {any} */ ({
         executionEngine,
         nervBridge,
         telemetry,
-        // @ts-ignore - KernelLoop constructor accepts additional callback properties
         onActivateTask: activateRuntimeTask,
         onTerminateTask: terminateRuntimeTask,
         onSuspendTask: suspendRuntimeTask,
         baseIntervalMs: 50,
         ...loopOptions,
     });
+    const kernelLoop = new KernelLoop(kernelLoopOptions);
 
     telemetry.info('kernel_composed', {
         subsystems: [

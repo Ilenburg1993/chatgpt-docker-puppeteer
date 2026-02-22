@@ -7,6 +7,7 @@ description: "Use when the task involves Contract Registry v3: creating/migratin
 
 ## When To Use
 - Definir ou alterar contratos em `contracts/domains/*.json`.
+- Ajustar contratos de quality gates em `contracts/domains/quality.json`.
 - Migrar regra legada para DSL canônica.
 - Investigar divergência DSL vs legado (`contracts-mode=hybrid`).
 - Ajustar `enforce-level` e estratégia de rollout.
@@ -24,6 +25,10 @@ description: "Use when the task involves Contract Registry v3: creating/migratin
 3. Validar cobertura operacional.
 - Rodar `npm run audit:quick -- --json --shadow-gate true`.
 - Verificar `contract_coverage`, `contract_drift`, `contract_parity`.
+- Para quality gates, verificar explicitamente:
+  - `contract_coverage.quality`
+  - findings com `contract_id=CONTRACT-QUALITY-*`
+  - `quality_gates.*` e `quality_execution.*` no report
 
 4. Fechar governança.
 - Garantir `owner` em contratos `P0/P1`.
@@ -33,6 +38,9 @@ description: "Use when the task involves Contract Registry v3: creating/migratin
 - Contrato crítico (`P0/P1`) sem `owner` é inválido para rollout.
 - Sem `test_recipe`, contrato não pode ficar `active`.
 - Em `hybrid`, divergência de paridade deve ser tratada antes de aumentar enforcement.
+- Rollout de quality contracts deve ser seletivo:
+  - subir primeiro `node syntax`, `typecheck_*`, `ts-ignore`
+  - manter `prettier`/`jsdoc` em `warn` até baseline calibrado
 
 ## Done Criteria
 - Contrato ativo carregado sem erro.

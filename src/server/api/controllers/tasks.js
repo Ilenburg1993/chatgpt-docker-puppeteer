@@ -17,7 +17,6 @@ import {
     getTaskById,
     insertTask as persistTaskInsert,
     listTasks,
-    purgeTask,
     releaseTaskLock,
     retryFailedTasks,
     updateTask as persistTaskUpdate,

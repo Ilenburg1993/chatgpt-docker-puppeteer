@@ -131,6 +131,9 @@ class TargetDriver extends EventEmitter {
     /** @type {Record<string, any>} */
     config;
 
+    /** @type {string} */
+    name;
+
     /** @type {number} */
     _createdAt;
 

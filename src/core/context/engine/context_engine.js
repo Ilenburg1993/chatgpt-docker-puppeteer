@@ -9,6 +9,7 @@ import { smartTruncate } from '../transformers/summary.js';
 import { extractTaskMetadata } from '../transformers/metadata.js';
 import identity from '../transformers/identity.js';
 import { log } from '../../logger.js';
+import { asRecord } from '#types/guards';
 
 /**
  * Transform Types: Tipos de transformação de contexto suportados
@@ -115,10 +116,15 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
                 continue;
             }
 
-            const tt = /** @type {Record<string, unknown>} */ (targetTask);
+            const tt = asRecord(targetTask);
+            const ttMeta = asRecord(tt.meta);
+            const ttSpec = asRecord(tt.spec);
+            const ttSpecPayload = asRecord(ttSpec.payload);
+            const currentTaskView = asRecord(currentTask);
+            const currentTaskMeta = asRecord(currentTaskView.meta);
 
             // Proteção contra auto-referência (Prevenção de paradoxo recursivo)
-            if (currentTask && tt.meta?.id === currentTask.meta?.id) {
+            if (currentTask && ttMeta.id === currentTaskMeta.id) {
                 resolvedText = resolvedText.split(ref.fullMatch).join(`[ERRO: AUTO_REFERENCIA]`);
                 continue;
             }
@@ -128,12 +134,12 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
 
             // Caso A: Referência ao PROMPT original (Metadado da Spec)
             if (ref.transform === 'PROMPT') {
-                injectedContent = tt.spec?.payload?.user_message || '';
+                injectedContent = String(ttSpecPayload.user_message || '');
             }
             // Caso B: Referência ao RESULTADO (I/O de arquivo físico)
             else {
                 // O io.loadResponse já respeita o sinal de aborto e o teto de 1MB
-                const rawResponse = await io.loadResponse(tt.meta.id, signal);
+                const rawResponse = await io.loadResponse(String(ttMeta.id || ''), signal);
                 injectedContent = await applyTransform(rawResponse, ref.transform, tt);
             }
 

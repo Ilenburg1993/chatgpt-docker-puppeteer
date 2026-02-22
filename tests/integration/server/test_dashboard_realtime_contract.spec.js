@@ -56,8 +56,9 @@ describe('Dashboard realtime contract (Socket.io)', () => {
             httpServer.listen(0, '127.0.0.1', () => resolve());
         });
 
-        // @ts-ignore
-        port = httpServer.address().port;
+        const address = httpServer.address();
+        assert.ok(address && typeof address !== 'string', 'server should expose AddressInfo');
+        port = address.port;
         assert.ok(port, 'server should bind an ephemeral port');
 
         socketHub.init(httpServer);

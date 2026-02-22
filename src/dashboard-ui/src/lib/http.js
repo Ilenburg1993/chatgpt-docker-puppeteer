@@ -11,8 +11,9 @@ http.interceptors.request.use(
     config => {
         const token = localStorage.getItem('auth_token');
         if (token) {
-            config.headers = config.headers || {};
-            config.headers.Authorization = `Bearer ${token}`;
+            const headers = /** @type {any} */ (config.headers || {});
+            headers.Authorization = `Bearer ${token}`;
+            config.headers = headers;
         }
         return config;
     },

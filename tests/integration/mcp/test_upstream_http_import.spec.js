@@ -6,6 +6,9 @@ import { once } from 'node:events';
 import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 import { registerUpstreams, shutdownUpstreams } from '../../../src/integration/mcp/upstream-manager.mjs';
 
+/**
+ * @returns {Promise<{ server: http.Server, url: string }>}
+ */
 function startFakeMcpHttpServer() {
     const server = http.createServer(async (req, res) => {
         try {
@@ -79,8 +82,6 @@ function startFakeMcpHttpServer() {
 }
 
 test('imports tools from HTTP upstream and proxies calls', async () => {
-    /** @type {{ server: http.Server, url: string }} */
-    // @ts-ignore
     const { server, url } = await startFakeMcpHttpServer();
     const registry = new ToolRegistry();
 
@@ -107,4 +108,3 @@ test('imports tools from HTTP upstream and proxies calls', async () => {
         await new Promise((r) => server.close(() => r(null)));
     }
 });
-

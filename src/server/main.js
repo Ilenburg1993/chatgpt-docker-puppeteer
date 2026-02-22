@@ -1,11 +1,17 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
+import '#core/env_bootstrap';
 import * as Authority from '#core/authority';
+import { shouldAutobootEntrypoint } from '#core/entrypoint_guard';
 import { getJwtSecret } from '#core/jwt_config';
 import { log } from '#core/logger';
+import { readPositiveInt, retryWithBackoff } from '#core/retry_policy';
+import {
+    clearRuntimeResources,
+    getRuntimeReadinessSummary,
+    setRuntimeResourceState,
+    upsertRuntimeResource,
+} from '#core/runtime_resource_registry';
 
 
 /* ==========================================================================
@@ -88,6 +94,49 @@ function validateDashboardAuthConfig(config) {
     getJwtSecret();
 }
 
+let __readySignalSent = false;
+function sendReadySignalOnce() {
+    if (__readySignalSent) return;
+    if (typeof process.send !== 'function') return;
+    process.send('ready');
+    __readySignalSent = true;
+}
+
+async function publishServerReadyWithRetry({
+    nerv,
+    payload,
+    highLevelNerv,
+    actorRole,
+    actionCode,
+    config,
+}) {
+    let attempt = 0;
+    const maxAttempts = Math.max(2, Math.min(3, readPositiveInt(config?.BOOT_RETRY_MAX_ATTEMPTS, 3)));
+    const baseDelayMs = readPositiveInt(config?.BOOT_RETRY_BASE_MS, 1000);
+    const maxDelayMs = readPositiveInt(config?.BOOT_RETRY_MAX_MS, 8000);
+
+    await retryWithBackoff(
+        async () => {
+            attempt += 1;
+            await highLevelNerv.sendEvent(nerv, actorRole, actionCode, payload);
+        },
+        {
+            maxAttempts,
+            baseDelayMs,
+            maxDelayMs,
+            onRetry: ({ attempt: currentAttempt, maxAttempts: totalAttempts, error, delayMs }) => {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                log(
+                    'WARN',
+                    `[BOOT] NERV SERVER_READY tentativa ${currentAttempt}/${totalAttempts} falhou: ${errorMessage}. Retry em ${delayMs}ms`
+                );
+            },
+        }
+    );
+
+    return { attempt, maxAttempts };
+}
+
 
 /* ==========================================================================
    BOOTSTRAP — SEQUÊNCIA SOBERANA DE INICIALIZAÇÃO
@@ -123,8 +172,10 @@ function validateDashboardAuthConfig(config) {
  */
 async function bootstrap(options = {}) {
     const authority = Authority.resolveAuthority(options.authority);
+    const runtimeOwner = 'dashboard-web';
 
     try {
+        clearRuntimeResources(runtimeOwner);
         const [
             { default: CONFIG },
             { CONNECTION_MODES },
@@ -215,6 +266,10 @@ async function bootstrap(options = {}) {
         -------------------------------------------------------------- */
         const basePort = /** @type {number} */ (CONFIG.SERVER_PORT);
         const { server: httpServer, port, protocol } = await serverEngine.start(basePort);
+        setRuntimeResourceState('http_server', 'ready', {
+            owner: runtimeOwner,
+            criticality: 'required',
+        });
 
         // Log protocol info
         if (protocol) {
@@ -235,6 +290,17 @@ async function bootstrap(options = {}) {
         -------------------------------------------------------------- */
         socketHub.init(httpServer);
         log('DEBUG', '[BOOT] Socket hub acoplado');
+        upsertRuntimeResource({
+            id: 'socket_hub',
+            owner: runtimeOwner,
+            criticality: 'required',
+            state: 'ready',
+            stop: async () => {
+                if (socketHub && typeof socketHub.stop === 'function') {
+                    await socketHub.stop();
+                }
+            },
+        });
 
         // Dashboard vNext: SSOT DB Event Feed (realtime via SQLite events table)
         if (dashboardTaskSyncMode === 'ssot_feed') {
@@ -242,11 +308,33 @@ async function bootstrap(options = {}) {
                 const intervalMs = Number(process.env.SSOT_EVENT_FEED_INTERVAL_MS || 250) || 250;
                 const batchLimit = Number(process.env.SSOT_EVENT_FEED_BATCH_LIMIT || 500) || 500;
                 ssotEventFeed.start({ socketHub, intervalMs, batchLimit });
+                upsertRuntimeResource({
+                    id: 'ssot_feed',
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    state: 'ready',
+                    stop: () => {
+                        if (typeof ssotEventFeed.stop === 'function') {
+                            ssotEventFeed.stop();
+                        }
+                    },
+                });
             } catch (err) {
                 log('WARN', `[BOOT] Falha ao iniciar SSOTEventFeed: ${err.message}`);
+                setRuntimeResourceState('ssot_feed', 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: 'SSOT_EVENT_FEED_START_FAILED',
+                    message: err?.message || String(err),
+                });
             }
         } else {
             log('INFO', `[BOOT] SSOTEventFeed desativado (DASHBOARD_TASK_SYNC_MODE=${dashboardTaskSyncMode})`);
+            setRuntimeResourceState('ssot_feed', 'stopped', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'SSOT_FEED_DISABLED_BY_MODE',
+            });
         }
 
         // Dashboard V2: TelemetryAggregator (realtime metrics)
@@ -254,8 +342,25 @@ async function bootstrap(options = {}) {
             const intervalMs = Number(process.env.DASHBOARD_TELEMETRY_INTERVAL_MS || 1000) || 1000;
             telemetryAggregator.start({ socketHub, intervalMs });
             log('INFO', `[BOOT] Dashboard telemetry aggregator ativo (interval=${intervalMs}ms)`);
+            upsertRuntimeResource({
+                id: 'telemetry_aggregator',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'ready',
+                stop: () => {
+                    if (typeof telemetryAggregator.stop === 'function') {
+                        telemetryAggregator.stop();
+                    }
+                },
+            });
         } catch (err) {
             log('WARN', `[BOOT] Falha ao iniciar TelemetryAggregator: ${err.message}`);
+            setRuntimeResourceState('telemetry_aggregator', 'degraded', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'TELEMETRY_AGGREGATOR_START_FAILED',
+                message: err?.message || String(err),
+            });
         }
 
         /* --------------------------------------------------------------
@@ -278,11 +383,28 @@ async function bootstrap(options = {}) {
         log('DEBUG', '[BOOT] Rotas HTTP consolidadas');
 
         try {
-            const { startPeriodicCleanup } = await import('#infra/db/token_blocklist');
+            const { startPeriodicCleanup, stopPeriodicCleanup } = await import('#infra/db/token_blocklist');
             startPeriodicCleanup();
             log('DEBUG', '[BOOT] Token blocklist cleanup periódico iniciado');
+            upsertRuntimeResource({
+                id: 'token_blocklist_cleanup',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'ready',
+                stop: () => {
+                    if (typeof stopPeriodicCleanup === 'function') {
+                        stopPeriodicCleanup();
+                    }
+                },
+            });
         } catch (err) {
             log('WARN', `[BOOT] Falha ao iniciar token blocklist cleanup: ${err.message}`);
+            setRuntimeResourceState('token_blocklist_cleanup', 'degraded', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'TOKEN_BLOCKLIST_CLEANUP_START_FAILED',
+                message: err?.message || String(err),
+            });
         }
 
         /* --------------------------------------------------------------
@@ -291,22 +413,73 @@ async function bootstrap(options = {}) {
         try {
             pm2Bridge.init();
             log('DEBUG', '[BOOT] PM2 Bridge inicializado');
+            upsertRuntimeResource({
+                id: 'pm2_bridge',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'ready',
+                stop: () => {
+                    if (typeof pm2Bridge.stop === 'function') {
+                        pm2Bridge.stop();
+                    }
+                },
+            });
         } catch (err) {
             log('WARN', `[BOOT] PM2 Bridge init falhou: ${err.message}`);
+            setRuntimeResourceState('pm2_bridge', 'degraded', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'PM2_BRIDGE_INIT_FAILED',
+                message: err?.message || String(err),
+            });
         }
 
         try {
             logTail.init();
             log('DEBUG', '[BOOT] LogTail inicializado');
+            upsertRuntimeResource({
+                id: 'log_tail',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'ready',
+                stop: () => {
+                    if (typeof logTail.stop === 'function') {
+                        logTail.stop();
+                    }
+                },
+            });
         } catch (err) {
             log('WARN', `[BOOT] LogTail init falhou: ${err.message}`);
+            setRuntimeResourceState('log_tail', 'degraded', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'LOG_TAIL_INIT_FAILED',
+                message: err?.message || String(err),
+            });
         }
 
         try {
             hardwareTelemetry.init();
             log('DEBUG', '[BOOT] Hardware Telemetry inicializado');
+            upsertRuntimeResource({
+                id: 'hardware_telemetry',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'ready',
+                stop: () => {
+                    if (typeof hardwareTelemetry.stop === 'function') {
+                        hardwareTelemetry.stop();
+                    }
+                },
+            });
         } catch (err) {
             log('WARN', `[BOOT] Hardware Telemetry init falhou: ${err.message}`);
+            setRuntimeResourceState('hardware_telemetry', 'degraded', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'HARDWARE_TELEMETRY_INIT_FAILED',
+                message: err?.message || String(err),
+            });
         }
 
         // Inicia snapshot de telemetria em background para respostas rápidas
@@ -325,15 +498,49 @@ async function bootstrap(options = {}) {
         try {
             fsWatcher.init();
             log('DEBUG', '[BOOT] FS Watcher inicializado');
+            upsertRuntimeResource({
+                id: 'fs_watcher',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'ready',
+                stop: () => {
+                    if (typeof fsWatcher.stop === 'function') {
+                        fsWatcher.stop();
+                    }
+                },
+            });
         } catch (err) {
             log('WARN', `[BOOT] FS Watcher init falhou: ${err.message}`);
+            setRuntimeResourceState('fs_watcher', 'degraded', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'FS_WATCHER_INIT_FAILED',
+                message: err?.message || String(err),
+            });
         }
 
         try {
             logWatcher.init();
             log('DEBUG', '[BOOT] Log Watcher inicializado');
+            upsertRuntimeResource({
+                id: 'log_watcher',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'ready',
+                stop: () => {
+                    if (typeof logWatcher.stop === 'function') {
+                        logWatcher.stop();
+                    }
+                },
+            });
         } catch (err) {
             log('WARN', `[BOOT] Log Watcher init falhou: ${err.message}`);
+            setRuntimeResourceState('log_watcher', 'degraded', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'LOG_WATCHER_INIT_FAILED',
+                message: err?.message || String(err),
+            });
         }
 
         log('DEBUG', '[BOOT] Watchers ativos');
@@ -362,6 +569,10 @@ async function bootstrap(options = {}) {
         } else {
             log('DEBUG', '[BOOT] NERV injetado (delegated)');
         }
+        setRuntimeResourceState('nerv_runtime', 'ready', {
+            owner: runtimeOwner,
+            criticality: 'required',
+        });
 
         // Dashboard legacy bridge: habilitado apenas em contingência explícita.
         if (dashboardTaskSyncMode === 'legacy_bridge') {
@@ -372,14 +583,41 @@ async function bootstrap(options = {}) {
                 if (taskSyncBridge && typeof taskSyncBridge.initialize === 'function') {
                     taskSyncBridge.initialize({ socketHub, nervClient: nerv });
                     log('WARN', '[BOOT] TaskSyncBridge inicializado (contingência legacy_bridge)');
+                    upsertRuntimeResource({
+                        id: 'task_sync_bridge',
+                        owner: runtimeOwner,
+                        criticality: 'optional',
+                        state: 'ready',
+                        stop: () => {
+                            if (typeof taskSyncBridge.clearAll === 'function') {
+                                taskSyncBridge.clearAll();
+                            }
+                        },
+                    });
                 } else {
                     log('WARN', '[BOOT] TaskSyncBridge indisponível para modo legacy_bridge');
+                    setRuntimeResourceState('task_sync_bridge', 'degraded', {
+                        owner: runtimeOwner,
+                        criticality: 'optional',
+                        reasonCode: 'TASK_SYNC_BRIDGE_MISSING',
+                    });
                 }
             } catch (err) {
                 log('WARN', `[BOOT] Falha ao inicializar TaskSyncBridge: ${err.message}`);
+                setRuntimeResourceState('task_sync_bridge', 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: 'TASK_SYNC_BRIDGE_START_FAILED',
+                    message: err?.message || String(err),
+                });
             }
         } else {
             log('INFO', `[BOOT] TaskSyncBridge desativado (modo efetivo=${dashboardTaskSyncMode})`);
+            setRuntimeResourceState('task_sync_bridge', 'stopped', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: 'TASK_SYNC_BRIDGE_DISABLED_BY_MODE',
+            });
         }
 
         // PUBLICAÇÃO CANÔNICA: SERVER_READY via NERV (canal preferencial para descoberta — somente standalone)
@@ -396,28 +634,26 @@ async function bootstrap(options = {}) {
                     httpAuthority: Boolean(port),
                 };
 
-                // Tenta publicar SERVER_READY via NERV com retry
+                // Publicação SERVER_READY com política unificada de retry/backoff.
                 let nervPublished = false;
                 try {
-                    await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
-                    log('DEBUG', '[BOOT] Evento NERV SERVER_READY publicado (standalone)');
+                    const { attempt, maxAttempts } = await publishServerReadyWithRetry({
+                        nerv,
+                        payload,
+                        highLevelNerv: HighLevelNERV,
+                        actorRole: ActorRole.SERVER,
+                        actionCode: ActionCode.SERVER_READY,
+                        config: CONFIG,
+                    });
+                    const level = attempt > 1 ? 'INFO' : 'DEBUG';
+                    log(level, `[BOOT] Evento NERV SERVER_READY publicado na tentativa ${attempt}/${maxAttempts}`);
                     nervPublished = true;
-                } catch (err) {
-                    log('WARN', `[BOOT] NERV SERVER_READY falhou na primeira tentativa: ${err.message}`);
+                } catch (retryErr) {
+                    log('ERROR', `[BOOT] CRITICAL: SERVER_READY falhou após retries: ${retryErr.message}`);
 
-                    // Retry após 2s
-                    try {
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                        await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
-                        log('INFO', '[BOOT] Evento NERV SERVER_READY publicado (retry bem-sucedido)');
-                        nervPublished = true;
-                    } catch (retryErr) {
-                        log('ERROR', `[BOOT] CRITICAL: SERVER_READY falhou após retry: ${retryErr.message}`);
-
-                        // Se em modo standalone, discovery é crítica
-                        if (Authority.isStandalone(authority)) {
-                            throw new Error(`Discovery crítica falhou: ${retryErr.message}`, { cause: retryErr });
-                        }
+                    // Se em modo standalone, discovery é crítica
+                    if (Authority.isStandalone(authority)) {
+                        throw new Error(`Discovery crítica falhou: ${retryErr.message}`, { cause: retryErr });
                     }
                 }
 
@@ -454,6 +690,10 @@ async function bootstrap(options = {}) {
       -------------------------------------------------------------- */
         const serverAdapter = new ServerNERVAdapter(nerv, socketHub);
         log('INFO', '[BOOT] ServerNERVAdapter ativo');
+        setRuntimeResourceState('server_adapter', 'ready', {
+            owner: runtimeOwner,
+            criticality: 'required',
+        });
 
         // Injeção opcional de MissionManager passada via options (delegated ou embed)
         try {
@@ -480,16 +720,39 @@ async function bootstrap(options = {}) {
 
         // PM2 readiness gate: prevents "online but not listening" situations.
         try {
-            if (typeof process.send === 'function') {
-                process.send('ready');
-                log('DEBUG', '[BOOT] PM2 ready signal sent');
-            }
+            sendReadySignalOnce();
+            log('DEBUG', '[BOOT] PM2 ready signal sent');
         } catch (e) {
             // noop
         }
 
         // Atualiza readiness do app HTTP para consumo do endpoint /ready
         try {
+            upsertRuntimeResource({
+                id: 'mcp_upstreams',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'unknown',
+                stop: async () => {
+                    const { shutdownUpstreams } = await import('../integration/mcp/upstream-manager.mjs');
+                    if (typeof shutdownUpstreams === 'function') {
+                        await shutdownUpstreams();
+                    }
+                },
+            });
+            upsertRuntimeResource({
+                id: 'lsp_daemon',
+                owner: runtimeOwner,
+                criticality: 'optional',
+                state: 'unknown',
+                stop: async () => {
+                    const { stopTsserverDaemon } = await import('../integration/lsp/tsserver-daemon.mjs');
+                    if (typeof stopTsserverDaemon === 'function') {
+                        await stopTsserverDaemon();
+                    }
+                },
+            });
+
             appInstance.locals = appInstance.locals || {};
             appInstance.locals.runtimeReadiness = Object.assign({}, appInstance.locals.runtimeReadiness || null, {
                 nerv: Boolean(nerv),
@@ -497,6 +760,42 @@ async function bootstrap(options = {}) {
                 httpServer: Boolean(httpServer),
             });
             appInstance.locals.requiredReadiness = appInstance.locals.requiredReadiness || ['nerv'];
+            appInstance.locals.getRuntimeResourcesStatus = () =>
+                getRuntimeReadinessSummary({
+                    owner: runtimeOwner,
+                    requiredComponents: ['http_server', 'nerv_runtime', 'server_adapter'],
+                    allowDegradedReady: CONFIG.BOOT_DEGRADED_READY_ALLOWED !== false,
+                });
+
+            const upstreamStatusGetter = appInstance.locals.getMcpUpstreamsStatus;
+            const upstreams = typeof upstreamStatusGetter === 'function' ? upstreamStatusGetter() : [];
+            const hasRequiredUpstreamDown = Array.isArray(upstreams)
+                ? upstreams.some(item => item?.required && item?.enabled !== false && item?.ready !== true)
+                : false;
+
+            if (hasRequiredUpstreamDown) {
+                setRuntimeResourceState('mcp_upstreams', 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: 'UPSTREAM_UNREADY',
+                    message: 'Há upstream obrigatório ainda indisponível',
+                });
+            } else {
+                setRuntimeResourceState('mcp_upstreams', 'ready', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                });
+            }
+
+            const mcpTools = appInstance.locals?.mcp?.tools;
+            const hasLspTools = Array.isArray(mcpTools) && mcpTools.some(tool => String(tool || '').startsWith('lsp_'));
+            setRuntimeResourceState('lsp_daemon', hasLspTools ? 'ready' : 'degraded', {
+                owner: runtimeOwner,
+                criticality: 'optional',
+                reasonCode: hasLspTools ? null : 'LSP_TOOLS_NOT_EXPOSED',
+                message: hasLspTools ? null : 'MCP não expôs ferramentas LSP neste ciclo',
+            });
+
             log('DEBUG', '[BOOT] runtimeReadiness definido no app (server process)');
         } catch (err) {
             log(
@@ -526,24 +825,11 @@ async function bootstrap(options = {}) {
    ENTRYPOINT CONTROL — COMPATIBILITY LAYER
 ========================================================================== */
 
-const __entryFile = fileURLToPath(import.meta.url);
-let __isDirectRun = false;
-try {
-    const argvFile = process.argv[1];
-    if (argvFile) {
-        __isDirectRun = resolve(argvFile) === resolve(__entryFile);
-    }
-} catch (err) {
-    __isDirectRun = false;
-}
-
-const __isPm2Managed =
-    typeof process.env.NODE_APP_INSTANCE !== 'undefined' ||
-    (process.env.PM2_JSON_PROCESSING === 'true' && Boolean(process.env.PM2_HOME));
-
-// Evita side effects de runtime em import puro do entrypoint.
-// Bootstrap automatico fica restrito a execucao direta ou processo gerenciado pelo PM2.
-const __shouldBootstrap = __isDirectRun || __isPm2Managed;
+const __shouldBootstrap = shouldAutobootEntrypoint({
+    importMetaUrl: import.meta.url,
+    explicitAutostartEnv: 'MAESTRO_ENTRY_AUTOSTART',
+    allowPm2ExecPathMatch: true,
+});
 
 if (__shouldBootstrap && !globalThis.__MISSION_CONTROL_BOOTSTRAPPED__) {
     globalThis.__MISSION_CONTROL_BOOTSTRAPPED__ = true;

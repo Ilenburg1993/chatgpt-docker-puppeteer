@@ -22,7 +22,6 @@ import helmet from 'helmet';
 import * as http from 'node:http';
 import * as net from 'node:net';
 import * as os from 'node:os';
-// @ts-ignore - ESM subpath imports not recognized by TypeScript
 import * as logger from '#core/logger';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as promClient from 'prom-client';
@@ -63,7 +62,6 @@ let HighLevelNERV = null;
 let ActionCode = null;
 let ActorRole = null;
 
-// @ts-ignore - ESM subpath imports not recognized by TypeScript
 import CONFIG from '#core/config';
 
 // Configurações locais do proxy (sobrescrevem CONFIG se fornecidas via env)
@@ -675,15 +673,14 @@ class ChromeProxyService {
        Health Check (Enhanced - validates Chrome)
     ====================================================================== */
     async _checkChromeHealth() {
+        let timeout = null;
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 3000);
+            timeout = setTimeout(() => controller.abort(), 3000);
 
             const res = await fetch(`http://${this.config.CHROME_HOST}:${this.config.CHROME_PORT}/json/version`, {
                 signal: controller.signal
             });
-
-            clearTimeout(timeout);
 
             if (!res.ok) {
                 return { healthy: false, error: `HTTP ${res.status}` };
@@ -699,6 +696,10 @@ class ChromeProxyService {
             };
         } catch (err) {
             return { healthy: false, error: err.message };
+        } finally {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
         }
     }
 
@@ -1235,12 +1236,12 @@ class ChromeProxyService {
         const idleTimeout = this._idleTimeoutMs;
         socket.setTimeout(idleTimeout);
 
-        socket.on('timeout', () => {
-            // @ts-ignore - Custom __lastActivity property added by markActive
-            const inactiveMs = Date.now() - (socket.__lastActivity || Date.now());
-            this.log('warn', 'WebSocket idle timeout', {
-                idleMs: inactiveMs,
-                threshold: idleTimeout
+            socket.on('timeout', () => {
+                const trackedSocket = /** @type {net.Socket & { __lastActivity?: number }} */ (socket);
+                const inactiveMs = Date.now() - (trackedSocket.__lastActivity || Date.now());
+                this.log('warn', 'WebSocket idle timeout', {
+                    idleMs: inactiveMs,
+                    threshold: idleTimeout
             });
 
             socket.destroy();
@@ -1427,13 +1428,10 @@ class ChromeProxyService {
         const nervEnabled = (process.env.NERV_INTEGRATION || 'true').toString().toLowerCase() !== 'false';
         if (nervEnabled) {
             try {
-                // @ts-ignore - ESM subpath imports not recognized by TypeScript
-                const nervModule = await import('#nerv/nerv');
+                const nervModule = /** @type {any} */ (await import('#nerv/nerv'));
                 createNERV = nervModule?.createNERV || null;
-                // @ts-ignore - ESM subpath imports not recognized by TypeScript
-                HighLevelNERV = await import('#nerv/adapters/high_level_adapter');
-                // @ts-ignore - ESM subpath imports not recognized by TypeScript
-                const nervConsts = await import('#shared/nerv/constants');
+                HighLevelNERV = /** @type {any} */ (await import('#nerv/adapters/high_level_adapter'));
+                const nervConsts = /** @type {any} */ (await import('#shared/nerv/constants'));
                 ActionCode = nervConsts?.ActionCode || null;
                 ActorRole = nervConsts?.ActorRole || {};
 
@@ -1525,35 +1523,9 @@ class ChromeProxyService {
             });
 
             // Health check endpoint (for PM2 readiness checks and external monitoring)
-            this.app.get('/health', (req, res) => {
+            this.app.get(['/health', '/healthz'], async (req, res) => {
                 try {
-                    const health = {
-                        status: 'ok',
-                        timestamp: Date.now(),
-                        uptime: process.uptime(),
-                        config: {
-                            proxyPort: this.config.PROXY_PORT,
-                            chromeHost: this.config.CHROME_HOST,
-                            chromePort: this.config.CHROME_PORT
-                        },
-                        circuitBreaker: {
-                            state: this.circuitBreaker.state,
-                            failures: this.circuitBreaker.failures
-                        },
-                        connections: {
-                            active: this.activeConnections.size,
-                            total: this.stats.wsUpgrades
-                        },
-                        stats: {
-                            httpRequests: this.stats.httpRequests,
-                            wsUpgrades: this.stats.wsUpgrades,
-                            errors: this.stats.errors
-                        }
-                    };
-
-                    res.statusCode = 200;
-                    res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify(health, null, 2));
+                    await this._handleHealthCheck(req, res);
                 } catch (err) {
                     this.log('error', 'Health check endpoint error', { error: err.message });
                     res.statusCode = 500;
@@ -1599,8 +1571,8 @@ class ChromeProxyService {
             });
 
             this.server.on('error', err => {
-                // @ts-ignore - Node.js system errors have 'code' property
-                if (err.code === 'EADDRINUSE') {
+                const errnoErr = /** @type {NodeJS.ErrnoException} */ (err);
+                if (errnoErr.code === 'EADDRINUSE') {
                     reject(
                         new Error(
                             `Port ${this.config.PROXY_PORT} is already in use. ` +

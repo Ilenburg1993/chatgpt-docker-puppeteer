@@ -38,14 +38,16 @@
 // =========================================================================
 // ENVIRONMENT VARIABLES (load .env.local before imports)
 // =========================================================================
-import { resolve } from 'node:path';
+import './core/env_bootstrap.js';
 import * as Authority from './core/authority.js';
 import CONFIG from './core/config.js';
 import { CONNECTION_MODES } from './core/constants/browser.js';
 import { STATUS_VALUES } from './core/constants/tasks.js';
+import { shouldAutobootEntrypoint } from './core/entrypoint_guard.js';
 import * as forensics from './core/forensics.js';
 import identityManager from './core/identity_manager.js';
 import { log } from './core/logger.js';
+import { retryWithBackoff } from './core/retry_policy.js';
 import { ConnectionOrchestrator } from './infra/ConnectionOrchestrator.js';
 import { importLegacyQueueFromDisk } from './infra/db/legacy_import.js';
 import { getDb } from './infra/db/sqlite.js';
@@ -53,12 +55,6 @@ import { saveResponse } from './infra/storage/response_adapter.js';
 import { createKernel } from './kernel/kernel.js';
 import { createNERV } from './nerv/nerv.js';
 import { ActionCode, ActorRole } from './shared/nerv/constants.js';
-
-import { AgentLoop } from '#agent/agent_loop';
-import { AttemptWatchdog } from '#agent/attempt_watchdog';
-import { HeartbeatWatchdog } from '#agent/heartbeat_watchdog';
-import { MissionPlannerProcessor } from '#agent/mission_planner_processor';
-import { MissionRunner } from '#agent/mission_runner';
 
 // =========================================================================
 // ARCHITECTURAL GUARDS (process-wide, non-negotiable)
@@ -234,10 +230,6 @@ function readPositiveInt(value, fallback) {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 async function probeSplitServerHealth(port, timeoutMs = 2000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -259,45 +251,49 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
         throw new Error('socket.connectExternal não disponível em modo split');
     }
 
-    const maxAttempts = readPositiveIntEnv('SPLIT_CONNECT_MAX_ATTEMPTS', 10);
-    const baseDelayMs = readPositiveIntEnv('SPLIT_CONNECT_RETRY_BASE_MS', 1000);
-    const maxDelayMs = readPositiveIntEnv('SPLIT_CONNECT_RETRY_MAX_MS', 8000);
-    const waitForHealth = process.env.SPLIT_WAIT_HEALTH === 'true';
-
-    let lastError = null;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            if (waitForHealth) {
-                await probeSplitServerHealth(externalPort);
-            }
-
-            const socketHub = await Promise.resolve(socketModule.connectExternal(externalPort));
-            log('INFO', `[BOOT] Conexão split estabelecida na tentativa ${attempt}/${maxAttempts}`);
-            return socketHub;
-        } catch (err) {
-            lastError = err;
-
-            if (attempt >= maxAttempts) {
-                break;
-            }
-
-            const exponentialDelay = Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1));
-            const jitterMs = Math.floor(Math.random() * Math.max(1, Math.floor(exponentialDelay * 0.2)));
-            const delayMs = exponentialDelay + jitterMs;
-
-            log(
-                'WARN',
-                `[BOOT] Split connect tentativa ${attempt}/${maxAttempts} falhou: ${err?.message || String(err)}. Retry em ${delayMs}ms`
-            );
-            await sleep(delayMs);
-        }
-    }
-
-    throw new Error(
-        `Falha ao conectar servidor externo em modo split após ${maxAttempts} tentativas (porta=${externalPort})`,
-        { cause: lastError }
+    const maxAttempts = readPositiveInt(
+        process.env.SPLIT_CONNECT_MAX_ATTEMPTS ?? process.env.BOOT_RETRY_MAX_ATTEMPTS,
+        10
     );
+    const baseDelayMs = readPositiveInt(
+        process.env.SPLIT_CONNECT_RETRY_BASE_MS ?? process.env.BOOT_RETRY_BASE_MS,
+        1000
+    );
+    const maxDelayMs = readPositiveInt(
+        process.env.SPLIT_CONNECT_RETRY_MAX_MS ?? process.env.BOOT_RETRY_MAX_MS,
+        8000
+    );
+    const waitForHealth = process.env.SPLIT_WAIT_HEALTH === 'true';
+    let attempt = 0;
+    try {
+        const socketHub = await retryWithBackoff(
+            async () => {
+                attempt += 1;
+                if (waitForHealth) {
+                    await probeSplitServerHealth(externalPort);
+                }
+                return await Promise.resolve(socketModule.connectExternal(externalPort));
+            },
+            {
+                maxAttempts,
+                baseDelayMs,
+                maxDelayMs,
+                onRetry: ({ attempt: currentAttempt, maxAttempts: totalAttempts, error, delayMs }) => {
+                    log(
+                        'WARN',
+                        `[BOOT] Split connect tentativa ${currentAttempt}/${totalAttempts} falhou: ${error?.message || String(error)}. Retry em ${delayMs}ms`
+                    );
+                },
+            }
+        );
+        log('INFO', `[BOOT] Conexão split estabelecida na tentativa ${attempt}/${maxAttempts}`);
+        return socketHub;
+    } catch (err) {
+        throw new Error(
+            `Falha ao conectar servidor externo em modo split após ${maxAttempts} tentativas (porta=${externalPort})`,
+            { cause: err }
+        );
+    }
 }
 
 /* ==========================================================================
@@ -554,8 +550,17 @@ async function boot() {
                 throw error; // Falha crítica - aborta boot
             }
         } else {
-            log('WARN', '[BOOT] ⚠️  Chrome Proxy Service desabilitado (CONFIG.CHROME_PROXY_ENABLED=false)');
-            log('WARN', '[BOOT] ⚠️  Conexões diretas ao Chrome podem falhar em ambientes containerizados');
+            const proxyPort = CONFIG.CHROME_PROXY_PORT || 9224;
+            const externalProxyRunning = await checkPortInUse(proxyPort);
+            if (externalProxyRunning) {
+                log(
+                    'INFO',
+                    `[BOOT] Chrome Proxy inline desabilitado (CONFIG.CHROME_PROXY_ENABLED=false), usando proxy externo na porta ${proxyPort}`
+                );
+            } else {
+                log('WARN', '[BOOT] ⚠️  Chrome Proxy Service desabilitado (CONFIG.CHROME_PROXY_ENABLED=false)');
+                log('WARN', '[BOOT] ⚠️  Conexões diretas ao Chrome podem falhar em ambientes containerizados');
+            }
         }
 
         // NERV-based server discovery (non-blocking): escuta evento SERVER_READY
@@ -798,13 +803,27 @@ async function boot() {
         let agentLoop = null;
 
         try {
-            const [{ QueueWorker }, { TaskControlWatcher }, { TaskOrchestrationWorker }, { TaskStateProjector }] =
-                await Promise.all([
-                    import('#agent/queue_worker'),
-                    import('#agent/task_control_watcher'),
-                    import('#agent/task_orchestration_worker'),
-                    import('#agent/task_state_projector'),
-                ]);
+            const [
+                { QueueWorker },
+                { TaskControlWatcher },
+                { TaskOrchestrationWorker },
+                { TaskStateProjector },
+                { AgentLoop },
+                { AttemptWatchdog },
+                { HeartbeatWatchdog },
+                { MissionPlannerProcessor },
+                { MissionRunner },
+            ] = await Promise.all([
+                import('#agent/queue_worker'),
+                import('#agent/task_control_watcher'),
+                import('#agent/task_orchestration_worker'),
+                import('#agent/task_state_projector'),
+                import('#agent/agent_loop'),
+                import('#agent/attempt_watchdog'),
+                import('#agent/heartbeat_watchdog'),
+                import('#agent/mission_planner_processor'),
+                import('#agent/mission_runner'),
+            ]);
 
             // BUG-009: Timeout wrapper para prevenir hang no SSOT init
             const SSOT_INIT_TIMEOUT = Number(process.env.SSOT_INIT_TIMEOUT_MS || 30000);
@@ -2036,22 +2055,11 @@ async function main() {
    EXECUÇÃO CONDICIONAL — COMPATIBILITY LAYER
 ========================================================================== */
 
-const __entryFile = import.meta.filename || process.argv[1];
-let __isDirectRun = false;
-try {
-    const argvFile = process.argv[1];
-    if (argvFile && __entryFile) {
-        __isDirectRun = resolve(argvFile) === resolve(__entryFile);
-    }
-} catch (err) {
-    __isDirectRun = false;
-}
-
-const __isPm2Managed =
-    typeof process.env.NODE_APP_INSTANCE !== 'undefined' ||
-    (process.env.PM2_JSON_PROCESSING === 'true' && Boolean(process.env.PM2_HOME));
-
-const __shouldBootstrap = __isDirectRun || __isPm2Managed || process.env.DAEMON_MODE === 'true';
+const __shouldBootstrap = shouldAutobootEntrypoint({
+    importMetaUrl: import.meta.url,
+    explicitAutostartEnv: 'MAESTRO_ENTRY_AUTOSTART',
+    allowPm2ExecPathMatch: false,
+});
 
 if (__shouldBootstrap && !globalThis.__MISSION_CONTROL_BOOTSTRAPPED__) {
     globalThis.__MISSION_CONTROL_BOOTSTRAPPED__ = true;

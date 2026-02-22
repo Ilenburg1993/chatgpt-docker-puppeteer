@@ -55,6 +55,9 @@ import { RecoverySystem } from '../modules/recovery_system.js';
 import { SubmissionController } from '../modules/submission_controller.js';
 
 class BaseDriver extends TargetDriver {
+    /** @type {string} */
+    name = '';
+
     /**
      * Construtor do BaseDriver - Orquestrador modular de execução.
      *
@@ -163,7 +166,8 @@ class BaseDriver extends TargetDriver {
 
         modules.forEach(module => {
             if (module) {
-                /** @type {import('puppeteer-core').Page | import('#types/driver/contracts').IDriver} */ (module).driver = this;
+                const moduleWithDriver = /** @type {{ driver?: unknown }} */ (/** @type {unknown} */ (module));
+                moduleWithDriver.driver = this;
             }
         });
     }

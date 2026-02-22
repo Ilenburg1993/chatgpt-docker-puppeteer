@@ -244,7 +244,7 @@ router.get('/tasks/:id', async (req, res) => {
 
         const task = taskRowToDetailTask(row);
 
-        /** @type {unknown} */
+        /** @type {Record<string, unknown>} */
         const data = { task };
         data.mission_ref = task.mission_ref || null;
 
@@ -389,7 +389,7 @@ router.get('/tasks/:id', async (req, res) => {
             if (row.latest_rendered_prompt_artifact_id) artifactIds.add(String(row.latest_rendered_prompt_artifact_id));
             if (row.latest_response_v2_json_artifact_id) artifactIds.add(String(row.latest_response_v2_json_artifact_id));
 
-            const attempts = include.has('attempts') ? data.attempts : listAttemptsByTask(taskId, { limit: 50 });
+            const attempts = include.has('attempts') ? /** @type {any} */ (data).attempts : listAttemptsByTask(taskId, { limit: 50 });
             for (const a of attempts || []) {
                 for (const k of [
                     'rendered_prompt_artifact_id',

@@ -1,6 +1,8 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
+/** @typedef {import('puppeteer-core').Page} PuppeteerPage */
+
 /**
  * Resultados de validação de pré-requisitos.
  */
@@ -17,7 +19,7 @@ const ValidationResult = {
 };
 
 // Valida se página está em URL utilizável para LLM.
-// @param {Page} page - Puppeteer Page
+// @param {PuppeteerPage} page - Puppeteer Page
 // @returns {Object} ValidationResult
 async function validateLLMPage(page) {
     if (!page) {
@@ -73,7 +75,7 @@ async function validateLLMPage(page) {
  * Valida se interface LLM está carregada e utilizável.
  * Usa SADI (Sensory Analysis Deep Intelligence) via analyzer.js.
  *
- * @param {Page} page - Puppeteer Page
+ * @param {PuppeteerPage} page - Puppeteer Page
  * @returns {Promise<Object>} ValidationResult
  */
 async function validateLLMInterface(page) {
@@ -208,7 +210,7 @@ function validateBrowserConnection(browser) {
         });
     }
 
-    if (!/** @type {import('puppeteer').Browser} */ (browser).isConnected()) {
+    if (!/** @type {any} */ (browser).isConnected()) {
         return ValidationResult.fail('BROWSER_DISCONNECTED', {
             message: 'Browser não está conectado',
             suggestion: 'Verifique se Chrome está rodando e acessível'
@@ -224,7 +226,7 @@ function validateBrowserConnection(browser) {
  *
  * @param {Object} options
  * @param {BrowserPoolManager} options.browserPool
- * @param {Page} options.page
+ * @param {PuppeteerPage} options.page
  * @returns {Promise<Object>} ValidationResult
  */
 async function validateDriverExecution({ browserPool, page }) {

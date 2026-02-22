@@ -46,6 +46,10 @@ class ResilientLockManager {
             uncaughtException: null,
             unhandledRejection: null,
         };
+        this._fatalHookRegistration = {
+            uncaughtExceptionHadExternalListener: false,
+            unhandledRejectionHadExternalListener: false,
+        };
 
         /**
          * Stats for monitoring
@@ -88,13 +92,33 @@ class ResilientLockManager {
         this._cleanupHandlers.sigterm = () => cleanup('SIGTERM');
         this._cleanupHandlers.beforeExit = () => cleanup('beforeExit');
 
-        // ❌ REMOVED: uncaughtException / unhandledRejection handlers.
-        // A library should never hijack global error handling or force process.exit(1).
-        // The main application (main.js/server.js) is responsible for crashing safely.
+        // Compatibility + cleanup safety:
+        // We keep passive fatal hooks so active locks are released under crash paths,
+        // but avoid taking ownership of the process lifecycle when another handler exists.
+        this._fatalHookRegistration.uncaughtExceptionHadExternalListener = process.listenerCount('uncaughtException') > 0;
+        this._fatalHookRegistration.unhandledRejectionHadExternalListener = process.listenerCount('unhandledRejection') > 0;
+        this._cleanupHandlers.uncaughtException = err => {
+            void cleanup('uncaughtException').finally(() => {
+                if (!this._fatalHookRegistration.uncaughtExceptionHadExternalListener) {
+                    // Preserve Node crash semantics when no app-level handler existed.
+                    queueMicrotask(() => {
+                        throw err;
+                    });
+                }
+            });
+        };
+        this._cleanupHandlers.unhandledRejection = reason => {
+            void cleanup('unhandledRejection');
+            // Deliberately no rethrow here to avoid changing Node's configured
+            // unhandled rejection mode. App-level policy remains the owner.
+            void reason;
+        };
 
         process.once('SIGINT', this._cleanupHandlers.sigint);
         process.once('SIGTERM', this._cleanupHandlers.sigterm);
         process.once('beforeExit', this._cleanupHandlers.beforeExit);
+        process.once('uncaughtException', this._cleanupHandlers.uncaughtException);
+        process.once('unhandledRejection', this._cleanupHandlers.unhandledRejection);
 
         this._cleanupHandlersRegistered = true;
         log('DEBUG', '[ResilientLock] Cleanup handlers registered');
@@ -117,8 +141,14 @@ class ResilientLockManager {
             process.removeListener('SIGTERM', this._cleanupHandlers.sigterm);
             this._cleanupHandlers.sigterm = null;
         }
-
-        // uncaughtException/unhandledRejection were removed in P0 fix
+        if (this._cleanupHandlers.uncaughtException) {
+            process.removeListener('uncaughtException', this._cleanupHandlers.uncaughtException);
+            this._cleanupHandlers.uncaughtException = null;
+        }
+        if (this._cleanupHandlers.unhandledRejection) {
+            process.removeListener('unhandledRejection', this._cleanupHandlers.unhandledRejection);
+            this._cleanupHandlers.unhandledRejection = null;
+        }
 
         this._cleanupHandlersRegistered = false;
         log('DEBUG', '[ResilientLock] Cleanup handlers removed');

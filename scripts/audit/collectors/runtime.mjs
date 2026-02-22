@@ -143,6 +143,10 @@ export async function collectRuntimeFindings(options) {
     for (const controlSignal of controlPlaneSignals) {
         signals.push(controlSignal);
     }
+    const bootAndLifecycleSignals = await detectBootAndLifecycleSignals(process.cwd(), exec);
+    for (const signal of bootAndLifecycleSignals) {
+        signals.push(signal);
+    }
 
     if (options.profile !== 'quick') {
         const smoke = await exec(
@@ -533,6 +537,122 @@ function detectControlPlaneSignals(rootDir) {
                 evidence: 'useSsotRealtime sem dedupe/reconciliação por cursor/event_id completo.',
                 source_tool: 'runtime-dashboard-realtime',
                 file: 'src/dashboard-ui/src/composables/useSsotRealtime.js',
+                line: null,
+            });
+        }
+    } catch {}
+
+    return results;
+}
+
+/**
+ * @param {string} rootDir
+ * @param {(stepId: string, command: string, args: string[], options?: any) => Promise<any>} exec
+ */
+async function detectBootAndLifecycleSignals(rootDir, exec) {
+    const results = [];
+
+    try {
+        const mainImport = await exec(
+            'runtime.wave20b_main_import_daemon_env',
+            'node',
+            ['--input-type=module', '-e', "import './src/main.js'; console.log('OK')"],
+            {
+                cwd: rootDir,
+                timeoutMs: 4000,
+                env: {
+                    DAEMON_MODE: 'true',
+                    MAESTRO_ENTRY_AUTOSTART: 'false',
+                },
+            }
+        );
+
+        const mainOutput = `${mainImport.stdout || ''}\n${mainImport.stderr || ''}`;
+        const mainHasBootNoise = /\[BOOT\]|Iniciando boot sequence|MISSION CONTROL PRIME ONLINE/i.test(mainOutput);
+        if (!mainImport.ok || mainImport.timedOut || mainHasBootNoise) {
+            results.push({
+                signal: 'boot_import_side_effect',
+                evidence: `main import com DAEMON_MODE=true apresentou side effects (ok=${mainImport.ok}, timedOut=${mainImport.timedOut})`,
+                source_tool: 'runtime-wave20b-import-safety',
+                file: 'src/main.js',
+                line: null,
+            });
+        }
+    } catch {}
+
+    try {
+        const serverImport = await exec(
+            'runtime.wave20b_server_import_pm2_env',
+            'node',
+            ['--input-type=module', '-e', "import './src/server/main.js'; console.log('OK')"],
+            {
+                cwd: rootDir,
+                timeoutMs: 4000,
+                env: {
+                    NODE_APP_INSTANCE: '0',
+                    PM2_JSON_PROCESSING: 'true',
+                    PM2_HOME: '/tmp/pm2',
+                    pm_exec_path: '/tmp/not-server-main.js',
+                    MAESTRO_ENTRY_AUTOSTART: 'false',
+                },
+            }
+        );
+
+        const serverOutput = `${serverImport.stdout || ''}\n${serverImport.stderr || ''}`;
+        const serverHasBootNoise = /\[BOOT\]|Canonical Bootstrap|MISSION CONTROL PRIME ONLINE/i.test(serverOutput);
+        if (!serverImport.ok || serverImport.timedOut || serverHasBootNoise) {
+            results.push({
+                signal: 'boot_import_side_effect',
+                evidence: `server import com env PM2 simulada apresentou side effects (ok=${serverImport.ok}, timedOut=${serverImport.timedOut})`,
+                source_tool: 'runtime-wave20b-import-safety',
+                file: 'src/server/main.js',
+                line: null,
+            });
+        }
+    } catch {}
+
+    try {
+        const wrapperPath = path.join(rootDir, 'scripts/chrome-proxy-service.js');
+        const wrapperContent = fs.existsSync(wrapperPath) ? fs.readFileSync(wrapperPath, 'utf8') : '';
+        const hasBroadListenerCleanup = /removeAllListeners\s*\(/.test(wrapperContent);
+        const hasAutoHandleSignalsFalse = /AUTO_HANDLE_SIGNALS\s*:\s*false/.test(wrapperContent);
+        if (hasBroadListenerCleanup || !hasAutoHandleSignalsFalse) {
+            results.push({
+                signal: 'signal_ownership_conflict',
+                evidence: 'chrome-proxy wrapper sem ownership exclusivo de sinais ou com cleanup global amplo.',
+                source_tool: 'runtime-wave20b-signal-ownership',
+                file: 'scripts/chrome-proxy-service.js',
+                line: null,
+            });
+        }
+    } catch {}
+
+    try {
+        const lifecyclePath = path.join(rootDir, 'src/server/engine/lifecycle.js');
+        const registryPath = path.join(rootDir, 'src/core/runtime_resource_registry.js');
+        const lifecycleContent = fs.existsSync(lifecyclePath) ? fs.readFileSync(lifecyclePath, 'utf8') : '';
+        const registryContent = fs.existsSync(registryPath) ? fs.readFileSync(registryPath, 'utf8') : '';
+
+        const hasRegistryStop = /stopRuntimeResources\s*\(/.test(lifecycleContent);
+        const hasTimeoutSignal = /RESOURCE_SHUTDOWN_TIMEOUT/.test(lifecycleContent);
+        const hasTimeoutRacePattern =
+            /Promise\.race\s*\(\s*\[/.test(registryContent) &&
+            /setTimeout\s*\(/.test(registryContent) &&
+            /clearTimeout\s*\(/.test(registryContent);
+        const hasTimeoutHelperPattern =
+            /function\s+runWithTimeout\s*\(/.test(registryContent) &&
+            /setTimeout\s*\(/.test(registryContent) &&
+            /clearTimeout\s*\(/.test(registryContent);
+        const hasTimeoutContract = hasTimeoutRacePattern || hasTimeoutHelperPattern;
+
+        if (!hasRegistryStop || !hasTimeoutSignal || !hasTimeoutContract) {
+            results.push({
+                signal: 'resource_shutdown_timeout',
+                evidence: 'Contrato de shutdown por recurso com timeout/telemetria não detectado integralmente.',
+                source_tool: 'runtime-wave20b-resource-shutdown',
+                file: !hasRegistryStop || !hasTimeoutSignal
+                    ? 'src/server/engine/lifecycle.js'
+                    : 'src/core/runtime_resource_registry.js',
                 line: null,
             });
         }

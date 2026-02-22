@@ -12,7 +12,12 @@
       "matcher": {
         "engine": "tool",
         "tool": "madge",
-        "args": ["--circular", "--format", "json", "src/"],
+        "args": [
+          "--circular",
+          "--format",
+          "json",
+          "src/"
+        ],
         "scope": "src"
       },
       "allowlist": {
@@ -54,7 +59,7 @@
       "status": "active",
       "version": 1,
       "enforcement": {
-        "level": "warn"
+        "level": "p1"
       }
     },
     {
@@ -80,7 +85,7 @@
       "status": "active",
       "version": 1,
       "enforcement": {
-        "level": "warn"
+        "level": "p1"
       }
     },
     {
@@ -287,6 +292,64 @@
       "version": 1,
       "enforcement": {
         "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-ENTRYPOINT-NO-IMPORT-AUTOSTART",
+      "title": "Entrypoint sem heurística frágil de auto-bootstrap",
+      "domain": "architecture",
+      "description": "Entrypoints não devem acoplar auto-bootstrap em env heurística ampla (NODE_APP_INSTANCE/DAEMON_MODE) que quebre import puro.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "NODE_APP_INSTANCE|PM2_JSON_PROCESSING|process\\.env\\.DAEMON_MODE\\s*===\\s*['\\\"]true['\\\"]",
+        "flags": "gm",
+        "scope": "src/main.js|src/server/main.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave20b_server_main_import_pm2_env_no_boot.spec.js tests/regression/test_wave20b_main_import_daemon_env_no_boot.spec.js"
+      ],
+      "owner": "architecture-runtime-bootstrap",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-ARCH-SIGNAL-OWNERSHIP-SINGLE",
+      "title": "Ownership único de sinais em wrapper PM2",
+      "domain": "architecture",
+      "description": "Wrapper de processo PM2 não deve limpar listeners globais de forma ampla nem delegar sinais ao impl interno concorrente.",
+      "kind": "static",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "regex",
+        "pattern": "removeAllListeners\\s*\\(|AUTO_HANDLE_SIGNALS\\s*:\\s*true",
+        "flags": "gm",
+        "scope": "scripts/chrome-proxy-service.js",
+        "ignore_comment_like": true,
+        "ignore_string_like": true
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave20b_signal_ownership_single_owner.spec.js"
+      ],
+      "owner": "architecture-runtime-lifecycle",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
       }
     }
   ]

@@ -15,6 +15,25 @@ export function isObject(value) {
 }
 
 /**
+ * Alias semântico para objetos dicionário (record).
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+export function isRecord(value) {
+    return isObject(value);
+}
+
+/**
+ * Converte unknown em record ou retorna fallback vazio.
+ * Útil para reduzir casts repetitivos em payloads/eventos.
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+export function asRecord(value) {
+    return isRecord(value) ? value : {};
+}
+
+/**
  * Verifica se valor é uma string não-vazia
  * @param {unknown} value
  * @returns {value is string}
@@ -97,6 +116,21 @@ export function isValidEnum(value, enumValues) {
 export function hasRequiredProperties(obj, requiredProps) {
     if (!isObject(obj)) return false;
     return requiredProps.every(prop => prop in obj && obj[prop] !== undefined);
+}
+
+/**
+ * Guard genérico para actor-like payloads (id/username/role opcionais).
+ * @param {unknown} value
+ * @returns {value is {id?: string|number, username?: string, role?: string, roles?: unknown[], permissions?: unknown[]}}
+ */
+export function isActorLike(value) {
+    if (!isRecord(value)) return false;
+    if (value.id !== undefined && typeof value.id !== 'string' && typeof value.id !== 'number') return false;
+    if (value.username !== undefined && typeof value.username !== 'string') return false;
+    if (value.role !== undefined && typeof value.role !== 'string') return false;
+    if (value.roles !== undefined && !Array.isArray(value.roles)) return false;
+    if (value.permissions !== undefined && !Array.isArray(value.permissions)) return false;
+    return true;
 }
 
 /**

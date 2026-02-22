@@ -150,16 +150,6 @@ function _pickAllowedTarget(options = /** @type {{requested?: any, allowedTarget
     return 'auto';
 }
 
-function _sendTransitionFailure(res, req, result) {
-    return res.status(Number(result?.statusCode || 500)).json({
-        success: false,
-        error: result?.error || 'Falha na transição da missão',
-        code: result?.code || 'MISSION_TRANSITION_FAILED',
-        details: result?.details || null,
-        request_id: req.id,
-    });
-}
-
 function _resolveIfVersion(mission, requestedIfVersion) {
     if (requestedIfVersion !== undefined && requestedIfVersion !== null) {
         return requestedIfVersion;
@@ -276,14 +266,16 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
             })
         );
 
+        const missionRecord = /** @type {any} */ (mission);
+
         recordEvent({
             entityType: 'mission',
-            entityId: mission.id,
+            entityId: missionRecord.id,
             actorType: 'user',
             actorId: req.ip || null,
             eventType: 'MISSION_CREATED',
             payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:mission:${mission.id}:created`,
+            dedupKey: `req:${req.id}:mission:${missionRecord.id}:created`,
         });
 
         res.status(201).json({

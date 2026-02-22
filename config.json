@@ -96,7 +96,7 @@
   "// IMPORTANTE: Usa Chrome Proxy Service para resolver networking Docker↔Windows": "",
   "// Container não consegue acessar ws://localhost do Windows diretamente (use proxy container-facing na porta 9224)": "",
   "// Proxy reescreve URLs (localhost → IP público) e proxia WebSocket transparentemente": "",
-  "DEBUG_PORT": "http://192.168.0.2:9224",
+  "DEBUG_PORT": "http://localhost:9224",
 
   "// =====================================================================": "",
   "// [A.1] CHROME PROXY CONFIGURATION": "",
@@ -110,10 +110,10 @@
   "// Documentação: DOCUMENTAÇÃO/WSL_INTEGRATION_GUIDE.md": "",
   "// CHROME_PROXY_ENABLED: Desabilitado - proxy rodando como processo PM2 separado": "",
   "CHROME_PROXY_ENABLED": false,
-  "CHROME_PROXY_HOST": "host.docker.internal",
+  "CHROME_PROXY_HOST": "localhost",
 
   "// Fallback Strategy (gerenciado pelo ConnectionOrchestrator):": "",
-  "// 1. Tenta 192.168.0.2:9224 (proxy via IP público) - PREFERENCIAL": "",
+  "// 1. Tenta localhost:9224 (proxy no próprio container) - PREFERENCIAL": "",
   "// 2. Tenta host.docker.internal:9224 (proxy via Docker DNS)": "",
   "// 3. Tenta host.docker.internal (conexão direta ao Chrome; porta é detalhe operacional)": "",
   "// 4. Tenta outras combinações (portas 9223, hosts 172.17.0.1, etc)": "",

@@ -109,7 +109,7 @@ class ValidationService {
         // LLM-as-Judge validator (FUNC-01 FIX: bypass explícito e documentado)
         // Anteriormente retornava score aleatório (Math.random()), invalidando toda
         // lógica de qualidade que dependia deste validador.
-        this.validators.set('llm_judge', async (_output, config) => {
+        this.validators.set('llm_judge', async () => {
             // BYPASS EXPLÍCITO: LLM-as-judge ainda não implementado.
             // Retorna resultado determinístico que indica "não validado" (score: null)
             // diferente de "falha" (score: 0) ou "aprovado" (score: 100).

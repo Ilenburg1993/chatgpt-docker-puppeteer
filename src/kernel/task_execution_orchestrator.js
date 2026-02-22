@@ -8,6 +8,7 @@ import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#sh
  * @typedef {{ action?: string, [key: string]: unknown }} OrchestrationDecision
  * @typedef {{ taskId?: string, result?: unknown }} DriverTaskCompletedPayload
  * @typedef {{ taskId?: string, error?: string, reason?: string, retryable?: boolean, suggestedDelayMs?: number, retryDelayMs?: number, next_action?: string, [key: string]: unknown }} DriverTaskFailedPayload
+ * @typedef {Error & { retryable?: boolean, delayMs?: number, reason?: string, nextAction?: string }} RetryableOrchestratorError
  * @typedef {{ task: TaskV5, correlationId: string|null, startedAt: number }} ActiveExecutionEntry
  * @typedef {'COMPLETED'|'FAILED'} ProcessedEventType
  * @typedef {{ correlationId: string|null, processed: Set<ProcessedEventType> }} ExecutionIdempotencyState
@@ -110,12 +111,9 @@ class TaskExecutionOrchestrator {
             this.activeExecutions.delete(taskId);
             this.processedExecutionEvents.delete(taskId);
 
-            const error = new Error(`beforeTaskExecution failed: ${msg}`);
-            // @ts-ignore - attach structured metadata for SSOT worker
+            const error = /** @type {RetryableOrchestratorError} */ (new Error(`beforeTaskExecution failed: ${msg}`));
             error.retryable = false;
-            // @ts-ignore
             error.delayMs = 0;
-            // @ts-ignore
             error.reason = 'BEFORE_EXECUTION_FAILED';
             throw error;
         }
@@ -145,14 +143,10 @@ class TaskExecutionOrchestrator {
             this.activeExecutions.delete(taskId);
             this.processedExecutionEvents.delete(taskId);
 
-            const error = new Error(`emitCommand failed: ${msg}`);
-            // @ts-ignore - attach structured metadata for SSOT worker
+            const error = /** @type {RetryableOrchestratorError} */ (new Error(`emitCommand failed: ${msg}`));
             error.retryable = true;
-            // @ts-ignore
             error.delayMs = 250;
-            // @ts-ignore
             error.reason = 'EMIT_COMMAND_FAILED';
-            // @ts-ignore
             error.nextAction = 'RETRY_LATER';
             throw error;
         }

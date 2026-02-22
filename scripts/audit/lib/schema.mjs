@@ -134,9 +134,33 @@
  * @property {{
  *   forbidden_ok: boolean|null,
  *   typecheck_ok: boolean|null,
+ *   node_check_ok?: boolean|null,
+ *   entrypoint_import_smoke_ok?: boolean|null,
+ *   lint_ok?: boolean|null,
+ *   typecheck_node_ok?: boolean|null,
+ *   typecheck_browser_ok?: boolean|null,
+ *   prettier_ok?: boolean|null,
+ *   jsdoc_delta_ok?: boolean|null,
+ *   jsdoc_full_ok?: boolean|null,
+ *   ts_ignore_ok?: boolean|null,
  *   runtime_smoke_ok: boolean|null,
  *   tests_ok: boolean|null,
  * }} quality_gates
+ * @property {{
+ *   strategy?: string,
+ *   risk?: string,
+ *   changed_files_count?: number,
+ *   decision_reasons?: string[],
+ *   fallbacks?: string[],
+ *   steps_executed?: string[],
+ *   steps_skipped?: Array<{step:string,reason:string}>,
+ *   duration_ms_by_step?: Record<string,number>,
+ *   impact?: Record<string, boolean|number|string|null>,
+ *   jsdoc?: Record<string, boolean|number|string|null>,
+ *   cache?: Record<string, unknown>,
+ *   parallelism?: Record<string, unknown>,
+ *   dedup?: Record<string, number>,
+ * }} [quality_execution]
  * @property {Record<string, { total: number, violated: number, covered: number, covered_by_run?: number, covered_by_tests?: number }>} contract_coverage
  * @property {{ stale_contracts: string[], unowned_critical: string[], tests_without_contract: string[] }} contract_drift
  * @property {{ enforce_level: string, blocking: boolean, blocking_findings: string[] }} gate_decision

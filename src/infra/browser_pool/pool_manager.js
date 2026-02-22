@@ -13,6 +13,8 @@ class BrowserPoolManager {
      *   poolSize?: number,
      *   allocationStrategy?: 'round-robin'|'least-loaded'|'target-affinity',
      *   healthCheckInterval?: number,
+     *   pageTtlMs?: number,
+     *   allocateMaxAttempts?: number|null,
      *   browserEndpoint?: { url?: string, wsEndpoint?: string, [key: string]: unknown }
      * }} [config={}] - Configuração do pool
      */

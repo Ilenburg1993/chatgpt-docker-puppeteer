@@ -60,6 +60,7 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
             codeBlocks: responseData.content.json.codeBlocks?.length || 0,
         });
 
+        /** @type {{ textFile: string, markdownFile: string, jsonFile: string, htmlFile: string, legacy?: { textFile: string, markdownFile: string, jsonFile: string, htmlFile: string } }} */
         const out = {
             textFile: `${basePath}.txt`,
             markdownFile: `${basePath}.md`,
@@ -79,7 +80,6 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
                     atomicWrite(`${legacyBase}.json`, JSON.stringify(responseData, null, 2), 'utf-8'),
                     atomicWrite(`${legacyBase}.html`, wrapHTML(responseData.content.html, taskId), 'utf-8'),
                 ]);
-                // @ts-ignore
                 out.legacy = {
                     textFile: `${legacyBase}.txt`,
                     markdownFile: `${legacyBase}.md`,

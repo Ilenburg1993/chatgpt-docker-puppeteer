@@ -12,6 +12,7 @@
     }
   },
   "include": [
+    "src/types/**/*.d.ts",
     "src/core/forensics.js",
     "src/driver/extractors/**/*",
     "src/driver/modules/**/*",
@@ -19,7 +20,8 @@
     "src/shared/sadi/**/*",
     "src/shared/page_stability/**/*",
     "src/shared/biomechanics/**/*",
-    "src/dashboard-ui/src/**/*.js"
+    "src/dashboard-ui/src/**/*.js",
+    "src/dashboard-ui/src/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",

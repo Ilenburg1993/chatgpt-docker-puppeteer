@@ -106,7 +106,7 @@ if (isLaunchDisabled) {
          * NÃO tenta fallback.
          * Falha de forma inequívoca.
          */
-        /** @type {typeof import('puppeteer-core')} */ (puppeteer).launch = function forbiddenLaunch() {
+        /** @type {any} */ (puppeteer).launch = function forbiddenLaunch() {
             const error = new Error(ARCH_VIOLATION_MESSAGE);
 
             // Metadados úteis para forensics / logs estruturados

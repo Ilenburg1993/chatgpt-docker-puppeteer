@@ -11,6 +11,7 @@ Padronizar tipagem robusta no projeto com foco em `Node 24 + ESM + NodeNext`, ma
 
 ## Quando usar
 - Estabilizar `npm run typecheck:node`.
+- Manter `npm run typecheck:full` verde (Node + Browser).
 - Corrigir pacotes de erros TS/JS com `allowJs + checkJs`.
 - Definir padrão de JSDoc e `.d.ts` para módulos JS.
 - Revisar compatibilidade entre `tsconfig.json` (canônico) e `jsconfig.json` (shim).
@@ -32,24 +33,32 @@ Padronizar tipagem robusta no projeto com foco em `Node 24 + ESM + NodeNext`, ma
 
 2. Baseline de tipagem (Node/Audit).
 - `npm run -s typecheck:node`
+- `npm run -s typecheck:browser` (quando tocar `src/dashboard-ui`, `src/shared`, `src/driver`, `src/types`)
+- `npm run -s typecheck:full` (gate final)
 - Se necessário, coletar saída detalhada: `npx tsc -p tsconfig.json --pretty false --extendedDiagnostics`
 
-3. Triage por classes de erro (ordem obrigatória).
+3. Baseline de JSDoc/qualidade de tipagem (quando a mudança for estrutural).
+- `npm run -s jsdoc:delta` (delta local)
+- `npm run -s jsdoc:coverage:json` (baseline full)
+- `rg -n "@ts-ignore" src scripts tests --glob '!**/dist/**'`
+
+4. Triage por classes de erro (ordem obrigatória).
 - `TS2307/TS2835`: resolução/import ESM (`.js`, aliases `#*`, paths).
 - `TS2339/TS2322`: contrato de objeto e narrowing.
 - `TS7006/TS7031`: parâmetros implícitos `any` (JSDoc `@param`).
 - `TS2554/TS2345`: assinaturas inconsistentes entre chamada e definição.
 - `TS2688/TS7016`: tipos ausentes para pacote externo ou módulo interno.
 
-4. Correção padronizada.
+5. Correção padronizada.
 - Preferir corrigir em origem (assinatura/fonte) antes de cast local.
 - Em JS, usar `@typedef`, `@param`, `@returns`, `@template`, `@satisfies`.
 - Para globais/augmentações, concentrar em `src/types/**/*.d.ts`.
 - Evitar `@ts-ignore`; quando inevitável, usar `@ts-expect-error` com justificativa curta.
 
-5. Validação de fechamento.
+6. Validação de fechamento.
 - `npm run -s lint`
-- `npm run -s typecheck:node`
+- `npm run -s typecheck:full`
+- `npm run -s jsdoc:delta` (ou `jsdoc:coverage:json` em ondas de documentação estrutural)
 - `npm run -s test:unit`
 
 ## Padrões de implementação recomendados
@@ -63,6 +72,7 @@ Padronizar tipagem robusta no projeto com foco em `Node 24 + ESM + NodeNext`, ma
 - Não introduzir CommonJS em caminhos ESM.
 - Não mascarar lote de erros com disable global (`checkJs=false`, `skipProject` etc.).
 - Não tratar warning de editor como exceção sem reproduzir em `tsc -p tsconfig.json`.
+- `@ts-ignore` é proibido em `src/`, `scripts/`, `tests/`; usar correção estrutural ou `@ts-expect-error` justificado.
 
 ## Estratégia de endurecimento progressivo
 1. Manter `typecheck` padrão focado em Node/Audit.

@@ -6,6 +6,7 @@ import * as shared from './shared_types.js';
 import { healTask } from './task_healer.js';
 import { TaskSchema } from './task_schema.js';
 import { TaskSchemaV5 } from './task_schema_v5.js';
+import { asRecord } from '#types/guards';
 
 /**
  * Objeto com tipos/schemas compartilhados para validação.
@@ -26,22 +27,23 @@ export const types = {
  * @throws {Error} Se a validação falhar após tentativas de migração.
  */
 export const parseTask = raw => {
-    /** @type {Record<string, unknown>} */
-    const r = raw;
+    const r = asRecord(raw);
+    const rMeta = asRecord(r.meta);
+    const rSpec = asRecord(r.spec);
     // V5-safe: never "heal" a declared V5 task back into V4.
-    if (r?.meta?.version === '5.0') {
+    if (rMeta.version === '5.0') {
         return TaskSchemaV5.parse(r);
     }
 
     // Best-effort: if the structure looks like V5 but version is missing, try
     // to validate as V5 before falling back to legacy healer+migrator.
-    const looksLikeV5 = Boolean(r?.execution || r?.mission || r?.spec?.execution);
+    const looksLikeV5 = Boolean(r.execution || r.mission || rSpec.execution);
     if (looksLikeV5 && r && typeof r === 'object') {
         try {
             const patched = {
                 ...r,
                 meta: {
-                    ...(r.meta || {}),
+                    ...rMeta,
                     version: '5.0',
                 },
             };

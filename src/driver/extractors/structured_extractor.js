@@ -140,7 +140,7 @@ class StructuredExtractor {
      */
     _parseStructured(html) {
         try {
-            const root = /** @type {HTMLElement} */ (parseHTML(html));
+            const root = /** @type {HTMLElement} */ (/** @type {unknown} */ (parseHTML(html)));
 
             return {
                 sections: this._extractSections(root),

@@ -30,6 +30,35 @@ export function buildPhasePlan(options) {
     }
 
     phases.push({
+        id: AUDIT_PHASES.COLLECT_QUALITY,
+        planned_steps: options.profile === 'quick'
+            ? [
+                'quality.plan_resolution',
+                'quality.fallback_resolution',
+                'quality.node_check',
+                'quality.entrypoint_import_smoke',
+                'quality.lint',
+                'quality.typecheck_node',
+                'quality.typecheck_browser',
+                'quality.prettier_check',
+                'quality.jsdoc_delta',
+                'quality.ts_ignore_scan',
+            ]
+            : [
+                'quality.plan_resolution',
+                'quality.fallback_resolution',
+                'quality.node_check',
+                'quality.entrypoint_import_smoke',
+                'quality.lint',
+                'quality.typecheck_node',
+                'quality.typecheck_browser',
+                'quality.prettier_check',
+                'quality.jsdoc_full',
+                'quality.ts_ignore_scan',
+            ],
+    });
+
+    phases.push({
         id: AUDIT_PHASES.COLLECT_STATIC,
         planned_steps: options.profile === 'quick'
             ? ['static.syntax', 'static.forbidden']
@@ -54,6 +83,16 @@ export function buildPhasePlan(options) {
     phases.push({
         id: AUDIT_PHASES.COLLECT_CHAOS,
         planned_steps: options.profile === 'nightly' ? ['chaos.contract_nightly'] : [],
+    });
+
+    phases.push({
+        id: AUDIT_PHASES.COLLECT_PERFORMANCE,
+        planned_steps: [],
+    });
+
+    phases.push({
+        id: AUDIT_PHASES.COLLECT_ARCHITECTURE,
+        planned_steps: [],
     });
 
     phases.push({ id: AUDIT_PHASES.NORMALIZE_CORRELATE, planned_steps: ['normalize.findings', 'normalize.evidence_graph'] });

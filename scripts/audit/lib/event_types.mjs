@@ -27,10 +27,13 @@ export const AUDIT_EVENT_TYPES = Object.freeze({
 export const AUDIT_PHASES = Object.freeze({
     PREFLIGHT: 'preflight',
     CONTEXT_REFRESH: 'context-refresh',
+    COLLECT_QUALITY: 'collect-quality',
     COLLECT_STATIC: 'collect-static',
     COLLECT_RUNTIME: 'collect-runtime',
     COLLECT_TESTS: 'collect-tests',
     COLLECT_CHAOS: 'collect-chaos',
+    COLLECT_PERFORMANCE: 'collect-performance',
+    COLLECT_ARCHITECTURE: 'collect-architecture',
     NORMALIZE_CORRELATE: 'normalize-correlate',
     TRIAGE_INTELLIGENCE: 'triage-intelligence',
     PUBLISH: 'publish',

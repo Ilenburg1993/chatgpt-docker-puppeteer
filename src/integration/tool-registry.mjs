@@ -497,7 +497,7 @@ export async function initialize() {
             // This is designed to be best-effort: failures should degrade, not crash the server.
             try {
                 const { registerUpstreams, getUpstreamStatus } = await import('./mcp/upstream-manager.mjs');
-                await registerUpstreams(registry);
+                await registerUpstreams(registry, { installShutdownHook: false });
                 const st = getUpstreamStatus();
                 const readyCount = st.upstreams.filter(u => u.ready).length;
                 const totalCount = st.upstreams.length;

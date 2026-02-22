@@ -322,6 +322,8 @@ function parseJscpdReport(jscpdJsonPath) {
  *   changedFiles: string[],
  *   artifactsDir?: string,
  *   contractsMode?: 'legacy'|'hybrid'|'strict',
+ *   skipQuickSyntax?: boolean,
+ *   skipLintTypecheck?: boolean,
  *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
  *   commandExistsFn?: (binary: string, stepId?: string) => Promise<boolean>,
  * }} options
@@ -357,7 +359,7 @@ export async function collectStaticFindings(options) {
         .filter(file => /\.(js|mjs|cjs)$/.test(file))
         .filter(file => fs.existsSync(file));
 
-    if (options.profile === 'quick' && changedJsFiles.length > 0) {
+    if (!options.skipQuickSyntax && options.profile === 'quick' && changedJsFiles.length > 0) {
         for (const file of changedJsFiles) {
             const check = await runCommand('node', ['--check', file], { timeoutMs: 30000 });
             if (!check.ok) {
@@ -404,7 +406,7 @@ export async function collectStaticFindings(options) {
         });
     }
 
-    if (options.profile !== 'quick') {
+    if (options.profile !== 'quick' && !options.skipLintTypecheck) {
         const lint = await exec('static.lint', 'npm', ['run', 'lint:quiet'], { timeoutMs: 300000, acceptExitCodes: [0, 1, 2] });
         const lintFindings = parseEslintOutput(`${lint.stdout}\n${lint.stderr}`);
         telemetry.gates.lint_ok = lintFindings.length === 0 && lint.ok;

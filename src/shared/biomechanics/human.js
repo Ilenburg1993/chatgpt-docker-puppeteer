@@ -801,7 +801,7 @@ async function humanClick(...args) {
     if (_isLegacyHumanClickArgs(args)) {
         // Legacy API used by biomechanics_engine.
         /** @type {[any, any, string, number?, number?, AbortSignal?, ((payload: unknown) => void)?]} */
-        const legacyArgs = /** @type {unknown} */ (args);
+        const legacyArgs = /** @type {[any, any, string, number?, number?, AbortSignal?, ((payload: unknown) => void)?]} */ (/** @type {unknown} */ (args));
         await humanClickCore(...legacyArgs);
         return true;
     }
@@ -885,7 +885,7 @@ async function humanType(...args) {
     if (_isLegacyHumanTypeArgs(args)) {
         // Legacy API used by biomechanics_engine.
         /** @type {[any, any, string, string, number?, AbortSignal?, ((payload: unknown) => void)?, string?]} */
-        const legacyArgs = /** @type {unknown} */ (args);
+        const legacyArgs = /** @type {[any, any, string, string, number?, AbortSignal?, ((payload: unknown) => void)?, string?]} */ (/** @type {unknown} */ (args));
         await humanTypeCore(...legacyArgs);
         return true;
     }

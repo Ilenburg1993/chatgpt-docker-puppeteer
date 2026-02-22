@@ -1,0 +1,276 @@
+{
+  "domain": "quality",
+  "contracts": [
+    {
+      "id": "CONTRACT-QUALITY-NODE-SYNTAX",
+      "title": "Node Syntax Check Limpo",
+      "domain": "quality",
+      "description": "Arquivos JS alterados devem passar em `node --check` no audit quick.",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.node_check.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run audit:quick -- --quality-mode smart --triage false"
+      ],
+      "owner": "audit-quality",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-ENTRYPOINT-IMPORT-SMOKE",
+      "title": "Entrypoints Import Smoke no Quick",
+      "domain": "quality",
+      "description": "Quando impactados, entrypoints devem passar import smoke sem side effects fatais.",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.entrypoint_import_smoke.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --input-type=module -e \"import './src/main.js'; console.log('OK')\"",
+        "node --input-type=module -e \"import './src/server/main.js'; console.log('OK')\""
+      ],
+      "owner": "runtime-bootstrap",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-LINT-CLEAN",
+      "title": "Lint Clean no Quality Gate",
+      "domain": "quality",
+      "description": "Lint deve permanecer limpo no escopo decidido pelo smart-hybrid.",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "incompletude",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.lint.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run lint -- --quiet"
+      ],
+      "owner": "quality-lint",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-TYPECHECK-NODE",
+      "title": "Typecheck Node Verde",
+      "domain": "quality",
+      "description": "`typecheck:node` deve passar quando o plano smart-hybrid indicar impacto Node.",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.typecheck_node.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run typecheck:node"
+      ],
+      "owner": "typing-node",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-TYPECHECK-BROWSER",
+      "title": "Typecheck Browser Verde",
+      "domain": "quality",
+      "description": "`typecheck:browser` deve passar quando o plano smart-hybrid indicar impacto Browser.",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.typecheck_browser.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run typecheck:browser"
+      ],
+      "owner": "typing-browser",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-PRETTIER-CHECK",
+      "title": "Prettier Check Limpo",
+      "domain": "quality",
+      "description": "Arquivos no escopo do quality gate devem respeitar o formatter canônico (Prettier).",
+      "kind": "operational",
+      "severity_default": "P2",
+      "type_default": "incompletude",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.prettier_check.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run format:check"
+      ],
+      "owner": "quality-format",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-TS-IGNORE-FORBIDDEN",
+      "title": "@ts-ignore Proibido no Código Auditado",
+      "domain": "quality",
+      "description": "`@ts-ignore` é proibido em `src/`, `scripts/` e `tests/` no fluxo de auditoria.",
+      "kind": "operational",
+      "severity_default": "P1",
+      "type_default": "falha de contrato",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.ts_ignore_scan.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "rg -n '@ts-ignore' src scripts tests --glob '!**/dist/**'"
+      ],
+      "owner": "typing-governance",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-JSDOC-DELTA-EXPORTS-DOCUMENTED",
+      "title": "Exports Alterados com JSDoc (Delta)",
+      "domain": "quality",
+      "description": "Exports JS alterados no quick devem manter JSDoc mínimo para evitar regressão de documentação.",
+      "kind": "operational",
+      "severity_default": "P2",
+      "type_default": "incompletude",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.jsdoc_delta.failed"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run jsdoc:delta"
+      ],
+      "owner": "docs-jsdoc",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-JSDOC-FULL-EXPORTS-DOCUMENTED",
+      "title": "Exports JS com JSDoc (Full)",
+      "domain": "quality",
+      "description": "`audit:deep/nightly` deve evidenciar exports públicos JS sem JSDoc via engine AST canônico.",
+      "kind": "operational",
+      "severity_default": "P2",
+      "type_default": "incompletude",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.jsdoc_full.exports_missing"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run jsdoc:coverage"
+      ],
+      "owner": "docs-jsdoc",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-QUALITY-JSDOC-FULL-COVERAGE-THRESHOLD",
+      "title": "Cobertura Global JSDoc Acima do Threshold",
+      "domain": "quality",
+      "description": "`audit:deep/nightly` deve avaliar cobertura global JSDoc contra threshold configurável e registrar desvio.",
+      "kind": "operational",
+      "severity_default": "P2",
+      "type_default": "incompletude",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "quality.jsdoc_full.coverage_below_threshold"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "npm run audit:deep -- --quality-jsdoc true --triage false"
+      ],
+      "owner": "docs-jsdoc",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "warn"
+      }
+    }
+  ]
+}

@@ -10,6 +10,43 @@ import { log } from '#core/logger';
 import StructuredExtractor from '../extractors/structured_extractor.js';
 import LLMJudge from '#validation/llm_judge';
 
+/**
+ * Protocolo retornado pelo SADI (shape permissivo usado neste driver).
+ * `framePath` pode vir como array de segmentos.
+ * @typedef {{ selector: string, context?: string, framePath?: string | string[] }} AnalyzerProtocol
+ */
+
+/**
+ * Protocolo mínimo aceito pelo FrameNavigator.
+ * @typedef {{ context: string, framePath: string }} FrameNavProtocol
+ */
+
+/**
+ * Resposta mínima de navegação usada neste driver.
+ * @typedef {{ ok(): boolean, status(): number }} HttpResponseLike
+ */
+
+/**
+ * Normaliza protocolo do SADI para o contrato esperado pelo FrameNavigator.
+ *
+ * @param {AnalyzerProtocol | null | undefined} protocol
+ * @returns {FrameNavProtocol}
+ */
+function toFrameNavProtocol(protocol) {
+    const rawFramePath = protocol?.framePath;
+    const framePath = Array.isArray(rawFramePath)
+        ? rawFramePath.filter(Boolean).join(' > ')
+        : typeof rawFramePath === 'string'
+          ? rawFramePath
+          : '';
+
+    const context = typeof protocol?.context === 'string' && protocol.context.length > 0
+        ? protocol.context
+        : 'root';
+
+    return { context, framePath };
+}
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -168,7 +205,7 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         // Valida interface carregada
-        const interfaceValidation = await validateLLMInterface(/** @type {import('puppeteer').Page} */ (this.page));
+        const interfaceValidation = await validateLLMInterface(/** @type {import('puppeteer-core').Page} */ (this.page));
         if (!interfaceValidation.valid) {
             const err = new Error(`PREREQUISITE_FAILED: ${interfaceValidation.reason}`);
             err.details = interfaceValidation.details;
@@ -249,13 +286,13 @@ class ChatGPTDriver extends BaseDriver {
 
             try {
                 // ✅ BUG #4: Validar navegação
-                const response = /** @type {import('puppeteer').HTTPResponse} */ (await this.page.goto(targetUrl, {
+                const response = /** @type {HttpResponseLike | null} */ (await this.page.goto(targetUrl, {
                     waitUntil: 'networkidle2',
                     timeout: CHATGPT_CONFIG.NAVIGATION_TIMEOUT_MS,
                 }));
 
-                if (!response.ok()) {
-                    throw new Error(`Navigation failed: HTTP ${response.status()}`);
+                if (!response || !response.ok()) {
+                    throw new Error(`Navigation failed: HTTP ${response ? response.status() : 'NO_RESPONSE'}`);
                 }
 
                 // Aguardar estabilidade da página
@@ -309,7 +346,10 @@ class ChatGPTDriver extends BaseDriver {
             throw new Error('Textarea not found');
         }
 
-        const { ctx } = await this.frameNavigator.getExecutionContext(/** @type {Protocol} */ (inputProtocol.protocol), this.signal);
+        const { ctx } = await this.frameNavigator.getExecutionContext(
+            toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (inputProtocol.protocol))),
+            this.signal
+        );
 
         // 2. Limpar textarea
         await ctx.evaluate(proto => {
@@ -339,7 +379,7 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         const { ctx: sendCtx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(
-            /** @type {Protocol} */ (sendProtocol.protocol),
+            toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (sendProtocol.protocol))),
             this.signal
         );
         const rect = await this.biomechanics.getStableRect(sendCtx, sendProtocol.protocol.selector);
@@ -430,7 +470,10 @@ class ChatGPTDriver extends BaseDriver {
                 let currentText = '';
 
                 if (responseArea && responseArea.protocol) {
-                    const { ctx } = await this.frameNavigator.getExecutionContext(/** @type {Protocol} */ (responseArea.protocol), this.signal);
+                    const { ctx } = await this.frameNavigator.getExecutionContext(
+                        toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (responseArea.protocol))),
+                        this.signal
+                    );
 
                     // Extração com Poda de Pensamento (NASA Standard Pruning)
                     const extractionResult = await ctx.evaluate(proto => {
@@ -717,7 +760,7 @@ class ChatGPTDriver extends BaseDriver {
 
         if (stopProtocol && stopProtocol.protocol) {
             const { ctx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(
-                /** @type {Protocol} */ (stopProtocol.protocol),
+                toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (stopProtocol.protocol))),
                 this.signal
             );
             const rect = await this.biomechanics.getStableRect(ctx, stopProtocol.protocol.selector);

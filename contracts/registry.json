@@ -8,6 +8,7 @@
     "domains/network.json",
     "domains/config_env.json",
     "domains/schemas.json",
+    "domains/quality.json",
     "domains/api_dashboard.json",
     "domains/logic.json",
     "domains/security.json",

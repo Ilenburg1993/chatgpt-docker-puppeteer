@@ -127,7 +127,7 @@ class PageLifecycleMonitor {
     handlePageClose() {
         try {
             // 1. Remove from pool
-            this.poolManager.removePageFromPool(this.taskId, this.page);
+            this.poolManager.removePageFromPool(this.taskId);
 
             // 2. Emit NERV event (se disponível)
             if (this.nerv) {
@@ -196,7 +196,7 @@ class PageLifecycleMonitor {
     handlePageDisconnect() {
         try {
             // 1. Remove from pool
-            this.poolManager.removePageFromPool(this.taskId, this.page);
+            this.poolManager.removePageFromPool(this.taskId);
 
             // 2. Update stats
             if (this.poolManager.stats) {

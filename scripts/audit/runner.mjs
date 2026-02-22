@@ -4,6 +4,7 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { collectArchitectureFindings } from './collectors/architecture.mjs';
 import { collectPerformanceFindings } from './collectors/performance.mjs';
+import { collectQualityFindings } from './collectors/quality.mjs';
 import { collectRuntimeFindings } from './collectors/runtime.mjs';
 import { collectStaticFindings } from './collectors/static.mjs';
 import { collectTestFindings } from './collectors/tests.mjs';
@@ -37,6 +38,7 @@ import { triageFindings } from './triage_llm.mjs';
 /** @typedef {'basic'|'standard'|'deep'} ProposalDepth */
 /** @typedef {'off'|'light'|'full'} ChaosProfile */
 /** @typedef {'off'|'on'} CloudFallbackMode */
+/** @typedef {'smart'|'full'|'changed'|'off'} QualityMode */
 /** @typedef {'success'|'partial'|'aborted'|'fatal'} RunOutcome */
 /** @typedef {'signal'|'uncaught_exception'|'unhandled_rejection'|'manual'|'none'} AbortReason */
 
@@ -53,7 +55,7 @@ const cliOptions = {
     'publish-master': { type: 'string', default: 'auto' },
     'publish-snapshot': { type: 'string', default: 'auto' },
     'output-dir': { type: 'string', default: OUTPUT_DIR },
-    triage: { type: 'boolean', default: true },
+    triage: { type: 'string', default: 'true' },
     'refresh-context': { type: 'string', default: 'smart' },
     focus: { type: 'string', default: 'bug-first' },
     progress: { type: 'string', default: 'true' },
@@ -76,6 +78,13 @@ const cliOptions = {
     'cloud-fallback': { type: 'string', default: 'off' },
     'contract-coverage-report': { type: 'string', default: 'true' },
     'shadow-gate': { type: 'string', default: 'true' },
+    'quality-mode': { type: 'string', default: 'smart' },
+    'quality-jsdoc': { type: 'string', default: 'true' },
+    'quality-prettier': { type: 'string', default: 'true' },
+    'quality-jsdoc-full-threshold-pct': { type: 'string', default: '80' },
+    'quality-cache': { type: 'string', default: 'true' },
+    'quality-cache-dir': { type: 'string', default: 'artifacts/audit/cache/quality' },
+    'quality-parallelism': { type: 'string', default: 'auto' },
 };
 
 /** @type {Record<string, any>} */
@@ -190,6 +199,18 @@ function parseCloudFallback(value) {
 
 /**
  * @param {string} value
+ * @returns {QualityMode}
+ */
+function parseQualityMode(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'full') return 'full';
+    if (normalized === 'changed') return 'changed';
+    if (normalized === 'off') return 'off';
+    return 'smart';
+}
+
+/**
+ * @param {string} value
  * @returns {string[]}
  */
 function parseDomains(value) {
@@ -231,6 +252,17 @@ async function main() {
     const proposalDepth = parseProposalDepth(String(values['proposal-depth'] || 'standard'));
     const chaosProfile = parseChaosProfile(String(values['chaos-profile'] || 'off'));
     const cloudFallback = parseCloudFallback(String(values['cloud-fallback'] || 'off'));
+    const qualityMode = parseQualityMode(String(values['quality-mode'] || (profile === 'quick' ? 'smart' : 'full')));
+    const qualityJsdoc = parseSwitch(values['quality-jsdoc'], true);
+    const qualityPrettier = parseSwitch(values['quality-prettier'], true);
+    const qualityJsdocFullThresholdPct = Math.max(
+        0,
+        Math.min(100, Number(values['quality-jsdoc-full-threshold-pct'] || 80))
+    );
+    const qualityCache = parseSwitch(values['quality-cache'], true);
+    const qualityCacheDir = String(values['quality-cache-dir'] || 'artifacts/audit/cache/quality');
+    const qualityParallelism =
+        String(values['quality-parallelism'] || 'auto').trim().toLowerCase() === 'serial' ? 'serial' : 'auto';
     const selectedDomains = parseDomains(String(values['contracts-domains'] || ''));
 
     const publishMaster = parseSwitch(values['publish-master'], profile !== 'quick');
@@ -240,6 +272,7 @@ async function main() {
     const proposeDiffs = parseSwitch(values['propose-diffs'], false);
     const contractCoverageReport = parseSwitch(values['contract-coverage-report'], true);
     const shadowGateEnabled = parseSwitch(values['shadow-gate'], true);
+    const triageEnabled = parseSwitch(values.triage, true);
 
     const heartbeatMs = Math.max(1000, Number(values['heartbeat-ms'] || 5000));
     const maxFindings = Math.max(0, Number(values['max-findings'] || 0));
@@ -867,6 +900,13 @@ async function main() {
             contracts_domains: selectedDomains,
             contract_coverage_report: contractCoverageReport,
             shadow_gate: shadowGateEnabled,
+            quality_mode: qualityMode,
+            quality_jsdoc: qualityJsdoc,
+            quality_prettier: qualityPrettier,
+            quality_jsdoc_full_threshold_pct: qualityJsdocFullThresholdPct,
+            quality_cache: qualityCache,
+            quality_cache_dir: qualityCacheDir,
+            quality_parallelism: qualityParallelism,
         },
     };
 
@@ -1090,20 +1130,64 @@ async function main() {
         finishPhase('context-refresh', 'skipped');
     }
 
+    // quality (smart hybrid)
+    startPhase('collect-quality');
+    await runInternalStep(
+        'collect-quality',
+        'quality.plan_resolution',
+        'Resolving smart-hybrid quality execution plan',
+        async () => ({ ok: true })
+    );
+    const qualityResult = await collectQualityFindings({
+        profile,
+        changedFiles,
+        qualityMode,
+        qualityJsdoc,
+        qualityPrettier,
+        qualityJsdocFullThresholdPct,
+        qualityCache,
+        qualityCacheDir,
+        qualityParallelism,
+        exec: (stepId, command, args, opts) => execStep('collect-quality', stepId, command, args, opts),
+    });
+    rawFindings = rawFindings.concat(qualityResult.findings);
+    errors.push(...qualityResult.errors);
+    warnings.push(...qualityResult.warnings);
+    if ((qualityResult.telemetry?.fallbacks || []).length > 0) {
+        await runInternalStep(
+            'collect-quality',
+            'quality.fallback_resolution',
+            'Recording quality smart-hybrid fallbacks',
+            async () => ({ ok: true, fallbacks: qualityResult.telemetry.fallbacks })
+        );
+    } else {
+        markStepSkipped('collect-quality', 'quality.fallback_resolution', 'Sem fallback de quality nesta execução');
+    }
+    for (const skipped of qualityResult.telemetry?.steps_skipped || []) {
+        markStepSkipped('collect-quality', skipped.step, skipped.reason);
+    }
+    finishPhase('collect-quality', qualityResult.errors.length > 0 ? 'failed' : 'completed');
+
     // static
     startPhase('collect-static');
+    const qualityCollectorActive = qualityMode !== 'off';
     const staticResult = await collectStaticFindings({
         profile,
         changedFiles,
         artifactsDir: runDir,
         contractsMode,
+        skipQuickSyntax: qualityCollectorActive,
+        skipLintTypecheck: qualityCollectorActive,
         exec: (stepId, command, args, opts) => execStep('collect-static', stepId, command, args, opts),
     });
     rawFindings = rawFindings.concat(staticResult.findings);
     errors.push(...staticResult.errors);
     warnings.push(...staticResult.warnings);
-    if (profile === 'quick') {
-        markStepSkipped('collect-static', 'static.syntax', 'Step resolved by quick per-file syntax checks');
+    if (profile === 'quick' && qualityCollectorActive) {
+        markStepSkipped('collect-static', 'static.syntax', 'Step moved to collect-quality (quality.node_check)');
+    } else if (profile !== 'quick' && qualityCollectorActive) {
+        markStepSkipped('collect-static', 'static.lint', 'Step moved to collect-quality (quality.lint)');
+        markStepSkipped('collect-static', 'static.typecheck', 'Step moved to collect-quality (quality.typecheck_*)');
     }
     if (
         staticResult.warnings.some(
@@ -1244,7 +1328,7 @@ async function main() {
             `Running triage intelligence (budget=${triageBudget}, timeout=${triageTimeoutMs}ms)`,
             async () =>
                 triageFindings(findings, {
-                    enabled: values.triage,
+                    enabled: triageEnabled,
                     maxMcpFindings: triageBudget,
                     proposeDiffs,
                     focusMode,
@@ -1547,16 +1631,61 @@ async function main() {
                 mcp_degraded: !runtimeResult.telemetry.mcp.ok,
                 rag_degraded: !runtimeResult.telemetry.rag.ok || runtimeResult.telemetry.rag.degraded === true,
                 lsp_degraded: !runtimeResult.telemetry.lsp.ok,
-                tooling_degraded: staticResult.errors.length > 0 || testsResult.errors.length > 0,
+                tooling_degraded:
+                    qualityResult.errors.length > 0 ||
+                    staticResult.errors.length > 0 ||
+                    testsResult.errors.length > 0,
             },
             quality_gates: {
                 forbidden_ok: staticResult.telemetry?.gates?.forbidden_ok ?? null,
                 typecheck_ok: staticResult.telemetry?.gates?.typecheck_ok ?? null,
+                node_check_ok: qualityResult.telemetry?.gates?.node_check_ok ?? null,
+                entrypoint_import_smoke_ok: qualityResult.telemetry?.gates?.entrypoint_import_smoke_ok ?? null,
+                lint_ok: qualityResult.telemetry?.gates?.lint_ok ?? null,
+                typecheck_node_ok: qualityResult.telemetry?.gates?.typecheck_node_ok ?? null,
+                typecheck_browser_ok: qualityResult.telemetry?.gates?.typecheck_browser_ok ?? null,
+                prettier_ok: qualityResult.telemetry?.gates?.prettier_ok ?? null,
+                jsdoc_delta_ok: qualityResult.telemetry?.gates?.jsdoc_delta_ok ?? null,
+                jsdoc_full_ok: qualityResult.telemetry?.gates?.jsdoc_full_ok ?? null,
+                ts_ignore_ok: qualityResult.telemetry?.gates?.ts_ignore_ok ?? null,
                 runtime_smoke_ok:
                     profile === 'quick'
                         ? null
                         : runtimeResult.findings.every(item => item.source_tool !== 'runtime-smoke'),
                 tests_ok: testsResult.errors.length === 0,
+            },
+            quality_execution: {
+                strategy: qualityResult.telemetry?.strategy ?? null,
+                risk: qualityResult.telemetry?.risk ?? null,
+                changed_files_count: qualityResult.telemetry?.changed_files_count ?? 0,
+                decision_reasons: Array.isArray(qualityResult.telemetry?.reasons) ? qualityResult.telemetry.reasons : [],
+                fallbacks: Array.isArray(qualityResult.telemetry?.fallbacks) ? qualityResult.telemetry.fallbacks : [],
+                steps_executed: Array.isArray(qualityResult.telemetry?.steps_executed) ? qualityResult.telemetry.steps_executed : [],
+                steps_skipped: Array.isArray(qualityResult.telemetry?.steps_skipped) ? qualityResult.telemetry.steps_skipped : [],
+                duration_ms_by_step:
+                    qualityResult.telemetry && typeof qualityResult.telemetry.duration_ms_by_step === 'object'
+                        ? qualityResult.telemetry.duration_ms_by_step
+                        : {},
+                impact:
+                    qualityResult.telemetry && typeof qualityResult.telemetry.impact === 'object'
+                        ? qualityResult.telemetry.impact
+                        : {},
+                jsdoc:
+                    qualityResult.telemetry && typeof qualityResult.telemetry.jsdoc === 'object'
+                        ? qualityResult.telemetry.jsdoc
+                        : {},
+                cache:
+                    qualityResult.telemetry && typeof qualityResult.telemetry.cache === 'object'
+                        ? qualityResult.telemetry.cache
+                        : {},
+                parallelism:
+                    qualityResult.telemetry && typeof qualityResult.telemetry.parallelism === 'object'
+                        ? qualityResult.telemetry.parallelism
+                        : {},
+                dedup:
+                    qualityResult.telemetry && typeof qualityResult.telemetry.dedup === 'object'
+                        ? qualityResult.telemetry.dedup
+                        : {},
             },
             contract_coverage: contractCoverage,
             contract_drift: contractDrift,
@@ -1748,6 +1877,13 @@ async function main() {
             `- remaining_step_keys: ${(report.remaining_step_keys || []).slice(0, 8).join(', ') || 'none'}`,
             `- log_overflow_steps: ${report.log_stats.steps_with_overflow}`,
             `- gate_blocking: ${report.gate_decision.blocking}`,
+            `- quality_strategy: ${report.quality_execution?.strategy || 'n/a'}`,
+            `- quality_risk: ${report.quality_execution?.risk || 'n/a'}`,
+            `- quality_lint_ok: ${report.quality_gates.lint_ok}`,
+            `- quality_typecheck_node_ok: ${report.quality_gates.typecheck_node_ok}`,
+            `- quality_typecheck_browser_ok: ${report.quality_gates.typecheck_browser_ok}`,
+            `- quality_prettier_ok: ${report.quality_gates.prettier_ok}`,
+            `- quality_ts_ignore_ok: ${report.quality_gates.ts_ignore_ok}`,
             `- chaos_enabled: ${report.chaos_summary.enabled}`,
             `- chaos_violations: ${report.chaos_summary.violations}`,
             ``,
@@ -2019,8 +2155,32 @@ function writeFatalFallbackReport(error) {
         quality_gates: {
             forbidden_ok: null,
             typecheck_ok: null,
+            node_check_ok: null,
+            entrypoint_import_smoke_ok: null,
+            lint_ok: null,
+            typecheck_node_ok: null,
+            typecheck_browser_ok: null,
+            prettier_ok: null,
+            jsdoc_delta_ok: null,
+            jsdoc_full_ok: null,
+            ts_ignore_ok: null,
             runtime_smoke_ok: null,
             tests_ok: null,
+        },
+        quality_execution: {
+            strategy: 'fatal-fallback',
+            risk: 'high',
+            changed_files_count: 0,
+            decision_reasons: ['fatal-fallback'],
+            fallbacks: [],
+            steps_executed: [],
+            steps_skipped: [],
+            duration_ms_by_step: {},
+            impact: {},
+            jsdoc: {},
+            cache: {},
+            parallelism: {},
+            dedup: {},
         },
         contract_coverage: {},
         contract_drift: {

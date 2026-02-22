@@ -453,7 +453,10 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
                 },
                 dedupKey: `control:${operation.id}:succeeded`,
             });
-        } catch {}
+        } catch (err) {
+            void err;
+            // Best-effort audit event; command success path must continue.
+        }
 
         await _emitCommandStatus({
             operation_id: operation.id,
@@ -499,7 +502,10 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
                 },
                 dedupKey: `control:${operation.id}:failed`,
             });
-        } catch {}
+        } catch (err) {
+            void err;
+            // Best-effort audit event; failure path telemetry must not mask original error.
+        }
 
         await _emitCommandStatus({
             operation_id: operation.id,
@@ -517,7 +523,7 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
         wrapped.statusCode = err?.statusCode || 500;
         wrapped.code = err?.code || 'CONTROL_COMMAND_FAILED';
         wrapped.details = err?.details || null;
-        wrapped.operation = failedOperation;
+        /** @type {any} */ (wrapped).operation = failedOperation;
         throw wrapped;
     }
 }

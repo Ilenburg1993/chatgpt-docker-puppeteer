@@ -187,6 +187,30 @@ export async function collectPerformanceFindings(rootDir) {
         });
     }
 
+    try {
+        const bootImportSafetyResult = await analyzeBootImportSafetyAndSignalOwnership(rootDir);
+        findings.push(...bootImportSafetyResult.findings);
+        errors.push(...bootImportSafetyResult.errors);
+        warnings.push(...bootImportSafetyResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze boot import safety/signal ownership: ${error.message}`,
+        });
+    }
+
+    try {
+        const runtimeResourceShutdownResult = await analyzeRuntimeResourceShutdownContracts(rootDir);
+        findings.push(...runtimeResourceShutdownResult.findings);
+        errors.push(...runtimeResourceShutdownResult.errors);
+        warnings.push(...runtimeResourceShutdownResult.warnings);
+    } catch (error) {
+        errors.push({
+            source: 'performance-collector',
+            message: `Failed to analyze runtime resource shutdown contracts: ${error.message}`,
+        });
+    }
+
     return { findings, errors, warnings };
 }
 
@@ -925,6 +949,128 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
         errors.push({
             source: 'performance-task-mission-context',
             message: `Failed to analyze task mission context contract: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeBootImportSafetyAndSignalOwnership(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    try {
+        const mainPath = path.join(rootDir, 'src/main.js');
+        const serverMainPath = path.join(rootDir, 'src/server/main.js');
+        const proxyScriptPath = path.join(rootDir, 'scripts/chrome-proxy-service.js');
+        const mainContent = fs.existsSync(mainPath) ? fs.readFileSync(mainPath, 'utf8') : '';
+        const serverMainContent = fs.existsSync(serverMainPath) ? fs.readFileSync(serverMainPath, 'utf8') : '';
+        const proxyScriptContent = fs.existsSync(proxyScriptPath) ? fs.readFileSync(proxyScriptPath, 'utf8') : '';
+
+        if (
+            /process\.env\.DAEMON_MODE\s*===\s*['"]true['"]/.test(mainContent) ||
+            /NODE_APP_INSTANCE|PM2_JSON_PROCESSING/.test(serverMainContent)
+        ) {
+            findings.push({
+                source_tool: 'performance-runtime-bootstrap',
+                contract_id: 'CONTRACT-RUNTIME-BOOT-IMPORT-SIDE-EFFECT',
+                domain: 'runtime',
+                file: /process\.env\.DAEMON_MODE/.test(mainContent) ? 'src/main.js' : 'src/server/main.js',
+                line: null,
+                evidence: 'Entrypoint com heurística de env para auto-bootstrap em import.',
+                severity_hint: 'P1',
+                type: 'bug',
+                impact: 'Import puro pode disparar boot indevido e quebrar testabilidade.',
+                root_cause: 'Acoplamento de bootstrap ao ambiente em vez de execução direta.',
+                suggested_patch: 'Usar guard de entrypoint determinístico (execução direta/pm_exec_path).',
+                test_strategy: 'Executar testes wave20b de import-safety com env PM2/daemon simulada.',
+                regression_risk: 'Médio',
+            });
+        }
+
+        if (/removeAllListeners\s*\(/.test(proxyScriptContent) || /AUTO_HANDLE_SIGNALS\s*:\s*true/.test(proxyScriptContent)) {
+            findings.push({
+                source_tool: 'performance-signal-ownership',
+                contract_id: 'CONTRACT-RUNTIME-SIGNAL-OWNERSHIP-CONFLICT',
+                domain: 'runtime',
+                file: 'scripts/chrome-proxy-service.js',
+                line: null,
+                evidence: 'Wrapper PM2 do chrome-proxy com indício de ownership concorrente de sinais.',
+                severity_hint: 'P1',
+                type: 'bug',
+                impact: 'Shutdown pode ocorrer por caminhos duplicados e gerar comportamento não determinístico.',
+                root_cause: 'Concorrência entre handlers do wrapper e handlers internos.',
+                suggested_patch: 'Fixar owner de sinais no wrapper e desabilitar auto-handle interno.',
+                test_strategy: 'Executar regressão wave5 + wave20b de ownership de sinais.',
+                regression_risk: 'Médio',
+            });
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-runtime-bootstrap',
+            message: `Failed to analyze boot import safety/signal ownership: ${error.message}`,
+        });
+    }
+
+    return { findings, errors, warnings };
+}
+
+/**
+ * @param {string} rootDir
+ * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ */
+async function analyzeRuntimeResourceShutdownContracts(rootDir) {
+    const findings = [];
+    const errors = [];
+    const warnings = [];
+
+    try {
+        const lifecyclePath = path.join(rootDir, 'src/server/engine/lifecycle.js');
+        const registryPath = path.join(rootDir, 'src/core/runtime_resource_registry.js');
+
+        const lifecycleContent = fs.existsSync(lifecyclePath) ? fs.readFileSync(lifecyclePath, 'utf8') : '';
+        const registryContent = fs.existsSync(registryPath) ? fs.readFileSync(registryPath, 'utf8') : '';
+
+        const hasRegistryShutdown = /stopRuntimeResources\s*\(/.test(lifecycleContent);
+        const hasTimeoutSignalization = /RESOURCE_SHUTDOWN_TIMEOUT/.test(lifecycleContent);
+        const hasPromiseRaceTimeout =
+            /Promise\.race\s*\(\s*\[/.test(registryContent) &&
+            /setTimeout\s*\(/.test(registryContent) &&
+            /clearTimeout\s*\(/.test(registryContent);
+        const hasCancelableTimeoutHelper =
+            /function\s+runWithTimeout\s*\(/.test(registryContent) &&
+            /setTimeout\s*\(/.test(registryContent) &&
+            /clearTimeout\s*\(/.test(registryContent);
+        const hasTimeoutContract = hasPromiseRaceTimeout || hasCancelableTimeoutHelper;
+
+        if (!hasRegistryShutdown || !hasTimeoutSignalization || !hasTimeoutContract) {
+            findings.push({
+                source_tool: 'performance-runtime-resource-registry',
+                contract_id: 'CONTRACT-RUNTIME-RESOURCE-SHUTDOWN-TIMEOUT',
+                domain: 'runtime',
+                file: !hasRegistryShutdown || !hasTimeoutSignalization
+                    ? 'src/server/engine/lifecycle.js'
+                    : 'src/core/runtime_resource_registry.js',
+                line: null,
+                evidence: 'Contrato de shutdown por recurso com timeout/telemetria está incompleto.',
+                severity_hint: 'P1',
+                type: 'gap',
+                impact: 'Recursos podem permanecer ativos após shutdown ou falhar sem observabilidade.',
+                root_cause: 'Ausência de orquestração unificada com timeout por recurso.',
+                suggested_patch: 'Centralizar stop em runtime registry com timeout e reason codes.',
+                test_strategy: 'Executar testes wave20b de ready/degraded e lifecycle.',
+                regression_risk: 'Médio',
+            });
+        }
+    } catch (error) {
+        errors.push({
+            source: 'performance-runtime-resource-registry',
+            message: `Failed to analyze runtime resource shutdown contracts: ${error.message}`,
         });
     }
 

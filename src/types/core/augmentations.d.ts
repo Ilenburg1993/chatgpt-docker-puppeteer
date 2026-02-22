@@ -78,6 +78,28 @@ declare module '#core/config' {
 // ============================================================
 
 declare module '#core/constants' {
+  export const DRIVER_DOMAINS: {
+    readonly INITIALIZATION: 'initialization';
+    readonly UNKNOWN_CONTEXT: 'unknown_context';
+    readonly MAIN_PAGE: 'main_page';
+    readonly IFRAME: 'iframe';
+    readonly POPUP: 'popup';
+  };
+
+  export const ERROR_NAMES: {
+    readonly FRAME_NAV_ERROR: 'FrameNavError';
+    readonly TRIAGE_ERROR: 'TriageError';
+    readonly BASE_DRIVER_ERROR: 'BaseDriverError';
+    readonly TARGET_DRIVER_ERROR: 'TargetDriverError';
+    readonly CHATGPT_ERROR: 'ChatGPTError';
+  };
+
+  export const DRIVER_NAMES: {
+    readonly BASE_UNIVERSAL: 'BaseUniversalDriver';
+    readonly GENERIC: 'Generic';
+    readonly CHATGPT: 'ChatGPT';
+  };
+
   export const DRIVER_STATES: {
     readonly PENDING: 'PENDING';
     readonly RUNNING: 'RUNNING';
@@ -109,6 +131,9 @@ declare module '#core/constants' {
   export const CONSTANTS: {
     DRIVER_STATES: typeof DRIVER_STATES;
     PROCESS_TYPES: typeof PROCESS_TYPES;
+    DRIVER_DOMAINS?: typeof DRIVER_DOMAINS;
+    ERROR_NAMES?: typeof ERROR_NAMES;
+    DRIVER_NAMES?: typeof DRIVER_NAMES;
     [key: string]: unknown;
   };
 }

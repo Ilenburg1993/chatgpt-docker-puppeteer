@@ -114,11 +114,13 @@ function startAgent(timeoutMs = 15000) {
     ensureDirs();
     const outPath = path.join(TMP_DIR, `stdout-${Date.now()}.log`);
     const outStream = fs.createWriteStream(outPath);
+    const childEnv = { ...process.env, FORCE_COLOR: '1' };
+    delete childEnv.NO_COLOR;
 
     const proc = child_process.spawn('node', ['index.js'], {
         cwd: ROOT,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, FORCE_COLOR: '1' }
+        env: childEnv
     });
 
     proc.stdout.pipe(outStream);

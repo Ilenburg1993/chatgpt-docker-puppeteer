@@ -3,8 +3,7 @@ import { log } from '#core/logger';
 import { recordEvent } from '#infra/db/events_repo';
 import { getMissionById, MISSION_STATUS, updateMission } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
-
-const TERMINAL_STATUSES = new Set([MISSION_STATUS.DONE, MISSION_STATUS.FAILED, MISSION_STATUS.CANCELLED]);
+import { asRecord } from '#types/guards';
 
 /**
  * @typedef {{
@@ -242,7 +241,12 @@ function updateMissionProgressState(params) {
     if (!missionRef.ok) return missionRef;
     const { mission, missionId } = missionRef;
 
-    if (TERMINAL_STATUSES.has(String(mission.status || '').toUpperCase())) {
+    const missionStatus = String(mission.status || '').toUpperCase();
+    if (
+        missionStatus === MISSION_STATUS.DONE ||
+        missionStatus === MISSION_STATUS.FAILED ||
+        missionStatus === MISSION_STATUS.CANCELLED
+    ) {
         return {
             ok: false,
             statusCode: 409,
@@ -268,12 +272,13 @@ function updateMissionProgressState(params) {
         return preconditionFailure;
     }
 
-    const context = mission.context && typeof mission.context === 'object' ? mission.context : {};
+    const context = asRecord(mission.context);
+    const contextProgress = asRecord(context.progress);
     const nextContext = {
         ...context,
         ...(params.contextPatch && typeof params.contextPatch === 'object' ? params.contextPatch : {}),
         progress: {
-            ...(context.progress && typeof context.progress === 'object' ? context.progress : {}),
+            ...contextProgress,
             ...(params.progress && typeof params.progress === 'object' ? params.progress : {}),
         },
     };

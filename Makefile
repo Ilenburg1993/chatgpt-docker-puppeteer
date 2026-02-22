@@ -170,8 +170,11 @@ help:
 	@echo "  $(CYAN)make audit-ready$(NC)       Checklist de prontidão antes da auditoria"
 	@echo "  $(CYAN)make audit-shadow$(NC)      Auditoria rápida em modo shadow gate"
 	@echo "  $(CYAN)make audit-quick$(NC)       Auditoria bug-first rápida (delta + ETA/progresso)"
+	@echo "  $(CYAN)make audit-quick-serial$(NC) Quick com quality serial (diagnóstico)"
+	@echo "  $(CYAN)make audit-quick-cache-off$(NC) Quick sem cache de quality (baseline)"
 	@echo "  $(CYAN)make audit-quick-skip-refresh$(NC) Quick sem refresh de contexto"
 	@echo "  $(CYAN)make audit-deep$(NC)        Auditoria bug-first completa local (com proposals)"
+	@echo "  $(CYAN)make audit-deep-jsdoc$(NC)  Deep com `jsdoc_full` + threshold"
 	@echo "  $(CYAN)make audit-nightly$(NC)     Auditoria noturna completa (com refresh/docs)"
 	@echo "  $(MAGENTA)$(BOLD)make audit-nightly-max-no-docs$(NC) Nightly máxima sem refresh (deep + diffs + chaos + all)"
 	@echo "  $(CYAN)make audit-nightly-no-docs$(NC)   Nightly sem refresh/docs (mais rápido)"
@@ -185,11 +188,14 @@ help:
 	@echo "$(YELLOW)$(BOLD)🎨 Formatação & Lint:$(NC)"
 	@echo "  $(CYAN)make format$(NC)            Formatar código (Prettier)"
 	@echo "  $(CYAN)make format-check$(NC)      Verificar formatação"
+	@echo "  $(CYAN)make jsdoc-coverage$(NC)    Cobertura JSDoc full"
+	@echo "  $(CYAN)make jsdoc-delta$(NC)       Cobertura JSDoc delta"
 	@echo "  $(CYAN)make lint$(NC)              Linting (ESLint)"
 	@echo "  $(CYAN)make lint-fix$(NC)          Fix automático"
 	@echo "  $(CYAN)make typecheck-node$(NC)    Typecheck canônico (Node/Audit)"
 	@echo "  $(CYAN)make typecheck-browser$(NC) Typecheck browser/UI isolado"
 	@echo "  $(CYAN)make typecheck-full$(NC)    Typecheck completo (node + browser)"
+	@echo "  $(CYAN)make test-audit-quality$(NC) Testes unitários do audit quality/JSDoc"
 	@echo ""
 	@echo "$(MAGENTA)$(BOLD)🛠️  Manutenção:$(NC)"
 	@echo "  $(CYAN)make clean$(NC)             Limpar temporários"
@@ -675,7 +681,7 @@ rag-rebuild-code-config-strict:
 # 🔟 FORMATAÇÃO & LINT
 # =============================================================================
 
-.PHONY: format format-check lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full
+.PHONY: format format-check jsdoc-coverage jsdoc-delta lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full test-audit-quality
 
 format:
 	@echo "$(CYAN)🎨 Formatando código (Prettier)$(NC)"
@@ -686,6 +692,14 @@ format-check:
 	@echo "$(CYAN)🔍 Verificando formatação$(NC)"
 	@$(NPM) run format:check
 	@echo "$(GREEN)✅ Formatação OK$(NC)"
+
+jsdoc-coverage:
+	@echo "$(CYAN)📘 Cobertura JSDoc (full)$(NC)"
+	@$(NPM) run jsdoc:coverage
+
+jsdoc-delta:
+	@echo "$(CYAN)📘 Cobertura JSDoc (delta)$(NC)"
+	@$(NPM) run jsdoc:delta
 
 lint:
 	@echo "$(CYAN)🔍 Linting (ESLint)$(NC)"
@@ -725,6 +739,10 @@ typecheck-browser:
 typecheck-full:
 	@echo "$(CYAN)🔎 Typecheck completo (Node + Browser/UI)$(NC)"
 	@$(NPM) run typecheck:full
+
+test-audit-quality:
+	@echo "$(CYAN)🧪 Testes unitários do audit quality/JSDoc$(NC)"
+	@$(NPM) run test:unit:audit-quality
 
 # =============================================================================
 # 1️⃣1️⃣ MANUTENÇÃO & LIMPEZA
@@ -845,7 +863,7 @@ check-bindings:
 # 1️⃣3️⃣ DEVELOPMENT SHORTCUTS
 # =============================================================================
 
-.PHONY: dev dev-debug quick-test quick-check check-forbidden audit-preflight audit-ready audit-shadow audit-quick audit-quick-skip-refresh audit-deep audit-nightly audit-nightly-no-docs audit-nightly-max-no-docs audit-run-last audit-progress audit-events-tail
+.PHONY: dev dev-debug quick-test quick-check check-forbidden audit-preflight audit-ready audit-shadow audit-quick audit-quick-serial audit-quick-cache-off audit-quick-skip-refresh audit-deep audit-deep-jsdoc audit-nightly audit-nightly-no-docs audit-nightly-max-no-docs audit-run-last audit-progress audit-events-tail
 
 dev:
 	@echo "$(GREEN)🚀 Iniciando modo desenvolvimento$(NC)"
@@ -880,6 +898,14 @@ audit-quick:
 	@echo "$(CYAN)🧪 Auditoria bug-first rápida (delta)$(NC)"
 	@$(NPM) run audit:quick
 
+audit-quick-serial:
+	@echo "$(CYAN)🧪 Auditoria rápida com quality serial (diagnóstico)$(NC)"
+	@$(NPM) run audit:quick:serial
+
+audit-quick-cache-off:
+	@echo "$(CYAN)🧪 Auditoria rápida sem cache de quality (baseline/tuning)$(NC)"
+	@$(NPM) run audit:quick:cache-off
+
 audit-quick-skip-refresh:
 	@echo "$(CYAN)🧪 Auditoria rápida (sem refresh de contexto)$(NC)"
 	@$(NPM) run audit:quick -- --refresh-context skip
@@ -887,6 +913,10 @@ audit-quick-skip-refresh:
 audit-deep:
 	@echo "$(CYAN)🧪 Auditoria bug-first completa local$(NC)"
 	@$(NPM) run audit:deep
+
+audit-deep-jsdoc:
+	@echo "$(CYAN)🧪 Auditoria deep com `jsdoc_full` + threshold$(NC)"
+	@$(NPM) run audit:deep:jsdoc
 
 audit-nightly:
 	@echo "$(CYAN)🌙 Auditoria noturna completa (refresh + docs + chaos + logs)$(NC)"

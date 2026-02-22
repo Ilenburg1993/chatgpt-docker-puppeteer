@@ -72,7 +72,7 @@ const DnaSchema = z
         // Regras globais de fallback (Padrões universais de chat)
         // [FIX] z.record precisa de key schema explícito
         global_selectors: z.record(z.string(), z.array(z.string())).default(
-            /** @type {Record<string, unknown>} */ ({
+            /** @type {any} */ ({
                 input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
                 send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"]
             })

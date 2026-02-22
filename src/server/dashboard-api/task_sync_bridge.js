@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import { ActionCode } from '#shared/nerv/constants';
+import { asRecord } from '#types/guards';
 import { getActionCode, getCorrelationId, getPayload, getTaskIdFromPayload } from '#shared/nerv/envelope_reader';
 import EventEmitter from 'node:events';
 
@@ -293,21 +294,23 @@ class TaskSyncBridge extends EventEmitter {
             const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
-            const err = payload.error || payload.reason || payload.err || null;
+            const payloadView = asRecord(payload);
+            const err = payloadView.error || payloadView.reason || payloadView.err || null;
+            const errView = asRecord(err);
             const errorText =
                 typeof err === 'string'
                     ? err
                     : err &&
                         typeof err === 'object' &&
                         err !== null &&
-                        typeof (/** @type {unknown} */ (err).message) === 'string'
-                      ? /** @type {unknown} */ (err).message
+                        typeof errView.message === 'string'
+                      ? errView.message
                       : err
                         ? JSON.stringify(err)
                         : 'Unknown error';
-            const reason = /** @type {string} */ (payload.reason) || 'UNKNOWN';
-            const nextAction = /** @type {string} */ (payload.next_action) || null;
-            const retryable = Boolean(payload.retryable);
+            const reason = /** @type {string} */ (payloadView.reason) || 'UNKNOWN';
+            const nextAction = /** @type {string} */ (payloadView.next_action) || null;
+            const retryable = Boolean(payloadView.retryable);
 
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,
@@ -339,21 +342,23 @@ class TaskSyncBridge extends EventEmitter {
             const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
-            const err = payload.error || payload.reason || payload.err || null;
+            const payloadView = asRecord(payload);
+            const err = payloadView.error || payloadView.reason || payloadView.err || null;
+            const errView = asRecord(err);
             const errorText =
                 typeof err === 'string'
                     ? err
                     : err &&
                         typeof err === 'object' &&
                         err !== null &&
-                        typeof (/** @type {unknown} */ (err).message) === 'string'
-                      ? /** @type {unknown} */ (err).message
+                        typeof errView.message === 'string'
+                      ? errView.message
                       : err
                         ? JSON.stringify(err)
                         : 'Task failed';
-            const reason = /** @type {string} */ (payload.reason) || 'UNKNOWN';
-            const nextAction = /** @type {string} */ (payload.next_action) || null;
-            const retryable = Boolean(payload.retryable);
+            const reason = /** @type {string} */ (payloadView.reason) || 'UNKNOWN';
+            const nextAction = /** @type {string} */ (payloadView.next_action) || null;
+            const retryable = Boolean(payloadView.retryable);
 
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,
@@ -459,25 +464,30 @@ class TaskSyncBridge extends EventEmitter {
             }
 
             const queue = await io.getQueue();
-            const task = /** @type {unknown} */ (
-                queue.find(t => /** @type {unknown} */ (t)?.meta?.id === taskId || /** @type {unknown} */ (t)?.id === taskId)
-            );
+            const task = queue.find(t => {
+                const taskView = asRecord(t);
+                const taskMeta = asRecord(taskView.meta);
+                return taskMeta.id === taskId || taskView.id === taskId;
+            });
             if (!task) {
                 return;
             }
+            const taskView = asRecord(task);
+            const taskRuntimeState = asRecord(taskView.runtime_state);
+            const taskState = asRecord(taskView.state);
 
             const persistedTask = {
-                ...task,
+                ...taskView,
                 runtime_state: {
-                    .../** @type {unknown} */ ((task).runtime_state || {}),
+                    ...taskRuntimeState,
                     ...runtimeState,
                 },
                 state: {
-                    .../** @type {unknown} */ ((task).state || {}),
+                    ...taskState,
                     status:
                         runtimeState.status ||
-                        /** @type {unknown} */ (task).state?.status ||
-                        /** @type {unknown} */ (task).status ||
+                        taskState.status ||
+                        taskView.status ||
                         UnifiedStatus.PENDING,
                     updated_at: Date.now(),
                 },

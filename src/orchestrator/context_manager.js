@@ -122,6 +122,18 @@ class ContextManager {
     }
 
     /**
+     * Compatibilidade retroativa: APIs legadas esperam `getContext`.
+     * Mantém contrato estável delegando para `getContextForStep`.
+     *
+     * @param {string} missionId
+     * @param {string} [stepId]
+     * @returns {object|null}
+     */
+    getContext(missionId, stepId = 'current') {
+        return this.getContextForStep(missionId, stepId);
+    }
+
+    /**
      * Aplica estratégia de chunking
      */
     _applyChunkingStrategy(context, _) {

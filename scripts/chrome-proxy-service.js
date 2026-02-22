@@ -11,6 +11,7 @@ import * as dns from 'node:dns/promises';
  * @property {number} PROXY_PORT - Proxy listening port (default: 9224)
  * @property {string} CHROME_HOST - Chrome host address (default: host.docker.internal)
  * @property {string} PROXY_BIND - Proxy bind address (default: 0.0.0.0)
+ * @property {boolean} [AUTO_HANDLE_SIGNALS] - Internal signal handlers toggle (default: false in PM2 wrapper)
  */
 
 /**
@@ -61,6 +62,22 @@ class ChromeProxyService extends _Impl {
      */
     handleWebSocketUpgrade(req, socket, head) {
         return super.handleWebSocketUpgrade(req, socket, head);
+    }
+
+    /**
+     * Start proxy service
+     * @returns {Promise<void>}
+     */
+    async start() {
+        return super.start();
+    }
+
+    /**
+     * Stop proxy service gracefully
+     * @returns {Promise<void>}
+     */
+    async stop() {
+        return super.stop();
     }
 }
 
@@ -365,9 +382,7 @@ function shutdownOnceFactory(svc, timeoutMs, reason, exitCode) {
 
         try {
             // ✅ P1 FIX: Properly await svc.stop() with null-safe fallback
-            // @ts-ignore - ChromeProxyService.stop() exists but TypeScript can't infer from ESM subpath import
             const stopPromise = typeof svc.stop === 'function'
-                // @ts-ignore - ChromeProxyService.stop() exists
                 ? svc.stop()
                 : Promise.resolve();
 
@@ -452,6 +467,7 @@ async function main() {
         PROXY_PORT,
         CHROME_HOST,
         PROXY_BIND,
+        AUTO_HANDLE_SIGNALS: false,
     };
 
     const svc = new ChromeProxyService(config);
@@ -465,69 +481,63 @@ async function main() {
     const shutdownGracefully = shutdownOnceFactory(svc, PM2_KILL_TIMEOUT_MS, 'graceful', 0);
     const shutdownFatal = shutdownOnceFactory(svc, PM2_KILL_TIMEOUT_MS, 'fatal', 1);
 
-    process.on('message', msg => {
-        // PM2: shutdown_with_message
-        if (msg === 'shutdown') shutdownGracefully();
-    });
-
-    process.on('disconnect', () => {
-        // PM2 may disconnect IPC on stop/reload; treat as shutdown signal
-        shutdownGracefully();
-    });
-
-    // IMPORTANT:
-    // If your _Impl already registers SIGINT/SIGTERM handlers, you *can* omit these.
-    // Having both is safe here because shutdownOnceFactory is idempotent.
-    process.on('SIGINT', shutdownGracefully);
-    process.on('SIGTERM', shutdownGracefully);
-    process.on('SIGQUIT', shutdownGracefully);
-    process.on('SIGUSR2', shutdownGracefully);
-
-    process.on('uncaughtException', err => {
-        console.error(`[ERROR][pm2:${tag}] uncaughtException:`, err && err.stack ? err.stack : err);
-        shutdownFatal();
-    });
-
-    process.on('unhandledRejection', reason => {
-        console.error(`[ERROR][pm2:${tag}] unhandledRejection:`, reason);
-        shutdownFatal();
-    });
-
-    // Optional: if PM2 uses wait_ready, and your implementation *doesn't* send 'ready',
-    // we send it after start resolves (idempotent / harmless if duplicated).
-    const sendReady = () => {
-        if (typeof process.send === 'function') {
-            try {
-                process.send('ready');
-            } catch (_) {}
-        }
+    const processHandlers = {
+        message: msg => {
+            // PM2: shutdown_with_message
+            if (msg === 'shutdown') shutdownGracefully();
+        },
+        disconnect: () => {
+            // PM2 may disconnect IPC on stop/reload; treat as shutdown signal
+            shutdownGracefully();
+        },
+        sigint: shutdownGracefully,
+        sigterm: shutdownGracefully,
+        sigquit: shutdownGracefully,
+        sigusr2: shutdownGracefully,
+        uncaughtException: err => {
+            console.error(`[ERROR][pm2:${tag}] uncaughtException:`, err && err.stack ? err.stack : err);
+            shutdownFatal();
+        },
+        unhandledRejection: reason => {
+            console.error(`[ERROR][pm2:${tag}] unhandledRejection:`, reason);
+            shutdownFatal();
+        },
     };
 
+    const unregisterProcessHandlers = () => {
+        process.removeListener('message', processHandlers.message);
+        process.removeListener('disconnect', processHandlers.disconnect);
+        process.removeListener('SIGINT', processHandlers.sigint);
+        process.removeListener('SIGTERM', processHandlers.sigterm);
+        process.removeListener('SIGQUIT', processHandlers.sigquit);
+        process.removeListener('SIGUSR2', processHandlers.sigusr2);
+        process.removeListener('uncaughtException', processHandlers.uncaughtException);
+        process.removeListener('unhandledRejection', processHandlers.unhandledRejection);
+    };
+
+    process.on('message', processHandlers.message);
+    process.on('disconnect', processHandlers.disconnect);
+    process.on('SIGINT', processHandlers.sigint);
+    process.on('SIGTERM', processHandlers.sigterm);
+    process.on('SIGQUIT', processHandlers.sigquit);
+    process.on('SIGUSR2', processHandlers.sigusr2);
+    process.on('uncaughtException', processHandlers.uncaughtException);
+    process.on('unhandledRejection', processHandlers.unhandledRejection);
+
     try {
-        // @ts-ignore - ChromeProxyService.start() exists but TypeScript can't infer from ESM subpath import
         await svc.start();
-        sendReady();
         console.log(`[INFO][pm2:${tag}] ChromeProxyService started successfully`);
     } catch (err) {
         console.error(`\n❌ Failed to start ChromeProxyService [pm2:${tag}]:`);
         console.error(err && err.stack ? err.stack : err);
 
-        // ✅ P2 FIX: Cleanup handlers before exit (prevent handler leaks)
-        process.removeAllListeners('message');
-        process.removeAllListeners('disconnect');
-        process.removeAllListeners('SIGINT');
-        process.removeAllListeners('SIGTERM');
-        process.removeAllListeners('SIGQUIT');
-        process.removeAllListeners('SIGUSR2');
-        process.removeAllListeners('uncaughtException');
-        process.removeAllListeners('unhandledRejection');
+        unregisterProcessHandlers();
 
         process.exit(1);
     }
 }
 
 // Always call main() - PM2 modifies process.argv[1], breaking main-module checks
-// @ts-ignore - Top-level await is supported in ESM (package.json has "type": "module")
 await main();
 
 export default ChromeProxyService;

@@ -75,14 +75,18 @@ function ensureConfigUpdatedListener() {
         log('INFO', `[HUB] Socket CORS allowlist atualizada (${dashboardAllowedOrigins.size} origens)`);
     };
 
-    CONFIG.on('updated', configUpdatedHandler);
+    if (typeof /** @type {any} */ (CONFIG).on === 'function') {
+        /** @type {any} */ (CONFIG).on('updated', configUpdatedHandler);
+    }
 }
 
 function removeConfigUpdatedListener() {
     if (!configUpdatedHandler) {
         return;
     }
-    CONFIG.off('updated', configUpdatedHandler);
+    if (typeof /** @type {any} */ (CONFIG).off === 'function') {
+        /** @type {any} */ (CONFIG).off('updated', configUpdatedHandler);
+    }
     configUpdatedHandler = null;
 }
 
@@ -255,9 +259,10 @@ function init(httpServer) {
                 }
 
                 if (policy.authRequired) {
-                    const userRole = socket.dashboardUser?.role || null;
+                    const dashboardUser = /** @type {any} */ (socket.dashboardUser);
+                    const userRole = dashboardUser?.role || null;
                     const roleAllowed = userRole === policy.commandRole || userRole === 'owner';
-                    const permAllowed = hasPermission(socket.dashboardUser, RBAC_PERMISSIONS.DASHBOARD_COMMAND);
+                    const permAllowed = hasPermission(dashboardUser, RBAC_PERMISSIONS.DASHBOARD_COMMAND);
                     if (!roleAllowed || !permAllowed) {
                         socket.emit('dashboard:command:error', {
                             code: 'COMMAND_FORBIDDEN',

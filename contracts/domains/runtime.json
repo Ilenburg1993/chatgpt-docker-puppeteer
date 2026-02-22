@@ -52,7 +52,7 @@
       "status": "active",
       "version": 1,
       "enforcement": {
-        "level": "warn"
+        "level": "p1"
       }
     },
     {
@@ -79,7 +79,7 @@
       "status": "active",
       "version": 1,
       "enforcement": {
-        "level": "warn"
+        "level": "p1"
       }
     },
     {
@@ -192,7 +192,7 @@
       "status": "active",
       "version": 1,
       "enforcement": {
-        "level": "warn"
+        "level": "p1"
       }
     },
     {
@@ -611,6 +611,89 @@
       "version": 1,
       "enforcement": {
         "level": "warn"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-BOOT-IMPORT-SIDE-EFFECT",
+      "title": "Import puro de entrypoint sem side effects de startup",
+      "domain": "runtime",
+      "description": "Import de src/main.js e src/server/main.js sob env PM2/daemon não pode disparar boot operacional.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "boot_import_side_effect"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave20b_server_main_import_pm2_env_no_boot.spec.js tests/regression/test_wave20b_main_import_daemon_env_no_boot.spec.js"
+      ],
+      "owner": "runtime-bootstrap",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-SIGNAL-OWNERSHIP-CONFLICT",
+      "title": "Conflito de ownership de sinal",
+      "domain": "runtime",
+      "description": "Runtime não deve manter ownership concorrente de sinais/shutdown para o mesmo processo operacional.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "bug",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "signal_ownership_conflict"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/regression/test_wave20b_signal_ownership_single_owner.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-lifecycle",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
+      }
+    },
+    {
+      "id": "CONTRACT-RUNTIME-RESOURCE-SHUTDOWN-TIMEOUT",
+      "title": "Shutdown de recurso sem timeout pendente",
+      "domain": "runtime",
+      "description": "Recursos do runtime registry não devem exceder timeout de shutdown sem sinalização de risco.",
+      "kind": "runtime",
+      "severity_default": "P1",
+      "type_default": "gap",
+      "matcher": {
+        "engine": "signal",
+        "signals": [
+          "resource_shutdown_timeout"
+        ]
+      },
+      "allowlist": {
+        "files": []
+      },
+      "test_recipe": [
+        "node --test tests/integration/server/test_wave20b_ready_degraded_components_contract.spec.js",
+        "npm run audit:quick"
+      ],
+      "owner": "runtime-resource-registry",
+      "status": "active",
+      "version": 1,
+      "enforcement": {
+        "level": "p1"
       }
     }
   ]

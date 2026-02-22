@@ -365,7 +365,7 @@ const StateSchemaV5 = z.object({
 	                    warnings_count: z.number().int().default(0),
 	                    retry_count: z.number().int().default(0),
 	                    // Zod v4: record(keyType, valueType)
-	                    phase_durations: z.record(z.string(), z.number()).default(/** @type {Record<string, number>} */ ({})), // { 'preparation': 1200, 'execution': 3400, ... }
+		                    phase_durations: z.record(z.string(), z.number()).default(/** @type {any} */ ({})), // { 'preparation': 1200, 'execution': 3400, ... }
 	                })
 	                .default({}),
 	        })

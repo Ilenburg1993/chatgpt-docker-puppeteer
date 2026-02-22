@@ -1,15 +1,10 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as server from './server.js';
 import * as socketHub from './socket.js';
-import * as pm2Bridge from '../realtime/bus/pm2_bridge.js';
-import * as logTail from '../realtime/streams/log_tail.js';
-import * as hardwareTelemetry from '../realtime/telemetry/hardware.js';
-import * as fsWatcher from '../watchers/fs_watcher.js';
-import * as logWatcher from '../watchers/log_watcher.js';
 import { log } from '#core/logger';
 import CONFIG from '#core/config';
+import { setRuntimeResourceState, stopRuntimeResources } from '#core/runtime_resource_registry';
 import * as Discovery from '#nerv/discovery';
-import * as ssotEventFeed from '../realtime/ssot_event_feed.js';
 
 /**
  * Legacy: file-based discovery handled by `@nerv/discovery`.
@@ -37,20 +32,6 @@ const signalHandlers = {
     uncaughtException: null,
     unhandledRejection: null,
 };
-
-async function loadDashboardShutdownModules() {
-    const [taskSyncBridgeModule, telemetryAggregatorModule, tokenBlocklistModule] = await Promise.all([
-        import('#server/dashboard-api/task_sync_bridge'),
-        import('#server/dashboard-api/telemetry_aggregator'),
-        import('#infra/db/token_blocklist'),
-    ]);
-
-    return {
-        taskSyncBridge: taskSyncBridgeModule?.default ?? null,
-        telemetryAggregator: telemetryAggregatorModule?.default ?? null,
-        stopTokenCleanup: tokenBlocklistModule?.stopPeriodicCleanup ?? null,
-    };
-}
 
 function setAllowProcessExit(flag) {
     allowProcessExit = !!flag;
@@ -105,105 +86,54 @@ async function gracefulShutdown(signal) {
     }, shutdownTimeoutMs);
 
     try {
-        // 1. DESATIVAÇÃO DOS OBSERVADORES (WATCHERS)
-        // Corta a entrada de novos eventos do sistema de arquivos.
-        log('DEBUG', '[LIFECYCLE] Finalizando observadores de disco...');
-        if (fsWatcher && typeof fsWatcher.stop === 'function') {
-            fsWatcher.stop();
-        }
-        if (logWatcher && typeof logWatcher.stop === 'function') {
-            logWatcher.stop();
-        }
-
-        // 2. DESATIVAÇÃO DOS MOTORES DE TELEMETRIA E STREAMING
-        // Interrompe o fluxo de dados de hardware e barramentos externos.
-        log('DEBUG', '[LIFECYCLE] Encerrando barramentos de dados vivos...');
-        if (hardwareTelemetry && typeof hardwareTelemetry.stop === 'function') {
-            hardwareTelemetry.stop();
-        }
-        // Snapshot telemetry disabled (module not found - telemetry directory missing)
-        // try {
-        //     if (snapshot && typeof snapshot.stop === 'function') {
-        //         snapshot.stop();
-        //     }
-        // } catch (e) {
-        //     log('WARN', `[LIFECYCLE] Falha ao parar snapshot: ${e.message}`);
-        // }
-        if (logTail && typeof logTail.stop === 'function') {
-            logTail.stop();
-        }
-        if (pm2Bridge && typeof pm2Bridge.stop === 'function') {
-            pm2Bridge.stop();
-        }
-
-        // 2.25. MCP UPSTREAMS (stdio child processes)
-        // Ensure no orphan child processes remain when shutting down Mission Control.
-        try {
-            const { shutdownUpstreams } = await import('../../integration/mcp/upstream-manager.mjs');
-            if (typeof shutdownUpstreams === 'function') {
-                await shutdownUpstreams();
-                log('DEBUG', '[LIFECYCLE] MCP upstreams encerrados');
+        // 1. Encerramento canônico de recursos runtime registrados (ordem reversa)
+        // Mantém ownership do lifecycle em dashboard-web com timeout por recurso.
+        const configuredResourceTimeoutMs = Number(CONFIG.get('SHUTDOWN_PHASE_TIMEOUT_MS', 10000)) || 10000;
+        const perResourceTimeoutMs = Math.max(500, Math.min(shutdownTimeoutMs, configuredResourceTimeoutMs));
+        const stopResults = await stopRuntimeResources({
+            owner: 'dashboard-web',
+            timeoutMs: perResourceTimeoutMs,
+            logger: log,
+        });
+        for (const result of stopResults) {
+            if (!result.ok) {
+                setRuntimeResourceState(result.id, 'degraded', {
+                    owner: 'dashboard-web',
+                    reasonCode: result.timeout ? 'RESOURCE_SHUTDOWN_TIMEOUT' : 'RESOURCE_SHUTDOWN_FAILED',
+                    message: result.error || null,
+                });
             }
-        } catch (e) {
-            log('DEBUG', `[LIFECYCLE] shutdownUpstreams skipped: ${e && e.message ? e.message : String(e)}`);
         }
 
-        // 2.3. LSP/tsserver daemon
-        try {
-            const { stopTsserverDaemon } = await import('../../integration/lsp/tsserver-daemon.mjs');
-            if (typeof stopTsserverDaemon === 'function') {
-                await stopTsserverDaemon();
-                log('DEBUG', '[LIFECYCLE] LSP daemon encerrado');
-            }
-        } catch (e) {
-            log('DEBUG', `[LIFECYCLE] stopTsserverDaemon skipped: ${e && e.message ? e.message : String(e)}`);
+        // 2. Fallback legacy lazy-load para compatibilidade de shutdown.
+        // Mantém import-safety (sem import estático) e preserva contrato Wave12.
+        const [taskSyncBridgeModule, telemetryAggregatorModule] = await Promise.all([
+            import('#server/dashboard-api/task_sync_bridge'),
+            import('#server/dashboard-api/telemetry_aggregator'),
+        ]);
+        const taskSyncBridge = /** @type {any} */ (taskSyncBridgeModule?.default);
+        const telemetryAggregator = /** @type {any} */ (telemetryAggregatorModule?.default);
+
+        if (
+            !stopResults.some(result => result.id === 'task_sync_bridge' && result.ok) &&
+            taskSyncBridge &&
+            typeof taskSyncBridge.stop === 'function'
+        ) {
+            await taskSyncBridge.stop();
         }
-
-        // 2.5. DASHBOARD AGGREGATORS (realtime)
-        // Lazy-load apenas no shutdown para evitar side effects no import do entrypoint.
-        // Para timers internos antes de desconectar o Hub.
-        try {
-            const { taskSyncBridge, telemetryAggregator, stopTokenCleanup } = await loadDashboardShutdownModules();
-
-            try {
-                if (telemetryAggregator && typeof telemetryAggregator.stop === 'function') {
-                    telemetryAggregator.stop();
-                }
-            } catch (e) {
-                log('DEBUG', `[LIFECYCLE] TelemetryAggregator.stop() skipped: ${e && e.message ? e.message : String(e)}`);
-            }
-
-            try {
-                if (taskSyncBridge && typeof taskSyncBridge.clearAll === 'function') {
-                    taskSyncBridge.clearAll();
-                }
-            } catch (e) {
-                log('DEBUG', `[LIFECYCLE] TaskSyncBridge.clearAll() skipped: ${e && e.message ? e.message : String(e)}`);
-            }
-
-            try {
-                if (typeof stopTokenCleanup === 'function') {
-                    stopTokenCleanup();
-                }
-            } catch (e) {
-                log('DEBUG', `[LIFECYCLE] stopPeriodicCleanup() skipped: ${e && e.message ? e.message : String(e)}`);
-            }
-        } catch (e) {
-            log('DEBUG', `[LIFECYCLE] Dashboard shutdown modules skipped: ${e && e.message ? e.message : String(e)}`);
-        }
-
-        try {
-            if (ssotEventFeed && typeof ssotEventFeed.stop === 'function') {
-                ssotEventFeed.stop();
-            }
-        } catch (e) {
-            log('DEBUG', `[LIFECYCLE] SSOTEventFeed.stop() skipped: ${e && e.message ? e.message : String(e)}`);
+        if (
+            !stopResults.some(result => result.id === 'telemetry_aggregator' && result.ok) &&
+            telemetryAggregator &&
+            typeof telemetryAggregator.stop === 'function'
+        ) {
+            await telemetryAggregator.stop();
         }
 
         // 3. DESATIVAÇÃO DO HUB DE EVENTOS (SOCKET.IO)
         // [V600] Desconecta agentes e limpa o Registry de forma assíncrona.
+        const socketStoppedByRegistry = stopResults.some(result => result.id === 'socket_hub' && result.ok);
         log('DEBUG', '[LIFECYCLE] Desconectando agentes e limpando barramento IPC...');
-        if (socketHub && typeof socketHub.stop === 'function') {
+        if (!socketStoppedByRegistry && socketHub && typeof socketHub.stop === 'function') {
             await socketHub.stop();
         }
 

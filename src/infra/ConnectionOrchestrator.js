@@ -285,7 +285,11 @@ class ConnectionOrchestrator {
             } catch (e) {
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
-                throw new Error(error, { cause: e });
+                errors.push(error);
+                if (!this.config.autoFallback) {
+                    throw new Error(error, { cause: e });
+                }
+                log('WARN', '[ORCH] Fast path falhou; tentando fallback de hosts/ports');
             }
         }
 
@@ -344,7 +348,11 @@ class ConnectionOrchestrator {
             } catch (e) {
                 const error = `browserEndpoint.wsEndpoint (${this.config.browserEndpoint.wsEndpoint}): ${e.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
-                throw new Error(error, { cause: e });
+                errors.push(error);
+                if (!this.config.autoFallback) {
+                    throw new Error(error, { cause: e });
+                }
+                log('WARN', '[ORCH] Fast path wsEndpoint falhou; tentando resolução/fallback');
             }
         }
 
@@ -355,31 +363,40 @@ class ConnectionOrchestrator {
                 log('INFO', `[ORCH] [FAST PATH] Resolvendo wsEndpoint via: ${url}`);
 
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                let timeoutId = null;
+                try {
+                    timeoutId = setTimeout(() => controller.abort(), 5000);
+                    const res = await fetch(url, { signal: controller.signal });
 
-                const res = await fetch(url, { signal: controller.signal });
-                clearTimeout(timeoutId);
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}`);
+                    }
 
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status}`);
+                    /** @type {{ webSocketDebuggerUrl?: string }} */
+                    const json = await res.json();
+                    if (!json.webSocketDebuggerUrl) {
+                        throw new Error('No webSocketDebuggerUrl in response');
+                    }
+
+                    log('INFO', `[ORCH] ✅ WebSocket URL resolvido: ${json.webSocketDebuggerUrl}`);
+                    return await puppeteerCore.connect({
+                        browserWSEndpoint: json.webSocketDebuggerUrl,
+                        defaultViewport: null,
+                        protocolTimeout: 10000
+                    });
+                } finally {
+                    if (timeoutId !== null) {
+                        clearTimeout(timeoutId);
+                    }
                 }
-
-                /** @type {{ webSocketDebuggerUrl?: string }} */
-                const json = await res.json();
-                if (!json.webSocketDebuggerUrl) {
-                    throw new Error('No webSocketDebuggerUrl in response');
-                }
-
-                log('INFO', `[ORCH] ✅ WebSocket URL resolvido: ${json.webSocketDebuggerUrl}`);
-                return await puppeteerCore.connect({
-                    browserWSEndpoint: json.webSocketDebuggerUrl,
-                    defaultViewport: null,
-                    protocolTimeout: 10000
-                });
             } catch (e) {
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
-                throw new Error(error, { cause: e });
+                errors.push(error);
+                if (!this.config.autoFallback) {
+                    throw new Error(error, { cause: e });
+                }
+                log('WARN', '[ORCH] Fast path browserEndpoint.url falhou; tentando fallback de hosts/ports');
             }
         }
 
@@ -398,10 +415,16 @@ class ConnectionOrchestrator {
                     log('DEBUG', `[ORCH] ${attemptType} Tentando WS endpoint: ${url}`);
 
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-                    const res = await fetch(url, { signal: controller.signal });
-                    clearTimeout(timeoutId);
+                    let timeoutId = null;
+                    let res;
+                    try {
+                        timeoutId = setTimeout(() => controller.abort(), 5000);
+                        res = await fetch(url, { signal: controller.signal });
+                    } finally {
+                        if (timeoutId !== null) {
+                            clearTimeout(timeoutId);
+                        }
+                    }
 
                     if (!res.ok) {
                         errors.push(`${host}:${port} - HTTP ${res.status}`);

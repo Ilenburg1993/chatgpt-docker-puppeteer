@@ -22,6 +22,7 @@ import {
     ragQuery,
 } from '../../../../tools/rag/lib/facade.mjs';
 import { resolveRagScopeConfig } from '../../../../tools/rag/lib/scope_config.mjs';
+import { asRecord } from '#types/guards';
 
 /**
  * Handler para POST /api/rag/ask - Busca semântica com output em Markdown.
@@ -190,7 +191,7 @@ export async function handleRagHealth(req, res) {
  */
 export async function handleRagIndex(req, res) {
   try {
-    const body = /** @type {unknown} */ (req.body || {});
+    const body = asRecord(req.body || {});
     const {
       root,
       profile,

@@ -128,7 +128,7 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                     let node = walker.currentNode;
 
                     while (node) {
-                        if (node.nodeType === 1) {
+                        if (node instanceof Element) {
                             if (node.matches(selector)) {
                                 // False positive filter: must be visible and have non-zero rects.
                                 const rects = node.getClientRects();
@@ -140,10 +140,12 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                                     }
                                 }
                             }
-                            if (node.shadowRoot && checkSpinnersDeep(node.shadowRoot)) return true;
+                            const nodeWithShadow = /** @type {Element & {shadowRoot?: ShadowRoot|null}} */ (node);
+                            const nodeWithContent = /** @type {Element & {contentDocument?: Document|null}} */ (node);
+                            if (nodeWithShadow.shadowRoot && checkSpinnersDeep(nodeWithShadow.shadowRoot)) return true;
                             if (node.tagName === 'IFRAME') {
                                 try {
-                                    if (node.contentDocument && checkSpinnersDeep(node.contentDocument)) return true;
+                                    if (nodeWithContent.contentDocument && checkSpinnersDeep(nodeWithContent.contentDocument)) return true;
                                 } catch (_err) {
                                     // Ignore cross-origin iframe access errors
                                 }
@@ -429,16 +431,18 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                     /** @type {unknown} */
                                     let node = walker.nextNode();
                                     while (node) {
-                                        if (node.nodeType === 1) {
-                                            if (node.shadowRoot) {
-                                                roots.push(node.shadowRoot);
-                                                queue.push(node.shadowRoot);
+                                        if (node instanceof Element) {
+                                            const nodeWithShadow = /** @type {Element & {shadowRoot?: ShadowRoot|null}} */ (node);
+                                            const nodeWithContent = /** @type {Element & {contentDocument?: Document|null}} */ (node);
+                                            if (nodeWithShadow.shadowRoot) {
+                                                roots.push(nodeWithShadow.shadowRoot);
+                                                queue.push(nodeWithShadow.shadowRoot);
                                             }
                                             if (node.tagName === 'IFRAME') {
                                                 try {
-                                                    if (node.contentDocument) {
-                                                        roots.push(node.contentDocument);
-                                                        queue.push(node.contentDocument);
+                                                    if (nodeWithContent.contentDocument) {
+                                                        roots.push(nodeWithContent.contentDocument);
+                                                        queue.push(nodeWithContent.contentDocument);
                                                     }
                                                 } catch (_err) {
                                                     // Ignore cross-origin iframe access errors

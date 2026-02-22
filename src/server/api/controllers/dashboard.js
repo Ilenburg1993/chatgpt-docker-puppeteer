@@ -119,9 +119,12 @@ router.post('/auth/login', async (req, res) => {
                 rbacUser = getRbacUserByUsername(credentials.username) || {
                     id: credentials.username,
                     username: credentials.username,
+                    active: true,
                     role: credentials.role,
                     roles: [credentials.role],
                     permissions: [],
+                    created_at_ms: Date.now(),
+                    updated_at_ms: Date.now(),
                 };
             }
 

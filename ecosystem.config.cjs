@@ -95,6 +95,7 @@ module.exports = {
             log_rotate_max: 7, // Manter últimos 7 dias
 
             // Ambiente
+            filter_env: ['NO_COLOR'],
             env: {
                 NODE_ENV: 'development',
                 FORCE_COLOR: '1',
@@ -161,6 +162,7 @@ module.exports = {
             env_file: './.env.local',
 
             // Ambiente
+            filter_env: ['NO_COLOR'],
             env: {
                 PORT: 3008,
                 NODE_ENV: 'development',
@@ -212,6 +214,7 @@ module.exports = {
             ],
 
             // Environment variables
+            filter_env: ['NO_COLOR'],
             env: {
                 NODE_ENV: 'development',
                 CHROME_HOST: 'host.docker.internal', // Docker Desktop → Windows

@@ -165,6 +165,12 @@ const ConfigSchema = z
         CONTROL_REQUIRE_REASON: z.boolean().default(process.env.CONTROL_REQUIRE_REASON !== 'false'),
         CONTROL_REQUIRE_IDEMPOTENCY_KEY: z.boolean().default(process.env.CONTROL_REQUIRE_IDEMPOTENCY_KEY !== 'false'),
         CONTROL_STRICT_PAUSE_TO_EDIT: z.boolean().default(process.env.CONTROL_STRICT_PAUSE_TO_EDIT !== 'false'),
+        MAESTRO_ENTRY_AUTOSTART: z.boolean().default(process.env.MAESTRO_ENTRY_AUTOSTART === 'true'),
+        BOOT_RETRY_BASE_MS: z.number().int().min(10).default(1000),
+        BOOT_RETRY_MAX_MS: z.number().int().min(10).default(8000),
+        BOOT_RETRY_MAX_ATTEMPTS: z.number().int().min(1).max(100).default(10),
+        BOOT_DEGRADED_READY_ALLOWED: z.boolean().default(process.env.BOOT_DEGRADED_READY_ALLOWED !== 'false'),
+        MCP_UPSTREAM_INSTALL_GLOBAL_HOOK: z.boolean().default(process.env.MCP_UPSTREAM_INSTALL_GLOBAL_HOOK === 'true'),
         RBAC_BOOTSTRAP_OWNER_USERNAME: z.string().default(process.env.RBAC_BOOTSTRAP_OWNER_USERNAME || ''),
         RBAC_BOOTSTRAP_OWNER_PASSWORD: z.string().default(process.env.RBAC_BOOTSTRAP_OWNER_PASSWORD || ''),
         UI_PREFS_PERSISTENCE: z.enum(['sqlite']).default('sqlite'),
@@ -449,6 +455,24 @@ class ConfigurationManager extends EventEmitter {
     get CONTROL_STRICT_PAUSE_TO_EDIT() {
         return this.currentConfig.CONTROL_STRICT_PAUSE_TO_EDIT;
     }
+    get MAESTRO_ENTRY_AUTOSTART() {
+        return this.currentConfig.MAESTRO_ENTRY_AUTOSTART;
+    }
+    get BOOT_RETRY_BASE_MS() {
+        return this.currentConfig.BOOT_RETRY_BASE_MS;
+    }
+    get BOOT_RETRY_MAX_MS() {
+        return this.currentConfig.BOOT_RETRY_MAX_MS;
+    }
+    get BOOT_RETRY_MAX_ATTEMPTS() {
+        return this.currentConfig.BOOT_RETRY_MAX_ATTEMPTS;
+    }
+    get BOOT_DEGRADED_READY_ALLOWED() {
+        return this.currentConfig.BOOT_DEGRADED_READY_ALLOWED;
+    }
+    get MCP_UPSTREAM_INSTALL_GLOBAL_HOOK() {
+        return this.currentConfig.MCP_UPSTREAM_INSTALL_GLOBAL_HOOK;
+    }
     get RBAC_BOOTSTRAP_OWNER_USERNAME() {
         return this.currentConfig.RBAC_BOOTSTRAP_OWNER_USERNAME;
     }
@@ -584,7 +608,7 @@ class ConfigurationManager extends EventEmitter {
             }
 
             return val;
-        } catch (e) {
+        } catch (_e) {
             // Fail-safe: never throw from config getter
             return fallback;
         }

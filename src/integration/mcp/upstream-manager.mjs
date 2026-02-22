@@ -16,6 +16,7 @@
 
 import { createMcpHttpClient } from './upstream-http.mjs';
 import { MCPStdioUpstreamClient } from './upstream-stdio-sdk.mjs';
+import { computeExponentialBackoffDelay, readPositiveInt } from '../../core/retry_policy.js';
 
 function safeJsonParse(s) {
     try {
@@ -148,6 +149,14 @@ function cleanupShutdownHook() {
     _shutdownHookInstalled = false;
 }
 
+function envFlag(raw, fallback = false) {
+    if (raw === undefined || raw === null || raw === '') return fallback;
+    const value = String(raw).trim().toLowerCase();
+    if (value === '1' || value === 'true' || value === 'yes' || value === 'on') return true;
+    if (value === '0' || value === 'false' || value === 'no' || value === 'off') return false;
+    return fallback;
+}
+
 function setStatus(next) {
     _status.upstreams = next;
 }
@@ -263,15 +272,17 @@ function buildChildEnv(env, envFrom) {
 }
 
 function getRestartConfig(env) {
-    const enabled = String(env.MCP_UPSTREAM_RESTART_ENABLED || '') === 'true';
-    const baseBackoffMs = Number(env.MCP_UPSTREAM_RESTART_BACKOFF_MS || 5000);
+    const enabled = envFlag(env.MCP_UPSTREAM_RESTART_ENABLED, false);
+    const baseBackoffMs = readPositiveInt(env.MCP_UPSTREAM_RESTART_BACKOFF_MS || env.BOOT_RETRY_BASE_MS, 5000);
+    const maxBackoffMs = readPositiveInt(env.MCP_UPSTREAM_RESTART_MAX_BACKOFF_MS || env.BOOT_RETRY_MAX_MS, 60000);
     const rawMax = Number(env.MCP_UPSTREAM_RESTART_MAX ?? 10);
     const maxRetries = !Number.isFinite(rawMax) ? 10 : rawMax === 0 ? Infinity : Math.max(0, rawMax);
 
     return {
         enabled,
-        baseBackoffMs: Number.isFinite(baseBackoffMs) && baseBackoffMs > 0 ? baseBackoffMs : 5000,
-        maxRetries
+        baseBackoffMs,
+        maxBackoffMs,
+        maxRetries,
     };
 }
 
@@ -299,7 +310,7 @@ function scheduleRetry(cfg, registry, env, options) {
     if (existing.attempts >= restart.maxRetries) return;
 
     existing.attempts += 1;
-    const delayMs = Math.min(restart.baseBackoffMs * (2 ** (existing.attempts - 1)), 60_000);
+    const delayMs = computeExponentialBackoffDelay(existing.attempts, restart.baseBackoffMs, restart.maxBackoffMs);
 
     existing.timer = setTimeout(async () => {
         existing.timer = null;
@@ -512,13 +523,15 @@ function markUpstreamCallFailure(cfg, err, registry, env, restart) {
  * Register tools from all enabled upstreams into the local registry.
  *
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
- * @param {{ env?: Record<string, any> }} [options]
+ * @param {{ env?: Record<string, any>, installShutdownHook?: boolean }} [options]
  * @returns {Promise<{upstreams: UpstreamStatus[]}>}
  */
 export async function registerUpstreams(registry, options = {}) {
     const env = options.env || process.env;
     const refresh = String(env.MCP_UPSTREAM_REFRESH || '') === 'true';
     const restart = getRestartConfig(env);
+    const installShutdownHook =
+        options.installShutdownHook ?? envFlag(env.MCP_UPSTREAM_INSTALL_GLOBAL_HOOK, true);
 
     const configs = parseUpstreamsFromEnv(env);
     if (configs.length === 0) {
@@ -527,7 +540,11 @@ export async function registerUpstreams(registry, options = {}) {
         return getUpstreamStatus();
     }
 
-    ensureShutdownHook();
+    if (installShutdownHook) {
+        ensureShutdownHook();
+    } else {
+        cleanupShutdownHook();
+    }
 
     /** @type {UpstreamStatus[]} */
     const statuses = [];

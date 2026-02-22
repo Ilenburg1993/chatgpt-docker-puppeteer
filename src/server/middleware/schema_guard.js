@@ -23,7 +23,7 @@ const schemaGuard = schema => (req, res, next) => {
 
     // 2. Execução da Validação "Safe"
     // safeParse não lança exceções, permitindo controle total sobre o fluxo de erro.
-    const result = /** @type {unknown} */ (schema.safeParse(req.body));
+    const result = /** @type {any} */ (schema.safeParse(req.body));
 
     if (!result.success) {
         // 3. Formatação Amigável de Erros

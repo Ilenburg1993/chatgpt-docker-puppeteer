@@ -4,6 +4,7 @@ import { recordEvent } from '#infra/db/events_repo';
 import { STEP_STATUS, syncMissionStepsFromWorkflow } from '#infra/db/mission_step_repo';
 import { AUTONOMY_MODES, createMission } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
+import { asRecord } from '#types/guards';
 
 const MISSION_STATUS = Object.freeze({
     READY: 'READY',
@@ -14,7 +15,9 @@ const MISSION_STATUS = Object.freeze({
     CANCELLED: 'CANCELLED',
 });
 
+/** @type {Set<string>} */
 const TERMINAL_MISSION = new Set([MISSION_STATUS.DONE, MISSION_STATUS.FAILED, MISSION_STATUS.CANCELLED]);
+/** @type {Set<string>} */
 const EDITABLE_MISSION = new Set([MISSION_STATUS.READY, MISSION_STATUS.PAUSED]);
 
 function _now() {
@@ -220,18 +223,23 @@ function _recordMissionEvents({ missionId, actorId, actorType = 'user', operatio
 }
 
 function createMissionCommand({ actor = {}, reason, payload = {} }) {
-    const title = String(payload?.title || '').trim();
+    const actorView = asRecord(actor);
+    const payloadView = asRecord(payload);
+    const title = String(payloadView.title || '').trim();
     if (!title) {
         throw _error(422, 'MISSION_TITLE_REQUIRED', 'title é obrigatório para criar missão');
     }
 
-    const description = String(payload?.description || '');
-    const autonomyModeRaw = payload?.autonomy_mode ?? payload?.autonomyMode ?? AUTONOMY_MODES.USER_ONLY;
-    const autonomyMode = Object.values(AUTONOMY_MODES).includes(String(autonomyModeRaw))
+    const description = String(payloadView.description || '');
+    const autonomyModeRaw = payloadView.autonomy_mode ?? payloadView.autonomyMode ?? AUTONOMY_MODES.USER_ONLY;
+    const autonomyModeValues = /** @type {string[]} */ (Object.values(AUTONOMY_MODES));
+    const autonomyMode = autonomyModeValues.includes(String(autonomyModeRaw))
         ? String(autonomyModeRaw)
         : AUTONOMY_MODES.USER_ONLY;
-    const policy = payload?.policy && typeof payload.policy === 'object' ? payload.policy : {};
-    const context = payload?.context && typeof payload.context === 'object' ? payload.context : {};
+    /** @type {Record<string, unknown>} */
+    const policy = payloadView.policy && typeof payloadView.policy === 'object' ? asRecord(payloadView.policy) : {};
+    /** @type {Record<string, unknown>} */
+    const context = payloadView.context && typeof payloadView.context === 'object' ? asRecord(payloadView.context) : {};
 
     const created = createMission({
         title,
@@ -248,7 +256,7 @@ function createMissionCommand({ actor = {}, reason, payload = {} }) {
 
     _recordMissionEvents({
         missionId: after.id,
-        actorId: actor?.id || actor?.username || null,
+        actorId: actorView.id || actorView.username || null,
         actorType: 'user',
         operation: 'MISSION_CREATE',
         before: null,
@@ -269,6 +277,7 @@ function createMissionCommand({ actor = {}, reason, payload = {} }) {
 }
 
 function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' }) {
+    const actorView = asRecord(actor);
     const db = getDb();
 
     const result = db.transaction(() => {
@@ -290,7 +299,7 @@ function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null
     _syncMissionStepsForMission(result.after);
     _recordMissionEvents({
         missionId,
-        actorId: actor?.id || actor?.username || null,
+        actorId: actorView.id || actorView.username || null,
         actorType: 'user',
         operation: command,
         before: result.before,
@@ -302,6 +311,7 @@ function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null
 }
 
 function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
+    const actorView = asRecord(actor);
     const db = getDb();
 
     const result = db.transaction(() => {
@@ -319,7 +329,7 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
 
     _recordMissionEvents({
         missionId,
-        actorId: actor?.id || actor?.username || null,
+        actorId: actorView.id || actorView.username || null,
         actorType: 'user',
         operation: 'MISSION_PAUSE',
         before: result.before,
@@ -331,6 +341,7 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
 }
 
 function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
+    const actorView = asRecord(actor);
     const db = getDb();
 
     const result = db.transaction(() => {
@@ -348,7 +359,7 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
 
     _recordMissionEvents({
         missionId,
-        actorId: actor?.id || actor?.username || null,
+        actorId: actorView.id || actorView.username || null,
         actorType: 'user',
         operation: 'MISSION_RESUME',
         before: result.before,
@@ -365,7 +376,8 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
     const result = db.transaction(() => {
         const row = _readMissionRowTx(db, missionId);
         _assertIfVersion(row, ifVersion);
-        if (TERMINAL_MISSION.has(String(row.status || '').toUpperCase())) {
+        const rowStatus = String(row.status || '').toUpperCase();
+        if (TERMINAL_MISSION.has(rowStatus)) {
             throw _error(409, 'MISSION_TERMINAL', 'Missão já está terminal', { status: row.status });
         }
 
@@ -388,7 +400,7 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
 
     _recordMissionEvents({
         missionId,
-        actorId: actor?.id || actor?.username || null,
+        actorId: asRecord(actor).id || asRecord(actor).username || null,
         actorType: 'user',
         operation: 'MISSION_CANCEL',
         before: result.before,
@@ -406,7 +418,7 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
                     entityType: 'task',
                     entityId: taskId,
                     actorType: 'user',
-                    actorId: actor?.id || actor?.username || null,
+                    actorId: asRecord(actor).id || asRecord(actor).username || null,
                     eventType: 'TASK_CANCELLED_BY_MISSION',
                     payload: { mission_id: missionId, reason },
                     dedupKey: `task:${taskId}:cancelled_by_mission:${result.after.updated_at_ms}`,
@@ -421,6 +433,8 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
 }
 
 function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, patch = {} }) {
+    const actorView = asRecord(actor);
+    const patchView = asRecord(patch);
     const db = getDb();
 
     const result = db.transaction(() => {
@@ -434,9 +448,9 @@ function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, 
         }
 
         const updatedRow = _updateMissionTx(db, row, {
-            title: patch.title,
-            description: patch.description,
-            autonomy_mode: patch.autonomy_mode,
+            title: patchView.title,
+            description: patchView.description,
+            autonomy_mode: patchView.autonomy_mode,
         });
 
         return { before: _rowToMission(row), after: _rowToMission(updatedRow), metadata: {} };
@@ -444,7 +458,7 @@ function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, 
 
     _recordMissionEvents({
         missionId,
-        actorId: actor?.id || actor?.username || null,
+        actorId: actorView.id || actorView.username || null,
         actorType: 'user',
         operation: 'MISSION_PATCH',
         before: result.before,
@@ -456,6 +470,7 @@ function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, 
 }
 
 function setMissionPolicyCommand({ missionId, actor = {}, reason, ifVersion = null, policy = null, autonomyMode = null }) {
+    const actorView = asRecord(actor);
     const db = getDb();
 
     const result = db.transaction(() => {
@@ -481,7 +496,7 @@ function setMissionPolicyCommand({ missionId, actor = {}, reason, ifVersion = nu
 
     _recordMissionEvents({
         missionId,
-        actorId: actor?.id || actor?.username || null,
+        actorId: actorView.id || actorView.username || null,
         actorType: 'user',
         operation: 'MISSION_SET_POLICY',
         before: result.before,
@@ -493,6 +508,7 @@ function setMissionPolicyCommand({ missionId, actor = {}, reason, ifVersion = nu
 }
 
 function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion = null, stepOrder = [] }) {
+    const actorView = asRecord(actor);
     const db = getDb();
 
     const result = db.transaction(() => {
@@ -551,7 +567,7 @@ function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion =
 
     _recordMissionEvents({
         missionId,
-        actorId: actor?.id || actor?.username || null,
+        actorId: actorView.id || actorView.username || null,
         actorType: 'user',
         operation: 'MISSION_REORDER_STEPS',
         before: result.before,

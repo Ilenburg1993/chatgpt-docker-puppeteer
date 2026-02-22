@@ -2,6 +2,7 @@
 import * as hardware from '#core/hardware';
 import CONFIG from '#core/config';
 import { log } from '#core/logger';
+import { getRuntimeReadinessSummary } from '#core/runtime_resource_registry';
 import { LOG_DIR, ROOT } from '#infra/fs/fs_utils';
 import compression from 'compression';
 import cors from 'cors';
@@ -163,7 +164,9 @@ function updateCorsOrigins() {
 
 // Inicializa e escuta mudanças
 updateCorsOrigins();
-CONFIG.on('updated', updateCorsOrigins);
+if (typeof /** @type {any} */ (CONFIG).on === 'function') {
+    /** @type {any} */ (CONFIG).on('updated', updateCorsOrigins);
+}
 
 app.use(
     cors({
@@ -340,6 +343,14 @@ app.get('/health', (req, res) => {
 app.get('/ready', (req, res) => {
     try {
         const runtime = app.locals && app.locals.runtimeReadiness ? app.locals.runtimeReadiness : null;
+        const runtimeResources =
+            app.locals && typeof app.locals.getRuntimeResourcesStatus === 'function'
+                ? app.locals.getRuntimeResourcesStatus()
+                : getRuntimeReadinessSummary({
+                      owner: 'dashboard-web',
+                      requiredComponents: ['http_server'],
+                      allowDegradedReady: CONFIG.BOOT_DEGRADED_READY_ALLOWED !== false,
+                  });
         const mcpBase = app.locals && app.locals.mcp ? app.locals.mcp : null;
         const hardwareMetrics = typeof hardware.getAllMetrics === 'function' ? hardware.getAllMetrics() : {};
 
@@ -382,8 +393,14 @@ app.get('/ready', (req, res) => {
             status = allReady ? 'ready' : 'not-ready';
         }
 
+        if (runtimeResources?.status === 'not-ready') {
+            status = 'not-ready';
+        } else if (status === 'ready' && runtimeResources?.status === 'degraded') {
+            status = 'degraded';
+        }
+
         const payload = Object.assign(
-            { status, ts: Date.now(), runtime, mcp, rag: readRagReadiness() },
+            { status, ts: Date.now(), runtime, runtime_resources: runtimeResources, mcp, rag: readRagReadiness() },
             hardwareMetrics || {}
         );
         res.json(payload);

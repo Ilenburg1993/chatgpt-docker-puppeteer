@@ -5,6 +5,7 @@ import { recordEvent } from '#infra/db/events_repo';
 import { getMissionById } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
 import { getTaskById, insertTask, purgeTask, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
+import { asRecord } from '#types/guards';
 import { v4 as uuidv4 } from 'uuid';
 
 const TERMINAL_TASK = new Set(['DONE', 'FAILED', 'CANCELLED', 'SKIPPED']);
@@ -239,13 +240,15 @@ function _isTaskBoundToMissionStep(db, row, task) {
 }
 
 function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = false }) {
-    const task = _buildTaskV5FromPayload(payload);
-    const stage = String(payload?.stage || TASK_STAGES.READY).toUpperCase();
-    const status = String(payload?.status || 'PENDING').toUpperCase();
+    const actorView = asRecord(actor);
+    const payloadView = asRecord(payload);
+    const task = _buildTaskV5FromPayload(payloadView);
+    const stage = String(payloadView.stage || TASK_STAGES.READY).toUpperCase();
+    const status = String(payloadView.status || 'PENDING').toUpperCase();
     const created = insertTask(task, {
         stage,
         status,
-        actor: actor?.username || actor?.id || 'user',
+        actor: String(actorView.username || actorView.id || 'user'),
         ifNotExists,
     });
 
@@ -269,11 +272,12 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
 }
 
 function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch = {} }) {
+    const patchView = asRecord(patch);
     const db = getDb();
     const row = _readTaskRowTx(db, taskId);
     _assertIfVersion(row, ifVersion);
     _assertPauseToEditTask(row);
-    if (_patchTouchesMissionBinding(patch)) {
+    if (_patchTouchesMissionBinding(patchView)) {
         throw _error(
             422,
             'TASK_MISSION_REASSIGN_USE_COMMAND',
@@ -290,33 +294,39 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
         ...existingTask,
         meta: {
             ...(existingTask.meta || {}),
-            ...(patch.meta && typeof patch.meta === 'object' ? patch.meta : {}),
+            ...(patchView.meta && typeof patchView.meta === 'object' ? patchView.meta : {}),
             priority:
-                patch.priority !== undefined
-                    ? Number(patch.priority) || Number(existingTask?.meta?.priority || 5)
+                patchView.priority !== undefined
+                    ? Number(patchView.priority) || Number(existingTask?.meta?.priority || 5)
                     : Number(existingTask?.meta?.priority || 5),
         },
         spec: {
             ...(existingTask.spec || {}),
-            ...(patch.spec && typeof patch.spec === 'object' ? patch.spec : {}),
-            target: patch.target !== undefined ? String(patch.target).toLowerCase().trim() : existingTask.spec?.target,
-            model: patch.model !== undefined ? patch.model : existingTask.spec?.model,
+            ...(patchView.spec && typeof patchView.spec === 'object' ? patchView.spec : {}),
+            target:
+                patchView.target !== undefined ? String(patchView.target).toLowerCase().trim() : existingTask.spec?.target,
+            model: patchView.model !== undefined ? patchView.model : existingTask.spec?.model,
             payload: {
                 ...(existingTask.spec?.payload || {}),
-                ...(patch.spec?.payload && typeof patch.spec.payload === 'object' ? patch.spec.payload : {}),
-                ...(patch.user_message !== undefined ? { user_message: String(patch.user_message || '') } : {}),
-                ...(patch.system_message !== undefined ? { system_message: String(patch.system_message || '') } : {}),
+                ...(() => {
+                    const patchSpec = asRecord(patchView.spec);
+                    return patchSpec.payload && typeof patchSpec.payload === 'object' ? patchSpec.payload : {};
+                })(),
+                ...(patchView.user_message !== undefined ? { user_message: String(patchView.user_message || '') } : {}),
+                ...(patchView.system_message !== undefined
+                    ? { system_message: String(patchView.system_message || '') }
+                    : {}),
             },
         },
         policy: {
             ...(existingTask.policy || {}),
-            ...(patch.policy && typeof patch.policy === 'object' ? patch.policy : {}),
-            ...(patch.execute_after_ms !== undefined
+            ...(patchView.policy && typeof patchView.policy === 'object' ? patchView.policy : {}),
+            ...(patchView.execute_after_ms !== undefined
                 ? {
                       execute_after:
-                          patch.execute_after_ms === null
+                          patchView.execute_after_ms === null
                               ? null
-                              : new Date(Number(patch.execute_after_ms) || Date.now()).toISOString(),
+                              : new Date(Number(patchView.execute_after_ms) || Date.now()).toISOString(),
                   }
                 : {}),
         },
@@ -324,14 +334,15 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
 
     const updated = updateTask(taskId, {
         task: nextTask,
-        stage: patch.stage ? String(patch.stage).toUpperCase() : undefined,
-        status: patch.status ? String(patch.status).toUpperCase() : undefined,
-        execute_after_ms: patch.execute_after_ms,
-        dependencies: patch.dependencies,
-        blocked_reason: patch.blocked_reason,
+        stage: patchView.stage ? String(patchView.stage).toUpperCase() : undefined,
+        status: patchView.status ? String(patchView.status).toUpperCase() : undefined,
+        execute_after_ms: patchView.execute_after_ms,
+        dependencies: patchView.dependencies,
+        blocked_reason: patchView.blocked_reason,
         blocked_details_json:
-            patch.blocked_details !== undefined ? JSON.stringify(patch.blocked_details ?? null) : undefined,
+            patchView.blocked_details !== undefined ? JSON.stringify(patchView.blocked_details ?? null) : undefined,
     });
+    const updatedView = /** @type {any} */ (updated);
 
     _recordTaskEvent({
         taskId,
@@ -340,7 +351,7 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
         reason,
         payload: {
             from_status: row.status,
-            to_status: updated?.unified_status || row.status,
+            to_status: updatedView?.unified_status || row.status,
         },
     });
 
@@ -610,6 +621,7 @@ function purgeTaskCommand({ taskId, actor = {}, reason }) {
 
 function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reason }) {
     const normalized = Array.isArray(ids) ? ids.map(id => String(id)).filter(Boolean) : [];
+    const paramsView = asRecord(params);
     if (normalized.length === 0) {
         throw _error(400, 'TASK_BULK_IDS_REQUIRED', 'ids vazio');
     }
@@ -644,13 +656,13 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                     result = patchTaskCommand({ taskId, actor, reason, patch: { stage: 'REJECTED' } });
                     break;
                 case 'SET_STAGE':
-                    result = patchTaskCommand({ taskId, actor, reason, patch: { stage: params?.stage } });
+                    result = patchTaskCommand({ taskId, actor, reason, patch: { stage: paramsView.stage } });
                     break;
                 case 'SET_TARGET':
-                    result = patchTaskCommand({ taskId, actor, reason, patch: { target: params?.target } });
+                    result = patchTaskCommand({ taskId, actor, reason, patch: { target: paramsView.target } });
                     break;
                 case 'SET_PRIORITY':
-                    result = patchTaskCommand({ taskId, actor, reason, patch: { priority: params?.priority } });
+                    result = patchTaskCommand({ taskId, actor, reason, patch: { priority: paramsView.priority } });
                     break;
                 case 'SET_EXECUTE_AFTER':
                     result = patchTaskCommand({
@@ -658,7 +670,7 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                         actor,
                         reason,
                         patch: {
-                            execute_after_ms: params?.execute_after_ms ?? null,
+                            execute_after_ms: paramsView.execute_after_ms ?? null,
                         },
                     });
                     break;
@@ -668,17 +680,17 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                         actor,
                         reason,
                         patch: {
-                            dependencies: params?.dependencies || [],
+                            dependencies: paramsView.dependencies || [],
                         },
                     });
                     break;
                 case 'REASSIGN_MISSION':
                     result = reassignTaskMissionCommand({
                         taskId,
-                        missionId: params?.mission_id,
+                        missionId: paramsView.mission_id,
                         actor,
                         reason,
-                        ifVersion: params?.if_version,
+                        ifVersion: paramsView.if_version,
                     });
                     break;
                 default:

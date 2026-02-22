@@ -183,7 +183,7 @@ router.get('/missions/:id', async (req, res) => {
             completed_at_ms: row.completed_at_ms ?? null,
         };
 
-        /** @type {unknown} */
+        /** @type {Record<string, unknown>} */
         const data = { mission };
 
         // Summary counts (always useful)

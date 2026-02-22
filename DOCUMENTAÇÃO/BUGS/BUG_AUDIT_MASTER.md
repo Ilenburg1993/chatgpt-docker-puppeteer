@@ -1,8 +1,8 @@
 # BUG_AUDIT_MASTER
 
-- Ultima atualizacao: 2026-02-21T10:21:35Z
-- Rodada: WAVE_AUDIT_QUICK_2026-02-21T10-20-30-099Z
-- Escopo: Wave 19 (`frontend hard cutover`, `MISSION_CREATE no control plane`, `realtime dedupe/cursor`, `presets operacionais`, `contracts/*`, `scripts/audit/*`) + governanca continua
+- Ultima atualizacao: 2026-02-22T04:17:18Z
+- Rodada: WAVE_AUDIT_QUICK_2026-02-22T04-16-03-246Z
+- Escopo: Wave 22 (`audit:quick canônico em p1`, `fallback warn explícito`, `normalização test:* com env -u NO_COLOR`, `diagnóstico de regressão ampla`) + governanca continua
 - Modo de entrega: implementacao completa das correcoes + validacao automatizada
 
 ## Trilha Contínua CODEX (Wave 12+)
@@ -11,7 +11,7 @@
 - Playbook operacional: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_PLAYBOOK.md`
 - Delta local de instruções: `DOCUMENTAÇÃO/BUGS/CODEX_DEFAULT_INSTRUCTIONS_DELTA.md`
 - Snapshot inicial da trilha: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-21_01-41.md`
-- Snapshot mais recente: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-21_10-20.md`
+- Snapshot mais recente: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-22_04-17.md`
 
 ## Automação Audit v2
 - Plano canônico: `DOCUMENTAÇÃO/BUGS/PLANO_MESTRE_UPGRADE_AUDITORIA_V2.md`
@@ -1602,3 +1602,31 @@ diff --git a/src/main.js b/src/main.js
 
 ### Resultado observado
 - Execução de validação (`audit:quick` controlado) encerrou com `progress_pct=100`, `remaining_step_keys=[]` e sem repetição infinita de heartbeat sem progresso de triagem.
+
+## Wave TYP-21 (2026-02-22)
+- Tracker canônico atualizado: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_TRACKER.md`
+- Snapshot: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-22_01-57.md`
+
+## Wave AUD-TYP-AQ1 (2026-02-22)
+- Tracker canônico atualizado: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_TRACKER.md`
+- Snapshot: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-22_03-20.md`
+
+## Wave AQ2 (2026-02-22)
+- Contratos v3 de quality (warn) + coverage/drift integrado
+- Snapshot: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-22_03-29.md`
+
+## Wave AQ3 (2026-02-22)
+- Cache + paralelismo + dedup no `collect-quality` com telemetria serializada (`quality_execution.cache|parallelism|dedup`)
+- Snapshot: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-22_03-40.md`
+
+## Wave AQ4 (2026-02-22)
+- Testes unitários de `impact_classifier` / engine JSDoc v2 / `collect-quality` (cenário smart leve)
+- `package.json` + `Makefile` atualizados com comandos de tuning (`serial`, `cache-off`, `deep-jsdoc`) e testes de quality
+- Skills de audit/contracts/typing atualizados (sem skill nova nesta rodada)
+- Snapshot: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-22_03-48.md`
+
+## Wave AQ5 (2026-02-22)
+- Testes de parser/fallback do `collect-quality` + parsers exportados para teste unitário
+- Rollout seletivo de contracts quality para `p1` (`node syntax`, `typecheck node/browser`, `ts-ignore`)
+- `audit:quick` validado sem bloqueio após promoção seletiva (`prettier/jsdoc` permanecem em `warn`)
+- Snapshot: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-22_03-56.md`

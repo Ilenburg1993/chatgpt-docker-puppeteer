@@ -122,6 +122,9 @@ function ensureBaseRbacData() {
     tx();
 }
 
+/**
+ * @param {{username:string, password:string, role?: string, active?: boolean}} params
+ */
 function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active = true }) {
     const db = getDb();
     const name = _normalizeUsername(username);
@@ -131,7 +134,8 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
 
     const now = _now();
     const passwordHash = _hashPassword(password);
-    const roleName = Object.values(RBAC_ROLES).includes(String(role)) ? String(role) : RBAC_ROLES.VIEWER;
+    const roleValues = /** @type {string[]} */ (Object.values(RBAC_ROLES));
+    const roleName = roleValues.includes(String(role)) ? String(role) : RBAC_ROLES.VIEWER;
 
     const existing = db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name);
     const userId = existing?.id || `usr-${uuidv4()}`;
@@ -163,6 +167,10 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
     return getRbacUserByUsername(name);
 }
 
+/**
+ * @param {string} username
+ * @returns {{id:string, username:string, active:boolean, roles:string[], role:string, permissions:string[], created_at_ms:number, updated_at_ms:number}|null}
+ */
 function getRbacUserByUsername(username) {
     const db = getDb();
     const name = _normalizeUsername(username);
@@ -195,7 +203,7 @@ function getRbacUserByUsername(username) {
         username: String(row.username),
         active: Number(row.active) === 1,
         roles,
-        role: roles[0] || RBAC_ROLES.VIEWER,
+        role: String(roles[0] || RBAC_ROLES.VIEWER),
         permissions,
         created_at_ms: Number(row.created_at_ms) || 0,
         updated_at_ms: Number(row.updated_at_ms) || 0,
@@ -228,13 +236,13 @@ function bootstrapRbacFromEnv() {
     const ownerPassword = String(process.env.RBAC_BOOTSTRAP_OWNER_PASSWORD || '');
 
     if (ownerUsername && ownerPassword.length >= 12) {
-        upsertRbacUser({ username: ownerUsername, password: ownerPassword, role: RBAC_ROLES.OWNER, active: true });
+        upsertRbacUser({ username: ownerUsername, password: ownerPassword, role: /** @type {string} */ (RBAC_ROLES.OWNER), active: true });
     }
 
     const dashboardUsername = _normalizeUsername(process.env.DASHBOARD_AUTH_USERNAME || 'admin');
     const dashboardPassword = String(process.env.DASHBOARD_AUTH_PASSWORD || 'admin123456789');
     if (dashboardUsername && dashboardPassword.length >= 12) {
-        upsertRbacUser({ username: dashboardUsername, password: dashboardPassword, role: RBAC_ROLES.ADMIN, active: true });
+        upsertRbacUser({ username: dashboardUsername, password: dashboardPassword, role: /** @type {string} */ (RBAC_ROLES.ADMIN), active: true });
     }
 }
 
