@@ -1,10 +1,48 @@
 # CODEX_AUDIT_TRACKER
 
-- Ultima atualizacao: 2026-02-22T04:58:05Z
+- Ultima atualizacao: 2026-02-22T12:42:10Z
 - Status: ativo (governanca continua)
 - Politica: bug-first (`P0/P1` no canal primario)
 - Canonico: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_TRACKER.md`
 - Alias solicitado: `DOCUMENTAÇÃO/bugs/CODEX_AUDIT_TRACKER.md`
+
+## Iniciativa Nova (Audit Agent LLM em Background)
+
+- Plano mestre canônico: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_AGENT_MASTER_PLAN.md`
+- Alias compatível: `DOCUMENTAÇÃO/bugs/CODEX_AUDIT_AGENT_MASTER_PLAN.md`
+- Status: implementação em andamento (`F0/F1` concluídas; `F2/F3/F4/F5/F6/F7/F8/F9` parciais implementadas)
+- Progresso recente:
+  - `Inference Gateway` runtime mínimo funcional (`generate/embed/listModels`) com `clientTag` obrigatório
+  - `ollama-host-supervisor` implementado (skeleton funcional com polling/circuit)
+  - `server/main` agora registra `ollama_host` no readiness via probe pontual (`ready/degraded`)
+  - `audit-agent` evoluiu para loop mínimo com jobs em memória + HTTP local (`/health`, `/metrics`, `/jobs`)
+  - `dashboard` ganhou endpoints de leitura `/api/dashboard/inference/{runtime,metrics,models}`
+  - `triage_llm` integrado ao `Audit Agent` via `Inference Gateway` (behind flag) com preflight de policy/profile (`/v1/validate/generate`)
+  - `dashboard_audit` agora expõe `llm_triage_summary` em list/detail de jobs (read-model compacto)
+  - wrappers de dashboard para mutações `AUDIT_*` e `INFERENCE_*` via control plane (sem terminal)
+  - `ecosystem.config.cjs` recebeu processos opcionais (`audit-agent`, `inference-gateway`,
+    `ollama-host-supervisor`) sob `ENABLE_AUDIT_AGENT_PM2_PROCESSES=true`
+- Decisão de arquitetura: `Audit Agent` + `Inference Gateway` + `Ollama host WSL` + `supervisor`
+  sidecar, com SSOT/control-plane obrigatório.
+- Observação anti-confusão: separar papéis entre `Audit Agent`, `Audit Runner`, `MCP`,
+  `LSP/TSServer`, `RAG` e LLMs externas do editor.
+
+### Rodada Atual (Audit Agent contínuo)
+
+- Escopo desta rodada: patch detail read-model + preflight de `audit_agent_patch` + guardrails de branch/path no `AUDIT_PATCH_APPLY`
+- Gates executados:
+  - `node --test` (patch-author runtime + control-plane persistence guards) -> **8/8 pass**
+  - `node --check` (arquivos alterados) -> **OK**
+  - `npm run typecheck:full` -> **OK**
+  - `eslint` direcionado -> **OK**
+  - `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+    - Run: `WAVE_AUDIT_QUICK_2026-02-22T12-41-54-404Z`
+    - `errors=0`, `warnings=0`, `partial=false`
+    - observação: cache miss em `quality.lint`/`quality.prettier_check` aumentou duração (~117s), sem quebrar gates
+- Próxima sequência natural:
+  1. read-model detalhado de `llm_patch_author` por job
+  2. schema/output mode mais estrito no `patch_author_llm`
+  3. esqueleto de apply real (`AUDIT_PATCH_APPLY`) com validação de branch limpa/dirty, ainda blocked-by-default
 
 ## Objetivo
 
@@ -743,3 +781,562 @@ Execução da próxima fase natural após `AQ5`: `audit:deep:jsdoc` para registr
 
 1. Sem rollback de código nesta rodada (execução/medição apenas).
 2. Manter contratos JSDoc em `warn` e baseline documentado.
+
+---
+
+# Wave AAG-F6/F9 (2026-02-22) — Audit Agent + Inference Gateway (avanço acelerado)
+
+## Resumo
+
+Implementação contínua de múltiplas fases do plano do `Audit Agent`, com foco em:
+1. `control_command_service` (comandos mínimos `AUDIT_*`/`INFERENCE_*`)
+2. `dashboard /api/dashboard/audit/*` (read-only V0)
+3. robustez de testes/proxy local para `audit-agent`
+
+## Correções / Implementações
+
+1. `src/server/domain/control_command_service.js`
+- adicionados comandos:
+  - `AUDIT_JOB_CREATE`
+  - `AUDIT_JOB_RUN`
+  - `AUDIT_JOB_CANCEL`
+  - `AUDIT_JOB_RETRY`
+  - `INFERENCE_PROFILE_VALIDATE`
+- proxy local para `audit-agent` (create/run/cancel/retry)
+- validação local de policy/route de inferência com `resolveInferencePolicy` + `validateInferenceRoute`
+
+2. `src/server/api/controllers/dashboard_audit.js` (novo)
+- endpoints V0:
+  - `/audit/runtime`
+  - `/audit/jobs`
+  - `/audit/jobs/:id`
+  - `/audit/jobs/:id/findings` (placeholder)
+  - `/audit/jobs/:id/patches` (placeholder)
+  - `/audit/watch-rules` (placeholder)
+
+3. `src/server/api/controllers/dashboard.js`
+- mount do `dashboardAuditRouter`
+
+4. `src/audit_agent/server.js`
+- `GET /jobs/:id` adicionado
+
+## Testes e Gates Executados
+
+1. `node --test tests/unit/audit_agent/test_audit_agent_server.spec.js tests/unit/server/test_control_command_service_audit_inference.spec.js` -> **5/5 pass**
+2. `npx eslint --quiet` (arquivos alterados) -> **OK**
+3. `npm run typecheck:full` -> **OK**
+4. `node --test tests/regression/test_wave20b_server_main_import_pm2_env_no_boot.spec.js tests/regression/test_wave20b_main_import_daemon_env_no_boot.spec.js` -> **2/2 pass**
+5. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T11-07-37-415Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. `audit-agent` ainda em memória (sem DB `audit_jobs/*`)
+2. `/api/dashboard/audit/*` com placeholders para findings/patches/watch-rules
+3. `AUDIT_PATCH_*` e `INFERENCE_*` avançados ainda não implementados no control plane
+
+## Próxima Rodada (escopo fechado)
+
+1. Persistência `audit_jobs`/`audit_job_runs` (Fase 4 parcial)
+2. `AUDIT_PATCH_*`/`AUDIT_WATCH_RULE_*` mínimos (stubs auditáveis) + `INFERENCE_*` persistidos
+3. `audit-agent` job manual real consumindo `Inference Gateway` + MCP (`lsp_*`/`rag_*`)
+
+---
+
+# Wave AAG-F4/F3 (2026-02-22) — Persistência SQLite (`audit_jobs/*` + `inference_*` mínimos)
+
+## Resumo
+
+Rodada acelerada de base de persistência para o `Audit Agent` e configuração avançada de inferência:
+1. migration v7 com tabelas `audit_jobs`, `audit_job_runs` e `inference_*` mínimos
+2. repos iniciais
+3. persistência SQLite opcional integrada ao runtime do `audit-agent`
+4. fallback de leitura em `/api/dashboard/audit/jobs*`
+
+## Implementado
+
+1. `src/infra/db/migrations.js`
+- migration `v7: audit_agent_and_inference_config`
+
+2. Repositórios novos
+- `src/infra/db/audit_job_repo.js`
+- `src/infra/db/audit_job_run_repo.js`
+- `src/infra/db/inference_profile_repo.js`
+- `src/infra/db/inference_client_policy_repo.js`
+
+3. `audit-agent` persistência mínima
+- `src/audit_agent/db_store.js`
+- `src/audit_agent/runtime.js` (save job snapshots + run start/finish)
+- `src/audit_agent/main.js` (store SQLite por padrão, com fallback em memória)
+
+4. `dashboard_audit` fallback
+- `src/server/api/controllers/dashboard_audit.js`
+- fallback para DB quando `audit-agent` local estiver indisponível
+
+## Gates / Evidências
+
+1. `node --test tests/unit/audit_agent/*.spec.js tests/unit/inference/*.spec.js tests/unit/server/test_control_command_service_audit_inference.spec.js` -> **22/22 pass**
+2. `npm run typecheck:full` -> **OK**
+3. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T11-20-35-842Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. `audit-agent` ainda não faz hidratação de jobs persistidos no startup
+2. `audit_job_findings` / `audit_patch_proposals` / `audit_watch_rules` ainda sem schema/repos
+3. `Inference Gateway` ainda não consome policies persistidas (`inference_client_policies`) em runtime
+
+## Próxima Rodada (escopo fechado)
+
+1. hidratação opcional de `audit_jobs` no startup do `audit-agent`
+2. schema/repos `audit_job_findings` + `audit_patch_proposals`
+3. job manual real com `Inference Gateway` + MCP (`lsp_*`, `rag_*`) em `read_only/propose_only`
+
+---
+
+# Wave AAG-F3/F4/F6/F9 (2026-02-22) — Policies DB-backed + Comandos de Patch/Watch/Inference + Dashboard Read APIs
+
+## Resumo
+
+Rodada de integração vertical do `Audit Agent` com:
+1. persistência de findings/patches/watch-rules
+2. `Inference Gateway` recarregando policies do SQLite
+3. expansão do `control_command_service` para `AUDIT_PATCH_*`, `AUDIT_WATCH_RULE_*` e `INFERENCE_*`
+4. endpoints de dashboard consumindo dados reais do domínio (`audit_*` e `inference_*`)
+
+## Correções / Implementações
+
+1. **Schema + repos (`audit_*`)**
+- `src/infra/db/migrations.js` (migration `v8`)
+- `src/infra/db/audit_finding_repo.js`
+- `src/infra/db/audit_patch_repo.js`
+- `src/infra/db/audit_watch_rule_repo.js`
+- `audit_patch_repo` com `updateAuditPatchProposal()`
+- `audit_watch_rule_repo` com `getAuditWatchRuleById()`
+
+2. **`audit-agent` persistência ampliada**
+- `src/audit_agent/runtime.js`
+  - persistência de findings e patch proposals
+  - `hydrateFromStore()`
+  - suporte a `contextBuilder.collectQuickContext()`
+- `src/audit_agent/main.js` (hydration opcional)
+- `src/audit_agent/context_builder.js` (read-only probe V0: MCP/RAG/LSP + Inference Gateway)
+
+3. **`Inference Gateway` DB-backed**
+- `src/inference_gateway/persistence.js`
+- `src/inference_gateway/gateway.js`
+  - `setPolicies()`, `getPolicySummary()`
+  - profile herdado de `clientPolicy.profile_name`
+- `src/inference_gateway/server.js`
+  - `GET /v1/policies`
+  - `POST /v1/policies/reload`
+- `src/inference_gateway/main.js` faz reload inicial do SQLite
+
+4. **Control Plane (`AUDIT_*` + `INFERENCE_*`)**
+- `src/server/domain/control_command_service.js`
+- comandos novos implementados:
+  - `AUDIT_PATCH_APPROVE`
+  - `AUDIT_PATCH_REJECT`
+  - `AUDIT_WATCH_RULE_UPSERT`
+  - `AUDIT_WATCH_RULE_TOGGLE`
+  - `INFERENCE_PROFILE_UPSERT`
+  - `INFERENCE_CLIENT_POLICY_UPSERT`
+- reload do `Inference Gateway` após `INFERENCE_*`
+- bug corrigido: import dinâmico de socket hub (`#server/engine/socket` vs `socket.js.js`)
+
+5. **Dashboard APIs**
+- `src/server/api/controllers/dashboard_audit.js`
+  - findings/patches/watch-rules saíram de placeholder e passaram a ler repos reais
+- `src/server/api/controllers/dashboard_inference.js`
+  - `GET /inference/profiles`
+  - `GET /inference/client-policies`
+  - `GET /inference/policies/summary`
+
+## Testes e Gates Executados
+
+1. `env -u NO_COLOR node --test tests/unit/inference/*.spec.js tests/unit/server/test_control_command_service_audit_inference.spec.js tests/unit/server/test_control_command_service_audit_persistence.spec.js` -> **15/15 pass**
+2. `npm run typecheck:full` -> **OK**
+3. `eslint` direcionado (arquivos alterados) -> **OK**
+4. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T11-39-17-917Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. `AUDIT_PATCH_APPLY` ainda não implementado (somente approve/reject).
+2. `context_builder` ainda em modo probe/health; falta uso direto de MCP `lsp_*`/`rag_*`.
+3. `inference_backends/models` ainda sem repos/gestão operacional completa.
+4. PM2 dos processos novos segue atrás de flags seguras (não ativado por default).
+
+## Próxima Rodada (escopo fechado)
+
+1. Primeiro job manual real do `audit-agent` com MCP `lsp_*`/`rag_*` (read-only).
+2. `AUDIT_PATCH_APPLY` guardado (sem fake apply) + dry-run/approval checks.
+3. Repos/gestão mínima de `inference_backends` e `inference_models`.
+
+---
+
+# Wave AAG-F5/F7/F6 (2026-02-22) — `context_builder` MCP-aware + `AUDIT_PATCH_APPLY` guardado
+
+## Resumo
+
+Rodada focada em avançar o `Audit Agent` para um contexto semântico mais real (MCP tools) sem abrir superfície de mutação insegura:
+1. `context_builder` passou a chamar MCP `lsp_*` e `rag_search` em modo read-only
+2. runtime agora passa o `job`/escopo ao `contextBuilder`
+3. `AUDIT_PATCH_APPLY` foi adicionado ao control plane com guardrails e bloqueio explícito em `propose_only`
+
+## Correções / Implementações
+
+1. `src/audit_agent/context_builder.js`
+- helper `callMcpTool()` via `/api/mcp` (`tools/call`)
+- probes MCP reais:
+  - `lsp_diagnostics`
+  - `lsp_definition`
+  - `rag_search`
+- modo `read_only_mcp_v1` quando MCP tools são invocados
+- findings de falha para `lsp_diagnostics`/`rag_search`
+
+2. `src/audit_agent/runtime.js`
+- `collectQuickContext(job)` passa o `job` para o `contextBuilder`
+- permite contexto orientado a escopo (`filePath`, `query`, `line`, `character`)
+
+3. `src/server/domain/control_command_service.js`
+- novo comando `AUDIT_PATCH_APPLY`
+- guardrails:
+  - exige patch aprovado
+  - exige `dry_run_result_json.ok === true`
+  - bloqueia por default em `propose_only`
+  - `AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL=true` como gate explícito (ainda não implementa apply)
+- comportamento atual: erro explícito/auditável (`disabled`/`not_implemented`), sem fake apply
+
+4. Testes
+- `tests/unit/audit_agent/test_audit_agent_runtime.spec.js`
+  - valida passagem do `job` ao `contextBuilder`
+- `tests/unit/server/test_control_command_service_audit_persistence.spec.js`
+  - cobre bloqueios de `AUDIT_PATCH_APPLY`
+
+## Testes e Gates Executados
+
+1. `env -u NO_COLOR node --test tests/unit/audit_agent/test_audit_agent_runtime.spec.js tests/unit/server/test_control_command_service_audit_persistence.spec.js` -> **4/4 pass**
+2. `npm run typecheck:full` -> **OK**
+3. `eslint` direcionado (arquivos alterados) -> **OK**
+4. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T11-48-38-596Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. `context_builder` usa MCP tools reais, mas ainda sem enriquecimento profundo (`rag_expand`, refs/symbols`) e sem budgets por etapa.
+2. `AUDIT_PATCH_APPLY` permanece guardado (sem execução real), como planejado.
+3. Falta realtime específico de `audit_jobs/findings/patches`.
+
+## Próxima Rodada (escopo fechado)
+
+1. Enriquecer `context_builder` com `rag_expand` e `lsp_references`/`lsp_document_symbols` sob budget.
+2. Repos mínimos para `inference_backends` / `inference_models` + endpoints dashboard de leitura.
+3. Preparar dry-run TTL/metadata para futura implementação segura de `AUDIT_PATCH_APPLY`.
+
+---
+
+# Wave AAG-F7/F3/F9 (2026-02-22) — `context_builder` budgeted MCP enrich + `inference_backends/models`
+
+## Resumo
+
+Rodada de avanço em duas frentes:
+1. enriquecimento semântico do `context_builder` com chamadas MCP adicionais sob budget
+2. base persistente/API de `inference_backends` e `inference_models` para configuração avançada da LLM local
+
+## Correções / Implementações
+
+1. `src/audit_agent/context_builder.js`
+- orçamento MCP simples (`mcp_budget` / `AUDIT_AGENT_CONTEXT_MCP_BUDGET`)
+- novas chamadas MCP read-only sob budget:
+  - `rag_expand`
+  - `lsp_references`
+  - `lsp_document_symbols`
+- `mcp_tools.budget` (limit/used/remaining)
+- `mcp_tool_payloads` com payloads brutos dos tools adicionais
+- findings informativos quando enriquecimento falha (`rag_expand`, `lsp_references`)
+
+2. Repos novos `inference_*`
+- `src/infra/db/inference_backend_repo.js`
+- `src/infra/db/inference_model_repo.js`
+
+3. `src/server/api/controllers/dashboard_inference.js`
+- `GET /api/dashboard/inference/backends`
+- `GET /api/dashboard/inference/models-db`
+
+4. `src/server/domain/control_command_service.js`
+- `INFERENCE_BACKEND_UPSERT`
+- `INFERENCE_MODEL_UPSERT`
+- reload explícito do `Inference Gateway` após mutações
+
+5. Testes
+- `tests/unit/audit_agent/test_audit_job_repo_and_db_store.spec.js` (repos `inference_backends/models`)
+- `tests/unit/server/test_control_command_service_audit_persistence.spec.js` (upserts backend/model)
+
+## Testes e Gates Executados
+
+1. `env -u NO_COLOR node --test tests/unit/audit_agent/test_audit_job_repo_and_db_store.spec.js tests/unit/server/test_control_command_service_audit_persistence.spec.js` -> **6/6 pass**
+2. `npm run typecheck:full` -> **OK**
+3. `eslint` direcionado (arquivos alterados) -> **OK**
+4. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T11-54-44-679Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. `context_builder` agora coleta mais payload; falta truncation/token budget formal para prompts LLM.
+2. `inference_backends/models` ainda sem validação profunda de capabilities/schema e sem toggle/disable dedicado via command específico.
+3. `AUDIT_PATCH_APPLY` continua guardado (sem execução real), conforme planejado.
+
+## Próxima Rodada (escopo fechado)
+
+1. Formalizar TTL/metadata de dry-run em `audit_patch_proposals` e endurecer `AUDIT_PATCH_APPLY` com validação temporal.
+2. Expandir dashboard inference com summary/capabilities de `backends/models`.
+3. Preparar job manual do `audit-agent` que use contexto MCP enriquecido para findings/patch proposal (sem apply).
+
+---
+
+# Wave AAG-F6/F9/F8 (2026-02-22) — Toggles `INFERENCE_*` + Dashboard Inference Summary/Capabilities + `dry_run_state`
+
+## Resumo
+
+Rodada de consolidação operacional em três frentes:
+1. fechar o ciclo de gestão de inferência com toggles (`backend/model`) via control plane
+2. dar visibilidade real no dashboard (`summary` + capabilities normalizadas)
+3. explicitar estado de dry-run dos patches de auditoria (`missing/pending/fresh/stale/...`)
+
+## Correções / Implementações
+
+1. `src/server/domain/control_command_service.js`
+- novos comandos:
+  - `INFERENCE_BACKEND_TOGGLE`
+  - `INFERENCE_MODEL_TOGGLE`
+- mantém reload explícito do `Inference Gateway` após mutações
+- `AUDIT_PATCH_APPLY` endurecido com validação temporal:
+  - timestamp obrigatório (`validated_at_ms`/`ts`)
+  - TTL válido (`ttl_ms` ou `AUDIT_PATCH_DRY_RUN_MAX_AGE_MS`)
+  - rejeita dry-run expirado
+
+2. `src/infra/db/inference_backend_repo.js`
+- `setInferenceBackendEnabled(...)`
+
+3. `src/infra/db/inference_model_repo.js`
+- `setInferenceModelEnabled(...)`
+
+4. `src/server/api/controllers/dashboard_inference.js`
+- `GET /api/dashboard/inference/models-db`
+  - agora retorna `capabilities_summary` e `policy_flags`
+- novo `GET /api/dashboard/inference/summary`
+  - counts + agregados por backend + totais de capability
+
+5. `src/server/api/controllers/dashboard_audit.js`
+- `GET /api/dashboard/audit/jobs/:id/patches`
+  - adiciona `dry_run_state`
+  - metadata com summary por `status` e estado de dry-run
+
+6. `src/audit_agent/runtime.js`
+- patch draft default enriquecido com `context_signals`, `context_budget`, `rag_anchor`
+- `dry_run_result_json` default passa a ser explícito (`pending/required`)
+
+7. Testes
+- `tests/unit/audit_agent/test_audit_job_repo_and_db_store.spec.js`
+  - toggle de `inference_backends/models` + patch summary/dry-run pending
+- `tests/unit/server/test_control_command_service_audit_persistence.spec.js`
+  - `INFERENCE_BACKEND_TOGGLE` e `INFERENCE_MODEL_TOGGLE`
+
+## Testes e Gates Executados
+
+1. `env -u NO_COLOR node --test tests/unit/audit_agent/test_audit_job_repo_and_db_store.spec.js tests/unit/server/test_control_command_service_audit_persistence.spec.js` -> **6/6 pass**
+2. `node --check src/server/domain/control_command_service.js src/server/api/controllers/dashboard_inference.js src/server/api/controllers/dashboard_audit.js src/infra/db/inference_backend_repo.js src/infra/db/inference_model_repo.js` -> **OK**
+3. `npm run typecheck:full` -> **OK**
+4. `eslint` direcionado (arquivos alterados) -> **OK**
+5. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T12-06-10-486Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. `AUDIT_PATCH_APPLY` ainda não aplica patch real (guardado por design), apesar de já validar approval + dry-run freshness.
+2. `context_builder` MCP enriched precisa de truncation/token-budget formal antes do pipeline LLM de patch.
+3. Faltam endpoints/fluxo de mutação no dashboard para operar `INFERENCE_*` sem terminal (API de leitura já existe).
+
+## Próxima Rodada (escopo fechado)
+
+1. Job manual `patch_suggest/bug_hunt` end-to-end com findings e patch proposal enriquecidos persistidos e visíveis no dashboard.
+2. Base de metadados de dry-run para futura implementação de apply real (ainda sem habilitar apply).
+3. Wrappers de dashboard/control para `INFERENCE_BACKEND_TOGGLE`/`INFERENCE_MODEL_TOGGLE` e `INFERENCE_PROFILE_VALIDATE`.
+
+---
+
+# Wave AAG-F9/F6 (2026-02-22) — Wrappers de Dashboard para `AUDIT_*` / `INFERENCE_*` + Fluxo manual `patch_suggest`
+
+## Resumo
+
+Rodada de usabilidade e integração:
+1. dashboard ganhou wrappers de mutação para `AUDIT_*` e `INFERENCE_*` via control plane
+2. fluxo manual `patch_suggest` via `AUDIT_JOB_CREATE` + `AUDIT_JOB_RUN` ficou coberto por teste
+3. pipeline do projeto permaneceu verde
+
+## Correções / Implementações
+
+1. `src/server/api/controllers/dashboard_audit.js`
+- wrappers novos:
+  - `POST /api/dashboard/audit/jobs` (`run_now` opcional)
+  - `POST /api/dashboard/audit/jobs/:id/run`
+  - `POST /api/dashboard/audit/jobs/:id/cancel`
+  - `POST /api/dashboard/audit/patches/:id/approve`
+  - `POST /api/dashboard/audit/patches/:id/reject`
+  - `POST /api/dashboard/audit/patches/:id/apply`
+  - `POST /api/dashboard/audit/watch-rules`
+  - `POST /api/dashboard/audit/watch-rules/:id/toggle`
+- todos usando `executeCommand(...)` (sem bypass)
+
+2. `src/server/api/controllers/dashboard_inference.js`
+- wrappers novos:
+  - `POST /api/dashboard/inference/profiles/validate`
+  - `POST /api/dashboard/inference/backends`
+  - `POST /api/dashboard/inference/backends/:id/toggle`
+  - `POST /api/dashboard/inference/models`
+  - `POST /api/dashboard/inference/models/:id/toggle`
+
+3. `tests/unit/server/test_control_command_service_audit_inference.spec.js`
+- novo teste de proxy `patch_suggest`:
+  - cria job
+  - executa run
+  - valida status `WAITING_APPROVAL`
+
+## Testes e Gates Executados
+
+1. `env -u NO_COLOR node --test tests/unit/server/test_control_command_service_audit_inference.spec.js` -> **4/4 pass**
+2. `node --check src/server/api/controllers/dashboard_audit.js src/server/api/controllers/dashboard_inference.js tests/unit/server/test_control_command_service_audit_inference.spec.js` -> **OK**
+3. `npm run typecheck:full` -> **OK**
+4. `eslint` direcionado (arquivos alterados) -> **OK**
+5. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T12-12-41-055Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. Wrappers de dashboard existem, mas faltam telas/composables para operar o fluxo sem requests manuais.
+2. `AUDIT_PATCH_APPLY` segue guardado (sem apply real), por design.
+3. Pipeline LLM real do `Audit Agent` ainda pendente; patch proposal atual é skeleton enriquecido por contexto MCP.
+
+## Próxima Rodada (escopo fechado)
+
+1. Integrar primeiro passo real de pipeline LLM via `Inference Gateway` (`audit_agent_triage`) com budgets/fallback.
+2. Expor wrappers adicionais de `INFERENCE_PROFILE_UPSERT` / `INFERENCE_CLIENT_POLICY_UPSERT`.
+3. Preparar endpoint/dashboard para execução manual `patch_suggest` com preview de `dry_run_state`.
+
+---
+
+# Wave AAG-F8/F9 (2026-02-22) — `triage_llm` via Inference Gateway + Wrappers `INFERENCE_*` adicionais
+
+## Resumo
+
+Rodada de avanço no pipeline LLM e na operação via dashboard:
+1. primeiro passo real de `triage_llm` integrado ao runtime do `Audit Agent` (via `Inference Gateway`, read-only, behind flag)
+2. wrappers de dashboard para `INFERENCE_PROFILE_UPSERT` e `INFERENCE_CLIENT_POLICY_UPSERT`
+3. pipeline e gates do projeto mantidos verdes
+
+## Correções / Implementações
+
+1. `src/audit_agent/triage_llm.js` (novo)
+- client HTTP para `Inference Gateway` (`POST /v1/generate`)
+- `clientTag = audit_agent_triage`
+- prompt de triage baseado em sinais MCP/LSP/RAG do `context_builder`
+- parsing JSON tolerante (`summary`, `risk_level`, `next_actions`)
+- flag de ativação: `AUDIT_AGENT_TRIAGE_LLM_ENABLED`
+
+2. `src/audit_agent/runtime.js`
+- novo passo `triage_llm` no fluxo de job
+- resultado persistido em `job.result_json.llm_triage`
+- findings informativos de sucesso/falha (não bloqueante)
+
+3. `src/audit_agent/main.js`
+- wiring opcional de `triageClient` no runtime
+- fallback seguro se módulo não carregar
+
+4. `src/server/api/controllers/dashboard_inference.js`
+- wrappers adicionais:
+  - `POST /api/dashboard/inference/profiles` (`INFERENCE_PROFILE_UPSERT`)
+  - `POST /api/dashboard/inference/client-policies` (`INFERENCE_CLIENT_POLICY_UPSERT`)
+
+5. Testes
+- `tests/unit/audit_agent/test_audit_agent_runtime.spec.js`
+  - novo teste com stub de `triageClient` validando persistência de `llm_triage`
+
+## Testes e Gates Executados
+
+1. `env -u NO_COLOR node --test tests/unit/audit_agent/test_audit_agent_runtime.spec.js tests/unit/server/test_control_command_service_audit_inference.spec.js` -> **8/8 pass**
+2. `node --check src/audit_agent/triage_llm.js src/audit_agent/runtime.js src/audit_agent/main.js src/server/api/controllers/dashboard_inference.js` -> **OK**
+3. `npm run typecheck:full` -> **OK**
+4. `eslint` direcionado (arquivos alterados) -> **OK**
+5. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T12-18-04-697Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. `triage_llm` está integrado, mas desabilitado por padrão até calibrar policy/model/budgets no ambiente real.
+2. Ainda não há patch author LLM real; patch proposal continua skeleton enriquecido por MCP.
+3. Dashboard ainda não tem visão dedicada de `llm_triage` (fica em `job.result_json` / findings).
+
+## Próxima Rodada (escopo fechado)
+
+1. Expor resumo de `llm_triage` no detail de job (read-model/dashboard).
+2. Validar preflight de policy/profile (`audit_agent_triage`) antes da chamada LLM, com fallback explícito.
+3. Criar teste de integração do `triage_llm` com `Inference Gateway` HTTP stubado.
+
+---
+
+# Wave AAG-F6/F9 (2026-02-22) — `AUDIT_PATCH_APPLY_VALIDATE` + endpoints de readiness de apply
+
+## Resumo
+
+Rodada de hardening de governança para patch apply:
+1. criação de comando canônico read-only para validar readiness de apply (`AUDIT_PATCH_APPLY_VALIDATE`)
+2. reutilização dos mesmos guardrails do `AUDIT_PATCH_APPLY` (sem drift)
+3. exposição de endpoints no dashboard para UI/API consumirem readiness sem mutação
+
+## Correções / Implementações
+
+1. `src/server/domain/control_command_service.js`
+- novo comando `AUDIT_PATCH_APPLY_VALIDATE`
+- helper central de readiness: avaliação de aprovação + dry-run TTL/freshness + guards branch/path/worktree + modo (`propose_only`/`unsafe_local_enabled`)
+- `AUDIT_PATCH_APPLY` passou a usar a avaliação centralizada e retorna `details` estruturados em erros de bloqueio
+
+2. `src/server/api/controllers/dashboard_audit.js`
+- novos endpoints:
+  - `GET /api/dashboard/audit/patches/:id/apply-readiness`
+  - `POST /api/dashboard/audit/patches/:id/apply/validate`
+- ambos retornam `patch` enriquecido + `validation`
+
+3. `tests/unit/server/test_control_command_service_audit_persistence.spec.js`
+- cobertura de `AUDIT_PATCH_APPLY_VALIDATE`
+- asserts de readiness incluindo bloqueio esperado por `propose_only`
+
+## Gates Executados
+
+1. `env -u NO_COLOR node --test tests/unit/server/test_control_command_service_audit_persistence.spec.js` -> **1/1 pass**
+2. `node --check src/server/domain/control_command_service.js src/server/api/controllers/dashboard_audit.js tests/unit/server/test_control_command_service_audit_persistence.spec.js` -> **OK**
+3. `npm run typecheck:full` -> **OK**
+4. `eslint` direcionado (arquivos alterados) -> **OK**
+5. `npm run audit:quick -- --triage false --progress false --eta false` -> **success**
+- Run: `WAVE_AUDIT_QUICK_2026-02-22T12-56-03-672Z`
+- `errors=0`, `warnings=0`, `partial=false`
+
+## Riscos Ativos
+
+1. `AUDIT_PATCH_APPLY` segue sem apply real (501/blocked), por design V1.
+2. UI ainda não consome os endpoints de readiness (API pronta; faltam telas/composables).
+3. Backlog de findings de `prettier` permanece no audit quick (não bloqueante nesta rodada).
+
+## Próxima Rodada (escopo fechado)
+
+1. Incluir `apply_readiness` no read-model de patch detail/list (quando solicitado via query flag ou summary leve).
+2. Preparar esqueleto de apply real (ainda blocked-by-default) consumindo a readiness centralizada.
+3. Endurecer `patch_author_llm` com schema/output mode mais estrito via `Inference Gateway`.

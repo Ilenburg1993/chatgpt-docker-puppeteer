@@ -10,6 +10,7 @@
 
 - Tracker vivo canônico: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_TRACKER.md`
 - Alias compatível: `DOCUMENTAÇÃO/bugs/CODEX_AUDIT_TRACKER.md`
+- Plano mestre Audit Agent (LLM engenharia em background): `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_AGENT_MASTER_PLAN.md`
 - Playbook operacional: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_PLAYBOOK.md`
 - Delta local de instruções: `DOCUMENTAÇÃO/BUGS/CODEX_DEFAULT_INSTRUCTIONS_DELTA.md`
 - Snapshot inicial da trilha: `DOCUMENTAÇÃO/BUGS/rodadas/CODEX_AUDIT_2026-02-21_01-41.md`
