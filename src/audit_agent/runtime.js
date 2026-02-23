@@ -114,6 +114,7 @@ export class AuditAgentRuntime {
      *   contextBuilder?: { collectQuickContext?: (job?:any)=>Promise<{context?:any, findings?:any[], patches?:any[]}> }|null
      *   triageClient?: { runTriage?: (job:any, contextPack:any)=>Promise<any>, isEnabled?: ()=>boolean }|null
      *   patchAuthorClient?: { runPatchAuthor?: (job:any, contextPack:any, llmTriage:any)=>Promise<any>, isEnabled?: ()=>boolean }|null
+     *   diagnosticClient?: { runDiagnostic?: (jobKind:string, params?:any)=>Promise<{success:boolean, data?:any, error?:string, durationMs?:number}>, isEnabled?: ()=>boolean }|null
      * }} [options]
      */
     constructor(options = {}) {
@@ -124,6 +125,7 @@ export class AuditAgentRuntime {
         this.contextBuilder = options.contextBuilder || null;
         this.triageClient = options.triageClient || null;
         this.patchAuthorClient = options.patchAuthorClient || null;
+        this.diagnosticClient = options.diagnosticClient || null;
         /** @type {Map<string, any>} */
         this.jobs = new Map();
         this._tickInFlight = false;
@@ -396,15 +398,43 @@ export class AuditAgentRuntime {
             }
         }
 
+        // Handle diagnostic jobs (DIAGNOSTIC_HEALTH, DIAGNOSTIC_SYSTEM, etc.)
+        const isDiagnosticJob =
+            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_HEALTH ||
+            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_SYSTEM ||
+            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_MODELS ||
+            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_VERIFY ||
+            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_REPORT;
+
+        let diagnosticResult = null;
+        if (isDiagnosticJob && this.diagnosticClient && typeof this.diagnosticClient.runDiagnostic === 'function') {
+            const tsDiag = this.now();
+            job.current_step = 'diagnostic_execution';
+            job.history.push({ ts: tsDiag, event: 'step', step: job.current_step });
+            this._persistJob(job);
+            try {
+                diagnosticResult = await this.diagnosticClient.runDiagnostic(job.kind, job.scope_json);
+            } catch (error) {
+                diagnosticResult = {
+                    success: false,
+                    error: error?.message || String(error),
+                };
+            }
+        }
+
         const endTs = this.now();
-        job.current_step = patchLike ? 'waiting_approval' : 'completed';
+        job.current_step = patchLike ? 'waiting_approval' : isDiagnosticJob ? 'diagnostic_completed' : 'completed';
         job.result_json = {
             skeleton: true,
             patch_proposal_pending: patchLike,
-            notes: 'AuditAgentRuntime read-only probe execution (DB snapshots enabled)',
+            is_diagnostic: isDiagnosticJob,
+            notes: isDiagnosticJob
+                ? 'Diagnostic job executed via Audit Agent (proxied to Diagnostic Agent)'
+                : 'AuditAgentRuntime read-only probe execution (DB snapshots enabled)',
             context: contextPack?.context || null,
             llm_triage: llmTriage || null,
             llm_patch_author: llmPatchAuthor || null,
+            diagnostic_result: diagnosticResult || null,
         };
         if (patchLike) {
             job.status = AUDIT_JOB_STATUS.WAITING_APPROVAL;

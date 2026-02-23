@@ -29,6 +29,12 @@ export const AUDIT_JOB_KIND = Object.freeze({
     REGRESSION_TRIAGE: 'regression_triage',
     RUNTIME_PROBE: 'runtime_probe',
     CUSTOM: 'custom',
+    // Diagnostic Agent job kinds (migrated from standalone)
+    DIAGNOSTIC_HEALTH: 'diagnostic_health',
+    DIAGNOSTIC_SYSTEM: 'diagnostic_system',
+    DIAGNOSTIC_MODELS: 'diagnostic_models',
+    DIAGNOSTIC_VERIFY: 'diagnostic_verify',
+    DIAGNOSTIC_REPORT: 'diagnostic_report',
 });
 
 /**

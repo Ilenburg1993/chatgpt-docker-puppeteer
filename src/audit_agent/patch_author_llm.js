@@ -91,6 +91,7 @@ function _coercePatchAuthorParsed(rawParsed) {
     const proposedChanges = Array.isArray(parsed.proposed_changes)
         ? parsed.proposed_changes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 20)
         : null;
+    
     return {
         parsed,
         strict: {
