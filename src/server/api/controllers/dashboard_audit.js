@@ -101,6 +101,31 @@ function _enrichPatch(patch) {
     };
 }
 
+/**
+ * Avalia readiness de apply para um patch usando o control plane.
+ * Retorna null se patch não for encontrado ou em caso de erro.
+ * @param {string} patchId
+ * @param {object} actor
+ * @returns {Promise<object|null>}
+ */
+async function _fetchApplyReadiness(patchId, actor) {
+    try {
+        const result = await executeCommand({
+            command: COMMANDS.AUDIT_PATCH_APPLY_VALIDATE,
+            payload: {
+                patch_id: patchId,
+                reason: 'read apply readiness for patch enrichment',
+                idempotency_key: `enrich:${patchId}:${Date.now()}`,
+            },
+            actor,
+        });
+        return result?.result?.metadata?.validation || null;
+    } catch (err) {
+        log('WARN', `[dashboard_audit] _fetchApplyReadiness failed for ${patchId}: ${err?.message || String(err)}`);
+        return null;
+    }
+}
+
 function _safeObject(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
 }
@@ -168,6 +193,35 @@ function getAuditAgentBaseUrl() {
     const host = process.env.AUDIT_AGENT_HOST || '127.0.0.1';
     const port = Number(process.env.AUDIT_AGENT_PORT || 3098);
     return `http://${host}:${port}`;
+}
+
+/**
+ * Get Diagnostic Agent base URL - now routes to Audit Agent
+ * Diagnostic jobs are processed by Audit Agent at port 3098
+ * @returns {string}
+ */
+function getDiagnosticAgentBaseUrl() {
+    // Diagnostic Agent was consolidated into Audit Agent
+    // Route all diagnostic requests to Audit Agent
+    return getAuditAgentBaseUrl();
+}
+
+/**
+ * Check if job kind is diagnostic
+ * @param {string} kind
+ * @returns {boolean}
+ */
+function _isDiagnosticKind(kind) {
+    return String(kind || '').startsWith('diagnostic_');
+}
+
+/**
+ * Filter diagnostic jobs from list
+ * @param {Array} jobs
+ * @returns {Array}
+ */
+function _filterDiagnosticJobs(jobs) {
+    return (jobs || []).filter(job => _isDiagnosticKind(job.kind));
 }
 
 async function safeFetchJson(url, timeoutMs = 2000, init = undefined) {
@@ -392,11 +446,25 @@ router.get('/audit/jobs/:id/findings', authenticate, (req, res) => {
     });
 });
 
-router.get('/audit/jobs/:id/patches', authenticate, (req, res) => {
+router.get('/audit/jobs/:id/patches', authenticate, async (req, res) => {
     const items = listAuditPatchProposalsByJobId(String(req.params.id || ''), {
         limit: req.query.limit ? Number(req.query.limit) : 50,
     });
-    const enriched = items.map(_enrichPatch);
+    const includeReadiness = String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+    const actor = _actorFromReq(req);
+    // Se include_readiness, buscar readiness para cada patch em paralelo
+    const enriched = await Promise.all(
+        items.map(async (patch) => {
+            const enrichedPatch = _enrichPatch(patch);
+            if (includeReadiness && patch.id) {
+                const readiness = await _fetchApplyReadiness(String(patch.id), actor);
+                if (readiness) {
+                    enrichedPatch.apply_readiness = readiness;
+                }
+            }
+            return enrichedPatch;
+        })
+    );
     const counts = enriched.reduce(
         (acc, item) => {
             const state = String(item?.dry_run_state?.state || 'unknown');
@@ -411,10 +479,11 @@ router.get('/audit/jobs/:id/patches', authenticate, (req, res) => {
         source: 'audit-patch-repo',
         audit_job_id: String(req.params.id || ''),
         summary: counts,
+        include_readiness: includeReadiness,
     });
 });
 
-router.get('/audit/patches/:id', authenticate, (req, res) => {
+router.get('/audit/patches/:id', authenticate, async (req, res) => {
     const patch = getAuditPatchProposalById(String(req.params.id || ''));
     if (!patch) {
         return fail(res, req, 404, {
@@ -422,9 +491,18 @@ router.get('/audit/patches/:id', authenticate, (req, res) => {
             error: 'Audit patch proposal não encontrado',
         });
     }
-    return ok(res, req, _enrichPatch(patch), {
+    const enriched = _enrichPatch(patch);
+    const includeReadiness = String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+    if (includeReadiness) {
+        const readiness = await _fetchApplyReadiness(String(req.params.id || ''), _actorFromReq(req));
+        if (readiness) {
+            enriched.apply_readiness = readiness;
+        }
+    }
+    return ok(res, req, enriched, {
         source: 'audit-patch-repo',
         audit_patch_id: String(req.params.id || ''),
+        include_readiness: includeReadiness,
     });
 });
 
@@ -461,7 +539,7 @@ router.get('/audit/patches/:id/apply-readiness', authenticate, async (req, res) 
     }
 });
 
-router.get('/audit/jobs/:id/patches/:patchId', authenticate, (req, res) => {
+router.get('/audit/jobs/:id/patches/:patchId', authenticate, async (req, res) => {
     const patch = getAuditPatchProposalById(String(req.params.patchId || ''));
     if (!patch || String(patch.job_id) !== String(req.params.id || '')) {
         return fail(res, req, 404, {
@@ -469,10 +547,19 @@ router.get('/audit/jobs/:id/patches/:patchId', authenticate, (req, res) => {
             error: 'Audit patch proposal não encontrado para este job',
         });
     }
-    return ok(res, req, _enrichPatch(patch), {
+    const enriched = _enrichPatch(patch);
+    const includeReadiness = String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+    if (includeReadiness) {
+        const readiness = await _fetchApplyReadiness(String(req.params.patchId || ''), _actorFromReq(req));
+        if (readiness) {
+            enriched.apply_readiness = readiness;
+        }
+    }
+    return ok(res, req, enriched, {
         source: 'audit-patch-repo',
         audit_patch_id: String(req.params.patchId || ''),
         audit_job_id: String(req.params.id || ''),
+        include_readiness: includeReadiness,
     });
 });
 
@@ -622,6 +709,293 @@ router.get('/audit/watch-rules', authenticate, (_req, res) => {
         limit: _req.query.limit ? Number(_req.query.limit) : 100,
     });
     return ok(res, _req, items, { source: 'audit-watch-rule-repo' });
+});
+
+// ===========================================
+// Diagnostic Agent Endpoints (via Audit Agent)
+// ===========================================
+
+/** Valid diagnostic job kinds */
+const DIAGNOSTIC_JOB_KINDS = [
+    'diagnostic_health',
+    'diagnostic_system',
+    'diagnostic_models',
+    'diagnostic_verify',
+    'diagnostic_report',
+];
+
+/**
+ * GET /audit/diagnostic/runtime
+ * Check Diagnostic Agent availability (routed via Audit Agent)
+ * Note: Diagnostic Agent was consolidated into Audit Agent
+ */
+router.get('/audit/diagnostic/runtime', authenticate, async (req, res) => {
+    try {
+        // Diagnostic jobs now route through Audit Agent
+        const diagBaseUrl = getAuditAgentBaseUrl();
+        const [health, models] = await Promise.all([
+            safeFetchJson(`${diagBaseUrl}/health`, 2000),
+            safeFetchJson(`${diagBaseUrl}/models`, 2000),
+        ]);
+
+        return ok(res, req, {
+            available: health.ok === true,
+            endpoints: {
+                diagnostic: diagBaseUrl,
+                health: `${diagBaseUrl}/health`,
+                models: `${diagBaseUrl}/models`,
+                execute: `${diagBaseUrl}/execute`,
+            },
+            health: health.json || { ok: health.ok, status: health.status },
+            models: models.json || null,
+            probe: {
+                health_status: health.status,
+                models_status: models.status,
+            },
+            routing: 'Diagnostic jobs now processed by Audit Agent',
+        }, { source: 'audit-agent', routing_note: 'diagnostic consolidated into audit-agent' });
+    } catch (err) {
+        return fail(res, req, 503, {
+            code: 'DIAGNOSTIC_TO_AUDIT_AGENT_FAILED',
+            error: 'Falha ao rotear Diagnostic para Audit Agent',
+            details: err?.message || String(err),
+        });
+    }
+});
+
+/**
+ * GET /audit/diagnostic/jobs
+ * List diagnostic jobs (filtered from audit jobs)
+ */
+router.get('/audit/diagnostic/jobs', authenticate, async (req, res) => {
+    try {
+        const baseUrl = getAuditAgentBaseUrl();
+        const url = new URL(`${baseUrl}/jobs`);
+        if (req.query.status) url.searchParams.set('status', String(req.query.status));
+        if (req.query.limit) url.searchParams.set('limit', String(req.query.limit));
+
+        const upstream = await safeFetchJson(url.toString(), 2500);
+        if (!upstream.ok) {
+            // Fallback to DB
+            const allJobs = listAuditJobs({
+                status: req.query.status ? String(req.query.status) : null,
+                limit: req.query.limit ? Number(req.query.limit) : 100,
+            });
+            const diagJobs = _filterDiagnosticJobs(allJobs);
+            return ok(res, req, diagJobs, {
+                source: 'audit-job-repo-fallback',
+                upstream_available: false,
+                count: diagJobs.length,
+            });
+        }
+
+        const allJobs = upstream.json?.items || [];
+        const diagJobs = _filterDiagnosticJobs(allJobs);
+        return ok(res, req, diagJobs, {
+            source: 'audit-agent',
+            count: diagJobs.length,
+            total_filtered: allJobs.length,
+        });
+    } catch (err) {
+        return fail(res, req, 500, {
+            code: 'DIAGNOSTIC_JOBS_LIST_FAILED',
+            error: 'Erro ao listar jobs diagnósticos',
+            details: err?.message || String(err),
+        });
+    }
+});
+
+/**
+ * GET /audit/diagnostic/jobs/:id
+ * Get diagnostic job by ID
+ */
+router.get('/audit/diagnostic/jobs/:id', authenticate, async (req, res) => {
+    const result = await _fetchAuditJobWithFallback(req.params.id);
+    if (!result.ok) {
+        return fail(res, req, result.status, {
+            code: result.upstream?.status === 404 ? 'DIAGNOSTIC_JOB_NOT_FOUND' : 'DIAGNOSTIC_AGENT_UNAVAILABLE',
+            error: result.upstream?.status === 404 ? 'Diagnostic job não encontrado' : 'Diagnostic Agent indisponível',
+            details: result.upstream?.error || result.upstream?.json || result.upstream?.text || null,
+        });
+    }
+
+    // Verify it's a diagnostic job
+    if (!_isDiagnosticKind(result.job?.kind)) {
+        return fail(res, req, 404, {
+            code: 'NOT_A_DIAGNOSTIC_JOB',
+            error: 'Job encontrado mas não é um job diagnóstico',
+        });
+    }
+
+    return ok(res, req, result.job, {
+        source: result.source,
+    });
+});
+
+/**
+ * GET /audit/diagnostic/jobs/:id/result
+ * Get diagnostic result from job
+ */
+router.get('/audit/diagnostic/jobs/:id/result', authenticate, async (req, res) => {
+    const result = await _fetchAuditJobWithFallback(req.params.id);
+    if (!result.ok) {
+        return fail(res, req, result.status, {
+            code: result.upstream?.status === 404 ? 'DIAGNOSTIC_JOB_NOT_FOUND' : 'DIAGNOSTIC_AGENT_UNAVAILABLE',
+            error: result.upstream?.status === 404 ? 'Diagnostic job não encontrado' : 'Diagnostic Agent indisponível',
+            details: result.upstream?.error || result.upstream?.json || result.upstream?.text || null,
+        });
+    }
+
+    if (!_isDiagnosticKind(result.job?.kind)) {
+        return fail(res, req, 404, {
+            code: 'NOT_A_DIAGNOSTIC_JOB',
+            error: 'Job encontrado mas não é um job diagnóstico',
+        });
+    }
+
+    const diagnosticResult = result.job?.result_json?.diagnostic_result || null;
+    return ok(res, req, diagnosticResult, {
+        source: result.source,
+        audit_job_id: String(req.params.id || ''),
+        job_status: result.job?.status,
+    });
+});
+
+/**
+ * POST /audit/diagnostic/jobs
+ * Create diagnostic job
+ */
+router.post('/audit/diagnostic/jobs', authenticate, async (req, res) => {
+    const body = req.body || {};
+    const kind = body.kind || body.job?.kind;
+
+    // Validate job kind
+    if (!kind || !DIAGNOSTIC_JOB_KINDS.includes(kind)) {
+        return fail(res, req, 400, {
+            code: 'INVALID_DIAGNOSTIC_JOB_KIND',
+            error: 'Tipo de job diagnóstico inválido ou ausente',
+            valid_kinds: DIAGNOSTIC_JOB_KINDS,
+        });
+    }
+
+    // Create job via control plane
+    const createResult = await _runControl(req, res, COMMANDS.DIAGNOSTIC_JOB_CREATE, {
+        kind,
+        scope_json: body.scope_json || body.scope || {},
+        trigger_type: body.trigger_type || 'manual',
+        run_now: body.run_now === true || body.runNow === true,
+    });
+
+    if (!createResult) return;
+
+    const createdJob = createResult.result?.after || createResult.result || null;
+    return ok(res, req, { job: createdJob }, {
+        source: 'control-plane',
+        command: COMMANDS.DIAGNOSTIC_JOB_CREATE,
+        operation_id: createResult.operation?.id || null,
+    });
+});
+
+/**
+ * POST /audit/diagnostic/jobs/:id/run
+ * Run (execute) diagnostic job
+ */
+router.post('/audit/diagnostic/jobs/:id/run', authenticate, async (req, res) => {
+    // First verify it's a diagnostic job
+    const jobCheck = await _fetchAuditJobWithFallback(req.params.id);
+    if (!jobCheck.ok) {
+        return fail(res, req, jobCheck.status, {
+            code: 'DIAGNOSTIC_JOB_NOT_FOUND',
+            error: 'Diagnostic job não encontrado',
+        });
+    }
+
+    if (!_isDiagnosticKind(jobCheck.job?.kind)) {
+        return fail(res, req, 400, {
+            code: 'NOT_A_DIAGNOSTIC_JOB',
+            error: 'Job encontrado mas não é um job diagnóstico',
+        });
+    }
+
+    const result = await _runControl(req, res, COMMANDS.DIAGNOSTIC_JOB_RUN, {
+        ...(req.body || {}),
+        diagnostic_job_id: req.params.id,
+    });
+    if (!result) return;
+
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.DIAGNOSTIC_JOB_RUN,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+/**
+ * POST /audit/diagnostic/jobs/:id/cancel
+ * Cancel diagnostic job
+ */
+router.post('/audit/diagnostic/jobs/:id/cancel', authenticate, async (req, res) => {
+    // First verify it's a diagnostic job
+    const jobCheck = await _fetchAuditJobWithFallback(req.params.id);
+    if (!jobCheck.ok) {
+        return fail(res, req, jobCheck.status, {
+            code: 'DIAGNOSTIC_JOB_NOT_FOUND',
+            error: 'Diagnostic job não encontrado',
+        });
+    }
+
+    if (!_isDiagnosticKind(jobCheck.job?.kind)) {
+        return fail(res, req, 400, {
+            code: 'NOT_A_DIAGNOSTIC_JOB',
+            error: 'Job encontrado mas não é um job diagnóstico',
+        });
+    }
+
+    const result = await _runControl(req, res, COMMANDS.DIAGNOSTIC_JOB_CANCEL, {
+        ...(req.body || {}),
+        diagnostic_job_id: req.params.id,
+    });
+    if (!result) return;
+
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.DIAGNOSTIC_JOB_CANCEL,
+        operation_id: result.operation?.id || null,
+    });
+});
+
+/**
+ * POST /audit/diagnostic/jobs/:id/retry
+ * Retry diagnostic job
+ */
+router.post('/audit/diagnostic/jobs/:id/retry', authenticate, async (req, res) => {
+    // First verify it's a diagnostic job
+    const jobCheck = await _fetchAuditJobWithFallback(req.params.id);
+    if (!jobCheck.ok) {
+        return fail(res, req, jobCheck.status, {
+            code: 'DIAGNOSTIC_JOB_NOT_FOUND',
+            error: 'Diagnostic job não encontrado',
+        });
+    }
+
+    if (!_isDiagnosticKind(jobCheck.job?.kind)) {
+        return fail(res, req, 400, {
+            code: 'NOT_A_DIAGNOSTIC_JOB',
+            error: 'Job encontrado mas não é um job diagnóstico',
+        });
+    }
+
+    const result = await _runControl(req, res, COMMANDS.DIAGNOSTIC_JOB_RETRY, {
+        ...(req.body || {}),
+        diagnostic_job_id: req.params.id,
+    });
+    if (!result) return;
+
+    return ok(res, req, result.result?.after || null, {
+        source: 'control-plane',
+        command: COMMANDS.DIAGNOSTIC_JOB_RETRY,
+        operation_id: result.operation?.id || null,
+    });
 });
 
 export default router;

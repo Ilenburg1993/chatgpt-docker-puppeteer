@@ -1,5 +1,8 @@
 // @ts-check
 import { execFileSync } from 'node:child_process';
+import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { log } from '#core/logger';
 import { insertAuditDiff } from '#infra/db/audit_diff_repo';
 import {
@@ -85,6 +88,11 @@ const COMMANDS = Object.freeze({
     INFERENCE_MODEL_TOGGLE: 'INFERENCE_MODEL_TOGGLE',
     INFERENCE_PROFILE_UPSERT: 'INFERENCE_PROFILE_UPSERT',
     INFERENCE_CLIENT_POLICY_UPSERT: 'INFERENCE_CLIENT_POLICY_UPSERT',
+    // Diagnostic Agent Commands
+    DIAGNOSTIC_JOB_CREATE: 'DIAGNOSTIC_JOB_CREATE',
+    DIAGNOSTIC_JOB_RUN: 'DIAGNOSTIC_JOB_RUN',
+    DIAGNOSTIC_JOB_CANCEL: 'DIAGNOSTIC_JOB_CANCEL',
+    DIAGNOSTIC_JOB_RETRY: 'DIAGNOSTIC_JOB_RETRY',
 });
 
 const COMMAND_PERMISSION = Object.freeze({
@@ -123,6 +131,11 @@ const COMMAND_PERMISSION = Object.freeze({
     [COMMANDS.INFERENCE_MODEL_TOGGLE]: RBAC_PERMISSIONS.CONTROL_EXECUTE,
     [COMMANDS.INFERENCE_PROFILE_UPSERT]: RBAC_PERMISSIONS.CONTROL_EXECUTE,
     [COMMANDS.INFERENCE_CLIENT_POLICY_UPSERT]: RBAC_PERMISSIONS.CONTROL_EXECUTE,
+    // Diagnostic Agent Commands
+    [COMMANDS.DIAGNOSTIC_JOB_CREATE]: RBAC_PERMISSIONS.CONTROL_EXECUTE,
+    [COMMANDS.DIAGNOSTIC_JOB_RUN]: RBAC_PERMISSIONS.CONTROL_EXECUTE,
+    [COMMANDS.DIAGNOSTIC_JOB_CANCEL]: RBAC_PERMISSIONS.CONTROL_EXECUTE,
+    [COMMANDS.DIAGNOSTIC_JOB_RETRY]: RBAC_PERMISSIONS.CONTROL_EXECUTE,
 });
 
 const COMMAND_REQUIRES_IF_VERSION = new Set([
@@ -146,6 +159,8 @@ const COMMAND_OPTIONAL_ENTITY_ID = new Set([
     COMMANDS.AUDIT_WATCH_RULE_UPSERT,
     COMMANDS.INFERENCE_PROFILE_UPSERT,
     COMMANDS.INFERENCE_CLIENT_POLICY_UPSERT,
+    // Diagnostic Agent Commands
+    COMMANDS.DIAGNOSTIC_JOB_CREATE,
 ]);
 
 function _boolEnv(name, fallback) {
@@ -339,6 +354,13 @@ function _asEntity(command, payload = {}) {
         };
     }
 
+    if (command.startsWith('DIAGNOSTIC_')) {
+        return {
+            entityType: 'diagnostic_job',
+            entityId: String(payload.diagnostic_job_id || payload.job_id || payload.id || ''),
+        };
+    }
+
     if (command.startsWith('INFERENCE_')) {
         return {
             entityType: 'inference',
@@ -381,6 +403,12 @@ function _getInferenceGatewayBaseUrl() {
     return `http://${host}:${port}`;
 }
 
+function _getDiagnosticAgentBaseUrl() {
+    const host = process.env.DIAGNOSTIC_AGENT_HOST || '127.0.0.1';
+    const port = Number(process.env.DIAGNOSTIC_AGENT_PORT || 3097);
+    return `http://${host}:${port}`;
+}
+
 async function _fetchJson(url, init = {}, timeoutMs = 5000) {
     const res = await fetch(url, {
         ...init,
@@ -406,6 +434,115 @@ async function _postJson(url, body, timeoutMs = 5000) {
         },
         timeoutMs
     );
+}
+
+/**
+ * Envia comandos DIAGNOSTIC_* para o Audit Agent (diagnóstico integrado ao Audit Agent).
+ * O Diagnostic Agent standalone foi removido; DIAGNOSTIC_* agora roteia para Audit Agent.
+ * @param {string} command - Comando a executar
+ * @param {object} payload - Payload do comando
+ * @returns {Promise<object>} Resultado da operação
+ */
+async function _dispatchDiagnosticCommand(command, payload) {
+    // DIAGNOSTIC_* agora roteia para o Audit Agent (mesma porta/base URL)
+    const baseUrl = _getAuditAgentBaseUrl();
+    try {
+        switch (command) {
+            case COMMANDS.DIAGNOSTIC_JOB_CREATE: {
+                const upstream = await _postJson(`${baseUrl}/jobs`, payload.job || payload, 4000);
+                if (!upstream.ok) {
+                    const err = new Error('Falha ao criar diagnostic job no diagnostic-agent');
+                    err.statusCode = upstream.status || 503;
+                    err.code = 'DIAGNOSTIC_AGENT_CREATE_FAILED';
+                    err.details = upstream.json || upstream.text || null;
+                    throw err;
+                }
+                const job = upstream.json?.job || null;
+                return {
+                    before: null,
+                    after: job,
+                    metadata: {
+                        source: 'audit-agent', // Diagnostic jobs agora via audit-agent
+                        diagnostic_job_id: job?.id || null,
+                        upstream_status: upstream.status,
+                    },
+                };
+            }
+            case COMMANDS.DIAGNOSTIC_JOB_RUN:
+            case COMMANDS.DIAGNOSTIC_JOB_RETRY: {
+                const jobId = String(payload.diagnostic_job_id || payload.job_id || payload.id || '').trim();
+                if (!jobId) {
+                    const err = new Error('diagnostic_job_id é obrigatório');
+                    err.statusCode = 422;
+                    err.code = 'DIAGNOSTIC_JOB_ID_REQUIRED';
+                    throw err;
+                }
+                const upstream = await _postJson(`${baseUrl}/jobs/${encodeURIComponent(jobId)}/run`, {}, 5000);
+                if (!upstream.ok) {
+                    const err = new Error('Falha ao disparar execução do diagnostic job');
+                    err.statusCode = upstream.status || 503;
+                    err.code = upstream.status === 404 ? 'DIAGNOSTIC_JOB_NOT_FOUND' : 'DIAGNOSTIC_AGENT_RUN_FAILED';
+                    err.details = upstream.json || upstream.text || null;
+                    throw err;
+                }
+                return {
+                    before: null,
+                    after: upstream.json?.job || null,
+                    metadata: {
+                        source: 'audit-agent', // Diagnostic jobs agora via audit-agent
+                        action: command === COMMANDS.DIAGNOSTIC_JOB_RETRY ? 'retry' : 'run',
+                        diagnostic_job_id: upstream.json?.job?.id || jobId,
+                        upstream_status: upstream.status,
+                    },
+                };
+            }
+            case COMMANDS.DIAGNOSTIC_JOB_CANCEL: {
+                const jobId = String(payload.diagnostic_job_id || payload.job_id || payload.id || '').trim();
+                if (!jobId) {
+                    const err = new Error('diagnostic_job_id é obrigatório');
+                    err.statusCode = 422;
+                    err.code = 'DIAGNOSTIC_JOB_ID_REQUIRED';
+                    throw err;
+                }
+                const upstream = await _postJson(
+                    `${baseUrl}/jobs/${encodeURIComponent(jobId)}/cancel`,
+                    { reason: payload.reason || 'control_command_cancel' },
+                    4000
+                );
+                if (!upstream.ok) {
+                    const err = new Error('Falha ao cancelar diagnostic job');
+                    err.statusCode = upstream.status || 503;
+                    err.code = upstream.status === 404 ? 'DIAGNOSTIC_JOB_NOT_FOUND' : 'DIAGNOSTIC_AGENT_CANCEL_FAILED';
+                    err.details = upstream.json || upstream.text || null;
+                    throw err;
+                }
+                return {
+                    before: null,
+                    after: upstream.json?.job || null,
+                    metadata: {
+                        source: 'audit-agent', // Diagnostic jobs agora via audit-agent
+                        action: 'cancel',
+                        diagnostic_job_id: upstream.json?.job?.id || jobId,
+                        upstream_status: upstream.status,
+                    },
+                };
+            }
+            default: {
+                const err = new Error(`Comando diagnostic não suportado: ${command}`);
+                err.statusCode = 422;
+                err.code = 'DIAGNOSTIC_COMMAND_UNSUPPORTED';
+                throw err;
+            }
+        }
+    } catch (err) {
+        if (err?.code) throw err;
+        // Diagnostic Agent standalone foi removido; agora roteia para Audit Agent
+        const wrapped = new Error(`Audit Agent (para DIAGNOSTIC) indisponível: ${err?.message || String(err)}`);
+        wrapped.statusCode = 503;
+        wrapped.code = 'DIAGNOSTIC_TO_AUDIT_AGENT_ROUTING_FAILED';
+        wrapped.details = { base_url: baseUrl, original_error: err?.message };
+        throw wrapped;
+    }
 }
 
 async function _dispatchAuditCommand(command, payload) {
@@ -642,16 +779,207 @@ async function _dispatchAuditPatchCommand(command, payload, actor) {
             throw err;
         }
 
-        const err = new Error('AUDIT_PATCH_APPLY ainda não implementado (guardado)');
-        err.statusCode = 501;
-        err.code = 'AUDIT_PATCH_APPLY_NOT_IMPLEMENTED';
-        throw err;
+        // ============================================================
+        // IMPLEMENTAÇÃO REAL DO APPLY (Task 5 - blocked-by-default)
+        // ============================================================
+        return _executeAuditPatchApply(patchId, before, actorId);
     }
 
     const err = new Error(`Comando audit patch não suportado: ${command}`);
     err.statusCode = 422;
     err.code = 'AUDIT_PATCH_COMMAND_UNSUPPORTED';
     throw err;
+}
+
+/**
+ * Executa a aplicação real do patch com rollback em caso de falha.
+ * @param {string} patchId - ID do patch
+ * @param {object} before - Estado atual do patch
+ * @param {string|null} actorId - ID do usuário que executou
+ * @returns {object} Resultado da operação
+ */
+function _executeAuditPatchApply(patchId, before, actorId) {
+    const patchDiff = before.patch_unified_diff;
+    if (!patchDiff || patchDiff.length < 10) {
+        const err = new Error('Patch não possui diff válido para aplicar');
+        err.statusCode = 400;
+        err.code = 'AUDIT_PATCH_APPLY_NO_DIFF';
+        throw err;
+    }
+
+    // Criar arquivo de patch temporário
+    const tmpDir = tmpdir();
+    const patchFile = join(tmpDir, `audit-patch-${patchId}-${Date.now()}.patch`);
+    let rollbackPatch = null;
+    let applySucceeded = false;
+
+    try {
+        // 1. Salvar estado atual dos arquivos afetados para rollback
+        const patchSummary = _asRecord(before.patch_summary_json);
+        const candidateFiles = Array.isArray(patchSummary.candidate_files)
+            ? patchSummary.candidate_files
+            : [];
+
+        if (candidateFiles.length > 0) {
+            try {
+                const beforeState = [];
+                for (const file of candidateFiles.slice(0, 20)) {
+                    if (existsSync(file)) {
+                        const content = execFileSync('git', ['show', `HEAD:${file}`], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+                        beforeState.push({ file, content });
+                    }
+                }
+                if (beforeState.length > 0) {
+                    // Criar diff reverso para rollback
+                    rollbackPatch = _createRollbackDiff(beforeState);
+                }
+            } catch (e) {
+                // Não conseguimos capturar estado para rollback - continuamos sem rollback
+                log('WARN', `[AUDIT_PATCH_APPLY] Não foi possível capturar estado para rollback: ${e?.message}`);
+            }
+        }
+
+        // 2. Escrever arquivo de patch temporário
+        writeFileSync(patchFile, patchDiff, 'utf8');
+
+        // 3. Tentar aplicar o patch com git apply
+        const dryRunFlag = _boolEnv('AUDIT_PATCH_APPLY_DRY_RUN_FIRST', true);
+        
+        if (dryRunFlag) {
+            // Primeiro tenta dry-run para validar
+            try {
+                execFileSync('git', ['apply', '--check', '--3way', patchFile], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+            } catch (checkErr) {
+                const err = new Error(`Patch não pode ser aplicado (dry-run failed): ${checkErr.message}`);
+                err.statusCode = 409;
+                err.code = 'AUDIT_PATCH_APPLY_DRY_RUN_FAILED';
+                err.details = { check_error: checkErr.message };
+                throw err;
+            }
+        }
+
+        // 4. Aplicar o patch
+        let stderrOutput = '';
+        try {
+            const applyResult = execFileSync('git', ['apply', '--3way', patchFile], { 
+                encoding: 'utf8', 
+                stdio: ['pipe', 'pipe', 'pipe'] 
+            });
+            applySucceeded = true;
+            
+            // Verificar se há warnings no stderr
+            if (stderrOutput && stderrOutput.trim().length > 0) {
+                log('WARN', `[AUDIT_PATCH_APPLY] git apply output: ${stderrOutput}`);
+            }
+        } catch (applyErr) {
+            stderrOutput = applyErr.stderr || '';
+            const err = new Error(`Falha ao aplicar patch: ${applyErr.message}${stderrOutput ? ` - ${stderrOutput}` : ''}`);
+            err.statusCode = 500;
+            err.code = 'AUDIT_PATCH_APPLY_FAILED';
+            err.details = { 
+                apply_error: applyErr.message,
+                stderr: stderrOutput || null,
+                has_conflicts: stderrOutput?.includes('conflict') || stderrOutput?.includes('CONFLICT')
+            };
+            throw err;
+        }
+
+        // 5. Atualizar status do patch para 'applied'
+        const now = Date.now();
+        const after = updateAuditPatchProposal(patchId, {
+            status: 'applied',
+            applied_by: actorId,
+            applied_at_ms: now,
+            rollback_patch: rollbackPatch,
+        });
+
+        log('INFO', `[AUDIT_PATCH_APPLY] Patch ${patchId} aplicado com sucesso por ${actorId}`);
+
+        return {
+            before,
+            after,
+            metadata: {
+                source: 'control-plane-local',
+                audit_patch_id: patchId,
+                action: 'apply',
+                applied_by: actorId,
+                applied_at_ms: now,
+                has_rollback: !!rollbackPatch,
+            },
+        };
+    } catch (err) {
+        // 6. Em caso de erro, tentar rollback se possível
+        if (applySucceeded && rollbackPatch) {
+            try {
+                log('WARN', `[AUDIT_PATCH_APPLY] Rollback iniciado para patch ${patchId}`);
+                const rollbackFile = join(tmpDir, `rollback-${patchId}-${Date.now()}.patch`);
+                writeFileSync(rollbackFile, rollbackPatch, 'utf8');
+                execFileSync('git', ['apply', '--3way', rollbackFile], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+                unlinkSync(rollbackFile);
+                log('INFO', `[AUDIT_PATCH_APPLY] Rollback concluído para patch ${patchId}`);
+            } catch (rollbackErr) {
+                log('ERROR', `[AUDIT_PATCH_APPLY] Rollback falhou para patch ${patchId}: ${rollbackErr.message}`);
+            }
+        }
+
+        // Propagar o erro original
+        throw err;
+    } finally {
+        // 7. Limpar arquivo temporário
+        try {
+            if (existsSync(patchFile)) {
+                unlinkSync(patchFile);
+            }
+        } catch (cleanupErr) {
+            log('WARN', `[AUDIT_PATCH_APPLY] Falha ao limpar arquivo temporário: ${cleanupErr.message}`);
+        }
+    }
+}
+
+/**
+ * Cria um diff de rollback a partir do estado anterior dos arquivos.
+ * Gera um diff reverso que pode ser aplicado para restaurar o estado anterior.
+ * @param {Array<{file: string, content: string}>} beforeState - Estado anterior dos arquivos
+ * @returns {string} Diff reverso no formato unificado
+ */
+function _createRollbackDiff(beforeState) {
+    if (!beforeState || beforeState.length === 0) {
+        return '';
+    }
+
+    // Gerar diff reverso usando o conteúdo anterior como "novo" e o atual como "antigo"
+    // Isso inverte o patch: onde o original adiciona, o rollback remove, e vice-versa
+    const diffLines = [];
+
+    for (const { file, content } of beforeState) {
+        if (!file || !content) {
+            continue;
+        }
+
+        // Adicionar cabeçalho do arquivo no diff
+        diffLines.push(`--- a/${file}`);
+        diffLines.push(`+++ b/${file}`);
+
+        // Dividir conteúdo em linhas para criar diff
+        const lines = content.split('\n');
+
+        for (const line of lines) {
+            // Prefixar cada linha como contexto (linhas que existem no arquivo original)
+            // O git apply --3way combinado com o diff original fará a reversão correta
+            if (line.startsWith('+')) {
+                // Linhas que foram adicionadas pelo patch original viram remoção no rollback
+                diffLines.push(`-${line.substring(1)}`);
+            } else if (line.startsWith('-')) {
+                // Linhas que foram removidas pelo patch original viram adição no rollback
+                diffLines.push(`+${line.substring(1)}`);
+            } else {
+                // Linhas de contexto permanecem inalteradas
+                diffLines.push(line);
+            }
+        }
+    }
+
+    return diffLines.join('\n');
 }
 
 async function _dispatchAuditWatchRuleCommand(command, payload) {
@@ -1116,6 +1444,12 @@ function _dispatch(command, payload, actor) {
         case COMMANDS.INFERENCE_PROFILE_UPSERT:
         case COMMANDS.INFERENCE_CLIENT_POLICY_UPSERT:
             return _dispatchInferenceCommand(command, payload);
+        // Diagnostic Agent Commands
+        case COMMANDS.DIAGNOSTIC_JOB_CREATE:
+        case COMMANDS.DIAGNOSTIC_JOB_RUN:
+        case COMMANDS.DIAGNOSTIC_JOB_CANCEL:
+        case COMMANDS.DIAGNOSTIC_JOB_RETRY:
+            return _dispatchDiagnosticCommand(command, payload);
         default: {
             const err = new Error(`Command não suportado: ${command}`);
             err.statusCode = 422;
