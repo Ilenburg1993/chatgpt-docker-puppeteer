@@ -23,10 +23,16 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.codeActionsOnSave": {
+      "source.sort.json": "never"
+    }
   },
   "[jsonc]": {
-    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint",
+    "editor.codeActionsOnSave": {
+      "source.sort.json": "never"
+    }
   },
   "[markdown]": {
     "editor.defaultFormatter": "yzhang.markdown-all-in-one",
@@ -90,9 +96,9 @@
   "chat.mcp.assisted.nuget.enabled": true,
   "chat.mcp.discovery.enabled": {
     "claude-desktop": true,
+    "windsurf": true,
     "cursor-global": true,
-    "cursor-workspace": true,
-    "windsurf": true
+    "cursor-workspace": true
   },
   "chat.mcp.gallery.enabled": true,
   "chat.mcp.serverSampling": {
@@ -108,7 +114,8 @@
         "copilot/claude-opus-4.6",
         "copilot/gemini-3-flash-preview",
         "copilot/gemini-3-pro-preview",
-        "copilot/gpt-5.3-codex"
+        "copilot/gpt-5.3-codex",
+        "copilot/Raptor mini (Preview)"
       ]
     },
     "chatgpt-docker-puppeteer/.vscode/mcp.json: context7": {
@@ -122,7 +129,8 @@
         "copilot/gemini-3-flash-preview",
         "copilot/gemini-3-pro-preview",
         "copilot/gpt-5.3-codex",
-        "copilot/grok-code-fast-1"
+        "copilot/grok-code-fast-1",
+        "copilot/Raptor mini (Preview)"
       ]
     }
   },
@@ -361,7 +369,6 @@
   "github.copilot.chat.anthropic.tools.websearch.enabled": true,
   "github.copilot.chat.anthropic.tools.websearch.maxUses": 10,
   "github.copilot.chat.anthropic.toolSearchTool.enabled": true,
-  "github.copilot.chat.byok.ollamaEndpoint": "http://host.docker.internal:11434/",
   "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
   "github.copilot.chat.claudeAgent.enabled": true,
   "github.copilot.chat.codesearch.enabled": true,
@@ -396,7 +403,7 @@
   },
   "github.copilot.inlineSuggest.enable": true,
   "github.copilot.nextEditSuggestions.enabled": true,
-  "github.copilot.selectedCompletionModel": "Gpt-5 mini",
+  "github.copilot.selectedCompletionModel": "",
   "githubIssues.assignWhenWorking": true,
   "gitlens.codeLens.enabled": true,
   "inlineChat.affordance": "editor",
@@ -685,9 +692,9 @@
   "window.openFoldersInNewWindow": "off",
   "window.restoreWindows": "none",
   "window.titleBarStyle": "custom",
-  "windowsaistudio.enableRemoteFine-tuningAndInference": true,
+  "windowsaistudio.enableRemoteFine-tuningAndInference": false,
   "windowsaistudio.externalOpenAIProviders": [],
-  "windowsaistudio.openAIInferencePort": 11434,
+  "windowsaistudio.openAIInferencePort": 0,
   "windowsaistudio.remoteInfereneEndpoints": [],
   "workbench.colorTheme": "GitHub Dark Default",
   "workbench.editor.alwaysShowEditorActions": false,
@@ -702,5 +709,9 @@
   "workbench.editor.limit.value": 15,
   "workbench.externalBrowser": "chrome",
   "workbench.iconTheme": "vs-seti",
-  "workbench.startupEditor": "agentSessionsWelcomePage"
+  "workbench.startupEditor": "agentSessionsWelcomePage",
+  "github.copilot.chat.completionsFetcher": "electron-fetch",
+  "github.copilot.chat.nesFetcher": "electron-fetch",
+  "appmod.enableMcpServer": true,
+  "github.copilot.nextEditSuggestions.extendedRange": true
 }
