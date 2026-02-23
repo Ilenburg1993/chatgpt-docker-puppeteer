@@ -60,6 +60,37 @@ const routes = [
         component: () => import('@/views/SystemHealth.vue'),
         meta: { title: 'Saúde do sistema' },
     },
+    // === ROTAS DE AUDIT ===
+    {
+        path: '/audit',
+        name: 'AuditDashboard',
+        component: () => import('@/views/AuditView.vue'),
+        meta: { title: 'Audit Agent' },
+    },
+    {
+        path: '/audit/jobs',
+        name: 'AuditJobs',
+        component: () => import('@/views/AuditJobs.vue'),
+        meta: { title: 'Jobs de Auditoria' },
+    },
+    {
+        path: '/audit/jobs/:id',
+        name: 'AuditJobDetail',
+        component: () => import('@/views/AuditJobDetail.vue'),
+        meta: { title: 'Detalhe do Job' },
+    },
+    {
+        path: '/audit/patches/:id',
+        name: 'AuditPatchDetail',
+        component: () => import('@/views/AuditPatchDetail.vue'),
+        meta: { title: 'Detalhe do Patch' },
+    },
+    {
+        path: '/audit/inference',
+        name: 'AuditInference',
+        component: () => import('@/views/AuditInference.vue'),
+        meta: { title: 'Inference Gateway' },
+    },
     {
         path: '/:pathMatch(.*)*',
         name: 'NotFound',

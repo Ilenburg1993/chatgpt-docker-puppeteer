@@ -1,5 +1,5 @@
 <script setup>
-import { Activity, ChevronLeft, LayoutDashboard, ListTodo, ScrollText, Target } from 'lucide-vue-next';
+import { Activity, ChevronLeft, LayoutDashboard, ListTodo, ScrollText, Target, ShieldCheck } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 
 const props = defineProps({
@@ -15,6 +15,7 @@ const route = useRoute();
 
 const menuItems = [
     { icon: LayoutDashboard, label: 'Visão geral', path: '/dashboard' },
+    { icon: ShieldCheck, label: 'Audit Agent', path: '/audit' },
     { icon: ListTodo, label: 'Tarefas', path: '/tasks' },
     { icon: Target, label: 'Missões', path: '/missions' },
     { icon: ScrollText, label: 'Eventos', path: '/events' },
