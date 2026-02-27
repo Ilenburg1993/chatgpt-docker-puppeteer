@@ -28,10 +28,9 @@ test('validateInferenceRoute enforces model/backend allowlists', () => {
         allowedBackends: ['ollama_local'],
     };
 
-    assert.deepEqual(
-        validateInferenceRoute(effective, { model: 'qwen2.5-coder:3b', backend: 'ollama_local' }),
-        { ok: true }
-    );
+    assert.deepEqual(validateInferenceRoute(effective, { model: 'qwen2.5-coder:3b', backend: 'ollama_local' }), {
+        ok: true,
+    });
     assert.equal(validateInferenceRoute(effective, { model: 'other-model', backend: 'ollama_local' }).ok, false);
     assert.equal(validateInferenceRoute(effective, { model: 'qwen2.5-coder:3b', backend: 'ollama_cloud' }).ok, false);
 });

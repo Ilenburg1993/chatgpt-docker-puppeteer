@@ -22,7 +22,10 @@ async function _runControl(req, res, command, payload = {}) {
             command,
             payload: {
                 ...payload,
-                reason: payload.reason || req.body?.reason || `${String(command).toLowerCase()} via /api/dashboard/inference`,
+                reason:
+                    payload.reason ||
+                    req.body?.reason ||
+                    `${String(command).toLowerCase()} via /api/dashboard/inference`,
                 idempotency_key:
                     payload.idempotency_key ||
                     req.body?.idempotency_key ||
@@ -172,7 +175,8 @@ async function safePostJson(url, body, timeoutMs = 2000) {
 router.get('/inference/runtime', authenticate, async (req, res) => {
     try {
         const appLocals = req.app?.locals || {};
-        const runtimeSummary = typeof appLocals.getRuntimeResourcesStatus === 'function' ? appLocals.getRuntimeResourcesStatus() : null;
+        const runtimeSummary =
+            typeof appLocals.getRuntimeResourcesStatus === 'function' ? appLocals.getRuntimeResourcesStatus() : null;
         const urls = getBaseUrls();
 
         const [gatewayHealth, auditAgentHealth] = await Promise.all([
@@ -181,7 +185,9 @@ router.get('/inference/runtime', authenticate, async (req, res) => {
         ]);
 
         const resources = Array.isArray(runtimeSummary?.resources)
-            ? runtimeSummary.resources.filter(item => ['ollama_host', 'inference_gateway', 'audit_agent'].includes(String(item.id)))
+            ? runtimeSummary.resources.filter(item =>
+                  ['ollama_host', 'inference_gateway', 'audit_agent'].includes(String(item.id))
+              )
             : [];
 
         ok(
@@ -356,7 +362,8 @@ router.post('/inference/triage/preflight', authenticate, async (req, res) => {
     try {
         const urls = getBaseUrls();
         const body = req.body || {};
-        const profileName = body.profile_name || body.profileName || process.env.AUDIT_AGENT_TRIAGE_PROFILE_NAME || undefined;
+        const profileName =
+            body.profile_name || body.profileName || process.env.AUDIT_AGENT_TRIAGE_PROFILE_NAME || undefined;
         const model = body.model || process.env.AUDIT_AGENT_LLM_MODEL_TRIAGE || undefined;
         const backend = body.backend || undefined;
         const timeoutMs = Math.max(500, Number(body.timeout_ms || body.timeoutMs || 2000));
@@ -372,7 +379,11 @@ router.post('/inference/triage/preflight', authenticate, async (req, res) => {
         );
         const modelsProbe =
             String(body.probe_models || 'false').toLowerCase() === 'true'
-                ? await safePostJson(`${urls.inferenceGateway}/v1/models`, { clientTag: 'diagnostics_probe' }, Math.min(timeoutMs + 1000, 5000))
+                ? await safePostJson(
+                      `${urls.inferenceGateway}/v1/models`,
+                      { clientTag: 'diagnostics_probe' },
+                      Math.min(timeoutMs + 1000, 5000)
+                  )
                 : null;
         if (!out.ok) {
             return fail(res, req, out.status || 503, {
@@ -410,7 +421,8 @@ router.post('/inference/patch/preflight', authenticate, async (req, res) => {
     try {
         const urls = getBaseUrls();
         const body = req.body || {};
-        const profileName = body.profile_name || body.profileName || process.env.AUDIT_AGENT_PATCH_AUTHOR_PROFILE_NAME || undefined;
+        const profileName =
+            body.profile_name || body.profileName || process.env.AUDIT_AGENT_PATCH_AUTHOR_PROFILE_NAME || undefined;
         const model = body.model || process.env.AUDIT_AGENT_LLM_MODEL_PATCH || undefined;
         const backend = body.backend || undefined;
         const timeoutMs = Math.max(500, Number(body.timeout_ms || body.timeoutMs || 2000));

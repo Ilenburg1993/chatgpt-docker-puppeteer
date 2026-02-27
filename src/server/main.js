@@ -863,7 +863,9 @@ async function bootstrap(options = {}) {
                     owner: runtimeOwner,
                     criticality: 'optional',
                     reasonCode: inferenceProbe.ok ? null : 'INFERENCE_GATEWAY_UNREACHABLE',
-                    message: inferenceProbe.ok ? null : inferenceProbe.error || `HTTP ${inferenceProbe.status || 'n/a'}`,
+                    message: inferenceProbe.ok
+                        ? null
+                        : inferenceProbe.error || `HTTP ${inferenceProbe.status || 'n/a'}`,
                     health: () => inferenceProbe,
                 });
             } catch (err) {
@@ -883,7 +885,9 @@ async function bootstrap(options = {}) {
                     owner: runtimeOwner,
                     criticality: 'optional',
                     reasonCode: auditAgentProbe.ok ? null : 'AUDIT_AGENT_UNREACHABLE',
-                    message: auditAgentProbe.ok ? null : auditAgentProbe.error || `HTTP ${auditAgentProbe.status || 'n/a'}`,
+                    message: auditAgentProbe.ok
+                        ? null
+                        : auditAgentProbe.error || `HTTP ${auditAgentProbe.status || 'n/a'}`,
                     health: () => auditAgentProbe,
                 });
             } catch (err) {

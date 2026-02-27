@@ -212,7 +212,9 @@ test(
                 actor: actor(),
             });
             assert.equal(modelOut.success, true);
-            const createdModel = listInferenceModels({ backendId: backend?.id }).find(m => m.alias === 'patch_model_strong');
+            const createdModel = listInferenceModels({ backendId: backend?.id }).find(
+                m => m.alias === 'patch_model_strong'
+            );
             assert.ok(createdModel);
 
             const backendToggleOut = await executeCommand({
@@ -239,7 +241,10 @@ test(
                 actor: actor(),
             });
             assert.equal(modelToggleOut.success, true);
-            assert.equal(listInferenceModels({ backendId: backend?.id }).find(m => m.id === createdModel?.id)?.enabled, false);
+            assert.equal(
+                listInferenceModels({ backendId: backend?.id }).find(m => m.id === createdModel?.id)?.enabled,
+                false
+            );
 
             const createdProfile = listInferenceProfiles().find(p => p.name === 'patch_safe');
             const clientPolicyOut = await executeCommand({
@@ -294,7 +299,10 @@ test(
             assert.equal(validateApply.result?.metadata?.validation?.dry_run?.present, true);
             assert.equal(validateApply.result?.metadata?.validation?.mode, 'propose_only');
             assert.equal(Array.isArray(validateApply.result?.metadata?.validation?.blocking_reasons), true);
-            assert.equal(validateApply.result?.metadata?.validation?.blocking_reasons.includes('apply_mode_propose_only'), true);
+            assert.equal(
+                validateApply.result?.metadata?.validation?.blocking_reasons.includes('apply_mode_propose_only'),
+                true
+            );
 
             const prevApplyEnabled = process.env.AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL;
             const prevAllowedPrefixes = process.env.AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES;

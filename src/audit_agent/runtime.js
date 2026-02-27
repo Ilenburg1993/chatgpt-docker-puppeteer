@@ -1,7 +1,13 @@
 // @ts-check
 
 import { randomUUID } from 'node:crypto';
-import { AUDIT_JOB_KIND, AUDIT_JOB_STATUS, AUDIT_JOB_TRIGGER_TYPE, isAuditJobKind, isAuditJobTriggerType } from './contracts.js';
+import {
+    AUDIT_JOB_KIND,
+    AUDIT_JOB_STATUS,
+    AUDIT_JOB_TRIGGER_TYPE,
+    isAuditJobKind,
+    isAuditJobTriggerType,
+} from './contracts.js';
 
 /** @typedef {import('./contracts.js')} _unused */
 
@@ -120,7 +126,10 @@ export class AuditAgentRuntime {
     constructor(options = {}) {
         this.now = options.now || nowMs;
         this.logger = options.logger || null;
-        this.maxConcurrentJobs = Math.max(1, Number(options.maxConcurrentJobs || process.env.AUDIT_AGENT_MAX_CONCURRENT_JOBS || 1));
+        this.maxConcurrentJobs = Math.max(
+            1,
+            Number(options.maxConcurrentJobs || process.env.AUDIT_AGENT_MAX_CONCURRENT_JOBS || 1)
+        );
         this.store = options.store || null;
         this.contextBuilder = options.contextBuilder || null;
         this.triageClient = options.triageClient || null;
@@ -152,7 +161,10 @@ export class AuditAgentRuntime {
         try {
             this.store.onRunStart(job);
         } catch (error) {
-            this._log('WARN', '[audit-agent] onRunStart failed', { id: job?.id, error: error?.message || String(error) });
+            this._log('WARN', '[audit-agent] onRunStart failed', {
+                id: job?.id,
+                error: error?.message || String(error),
+            });
         }
     }
 
@@ -161,7 +173,10 @@ export class AuditAgentRuntime {
         try {
             this.store.onRunFinish(job);
         } catch (error) {
-            this._log('WARN', '[audit-agent] onRunFinish failed', { id: job?.id, error: error?.message || String(error) });
+            this._log('WARN', '[audit-agent] onRunFinish failed', {
+                id: job?.id,
+                error: error?.message || String(error),
+            });
         }
     }
 
@@ -170,7 +185,10 @@ export class AuditAgentRuntime {
         try {
             this.store.saveFindings(jobId, Array.isArray(findings) ? findings : []);
         } catch (error) {
-            this._log('WARN', '[audit-agent] saveFindings failed', { id: jobId, error: error?.message || String(error) });
+            this._log('WARN', '[audit-agent] saveFindings failed', {
+                id: jobId,
+                error: error?.message || String(error),
+            });
         }
     }
 
@@ -502,7 +520,11 @@ export class AuditAgentRuntime {
             const defaultPatch = _derivePatchDraftFromContext(job, contextPack);
             /** @type {any[]} */
             const patches = [];
-            if (llmPatchAuthor?.ok && llmPatchAuthor.patch_proposal && typeof llmPatchAuthor.patch_proposal === 'object') {
+            if (
+                llmPatchAuthor?.ok &&
+                llmPatchAuthor.patch_proposal &&
+                typeof llmPatchAuthor.patch_proposal === 'object'
+            ) {
                 patches.push(llmPatchAuthor.patch_proposal);
             }
             if (Array.isArray(contextPack?.patches) && contextPack.patches.length > 0) {

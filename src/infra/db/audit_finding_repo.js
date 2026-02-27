@@ -122,4 +122,3 @@ function listAuditFindingsByJobId(jobId, { limit = 200 } = {}) {
 }
 
 export { getAuditFindingById, listAuditFindingsByJobId, upsertAuditFinding };
-

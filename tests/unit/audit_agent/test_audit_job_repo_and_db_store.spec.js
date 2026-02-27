@@ -17,7 +17,11 @@ import {
     setInferenceBackendEnabled,
     upsertInferenceBackend,
 } from '../../../src/infra/db/inference_backend_repo.js';
-import { listInferenceModels, setInferenceModelEnabled, upsertInferenceModel } from '../../../src/infra/db/inference_model_repo.js';
+import {
+    listInferenceModels,
+    setInferenceModelEnabled,
+    upsertInferenceModel,
+} from '../../../src/infra/db/inference_model_repo.js';
 import {
     getInferenceClientPolicyByTag,
     listInferenceClientPolicies,

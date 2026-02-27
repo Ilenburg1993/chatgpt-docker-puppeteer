@@ -22,7 +22,8 @@ async function _runControl(req, res, command, payload = {}) {
             command,
             payload: {
                 ...payload,
-                reason: payload.reason || req.body?.reason || `${String(command).toLowerCase()} via /api/dashboard/audit`,
+                reason:
+                    payload.reason || req.body?.reason || `${String(command).toLowerCase()} via /api/dashboard/audit`,
                 idempotency_key:
                     payload.idempotency_key ||
                     req.body?.idempotency_key ||
@@ -78,10 +79,16 @@ function _computeDryRunState(patch) {
 function _enrichPatch(patch) {
     const summary = _safeObject(patch?.patch_summary_json);
     const proposedChanges = Array.isArray(summary?.proposed_changes)
-        ? summary.proposed_changes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 20)
+        ? summary.proposed_changes
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 20)
         : [];
     const candidateFiles = Array.isArray(summary?.candidate_files)
-        ? summary.candidate_files.map(v => String(v || '').trim()).filter(Boolean).slice(0, 20)
+        ? summary.candidate_files
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 20)
         : [];
     const llmMeta = {
         source: summary?.source ? String(summary.source) : null,
@@ -136,7 +143,10 @@ function _deriveLlmTriageSummary(job) {
     if (!triage) return null;
     const parsed = _safeObject(triage.parsed);
     const nextActions = Array.isArray(parsed?.next_actions)
-        ? parsed.next_actions.map(v => String(v || '').trim()).filter(Boolean).slice(0, 5)
+        ? parsed.next_actions
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 5)
         : [];
     return {
         present: true,
@@ -159,10 +169,16 @@ function _deriveLlmPatchAuthorSummary(job) {
     const parsed = _safeObject(patchAuthor.parsed);
     const validation = _safeObject(patchAuthor.validation);
     const candidateFiles = Array.isArray(parsed?.candidate_files)
-        ? parsed.candidate_files.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+        ? parsed.candidate_files
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 10)
         : [];
     const proposedChanges = Array.isArray(parsed?.proposed_changes)
-        ? parsed.proposed_changes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+        ? parsed.proposed_changes
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 10)
         : [];
     return {
         present: true,
@@ -271,7 +287,8 @@ async function _fetchAuditJobWithFallback(id) {
 router.get('/audit/runtime', authenticate, async (req, res) => {
     try {
         const appLocals = req.app?.locals || {};
-        const runtimeSummary = typeof appLocals.getRuntimeResourcesStatus === 'function' ? appLocals.getRuntimeResourcesStatus() : null;
+        const runtimeSummary =
+            typeof appLocals.getRuntimeResourcesStatus === 'function' ? appLocals.getRuntimeResourcesStatus() : null;
         const baseUrl = getAuditAgentBaseUrl();
         const [health, metrics] = await Promise.all([
             safeFetchJson(`${baseUrl}/health`, 1500),
@@ -346,7 +363,10 @@ router.get('/audit/jobs/:id', authenticate, async (req, res) => {
     return ok(res, req, _enrichAuditJob(result.job), {
         source: result.source,
         upstream_available: result.source === 'audit-agent',
-        upstream_error: result.source === 'audit-agent' ? null : result.upstream?.error || result.upstream?.json || result.upstream?.text || null,
+        upstream_error:
+            result.source === 'audit-agent'
+                ? null
+                : result.upstream?.error || result.upstream?.json || result.upstream?.text || null,
     });
 });
 
@@ -450,11 +470,12 @@ router.get('/audit/jobs/:id/patches', authenticate, async (req, res) => {
     const items = listAuditPatchProposalsByJobId(String(req.params.id || ''), {
         limit: req.query.limit ? Number(req.query.limit) : 50,
     });
-    const includeReadiness = String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+    const includeReadiness =
+        String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
     const actor = _actorFromReq(req);
     // Se include_readiness, buscar readiness para cada patch em paralelo
     const enriched = await Promise.all(
-        items.map(async (patch) => {
+        items.map(async patch => {
             const enrichedPatch = _enrichPatch(patch);
             if (includeReadiness && patch.id) {
                 const readiness = await _fetchApplyReadiness(String(patch.id), actor);
@@ -469,7 +490,8 @@ router.get('/audit/jobs/:id/patches', authenticate, async (req, res) => {
         (acc, item) => {
             const state = String(item?.dry_run_state?.state || 'unknown');
             acc.total += 1;
-            acc.by_status[String(item.status || 'unknown')] = (acc.by_status[String(item.status || 'unknown')] || 0) + 1;
+            acc.by_status[String(item.status || 'unknown')] =
+                (acc.by_status[String(item.status || 'unknown')] || 0) + 1;
             acc.dry_run[state] = (acc.dry_run[state] || 0) + 1;
             return acc;
         },
@@ -492,7 +514,8 @@ router.get('/audit/patches/:id', authenticate, async (req, res) => {
         });
     }
     const enriched = _enrichPatch(patch);
-    const includeReadiness = String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+    const includeReadiness =
+        String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
     if (includeReadiness) {
         const readiness = await _fetchApplyReadiness(String(req.params.id || ''), _actorFromReq(req));
         if (readiness) {
@@ -548,7 +571,8 @@ router.get('/audit/jobs/:id/patches/:patchId', authenticate, async (req, res) =>
         });
     }
     const enriched = _enrichPatch(patch);
-    const includeReadiness = String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+    const includeReadiness =
+        String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
     if (includeReadiness) {
         const readiness = await _fetchApplyReadiness(String(req.params.patchId || ''), _actorFromReq(req));
         if (readiness) {
@@ -570,11 +594,16 @@ router.post('/audit/jobs', authenticate, async (req, res) => {
     const createdJob = createResult.result?.after || createResult.result || null;
     const runNow = body.run_now === true || body.runNow === true;
     if (!runNow || !createdJob?.id) {
-        return ok(res, req, { job: createdJob, run: null }, {
-            source: 'control-plane',
-            command: COMMANDS.AUDIT_JOB_CREATE,
-            operation_id: createResult.operation?.id || null,
-        });
+        return ok(
+            res,
+            req,
+            { job: createdJob, run: null },
+            {
+                source: 'control-plane',
+                command: COMMANDS.AUDIT_JOB_CREATE,
+                operation_id: createResult.operation?.id || null,
+            }
+        );
     }
 
     const runResult = await _runControl(req, res, COMMANDS.AUDIT_JOB_RUN, {
@@ -585,7 +614,11 @@ router.post('/audit/jobs', authenticate, async (req, res) => {
     return ok(
         res,
         req,
-        { job: runResult.result?.after || createdJob, create: createResult.result || null, run: runResult.result || null },
+        {
+            job: runResult.result?.after || createdJob,
+            create: createResult.result || null,
+            run: runResult.result || null,
+        },
         {
             source: 'control-plane',
             command: `${COMMANDS.AUDIT_JOB_CREATE}+${COMMANDS.AUDIT_JOB_RUN}`,
@@ -738,22 +771,27 @@ router.get('/audit/diagnostic/runtime', authenticate, async (req, res) => {
             safeFetchJson(`${diagBaseUrl}/models`, 2000),
         ]);
 
-        return ok(res, req, {
-            available: health.ok === true,
-            endpoints: {
-                diagnostic: diagBaseUrl,
-                health: `${diagBaseUrl}/health`,
-                models: `${diagBaseUrl}/models`,
-                execute: `${diagBaseUrl}/execute`,
+        return ok(
+            res,
+            req,
+            {
+                available: health.ok === true,
+                endpoints: {
+                    diagnostic: diagBaseUrl,
+                    health: `${diagBaseUrl}/health`,
+                    models: `${diagBaseUrl}/models`,
+                    execute: `${diagBaseUrl}/execute`,
+                },
+                health: health.json || { ok: health.ok, status: health.status },
+                models: models.json || null,
+                probe: {
+                    health_status: health.status,
+                    models_status: models.status,
+                },
+                routing: 'Diagnostic jobs now processed by Audit Agent',
             },
-            health: health.json || { ok: health.ok, status: health.status },
-            models: models.json || null,
-            probe: {
-                health_status: health.status,
-                models_status: models.status,
-            },
-            routing: 'Diagnostic jobs now processed by Audit Agent',
-        }, { source: 'audit-agent', routing_note: 'diagnostic consolidated into audit-agent' });
+            { source: 'audit-agent', routing_note: 'diagnostic consolidated into audit-agent' }
+        );
     } catch (err) {
         return fail(res, req, 503, {
             code: 'DIAGNOSTIC_TO_AUDIT_AGENT_FAILED',
@@ -889,11 +927,16 @@ router.post('/audit/diagnostic/jobs', authenticate, async (req, res) => {
     if (!createResult) return;
 
     const createdJob = createResult.result?.after || createResult.result || null;
-    return ok(res, req, { job: createdJob }, {
-        source: 'control-plane',
-        command: COMMANDS.DIAGNOSTIC_JOB_CREATE,
-        operation_id: createResult.operation?.id || null,
-    });
+    return ok(
+        res,
+        req,
+        { job: createdJob },
+        {
+            source: 'control-plane',
+            command: COMMANDS.DIAGNOSTIC_JOB_CREATE,
+            operation_id: createResult.operation?.id || null,
+        }
+    );
 });
 
 /**

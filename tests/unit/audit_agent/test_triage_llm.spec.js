@@ -112,7 +112,10 @@ test('triage_llm skips with explicit reason when preflight rejects route', async
             },
             async () => {
                 const client = createAuditAgentTriageLlmClient();
-                const out = await client.runTriage({ kind: 'quick_audit', scope_json: {} }, { context: {}, findings: [] });
+                const out = await client.runTriage(
+                    { kind: 'quick_audit', scope_json: {} },
+                    { context: {}, findings: [] }
+                );
                 assert.equal(out.ok, false);
                 assert.equal(out.skipped, true);
                 assert.equal(out.error, 'inference_gateway_preflight_failed');
@@ -122,4 +125,3 @@ test('triage_llm skips with explicit reason when preflight rejects route', async
         await new Promise(resolve => server.close(() => resolve()));
     }
 });
-

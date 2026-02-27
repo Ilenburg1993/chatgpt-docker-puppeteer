@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
 
 test('AuditAgentRuntime creates, queues and processes quick audit jobs to completed', async () => {
-    const rt = new AuditAgentRuntime({ now: (() => { let t = 1000; return () => ++t; })() });
+    const rt = new AuditAgentRuntime({
+        now: (() => {
+            let t = 1000;
+            return () => ++t;
+        })(),
+    });
     const job = rt.createJob({ kind: 'quick_audit', trigger_type: 'manual' });
     assert.equal(job.status, 'PENDING');
     rt.queueJob(job.id);
@@ -107,7 +112,12 @@ test('AuditAgentRuntime executes patchAuthorClient for patch-like job and record
                         patch_unified_diff: '',
                         patch_summary: { source: 'audit-agent-patch-llm', candidate_files: ['src/main.js'] },
                         risk_score: 0.2,
-                        dry_run_result_json: { ok: false, pending: true, required: true, reason: 'dry_run_not_executed_yet' },
+                        dry_run_result_json: {
+                            ok: false,
+                            pending: true,
+                            required: true,
+                            reason: 'dry_run_not_executed_yet',
+                        },
                         approval_required: true,
                     },
                 };

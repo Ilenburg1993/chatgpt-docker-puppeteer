@@ -1,16 +1,18 @@
 ---
 name: audit-agent-background-llm-ops
 description:
-  'Use when implementing or operating the background Audit Agent (LLM engineering assistant), including inference-gateway policies, ollama host supervisor, job pipeline, approval flow, and CPU/budget controls.'
+  'Use when implementing or operating the background Audit Agent (LLM engineering assistant),
+  including inference-gateway policies, ollama host supervisor, job pipeline, approval flow, and
+  CPU/budget controls.'
 ---
 
 # Audit Agent Background LLM Ops
 
 ## Overview
 
-Skill para implementação e operação do novo subsistema `Audit Agent` neste repositório.
-Foco: `Audit Agent` + `Inference Gateway` + `ollama-host-supervisor` + integração com `MCP/LSP/RAG`
-sem violar SSOT/control-plane.
+Skill para implementação e operação do novo subsistema `Audit Agent` neste repositório. Foco:
+`Audit Agent` + `Inference Gateway` + `ollama-host-supervisor` + integração com `MCP/LSP/RAG` sem
+violar SSOT/control-plane.
 
 ## When To Use
 

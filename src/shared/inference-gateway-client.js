@@ -2,17 +2,17 @@
 
 /**
  * Shared Inference Gateway Client
- * 
+ *
  * Módulo centralizado para comunicação com o Inference Gateway.
  * Usado por Audit Agent, Diagnostic Agent e outros consumidores.
- * 
+ *
  * Variáveis de ambiente:
  * - INFERENCE_GATEWAY_HOST: Host do Gateway (padrão: 127.0.0.1)
  * - INFERENCE_GATEWAY_PORT: Porta do Gateway (padrão: 3099)
  * - INFERENCE_GATEWAY_ENABLED: Habilitar/desabilitar (padrão: true)
  * - INFERENCE_GATEWAY_TIMEOUT_MS: Timeout em ms (padrão: 120000)
  * - INFERENCE_GATEWAY_DEFAULT_MODEL: Modelo padrão (padrão: llama3.2)
- * 
+ *
  * Client Tags disponíveis:
  * - audit_agent_triage: Para triage de auditoria
  * - audit_agent_patch: Para geração de patches
@@ -162,7 +162,7 @@ async function _postJson(url, body, timeoutMs) {
 async function _getJson(url, timeoutMs) {
     const res = await fetch(url, {
         method: 'GET',
-        headers: { 'accept': 'application/json' },
+        headers: { accept: 'application/json' },
         signal: AbortSignal.timeout(timeoutMs),
     });
     const text = await res.text();
@@ -188,15 +188,7 @@ async function _getJson(url, timeoutMs) {
  * @returns {object}
  */
 export function createGatewayClient(options = {}) {
-    const {
-        clientTag = 'fallback_generic',
-        baseUrl,
-        host,
-        port,
-        model,
-        timeout,
-        enabled = true,
-    } = options;
+    const { clientTag = 'fallback_generic', baseUrl, host, port, model, timeout, enabled = true } = options;
 
     const _baseUrl = baseUrl || getGatewayBaseUrl({ host, port });
     const _timeout = timeout || getTimeout();
@@ -205,10 +197,10 @@ export function createGatewayClient(options = {}) {
     return {
         /** @returns {string} */
         getBaseUrl: () => _baseUrl,
-        
+
         /** @returns {string} */
         getClientTag: () => clientTag,
-        
+
         /** @returns {boolean} */
         isEnabled: () => enabled && isGatewayEnabled(),
 
@@ -263,12 +255,8 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(
-                    `${_baseUrl}/v1/validate/generate`,
-                    payload,
-                    Math.min(_timeout, 10000)
-                );
-                
+                const result = await _postJson(`${_baseUrl}/v1/validate/generate`, payload, Math.min(_timeout, 10000));
+
                 if (!result.ok || !result.json?.ok) {
                     return {
                         ok: false,
@@ -334,7 +322,7 @@ export function createGatewayClient(options = {}) {
                     model: mod,
                     runtime,
                 });
-                
+
                 if (!preflightResult.validated) {
                     return {
                         ok: false,
@@ -356,17 +344,13 @@ export function createGatewayClient(options = {}) {
                 prompt,
                 maxTokens,
             };
-            
+
             if (temperature !== undefined) {
                 payload.temperature = temperature;
             }
 
             try {
-                const result = await _postJson(
-                    `${_baseUrl}/v1/generate`,
-                    payload,
-                    _timeout
-                );
+                const result = await _postJson(`${_baseUrl}/v1/generate`, payload, _timeout);
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -422,12 +406,7 @@ export function createGatewayClient(options = {}) {
          * }>}
          */
         async embed(options = {}) {
-            const {
-                input,
-                clientTag: optClientTag,
-                model: optModel,
-                preflight: doPreflight = true,
-            } = options;
+            const { input, clientTag: optClientTag, model: optModel, preflight: doPreflight = true } = options;
 
             const tag = optClientTag || clientTag;
             const mod = optModel || _model;
@@ -438,7 +417,7 @@ export function createGatewayClient(options = {}) {
                     clientTag: tag,
                     model: mod,
                 });
-                
+
                 if (!preflightResult.validated) {
                     return {
                         ok: false,
@@ -455,11 +434,7 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(
-                    `${_baseUrl}/v1/embed`,
-                    payload,
-                    _timeout
-                );
+                const result = await _postJson(`${_baseUrl}/v1/embed`, payload, _timeout);
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -497,12 +472,8 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(
-                    `${_baseUrl}/v1/validate/embed`,
-                    payload,
-                    Math.min(_timeout, 10000)
-                );
-                
+                const result = await _postJson(`${_baseUrl}/v1/validate/embed`, payload, Math.min(_timeout, 10000));
+
                 if (!result.ok || !result.json?.ok) {
                     return {
                         ok: false,

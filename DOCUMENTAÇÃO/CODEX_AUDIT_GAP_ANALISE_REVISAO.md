@@ -127,8 +127,8 @@ foram implementadas.
 
 ## Status de Implementação por Módulo
 
-| Módulo                              | Arquivos          | Status     | Alignment |
-| ----------------------------------- | ----------------- | ---------- | --------- |
+| Módulo                              | Arquivos          | Status      | Alignment |
+| ----------------------------------- | ----------------- | ----------- | --------- |
 | **audit_agent/main.js**             | Entry point       | ✅ Completo | 100%      |
 | **audit_agent/runtime.js**          | Job orchestration | ✅ Completo | 100%      |
 | **audit_agent/server.js**           | HTTP server       | ✅ Completo | 100%      |

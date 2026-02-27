@@ -62,7 +62,11 @@ export class InferenceGateway {
         this.globalPolicy = options.globalPolicy || null;
         this.profilePolicies = options.profilePolicies || Object.create(null);
         this.clientPolicies = options.clientPolicies || Object.create(null);
-        this.defaults = options.defaults || { timeoutMs: 120000, maxParallel: 1, degradedBehavior: 'degraded_continue' };
+        this.defaults = options.defaults || {
+            timeoutMs: 120000,
+            maxParallel: 1,
+            degradedBehavior: 'degraded_continue',
+        };
         this._inFlightByClient = new Map();
         /** @type {InferenceGatewayMetrics} */
         this.metrics = {
@@ -132,7 +136,10 @@ export class InferenceGateway {
         const clientTag = requireInferenceClientTag(options?.clientTag);
         const clientPolicy = this.clientPolicies[clientTag] || null;
         const profileName = String(
-            options?.profileName || /** @type {any} */ (clientPolicy)?.profile_name || /** @type {any} */ (clientPolicy)?.profileName || ''
+            options?.profileName ||
+                /** @type {any} */ (clientPolicy)?.profile_name ||
+                /** @type {any} */ (clientPolicy)?.profileName ||
+                ''
         ).trim();
         return resolveInferencePolicy({
             clientTag,
@@ -182,7 +189,10 @@ export class InferenceGateway {
             overrides: request.policyOverrides,
         });
         const clientTag = policy.clientTag;
-        const routeCheck = validateInferenceRoute(policy.effective, { model: request.model || null, backend: request.backend || null });
+        const routeCheck = validateInferenceRoute(policy.effective, {
+            model: request.model || null,
+            backend: request.backend || null,
+        });
         if (!routeCheck.ok) {
             const err = new Error(routeCheck.reason || 'rota inválida');
             /** @type {any} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
@@ -224,7 +234,10 @@ export class InferenceGateway {
             overrides: request.policyOverrides,
         });
         const clientTag = policy.clientTag;
-        const routeCheck = validateInferenceRoute(policy.effective, { model: request.model || null, backend: request.backend || null });
+        const routeCheck = validateInferenceRoute(policy.effective, {
+            model: request.model || null,
+            backend: request.backend || null,
+        });
         if (!routeCheck.ok) {
             const err = new Error(routeCheck.reason || 'rota inválida');
             /** @type {any} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';

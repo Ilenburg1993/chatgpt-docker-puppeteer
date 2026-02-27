@@ -2,7 +2,7 @@
 
 **Data de Criação:** 2026-02-23  
 **Versão:** 1.0.0  
-**Status:** Análise Concluída  
+**Status:** Análise Concluída
 
 ---
 
@@ -25,23 +25,26 @@
 
 ### 1.1 Visão Geral dos Agentes
 
-Após análise detalhada do código-fonte de ambos os sistemas, identificamos que existem dois agentes com propósitos distintos, porém com algumas sobreposições funcionais:
+Após análise detalhada do código-fonte de ambos os sistemas, identificamos que existem dois agentes
+com propósitos distintos, porém com algumas sobreposições funcionais:
 
-| Aspecto | Audit Agent | Diagnostic Agent |
-|---------|-------------|------------------|
-| **Propósito Principal** | Auditoria de código, detecção de bugs, geração de patches | Diagnóstico de infraestrutura LLM/Ollama, análise de código via LLM |
-| **Escopo** | Focado em quality gates, contratos, lint, typecheck | Focado em saúde do Ollama, análise de código, relatórios |
-| **Maturidade** | Alto - múltiplas ondas de desenvolvimento (AQ1-AQ6, AAG-F3-F9) | Médio - implementação inicial recente |
-| **Persistência** | SQLite com repositórios completos | Não possui persistência (apenas memória) |
-| **Integração com LLM** | Via Inference Gateway com políticas | Via Inference Gateway direto |
+| Aspecto                 | Audit Agent                                                    | Diagnostic Agent                                                    |
+| ----------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Propósito Principal** | Auditoria de código, detecção de bugs, geração de patches      | Diagnóstico de infraestrutura LLM/Ollama, análise de código via LLM |
+| **Escopo**              | Focado em quality gates, contratos, lint, typecheck            | Focado em saúde do Ollama, análise de código, relatórios            |
+| **Maturidade**          | Alto - múltiplas ondas de desenvolvimento (AQ1-AQ6, AAG-F3-F9) | Médio - implementação inicial recente                               |
+| **Persistência**        | SQLite com repositórios completos                              | Não possui persistência (apenas memória)                            |
+| **Integração com LLM**  | Via Inference Gateway com políticas                            | Via Inference Gateway direto                                        |
 
 ### 1.2 Conclusão Principal
 
 **A existência de ambos é justificada**, pois atendem a propósitos complementares:
+
 - **Audit Agent**: focado em auditoria determinística e assistida por LLM para código
 - **Diagnostic Agent**: focado em diagnóstico de infraestrutura e análise de código via LLM
 
 Porém, há **sobreposições significativas** em:
+
 - Análise de código via LLM
 - Integração com Inference Gateway
 - Verificação de saúde de serviços
@@ -100,38 +103,40 @@ src/server/api/controllers/
 
 ### 3.1 Audit Agent - Funcionalidades
 
-| Funcionalidade | Status | Descrição |
-|----------------|--------|-----------|
-| **Job Queue System** | ✅ Completo | Sistema de jobs com estados (PENDING, QUEUED, RUNNING, WAITING_APPROVAL, COMPLETED, FAILED, CANCELLED) |
-| **Context Builder** | ✅ Completo | Coleta contexto via MCP (lsp_diagnostics, lsp_definition, rag_search, rag_expand, lsp_references, lsp_document_symbols) |
-| **Triage LLM** | ✅ Completo | Triagem de código via Inference Gateway com preflight de policy |
-| **Patch Author LLM** | ✅ Completo | Geração de proposals de patch via Inference Gateway |
-| **Persistência SQLite** | ✅ Completo | Repositórios para jobs, runs, findings, patches, watch_rules |
-| **Control Plane Integration** | ✅ Completo | Comandos AUDIT_JOB_CREATE, AUDIT_JOB_RUN, AUDIT_PATCH_APPLY, etc. |
-| **Dry-run Validation** | ✅ Completo | Validação temporal de dry-run com TTL |
-| **Guardrails de Apply** | ✅ Completo | Validação de branch, path, worktree antes de apply |
+| Funcionalidade                | Status      | Descrição                                                                                                               |
+| ----------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Job Queue System**          | ✅ Completo | Sistema de jobs com estados (PENDING, QUEUED, RUNNING, WAITING_APPROVAL, COMPLETED, FAILED, CANCELLED)                  |
+| **Context Builder**           | ✅ Completo | Coleta contexto via MCP (lsp_diagnostics, lsp_definition, rag_search, rag_expand, lsp_references, lsp_document_symbols) |
+| **Triage LLM**                | ✅ Completo | Triagem de código via Inference Gateway com preflight de policy                                                         |
+| **Patch Author LLM**          | ✅ Completo | Geração de proposals de patch via Inference Gateway                                                                     |
+| **Persistência SQLite**       | ✅ Completo | Repositórios para jobs, runs, findings, patches, watch_rules                                                            |
+| **Control Plane Integration** | ✅ Completo | Comandos AUDIT_JOB_CREATE, AUDIT_JOB_RUN, AUDIT_PATCH_APPLY, etc.                                                       |
+| **Dry-run Validation**        | ✅ Completo | Validação temporal de dry-run com TTL                                                                                   |
+| **Guardrails de Apply**       | ✅ Completo | Validação de branch, path, worktree antes de apply                                                                      |
 
 ### 3.2 Diagnostic Agent - Funcionalidades
 
-| Funcionalidade | Status | Descrição |
-|----------------|--------|-----------|
-| **Health Check Ollama** | ✅ Completo | Verificação de conectividade, modelos disponíveis |
-| **Health Check Gateway** | ✅ Completo | Verificação de políticas carregadas |
-| **System Monitor** | ✅ Completo | CPU, memória, uptime |
-| **Code Analyzer** | ✅ Completo | Leitura de arquivos + análise via LLM |
-| **Report Generator** | ✅ Completo | Geração de relatórios em Markdown |
-| **Model Analyzer** | ✅ Completo | Listagem de modelos disponíveis |
-| **Persistência** | ❌ Ausente | Não há persistência de dados |
-| **Control Plane Integration** | ❌ Ausente | Não há comandos DIAGNOSTIC_* no control plane |
+| Funcionalidade                | Status      | Descrição                                         |
+| ----------------------------- | ----------- | ------------------------------------------------- |
+| **Health Check Ollama**       | ✅ Completo | Verificação de conectividade, modelos disponíveis |
+| **Health Check Gateway**      | ✅ Completo | Verificação de políticas carregadas               |
+| **System Monitor**            | ✅ Completo | CPU, memória, uptime                              |
+| **Code Analyzer**             | ✅ Completo | Leitura de arquivos + análise via LLM             |
+| **Report Generator**          | ✅ Completo | Geração de relatórios em Markdown                 |
+| **Model Analyzer**            | ✅ Completo | Listagem de modelos disponíveis                   |
+| **Persistência**              | ❌ Ausente  | Não há persistência de dados                      |
+| **Control Plane Integration** | ❌ Ausente  | Não há comandos DIAGNOSTIC\_\* no control plane   |
 
 ### 3.3 Comparação de Pipeline LLM
 
 #### Audit Agent Pipeline
+
 ```
 Job Creation → Collect Context (MCP/LSP/RAG) → Triage LLM → Patch Author LLM → Findings → Patches → Approval → Apply
 ```
 
 #### Diagnostic Agent Pipeline
+
 ```
 Request → Read Files → Analyze with LLM → Generate Report (Markdown/JSON)
 ```
@@ -142,38 +147,43 @@ Request → Read Files → Analyze with LLM → Generate Report (Markdown/JSON)
 
 ### 4.1 Sobreposições Identificadas
 
-| Área | Audit Agent | Diagnostic Agent | Severity |
-|------|-------------|------------------|----------|
-| **Análise de Código via LLM** | `triage_llm.js`, `patch_author_llm.js` | `code-analyzer.js` | **ALTA** |
-| **Verificação de Saúde** | `context_builder.js` (probeInferenceGateway) | `health-checker.js` | **MÉDIA** |
-| **Inference Gateway Integration** | HTTP client para `/v1/generate` | HTTP client para `/v1/generate` | **ALTA** |
-| **Relatórios** | `result_json` em jobs | `report-generator.js` | **BAIXA** |
+| Área                              | Audit Agent                                  | Diagnostic Agent                | Severity  |
+| --------------------------------- | -------------------------------------------- | ------------------------------- | --------- |
+| **Análise de Código via LLM**     | `triage_llm.js`, `patch_author_llm.js`       | `code-analyzer.js`              | **ALTA**  |
+| **Verificação de Saúde**          | `context_builder.js` (probeInferenceGateway) | `health-checker.js`             | **MÉDIA** |
+| **Inference Gateway Integration** | HTTP client para `/v1/generate`              | HTTP client para `/v1/generate` | **ALTA**  |
+| **Relatórios**                    | `result_json` em jobs                        | `report-generator.js`           | **BAIXA** |
 
 ### 4.2 Análise Detalhada das Redundâncias
 
 #### 4.2.1 Análise de Código via LLM
 
 **Audit Agent:**
+
 - Usa contexto do MCP (LSP diagnostics, RAG search)
 - Prompt focado em triagem e risco
 - Saída estruturada (summary, risk_level, next_actions)
 - Integração com patch author
 
 **Diagnostic Agent:**
+
 - Lê arquivos diretamente do filesystem
 - Prompt focado em análise detalhada (bugs, gaps, recommendations)
 - Saída estruturada (issues, gaps, recommendations, score)
 - Não há integração com sistema de patches
 
-**Conclusão:** Embora o propósito seja diferente (triagem vs análise detalhada), há lógica duplicada na chamada LLM.
+**Conclusão:** Embora o propósito seja diferente (triagem vs análise detalhada), há lógica duplicada
+na chamada LLM.
 
 #### 4.2.2 Verificação de Saúde
 
 **Audit Agent:**
+
 - `probeInferenceGateway()` em `context_builder.js`
 - Verifica `/health` e `/v1/models`
 
 **Diagnostic Agent:**
+
 - `HealthChecker.checkGateway()` em `health-checker.js`
 - Verifica `/health` e `/v1/models`
 
@@ -185,30 +195,30 @@ Request → Read Files → Analyze with LLM → Generate Report (Markdown/JSON)
 
 ### 5.1 Problemas Críticos
 
-| ID | Problema | Impacto | агента |
-|----|----------|---------|--------|
-| P1 | Diagnostic Agent sem persistência | Não mantém histórico de análises | Diagnostic |
-| P2 | Diagnostic Agent sem Control Plane | Não pode ser operado via comandos centralizados | Diagnostic |
-| P3 | Duplicação de integração LLM | Manutenção duplicada | Ambos |
-| P4 | Duplicação de health checks | Manutenção duplicada | Ambos |
+| ID  | Problema                           | Impacto                                         | агента     |
+| --- | ---------------------------------- | ----------------------------------------------- | ---------- |
+| P1  | Diagnostic Agent sem persistência  | Não mantém histórico de análises                | Diagnostic |
+| P2  | Diagnostic Agent sem Control Plane | Não pode ser operado via comandos centralizados | Diagnostic |
+| P3  | Duplicação de integração LLM       | Manutenção duplicada                            | Ambos      |
+| P4  | Duplicação de health checks        | Manutenção duplicada                            | Ambos      |
 
 ### 5.2 Inconsistências Arquiteturais
 
-| Inconsistência | Descrição |
-|----------------|-----------|
-| **Pattern de Logging** | Audit Agent usa logger custom via callback; Diagnostic Agent usa logger próprio em `utils/logger.js` |
-| **Pattern de Configuração** | Audit Agent usa env vars diretas; Diagnostic Agent usa `constants.js` |
-| **HTTP Server** | Audit Agent usa servidor simples; Diagnostic Agent usa servidor com mais estrutura |
-| **Type Safety** | Audit Agent tem `@ts-check` e tipos mais rigorosos; Diagnostic Agent tem tipos menos definidos |
+| Inconsistência              | Descrição                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Pattern de Logging**      | Audit Agent usa logger custom via callback; Diagnostic Agent usa logger próprio em `utils/logger.js` |
+| **Pattern de Configuração** | Audit Agent usa env vars diretas; Diagnostic Agent usa `constants.js`                                |
+| **HTTP Server**             | Audit Agent usa servidor simples; Diagnostic Agent usa servidor com mais estrutura                   |
+| **Type Safety**             | Audit Agent tem `@ts-check` e tipos mais rigorosos; Diagnostic Agent tem tipos menos definidos       |
 
 ### 5.3 Áreas de Melhoria
 
-| Área | Melhoria Proposta |
-|------|-------------------|
-| **Reutilização** | Criar módulo compartilhado para integração com Inference Gateway |
-| **Persistência** | Adicionar persistência SQLite ao Diagnostic Agent |
-| **Control Plane** | Adicionar comandos DIAGNOSTIC_* ao control_command_service.js |
-| **Unificação** | Considerar migrar análise de código do Diagnostic Agent para o Audit Agent |
+| Área              | Melhoria Proposta                                                          |
+| ----------------- | -------------------------------------------------------------------------- |
+| **Reutilização**  | Criar módulo compartilhado para integração com Inference Gateway           |
+| **Persistência**  | Adicionar persistência SQLite ao Diagnostic Agent                          |
+| **Control Plane** | Adicionar comandos DIAGNOSTIC\_\* ao control_command_service.js            |
+| **Unificação**    | Considerar migrar análise de código do Diagnostic Agent para o Audit Agent |
 
 ---
 
@@ -216,30 +226,31 @@ Request → Read Files → Analyze with LLM → Generate Report (Markdown/JSON)
 
 ### 6.1 Inference Gateway
 
-| Aspecto | Audit Agent | Diagnostic Agent |
-|---------|-------------|------------------|
-| **URL Base** | `INFERENCE_GATEWAY_HOST:INFERENCE_GATEWAY_PORT` (default 127.0.0.1:3099) | `INFERENCE_GATEWAY_URL` (default http://localhost:3457) |
-| **Client Tags** | `audit_agent_triage`, `audit_agent_patch` | `diagnostic_code_analyzer` |
-| **Preflight** | Sim (via `/v1/validate/generate`) | Não |
-| **Políticas** | DB-backed (inference_client_policies) | Não |
+| Aspecto         | Audit Agent                                                              | Diagnostic Agent                                        |
+| --------------- | ------------------------------------------------------------------------ | ------------------------------------------------------- |
+| **URL Base**    | `INFERENCE_GATEWAY_HOST:INFERENCE_GATEWAY_PORT` (default 127.0.0.1:3099) | `INFERENCE_GATEWAY_URL` (default http://localhost:3457) |
+| **Client Tags** | `audit_agent_triage`, `audit_agent_patch`                                | `diagnostic_code_analyzer`                              |
+| **Preflight**   | Sim (via `/v1/validate/generate`)                                        | Não                                                     |
+| **Políticas**   | DB-backed (inference_client_policies)                                    | Não                                                     |
 
 ### 6.2 MCP/LSP/RAG (Apenas Audit Agent)
 
-O Diagnostic Agent **não utiliza** MCP, LSP ou RAG para análise de código. Ele lê arquivos diretamente do filesystem, enquanto o Audit Agent utiliza ferramentas semânticas.
+O Diagnostic Agent **não utiliza** MCP, LSP ou RAG para análise de código. Ele lê arquivos
+diretamente do filesystem, enquanto o Audit Agent utiliza ferramentas semânticas.
 
 ### 6.3 SQLite
 
-| Tabela | Audit Agent | Diagnostic Agent |
-|--------|-------------|-------------------|
-| `audit_jobs` | ✅ | ❌ |
-| `audit_job_runs` | ✅ | ❌ |
-| `audit_job_findings` | ✅ | ❌ |
-| `audit_patch_proposals` | ✅ | ❌ |
-| `audit_watch_rules` | ✅ | ❌ |
-| `inference_profiles` | ✅ | ❌ |
-| `inference_client_policies` | ✅ | ❌ |
-| `inference_backends` | ✅ | ❌ |
-| `inference_models` | ✅ | ❌ |
+| Tabela                      | Audit Agent | Diagnostic Agent |
+| --------------------------- | ----------- | ---------------- |
+| `audit_jobs`                | ✅          | ❌               |
+| `audit_job_runs`            | ✅          | ❌               |
+| `audit_job_findings`        | ✅          | ❌               |
+| `audit_patch_proposals`     | ✅          | ❌               |
+| `audit_watch_rules`         | ✅          | ❌               |
+| `inference_profiles`        | ✅          | ❌               |
+| `inference_client_policies` | ✅          | ❌               |
+| `inference_backends`        | ✅          | ❌               |
+| `inference_models`          | ✅          | ❌               |
 
 ---
 
@@ -247,25 +258,25 @@ O Diagnostic Agent **não utiliza** MCP, LSP ou RAG para análise de código. El
 
 ### 7.1 Recomendação de Curto Prazo (Immediately)
 
-| # | Recomendação | Justificativa | Esforço |
-|---|--------------|---------------|---------|
-| R1 | Adicionar health check do Diagnostic Agent ao Audit Agent context_builder | Elimina duplicação de lógica de health check | Baixo |
-| R2 | Unificar URL do Inference Gateway em constants compartilhadas | Elimina inconsistência de configuração | Baixo |
-| R3 | Adicionar comandos DIAGNOSTIC_* ao Control Plane | Permite operação centralizada do Diagnostic Agent | Médio |
+| #   | Recomendação                                                              | Justificativa                                     | Esforço |
+| --- | ------------------------------------------------------------------------- | ------------------------------------------------- | ------- |
+| R1  | Adicionar health check do Diagnostic Agent ao Audit Agent context_builder | Elimina duplicação de lógica de health check      | Baixo   |
+| R2  | Unificar URL do Inference Gateway em constants compartilhadas             | Elimina inconsistência de configuração            | Baixo   |
+| R3  | Adicionar comandos DIAGNOSTIC\_\* ao Control Plane                        | Permite operação centralizada do Diagnostic Agent | Médio   |
 
 ### 7.2 Recomendação de Médio Prazo
 
-| # | Recomendação | Justificativa | Esforço |
-|---|--------------|---------------|---------|
-| R4 | Criar módulo compartilhado `llm-client` para Inference Gateway | Elimina duplicação de código HTTP | Médio |
-| R5 | Adicionar persistência SQLite ao Diagnostic Agent | Permite histórico de análises | Médio |
-| R6 | Migrar análise de código do Diagnostic Agent para o Audit Agent | Unifica funcionalidade de análise LLM | Alto |
+| #   | Recomendação                                                    | Justificativa                         | Esforço |
+| --- | --------------------------------------------------------------- | ------------------------------------- | ------- |
+| R4  | Criar módulo compartilhado `llm-client` para Inference Gateway  | Elimina duplicação de código HTTP     | Médio   |
+| R5  | Adicionar persistência SQLite ao Diagnostic Agent               | Permite histórico de análises         | Médio   |
+| R6  | Migrar análise de código do Diagnostic Agent para o Audit Agent | Unifica funcionalidade de análise LLM | Alto    |
 
 ### 7.3 Recomendação de Longo Prazo
 
-| # | Recomendação | Justificativa | Esforço |
-|---|--------------|---------------|---------|
-| R7 | Consolidar ambos os agentes em um único sistema modular | Simplifica manutenção e reduz complexidade | Muito Alto |
+| #   | Recomendação                                            | Justificativa                              | Esforço    |
+| --- | ------------------------------------------------------- | ------------------------------------------ | ---------- |
+| R7  | Consolidar ambos os agentes em um único sistema modular | Simplifica manutenção e reduz complexidade | Muito Alto |
 
 ---
 
@@ -293,7 +304,7 @@ O Diagnostic Agent **não utiliza** MCP, LSP ou RAG para análise de código. El
 
 ### Fase 4: Control Plane (Próximas 4 Semanas)
 
-- [ ] **T4.1** - Adicionar comandos DIAGNOSTIC_* ao control_command_service.js
+- [ ] **T4.1** - Adicionar comandos DIAGNOSTIC\_\* ao control_command_service.js
 - [ ] **T4.2** - Adicionar wrappers de mutação ao dashboard_diagnostic.js
 - [ ] **T4.3** - Testar fluxo completo via Control Plane
 
@@ -310,22 +321,27 @@ O Diagnostic Agent **não utiliza** MCP, LSP ou RAG para análise de código. El
 ### 9.1 Estado Atual
 
 #### Dashboard Audit (dashboard_audit.js)
-- Endpoints de leitura: `/audit/jobs`, `/audit/jobs/:id`, `/audit/jobs/:id/findings`, `/audit/jobs/:id/patches`
-- Endpoints de mutação: `POST /audit/jobs`, `POST /audit/jobs/:id/run`, `POST /audit/patches/:id/approve`
+
+- Endpoints de leitura: `/audit/jobs`, `/audit/jobs/:id`, `/audit/jobs/:id/findings`,
+  `/audit/jobs/:id/patches`
+- Endpoints de mutação: `POST /audit/jobs`, `POST /audit/jobs/:id/run`,
+  `POST /audit/patches/:id/approve`
 - Read-models enriquecidos: `llm_triage_summary`, `dry_run_state`, `apply_readiness`
 
 #### Dashboard Diagnostic (dashboard_diagnostic.js) - RECÉM-CRIADO
-- Endpoints de leitura: `/diagnostic/health`, `/diagnostic/status`, `/diagnostic/models`, `/diagnostic/system`, `/diagnostic/config`
+
+- Endpoints de leitura: `/diagnostic/health`, `/diagnostic/status`, `/diagnostic/models`,
+  `/diagnostic/system`, `/diagnostic/config`
 - Endpoints de análise: `POST /diagnostic/analyze`, `POST /diagnostic/analyze/report`
 - Endpoints de comando: `POST /diagnostic/command`
 
 ### 9.2 Gaps Identificados
 
-| Gap | Descrição | Prioridade |
-|-----|-----------|------------|
-| G1 | Diagnostic Agent não expõe métricas no formato esperado pelo Dashboard | Alta |
-| G2 | Não há endpoint de listagem de análises históricas | Alta |
-| G3 | Não há integração com Control Plane para comandos DIAGNOSTIC_* | Média |
+| Gap | Descrição                                                              | Prioridade |
+| --- | ---------------------------------------------------------------------- | ---------- |
+| G1  | Diagnostic Agent não expõe métricas no formato esperado pelo Dashboard | Alta       |
+| G2  | Não há endpoint de listagem de análises históricas                     | Alta       |
+| G3  | Não há integração com Control Plane para comandos DIAGNOSTIC\_\*       | Média      |
 
 ### 9.3 Ações Recomendadas
 
@@ -344,7 +360,8 @@ A análise comparativa entre o **Audit Agent** e o **Diagnostic Agent** revela:
 1. **Dois sistemas complementares**: Cada agente atende a propósitos distintos e justificados
 2. **Sobreposições significativas**: Particularmente em análise de código LLM e health checks
 3. **Inconsistências arquiteturais**: Diferentes patterns de logging, configuração e tipagem
-4. **Oportunidades de consolidação**: Módulo compartilhado para integração LLM, persistência unificada
+4. **Oportunidades de consolidação**: Módulo compartilhado para integração LLM, persistência
+   unificada
 
 ### 10.2 Recomendação Final
 
@@ -354,9 +371,10 @@ A análise comparativa entre o **Audit Agent** e o **Diagnostic Agent** revela:
 2. **Médio prazo**: Adicionar persistência e Control Plane ao Diagnostic Agent
 3. **Longo prazo**: Avaliar migração de análise de código para o Audit Agent
 
-Esta abordagem preserva a especialização de cada agente enquanto reduz redundância e complexidade de manutenção.
+Esta abordagem preserva a especialização de cada agente enquanto reduz redundância e complexidade de
+manutenção.
 
 ---
 
-*Documento gerado automaticamente via análise de código-fonte*
-*Versão do código analisado: 2026-02-22*
+_Documento gerado automaticamente via análise de código-fonte_ _Versão do código analisado:
+2026-02-22_

@@ -13,8 +13,8 @@
 
 ### 1.2 Componentes Funcionais
 
-| Módulo            | Status        | Observações                      |
-| ----------------- | ------------- | -------------------------------- |
+| Módulo            | Status         | Observações                      |
+| ----------------- | -------------- | -------------------------------- |
 | Audit Runner      | ✅ Estável     | audit:quick/deep/nightly         |
 | Inference Gateway | ✅ Funcional   | generate/embed/listModels        |
 | Control Plane     | ✅ Operacional | AUDIT*\* / INFERENCE*\* commands |
@@ -23,8 +23,8 @@
 
 ### 1.3 Componentes Pendentes
 
-| Módulo                 | Status     | Dependência            |
-| ---------------------- | ---------- | ---------------------- |
+| Módulo                 | Status      | Dependência            |
+| ---------------------- | ----------- | ---------------------- |
 | AUDIT_PATCH_APPLY real | 🔒 Guardado | Necesita guardrails    |
 | UI Dashboard completa  | 🔲 Parcial  | APIs prontas           |
 | patch_author_llm V1    | 🔲 V0       | Depende de calibration |
@@ -104,7 +104,8 @@ flowchart TB
   - `src/audit_agent/runtime.js` (existente)
 - **Entregável:** Endpoint `GET /api/dashboard/audit/jobs/:id/llm-patch-author`
 - **Gates:** node --check + typecheck:full + 1 teste novo
-- **Status:** Implementado - endpoint já existe e retorna: summary, parsed, raw_response, preflight, policy, validation, patch_proposal
+- **Status:** Implementado - endpoint já existe e retorna: summary, parsed, raw_response, preflight,
+  policy, validation, patch_proposal
 - **Evidência:** Gates executados em 2026-02-22T14:11:29 - 32/32 testes passaram
 
 #### Tarefa 2: Apply Readiness em patch detail/list ✅ CONCLUÍDA
@@ -151,13 +152,15 @@ flowchart TB
 - **Gates:** node --check + typecheck:full + npm run test:unit:audit-agent
 - **Status:** Fluxo completo validado por testes
   - Criação de job `patch_suggest` via `createJob({kind: 'patch_suggest'})`
-  - Pipeline completo: collect_context → deterministic_checks → triage → triage_llm → patch_author_llm → waiting_approval
+  - Pipeline completo: collect_context → deterministic_checks → triage → triage_llm →
+    patch_author_llm → waiting_approval
   - Persistência de jobs/runs via DB store
   - Persistência de findings via `_persistFindings()`
   - Persistência de patches via `_persistPatchProposals()`
   - Contexto MCP coletado (quando disponível)
 - **Evidência:** Gates executados em 2026-02-22T14:42:05
-  - Testes: `test_control_command_service_audit_inference` (4/4), `test_audit_agent_runtime` (5/5), `test_audit_job_repo_and_db_store` (5/5)
+  - Testes: `test_control_command_service_audit_inference` (4/4), `test_audit_agent_runtime` (5/5),
+    `test_audit_job_repo_and_db_store` (5/5)
   - audit:quick: errors=0, warnings=0, partial=false
   - Run: `WAVE_AUDIT_QUICK_2026-02-22T14-41-42-463Z`
 
@@ -367,7 +370,8 @@ Iniciar **Tarefa 2**: Apply Readiness em patch detail/list
 
 **Passos:**
 
-1. Adicionar campo `apply_readiness` nas responses de `/audit/patches/:id` e `/audit/jobs/:id/patches`
+1. Adicionar campo `apply_readiness` nas responses de `/audit/patches/:id` e
+   `/audit/jobs/:id/patches`
 2. Usar `AUDIT_PATCH_APPLY_VALIDATE` para obter readiness
 3. Retornar approval + dry_run + guards + blocking_reasons
 4. Adicionar fallback para DB se audit-agent indisponível

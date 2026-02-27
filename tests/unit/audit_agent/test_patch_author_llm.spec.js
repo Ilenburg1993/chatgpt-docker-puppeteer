@@ -118,7 +118,11 @@ test('patch_author_llm tolerates non-JSON model response and emits fallback vali
             },
             async () => {
                 const client = createAuditAgentPatchAuthorLlmClient();
-                const out = await client.runPatchAuthor({ kind: 'patch_suggest', scope_json: {} }, { context: {}, findings: [] }, null);
+                const out = await client.runPatchAuthor(
+                    { kind: 'patch_suggest', scope_json: {} },
+                    { context: {}, findings: [] },
+                    null
+                );
                 assert.equal(out.ok, true);
                 assert.equal(out.validation?.strict_shape_ok, false);
                 assert.equal(out.patch_proposal?.patch_summary?.validation?.strict_shape_ok, false);
@@ -159,7 +163,11 @@ test('patch_author_llm fails when strict JSON mode is required and response shap
             },
             async () => {
                 const client = createAuditAgentPatchAuthorLlmClient();
-                const out = await client.runPatchAuthor({ kind: 'patch_suggest', scope_json: {} }, { context: {}, findings: [] }, null);
+                const out = await client.runPatchAuthor(
+                    { kind: 'patch_suggest', scope_json: {} },
+                    { context: {}, findings: [] },
+                    null
+                );
                 assert.equal(out.ok, false);
                 assert.equal(out.error, 'patch_author_invalid_json_shape');
                 assert.equal(out.details?.strict?.ok, false);

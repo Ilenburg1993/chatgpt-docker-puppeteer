@@ -247,8 +247,8 @@ quality_execution.dedup = {
 
 #### 3.3.1 Comandos AUDIT\_\*
 
-| Comando                      | Descrição              | Status       |
-| ---------------------------- | ---------------------- | ------------ |
+| Comando                      | Descrição              | Status        |
+| ---------------------------- | ---------------------- | ------------- |
 | `AUDIT_JOB_CREATE`           | Criar job de auditoria | ✅            |
 | `AUDIT_JOB_RUN`              | Executar job           | ✅            |
 | `AUDIT_JOB_CANCEL`           | Cancelar job           | ✅            |
@@ -264,13 +264,13 @@ quality_execution.dedup = {
 
 | Comando                          | Descrição                | Status |
 | -------------------------------- | ------------------------ | ------ |
-| `INFERENCE_PROFILE_VALIDATE`     | Validar perfil           | ✅      |
-| `INFERENCE_PROFILE_UPSERT`       | Criar/atualizar perfil   | ✅      |
-| `INFERENCE_CLIENT_POLICY_UPSERT` | Criar/atualizar política | ✅      |
-| `INFERENCE_BACKEND_UPSERT`       | Criar/atualizar backend  | ✅      |
-| `INFERENCE_BACKEND_TOGGLE`       | Ativar/desativar backend | ✅      |
-| `INFERENCE_MODEL_UPSERT`         | Criar/atualizar modelo   | ✅      |
-| `INFERENCE_MODEL_TOGGLE`         | Ativar/desativar modelo  | ✅      |
+| `INFERENCE_PROFILE_VALIDATE`     | Validar perfil           | ✅     |
+| `INFERENCE_PROFILE_UPSERT`       | Criar/atualizar perfil   | ✅     |
+| `INFERENCE_CLIENT_POLICY_UPSERT` | Criar/atualizar política | ✅     |
+| `INFERENCE_BACKEND_UPSERT`       | Criar/atualizar backend  | ✅     |
+| `INFERENCE_BACKEND_TOGGLE`       | Ativar/desativar backend | ✅     |
+| `INFERENCE_MODEL_UPSERT`         | Criar/atualizar modelo   | ✅     |
+| `INFERENCE_MODEL_TOGGLE`         | Ativar/desativar modelo  | ✅     |
 
 ### 3.4 Guardrails de Apply
 
@@ -416,7 +416,7 @@ O sistema implementa guardrails robustos para aplicação de patches:
 #### 5.2.2 MCP Server
 
 - **Endpoint**: `/api/mcp`
-- **Tools disponíveis**: 14 tools (lsp*\*, rag*_, ollama\__)
+- **Tools disponíveis**: 14 tools (lsp*\*, rag*\_, ollama\_\_)
 - **Modo fallback**: Deterministico quando indisponível
 
 #### 5.2.3 RAG

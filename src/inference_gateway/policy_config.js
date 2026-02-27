@@ -48,7 +48,9 @@ function asNonNegativeIntOrNull(value, fallback = null) {
 }
 
 function normalizeDegradedBehavior(value, fallback = 'degraded_continue') {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
     return normalized === 'fail_closed' ? 'fail_closed' : fallback;
 }
 
@@ -57,7 +59,10 @@ function mergeLayer(target, layer) {
     if (!src) return target;
 
     if ('timeoutMs' in src || 'timeout_ms' in src) {
-        target.timeoutMs = asPositiveInt(/** @type {any} */ (src).timeoutMs ?? /** @type {any} */ (src).timeout_ms, target.timeoutMs);
+        target.timeoutMs = asPositiveInt(
+            /** @type {any} */ (src).timeoutMs ?? /** @type {any} */ (src).timeout_ms,
+            target.timeoutMs
+        );
     }
     if ('maxParallel' in src || 'max_parallel' in src) {
         target.maxParallel = asPositiveInt(

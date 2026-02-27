@@ -89,7 +89,11 @@ function upsertInferenceClientPolicy(input = {}) {
         max_parallel: Math.max(1, Number(input.max_parallel ?? existing?.max_parallel ?? 1) || 1),
         rate_limit_json: _safeJsonString(input.rate_limit_json ?? input.rate_limit ?? {}),
         timeout_ms:
-            input.timeout_ms === undefined ? (existing?.timeout_ms ?? null) : input.timeout_ms == null ? null : Number(input.timeout_ms),
+            input.timeout_ms === undefined
+                ? (existing?.timeout_ms ?? null)
+                : input.timeout_ms == null
+                  ? null
+                  : Number(input.timeout_ms),
         token_budget_json: _safeJsonString(input.token_budget_json ?? input.token_budget ?? {}),
         priority: Number(input.priority ?? existing?.priority ?? 50) || 50,
         degraded_behavior_json: _safeJsonString(input.degraded_behavior_json ?? input.degraded_behavior ?? {}),
@@ -125,4 +129,3 @@ function listInferenceClientPolicies({ enabledOnly = false, limit = 100 } = {}) 
 }
 
 export { getInferenceClientPolicyByTag, listInferenceClientPolicies, upsertInferenceClientPolicy };
-

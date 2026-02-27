@@ -107,7 +107,10 @@ async function collectMcpSemanticContext(job) {
     const line = Math.max(1, Number(scope.line || 1));
     const character = Math.max(1, Number(scope.character || 1));
     const query = String(scope.query || scope.rag_query || 'AUDIT_AGENT');
-    const mcpBudget = Math.max(1, Math.min(Number(scope.mcp_budget || process.env.AUDIT_AGENT_CONTEXT_MCP_BUDGET || 5) || 5, 8));
+    const mcpBudget = Math.max(
+        1,
+        Math.min(Number(scope.mcp_budget || process.env.AUDIT_AGENT_CONTEXT_MCP_BUDGET || 5) || 5, 8)
+    );
     let budgetUsed = 0;
 
     const canSpend = () => budgetUsed < mcpBudget;
@@ -119,7 +122,11 @@ async function collectMcpSemanticContext(job) {
     spend();
     const [lspDiagnostics, ragSearch] = await Promise.all([
         callMcpTool('lsp_diagnostics', { filePath, maxResults: 20 }, { timeoutMs: 5000, id: 201 }),
-        callMcpTool('rag_search', { query, topK: 2, mode: 'auto', includeDiagnostics: true }, { timeoutMs: 8000, id: 202 }),
+        callMcpTool(
+            'rag_search',
+            { query, topK: 2, mode: 'auto', includeDiagnostics: true },
+            { timeoutMs: 8000, id: 202 }
+        ),
     ]);
 
     const lspData = lspDiagnostics.json?.result?.structuredContent?.data || null;
@@ -130,11 +137,11 @@ async function collectMcpSemanticContext(job) {
     if (lspDiagnostics.ok) {
         if (canSpend()) {
             spend();
-        lspDefinition = await callMcpTool(
-            'lsp_definition',
-            { filePath, line, character, maxResults: 10 },
-            { timeoutMs: 5000, id: 203 }
-        );
+            lspDefinition = await callMcpTool(
+                'lsp_definition',
+                { filePath, line, character, maxResults: 10 },
+                { timeoutMs: 5000, id: 203 }
+            );
         }
     }
     const defData = lspDefinition?.json?.result?.structuredContent?.data || null;
@@ -368,9 +375,15 @@ export function createAuditAgentContextBuilder() {
 
             const context = {
                 runtime: {
-                    mcp: mcpProbe.ok ? { ok: true, ...(mcpJson || {}) } : { ok: false, error: mcpProbe.error, stderr: mcpProbe.stderr || '' },
-                    rag: ragProbe.ok ? { ok: true, ...(ragJson || {}) } : { ok: false, error: ragProbe.error, stderr: ragProbe.stderr || '' },
-                    lsp: lspProbe.ok ? { ok: true, ...(lspJson || {}) } : { ok: false, error: lspProbe.error, stderr: lspProbe.stderr || '' },
+                    mcp: mcpProbe.ok
+                        ? { ok: true, ...(mcpJson || {}) }
+                        : { ok: false, error: mcpProbe.error, stderr: mcpProbe.stderr || '' },
+                    rag: ragProbe.ok
+                        ? { ok: true, ...(ragJson || {}) }
+                        : { ok: false, error: ragProbe.error, stderr: ragProbe.stderr || '' },
+                    lsp: lspProbe.ok
+                        ? { ok: true, ...(lspJson || {}) }
+                        : { ok: false, error: lspProbe.error, stderr: lspProbe.stderr || '' },
                 },
                 inference_gateway: infProbe,
                 mcp_tools: mcpSemantic?.tools || null,

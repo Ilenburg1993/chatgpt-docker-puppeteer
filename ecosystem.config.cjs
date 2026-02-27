@@ -31,7 +31,8 @@
 const isProduction = __dirname.endsWith('/dist') || __dirname.endsWith('\\dist');
 const projectRoot = isProduction ? require('path').resolve(__dirname, '..') : __dirname;
 const scriptPath = isProduction ? './start.js' : './index.js';
-const enableAuditAgentPm2Processes = String(process.env.ENABLE_AUDIT_AGENT_PM2_PROCESSES || '').toLowerCase() === 'true';
+const enableAuditAgentPm2Processes =
+    String(process.env.ENABLE_AUDIT_AGENT_PM2_PROCESSES || '').toLowerCase() === 'true';
 
 console.log(`🔍 PM2 Environment: ${isProduction ? 'PRODUCTION (dist)' : 'DEVELOPMENT (root)'}`);
 console.log(`📁 Project root: ${projectRoot}`);

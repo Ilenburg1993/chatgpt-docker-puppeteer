@@ -67,7 +67,9 @@ function createAuditJob(input = {}) {
     `
     ).run({
         id: String(input.id || '').trim(),
-        status: String(input.status || 'PENDING').trim().toUpperCase(),
+        status: String(input.status || 'PENDING')
+            .trim()
+            .toUpperCase(),
         kind: String(input.kind || 'quick_audit').trim(),
         priority: Number(input.priority) || 50,
         trigger_type: String(input.trigger_type || 'manual').trim(),
@@ -145,7 +147,12 @@ function updateAuditJob(id, updates = {}) {
         id: existing.id,
         status: updates.status ? String(updates.status).trim().toUpperCase() : existing.status,
         priority: updates.priority !== undefined ? Number(updates.priority) || existing.priority : existing.priority,
-        trigger_ref: updates.trigger_ref !== undefined ? (updates.trigger_ref ? String(updates.trigger_ref) : null) : existing.trigger_ref,
+        trigger_ref:
+            updates.trigger_ref !== undefined
+                ? updates.trigger_ref
+                    ? String(updates.trigger_ref)
+                    : null
+                : existing.trigger_ref,
         scope_json:
             updates.scope_json !== undefined || updates.scope !== undefined
                 ? _safeJsonString(updates.scope_json ?? updates.scope ?? {}, '{}')
@@ -154,10 +161,24 @@ function updateAuditJob(id, updates = {}) {
             updates.policy_json !== undefined || updates.policy !== undefined
                 ? _safeJsonString(updates.policy_json ?? updates.policy ?? {}, '{}')
                 : _safeJsonString(existing.policy_json, '{}'),
-        mission_id: updates.mission_id !== undefined ? (updates.mission_id ? String(updates.mission_id) : null) : existing.mission_id,
+        mission_id:
+            updates.mission_id !== undefined
+                ? updates.mission_id
+                    ? String(updates.mission_id)
+                    : null
+                : existing.mission_id,
         current_step:
-            updates.current_step !== undefined ? (updates.current_step ? String(updates.current_step) : null) : existing.current_step,
-        assigned_to: updates.assigned_to !== undefined ? (updates.assigned_to ? String(updates.assigned_to) : null) : existing.assigned_to,
+            updates.current_step !== undefined
+                ? updates.current_step
+                    ? String(updates.current_step)
+                    : null
+                : existing.current_step,
+        assigned_to:
+            updates.assigned_to !== undefined
+                ? updates.assigned_to
+                    ? String(updates.assigned_to)
+                    : null
+                : existing.assigned_to,
         attempt_seq: updates.attempt_seq !== undefined ? Number(updates.attempt_seq) || 0 : existing.attempt_seq,
         result_json:
             updates.result_json !== undefined
@@ -174,11 +195,15 @@ function updateAuditJob(id, updates = {}) {
         updated_at_ms: now,
         started_at_ms:
             updates.started_at_ms !== undefined
-                ? (updates.started_at_ms == null ? null : Number(updates.started_at_ms))
+                ? updates.started_at_ms == null
+                    ? null
+                    : Number(updates.started_at_ms)
                 : existing.started_at_ms,
         completed_at_ms:
             updates.completed_at_ms !== undefined
-                ? (updates.completed_at_ms == null ? null : Number(updates.completed_at_ms))
+                ? updates.completed_at_ms == null
+                    ? null
+                    : Number(updates.completed_at_ms)
                 : existing.completed_at_ms,
     });
     return getAuditJobById(existing.id);
@@ -192,4 +217,3 @@ function upsertAuditJobSnapshot(job) {
 }
 
 export { createAuditJob, getAuditJobById, listAuditJobs, updateAuditJob, upsertAuditJobSnapshot };
-

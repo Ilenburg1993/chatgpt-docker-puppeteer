@@ -36,21 +36,27 @@ try {
     const { createAuditAgentContextBuilder } = await import('./context_builder.js');
     contextBuilder = createAuditAgentContextBuilder();
 } catch (error) {
-    console.warn(`[audit-agent] context builder unavailable (read-only probes disabled): ${error?.message || String(error)}`);
+    console.warn(
+        `[audit-agent] context builder unavailable (read-only probes disabled): ${error?.message || String(error)}`
+    );
 }
 let triageClient = null;
 try {
     const { createAuditAgentTriageLlmClient } = await import('./triage_llm.js');
     triageClient = createAuditAgentTriageLlmClient();
 } catch (error) {
-    console.warn(`[audit-agent] triage llm client unavailable (LLM triage disabled): ${error?.message || String(error)}`);
+    console.warn(
+        `[audit-agent] triage llm client unavailable (LLM triage disabled): ${error?.message || String(error)}`
+    );
 }
 let patchAuthorClient = null;
 try {
     const { createAuditAgentPatchAuthorLlmClient } = await import('./patch_author_llm.js');
     patchAuthorClient = createAuditAgentPatchAuthorLlmClient();
 } catch (error) {
-    console.warn(`[audit-agent] patch author llm client unavailable (LLM patch author disabled): ${error?.message || String(error)}`);
+    console.warn(
+        `[audit-agent] patch author llm client unavailable (LLM patch author disabled): ${error?.message || String(error)}`
+    );
 }
 
 const runtime = new AuditAgentRuntime({
@@ -73,9 +79,12 @@ if (String(process.env.AUDIT_AGENT_HYDRATE_ON_START || 'true').toLowerCase() ===
     console.log('[audit-agent] hydration', hydration);
 }
 
-const heartbeat = setInterval(() => {
-    void runtime.tick();
-}, Math.max(1000, cfg.triggerDebounceMs));
+const heartbeat = setInterval(
+    () => {
+        void runtime.tick();
+    },
+    Math.max(1000, cfg.triggerDebounceMs)
+);
 heartbeat.unref?.();
 
 await new Promise((resolve, reject) => {

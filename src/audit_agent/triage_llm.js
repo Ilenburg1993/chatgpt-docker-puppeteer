@@ -34,8 +34,10 @@ function _buildTriagePrompt(job, contextPack) {
         `lsp_document_symbols=${JSON.stringify(mcpTools.lsp_document_symbols || null)}`,
         `rag_search=${JSON.stringify(mcpTools.rag_search || null)}`,
         `rag_expand=${JSON.stringify(mcpTools.rag_expand || null)}`,
-        `existing_findings=${JSON.stringify(findings.slice(0, 8).map(f => ({ title: f?.title, severity: f?.severity, category: f?.category })))}`
-            .slice(0, 4000),
+        `existing_findings=${JSON.stringify(findings.slice(0, 8).map(f => ({ title: f?.title, severity: f?.severity, category: f?.category })))}`.slice(
+            0,
+            4000
+        ),
         'Responda em JSON com {summary:string, risk_level:"low|medium|high", next_actions:string[]}',
     ];
     return lines.join('\n');
@@ -91,7 +93,11 @@ export function createAuditAgentTriageLlmClient() {
                 runtime: 'local',
             };
 
-            const preflight = await _postJson(`${baseUrl}/v1/validate/generate`, basePayload, Math.min(timeoutMs, 10_000));
+            const preflight = await _postJson(
+                `${baseUrl}/v1/validate/generate`,
+                basePayload,
+                Math.min(timeoutMs, 10_000)
+            );
             if (!preflight.ok || !preflight.json?.ok) {
                 return {
                     ok: false,

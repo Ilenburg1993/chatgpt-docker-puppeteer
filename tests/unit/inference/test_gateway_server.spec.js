@@ -73,4 +73,3 @@ test('inference gateway server returns 400 when preflight route is rejected', as
         await new Promise(resolve => server.close(() => resolve()));
     }
 });
-

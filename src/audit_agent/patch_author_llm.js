@@ -72,10 +72,9 @@ function _buildPatchPrompt(job, contextPack, llmTriage) {
         `lsp_references=${JSON.stringify(mcpTools.lsp_references || null)}`,
         `rag_search=${JSON.stringify(mcpTools.rag_search || null)}`,
         `rag_expand=${JSON.stringify(mcpTools.rag_expand || null)}`,
-        `findings=${JSON.stringify(findings.slice(0, 10).map(f => ({ title: f?.title, severity: f?.severity, category: f?.category }))).slice(
-            0,
-            5000
-        )}`,
+        `findings=${JSON.stringify(
+            findings.slice(0, 10).map(f => ({ title: f?.title, severity: f?.severity, category: f?.category }))
+        ).slice(0, 5000)}`,
     ].join('\n');
 }
 
@@ -86,16 +85,26 @@ function _coercePatchAuthorParsed(rawParsed) {
         ? String(parsed.risk_level).toLowerCase()
         : null;
     const candidateFiles = Array.isArray(parsed.candidate_files)
-        ? parsed.candidate_files.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+        ? parsed.candidate_files
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 10)
         : null;
     const proposedChanges = Array.isArray(parsed.proposed_changes)
-        ? parsed.proposed_changes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 20)
+        ? parsed.proposed_changes
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 20)
         : null;
-    
+
     return {
         parsed,
         strict: {
-            ok: Boolean(summary) && Boolean(riskLevel) && Array.isArray(candidateFiles) && Array.isArray(proposedChanges),
+            ok:
+                Boolean(summary) &&
+                Boolean(riskLevel) &&
+                Array.isArray(candidateFiles) &&
+                Array.isArray(proposedChanges),
             errors: [
                 ...(summary ? [] : ['summary_missing_or_invalid']),
                 ...(riskLevel ? [] : ['risk_level_invalid']),
@@ -111,14 +120,20 @@ function _normalizePatchProposal(job, contextPack, llmOut) {
     const scope = _asRecord(job?.scope_json);
     const targetFile = _safeString(scope.filePath || scope.file_path, 'src/main.js');
     const candidateFiles = Array.isArray(parsed.candidate_files)
-        ? parsed.candidate_files.map(v => String(v || '').trim()).filter(Boolean).slice(0, 10)
+        ? parsed.candidate_files
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 10)
         : [targetFile];
     const riskMap = { low: 0.2, medium: 0.45, high: 0.75 };
     const riskLevel = _safeString(parsed.risk_level, 'medium').toLowerCase();
     const riskScore = riskMap[riskLevel] ?? 0.45;
     const patchUnifiedDiff = typeof parsed.patch_unified_diff === 'string' ? parsed.patch_unified_diff : '';
     const proposedChanges = Array.isArray(parsed.proposed_changes)
-        ? parsed.proposed_changes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 20)
+        ? parsed.proposed_changes
+              .map(v => String(v || '').trim())
+              .filter(Boolean)
+              .slice(0, 20)
         : [];
 
     const validation = {
@@ -178,7 +193,11 @@ export function createAuditAgentPatchAuthorLlmClient() {
                 model,
                 runtime: 'local',
             };
-            const preflight = await _postJson(`${baseUrl}/v1/validate/generate`, basePayload, Math.min(timeoutMs, 10_000));
+            const preflight = await _postJson(
+                `${baseUrl}/v1/validate/generate`,
+                basePayload,
+                Math.min(timeoutMs, 10_000)
+            );
             if (!preflight.ok || !preflight.json?.ok) {
                 return {
                     ok: false,
@@ -226,18 +245,14 @@ export function createAuditAgentPatchAuthorLlmClient() {
                     preflight: preflight.json || null,
                 };
             }
-            const normalizedProposal = _normalizePatchProposal(
-                job,
-                contextPack,
-                {
-                    ok: true,
-                    provider: 'inference-gateway',
-                    profile_name: profileName || null,
-                    model: model || null,
-                    parsed: parsedInfo.parsed,
-                    triage_anchor: _asRecord(llmTriage?.parsed),
-                }
-            );
+            const normalizedProposal = _normalizePatchProposal(job, contextPack, {
+                ok: true,
+                provider: 'inference-gateway',
+                profile_name: profileName || null,
+                model: model || null,
+                parsed: parsedInfo.parsed,
+                triage_anchor: _asRecord(llmTriage?.parsed),
+            });
             normalizedProposal.patch_summary.validation = {
                 ..._asRecord(normalizedProposal.patch_summary.validation),
                 strict_shape_ok: parsedInfo.strict.ok,

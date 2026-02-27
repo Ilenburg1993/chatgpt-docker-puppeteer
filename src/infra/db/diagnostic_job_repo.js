@@ -2,10 +2,10 @@
 
 /**
  * Diagnostic Agent Job Repository
- * 
+ *
  * Repositório para persistência de jobs do Diagnostic Agent.
  * Fornece operações CRUD para diagnostic_jobs e diagnostic_reports.
- * 
+ *
  * Tabelas:
  * - diagnostic_jobs: Jobs de diagnóstico
  * - diagnostic_reports: Relatórios gerados
@@ -86,7 +86,8 @@ export function createDiagnosticJob(input) {
     const now = _now();
     const id = input.id || `diag-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-    db.prepare(`
+    db.prepare(
+        `
         INSERT INTO diagnostic_jobs (
             id, status, kind, priority, trigger_type, trigger_ref,
             scope_json, target_path, analysis_type, config_json,
@@ -100,9 +101,12 @@ export function createDiagnosticJob(input) {
             @result_json, @error_json,
             @created_at_ms, @updated_at_ms, @started_at_ms, @completed_at_ms
         )
-    `).run({
+    `
+    ).run({
         id,
-        status: String(input.status || 'PENDING').trim().toUpperCase(),
+        status: String(input.status || 'PENDING')
+            .trim()
+            .toUpperCase(),
         kind: String(input.kind || 'code_analysis').trim(),
         priority: Number(input.priority) || 50,
         triggerType: String(input.trigger_type || 'manual').trim(),
@@ -164,8 +168,8 @@ export function listDiagnosticJobs(filters = {}) {
     }
 
     if (triggerType) {
-        whereClause = whereClause 
-            ? `${whereClause} AND trigger_type = @trigger_type` 
+        whereClause = whereClause
+            ? `${whereClause} AND trigger_type = @trigger_type`
             : 'WHERE trigger_type = @trigger_type';
         params.trigger_type = triggerType;
     }
@@ -173,13 +177,17 @@ export function listDiagnosticJobs(filters = {}) {
     params.limit = limit;
     params.offset = offset;
 
-    const rows = db.prepare(`
+    const rows = db
+        .prepare(
+            `
         SELECT *
         FROM diagnostic_jobs
         ${whereClause}
         ORDER BY updated_at_ms DESC
         LIMIT @limit OFFSET @offset
-    `).all(params);
+    `
+        )
+        .all(params);
 
     return rows.map(_rowToJob);
 }
@@ -193,7 +201,7 @@ export function listDiagnosticJobs(filters = {}) {
 export function updateDiagnosticJob(id, updates = {}) {
     const db = getDb();
     const now = _now();
-    
+
     // Primeiro verifica se o job existe
     const existing = getDiagnosticJobById(id);
     if (!existing) return null;
@@ -249,11 +257,13 @@ export function updateDiagnosticJob(id, updates = {}) {
 
     fields.push('updated_at_ms = @updated_at_ms');
 
-    db.prepare(`
+    db.prepare(
+        `
         UPDATE diagnostic_jobs SET
             ${fields.join(', ')}
         WHERE id = @id
-    `).run(params);
+    `
+    ).run(params);
 
     return getDiagnosticJobById(id);
 }
@@ -268,7 +278,8 @@ export function createDiagnosticReport(input) {
     const now = _now();
     const id = input.id || `diagr-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-    db.prepare(`
+    db.prepare(
+        `
         INSERT INTO diagnostic_reports (
             id, job_id, report_type, format, title, summary,
             content_json, findings_count, severity_counts_json,
@@ -280,7 +291,8 @@ export function createDiagnosticReport(input) {
             @llm_model_used, @llm_prompt_tokens, @llm_completion_tokens, @duration_ms,
             @created_at_ms
         )
-    `).run({
+    `
+    ).run({
         id,
         job_id: String(input.jobId || ''),
         report_type: String(input.reportType || 'code_analysis'),
@@ -318,12 +330,16 @@ export function getDiagnosticReportById(id) {
  */
 export function listDiagnosticReportsByJob(jobId) {
     const db = getDb();
-    const rows = db.prepare(`
+    const rows = db
+        .prepare(
+            `
         SELECT *
         FROM diagnostic_reports
         WHERE job_id = ?
         ORDER BY created_at_ms DESC
-    `).all(String(jobId || '').trim());
+    `
+        )
+        .all(String(jobId || '').trim());
 
     return rows.map(_rowToReport);
 }

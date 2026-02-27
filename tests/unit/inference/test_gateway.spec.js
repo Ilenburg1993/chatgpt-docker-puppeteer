@@ -32,7 +32,11 @@ test('InferenceGateway generate uses policy precedence and validates route', asy
 
 test('InferenceGateway rejects disallowed route by client policy', async () => {
     const gateway = new InferenceGateway({
-        ollamaClient: { async generate() { return { response: 'ok' }; } },
+        ollamaClient: {
+            async generate() {
+                return { response: 'ok' };
+            },
+        },
         clientPolicies: {
             audit_agent_patch: { allowed_models: ['qwen2.5-coder:3b'] },
         },
@@ -60,10 +64,7 @@ test('InferenceGateway enforces per-client concurrency limit', async () => {
     });
 
     const p1 = gateway.generate({ clientTag: 'audit_agent_triage', prompt: 'a' });
-    await assert.rejects(
-        () => gateway.generate({ clientTag: 'audit_agent_triage', prompt: 'b' }),
-        /concorrência/
-    );
+    await assert.rejects(() => gateway.generate({ clientTag: 'audit_agent_triage', prompt: 'b' }), /concorrência/);
     release();
     await p1;
 });

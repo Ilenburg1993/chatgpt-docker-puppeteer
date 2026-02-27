@@ -346,7 +346,7 @@ O sistema define clientTags obrigatórios para governança:
 | Serviço          | Integração                        | Status       |
 | ---------------- | --------------------------------- | ------------ |
 | **Ollama**       | Inference Gateway + Supervisor    | Funcional    |
-| **MCP Server**   | context*builder (lsp*_, rag\__)   | Read-only V0 |
+| **MCP Server**   | context*builder (lsp*\_, rag\_\_) | Read-only V0 |
 | **LSP/TSServer** | Diagnósticos e referências        | Parcial      |
 | **RAG**          | Busca de contexto                 | Read-only    |
 | **PM2**          | Processos opcionais (behind flag) | Configurado  |

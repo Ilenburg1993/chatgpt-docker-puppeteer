@@ -119,11 +119,13 @@ Notas importantes:
 
 1. **Unitário (bash):** simular diferentes UIDs e verificar saída de `env`.
 2. **Integração:** em contêineres de teste com `updateRemoteUserUID` `true` e `false`, executar:
+
    ```sh
    docker exec <id> bash -c 'echo $NSS_WRAPPER_PASSWD; whoami; id'
    ```
 
    - deve sempre mostrar o ficheiro correcto e `whoami` nunca vazio.
+
 3. **Batch/CI:** rodar `node -e 'console.log(process.getuid())'` em non-interactive e garantir que
    `getpwuid` devolve nome (pode ser verificado via um pequeno script C compilado).
 4. **Regression:** criar container, abortar `post-create` propositadamente, e confirmar que o perfil

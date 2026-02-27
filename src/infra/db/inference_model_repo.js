@@ -46,7 +46,11 @@ function _setModelEnabled(id, enabled) {
     if (!targetId) return null;
     const existing = db.prepare('SELECT * FROM inference_models WHERE id = ?').get(targetId);
     if (!existing) return null;
-    db.prepare('UPDATE inference_models SET enabled = ?, updated_at_ms = ? WHERE id = ?').run(enabled ? 1 : 0, _now(), targetId);
+    db.prepare('UPDATE inference_models SET enabled = ?, updated_at_ms = ? WHERE id = ?').run(
+        enabled ? 1 : 0,
+        _now(),
+        targetId
+    );
     return getInferenceModelById(targetId);
 }
 

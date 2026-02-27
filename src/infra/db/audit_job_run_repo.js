@@ -59,7 +59,9 @@ function createAuditJobRun(input = {}) {
         id: String(input.id || '').trim(),
         job_id: String(input.job_id || '').trim(),
         attempt_seq: Number(input.attempt_seq) || 0,
-        status: String(input.status || 'RUNNING').trim().toUpperCase(),
+        status: String(input.status || 'RUNNING')
+            .trim()
+            .toUpperCase(),
         executor: String(input.executor || 'audit-agent'),
         llm_model: input.llm_model ? String(input.llm_model) : null,
         llm_provider: input.llm_provider ? String(input.llm_provider) : null,
@@ -99,9 +101,18 @@ function updateAuditJobRun(id, updates = {}) {
     ).run({
         id: existing.id,
         status: updates.status ? String(updates.status).trim().toUpperCase() : existing.status,
-        llm_model: updates.llm_model !== undefined ? (updates.llm_model ? String(updates.llm_model) : null) : existing.llm_model,
+        llm_model:
+            updates.llm_model !== undefined
+                ? updates.llm_model
+                    ? String(updates.llm_model)
+                    : null
+                : existing.llm_model,
         llm_provider:
-            updates.llm_provider !== undefined ? (updates.llm_provider ? String(updates.llm_provider) : null) : existing.llm_provider,
+            updates.llm_provider !== undefined
+                ? updates.llm_provider
+                    ? String(updates.llm_provider)
+                    : null
+                : existing.llm_provider,
         token_usage_json:
             updates.token_usage_json !== undefined
                 ? _safeJsonString(updates.token_usage_json, 'null')
@@ -122,7 +133,9 @@ function updateAuditJobRun(id, updates = {}) {
                   : null,
         completed_at_ms:
             updates.completed_at_ms !== undefined
-                ? (updates.completed_at_ms == null ? null : Number(updates.completed_at_ms))
+                ? updates.completed_at_ms == null
+                    ? null
+                    : Number(updates.completed_at_ms)
                 : existing.completed_at_ms,
     });
     return getAuditJobRunById(existing.id);
@@ -145,4 +158,3 @@ function listAuditJobRunsByJobId(jobId, { limit = 50 } = {}) {
 }
 
 export { createAuditJobRun, getAuditJobRunById, listAuditJobRunsByJobId, updateAuditJobRun };
-

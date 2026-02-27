@@ -69,7 +69,7 @@ function _updatePatch(id, fields = {}) {
         status: String(fields.status ?? existing.status ?? 'draft'),
         patch_unified_diff: String(fields.patch_unified_diff ?? existing.patch_unified_diff ?? ''),
         patch_summary_json: _safeJsonString(
-            fields.patch_summary_json ?? (fields.patch_summary ?? _parseJson(existing.patch_summary_json, {})),
+            fields.patch_summary_json ?? fields.patch_summary ?? _parseJson(existing.patch_summary_json, {}),
             '{}'
         ),
         risk_score: fields.risk_score == null ? existing.risk_score : Number(fields.risk_score),
@@ -78,11 +78,7 @@ function _updatePatch(id, fields = {}) {
                 ? existing.dry_run_result_json
                 : _safeJsonString(fields.dry_run_result_json, 'null'),
         approval_required:
-            fields.approval_required === undefined
-                ? existing.approval_required
-                : fields.approval_required
-                  ? 1
-                  : 0,
+            fields.approval_required === undefined ? existing.approval_required : fields.approval_required ? 1 : 0,
         approved_by: fields.approved_by === undefined ? existing.approved_by : fields.approved_by,
         approved_at_ms: fields.approved_at_ms === undefined ? existing.approved_at_ms : fields.approved_at_ms,
         applied_by: fields.applied_by === undefined ? existing.applied_by : fields.applied_by,
@@ -158,4 +154,9 @@ function updateAuditPatchProposal(id, fields = {}) {
     return _updatePatch(id, fields);
 }
 
-export { createAuditPatchProposal, getAuditPatchProposalById, listAuditPatchProposalsByJobId, updateAuditPatchProposal };
+export {
+    createAuditPatchProposal,
+    getAuditPatchProposalById,
+    listAuditPatchProposalsByJobId,
+    updateAuditPatchProposal,
+};

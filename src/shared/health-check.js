@@ -2,16 +2,16 @@
 
 /**
  * Shared Health Check Module
- * 
+ *
  * Módulo centralizado para verificação de saúde de serviços.
  * Usado por Audit Agent, Diagnostic Agent e outros consumidores.
- * 
+ *
  * Este módulo fornece:
  * - Verificação de saúde do Ollama (localhost:11434)
  * - Verificação de saúde do Inference Gateway
  * - Verificação de recursos do sistema (CPU, memória)
  * - Status consolidado (healthy/degraded/unhealthy)
- * 
+ *
  * Variáveis de ambiente:
  * - OLLAMA_HOST: Host do Ollama (padrão: http://localhost:11434)
  * - INFERENCE_GATEWAY_HOST: Host do Gateway (padrão: 127.0.0.1)
@@ -98,7 +98,7 @@ export function getHealthCheckTimeout(defaultTimeout = 30000) {
 export async function checkOllamaHealth(depth = 'quick') {
     const start = Date.now();
     const ollamaHost = getOllamaHost();
-    
+
     /** @type {Object} */
     const result = {
         connected: false,
@@ -125,7 +125,7 @@ export async function checkOllamaHealth(depth = 'quick') {
         if (response.ok) {
             result.connected = true;
             const data = await response.json();
-            result.models = (data.models || []).map((m) => ({
+            result.models = (data.models || []).map(m => ({
                 name: m.name,
                 size: m.size,
                 modified_at: m.modified_at,
@@ -181,7 +181,7 @@ async function getOllamaVersion(ollamaHost) {
 export async function checkGatewayHealth(depth = 'quick') {
     const start = Date.now();
     const gatewayUrl = getGatewayUrl();
-    
+
     /** @type {Object} */
     const result = {
         connected: false,
@@ -251,7 +251,7 @@ export async function checkGatewayHealth(depth = 'quick') {
 export async function checkSystemHealth(depth = 'quick') {
     // Dynamic import para evitar problemas de inicialização
     const os = await import('node:os');
-    
+
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
     const usedMem = totalMem - freeMem;
@@ -345,18 +345,13 @@ export function calculateOverallStatus(ollama, gateway, system) {
  * @returns {Promise<HealthCheckResult>}
  */
 export async function checkHealth(options = {}) {
-    const {
-        depth = 'quick',
-        includeOllama = true,
-        includeGateway = true,
-        includeSystem = true,
-    } = options;
+    const { depth = 'quick', includeOllama = true, includeGateway = true, includeSystem = true } = options;
 
     const start = Date.now();
 
     // Executa verificações em paralelo
     const checks = [];
-    
+
     if (includeOllama) {
         checks.push(checkOllamaHealth(depth));
     }
@@ -431,7 +426,7 @@ export class SharedHealthChecker {
     async checkAll(opts = {}) {
         const depth = opts.depth || this.options?.depth || 'quick';
         const result = await checkHealth({ depth });
-        
+
         this.lastCheck = result;
         this.checkCount++;
 

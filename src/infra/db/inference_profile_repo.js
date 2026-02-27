@@ -116,4 +116,3 @@ function listInferenceProfiles({ enabledOnly = false, limit = 100 } = {}) {
 }
 
 export { getInferenceProfileById, listInferenceProfiles, upsertInferenceProfile };
-

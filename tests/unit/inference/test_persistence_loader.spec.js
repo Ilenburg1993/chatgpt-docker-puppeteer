@@ -53,7 +53,11 @@ test(
         assert.equal(loaded.clientPolicies.audit_agent_patch.profile_name, 'patch_safe');
 
         const gateway = new InferenceGateway({
-            ollamaClient: { async listModels() { return []; } },
+            ollamaClient: {
+                async listModels() {
+                    return [];
+                },
+            },
         });
         gateway.setPolicies({
             profilePolicies: loaded.profilePolicies,
@@ -69,4 +73,3 @@ test(
         assert.equal(gateway.getPolicySummary().clientPolicyCount, 1);
     })
 );
-

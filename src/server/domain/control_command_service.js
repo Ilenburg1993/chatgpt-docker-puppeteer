@@ -14,18 +14,16 @@ import {
 } from '#infra/db/control_operation_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { RBAC_PERMISSIONS } from '#infra/db/rbac_repo';
-import {
-    getAuditPatchProposalById,
-    updateAuditPatchProposal,
-} from '#infra/db/audit_patch_repo';
+import { getAuditPatchProposalById, updateAuditPatchProposal } from '#infra/db/audit_patch_repo';
 import { getAuditWatchRuleById, upsertAuditWatchRule } from '#infra/db/audit_watch_rule_repo';
 import { upsertInferenceProfile } from '#infra/db/inference_profile_repo';
-import { getInferenceBackendById, setInferenceBackendEnabled, upsertInferenceBackend } from '#infra/db/inference_backend_repo';
-import { getInferenceModelById, setInferenceModelEnabled, upsertInferenceModel } from '#infra/db/inference_model_repo';
 import {
-    getInferenceClientPolicyByTag,
-    upsertInferenceClientPolicy,
-} from '#infra/db/inference_client_policy_repo';
+    getInferenceBackendById,
+    setInferenceBackendEnabled,
+    upsertInferenceBackend,
+} from '#infra/db/inference_backend_repo';
+import { getInferenceModelById, setInferenceModelEnabled, upsertInferenceModel } from '#infra/db/inference_model_repo';
+import { getInferenceClientPolicyByTag, upsertInferenceClientPolicy } from '#infra/db/inference_client_policy_repo';
 import {
     cancelMissionCommand,
     createMissionCommand,
@@ -192,7 +190,10 @@ function _asRecord(value) {
 
 function _safeGitCurrentBranch() {
     try {
-        return String(execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }) || '').trim() || null;
+        return (
+            String(execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }) || '').trim() ||
+            null
+        );
     } catch {
         return null;
     }
@@ -816,16 +817,17 @@ function _executeAuditPatchApply(patchId, before, actorId) {
     try {
         // 1. Salvar estado atual dos arquivos afetados para rollback
         const patchSummary = _asRecord(before.patch_summary_json);
-        const candidateFiles = Array.isArray(patchSummary.candidate_files)
-            ? patchSummary.candidate_files
-            : [];
+        const candidateFiles = Array.isArray(patchSummary.candidate_files) ? patchSummary.candidate_files : [];
 
         if (candidateFiles.length > 0) {
             try {
                 const beforeState = [];
                 for (const file of candidateFiles.slice(0, 20)) {
                     if (existsSync(file)) {
-                        const content = execFileSync('git', ['show', `HEAD:${file}`], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+                        const content = execFileSync('git', ['show', `HEAD:${file}`], {
+                            encoding: 'utf8',
+                            stdio: ['pipe', 'pipe', 'ignore'],
+                        });
                         beforeState.push({ file, content });
                     }
                 }
@@ -844,11 +846,14 @@ function _executeAuditPatchApply(patchId, before, actorId) {
 
         // 3. Tentar aplicar o patch com git apply
         const dryRunFlag = _boolEnv('AUDIT_PATCH_APPLY_DRY_RUN_FIRST', true);
-        
+
         if (dryRunFlag) {
             // Primeiro tenta dry-run para validar
             try {
-                execFileSync('git', ['apply', '--check', '--3way', patchFile], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+                execFileSync('git', ['apply', '--check', '--3way', patchFile], {
+                    encoding: 'utf8',
+                    stdio: ['pipe', 'pipe', 'ignore'],
+                });
             } catch (checkErr) {
                 const err = new Error(`Patch não pode ser aplicado (dry-run failed): ${checkErr.message}`);
                 err.statusCode = 409;
@@ -861,25 +866,27 @@ function _executeAuditPatchApply(patchId, before, actorId) {
         // 4. Aplicar o patch
         let stderrOutput = '';
         try {
-            const applyResult = execFileSync('git', ['apply', '--3way', patchFile], { 
-                encoding: 'utf8', 
-                stdio: ['pipe', 'pipe', 'pipe'] 
+            const applyResult = execFileSync('git', ['apply', '--3way', patchFile], {
+                encoding: 'utf8',
+                stdio: ['pipe', 'pipe', 'pipe'],
             });
             applySucceeded = true;
-            
+
             // Verificar se há warnings no stderr
             if (stderrOutput && stderrOutput.trim().length > 0) {
                 log('WARN', `[AUDIT_PATCH_APPLY] git apply output: ${stderrOutput}`);
             }
         } catch (applyErr) {
             stderrOutput = applyErr.stderr || '';
-            const err = new Error(`Falha ao aplicar patch: ${applyErr.message}${stderrOutput ? ` - ${stderrOutput}` : ''}`);
+            const err = new Error(
+                `Falha ao aplicar patch: ${applyErr.message}${stderrOutput ? ` - ${stderrOutput}` : ''}`
+            );
             err.statusCode = 500;
             err.code = 'AUDIT_PATCH_APPLY_FAILED';
-            err.details = { 
+            err.details = {
                 apply_error: applyErr.message,
                 stderr: stderrOutput || null,
-                has_conflicts: stderrOutput?.includes('conflict') || stderrOutput?.includes('CONFLICT')
+                has_conflicts: stderrOutput?.includes('conflict') || stderrOutput?.includes('CONFLICT'),
             };
             throw err;
         }
@@ -914,7 +921,10 @@ function _executeAuditPatchApply(patchId, before, actorId) {
                 log('WARN', `[AUDIT_PATCH_APPLY] Rollback iniciado para patch ${patchId}`);
                 const rollbackFile = join(tmpDir, `rollback-${patchId}-${Date.now()}.patch`);
                 writeFileSync(rollbackFile, rollbackPatch, 'utf8');
-                execFileSync('git', ['apply', '--3way', rollbackFile], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+                execFileSync('git', ['apply', '--3way', rollbackFile], {
+                    encoding: 'utf8',
+                    stdio: ['pipe', 'pipe', 'ignore'],
+                });
                 unlinkSync(rollbackFile);
                 log('INFO', `[AUDIT_PATCH_APPLY] Rollback concluído para patch ${patchId}`);
             } catch (rollbackErr) {
@@ -984,7 +994,8 @@ function _createRollbackDiff(beforeState) {
 
 async function _dispatchAuditWatchRuleCommand(command, payload) {
     if (command === COMMANDS.AUDIT_WATCH_RULE_UPSERT) {
-        const before = payload.id || payload.watch_rule_id ? getAuditWatchRuleById(payload.id || payload.watch_rule_id) : null;
+        const before =
+            payload.id || payload.watch_rule_id ? getAuditWatchRuleById(payload.id || payload.watch_rule_id) : null;
         const after = upsertAuditWatchRule({
             id: payload.id || payload.watch_rule_id || null,
             enabled: payload.enabled,
@@ -1105,7 +1116,10 @@ async function _dispatchInferenceCommand(command, payload) {
             err.code = 'INFERENCE_BACKEND_NOT_FOUND';
             throw err;
         }
-        const after = setInferenceBackendEnabled(backendId, payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled));
+        const after = setInferenceBackendEnabled(
+            backendId,
+            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled)
+        );
         const reload = await _refreshInferenceGatewayPolicies();
         return {
             before,
@@ -1123,7 +1137,10 @@ async function _dispatchInferenceCommand(command, payload) {
             err.code = 'INFERENCE_MODEL_NOT_FOUND';
             throw err;
         }
-        const after = setInferenceModelEnabled(modelId, payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled));
+        const after = setInferenceModelEnabled(
+            modelId,
+            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled)
+        );
         const reload = await _refreshInferenceGatewayPolicies();
         return {
             before,
@@ -1219,7 +1236,11 @@ async function _dispatchInferenceCommand(command, payload) {
     let modelsProbe = null;
     if (payload.probe_models === true || payload.probeModels === true) {
         try {
-            const upstream = await _postJson(`${_getInferenceGatewayBaseUrl()}/v1/models`, { clientTag: resolved.clientTag }, 3000);
+            const upstream = await _postJson(
+                `${_getInferenceGatewayBaseUrl()}/v1/models`,
+                { clientTag: resolved.clientTag },
+                3000
+            );
             modelsProbe = {
                 ok: upstream.ok,
                 status: upstream.status,

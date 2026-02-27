@@ -44,14 +44,15 @@ export class OllamaHostSupervisor {
      * }} [options]
      */
     constructor(options = {}) {
-        this.baseUrl = options.baseUrl || process.env.OLLAMA_LOCAL_BASE_URL || process.env.OLLAMA_BASE_URL || 'http://host.docker.internal:11434';
+        this.baseUrl =
+            options.baseUrl ||
+            process.env.OLLAMA_LOCAL_BASE_URL ||
+            process.env.OLLAMA_BASE_URL ||
+            'http://host.docker.internal:11434';
         this.fetch = options.fetch || globalThis.fetch;
         this.pollMs = parseIntPos(options.pollMs ?? process.env.OLLAMA_HEALTH_POLL_MS, 5000);
         this.requestTimeoutMs = parseIntPos(options.requestTimeoutMs ?? process.env.OLLAMA_HEALTH_TIMEOUT, 5000);
-        this.circuitEnabled = parseBool(
-            options.circuitEnabled ?? process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED,
-            true
-        );
+        this.circuitEnabled = parseBool(options.circuitEnabled ?? process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED, true);
         this.circuitThreshold = parseIntPos(
             options.circuitThreshold ?? process.env.OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
             5
@@ -113,15 +114,16 @@ export class OllamaHostSupervisor {
 
     getState() {
         const circuitOpen = this.circuitEnabled && this.now() < this._circuitOpenUntil;
-        const reasonCode = this._state === 'ready'
-            ? null
-            : circuitOpen
-              ? 'OLLAMA_CIRCUIT_OPEN'
-              : this._last.error
-                ? 'OLLAMA_HOST_UNREACHABLE'
-                : this._state === 'stopped'
-                  ? 'OLLAMA_SUPERVISOR_STOPPED'
-                  : 'OLLAMA_HOST_DEGRADED';
+        const reasonCode =
+            this._state === 'ready'
+                ? null
+                : circuitOpen
+                  ? 'OLLAMA_CIRCUIT_OPEN'
+                  : this._last.error
+                    ? 'OLLAMA_HOST_UNREACHABLE'
+                    : this._state === 'stopped'
+                      ? 'OLLAMA_SUPERVISOR_STOPPED'
+                      : 'OLLAMA_HOST_DEGRADED';
         return {
             state: this._state,
             reasonCode,
