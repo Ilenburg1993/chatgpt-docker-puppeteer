@@ -53,6 +53,45 @@ describe('TsserverDaemon', () => {
         }
     });
 
+    it('provides completion and allows updating files', async () => {
+        const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-daemon-'));
+        try {
+            await fs.writeFile(
+                path.join(rootDir, 'jsconfig.json'),
+                JSON.stringify({
+                    compilerOptions: { checkJs: true, allowJs: true, module: 'NodeNext', moduleResolution: 'NodeNext' },
+                    include: ['**/*.js'],
+                }),
+                'utf8'
+            );
+            const filePath = path.join(rootDir, 'auto.js');
+            await fs.writeFile(filePath, 'function foo() { return 42; }\nfoo();\n', 'utf8');
+
+            const daemon = new TsserverDaemon({ rootDir, timeoutMs: 10000 });
+            await daemon.start();
+
+            const comps = await daemon.execute('completion', {
+                filePath,
+                line: 2,
+                character: 1,
+            });
+            assert.ok(Array.isArray(comps));
+            assert.ok(comps.some(c => c.name === 'foo'));
+
+            const update = await daemon.execute('updateFile', {
+                filePath,
+                content: 'const x = 123;\n',
+            });
+            assert.deepStrictEqual(update, { updated: true });
+            const newContent = await fs.readFile(filePath, 'utf8');
+            assert.strictEqual(newContent, 'const x = 123;\n');
+
+            await daemon.stop();
+        } finally {
+            await fs.rm(rootDir, { recursive: true, force: true });
+        }
+    });
+
     it('supports preview/apply code action edits with mutation guards', async () => {
         const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-daemon-'));
         const previousMutationsEnabled = process.env.LSP_MUTATIONS_ENABLED;

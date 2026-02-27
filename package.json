@@ -52,11 +52,14 @@
   "devDependencies": {
     "@eslint/css": "^0.14.1",
     "@eslint/js": "^10.0.1",
-    "vitest": "^2.4.1",
-    "@vitest/coverage-c8": "^2.4.1",
     "@eslint/markdown": "^7.5.1",
     "@faker-js/faker": "^10.3.0",
+    "@types/compression": "^1.8.1",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.0.0",
+    "@types/socket.io": "^3.0.1",
+    "@types/uuid": "^10.0.0",
     "audit-ci": "^7.1.0",
     "c8": "^10.1.3",
     "complexity-report": "^2.0.0-alpha",
@@ -83,7 +86,9 @@
     "puppeteer-core": "^24.37.2",
     "sinon": "21.0.1",
     "supertest": "7.2.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-language-server": "^5.1.3",
+    "vitest": "^2.1.9"
   },
   "directories": {
     "doc": "DOCUMENTAÇÃO",
@@ -271,7 +276,6 @@
     "test:unit:audit-agent": "env -u NO_COLOR node --test tests/unit/audit_agent/*.spec.js tests/unit/inference/*.spec.js",
     "test:unit": "env -u NO_COLOR node --test 'tests/unit/**/*.spec.js'",
     "test:vitest": "vitest run --coverage",
-    "test:watch": "vitest",
     "test:watch": "env -u NO_COLOR node --test --watch 'tests/**/*.spec.js'",
     "typecheck": "npm run typecheck:node",
     "typecheck:browser": "tsc -p tsconfig.browser.json",

@@ -6,7 +6,7 @@ import { log, audit } from '#core/logger';
  * Atua como o "Guarda de Fronteira" para as intenções de negócio.
  *
  * @param {import('zod').ZodType} schema - O Schema Zod (ex: TaskSchema) para validação.
- * @returns {Function} Middleware Express (req, res, next).
+ * @returns {import('express').RequestHandler} Middleware Express (req, res, next).
  */
 const schemaGuard = schema => (req, res, next) => {
     const requestId = req.id || 'no-id';

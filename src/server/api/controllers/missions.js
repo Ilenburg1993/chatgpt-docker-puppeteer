@@ -364,7 +364,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
     try {
-        const missionId = req.params.id;
+        const missionId = String(req.params.id);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({
@@ -395,7 +395,7 @@ router.get('/:id', async (req, res) => {
  */
 router.get('/:id/progress', async (req, res) => {
     try {
-        const missionId = req.params.id;
+        const missionId = String(req.params.id);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({
@@ -432,7 +432,7 @@ router.get('/:id/progress', async (req, res) => {
  */
 router.post('/:id/execute', async (req, res) => {
     try {
-        const missionId = req.params.id;
+        const missionId = String(req.params.id);
         const control = await _runMissionControlCommand(req, res, 'MISSION_EXECUTE', {
             mission_id: missionId,
         });
@@ -460,7 +460,7 @@ router.post('/:id/execute', async (req, res) => {
  */
 router.post('/:id/pause', async (req, res) => {
     try {
-        const missionId = req.params.id;
+        const missionId = String(req.params.id);
         const control = await _runMissionControlCommand(req, res, 'MISSION_PAUSE', { mission_id: missionId });
         if (!control) return;
 
@@ -486,7 +486,7 @@ router.post('/:id/pause', async (req, res) => {
  */
 router.post('/:id/resume', async (req, res) => {
     try {
-        const missionId = req.params.id;
+        const missionId = String(req.params.id);
         const control = await _runMissionControlCommand(req, res, 'MISSION_RESUME', { mission_id: missionId });
         if (!control) return;
 
@@ -560,7 +560,8 @@ router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => 
  */
 router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
     try {
-        const missionId = req.params.id;
+        /** @type {string} */
+        const missionId = String(req.params.id);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
@@ -626,7 +627,8 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
  */
 router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, res) => {
     try {
-        const missionId = req.params.id;
+        /** @type {string} */
+        const missionId = String(req.params.id);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
@@ -796,7 +798,8 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
  */
 router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (req, res) => {
     try {
-        const missionId = req.params.id;
+        /** @type {string} */
+        const missionId = String(req.params.id);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });

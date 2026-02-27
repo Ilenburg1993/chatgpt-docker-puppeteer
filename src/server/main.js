@@ -693,8 +693,8 @@ async function bootstrap(options = {}) {
         try {
             if (options.missionManager) {
                 const missionsController = await import('./api/controllers/missions.js').then(m => m.default ?? m);
-                if (typeof missionsController.setMissionManager === 'function') {
-                    missionsController.setMissionManager(options.missionManager);
+                if (typeof (/** @type {any} */ (missionsController).setMissionManager) === 'function') {
+                    /** @type {any} */ (missionsController).setMissionManager(options.missionManager);
                     log('DEBUG', '[BOOT] MissionManager injetado via options.missionManager');
                 }
             }

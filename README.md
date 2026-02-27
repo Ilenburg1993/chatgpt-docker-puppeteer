@@ -114,6 +114,32 @@ make up
 make logs
 ```
 
+## 🧩 Usando o daemon LSP integrado
+
+Para scripts ou editores que queiram interagir com o servidor TypeScript interno, a biblioteca
+exporta `TsserverDaemon` em `src/integration/lsp/tsserver-daemon.mjs`. Exemplo mínimo:
+
+```js
+import { TsserverDaemon } from './src/integration/lsp/tsserver-daemon.mjs';
+
+async function demo() {
+  const daemon = new TsserverDaemon({ rootDir: process.cwd() });
+  await daemon.start();
+  const defs = await daemon.execute('definition', {
+    filePath: 'src/index.js',
+    line: 10,
+    character: 5,
+  });
+  console.log('definitions', defs);
+  await daemon.stop();
+}
+
+demo();
+```
+
+Esse serviço pode ser ampliado com `completion`, `updateFile`, etc., e a integração com
+`typescript-language-server` é documentada em `DOCUMENTAÇÃO/LSP_UPGRADE_AUDIT.md`.
+
 ## 🏗️ Build e Distribuição
 
 ### Build de Desenvolvimento

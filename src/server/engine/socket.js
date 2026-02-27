@@ -105,7 +105,9 @@ function verifyDashboardToken(token) {
     }
 
     try {
-        const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+        const decoded = /** @type {any} */ (
+            jwt.verify(token, getJwtSecret(), /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS))
+        );
         const jti = decoded?.jti;
 
         if (jti && isTokenRevoked(jti)) {

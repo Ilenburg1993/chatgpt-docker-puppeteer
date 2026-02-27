@@ -17,6 +17,9 @@
     "downlevelIteration": true,
 
     "strict": false,
+    "noImplicitAny": false,
+    // turning on strict mode revealed many errors; see DOCUMENTAÇÃO/STRICT_MIGRATION_CHECKLIST.md for tracking
+
     "types": ["node"],
     "skipLibCheck": true,
     "maxNodeModuleJsDepth": 0,
@@ -69,6 +72,7 @@
     "local-login",
     "DOCUMENTAÇÃO",
     "src/dashboard-ui/**",
+    "vitest.config.js",
     ".git",
     "**/node_modules/**",
     "**/*.min.js",

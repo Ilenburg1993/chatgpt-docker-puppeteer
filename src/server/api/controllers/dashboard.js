@@ -154,7 +154,7 @@ router.post('/auth/login', async (req, res) => {
                 jti,
             },
             getJwtSecret(),
-            JWT_SIGN_OPTIONS
+            /** @type {import('jsonwebtoken').SignOptions} */ (JWT_SIGN_OPTIONS)
         );
 
         log('INFO', `[AUTH] User logged in: ${authUser.username}`, req.id);
@@ -259,7 +259,7 @@ router.get('/telemetry/history/:metric', async (req, res) => {
     try {
         const telemetryAggregator = await getTelemetryAggregator();
         const metric = req.params.metric;
-        const samples = parseInt(req.query.samples, 10) || 60;
+        const samples = parseInt(String(req.query.samples), 10) || 60;
         const history = telemetryAggregator.getHistory(metric, samples);
 
         if (history.error) {

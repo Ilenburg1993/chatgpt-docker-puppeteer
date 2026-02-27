@@ -182,14 +182,14 @@ async function _runTaskControlCommand(req, res, command, payload = {}) {
 router.get('/', async (req, res) => {
     try {
         // Parse pagination parameters
-        const page = Math.max(1, parseInt(req.query.page) || 1);
-        const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 100));
+        const page = Math.max(1, parseInt(String(req.query.page)) || 1);
+        const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit)) || 100));
         const offset = (page - 1) * limit;
 
         // Get optional filters
-        const status = req.query.status || null;
-        const stage = req.query.stage || null;
-        const missionId = req.query.missionId || null;
+        const status = req.query.status ? String(req.query.status) : null;
+        const stage = req.query.stage ? String(req.query.stage) : null;
+        const missionId = req.query.missionId ? String(req.query.missionId) : null;
 
         // Fetch paginated tasks and total count in parallel
         const [tasks, total] = await Promise.all([

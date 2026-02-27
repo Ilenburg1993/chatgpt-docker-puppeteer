@@ -163,7 +163,7 @@ router.patch('/preferences/me', authenticate, schemaGuard(prefsPatchSchema), (re
 });
 
 router.get('/rbac/users/:username', authenticate, requirePermission(RBAC_PERMISSIONS.RBAC_MANAGE), (req, res) => {
-    const user = getRbacUserByUsername(req.params.username);
+    const user = getRbacUserByUsername(String(req.params.username));
     if (!user) {
         return res.status(404).json({
             success: false,
@@ -186,7 +186,7 @@ router.put(
     schemaGuard(rbacPatchSchema),
     (req, res) => {
         const updated = upsertRbacUser({
-            username: req.params.username,
+            username: String(req.params.username),
             password: req.body.password,
             role: req.body.role,
             active: req.body.active !== false,

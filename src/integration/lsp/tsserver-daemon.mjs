@@ -186,6 +186,10 @@ class TsserverDaemon {
                 return this._diagnostics(params, signal);
             case 'code_actions':
                 return this._codeActions(params, signal);
+            case 'completion':
+                return this._completion(params, signal);
+            case 'updateFile':
+                return this._updateFile(params, signal);
             case 'apply_code_action':
                 return this._applyCodeAction(params, signal);
             default:
@@ -360,6 +364,34 @@ class TsserverDaemon {
         } finally {
             dispose();
         }
+    }
+
+    async _completion(params, signal) {
+        this._assertNotAborted(signal);
+        const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
+        const { languageService, dispose } = createLanguageService(this.rootDir, filePath);
+        try {
+            const source = languageService.getProgram()?.getSourceFile(filePath);
+            if (!source) return [];
+            const offset = lineCharToOffset(source, params.line, params.character);
+            const list = languageService.getCompletionsAtPosition(filePath, offset, {});
+            if (!list) return [];
+            return list.entries.slice(0, DEFAULT_MAX_RESULTS).map(entry => ({
+                name: entry.name,
+                kind: entry.kind,
+                kindModifiers: entry.kindModifiers,
+                sortText: entry.sortText,
+            }));
+        } finally {
+            dispose();
+        }
+    }
+
+    async _updateFile(params, signal) {
+        this._assertNotAborted(signal);
+        const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
+        await fsp.writeFile(filePath, String(params.content || ''), 'utf8');
+        return { updated: true };
     }
 
     async _codeActions(params, signal) {

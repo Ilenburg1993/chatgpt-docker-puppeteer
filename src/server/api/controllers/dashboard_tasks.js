@@ -152,7 +152,7 @@ router.get('/tasks', async (req, res) => {
         const missionId = req.query.mission_id ? String(req.query.mission_id) : null;
         const target = req.query.target ? String(req.query.target) : null;
         const search = req.query.search ? String(req.query.search) : null;
-        const priorityGte = req.query.priority_gte ?? null;
+        const priorityGte = req.query.priority_gte != null ? String(req.query.priority_gte) : null;
         const blockedRaw = req.query.blocked;
         const blocked =
             blockedRaw === undefined

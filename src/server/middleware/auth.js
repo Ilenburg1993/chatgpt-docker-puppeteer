@@ -12,7 +12,7 @@ import { isTokenRevoked } from '#infra/db/token_blocklist';
  * @param {import('express').Request} req - Requisição Express
  * @param {import('express').Response} res - Resposta Express
  * @param {import('express').NextFunction} next - Próxima função middleware
- * @returns {void}
+ * @returns {import('express').Response|void}
  * @sideEffects - Pode enviar resposta de erro 401 se autenticação falhar
  */
 export function authenticate(req, res, next) {
@@ -31,7 +31,9 @@ export function authenticate(req, res, next) {
 
     try {
         // Verificar token JWT usando secret centralizado e validado
-        const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+        const decoded = /** @type {{[k:string]: any}} */ (
+            jwt.verify(token, getJwtSecret(), /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS))
+        );
 
         // SEC-02 FIX: Verificar se o token foi revogado (logout explícito)
         const jti = decoded.jti;
@@ -107,7 +109,13 @@ export function optionalAuthenticate(req, res, next) {
         const token = authHeader.substring(7);
 
         try {
-            const decoded = jwt.verify(token, getJwtSecret(), JWT_VERIFY_OPTIONS);
+            const decoded = /** @type {{[k:string]: any}} */ (
+                jwt.verify(
+                    token,
+                    getJwtSecret(),
+                    /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS)
+                )
+            );
             const jti = decoded.jti;
             if (jti && isTokenRevoked(jti)) {
                 log('DEBUG', '[AUTH] Optional auth ignored due to revoked token', req.id);

@@ -68,19 +68,23 @@ export function _resetSecretCache() {
  * Opções padrão para `jwt.sign()`.
  * Centralizado para garantir consistência entre sign e verify.
  *
- * @type {{ expiresIn: string, algorithm: string }}
+/**
+ * JWT sign options (cast to any to keep JSDoc simple).
+ * @type {any}
  */
-export const JWT_SIGN_OPTIONS = Object.freeze({
-    expiresIn: process.env.JWT_EXPIRY || '24h',
-    algorithm: 'HS256',
-});
+export const JWT_SIGN_OPTIONS = /** @type {any} */ (
+    Object.freeze({
+        expiresIn: process.env.JWT_EXPIRY || '24h',
+        algorithm: 'HS256',
+    })
+);
 
 /**
  * Opções padrão para `jwt.verify()`.
  * Restringe ao algoritmo HS256 para prevenir ataques de algorithm confusion.
- *
- * @type {{ algorithms: string[] }}
  */
-export const JWT_VERIFY_OPTIONS = Object.freeze({
-    algorithms: ['HS256'],
-});
+export const JWT_VERIFY_OPTIONS = /** @type {import('jsonwebtoken').VerifyOptions} */ (
+    Object.freeze({
+        algorithms: ['HS256'],
+    })
+);

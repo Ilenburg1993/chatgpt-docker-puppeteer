@@ -18,6 +18,9 @@ rebuild. For contract governance, runbook observability and deep proposal genera
 - `audit-runbook-observability`
 - `audit-proposal-deep-triage`
 
+When specifically working with language-server features (definitions, completions, diagnostics), you
+can also pair this with the dedicated `lsp-ops` skill for finer semantic guidance.
+
 ## When To Use
 
 - User asks to rebuild/reindex RAG.
