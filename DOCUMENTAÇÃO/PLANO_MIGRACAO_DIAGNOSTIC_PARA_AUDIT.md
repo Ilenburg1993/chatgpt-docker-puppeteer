@@ -398,14 +398,14 @@ curl -X POST http://localhost:3000/api/control/commands \
 
 ## Anexo A: Glossário
 
-| Termo                 | Definição                                                          |
-| --------------------- | ------------------------------------------------------------------ |
-| **Audit Agent**       | Agente de auditoria contínua de código (processo PM2)              |
-| **Diagnostic Agent**  | Agente de diagnóstico de infraestrutura (será eliminado)           |
-| **Control Plane**     | Sistema central de comandos (AUDIT*\*, INFERENCE*_, DIAGNOSTIC\__) |
-| **Inference Gateway** | Gateway de inferência LLM com políticas e budgets                  |
-| **Job**               | Unidade de trabalho executada pelo Audit Agent                     |
-| **Cutover**           | Momento de transição para o novo sistema                           |
+| Termo                 | Definição                                                            |
+| --------------------- | -------------------------------------------------------------------- |
+| **Audit Agent**       | Agente de auditoria contínua de código (processo PM2)                |
+| **Diagnostic Agent**  | Agente de diagnóstico de infraestrutura (será eliminado)             |
+| **Control Plane**     | Sistema central de comandos (AUDIT*\*, INFERENCE*\_, DIAGNOSTIC\_\_) |
+| **Inference Gateway** | Gateway de inferência LLM com políticas e budgets                    |
+| **Job**               | Unidade de trabalho executada pelo Audit Agent                       |
+| **Cutover**           | Momento de transição para o novo sistema                             |
 
 ---
 

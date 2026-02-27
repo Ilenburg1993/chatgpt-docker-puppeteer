@@ -27,7 +27,7 @@ da arquitetura, mapeamento de componentes, identificação de problemas e recome
 2. Audit Agent orquestra jobs, chama LLMs, consolida findings e propõe patches.
 3. Inference Gateway governa inferência com políticas, budgets, quotas e circuit breaker.
 4. MCP, LSP/TSServer e RAG são fontes de contexto, não governança.
-5. Control Plane gerencia todas as mutações via commands AUDIT*\*, INFERENCE*_, DIAGNOSTIC\__.
+5. Control Plane gerencia todas as mutações via commands AUDIT*\*, INFERENCE*\_, DIAGNOSTIC\_\_.
 
 ## Components Analysis
 

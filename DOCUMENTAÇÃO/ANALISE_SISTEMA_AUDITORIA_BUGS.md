@@ -89,8 +89,8 @@ logger.js para logging customizado e validators.js para validações.
 ### 2.4 Control Plane e APIs
 
 O sistema de controle centralizado está implementado em
-src/server/domain/control*command_service.js, que gerencia todos os comandos AUDIT*_, INFERENCE\__ e
-DIAGNOSTIC\_\*. As APIs de dashboard estão distribuídas em dashboard_audit.js e
+src/server/domain/control*command_service.js, que gerencia todos os comandos AUDIT*\_, INFERENCE\_\_
+e DIAGNOSTIC\_\*. As APIs de dashboard estão distribuídas em dashboard_audit.js e
 dashboard_inference.js, oferecendo endpoints para gerenciamento de jobs, patches, watch rules e
 configuração de inferência.
 
@@ -294,9 +294,9 @@ incluindo padrões de operação, comandos disponíveis, troubleshooting e proce
 ### 7.2 Estrutura Proposta
 
 A skill deve incluir seções para quick start com pré-requisitos e inicialização básica, referência
-de comandos AUDIT*\*, INFERENCE*_ e DIAGNOSTIC\__, troubleshooting comum com soluções para problemas
-frequentes, configuração avançada incluindo flags e variáveis de ambiente, e procedimentos de
-manutenção para backup, restore e migrations.
+de comandos AUDIT*\*, INFERENCE*\_ e DIAGNOSTIC\_\_, troubleshooting comum com soluções para
+problemas frequentes, configuração avançada incluindo flags e variáveis de ambiente, e procedimentos
+de manutenção para backup, restore e migrations.
 
 ### 7.3 Conteúdo Técnico
 
