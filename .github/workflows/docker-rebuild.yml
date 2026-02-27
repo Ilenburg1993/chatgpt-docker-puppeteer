@@ -1,0 +1,65 @@
+name: Docker Rebuild
+
+# Workflow for building the DevContainer image, linting Dockerfile and
+# scripts, and running a healthcheck.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".devcontainer/**"
+      - "Dockerfile"
+  schedule:
+    # run nightly at 03:00 UTC
+    - cron: "0 3 * * *"
+
+jobs:
+  build:
+    name: Build and validate container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for multiarch
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build image (no cache)
+        run: |
+          docker build --no-cache --tag container-test -f .devcontainer/Dockerfile .
+
+      - name: Lint Dockerfile with hadolint
+        uses: hadolint/hadolint-action@v4
+        with:
+          dockerfile: .devcontainer/Dockerfile
+
+      - name: Lint shell scripts with shellcheck
+        uses: reviewdog/action-shellcheck@v1
+        with:
+          # run on all scripts in repo
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          shellcheck_flags: "-x"
+          reporter: github-pr-review
+          filter_mode: added
+          fail_on_error: false
+
+      - name: Run apt pin check
+        run: scripts/ci/apt-pins.sh
+
+      - name: Run container healthcheck and NSS wrapper test
+        run: |
+          # run container in background
+          docker run --rm -d --name tmpcontainer -p 3008:3008 container-test sleep infinity
+          sleep 5
+          if ! docker ps | grep tmpcontainer; then
+            echo "Container did not start" >&2
+            exit 1
+          fi
+          # attempt healthcheck command inside container
+          docker exec tmpcontainer sh -c "if curl -f http://localhost:3008; then exit 0; else exit 1; fi"
+          # test NSS wrapper mapping (requires post-create artifacts)
+          docker exec tmpcontainer sh -c "getent passwd \\$(id -u) || exit 1"
+          docker rm -f tmpcontainer || true
+
+      - name: Cleanup image
+        run: docker rmi container-test || true

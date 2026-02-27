@@ -81,6 +81,13 @@
   // CONTAINER ENVIRONMENT VARIABLES (Simbiose v3.4)
   // ============================================================
   "containerEnv": {
+    // canonical shell contract mirrored from /etc/profile.d/00-runtime.sh
+    // ensures non‑login terminals inherit the same semantic hints as
+    // interactive logins. purely informational, used by helpers and tests.
+    "SHELL_CANONICAL": "bash",
+    "CANONICAL_SHELL": "bash",
+    "INSTRUMENTAL_SHELLS": "pwsh",
+
     "APP_ENV": "dev",
     "APP_NAME": "chatgpt-docker-puppeteer",
     "APP_ROLE": "agent",
@@ -1022,7 +1029,15 @@
   // LIFECYCLE FINALIZATION
   // ============================================================
   "shutdownAction": "stopContainer",
-  "updateRemoteUserUID": false,
+  // IMPORTANT: some hosts may run the container using an arbitrary UID that
+  // does not match the fixed ‘node’ entry baked into the image (UID 1000).
+  // When this happens the user ID has no corresponding name in /etc/passwd
+  // and interactive shells display «Eu não tenho nome» / «I have no name».
+  // Setting updateRemoteUserUID:true instructs the devcontainer extension to
+  // rewrite the /etc/passwd entry at startup so that the active UID is
+  // always resolvable.  See .devcontainer/USER_ID_ASSIGNMENT_INVESTIGATION.md
+  // for a full analysis.
+  "updateRemoteUserUID": true,
   "waitFor": "postCreateCommand",
   // Workspace dinâmico: herda o nome da pasta no seu Windows/Host
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"

@@ -1,9 +1,5 @@
 {
-  "servers": {
-    "chatgpt-docker-puppeteer": {
-      "transport": "http",
-      "url": "http://localhost:3008/api/mcp"
-    },
+  "mcpServers": {
     "context7": {
       "transport": "stdio",
       "command": "npx",

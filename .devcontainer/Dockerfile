@@ -1,50 +1,51 @@
 # =============================================================================
-# Dockerfile v5.2 — ChatGPT Docker Puppeteer DevContainer (OTIMIZADO)
+# Dockerfile v1.0 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
 # Base: Node.js 24 + Debian Bookworm (Microsoft DevContainers)
 #
-# FOCO:
-# - Estabilidade máxima do VS Code Server
-# - Compatibilidade total com Copilot / Copilot Chat
-# - Docker CLI funcional (sem dockerd)
-# - Puppeteer estável (Chrome externo + fallback local)
-# - Tooling completo (GitHub, análise, debugging, profiling)
-# - Build otimizado (cache layers, sem duplicações)
+# OBJETIVO MACRO (v1.0)
+#   Este Dockerfile define uma imagem DEV (apenas desenvolvimento) com foco em:
+#   - Estabilidade máxima do VS Code Server (Remote - Containers / Dev Containers)
+#   - Compatibilidade alta com GitHub Copilot / Copilot Chat e fluxos de agente
+#   - Puppeteer estável em modo CONNECT (Chrome externo via CDP) com fallback local
+#   - Tooling de diagnóstico, profiling, rede e inspeção (sem daemons)
+#   - Estrutura de filesystem do usuário previsível (XDG-safe) e amigável a volumes
+#   - Contratos formais: shell canônico, shell instrumental, gatekeeper NSS e UX
 #
-# PRINCÍPIOS (INVIOLÁVEIS):
-# - Ambiente DEV
-# - Nenhum serviço iniciado automaticamente
-# - Chrome externo como primário (CDP)
-# - Makefile governa execução
-# - Estabilidade > minimalismo
-# - Documentação robusta (NUNCA reduzir)
+# PRINCÍPIOS (INVIOLÁVEIS)
+#   1) AMBIENTE DEV: não é imagem de produção.
+#   2) NENHUM SERVIÇO/DAEMON auto-start: nada inicia no build nem por default no runtime.
+#   3) CHROME EXTERNO É PRIMÁRIO: Puppeteer conecta via CDP; Chromium local é fallback técnico.
+#   4) DOCKER CLI SEM DOCKERD: somente CLI, via socket do host (bind mount).
+#   5) REPRODUTIBILIDADE PRÁTICA: camadas bem definidas; limpeza de apt em todas as seções.
+#   6) DOCUMENTAÇÃO ROBUSTA: comentários são parte do contrato (não reduzir).
 #
-# CHANGELOG v5.2 (2026-02-02):
-# ✅ OTIMIZAÇÕES:
-# + Removidas duplicações de pacotes (libnss-wrapper, curl, ca-certificates)
-# + Adicionado apt-get clean em todas as layers (-30MB)
-# + Cache layers reorganizadas (build incremental 2-3x mais rápido)
-# + Registro de HEALTHCHECK alinhado (não há instrução HEALTHCHECK neste Dockerfile)
-# + BUILD_ARGs usados em mensagens
-# + Adicionado bubblewrap (sandbox isolation para GitHub Copilot Agent)
-# ✅ v5.1 (anteriormente):
-# + GitHub CLI (gh) + git-lfs
-# + Network debugging (socat, mtr-tiny)
-# + Code analysis (cloc, tokei)
-# + JSON/YAML tooling (jd, dasel)
-# + Container tooling (docker-compose, docker-buildx)
-# + Performance analysis (ccache, pandoc)
-# + Database/Protocol (postgresql-client, protobuf-compiler)
+# NOTA DE SEGURANÇA (DOCKER SOCKET)
+#   Montar /var/run/docker.sock dentro do container equivale a conceder privilégios
+#   altos no host (na prática, root-equivalent). Isso é deliberado para DEV.
+#
+# VERSÃO
+#   - Todas as versões/contratos internos nesta imagem usam "1.0".
+#   - ARG VERSION default é 1.0 e é propagado para contratos e labels OCI.
 # =============================================================================
 
+
 # =============================================================================
-# SECTION 0 — BUILD METADATA
+# SECTION 0 — BASE IMAGE, SHELL GLOBAL & BUILD METADATA (OCI)
 # =============================================================================
 FROM mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
 
 # ---------------------------------------------------------------------------
-# Build-time metadata (OCI)
+# SHELL GLOBAL (PIPEFAIL)
+# - Garante que pipelines em RUN falhem corretamente (curl | gpg, etc.).
+# - Aumenta rigor e previsibilidade do build.
 # ---------------------------------------------------------------------------
-ARG VERSION=dev
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# ---------------------------------------------------------------------------
+# Build-time metadata (OCI)
+# - VERSION deve ser "1.0" para o release canônico (pode ser override via build-arg).
+# ---------------------------------------------------------------------------
+ARG VERSION=1.0
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG IMAGE_NAME=chatgpt-docker-puppeteer
@@ -57,10 +58,11 @@ LABEL org.opencontainers.image.title="${IMAGE_NAME}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
     org.opencontainers.image.environment="${BUILD_ENV}" \
-    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV)"
+    org.opencontainers.image.description="DevContainer for ChatGPT Puppeteer Agent (DEV) — Canonical v1.0"
 
 # ---------------------------------------------------------------------------
 # Build-time feedback (logs)
+# - Meramente informativo; não cria dependências.
 # ---------------------------------------------------------------------------
 RUN echo "" \
     && echo "📦 Building ${IMAGE_NAME} v${VERSION}" \
@@ -69,79 +71,57 @@ RUN echo "" \
     && echo "🔗 VCS ref: ${VCS_REF}" \
     && echo ""
 
+
 # =============================================================================
-# SECTION 1 — IDENTITY & PATH DISCOVERY (CANONICAL)
+# SECTION 1 — IDENTIDADE, CAMINHOS E XDG (CANÔNICO)
 #
 # Finalidade:
-#   • Definir identidade lógica fixa do usuário
-#   • Descobrir caminhos base de forma determinística
-#   • Garantir que a imagem seja reutilizável fora do DevContainer
+#   • Estabelecer identidade lógica e caminhos base de forma determinística
+#   • Alinhar com devcontainer.json (REMOTE_USER) sem assumir VS Code em runtime
+#   • Criar APP_DIR sem chown recursivo amplo
 #
-# NOTAS DE DESIGN:
-#   • Identidade NÃO é dinâmica em build-time
-#   • Não assume volumes montados
-#   • Não assume VS Code
-#   • Não executa chown amplo ou recursivo
+# Nota:
+#   Este Dockerfile assume que o usuário REMOTE_USER já existe no base image.
+#   (Na imagem Microsoft DevContainers, "node" existe.)
 # =============================================================================
 
-# ---------------------------------------------------------------------------
-# Projeto (usado apenas para WORKDIR; não cria lógica)
-# ---------------------------------------------------------------------------
+# Projeto (usado para WORKDIR / path; não cria lógica de runtime)
 ARG PROJECT_NAME=chatgpt-docker-puppeteer
 
-# ---------------------------------------------------------------------------
-# Identidade dinâmica (sincronizada com devcontainer.json via REMOTE_USER)
-# ---------------------------------------------------------------------------
-# ARG REMOTE_USER é passado do devcontainer.json (build.args.REMOTE_USER: "node")
-# Permite que a imagem seja reutilizável com diferentes usuários
+# Usuário remoto (normalmente: "node")
 ARG REMOTE_USER=node
 
-ENV USER_NAME=${REMOTE_USER} \
-    HOME_DIR=/home/${REMOTE_USER} \
-    APP_DIR=/workspaces/${PROJECT_NAME}
+ENV USER_NAME="${REMOTE_USER}" \
+    HOME_DIR="/home/${REMOTE_USER}" \
+    APP_DIR="/workspaces/${PROJECT_NAME}"
 
-# ---------------------------------------------------------------------------
 # XDG Base Directories — fonte única de verdade
-# ---------------------------------------------------------------------------
-ENV XDG_CONFIG_HOME=${HOME_DIR}/.config \
-    XDG_CACHE_HOME=${HOME_DIR}/.cache \
-    XDG_DATA_HOME=${HOME_DIR}/.local/share \
-    XDG_STATE_HOME=${HOME_DIR}/.local/state \
-    PUPPETEER_CACHE_DIR=${HOME_DIR}/.cache/puppeteer
+ENV XDG_CONFIG_HOME="${HOME_DIR}/.config" \
+    XDG_CACHE_HOME="${HOME_DIR}/.cache" \
+    XDG_DATA_HOME="${HOME_DIR}/.local/share" \
+    XDG_STATE_HOME="${HOME_DIR}/.local/state" \
+    PUPPETEER_CACHE_DIR="${HOME_DIR}/.cache/puppeteer"
 
-# ---------------------------------------------------------------------------
 # Hardening mínimo:
-#   • Garante que o diretório da aplicação exista
-#   • Ownership explícito e local (sem chown -R)
-# ---------------------------------------------------------------------------
-RUN mkdir -p ${APP_DIR} \
-    && chown ${USER_NAME}:${USER_NAME} ${APP_DIR}
+# - Garante diretório de workspace
+# - Ownership local (não recursivo)
+RUN mkdir -p "${APP_DIR}" \
+    && chown "${USER_NAME}:${USER_NAME}" "${APP_DIR}"
 
-# -----------------------------------------------------------------------------
-# SSH Agent Anchor (FILE, NOT DIRECTORY)
-#
-# Contract:
-# • This image NEVER starts ssh-agent
-# • This image NEVER contains private keys
-# • SSH is available ONLY if runtime binds a socket here
-# • Absence of SSH_AUTH_SOCK is a valid state
-#
-# Semântica:
-# • /ssh-agent é um *ponto de ancoragem de arquivo*
-# • O socket real é sempre fornecido pelo runtime (bind mount)
-# -----------------------------------------------------------------------------
-##RUN touch /ssh-agent \
-##    && chmod 666 /ssh-agent
 
 # =============================================================================
-# SECTION 2 — LOCALE / TIMEZONE / SYSTEM (VS CODE SAFE)
-# libnss-wrapper: requerido pelo Gatekeeper (post-create.sh)
+# SECTION 2 — LOCALE / TIMEZONE / BASE SYSTEM (VS CODE SAFE)
+#
+# Finalidade:
+#   • Locale PT-BR e timezone America/Sao_Paulo
+#   • libnss-wrapper requerido para Gatekeeper NSS (runtime)
+#   • openssh-client para compatibilidade com operações git/ssh (sem agent auto-start)
 # =============================================================================
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=America/Sao_Paulo \
     LANGUAGE=pt_BR:pt:en
 
-RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime \
+RUN ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime \
     && echo "${TZ}" > /etc/timezone \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -158,115 +138,75 @@ RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime \
 ENV LANG=pt_BR.UTF-8 \
     LC_MESSAGES=pt_BR.UTF-8
 
+
 # =============================================================================
-# SECTION 3 — NODE NATIVE BUILD TOOLCHAIN (CANONICAL)
+# SECTION 3 — TOOLCHAIN NATIVA NODE (node-gyp / bindings) + NPM GLOBAL PATH
 #
 # Finalidade:
-#   • Compilação determinística de módulos nativos (node-gyp / gyp-next)
-#   • Compatibilidade total com Node.js 24+
-#   • Suporte a bindings C/C++, autotools e toolchains híbridos
-#
-# Escopo:
-#   • Ambiente DEV
-#   • Nenhuma dependência implícita de runtime
-#   • Nenhuma instalação global de node-gyp
+#   • Compilação determinística de módulos nativos (C/C++/autotools/cmake)
+#   • Python 3 para toolchains híbridas
+#   • TLS e downloads confiáveis (ca-certificates/openssl/curl)
+#   • PATH consistente para npm global prefix (.npm-global)
 # =============================================================================
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    \
-    # -------------------------------------------------------------------------
-    # Toolchain C/C++ básica (node-gyp)
-    # -------------------------------------------------------------------------
     build-essential \
     pkg-config \
-    \
-    # -------------------------------------------------------------------------
-    # Toolchain Autotools (bindings legados / híbridos)
-    # -------------------------------------------------------------------------
     autoconf \
     automake \
     libtool \
-    \
-    # -------------------------------------------------------------------------
-    # Python (toolchain híbrido Node + Python)
-    # -------------------------------------------------------------------------
     python3 \
     python3-pip \
     python-is-python3 \
-    \
-    # -------------------------------------------------------------------------
-    # Crypto & TLS (npm, node-gyp, downloads HTTPS)
-    # -------------------------------------------------------------------------
     openssl \
     ca-certificates \
     curl \
-    # -------------------------------------------------------------------------
-    # NEW
-    # -------------------------------------------------------------------------
     cmake \
     libssl-dev \
     zlib1g-dev \
-    \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# ---------------------------------------------------------------------------
-# Compatibilidade explícita com toolchains legadas
-# (node-gyp, scripts configure, bindings antigos)
-# ---------------------------------------------------------------------------
+# Compatibilidade explícita para scripts legados que chamam "python"
 RUN ln -sf /usr/bin/python3 /usr/bin/python
 
-# ---------------------------------------------------------------------------
-# NPM — Comportamento previsível e silencioso
-# (alinhado com mounts e XDG)
-# ---------------------------------------------------------------------------
-ENV NPM_CONFIG_AUDIT=false \
+# NPM global prefix + PATH (garante disponibilidade das bins globais)
+ENV PATH="${HOME_DIR}/.npm-global/bin:${HOME_DIR}/.local/bin:${PATH}" \
+    NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_LOGLEVEL=warn \
-    NPM_CONFIG_PREFIX=${HOME_DIR}/.npm-global
+    NPM_CONFIG_PREFIX="${HOME_DIR}/.npm-global"
+
+# Ferramentas globais úteis (LSP/edição)
+# - Fail-safe com aviso: evita build quebrar por instabilidade de rede,
+#   mas também não silencia completamente o problema.
+RUN npm install -g typescript@5.9.3 typescript-language-server >/dev/null 2>&1 \
+    || echo "WARN: Falha ao instalar ferramentas globais TS (typescript/typescript-language-server)." >&2
+
 
 # =============================================================================
-# SECTION 4 — BROWSER FALLBACK & CHROME COMPATIBILITY LAYER
+# SECTION 4 — BROWSER LAYER (Chromium fallback + libs headless)
 #
 # Finalidade:
-#   • Fallback local de Chromium (uso EXCEPCIONAL)
-#   • Camada de compatibilidade para Chrome externo via CDP
-#   • Garantir estabilidade máxima do Puppeteer (connect / launch)
+#   • Chromium local apenas como fallback técnico
+#   • Dependências comuns para Chrome/Chromium headless (GTK shims, X11, NSS/NSPR etc.)
+#   • Ferramentas de análise (gdb/heaptrack) úteis em DEV
 #
-# Princípios:
-#   • Chrome externo é PRIMÁRIO e NECESSÁRIO para operações Puppeteer
-#   • Chromium local existe apenas como camada de compatibilidade runtime
-#   • Nenhum download automático de browser
-#   • Nenhuma UI gráfica iniciada
+# Princípio:
+#   • Puppeteer deve preferir CHROME EXTERNO via CDP; Chromium local é contingência.
 # =============================================================================
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    \
-    # -------------------------------------------------------------------------
-    # Chromium (fallback local controlado)
-    # -------------------------------------------------------------------------
     chromium \
-    \
-    # -------------------------------------------------------------------------
-    # Runtime base (audio, IPC, sandbox, threads)
-    # -------------------------------------------------------------------------
     libasound2 \
     libcups2 \
     libdbus-1-3 \
     libdrm2 \
     libgbm1 \
     libglib2.0-0 \
-    \
-    # -------------------------------------------------------------------------
-    # GTK / UI shims (necessários mesmo em headless)
-    # -------------------------------------------------------------------------
     libgtk-3-0 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
-    \
-    # -------------------------------------------------------------------------
-    # X11 / Wayland compatibility (headless-safe)
-    # -------------------------------------------------------------------------
     libx11-6 \
     libx11-xcb1 \
     libxcb1 \
@@ -281,141 +221,63 @@ RUN apt-get update \
     libxshmfence1 \
     libxss1 \
     libxtst6 \
-    \
-    # -------------------------------------------------------------------------
-    # NSS / NSPR (TLS, certs, Chrome internals)
-    # -------------------------------------------------------------------------
     libnss3 \
     libnspr4 \
-    \
-    # -------------------------------------------------------------------------
-    # Graphics & GPU abstraction (safe even sem GPU)
-    # -------------------------------------------------------------------------
     libgl1 \
     libvulkan1 \
     mesa-utils \
-    \
-    # Memory & perf analysis
     gdb \
     heaptrack \
-    \
-    # -------------------------------------------------------------------------
-    # Fonts & text rendering (PDF, emojis, i18n)
-    # -------------------------------------------------------------------------
     fontconfig \
     libfreetype6 \
-    \
-    # -------------------------------------------------------------------------
-    # Desktop / runtime helpers (headless-safe)
-    # -------------------------------------------------------------------------
     xdg-utils \
-    \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+# Observação:
+# - Chromium fallback NÃO implica uso por padrão.
+# - Para Puppeteer connect, configure CHROME_HOST/CHROME_PORT/WS endpoint via devcontainer.json/.env.
 
-
-# Chromium é FALLBACK TÉCNICO
-# Chrome CANÔNICO é externo (host)
 
 # =============================================================================
-# SECTION 5 — FONTS & TEXT RENDERING (PDF / EMOJI / I18N / SCREENSHOTS)
+# SECTION 5 — FONTS & TEXT RENDERING (PDF / EMOJI / I18N)
 #
 # Finalidade:
-#   • Renderização previsível de texto em:
-#       - PDFs
-#       - Screenshots (Puppeteer)
-#       - Dashboards HTML
-#   • Compatibilidade total com Chrome externo e Chromium fallback
-#
-# Princípios:
-#   • Fontes amplas, mas controladas
-#   • Fontconfig como árbitro único
-#   • Sem dependência de fontes do host
+#   • Renderização previsível de PDFs e screenshots
+#   • Cobertura ampla (Noto + DejaVu + Liberation + Emoji)
 # =============================================================================
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    \
-    # -------------------------------------------------------------------------
-    # FONTCONFIG — FUNDACIONAL (NUNCA REMOVER)
-    # -------------------------------------------------------------------------
     fontconfig \
-    \
-    # -------------------------------------------------------------------------
-    # BASE LATINA (PT-BR / EN / EU)
-    # -------------------------------------------------------------------------
     fonts-dejavu-core \
     fonts-dejavu-extra \
     fonts-liberation \
-    \
-    # -------------------------------------------------------------------------
-    # NOTO FAMILY — COBERTURA GLOBAL UNIFICADA
-    # -------------------------------------------------------------------------
     fonts-noto-core \
     fonts-noto-ui-core \
     fonts-noto-color-emoji \
-    ##fonts-noto-cjk \
-    ##fonts-noto-extra \
     fonts-jetbrains-mono \
-    \
-    # -------------------------------------------------------------------------
-    # ASIAN SCRIPTS (fallback robusto)
-    # -------------------------------------------------------------------------
     fonts-ipafont-gothic \
     fonts-wqy-zenhei \
-    \
-    # -------------------------------------------------------------------------
-    # RTL & COMPLEMENTARES (árabe, hebraico, etc.)
-    # -------------------------------------------------------------------------
     fonts-kacst \
-    \
-    # -------------------------------------------------------------------------
-    # LEGACY / COMPATIBILIDADE (PDFs antigos)
-    # -------------------------------------------------------------------------
     fonts-freefont-ttf \
-    \
-    # -------------------------------------------------------------------------
-    # XDG UTILITIES (PDF viewers / helpers)
-    # -------------------------------------------------------------------------
     xdg-utils \
-    \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+
 # =============================================================================
-# SECTION 6 — DEV UX (CLI & DIAGNOSTICS)
-#
-# Finalidade:
-#   • Ferramentas passivas de diagnóstico e inspeção em ambiente DEV
-#   • Suporte explícito a Node.js, Puppeteer, rede, TLS e sistema
-#   • UX de terminal rica, previsível e silenciosa
+# SECTION 6 — DEV UX (CLIs & DIAGNÓSTICO) — PASSIVO / SEM DAEMONS
 #
 # Princípios:
-#   • Apenas CLIs (nenhum daemon, nenhum serviço automático)
-#   • Nenhuma interferência com o VS Code Server
-#   • Seguro para rebuild frequente (stateless)
-#   • Compatível com WSL, Docker e CI
+#   • Ferramentas de linha de comando apenas (sem serviços)
+#   • Úteis para: rede/TLS, inspeção de processos, encoding, análise de código, etc.
 # =============================================================================
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    \
-    # =====================================================================
-    # CONTROLE DE VERSÃO & TEXTO
-    # ---------------------------------------------------------------------
-    # • Inspeção de código
-    # • Navegação e edição emergencial
-    # =====================================================================
     git \
     less \
     vim \
     nano \
-    \
-    # =====================================================================
-    # ARQUIVOS & INSPEÇÃO
-    # ---------------------------------------------------------------------
-    # • Análise de encoding / CRLF / BOM
-    # • Manipulação e inspeção de dados estruturados
-    # =====================================================================
     unzip \
     zip \
     tree \
@@ -423,50 +285,28 @@ RUN apt-get update \
     dos2unix \
     file \
     libc-bin \
-    \
-    # =====================================================================
-    # MONITORAMENTO & PROCESSOS
-    # ---------------------------------------------------------------------
-    # • Observabilidade local
-    # • Diagnóstico de leaks, travamentos e limites
-    # =====================================================================
     htop \
     lsof \
     procps \
     psmisc \
     sysstat \
-    \
-    # =====================================================================
-    # REDE & DIAGNÓSTICO (Node / Puppeteer / APIs)
-    # ---------------------------------------------------------------------
-    # • Testes HTTP/TLS
-    # • Conectividade CDP / WebSocket
-    # • Debug de DNS e rotas
-    # =====================================================================
     curl \
     wget \
     netcat-openbsd \
     dnsutils \
+    iproute2 \
     iputils-ping \
     traceroute \
+    nmap \
+    tcpdump \
+    ncdu \
     openssl \
-    \
-    # =====================================================================
-    # DEBUG DE SISTEMA
-    # ---------------------------------------------------------------------
-    # • Syscalls, timing e comportamento runtime
-    # =====================================================================
     watch \
     time \
     strace \
-    \
-    # =====================================================================
-    # PRODUTIVIDADE (LOW NOISE, HIGH VALUE)
-    # ---------------------------------------------------------------------
-    # • Busca rápida de código e arquivos
-    # • UX CLI moderna, sem sobreposição com VS Code
-    # • Sandbox container (bubblewrap) para isolamento de comandos
-    # =====================================================================
+    ltrace \
+    dstat \
+    man-db \
     bat \
     ripgrep \
     bubblewrap \
@@ -484,95 +324,28 @@ RUN apt-get update \
     moreutils \
     watchman \
     hyperfine \
-    \
-    # =====================================================================
-    # GIT & GITHUB INTEGRATION (v5.1)
-    # ---------------------------------------------------------------------
-    # • GitHub CLI (issues, PRs, releases)
-    # • Large File Storage
-    # =====================================================================
     gh \
     git-lfs \
-    \
-    # =====================================================================
-    # NETWORK DEBUGGING AVANÇADO (v5.1)
-    # ---------------------------------------------------------------------
-    # • Socket debugging (CDP, WebSocket)
-    # • Traceroute melhorado
-    # =====================================================================
     socat \
     mtr-tiny \
-    \
-    # =====================================================================
-    # CODE ANALYSIS & STATISTICS (v5.1)
-    # ---------------------------------------------------------------------
-    # • Lines of code counter
-    # • Fast code statistics (Rust-based)
-    # =====================================================================
     cloc \
-    \
-    # =====================================================================
-    # JSON/YAML/TOML TOOLING (v5.1)
-    # ---------------------------------------------------------------------
-    # • JSON diff visual
-    # • Query unificado (JSON/YAML/TOML)
-    # =====================================================================
-    \
-    # =====================================================================
-    # CONTAINER TOOLING (v5.1)
-    # ---------------------------------------------------------------------
-    # • Compose CLI v2
-    # • BuildKit avançado
-    # =====================================================================
-    docker-compose \
-    \
-    # =====================================================================
-    # BUILD OPTIMIZATION (v5.1)
-    # ---------------------------------------------------------------------
-    # • Cache compilação C/C++ (acelera rebuilds)
-    # =====================================================================
     ccache \
-    \
-    # =====================================================================
-    # DOCUMENT CONVERSION (v5.1)
-    # ---------------------------------------------------------------------
-    # • Markdown → PDF/HTML/DOCX
-    # =====================================================================
-    ## pandoc pesado
-    # =====================================================================
-    # DATABASE & PROTOCOL (v5.1)
-    # ---------------------------------------------------------------------
-    # • PostgreSQL client
-    # • Protobuf compiler (gRPC/protobuf)
-    # =====================================================================
     postgresql-client \
     protobuf-compiler \
-    \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+
 # =============================================================================
-# SECTION 6.5 — POWERSHELL (INSTRUMENTAL / NON-CANONICAL)
+# SECTION 6.5 — POWERSHELL (INSTRUMENTAL / NÃO-CANÔNICO)
 #
 # Finalidade:
-#   • Shell semântico para inspeção, diagnóstico e IA
-#   • Integração com VS Code, Copilot e Claude
-#   • Apoio a debugging, análise de objetos e introspecção
+#   • Shell instrumental para inspeção/IA/diagnóstico (não substitui bash)
+#   • Integração com VS Code e fluxos de agente (quando aplicável)
 #
-# Princípios:
-#   • NÃO substitui bash (shell canônico)
-#   • NÃO é shell default
-#   • NÃO inicia serviços
-#   • NÃO interfere em bootstrap, build ou runtime
-#   • Seguro para rebuild e CI
+# Contrato:
+#   • PowerShell é SEMPRE subordinado ao bash canônico nesta imagem.
 # =============================================================================
-
-# -----------------------------------------------------------------------------
-# Instalação mínima e oficial do PowerShell (pwsh)
-# • Repositório oficial Microsoft
-# • Compatível com Debian Bookworm
-# • Sem dependências extras desnecessárias
-# -----------------------------------------------------------------------------
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -580,67 +353,47 @@ RUN apt-get update \
     gnupg \
     && install -d -m 0755 /etc/apt/keyrings \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
-    | gpg --dearmor \
-    > /etc/apt/keyrings/microsoft.gpg \
-    && chmod 644 /etc/apt/keyrings/microsoft.gpg \
-    && echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] \
-    https://packages.microsoft.com/debian/12/prod bookworm main" \
+    | gpg --dearmor > /etc/apt/keyrings/microsoft.gpg \
+    && chmod 0644 /etc/apt/keyrings/microsoft.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \
     > /etc/apt/sources.list.d/microsoft-prod.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends powershell \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-
-# =============================================================================
 # SECTION 6.6 — POWERSHELL CONTRACT (GLOBAL, READ-ONLY)
-#
-# Contrato explícito:
-#   • PowerShell é INSTRUMENTAL
-#   • Bash é o shell CANÔNICO
-#   • Nenhuma mutação de estado
-#   • Nenhum efeito colateral
-# =============================================================================
-
-# Estrutura global (imagem)
 RUN mkdir -p /etc/powershell \
-    && chmod 755 /etc/powershell
+    && chmod 0755 /etc/powershell
 
-
-# -----------------------------------------------------------------------------
-# PowerShell Contract — Imutável
-# -----------------------------------------------------------------------------
-RUN cat <<'EOF' > /etc/powershell/PowerShell.Contract.ps1
+RUN cat > /etc/powershell/PowerShell.Contract.ps1 <<'EOF'
 # =============================================================================
 # PowerShell Contract — DevContainer
 # Version: 1.0
 #
 # Authority Model:
-#   • PowerShell  → Instrumental
-#   • Bash        → Canonical
+#   • PowerShell  → Instrumental (subordinado)
+#   • Bash        → Canonical (autoridade)
 # =============================================================================
 
-# Identidade do contrato
-$env:POWERSHELL_CONTRACT_LOADED = "true"
-$env:POWERSHELL_ROLE            = "instrumental"
-$env:POWERSHELL_AUTHORITY       = "subordinate"
-$env:POWERSHELL_CANONICAL       = "false"
+$env:POWERSHELL_CONTRACT_VERSION = "1.0"
+$env:POWERSHELL_CONTRACT_LOADED  = "true"
+$env:POWERSHELL_ROLE             = "instrumental"
+$env:POWERSHELL_AUTHORITY        = "subordinate"
+$env:POWERSHELL_CANONICAL        = "false"
 
-# Fonte única de verdade do shell
+# Fonte única de verdade (shell canônico)
 $env:SHELL_CANONICAL = "bash"
 
-# Endurecimento básico
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 function Assert-NotCanonical {
     Write-Verbose "[PSC] PowerShell é instrumental. Bash é canônico."
 }
-
 Assert-NotCanonical
 
-# Prompt explícito (apenas console interativo)
+# Prompt explícito (somente console interativo)
 if ($Host.Name -eq "ConsoleHost") {
     function prompt {
         "PS(instr) $(Get-Location)> "
@@ -648,306 +401,152 @@ if ($Host.Name -eq "ConsoleHost") {
 }
 EOF
 
-RUN chmod 444 /etc/powershell/PowerShell.Contract.ps1
+RUN chmod 0444 /etc/powershell/PowerShell.Contract.ps1
 
-
-# -----------------------------------------------------------------------------
-# PowerShell Global Profile (bootstrap defensivo)
-# • Executado automaticamente pelo pwsh
-# • Não depende de HOME
-# • Não interfere no VS Code
-# -----------------------------------------------------------------------------
-RUN cat <<'EOF' > /etc/powershell/profile.ps1
+RUN cat > /etc/powershell/profile.ps1 <<'EOF'
 # PowerShell Global Profile — DevContainer (Read-only)
-
 $contract = "/etc/powershell/PowerShell.Contract.ps1"
-
-if (Test-Path $contract) {
-    . $contract
-}
+if (Test-Path $contract) { . $contract }
 EOF
 
-RUN chmod 444 /etc/powershell/profile.ps1
-
+RUN chmod 0444 /etc/powershell/profile.ps1
 
 
 # =============================================================================
-# SECTION 7 — DOCKER CLI (NO DOCKERD)
+# SECTION 7 — DOCKER CLI (SEM DOCKERD) + PLUGINS (COMPOSE/BUILDX)
 #
 # Finalidade:
-#   • Permitir uso do Docker CLI via socket do host
-#   • Nenhum daemon Docker dentro do container
+#   • Permitir docker CLI via socket do host (bind mount /var/run/docker.sock)
+#   • Instalar plugins modernos: docker-compose-plugin e docker-buildx-plugin
 #
-# Contrato (INVIOLÁVEL):
-#   • Ambiente DEV apenas
-#   • CLI-only (dockerd NÃO instalado)
-#   • Nenhuma dependência de GID fixo
-#   • Funciona com ou sem sincronização explícita de grupo
-#
-# Notas de segurança:
-#   • Acesso ao socket do host ⇒ privilégios equivalentes a root no host
-#   • O alinhamento de GID é best-effort e NUNCA obrigatório
-#   • Falhas de alinhamento NÃO quebram o build
+# Segurança:
+#   • Acesso ao socket do host => privilégios elevados no host.
+#   • Sincronização de GID é best-effort (não quebra build).
 # =============================================================================
-
 USER root
+ARG DOCKER_GID=999
 
-# -----------------------------------------------------------------------------
-# GID do grupo docker no host (OPCIONAL)
-#
-# • Normalmente injetado pelo devcontainer.json
-# • Ausência é tratada como cenário válido
-# -----------------------------------------------------------------------------
-ARG DOCKER_GID
-
-# -----------------------------------------------------------------------------
-# Instalação do Docker CLI (SEM daemon)
-#
-# Garantias:
-# • Apenas docker-ce-cli
-# • Nenhum serviço automático
-# • Compatível com Debian Bookworm
-# -----------------------------------------------------------------------------
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     gnupg \
-    \
-    # Keyring isolado (padrão moderno APT)
     && install -m 0755 -d /etc/apt/keyrings \
-    \
-    # Importação segura da chave oficial do Docker
     && curl -fsSL https://download.docker.com/linux/debian/gpg \
     | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
     && chmod a+r /etc/apt/keyrings/docker.gpg \
-    \
-    # Repositório oficial (CLI apenas)
-    && echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/debian bookworm stable" \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" \
     > /etc/apt/sources.list.d/docker.list \
-    \
     && apt-get update \
-    && apt-get install -y --no-install-recommends docker-ce-cli \
-    \
+    && apt-get install -y --no-install-recommends \
+    docker-ce-cli \
+    docker-compose-plugin \
+    docker-buildx-plugin \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# -----------------------------------------------------------------------------
-# Grupo docker — sincronização defensiva com o host
-#
-# Estratégia formal:
-#   • DOCKER_GID definido:
-#       - tenta alinhar exatamente com o host
-#       - falha é tolerada
-#
-#   • DOCKER_GID ausente:
-#       - cria grupo docker local (fallback)
-#
-# Propriedades:
-#   • Nunca falha o build
-#   • Nunca assume existência prévia de grupo
-#   • Nunca cria dependência rígida
-# -----------------------------------------------------------------------------
+# Grupo docker — alinhamento defensivo com host (best-effort)
 RUN set -e; \
-    if [ -n "${DOCKER_GID}" ]; then \
+    if [ -n "${DOCKER_GID:-}" ]; then \
     echo "→ DOCKER_GID fornecido: ${DOCKER_GID}"; \
-    groupadd -g "${DOCKER_GID}" docker 2>/dev/null || true; \
+    if getent group docker >/dev/null 2>&1; then \
+    groupmod -g "${DOCKER_GID}" docker 2>/dev/null || true; \
     else \
-    echo "→ DOCKER_GID não fornecido — criando grupo docker local"; \
-    groupadd -f docker; \
+    groupadd -g "${DOCKER_GID}" docker 2>/dev/null || true; \
     fi; \
-    usermod -aG docker ${USER_NAME}
-
+    else \
+    echo "→ DOCKER_GID não fornecido — garantindo grupo docker local"; \
+    groupadd -f docker 2>/dev/null || true; \
+    fi; \
+    usermod -aG docker "${USER_NAME}" 2>/dev/null || true; \
+    true
 
 
 # =============================================================================
 # SECTION 8 — USER CONTEXT (VS CODE / COPILOT / CLAUDE / XDG SAFE)
 #
-# FINALIDADE
-# ────────────────────────────────────────────────────────────────────────────
-# Definir a ESTRUTURA BASE e IMUTÁVEL do filesystem do usuário NA IMAGEM,
-# antes de qualquer mount de volume ou reconciliação dinâmica em runtime.
+# Finalidade:
+#   • Criar estrutura base (imagem-level) antes de mounts de volumes
+#   • Evitar criação de diretórios como root em runtime (quando possível)
+#   • Garantir ownership inicial correto sem chown indiscriminado do $HOME
 #
-# PRINCÍPIOS
-# ────────────────────────────────────────────────────────────────────────────
-# • A imagem cria apenas DIRETÓRIOS ESTRUTURAIS (sem estado)
-# • Nenhum diretório deve ser criado como root em runtime
-# • Nenhuma dependência de volumes montados
-# • Total compatibilidade com VS Code Server, Copilot, Node 24 e XDG
-#
-# RESPONSABILIDADE DESTA SEÇÃO
-# ────────────────────────────────────────────────────────────────────────────
-# • Criar diretórios pertencentes à IMAGEM
-# • Garantir ownership inicial correto
-# • Evitar efeitos colaterais quando volumes forem montados
-#
-# RESPONSABILIDADE EXPLÍCITA DO post-create.sh
-# ────────────────────────────────────────────────────────────────────────────
-# • Ajuste de ownership de VOLUMES
-# • Reconciliação UID/GID
-# • Lógica dinâmica (NSS, agentes, etc.)
-#
-# PROIBIÇÕES (SEMÂNTICAS)
-# ────────────────────────────────────────────────────────────────────────────
-# • ❌ chown -R ${HOME_DIR} indiscriminadamente
-# • ❌ assumir presença de volumes
-# • ❌ criar estado persistente na imagem
+# Nota:
+#   Ajustes dinâmicos de UID/GID, volumes e NSS são responsabilidade do post-create.sh.
 # =============================================================================
-
 RUN mkdir -p \
-    \
-    # =====================================================================
-    # VS CODE SERVER — ESTRUTURA BASE (IMAGEM)
-    # =====================================================================
-    ${HOME_DIR}/.vscode-server/bin \
-    ${HOME_DIR}/.vscode-server/data/Machine \
-    ${HOME_DIR}/.vscode-server/data/User \
-    ${HOME_DIR}/.vscode-server/data/CachedProfilesData \
-    ${HOME_DIR}/.vscode-server/extensions \
-    ${HOME_DIR}/.vscode-server/extensionsCache \
-    \
-    # =====================================================================
-    # XDG BASE DIRECTORIES & CACHES (ALINHADO AOS MOUNTS)
-    # =====================================================================
-    ${HOME_DIR}/.cache \
-    ${HOME_DIR}/.cache/Microsoft \
-    ${HOME_DIR}/.cache/puppeteer \
-    ${HOME_DIR}/.cache/typescript \
-    \
-    ${HOME_DIR}/.local/share \
-    ${HOME_DIR}/.local/share/github-copilot \
-    ${HOME_DIR}/.local/share/rag-db \
-    ${HOME_DIR}/.local/share/rag-index \
-    ${HOME_DIR}/.local/state \
-    ${HOME_DIR}/.local/bin \
-    \
-    # =====================================================================
-    # NODE / PACKAGE ECOSYSTEM
-    # =====================================================================
-    ${HOME_DIR}/.npm \
-    ${HOME_DIR}/.npm-global \
-    ${HOME_DIR}/.pm2 \
-    \
-    # =====================================================================
-    # USER CONFIGURATION (XDG CONFIG)
-    # =====================================================================
-    ${HOME_DIR}/.config \
-    ${HOME_DIR}/.config/github-copilot \
-    ${HOME_DIR}/.config/"GitHub Copilot" \
-    \
-    # =====================================================================
-    # IDENTITY & SECRETS (ESTRUTURA APENAS — CHAVES VÊM DO HOST / AGENT)
-    # =====================================================================
-    ${HOME_DIR}/.ssh \
-    ${HOME_DIR}/.gnupg \
-    \
-    # =====================================================================
-    # AI / AGENT STATE (ESTRUTURA NEUTRA)
-    # =====================================================================
-    ${HOME_DIR}/.claude \
-    \
-    # =====================================================================
-    # UX — HISTÓRICO DE SHELL (FORA DO $HOME POR DESIGN)
-    # =====================================================================
-    /home/${USER_NAME}-history \
-    \
-    # =====================================================================
-    # OWNERSHIP — APLICAÇÃO CONTROLADA (APENAS DIRETÓRIOS CRIADOS)
-    # =====================================================================
-    && chown -R ${USER_NAME}:${USER_NAME} \
-    ${HOME_DIR}/.vscode-server \
-    ${HOME_DIR}/.cache \
-    ${HOME_DIR}/.npm \
-    ${HOME_DIR}/.npm-global \
-    ${HOME_DIR}/.pm2 \
-    ${HOME_DIR}/.config \
-    ${HOME_DIR}/.local \
-    ${HOME_DIR}/.ssh \
-    ${HOME_DIR}/.gnupg \
-    ${HOME_DIR}/.claude \
-    /home/${USER_NAME}-history \
-    \
-    # =====================================================================
-    # UX — HISTÓRICO DE SHELL (ÂNCORA FÍSICA IMAGEM-LEVEL)
-    # =====================================================================
-    && touch /home/${USER_NAME}-history/.bash_history \
-    && chown ${USER_NAME}:${USER_NAME} /home/${USER_NAME}-history/.bash_history \
-    \
-    # =====================================================================
-    # PERMISSIONS — MÍNIMAS, SEGURAS E PREVISÍVEIS
-    # =====================================================================
+    "${HOME_DIR}/.vscode-server/bin" \
+    "${HOME_DIR}/.vscode-server/data/Machine" \
+    "${HOME_DIR}/.vscode-server/data/User" \
+    "${HOME_DIR}/.vscode-server/data/CachedProfilesData" \
+    "${HOME_DIR}/.vscode-server/extensions" \
+    "${HOME_DIR}/.vscode-server/extensionsCache" \
+    "${HOME_DIR}/.cache" \
+    "${HOME_DIR}/.cache/Microsoft" \
+    "${HOME_DIR}/.cache/puppeteer" \
+    "${HOME_DIR}/.cache/typescript" \
+    "${HOME_DIR}/.local/share" \
+    "${HOME_DIR}/.local/share/github-copilot" \
+    "${HOME_DIR}/.local/share/rag-db" \
+    "${HOME_DIR}/.local/share/rag-index" \
+    "${HOME_DIR}/.local/state" \
+    "${HOME_DIR}/.local/bin" \
+    "${HOME_DIR}/.npm" \
+    "${HOME_DIR}/.npm-global" \
+    "${HOME_DIR}/.pm2" \
+    "${HOME_DIR}/.config" \
+    "${HOME_DIR}/.config/github-copilot" \
+    "${HOME_DIR}/.config/GitHub Copilot" \
+    "${HOME_DIR}/.ssh" \
+    "${HOME_DIR}/.gnupg" \
+    "${HOME_DIR}/.claude" \
+    "/home/${USER_NAME}-history" \
+    && chown -R "${USER_NAME}:${USER_NAME}" \
+    "${HOME_DIR}/.vscode-server" \
+    "${HOME_DIR}/.cache" \
+    "${HOME_DIR}/.npm" \
+    "${HOME_DIR}/.npm-global" \
+    "${HOME_DIR}/.pm2" \
+    "${HOME_DIR}/.config" \
+    "${HOME_DIR}/.local" \
+    "${HOME_DIR}/.ssh" \
+    "${HOME_DIR}/.gnupg" \
+    "${HOME_DIR}/.claude" \
+    "/home/${USER_NAME}-history" \
+    && touch "/home/${USER_NAME}-history/.bash_history" \
+    && chown "${USER_NAME}:${USER_NAME}" "/home/${USER_NAME}-history/.bash_history" \
     && chmod 1777 /tmp \
-    \
-    # SSH / GPG — PERMISSÕES ESTRITAS (OpenSSH / GnuPG compliant)
-    && chmod 700 ${HOME_DIR}/.ssh ${HOME_DIR}/.gnupg \
-    && touch ${HOME_DIR}/.ssh/config \
-    && chmod 600 ${HOME_DIR}/.ssh/config \
-    && chown ${USER_NAME}:${USER_NAME} ${HOME_DIR}/.ssh/config \
-    \
-    # Permissões relaxadas APENAS para áreas NÃO sensíveis
+    && chmod 0700 "${HOME_DIR}/.ssh" "${HOME_DIR}/.gnupg" \
+    && touch "${HOME_DIR}/.ssh/config" \
+    && chmod 0600 "${HOME_DIR}/.ssh/config" \
+    && chown "${USER_NAME}:${USER_NAME}" "${HOME_DIR}/.ssh/config" \
+    # Endurecimento adicional (sensíveis mas não secretos por si só)
+    && chmod 0700 "${HOME_DIR}/.config/github-copilot" "${HOME_DIR}/.claude" "/home/${USER_NAME}-history" \
+    # Permissões relaxadas apenas em bits do usuário (não altera group/other)
     && chmod -R u+rwX \
-    ${HOME_DIR}/.vscode-server \
-    ${HOME_DIR}/.cache \
-    ${HOME_DIR}/.npm \
-    ${HOME_DIR}/.npm-global \
-    ${HOME_DIR}/.pm2 \
-    ${HOME_DIR}/.config \
-    ${HOME_DIR}/.local \
-    ${HOME_DIR}/.claude \
-    /home/${USER_NAME}-history
+    "${HOME_DIR}/.vscode-server" \
+    "${HOME_DIR}/.cache" \
+    "${HOME_DIR}/.npm" \
+    "${HOME_DIR}/.npm-global" \
+    "${HOME_DIR}/.pm2" \
+    "${HOME_DIR}/.config" \
+    "${HOME_DIR}/.local" \
+    "${HOME_DIR}/.claude" \
+    "/home/${USER_NAME}-history"
 
-# Nota: chown -R aplicado SOMENTE aos diretórios criados acima (imagem-level)
 
 # =============================================================================
-# SECTION 8.5 — ENVIRONMENT VARIABLES (DEFAULTS & DOCUMENTATION)
+# SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.0
 #
-# PROPÓSITO:
-#   • Documentar sistema ENV (150+ variáveis)
-#   • Definir defaults seguros para desenvolvimento
-#   • Fornecer self-documentation na imagem
+# Hierarquia (maior prioridade -> menor):
+#   1) devcontainer.json: remoteEnv
+#   2) devcontainer.json: runArgs --env-file
+#   3) ENV neste Dockerfile
+#   4) arquivos config (app)
+#   5) fallback hardcoded em código
 #
-# HIERARQUIA DE CONFIGURAÇÃO:
-#   1. remoteEnv (devcontainer.json) [PRIORIDADE MÁXIMA]
-#   2. runArgs --env-file (devcontainer.json)
-#   3. ENV declarations (este Dockerfile)
-#   4. config.json (aplicação)
-#   5. Código (fallbacks hardcoded)
-#
-# DOCUMENTAÇÃO COMPLETA:
-#   • DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md (550+ linhas)
-#   • .env.example (template completo, 150+ vars)
-#   • .env.development (defaults development)
-#   • .env.production (hardened production)
-#   • .env.test (test automation)
-#
-# CATEGORIAS (19):
-#   [1]  Ambiente e Execução
-#   [2]  Portas e Networking
-#   [3]  Chrome Browser
-#   [4]  Browser Pool
-#   [5]  Chrome Proxy Service v2.0
-#   [6]  Logging e Telemetria
-#   [7]  Kernel e Execution Engine
-#   [8]  Context Management
-#   [9]  Missions e Checkpoints
-#   [10] Driver Factory
-#   [11] Triage Module
-#   [12] Frame Navigator
-#   [13] Biomechanics Engine
-#   [14] Recovery System
-#   [15] Submission Controller
-#   [16] Dashboard e Autenticação
-#   [17] State Management
-#   [18] Legacy (Deprecados)
-#   [19] PM2 Process Manager
+# Observação:
+#   Estes defaults são DEV. Para produção, use .env.production (fora desta imagem).
 # =============================================================================
-
-# ---------------------------------------------------------------------------
-# DEFAULTS SEGUROS (Development) v6.0
-# Sobrescritos por devcontainer.json ou .env files
-# ---------------------------------------------------------------------------
 
 # STRUCTURAL (identidade do sistema)
 ENV NODE_ENV=development \
@@ -990,74 +589,57 @@ ENV PUPPETEER_LOCAL_LAUNCH_DISABLED=true \
     MOCK_CHROME=0 \
     ENABLE_STATE_FILE=true
 
-# ---------------------------------------------------------------------------
-# CHROME PROXY SERVICE v2.0 (Variáveis específicas)
-# ---------------------------------------------------------------------------
+# CHROME PROXY SERVICE (v1.0)
 ENV WS_IDLE_TIMEOUT_MS=300000 \
     ALLOWED_ORIGINS="http://localhost:3008,http://127.0.0.1:3008"
 
-# ---------------------------------------------------------------------------
-# NOTA IMPORTANTE:
-# Estes são DEFAULTS SEGUROS para desenvolvimento.
-# Para produção, use .env.production com:
-#   • DASHBOARD_PASSWORD (obrigatório)
-#   • ALLOWED_ORIGINS (domínios de produção)
-#   • PUBLIC_IP (IP/domínio público)
-#   • LOG_LEVEL=info (não debug)
-#   • ALLOW_DEGRADED_MODE=false
-# ---------------------------------------------------------------------------
 
 # =============================================================================
-# SECTION 9 — SHELL CONTRACT, UX BASELINE & RUNTIME HANDOFF (DIAMOND)
+# SECTION 9 — SHELL CONTRACT + GATEKEEPER NSS + UX BASELINE + HANDOFF (v1.0)
 #
-# OBJETIVOS (FORMALIZADOS):
-# [A] Infraestrutura: Suporte passivo (autocomplete).
-# [B] Contrato: Imutável (444), Global, Declarativo.
-# [C] Gatekeeper: Identidade dinâmica (NSS), Global, Read-only.
-# [D] UX Baseline: Global, Read-only, Interactive-only.
-# [E] Segurança: Pipefail obrigatório.
+# Objetivos:
+#   [A] Infra: bash-completion + dumb-init (entrypoint)
+#   [B] Contrato: /etc/profile.d/00-runtime.sh (read-only)
+#   [C] Gatekeeper NSS: /etc/profile.d/10-gatekeeper-nss.sh (read-only, fail-safe)
+#   [D] UX baseline: /etc/profile.d/20-devcontainer-ux.sh (read-only, interactive-only)
+#   [E] Handoff: ENTRYPOINT com dumb-init + nss-gatekeeper
 #
-# EXTENSÃO SEMÂNTICA (v4.4):
-# • Sinalização explícita para IA / Copilot / Agentes
-# • Zero impacto comportamental
-# • Zero lógica dinâmica adicional
+# NOTA SOBRE /etc/profile.d:
+#   Scripts aqui precisam ser POSIX-safe sempre que possível, pois podem ser
+#   “sourceados” em diferentes shells via /etc/profile.
 # =============================================================================
 
-
-# -----------------------------------------------------------------------------
-# [A] PRÉ-REQUISITOS DE SHELL (INFRAESTRUTURA)
-# -----------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# [A] PRÉ-REQUISITOS
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
     bash-completion \
     dumb-init \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-
-# -----------------------------------------------------------------------------
-# [B] CONTRATO CANÔNICO DE RUNTIME (GLOBAL & READ-ONLY)
-# Declarativo, sem lógica, sem efeitos colaterais
-# -----------------------------------------------------------------------------
-RUN printf '%s\n' \
+# [B] CONTRATO CANÔNICO RUNTIME (GLOBAL, READ-ONLY)
+RUN mkdir -p /etc/profile.d \
+    && printf '%s\n' \
     '# Canonical Runtime Shell Contract' \
+    '# Version: 1.0' \
     '# Declarative only — no logic, no side effects' \
     '# AI-AWARE CONTRACT (Semantic Hints Only)' \
     '' \
-    '## Canonical shell model' \
+    '## Shell canônico' \
     'export SHELL_CANONICAL=bash' \
     'export CANONICAL_SHELL=bash' \
     'export INSTRUMENTAL_SHELLS="pwsh"' \
     '' \
-    '## Contract identity' \
-    "export SHELL_CONTRACT_VERSION=${VERSION:-4.4}" \
+    '## Identidade do contrato' \
+    "export SHELL_CONTRACT_VERSION=${VERSION:-1.0}" \
     'export SHELL_CONTRACT_LOADED=true' \
     '' \
-    '## Runtime classification' \
+    '## Classificação de runtime (semântica)' \
     "export RUNTIME_ENV=${BUILD_ENV:-dev}" \
     'export RUNTIME_PROFILE=default' \
     'export RUNTIME_ROLE=devcontainer' \
     '' \
-    '## Capability flags (semantic only)' \
+    '## Flags de capacidade (semânticas)' \
     'export CAPABILITY_INTERACTIVE=true' \
     'export CAPABILITY_AGENT=false' \
     'export CAPABILITY_CI=false' \
@@ -1065,133 +647,141 @@ RUN printf '%s\n' \
     'export CAPABILITY_SEMANTIC_SHELL=true' \
     '' \
     '# AI-HINT:' \
-    '# - Bash is the canonical shell for automation and execution' \
-    '# - PowerShell (pwsh) is instrumental, semantic, and non-authoritative' \
-    '# - Automations MUST assume bash unless explicitly overridden' \
+    '# - Bash é o shell canônico para automação e execução' \
+    '# - PowerShell (pwsh) é instrumental e não-autoritativo' \
     > /etc/profile.d/00-runtime.sh \
-    && chmod 444 /etc/profile.d/00-runtime.sh
+    && chmod 0444 /etc/profile.d/00-runtime.sh
 
-
-# -----------------------------------------------------------------------------
-# [C] GATEKEEPER — IDENTIDADE DINÂMICA (NSS WRAPPER)
-#
-# • Ativação somente em shells interativos
-# • Artefatos gerados EXCLUSIVAMENTE pelo post-create.sh
-# • Fail-safe: ausência de libnss_wrapper ou artefatos não quebra shell
-# • Bypass explícito via DEVCONTAINER_SKIP_NSS
-# -----------------------------------------------------------------------------
-RUN cat <<'EOF' > /etc/profile.d/10-gatekeeper-nss.sh
+# [C] GATEKEEPER NSS (GLOBAL, FAIL-SAFE, POSIX-SAFE)
+RUN cat > /etc/profile.d/10-gatekeeper-nss.sh <<'EOF'
 # DevContainer Gatekeeper — NSS Wrapper
-# Scope: Interactive shells only
+# Version: 1.0
+# Scope: Universal (all shells)
 # Mutability: READ-ONLY (Image-level)
+# Behavior: Fail-safe; activates only if artifacts exist and library is present.
+#
+# POSIX-sh compatible (no [[ ]], no arrays).
 
-# Nunca interfere em shells não-interativos
-[[ $- != *i* ]] && return
+# Bypass explícito
+if [ -n "${DEVCONTAINER_SKIP_NSS:-}" ]; then
+  return 0 2>/dev/null || exit 0
+fi
 
-# Bypass explícito (humano / makefile / debug)
-[ -n "${DEVCONTAINER_SKIP_NSS:-}" ] && return
+# Opcional: restringir a interativo
+# case "$-" in *i*) ;; *) return 0 2>/dev/null || exit 0 ;; esac
 
-# Artefatos esperados do post-create.sh
-NSS_BASE_DIR="/tmp/devcontainer-nss"
+# Artefatos canônicos (gerados exclusivamente pelo post-create.sh)
+NSS_BASE_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
 PASSWD_FILE="${NSS_BASE_DIR}/passwd"
 GROUP_FILE="${NSS_BASE_DIR}/group"
 
-# Localização típica da lib (Debian / Ubuntu)
-NSS_SO_PATH="/usr/lib/$(uname -m)-linux-gnu/libnss_wrapper.so"
+# Diretório best-effort (nunca fatal)
+mkdir -p "${NSS_BASE_DIR}" 2>/dev/null || true
+chmod 700 "${NSS_BASE_DIR}" 2>/dev/null || true
 
-# Ativação defensiva
-if [ -f "${PASSWD_FILE}" ] \
-   && { [ -f "${NSS_SO_PATH}" ] || ldconfig -p 2>/dev/null | grep -q libnss_wrapper.so; }; then
-    export NSS_WRAPPER_PASSWD="${PASSWD_FILE}"
-    export NSS_WRAPPER_GROUP="${GROUP_FILE}"
-    export LD_PRELOAD="libnss_wrapper.so${LD_PRELOAD:+:$LD_PRELOAD}"
+# Só ativa se artefatos existirem e não estiverem vazios
+if [ ! -s "${PASSWD_FILE}" ] || [ ! -s "${GROUP_FILE}" ]; then
+  return 0 2>/dev/null || exit 0
 fi
+
+ARCH="$(uname -m 2>/dev/null || echo x86_64)"
+NSS_LIB=""
+
+# Paths conhecidos (Debian/Ubuntu multiarch)
+if [ -f "/usr/lib/${ARCH}-linux-gnu/libnss_wrapper.so" ]; then
+  NSS_LIB="/usr/lib/${ARCH}-linux-gnu/libnss_wrapper.so"
+elif [ -f "/usr/lib/x86_64-linux-gnu/libnss_wrapper.so" ]; then
+  NSS_LIB="/usr/lib/x86_64-linux-gnu/libnss_wrapper.so"
+elif command -v ldconfig >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -q "libnss_wrapper\.so"; then
+  NSS_LIB="libnss_wrapper.so"
+else
+  return 0 2>/dev/null || exit 0
+fi
+
+export NSS_WRAPPER_PASSWD="${PASSWD_FILE}"
+export NSS_WRAPPER_GROUP="${GROUP_FILE}"
+
+# Evitar duplicação em LD_PRELOAD
+case ":${LD_PRELOAD:-}:" in
+  *":${NSS_LIB}:"*) : ;;
+  *) export LD_PRELOAD="${NSS_LIB}${LD_PRELOAD:+:$LD_PRELOAD}" ;;
+esac
+
+# Debug opt-in (stderr)
+if [ -n "${DEBUG:-}" ]; then
+  CURRENT_UID="$(id -u 2>/dev/null || echo unknown)"
+  echo "[gatekeeper] NSS active (UID=${CURRENT_UID}, preload=${NSS_LIB})" >&2
+fi
+
+return 0 2>/dev/null || exit 0
 EOF
 
-RUN chmod 444 /etc/profile.d/10-gatekeeper-nss.sh
+RUN chmod 0444 /etc/profile.d/10-gatekeeper-nss.sh
 
+# Wrapper de entrypoint (arquivo fornecido pelo projeto)
+# - Este script deve ser POSIX-safe e idempotente.
+# - Ele pode ativar o ambiente NSS wrapper antes de executar o comando final.
+COPY .devcontainer/nss-gatekeeper.sh /usr/local/bin/nss-gatekeeper
+RUN chmod 0755 /usr/local/bin/nss-gatekeeper
 
-# -----------------------------------------------------------------------------
-# [D] UX HUMANO BASELINE (GLOBAL, READ-ONLY, INTERACTIVE-ONLY)
-#
-# Fonte única de verdade para:
-# • Prompt
-# • Histórico
-# • UX de shell
-#
-# ❗ NÃO usa ~/.bashrc
-# ❗ NÃO depende de ownership
-# ❗ Contém apenas sinais legíveis (human + AI)
-# -----------------------------------------------------------------------------
-RUN cat <<'EOF' > /etc/profile.d/20-devcontainer-ux.sh
+# [D] UX BASELINE (GLOBAL, READ-ONLY, INTERACTIVE-ONLY, POSIX-SAFE)
+RUN cat > /etc/profile.d/20-devcontainer-ux.sh <<'EOF'
 # DevContainer UX Contract
-# Version: 4.4
+# Version: 1.0
 # Scope: Interactive shells only
 # Mutability: READ-ONLY (Image-level)
 
-# Guards — nunca afeta shells não-interativos
-[[ $- != *i* ]] && return
+# Nunca afeta shells não-interativos
+case "$-" in *i*) ;; *) return 0 ;; esac
 
-# AI-HINT:
-# - This shell is human-facing and AI-observable
-# - No automation logic must depend on this file
-
-# -------------------------------------------------------------------------
-# Prompt helpers (namespaced)
-# -------------------------------------------------------------------------
 __dc_parse_git_branch() {
   command -v git >/dev/null 2>&1 || return 0
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-
-  git branch 2>/dev/null \
-    | sed -n 's/^\* \(.*\)$/ (\1)/p'
+  git branch 2>/dev/null | sed -n 's/^\* \(.*\)$/ (\1)/p'
 }
-# -------------------------------------------------------------------------
-# Prompt visual informativo
-# -------------------------------------------------------------------------
+
+# Prompt informativo (compatível com bash; em sh apenas “degrada” visualmente)
 export PS1="\n\[\033[01;30m\][\t]\[\033[00m\] \
 \[\033[01;32m\]➜ \[\033[00m\]\
 \[\033[01;34m\]\w\[\033[00m\]\
 \[\033[33m\]\$(__dc_parse_git_branch)\[\033[00m\]\n\$ "
 
-# -------------------------------------------------------------------------
-# Histórico persistente (compatível com volumes externos)
-# -------------------------------------------------------------------------
+# Histórico
 export HISTCONTROL=ignoreboth
-shopt -s histappend
+if [ -n "${BASH_VERSION:-}" ]; then
+  shopt -s histappend 2>/dev/null || true
+fi
 export HISTSIZE=10000
 export HISTFILESIZE=20000
 export HISTTIMEFORMAT="%F %T "
 
-# -------------------------------------------------------------------------
-# Infraestrutura auxiliar
-# -------------------------------------------------------------------------
-[ -f /usr/share/bash-completion/bash_completion ] \
-  && . /usr/share/bash-completion/bash_completion
+# Autocomplete (se disponível)
+if [ -f /usr/share/bash-completion/bash_completion ]; then
+  . /usr/share/bash-completion/bash_completion
+fi
 EOF
 
-RUN chmod 444 /etc/profile.d/20-devcontainer-ux.sh
+RUN chmod 0444 /etc/profile.d/20-devcontainer-ux.sh
 
 
-# -----------------------------------------------------------------------------
-# [E] SHELL SEGURO PARA BUILDS FUTUROS
-# -----------------------------------------------------------------------------
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-# -----------------------------------------------------------------------------
-# [F] HANDOFF FINAL (Transição para Runtime)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# SECTION 10 — HANDOFF FINAL (RUNTIME)
+#
+# Regras:
+#   • ENTRYPOINT = dumb-init + nss-gatekeeper
+#   • CMD default = "sleep infinity" (container fica vivo para VS Code)
+#   • USER = ${USER_NAME}
+# =============================================================================
 USER ${USER_NAME}
 WORKDIR ${APP_DIR}
 
-ENTRYPOINT ["dumb-init", "--"]
+ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/nss-gatekeeper"]
 CMD ["sleep", "infinity"]
 
 # =============================================================================
-# FINAL NOTES
+# FINAL NOTES (v1.0)
+#   - dockerd NÃO é instalado
+#   - Docker CLI opera via socket do host (bind mount)
+#   - NSS wrapper é configurado apenas em runtime (post-create.sh) via artefatos
+#   - Contratos de shell em /etc/profile.d são read-only
 # =============================================================================
-# - dockerd NÃO está instalado
-# - docker CLI usa socket do host
-# - NSS Wrapper é configurado apenas em runtime (post-create.sh)
-# - VS Code Server estável por design
-# - Base canônica congelável

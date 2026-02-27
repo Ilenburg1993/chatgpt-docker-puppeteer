@@ -1,26 +1,29 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import { strict as assert } from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 
 describe('Core Config Completo - Configuração (Vitest)', () => {
     it('deve existir e ser JSON válido', () => {
-        const configPath = path.join(import.meta.dirname, '../../../config.json');
+        const __dirname = path.dirname(new URL(import.meta.url).pathname);
+        const configPath = path.join(__dirname, '../../../config.json');
 
-        expect(fs.existsSync(configPath)).toBe(true);
+        assert.ok(fs.existsSync(configPath), 'config.json should exist');
 
         const content = fs.readFileSync(configPath, 'utf-8');
         const config = JSON.parse(content);
 
-        expect(config).toBeTruthy();
+        assert.ok(config);
     });
 
     it('deve ter campos obrigatórios', () => {
-        const configPath = path.join(import.meta.dirname, '../../../config.json');
+        const __dirname = path.dirname(new URL(import.meta.url).pathname);
+        const configPath = path.join(__dirname, '../../../config.json');
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
-        const required = ['DEBUG_PORT', 'IDLE_SLEEP', 'CYCLE_DELAY', 'allowedDomains'];
+        const required = ['DEBUG_PORT', 'SERVER_PORT', 'BROWSER_MODE', 'allowedDomains'];
         for (const field of required) {
-            expect(field in config).toBe(true);
+            assert.ok(field in config, `missing field ${field}`);
         }
     });
 

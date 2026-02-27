@@ -80,6 +80,17 @@ class EnvValidator {
         // Validar constraints
         this.validateConstraints(envData);
 
+        // Report unrecognised keys (extras that exist in the file but are not defined in the schema).
+        const schemaKeys = Object.values(this.schema.categories).flatMap(c =>
+            c.properties ? Object.keys(c.properties) : []
+        );
+        const extras = Object.keys(envData).filter(k => !schemaKeys.includes(k));
+        if (extras.length) {
+            const list = extras.join(', ');
+            this.warnings.push(`Extras not in schema: ${list}`);
+            console.log(`${colors.yellow}⚠${colors.reset} Extras não definidos no schema: ${list}`);
+        }
+
         // Report
         this.report();
 

@@ -407,7 +407,7 @@
   "githubIssues.assignWhenWorking": true,
   "gitlens.codeLens.enabled": true,
   "inlineChat.affordance": "editor",
-  "inlineChat.defaultModel": "GPT-5 mini (copilot)",
+  "inlineChat.defaultModel": "Raptor mini (Preview) (copilot)",
   "inlineChat.enableV2": true,
   "inlineChat.finishOnType": true,
   "inlineChat.lineEmptyHint": "Digite uma mensagem para iniciar o chat...",
@@ -550,6 +550,16 @@
         "biome.jsonc"
       ],
       "url": "https://json.schemastore.org/biome"
+    },
+    {
+      // custom schema to allow arbitrary fields (sse flag etc.) in infra MCP config
+      "fileMatch": [
+        ".vscode/mcp.json"
+      ],
+      "schema": {
+        "type": "object",
+        "additionalProperties": true
+      }
     }
   ],
   "json.suggest.enable": true,
@@ -713,5 +723,12 @@
   "github.copilot.chat.completionsFetcher": "electron-fetch",
   "github.copilot.chat.nesFetcher": "electron-fetch",
   "appmod.enableMcpServer": true,
-  "github.copilot.nextEditSuggestions.extendedRange": true
+  "github.copilot.nextEditSuggestions.extendedRange": true,
+  "terminal.integrated.localEchoEnabled": "auto",
+  "chat.useClaudeHooks": true,
+  "chat.useNestedAgentsMdFiles": true,
+  "chat.viewProgressBadge.enabled": true,
+  "appmod.enableCustomTaskRepository": true,
+  "kilo-code.newTaskRequireTodos": true,
+  "kilo-code.preventCompletionWithOpenTodos": true
 }

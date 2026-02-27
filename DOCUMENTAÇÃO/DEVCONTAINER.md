@@ -1,7 +1,27 @@
 # DEVCONTAINER — .devcontainer/devcontainer.json
 
+> **Build arguments**: the Dockerfile now supports `ARG INSTALL_ZSH` (default `0`). Set
+> `--build-arg INSTALL_ZSH=1` when running `docker build` to include `zsh` in the image. This is
+> useful for developers who prefer zsh as their interactive shell without polluting the default bash
+> runtime.
+
 Este documento explica a configuração presente em `.devcontainer/devcontainer.json` do projeto
 `chatgpt-docker-puppeteer`, descreve riscos, recomendações e procedimentos de verificação.
+
+## Visão Geral
+
+Os **scripts de lifecycle** (`post-create.sh`, `post-start.sh`, `post-attach.sh`) passaram
+recentemente por uma modularização profunda (fev‑mar‑2026). Em vez de embutir dezenas de checagens e
+preparações num único arquivo de 1600 linhas, o `post-create.sh` agora age como um orquestrador que
+chama utilitários menores em `scripts/devcontainer/` (identity-guard, context-helpers,
+audit-structure, nss-setup, git-config, ssh-audit, deep-audit, etc.). Essa mudança melhora a
+legibilidade, permite cobertura de testes unitários e facilita o reuso desses diagnósticos também em
+`post-start.sh`/`post-attach.sh`. O `post-attach.sh` foi aprimorado para suportar as flags `--brief`
+e `--json` (a primeira já disponível e reduz o ruído), além de `DEBUG`/`DRY_RUN` e documentação de
+override via `DEVCONTAINER_PROJECT_ROOT`. Os demais hooks foram ajustados para reaproveitar
+`validate-env.sh`, `ssh-audit.sh` e `deep-audit.sh` de maneira não bloqueante. Consulte o arquivo
+`.devcontainer/POST_CREATE_MODULARIZATION_AUDIT.md` ou os scripts de `tests/unit/devcontainer` para
+mais detalhes.
 
 ## Visão Geral
 
@@ -22,6 +42,14 @@ Este documento explica a configuração presente em `.devcontainer/devcontainer.
 - `forwardPorts` / `portsAttributes` — portas mapeadas para o host:
   - `3008`: Socket.io + Express API (HTTP)
   - `9229`, `9230`: Node debug (PM2)
+
+- **Novas dependências na imagem** (containers baseia-se em Node 24 + Debian): a partir de
+  2026‑02‑23, o Dockerfile instala utilitários de desenvolvimento como `shellcheck`, `hadolint`,
+  `yq`, `net-tools`, `postgresql-client`, `sqlite3` e `zsh`. Eles visam facilitar lint, análise e
+  debug dentro do container.
+
+- A imagem agora declara um `HEALTHCHECK` simples apontando para `http://localhost:3008`. Isso
+  permite que plataformas CI/registro de imagens detectem contêineres inválidos.
 - `mounts` — montagens configuradas:
   - Bind mount do `.git` com `consistency=delegated` (melhor I/O).
   - Volumes persistentes: `devcontainer-node_modules`, `devcontainer-profile`, `devcontainer-logs`,
@@ -32,7 +60,28 @@ Este documento explica a configuração presente em `.devcontainer/devcontainer.
   - Puppeteer: `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true` e
     `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`.
 - `customizations.vscode` — recomendações de extensões (17 extensões listadas) e configurações de
-  workspace (`editor.formatOnSave`, `files.watcherExclude`, etc.).
+  workspace (`editor.formatOnSave`, `files.watcherExclude`, etc.). Recomenda-se incluir utilitários
+  como `shellcheck.shellcheck`, `timonwong.shellcheck`, `vscode-yaml`, `esbenp.prettier-vscode`
+  entre outros para facilitar lint dentro do container.
+
+  Exemplo de snippet para `devcontainer.json`:
+
+```jsonc
+"customizations": {
+  "vscode": {
+    "extensions": [
+      "shellcheck.shellcheck",
+      "shardulm94.trailing-spaces",
+      "eamodio.gitlens",
+      "mhutchie.git-graph"
+    ]
+  }
+},
+"containerEnv": {
+  "DEVCONTAINER_INSTALL_ZSH": "1" // opcional para usuários que preferem zsh (ativado também durante o build com ARG INSTALL_ZSH=1)
+}
+```
+
 - `postCreateCommand` — comando executado após criar o container. Atualmente:
   `sudo chown -R node:node /workspaces/chatgpt-docker-puppeteer/node_modules && npm ci --prefer-offline --no-audit --progress=false && bash scripts/setup-devcontainer.sh`
 - `postStartCommand` — comando executado a cada start do container:
@@ -48,6 +97,9 @@ Este documento explica a configuração presente em `.devcontainer/devcontainer.
 - Configurações de VS Code e lista de extensões bem alinhadas ao fluxo Node/Puppeteer.
 
 ## Riscos e pontos de atenção
+
+- A presença de utilitários adicionais (`shellcheck`, `hadolint`, etc.) aumenta levemente o tamanho
+  da imagem (~XX MB); porém, são apenas para desenvolvimento e não são carregados em produção.
 
 1. **Uso de `sudo` no `postCreateCommand`**
    - O comando atual utiliza `sudo chown -R node:node ...`. Dependendo de como o hook é executado
@@ -93,6 +145,26 @@ Este documento explica a configuração presente em `.devcontainer/devcontainer.
   (`make info || true`) e deixar `make health` como execução manual.
 
 ## Procedimentos de verificação rápida
+
+### Limpeza de volumes
+
+O DevContainer usa diversos volumes para caches (`devcontainer-npm-cache`,
+`devcontainer-puppeteer-cache`, `devcontainer-node_modules`). Para recuperar espaço ou forçar
+limpeza, execute:
+
+```bash
+docker volume rm devcontainer-npm-cache devcontainer-puppeteer-cache \
+  devcontainer-node_modules || true
+```
+
+Para remover imagens antigas:
+
+```bash
+docker rmi chatgpt-docker-puppeteer-dev || true
+```
+
+> **Checklist de rebuild**: um checklist detalhado das tarefas de rebuild está disponível em
+> [DEVCONTAINER_CHECKLIST.md](../DEVCONTAINER_CHECKLIST.md).
 
 1. Rebuild do Dev Container (VS Code: Rebuild and Reopen in Container) ou via CLI:
 

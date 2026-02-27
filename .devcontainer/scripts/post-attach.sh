@@ -21,6 +21,36 @@ set +o pipefail 2>/dev/null || true
 # Neutraliza traps herdados (defensivo absoluto)
 trap - ERR EXIT INT TERM 2>/dev/null || true
 
+# ---------------------------------------------------------------------------
+# CLI options parser
+# ---------------------------------------------------------------------------
+BRIEF=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --brief)
+            BRIEF=true
+            shift
+            ;;
+        --help)
+            cat <<'EOF'
+post-attach.sh [--brief] [--help] [--version]
+
+--brief    suppress detailed environment diagnostics
+--help     display this help text and exit
+--version  print script version and exit
+EOF
+            exit 0
+            ;;
+        --version)
+            echo "${SCRIPT_NAME} v${SCRIPT_VERSION}"
+            exit 0
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 # =============================================================================
 # PHASE 1 — UX HELPERS (API SEMÂNTICA DE OUTPUT)
 # CANONICAL v5.2.0
@@ -96,9 +126,18 @@ warn() { printf "%b\n" "${YELLOW}⚠️  $*${NC}"; }
 
 echo ""
 
+# simple internationalization: switch to English when LANG starts with en
+if [[ "${LANG:-}" =~ ^en ]]; then
+    BANNER_ATTACH="🔗 VS Code attached to DevContainer"
+    BANNER_PROJECT="📦 Project: ChatGPT Docker Puppeteer"
+else
+    BANNER_ATTACH="🔗 VS Code anexado ao DevContainer"
+    BANNER_PROJECT="📦 Projeto: ChatGPT Docker Puppeteer"
+fi
+
 printf "%b\n" "${BLUE}══════════════════════════════════════════════════════════════${NC}"
-printf "%b\n" "${BLUE}🔗 VS Code anexado ao DevContainer${NC}"
-printf "%b\n" "${BLUE}📦 Projeto: ChatGPT Docker Puppeteer${NC}"
+printf "%b\n" "${BLUE}${BANNER_ATTACH}${NC}"
+printf "%b\n" "${BLUE}${BANNER_PROJECT}${NC}"
 printf "%b\n" "${BLUE}🧩 Hook: ${SCRIPT_NAME}  |  v${SCRIPT_VERSION}${NC}"
 printf "%b\n" "${BLUE}══════════════════════════════════════════════════════════════${NC}"
 
@@ -158,26 +197,60 @@ fi
 # ---------------------------------------------------------------------------
 # Atualização do contador de attaches (informativo)
 # ---------------------------------------------------------------------------
-ATTACH_COUNT=0
+# amortização: mantemos um contador base gravado em
+# ${ATTACH_COUNT_FILE} e um offset transitório em
+# ${ATTACH_COUNT_FILE}-offset.  o arquivo base só é
+# reescrito quando atingimos um múltiplo de 10, mas o
+# offset acumula os demais anexos para que o cálculo
+# total seja correto.
 
-if [[ "${UX_STATE_WRITABLE}" == "true" && -f "${ATTACH_COUNT_FILE}" ]]; then
-    ATTACH_COUNT="$(cat "${ATTACH_COUNT_FILE}" 2>/dev/null || echo 0)"
-fi
-
-ATTACH_COUNT=$((ATTACH_COUNT + 1))
+ATTACH_OFFSET_FILE="${ATTACH_COUNT_FILE}-offset"
 
 if [[ "${UX_STATE_WRITABLE}" == "true" ]]; then
-    printf '%s\n' "${ATTACH_COUNT}" > "${ATTACH_COUNT_FILE}.tmp" 2>/dev/null \
-        && mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
+    # garantimos que o diretório existe antes de mexer nos arquivos
+    mkdir -p "${UX_STATE_DIR}" 2>/dev/null || true
 
-    date -Is > "${LAST_ATTACH_AT_FILE}.tmp" 2>/dev/null \
-        && mv "${LAST_ATTACH_AT_FILE}.tmp" "${LAST_ATTACH_AT_FILE}" 2>/dev/null || true
+    if [[ ! -f "${ATTACH_COUNT_FILE}" ]]; then
+        # primeiro attach: criamos o arquivo base com 1 e limpamos qualquer offset
+        if printf '%s\n' 1 > "${ATTACH_COUNT_FILE}.tmp" 2>/dev/null; then
+            mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
+        fi
+        rm -f "${ATTACH_OFFSET_FILE}" 2>/dev/null || true
+        echo "DEBUG first attach, wrote base=1" >&2
+    else
+        base=$(cat "${ATTACH_COUNT_FILE}" 2>/dev/null || echo 0)
+        offset=0
+        if [[ -f "${ATTACH_OFFSET_FILE}" ]]; then
+            offset=$(cat "${ATTACH_OFFSET_FILE}" 2>/dev/null || echo 0)
+        fi
+        offset=$((offset + 1))
+        total=$((base + offset))
+        echo "DEBUG read base=${base} offset=${offset} total=${total}" >&2
+
+        if (( total % 10 == 0 )); then
+            echo "DEBUG threshold reached, updating base to ${total}" >&2
+            if printf '%s\n' "${total}" > "${ATTACH_COUNT_FILE}.tmp" 2>/dev/null; then
+                mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
+            fi
+            rm -f "${ATTACH_OFFSET_FILE}" 2>/dev/null || true
+        else
+            # atualizamos apenas o offset, mantendo o base intacto
+            if printf '%s\n' "${offset}" > "${ATTACH_OFFSET_FILE}.tmp" 2>/dev/null; then
+                mv "${ATTACH_OFFSET_FILE}.tmp" "${ATTACH_OFFSET_FILE}" 2>/dev/null || true
+            fi
+        fi
+    fi
+
+    if date -Is > "${LAST_ATTACH_AT_FILE}.tmp" 2>/dev/null; then
+        mv "${LAST_ATTACH_AT_FILE}.tmp" "${LAST_ATTACH_AT_FILE}" 2>/dev/null || true
+    fi
 
     touch "${LAST_ATTACH_MARKER}" 2>/dev/null || true
 fi
 
 # =============================================================================
 # PHASE 4 — CONTEXTO BÁSICO DO AMBIENTE (DIAGNÓSTICO HUMANO)
+# additional environment diagnostics including LD_PRELOAD
 # CANONICAL v5.2.0
 #
 # CONTRATO:
@@ -191,7 +264,9 @@ fi
 #   • Tornar EXPLÍCITAS as heurísticas e suas limitações
 # =============================================================================
 
-info "Contexto do ambiente:"
+if [[ "${BRIEF}" != "true" ]]; then
+    info "Contexto do ambiente:"
+fi
 
 # ---------------------------------------------------------------------------
 # Identidade de execução (defensiva)
@@ -232,7 +307,10 @@ if [[ -n "${WORKSPACE_DIR}" ]]; then
     if [[ -f "${WORKSPACE_DIR}/Makefile" || -d "${WORKSPACE_DIR}/.git" ]]; then
         PROJECT_ROOT="${WORKSPACE_DIR}"
     else
-        PARENT_DIR="$(cd "${WORKSPACE_DIR}/.." 2>/dev/null && pwd || true)"
+        PARENT_DIR=""
+        if cd "${WORKSPACE_DIR}/.." 2>/dev/null; then
+            PARENT_DIR=$(pwd || true)
+        fi
         if [[ -n "${PARENT_DIR}" ]] \
            && { [[ -f "${PARENT_DIR}/Makefile" ]] || [[ -d "${PARENT_DIR}/.git" ]]; }; then
             PROJECT_ROOT="${PARENT_DIR}"
@@ -257,11 +335,21 @@ printf "  • %-22s %s\n" "Usuário:"             "${CURRENT_USER}"
 printf "  • %-22s %s\n" "Contexto execução:"   "${EXECUTION_CONTEXT}"
 printf "  • %-22s %s\n" "Workspace (PWD):"     "${WORKSPACE_DIR}"
 printf "  • %-22s %s\n" "Projeto (root):"      "${PROJECT_ROOT}"
-printf "  • %-22s %s\n" "Node.js:"             "${NODE_VERSION}"
-printf "  • %-22s %s\n" "npm:"                 "${NPM_VERSION}"
-printf "  • %-22s %s\n" "Node path:"           "${NODE_PATH}"
-
-echo ""
+printf "  • %-22s %s\n" "LD_PRELOAD:"           "${LD_PRELOAD:-<unset>}"
+if [[ -z "${LD_PRELOAD:-}" || ! "${LD_PRELOAD}" =~ libnss_wrapper\.so ]]; then
+    warn "LD_PRELOAD does not contain libnss_wrapper.so; identity wrapper may be inactive"
+fi
+# always expose NSS base dir when configured, regardless of LD_PRELOAD state
+if [[ -n "${DEVCONTAINER_NSS_DIR:-}" ]]; then
+    # print runtime info when LD_PRELOAD is set but missing wrapper, else keep simple
+    if [[ -n "${LD_PRELOAD:-}" && ! "${LD_PRELOAD}" =~ libnss_wrapper\.so ]]; then
+        printf "  • %-22s %s\n" "Node.js:"             "${NODE_VERSION}"
+        printf "  • %-22s %s\n" "npm:"                 "${NPM_VERSION}"
+        printf "  • %-22s %s\n" "Node path:"           "${NODE_PATH}"
+    fi
+    printf "  • %-22s %s\n" "NSS base dir:"        "${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
+    echo ""
+fi
 
 
 

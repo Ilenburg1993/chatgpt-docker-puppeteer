@@ -361,14 +361,26 @@ export function setupMCPHandler(app, registry) {
      * Returns server info, available tools, and methods
      */
     app.get('/api/mcp', (req, res) => {
-        // Streamable HTTP clients may probe a GET SSE stream with Accept: text/event-stream.
-        // We do not currently support SSE; return 405 so clients can fall back to plain JSON.
+        // Streamable HTTP clients (like Kilo) may probe a GET SSE stream by
+        // sending `Accept: text/event-stream`.  Historically we replied 405 to
+        // signal "SSE not supported" so others would fall back to JSON.  that
+        // behaviour, however, causes clients which treat any non-200 status as a
+        // failure to repeatedly reconnect and eventually drop the server entry.
+        //
+        // Instead we now ignore the Accept header and simply return the normal
+        // discovery payload regardless of whether the probe looked for SSE.  the
+        // presence of `sse: false` in the JSON makes the intent explicit.
+        //
+        // This keeps the connector stable (Kilo will see a 200 and stop restarting)
+        // while preserving backward compatibility with clients that reject
+        // unexpected content-types.
+
+        /* eslint-disable no-unused-vars */
         const accept = String(req.headers?.accept || '');
-        if (accept.includes('text/event-stream')) {
-            return res.status(405).send('SSE stream not supported on this endpoint');
-        }
+        /* eslint-enable no-unused-vars */
 
         res.json({
+            sse: false, // explicit hint to clients that streaming is not available
             name: 'chatgpt-docker-unified',
             version: '4.0.0',
             protocol: 'MCP/JSON-RPC 2.0',

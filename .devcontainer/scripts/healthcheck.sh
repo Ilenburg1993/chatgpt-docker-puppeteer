@@ -158,6 +158,16 @@ check_chromium_local() {
 main() {
     local exit_code=$EXIT_HEALTHY
 
+    # if post-start already marked degraded, propagate immediately
+    if [[ -f "/tmp/devcontainer-health.status" ]]; then
+        # use cat to avoid SC2188 warning
+        health=$(cat "/tmp/devcontainer-health.status" 2>/dev/null || echo ok)
+        if [[ "${health}" != "ok" ]]; then
+            log_warn "health status file reports '${health}' (post-start)"
+            exit_code=$EXIT_UNHEALTHY
+        fi
+    fi
+
     log_info "Iniciando health check..."
     [ -n "$HOST_OS" ] && [ "$HOST_OS" != "unknown" ] && log_info "Host OS: $HOST_OS"
 
@@ -176,6 +186,9 @@ main() {
     else
         log_error "Container unhealthy (Node.js ausente)"
     fi
+
+    # expose numeric code for external tooling (e.g. make info)
+    log_info "HEALTHCODE=${exit_code}"
 
     return $exit_code
 }
