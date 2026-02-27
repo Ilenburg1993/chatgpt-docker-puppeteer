@@ -404,11 +404,13 @@ function _getInferenceGatewayBaseUrl() {
     return `http://${host}:${port}`;
 }
 
+/* eslint-disable no-unused-vars */
 function _getDiagnosticAgentBaseUrl() {
     const host = process.env.DIAGNOSTIC_AGENT_HOST || '127.0.0.1';
     const port = Number(process.env.DIAGNOSTIC_AGENT_PORT || 3097);
     return `http://${host}:${port}`;
 }
+/* eslint-enable no-unused-vars */
 
 async function _fetchJson(url, init = {}, timeoutMs = 5000) {
     const res = await fetch(url, {
@@ -866,7 +868,7 @@ function _executeAuditPatchApply(patchId, before, actorId) {
         // 4. Aplicar o patch
         let stderrOutput = '';
         try {
-            const applyResult = execFileSync('git', ['apply', '--3way', patchFile], {
+            const _applyResult = execFileSync('git', ['apply', '--3way', patchFile], {
                 encoding: 'utf8',
                 stdio: ['pipe', 'pipe', 'pipe'],
             });

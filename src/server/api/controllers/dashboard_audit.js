@@ -216,11 +216,13 @@ function getAuditAgentBaseUrl() {
  * Diagnostic jobs are processed by Audit Agent at port 3098
  * @returns {string}
  */
+/* eslint-disable no-unused-vars */
 function getDiagnosticAgentBaseUrl() {
     // Diagnostic Agent was consolidated into Audit Agent
     // Route all diagnostic requests to Audit Agent
     return getAuditAgentBaseUrl();
 }
+/* eslint-enable no-unused-vars */
 
 /**
  * Check if job kind is diagnostic
