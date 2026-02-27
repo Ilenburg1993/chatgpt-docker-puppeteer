@@ -868,6 +868,7 @@ function _executeAuditPatchApply(patchId, before, actorId) {
         // 4. Aplicar o patch
         let stderrOutput = '';
         try {
+            // eslint-disable-next-line no-unused-vars
             const _applyResult = execFileSync('git', ['apply', '--3way', patchFile], {
                 encoding: 'utf8',
                 stdio: ['pipe', 'pipe', 'pipe'],
