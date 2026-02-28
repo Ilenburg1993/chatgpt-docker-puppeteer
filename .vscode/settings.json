@@ -79,18 +79,20 @@
   "chat.agentsControl.enabled": true,
   "chat.agentSessionProjection.enabled": true,
   "chat.agentSkillsLocations": {
-    ".codex/skills": true,
-    "~/.codex/skills": true
+    ".github/skills": true
   },
   "chat.checkpoints.showFileChanges": true,
   "chat.customAgentInSubagent.enabled": true,
+  "chat.useAgentsMdFile": true,
+  "chat.instructionsFilesLocations": [".github/instructions"],
+  "chat.includeApplyingInstructions": true,
+  "chat.includeReferencedInstructions": true,
   "chat.editing.autoAcceptDelay": 3,
   "chat.editing.explainChanges.enabled": true,
   "chat.editMode.hidden": false,
   "chat.editor.wordWrap": "on",
   "chat.edits2.enabled": true,
   "chat.experimental.useSkillAdherencePrompt": true,
-  "chat.includeReferencedInstructions": true,
   "chat.math.enabled": true,
   "chat.mcp.access": true,
   "chat.mcp.assisted.nuget.enabled": true,
@@ -613,11 +615,36 @@
   // ===========================================================================
   // FASE 15) SEARCH / FILESYSTEM UX
   // ===========================================================================
-  "search.exclude": { /* intact */},
+  // search performance / filtering
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/.git": true,
+    "**/dist": true,
+    "**/build": true
+  },
+  "search.useIgnoreFiles": true,
+  "search.useGlobalIgnoreFiles": true,
+  "search.useParentIgnoreFiles": true,
+  "search.followSymlinks": false,
+  "search.maxResults": 50000,
+  "search.quickOpen.includeSymbols": true,
+  "search.location": "panel",
+  "search.searchEditor.defaultNumberOfContextLines": 3,
+
   "search.globalFindClipboard": true,
   "search.searchOnType": true,
   "search.searchOnTypeDebouncePeriod": 300,
   "search.smartCase": true,
+
+  // Copilot Smart Actions enhancements ------------------------------------------------
+  // semantic search in the Search view (used by smart actions and agent prompts)
+  "search.searchView.semanticSearchBehavior": "automatic",
+  "search.searchView.keywordSuggestions": true,
+
+  // allow AI-assisted lookup when browsing the Settings editor
+  "workbench.settings.showAISearchToggle": true,
+
   "task.autoDetect": "on",
   "task.problemMatchers.neverPrompt": false,
   "task.quickOpen.detail": true,
@@ -730,5 +757,50 @@
   "chat.viewProgressBadge.enabled": true,
   "appmod.enableCustomTaskRepository": true,
   "kilo-code.newTaskRequireTodos": true,
-  "kilo-code.preventCompletionWithOpenTodos": true
+  "kilo-code.preventCompletionWithOpenTodos": true,
+  "github.copilot.chat.updated53CodexPrompt.enabled": true,
+  // --- GitHub Pull Request extension configuration --------------------------------
+  // these settings drive the GitHub PR viewlet; make sure the extension is
+  // installed (recommendation added in .vscode/extensions.json) and that the
+  // user has signed in via the 'Sign in to GitHub' button in the PR pane.
+  // 'remotes' tells the extension which git remotes to monitor; add any custom
+  // remotes your workflow uses.  the default list here covers the typical
+  // origin/upstream/main trio.
+  "githubPullRequests.remotes": [
+    "origin",
+    "upstream",
+    "main"
+  ],
+
+  // customize the tree by providing labelled search queries; variables such as
+  // ${user}, ${owner} and ${repository} are substituted automatically.
+  // the project already ships with a broad set of categories, feel free to
+  // extend it (e.g. "Mentioned Me" or other team-specific filters).
+  "githubPullRequests.queries": [
+    {
+      "label": "Atribuído a Mim",
+      "query": "repo:${owner}/${repository} is:open assignee:${user}"
+    },
+    {
+      "label": "Copilot em Meu Nome",
+      "query": "repo:${owner}/${repository} is:open author:copilot assignee:${user}"
+    },
+    {
+      "label": "Local Pull Request Branches",
+      "query": "default"
+    },
+    {
+      "label": "Aguardando Minha Análise",
+      "query": "repo:${owner}/${repository} is:open review-requested:${user}"
+    },
+    {
+      "label": "Criado Por Mim",
+      "query": "repo:${owner}/${repository} is:open author:${user}"
+    },
+    {
+      "label": "All Open",
+      "query": "default"
+    }
+  ],
+  "githubPullRequests.showPullRequestNumberInTree": true
 }
