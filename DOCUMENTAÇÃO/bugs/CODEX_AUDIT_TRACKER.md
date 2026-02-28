@@ -582,9 +582,9 @@ operacionais no `package.json`/`Makefile` e atualizar skills existentes para ref
 
 4. Skills atualizados
 
-- `.codex/skills/audit-runbook-observability/SKILL.md`
-- `.codex/skills/audit-contracts-v3-ops/SKILL.md`
-- `.codex/skills/typing-node24-esm-tsserver/SKILL.md`
+- `.github/skills/audit-runbook-observability/SKILL.md`
+- `.github/skills/audit-contracts-v3-ops/SKILL.md`
+- `.github/skills/typing-node24-esm-tsserver/SKILL.md`
 
 ## Testes Executados e Resultado
 

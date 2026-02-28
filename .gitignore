@@ -13,6 +13,11 @@ src/dashboard-ui/node_modules/**
 .env.development
 .env.*.local
 
+# Codex local state (skills, sessions, etc.)
+.codex/*
+!.codex/config.toml
+!.codex/README.md
+
 # Local assistant notes/config (keep an example committed)
 /assistant/perf-notes.toml
 

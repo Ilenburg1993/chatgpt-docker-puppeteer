@@ -1,12 +1,12 @@
 # Fluxo de Implementação do Sistema de Skills de Auditoria 📋
 
-Este documento acompanha, em formato de checklists, todas as etapas práticas que
-precisam ser realizadas para construir, testar e operacionalizar o novo sistema de
-skills de auditoria descrito no **Plano Mestre**. Cada item é marcado conforme a
-equipe avança (nós mesmos, neste momento, vamos preenchendo).
+Este documento acompanha, em formato de checklists, todas as etapas práticas que precisam ser
+realizadas para construir, testar e operacionalizar o novo sistema de skills de auditoria descrito
+no **Plano Mestre**. Cada item é marcado conforme a equipe avança (nós mesmos, neste momento, vamos
+preenchendo).
 
-> Nota: a existência deste arquivo facilita a visibilidade de progresso e serve como
-a "lista de tarefas" que pode ser citada em issues/PRs.
+> Nota: a existência deste arquivo facilita a visibilidade de progresso e serve como a "lista de
+> tarefas" que pode ser citada em issues/PRs.
 
 ---
 
@@ -14,32 +14,35 @@ a "lista de tarefas" que pode ser citada em issues/PRs.
 
 - [x] Ler e auditar o sistema de auditoria existente (`scripts/audit/runner.mjs`).
 - [x] Escrever `AUDIT_SKILLS_PLAN.md` com visão, objetivos e estrutura geral.
-- [x] Identificar inventário de skills existentes (`.codex/skills`).
+- [x] Identificar inventário de skills existentes (`.github/skills`).
 - [x] Definir template comum de skill e roadmap de fases (identificação/proposta/aplicação).
 
 ## 2. Infraestrutura de suporte
 
 - [x] Criar `scripts/audit/make-skill.js` gerador de boilerplate (com testes).
-- [x] Configurar aliases npm (automáticos via gerador). 
-- [x] Bibliotecas de prompts compartilhados (`scripts/audit/prompts.js`).
+- [x] Configurar aliases npm (automáticos via gerador).
+- [x] Bibliotecas de prompts compartilhados (`.github/prompts/prompts.js`).
 - [x] Definir lista de comandos sugeridos e padrão de chaining entre skills.
 - [x] Estabelecer tracker de feedback (planilha JSON ou link externo).
 
 ## 3. Documentação e artefatos
 
 - [x] Atualizar `AUDIT_SKILLS_PLAN.md` com prompts reuse, detalhes de generator, etc.
-- [ ] Criar `AUDIT_SKILLS_WORKFLOW.md` (este arquivo). ✅
-- [ ] Adicionar seção "biblioteca de prompts" no Plan e referência nas skills.
+- [x] Criar `AUDIT_SKILLS_WORKFLOW.md` (este arquivo). ✅
+- [x] Adicionar seção "biblioteca de prompts" no Plan e referência nas skills.
 - [ ] Escrever README genérico explicando como usar qualquer skill novo.
 
 ## 4. Desenvolvimento de skills iniciais
 
-- [x] Implementar `bug-fix-audit` SKILL.md e commitar.
+- [x] Implementar `reactive-bug-audit` SKILL.md e commitar (inclui regra de criação/atualização de
+- [x] Implementar `exploratory-bug-hunt` SKILL.md e commitar arquivo MD em `DOCUMENTAÇÃO/BUGS`).
 - [ ] Implementar `security-audit` SKILL.md.
 - [ ] Implementar `architecture-audit` SKILL.md.
 - [ ] Implementar `performance-audit` SKILL.md.
 - [ ] Implementar `ops-audit` SKILL.md.
 - [ ] Implementar `upgrade-proposal` SKILL.md.
+- [x] Escrever ou gerar alguns exemplos auxiliares (`example-skill`, `security-checklist`,
+      `performance-audit`).
 - [ ] (Opcional) criar extras como `dashboard-audit`, `rag-health-audit` etc.
 
 ## 5. Testes e validação
@@ -63,5 +66,5 @@ a "lista de tarefas" que pode ser citada em issues/PRs.
 
 ---
 
-Workflow iniciado em 27 fev 2026 pelo assistente Copilot. Marcar tarefas conforme forem
-concluídas e editar este arquivo repetidamente para manter a previsibilidade.
+Workflow iniciado em 27 fev 2026 pelo assistente Copilot. Marcar tarefas conforme forem concluídas e
+editar este arquivo repetidamente para manter a previsibilidade.

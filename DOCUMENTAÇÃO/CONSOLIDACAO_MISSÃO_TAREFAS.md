@@ -237,7 +237,7 @@ Consolidar os sistemas **Audit Agent** e **Diagnostic Agent** através de:
 ## 🔗 Referências
 
 - **Documento de Análise:** `DOCUMENTAÇÃO/ANALISE_COMPARATIVA_AUDIT_DIAGNOSTIC_AGENT.md`
-- **Skill:** `.codex/skills/agent-consolidation-ops/SKILL.md`
+- **Skill:** `.github/skills/agent-consolidation-ops/SKILL.md`
 - **Audit Agent:** `src/audit_agent/`
 - **Diagnostic Agent:** `src/diagnostic_agent/`
 - **Inference Gateway:** `src/inference_gateway/`

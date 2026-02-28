@@ -2,6 +2,8 @@
 
 This repository keeps a project-scoped Codex config in `.codex/config.toml`.
 
+*⚠️ Atualização:* desde a migração de skills, a pasta `.codex/skills/` não é mais usada. coloque novas skills em `.github/skills/` e remova o conteúdo antigo se ainda existir.
+
 ## Use in terminal
 
 Run Codex with:

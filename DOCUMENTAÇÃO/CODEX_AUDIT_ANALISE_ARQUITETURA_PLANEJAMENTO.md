@@ -165,10 +165,10 @@ composto por quatro subsistemas principais:
 
 | Skill                                                                              | Função                    |
 | ---------------------------------------------------------------------------------- | ------------------------- |
-| [`audit-agent-background-llm-ops/`](.codex/skills/audit-agent-background-llm-ops/) | Operações do Audit Agent  |
-| [`audit-contracts-v3-ops/`](.codex/skills/audit-contracts-v3-ops/)                 | Operações de contratos v3 |
-| [`audit-runbook-observability/`](.codex/skills/audit-runbook-observability/)       | Observabilidade           |
-| [`audit-proposal-deep-triage/`](.codex/skills/audit-proposal-deep-triage/)         | Triagem profunda          |
+| [`audit-agent-background-llm-ops/`](.github/skills/audit-agent-background-llm-ops/) | Operações do Audit Agent  |
+| [`audit-contracts-v3-ops/`](.github/skills/audit-contracts-v3-ops/)                 | Operações de contratos v3 |
+| [`audit-runbook-observability/`](.github/skills/audit-runbook-observability/)       | Observabilidade           |
+| [`audit-proposal-deep-triage/`](.github/skills/audit-proposal-deep-triage/)         | Triagem profunda          |
 
 ---
 
@@ -466,7 +466,7 @@ atual do sistema. A skill deve incluir:
 ### 7.2 Ação Necessária
 
 Atualizar a skill existente em
-[`.codex/skills/audit-agent-background-llm-ops/SKILL.md`](.codex/skills/audit-agent-background-llm-ops/SKILL.md)
+[`.github/skills/audit-agent-background-llm-ops/SKILL.md`](.github/skills/audit-agent-background-llm-ops/SKILL.md)
 com as informações desta análise.
 
 ---
