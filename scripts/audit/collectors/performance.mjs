@@ -8,7 +8,12 @@ import { runCommand } from '../lib/exec.mjs';
 
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *   findings: RawFinding[],
+ *   errors: Array<{source:string,message:string}>,
+ *   warnings: Array<{source:string,message:string}>,
+ *   telemetry: { score: number|null, categories: Record<string, number> }
+ * }>}
  */
 export async function collectPerformanceFindings(rootDir) {
     /** @type {RawFinding[]} */
@@ -211,7 +216,49 @@ export async function collectPerformanceFindings(rootDir) {
         });
     }
 
-    return { findings, errors, warnings };
+    /** @type {Record<string, number>} */
+    const categories = {
+        cpu: 0,
+        memory: 0,
+        io: 0,
+        cache: 0,
+        'event-loop': 0,
+        'test-cost': 0,
+        generic: 0,
+    };
+
+    for (const finding of findings) {
+        const tool = String(finding.source_tool || '');
+        if (tool.includes('complexity')) {
+            categories.cpu += 1;
+        } else if (tool.includes('memory')) {
+            categories.memory += 1;
+        } else if (tool.includes('query')) {
+            categories.io += 1;
+        } else if (tool.includes('timeout') || tool.includes('race')) {
+            categories['event-loop'] += 1;
+        } else if (tool.includes('cache')) {
+            categories.cache += 1;
+        } else if (tool.includes('test')) {
+            categories['test-cost'] += 1;
+        } else {
+            categories.generic += 1;
+        }
+    }
+
+    const weightedIssues =
+        findings.length + errors.length * 2 + Math.max(0, categories.memory - 1) + Math.max(0, categories.cpu - 1);
+    const score = Math.max(0, 100 - weightedIssues * 5);
+
+    return {
+        findings,
+        errors,
+        warnings,
+        telemetry: {
+            score,
+            categories,
+        },
+    };
 }
 
 /**

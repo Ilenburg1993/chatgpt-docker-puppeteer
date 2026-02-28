@@ -148,7 +148,8 @@ O sistema de auditoria CODEX é uma plataforma комплексная de engenha
 | `logic.json`        | 3 contratos      | P1                   |
 
 ### 2.3 Skills do Codex (`.github/skills/`)
-*Nota: a pasta `.codex/skills/` foi removida; use `.github/skills/` para os skill de auditoria.*
+
+_Nota: a pasta `.codex/skills/` foi removida; use `.github/skills/` para os skill de auditoria._
 
 | Skill                            | Descrição                     |
 | -------------------------------- | ----------------------------- |

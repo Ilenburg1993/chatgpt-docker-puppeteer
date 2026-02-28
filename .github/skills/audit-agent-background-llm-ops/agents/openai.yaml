@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Agent Background LLM Ops"
+  short_description: "Operação e evolução do Audit Agent e do Inference Gateway."
+  default_prompt: "Use $audit-agent-background-llm-ops para trabalhar no Audit Agent, no Inference Gateway e nas políticas de budget/clientTag com guardrails explícitos."

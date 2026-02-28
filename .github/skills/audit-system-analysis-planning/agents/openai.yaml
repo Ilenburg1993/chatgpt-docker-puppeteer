@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit System Analysis Planning"
+  short_description: "Análise arquitetural e planejamento do subsistema de auditoria."
+  default_prompt: "Use $audit-system-analysis-planning para mapear o subsistema de auditoria, identificar gaps estruturais e propor um plano evolutivo por fases."

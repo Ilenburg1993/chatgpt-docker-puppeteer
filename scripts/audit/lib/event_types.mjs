@@ -40,6 +40,7 @@ export const AUDIT_PHASES = Object.freeze({
     COLLECT_RUNTIME: 'collect-runtime',
     COLLECT_TESTS: 'collect-tests',
     COLLECT_CHAOS: 'collect-chaos',
+    COLLECT_SECURITY: 'collect-security',
     COLLECT_PERFORMANCE: 'collect-performance',
     COLLECT_ARCHITECTURE: 'collect-architecture',
     NORMALIZE_CORRELATE: 'normalize-correlate',

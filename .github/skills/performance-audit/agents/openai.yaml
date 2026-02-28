@@ -1,0 +1,4 @@
+interface:
+  display_name: "Performance Audit"
+  short_description: "Auditoria de performance baseada no coletor do audit runner."
+  default_prompt: "Use $performance-audit para executar a auditoria de performance, classificar sinais por categoria e propor validação objetiva."

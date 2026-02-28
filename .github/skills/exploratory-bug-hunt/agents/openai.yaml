@@ -1,0 +1,4 @@
+interface:
+  display_name: "Exploratory Bug Hunt"
+  short_description: "Caça proativa de bugs e gaps sem pista inicial."
+  default_prompt: "Use $exploratory-bug-hunt para escolher um escopo, rodar a auditoria exploratória e gerar backlog versionado de achados."

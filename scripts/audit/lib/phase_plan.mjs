@@ -1,10 +1,30 @@
 import { AUDIT_PHASES } from './event_types.mjs';
 
 /**
- * @param {{ profile: 'quick'|'deep'|'nightly', refreshContextMode: 'smart'|'force'|'skip' }} options
+ * @param {{
+ *   profile: 'quick'|'deep'|'nightly',
+ *   refreshContextMode: 'smart'|'force'|'skip',
+ *   auditMode?: 'observability'|'reactive_bug'|'exploratory_bug'|'contracts'|'security'|'performance'|'architecture'
+ * }} options
  */
 export function buildPhasePlan(options) {
     const phases = [];
+    const auditMode = options.auditMode || 'reactive_bug';
+    const includeStatic = ['reactive_bug', 'exploratory_bug', 'contracts', 'security', 'architecture'].includes(
+        auditMode
+    );
+    const includeRuntime = ['observability', 'reactive_bug', 'exploratory_bug', 'security', 'performance', 'architecture'].includes(
+        auditMode
+    );
+    const includeTests = ['observability', 'reactive_bug', 'exploratory_bug', 'security', 'performance'].includes(
+        auditMode
+    );
+    const includeChaos = options.profile === 'nightly' && ['exploratory_bug', 'reactive_bug', 'security', 'performance'].includes(auditMode);
+    const includeSecurity = auditMode === 'security';
+    const includePerformance = ['exploratory_bug', 'performance'].includes(auditMode);
+    const includeArchitecture = ['exploratory_bug', 'performance', 'architecture'].includes(auditMode);
+    const includeNormalize = true;
+    const includeTriage = ['reactive_bug', 'exploratory_bug', 'security', 'performance'].includes(auditMode);
 
     phases.push({
         id: AUDIT_PHASES.PREFLIGHT,
@@ -61,8 +81,8 @@ export function buildPhasePlan(options) {
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_STATIC,
-        planned_steps:
-            options.profile === 'quick'
+        planned_steps: includeStatic
+            ? options.profile === 'quick'
                 ? ['static.syntax', 'static.forbidden']
                 : [
                       'static.forbidden',
@@ -72,49 +92,53 @@ export function buildPhasePlan(options) {
                       'static.depcruise',
                       'static.jscpd',
                       'static.semgrep',
-                  ],
+                  ]
+            : [],
     });
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_RUNTIME,
-        planned_steps: [
-            'runtime.mcp_diagnose',
-            'runtime.rag_health',
-            'runtime.lsp_health',
-            ...(options.profile === 'quick' ? [] : ['runtime.smoke']),
-        ],
+        planned_steps: includeRuntime
+            ? ['runtime.mcp_diagnose', 'runtime.rag_health', 'runtime.lsp_health', ...(options.profile === 'quick' ? [] : ['runtime.smoke'])]
+            : [],
     });
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_TESTS,
-        planned_steps:
-            options.profile === 'quick'
-                ? ['tests.smoke']
-                : options.profile === 'deep'
-                  ? ['tests.unit']
-                  : ['tests.unit', 'tests.integration', 'tests.regression'],
+        planned_steps: !includeTests
+            ? []
+            : options.profile === 'quick'
+              ? ['tests.smoke']
+              : options.profile === 'deep'
+                ? ['tests.unit']
+                : ['tests.unit', 'tests.integration', 'tests.regression'],
     });
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_CHAOS,
-        planned_steps: options.profile === 'nightly' ? ['chaos.contract_nightly'] : [],
+        planned_steps: includeChaos ? ['chaos.contract_nightly'] : [],
+    });
+
+    phases.push({
+        id: AUDIT_PHASES.COLLECT_SECURITY,
+        planned_steps: includeSecurity ? ['security.contracts', 'security.http_surface', 'security.headers'] : [],
     });
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_PERFORMANCE,
-        planned_steps: [],
+        planned_steps: includePerformance ? ['performance.analysis'] : [],
     });
 
     phases.push({
         id: AUDIT_PHASES.COLLECT_ARCHITECTURE,
-        planned_steps: [],
+        planned_steps: includeArchitecture ? ['architecture.analysis'] : [],
     });
 
     phases.push({
         id: AUDIT_PHASES.NORMALIZE_CORRELATE,
-        planned_steps: ['normalize.findings', 'normalize.evidence_graph'],
+        planned_steps: includeNormalize ? ['normalize.findings', 'normalize.evidence_graph'] : [],
     });
-    phases.push({ id: AUDIT_PHASES.TRIAGE_INTELLIGENCE, planned_steps: ['triage.enrich'] });
+    phases.push({ id: AUDIT_PHASES.TRIAGE_INTELLIGENCE, planned_steps: includeTriage ? ['triage.enrich'] : [] });
     phases.push({
         id: AUDIT_PHASES.PUBLISH,
         planned_steps: ['publish.json', 'publish.master', 'publish.snapshot', 'publish.contract_reports'],

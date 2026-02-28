@@ -4,6 +4,7 @@
  * @typedef {'bug'|'gap'|'falha de contrato'|'incompletude'|'upgrade'} FindingType
  * @typedef {'baixo'|'medio'|'alto'} BlastRadius
  * @typedef {'off'|'warn'|'p1'|'p0'} EnforcementState
+ * @typedef {'observability'|'reactive_bug'|'exploratory_bug'|'contracts'|'security'|'performance'|'architecture'} AuditMode
  *
  * @typedef {{
  *   cause: string,
@@ -75,7 +76,9 @@
  * @property {'3.2'} schema_version
  * @property {string} run_id
  * @property {'quick'|'deep'|'nightly'} profile
+ * @property {AuditMode} audit_mode
  * @property {string} scope
+ * @property {string} focus_area
  * @property {string} focus_mode
  * @property {string} contracts_mode
  * @property {string} enforce_level
@@ -90,6 +93,7 @@
  * @property {'signal'|'uncaught_exception'|'unhandled_rejection'|'manual'|'none'} abort_reason
  * @property {number} duration_ms_total
  * @property {string[]} remaining_step_keys
+ * @property {{ active_phases: string[], skipped_phases: string[] }} collector_plan
  * @property {PhaseStatusEntry[]} phase_status
  * @property {{
  *   mcp: { ok: boolean, details?: string },
@@ -161,6 +165,19 @@
  *   parallelism?: Record<string, unknown>,
  *   dedup?: Record<string, number>,
  * }} [quality_execution]
+ * @property {{
+ *   enabled: boolean,
+ *   findings: number,
+ *   contracts_scanned?: number,
+ *   files_scanned?: number,
+ *   checks: string[],
+ * }} [security_execution]
+ * @property {{
+ *   enabled: boolean,
+ *   findings: number,
+ *   score: number|null,
+ *   categories: Record<string, number>,
+ * }} [performance_execution]
  * @property {Record<string, { total: number, violated: number, covered: number, covered_by_run?: number, covered_by_tests?: number }>} contract_coverage
  * @property {{ stale_contracts: string[], unowned_critical: string[], tests_without_contract: string[] }} contract_drift
  * @property {{ enforce_level: string, blocking: boolean, blocking_findings: string[] }} gate_decision
@@ -234,7 +251,9 @@ export function validateAuditRun(run) {
     if (run.schema_version !== SCHEMA_VERSION) errors.push('schema_version must be 3.2');
     if (!run.run_id) errors.push('run_id is required');
     if (!run.profile) errors.push('profile is required');
+    if (!run.audit_mode) errors.push('audit_mode is required');
     if (!run.scope) errors.push('scope is required');
+    if (!run.focus_area) errors.push('focus_area is required');
     if (!run.focus_mode) errors.push('focus_mode is required');
     if (!run.contracts_mode) errors.push('contracts_mode is required');
     if (!run.enforce_level) errors.push('enforce_level is required');
@@ -266,6 +285,7 @@ export function validateAuditRun(run) {
     if (run.abort_reason && !ABORT_REASONS.includes(run.abort_reason)) errors.push('abort_reason invalid');
     if (typeof run.duration_ms_total !== 'number') errors.push('duration_ms_total is required');
     if (!Array.isArray(run.remaining_step_keys)) errors.push('remaining_step_keys must be an array');
+    if (!run.collector_plan || typeof run.collector_plan !== 'object') errors.push('collector_plan is required');
 
     if (Array.isArray(run.findings)) {
         run.findings.forEach((finding, index) => {

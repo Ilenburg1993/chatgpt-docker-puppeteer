@@ -24,7 +24,9 @@ export function printFinalReport(report, outputs) {
     console.log('=== Audit Automation Report v3.2 ===');
     console.log(`run_id: ${report.run_id}`);
     console.log(`profile: ${report.profile}`);
+    console.log(`audit_mode: ${report.audit_mode}`);
     console.log(`focus: ${report.focus_mode}`);
+    console.log(`focus_area: ${report.focus_area}`);
     console.log(`contracts_mode: ${report.contracts_mode}`);
     console.log(`enforce_level: ${report.enforce_level}`);
     console.log(`proposal_depth: ${report.proposal_depth}`);
@@ -45,6 +47,10 @@ export function printFinalReport(report, outputs) {
     console.log(`LSP: ${report.telemetry.lsp.ok ? 'OK' : 'WARN'}`);
     console.log(`semantic_preflight_ok: ${report.semantic_preflight?.ok === true}`);
     console.log(`shadow_would_block: ${report.shadow_gate?.would_block === true}`);
+    console.log(`security_enabled: ${report.security_execution?.enabled === true}`);
+    console.log(`security_findings: ${report.security_execution?.findings || 0}`);
+    console.log(`performance_enabled: ${report.performance_execution?.enabled === true}`);
+    console.log(`performance_score: ${report.performance_execution?.score ?? 'n/a'}`);
     console.log(`gate_blocking: ${report.gate_decision.blocking}`);
     console.log(`chaos_enabled: ${report.chaos_summary.enabled}`);
     console.log(`chaos_violations: ${report.chaos_summary.violations}`);

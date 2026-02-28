@@ -6,6 +6,7 @@ import { collectArchitectureFindings } from './collectors/architecture.mjs';
 import { collectPerformanceFindings } from './collectors/performance.mjs';
 import { collectQualityFindings } from './collectors/quality.mjs';
 import { collectRuntimeFindings } from './collectors/runtime.mjs';
+import { collectSecurityFindings } from './collectors/security.mjs';
 import { collectStaticFindings } from './collectors/static.mjs';
 import { collectTestFindings } from './collectors/tests.mjs';
 import { evaluateChaosContracts } from './contracts/evaluate_chaos.mjs';
@@ -13,7 +14,7 @@ import { buildEvidenceGraph } from './contracts/evidence_graph.mjs';
 import { getLegacyStaticContracts } from './contracts/legacy_adapter.mjs';
 import { loadContractRegistry } from './contracts/load_registry.mjs';
 import { createEtaEstimator } from './lib/eta_estimator.mjs';
-import { AUDIT_EVENT_TYPES } from './lib/event_types.mjs';
+import { AUDIT_EVENT_TYPES, AUDIT_PHASES } from './lib/event_types.mjs';
 import { parseJsonFromMixedOutput, runCommand } from './lib/exec.mjs';
 import { getChangedFiles } from './lib/git.mjs';
 import { createAuditLogger } from './lib/logger.mjs';
@@ -35,12 +36,13 @@ import { triageFindings } from './triage_llm.mjs';
 /** @typedef {'smart'|'force'|'skip'} RefreshContextMode */
 /** @typedef {'legacy'|'hybrid'|'strict'} ContractsMode */
 /** @typedef {'off'|'warn'|'p1'|'p0'} EnforceLevel */
-/** @typedef {'basic'|'standard'|'deep'} ProposalDepth */
+/** @typedef {'off'|'basic'|'standard'|'deep'} ProposalDepth */
 /** @typedef {'off'|'light'|'full'} ChaosProfile */
 /** @typedef {'off'|'on'} CloudFallbackMode */
 /** @typedef {'smart'|'full'|'changed'|'off'} QualityMode */
 /** @typedef {'success'|'partial'|'aborted'|'fatal'} RunOutcome */
 /** @typedef {'signal'|'uncaught_exception'|'unhandled_rejection'|'manual'|'none'} AbortReason */
+/** @typedef {'observability'|'reactive_bug'|'exploratory_bug'|'contracts'|'security'|'performance'|'architecture'} AuditMode */
 
 const MASTER_PATH = 'DOCUMENTAÇÃO/BUGS/BUG_AUDIT_MASTER.md';
 const SNAPSHOTS_DIR = 'DOCUMENTAÇÃO/BUGS/rodadas';
@@ -49,6 +51,7 @@ const OUTPUT_DIR = 'artifacts/audit';
 /** @type {import('node:util').ParseArgsConfig['options']} */
 const cliOptions = {
     profile: { type: 'string', default: 'quick' },
+    'audit-mode': { type: 'string', default: 'auto' },
     scope: { type: 'string', default: 'repo' },
     'changed-only': { type: 'boolean', default: false },
     json: { type: 'boolean', default: false },
@@ -185,9 +188,31 @@ function parseProposalDepth(value) {
     const normalized = String(value || '')
         .trim()
         .toLowerCase();
+    if (normalized === 'off') return 'off';
     if (normalized === 'basic') return 'basic';
     if (normalized === 'deep') return 'deep';
     return 'standard';
+}
+
+/**
+ * @param {string} value
+ * @param {Profile} profile
+ * @returns {AuditMode}
+ */
+function parseAuditMode(value, profile) {
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase();
+
+    if (normalized === 'observability') return 'observability';
+    if (normalized === 'reactive_bug') return 'reactive_bug';
+    if (normalized === 'exploratory_bug') return 'exploratory_bug';
+    if (normalized === 'contracts') return 'contracts';
+    if (normalized === 'security') return 'security';
+    if (normalized === 'performance') return 'performance';
+    if (normalized === 'architecture') return 'architecture';
+
+    return profile === 'nightly' ? 'exploratory_bug' : 'reactive_bug';
 }
 
 /**
@@ -268,6 +293,7 @@ async function main() {
     const profile = /** @type {Profile} */ (
         ['quick', 'deep', 'nightly'].includes(values.profile) ? values.profile : 'quick'
     );
+    const auditMode = parseAuditMode(String(values['audit-mode'] || 'auto'), profile);
     const scope = String(values.scope || 'repo');
     const changedOnly = values['changed-only'] || profile === 'quick';
     const focusMode = parseFocusMode(String(values.focus || 'bug-first'));
@@ -333,13 +359,14 @@ async function main() {
     });
     registerLifecycleGuards();
 
-    const phasePlan = buildPhasePlan({ profile, refreshContextMode });
+    const phasePlan = buildPhasePlan({ profile, refreshContextMode, auditMode });
     const plannedStepKeys = flattenPlannedStepKeys(phasePlan);
+    const phasePlanMap = new Map(phasePlan.map(phase => [phase.id, phase]));
 
     const progress = createProgressTracker({ stepsTotal: plannedStepKeys.length, startedAt: Date.now() });
     const etaEstimator = createEtaEstimator({
         historyPath: path.join(outputRoot, 'step_metrics.json'),
-        scopeKey: profile,
+        scopeKey: `${auditMode}:${profile}`,
         ewmaAlpha: 0.35,
     });
 
@@ -393,6 +420,12 @@ async function main() {
     let abortRequested = false;
     let abortMessage = '';
     let fatalMessage = '';
+    /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
+    let securityResult = { findings: [], errors: [], warnings: [], telemetry: { contracts_scanned: 0, files_scanned: 0, checks: [], findings_by_kind: {} } };
+    /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
+    let performanceResult = { findings: [], errors: [], warnings: [], telemetry: { score: null, categories: {} } };
+    /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
+    let architectureResult = { findings: [], errors: [], warnings: [], telemetry: { findings_by_kind: {} } };
     const plannedStartEta = etaEstimator.estimateRemaining(plannedStepKeys);
     /** @type {{ stdout_bytes_total: number, stderr_bytes_total: number, stdout_truncated_steps: string[], stderr_truncated_steps: string[], steps_with_overflow: number, max_stdout_bytes: number, max_stderr_bytes: number }} */
     const logStats = {
@@ -407,6 +440,14 @@ async function main() {
 
     /** @type {ReturnType<typeof setInterval>|null} */
     let heartbeat = null;
+
+    /**
+     * @param {typeof AUDIT_PHASES[keyof typeof AUDIT_PHASES]} phase
+     * @returns {boolean}
+     */
+    function shouldRunPhase(phase) {
+        return (phasePlanMap.get(phase)?.planned_steps?.length || 0) > 0;
+    }
 
     /**
      * @param {AbortReason} reason
@@ -904,6 +945,7 @@ async function main() {
         schema_version: SCHEMA_VERSION,
         run_id: runId,
         profile,
+        audit_mode: auditMode,
         scope,
         focus_mode: focusMode,
         contracts_mode: contractsMode,
@@ -960,6 +1002,7 @@ async function main() {
         status: 'running',
         message: `Audit run started (${runId})`,
         profile,
+        audit_mode: auditMode,
         scope,
         focus_mode: focusMode,
         contracts_mode: contractsMode,
@@ -1163,9 +1206,9 @@ async function main() {
     }
 
     // quality (smart hybrid)
-    startPhase('collect-quality');
+    startPhase(AUDIT_PHASES.COLLECT_QUALITY);
     await runInternalStep(
-        'collect-quality',
+        AUDIT_PHASES.COLLECT_QUALITY,
         'quality.plan_resolution',
         'Resolving smart-hybrid quality execution plan',
         async () => ({ ok: true })
@@ -1180,149 +1223,271 @@ async function main() {
         qualityCache,
         qualityCacheDir,
         qualityParallelism,
-        exec: (stepId, command, args, opts) => execStep('collect-quality', stepId, command, args, opts),
+        exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_QUALITY, stepId, command, args, opts),
     });
     rawFindings = rawFindings.concat(qualityResult.findings);
     errors.push(...qualityResult.errors);
     warnings.push(...qualityResult.warnings);
     if ((qualityResult.telemetry?.fallbacks || []).length > 0) {
         await runInternalStep(
-            'collect-quality',
+            AUDIT_PHASES.COLLECT_QUALITY,
             'quality.fallback_resolution',
             'Recording quality smart-hybrid fallbacks',
             async () => ({ ok: true, fallbacks: qualityResult.telemetry.fallbacks })
         );
     } else {
-        markStepSkipped('collect-quality', 'quality.fallback_resolution', 'Sem fallback de quality nesta execução');
+        markStepSkipped(AUDIT_PHASES.COLLECT_QUALITY, 'quality.fallback_resolution', 'Sem fallback de quality nesta execução');
     }
     for (const skipped of qualityResult.telemetry?.steps_skipped || []) {
-        markStepSkipped('collect-quality', skipped.step, skipped.reason);
+        markStepSkipped(AUDIT_PHASES.COLLECT_QUALITY, skipped.step, skipped.reason);
     }
-    finishPhase('collect-quality', qualityResult.errors.length > 0 ? 'failed' : 'completed');
+    finishPhase(AUDIT_PHASES.COLLECT_QUALITY, qualityResult.errors.length > 0 ? 'failed' : 'completed');
 
     // static
-    startPhase('collect-static');
     const qualityCollectorActive = qualityMode !== 'off';
-    const staticResult = await collectStaticFindings({
-        profile,
-        changedFiles,
-        artifactsDir: runDir,
-        contractsMode,
-        skipQuickSyntax: qualityCollectorActive,
-        skipLintTypecheck: qualityCollectorActive,
-        exec: (stepId, command, args, opts) => execStep('collect-static', stepId, command, args, opts),
-    });
-    rawFindings = rawFindings.concat(staticResult.findings);
-    errors.push(...staticResult.errors);
-    warnings.push(...staticResult.warnings);
-    if (profile === 'quick' && qualityCollectorActive) {
-        markStepSkipped('collect-static', 'static.syntax', 'Step moved to collect-quality (quality.node_check)');
-    } else if (profile !== 'quick' && qualityCollectorActive) {
-        markStepSkipped('collect-static', 'static.lint', 'Step moved to collect-quality (quality.lint)');
-        markStepSkipped('collect-static', 'static.typecheck', 'Step moved to collect-quality (quality.typecheck_*)');
+    const staticResult = { findings: [], errors: [], warnings: [], telemetry: {} };
+    if (!shouldRunPhase(AUDIT_PHASES.COLLECT_STATIC)) {
+        startPhase(AUDIT_PHASES.COLLECT_STATIC);
+        for (const stepId of ['static.syntax', 'static.forbidden', 'static.lint', 'static.typecheck', 'static.madge', 'static.depcruise', 'static.jscpd', 'static.semgrep']) {
+            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, stepId, `Step skipped by audit_mode=${auditMode}`);
+        }
+        finishPhase(AUDIT_PHASES.COLLECT_STATIC, 'skipped');
+    } else {
+        startPhase(AUDIT_PHASES.COLLECT_STATIC);
+        Object.assign(
+            staticResult,
+            await collectStaticFindings({
+                profile,
+                changedFiles,
+                artifactsDir: runDir,
+                contractsMode,
+                skipQuickSyntax: qualityCollectorActive,
+                skipLintTypecheck: qualityCollectorActive,
+                exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_STATIC, stepId, command, args, opts),
+            })
+        );
+        rawFindings = rawFindings.concat(staticResult.findings);
+        errors.push(...staticResult.errors);
+        warnings.push(...staticResult.warnings);
+        if (profile === 'quick' && qualityCollectorActive) {
+            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.syntax', 'Step moved to collect-quality (quality.node_check)');
+        } else if (profile !== 'quick' && qualityCollectorActive) {
+            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.lint', 'Step moved to collect-quality (quality.lint)');
+            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.typecheck', 'Step moved to collect-quality (quality.typecheck_*)');
+        }
+        if (
+            staticResult.warnings.some(
+                item => item.source === 'dependency-cruiser' && /not installed/i.test(String(item.message || ''))
+            )
+        ) {
+            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.depcruise', 'Step skipped: dependency-cruiser não instalado');
+        }
+        if (
+            staticResult.warnings.some(
+                item => item.source === 'semgrep' && /not installed/i.test(String(item.message || ''))
+            )
+        ) {
+            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.semgrep', 'Step skipped: semgrep não instalado');
+        }
+        const staticFailed = staticResult.errors.length > 0;
+        finishPhase(AUDIT_PHASES.COLLECT_STATIC, staticFailed ? 'failed' : 'completed');
     }
-    if (
-        staticResult.warnings.some(
-            item => item.source === 'dependency-cruiser' && /not installed/i.test(String(item.message || ''))
-        )
-    ) {
-        markStepSkipped('collect-static', 'static.depcruise', 'Step skipped: dependency-cruiser não instalado');
-    }
-    if (
-        staticResult.warnings.some(
-            item => item.source === 'semgrep' && /not installed/i.test(String(item.message || ''))
-        )
-    ) {
-        markStepSkipped('collect-static', 'static.semgrep', 'Step skipped: semgrep não instalado');
-    }
-    const staticFailed = staticResult.errors.length > 0;
-    finishPhase('collect-static', staticFailed ? 'failed' : 'completed');
 
     // runtime
-    startPhase('collect-runtime');
-    const runtimeResult = await collectRuntimeFindings({
-        profile,
-        contracts: activeContracts,
-        exec: (stepId, command, args, opts) => execStep('collect-runtime', stepId, command, args, opts),
-    });
-    rawFindings = rawFindings.concat(runtimeResult.findings);
-    errors.push(...runtimeResult.errors);
-    warnings.push(...runtimeResult.warnings);
-    finishPhase('collect-runtime', runtimeResult.errors.length > 0 ? 'failed' : 'completed');
+    const runtimeResult = {
+        findings: [],
+        errors: [],
+        warnings: [],
+        telemetry: {
+            mcp: { ok: false, details: 'skipped' },
+            rag: { ok: false, available: false, degraded: true },
+            lsp: { ok: false, details: 'skipped' },
+        },
+    };
+    if (!shouldRunPhase(AUDIT_PHASES.COLLECT_RUNTIME)) {
+        startPhase(AUDIT_PHASES.COLLECT_RUNTIME);
+        for (const stepId of ['runtime.mcp_diagnose', 'runtime.rag_health', 'runtime.lsp_health', 'runtime.smoke']) {
+            markStepSkipped(AUDIT_PHASES.COLLECT_RUNTIME, stepId, `Step skipped by audit_mode=${auditMode}`);
+        }
+        finishPhase(AUDIT_PHASES.COLLECT_RUNTIME, 'skipped');
+    } else {
+        startPhase(AUDIT_PHASES.COLLECT_RUNTIME);
+        Object.assign(
+            runtimeResult,
+            await collectRuntimeFindings({
+                profile,
+                contracts: activeContracts,
+                exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_RUNTIME, stepId, command, args, opts),
+            })
+        );
+        rawFindings = rawFindings.concat(runtimeResult.findings);
+        errors.push(...runtimeResult.errors);
+        warnings.push(...runtimeResult.warnings);
+        finishPhase(AUDIT_PHASES.COLLECT_RUNTIME, runtimeResult.errors.length > 0 ? 'failed' : 'completed');
+    }
 
     // tests
-    startPhase('collect-tests');
-    const testsResult = await collectTestFindings({
-        profile,
-        exec: (stepId, command, args, opts) => execStep('collect-tests', stepId, command, args, opts),
-    });
-    rawFindings = rawFindings.concat(testsResult.findings);
-    errors.push(...testsResult.errors);
-    warnings.push(...testsResult.warnings);
-    finishPhase('collect-tests', testsResult.errors.length > 0 ? 'failed' : 'completed');
+    const testsResult = { findings: [], errors: [], warnings: [], telemetry: {} };
+    if (!shouldRunPhase(AUDIT_PHASES.COLLECT_TESTS)) {
+        startPhase(AUDIT_PHASES.COLLECT_TESTS);
+        for (const stepId of ['tests.smoke', 'tests.unit', 'tests.integration', 'tests.regression']) {
+            markStepSkipped(AUDIT_PHASES.COLLECT_TESTS, stepId, `Step skipped by audit_mode=${auditMode}`);
+        }
+        finishPhase(AUDIT_PHASES.COLLECT_TESTS, 'skipped');
+    } else {
+        startPhase(AUDIT_PHASES.COLLECT_TESTS);
+        Object.assign(
+            testsResult,
+            await collectTestFindings({
+                profile,
+                exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_TESTS, stepId, command, args, opts),
+            })
+        );
+        rawFindings = rawFindings.concat(testsResult.findings);
+        errors.push(...testsResult.errors);
+        warnings.push(...testsResult.warnings);
+        finishPhase(AUDIT_PHASES.COLLECT_TESTS, testsResult.errors.length > 0 ? 'failed' : 'completed');
+    }
 
     // chaos
-    startPhase('collect-chaos');
-    const chaosResult = await evaluateChaosContracts({
-        profile,
-        chaosProfile,
-        contracts: activeContracts,
-        runDir,
-        exec: (stepId, command, args, opts) => execStep('collect-chaos', stepId, command, args, opts),
-    });
-    rawFindings = rawFindings.concat(
-        /** @type {import('./normalize/findings.mjs').RawFinding[]} */ (chaosResult.findings)
-    );
-    errors.push(...chaosResult.errors);
-    warnings.push(...chaosResult.warnings);
-    finishPhase('collect-chaos', chaosResult.errors.length > 0 ? 'failed' : 'completed');
+    const chaosResult = {
+        findings: [],
+        errors: [],
+        warnings: [],
+        summary: {
+            enabled: false,
+            profile: 'off',
+            scenarios_executed: 0,
+            violations: 0,
+        },
+        eventsPath: path.join(runDir, 'chaos_events.jsonl'),
+    };
+    if (!shouldRunPhase(AUDIT_PHASES.COLLECT_CHAOS)) {
+        startPhase(AUDIT_PHASES.COLLECT_CHAOS);
+        markStepSkipped(AUDIT_PHASES.COLLECT_CHAOS, 'chaos.contract_nightly', `Step skipped by audit_mode=${auditMode} or profile=${profile}`);
+        finishPhase(AUDIT_PHASES.COLLECT_CHAOS, 'skipped');
+    } else {
+        startPhase(AUDIT_PHASES.COLLECT_CHAOS);
+        Object.assign(
+            chaosResult,
+            await evaluateChaosContracts({
+                profile,
+                chaosProfile,
+                contracts: activeContracts,
+                runDir,
+                exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_CHAOS, stepId, command, args, opts),
+            })
+        );
+        rawFindings = rawFindings.concat(
+            /** @type {import('./normalize/findings.mjs').RawFinding[]} */ (chaosResult.findings)
+        );
+        errors.push(...chaosResult.errors);
+        warnings.push(...chaosResult.warnings);
+        finishPhase(AUDIT_PHASES.COLLECT_CHAOS, chaosResult.errors.length > 0 ? 'failed' : 'completed');
+    }
+
+    // security
+    if (!shouldRunPhase(AUDIT_PHASES.COLLECT_SECURITY)) {
+        startPhase(AUDIT_PHASES.COLLECT_SECURITY);
+        for (const stepId of ['security.contracts', 'security.http_surface', 'security.headers']) {
+            markStepSkipped(AUDIT_PHASES.COLLECT_SECURITY, stepId, `Step skipped by audit_mode=${auditMode}`);
+        }
+        finishPhase(AUDIT_PHASES.COLLECT_SECURITY, 'skipped');
+    } else {
+        startPhase(AUDIT_PHASES.COLLECT_SECURITY);
+        securityResult = await runInternalStep(
+            AUDIT_PHASES.COLLECT_SECURITY,
+            'security.contracts',
+            'Running security collector',
+            async () =>
+                collectSecurityFindings({
+                    rootDir: process.cwd(),
+                    contracts: activeContracts,
+                })
+        );
+        rawFindings = rawFindings.concat(
+            /** @type {import('./normalize/findings.mjs').RawFinding[]} */ (securityResult.findings)
+        );
+        errors.push(...securityResult.errors);
+        warnings.push(...securityResult.warnings);
+        markStepSkipped(AUDIT_PHASES.COLLECT_SECURITY, 'security.http_surface', 'Covered by collectSecurityFindings');
+        markStepSkipped(AUDIT_PHASES.COLLECT_SECURITY, 'security.headers', 'Covered by collectSecurityFindings');
+        if (securityResult.findings.length > 0 || securityResult.warnings.length > 0 || securityResult.errors.length > 0) {
+            logger.emit({
+                level: 'info',
+                event_type: AUDIT_EVENT_TYPES.SECURITY_ANALYSIS_COMPLETED,
+                phase: AUDIT_PHASES.COLLECT_SECURITY,
+                message: `Security analysis completed with ${securityResult.findings.length} issues found`,
+                domain: 'security',
+                findings_count: securityResult.findings.length,
+                warnings_count: securityResult.warnings.length,
+                errors_count: securityResult.errors.length,
+            });
+        }
+        finishPhase(AUDIT_PHASES.COLLECT_SECURITY, securityResult.errors.length > 0 ? 'failed' : 'completed');
+    }
 
     // performance
-    startPhase('collect-performance');
-    const performanceResult = await collectPerformanceFindings(process.cwd());
-    rawFindings = rawFindings.concat(performanceResult.findings);
-    errors.push(...performanceResult.errors);
-    warnings.push(...performanceResult.warnings);
-    if (performanceResult.findings.length > 0) {
-        logger.emit({
-            level: 'info',
-            event_type: AUDIT_EVENT_TYPES.PERFORMANCE_ANALYSIS_COMPLETED,
-            phase: 'collect-performance',
-            message: `Performance analysis completed with ${performanceResult.findings.length} issues found`,
-            domain: 'performance',
-            findings_count: performanceResult.findings.length,
-            warnings_count: performanceResult.warnings.length,
-            errors_count: performanceResult.errors.length,
-        });
+    if (!shouldRunPhase(AUDIT_PHASES.COLLECT_PERFORMANCE)) {
+        startPhase(AUDIT_PHASES.COLLECT_PERFORMANCE);
+        markStepSkipped(AUDIT_PHASES.COLLECT_PERFORMANCE, 'performance.analysis', `Step skipped by audit_mode=${auditMode}`);
+        finishPhase(AUDIT_PHASES.COLLECT_PERFORMANCE, 'skipped');
+    } else {
+        startPhase(AUDIT_PHASES.COLLECT_PERFORMANCE);
+        performanceResult = await collectPerformanceFindings(process.cwd());
+        rawFindings = rawFindings.concat(performanceResult.findings);
+        errors.push(...performanceResult.errors);
+        warnings.push(...performanceResult.warnings);
+        if (performanceResult.findings.length > 0) {
+            logger.emit({
+                level: 'info',
+                event_type: AUDIT_EVENT_TYPES.PERFORMANCE_ANALYSIS_COMPLETED,
+                phase: AUDIT_PHASES.COLLECT_PERFORMANCE,
+                message: `Performance analysis completed with ${performanceResult.findings.length} issues found`,
+                domain: 'performance',
+                findings_count: performanceResult.findings.length,
+                warnings_count: performanceResult.warnings.length,
+                errors_count: performanceResult.errors.length,
+            });
+        }
+        finishPhase(AUDIT_PHASES.COLLECT_PERFORMANCE, performanceResult.errors.length > 0 ? 'failed' : 'completed');
     }
-    finishPhase('collect-performance', performanceResult.errors.length > 0 ? 'failed' : 'completed');
 
     // architecture
-    startPhase('collect-architecture');
-    const architectureResult = await collectArchitectureFindings(process.cwd());
-    rawFindings = rawFindings.concat(architectureResult.findings);
-    errors.push(...architectureResult.errors);
-    warnings.push(...architectureResult.warnings);
-    if (architectureResult.findings.length > 0) {
-        logger.emit({
-            level: 'info',
-            event_type: AUDIT_EVENT_TYPES.ARCHITECTURE_ANALYSIS_COMPLETED,
-            phase: 'collect-architecture',
-            message: `Architecture analysis completed with ${architectureResult.findings.length} issues found`,
-            domain: 'architecture',
-            findings_count: architectureResult.findings.length,
-            warnings_count: architectureResult.warnings.length,
-            errors_count: architectureResult.errors.length,
-        });
+    if (!shouldRunPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE)) {
+        startPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE);
+        markStepSkipped(AUDIT_PHASES.COLLECT_ARCHITECTURE, 'architecture.analysis', `Step skipped by audit_mode=${auditMode}`);
+        finishPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE, 'skipped');
+    } else {
+        startPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE);
+        architectureResult = await collectArchitectureFindings(process.cwd());
+        rawFindings = rawFindings.concat(architectureResult.findings);
+        errors.push(...architectureResult.errors);
+        warnings.push(...architectureResult.warnings);
+        if (architectureResult.findings.length > 0) {
+            logger.emit({
+                level: 'info',
+                event_type: AUDIT_EVENT_TYPES.ARCHITECTURE_ANALYSIS_COMPLETED,
+                phase: AUDIT_PHASES.COLLECT_ARCHITECTURE,
+                message: `Architecture analysis completed with ${architectureResult.findings.length} issues found`,
+                domain: 'architecture',
+                findings_count: architectureResult.findings.length,
+                warnings_count: architectureResult.warnings.length,
+                errors_count: architectureResult.errors.length,
+            });
+        }
+        finishPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE, architectureResult.errors.length > 0 ? 'failed' : 'completed');
     }
-    finishPhase('collect-architecture', architectureResult.errors.length > 0 ? 'failed' : 'completed');
 
     stateStore.writeFindingsRaw(rawFindings);
 
+    /** @type {import('./lib/schema.mjs').AuditFindingV3[]} */
+    let findings = [];
+
     // normalize
-    startPhase('normalize-correlate');
-    let findings = await runInternalStep(
-        'normalize-correlate',
+    startPhase(AUDIT_PHASES.NORMALIZE_CORRELATE);
+    findings = await runInternalStep(
+        AUDIT_PHASES.NORMALIZE_CORRELATE,
         'normalize.findings',
         'Normalizing findings',
         async () =>
@@ -1332,7 +1497,7 @@ async function main() {
             })
     );
     const evidencePack = await runInternalStep(
-        'normalize-correlate',
+        AUDIT_PHASES.NORMALIZE_CORRELATE,
         'normalize.evidence_graph',
         'Building evidence graph',
         async () => buildEvidenceGraph(findings)
@@ -1342,83 +1507,90 @@ async function main() {
     logger.emit({
         level: 'info',
         event_type: AUDIT_EVENT_TYPES.CONTRACT_CORRELATED,
-        phase: 'normalize-correlate',
+        phase: AUDIT_PHASES.NORMALIZE_CORRELATE,
         status: 'completed',
         message: `Evidence graph built with ${evidencePack.graph.nodes.length} nodes`,
     });
-    finishPhase('normalize-correlate', 'completed');
+    finishPhase(AUDIT_PHASES.NORMALIZE_CORRELATE, 'completed');
 
     // triage
-    startPhase('triage-intelligence');
     const triageBudget = profile === 'quick' ? 40 : profile === 'deep' ? 120 : 200;
+    const effectiveProposalDepth = proposalDepth === 'off' ? 'basic' : proposalDepth;
     let lastTriageProgressTs = 0;
-    let triage;
-    try {
-        triage = await runInternalStep(
-            'triage-intelligence',
-            'triage.enrich',
-            `Running triage intelligence (budget=${triageBudget}, timeout=${triageTimeoutMs}ms)`,
-            async () =>
-                triageFindings(findings, {
-                    enabled: triageEnabled,
-                    maxMcpFindings: triageBudget,
-                    proposeDiffs,
-                    focusMode,
-                    proposalDepth,
-                    cloudFallback,
-                    masterPath: MASTER_PATH,
-                    maxDurationMs: triageTimeoutMs,
-                    onProgress: payload => {
-                        const now = Date.now();
-                        const shouldEmit =
-                            payload.processed <= 2 ||
-                            payload.processed === payload.total ||
-                            payload.processed % 20 === 0 ||
-                            now - lastTriageProgressTs >= 5000;
-                        if (!shouldEmit) {
-                            return;
-                        }
-                        lastTriageProgressTs = now;
-                        const triageRemaining = getRemainingStepKeys();
-                        const triageEta = etaEstimator.estimateRemaining(triageRemaining);
-                        const triageSnap = progress.snapshot(triageEta.eta_ms);
-                        logger.emit({
-                            level: 'debug',
-                            event_type: AUDIT_EVENT_TYPES.STEP_PROGRESS,
-                            phase: 'triage-intelligence',
-                            step_id: 'triage.enrich',
-                            status: 'running',
-                            progress_pct: triageSnap.progress_pct,
-                            eta_ms: triageSnap.eta_ms,
-                            message: `triage progress ${payload.processed}/${payload.total} (${payload.percent}%) mode=${payload.mode}`,
-                        });
-                    },
-                }),
-            { timeoutMs: triageTimeoutMs + 15000 }
-        );
-    } catch (error) {
-        warnings.push({
-            source: 'triage_llm',
-            message: `triage internal step failed; deterministic fallback used (${error instanceof Error ? error.message : String(error)})`,
+    if (!shouldRunPhase(AUDIT_PHASES.TRIAGE_INTELLIGENCE)) {
+        startPhase(AUDIT_PHASES.TRIAGE_INTELLIGENCE);
+        markStepSkipped(AUDIT_PHASES.TRIAGE_INTELLIGENCE, 'triage.enrich', `Step skipped by audit_mode=${auditMode}`);
+        finishPhase(AUDIT_PHASES.TRIAGE_INTELLIGENCE, 'skipped');
+    } else {
+        startPhase(AUDIT_PHASES.TRIAGE_INTELLIGENCE);
+        let triage;
+        try {
+            triage = await runInternalStep(
+                AUDIT_PHASES.TRIAGE_INTELLIGENCE,
+                'triage.enrich',
+                `Running triage intelligence (budget=${triageBudget}, timeout=${triageTimeoutMs}ms)`,
+                async () =>
+                    triageFindings(findings, {
+                        enabled: triageEnabled && proposalDepth !== 'off',
+                        maxMcpFindings: triageBudget,
+                        proposeDiffs,
+                        focusMode,
+                        proposalDepth: effectiveProposalDepth,
+                        cloudFallback,
+                        masterPath: MASTER_PATH,
+                        maxDurationMs: triageTimeoutMs,
+                        onProgress: payload => {
+                            const now = Date.now();
+                            const shouldEmit =
+                                payload.processed <= 2 ||
+                                payload.processed === payload.total ||
+                                payload.processed % 20 === 0 ||
+                                now - lastTriageProgressTs >= 5000;
+                            if (!shouldEmit) {
+                                return;
+                            }
+                            lastTriageProgressTs = now;
+                            const triageRemaining = getRemainingStepKeys();
+                            const triageEta = etaEstimator.estimateRemaining(triageRemaining);
+                            const triageSnap = progress.snapshot(triageEta.eta_ms);
+                            logger.emit({
+                                level: 'debug',
+                                event_type: AUDIT_EVENT_TYPES.STEP_PROGRESS,
+                                phase: AUDIT_PHASES.TRIAGE_INTELLIGENCE,
+                                step_id: 'triage.enrich',
+                                status: 'running',
+                                progress_pct: triageSnap.progress_pct,
+                                eta_ms: triageSnap.eta_ms,
+                                message: `triage progress ${payload.processed}/${payload.total} (${payload.percent}%) mode=${payload.mode}`,
+                            });
+                        },
+                    }),
+                { timeoutMs: triageTimeoutMs + 15000 }
+            );
+        } catch (error) {
+            warnings.push({
+                source: 'triage_llm',
+                message: `triage internal step failed; deterministic fallback used (${error instanceof Error ? error.message : String(error)})`,
+            });
+            triage = await triageFindings(findings, {
+                enabled: false,
+                focusMode,
+                proposalDepth: effectiveProposalDepth,
+                cloudFallback,
+                masterPath: MASTER_PATH,
+            });
+        }
+        findings = triage.findings;
+        warnings.push(...triage.warnings.map(message => ({ source: 'triage_llm', message })));
+        logger.emit({
+            level: 'info',
+            event_type: AUDIT_EVENT_TYPES.PROPOSAL_GENERATED,
+            phase: AUDIT_PHASES.TRIAGE_INTELLIGENCE,
+            status: 'completed',
+            message: `Proposals generated for ${findings.length} findings`,
         });
-        triage = await triageFindings(findings, {
-            enabled: false,
-            focusMode,
-            proposalDepth,
-            cloudFallback,
-            masterPath: MASTER_PATH,
-        });
+        finishPhase(AUDIT_PHASES.TRIAGE_INTELLIGENCE, 'completed');
     }
-    findings = triage.findings;
-    warnings.push(...triage.warnings.map(message => ({ source: 'triage_llm', message })));
-    logger.emit({
-        level: 'info',
-        event_type: AUDIT_EVENT_TYPES.PROPOSAL_GENERATED,
-        phase: 'triage-intelligence',
-        status: 'completed',
-        message: `Proposals generated for ${findings.length} findings`,
-    });
-    finishPhase('triage-intelligence', 'completed');
 
     if (maxFindings > 0) {
         findings = findings.slice(0, maxFindings);
@@ -1615,12 +1787,16 @@ async function main() {
         if (runOutcome !== 'aborted' && runOutcome !== 'fatal') {
             runOutcome = summaryPartial ? 'partial' : 'success';
         }
+        const activePhases = phasePlan.filter(item => (item.planned_steps || []).length > 0).map(item => item.id);
+        const skippedPhases = phasePlan.filter(item => (item.planned_steps || []).length === 0).map(item => item.id);
         return /** @type {import('./lib/schema.mjs').AuditRunV3 & { errors_count: number, warnings_count: number }} */ ({
             schema_version: SCHEMA_VERSION,
             run_id: runId,
             profile,
+            audit_mode: auditMode,
             scope,
             focus_mode: focusMode,
+            focus_area: auditMode,
             contracts_mode: contractsMode,
             enforce_level: enforceLevel,
             proposal_depth: proposalDepth,
@@ -1644,6 +1820,10 @@ async function main() {
                 steps_total: metrics.progressSnapshot.steps_total,
                 progress_pct: metrics.progressSnapshot.progress_pct,
                 remaining_steps: metrics.progressSnapshot.remaining_steps,
+            },
+            collector_plan: {
+                active_phases: activePhases,
+                skipped_phases: skippedPhases,
             },
             eta: metrics.eta,
             phase_status: phaseStatus,
@@ -1722,6 +1902,24 @@ async function main() {
                     qualityResult.telemetry && typeof qualityResult.telemetry.dedup === 'object'
                         ? qualityResult.telemetry.dedup
                         : {},
+            },
+            security_execution: {
+                enabled: shouldRunPhase(AUDIT_PHASES.COLLECT_SECURITY),
+                checks: Array.isArray(securityResult.telemetry?.checks) ? securityResult.telemetry.checks : [],
+                findings: securityResult.findings.length,
+                warnings: securityResult.warnings.length,
+                errors: securityResult.errors.length,
+            },
+            performance_execution: {
+                enabled: shouldRunPhase(AUDIT_PHASES.COLLECT_PERFORMANCE),
+                score: performanceResult.telemetry?.score ?? null,
+                categories:
+                    performanceResult.telemetry && typeof performanceResult.telemetry.categories === 'object'
+                        ? performanceResult.telemetry.categories
+                        : {},
+                findings: performanceResult.findings.length,
+                warnings: performanceResult.warnings.length,
+                errors: performanceResult.errors.length,
             },
             contract_coverage: contractCoverage,
             contract_drift: contractDrift,
@@ -1890,7 +2088,9 @@ async function main() {
             ``,
             `- run_id: ${report.run_id}`,
             `- profile: ${report.profile}`,
+            `- audit_mode: ${report.audit_mode}`,
             `- focus_mode: ${report.focus_mode}`,
+            `- focus_area: ${report.focus_area}`,
             `- contracts_mode: ${report.contracts_mode}`,
             `- enforce_level: ${report.enforce_level}`,
             `- proposal_depth: ${report.proposal_depth}`,
@@ -1920,6 +2120,10 @@ async function main() {
             `- quality_typecheck_browser_ok: ${report.quality_gates.typecheck_browser_ok}`,
             `- quality_prettier_ok: ${report.quality_gates.prettier_ok}`,
             `- quality_ts_ignore_ok: ${report.quality_gates.ts_ignore_ok}`,
+            `- security_enabled: ${report.security_execution?.enabled === true}`,
+            `- security_findings: ${report.security_execution?.findings || 0}`,
+            `- performance_enabled: ${report.performance_execution?.enabled === true}`,
+            `- performance_score: ${report.performance_execution?.score ?? 'n/a'}`,
             `- chaos_enabled: ${report.chaos_summary.enabled}`,
             `- chaos_violations: ${report.chaos_summary.violations}`,
             ``,
@@ -2008,6 +2212,7 @@ function writeFatalFallbackReport(error) {
         event_type: AUDIT_EVENT_TYPES.RUN_STARTED,
         status: 'running',
         message: `Audit run started (${runId}) [fatal-fallback]`,
+        audit_mode: 'reactive_bug',
     });
     logger.emit({
         level: 'error',
@@ -2028,6 +2233,7 @@ function writeFatalFallbackReport(error) {
         schema_version: SCHEMA_VERSION,
         run_id: runId,
         profile: 'quick',
+        audit_mode: 'reactive_bug',
         scope: 'repo',
         started_at: startedAtIso,
         output_root: outputRoot,
@@ -2101,8 +2307,10 @@ function writeFatalFallbackReport(error) {
         schema_version: SCHEMA_VERSION,
         run_id: runId,
         profile: /** @type {'quick'} */ ('quick'),
+        audit_mode: /** @type {'reactive_bug'} */ ('reactive_bug'),
         scope: 'repo',
         focus_mode: 'bug-first',
+        focus_area: 'fatal-fallback',
         contracts_mode: 'hybrid',
         enforce_level: 'warn',
         proposal_depth: 'standard',
@@ -2126,6 +2334,10 @@ function writeFatalFallbackReport(error) {
             steps_total: 0,
             progress_pct: 0,
             remaining_steps: 0,
+        },
+        collector_plan: {
+            active_phases: [],
+            skipped_phases: [],
         },
         eta: {
             eta_ms: 0,
@@ -2218,6 +2430,21 @@ function writeFatalFallbackReport(error) {
             parallelism: {},
             dedup: {},
         },
+        security_execution: {
+            enabled: false,
+            checks: [],
+            findings: 0,
+            warnings: 0,
+            errors: 0,
+        },
+        performance_execution: {
+            enabled: false,
+            score: null,
+            categories: {},
+            findings: 0,
+            warnings: 0,
+            errors: 0,
+        },
         contract_coverage: {},
         contract_drift: {
             stale_contracts: [],
@@ -2268,6 +2495,7 @@ function writeFatalFallbackReport(error) {
             '# Audit v3.2 Summary (Fatal Fallback)',
             '',
             `- run_id: ${runId}`,
+            `- audit_mode: reactive_bug`,
             `- run_outcome: fatal`,
             `- abort_reason: uncaught_exception`,
             `- message: ${message}`,

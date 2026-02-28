@@ -163,8 +163,8 @@ composto por quatro subsistemas principais:
 
 ### 2.9 Skills Codex Existentes
 
-| Skill                                                                              | Função                    |
-| ---------------------------------------------------------------------------------- | ------------------------- |
+| Skill                                                                               | Função                    |
+| ----------------------------------------------------------------------------------- | ------------------------- |
 | [`audit-agent-background-llm-ops/`](.github/skills/audit-agent-background-llm-ops/) | Operações do Audit Agent  |
 | [`audit-contracts-v3-ops/`](.github/skills/audit-contracts-v3-ops/)                 | Operações de contratos v3 |
 | [`audit-runbook-observability/`](.github/skills/audit-runbook-observability/)       | Observabilidade           |

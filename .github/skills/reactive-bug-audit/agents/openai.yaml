@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reactive Bug Audit"
+  short_description: "Triagem reativa de bugs com pista inicial e coleta focada."
+  default_prompt: "Use $reactive-bug-audit para investigar um bug já observado, executar a coleta reativa e sair com causa-raiz e plano de correção."

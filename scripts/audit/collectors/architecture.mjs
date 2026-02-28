@@ -7,7 +7,12 @@ import path from 'node:path';
 
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *   findings: RawFinding[],
+ *   errors: Array<{source:string,message:string}>,
+ *   warnings: Array<{source:string,message:string}>,
+ *   telemetry: { findings_by_kind: Record<string, number> }
+ * }>}
  */
 export async function collectArchitectureFindings(rootDir) {
     /** @type {RawFinding[]} */
@@ -43,7 +48,32 @@ export async function collectArchitectureFindings(rootDir) {
         });
     }
 
-    return { findings, errors, warnings };
+    /** @type {Record<string, number>} */
+    const findingsByKind = {
+        coupling: 0,
+        circular: 0,
+        generic: 0,
+    };
+
+    for (const finding of findings) {
+        const tool = String(finding.source_tool || '');
+        if (tool.includes('coupling')) {
+            findingsByKind.coupling += 1;
+        } else if (tool.includes('circular')) {
+            findingsByKind.circular += 1;
+        } else {
+            findingsByKind.generic += 1;
+        }
+    }
+
+    return {
+        findings,
+        errors,
+        warnings,
+        telemetry: {
+            findings_by_kind: findingsByKind,
+        },
+    };
 }
 
 /**

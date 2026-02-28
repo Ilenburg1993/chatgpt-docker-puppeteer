@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security Checklist"
+  short_description: "Auditoria de segurança com foco em contracts, auth e headers."
+  default_prompt: "Use $security-checklist para rodar a auditoria de segurança, revisar findings do domínio security e consolidar risco com evidência."
