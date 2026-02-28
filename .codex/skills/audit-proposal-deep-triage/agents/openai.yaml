@@ -1,4 +1,0 @@
-interface:
-  display_name: "Audit Proposal Deep Triage"
-  short_description: "Triagem P0/P1 com vínculo obrigatório ao tracker."
-  default_prompt: "Use $audit-proposal-deep-triage para gerar proposta P0/P1 com causa-raiz Top 3, validação, rollback e referência explícita ao tracker."

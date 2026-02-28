@@ -1,4 +1,0 @@
-interface:
-  display_name: "RAG MCP LSP Ops"
-  short_description: "RAG/MCP/LSP com política de frescor e fallback lexical"
-  default_prompt: "Use $rag-mcp-lsp-ops para operar PM2/MCP/RAG com checagem de frescor do índice e fallback formal quando Ollama/model estiver indisponível."

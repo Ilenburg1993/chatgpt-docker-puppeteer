@@ -1,4 +1,0 @@
-interface:
-  display_name: "Context7 Docs Ops"
-  short_description: "Context7-first docs lookup workflow."
-  default_prompt: "Use Context7 first for external library and framework docs with explicit versioning and fallback."

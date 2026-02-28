@@ -1,4 +1,0 @@
-interface:
-  display_name: "Audit Contracts v3 Ops"
-  short_description: "Governança e rollout de contratos v3."
-  default_prompt: "Use $audit-contracts-v3-ops para operar/migrar contratos DSL v3, validar paridade híbrida e calibrar enforcement."

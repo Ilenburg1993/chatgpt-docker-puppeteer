@@ -1,4 +1,0 @@
-interface:
-  display_name: "Audit Runbook Observability"
-  short_description: "Auditoria operacional com baseline inicio/fim e gate de risco."
-  default_prompt: "Use $audit-runbook-observability para coletar baseline PM2/MCP/RAG/LSP, executar auditoria e registrar risco/trilha no tracker canônico."
