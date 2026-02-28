@@ -5,7 +5,6 @@
     // ============================================================
     "recommendations": [
         // === CORE ESSENTIALS ===
-        "GitHub.copilot",
         "GitHub.copilot-chat",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
@@ -17,6 +16,7 @@
         "pflannery.vscode-versionlens",
         // === GIT & VERSION CONTROL ===
         "eamodio.gitlens",
+        "GitHub.vscode-pull-request-github", // enable PR management directly from the editor
         // === CODE QUALITY & PRODUCTIVITY ===
         "usernamehw.errorlens",
         "aaron-bond.better-comments",

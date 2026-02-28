@@ -15,6 +15,12 @@
  * - Same tools available via MCP, REST API, and direct code calls
  */
 
+// we need access to mission templates when serving MCP resource requests
+import { WorkflowGenerator } from '#missions/workflow_generator';
+
+// create a singleton generator so the handler can query template list and load files
+const workflowGenerator = new WorkflowGenerator();
+
 /**
  * Lightweight, compatible MCP-ish HTTP endpoint.
  *
@@ -170,16 +176,33 @@ const handlers = {
     'resources/list': async () => {
         console.error('[MCP Handler] resources/list request');
 
-        return {
-            resources: [
-                {
-                    uri: 'rag://stats',
-                    name: 'RAG Runtime Statistics',
+        // basic resources, additional categories may be added as needed
+        const resources = [
+            {
+                uri: 'rag://stats',
+                name: 'RAG Runtime Statistics',
+                mimeType: 'application/json',
+                description: 'RAG cache, index freshness, chunk schema and expand health',
+            },
+        ];
+
+        // advertise templates as a sub-resource if any exist
+        try {
+            const templates = await workflowGenerator.listTemplates();
+            if (templates.length > 0) {
+                resources.push({
+                    uri: 'templates://',
+                    name: 'Mission Templates',
                     mimeType: 'application/json',
-                    description: 'RAG cache, index freshness, chunk schema and expand health',
-                },
-            ],
-        };
+                    description: 'List and read available mission templates via resources/templates/* methods',
+                });
+            }
+        } catch (e) {
+            // ignore errors when listing templates; this resource is optional
+            console.error('[MCP Handler] failed to enumerate templates:', e.message);
+        }
+
+        return { resources };
     },
 
     /**
@@ -224,6 +247,32 @@ const handlers = {
         }
 
         throw new Error(`Unknown resource: ${uri}`);
+    },
+
+    /**
+     * resources/templates/list - list available mission templates
+     */
+    'resources/templates/list': async () => {
+        console.error('[MCP Handler] resources/templates/list request');
+        const templates = await workflowGenerator.listTemplates();
+        return {
+            total: templates.length,
+            templates,
+        };
+    },
+
+    /**
+     * resources/templates/read - fetch a single template by id
+     * params: { id: string }
+     */
+    'resources/templates/read': async params => {
+        const { id } = params || {};
+        console.error(`[MCP Handler] resources/templates/read: ${id}`);
+        if (!id) {
+            throw new Error('Template id is required');
+        }
+        const template = await workflowGenerator.loadTemplate(id);
+        return { template };
     },
 };
 

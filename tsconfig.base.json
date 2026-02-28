@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "target": "ES2024",
+    "verbatimModuleSyntax": true,
+    "resolvePackageJsonExports": true,
+    "resolvePackageJsonImports": true,
+    "downlevelIteration": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "maxNodeModuleJsDepth": 0,
+    "baseUrl": ".",
+    "paths": {
+      "#core/*": ["src/core/*"],
+      "#shared/*": ["src/shared/*"],
+      "#nerv/*": ["src/nerv/*"],
+      "#kernel/*": ["src/kernel/*"],
+      "#driver/*": ["src/driver/*"],
+      "#agent/*": ["src/agent/*"],
+      "#infra/*": ["src/infra/*"],
+      "#integration/*": ["src/integration/*"],
+      "#types/*": ["src/types/*"],
+      "#main": ["src/main.js"],
+      "#server/*": ["src/server/*"],
+      "#logic/*": ["src/logic/*"],
+      "#orchestrator/*": ["src/orchestrator/*"],
+      "#missions/*": ["src/missions/*"],
+      "#validation/*": ["src/validation/*"]
+    }
+  }
+}

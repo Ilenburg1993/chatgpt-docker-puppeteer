@@ -311,6 +311,8 @@
         "ms-vscode.powershell" // PowerShell IntelliSense + debug
       ],
       "settings": {
+        // In DevContainer, Codex must run in-container instead of being redirected to host-side WSL.
+        "chatgpt.runCodexInWindowsSubsystemForLinux": false,
         "cSpell.enabledFileTypes": {
           "javascript": true,
           "json": true,
@@ -915,6 +917,10 @@
     "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
     "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
     "CHROME_PROXY_BIND": "${localEnv:CHROME_PROXY_BIND:0.0.0.0}",
+    // Keep Codex state consistent across terminal + extension processes in-container.
+    // Contract: this overrides the Dockerfile fallback and must match
+    // .vscode/settings.json terminal.integrated.env.linux.CODEX_HOME.
+    "CODEX_HOME": "${containerWorkspaceFolder}/.codex",
     // PORT deprecated v6.0: Use apenas SERVER_PORT
     "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
     // State & lifecycle

@@ -1,43 +1,33 @@
 {
   "version": "0.2.0",
   "configurations": [
+
     {
-      "type": "node",
+      "name": "Node: Agente (dev)",
+      "type": "pwa-node",
       "request": "launch",
-      "name": "🚀 Debug Agente (Enhanced)",
       "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": [
-        "--max-old-space-size=2048"
-      ],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
-      "autoAttachChildProcesses": true,
-      "smartStep": true,
-      "showAsyncStacks": true,
-      "trace": false,
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
       "env": {
         "NODE_ENV": "development",
         "LOG_LEVEL": "debug",
         "DEBUG": "nerv:*,kernel:*,driver:*",
         "FORCE_COLOR": "1"
       },
-      "console": "integratedTerminal",
-      "outputCapture": "std",
-      "internalConsoleOptions": "neverOpen"
+      "runtimeArgs": ["--enable-source-maps", "--max-old-space-size=2048"],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "autoAttachChildProcesses": true
     },
     {
-      "type": "node",
+      "name": "Node: Dashboard (dev)",
+      "type": "pwa-node",
       "request": "launch",
-      "name": "📊 Debug Dashboard (Enhanced)",
       "program": "${workspaceFolder}/src/server/main.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
-      "autoAttachChildProcesses": true,
-      "smartStep": true,
-      "showAsyncStacks": true,
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env",
       "env": {
         "NODE_ENV": "development",
         "PORT": "3008",
@@ -45,477 +35,102 @@
         "DEBUG": "server:*",
         "FORCE_COLOR": "1"
       },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🔧 Debug Agente (Production Mode)",
-      "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048"],
+      "runtimeArgs": ["--enable-source-maps", "--max-old-space-size=1024"],
       "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "env": {
-        "NODE_ENV": "production",
-        "LOG_LEVEL": "info"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
+      "autoAttachChildProcesses": true
     },
     {
-      "type": "node",
+      "name": "Node: Test current file",
+      "type": "pwa-node",
       "request": "launch",
-      "name": "🧠 Debug NERV Subsystem",
-      "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "nerv:*,nerv:emit:*,nerv:receive:*,nerv:buffer:*"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "⚙️ Debug Kernel Engine",
-      "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "kernel:*,execution:*,policy:*,runtime:*"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🎮 Debug Driver (ChatGPT/Gemini)",
-      "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "driver:*,puppeteer:*",
-        "PUPPETEER_HEADLESS": "false"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🌊 Debug Browser Pool",
-      "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "pool:*,connection:*,health:*"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🔧 Debug Boot Sequence",
-      "program": "${workspaceFolder}/src/main.js",
-      "runtimeArgs": ["--max-old-space-size=2048"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "stopOnEntry": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "boot:*,config:*,identity:*"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "💥 Debug Crash Recovery",
-      "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "forensics:*,recovery:*,failure:*"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🔒 Debug Lock Contention",
-      "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "lock:*,orphan:*,contention:*"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "📊 Debug Memory Profiling",
-      "program": "${workspaceFolder}/index.js",
-      "runtimeArgs": ["--max-old-space-size=2048", "--expose-gc", "--inspect-brk=9229"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "info",
-        "DEBUG": "memory:*,gc:*"
-      },
-      "console": "integratedTerminal",
-      "outputCapture": "std",
-      "port": 9229
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug Current Test File",
       "program": "${file}",
       "cwd": "${workspaceFolder}",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "debug"
-      },
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "env": { "NODE_ENV": "test", "LOG_LEVEL": "debug" },
+      "autoAttachChildProcesses": true
     },
     {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug P1 Fixes",
-      "program": "${workspaceFolder}/tests/regression/test_p1_fixes.spec.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "debug"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug P2 Fixes",
-      "program": "${workspaceFolder}/tests/regression/test_p2_fixes.spec.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "debug"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug P3 Fixes",
-      "program": "${workspaceFolder}/tests/regression/test_p3_fixes.spec.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "debug"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug P4-P5 Fixes",
-      "program": "${workspaceFolder}/tests/regression/test_p4_p5_fixes.spec.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "debug"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug Driver NERV",
-      "program": "${workspaceFolder}/tests/integration/driver/test_driver_nerv.spec.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "driver:*,nerv:*"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug Launcher Integration",
-      "program": "${workspaceFolder}/tests/integration/test_launcher_integration.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "debug"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🧪 Debug Browser Connection",
-      "program": "${workspaceFolder}/tests/integration/browser/test_connection_orchestrator.spec.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "test",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "connection:*,pool:*"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "⚡ Debug CI Validation",
-      "program": "${workspaceFolder}/scripts/validate-ci.js",
-      "runtimeArgs": ["--max-old-space-size=512"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "🌐 Debug Puppeteer Test",
-      "program": "${workspaceFolder}/test-puppeteer.js",
-      "runtimeArgs": ["--max-old-space-size=1024"],
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "env": {
-        "NODE_ENV": "development",
-        "LOG_LEVEL": "debug",
-        "DEBUG": "puppeteer:*,connection:*",
-        "PUPPETEER_HEADLESS": "false"
-      },
-      "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
+      "name": "Attach: PM2 agente (9229)",
+      "type": "pwa-node",
       "request": "attach",
-      "name": "📌 Attach to PM2 (9229)",
       "port": 9229,
       "restart": true,
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "${workspaceFolder}",
-      "sourceMaps": true,
-      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "presentation": {
-        "hidden": false,
-        "group": "attach",
-        "order": 1
-      }
-      // ⚠️  WARNING: Only use this when PM2 is running with --node-args="--inspect=0.0.0.0:9229"
-      // To start with debug: pm2 start ecosystem.config.js --node-args="--inspect=0.0.0.0:9229"
-      // To check if debug is active: curl -s http://127.0.0.1:9229/json/list
-    },
-    {
-      "type": "node",
-      "request": "attach",
-      "name": "📌 Attach to PM2 (9230)",
-      "port": 9230,
-      "restart": true,
       "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "localRoot": "${workspaceFolder}",
-      "remoteRoot": "${workspaceFolder}",
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "presentation": {
-        "hidden": false,
-        "group": "attach",
-        "order": 2
-      }
-      // ⚠️  WARNING: Only use when dashboard is running with --inspect=0.0.0.0:9230
+      "autoAttachChildProcesses": true
     },
     {
-      "type": "node",
+      "name": "Attach: Docker (9229)",
+      "type": "pwa-node",
       "request": "attach",
-      "name": "🐳 Attach to Docker (9229)",
+      "address": "localhost",
       "port": 9229,
-      "address": "localhost",
       "restart": false,
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "localRoot": "${workspaceFolder}",
-      "remoteRoot": "/app",
-      "sourceMaps": true,
-      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
-      "autoAttachChildProcesses": true,
-      "showAsyncStacks": true,
-      "presentation": {
-        "hidden": false,
-        "group": "attach",
-        "order": 3
-      }
-      // ⚠️  For standalone Docker (not DevContainer)
+      "remoteRoot": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
+      "autoAttachChildProcesses": true
     },
     {
-      "type": "node",
-      "request": "attach",
-      "name": "🐳 Attach to Docker (9230)",
-      "port": 9230,
-      "address": "localhost",
-      "restart": false,
-      "skipFiles": ["<node_internals>/**", "node_modules/**"],
-      "localRoot": "${workspaceFolder}",
-      "remoteRoot": "/app",
-      "sourceMaps": true,
-      "autoAttachChildProcesses": true,
-      "presentation": {
-        "hidden": false,
-        "group": "attach",
-        "order": 4
-      }
-      // ⚠️  For standalone Docker (not DevContainer)
-    },
-    {
-      "name": "🎨 Debug Vite Dev Server (Vue)",
-      "type": "node",
+      "name": "Vite: dashboard",
+      "type": "pwa-node",
       "request": "launch",
       "cwd": "${workspaceFolder}/src/dashboard-ui",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal",
-      "env": {
-        "NODE_ENV": "development",
-        "VITE_CJS_TRACE": "true"
-      },
-      "presentation": {
-        "hidden": false,
-        "group": "vue",
-        "order": 1
-      }
-      // Use this to debug Vite configuration issues
+      "env": { "NODE_ENV": "development" },
+      "presentation": { "group": "vue" }
     },
     {
-      "type": "chrome",
+      "name": "Chrome: Vue app",
+      "type": "pwa-chrome",
       "request": "launch",
-      "name": "🌐 Debug Vue App in Chrome",
       "url": "http://localhost:5173/dashboard/",
       "webRoot": "${workspaceFolder}/src/dashboard-ui",
       "sourceMaps": true,
-      "sourceMapPathOverrides": {
-        "/@fs/*": "${workspaceFolder}/*"
-      },
-      "presentation": {
-        "hidden": false,
-        "group": "vue",
-        "order": 2
-      },
-      "preLaunchTask": null
-      // ⚠️  Requires Vite dev server running (port 5173)
-      // ⚠️  Requires Chrome remote debugging enabled
+      "presentation": { "group": "vue" }
+    },
+    // Python agent debugging configurations
+    {
+      "name": "Debug Python Agent HTTP Server",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "localhost", "port": 5679 },
+      "preLaunchTask": "Open Agent Inspector",
+      "internalConsoleOptions": "neverOpen",
+      "postDebugTask": "Terminate All Tasks"
+    },
+    {
+      "name": "Debug Python Agent in Terminal",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "localhost", "port": 5679 },
+      "preLaunchTask": "Run Python Agent in Terminal",
+      "internalConsoleOptions": "neverOpen",
+      "postDebugTask": "Terminate All Tasks"
     }
   ],
   "compounds": [
     {
-      "name": "🚀 Full System (Agent + Dashboard)",
-      "configurations": ["🚀 Debug Agente (Enhanced)", "📊 Debug Dashboard (Enhanced)"],
+      "name": "Full system",
+      "configurations": [
+        "Node: Agente (dev)",
+        "Node: Dashboard (dev)"
+      ],
       "stopAll": true
     },
     {
-      "name": "🧪 Regression Tests (P1-P5)",
-      "configurations": ["🧪 Debug P1 Fixes", "🧪 Debug P2 Fixes", "🧪 Debug P3 Fixes", "🧪 Debug P4-P5 Fixes"],
+      "name": "Regression Tests",
+      "configurations": ["Node: Test current file"],
       "stopAll": true
     },
     {
-      "name": "🧪 Integration Tests",
-      "configurations": ["🧪 Debug Driver NERV", "🧪 Debug Launcher Integration", "🧪 Debug Browser Connection"],
-      "stopAll": true
-    },
-    {
-      "name": "🔍 Full Subsystems",
-      "configurations": ["🧠 Debug NERV Subsystem", "⚙️ Debug Kernel Engine", "🎮 Debug Driver (ChatGPT/Gemini)"],
-      "stopAll": true
-    },
-    {
-      "name": "⚡ Critical Path (Boot + NERV + Kernel)",
-      "configurations": ["🔧 Debug Boot Sequence", "🧠 Debug NERV Subsystem", "⚙️ Debug Kernel Engine"],
+      "name": "Dashboard full debug",
+      "configurations": [
+        "Vite: dashboard",
+        "Chrome: Vue app"
+      ],
       "stopAll": true
     }
   ]

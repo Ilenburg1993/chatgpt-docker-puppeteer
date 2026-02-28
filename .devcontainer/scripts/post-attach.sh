@@ -216,7 +216,6 @@ if [[ "${UX_STATE_WRITABLE}" == "true" ]]; then
             mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
         fi
         rm -f "${ATTACH_OFFSET_FILE}" 2>/dev/null || true
-        echo "DEBUG first attach, wrote base=1" >&2
     else
         base=$(cat "${ATTACH_COUNT_FILE}" 2>/dev/null || echo 0)
         offset=0
@@ -225,10 +224,8 @@ if [[ "${UX_STATE_WRITABLE}" == "true" ]]; then
         fi
         offset=$((offset + 1))
         total=$((base + offset))
-        echo "DEBUG read base=${base} offset=${offset} total=${total}" >&2
 
         if (( total % 10 == 0 )); then
-            echo "DEBUG threshold reached, updating base to ${total}" >&2
             if printf '%s\n' "${total}" > "${ATTACH_COUNT_FILE}.tmp" 2>/dev/null; then
                 mv "${ATTACH_COUNT_FILE}.tmp" "${ATTACH_COUNT_FILE}" 2>/dev/null || true
             fi
@@ -327,6 +324,7 @@ fi
 NODE_VERSION="$(node --version 2>/dev/null || echo 'não disponível')"
 NPM_VERSION="$(npm --version 2>/dev/null || echo 'não disponível')"
 NODE_PATH="$(command -v node 2>/dev/null || echo 'não encontrado')"
+NPM_PATH="$(command -v npm 2>/dev/null || echo 'não encontrado')"
 
 # ---------------------------------------------------------------------------
 # Output humano estruturado
@@ -336,6 +334,12 @@ printf "  • %-22s %s\n" "Contexto execução:"   "${EXECUTION_CONTEXT}"
 printf "  • %-22s %s\n" "Workspace (PWD):"     "${WORKSPACE_DIR}"
 printf "  • %-22s %s\n" "Projeto (root):"      "${PROJECT_ROOT}"
 printf "  • %-22s %s\n" "LD_PRELOAD:"           "${LD_PRELOAD:-<unset>}"
+if [[ "${NODE_PATH}" =~ ^/mnt/[A-Za-z]/ ]]; then
+    warn "Node.js resolve para um binário do Windows (${NODE_PATH}); prefira o Node Linux no WSL/container"
+fi
+if [[ "${NPM_PATH}" =~ ^/mnt/[A-Za-z]/ ]]; then
+    warn "npm resolve para um binário do Windows (${NPM_PATH}); isso pode quebrar Codex, npm scripts e paths UNC"
+fi
 if [[ -z "${LD_PRELOAD:-}" || ! "${LD_PRELOAD}" =~ libnss_wrapper\.so ]]; then
     warn "LD_PRELOAD does not contain libnss_wrapper.so; identity wrapper may be inactive"
 fi

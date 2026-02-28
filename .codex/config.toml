@@ -6,14 +6,39 @@
 #
 # Goal: keep good quality while reducing latency/overhead for day-to-day work.
 
-model_reasoning_effort = "medium"
+model_reasoning_effort = "high"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
 web_search = "cached"
 suppress_unstable_features_warning = true
+model = "gpt-5.3-codex"
+
+[shell_environment_policy]
+inherit = "all"
+ignore_default_excludes = true
 
 [features]
+collaboration_modes = true
+personality = true
+request_rule = true
+shell_tool = true
 shell_snapshot = true
+shell_tool_allow_bypass = true
 unified_exec = true
-apply_patch_freeform = false
+undo = true
+use_linux_sandbox_bwrap = false
+apply_patch_freeform = true
 exec_policy = true
 remote_compaction = true
-remote_models = false
+# Intentionally omitted: remote_models (obsolete/removed; caused prior Codex issues in the container)
+
+[request_rule]
+text = """
+Antes de tarefas nao triviais, priorize .github/AGENTS.md,
+.github/copilot-instructions.md e .github/instructions/project-canon.instructions.md. Se a tarefa
+casar com uma skill, procure-a em .github/skills antes de definir a abordagem. Preserve pt-BR,
+Node.js 24+ com ESM, src/main.js como bootstrap canonico, arquitetura orientada a eventos com NERV
+e a proibicao de usar puppeteer.launch() ou gerenciar browser localmente. Apos mudancas relevantes,
+rode npm run lint, npm run format:check e npm run test:unit; inclua npm run test:integration quando
+alterar driver, kernel ou server.
+"""

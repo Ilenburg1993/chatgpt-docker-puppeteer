@@ -93,7 +93,8 @@ ARG REMOTE_USER=node
 
 ENV USER_NAME="${REMOTE_USER}" \
     HOME_DIR="/home/${REMOTE_USER}" \
-    APP_DIR="/workspaces/${PROJECT_NAME}"
+    APP_DIR="/workspaces/${PROJECT_NAME}" \
+    CODEX_HOME="/workspaces/${PROJECT_NAME}/.codex"
 
 # XDG Base Directories — fonte única de verdade
 ENV XDG_CONFIG_HOME="${HOME_DIR}/.config" \
@@ -157,6 +158,7 @@ RUN apt-get update \
     libtool \
     python3 \
     python3-pip \
+    python3-venv \
     python-is-python3 \
     openssl \
     ca-certificates \
@@ -417,10 +419,12 @@ RUN chmod 0444 /etc/powershell/profile.ps1
 #
 # Finalidade:
 #   • Permitir docker CLI via socket do host (bind mount /var/run/docker.sock)
+#   • O socket real é sempre fornecido pelo runtime; a imagem não fabrica socket local.
 #   • Instalar plugins modernos: docker-compose-plugin e docker-buildx-plugin
 #
 # Segurança:
 #   • Acesso ao socket do host => privilégios elevados no host.
+#   • As políticas de mount são auditadas de forma centralizada pelos hooks do DevContainer.
 #   • Sincronização de GID é best-effort (não quebra build).
 # =============================================================================
 USER root

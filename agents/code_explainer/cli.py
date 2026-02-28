@@ -1,8 +1,23 @@
 #!/usr/bin/env python3
 import sys
+import argparse
 from rich import print
 from rich.prompt import Prompt
 from agents.code_explainer.agent import CodeExplainer
+
+# support HTTP server mode via the new top‑level wrapper
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument("--server", action="store_true", help="start HTTP server (see agents/server.py)")
+parser.add_argument("--port", type=int, default=8087, help="port for HTTP server")
+# parse only known args so we can keep interactive behaviour
+args, remaining = parser.parse_known_args()
+if args.server:
+    # defer to generic server; it will handle its own argument parsing
+    from agents import server  # imported lazily to avoid circular import
+
+    server._cli_main(["--server", f"--port={args.port}"])
+    sys.exit(0)
+
 
 
 def print_help():

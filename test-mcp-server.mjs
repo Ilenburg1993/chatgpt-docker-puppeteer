@@ -285,6 +285,46 @@ async function runTests() {
         assert(res.body.error.code === -32603, 'Should be internal error code');
     });
 
+    // new resource namespace for mission templates
+    await test('7.4 POST /api/mcp - resources/templates/list', async () => {
+        const res = await request('POST', BASE_URL, {
+            jsonrpc: '2.0',
+            id: 11,
+            method: 'resources/templates/list',
+            params: {},
+        });
+        assert(res.status === 200, `Expected 200, got ${res.status}`, res.body);
+        assert(Array.isArray(res.body.result.templates), 'templates should be array');
+        log('gray', `    Found ${res.body.result.templates.length} templates`);
+        if (res.body.result.templates.length > 0) {
+            assert(typeof res.body.result.templates[0] === 'string');
+        }
+    });
+
+    await test('7.5 POST /api/mcp - resources/templates/read', async () => {
+        const listRes = await request('POST', BASE_URL, {
+            jsonrpc: '2.0',
+            id: 12,
+            method: 'resources/templates/list',
+            params: {},
+        });
+        const templates = listRes.body.result.templates || [];
+        if (templates.length === 0) {
+            // no templates available, skip read
+            return;
+        }
+        const templateId = templates[0];
+        const readRes = await request('POST', BASE_URL, {
+            jsonrpc: '2.0',
+            id: 13,
+            method: 'resources/templates/read',
+            params: { id: templateId },
+        });
+        assert(readRes.status === 200, `Expected 200, got ${readRes.status}`, readRes.body);
+        assert(readRes.body.result.template, 'result should include template');
+        assert(readRes.body.result.template.id === templateId, 'template id should match');
+    });
+
     // ========================================================================
     // 8. Batch Requests
     // ========================================================================

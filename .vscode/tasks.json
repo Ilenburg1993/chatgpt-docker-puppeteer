@@ -1,722 +1,445 @@
 {
+  // workspace tasks for chatgpt-docker-puppeteer
+  // grouped by build, test, and utility categories.
+  // most commands delegate to Makefile targets for portability.
   "version": "2.0.0",
+  "presentation": {
+    "panel": "shared"
+  },
   "tasks": [
-    // =========================================================================
-    // 🔍 DEBUG MODE - Workspace-Wide Validation (Comprehensive Suite)
-    // =========================================================================
     {
-        "label": "🔍 Debug Mode: Full Workspace Scan",
-        "type": "shell",
-        "command": "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=stylish --max-warnings=999999",
-        "problemMatcher": [
-            "$eslint-stylish"
-        ],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "showReuseMessage": false,
-            "focus": true
-        },
-        "group": {
-            "kind": "test",
-            "isDefault": false
-        }
-    },
-    {
-        "label": "🔍 Debug Mode: Full Workspace + Stats",
-        "type": "shell",
-        "command": "bash",
-        "args": [
-            "-c",
-            "echo '=== 🔍 WORKSPACE SCAN ===' && npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=stylish --max-warnings=999999 && echo '' && echo '=== 📊 STATS ===' && echo \"Files: $(find . -name '*.js' -not -path './node_modules/*' -not -path './backups/*' -not -path './tmp/*' -not -path './dist/*' -not -path './dashboard-ui/dist/*' | wc -l)\" && echo \"Total Issues: $(npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --format=json 2>/dev/null | grep -o '\"severity\":' | wc -l)\""
-        ],
-        "problemMatcher": [
-            "$eslint-stylish"
-        ],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "showReuseMessage": false,
-            "focus": true
-        }
-    },
-    {
-        "label": "🔍 Debug Mode: Source Code Only (src/)",
-        "type": "shell",
-        "command": "npx eslint src/ --format=stylish --max-warnings=999999",
-        "problemMatcher": [
-            "$eslint-stylish"
-        ],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "focus": true
-        }
-    },
-    {
-        "label": "🔍 Debug Mode: Tests Only (tests/)",
-        "type": "shell",
-        "command": "npx eslint tests/ --format=stylish --max-warnings=999999",
-        "problemMatcher": [
-            "$eslint-stylish"
-        ],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "focus": true
-        }
-    },
-    {
-        "label": "🔍 Debug Mode: Scripts Only (scripts/)",
-        "type": "shell",
-        "command": "npx eslint scripts/ --format=stylish --max-warnings=999999",
-        "problemMatcher": [
-            "$eslint-stylish"
-        ],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "focus": true
-        }
-    },
-    {
-        "label": "🔍 Debug Mode: Errors Only (No Warnings)",
-        "type": "shell",
-        "command": "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --quiet --format=stylish",
-        "problemMatcher": [
-            "$eslint-stylish"
-        ],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "focus": true
-        }
-    },
-    {
-        "label": "📊 Debug Mode: Export JSON Report",
-        "type": "shell",
-        "command": "bash",
-        "args": [
-            "-c",
-            "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=json --output-file=eslint-report.json && echo '✅ Report saved: eslint-report.json' && wc -l eslint-report.json"
-        ],
-        "problemMatcher": [],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "focus": true
-        }
-    },
-    {
-        "label": "📊 Debug Mode: Export HTML Report",
-        "type": "shell",
-        "command": "bash",
-        "args": [
-            "-c",
-            "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**' --ignore-pattern 'analysis/**' --format=html --output-file=eslint-report.html && echo '✅ Report saved: eslint-report.html' && echo 'Open with: xdg-open eslint-report.html'"
-        ],
-        "problemMatcher": [],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "focus": true
-        }
-    },
-    {
-        "label": "🎯 Debug Mode: Master Scan (All Validations)",
-        "dependsOn": [
-            "🔍 Debug Mode: Full Workspace + Stats",
-            "Validate: JSON Files",
-            "Validate: Shell Scripts",
-            "Validate: Git Status",
-            "Validate: Node Syntax"
-        ],
-        "dependsOrder": "sequence",
-        "problemMatcher": [],
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "clear": true,
-            "focus": true
-        }
-    },
-    // =========================================================================
-    // Build & Quality (ESLint, Format, Lint)
-    // =========================================================================
-    {
-      "label": "ESLint: Fix All Files",
+      "label": "lint",
       "type": "shell",
-      "command": "npx eslint . --fix",
+      "command": "make lint",
       "problemMatcher": ["$eslint-stylish"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
+      "group": { "kind": "build", "isDefault": true }
     },
     {
-      "label": "ESLint: Check All Files",
-      "type": "shell",
-    "command": "npx eslint . --ignore-pattern 'backups/**' --ignore-pattern 'node_modules/**' --ignore-pattern 'tmp/**'",
-      "problemMatcher": ["$eslint-stylish"],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
-    },
-    {
-      "label": "Format Code (ESLint + Prettier)",
+      "label": "format",
       "type": "shell",
       "command": "make format-code",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
+      "group": "build"
+    },
+    {
+      "label": "typecheck:node",
+      "type": "shell",
+      "command": "npm run typecheck:node",
+      "problemMatcher": ["$tsc"],
+      "group": "build",
+      "detail": "typecheck do backend Node 24 + ESM"
+    },
+    {
+      "label": "typecheck:tools",
+      "type": "shell",
+      "command": "npm run typecheck:tools",
+      "problemMatcher": ["$tsc"],
+      "group": "build",
+      "detail": "typecheck de tests, scripts e ferramentas"
+    },
+    {
+      "label": "typecheck:browser",
+      "type": "shell",
+      "command": "npm run typecheck:browser",
+      "problemMatcher": ["$tsc"],
+      "group": "build",
+      "detail": "typecheck do alvo browser/dashboard"
+    },
+    {
+      "label": "typecheck:full",
+      "type": "shell",
+      "command": "npm run typecheck:full",
+      "problemMatcher": ["$tsc"],
+      "group": "build",
+      "detail": "typecheck consolidado de node, tools e browser"
+    },
+    {
+      "label": "typecheck:strict",
+      "type": "shell",
+      "command": "npm run typecheck:strict",
+      "problemMatcher": ["$tsc"],
+      "group": "build",
+      "detail": "trilha opt-in de strict mode para dominios priorizados"
+    },
+    {
+      "label": "typecheck:watch:node",
+      "type": "shell",
+      "command": "npm run typecheck:watch:node",
+      "problemMatcher": ["$tsc-watch"],
+      "group": "build",
+      "isBackground": true,
+      "detail": "watch de typecheck do backend Node"
     },
 
-    // =========================================================================
-    // Testing (Fast, Integration, All)
-    // =========================================================================
     {
-      "label": "Test: Fast (Pre-commit)",
+      "label": "test:fast",
       "type": "shell",
       "command": "make test-fast",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      }
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "Test: Integration (Full)",
+      "label": "test:integration",
       "type": "shell",
       "command": "make test-integration",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      }
+      "group": "test"
     },
     {
-      "label": "Test: All Tests",
+      "label": "test:all",
       "type": "shell",
       "command": "make test-all",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      }
+      "group": "test"
     },
 
-    // =========================================================================
-    // Health Checks (Core, Full)
-    // =========================================================================
     {
-      "label": "Health: Quick Check (Core)",
+      "label": "health:core",
       "type": "shell",
       "command": "make health-core",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "test",
+      "detail": "quick health check of core services"
     },
     {
-      "label": "Health: Full Check (4 endpoints + PM2)",
+      "label": "health:full",
       "type": "shell",
       "command": "make health",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "test",
+      "detail": "run full health diagnostics (takes longer)"
     },
 
-    // =========================================================================
-    // PM2 Lifecycle (Start, Stop, Restart, Status)
-    // =========================================================================
     {
-      "label": "PM2: Start System",
+      "label": "pm2:start",
       "type": "shell",
       "command": "make start",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "start PM2 agent (alias to npm run daemon:start)"
     },
     {
-      "label": "PM2: Stop System",
+      "label": "pm2:stop",
       "type": "shell",
       "command": "make stop",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "stop PM2 agent"
     },
     {
-      "label": "PM2: Restart System",
+      "label": "pm2:restart",
       "type": "shell",
       "command": "make restart",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "restart PM2 agent"
     },
     {
-      "label": "PM2: Show Status",
+      "label": "pm2:status",
       "type": "shell",
       "command": "make status",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "show PM2 process status"
     },
     {
-      "label": "PM2: Monitor (Dashboard)",
+      "label": "pm2:monitor",
       "type": "shell",
-      "command": "make pm2-monit",
+      "command": "make monit",
       "isBackground": true,
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": true
-      }
+      "detail": "start PM2 dashboard (alias 'monit' target in Makefile)"
     },
 
-    // =========================================================================
-    // Logs & Monitoring
-    // =========================================================================
     {
-      "label": "Logs: Follow (Real-time)",
+      "label": "logs:follow",
       "type": "shell",
       "command": "make logs",
       "isBackground": true,
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": false
-      }
+      "group": "none",
+      "detail": "tail the logs continuously"
     },
     {
-      "label": "Logs: Watch (Filtered)",
+      "label": "test:watch",
       "type": "shell",
-      "command": "make watch",
+      "command": "make test-watch",
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "group": "test",
       "isBackground": true,
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": false
-      }
+      "detail": "watch unit tests (invokes npm run test:watch via Makefile)"
     },
 
-    // =========================================================================
-    // Queue Operations
-    // =========================================================================
     {
-      "label": "Queue: Show Status",
+      "label": "queue:status",
       "type": "shell",
       "command": "make queue",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "display current task queue"
     },
     {
-      "label": "Queue: Watch Status (Live)",
+      "label": "queue:flow",
       "type": "shell",
-      "command": "make queue-watch",
+      "command": "make queue-flow",
       "isBackground": true,
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": false
-      }
+      "group": "none",
+      "detail": "launch the queue flow manager (interactive)"
     },
     {
-      "label": "Queue: Add Task",
+      "label": "queue:clean",
       "type": "shell",
-      "command": "make queue-add",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
+      "command": "make queue-clean",
+      "group": "none",
+      "detail": "clear all tasks from the queue"
+    },
+    {
+      "label": "queue:add",
+      "type": "shell",
+      "command": "make queue-add"
     },
 
-    // =========================================================================
-    // Git Workflows (Safe Push, Changed Files)
-    // =========================================================================
     {
-      "label": "Git: Safe Push (5-step validation)",
+      "label": "git:safe-push",
       "type": "shell",
       "command": "make git-push-safe",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "run pre-push validation checks defined in Makefile"
     },
     {
-      "label": "Git: Show Changed Files",
+      "label": "git:changed",
       "type": "shell",
       "command": "make git-changed",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "show changed files ready for commit"
     },
 
-    // =========================================================================
-    // Dependencies Management
-    // =========================================================================
     {
-      "label": "Dependencies: Check Consistency",
+      "label": "deps:check",
       "type": "shell",
       "command": "make deps-consistency",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "verify package dependency consistency"
     },
     {
-      "label": "Dependencies: Install",
+      "label": "deps:install",
       "type": "shell",
       "command": "make install-deps",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "install project dependencies via Makefile wrapper"
     },
     {
-      "label": "Dependencies: Check Outdated",
+      "label": "deps:update",
       "type": "shell",
       "command": "make update-deps",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "group": "none",
+      "detail": "check for outdated dependencies"
     },
 
-    // =========================================================================
-    // Maintenance & Diagnostics
-    // =========================================================================
     {
-      "label": "Clean: Remove Logs & Temp Files",
+      "label": "clean",
       "type": "shell",
-      "command": "make clean",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "command": "make clean"
     },
     {
-      "label": "Diagnostics: Run Full Report",
+      "label": "diagnose",
       "type": "shell",
-      "command": "make diagnose",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
+      "command": "make diagnose"
     },
     {
-      "label": "Backup: Create Backup",
+      "label": "backup",
       "type": "shell",
-      "command": "make backup",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "command": "make backup"
     },
 
-    // =========================================================================
-    // System Information
-    // =========================================================================
     {
-      "label": "Info: Show System Information",
+      "label": "info",
       "type": "shell",
-      "command": "make info",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "command": "make info"
     },
     {
-      "label": "Info: Show Version",
+      "label": "version",
       "type": "shell",
-      "command": "make version",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "command": "make version"
     },
     {
-      "label": "Info: Check Dependencies",
+      "label": "check-deps",
       "type": "shell",
-      "command": "make check-deps",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "clear": true
-      }
+      "command": "make check-deps"
     },
 
-    // =========================================================================
-    // Compound Workflows
-    // =========================================================================
     {
-      "label": "Workflow: Pre-Commit Check",
+      "label": "validate:json",
+      "type": "shell",
+      "command": "node -e \"const fs=require('fs'),path=require('path');const files=['package.json','config.json','controle.json','dynamic_rules.json','ecosystem.config.js'];let errs=0;files.forEach(f=>{if(!fs.existsSync(f))return;try{JSON.parse(fs.readFileSync(f));console.log('✓',f);}catch(e){console.error(path.resolve(f)+':1:'+e.message);errs++;}});process.exit(errs);\"",
+      "problemMatcher": {
+        "owner": "json-validator",
+        "source": "json",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.+):(\\d+): (.+)$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        }
+      },
+      "group": "test",
+      "detail": "verify that critical JSON files parse correctly"
+    },
+    {
+      "label": "validate:shell",
+      "type": "shell",
+      "command": "bash -c \"if command -v shellcheck >/dev/null 2>&1; then find . -name '*.sh' -not -path './node_modules/*' -not -path './backups/*' -exec shellcheck -f gcc {} +; else echo 'ShellCheck not installed'; fi\"",
+      "problemMatcher": {
+        "owner": "shellcheck",
+        "source": "shellcheck",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.+)\\s+\\[(.+)\\]$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5,
+          "code": 6
+        }
+      },
+      "group": "test",
+      "detail": "lint shell scripts using shellcheck"
+    },
+    {
+      "label": "validate:git",
+      "type": "shell",
+      "command": "git diff --check",
+      "problemMatcher": {
+        "owner": "git",
+        "source": "git",
+        "fileLocation": "relative",
+        "pattern": {
+          "regexp": "^(.+):(\\d+): (.+)$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        }
+      },
+      "group": "test",
+      "detail": "run git diff checker for whitespace errors"
+    },
+    {
+      "label": "validate:node",
+      "type": "shell",
+      "command": "bash -c 'errors=0; for file in $(find src tests -name \"*.js\" 2>/dev/null); do node --check \"$file\" 2>&1 | grep -v \"Debugger\" && ((errors++)); done; exit $errors'",
+      "problemMatcher": {
+        "owner": "node-syntax",
+        "source": "node",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.+):(\\d+)$",
+          "file": 1,
+          "line": 2,
+          "message": 0
+        }
+      },
+      "group": "test",
+      "detail": "check JS syntax across src and tests"
+    },
+    {
+      "label": "validate:all",
       "dependsOn": [
-        "Format Code (ESLint + Prettier)",
-        "Test: Fast (Pre-commit)",
-        "Health: Quick Check (Core)"
+        "lint",
+        "test:fast",
+        "health:core",
+        "git:changed",
+        "validate:json",
+        "validate:shell",
+        "validate:git",
+        "validate:node"
       ],
       "dependsOrder": "sequence",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
+      "group": "test",
+      "detail": "run a suite of linting/validation checks in order"
+    },
+    // Python agent debug/inspector tasks
+    {
+      "label": "Validate Python Debug Prerequisites",
+      "type": "aitk",
+      "command": "debug-check-prerequisites",
+      "args": {
+        "portOccupancy": [
+          5679,
+          8087
+        ]
       }
     },
     {
-      "label": "Workflow: Full CI Check",
+      "label": "Run Python Agent HTTP Server",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m debugpy --listen 127.0.0.1:5679 -m agentdev run agents/server.py --verbose --port 8087 -- --server",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "dependsOn": [
-        "Dependencies: Check Consistency",
-        "ESLint: Check All Files",
-        "Test: All Tests",
-        "Health: Full Check (4 endpoints + PM2)"
+        "Validate Python Debug Prerequisites"
       ],
-      "dependsOrder": "sequence",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
+      "problemMatcher": {
+        "pattern": [
+          {
+            "regexp": "^.*$",
+            "file": 0,
+            "location": 1,
+            "message": 2
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Application startup complete|running on|Started server process"
+        }
       }
     },
     {
-      "label": "Workflow: Start & Monitor",
-      "dependsOn": [
-        "PM2: Start System"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": [],
+      "label": "Open Agent Inspector",
+      "type": "shell",
+      "command": "echo '${input:openAgentInspector}'",
       "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
+        "reveal": "never"
+      },
+      "dependsOn": [
+        "Run Python Agent HTTP Server"
+      ]
+    },
+    {
+      "label": "Run Python Agent in Terminal",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m debugpy --listen 127.0.0.1:5679 -m agentdev run agents/server.py --cli",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": {
+        "pattern": [
+          {
+            "regexp": "^.*$",
+            "file": 0,
+            "location": 1,
+            "message": 2
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Application startup complete|running on|Started server process"
+        }
       }
     },
-    // =========================================================================
-    // VALIDATION TASKS (Maximiza uso da aba Problems)
-    // =========================================================================
     {
-        "label": "🔍 Validate All: Complete Workspace Check",
-        "type": "shell",
-        "command": "echo",
-        "args": [
-            "✅ Running comprehensive validation across all tools..."
-        ],
-        "dependsOn": [
-            "Validate: JSON Files",
-            "Validate: Shell Scripts",
-            "Validate: Git Status",
-            "Validate: Node Syntax"
-        ],
-        "dependsOrder": "parallel",
-        "problemMatcher": [],
-        "group": {
-            "kind": "test",
-            "isDefault": false
-        },
-        "presentation": {
-            "reveal": "always",
-            "panel": "dedicated",
-            "showReuseMessage": false,
-            "clear": true
-        }
+      "label": "Terminate All Tasks",
+      "command": "echo ${input:terminate}",
+      "type": "shell",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "openAgentInspector",
+      "type": "command",
+      "command": "ai-mlstudio.openTestTool",
+      "args": { "triggeredFrom": "tasks", "port": 8087 }
     },
     {
-        "label": "Validate: JSON Files",
-        "type": "shell",
-        "command": "node",
-        "args": [
-            "-e",
-            "const fs=require('fs');const path=require('path');const files=['package.json','config.json','controle.json','dynamic_rules.json','ecosystem.config.js'];let errors=0;files.forEach(f=>{if(!fs.existsSync(f))return;try{const content=fs.readFileSync(f,'utf8');if(f.endsWith('.json'))JSON.parse(content);console.log(`✓ ${f}`)}catch(e){console.error(`${path.resolve(f)}:1: ${e.message}`);errors++}});process.exit(errors)"
-        ],
-        "problemMatcher": {
-            "owner": "json-validator",
-            "source": "json",
-            "fileLocation": "absolute",
-            "pattern": {
-                "regexp": "^(.+):(\\d+): (.+)$",
-                "file": 1,
-                "line": 2,
-                "message": 3
-            }
-        },
-        "presentation": {
-            "reveal": "silent",
-            "panel": "shared"
-        }
-    },
-    {
-        "label": "Validate: Shell Scripts",
-        "type": "shell",
-        "command": "bash",
-        "args": [
-            "-c",
-            "if command -v shellcheck >/dev/null 2>&1; then find . -name '*.sh' -not -path './node_modules/*' -not -path './backups/*' -exec shellcheck -f gcc {} +; else echo 'ShellCheck not installed (optional)'; fi"
-        ],
-        "problemMatcher": {
-            "owner": "shellcheck",
-            "source": "shellcheck",
-            "fileLocation": "absolute",
-            "pattern": {
-                "regexp": "^(.+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.+)\\s+\\[(.+)\\]$",
-                "file": 1,
-                "line": 2,
-                "column": 3,
-                "severity": 4,
-                "message": 5,
-                "code": 6
-            }
-        },
-        "presentation": {
-            "reveal": "silent",
-            "panel": "shared"
-        }
-    },
-    {
-        "label": "Validate: Git Status",
-        "type": "shell",
-        "command": "git",
-        "args": [
-            "diff",
-            "--check"
-        ],
-        "problemMatcher": {
-            "owner": "git",
-            "source": "git",
-            "fileLocation": "relative",
-            "pattern": {
-                "regexp": "^(.+):(\\d+): (.+)$",
-                "file": 1,
-                "line": 2,
-                "message": 3
-            }
-        },
-        "presentation": {
-            "reveal": "silent",
-            "panel": "shared"
-        }
-    },
-    {
-        "label": "Validate: Node Syntax",
-        "type": "shell",
-        "command": "bash",
-        "args": [
-            "-c",
-            "errors=0; for file in $(find src tests -name '*.js' 2>/dev/null); do node --check \"$file\" 2>&1 | grep -v 'Debugger' && ((errors++)); done; exit $errors"
-        ],
-        "problemMatcher": {
-            "owner": "node-syntax",
-            "source": "node",
-            "fileLocation": "absolute",
-            "pattern": {
-                "regexp": "^(.+):(\\d+)$",
-                "file": 1,
-                "line": 2,
-                "message": 0
-            }
-        },
-        "presentation": {
-            "reveal": "silent",
-            "panel": "shared"
-        }
-    },
-    {
-        "label": "Validate: Package Dependencies",
-        "type": "shell",
-        "command": "npm",
-        "args": [
-            "audit",
-            "--audit-level=moderate"
-        ],
-        "problemMatcher": [],
-        "presentation": {
-            "reveal": "silent",
-            "panel": "shared"
-        }
+      "id": "terminate",
+      "type": "command",
+      "command": "workbench.action.tasks.terminate",
+      "args": "terminateAll"
     }
   ]
 }

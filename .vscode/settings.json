@@ -1,13 +1,14 @@
-// =============================================================================
+// ===========================================================================
 // VS Code — Workspace settings (JSONC)
-// REORGANIZADO POR FASES / SUBFASES — SEM ALTERAR NENHUMA CONFIGURAÇÃO
-// =============================================================================
-// Nota: valores, chaves e payloads foram preservados; apenas reordenação + comentários.
-// =============================================================================
+// Organizado por fases e subfases sem alterar os valores efetivos.
+// Contrato: apenas reordenacao, melhor documentacao e agrupamento semantico.
+// ===========================================================================
 {
   // ===========================================================================
-  // FASE 00) OVERRIDES POR LINGUAGEM (FORMATTER / CODELENS / QUICK SUGGEST)
+  // FASE 00) OVERRIDES POR LINGUAGEM
+  // Formatters, CodeLens e sugestoes especificas por linguagem.
   // ===========================================================================
+  // Subfase 00.1) Scopes de linguagem
   "[css]": {
     "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
   },
@@ -61,130 +62,55 @@
   "[vue]": {
     "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
   },
+
   // ===========================================================================
-  // FASE 01) IDENTIDADE / TOOLCHAIN BASE / EXPERIMENTOS DE UPGRADE
+  // FASE 01) IDENTIDADE / TOOLCHAIN BASE / SINAIS GLOBAIS
+  // Flags-base do workspace e pistas de navegacao globais.
   // ===========================================================================
+  // Subfase 01.1) Flags base
   "appmod.experimental.task.typescript.upgrade": true,
+  // Subfase 01.2) Breadcrumbs
   "breadcrumbs.enabled": true,
   "breadcrumbs.filePath": "on",
   "breadcrumbs.symbolPath": "last",
+
   // ===========================================================================
-  // FASE 19) IA / CHAT / COPILOT / MCP / INLINE CHAT / EXTENSÕES
+  // FASE 02) ARQUIVOS / ENCODING / AUTOSAVE / INTEGRIDADE
+  // Comportamento de leitura, salvamento e higiene de arquivos.
   // ===========================================================================
-  "chat.agent.enabled": true,
-  "chat.agent.maxRequests": 250,
-  "chat.agent.thinking.collapsedTools": "always",
-  "chat.agent.thinkingStyle": "fixedScrolling",
-  "chat.agentsControl.clickBehavior": "cycle",
-  "chat.agentsControl.enabled": true,
-  "chat.agentSessionProjection.enabled": true,
-  "chat.agentSkillsLocations": {
-    ".github/skills": true
+  // Subfase 02.1) Arquivos e encoding
+  "files.associations": {},
+  "files.autoGuessEncoding": true,
+  "files.autoSave": "onFocusChange",
+  "files.autoSaveDelay": 1000,
+  "files.encoding": "utf8",
+  "files.eol": "\n",
+  "files.hotExit": "onExitAndWindowClose",
+  "files.insertFinalNewline": true,
+  "files.refactoring.autoSave": true,
+  "files.restoreUndoStack": true,
+  "files.saveConflictResolution": "overwriteFileOnDisk",
+  "files.simpleDialog.enable": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+  "files.watcherExclude": {
+    "**/.venv/**": true,
+    "**/.codex/sessions/**": true,
+    "**/.codex/shell_snapshots/**": true,
+    "**/.codex/tmp/**": true,
+    "**/__pycache__/**": true,
+    "**/.pytest_cache/**": true,
+    "**/.mypy_cache/**": true,
+    "**/.ruff_cache/**": true
   },
-  "chat.checkpoints.showFileChanges": true,
-  "chat.customAgentInSubagent.enabled": true,
-  "chat.useAgentsMdFile": true,
-  "chat.instructionsFilesLocations": [".github/instructions"],
-  "chat.includeApplyingInstructions": true,
-  "chat.includeReferencedInstructions": true,
-  "chat.editing.autoAcceptDelay": 3,
-  "chat.editing.explainChanges.enabled": true,
-  "chat.editMode.hidden": false,
-  "chat.editor.wordWrap": "on",
-  "chat.edits2.enabled": true,
-  "chat.experimental.useSkillAdherencePrompt": true,
-  "chat.math.enabled": true,
-  "chat.mcp.access": true,
-  "chat.mcp.assisted.nuget.enabled": true,
-  "chat.mcp.discovery.enabled": {
-    "claude-desktop": true,
-    "windsurf": true,
-    "cursor-global": true,
-    "cursor-workspace": true
-  },
-  "chat.mcp.gallery.enabled": true,
-  "chat.mcp.serverSampling": {
-    "chatgpt-docker-puppeteer/.vscode/mcp.json: chatgpt-docker-puppeteer": {
-      "allowedModels": [
-        "copilot/auto",
-        "copilot/claude-sonnet-4.5",
-        "copilot/gpt-5-mini",
-        "copilot/gpt-5.2-codex",
-        "copilot/grok-code-fast-1",
-        "copilot/oswe-vscode-prime",
-        "copilot/claude-haiku-4.5",
-        "copilot/claude-opus-4.6",
-        "copilot/gemini-3-flash-preview",
-        "copilot/gemini-3-pro-preview",
-        "copilot/gpt-5.3-codex",
-        "copilot/Raptor mini (Preview)"
-      ]
-    },
-    "chatgpt-docker-puppeteer/.vscode/mcp.json: context7": {
-      "allowedModels": [
-        "copilot/auto",
-        "copilot/claude-opus-4.5",
-        "copilot/claude-opus-4.6",
-        "copilot/claude-sonnet-4",
-        "copilot/claude-sonnet-4.5",
-        "copilot/gpt-5-mini",
-        "copilot/gemini-3-flash-preview",
-        "copilot/gemini-3-pro-preview",
-        "copilot/gpt-5.3-codex",
-        "copilot/grok-code-fast-1",
-        "copilot/Raptor mini (Preview)"
-      ]
-    }
-  },
-  "chat.renderRelatedFiles": true,
-  "chat.tips.enabled": true,
-  "chat.tools.global.autoApprove": true,
-  "chat.tools.terminal.autoReplyToPrompts": true,
-  "chat.tools.terminal.blockDetectedFileWrites": "never",
-  "chat.tools.terminal.enableAutoApprove": true,
-  "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
-  "chat.tools.terminal.sandbox.enabled": false,
-  "chat.unifiedAgentsBar.enabled": true,
-  "chat.useAgentSkills": true,
-  "chat.viewSessions.enabled": true,
-  "chatgpt.runCodexInWindowsSubsystemForLinux": true,
-  "claude-code.autoCloseDiffTabs": true,
-  "claude-code.autosave": true,
-  "claude-code.selectedModel": "sonnet",
-  "claude-code.useTerminal": true,
-  "claudeCode.allowDangerouslySkipPermissions": true,
-  "claudeCodeChat.permissions.yoloMode": true,
-  "cSpell.enabled": false,
-  "cSpell.language": "en,pt-BR",
-  "debug.focusEditorOnBreak": true,
-  "debug.inlineValues": "on",
-  "debug.showBreakpointsInOverviewRuler": true,
-  "debug.showInlineBreakpointCandidates": true,
-  "debug.toolBarLocation": "docked",
+
   // ===========================================================================
-  // FASE 14) DEV CONTAINERS / REMOTE / SSH / PORTS
+  // FASE 03) EDITOR — BASE / FORMATACAO / SAVE PIPELINE
+  // Configuracoes estruturais do editor e pipeline de escrita.
   // ===========================================================================
-  "dev.containers.defaultExtensions": [],
-  "dev.containers.executeInWSL": true,
-  "dev.containers.gpuAvailability": "none",
-  // ===========================================================================
-  // FASE 08) DIFF EDITOR
-  // ===========================================================================
-  "diffEditor.codeLens": true,
-  "diffEditor.diffAlgorithm": "advanced",
-  "diffEditor.experimental.showMoves": true,
-  "diffEditor.ignoreTrimWhitespace": true,
-  "diffEditor.maxComputationTime": 0,
-  "diffEditor.maxFileSize": 100,
-  "diffEditor.renderIndicators": true,
-  "diffEditor.renderMarginRevertIcon": true,
-  "diffEditor.renderSideBySide": true,
-  "diffEditor.wordWrap": "on",
+  // Subfase 03.1) Base e formatacao
   "editor.acceptSuggestionOnCommitCharacter": true,
   "editor.acceptSuggestionOnEnter": "off",
-  "editor.bracketPairColorization.enabled": true,
-  "editor.bracketPairColorization.independentColorPoolPerBracketType": true,
-  // Code Actions (Save / Focus)
   "editor.codeActions.triggerOnFocusChange": true,
   "editor.codeActionsOnSave": {
     "source.fixAll": "always",
@@ -193,70 +119,33 @@
     "source.organizeLinkDefinitions": "always",
     "source.sort.json": "always"
   },
-  // ===========================================================================
-  // FASE 07) CODELENS / BREADCRUMBS / OUTLINE
-  // ===========================================================================
-  "editor.codeLens": true,
-  // ===========================================================================
-  // FASE 04) EDITOR — UX (CURSOR / SCROLL / RENDER / GUIAS)
-  // ===========================================================================
-  "editor.cursorBlinking": "smooth",
-  "editor.cursorSmoothCaretAnimation": "on",
-  // ===========================================================================
-  // FASE 03) EDITOR — BASE (FORMATAÇÃO / SAVE PIPELINE / INDENTAÇÃO)
-  // ===========================================================================
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.detectIndentation": true,
-  // Treesitter prefer (editor)
   "editor.experimental.preferTreeSitter.typescript": true,
-  // ===========================================================================
-  // FASE 06) EDITOR — NAVEGAÇÃO / FOLDING / OCCURRENCES / WORD WRAP
-  // ===========================================================================
-  "editor.folding": true,
-  "editor.foldingHighlight": true,
-  "editor.foldingMaximumRegions": 5000,
-  "editor.foldingStrategy": "auto",
   "editor.formatOnPaste": true,
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",
   "editor.formatOnType": false,
-  // Go-to behavior
-  "editor.gotoLocation.alternativeImplementationCommand": "editor.action.peekImplementation",
-  "editor.gotoLocation.alternativeReferenceCommand": "editor.action.referenceSearch.trigger",
-  "editor.gotoLocation.alternativeTypeDefinitionCommand": "editor.action.peekImplementation",
-  "editor.gotoLocation.multipleDefinitions": "peek",
-  "editor.gotoLocation.multipleReferences": "goto",
+  "editor.insertSpaces": true,
+  "editor.tabSize": 4,
+
+  // ===========================================================================
+  // FASE 04) EDITOR — UX / RENDER / CURSOR / MINIMAP
+  // Ajustes visuais e ergonomicos do editor.
+  // ===========================================================================
+  // Subfase 04.1) Cursor e renderizacao
+  "editor.bracketPairColorization.enabled": true,
+  "editor.bracketPairColorization.independentColorPoolPerBracketType": true,
+  "editor.cursorBlinking": "smooth",
+  "editor.cursorSmoothCaretAnimation": "on",
   "editor.guides.bracketPairs": "active",
   "editor.guides.highlightActiveIndentation": true,
   "editor.guides.indentation": true,
-  "editor.inlayHints.padding": true,
-  "editor.inlineCompletionsAccessibilityVerbose": true,
-  // ===========================================================================
-  // FASE 05) EDITOR — SUGGEST / INTELLISENSE / INLINE / LIGHTBULB
-  // ===========================================================================
-  "editor.inlineSuggest.enabled": true,
-  "editor.inlineSuggest.minShowDelay": 300,
-  "editor.inlineSuggest.suppressSuggestions": false,
-  "editor.inlineSuggest.syntaxHighlightingEnabled": true,
-  "editor.insertSpaces": true,
-  "editor.largeFileOptimizations": true,
-  "editor.lightbulb.enabled": "on",
-  "editor.linkedEditing": true,
-  "editor.matchBrackets": "always",
-  // Sticky scroll / minimap
   "editor.minimap.enabled": true,
   "editor.minimap.maxColumn": 120,
   "editor.minimap.renderCharacters": false,
   "editor.minimap.showSlider": "always",
   "editor.mouseWheelZoom": true,
-  "editor.occurrencesHighlight": "singleFile",
-  "editor.occurrencesHighlightDelay": 100,
-  "editor.quickSuggestions": {
-    "comments": "off",
-    "other": "off",
-    "strings": "off"
-  },
-  "editor.quickSuggestionsDelay": 100,
   "editor.renderControlCharacters": true,
   "editor.renderLineHighlight": "all",
   "editor.renderWhitespace": "boundary",
@@ -264,13 +153,32 @@
     100,
     120
   ],
-  "editor.selectionHighlight": false,
-  "editor.showFoldingControls": "always",
   "editor.smoothScrolling": true,
-  "editor.snippetSuggestions": "bottom",
   "editor.stickyScroll.defaultModel": "outlineModel",
   "editor.stickyScroll.enabled": false,
   "editor.stickyScroll.maxLineCount": 5,
+
+  // ===========================================================================
+  // FASE 05) EDITOR — SUGESTOES / INTELLISENSE / INLINE
+  // Completions, hints e experiencia de assistencia inline.
+  // ===========================================================================
+  // Subfase 05.1) Sugestoes e inline
+  "editor.inlayHints.padding": true,
+  "editor.inlineCompletionsAccessibilityVerbose": true,
+  "editor.inlineSuggest.enabled": true,
+  "editor.inlineSuggest.minShowDelay": 300,
+  "editor.inlineSuggest.suppressSuggestions": false,
+  "editor.inlineSuggest.syntaxHighlightingEnabled": true,
+  "editor.largeFileOptimizations": true,
+  "editor.lightbulb.enabled": "on",
+  "editor.linkedEditing": true,
+  "editor.quickSuggestions": {
+    "comments": "off",
+    "other": "off",
+    "strings": "off"
+  },
+  "editor.quickSuggestionsDelay": 100,
+  "editor.snippetSuggestions": "bottom",
   "editor.suggest.filterGraceful": true,
   "editor.suggest.localityBonus": true,
   "editor.suggest.matchOnWordStartOnly": false,
@@ -282,18 +190,69 @@
   "editor.suggest.showStatusBar": true,
   "editor.suggestOnTriggerCharacters": true,
   "editor.tabCompletion": "on",
-  "editor.tabSize": 4,
   "editor.wordBasedSuggestions": "offWithInlineSuggestions",
   "editor.wordBasedSuggestionsMode": "currentDocument",
+
+  // ===========================================================================
+  // FASE 06) EDITOR — NAVEGACAO / FOLDING / MATCHING
+  // Navegacao, dobragem e comportamento de leitura.
+  // ===========================================================================
+  // Subfase 06.1) Navegacao e estrutura
+  "editor.folding": true,
+  "editor.foldingHighlight": true,
+  "editor.foldingMaximumRegions": 5000,
+  "editor.foldingStrategy": "auto",
+  "editor.gotoLocation.alternativeImplementationCommand": "editor.action.peekImplementation",
+  "editor.gotoLocation.alternativeReferenceCommand": "editor.action.referenceSearch.trigger",
+  "editor.gotoLocation.alternativeTypeDefinitionCommand": "editor.action.peekImplementation",
+  "editor.gotoLocation.multipleDefinitions": "peek",
+  "editor.gotoLocation.multipleReferences": "goto",
+  "editor.matchBrackets": "always",
+  "editor.occurrencesHighlight": "singleFile",
+  "editor.occurrencesHighlightDelay": 100,
+  "editor.selectionHighlight": false,
+  "editor.showFoldingControls": "always",
   "editor.wordWrap": "on",
   "editor.wordWrapColumn": 120,
   "editor.wrappingIndent": "indent",
+
+  // ===========================================================================
+  // FASE 07) CODELENS / OUTLINE / SINAIS DE LEITURA
+  // Sinais auxiliares de leitura e navegacao estrutural.
+  // ===========================================================================
+  // Subfase 07.1) CodeLens e outline
+  "editor.codeLens": true,
+  "geminicodeassist.outlines.automaticOutlineGeneration": true,
+  "gitlens.codeLens.enabled": true,
+  "outline.showFiles": true,
+  "outline.showFunctions": true,
+  "outline.showModules": false,
+  "outline.showVariables": false,
+
+  // ===========================================================================
+  // FASE 08) DIFF EDITOR
+  // Ajustes do editor de diff e comparacao.
+  // ===========================================================================
+  // Subfase 08.1) Diff
+  "diffEditor.codeLens": true,
+  "diffEditor.diffAlgorithm": "advanced",
+  "diffEditor.experimental.showMoves": true,
+  "diffEditor.ignoreTrimWhitespace": true,
+  "diffEditor.maxComputationTime": 0,
+  "diffEditor.maxFileSize": 100,
+  "diffEditor.renderIndicators": true,
+  "diffEditor.renderMarginRevertIcon": true,
+  "diffEditor.renderSideBySide": true,
+  "diffEditor.wordWrap": "on",
+
+  // ===========================================================================
+  // FASE 09) ESLINT / LINTING
+  // Regras e execucao do ESLint no workspace.
+  // ===========================================================================
+  // Subfase 09.1) ESLint
   "eslint.alwaysShowStatus": false,
   "eslint.codeActionsOnSave.mode": "problems",
   "eslint.debug": false,
-  // ===========================================================================
-  // FASE 09) ESLINT / LINTING
-  // ===========================================================================
   "eslint.enable": true,
   "eslint.format.enable": true,
   "eslint.lintTask.enable": true,
@@ -327,98 +286,12 @@
       "mode": "auto"
     }
   ],
+
   // ===========================================================================
-  // FASE 02) ARQUIVOS / ENCODING / AUTOSAVE / INTEGRIDADE
+  // FASE 10) JAVASCRIPT — LANGUAGE FEATURES
+  // Preferencias e inteligencia especificas de JavaScript.
   // ===========================================================================
-  "files.associations": { /* intact */},
-  "files.autoGuessEncoding": true,
-  "files.autoSave": "onFocusChange",
-  "files.autoSaveDelay": 1000,
-  "files.encoding": "utf8",
-  "files.eol": "\n",
-  "files.hotExit": "onExitAndWindowClose",
-  "files.insertFinalNewline": true,
-  "files.refactoring.autoSave": true,
-  "files.restoreUndoStack": true,
-  "files.saveConflictResolution": "overwriteFileOnDisk",
-  "files.simpleDialog.enable": true,
-  "files.trimFinalNewlines": true,
-  "files.trimTrailingWhitespace": true,
-  "files.watcherExclude": { /* intact */},
-  "geminicodeassist.outlines.automaticOutlineGeneration": true,
-  "git.autofetch": false,
-  "git.branchProtection": [
-    "main",
-    "master"
-  ],
-  "git.confirmSync": false,
-  "git.enableSmartCommit": true,
-  "git.fetchOnPull": true,
-  "git.followTagsWhenSync": true,
-  "git.ignoreLimitWarning": true,
-  "git.mergeEditor": true,
-  "git.openRepositoryInParentFolders": "always",
-  "git.pruneOnFetch": true,
-  "git.showProgress": true,
-  "git.timeline.showUncommitted": true,
-  "git.untrackedChanges": "separate",
-  "github.copilot.advanced": { /* intact */},
-  "github.copilot.chat.advanced.workspace.codeSearchExternalIngest.enabled": true,
-  "github.copilot.chat.agent.autoFix": true,
-  "github.copilot.chat.agent.thinkingTool": true,
-  "github.copilot.chat.anthropic.contextEditing.enabled": true,
-  "github.copilot.chat.anthropic.thinking.budgetTokens": 32000,
-  "github.copilot.chat.anthropic.tools.websearch.enabled": true,
-  "github.copilot.chat.anthropic.tools.websearch.maxUses": 10,
-  "github.copilot.chat.anthropic.toolSearchTool.enabled": true,
-  "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
-  "github.copilot.chat.claudeAgent.enabled": true,
-  "github.copilot.chat.codesearch.enabled": true,
-  "github.copilot.chat.copilotMemory.enabled": true,
-  "github.copilot.chat.customAgents.showOrganizationAndEnterpriseAgents": true,
-  "github.copilot.chat.generateTests.codeLens": true,
-  "github.copilot.chat.githubMcpServer.enabled": true,
-  "github.copilot.chat.languageContext.fix.typescript.enabled": true,
-  "github.copilot.chat.languageContext.inline.typescript.enabled": true,
-  "github.copilot.chat.languageContext.typescript.cacheTimeout": 800,
-  "github.copilot.chat.languageContext.typescript.enabled": true,
-  "github.copilot.chat.languageContext.typescript.includeDocumentation": true,
-  "github.copilot.chat.localeOverride": "pt-br",
-  "github.copilot.chat.newWorkspace.useContext7": true,
-  "github.copilot.chat.newWorkspaceCreation.enabled": true,
-  "github.copilot.chat.responsesApiReasoningEffort": "high",
-  "github.copilot.chat.reviewSelection.enabled": true,
-  "github.copilot.chat.reviewSelection.instructions": "Selecione o código que deseja revisar e pressione Ctrl+Enter para enviar ao Copilot Chat.",
-  "github.copilot.chat.reviewSelection.instructions.pt-br": "Selecione o código que deseja revisar e pressione Ctrl+Enter para enviar ao Copilot Chat.",
-  "github.copilot.chat.summarizeAgentConversationHistory.enabled": true,
-  "github.copilot.chat.switchAgent.enabled": true,
-  "github.copilot.chat.tools.memory.enabled": true,
-  "github.copilot.chat.virtualTools.threshold": 128,
-  "github.copilot.chat.welcomeMessage": "once",
-  "github.copilot.editor.enableAutoCompletions": true,
-  "github.copilot.enable": {
-    "*": true,
-    "javascript": true,
-    "json": true,
-    "markdown": true,
-    "plaintext": false
-  },
-  "github.copilot.inlineSuggest.enable": true,
-  "github.copilot.nextEditSuggestions.enabled": true,
-  "github.copilot.selectedCompletionModel": "",
-  "githubIssues.assignWhenWorking": true,
-  "gitlens.codeLens.enabled": true,
-  "inlineChat.affordance": "editor",
-  "inlineChat.defaultModel": "Raptor mini (Preview) (copilot)",
-  "inlineChat.enableV2": true,
-  "inlineChat.finishOnType": true,
-  "inlineChat.lineEmptyHint": "Digite uma mensagem para iniciar o chat...",
-  "inlineChat.lineNaturalLanguageHint": "Digite uma mensagem em linguagem natural...",
-  "inlineChat.notebookAgent": false,
-  "inlineChat.renderMode": "hover",
-  // ===========================================================================
-  // FASE 10) JAVASCRIPT — LANGUAGE FEATURES / INTELLISENSE
-  // ===========================================================================
+  // Subfase 10.1) JavaScript
   "javascript.format.enable": false,
   "javascript.implicitProjectConfig.checkJs": true,
   "javascript.inlayHints.functionLikeReturnTypes.enabled": true,
@@ -426,7 +299,7 @@
   "javascript.inlayHints.parameterTypes.enabled": true,
   "javascript.inlayHints.propertyDeclarationTypes.enabled": true,
   "javascript.inlayHints.variableTypes.enabled": true,
-  "javascript.preferences.importModuleSpecifier": "relative",
+  "javascript.preferences.importModuleSpecifier": "non-relative",
   "javascript.preferences.importModuleSpecifierEnding": "js",
   "javascript.preferences.quoteStyle": "single",
   "javascript.referencesCodeLens.enabled": true,
@@ -438,16 +311,65 @@
   "javascript.suggest.paths": true,
   "javascript.updateImportsOnFileMove.enabled": "always",
   "javascript.validate.enable": true,
+
   // ===========================================================================
-  // FASE 11) JS/TS — IMPLICIT PROJECT CONFIG (SEM TSCONFIG/JSCONFIG)
+  // FASE 11) JS/TS — IMPLICIT PROJECT CONFIG
+  // Fallbacks de projeto implicito para arquivos soltos fora dos tsconfig.*.json.
   // ===========================================================================
+  // Subfase 11.1) Projeto implicito JS/TS
   "js/ts.implicitProjectConfig.checkJs": true,
   "js/ts.implicitProjectConfig.module": "NodeNext",
   "js/ts.implicitProjectConfig.moduleResolution": "NodeNext",
   "js/ts.implicitProjectConfig.target": "ES2024",
+
   // ===========================================================================
-  // FASE 13) JSON — FORMAT / VALIDATE / SCHEMAS / TRACE
+  // FASE 12) TYPESCRIPT — LANGUAGE FEATURES / TSSERVER
+  // Preferencias de TypeScript, tsserver e diagnosticos.
   // ===========================================================================
+  // Subfase 12.1) TypeScript
+  "typescript.disableAutomaticTypeAcquisition": false,
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.implementationsCodeLens.enabled": true,
+  "typescript.implementationsCodeLens.showOnAllClassMethods": true,
+  "typescript.implementationsCodeLens.showOnInterfaceMethods": true,
+  "typescript.implicitProjectConfig.checkJs": true,
+  "typescript.inlayHints.enumMemberValues.enabled": true,
+  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "typescript.inlayHints.parameterNames.enabled": "all",
+  "typescript.inlayHints.parameterTypes.enabled": true,
+  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
+  "typescript.inlayHints.variableTypes.enabled": true,
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.importModuleSpecifierEnding": "js",
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.referencesCodeLens.enabled": true,
+  "typescript.referencesCodeLens.showOnAllFunctions": true,
+  "typescript.reportStyleChecksAsWarnings": false,
+  "typescript.suggest.autoImports": true,
+  "typescript.suggest.completeFunctionCalls": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.tsserver.enableTracing": false,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "typescript.tsserver.experimental.useVsCodeWatcher": true,
+  "typescript.tsserver.log": "terse",
+  "typescript.tsserver.maxTsServerMemory": 6144,
+  "typescript.tsserver.useSeparateSyntaxServer": true,
+  "typescript.tsserver.useSyntaxServer": "always",
+  "typescript.tsserver.watchOptions": {
+    "fallbackPolling": "dynamicPriorityPolling",
+    "watchDirectory": "useFsEvents",
+    "watchFile": "useFsEvents"
+  },
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.validate.enable": true,
+  // Subfase 12.2) Python analysis complementar
+  "python.analysis.aiHoverSummaries": true,
+
+  // ===========================================================================
+  // FASE 13) JSON — FORMAT / VALIDATE / SCHEMAS
+  // Validacao e schemas para arquivos JSON e JSONC.
+  // ===========================================================================
+  // Subfase 13.1) JSON
   "json.format.enable": true,
   "json.maxItemsComputed": 10000,
   "json.schemaDownload.enable": true,
@@ -554,7 +476,6 @@
       "url": "https://json.schemastore.org/biome"
     },
     {
-      // custom schema to allow arbitrary fields (sse flag etc.) in infra MCP config
       "fileMatch": [
         ".vscode/mcp.json"
       ],
@@ -567,32 +488,16 @@
   "json.suggest.enable": true,
   "json.trace.server": "messages",
   "json.validate.enable": true,
+
   // ===========================================================================
-  // FASE 21) MISC
+  // FASE 14) DEV CONTAINERS / REMOTE / SSH / PORTAS
+  // Contrato do ambiente remoto, DevContainer e forwarding.
   // ===========================================================================
-  "makefile.configureOnOpen": false,
-  // Notebook formatter (mantido)
-  "notebook.defaultFormatter": "rvest.vs-code-prettier-eslint",
-  "outline.showFiles": true,
-  "outline.showFunctions": true,
-  "outline.showModules": false,
-  "outline.showVariables": false,
-  // ===========================================================================
-  // FASE 17) PROBLEMS / DEBUG / TASKS / TESTING
-  // ===========================================================================
-  "problems.autoReveal": true,
-  "problems.decorations.enabled": true,
-  "problems.defaultViewMode": "tree",
-  "problems.maxNumberOfProblems": 10000,
-  "problems.multiline.enabled": true,
-  "problems.multiline.indentSize": 4,
-  "problems.resultsPanelMinWidth": 300,
-  "problems.showCurrentInStatus": true,
-  "problems.sortOrder": "severity",
-  "problems.tabSize": 10,
-  "problems.visibility": true,
-  "python.analysis.aiHoverSummaries": true,
-  "redhat.telemetry.enabled": false,
+  // Subfase 14.1) Dev Containers
+  "dev.containers.defaultExtensions": [],
+  "dev.containers.executeInWSL": true,
+  "dev.containers.gpuAvailability": "none",
+  // Subfase 14.2) Remote / SSH
   "remote.autoForwardPorts": false,
   "remote.portsAttributes": {
     "9224": {
@@ -605,177 +510,90 @@
   "remote.SSH.enableAgentForwarding": true,
   "remote.SSH.loglevel": "info",
   "remote.SSH.useLocalServer": true,
-  // ===========================================================================
-  // FASE 16) SCM / GIT
-  // ===========================================================================
-  "scm.alwaysShowProviders": true,
-  "scm.defaultViewMode": "tree",
-  "scm.diffDecorations": "all",
-  "scm.diffDecorationsGutterWidth": 3,
+
   // ===========================================================================
   // FASE 15) SEARCH / FILESYSTEM UX
+  // Busca, filtros e higiene visual de arquivos.
   // ===========================================================================
-  // search performance / filtering
+  // Subfase 15.1) Exclusoes e busca
+  "files.exclude": {
+    "**/.venv": true,
+    "**/.codex/auth.json": true,
+    "**/.codex/models_cache.json": true,
+    "**/.codex/sessions": true,
+    "**/.codex/shell_snapshots": true,
+    "**/.codex/state_*.sqlite": true,
+    "**/.codex/state_*.sqlite-shm": true,
+    "**/.codex/state_*.sqlite-wal": true,
+    "**/.codex/tmp": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true
+  },
   "search.exclude": {
     "**/node_modules": true,
     "**/bower_components": true,
     "**/.git": true,
+    "**/.venv": true,
+    "**/.codex/auth.json": true,
+    "**/.codex/models_cache.json": true,
+    "**/.codex/sessions": true,
+    "**/.codex/shell_snapshots": true,
+    "**/.codex/state_*.sqlite": true,
+    "**/.codex/state_*.sqlite-shm": true,
+    "**/.codex/state_*.sqlite-wal": true,
+    "**/.codex/tmp": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
     "**/dist": true,
     "**/build": true
   },
-  "search.useIgnoreFiles": true,
-  "search.useGlobalIgnoreFiles": true,
-  "search.useParentIgnoreFiles": true,
   "search.followSymlinks": false,
+  "search.globalFindClipboard": true,
+  "search.location": "panel",
   "search.maxResults": 50000,
   "search.quickOpen.includeSymbols": true,
-  "search.location": "panel",
   "search.searchEditor.defaultNumberOfContextLines": 3,
-
-  "search.globalFindClipboard": true,
   "search.searchOnType": true,
   "search.searchOnTypeDebouncePeriod": 300,
-  "search.smartCase": true,
-
-  // Copilot Smart Actions enhancements ------------------------------------------------
-  // semantic search in the Search view (used by smart actions and agent prompts)
-  "search.searchView.semanticSearchBehavior": "automatic",
   "search.searchView.keywordSuggestions": true,
-
-  // allow AI-assisted lookup when browsing the Settings editor
+  "search.searchView.semanticSearchBehavior": "automatic",
+  "search.smartCase": true,
+  "search.useGlobalIgnoreFiles": true,
+  "search.useIgnoreFiles": true,
+  "search.useParentIgnoreFiles": true,
   "workbench.settings.showAISearchToggle": true,
 
-  "task.autoDetect": "on",
-  "task.problemMatchers.neverPrompt": false,
-  "task.quickOpen.detail": true,
-  "task.quickOpen.skip": false,
-  "task.slowProviderWarning": true,
-  "telemetry.telemetryLevel": "off",
   // ===========================================================================
-  // FASE 18) TERMINAL INTEGRADO (UX / PERFIS / SHELL INTEGRATION / ENV)
+  // FASE 16) SCM / GIT / PULL REQUESTS
+  // Fluxo de controle de versao, PRs e integracao com GitHub.
   // ===========================================================================
-  "terminal.integrated.confirmOnExit": "hasChildProcesses",
-  "terminal.integrated.confirmOnKill": "editor",
-  "terminal.integrated.copyOnSelection": true,
-  "terminal.integrated.cursorBlinking": true,
-  "terminal.integrated.defaultProfile.linux": "bash",
-  "terminal.integrated.enableKittyKeyboardProtocol": true,
-  "terminal.integrated.enableMultiLinePasteWarning": "never",
-  "terminal.integrated.enablePersistentSessions": true,
-  "terminal.integrated.env.linux": {
-    "CODEX_HOME": "${workspaceFolder}/.codex"
-  },
-  "terminal.integrated.fontFamily": "monospace",
-  "terminal.integrated.fontSize": 13,
-  "terminal.integrated.gpuAcceleration": "auto",
-  "terminal.integrated.persistentSessionReviveProcess": "onExit",
-  "terminal.integrated.scrollback": 10000,
-  "terminal.integrated.shellIntegration.decorationsEnabled": "both",
-  "terminal.integrated.shellIntegration.enabled": true,
-  "terminal.integrated.shellIntegration.environmentReporting": true,
-  "terminal.integrated.shellIntegration.history": 1000,
-  "terminal.integrated.smoothScrolling": true,
-  "terminal.integrated.suggest.enabled": true,
-  "terminal.integrated.tabs.enabled": true,
-  "terminal.integrated.tabs.hideCondition": "never",
-  "testing.alwaysRevealTestOnStateChange": false,
-  "testing.automaticallyOpenPeekView": "failureInVisibleDocument",
-  "testing.automaticallyOpenTestResults": "neverOpen",
-  "testing.followRunningTest": true,
-  "testing.openTesting": "neverOpen",
-  "testing.saveBeforeTest": true,
-  // ===========================================================================
-  // FASE 12) TYPESCRIPT — LANGUAGE FEATURES / TSSERVER / DIAGNÓSTICOS
-  // ===========================================================================
-  "typescript.disableAutomaticTypeAcquisition": false,
-  "typescript.enablePromptUseWorkspaceTsdk": true,
-  "typescript.implementationsCodeLens.enabled": true,
-  "typescript.implementationsCodeLens.showOnAllClassMethods": true,
-  "typescript.implementationsCodeLens.showOnInterfaceMethods": true,
-  "typescript.implicitProjectConfig.checkJs": true,
-  "typescript.inlayHints.enumMemberValues.enabled": true,
-  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
-  "typescript.inlayHints.parameterNames.enabled": "all",
-  "typescript.inlayHints.parameterTypes.enabled": true,
-  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
-  "typescript.inlayHints.variableTypes.enabled": true,
-  "typescript.preferences.importModuleSpecifier": "relative",
-  "typescript.preferences.importModuleSpecifierEnding": "js",
-  "typescript.referencesCodeLens.enabled": true,
-  "typescript.referencesCodeLens.showOnAllFunctions": true,
-  "typescript.reportStyleChecksAsWarnings": false,
-  "typescript.suggest.completeFunctionCalls": true,
-  "typescript.tsdk": "node_modules/typescript/lib",
-  // tsserver (logging / tracing / mem / watcher)
-  "typescript.tsserver.enableTracing": false,
-  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
-  "typescript.tsserver.experimental.useVsCodeWatcher": true,
-  "typescript.tsserver.log": "terse",
-  "typescript.tsserver.maxTsServerMemory": 6144,
-  "typescript.tsserver.useSeparateSyntaxServer": true,
-  "typescript.tsserver.useSyntaxServer": "always",
-  "typescript.tsserver.watchOptions": {
-    "fallbackPolling": "dynamicPriorityPolling",
-    "watchDirectory": "useFsEvents",
-    "watchFile": "useFsEvents"
-  },
-  "typescript.updateImportsOnFileMove.enabled": "always",
-  "typescript.validate.enable": true,
-  // ===========================================================================
-  // FASE 20) JANELA / WORKBENCH / UI / TELEMETRIA / AI STUDIO
-  // ===========================================================================
-  "window.newWindowDimensions": "default",
-  "window.openFilesInNewWindow": "off",
-  "window.openFoldersInNewWindow": "off",
-  "window.restoreWindows": "none",
-  "window.titleBarStyle": "custom",
-  "windowsaistudio.enableRemoteFine-tuningAndInference": false,
-  "windowsaistudio.externalOpenAIProviders": [],
-  "windowsaistudio.openAIInferencePort": 0,
-  "windowsaistudio.remoteInfereneEndpoints": [],
-  "workbench.colorTheme": "GitHub Dark Default",
-  "workbench.editor.alwaysShowEditorActions": false,
-  "workbench.editor.closeEmptyGroups": true,
-  "workbench.editor.closeOnFileDelete": true,
-  "workbench.editor.enablePreview": true,
-  "workbench.editor.enablePreviewFromCodeNavigation": true,
-  "workbench.editor.enablePreviewFromQuickOpen": true,
-  "workbench.editor.highlightModifiedTabs": true,
-  "workbench.editor.limit.enabled": true,
-  "workbench.editor.limit.perEditorGroup": true,
-  "workbench.editor.limit.value": 15,
-  "workbench.externalBrowser": "chrome",
-  "workbench.iconTheme": "vs-seti",
-  "workbench.startupEditor": "agentSessionsWelcomePage",
-  "github.copilot.chat.completionsFetcher": "electron-fetch",
-  "github.copilot.chat.nesFetcher": "electron-fetch",
-  "appmod.enableMcpServer": true,
-  "github.copilot.nextEditSuggestions.extendedRange": true,
-  "terminal.integrated.localEchoEnabled": "auto",
-  "chat.useClaudeHooks": true,
-  "chat.useNestedAgentsMdFiles": true,
-  "chat.viewProgressBadge.enabled": true,
-  "appmod.enableCustomTaskRepository": true,
-  "kilo-code.newTaskRequireTodos": true,
-  "kilo-code.preventCompletionWithOpenTodos": true,
-  "github.copilot.chat.updated53CodexPrompt.enabled": true,
-  // --- GitHub Pull Request extension configuration --------------------------------
-  // these settings drive the GitHub PR viewlet; make sure the extension is
-  // installed (recommendation added in .vscode/extensions.json) and that the
-  // user has signed in via the 'Sign in to GitHub' button in the PR pane.
-  // 'remotes' tells the extension which git remotes to monitor; add any custom
-  // remotes your workflow uses.  the default list here covers the typical
-  // origin/upstream/main trio.
-  "githubPullRequests.remotes": [
-    "origin",
-    "upstream",
-    "main"
+  // Subfase 16.1) SCM e Git
+  "git.autofetch": false,
+  "git.branchProtection": [
+    "main",
+    "master"
   ],
-
-  // customize the tree by providing labelled search queries; variables such as
-  // ${user}, ${owner} and ${repository} are substituted automatically.
-  // the project already ships with a broad set of categories, feel free to
-  // extend it (e.g. "Mentioned Me" or other team-specific filters).
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "git.fetchOnPull": true,
+  "git.followTagsWhenSync": true,
+  "git.ignoreLimitWarning": true,
+  "git.mergeEditor": true,
+  "git.openRepositoryInParentFolders": "always",
+  "git.pruneOnFetch": true,
+  "git.showProgress": true,
+  "git.timeline.showUncommitted": true,
+  "git.untrackedChanges": "separate",
+  "scm.alwaysShowProviders": true,
+  "scm.defaultViewMode": "tree",
+  "scm.diffDecorations": "all",
+  "scm.diffDecorationsGutterWidth": 3,
+  // Subfase 16.2) Issues e PRs
+  "githubIssues.assignWhenWorking": true,
   "githubPullRequests.queries": [
     {
       "label": "Atribuído a Mim",
@@ -802,5 +620,278 @@
       "query": "default"
     }
   ],
-  "githubPullRequests.showPullRequestNumberInTree": true
+  "githubPullRequests.remotes": [
+    "origin",
+    "upstream",
+    "main"
+  ],
+  "githubPullRequests.showPullRequestNumberInTree": true,
+
+  // ===========================================================================
+  // FASE 17) PROBLEMS / DEBUG / TASKS / TESTING
+  // Observabilidade do editor e execucao de tarefas.
+  // ===========================================================================
+  // Subfase 17.1) Debug e problemas
+  "debug.javascript.autoAttachFilter": "onlyWithFlag",
+  "debug.focusEditorOnBreak": true,
+  "debug.inlineValues": "on",
+  "debug.showBreakpointsInOverviewRuler": true,
+  "debug.showInlineBreakpointCandidates": true,
+  "debug.toolBarLocation": "docked",
+  "problems.autoReveal": true,
+  "problems.decorations.enabled": true,
+  "problems.defaultViewMode": "tree",
+  "problems.maxNumberOfProblems": 10000,
+  "problems.multiline.enabled": true,
+  "problems.multiline.indentSize": 4,
+  "problems.resultsPanelMinWidth": 300,
+  "problems.showCurrentInStatus": true,
+  "problems.sortOrder": "severity",
+  "problems.tabSize": 10,
+  "problems.visibility": true,
+  // Subfase 17.2) Tasks e testes
+  "task.autoDetect": "on",
+  "task.problemMatchers.neverPrompt": false,
+  "task.quickOpen.detail": true,
+  "task.quickOpen.skip": false,
+  "task.slowProviderWarning": true,
+  "testing.alwaysRevealTestOnStateChange": false,
+  "testing.automaticallyOpenPeekView": "failureInVisibleDocument",
+  "testing.automaticallyOpenTestResults": "neverOpen",
+  "testing.followRunningTest": true,
+  "testing.openTesting": "neverOpen",
+  "testing.saveBeforeTest": true,
+
+  // ===========================================================================
+  // FASE 18) TERMINAL INTEGRADO
+  // Perfil do terminal integrado e contrato de ambiente in-container.
+  // ===========================================================================
+  // Subfase 18.1) Terminal
+  "terminal.integrated.confirmOnExit": "hasChildProcesses",
+  "terminal.integrated.confirmOnKill": "editor",
+  "terminal.integrated.copyOnSelection": true,
+  "terminal.integrated.cursorBlinking": true,
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.enableKittyKeyboardProtocol": true,
+  "terminal.integrated.enableMultiLinePasteWarning": "never",
+  "terminal.integrated.enablePersistentSessions": true,
+  "terminal.integrated.env.linux": {
+    "CODEX_HOME": "${workspaceFolder}/.codex"
+  },
+  "terminal.integrated.fontFamily": "monospace",
+  "terminal.integrated.fontSize": 13,
+  "terminal.integrated.gpuAcceleration": "auto",
+  "terminal.integrated.localEchoEnabled": "auto",
+  "terminal.integrated.persistentSessionReviveProcess": "onExit",
+  "terminal.integrated.scrollback": 10000,
+  "terminal.integrated.shellIntegration.decorationsEnabled": "both",
+  "terminal.integrated.shellIntegration.enabled": true,
+  "terminal.integrated.shellIntegration.environmentReporting": true,
+  "terminal.integrated.shellIntegration.history": 1000,
+  "terminal.integrated.smoothScrolling": true,
+  "terminal.integrated.suggest.enabled": true,
+  "terminal.integrated.tabs.enabled": true,
+  "terminal.integrated.tabs.hideCondition": "never",
+
+  // ===========================================================================
+  // FASE 19) IA / CHAT / COPILOT / MCP / AGENTES
+  // Configuracoes de agentes, chat, Copilot, MCP e extensoes correlatas.
+  // ===========================================================================
+  // Subfase 19.1) Chat e agentes
+  "chat.agent.enabled": true,
+  "chat.agent.maxRequests": 250,
+  "chat.agent.thinking.collapsedTools": "always",
+  "chat.agent.thinkingStyle": "fixedScrolling",
+  "chat.agentsControl.clickBehavior": "cycle",
+  "chat.agentsControl.enabled": true,
+  "chat.agentSessionProjection.enabled": true,
+  "chat.agentSkillsLocations": {
+    ".github/skills": true
+  },
+  "chat.checkpoints.showFileChanges": true,
+  "chat.customAgentInSubagent.enabled": true,
+  "chat.editing.autoAcceptDelay": 3,
+  "chat.editing.explainChanges.enabled": true,
+  "chat.editMode.hidden": false,
+  "chat.editor.wordWrap": "on",
+  "chat.edits2.enabled": true,
+  "chat.experimental.useSkillAdherencePrompt": true,
+  "chat.includeApplyingInstructions": true,
+  "chat.includeReferencedInstructions": true,
+  "chat.instructionsFilesLocations": [
+    ".github/instructions"
+  ],
+  "chat.math.enabled": true,
+  "chat.mcp.access": true,
+  "chat.mcp.assisted.nuget.enabled": true,
+  "chat.mcp.discovery.enabled": {
+    "claude-desktop": true,
+    "windsurf": true,
+    "cursor-global": true,
+    "cursor-workspace": true
+  },
+  "chat.mcp.gallery.enabled": true,
+  "chat.mcp.serverSampling": {
+    "chatgpt-docker-puppeteer/.vscode/mcp.json: chatgpt-docker-puppeteer": {
+      "allowedModels": [
+        "copilot/auto",
+        "copilot/claude-sonnet-4.5",
+        "copilot/gpt-5-mini",
+        "copilot/gpt-5.2-codex",
+        "copilot/grok-code-fast-1",
+        "copilot/oswe-vscode-prime",
+        "copilot/claude-haiku-4.5",
+        "copilot/claude-opus-4.6",
+        "copilot/gemini-3-flash-preview",
+        "copilot/gemini-3-pro-preview",
+        "copilot/gpt-5.3-codex",
+        "copilot/Raptor mini (Preview)"
+      ]
+    },
+    "chatgpt-docker-puppeteer/.vscode/mcp.json: context7": {
+      "allowedModels": [
+        "copilot/auto",
+        "copilot/claude-opus-4.5",
+        "copilot/claude-opus-4.6",
+        "copilot/claude-sonnet-4",
+        "copilot/claude-sonnet-4.5",
+        "copilot/gpt-5-mini",
+        "copilot/gemini-3-flash-preview",
+        "copilot/gemini-3-pro-preview",
+        "copilot/gpt-5.3-codex",
+        "copilot/grok-code-fast-1",
+        "copilot/Raptor mini (Preview)"
+      ]
+    }
+  },
+  "chat.renderRelatedFiles": true,
+  "chat.tips.enabled": true,
+  "chat.tools.global.autoApprove": true,
+  "chat.tools.terminal.autoReplyToPrompts": true,
+  "chat.tools.terminal.blockDetectedFileWrites": "never",
+  "chat.tools.terminal.enableAutoApprove": true,
+  "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
+  "chat.tools.terminal.sandbox.enabled": false,
+  "chat.unifiedAgentsBar.enabled": true,
+  "chat.useAgentSkills": true,
+  "chat.useAgentsMdFile": true,
+  "chat.useClaudeHooks": true,
+  "chat.useNestedAgentsMdFiles": true,
+  "chat.viewProgressBadge.enabled": true,
+  "chat.viewSessions.enabled": true,
+  // Base contract: outside the DevContainer, prefer Codex running directly in WSL.
+  // The DevContainer overrides this to false to keep Codex in-container.
+  "chatgpt.runCodexInWindowsSubsystemForLinux": true,
+  "chatgpt.openOnStartup": false,
+  // Subfase 19.2) Claude / CSpell
+  "claude-code.autoCloseDiffTabs": true,
+  "claude-code.autosave": true,
+  "claude-code.selectedModel": "sonnet",
+  "claude-code.useTerminal": true,
+  "claudeCode.allowDangerouslySkipPermissions": true,
+  "claudeCodeChat.permissions.yoloMode": true,
+  "cSpell.enabled": false,
+  "cSpell.language": "en,pt-BR",
+  // Subfase 19.3) GitHub Copilot
+  "github.copilot.advanced": {},
+  "github.copilot.chat.advanced.workspace.codeSearchExternalIngest.enabled": true,
+  "github.copilot.chat.agent.autoFix": true,
+  "github.copilot.chat.agent.thinkingTool": true,
+  "github.copilot.chat.anthropic.contextEditing.enabled": true,
+  "github.copilot.chat.anthropic.thinking.budgetTokens": 32000,
+  "github.copilot.chat.anthropic.tools.websearch.enabled": true,
+  "github.copilot.chat.anthropic.tools.websearch.maxUses": 10,
+  "github.copilot.chat.anthropic.toolSearchTool.enabled": true,
+  "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": true,
+  "github.copilot.chat.claudeAgent.enabled": true,
+  "github.copilot.chat.codesearch.enabled": true,
+  "github.copilot.chat.completionsFetcher": "electron-fetch",
+  "github.copilot.chat.copilotMemory.enabled": true,
+  "github.copilot.chat.customAgents.showOrganizationAndEnterpriseAgents": true,
+  "github.copilot.chat.generateTests.codeLens": true,
+  "github.copilot.chat.githubMcpServer.enabled": true,
+  "github.copilot.chat.languageContext.fix.typescript.enabled": true,
+  "github.copilot.chat.languageContext.inline.typescript.enabled": true,
+  "github.copilot.chat.languageContext.typescript.cacheTimeout": 800,
+  "github.copilot.chat.languageContext.typescript.enabled": true,
+  "github.copilot.chat.languageContext.typescript.includeDocumentation": true,
+  "github.copilot.chat.localeOverride": "pt-br",
+  "github.copilot.chat.nesFetcher": "electron-fetch",
+  "github.copilot.chat.newWorkspace.useContext7": true,
+  "github.copilot.chat.newWorkspaceCreation.enabled": true,
+  "github.copilot.chat.responsesApiReasoningEffort": "high",
+  "github.copilot.chat.reviewSelection.enabled": true,
+  "github.copilot.chat.reviewSelection.instructions": "Selecione o código que deseja revisar e pressione Ctrl+Enter para enviar ao Copilot Chat.",
+  "github.copilot.chat.reviewSelection.instructions.pt-br": "Selecione o código que deseja revisar e pressione Ctrl+Enter para enviar ao Copilot Chat.",
+  "github.copilot.chat.summarizeAgentConversationHistory.enabled": true,
+  "github.copilot.chat.switchAgent.enabled": true,
+  "github.copilot.chat.tools.memory.enabled": true,
+  "github.copilot.chat.updated53CodexPrompt.enabled": true,
+  "github.copilot.chat.virtualTools.threshold": 128,
+  "github.copilot.chat.welcomeMessage": "once",
+  "github.copilot.editor.enableAutoCompletions": true,
+  "github.copilot.enable": {
+    "*": true,
+    "javascript": true,
+    "json": true,
+    "markdown": true,
+    "plaintext": false
+  },
+  "github.copilot.inlineSuggest.enable": true,
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "github.copilot.nextEditSuggestions.extendedRange": true,
+  "github.copilot.selectedCompletionModel": "",
+  // Subfase 19.4) Inline chat
+  "inlineChat.affordance": "editor",
+  "inlineChat.defaultModel": "Raptor mini (Preview) (copilot)",
+  "inlineChat.enableV2": true,
+  "inlineChat.finishOnType": true,
+  "inlineChat.lineEmptyHint": "Digite uma mensagem para iniciar o chat...",
+  "inlineChat.lineNaturalLanguageHint": "Digite uma mensagem em linguagem natural...",
+  "inlineChat.notebookAgent": false,
+  "inlineChat.renderMode": "hover",
+
+  // ===========================================================================
+  // FASE 20) JANELA / WORKBENCH / UI / TELEMETRIA / AI STUDIO
+  // Aparencia, layout global e telemetria do editor.
+  // ===========================================================================
+  // Subfase 20.1) Janela e workbench
+  "window.newWindowDimensions": "default",
+  "window.openFilesInNewWindow": "off",
+  "window.openFoldersInNewWindow": "off",
+  "window.restoreWindows": "none",
+  "window.titleBarStyle": "custom",
+  "workbench.colorTheme": "GitHub Dark Default",
+  "workbench.editor.alwaysShowEditorActions": false,
+  "workbench.editor.closeEmptyGroups": true,
+  "workbench.editor.closeOnFileDelete": true,
+  "workbench.editor.enablePreview": true,
+  "workbench.editor.enablePreviewFromCodeNavigation": true,
+  "workbench.editor.enablePreviewFromQuickOpen": true,
+  "workbench.editor.highlightModifiedTabs": true,
+  "workbench.editor.limit.enabled": true,
+  "workbench.editor.limit.perEditorGroup": true,
+  "workbench.editor.limit.value": 15,
+  "workbench.externalBrowser": "chrome",
+  "workbench.iconTheme": "vs-seti",
+  "workbench.startupEditor": "agentSessionsWelcomePage",
+  // Subfase 20.2) Telemetria e AI Studio
+  "redhat.telemetry.enabled": false,
+  "telemetry.telemetryLevel": "off",
+  "windowsaistudio.enableRemoteFine-tuningAndInference": false,
+  "windowsaistudio.externalOpenAIProviders": [],
+  "windowsaistudio.openAIInferencePort": 0,
+  "windowsaistudio.remoteInfereneEndpoints": [],
+
+  // ===========================================================================
+  // FASE 21) MISC / FERRAMENTAS AUXILIARES
+  // Integracoes auxiliares e flags fora dos grandes dominios anteriores.
+  // ===========================================================================
+  // Subfase 21.1) Ferramentas auxiliares
+  "appmod.enableCustomTaskRepository": true,
+  "appmod.enableMcpServer": true,
+  "kilo-code.newTaskRequireTodos": true,
+  "kilo-code.preventCompletionWithOpenTodos": true,
+  "makefile.configureOnOpen": false,
+  "notebook.defaultFormatter": "rvest.vs-code-prettier-eslint"
 }

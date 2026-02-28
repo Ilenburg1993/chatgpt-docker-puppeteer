@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.tools.tsbuildinfo",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024", "ES2022.Error", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": [
+    "scripts/build/**/*.mjs",
+    "scripts/env/**/*.mjs",
+    "scripts/health/**/*.mjs",
+    "scripts/setup/**/*.mjs",
+    "eslint.config.mjs",
+    ".puppeteerrc.cjs"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "logs",
+    "fila",
+    "respostas",
+    "artifacts",
+    "profile",
+    "public",
+    "backups",
+    "monitoring",
+    "tmp",
+    "analysis",
+    "local-login",
+    "DOCUMENTAÇÃO",
+    "src/dashboard-ui/**",
+    ".git",
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/*.map",
+    "**/bundle.js",
+    "**/*.bundle.js",
+    "**/*.d.ts.map",
+    "**/*.js.map",
+    "scripts/legacy/**"
+  ]
+}

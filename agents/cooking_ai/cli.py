@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
 import sys
+import argparse
 from rich import print
 from rich.prompt import Prompt
+
+# allow running the common HTTP server instead of the interactive REPL
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument("--server", action="store_true", help="run shared HTTP server (agents/server.py)")
+parser.add_argument("--port", type=int, default=8087, help="port for HTTP server")
+args, _remaining = parser.parse_known_args()
+if args.server:
+    from agents import server
+    server._cli_main(["--server", f"--port={args.port}"])
+    sys.exit(0)
 
 from .agent import CookingAgent
 

@@ -98,8 +98,13 @@ OLD_NSS_WRAPPER_GROUP="${NSS_WRAPPER_GROUP:-}"
 
 _dc_dbg "original LD_PRELOAD len=${#OLD_LD_PRELOAD}"
 
-# Source canonical profile (single source of truth)
+# Source canonical profile (single source of truth).
+# Tests and special workflows may inject a local profile override in DEVCONTAINER_NSS_DIR.
 PROFILE_FILE="/etc/profile.d/10-gatekeeper-nss.sh"
+PROFILE_OVERRIDE="${DEVCONTAINER_NSS_DIR}/10-gatekeeper-nss.sh"
+if [[ -f "${PROFILE_OVERRIDE}" ]]; then
+  PROFILE_FILE="${PROFILE_OVERRIDE}"
+fi
 if [[ -f "${PROFILE_FILE}" ]]; then
   _dc_dbg "sourcing ${PROFILE_FILE}"
   _safe_source "${PROFILE_FILE}"
@@ -156,7 +161,7 @@ if [[ -n "${LD_PRELOAD:-}" ]]; then
     echo "⚠️  [nss-gatekeeper] LD_PRELOAD contains empty token(s): '${LD_PRELOAD}'" >&2
   fi
   if (( ${#LD_PRELOAD} > 4096 )); then
-    echo "⚠️  [nss-gatekeeper] LD_PRELOAD length ${#LD_PRELOAD} exceeds typical kernel limit; may be truncated" >&2
+    echo "⚠️  [nss-gatekeeper] LD_PRELOAD length ${#LD_PRELOAD} exceeds kernel limit; may be truncated" >&2
   fi
   _dc_dbg "final LD_PRELOAD len=${#LD_PRELOAD}"
 fi

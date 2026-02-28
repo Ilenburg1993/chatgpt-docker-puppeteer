@@ -27,6 +27,25 @@ if (isInDist) {
 }
 
 console.log('');
+console.log('🧭 Runtime atual:');
+console.log(`   node: ${process.execPath}`);
+if (process.env.npm_execpath) {
+    console.log(`   npm:  ${process.env.npm_execpath}`);
+}
+
+const windowsMountPattern = /^\/mnt\/[a-z]\//i;
+const isWindowsMountedNode = windowsMountPattern.test(process.execPath);
+const isWindowsMountedNpm = Boolean(
+    process.env.npm_execpath && windowsMountPattern.test(process.env.npm_execpath)
+);
+
+if (isWindowsMountedNode || isWindowsMountedNpm) {
+    console.log('   ⚠️  Runtime misto detectado: node/npm estão vindo de um path do Windows.');
+    console.log('   ⚠️  Isso pode quebrar Codex, npm scripts, subprocessos e caminhos UNC no WSL.');
+    console.log('   ✅ Recomendado: usar instalações Linux de node/npm dentro do WSL ou do container.');
+    console.log('');
+}
+
 console.log('🚀 Comandos recomendados:');
 if (isInDist) {
     console.log('   node start.js              # Executar');

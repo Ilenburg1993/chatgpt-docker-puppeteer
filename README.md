@@ -60,21 +60,83 @@ com intervenção humana mínima através de um dashboard web.
 
 ### Desenvolvimento
 
-```bash
+````bash
 # Clone o repositório
 git clone https://github.com/Ilenburg1993/chatgpt-docker-puppeteer.git
 cd chatgpt-docker-puppeteer
+## Python helpers & local agents
+
+In addition to the Node.js core there are two lightweight Python "agents" used
+for demonstrations (`agents/code_explainer` and `agents/cooking_ai`).  A
+shared HTTP wrapper (`agents/server.py`) exposes a minimal REST API so that the
+AI Toolkit Agent Inspector can attach via **agentdev**.
+
+To prepare the environment:
+
+```bash
+# create a local venv (recommended in this DevContainer)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r agents/code_explainer/requirements.txt \
+            -r agents/cooking_ai/requirements.txt
+````
+
+> **Nota:** neste DevContainer o suporte a `venv` faz parte da imagem. A pasta `.venv/` é um artefato
+> local, fica ignorada pelo Git e não deve ser tratada como parte do código do projeto.
+>
+> Em ambientes externos, a criação de venv ainda pode falhar devido à falta de `python3-venv` ou
+> políticas de "externally-managed environment".
+>
+> Se isso ocorrer, escolha um dos seguintes caminhos:
+>
+> 1. Instale `python3-venv` no seu sistema e repita o passo anterior.
+> 2. Use `pipx` ou `pip install --user` para colocar as dependências em seu diretório de usuário:
+>    ```bash
+>    python3 -m pip install --user -r agents/code_explainer/requirements.txt \
+>                -r agents/cooking_ai/requirements.txt
+>    ```
+> 3. Ou simplesmente execute os comandos dentro de um ambiente controlado (venv/conda) fora deste
+>    contêiner.
+>
+> Após isso, você terá `pytest`, `debugpy` e `agent-dev-cli` disponíveis para executar os testes e
+> iniciar o servidor HTTP para depuração.
+
+You can still run each agent interactively:
+
+```bash
+python agents/code_explainer/cli.py
+python agents/cooking_ai/cli.py
+```
+
+or start the HTTP server (8087 by default):
+
+```bash
+python agents/server.py --server
+```
+
+### Debugging with Agent Inspector
+
+The workspace contains VS Code tasks and launch configurations that wire up `debugpy` and
+`agentdev`. Use **Run Python Agent HTTP Server** from the task list and then launch the **Debug
+Python Agent HTTP Server** configuration to attach the debugger and automatically open the inspector
+on port 8087.
+
+See `.vscode/tasks.json` and `.vscode/launch.json` for the full commands.
 
 # Instale dependências
+
 npm install
 
 # Configure variáveis de ambiente
+
 cp .env.example .env.local
+
 # Edite .env.local com suas chaves API
 
 # Inicie em modo desenvolvimento
+
 npm run dev
-```
+
+````
 
 ### Produção (PM2)
 
@@ -88,7 +150,7 @@ npm run daemon:start
 
 # Verifique status
 npm run daemon:status
-```
+````
 
 ### Pipeline Canônico RAG/MCP
 
@@ -113,6 +175,62 @@ make up
 # Verifique logs
 make logs
 ```
+
+## 🔧 Depuração
+
+O workspace já inclui um arquivo `./.vscode/launch.json` moderno com perfis para o agente, o
+dashboard, testes e attaches (PM2/Docker/Vite).
+
+#### Usando o VS Code
+
+1. Abra a paleta de comandos (Ctrl+Shift+P) e selecione **Run and Debug**.
+2. Escolha um dos lançadores como **Node: Agente (dev)** ou o compound _Full system_.
+3. Para perfis de subsistema (NERV, Kernel, etc.) basta copiar o perfil do agente e alterar a
+   variável de ambiente `DEBUG` para o filtro desejado.
+
+> ⚠️ Requer **VS Code 1.80+** para suporte aos tipos `pwa-node`/`pwa-chrome`.
+
+#### Iniciando PM2 com inspeção
+
+O `ecosystem.config.cjs` foi atualizado para aceitar a variável de ambiente `DEBUG_PORT`. por
+exemplo:
+
+```bash
+# iniciar o agente com inspector na porta 9229
+DEBUG_PORT=9229 npm run daemon:start
+
+# ou usar o script auxiliar
+scripts/ops/start-pm2-debug.sh
+```
+
+O campo `DEBUG_PORT` aceita uma lista separada por vírgulas se você precisar ligar múltiplos
+processos.
+
+#### Outros utilitários
+
+- `npm run dev` já executa `nodemon` com `--inspect=0.0.0.0:9229`.
+- Há scripts de profiling em `package.json` (`debug:memory-leak`, `debug:performance`, etc.).
+
+**Snippet útil** – copie e ajuste para criar novos perfis rapidamente:
+
+```json
+{
+  "name": "Node: NERV Subsystem",
+  "type": "pwa-node",
+  "request": "launch",
+  "program": "${workspaceFolder}/index.js",
+  "env": {
+    "NODE_ENV": "development",
+    "DEBUG": "nerv:*,nerv:emit:*"
+  },
+  "runtimeArgs": ["--max-old-space-size=2048"],
+  "skipFiles": ["<node_internals>/**", "node_modules/**"],
+  "autoAttachChildProcesses": true
+}
+```
+
+Estas instruções garantem que a nova configuração de debug esteja documentada e funcionando para
+qualquer desenvolvedor.
 
 ## 🧩 Usando o daemon LSP integrado
 

@@ -1,11 +1,13 @@
-# Migração para `strict` completo 🛡️
+# Migração incremental para `strict` 🛡️
 
-Este documento descreve o processo de ativação de `strict` no `tsconfig.json` e os passos
-subsequentes para garantir que o projeto permanece tipo‑seguro. Use as caixas de seleção para
-acompanhar o progresso; vá marcando conforme for corrigindo cada item.
+Este documento descreve o processo incremental de expansão do `strict` no projeto e os passos
+subsequentes para garantir que a base permaneça tipo-segura. O baseline atual continua em
+JavaScript com `checkJs`, enquanto a trilha de endurecimento progressivo passa a viver em
+`tsconfig.strict.json`. Use as caixas de seleção para acompanhar o progresso.
 
-> **Observação**: este é um fluxograma incremental. não precisa concluir tudo de uma só vez, mas o
-> objetivo final é `tsc` sem erros.
+> **Observação**: este é um fluxograma incremental. Não precisa concluir tudo de uma só vez. O
+> objetivo imediato é manter `typecheck` verde no baseline e expandir a cobertura `strict` por
+> domínio, sem assumir `strict` global ainda.
 
 ---
 
@@ -15,10 +17,10 @@ acompanhar o progresso; vá marcando conforme for corrigindo cada item.
 - [ ] Garantir que `npm test` e `npm run typecheck:full` rodem sem erros antes da mudança.
 - [ ] Confirmar que o repositório está limpo (`git status`).
 
-## 2. Ativar modo estrito
+## 2. Expandir a trilha estrita
 
-- [ ] Abrir `tsconfig.json`.
-- [ ] Modificar `"strict": false` para `"strict": true`.
+- [ ] Abrir `tsconfig.strict.json`.
+- [ ] Revisar o escopo inicial coberto por `strict`.
 - [ ] Opcionalmente decidir flags adicionais (por exemplo `noImplicitAny`, `strictNullChecks`,
       etc.).
 - [ ] Salvar e confirmar alteração com commit preliminar.
@@ -26,6 +28,7 @@ acompanhar o progresso; vá marcando conforme for corrigindo cada item.
 ## 3. Executar compilação inicial
 
 - [x] Rodar `npm run typecheck:node`.
+- [x] Confirmar que `npm run typecheck:full` continua verde no baseline.
 - [x] Anotar todos os erros gerados (importações faltando, `any` implícito, etc.).
   - Resultado inicial: **6175 erros em 276 arquivos**. Muitos deles são parâmetros não tipados,
     propriedades em objetos genéricos e módulos sem declarações de tipos.
@@ -52,13 +55,14 @@ acompanhar o progresso; vá marcando conforme for corrigindo cada item.
 - [ ] Após grande avanço, considerar setar `"allowJs": false` se for migrar tudo para `.ts`.
 - [ ] Habilitar `noEmit` para evitar artefatos inesperados.
 
-## 6. Iterar até zero erros
+## 6. Iterar até zero erros na trilha `strict`
 
 - [ ] Re-executar `npm run typecheck:full` após cada lote de correções.
 - [ ] Corrigir erros, commitar e repetir.
-- [x] **Meta atingida:** `tsc` agora conclui **sem erros** em todo o workspace sob `strict`.
-- [ ] Continuar este ciclo até que `tsc` conclua limpo em ambos `tsconfig.json` e
-      `tsconfig.browser.json`.
+- [ ] **Meta parcial:** fazer `npm run typecheck:strict` concluir sem erros nas áreas já incluídas.
+- [ ] Expandir o escopo do `tsconfig.strict.json` apenas quando a área atual estiver estável.
+- [ ] Só considerar `strict` global quando a trilha incremental estiver madura e sem drift com o
+      baseline.
 - [ ] **Infra:** atualizar dependência `typescript` para versão mais recente (>=5.10) e anotar no
       changelog/release notes; rodar `npm install` e revalidar compilação.
 

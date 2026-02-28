@@ -13,6 +13,19 @@ src/dashboard-ui/node_modules/**
 .env.development
 .env.*.local
 
+# Local Python virtual environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+
 # Codex local state (skills, sessions, etc.)
 .codex/*
 !.codex/config.toml

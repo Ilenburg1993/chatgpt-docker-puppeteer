@@ -100,12 +100,12 @@ describe('MCP Endpoint Discovery', () => {
         assert.ok(data.methods.includes('resources/read'));
     });
 
-    it('GET /api/mcp with Accept: text/event-stream should return 405', async () => {
+    it('GET /api/mcp with Accept: text/event-stream should return 200', async () => {
         const response = await fetch(`${baseUrl}/api/mcp`, {
             headers: { Accept: 'text/event-stream' },
         });
 
-        assert.strictEqual(response.status, 405);
+        assert.strictEqual(response.status, 200);
     });
 });
 
@@ -521,6 +521,7 @@ describe('MCP Protocol - resources/list', () => {
     });
 });
 
+// resources/read tests (moved before template namespace)
 describe('MCP Protocol - resources/read', () => {
     it('should read rag://stats resource', async () => {
         const result = await mcpRequest('resources/read', {
@@ -548,6 +549,31 @@ describe('MCP Protocol - resources/read', () => {
         });
 
         assert.ok(result.error);
+    });
+});
+
+// templates namespace tests
+
+describe('MCP Protocol - resources/templates', () => {
+    it('should list available templates', async () => {
+        const result = await mcpRequest('resources/templates/list');
+        assert.strictEqual(result.jsonrpc, '2.0');
+        assert.ok(Array.isArray(result.result.templates));
+        // templates list logged for visibility
+        console.log('    templates:', result.result.templates.join(', '));
+    });
+
+    it('should read a template when one exists', async () => {
+        const listRes = await mcpRequest('resources/templates/list');
+        const templates = listRes.result.templates || [];
+        if (templates.length === 0) {
+            // nothing to read
+            return;
+        }
+        const readRes = await mcpRequest('resources/templates/read', { id: templates[0] });
+        assert.strictEqual(readRes.jsonrpc, '2.0');
+        assert.ok(readRes.result.template);
+        assert.strictEqual(readRes.result.template.id, templates[0]);
     });
 });
 

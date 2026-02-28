@@ -70,6 +70,14 @@ export function classifyError(error, context = {}) {
     const name = String(error?.name || '');
     const code = String(error?.code || '');
 
+    // helper: try to pick a model name out of a free-form message
+    function extractModel(text) {
+        const m = text.match(/(qwen[\w.\-:]+)/i);
+        return m ? m[1] : null;
+    }
+
+    const detectedModel = context.model || extractModel(msg);
+
     // 1. TRANSIENT: Network failures, temporary unavailability
     // These are infrastructure issues that often resolve quickly
     if (
@@ -117,6 +125,8 @@ export function classifyError(error, context = {}) {
             (context.tool?.includes('ollama') || msg.includes('Ollama')) &&
             (msg.includes('timeout') || msg.includes('timed out') || msg.includes('aborted'));
 
+        const fallbackModel = isOllamaTimeout ? getSmallerModel(detectedModel) : null;
+
         return {
             errorClass: ErrorClass.DEGRADED,
             reasonClass: 'ENV_UNAVAILABLE', // Timeout is infrastructure issue
@@ -125,15 +135,16 @@ export function classifyError(error, context = {}) {
             retryable: true,
             countAttempt: false, // Don't count timeouts as user errors
             suggestedDelayMs: msg.includes('rate limit') ? 5000 : 0, // 5s for rate limits, 0 for timeout+fallback
-            modelFallback: isOllamaTimeout ? getSmallerModel(context.model) : null,
+            modelFallback: fallbackModel,
             message: isOllamaTimeout
-                ? `Timeout on ${context.model || 'model'} - will try smaller/faster model`
+                ? `Timeout on ${detectedModel || 'model'} - will try smaller/faster model`
                 : 'Service timeout or rate limit - will retry with backoff',
         };
     }
 
-    // 3. PERMANENT: Auth failures, invalid input, not found
-    // These won't succeed even with retries
+    // 3. PERMANENT: Auth failures or bad request parameters
+    // Most of these won't succeed even with retries, but a missing model
+    // sometimes deserves a last‑ditch fallback attempt.
     if (
         msg.includes('401') ||
         msg.includes('403') ||
@@ -142,21 +153,40 @@ export function classifyError(error, context = {}) {
         msg.includes('authentication failed') ||
         msg.includes('OLLAMA_CLOUD_API_KEY') ||
         msg.includes('API key') ||
-        msg.includes('404') ||
-        msg.includes('not found') ||
-        msg.includes('Not Found') ||
         msg.includes('invalid') ||
         msg.includes('Invalid') ||
         msg.includes('Unknown tool') ||
         msg.includes('validation error') ||
         msg.includes('ValidationError') ||
-        name === 'ValidationError'
+        name === 'ValidationError' ||
+        // treat *not found* separately below
+        msg.includes('404') ||
+        msg.includes('not found') ||
+        msg.includes('Not Found')
     ) {
         const isAuthError =
             msg.includes('401') ||
             msg.includes('403') ||
             msg.includes('authentication') ||
             msg.includes('Unauthorized');
+
+        // if the message indicates a missing model/endpoint, try a smaller one
+        const isModelMissing = msg.includes('404') || msg.includes('not found') || msg.includes('Not Found');
+        const fallback = isModelMissing ? getSmallerModel(detectedModel) : null;
+
+        if (fallback) {
+            return {
+                errorClass: ErrorClass.DEGRADED,
+                reasonClass: 'ENV_UNAVAILABLE',
+                reasonCode: 'MODEL_NOT_FOUND',
+                strategy: RetryStrategy.MODEL_FALLBACK,
+                retryable: true,
+                countAttempt: false, // don't charge user for missing model
+                suggestedDelayMs: 0,
+                modelFallback: fallback,
+                message: `Model ${detectedModel || 'unknown'} not found – trying ${fallback}`,
+            };
+        }
 
         return {
             errorClass: ErrorClass.PERMANENT,
@@ -210,12 +240,15 @@ export function classifyError(error, context = {}) {
  *
  * @example
  * getSmallerModel('qwen3-coder-next')  // → 'qwen2.5-coder:7b'
- * getSmallerModel('qwen2.5-coder:3b')  // → null (already smallest)
+ * getSmallerModel('qwen2.5-coder:3b')  // → 'qwen2.5-coder:1.5b' (new 1.5b tier)
  */
 export function getSmallerModel(currentModel) {
     if (!currentModel) return null;
 
-    // Fallback chain: cloud → local 7b → local 3b → null
+    // strip any wrapper that some toolkits add (e.g. `Custom/` prefix)
+    const normalized = String(currentModel).replace(/^custom\//i, '');
+
+    // Fallback chain: cloud → local 7b → local 3b → local 1.5b → null
     const fallbackChain = {
         // Cloud models (slow) → Local medium
         'qwen3-coder-next': 'qwen2.5-coder:7b',
@@ -226,12 +259,12 @@ export function getSmallerModel(currentModel) {
         'qwen2.5-coder:7b': 'qwen2.5-coder:3b',
         'qwen2.5-coder': 'qwen2.5-coder:3b',
 
-        // Local small (fast) → No more fallbacks
-        'qwen2.5-coder:3b': null,
+        // Local small (fast) → tiny
+        'qwen2.5-coder:3b': 'qwen2.5-coder:1.5b',
         'qwen2.5-coder:1.5b': null,
     };
 
-    return fallbackChain[currentModel] || null;
+    return fallbackChain[normalized] || null;
 }
 
 /**

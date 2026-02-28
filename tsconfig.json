@@ -1,85 +1,16 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "compilerOptions": {
-    "allowJs": true,
-    "checkJs": true,
-    "noEmit": true,
-    "incremental": true,
-    "tsBuildInfoFile": "/home/node/.cache/typescript/tsbuildinfo",
-
-    "target": "ES2024",
-    "lib": ["ES2024", "ES2022.Error", "DOM", "DOM.Iterable"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "verbatimModuleSyntax": true,
-    "resolvePackageJsonExports": true,
-    "resolvePackageJsonImports": true,
-    "downlevelIteration": true,
-
-    "strict": false,
-    "noImplicitAny": false,
-    // turning on strict mode revealed many errors; see DOCUMENTAÇÃO/STRICT_MIGRATION_CHECKLIST.md for tracking
-
-    "types": ["node"],
-    "skipLibCheck": true,
-    "maxNodeModuleJsDepth": 0,
-
-    "baseUrl": ".",
-    "paths": {
-      "#core/*": ["src/core/*"],
-      "#shared/*": ["src/shared/*"],
-      "#nerv/*": ["src/nerv/*"],
-      "#kernel/*": ["src/kernel/*"],
-      "#driver/*": ["src/driver/*"],
-      "#agent/*": ["src/agent/*"],
-      "#infra/*": ["src/infra/*"],
-      "#integration/*": ["src/integration/*"],
-      "#types/*": ["src/types/*"],
-      "#main": ["src/main.js"],
-      "#server/*": ["src/server/*"],
-      "#logic/*": ["src/logic/*"],
-      "#orchestrator/*": ["src/orchestrator/*"],
-      "#missions/*": ["src/missions/*"],
-      "#validation/*": ["src/validation/*"]
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./tsconfig.browser.json"
+    },
+    {
+      "path": "./tsconfig.tools.json"
     }
-  },
-  "include": [
-    "src/**/*",
-    "scripts/audit/**/*.mjs",
-    "scripts/check_forbidden_patterns.js",
-    "scripts/analyze-code-graph.js",
-    "scripts/diagnose-mcp.mjs",
-    "scripts/diagnose-lsp.mjs",
-    "*.config.js",
-    "*.config.mjs",
-    "*.config.cjs"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "build",
-    "coverage",
-    "logs",
-    "fila",
-    "respostas",
-    "artifacts",
-    "profile",
-    "public",
-    "backups",
-    "monitoring",
-    "tmp",
-    "analysis",
-    "local-login",
-    "DOCUMENTAÇÃO",
-    "src/dashboard-ui/**",
-    "vitest.config.js",
-    ".git",
-    "**/node_modules/**",
-    "**/*.min.js",
-    "**/*.map",
-    "**/bundle.js",
-    "**/*.bundle.js",
-    "**/*.d.ts.map",
-    "**/*.js.map"
-  ]
+  "display": "workspace solution"
 }

@@ -157,13 +157,39 @@ check_chromium_local() {
 
 main() {
     local exit_code=$EXIT_HEALTHY
+    local health="ok"
+    local npm_path=""
+    local node_path=""
 
-    # if post-start already marked degraded, propagate immediately
+    # post-start may report degraded for advisory issues; only explicit fatal states should fail healthcheck
     if [[ -f "/tmp/devcontainer-health.status" ]]; then
-        # use cat to avoid SC2188 warning
         health=$(cat "/tmp/devcontainer-health.status" 2>/dev/null || echo ok)
-        if [[ "${health}" != "ok" ]]; then
-            log_warn "health status file reports '${health}' (post-start)"
+        case "${health}" in
+            ok)
+                ;;
+            fatal|unhealthy)
+                log_error "health status file reports critical state '${health}' (post-start)"
+                exit_code=$EXIT_UNHEALTHY
+                ;;
+            *)
+                log_warn "health status file reports advisory state '${health}' (post-start)"
+                ;;
+        esac
+    fi
+
+    if command -v npm >/dev/null 2>&1; then
+        npm_path=$(command -v npm)
+        if [[ "${npm_path}" =~ ^/mnt/[A-Za-z]/ ]]; then
+            log_warn "npm resolve para um binário do Windows (${npm_path}); prefira Node/npm Linux para evitar problemas de UNC e subprocessos."
+        fi
+    else
+        log_warn "npm não encontrado no PATH."
+    fi
+
+    if command -v node >/dev/null 2>&1; then
+        node_path=$(command -v node)
+        if [[ "${node_path}" =~ ^/mnt/[A-Za-z]/ ]]; then
+            log_error "node resolve para um binário do Windows (${node_path}); isso é um estado crítico no ambiente Linux."
             exit_code=$EXIT_UNHEALTHY
         fi
     fi
@@ -184,7 +210,7 @@ main() {
     if [ $exit_code -eq $EXIT_HEALTHY ]; then
         log_ok "Container healthy"
     else
-        log_error "Container unhealthy (Node.js ausente)"
+        log_error "Container unhealthy (critical check failed)"
     fi
 
     # expose numeric code for external tooling (e.g. make info)

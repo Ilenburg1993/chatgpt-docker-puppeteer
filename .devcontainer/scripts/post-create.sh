@@ -62,11 +62,11 @@ safe_chown() { chown "$@" 2>/dev/null || true; }
 validate_ld_preload() {
   local val="${1:-}"
   if [[ -z "${val}" ]]; then
-    echo "⚠️  [post-create] LD_PRELOAD vazio; NSS pode não ativar" >&2
+    echo "⚠️  [post-create] LD_PRELOAD is empty; NSS may not activate" >&2
     return 1
   fi
   if (( ${#val} > 4096 )); then
-    echo "⚠️  [post-create] LD_PRELOAD length ${#val} > 4096; kernel pode truncar" >&2
+    echo "⚠️  [post-create] LD_PRELOAD length ${#val} exceeds kernel limit; may be truncated" >&2
   fi
   return 0
 }
@@ -97,15 +97,18 @@ audit_mounts() {
   local proj="${1:-}" user="${2:-}"
   echo -e "\n[2. Mount Analysis & Filesystem Context]"
 
-  if command -v mount >/dev/null 2>&1; then
+  if ! command -v mount >/dev/null 2>&1; then
+    echo "mount command not available"
+    if command -v findmnt >/dev/null 2>&1; then
+      findmnt --noheadings --target "${proj:-/workspaces}" 2>/dev/null || true
+    fi
+  elif command -v mount >/dev/null 2>&1; then
     local esc_project
     esc_project="$(printf '%s' "${proj}" | sed -e 's/[][\\.^$*+?()|{}]/\\&/g')"
     mount 2>/dev/null \
       | grep -E "(${esc_project}|/home/${user:-unknown})" 2>/dev/null \
       | column -t 2>/dev/null \
       || echo "Mount information unavailable or filtered."
-  elif command -v findmnt >/dev/null 2>&1; then
-    findmnt --noheadings --target "${proj:-/workspaces}" 2>/dev/null || echo "mount info unavailable"
   else
     echo "mount/findmnt indisponível"
   fi
@@ -199,6 +202,11 @@ if [[ ! -d "${LOG_DIR}" || ! -w "${LOG_DIR}" ]]; then
   LOG_FILE="${LOG_DIR}/post-create.log"
 fi
 readonly LOG_DIR LOG_FILE
+
+# Registra o estado bruto herdado do ambiente antes de redirecionar stdout/stderr para o logger.
+if [[ -z "${LD_PRELOAD:-}" ]]; then
+  validate_ld_preload "${LD_PRELOAD:-}" || true
+fi
 
 # Hash defensivo (best-effort)
 SCRIPT_HASH="unknown"

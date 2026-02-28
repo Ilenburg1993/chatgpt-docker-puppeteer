@@ -1,2 +1,8 @@
 rich>=13.0.0
 pydantic>=1.10.0
+
+# used for local debugging / agent inspector support
+# debugpy enables VSCode remote attach and agent-dev-cli provides
+# the `agentdev` wrapper that instruments the process for the inspector.
+debugpy>=1.6.0
+agent-dev-cli>=0.0.1

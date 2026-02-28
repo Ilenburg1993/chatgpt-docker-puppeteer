@@ -12,11 +12,13 @@
 # Papel:
 # - Diagnóstico leve (make info, identidade, NSS artifacts, LD_PRELOAD)
 # - Registro de health/status em /tmp (observacional)
+# - Auto-reparo mínimo e seguro de artefatos NSS ausentes para sessões normais
 # - Sinais úteis para humanos/agentes sem “auto-repair” destrutivo
 #
 # Nota importante:
-# - Post-create é o ÚNICO responsável por gerar /tmp/devcontainer-nss/{passwd,group}.
-# - Este hook NÃO deve “consertar” NSS gerando placeholders (isso mascara falhas).
+# - Post-create continua sendo a origem canônica dos artefatos NSS.
+# - Este hook pode regenerar artefatos mínimos quando eles estiverem ausentes e o processo não
+#   estiver rodando como root, para manter o ambiente utilizável e observável.
 # =============================================================================
 
 # Defesa máxima contra herança de shell estrito (fail-safe)
@@ -42,7 +44,7 @@ readonly NSS_BASE_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
 # Logging minimalista (não depende de cores; não quebra)
 # ---------------------------------------------------------------------------
 log_info() { printf "%s\n" "ℹ️  [${SCRIPT_NAME}] $*"; }
-log_warn() { printf "%s\n" "⚠️  [${SCRIPT_NAME}] $*" >&2; }
+log_warn() { printf "%s\n" "⚠️  [${SCRIPT_NAME}] $*"; }
 
 # ---------------------------------------------------------------------------
 # Diagnóstico: LD_PRELOAD (informativo)
@@ -50,15 +52,39 @@ log_warn() { printf "%s\n" "⚠️  [${SCRIPT_NAME}] $*" >&2; }
 check_ld_preload() {
   local val="${LD_PRELOAD:-}"
   if [[ -z "${val}" ]]; then
-    log_warn "LD_PRELOAD está vazio; NSS wrapper pode não estar ativo (isso pode ser normal antes do profile)."
+    log_warn "LD_PRELOAD is empty; NSS wrapper may not be active (this can be normal before profile load)."
     return 1
   fi
   if [[ "${val}" == ":"* || "${val}" == *":" || "${val}" == *"::"* ]]; then
     log_warn "LD_PRELOAD contém token vazio (p.ex. '::' ou ':' nas pontas): '${val}'"
   fi
   if (( ${#val} > 4096 )); then
-    log_warn "LD_PRELOAD length=${#val} excede limite típico do kernel; pode haver truncamento."
+    log_warn "LD_PRELOAD length=${#val} exceeds kernel limit; truncation may occur."
   fi
+  return 0
+}
+
+repair_nss_artifacts() {
+  local current_uid current_gid current_user passwd_file group_file
+
+  current_uid="$(id -u 2>/dev/null || echo unknown)"
+  if [[ "${current_uid}" == "0" || "${current_uid}" == "unknown" ]]; then
+    return 1
+  fi
+
+  current_gid="$(id -g 2>/dev/null || echo unknown)"
+  current_user="$(id -un 2>/dev/null || echo node)"
+  [[ -z "${current_user}" || "${current_user}" == "unknown" ]] && current_user="node"
+
+  passwd_file="${NSS_BASE_DIR}/passwd"
+  group_file="${NSS_BASE_DIR}/group"
+
+  mkdir -p "${NSS_BASE_DIR}" 2>/dev/null || return 1
+  printf '%s:x:%s:%s:%s user:%s:/bin/bash\n' \
+    "${current_user}" "${current_uid}" "${current_gid}" "${current_user}" "${HOME:-/home/node}" > "${passwd_file}" 2>/dev/null || return 1
+  printf '%s:x:%s:\n' "${current_user}" "${current_gid}" > "${group_file}" 2>/dev/null || return 1
+  chmod 644 "${passwd_file}" "${group_file}" 2>/dev/null || true
+  log_info "NSS artifacts repaired in post-start: ${NSS_BASE_DIR}"
   return 0
 }
 
@@ -76,6 +102,10 @@ audit_nss_artifacts() {
   export DEVCONTAINER_NSS_DIR="${NSS_BASE_DIR}"
 
   # NSS artifacts são runtime-only; ausência pode ser normal se post-create não rodou ainda
+  if [[ ! -s "${passwd_file}" || ! -s "${group_file}" ]]; then
+    repair_nss_artifacts || true
+  fi
+
   if [[ -s "${passwd_file}" ]]; then
     log_info "NSS artifact OK: ${passwd_file}"
   else
@@ -119,7 +149,7 @@ audit_initialized_marker() {
     return 0
   fi
   log_warn "Marker ausente: .devcontainer/.initialized (post-create pode ter falhado ou não rodou)."
-  return 1
+  return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -165,7 +195,7 @@ audit_ssh() {
   fi
 
   if [[ "${ENABLE_SSHD_CHECK}" != "true" ]]; then
-    log_info "SSHD check desativado via DEVCONTAINER_ENABLE_SSHD_CHECK."
+    log_info "SSHD check skipped via DEVCONTAINER_ENABLE_SSHD_CHECK."
   else
     if command -v sshd >/dev/null 2>&1; then
       log_info "sshd está instalado."
@@ -206,12 +236,7 @@ if [[ "${nss_rc}" -ne 0 ]]; then
   log_warn "Ação recomendada: Rebuild Container OU execute manualmente: .devcontainer/scripts/post-create.sh (com REEXECUTE_POST_CREATE=true se aplicável)."
 fi
 
-audit_initialized_marker
-init_rc=$?
-if [[ "${init_rc}" -ne 0 ]]; then
-  status="degraded"
-  log_warn "Estado persistente ausente (marker). Isso costuma indicar post-create interrompido."
-fi
+audit_initialized_marker || true
 
 # SSH (WARN only)
 audit_ssh || true

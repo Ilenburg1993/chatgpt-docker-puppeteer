@@ -4,6 +4,106 @@ import { promisify } from 'node:util';
 
 const execFile = promisify(execFileCb);
 
+/**
+ * @typedef {{
+ *     ok: boolean,
+ *     status: number | null,
+ *     json: Record<string, unknown> | null,
+ *     text: string,
+ *     error?: string
+ * }} McpToolCallResult
+ */
+
+/**
+ * @typedef {(name: string, args: Record<string, unknown>, options?: { timeoutMs?: number, id?: number }) => Promise<McpToolCallResult>} CallMcpToolOverride
+ */
+
+/**
+ * @typedef {{
+ *     ok: true,
+ *     stdout: string,
+ *     stderr: string
+ * } | {
+ *     ok: false,
+ *     error: string,
+ *     stdout: string,
+ *     stderr: string
+ * }} ScriptRunResult
+ */
+
+/**
+ * @typedef {{
+ *     ok: false,
+ *     error: string,
+ *     stdout: string,
+ *     stderr: string
+ * }} FailedScriptRunResult
+ */
+
+/**
+ * @typedef {{ scope_json?: Record<string, unknown> | null } | null} AuditAgentContextJob
+ */
+
+/**
+ * @typedef {{
+ *     runtime?: Record<string, unknown>,
+ *     inference_gateway?: Record<string, unknown>,
+ *     mcp_tools?: Record<string, unknown> | null,
+ *     semantic_quality?: string,
+ *     rag_quality?: string,
+ *     runtime_quality?: string
+ * }} AuditContext
+ */
+
+/**
+ * @typedef {object} AuditAgentContextBuilderOptions
+ * @property {CallMcpToolOverride} [callMcpTool]
+ */
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function asRecord(value) {
+    return value && typeof value === 'object' ? /** @type {Record<string, unknown>} */ (value) : null;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function getErrorMessage(error) {
+    const errorData = asRecord(error);
+    const message = errorData?.message;
+    return typeof message === 'string' ? message : String(error);
+}
+
+/**
+ * @param {unknown} error
+ * @param {'stdout' | 'stderr'} field
+ * @returns {string}
+ */
+function getExecErrorOutput(error, field) {
+    const errorData = asRecord(error);
+    const value = errorData?.[field];
+    return typeof value === 'string' ? value : '';
+}
+
+/**
+ * @param {Record<string, unknown> | null} json
+ * @returns {Record<string, unknown> | null}
+ */
+function getStructuredContentData(json) {
+    const result = asRecord(json?.result);
+    const structuredContent = asRecord(result?.structuredContent);
+    return asRecord(structuredContent?.data);
+}
+
+/**
+ * @param {unknown} text
+ * @param {unknown} [fallback=null]
+ * @returns {unknown}
+ */
 function parseJsonSafe(text, fallback = null) {
     try {
         return text ? JSON.parse(String(text)) : fallback;
@@ -18,6 +118,11 @@ function getServerBaseUrl() {
     return `http://${host}:${port}`;
 }
 
+/**
+ * @param {string[]} scriptArgs
+ * @param {number} [timeoutMs=10000]
+ * @returns {Promise<ScriptRunResult>}
+ */
 async function runNodeScript(scriptArgs, timeoutMs = 10000) {
     try {
         /** @type {Record<string, string|undefined>} */
@@ -33,9 +138,9 @@ async function runNodeScript(scriptArgs, timeoutMs = 10000) {
     } catch (error) {
         return {
             ok: false,
-            error: error?.message || String(error),
-            stdout: error?.stdout || '',
-            stderr: error?.stderr || '',
+            error: getErrorMessage(error),
+            stdout: getExecErrorOutput(error, 'stdout'),
+            stderr: getExecErrorOutput(error, 'stderr'),
         };
     }
 }
@@ -55,19 +160,65 @@ async function probeInferenceGateway() {
             }),
         ]);
         const health = parseJsonSafe(await healthRes.text(), null);
-        const models = parseJsonSafe(await modelsRes.text(), null);
+        const models = asRecord(parseJsonSafe(await modelsRes.text(), null));
+        const modelEntries = models && Array.isArray(models.models) ? models.models : null;
         return {
             ok: healthRes.ok,
             status: healthRes.status,
             models_ok: modelsRes.ok,
-            models_count: Array.isArray(models?.models) ? models.models.length : null,
+            models_count: modelEntries ? modelEntries.length : null,
             health,
         };
     } catch (error) {
-        return { ok: false, status: null, error: error?.message || String(error) };
+        return { ok: false, status: null, error: getErrorMessage(error) };
     }
 }
 
+// simple in-memory cache for MCP LSP calls; keys include tool name so
+// we can reuse both definition and reference responses. The cache is kept
+// at module scope so that repeated invocations of the context builder share
+// data (useful when the agent processes multiple jobs on the same file).
+// Note: No TTL is implemented, but max size limits prevent unbounded growth.
+const MAX_CACHE_SIZE = 100;
+/** @type {Map<string, McpToolCallResult>} */
+const _mcpLspCache = new Map();
+
+/**
+ * @param {string} tool
+ * @param {string} filePath
+ * @param {number} line
+ * @param {number} character
+ * @returns {string}
+ */
+function _cacheKey(tool, filePath, line, character) {
+    return `${tool}|${filePath}|${line}|${character}`;
+}
+
+function _ensureCacheSpace() {
+    // Evict oldest entries if cache exceeds max size (FIFO)
+    while (_mcpLspCache.size >= MAX_CACHE_SIZE) {
+        const firstKey = _mcpLspCache.keys().next().value;
+        if (typeof firstKey !== 'string') {
+            break;
+        }
+        _mcpLspCache.delete(firstKey);
+    }
+}
+
+function _clearMcpLspCache() {
+    _mcpLspCache.clear();
+}
+
+function _getMcpLspCacheSize() {
+    return _mcpLspCache.size;
+}
+
+/**
+ * @param {string} name
+ * @param {Record<string, unknown>} args
+ * @param {{ timeoutMs?: number, id?: number }} [options]
+ * @returns {Promise<McpToolCallResult>}
+ */
 async function callMcpTool(name, args, { timeoutMs = 5000, id = 1 } = {}) {
     const baseUrl = getServerBaseUrl();
     try {
@@ -83,7 +234,7 @@ async function callMcpTool(name, args, { timeoutMs = 5000, id = 1 } = {}) {
             signal: AbortSignal.timeout(timeoutMs),
         });
         const text = await res.text();
-        const json = parseJsonSafe(text, null);
+        const json = asRecord(parseJsonSafe(text, null));
         return {
             ok: res.ok && !json?.error,
             status: res.status,
@@ -94,15 +245,23 @@ async function callMcpTool(name, args, { timeoutMs = 5000, id = 1 } = {}) {
         return {
             ok: false,
             status: null,
-            error: error?.message || String(error),
+            error: getErrorMessage(error),
             json: null,
             text: '',
         };
     }
 }
 
-async function collectMcpSemanticContext(job) {
-    const scope = job?.scope_json && typeof job.scope_json === 'object' ? job.scope_json : {};
+/**
+ * @param {AuditAgentContextJob} job
+ * @param {CallMcpToolOverride | undefined} callToolOverride
+ * @returns {Promise<{ tools: Record<string, unknown>, raw: Record<string, unknown> }>}
+ */
+async function collectMcpSemanticContext(job, callToolOverride) {
+    // allows tests or external callers to provide a fake MCP tool implementation
+    const call = callToolOverride || callMcpTool;
+
+    const scope = asRecord(job?.scope_json) || {};
     const filePath = String(scope.filePath || scope.file_path || 'src/main.js');
     const line = Math.max(1, Number(scope.line || 1));
     const character = Math.max(1, Number(scope.character || 1));
@@ -121,67 +280,83 @@ async function collectMcpSemanticContext(job) {
     spend();
     spend();
     const [lspDiagnostics, ragSearch] = await Promise.all([
-        callMcpTool('lsp_diagnostics', { filePath, maxResults: 20 }, { timeoutMs: 5000, id: 201 }),
-        callMcpTool(
-            'rag_search',
-            { query, topK: 2, mode: 'auto', includeDiagnostics: true },
-            { timeoutMs: 8000, id: 202 }
-        ),
+        call('lsp_diagnostics', { filePath, maxResults: 20 }, { timeoutMs: 5000, id: 201 }),
+        call('rag_search', { query, topK: 2, mode: 'auto', includeDiagnostics: true }, { timeoutMs: 8000, id: 202 }),
     ]);
 
-    const lspData = lspDiagnostics.json?.result?.structuredContent?.data || null;
-    const ragData = ragSearch.json?.result?.structuredContent?.data || null;
+    const lspData = getStructuredContentData(lspDiagnostics.json);
+    const ragData = getStructuredContentData(ragSearch.json);
 
     // Optional targeted definition probe when diagnostics path is usable.
+    /** @type {McpToolCallResult | null} */
     let lspDefinition = null;
     if (lspDiagnostics.ok) {
-        if (canSpend()) {
+        const defKey = _cacheKey('lsp_definition', filePath, line, character);
+        if (_mcpLspCache.has(defKey)) {
+            // cache hit, no budget spent
+            lspDefinition = _mcpLspCache.get(defKey) || null;
+        } else if (canSpend()) {
             spend();
-            lspDefinition = await callMcpTool(
+            lspDefinition = await call(
                 'lsp_definition',
                 { filePath, line, character, maxResults: 10 },
                 { timeoutMs: 5000, id: 203 }
             );
+            if (lspDefinition.ok) {
+                _ensureCacheSpace();
+                _mcpLspCache.set(defKey, lspDefinition);
+            }
         }
     }
-    const defData = lspDefinition?.json?.result?.structuredContent?.data || null;
+    const defData = getStructuredContentData(lspDefinition?.json || null);
 
-    /** @type {any} */
+    /** @type {McpToolCallResult | null} */
     let ragExpand = null;
-    const firstChunkId = ragData?.results?.[0]?.chunk_id || null;
+    const ragResults = ragData && Array.isArray(ragData.results) ? ragData.results : null;
+    const firstChunk = asRecord(ragResults?.[0]);
+    const firstChunkId = firstChunk?.chunk_id || null;
     if (ragSearch.ok && firstChunkId && canSpend()) {
         spend();
-        ragExpand = await callMcpTool(
+        ragExpand = await call(
             'rag_expand',
             { chunk_id: firstChunkId, mode: 'lines', before_lines: 20, after_lines: 20 },
             { timeoutMs: 5000, id: 204 }
         );
     }
-    const ragExpandData = ragExpand?.json?.result?.structuredContent?.data || null;
+    const ragExpandData = getStructuredContentData(ragExpand?.json || null);
 
-    /** @type {any} */
+    /** @type {McpToolCallResult | null} */
     let lspReferences = null;
-    if (lspDefinition?.ok && canSpend()) {
-        spend();
-        lspReferences = await callMcpTool(
-            'lsp_references',
-            { filePath, line, character, maxResults: 20 },
-            { timeoutMs: 5000, id: 205 }
-        );
+    if (lspDefinition?.ok) {
+        const refKey = _cacheKey('lsp_references', filePath, line, character);
+        if (_mcpLspCache.has(refKey)) {
+            lspReferences = _mcpLspCache.get(refKey) || null;
+        } else if (canSpend()) {
+            spend();
+            lspReferences = await call(
+                'lsp_references',
+                { filePath, line, character, maxResults: 20 },
+                { timeoutMs: 5000, id: 205 }
+            );
+            if (lspReferences.ok) {
+                _ensureCacheSpace();
+                _mcpLspCache.set(refKey, lspReferences);
+            }
+        }
     }
-    const refsData = lspReferences?.json?.result?.structuredContent?.data || null;
+    const refsData = getStructuredContentData(lspReferences?.json || null);
 
-    /** @type {any} */
+    /** @type {McpToolCallResult | null} */
     let lspDocumentSymbols = null;
     if (canSpend()) {
         spend();
-        lspDocumentSymbols = await callMcpTool(
+        lspDocumentSymbols = await call(
             'lsp_document_symbols',
             { filePath, maxResults: 100 },
             { timeoutMs: 5000, id: 206 }
         );
     }
-    const symbolsData = lspDocumentSymbols?.json?.result?.structuredContent?.data || null;
+    const symbolsData = getStructuredContentData(lspDocumentSymbols?.json || null);
 
     return {
         tools: {
@@ -243,15 +418,23 @@ async function collectMcpSemanticContext(job) {
     };
 }
 
+/**
+ * @param {AuditContext} context
+ * @returns {Array<Record<string, unknown>>}
+ */
 function deriveContextFindings(context) {
-    /** @type {any[]} */
+    /** @type {Array<Record<string, unknown>>} */
     const findings = [];
-    const runtime = context.runtime || {};
-    const mcp = runtime.mcp || {};
-    const rag = runtime.rag || {};
-    const lsp = runtime.lsp || {};
-    const inf = context.inference_gateway || {};
-    const mcpTools = context.mcp_tools || {};
+    const runtime = asRecord(context.runtime) || {};
+    const mcp = asRecord(runtime.mcp) || {};
+    const rag = asRecord(runtime.rag) || {};
+    const lsp = asRecord(runtime.lsp) || {};
+    const inf = asRecord(context.inference_gateway) || {};
+    const mcpTools = asRecord(context.mcp_tools) || {};
+    const lspDiagnosticsTool = asRecord(mcpTools.lsp_diagnostics);
+    const ragSearchTool = asRecord(mcpTools.rag_search);
+    const ragExpandTool = asRecord(mcpTools.rag_expand);
+    const lspReferencesTool = asRecord(mcpTools.lsp_references);
 
     if (!mcp.ok) {
         findings.push({
@@ -294,44 +477,44 @@ function deriveContextFindings(context) {
         });
     }
 
-    if (mcpTools.lsp_diagnostics && mcpTools.lsp_diagnostics.ok === false) {
+    if (lspDiagnosticsTool && lspDiagnosticsTool.ok === false) {
         findings.push({
             severity: 'warning',
             category: 'semantic',
             title: 'MCP lsp_diagnostics falhou no context builder',
             source: 'audit-agent',
             dedup_key: 'ctx:mcp:lsp_diagnostics:fail',
-            evidence: { tool: 'lsp_diagnostics', details: mcpTools.lsp_diagnostics },
+            evidence: { tool: 'lsp_diagnostics', details: lspDiagnosticsTool },
         });
     }
-    if (mcpTools.rag_search && mcpTools.rag_search.ok === false) {
+    if (ragSearchTool && ragSearchTool.ok === false) {
         findings.push({
             severity: 'warning',
             category: 'context',
             title: 'MCP rag_search falhou no context builder',
             source: 'audit-agent',
             dedup_key: 'ctx:mcp:rag_search:fail',
-            evidence: { tool: 'rag_search', details: mcpTools.rag_search },
+            evidence: { tool: 'rag_search', details: ragSearchTool },
         });
     }
-    if (mcpTools.rag_expand && mcpTools.rag_expand.ok === false && !mcpTools.rag_expand.skipped) {
+    if (ragExpandTool && ragExpandTool.ok === false && !ragExpandTool.skipped) {
         findings.push({
             severity: 'info',
             category: 'context',
             title: 'MCP rag_expand não disponível para enriquecimento (seguindo sem expand)',
             source: 'audit-agent',
             dedup_key: 'ctx:mcp:rag_expand:fail',
-            evidence: { tool: 'rag_expand', details: mcpTools.rag_expand },
+            evidence: { tool: 'rag_expand', details: ragExpandTool },
         });
     }
-    if (mcpTools.lsp_references && mcpTools.lsp_references.ok === false && !mcpTools.lsp_references.skipped) {
+    if (lspReferencesTool && lspReferencesTool.ok === false && !lspReferencesTool.skipped) {
         findings.push({
             severity: 'info',
             category: 'semantic',
             title: 'MCP lsp_references falhou (seguindo com contexto reduzido)',
             source: 'audit-agent',
             dedup_key: 'ctx:mcp:lsp_references:fail',
-            evidence: { tool: 'lsp_references', details: mcpTools.lsp_references },
+            evidence: { tool: 'lsp_references', details: lspReferencesTool },
         });
     }
 
@@ -354,7 +537,28 @@ function deriveContextFindings(context) {
     return findings;
 }
 
-export function createAuditAgentContextBuilder() {
+/**
+ * @param {ScriptRunResult} probe
+ * @param {unknown} parsedJson
+ * @returns {Record<string, unknown>}
+ */
+function buildProbeState(probe, parsedJson) {
+    if (probe.ok) {
+        return { ok: true, ...(asRecord(parsedJson) || {}) };
+    }
+
+    const failedProbe = /** @type {FailedScriptRunResult} */ (probe);
+    return {
+        ok: false,
+        error: failedProbe.error,
+        stderr: failedProbe.stderr || '',
+    };
+}
+
+/**
+ * @param {AuditAgentContextBuilderOptions} [options={}]
+ */
+export function createAuditAgentContextBuilder({ callMcpTool: callOverride } = {}) {
     return {
         async collectQuickContext(job = null) {
             const [mcpProbe, ragProbe, lspProbe, infProbe] = await Promise.all([
@@ -371,19 +575,13 @@ export function createAuditAgentContextBuilder() {
             const shouldInvokeMcpTools =
                 mcpProbe.ok &&
                 String(process.env.AUDIT_AGENT_CONTEXT_USE_MCP_TOOLS || 'true').toLowerCase() !== 'false';
-            const mcpSemantic = shouldInvokeMcpTools ? await collectMcpSemanticContext(job) : null;
+            const mcpSemantic = shouldInvokeMcpTools ? await collectMcpSemanticContext(job, callOverride) : null;
 
             const context = {
                 runtime: {
-                    mcp: mcpProbe.ok
-                        ? { ok: true, ...(mcpJson || {}) }
-                        : { ok: false, error: mcpProbe.error, stderr: mcpProbe.stderr || '' },
-                    rag: ragProbe.ok
-                        ? { ok: true, ...(ragJson || {}) }
-                        : { ok: false, error: ragProbe.error, stderr: ragProbe.stderr || '' },
-                    lsp: lspProbe.ok
-                        ? { ok: true, ...(lspJson || {}) }
-                        : { ok: false, error: lspProbe.error, stderr: lspProbe.stderr || '' },
+                    mcp: buildProbeState(mcpProbe, mcpJson),
+                    rag: buildProbeState(ragProbe, ragJson),
+                    lsp: buildProbeState(lspProbe, lspJson),
                 },
                 inference_gateway: infProbe,
                 mcp_tools: mcpSemantic?.tools || null,
@@ -401,5 +599,13 @@ export function createAuditAgentContextBuilder() {
                 patches: [],
             };
         },
+        // expose semantic context collector so callers (and tests) can invoke
+        // it directly. bind callOverride so the stub injected into the builder
+        // applies uniformly.
+        async collectMcpSemanticContext(job = null) {
+            return collectMcpSemanticContext(job, callOverride);
+        },
     };
 }
+// Exported helpers for testing and external introspection
+export { callMcpTool, _clearMcpLspCache, _getMcpLspCacheSize };

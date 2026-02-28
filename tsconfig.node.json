@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.node.tsbuildinfo",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024", "ES2022.Error", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*",
+    "scripts/audit/**/*.mjs",
+    "scripts/check_forbidden_patterns.js",
+    "scripts/analysis/analyze-code-graph.js",
+    "scripts/health/diagnose-mcp.mjs",
+    "scripts/health/diagnose-lsp.mjs",
+    "scripts/build/build.mjs",
+    "scripts/build/build-sea.mjs",
+    "*.config.js",
+    "*.config.mjs",
+    "*.config.cjs",
+    ".puppeteerrc.cjs"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "logs",
+    "fila",
+    "respostas",
+    "artifacts",
+    "profile",
+    "public",
+    "backups",
+    "monitoring",
+    "tmp",
+    "analysis",
+    "local-login",
+    "DOCUMENTAÇÃO",
+    "src/dashboard-ui/**",
+    "vitest.config.js",
+    ".git",
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/*.map",
+    "**/bundle.js",
+    "**/*.bundle.js",
+    "**/*.d.ts.map",
+    "**/*.js.map"
+  ]
+}

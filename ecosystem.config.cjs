@@ -48,6 +48,27 @@ const NODE_ARGS_BASE = [
     // Removed: --trace-gc-ignored-scavenger (not supported in Node.js 20)
 ];
 
+// ----------------------------------------------------------------------------
+// Debug helper: if DEBUG_PORT is set in the environment, automatically expose the
+// inspector on that port. This mirrors the behavior of
+// scripts/ops/start-pm2-debug.sh and lets developers run
+//
+//     DEBUG_PORT=9229 npm run daemon:start
+//
+// without editing the ecosystem file manually. Values are additive so multiple
+// ports can be supplied as a comma-separated list.
+// ----------------------------------------------------------------------------
+const debugPortEnv = process.env.DEBUG_PORT;
+if (debugPortEnv) {
+    const ports = debugPortEnv
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean);
+    for (const p of ports) {
+        NODE_ARGS_BASE.push(`--inspect=0.0.0.0:${p}`);
+    }
+}
+
 module.exports = {
     apps: [
         /* =====================================================================
