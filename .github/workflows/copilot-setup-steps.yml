@@ -109,7 +109,36 @@ jobs:
           lfs: false
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 1. NODE.JS 24 LTS
+      # 1. PROJECT INSTRUCTIONS
+      # Exibe as orientações canônicas do projeto no log do job para que o
+      # agente possa consultá-las durante a sessão. Os arquivos são:
+      #   • .github/copilot-instructions.md  — guia operacional completo
+      #   • .github/AGENTS.md               — baseline universal multi-agente
+      #   • .github/instructions/project-canon.instructions.md — baseline curto
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Load project instructions
+        run: |
+          INSTRUCTIONS=(
+            ".github/copilot-instructions.md"
+            ".github/AGENTS.md"
+            ".github/instructions/project-canon.instructions.md"
+          )
+          for file in "${INSTRUCTIONS[@]}"; do
+            if [ -f "$file" ]; then
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "📄  $file"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              cat "$file"
+            else
+              echo "⚠️  $file — não encontrado"
+            fi
+          done
+          echo ""
+          echo "✅ Instruções do projeto carregadas"
+
+      # ═══════════════════════════════════════════════════════════════════
+      # 2. NODE.JS 24 LTS
       # setup-node@v6 com cache:npm gerencia ~/.npm automaticamente.
       # A chave de cache é baseada em package-lock.json — garante que mudanças
       # de dependências invalidam o cache.
@@ -124,7 +153,7 @@ jobs:
         run: node scripts/ci/check-node-version.mjs
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 2. PREFIXO npm GLOBAL (isolado e cacheável)
+      # 3. PREFIXO npm GLOBAL (isolado e cacheável)
       # Usa ~/npm-global em vez de /usr/local para:
       #   • não exigir sudo em npm install -g
       #   • permitir cache via actions/cache@v4 (step 3)
@@ -140,7 +169,7 @@ jobs:
           echo "✅ npm global prefix: $NPM_GLOBAL"
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 3. CACHE — Ferramentas globais npm (camada 3 de cache)
+      # 4. CACHE — Ferramentas globais npm (camada 3 de cache)
       # Cache da instalação de PM2, TypeScript, pnpm, ts-lsp, devcontainer CLI.
       # Chave baseada no hash do workflow → qualquer mudança de versão invalida.
       # ═══════════════════════════════════════════════════════════════════════
@@ -154,7 +183,7 @@ jobs:
             ${{ runner.os }}-npm-global-v4-
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 4. CACHE — node_modules dashboard-ui (camada 2 de cache)
+      # 5. CACHE — node_modules dashboard-ui (camada 2 de cache)
       # O workspace Vue.js/Vite tem package-lock.json próprio.
       # O cache de node_modules raiz (camada 1) NÃO cobre este workspace.
       # ═══════════════════════════════════════════════════════════════════════
@@ -168,7 +197,7 @@ jobs:
             ${{ runner.os }}-dashboard-ui-v3-
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 5. CACHE — packages Python (camada 4 de cache)
+      # 6. CACHE — packages Python (camada 4 de cache)
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: Python pip"
         uses: actions/cache@v4
@@ -179,7 +208,7 @@ jobs:
             ${{ runner.os }}-pip-v2-
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 6A. apt — FERRAMENTAS BASE (espelha SECTION 6 do Dockerfile)
+      # 7A. apt — FERRAMENTAS BASE (espelha SECTION 6 do Dockerfile)
       # Ferramentas de desenvolvimento, navegação e diagnóstico usadas pelo
       # agente ao executar scripts de análise, linting e busca de código.
       # ═══════════════════════════════════════════════════════════════════════
@@ -236,7 +265,7 @@ jobs:
           echo "✅ Ferramentas base instaladas"
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 6B. apt — FERRAMENTAS ESPECIALIZADAS (análise, dados, segurança)
+      # 7B. apt — FERRAMENTAS ESPECIALIZADAS (análise, dados, segurança)
       # sqlite3: necessário para better-sqlite3 e queries diretas no DB
       # redis-tools: conectar ao Redis de testes de integração
       # graphviz: npm run analyze:deps --diagram
@@ -261,7 +290,7 @@ jobs:
           echo "✅ Ferramentas especializadas instaladas"
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 7. PYTHON 3 + FERRAMENTAS DE BUILD (espelha SECTION 3 do Dockerfile)
+      # 8. PYTHON 3 + FERRAMENTAS DE BUILD (espelha SECTION 3 do Dockerfile)
       # Necessário para:
       #   • node-gyp: compila melhor-sqlite3 e outros módulos nativos C++
       #   • scripts Python: agents/code_explainer, colect.py, análise
@@ -287,7 +316,7 @@ jobs:
           python3 -c "print('✅ Python 3 OK')"
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 8. DOCKER CLI (sem dockerd — espelha SECTION 7 do Dockerfile)
+      # 9. DOCKER CLI (sem dockerd — espelha SECTION 7 do Dockerfile)
       # O agente pode usar docker/docker compose para tarefas de infraestrutura.
       # OPCIONAL: falha não impede o agente de trabalhar em tarefas de código.
       # ═══════════════════════════════════════════════════════════════════════
@@ -312,7 +341,7 @@ jobs:
         continue-on-error: true
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 9. yq (YAML processor) — versão fixada do Dockerfile
+      # 10. yq (YAML processor) — versão fixada do Dockerfile
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Install yq (YAML processor) — pinned version"
         run: |
@@ -324,7 +353,7 @@ jobs:
         continue-on-error: true
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 10. gh CLI — versão pinada com verificação de checksum SHA-256
+      # 11. gh CLI — versão pinada com verificação de checksum SHA-256
       # Espelha instalação canônica do .devcontainer/Dockerfile.
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Install gh CLI — pinned with checksum"
@@ -345,7 +374,7 @@ jobs:
         continue-on-error: true
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 11. actionlint + hadolint — versões pinadas com checksum SHA-256
+      # 12. actionlint + hadolint — versões pinadas com checksum SHA-256
       # Necessários para: npm run check:workflows:lint, check:dockerfile:lint
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Install actionlint + hadolint — pinned with checksum"
@@ -389,7 +418,7 @@ jobs:
         continue-on-error: true
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 12. FERRAMENTAS GLOBAIS npm (usa cache se disponível — economiza ~90s)
+      # 13. FERRAMENTAS GLOBAIS npm (usa cache se disponível — economiza ~90s)
       # Espelha SECTION 3 do Dockerfile.
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Install global npm tools (PM2, TypeScript, pnpm, devcontainer CLI)"
@@ -415,7 +444,7 @@ jobs:
           printf "devcontainer: %s\n" "$(devcontainer --version 2>/dev/null || echo 'n/a')"
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 13. DEPENDÊNCIAS DO PROJETO (npm ci com scripts nativos)
+      # 14. DEPENDÊNCIAS DO PROJETO (npm ci com scripts nativos)
       # NÃO usa --ignore-scripts: better-sqlite3 e outros módulos nativos
       # precisam executar pós-instalação (node-gyp compile).
       # ═══════════════════════════════════════════════════════════════════════
@@ -443,7 +472,7 @@ jobs:
         continue-on-error: true
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 14. DASHBOARD-UI (Vue.js + Vite)
+      # 15. DASHBOARD-UI (Vue.js + Vite)
       # ═══════════════════════════════════════════════════════════════════════
       - name: "dashboard-ui: install dependencies"
         if: steps.cache-dashboard-deps.outputs.cache-hit != 'true'
@@ -461,7 +490,7 @@ jobs:
         continue-on-error: true
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 15. GIT CONFIG
+      # 16. GIT CONFIG
       # ═══════════════════════════════════════════════════════════════════════
       - name: Configure Git identity
         run: |
@@ -475,7 +504,7 @@ jobs:
           echo "✅ Git configurado"
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 16. SMOKE CHECKS (não bloqueiam o agente)
+      # 17. SMOKE CHECKS (não bloqueiam o agente)
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Lint smoke check (non-blocking)"
         run: npm run lint -- --max-warnings 150 2>&1 | tail -5 || true
@@ -488,7 +517,7 @@ jobs:
         continue-on-error: true
 
       # ═══════════════════════════════════════════════════════════════════════
-      # 17. ENVIRONMENT SUMMARY
+      # 18. ENVIRONMENT SUMMARY
       # ═══════════════════════════════════════════════════════════════════════
       - name: Environment summary
         run: |
