@@ -114,6 +114,33 @@ _seed_nss_artifacts_if_missing() {
   return 0
 }
 
+_normalize_inherited_nss_env() {
+  local current_passwd="${NSS_WRAPPER_PASSWD:-}"
+  local current_group="${NSS_WRAPPER_GROUP:-}"
+  local fallback_passwd="/etc/passwd"
+  local fallback_group="/etc/group"
+
+  # Keep already valid bindings untouched.
+  if [[ -n "${current_passwd}" && -n "${current_group}" && -s "${current_passwd}" && -s "${current_group}" ]]; then
+    _dc_dbg "inherited NSS env already valid"
+    return 0
+  fi
+
+  # Repair broken or partial bindings to a stable baseline that always exists in the image.
+  if [[ -r "${fallback_passwd}" && -r "${fallback_group}" ]]; then
+    export NSS_WRAPPER_PASSWD="${fallback_passwd}"
+    export NSS_WRAPPER_GROUP="${fallback_group}"
+    _dc_dbg "normalized inherited NSS env to stable /etc baseline"
+    return 0
+  fi
+
+  # Last resort: avoid propagating a broken partial NSS configuration.
+  unset NSS_WRAPPER_PASSWD 2>/dev/null || true
+  unset NSS_WRAPPER_GROUP 2>/dev/null || true
+  _dc_dbg "could not normalize NSS env; unset broken bindings"
+  return 0
+}
+
 # ---- main ------------------------------------------------------------------
 
 # Must have a command
@@ -134,6 +161,10 @@ export DEVCONTAINER_NSS_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
 # Seed fallback artifacts early so later remote-exec / VS Code processes can
 # safely preload nss_wrapper without racing a missing file.
 _seed_nss_artifacts_if_missing || true
+
+# Repair inherited NSS paths before snapshot/merge logic so stale overrides do
+# not leak into the child process when profile activation is skipped or partial.
+_normalize_inherited_nss_env || true
 
 # Snapshot original env
 OLD_LD_PRELOAD="${LD_PRELOAD:-}"

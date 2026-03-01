@@ -30,4 +30,22 @@ describe('nss-gatekeeper entrypoint wrapper', () => {
         assert.ok(out.includes('DEVCONTAINER_LD_PRELOAD_FROM_PROFILE=/tmp/fakelib.so'));
         rmSync(fake, { recursive: true, force: true });
     });
+
+    it('repairs broken inherited NSS bindings to the stable /etc baseline', () => {
+        const fake = mkdtempSync(join(tmpdir(), 'gate-'));
+        const prof = join(fake, '10-gatekeeper-nss.sh');
+        // No-op override: this keeps the test independent from the host profile
+        // while exercising the wrapper normalization path.
+        writeFileSync(prof, ':');
+        const env = {
+            ...process.env,
+            DEVCONTAINER_NSS_DIR: fake,
+            NSS_WRAPPER_PASSWD: '/tmp/missing-passwd',
+            NSS_WRAPPER_GROUP: '/tmp/missing-group',
+        };
+        const out = execSync(`bash "${wrapper}" env`, { env }).toString();
+        assert.ok(out.includes('NSS_WRAPPER_PASSWD=/etc/passwd'));
+        assert.ok(out.includes('NSS_WRAPPER_GROUP=/etc/group'));
+        rmSync(fake, { recursive: true, force: true });
+    });
 });

@@ -31,6 +31,13 @@ O DevContainer usa:
 Isso significa que a imagem final depende do `Dockerfile` do projeto e de argumentos de build
 controlados, não de uma imagem pronta genérica.
 
+Leitura importante:
+
+- o arquivo não declara `features` do catálogo Dev Containers;
+- isso é intencional: um bloco vazio de `features` força um Dockerfile intermediário inútil e pode
+  gerar warning de `ARG BASE_IMAGE` sem default durante o rebuild;
+- o tooling relevante é instalado diretamente no `Dockerfile`, sob controle explícito do projeto.
+
 ### Tooling de imagem já embutido
 
 O `Dockerfile` agora entrega um baseline mais completo e determinístico para o próprio ciclo de
@@ -79,10 +86,10 @@ Leitura importante:
 - o DevContainer não deve “decidir” topologia por conta própria;
 - o endpoint canônico de Puppeteer dentro do container continua sendo `localhost:9224`.
 - `FORCE_COLOR` não é mais exportado globalmente; cor forçada deve ser por processo.
-- o NSS wrapper agora é híbrido: `nss-gatekeeper` semeia artefatos cedo, `containerEnv` carrega
-  `LD_PRELOAD` e também `NSS_WRAPPER_*` já apontando para os artefatos seedados, e `remoteEnv`
-  mantém a mesma superfície para processos do VS Code; isso cobre a lacuna que `profile.d` sozinho
-  não cobre.
+- o NSS wrapper agora é híbrido: `nss-gatekeeper` semeia artefatos cedo, `containerEnv` e
+  `remoteEnv` expõem uma baseline segura (`LD_PRELOAD` + `NSS_WRAPPER_*` apontando para `/etc`) e
+  o fluxo de profile/hook pode promover isso para os artefatos dinâmicos em `/tmp`; isso cobre a
+  lacuna que `profile.d` sozinho não cobre sem depender de arquivos efêmeros no bootstrap.
 - `CODEX_HOME` e os paths do NSS não precisam mais ficar duplicados em `remoteEnv`: o arquivo usa
   `${containerEnv:*}` para reaproveitar a mesma fonte de verdade nesses valores fixos.
 
