@@ -45,6 +45,7 @@ Ele:
 - confirma com `npm view` se a versão de correção sugerida existe no registry, exigindo
   consistência entre o packument do pacote (`versions` e `time`) e o manifesto da versão exata
   (`dist.tarball`);
+- valida também a alcançabilidade real do tarball antes de classificar o finding como bloqueante;
 - separa findings entre:
   - `actionable`
   - `manual-review`

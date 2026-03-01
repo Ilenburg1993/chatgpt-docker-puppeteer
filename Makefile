@@ -9,8 +9,11 @@
 # • Compatível com Docker / DevContainer do zero
 # • Alinhado com package.json scripts (95% coverage)
 #
-# Versão: 4.1.0
-# Data:   2026-02-15
+# Versão: 4.1.1
+# Data:   2026-03-01
+# Changelog v4.1.1:
+#   - Consolidação de validações de DevContainer, Dockerfile e GitHub/Actions
+#   - Novos targets validate-devcontainer, validate-dockerfile, validate-github e validate-platform
 # Changelog v4.1:
 #   - Expansão abrangente dos comandos de RAG e Audit (execução + operação)
 #   - Novos targets para rebuild/index sem docs, docs-only e modo estrito
@@ -123,6 +126,11 @@ help:
 	@echo "  $(CYAN)make validate$(NC)          Validar config.json"
 	@echo "  $(CYAN)make validate-all$(NC)      Validação completa (check+lint+format+test)"
 	@echo "  $(CYAN)make validate-env$(NC)      Validar arquivos .env"
+	@echo "  $(CYAN)make validate-devcontainer$(NC) Validar devcontainer + drift"
+	@echo "  $(CYAN)make validate-dockerfile$(NC)   Lint do Dockerfile"
+	@echo "  $(CYAN)make validate-github$(NC)       Validar workflows GitHub locais"
+	@echo "  $(CYAN)make validate-github-remote$(NC) Validar workflows GitHub remotos"
+	@echo "  $(CYAN)make validate-platform$(NC)     Validação consolidada de plataforma/CI"
 	@echo "  $(CYAN)make validate-git$(NC)      Validar configurações Git"
 	@echo "  $(CYAN)make mcp-diagnose$(NC)      Diagnóstico MCP (RAG/LSP/Ollama)"
 	@echo "  $(CYAN)make lsp-health$(NC)        Diagnóstico funcional LSP via MCP"
@@ -224,17 +232,17 @@ info:
 	@echo "  npm:  $(GREEN)$$($(NPM) --version 2>/dev/null || echo 'não instalado')$(NC)"
 	@echo "  PM2:  $(GREEN)$$($(PM2) --version 2>/dev/null || echo 'não disponível')$(NC)"
 	@echo "  Diretório: $(BOLD)$$(pwd)$(NC)"
-	@echo "  Makefile: $(BOLD)v4.1.0$(NC)"
+	@echo "  Makefile: $(BOLD)v4.1.1$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Pacotes base instalados no projeto:$(NC)"
-	@echo "  • $(GREEN)chalk$(NC) (^4.1.2) - Terminal colors"
-	@echo "  • $(GREEN)dotenv$(NC) (^16.6.1) - ENV loader"
-	@echo "  • $(GREEN)winston$(NC) (^3.19.0) - Logger estruturado"
+	@echo "  • $(GREEN)chalk$(NC) (^5.6.2) - Terminal colors"
+	@echo "  • $(GREEN)dotenv$(NC) (^17.2.4) - ENV loader"
+	@echo "  • $(GREEN)pino$(NC) (^10.3.1) - Logger estruturado"
 	@echo ""
 
 version:
-	@echo "Makefile v4.1.0 — DEV / Bootstrap-Ready / Production-Ready"
-	@echo "Data: 2026-02-15"
+	@echo "Makefile v4.1.1 — DEV / Bootstrap-Ready / Production-Ready"
+	@echo "Data: 2026-03-01"
 	@echo "Targets: 80+ | Aliases: 13 | Coverage: 97%"
 
 # =============================================================================
@@ -403,7 +411,7 @@ dashboard-sync:
 # 5️⃣ HEALTH (PM2 SOVEREIGN MODE)
 # =============================================================================
 
-.PHONY: health health-core pm2-check pm2-check-fix pm2-startup pm2-validate validate validate-all
+.PHONY: health health-core pm2-check pm2-check-fix pm2-startup pm2-validate validate validate-all validate-devcontainer validate-dockerfile validate-github validate-github-remote validate-platform
 
 health:
 	@echo "$(CYAN)🏥 PM2 Health Check (Sovereign Mode)$(NC)"
@@ -435,6 +443,31 @@ validate-all:
 	@echo "$(CYAN)🔍 Validação completa (check+lint+format+test)$(NC)"
 	@$(NPM) run validate:all
 	@echo "$(GREEN)✅ Validação completa finalizada$(NC)"
+
+validate-devcontainer:
+	@echo "$(CYAN)🔍 Validando DevContainer (JSONC + env + sync)$(NC)"
+	@$(NPM) run check:devcontainer
+	@echo "$(GREEN)✅ DevContainer validado$(NC)"
+
+validate-dockerfile:
+	@echo "$(CYAN)🔍 Validando Dockerfile$(NC)"
+	@$(NPM) run check:dockerfile:lint
+	@echo "$(GREEN)✅ Dockerfile validado$(NC)"
+
+validate-github:
+	@echo "$(CYAN)🔍 Validando workflows GitHub locais$(NC)"
+	@$(NPM) run check:github
+	@echo "$(GREEN)✅ Workflows GitHub locais validados$(NC)"
+
+validate-github-remote:
+	@echo "$(CYAN)🔍 Validando workflows GitHub remotos$(NC)"
+	@$(NPM) run check:github:remote
+	@echo "$(GREEN)✅ Workflows GitHub remotos validados$(NC)"
+
+validate-platform:
+	@echo "$(CYAN)🔍 Validação consolidada de plataforma/CI$(NC)"
+	@$(NPM) run check:platform
+	@echo "$(GREEN)✅ Plataforma/CI validada$(NC)"
 
 # =============================================================================
 # 6️⃣ ANÁLISE & CODE QUALITY

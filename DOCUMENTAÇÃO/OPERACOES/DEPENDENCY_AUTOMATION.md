@@ -163,6 +163,21 @@ Exemplos observados:
 - `minimatch`
 - faixas específicas de `ajv`
 
+Estado de ancoragem aplicado no projeto nesta revisão:
+
+- `basic-ftp` fixado em `5.1.0` via `overrides` (última versão estável efetivamente publicada hoje);
+- `systeminformation` fixado em `5.30.7` via `overrides` (última versão estável efetivamente
+  publicada hoje);
+- `glob` moderno disponível no topo da árvore em `13.0.2` para uso explícito de tooling;
+- `minimatch` moderno disponível no topo da árvore em `10.1.2` para uso explícito de tooling.
+
+Importante:
+
+- a presença de `glob`/`minimatch` modernos no topo não remove automaticamente subárvores legadas
+  transitivas;
+- consumers antigos, como `rimraf@3` dentro de dependências de terceiros, ainda podem carregar
+  `glob@7`/`minimatch@3` até que os fornecedores publiquem uma cadeia compatível.
+
 Esse estado deve ser tratado como dependência do ecossistema, não como correção local pendente.
 
 ## Regras de manutenção

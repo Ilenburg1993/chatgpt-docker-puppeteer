@@ -73,12 +73,14 @@
     "eslint-plugin-jsonc": "^2.21.1",
     "eslint-plugin-n": "^17.23.2",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "glob": "^13.0.2",
     "globals": "^17.3.0",
     "graphviz-cli": "^2.0.0",
     "jscodeshift": "17.3.0",
     "jscpd": "^4.0.8",
     "madge": "^8.0.0",
     "mermaid": "^11.12.2",
+    "minimatch": "^10.1.2",
     "nodemon": "^3.1.11",
     "npm-check-updates": "^19.3.2",
     "pino-pretty": "^13.1.3",
@@ -201,6 +203,10 @@
     "check": "npm run validate:all",
     "check:chrome": "node scripts/health/check-chrome.js",
     "check:dockerfile:lint": "hadolint .devcontainer/Dockerfile",
+    "check:devcontainer": "jsonc-validate .devcontainer/devcontainer.json && bash .devcontainer/scripts/validate-env.sh && bash scripts/check-devcontainer-sync.sh",
+    "check:github": "npm run check:workflows && npm run check:workflows:lint",
+    "check:github:remote": "npm run check:workflows:remote:strict",
+    "check:platform": "npm run check:devcontainer && npm run check:dockerfile:lint && npm run check:github",
     "check:env": "node scripts/env/check-env.mjs",
     "check:envlocal": "node scripts/env/check-env-local.mjs",
     "check:forbidden": "node scripts/check_forbidden_patterns.js",
@@ -322,5 +328,9 @@
   },
   "workspaces": [
     "src/dashboard-ui"
-  ]
+  ],
+  "overrides": {
+    "basic-ftp": "5.1.0",
+    "systeminformation": "5.30.7"
+  }
 }

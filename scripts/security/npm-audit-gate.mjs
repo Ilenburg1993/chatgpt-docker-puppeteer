@@ -17,6 +17,7 @@ const SEVERITY_RANK = {
 
 const PACKAGE_METADATA_CACHE = new Map();
 const PUBLISHED_VERSION_CACHE = new Map();
+const TARBALL_CHECK_CACHE = new Map();
 
 /**
  * @param {string[]} argv
@@ -216,6 +217,35 @@ async function getPackageRegistryMetadata(packageName) {
 }
 
 /**
+ * @param {string} url
+ * @returns {Promise<boolean>}
+ */
+async function isReachableTarball(url) {
+    if (!url) {
+        return false;
+    }
+    if (TARBALL_CHECK_CACHE.has(url)) {
+        return TARBALL_CHECK_CACHE.get(url);
+    }
+
+    /** @type {boolean} */
+    let reachable = false;
+    try {
+        const response = await fetch(url, {
+            method: 'HEAD',
+            redirect: 'follow',
+            signal: AbortSignal.timeout(5000),
+        });
+        reachable = response.ok;
+    } catch {
+        reachable = false;
+    }
+
+    TARBALL_CHECK_CACHE.set(url, reachable);
+    return reachable;
+}
+
+/**
  * @param {string} spec
  * @returns {Promise<boolean>}
  */
@@ -241,12 +271,13 @@ async function isPublishedVersion(spec) {
     const timed = typeof packument?.time?.[parsedSpec.version] === 'string';
     const exactVersion = manifest?.version;
     const tarball = manifest?.['dist.tarball'];
+    const tarballReachable =
+        typeof tarball === 'string' && tarball.length > 0 ? await isReachableTarball(tarball) : false;
     const published =
         listed &&
         timed &&
         exactVersion === parsedSpec.version &&
-        typeof tarball === 'string' &&
-        tarball.length > 0;
+        tarballReachable;
 
     PUBLISHED_VERSION_CACHE.set(spec, published);
     return published;
