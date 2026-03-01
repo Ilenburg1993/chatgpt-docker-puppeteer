@@ -216,8 +216,8 @@ function stop() {
     isBusActive = false;
     try {
         pm2Raw.disconnect();
-    } catch (_) {
-        /* ignore disconnect errors during stop */
+    } catch (disconnectErr) {
+        log('DEBUG', `[PM2_BRIDGE] Disconnect error during stop: ${disconnectErr && disconnectErr.message ? disconnectErr.message : String(disconnectErr)}`);
     }
     log('INFO', '[PM2_BRIDGE] Ponte de eventos encerrada.');
 }
