@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const MARKER_START = '<!-- AUDIT_AUTOMATION_V3_START -->';
 const MARKER_END = '<!-- AUDIT_AUTOMATION_V3_END -->';
-const PLAN_PATH = 'DOCUMENTAÇÃO/BUGS/PLANO_MESTRE_CONTRATOS_V3.md';
+const PLAN_PATH = 'DOCUMENTAÇÃO/AUDITORIAS/BUGS/PLANO_MESTRE_CONTRATOS_V3.md';
 
 /**
  * @param {import('./lib/schema.mjs').AuditRunV3} report

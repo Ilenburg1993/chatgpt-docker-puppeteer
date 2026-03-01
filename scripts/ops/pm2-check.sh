@@ -3,10 +3,12 @@
 # pm2-check.sh - PM2 Health Check & Diagnostics
 # =============================================================================
 # Verifica se todos os processos PM2 estão rodando corretamente
-# Uso: bash scripts/pm2-check.sh [--fix]
+# Uso: bash scripts/ops/pm2-check.sh [--fix]
 # =============================================================================
 
 set -euo pipefail
+
+PM2_CMD=(npx pm2)
 
 # Cores
 RED='\033[0;31m'
@@ -34,19 +36,19 @@ echo ""
 # =============================================================================
 echo -e "${YELLOW}[1/6]${NC} Verificando daemon PM2..."
 
-if ! command -v pm2 &> /dev/null; then
-    echo -e "${RED}❌ PM2 não instalado${NC}"
-    echo "   Instalar: npm install -g pm2"
+if ! "${PM2_CMD[@]}" --version &> /dev/null; then
+    echo -e "${RED}❌ PM2 indisponível via npx${NC}"
+    echo "   Execute: npm install"
     exit 1
 fi
 
-if ! pm2 ping &> /dev/null; then
+if ! "${PM2_CMD[@]}" ping &> /dev/null; then
     echo -e "${RED}❌ PM2 daemon não está respondendo${NC}"
     if [ "$FIX_MODE" = true ]; then
         echo "   Iniciando daemon..."
-        pm2 ping
+        "${PM2_CMD[@]}" ping
     else
-        echo "   Executar: pm2 ping"
+        echo "   Executar: npx pm2 ping"
         exit 1
     fi
 else
@@ -63,8 +65,8 @@ STOPPED_PROCESSES=()
 ERROR_PROCESSES=()
 
 for process in "${EXPECTED_PROCESSES[@]}"; do
-    if pm2 list | grep -q "$process"; then
-        status=$(pm2 jlist | jq -r ".[] | select(.name==\"$process\") | .pm2_env.status")
+    if "${PM2_CMD[@]}" list | grep -q "$process"; then
+        status=$("${PM2_CMD[@]}" jlist | jq -r ".[] | select(.name==\"$process\") | .pm2_env.status")
 
         if [ "$status" == "online" ]; then
             echo -e "${GREEN}✅ $process (online)${NC}"
@@ -87,8 +89,8 @@ done
 echo -e "${YELLOW}[3/6]${NC} Verificando restarts..."
 
 for process in "${EXPECTED_PROCESSES[@]}"; do
-    if pm2 list | grep -q "$process"; then
-        restarts=$(pm2 jlist | jq -r ".[] | select(.name==\"$process\") | .pm2_env.restart_time")
+    if "${PM2_CMD[@]}" list | grep -q "$process"; then
+        restarts=$("${PM2_CMD[@]}" jlist | jq -r ".[] | select(.name==\"$process\") | .pm2_env.restart_time")
 
         if [ "$restarts" -eq 0 ]; then
             echo -e "${GREEN}✅ $process (0 restarts)${NC}"
@@ -106,8 +108,8 @@ done
 echo -e "${YELLOW}[4/6]${NC} Verificando uso de memória..."
 
 for process in "${EXPECTED_PROCESSES[@]}"; do
-    if pm2 list | grep -q "$process"; then
-        memory_mb=$(pm2 jlist | jq -r ".[] | select(.name==\"$process\") | .monit.memory" | awk '{print int($1/1024/1024)}')
+    if "${PM2_CMD[@]}" list | grep -q "$process"; then
+        memory_mb=$("${PM2_CMD[@]}" jlist | jq -r ".[] | select(.name==\"$process\") | .monit.memory" | awk '{print int($1/1024/1024)}')
 
         # Limites: agente-gpt=3GB, dashboard-web=3GB, chrome-proxy=500MB
         limit=3000
@@ -129,8 +131,8 @@ done
 echo -e "${YELLOW}[5/6]${NC} Verificando variáveis de ambiente..."
 
 # agente-gpt deve ter SERVER_MODE=split
-if pm2 list | grep -q "agente-gpt"; then
-    server_mode=$(pm2 jlist | jq -r '.[] | select(.name=="agente-gpt") | .pm2_env.SERVER_MODE')
+if "${PM2_CMD[@]}" list | grep -q "agente-gpt"; then
+    server_mode=$("${PM2_CMD[@]}" jlist | jq -r '.[] | select(.name=="agente-gpt") | .pm2_env.SERVER_MODE')
     if [ "$server_mode" == "split" ]; then
         echo -e "${GREEN}✅ agente-gpt (SERVER_MODE=split)${NC}"
     else
@@ -139,8 +141,8 @@ if pm2 list | grep -q "agente-gpt"; then
 fi
 
 # dashboard-web deve ter DAEMON_MODE=true
-if pm2 list | grep -q "dashboard-web"; then
-    daemon_mode=$(pm2 jlist | jq -r '.[] | select(.name=="dashboard-web") | .pm2_env.DAEMON_MODE')
+if "${PM2_CMD[@]}" list | grep -q "dashboard-web"; then
+    daemon_mode=$("${PM2_CMD[@]}" jlist | jq -r '.[] | select(.name=="dashboard-web") | .pm2_env.DAEMON_MODE')
     if [ "$daemon_mode" == "true" ]; then
         echo -e "${GREEN}✅ dashboard-web (DAEMON_MODE=true)${NC}"
     else
@@ -156,8 +158,8 @@ echo -e "${YELLOW}[6/6]${NC} Verificando logs recentes (últimas 50 linhas)..."
 CRITICAL_ERRORS=0
 
 for process in "${EXPECTED_PROCESSES[@]}"; do
-    if pm2 list | grep -q "$process"; then
-        errors=$(pm2 logs "$process" --lines 50 --nostream --err 2>/dev/null | grep -c "\[FATAL\]\|\[ERROR\]" || true)
+    if "${PM2_CMD[@]}" list | grep -q "$process"; then
+        errors=$("${PM2_CMD[@]}" logs "$process" --lines 50 --nostream --err 2>/dev/null | grep -c "\[FATAL\]\|\[ERROR\]" || true)
 
         if [ "$errors" -eq 0 ]; then
             echo -e "${GREEN}✅ $process (sem erros críticos)${NC}"
@@ -210,15 +212,15 @@ else
 
         if [ "${#MISSING_PROCESSES[@]}" -gt 0 ] || [ "${#STOPPED_PROCESSES[@]}" -gt 0 ]; then
             echo "  → Iniciando processos faltantes/parados..."
-            pm2 start ecosystem.config.js
+            "${PM2_CMD[@]}" start ecosystem.config.cjs
             sleep 3
-            pm2 status
+            "${PM2_CMD[@]}" status
         fi
 
         if [ "${#ERROR_PROCESSES[@]}" -gt 0 ]; then
             echo "  → Reiniciando processos com erro..."
             for process in "${ERROR_PROCESSES[@]}"; do
-                pm2 restart "$process"
+                "${PM2_CMD[@]}" restart "$process"
             done
             sleep 3
         fi
@@ -228,10 +230,10 @@ else
     else
         echo -e "${YELLOW}SOLUÇÕES:${NC}"
         echo ""
-        echo "  1. Iniciar processos: pm2 start ecosystem.config.js"
-        echo "  2. Reiniciar processos: pm2 restart all"
-        echo "  3. Ver logs: pm2 logs"
-        echo "  4. Auto-fix: bash scripts/pm2-check.sh --fix"
+        echo "  1. Iniciar processos: npx pm2 start ecosystem.config.cjs"
+        echo "  2. Reiniciar processos: npx pm2 restart all"
+        echo "  3. Ver logs: npx pm2 logs"
+        echo "  4. Auto-fix: bash scripts/ops/pm2-check.sh --fix"
     fi
 
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"

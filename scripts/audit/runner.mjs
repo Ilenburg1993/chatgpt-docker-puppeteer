@@ -44,8 +44,8 @@ import { triageFindings } from './triage_llm.mjs';
 /** @typedef {'signal'|'uncaught_exception'|'unhandled_rejection'|'manual'|'none'} AbortReason */
 /** @typedef {'observability'|'reactive_bug'|'exploratory_bug'|'contracts'|'security'|'performance'|'architecture'} AuditMode */
 
-const MASTER_PATH = 'DOCUMENTAÇÃO/BUGS/BUG_AUDIT_MASTER.md';
-const SNAPSHOTS_DIR = 'DOCUMENTAÇÃO/BUGS/rodadas';
+const MASTER_PATH = 'DOCUMENTAÇÃO/AUDITORIAS/BUGS/BUG_AUDIT_MASTER.md';
+const SNAPSHOTS_DIR = 'DOCUMENTAÇÃO/AUDITORIAS/BUGS/rodadas';
 const OUTPUT_DIR = 'artifacts/audit';
 
 /** @type {import('node:util').ParseArgsConfig['options']} */

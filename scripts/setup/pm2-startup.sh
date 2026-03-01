@@ -8,6 +8,8 @@
 
 set -euo pipefail
 
+PM2_CMD=(npx pm2)
+
 # Cores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,25 +29,25 @@ echo ""
 # =============================================================================
 echo -e "${BLUE}[1/5]${NC} Pré-voo: Validações..."
 
-# Check 1: PM2 instalado?
-if ! command -v pm2 &> /dev/null; then
-    echo -e "${RED}❌ PM2 não instalado${NC}"
-    echo "   Instalar: npm install -g pm2"
+# Check 1: PM2 disponível?
+if ! "${PM2_CMD[@]}" --version &> /dev/null; then
+    echo -e "${RED}❌ PM2 indisponível via npx${NC}"
+    echo "   Execute: npm install"
     exit 1
 fi
-echo -e "${GREEN}  ✓ PM2 instalado${NC}"
+echo -e "${GREEN}  ✓ PM2 disponível via npx${NC}"
 
-# Check 2: ecosystem.config.js existe?
-if [ ! -f "ecosystem.config.js" ]; then
-    echo -e "${RED}❌ ecosystem.config.js não encontrado${NC}"
+# Check 2: ecosystem.config.cjs existe?
+if [ ! -f "ecosystem.config.cjs" ]; then
+    echo -e "${RED}❌ ecosystem.config.cjs não encontrado${NC}"
     exit 1
 fi
-echo -e "${GREEN}  ✓ ecosystem.config.js encontrado${NC}"
+echo -e "${GREEN}  ✓ ecosystem.config.cjs encontrado${NC}"
 
-# Check 3: Node.js version >= 20?
+# Check 3: Node.js version >= 24?
 node_version=$(node -v | cut -d'.' -f1 | sed 's/v//')
-if [ "$node_version" -lt 20 ]; then
-    echo -e "${RED}❌ Node.js $node_version < 20 (requerido)${NC}"
+if [ "$node_version" -lt 24 ]; then
+    echo -e "${RED}❌ Node.js $node_version < 24 (requerido)${NC}"
     exit 1
 fi
 echo -e "${GREEN}  ✓ Node.js $(node -v) OK${NC}"
@@ -64,14 +66,14 @@ echo -e "${GREEN}  ✓ Estrutura de diretórios OK${NC}"
 # =============================================================================
 echo -e "${BLUE}[2/5]${NC} Limpeza: Verificando processos órfãos..."
 
-if pm2 list 2>/dev/null | grep -q "agente-gpt\|dashboard-web\|chrome-proxy"; then
+if "${PM2_CMD[@]}" list 2>/dev/null | grep -q "agente-gpt\|dashboard-web\|chrome-proxy"; then
     echo -e "${YELLOW}  ⚠ Processos PM2 já rodando${NC}"
     read -p "  Deseja parar e reiniciar? [y/N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "  → Parando processos..."
-        pm2 stop agente-gpt dashboard-web chrome-proxy 2>/dev/null || true
-        pm2 delete agente-gpt dashboard-web chrome-proxy 2>/dev/null || true
+        "${PM2_CMD[@]}" stop agente-gpt dashboard-web chrome-proxy 2>/dev/null || true
+        "${PM2_CMD[@]}" delete agente-gpt dashboard-web chrome-proxy 2>/dev/null || true
         echo -e "${GREEN}  ✓ Processos limpos${NC}"
     else
         echo -e "${YELLOW}  ⚠ Processos mantidos (pode causar conflitos)${NC}"
@@ -85,7 +87,7 @@ fi
 # =============================================================================
 echo -e "${BLUE}[3/5]${NC} Inicialização: Iniciando processos PM2..."
 
-pm2 start ecosystem.config.js
+"${PM2_CMD[@]}" start ecosystem.config.cjs
 
 sleep 3
 
@@ -100,23 +102,23 @@ echo -e "${BLUE}[4/5]${NC} Validação: Health checks..."
 sleep 5
 
 # Check status
-if ! pm2 list | grep -q "agente-gpt.*online"; then
+if ! "${PM2_CMD[@]}" list | grep -q "agente-gpt.*online"; then
     echo -e "${RED}❌ agente-gpt não está online${NC}"
-    pm2 logs agente-gpt --lines 20 --nostream
+    "${PM2_CMD[@]}" logs agente-gpt --lines 20 --nostream
     exit 1
 fi
 echo -e "${GREEN}  ✓ agente-gpt online${NC}"
 
-if ! pm2 list | grep -q "dashboard-web.*online"; then
+if ! "${PM2_CMD[@]}" list | grep -q "dashboard-web.*online"; then
     echo -e "${RED}❌ dashboard-web não está online${NC}"
-    pm2 logs dashboard-web --lines 20 --nostream
+    "${PM2_CMD[@]}" logs dashboard-web --lines 20 --nostream
     exit 1
 fi
 echo -e "${GREEN}  ✓ dashboard-web online${NC}"
 
-if ! pm2 list | grep -q "chrome-proxy.*online"; then
+if ! "${PM2_CMD[@]}" list | grep -q "chrome-proxy.*online"; then
     echo -e "${RED}❌ chrome-proxy não está online${NC}"
-    pm2 logs chrome-proxy --lines 20 --nostream
+    "${PM2_CMD[@]}" logs chrome-proxy --lines 20 --nostream
     exit 1
 fi
 echo -e "${GREEN}  ✓ chrome-proxy online${NC}"
@@ -131,7 +133,7 @@ for i in {1..10}; do
 
     if [ $i -eq 10 ]; then
         echo -e "${RED}❌ Servidor HTTP não respondeu após 10s${NC}"
-        pm2 logs dashboard-web --lines 20 --nostream
+        "${PM2_CMD[@]}" logs dashboard-web --lines 20 --nostream
         exit 1
     fi
 
@@ -144,7 +146,7 @@ done
 echo -e "${BLUE}[5/5]${NC} Status: Resumo do sistema..."
 echo ""
 
-pm2 status
+"${PM2_CMD[@]}" status
 
 echo ""
 echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
@@ -152,11 +154,11 @@ echo -e "${CYAN}║  ${GREEN}✅ PM2 Sovereign Mode - Sistema Operacional${NC}  
 echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${GREEN}Comandos úteis:${NC}"
-echo "  • Ver logs:      pm2 logs"
-echo "  • Monitorar:     pm2 monit"
-echo "  • Status:        pm2 status"
-echo "  • Restart:       pm2 restart all"
-echo "  • Health check:  bash scripts/pm2-check.sh"
+echo "  • Ver logs:      npm run daemon:logs"
+echo "  • Monitorar:     npm run daemon:monit"
+echo "  • Status:        npm run daemon:status"
+echo "  • Restart:       npm run daemon:restart"
+echo "  • Health check:  bash scripts/ops/pm2-check.sh"
 echo "  • Dashboard:     http://localhost:3008"
 echo ""
 echo -e "${YELLOW}Sistema pronto para uso!${NC}"

@@ -5,7 +5,7 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '..');
 
 const ALLOWED_PATTERNS = [
-    'DOCUMENTAÇÃO/DEPRECATIONS/',
+    'DOCUMENTAÇÃO/ARQUIVO_MORTO/DEPRECADO/',
     'backups/',
     'tools/outputs/',
     'DOCUMENTAÇÃO/', // allow docs generally if they contain DEPRECATED annotations
@@ -59,7 +59,7 @@ if (offending.length > 0) {
         console.error(` - ${o.file}`);
     }
     console.error(
-        '\nAções sugeridas: atualizar os arquivos acima para usar NERV SERVER_READY ou mover referências para DOCUMENTAÇÃO/DEPRECATIONS.'
+        '\nAções sugeridas: atualizar os arquivos acima para usar NERV SERVER_READY ou mover referências para DOCUMENTAÇÃO/ARQUIVO_MORTO/DEPRECADO/.'
     );
     process.exit(2);
 }

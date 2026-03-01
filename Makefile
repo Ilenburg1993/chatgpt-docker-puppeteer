@@ -374,15 +374,15 @@ monit:
 
 dashboard-check:
 	@echo "$(CYAN)🔍 Dashboard Access Diagnostics$(NC)"
-	@bash scripts/ops/check-dashboard-access.sh
+	@bash scripts/check-dashboard-access.sh
 
 dashboard-guide:
 	@echo "$(CYAN)📖 Port Forwarding Setup Guide$(NC)"
-	@bash scripts/ops/guide-port-forwarding.sh
+	@bash scripts/guide-port-forwarding.sh
 
 dashboard-open:
 	@echo "$(CYAN)🌐 Opening Dashboard in Browser$(NC)"
-	@bash scripts/ops/open-dashboard-browser.sh
+	@bash scripts/open-dashboard-browser.sh
 
 dashboard-test-windows:
 	@echo "$(CYAN)🪟 Test Dashboard Access from Windows$(NC)"
@@ -397,7 +397,7 @@ dashboard-test-windows:
 
 dashboard-sync:
 	@echo "$(CYAN)🔄 DevContainer Config Sync Check$(NC)"
-	@bash scripts/ops/check-devcontainer-sync.sh
+	@bash scripts/check-devcontainer-sync.sh
 
 # =============================================================================
 # 5️⃣ HEALTH (PM2 SOVEREIGN MODE)
@@ -412,7 +412,7 @@ health:
 health-core: health
 
 pm2-check:
-	@bash scripts/pm2-check.sh
+	@bash scripts/ops/pm2-check.sh
 
 pm2-check-fix:
 	@bash scripts/ops/pm2-check.sh --fix
@@ -1008,7 +1008,7 @@ docs:
 	@echo "  • $(BOLD)DOCUMENTAÇÃO/DEPENDENCIES_ANALYSIS.md$(NC)"
 	@echo "  • $(BOLD)DOCUMENTAÇÃO/FINAL_CONSOLIDATED_REPORT.md$(NC)"
 	@echo "  • $(BOLD)DOCUMENTAÇÃO/MAKEFILE_UPGRADE_PROPOSAL.md$(NC)"
-	@echo "  • $(BOLD)docs/integration/RAG_MCP_LSP_PLAYBOOK_PTBR.md$(NC)"
+	@echo "  • $(BOLD)DOCUMENTAÇÃO/REFERENCIA/INTEGRACOES/RAG_MCP_LSP_PLAYBOOK_PTBR.md$(NC)"
 	@echo ""
 	@echo "$(CYAN)Use: $(BOLD)cat DOCUMENTAÇÃO/<arquivo>$(NC) ou $(BOLD)cat docs/integration/<arquivo>$(NC)"
 

@@ -983,7 +983,7 @@ if [ "${IS_FIRST_ATTACH}" = true ]; then
 
     info "Documentação:"
     echo "  • Arquitetura: ARCHITECTURE.md"
-    echo "  • Chrome Proxy: DOCUMENTAÇÃO/CONNECTION_ARCHITECTURE/"
+    echo "  • Chrome Proxy: DOCUMENTAÇÃO/ARQUITETURA/CONNECTION_ARCHITECTURE/"
     echo "  • Onboarding: .github/copilot-instructions.md"
     echo "  • Comandos: make help"
     echo ""
