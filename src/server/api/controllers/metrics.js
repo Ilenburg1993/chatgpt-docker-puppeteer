@@ -29,8 +29,8 @@ async function getMetrics(req, res) {
 async function getTaskMetrics(req, res) {
     try {
         // TODO: Implementar métricas reais de tasks
-        res.json({
-            status: 'unknown',
+        res.status(501).json({
+            status: 'not_implemented',
             message: 'Task metrics not implemented yet',
         });
     } catch (err) {

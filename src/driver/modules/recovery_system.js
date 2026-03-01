@@ -352,14 +352,19 @@ class RecoverySystem extends EventEmitter {
                     correlationId
                 );
 
-                // ✅ Timeout wrapper
-                await Promise.race([
-                    this.driver.page.reload({
-                        waitUntil: 'domcontentloaded',
-                        timeout: reloadTimeout,
-                    }),
-                    this._timeout(reloadTimeout, 'page_reload'),
-                ]);
+                // ✅ Timeout wrapper (B009: timer cancelado após race settle)
+                const pageReloadTimeout = this._timeout(reloadTimeout, 'page_reload');
+                try {
+                    await Promise.race([
+                        this.driver.page.reload({
+                            waitUntil: 'domcontentloaded',
+                            timeout: reloadTimeout,
+                        }),
+                        pageReloadTimeout.promise,
+                    ]);
+                } finally {
+                    pageReloadTimeout.cancel();
+                }
 
                 // Stabilizer wait
                 await stabilizer.waitForStability(this.driver.page);
@@ -454,17 +459,23 @@ class RecoverySystem extends EventEmitter {
                     correlationId
                 );
 
-                await Promise.race([
-                    new Promise((resolve, reject) => {
-                        try {
-                            proc.kill('SIGKILL');
-                            resolve();
-                        } catch (err) {
-                            reject(err);
-                        }
-                    }),
-                    this._timeout(KILL_TIMEOUT, 'browser_kill'),
-                ]);
+                // B009: timer cancelado via finally para evitar timer pendente após race settle
+                const killTimeout = this._timeout(KILL_TIMEOUT, 'browser_kill');
+                try {
+                    await Promise.race([
+                        new Promise((resolve, reject) => {
+                            try {
+                                proc.kill('SIGKILL');
+                                resolve();
+                            } catch (err) {
+                                reject(err);
+                            }
+                        }),
+                        killTimeout.promise,
+                    ]);
+                } finally {
+                    killTimeout.cancel();
+                }
 
                 log('DEBUG', `[RECOVERY] Tier 3: Browser process kill issued`, correlationId);
             } catch (killErr) {
@@ -517,19 +528,25 @@ class RecoverySystem extends EventEmitter {
     /**
      * Helper: Timeout promise wrapper
      *
+     * Returns a promise that rejects after `ms` milliseconds.
+     * The timer is automatically cancelled when the returned promise's
+     * `cancel()` method is called (use in Promise.race finalization).
+     *
      * @private
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para logs)
-     * @returns {Promise<never>} Promise que rejeita após timeout
+     * @returns {{ promise: Promise<never>, cancel: () => void }}
      */
     _timeout(ms, operation) {
-        return new Promise((_, reject) => {
-            setTimeout(() => {
+        let handle;
+        const promise = new Promise((_, reject) => {
+            handle = setTimeout(() => {
                 const error = new Error(`Timeout in ${operation} after ${ms}ms`);
                 error.name = 'TimeoutError';
                 reject(error);
             }, ms);
         });
+        return { promise, cancel: () => clearTimeout(handle) };
     }
 
     /* ==========================================================================

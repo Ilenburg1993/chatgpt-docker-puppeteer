@@ -93,10 +93,13 @@ function openObservationWindow() {
         return;
     }
 
-    windowTimer = setTimeout(async () => {
+    windowTimer = setTimeout(() => {
         windowTimer = null;
         if (isCacheDirty) {
-            await scanQueue();
+            // Erros de scanQueue são logados; não devem virar unhandled rejection
+            scanQueue().catch(err => {
+                log('ERROR', `[CACHE] Falha na varredura da fila (observation window): ${err.message}`);
+            });
         }
     }, OBSERVATION_WINDOW_MS);
 }

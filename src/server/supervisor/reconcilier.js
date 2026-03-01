@@ -51,7 +51,8 @@ class SupervisorReconciler {
             this._retryAttachTimer = setTimeout(() => {
                 this._retryAttachTimer = null;
                 this._attachSensoryListeners();
-            }, 5000);            return;
+            }, 5000);
+            return;
         }
 
         /**

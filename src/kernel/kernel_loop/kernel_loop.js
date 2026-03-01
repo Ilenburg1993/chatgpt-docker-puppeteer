@@ -512,6 +512,16 @@ class KernelLoop {
 
     /**
      * Agenda próximo ciclo lógico.
+     *
+     * Invariante de scheduling (A010):
+     * - step() é awaited antes de _scheduleNextTick() ser chamado.
+     *   Isso garante que apenas uma execução de step() ocorre por vez.
+     * - Se stop() é chamado durante step(): this._running passa a false,
+     *   _scheduleNextTick() retorna imediatamente (linha 1), e nenhum
+     *   novo timer é criado. Race condition controlada.
+     * - Se stop() é chamado DENTRO de step() (via circuit breaker):
+     *   this._timer já foi limpo por stop(); a sequência
+     *   "await step() → _scheduleNextTick() → return" termina sem agendar.
      */
     _scheduleNextTick() {
         if (!this._running) {
