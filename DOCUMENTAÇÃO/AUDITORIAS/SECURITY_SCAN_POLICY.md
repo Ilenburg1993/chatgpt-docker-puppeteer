@@ -42,7 +42,9 @@ A fonte de verdade operacional é o wrapper
 Ele:
 
 - roda `npm audit --json`;
-- confirma com `npm view` se a versão de correção sugerida existe no registry;
+- confirma com `npm view` se a versão de correção sugerida existe no registry, exigindo
+  consistência entre o packument do pacote (`versions` e `time`) e o manifesto da versão exata
+  (`dist.tarball`);
 - separa findings entre:
   - `actionable`
   - `manual-review`
@@ -66,6 +68,9 @@ Os cenários abaixo permanecem visíveis no relatório, mas não viram falha aut
 - pacote sem fix disponível.
 
 Esses casos exigem backlog e revisão humana, não `audit fix` cego.
+
+O gate também reduz falsos positivos transitórios de cache/edge do registry: um único `npm view
+<pacote>@<versão>` positivo não basta para classificar o finding como bloqueante.
 
 ## Dependabot
 

@@ -107,7 +107,8 @@ O `npm audit` puro não é a fonte de verdade operacional final neste repositór
 O wrapper [npm-audit-gate.mjs](../../scripts/security/npm-audit-gate.mjs):
 
 - roda `npm audit --json`;
-- cruza os “fixes” com `npm view`, para verificar se a versão sugerida realmente existe no registry;
+- cruza os “fixes” com `npm view`, exigindo evidência consistente no packument do pacote e no
+  manifesto da versão exata (lista de `versions`, `time` e `dist.tarball`);
 - separa findings em:
   - `actionable`
   - `manual-review`
@@ -130,6 +131,9 @@ Os cenários abaixo geram risco residual documentado, mas não falha automática
 - o próprio `npm audit` informa que não há correção (`no-fix`).
 
 Essa regra evita tratar advisory inconsistente do ecossistema como erro de CI do projeto.
+
+Ela também reduz falsos positivos transitórios de cache/edge do registry: um único `npm view
+<pacote>@<versão>` positivo não basta para tornar o finding bloqueante.
 
 ## Comandos operacionais
 

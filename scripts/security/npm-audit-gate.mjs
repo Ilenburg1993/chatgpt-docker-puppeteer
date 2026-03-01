@@ -15,6 +15,9 @@ const SEVERITY_RANK = {
     critical: 4,
 };
 
+const PACKAGE_METADATA_CACHE = new Map();
+const PUBLISHED_VERSION_CACHE = new Map();
+
 /**
  * @param {string[]} argv
  * @returns {{
@@ -109,6 +112,18 @@ async function execJsonCapable(command, args) {
 }
 
 /**
+ * @param {string} body
+ * @returns {any | null}
+ */
+function tryParseJson(body) {
+    try {
+        return JSON.parse(body);
+    } catch {
+        return null;
+    }
+}
+
+/**
  * @param {string} text
  * @returns {string[]}
  */
@@ -141,23 +156,100 @@ function normalizeViaEntries(value) {
 
 /**
  * @param {string} spec
+ * @returns {{ name: string, version: string } | null}
+ */
+function parseExactPackageSpec(spec) {
+    const separatorIndex = spec.lastIndexOf('@');
+    if (separatorIndex <= 0) {
+        return null;
+    }
+    const name = spec.slice(0, separatorIndex).trim();
+    const version = spec.slice(separatorIndex + 1).trim();
+    if (!name || !version) {
+        return null;
+    }
+    if (/[<>=~^*| ]/.test(version)) {
+        return null;
+    }
+    return { name, version };
+}
+
+/**
+ * @param {string[]} args
+ * @returns {Promise<{ stdout: string, stderr: string, exitCode: number }>}
+ */
+async function npmViewJson(args) {
+    return execJsonCapable('npm', ['view', ...args, '--json', '--prefer-online']);
+}
+
+/**
+ * @param {string} packageName
+ * @returns {Promise<{ versions: Set<string>, time: Record<string, unknown> } | null>}
+ */
+async function getPackageRegistryMetadata(packageName) {
+    if (PACKAGE_METADATA_CACHE.has(packageName)) {
+        return PACKAGE_METADATA_CACHE.get(packageName);
+    }
+
+    const response = await npmViewJson([packageName, 'versions', 'time']);
+    if (response.exitCode !== 0) {
+        PACKAGE_METADATA_CACHE.set(packageName, null);
+        return null;
+    }
+
+    const parsed = tryParseJson(response.stdout.trim());
+    if (!parsed || typeof parsed !== 'object') {
+        PACKAGE_METADATA_CACHE.set(packageName, null);
+        return null;
+    }
+
+    const versions = Array.isArray(parsed.versions)
+        ? parsed.versions.filter(version => typeof version === 'string' && version.length > 0)
+        : [];
+    const time =
+        parsed.time && typeof parsed.time === 'object'
+            ? /** @type {Record<string, unknown>} */ (parsed.time)
+            : {};
+    const metadata = { versions: new Set(versions), time };
+    PACKAGE_METADATA_CACHE.set(packageName, metadata);
+    return metadata;
+}
+
+/**
+ * @param {string} spec
  * @returns {Promise<boolean>}
  */
 async function isPublishedVersion(spec) {
-    const response = await execJsonCapable('npm', ['view', spec, 'version', '--json']);
-    if (response.exitCode !== 0) {
+    if (PUBLISHED_VERSION_CACHE.has(spec)) {
+        return PUBLISHED_VERSION_CACHE.get(spec);
+    }
+
+    const parsedSpec = parseExactPackageSpec(spec);
+    if (!parsedSpec) {
+        PUBLISHED_VERSION_CACHE.set(spec, false);
         return false;
     }
-    const body = response.stdout.trim();
-    if (!body) {
-        return false;
-    }
-    try {
-        const parsed = JSON.parse(body);
-        return typeof parsed === 'string' && parsed.length > 0;
-    } catch {
-        return false;
-    }
+
+    const [packument, manifestResponse] = await Promise.all([
+        getPackageRegistryMetadata(parsedSpec.name),
+        npmViewJson([spec, 'version', 'dist.tarball']),
+    ]);
+
+    const manifest =
+        manifestResponse.exitCode === 0 ? tryParseJson(manifestResponse.stdout.trim()) : null;
+    const listed = Boolean(packument?.versions.has(parsedSpec.version));
+    const timed = typeof packument?.time?.[parsedSpec.version] === 'string';
+    const exactVersion = manifest?.version;
+    const tarball = manifest?.['dist.tarball'];
+    const published =
+        listed &&
+        timed &&
+        exactVersion === parsedSpec.version &&
+        typeof tarball === 'string' &&
+        tarball.length > 0;
+
+    PUBLISHED_VERSION_CACHE.set(spec, published);
+    return published;
 }
 
 /**
