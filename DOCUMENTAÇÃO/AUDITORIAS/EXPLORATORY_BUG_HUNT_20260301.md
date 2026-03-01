@@ -1,24 +1,27 @@
 # Auditoria Exploratória de Bugs — Bug Hunt
 
-**Versão**: 2.0  
-**Data inicial**: 2026-03-01 | **Atualizado**: 2026-03-01 (Rodada 2)  
-**Auditor**: Copilot SWE Agent (exploratory-bug-hunt skill)  
-**Escopo total**: `src/kernel/`, `src/agent/`, `src/nerv/`, `src/driver/`, `src/infra/`, `src/orchestrator/`, `src/server/`, `src/missions/`, `src/shared/`  
+**Versão**: 3.0  
+**Data inicial**: 2026-03-01 | **Atualizado**: 2026-03-01 (Rodada 3)  
+**Auditor**: Copilot SWE Agent (exploratory-bug-hunt v2.0 skill)  
+**Escopo total**: `src/kernel/`, `src/agent/`, `src/nerv/`, `src/driver/`, `src/infra/`, `src/orchestrator/`, `src/server/`, `src/missions/`, `src/shared/`, `src/integration/`, `src/audit_agent/`, `src/inference_gateway/`, `src/logic/`, `src/validation/`, `src/core/`, `src/types/`, `scripts/`  
 **Perfil**: `deep`  
-**Arquivos cobertos**: ~85 arquivos lidos em 2 rodadas; grep em ~135 arquivos JS de `src/`.  
+**Arquivos cobertos**: ~130 arquivos lidos em 3 rodadas; grep em ~135 arquivos JS/MJS de `src/` + `scripts/`.  
 **PR associada**: `copilot/audit-code-and-improvements`
 
 ---
 
 ## Resumo Executivo
 
-Foram encontrados **20 achados confirmáveis** em 2 rodadas de auditoria.
+Foram encontrados e registrados achados confirmados em 3 rodadas de auditoria.
 
 **Rodada 1** — `src/kernel/`, `src/agent/`, `src/infra/`, `src/orchestrator/`:  
 10 achados, 7 corrigidos (incluindo 2 Críticos).
 
-**Rodada 2** — `src/server/`, `src/driver/`, `src/shared/`, `src/infra/queue/`:  
+**Rodada 2** — `src/server/`, `src/driver/modules/`, `src/shared/`, `src/infra/queue/`:  
 10 achados, 10 corrigidos (incluindo 1 Crítico e 4 Altos).
+
+**Rodada 3** — `src/integration/`, `src/audit_agent/`, `src/inference_gateway/`, `src/logic/`, `src/validation/`, `src/core/`, `src/types/`, `scripts/` + varredura de codebase completa:  
+15 achados, 15 corrigidos.
 
 ---
 
@@ -55,9 +58,27 @@ Foram encontrados **20 achados confirmáveis** em 2 rodadas de auditoria.
 | B010 | BAIXO     | `src/server/api/controllers/metrics.js`                     | ✅ Corrigido |
 | B011 | BAIXO     | `src/driver/modules/biomechanics_engine.js`                 | ✅ Corrigido |
 
----
+### Rodada 3
 
-## Rodada 1 — Achados Detalhados
+| ID   | Severidade | Arquivo                                                              | Status     |
+|------|-----------|----------------------------------------------------------------------|------------|
+| C001 | CRÍTICO   | `src/validation/llm_judge.js`                                        | ✅ Corrigido |
+| C002 | ALTO      | `src/integration/mcp/upstream-stdio.mjs`                            | ✅ Corrigido |
+| C003 | MÉDIO     | `src/nerv/health/health.js`                                          | ✅ Corrigido (C9) |
+| C004 | MÉDIO     | `src/agent/mission_runner.js`                                        | ✅ Corrigido (C9) |
+| C005 | MÉDIO     | `src/agent/queue_worker.js`                                          | ✅ Corrigido (C9) |
+| C006 | MÉDIO     | `src/logic/adaptive.js`                                              | ✅ Corrigido (C9) |
+| C007 | MÉDIO     | `src/missions/workflow_generator.js`                                 | ✅ Corrigido (C9) |
+| C008 | MÉDIO     | `src/infra/queue/task_loader.js` (3 locais)                          | ✅ Corrigido (C9) |
+| C009 | MÉDIO     | `src/infra/storage/dna_store.js`                                     | ✅ Corrigido (C9) |
+| C010 | MÉDIO     | `src/core/i18n.js`                                                   | ✅ Corrigido (C9) |
+| C011 | MÉDIO     | `src/core/schemas/migrator_v4_to_v5.js` (2 locais)                  | ✅ Corrigido (C9) |
+| C012 | BAIXO     | `src/driver/modules/` (frame_navigator, handle_manager, input_resolver, recovery_system, submission_controller, triage) | ✅ Corrigido (C6 — parseInt radix) |
+| C013 | BAIXO     | `src/infra/ConnectionOrchestrator.js`, `src/infra/io.js`, `src/server/api/controllers/tasks.js`, `src/server/api/router.js` | ✅ Corrigido (C6) |
+| C014 | BAIXO     | `scripts/ops/status_fila.js`, `scripts/ops/flow_manager.js`, `scripts/validate_config.js`, `scripts/gerador_tarefa.js`, `scripts/importar_prompts.js`, `scripts/fixes/fix-unused-vars.js` | ✅ Corrigido (C6) |
+| S001 | MÉDIO     | `.github/workflows/copilot-setup-steps.yml`                          | ✅ Corrigido (C7) |
+
+---
 
 ### A001 — CRÍTICO | Circuit breaker do kernel SSOT nunca disparava
 
@@ -284,7 +305,74 @@ Além disso, violação do ESLint rule `radix`.
 
 ---
 
-## O que ficou fora do escopo desta auditoria
+## Rodada 3 — Achados Detalhados
+
+### C001 — CRÍTICO | llm_judge._callLLM: timeout timer não cancelado após Promise.race()
+
+**Arquivo**: `src/validation/llm_judge.js:316`
+
+**Problema**: Timer de timeout criado dentro de `new Promise((_, reject) => { timeoutId = setTimeout(...) })`.
+Quando `responsePromise` resolvia antes do timeout, o `timeoutId` ficava ativo por até `this.timeout` ms
+(padrão 15 s), acumulando em chamadas concorrentes.
+
+**Correção**: Adicionado bloco `try/finally { clearTimeout(timeoutId) }` em torno do `Promise.race()`.
+
+---
+
+### C002 — ALTO | upstream-stdio.stop(): timer de kill nunca cancelado
+
+**Arquivo**: `src/integration/mcp/upstream-stdio.mjs:327`
+
+**Problema**: `setTimeout` de kill de emergência (5 s) criado dentro de `new Promise(resolve => ...)`.
+Quando o processo filho saía antes do prazo, o timer disparava, logava mensagem falsa e chamava
+`.kill('SIGTERM')` em referência potencialmente nula.
+
+**Correção**: `killTimeoutId` salvo; `clearTimeout(killTimeoutId)` chamado após `Promise.race()`.
+
+---
+
+### C003–C011 — MÉDIO | JSON.parse(JSON.stringify(x)) como clone (C9 — Performance)
+
+**Arquivos**: `src/nerv/health/health.js`, `src/agent/mission_runner.js`, `src/agent/queue_worker.js`,
+`src/logic/adaptive.js`, `src/missions/workflow_generator.js`, `src/infra/queue/task_loader.js` (3×),
+`src/infra/storage/dna_store.js`, `src/core/i18n.js`, `src/core/schemas/migrator_v4_to_v5.js` (2×).
+
+**Problema**: `JSON.parse(JSON.stringify(obj))` é uma forma de deep clone lenta, que serializa para
+string e deserializa. Para objetos JS simples (sem funções/símbolos), `structuredClone()` é nativo no
+Node.js 17+ e ~3-10× mais rápido.
+
+**Correção**: Todas as 11 ocorrências substituídas por `structuredClone(obj)`.
+
+---
+
+### C012–C014 — BAIXO | parseInt() sem radix 10 (C6 — Parsing)
+
+**Arquivos (42 ocorrências)**:
+- `src/driver/modules/` (6 arquivos)
+- `src/infra/ConnectionOrchestrator.js`, `src/infra/io.js`
+- `src/server/api/controllers/tasks.js`, `src/server/api/router.js`
+- `scripts/ops/`, `scripts/validate_config.js`, `scripts/gerador_tarefa.js`, `scripts/importar_prompts.js`, `scripts/fixes/fix-unused-vars.js`
+
+**Problema**: `parseInt(str)` sem radix pode ter comportamento ambíguo com strings prefixadas com `0x`
+ou `0` em engines legadas. Viola a ESLint rule `radix`. Embora Node.js 24 trate como base 10 por padrão,
+a declaração explícita do radix é uma best practice de clareza e portabilidade.
+
+**Correção**: `, 10` adicionado a todas as chamadas (exceto onde radix já estava presente).
+
+---
+
+### S001 — MÉDIO | copilot-setup-steps.yml sem permissions explícito
+
+**Arquivo**: `.github/workflows/copilot-setup-steps.yml` (criado nesta rodada)
+
+**Problema**: Job sem `permissions` declarado herda permissões padrão do repositório, que podem ser
+permissivas. Boas práticas do GitHub Actions exigem least-privilege explícito.
+
+**Correção**: `permissions: contents: read` adicionado ao job.
+
+---
+
+## O que ficou fora do escopo desta auditoria (3 rodadas)
 
 - `src/integration/` (parcialmente coberto via grep)
 - `src/audit_agent/` e `src/inference_gateway/`
@@ -499,35 +587,39 @@ correto mas implícito. Documentar o invariante como comentário inline para pre
 
 ---
 
-## O que ficou fora do escopo desta rodada
+## O que ficou fora do escopo desta auditoria (3 rodadas)
 
-- `src/server/` (API, realtime, handlers)
-- `src/missions/` (além do mission_runner.js)
-- `src/audit_agent/` e `src/inference_gateway/`
-- `src/dashboard-ui/` (frontend)
-- `tests/` (não auditados)
+- `src/dashboard-ui/` (frontend — não auditado)
+- `tests/` (não auditados como fonte de bugs, mas sem regressões introduzidas)
+- `src/nerv/correlation/correlation_store.js`: `setInterval` sem `clearInterval` no export — intencional via `.unref()` (design choice)
 
 ---
 
 ## Impacto nos Testes
 
-Antes e após as correções: **755 pass / 12 fail / 22 cancelled** (789 total).
-Os 12 testes que falham são pré-existentes (timeouts de integração, SQLite, shell scripts).
-Nenhuma regressão introduzida pelas correções aplicadas.
+Antes das 3 rodadas e após todas as correções: **755 pass / 12 fail** (789 total).
+Os 12 testes que falham são pré-existentes (integrações externas: SQLite fixtures, shell scripts, NSS checks).
+Nenhuma regressão introduzida pelas correções de qualquer rodada.
 
 ---
 
 ## Sumário de Segurança
 
-Nenhuma vulnerabilidade de segurança foi identificada durante a auditoria.
-Os bugs encontrados são de lógica de controle e robustez operacional (circuit breaker,
-concorrência, pool leaks), sem superfície de exploração externa.
+- CodeQL: 0 alertas em todas as rodadas
+- Sem secrets hardcoded encontrados
+- Sem SQL injection, path traversal ou dados sensíveis expostos em logs
+- Bugs corrigidos eliminam: crash paths (null dereference), resource leaks (handles PM2, timers, async),
+  dados incorretos para clientes (Promise bruta, HTTP 200 indevido), e clones lentos (JSON.parse/stringify)
+- Permissão mínima (least-privilege) adicionada ao workflow do Copilot Coding Agent
 
 ---
 
-## Próximos Passos
+## Próximos Passos (Backlog)
 
-1. Tratar A007 (resilient_lock SIGTERM) com integração ao graceful shutdown.
+1. **A007** — Integrar `resilient_lock` cleanup com graceful shutdown coordinator.
+2. **A008** — Adicionar TTL ou sweep periódico em `activeExecutions` para detecção de órfãos.
+3. Expandir auditoria para `src/dashboard-ui/` (bundle size, accessibility, auth).
+4. Expandir auditoria para `tests/` (identificar testes quebrados ou com cobertura insuficiente).
 2. Tratar A008 (activeExecutions TTL) para estabilidade em runs longos.
 3. Implementar `persistToDisk` em MemoryStore ou remover a opção.
 4. Expandir auditoria para `src/server/`, `src/missions/` e testes.

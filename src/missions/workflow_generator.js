@@ -178,7 +178,7 @@ class WorkflowGenerator {
                 const numChapters = context.num_chapters || 1;
 
                 for (let i = 1; i <= numChapters; i++) {
-                    const expandedStep = JSON.parse(JSON.stringify(step)); // Deep clone
+                    const expandedStep = structuredClone(step); // Deep clone
                     delete expandedStep.repeat_for_each;
 
                     // Substitui {{chapter_num}} no ID

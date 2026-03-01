@@ -422,7 +422,7 @@ class QueueWorker {
                 }
 
                 // Hydrate runtime task: ensure the rendered user_message is what the driver will type.
-                const runtimeTask = JSON.parse(JSON.stringify(task));
+                const runtimeTask = structuredClone(task);
                 runtimeTask.spec = runtimeTask.spec || {};
                 runtimeTask.spec.payload = runtimeTask.spec.payload || {};
                 runtimeTask.spec.payload.user_message = renderedUserMessage;

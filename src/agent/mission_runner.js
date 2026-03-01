@@ -48,7 +48,7 @@ function _sleep(ms) {
 
 function _safeJson(obj, fallback) {
     try {
-        return JSON.parse(JSON.stringify(obj));
+        return structuredClone(obj);
     } catch (_) {
         return fallback;
     }

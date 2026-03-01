@@ -122,7 +122,7 @@ async function loadVocab() {
     }
 
     // Fallback para a semente e tenta salvar
-    vocabCache = JSON.parse(JSON.stringify(BASE_VOCAB));
+    vocabCache = structuredClone(BASE_VOCAB);
     await atomicWrite(VOCAB_FILE, JSON.stringify(vocabCache, null, 2)).catch(() => {});
     return vocabCache;
 }

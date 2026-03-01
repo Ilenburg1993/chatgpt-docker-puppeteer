@@ -14,20 +14,21 @@ import { log } from '#core/logger';
 const RESOLVER_CONFIG = {
     /** Cache TTL para protocolos (ms) - Default: 60s */
     CACHE_TTL_MS: parseInt(
-        process.env.RESOLVER_CACHE_TTL || /** @type {any} */ (CONFIG).all?.INPUT_CACHE_TTL || '60000'
+        process.env.RESOLVER_CACHE_TTL || String(/** @type {any} */ (CONFIG)?.all?.INPUT_CACHE_TTL || '60000'),
+        10
     ),
 
     /** Timeout para resolve completo (ms) - Default: 15s */
-    RESOLVE_TIMEOUT_MS: parseInt(process.env.RESOLVER_TIMEOUT || '15000'),
+    RESOLVE_TIMEOUT_MS: parseInt(process.env.RESOLVER_TIMEOUT || '15000', 10),
 
     /** Timeout para validação de interatividade (ms) - Default: 5s */
-    VALIDATION_TIMEOUT_MS: parseInt(process.env.RESOLVER_VALIDATION_TIMEOUT || '5000'),
+    VALIDATION_TIMEOUT_MS: parseInt(process.env.RESOLVER_VALIDATION_TIMEOUT || '5000', 10),
 
     /** Máximo de retries em fallback heurístico - Default: 2 */
-    MAX_HEURISTIC_RETRIES: parseInt(process.env.RESOLVER_MAX_RETRIES || '2'),
+    MAX_HEURISTIC_RETRIES: parseInt(process.env.RESOLVER_MAX_RETRIES || '2', 10),
 
     /** Máximo de protocolos em cache (multi-domain) - Default: 10 */
-    MAX_CACHE_SIZE: parseInt(process.env.RESOLVER_CACHE_SIZE || '10'),
+    MAX_CACHE_SIZE: parseInt(process.env.RESOLVER_CACHE_SIZE || '10', 10),
 
     /** Confidence threshold para cache (0-1) - Default: 0.7 */
     MIN_CONFIDENCE_THRESHOLD: parseFloat(process.env.RESOLVER_MIN_CONFIDENCE || '0.7'),

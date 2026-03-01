@@ -35,7 +35,7 @@ function now() {
  * Clona objeto simples (snapshot defensivo).
  */
 function clone(obj) {
-    return JSON.parse(JSON.stringify(obj));
+    return structuredClone(obj);
 }
 
 /* ===========================

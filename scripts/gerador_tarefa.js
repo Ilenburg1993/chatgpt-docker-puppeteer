@@ -110,7 +110,7 @@ function parseSchedule(input) {
     }
     const match = input.match(/^(\d+)([mh])$/);
     if (match) {
-        const val = parseInt(match[1]);
+        const val = parseInt(match[1], 10);
         const unit = match[2];
         return new Date(Date.now() + val * (unit === 'm' ? 60000 : 3600000)).toISOString();
     }

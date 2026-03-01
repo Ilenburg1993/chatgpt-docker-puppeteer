@@ -9,7 +9,7 @@ const args = process.argv.slice(2);
 const WATCH_MODE = args.includes('--watch');
 const ONLY_FAILED = args.includes('--failed');
 const TAG_FILTER = args.find(a => a.startsWith('--tag='))?.split('=')[1];
-const LIMIT = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1]) || 15;
+const LIMIT = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1], 10) || 15;
 
 // Cores ANSI
 const C = {

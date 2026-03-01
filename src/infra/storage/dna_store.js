@@ -40,7 +40,7 @@ const MAX_HISTORY = 10;
 function backupDna(dna) {
     try {
         const backup = {
-            snapshot: JSON.parse(JSON.stringify(dna)),
+            snapshot: structuredClone(dna),
             timestamp: new Date().toISOString(),
             version: dna._meta?.version || 0,
         };

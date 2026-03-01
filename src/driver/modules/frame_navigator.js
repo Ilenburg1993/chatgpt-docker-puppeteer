@@ -11,19 +11,19 @@ import { ERROR_NAMES } from '#core/constants';
  */
 const FRAME_NAV_CONFIG = {
     /** Profundidade máxima de frames - Default: 10 */
-    MAX_DEPTH: parseInt(process.env.FRAME_NAV_MAX_DEPTH || '10'),
+    MAX_DEPTH: parseInt(process.env.FRAME_NAV_MAX_DEPTH || '10', 10),
 
     /** Timeout de traversal completo (ms) - Default: 15s */
-    TRAVERSAL_TIMEOUT_MS: parseInt(process.env.FRAME_NAV_TIMEOUT || '15000'),
+    TRAVERSAL_TIMEOUT_MS: parseInt(process.env.FRAME_NAV_TIMEOUT || '15000', 10),
 
     /** Timeout de boundingBox (ms) - Default: 2s */
-    BOUNDING_BOX_TIMEOUT_MS: parseInt(process.env.FRAME_NAV_BBOX_TIMEOUT || '2000'),
+    BOUNDING_BOX_TIMEOUT_MS: parseInt(process.env.FRAME_NAV_BBOX_TIMEOUT || '2000', 10),
 
     /** Tentativas de retry para dispose - Default: 3 */
-    DISPOSE_RETRY_ATTEMPTS: parseInt(process.env.FRAME_NAV_DISPOSE_RETRIES || '3'),
+    DISPOSE_RETRY_ATTEMPTS: parseInt(process.env.FRAME_NAV_DISPOSE_RETRIES || '3', 10),
 
     /** Delay entre retries de dispose (ms) - Default: 100ms */
-    DISPOSE_RETRY_DELAY_MS: parseInt(process.env.FRAME_NAV_DISPOSE_DELAY || '100'),
+    DISPOSE_RETRY_DELAY_MS: parseInt(process.env.FRAME_NAV_DISPOSE_DELAY || '100', 10),
 };
 
 /**

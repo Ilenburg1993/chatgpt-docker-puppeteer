@@ -91,7 +91,7 @@ lines.forEach((line, idx) => {
             const json = JSON.parse(line);
             taskData.user_prompt = sanitizePrompt(json.prompt || json.user_message || '');
             taskData.system_prompt = sanitizePrompt(json.system || json.system_message || '');
-            taskData.prio = parseInt(json.prio || json.priority) || 5;
+            taskData.prio = parseInt(json.prio || json.priority, 10) || 5;
             taskData.model = json.model || 'gpt-5';
             taskData.target = json.target || 'chatgpt';
             if (Array.isArray(json.tags)) {
