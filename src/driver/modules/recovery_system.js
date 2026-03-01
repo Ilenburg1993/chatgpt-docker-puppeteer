@@ -433,7 +433,14 @@ class RecoverySystem extends EventEmitter {
 
         log('FATAL', `[RECOVERY] Tier 3: Critical connection failure - browser may need manual restart`, correlationId);
 
-        const browser = this.driver.page.browser();
+        const page = this.driver.page;
+
+        if (!page) {
+            log('WARN', '[RECOVERY] Tier 3: page is null, cannot access browser', correlationId);
+            throw recoveryErr;
+        }
+
+        const browser = page.browser();
 
         // ✅ v3.0: Internal mode (local/child process) -> try kill with timeout
         const KILL_TIMEOUT = RECOVERY_CONFIG.KILL_TIMEOUT_MS;

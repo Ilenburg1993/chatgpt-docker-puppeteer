@@ -372,9 +372,10 @@ class TelemetryAggregator {
 
     /**
      * API: Retorna métricas atuais.
+     * @returns {Promise<Object>} Métricas coletadas
      */
-    getCurrent() {
-        return this.lastMetrics || this._collectMetrics();
+    async getCurrent() {
+        return this.lastMetrics || await this._collectMetrics();
     }
 
     /**

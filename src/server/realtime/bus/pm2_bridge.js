@@ -214,6 +214,11 @@ function stop() {
 
     lastProcessStates.clear();
     isBusActive = false;
+    try {
+        pm2Raw.disconnect();
+    } catch (_) {
+        /* ignore disconnect errors during stop */
+    }
     log('INFO', '[PM2_BRIDGE] Ponte de eventos encerrada.');
 }
 
