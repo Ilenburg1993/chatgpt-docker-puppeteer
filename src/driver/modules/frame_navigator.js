@@ -439,10 +439,13 @@ class FrameNavigator extends EventEmitter {
 
         try {
             // ✅ BUG #4 fix: Timeout protection
-            const result = await Promise.race([
-                this._executeGetExecutionContext(protocol, signal),
-                this._timeout(FRAME_NAV_CONFIG.TRAVERSAL_TIMEOUT_MS, 'getExecutionContext'),
-            ]);
+            const timeoutP = this._timeout(FRAME_NAV_CONFIG.TRAVERSAL_TIMEOUT_MS, 'getExecutionContext');
+            let result;
+            try {
+                result = await Promise.race([this._executeGetExecutionContext(protocol, signal), timeoutP]);
+            } finally {
+                timeoutP.cancel();
+            }
 
             const duration = Date.now() - startTime;
             this.stats.totalNavigationDuration += duration;
@@ -549,8 +552,9 @@ class FrameNavigator extends EventEmitter {
      * @returns {Promise<never>} Promise que rejeita após timeout
      */
     _timeout(ms, operation) {
-        return new Promise((_, reject) => {
-            setTimeout(() => {
+        let timerId;
+        const p = new Promise((_, reject) => {
+            timerId = setTimeout(() => {
                 const error = new FrameNavError('TIMEOUT', `Timeout in ${operation} after ${ms}ms`, {
                     timeout: ms,
                     operation,
@@ -558,6 +562,8 @@ class FrameNavigator extends EventEmitter {
                 reject(error);
             }, ms);
         });
+        p.cancel = () => clearTimeout(timerId);
+        return p;
     }
 }
 

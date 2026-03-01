@@ -196,11 +196,9 @@ class SubmissionController extends EventEmitter {
         const correlationId = this.driver.correlationId;
 
         // ✅ Timeout protection (BUG #4 fix)
+        const timeoutP = this._timeout(SUBMISSION_CONFIG.SUBMIT_TIMEOUT_MS, 'submit');
         try {
-            await Promise.race([
-                this._executeSubmit(ctx, selector, taskId, correlationId),
-                this._timeout(SUBMISSION_CONFIG.SUBMIT_TIMEOUT_MS, 'submit'),
-            ]);
+            await Promise.race([this._executeSubmit(ctx, selector, taskId, correlationId), timeoutP]);
         } catch (err) {
             this.stats.failedSubmissions++;
 
@@ -222,6 +220,7 @@ class SubmissionController extends EventEmitter {
             log('ERROR', `[SUBMISSION] Falha no processo de envio: ${err.message}`, correlationId);
             throw err;
         } finally {
+            timeoutP.cancel();
             this.submissionLock = null;
         }
     }
@@ -516,13 +515,16 @@ class SubmissionController extends EventEmitter {
      * @returns {Promise<never>} Promise que rejeita após timeout
      */
     _timeout(ms, operation) {
-        return new Promise((_, reject) => {
-            setTimeout(() => {
+        let timerId;
+        const p = new Promise((_, reject) => {
+            timerId = setTimeout(() => {
                 const error = new Error(`Timeout in ${operation} after ${ms}ms`);
                 error.name = 'TimeoutError';
                 reject(error);
             }, ms);
         });
+        p.cancel = () => clearTimeout(timerId);
+        return p;
     }
 }
 

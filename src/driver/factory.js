@@ -634,15 +634,20 @@ class DriverFactory extends EventEmitter {
 
             // Lazy-load COM timeout
             try {
+                let lazyLoadTimerId;
                 const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => {
+                    lazyLoadTimerId = setTimeout(() => {
                         reject(new Error(`Lazy-load timeout após ${CONSTANTS.LAZY_LOAD_TIMEOUT_MS}ms`));
                     }, CONSTANTS.LAZY_LOAD_TIMEOUT_MS);
                 });
 
                 const importPromise = import(pathToFileURL(meta.path).href).then(mod => mod.default ?? mod);
 
-                DriverClass = await Promise.race([importPromise, timeoutPromise]);
+                try {
+                    DriverClass = await Promise.race([importPromise, timeoutPromise]);
+                } finally {
+                    clearTimeout(lazyLoadTimerId);
+                }
             } catch (requireError) {
                 this.failedDrivers.add(key);
                 log('ERROR', `[FACTORY] Failed to load driver class '${key}': ${requireError.message}`);
