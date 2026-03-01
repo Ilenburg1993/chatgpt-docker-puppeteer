@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
 import rateLimit from 'express-rate-limit';
 import { log } from '#core/logger';
@@ -41,9 +41,14 @@ const authLimiter = rateLimit({
 
 async function getTelemetryAggregator() {
     if (!telemetryAggregatorPromise) {
-        telemetryAggregatorPromise = import('#server/dashboard-api/telemetry_aggregator').then(
-            module => module.default ?? module
-        );
+        telemetryAggregatorPromise = import('#server/dashboard-api/telemetry_aggregator')
+            .then(module => module.default ?? module)
+            .catch(err => {
+                // Clear the cached promise so the next call can retry the import.
+                // Without this, a single import failure permanently breaks all telemetry endpoints.
+                telemetryAggregatorPromise = null;
+                throw err;
+            });
     }
     return telemetryAggregatorPromise;
 }
@@ -70,12 +75,12 @@ function getDashboardAuthCredentials() {
 }
 
 function safeCredentialMatch(input, expected) {
-    const left = Buffer.from(String(input || ''), 'utf8');
-    const right = Buffer.from(String(expected || ''), 'utf8');
-    if (left.length !== right.length) {
-        return false;
-    }
-    return timingSafeEqual(left, right);
+    // Hash both values to normalize buffer length, preventing length-based timing side-channels.
+    // timingSafeEqual requires equal-length buffers; SHA-256 digests are always 32 bytes.
+    // An early-return on length mismatch would leak the expected credential's length to timing attacks.
+    const hashA = createHash('sha256').update(String(input || '')).digest();
+    const hashB = createHash('sha256').update(String(expected || '')).digest();
+    return timingSafeEqual(hashA, hashB);
 }
 
 function getBridgeMetrics() {
