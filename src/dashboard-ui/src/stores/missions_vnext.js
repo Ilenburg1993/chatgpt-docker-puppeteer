@@ -70,6 +70,26 @@ async function _syncMissionAndTasksContext(missionId) {
     await Promise.allSettled([_refreshTasksSliceForMission(missionId), _refreshMissionSlice()]);
 }
 
+/**
+ * Deriva o ifVersion do objeto de missão retornado pela API.
+ * A API retorna `updated_at` como ISO string; convertemos para ms via Date.parse
+ * para enviar ao control plane (que compara com updated_at_ms no DB).
+ * @param {any} mission
+ * @returns {number|null}
+ */
+function _resolveIfVersion(mission) {
+    if (!mission) return null;
+    // Prefer explicit ms field (some API shapes include both)
+    if (typeof mission.updated_at_ms === 'number' && mission.updated_at_ms > 0) {
+        return mission.updated_at_ms;
+    }
+    // Fallback: parse ISO string returned by mission_repo._rowToMission
+    const iso = mission.updated_at;
+    if (!iso) return null;
+    const ms = Date.parse(String(iso));
+    return Number.isFinite(ms) ? ms : null;
+}
+
 /** Constante/valor exportado: useMissionsVNextStore. */
 export const useMissionsVNextStore = defineStore('missions_vnext', {
     state: () => ({
@@ -86,6 +106,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             search: '',
         },
         selected: null,
+        selectedProgress: /** @type {any} */ (null),
         selectedTasks: [],
         selectedProposals: [],
         selectedGraph: null,
@@ -168,6 +189,20 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             return this.selected;
         },
 
+        async fetchMissionProgress(missionId) {
+            try {
+                const res = await http.get(`/api/missions/${missionId}/progress`);
+                this.selectedProgress = {
+                    progress: res.data?.progress || null,
+                    live_counts: res.data?.live_counts || null,
+                };
+                return this.selectedProgress;
+            } catch (_) {
+                this.selectedProgress = null;
+                return null;
+            }
+        },
+
         async fetchMissionTasks(missionId, { stage = null, status = null, limit = 200, cursor = null } = {}) {
             const params = { limit };
             if (cursor) params.cursor = cursor;
@@ -211,7 +246,9 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
         },
         async patchMission(missionId, payload) {
             const mission = this.getById(missionId) || this.selected || null;
-            const ifVersion = mission?.updated_at_ms || null;
+            // BUG-UI-1 fix: mission_repo returns `updated_at` (ISO string), not `updated_at_ms`.
+            // Use _resolveIfVersion to correctly derive the ms timestamp for optimistic locking.
+            const ifVersion = _resolveIfVersion(mission);
             const result = await _dispatchControlCommand('MISSION_PATCH', {
                 mission_id: missionId,
                 if_version: ifVersion,
@@ -255,7 +292,8 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
         },
         async updatePolicy(missionId, { autonomy_mode, policy, reason = 'Atualização de policy/autonomia da missão' }) {
             const mission = this.getById(missionId) || this.selected || null;
-            const ifVersion = mission?.updated_at_ms || null;
+            // BUG-UI-1 fix: use _resolveIfVersion for correct optimistic locking
+            const ifVersion = _resolveIfVersion(mission);
             const result = await _dispatchControlCommand('MISSION_SET_POLICY', {
                 mission_id: missionId,
                 if_version: ifVersion,
@@ -274,20 +312,48 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
                 tasks: this.selectedTasks,
             };
         },
+
+        /**
+         * Adiciona feedback textual a uma missão via REST (não passa pelo control plane).
+         * @param {string} missionId
+         * @param {string} feedback
+         */
         async addFeedback(missionId, feedback) {
-            throw new Error(
-                `Operação desativada no hard cutover vNext: addFeedback(${missionId}). Use command flow/control plane.`
-            );
+            const res = await http.post(`/api/missions/${missionId}/feedback`, { feedback });
+            return res.data;
         },
+
+        /**
+         * Solicita sugestão de tasks via LLM (planner task).
+         * Requer missão RUNNING e autonomy_mode ≠ USER_ONLY.
+         * @param {string} missionId
+         * @param {{ max_proposals?: number, target?: string }} [payload]
+         */
         async suggestTasks(missionId, payload = {}) {
-            throw new Error(
-                `Operação desativada no hard cutover vNext: suggestTasks(${missionId}). Use command flow/control plane.`
-            );
+            const res = await http.post(`/api/missions/${missionId}/suggest-tasks`, payload);
+            return res.data;
         },
+
+        /**
+         * Rejeita proposals (tasks em stage=PROPOSED) de uma missão.
+         * @param {string} missionId
+         * @param {{ all?: boolean, task_ids?: string[] }} payload
+         */
         async rejectProposals(missionId, payload) {
-            throw new Error(
-                `Operação desativada no hard cutover vNext: rejectProposals(${missionId}). Use command flow/control plane.`
-            );
+            const res = await http.post(`/api/missions/${missionId}/proposals/reject`, payload);
+            await _syncMissionAndTasksContext(missionId);
+            return res.data;
+        },
+
+        /**
+         * Aceita proposals como tasks READY via REST (não passa pelo control plane).
+         * @param {string} missionId
+         * @param {{ proposals: any[] }} payload
+         */
+        async acceptProposals(missionId, payload) {
+            const res = await http.post(`/api/missions/${missionId}/proposals/accept`, payload);
+            await _syncMissionAndTasksContext(missionId);
+            return res.data;
         },
     },
 });

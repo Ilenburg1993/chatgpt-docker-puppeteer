@@ -29,6 +29,9 @@ const ALLOWED_TARGETS = new Set(['auto', 'chatgpt', 'gemini', 'claude', 'ollama'
 const AUTONOMY_VALUES = Object.values(AUTONOMY_MODES);
 const AUTONOMY_SCHEMA = z.enum(/** @type {[string, ...string[]]} */ (AUTONOMY_VALUES));
 
+// Terminal mission statuses: proposals cannot be accepted for missions in these states.
+const TERMINAL_MISSION_STATUSES = new Set([MISSION_STATUS.DONE, MISSION_STATUS.FAILED, MISSION_STATUS.CANCELLED]);
+
 const createMissionSchema = z.object({
     title: z.string().min(1).max(500),
     description: z.string().max(5000).optional(),
@@ -847,7 +850,6 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
 
         // Guard: reject proposals for missions in terminal state.
         // Tasks created for DONE/FAILED/CANCELLED missions would be queued and executed unexpectedly.
-        const TERMINAL_MISSION_STATUSES = new Set([MISSION_STATUS.DONE, MISSION_STATUS.FAILED, MISSION_STATUS.CANCELLED]);
         if (TERMINAL_MISSION_STATUSES.has(mission.status)) {
             return res.status(409).json({
                 success: false,

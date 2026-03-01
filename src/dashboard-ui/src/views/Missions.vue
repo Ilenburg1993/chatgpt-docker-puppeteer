@@ -141,11 +141,12 @@ onMounted(refresh);
                     <div class="flex items-center gap-2 flex-wrap justify-end">
                         <Badge size="sm" :variant="statusVariant(m.status)">{{ m.status }}</Badge>
                         <Badge size="sm">{{ m.autonomy_mode }}</Badge>
-                        <Badge size="sm">propostas: {{ m.counts?.proposed ?? 0 }}</Badge>
+                        <Badge size="sm">prop: {{ m.counts?.proposed ?? 0 }}</Badge>
                         <Badge size="sm">pend: {{ m.counts?.pending ?? 0 }}</Badge>
-                        <Badge size="sm">run: {{ m.counts?.running ?? 0 }}</Badge>
-                        <Badge size="sm">done: {{ m.counts?.done ?? 0 }}</Badge>
-                        <Badge size="sm">blk: {{ m.counts?.blocked ?? 0 }}</Badge>
+                        <Badge size="sm" variant="info">run: {{ m.counts?.running ?? 0 }}</Badge>
+                        <Badge size="sm" variant="success">done: {{ m.counts?.done ?? 0 }}</Badge>
+                        <Badge v-if="m.counts?.failed > 0" size="sm" variant="error">fail: {{ m.counts?.failed ?? 0 }}</Badge>
+                        <Badge v-if="m.counts?.blocked > 0" size="sm" variant="warning">blk: {{ m.counts?.blocked ?? 0 }}</Badge>
                     </div>
                 </div>
             </div>
