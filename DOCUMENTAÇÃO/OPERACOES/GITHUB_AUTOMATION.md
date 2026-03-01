@@ -40,6 +40,12 @@ Este documento cobre:
 - arquivo: [../../.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml)
 - função: review de PR de dependências, installability e triagem automática de PR do Dependabot
 
+Observação operacional:
+
+- quando o `GITHUB_TOKEN` vier read-only no contexto do Dependabot, a triagem automática não tenta
+  derrubar o workflow por `403`;
+- nesse caso, labels/comentários viram operação best-effort e o resumo vai para `GITHUB_STEP_SUMMARY`.
+
 ### Dependency Hygiene
 
 - arquivo: [../../.github/workflows/dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.yml)

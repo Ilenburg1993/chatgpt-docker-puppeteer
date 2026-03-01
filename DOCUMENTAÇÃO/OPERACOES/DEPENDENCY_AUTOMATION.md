@@ -68,6 +68,9 @@ Na triagem automática, o workflow:
 - publica ou atualiza um comentário de triagem na PR;
 - explicita que patches/minors seguem fast-path após checks verdes e majors ficam em revisão manual.
 
+Quando o run herda `GITHUB_TOKEN` read-only do contexto do Dependabot, a triagem degrada para
+`GITHUB_STEP_SUMMARY` e não falha o job por `403 Resource not accessible by integration`.
+
 Observação importante:
 
 - o GitHub Actions também pode exibir um item chamado `Dependabot Updates` com `on: dynamic`;

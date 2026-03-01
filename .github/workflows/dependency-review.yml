@@ -90,13 +90,6 @@ jobs:
             else if (dependencyType === 'direct:development') labels.add('deps:dev');
             else labels.add('deps:transitive-or-mixed');
 
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: [...labels],
-            });
-
             const body = [
               marker,
               '## Dependabot Triage',
@@ -107,30 +100,54 @@ jobs:
               '- required checks: dependency-review, dependabot-installability, security',
               '- merge policy: patch/minor can follow the normal fast-path after green checks; major stays manual.',
             ].join('\n');
+            const isReadonlyIntegrationError = (error) =>
+              error?.status === 403 &&
+              error?.response?.data?.message === 'Resource not accessible by integration';
 
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              per_page: 100,
-            });
-
-            const existing = comments.find((comment) =>
-              comment.user?.type === 'Bot' && typeof comment.body === 'string' && comment.body.includes(marker)
-            );
-
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
+            try {
+              await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body,
+                labels: [...labels],
               });
+
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+
+              const existing = comments.find((comment) =>
+                comment.user?.type === 'Bot' && typeof comment.body === 'string' && comment.body.includes(marker)
+              );
+
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (error) {
+              if (!isReadonlyIntegrationError(error)) {
+                throw error;
+              }
+
+              core.warning(
+                'Dependabot triage token is read-only in this run; skipping labels/comments and writing step summary instead.'
+              );
+              await core.summary
+                .addHeading('Dependabot Triage (read-only token fallback)')
+                .addRaw(body, true)
+                .write();
             }
