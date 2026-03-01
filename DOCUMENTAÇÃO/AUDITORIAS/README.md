@@ -3,7 +3,7 @@
 **Propósito**: concentrar auditorias formais, trilhas de bug audit, matrizes de correção e material de rastreabilidade viva do projeto.  
 **Status documental**: Canônico.  
 **Público**: engenharia, auditoria, manutenção e agentes de IA.  
-**Última atualização**: 28 de fevereiro de 2026.
+**Última atualização**: 1 de março de 2026.
 
 ## O que esta pasta contém
 
@@ -32,6 +32,7 @@
 - [BUGS/BUG_AUDIT_MASTER.md](./BUGS/BUG_AUDIT_MASTER.md)
 - [BUGS/CODEX_AUDIT_TRACKER.md](./BUGS/CODEX_AUDIT_TRACKER.md)
 - [ENV_STRUCTURE_AUDIT_2026-03-01.md](./ENV_STRUCTURE_AUDIT_2026-03-01.md)
+- [SECURITY_SCAN_POLICY.md](./SECURITY_SCAN_POLICY.md)
 
 ## Subárvores locais
 

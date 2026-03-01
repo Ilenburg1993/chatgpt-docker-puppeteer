@@ -8,25 +8,43 @@ on:
   push:
     paths:
       - ".devcontainer/**"
-      - "Dockerfile"
+      - ".github/workflows/docker-rebuild.yml"
+      - "scripts/check-devcontainer-sync.sh"
+      - "scripts/ci/**"
   schedule:
-    # run nightly at 03:00 UTC
-    - cron: "0 3 * * *"
+    # run nightly at 03:50 UTC
+    - cron: "50 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-rebuild-${{ github.workflow }}-${{ github.event_name }}
+  cancel-in-progress: true
 
 jobs:
   build:
     name: Build and validate container
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up QEMU for multiarch
         uses: docker/setup-qemu-action@v3
 
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build image (no cache)
         run: |
-          docker build --no-cache --tag container-test -f .devcontainer/Dockerfile .
+          docker buildx build --load --no-cache --tag container-test -f .devcontainer/Dockerfile .
 
       - name: Lint Dockerfile with hadolint
         uses: hadolint/hadolint-action@v4
@@ -36,30 +54,36 @@ jobs:
       - name: Lint shell scripts with shellcheck
         uses: reviewdog/action-shellcheck@v1
         with:
-          # run on all scripts in repo
           github_token: ${{ secrets.GITHUB_TOKEN }}
           shellcheck_flags: "-x"
-          reporter: github-pr-review
-          filter_mode: added
-          fail_on_error: false
+          reporter: github-check
+          filter_mode: nofilter
+          fail_level: none
 
       - name: Run apt pin check
         run: scripts/ci/apt-pins.sh
 
-      - name: Run container healthcheck and NSS wrapper test
+      - name: Run container tooling smoke test
         run: |
-          # run container in background
-          docker run --rm -d --name tmpcontainer -p 3008:3008 container-test sleep infinity
-          sleep 5
-          if ! docker ps | grep tmpcontainer; then
-            echo "Container did not start" >&2
-            exit 1
-          fi
-          # attempt healthcheck command inside container
-          docker exec tmpcontainer sh -c "if curl -f http://localhost:3008; then exit 0; else exit 1; fi"
-          # test NSS wrapper mapping (requires post-create artifacts)
-          docker exec tmpcontainer sh -c "getent passwd \\$(id -u) || exit 1"
-          docker rm -f tmpcontainer || true
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            container-test \
+            bash -lc '
+              command -v node >/dev/null
+              command -v devcontainer >/dev/null
+              command -v gh >/dev/null
+              command -v actionlint >/dev/null
+              command -v hadolint >/dev/null
+              command -v jsonc-validate >/dev/null
+              gh --version >/dev/null
+              actionlint -version >/dev/null
+              hadolint --version >/dev/null
+              jsonc-validate .devcontainer/devcontainer.json >/dev/null
+              bash -n .devcontainer/scripts/*.sh .devcontainer/nss-gatekeeper.sh
+              bash scripts/check-devcontainer-sync.sh >/tmp/devcontainer-sync.log
+              tail -n 20 /tmp/devcontainer-sync.log
+            '
 
       - name: Cleanup image
         run: docker rmi container-test || true

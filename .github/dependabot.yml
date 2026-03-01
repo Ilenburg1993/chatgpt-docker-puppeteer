@@ -2,18 +2,24 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: "/"
+    target-branch: "main"
+    pull-request-branch-name:
+      separator: "-"
     schedule:
       interval: weekly
       day: monday
-      time: "08:00"
+      time: "08:17"
       timezone: "UTC"
     cooldown:
       semver-major-days: 14
       semver-minor-days: 7
       semver-patch-days: 7
+    rebase-strategy: auto
+    versioning-strategy: increase-if-necessary
     open-pull-requests-limit: 10
     labels:
       - dependencies
+      - dependabot
       - npm
     commit-message:
       prefix: "deps"
@@ -30,6 +36,14 @@ updates:
           - c8
           - sinon
           - supertest
+          - vitest
+      toolchain-and-watchers:
+        patterns:
+          - "@types/node"
+          - esbuild
+          - nodemon
+          - typescript
+          - typescript-language-server
       runtime-core:
         patterns:
           - puppeteer*
@@ -37,35 +51,60 @@ updates:
           - socket.io*
           - openai
           - "@modelcontextprotocol/*"
+      security-foundation:
+        patterns:
+          - axios
+          - dotenv
+          - helmet
+          - jsonwebtoken
+          - uuid
+          - ws
+          - zod
 
   - package-ecosystem: github-actions
     directory: "/"
+    target-branch: "main"
+    pull-request-branch-name:
+      separator: "-"
     schedule:
       interval: weekly
       day: monday
-      time: "09:00"
+      time: "09:23"
       timezone: "UTC"
     cooldown:
       default-days: 3
+    rebase-strategy: auto
     open-pull-requests-limit: 5
     labels:
       - dependencies
+      - dependabot
       - github-actions
     commit-message:
       prefix: "ci"
+    groups:
+      core-actions:
+        patterns:
+          - actions/*
+          - dependabot/*
+          - github/*
 
   - package-ecosystem: docker
     directory: "/"
+    target-branch: "main"
+    pull-request-branch-name:
+      separator: "-"
     schedule:
       interval: weekly
       day: monday
-      time: "10:00"
+      time: "10:29"
       timezone: "UTC"
     cooldown:
       default-days: 3
+    rebase-strategy: auto
     open-pull-requests-limit: 3
     labels:
       - dependencies
+      - dependabot
       - docker
     commit-message:
       prefix: "docker"

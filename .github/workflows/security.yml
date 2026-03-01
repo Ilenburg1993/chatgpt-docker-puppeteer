@@ -5,23 +5,30 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
   schedule:
-    - cron: "0 5 * * 1"
+    - cron: "23 5 * * 1"
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   npm-audit:
     name: NPM audit (prod)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: "npm"
@@ -49,22 +56,51 @@ jobs:
           exit 1
 
       - name: NPM audit (prod only)
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          node scripts/security/npm-audit-gate.mjs \
+            --omit=dev \
+            --min-severity=high \
+            --report-file artifacts/security/npm-audit-gate.json \
+            --markdown-file artifacts/security/npm-audit-summary.md
+
+      - name: Publish security summary
+        if: always()
+        run: |
+          if [ -f artifacts/security/npm-audit-summary.md ]; then
+            cat artifacts/security/npm-audit-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload security audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: security-audit-${{ github.run_id }}
+          path: artifacts/security
+          if-no-files-found: warn
+          retention-days: 14
 
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4

@@ -41,7 +41,9 @@ manutenção do DevContainer:
 - `jsonc-parser` como biblioteca global e o wrapper `jsonc-validate` para validar `.jsonc` reais
   (`.devcontainer/devcontainer.json`, `settings.json`, templates do OpenCode);
 - `typescript` (que já inclui `tsserver`) e `typescript-language-server`;
-- `npm` alinhado ao baseline do repositório e `pnpm` ativado via Corepack.
+- `npm` e `pnpm` alinhados ao baseline do repositório no prefixo canônico da imagem;
+- `gh`, `actionlint` e `hadolint` instalados a partir dos releases oficiais upstream, em vez dos
+  pacotes atrasados (ou ausentes) do Debian.
 
 Leitura importante:
 
@@ -52,6 +54,9 @@ Leitura importante:
   `~/.npm-global`, porque `~/.npm-global` é um volume nomeado e mascara conteúdo da imagem;
 - os binários críticos também são espelhados em `/usr/local/bin` para evitar drift com ferramentas
   que chamem caminhos absolutos;
+- `gh`, `actionlint` e `hadolint` são ferramentas curadas: ficam pinadas no `Dockerfile` por
+  versão estável e devem ser atualizadas deliberadamente, não “por acaso” via `apt`;
+- os downloads upstream dessas ferramentas passam por validação de checksum durante o build;
 - o container continua não instalando `bun` como ferramenta base, porque o fluxo canônico segue em
   `npm` e `bun` hoje é apenas engine aceita, não dependência operacional do runtime.
 
@@ -158,6 +163,9 @@ make info
 
 ```bash
 devcontainer --version
+gh --version
+actionlint -version
+hadolint --version
 jsonc-validate .devcontainer/devcontainer.json
 bash scripts/check-devcontainer-sync.sh
 ```

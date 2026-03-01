@@ -3,7 +3,7 @@
 **Propósito**: concentrar a documentação de deploy, ambiente, PM2, devcontainer, rede e operação do runtime em execução.  
 **Status documental**: Canônico.  
 **Público**: engenharia, operação, manutenção e agentes de IA.  
-**Última atualização**: 28 de fevereiro de 2026.
+**Última atualização**: 1 de março de 2026.
 
 ## O que esta pasta contém
 
@@ -28,6 +28,8 @@
 - [LAUNCHER.md](./LAUNCHER.md)
 - [NETWORKING.md](./NETWORKING.md)
 - [SECURITY.md](./SECURITY.md)
+- [DEPENDENCY_AUTOMATION.md](./DEPENDENCY_AUTOMATION.md)
+- [GITHUB_AUTOMATION.md](./GITHUB_AUTOMATION.md)
 
 ## Trilhas operacionais importantes
 
@@ -36,6 +38,10 @@
   - [CHROME_PROXY_INTEGRATION_GUIDE.md](./CHROME_PROXY_INTEGRATION_GUIDE.md)
 - Devcontainer e ambiente:
   - [DEVCONTAINER.md](./DEVCONTAINER.md)
+- Dependências e supply chain:
+  - [DEPENDENCY_AUTOMATION.md](./DEPENDENCY_AUTOMATION.md)
+- GitHub e CI/CD:
+  - [GITHUB_AUTOMATION.md](./GITHUB_AUTOMATION.md)
 - Dashboard e conectividade:
   - [DASHBOARD_PORT_FORWARDING.md](./DASHBOARD_PORT_FORWARDING.md)
 - PM2 e rollout:

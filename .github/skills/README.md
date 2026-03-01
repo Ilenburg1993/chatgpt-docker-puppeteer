@@ -2,6 +2,8 @@
 
 Este diretório é a fonte viva de skills do projeto.
 
+Para o hub estrutural de `.github/`, consulte também [../README.md](../README.md).
+
 ## Regras de governança
 
 - O conteúdo canônico mora em `.github/skills`.

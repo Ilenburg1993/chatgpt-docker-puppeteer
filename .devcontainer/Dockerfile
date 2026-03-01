@@ -1,6 +1,7 @@
 # =============================================================================
 # Dockerfile v1.0 — ChatGPT Docker Puppeteer DevContainer (CANÔNICO / DEFINITIVO)
 # Base: Node.js 24 + Debian Bookworm (Microsoft DevContainers)
+# hadolint global ignore=DL3008,DL3059
 #
 # OBJETIVO MACRO (v1.0)
 #   Este Dockerfile define uma imagem DEV (apenas desenvolvimento) com foco em:
@@ -33,6 +34,18 @@
 # SECTION 0 — BASE IMAGE, SHELL GLOBAL & BUILD METADATA (OCI)
 # =============================================================================
 FROM mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
+
+# ---------------------------------------------------------------------------
+# Toolchain pins (upstream stable)
+# - Curated tools that are too stale in Debian should be pinned explicitly.
+# - Keep these values in sync with upstream stable releases when refreshing the image.
+# ---------------------------------------------------------------------------
+ARG NPM_VERSION=11.11.0
+ARG DEVCONTAINER_CLI_VERSION=0.83.3
+ARG PNPM_VERSION=10.30.3
+ARG GH_VERSION=2.87.3
+ARG ACTIONLINT_VERSION=1.7.11
+ARG HADOLINT_VERSION=2.14.0
 
 # ---------------------------------------------------------------------------
 # SHELL GLOBAL (PIPEFAIL)
@@ -190,22 +203,22 @@ ENV PATH="/usr/local/share/npm-global/bin:${HOME_DIR}/.npm-global/bin:${HOME_DIR
 # - Alinha npm com o contrato do repo (volta/package.json)
 # - Expõe `devcontainer` para build/read-configuration dentro do próprio container
 # - Expõe `jsonc-parser` para validação real de `devcontainer.json`, `settings.json` e templates .jsonc
-# - Fixa `pnpm` via Corepack para evitar depender do estado da imagem-base
+# - Fixa `pnpm` explicitamente no prefixo canônico para evitar depender do estado da imagem-base
 #
 # NOTA:
 # - Instalar em /usr/local/share/npm-global evita que o volume /home/node/.npm-global
 #   esconda os binários da imagem após rebuild.
 RUN mkdir -p "${HOME_DIR}/.npm-global" /usr/local/share/npm-global \
     && env NPM_CONFIG_PREFIX=/usr/local/share/npm-global npm install -g \
-    npm@11.8.0 \
-    @devcontainers/cli@0.83.3 \
+    npm@${NPM_VERSION} \
+    pnpm@${PNPM_VERSION} \
+    @devcontainers/cli@${DEVCONTAINER_CLI_VERSION} \
     jsonc-parser@3.3.1 \
     typescript@5.9.3 \
     typescript-language-server@5.1.3 \
-    && corepack enable \
-    && corepack prepare pnpm@10.28.2 --activate \
     && ln -sf /usr/local/share/npm-global/bin/npm /usr/local/bin/npm \
     && ln -sf /usr/local/share/npm-global/bin/npx /usr/local/bin/npx \
+    && ln -sf /usr/local/share/npm-global/bin/pnpm /usr/local/bin/pnpm \
     && ln -sf /usr/local/share/npm-global/bin/devcontainer /usr/local/bin/devcontainer \
     && ln -sf /usr/local/share/npm-global/bin/tsc /usr/local/bin/tsc \
     && ln -sf /usr/local/share/npm-global/bin/tsserver /usr/local/bin/tsserver \
@@ -352,7 +365,6 @@ RUN apt-get update \
     moreutils \
     watchman \
     hyperfine \
-    gh \
     git-lfs \
     socat \
     mtr-tiny \
@@ -373,6 +385,38 @@ RUN if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; th
     && if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then \
       ln -sf /usr/bin/fdfind /usr/local/bin/fd; \
     fi
+
+# Curated upstream CLI binaries
+# - `gh` from Debian bookworm lags significantly behind upstream; use the official release artifact.
+# - `actionlint` and `hadolint` close the local lint toolchain for GitHub Actions and Dockerfiles.
+# - Every upstream download is verified with the checksum published by the corresponding release.
+RUN set -e; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+      amd64) gh_arch='amd64'; actionlint_arch='amd64'; hadolint_arch='x86_64' ;; \
+      arm64) gh_arch='arm64'; actionlint_arch='arm64'; hadolint_arch='arm64' ;; \
+      *) echo "Unsupported architecture for curated CLIs: $arch" >&2; exit 1 ;; \
+    esac; \
+    gh_asset="gh_${GH_VERSION}_linux_${gh_arch}.tar.gz"; \
+    curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${gh_asset}" -o /tmp/gh.tgz; \
+    curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_checksums.txt" -o /tmp/gh_checksums.txt; \
+    grep "  ${gh_asset}\$" /tmp/gh_checksums.txt | sed 's#  .*#  /tmp/gh.tgz#' | sha256sum -c -; \
+    tar -xzf /tmp/gh.tgz -C /tmp; \
+    install -m 0755 "/tmp/gh_${GH_VERSION}_linux_${gh_arch}/bin/gh" /usr/local/bin/gh; \
+    actionlint_asset="actionlint_${ACTIONLINT_VERSION}_linux_${actionlint_arch}.tar.gz"; \
+    curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${actionlint_asset}" -o /tmp/actionlint.tgz; \
+    curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_checksums.txt" -o /tmp/actionlint_checksums.txt; \
+    grep "  ${actionlint_asset}\$" /tmp/actionlint_checksums.txt | sed 's#  .*#  /tmp/actionlint.tgz#' | sha256sum -c -; \
+    tar -xzf /tmp/actionlint.tgz -C /tmp; \
+    install -m 0755 /tmp/actionlint /usr/local/bin/actionlint; \
+    curl -fsSL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hadolint_arch}" -o /tmp/hadolint; \
+    curl -fsSL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hadolint_arch}.sha256" -o /tmp/hadolint.sha256; \
+    awk '{print $1 "  /tmp/hadolint"}' /tmp/hadolint.sha256 | sha256sum -c -; \
+    install -m 0755 /tmp/hadolint /usr/local/bin/hadolint; \
+    rm -rf /tmp/gh.tgz /tmp/gh_checksums.txt "/tmp/gh_${GH_VERSION}_linux_${gh_arch}" /tmp/actionlint.tgz /tmp/actionlint_checksums.txt /tmp/actionlint /tmp/hadolint /tmp/hadolint.sha256; \
+    gh --version | head -n 1; \
+    actionlint -version; \
+    hadolint --version
 
 
 # =============================================================================

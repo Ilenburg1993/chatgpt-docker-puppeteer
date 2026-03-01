@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const JSON_OUTPUT = process.argv.includes('--json');
-const ROOT = path.join(import.meta.dirname, '..');
+const ROOT = path.join(import.meta.dirname, '..', '..');
 
 // Read package.json
 const pkgPath = path.join(ROOT, 'package.json');

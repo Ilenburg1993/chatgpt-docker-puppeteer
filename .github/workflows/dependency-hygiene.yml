@@ -1,0 +1,115 @@
+name: Dependency Hygiene
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 3"
+
+concurrency:
+  group: dependency-hygiene-${{ github.workflow }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-hygiene:
+    name: Dependency hygiene (full graph)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          rm -rf node_modules
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Run full npm audit gate
+        id: npm_audit_gate
+        continue-on-error: true
+        run: |
+          node scripts/security/npm-audit-gate.mjs \
+            --min-severity=moderate \
+            --report-file artifacts/dependency-hygiene/npm-audit-gate-full.json \
+            --markdown-file artifacts/dependency-hygiene/npm-audit-gate-full.md
+
+      - name: Audit declared vs used dependencies
+        if: always()
+        run: |
+          node scripts/analysis/audit-dependencies.js --json > artifacts/dependency-hygiene/dependency-surface.json
+
+      - name: Build dependency hygiene summary
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          node --input-type=module -e '
+            import fs from "node:fs";
+
+            const auditPath = "artifacts/dependency-hygiene/npm-audit-gate-full.json";
+            const depPath = "artifacts/dependency-hygiene/dependency-surface.json";
+            const audit = fs.existsSync(auditPath)
+              ? JSON.parse(fs.readFileSync(auditPath, "utf8"))
+              : {};
+            const dep = fs.existsSync(depPath)
+              ? JSON.parse(fs.readFileSync(depPath, "utf8"))
+              : {};
+
+            const lines = [
+              "# Dependency Hygiene",
+              "",
+              `- npm_audit_outcome: ${process.env.NPM_AUDIT_OUTCOME || "unknown"}`,
+              `- filtered_vulnerabilities: ${audit.filteredCount ?? 0}`,
+              `- actionable: ${audit.actionableCount ?? 0}`,
+              `- residual: ${audit.residualCount ?? 0}`,
+              `- declared: ${dep.summary?.totalDeclared ?? 0}`,
+              `- missing: ${dep.summary?.missing ?? 0}`,
+              `- possibly_unused: ${dep.summary?.possiblyUnused ?? 0}`,
+            ];
+
+            fs.writeFileSync("artifacts/dependency-hygiene/summary.md", `${lines.join("\\n")}\\n`);
+          '
+          cat artifacts/dependency-hygiene/summary.md >> "$GITHUB_STEP_SUMMARY"
+        env:
+          NPM_AUDIT_OUTCOME: ${{ steps.npm_audit_gate.outcome }}
+
+      - name: Upload dependency hygiene artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: dependency-hygiene-${{ github.run_id }}
+          path: artifacts/dependency-hygiene
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail workflow if npm audit gate found actionable issues
+        if: steps.npm_audit_gate.outcome == 'failure'
+        run: |
+          echo "Dependency hygiene failed because the npm audit gate reported actionable issues." >&2
+          exit 1

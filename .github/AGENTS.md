@@ -33,6 +33,7 @@ interaja com o workspace. Ele complementa o `.github/copilot-instructions.md` e 
 - Status geral da documentação: `DOCUMENTAÇÃO/RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md`
 - Baseline curto: `.github/instructions/project-canon.instructions.md`
 - Guia operacional para agentes: `.github/copilot-instructions.md`
+- Hub de automação GitHub: `.github/README.md`
 
 > Estas instruções têm prioridade equivalente às do `copilot-instructions.md` e são carregadas
 > automaticamente pelo VS Code graças a `chat.useAgentsMdFile`.

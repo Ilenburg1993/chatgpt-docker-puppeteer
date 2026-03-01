@@ -213,6 +213,7 @@ A documentação canônica deve privilegiar o comportamento observado no código
 
 ## Links relacionados
 
+- Dependências e supply chain: [DEPENDENCY_AUTOMATION.md](./DEPENDENCY_AUTOMATION.md)
 - Networking: [NETWORKING.md](./NETWORKING.md)
 - Deploy: [DEPLOYMENT.md](./DEPLOYMENT.md)
 - DevContainer: [DEVCONTAINER.md](./DEVCONTAINER.md)

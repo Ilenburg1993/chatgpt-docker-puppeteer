@@ -13,6 +13,7 @@ GitHub Copilot e outros agentes compatíveis no workspace.
 Use estas fontes, nesta ordem, como base estável de contexto:
 
 - `.github/AGENTS.md`
+- `.github/README.md`
 - `.github/instructions/project-canon.instructions.md`
 - `.github/copilot-instructions.md`
 - `DOCUMENTAÇÃO/ARQUITETURA/README.md`

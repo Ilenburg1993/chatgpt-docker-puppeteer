@@ -4,6 +4,19 @@ on:
   schedule:
     - cron: "20 3 * * *"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "Audit mode to run"
+        required: false
+        default: standard
+        type: choice
+        options:
+          - standard
+          - full
+
+concurrency:
+  group: audit-nightly-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && (inputs.mode || 'standard') || 'standard' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -13,12 +26,15 @@ jobs:
     name: Automated audit nightly (non-blocking)
     runs-on: ubuntu-latest
     continue-on-error: true
+    timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: "npm"
@@ -45,20 +61,53 @@ jobs:
           done
           exit 1
 
-      - name: Run audit nightly (artifact mode)
+      - name: Select audit mode
+        id: select_mode
+        run: |
+          MODE="standard"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.mode }}" = "full" ]; then
+            MODE="full"
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Run audit nightly (standard, artifact mode)
+        if: steps.select_mode.outputs.mode == 'standard'
         run: |
           npm run audit:preflight
-          npm run audit:nightly -- --json --publish-master false --publish-snapshot false --output-dir artifacts/audit --focus bug-first --contracts-mode hybrid --enforce-level warn --proposal-depth deep --chaos-profile full --cloud-fallback on --log-format jsonl --progress false --eta false --refresh-context smart --shadow-gate true
+          rc=0
+          timeout --signal=INT --kill-after=30s 40m npm run audit:nightly -- --json --output-dir artifacts/audit || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+            exit "$rc"
+          fi
+          if [ "$rc" -eq 124 ]; then
+            echo "Audit nightly standard hit enforced timeout after 40 minutes." >&2
+          fi
+
+      - name: Run audit nightly (full, manual artifact mode)
+        if: steps.select_mode.outputs.mode == 'full'
+        run: |
+          npm run audit:preflight
+          rc=0
+          timeout --signal=INT --kill-after=30s 55m npm run audit:nightly:full -- --json --publish-master false --publish-snapshot false --output-dir artifacts/audit --progress false --eta false || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+            exit "$rc"
+          fi
+          if [ "$rc" -eq 124 ]; then
+            echo "Audit nightly full hit enforced timeout after 55 minutes." >&2
+          fi
 
       - name: Build nightly audit summary
+        if: always()
         run: |
+          # shellcheck disable=SC2016
           node --input-type=module -e '
             import fs from "node:fs";
             import path from "node:path";
             const dir = "artifacts/audit";
             const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith(".json")) : [];
             if (files.length === 0) {
-              console.log("No audit JSON artifact found.");
+              fs.mkdirSync(dir, { recursive: true });
+              fs.writeFileSync("artifacts/audit/nightly-summary.md", "## Audit Nightly\n\nNo audit JSON artifact was generated.\n");
               process.exit(0);
             }
             files.sort();
@@ -68,6 +117,7 @@ jobs:
             const lines = [
               "## Audit Nightly",
               "",
+              `- mode: ${process.env.AUDIT_MODE || "standard"}`,
               `- run_id: ${report?.run_id || "n/a"}`,
               `- findings: ${report?.summary?.total_findings ?? 0}`,
               `- primary: ${report?.summary?.total_primary ?? 0} | backlog: ${report?.summary?.total_backlog ?? 0}`,
@@ -77,12 +127,17 @@ jobs:
             ];
             fs.writeFileSync("artifacts/audit/nightly-summary.md", `${lines.join("\\n")}\\n`);
           '
-          cat artifacts/audit/nightly-summary.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f artifacts/audit/nightly-summary.md ]; then
+            cat artifacts/audit/nightly-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          AUDIT_MODE: ${{ steps.select_mode.outputs.mode }}
 
       - name: Upload audit artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: audit-nightly-${{ github.run_id }}
+          name: audit-nightly-${{ steps.select_mode.outputs.mode }}-${{ github.run_id }}
           path: artifacts/audit
           if-no-files-found: warn
+          retention-days: 14

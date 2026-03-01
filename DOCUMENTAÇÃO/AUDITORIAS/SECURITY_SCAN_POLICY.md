@@ -1,105 +1,112 @@
-# Security Scan & Remediation Policy
-
-This repository includes automated secret scanning and remediation guidelines.
-
-- Scheduled scans: `.github/workflows/secret-scan-schedule.yml` dispatches periodic scans.
-- Pre-commit: ensure `pre-commit` is configured locally to run the included secret checks.
-- Post-rotation verification: use `analysis/rotation-scripts/post_rotation_verify.sh` to collect
-  verification reports.
-
-Owner responsibilities:
-
-- Run rotation scripts in `analysis/rotation-scripts/` and confirm completion in issue #15.
-- Request host-side GC from platform support and attach evidence to issue #16.
-
-For emergencies, archive `analysis/outputs/final_package.zip` and contact repository support.
-
 # Security Scan Policy
 
-## Objetivo
-
-Definir regras, thresholds e procedimentos operacionais para varredura de segredos e artefatos
-sensíveis no repositório.
+**Propósito**: consolidar a política viva de scans automatizados de dependências e a postura atual
+de triagem de risco residual.  
+**Status documental**: Canônico.  
+**Público**: engenharia, auditoria, manutenção e agentes de IA.  
+**Última atualização**: 1 de março de 2026.
 
 ## Escopo
 
-- Filesystem (arquivos presentes no workspace)
-- Git history (commits/objetos históricos)
+Este documento cobre:
 
-## Ferramentas recomendadas
+- scans automáticos executados no GitHub Actions;
+- critérios de bloqueio para vulnerabilidades de dependências;
+- tratamento de advisories sem versão publicada;
+- postura atual sobre secret scanning.
 
-- TruffleHog (deep entropy / regex)
-- git-secrets (hooks locais / CI)
-- git-sizer (detecção de blobs grandes)
-- git-filter-repo / BFG (remoção histórica)
+## Workflows ativos
 
-## Exclusões e whitelist padrão
+### Dependências e supply chain
 
-- Ignorar diretórios gerados: `node_modules/`, `vendor/`, `build/`, `dist/`.
-- Ignorar diretórios gerados: `node_modules/`, `vendor/`, `build/`, `dist/`, `local-login/`.
-- Arquivos binários grandes devem ser tratados separadamente (ex.: armazenar em LFS ou repositório
-  de assets).
-- Lockfiles (`package-lock.json`, `yarn.lock`) são escaneados, mas marcados com suspeita reduzida
-  (muitos hashes/integrity são falsos-positives).
+- [../../.github/workflows/security.yml](../../.github/workflows/security.yml)
+  - gate de `npm audit` para dependências de produção;
+  - CodeQL;
+  - resumo e artefatos do scan.
+- [../../.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml)
+  - `actions/dependency-review-action`;
+  - `npm ci --ignore-scripts` para PRs do Dependabot;
+  - triagem automática e rotulagem de PRs do Dependabot.
+- [../../.github/workflows/dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.yml)
+  - auditoria completa (`prod + dev`);
+  - verificação de dependências declaradas vs. usadas;
+  - artifact periódico para revisão manual.
 
-## Assinaturas e regex (catálogo)
+## Fonte de verdade para npm audit
 
-- AWS access keys: `AKIA[0-9A-Z]{16}`
-- Azure keys, GCP service-account JSON patterns
-- JWT-like tokens (header.payload.signature)
-- Webhooks (Slack, etc.)
-- Private keys: `-----BEGIN .* PRIVATE KEY-----`
-- DB URIs, basic auth patterns, URLs com tokens
+O repositório não usa mais `npm audit` puro como gate bloqueante.
 
-## Entropia e thresholds
+A fonte de verdade operacional é o wrapper
+[../../scripts/security/npm-audit-gate.mjs](../../scripts/security/npm-audit-gate.mjs).
 
-- Heurística combinada: entropia (Shannon) + comprimento mínimo.
-- Recomendação inicial: entropia >= 4.5 e comprimento >= 20 bytes para marcar como suspeito.
-- Para base64/hex permitir thresholds diferenciados e sinalizar com menor severidade se o contexto
-  for lockfile.
+Ele:
 
-## Fluxo de triagem (Triage)
+- roda `npm audit --json`;
+- confirma com `npm view` se a versão de correção sugerida existe no registry;
+- separa findings entre:
+  - `actionable`
+  - `manual-review`
+  - `unpublished-fix`
+  - `no-fix`
 
-1. Detectado → coletar evidências (path, commit, snippet).
-2. Triage manual por owner: confirmar falso-positivo ou credencial ativa.
-3. Classificação de severidade:
-   - P0: credencial ativa com exposição pública/produção (ação imediata)
-   - P1: credencial válida em ambiente de desenvolvimento/local
-   - P2: possível token / baixa probabilidade
-   - P3: provável falso-positivo (ex.: integrity hashes)
-4. Criar issue/ticket com owner e prazo.
+## Critério de bloqueio
 
-## Remediação
+O pipeline só deve falhar automaticamente quando:
 
-Se confirmado, seguir ordem:
+- a vulnerabilidade está no threshold de severidade configurado; e
+- existe correção publicada; e
+- a correção não exige revisão `semver-major`.
 
-1. Rotacionar a credencial/Token imediatamente (não esperar remoção do git).
-2. Fazer backup do repositório: `git bundle --all -o /tmp/repo-backup.bundle`.
-3. Remover histórico com `git-filter-repo` (ou BFG) para os paths/strings afetados.
-4. `git reflog expire --expire=now --all` && `git gc --prune=now --aggressive`.
-5. Testar localmente e `git push --force` para remotos afetados.
-6. Registrar a ação na issue (quem rotacionou, quando, comando usado).
+## Casos que não bloqueiam automaticamente
 
-## Prevenção
+Os cenários abaixo permanecem visíveis no relatório, mas não viram falha automática:
 
-- Hooks locais `pre-commit` para bloquear commits com segredos.
-- Pre-push checks e CI scans (PR) que executem TruffleHog/git-secrets.
-- Educação dos contribuidores: não commitar `profile/`, chaves privadas, ou arquivos sensíveis.
+- advisory com “fix” para versão não publicada no registry;
+- advisory cuja única saída é upgrade major;
+- pacote sem fix disponível.
 
-## Logging e retenção
+Esses casos exigem backlog e revisão humana, não `audit fix` cego.
 
-- Salvar saídas JSON de scanners com timestamp em storage seguro (retenção sugerida: 90 dias).
-- Registrar auditoria para whitelists/exceções.
+## Dependabot
 
-## Exceções
+O Dependabot é parte da política de segurança de supply chain:
 
-- Qualquer pedido de whitelist deve ter: motivo, owner, duração e aprovação de 2 reviewers.
-- Exceções expiradas são removidas automaticamente.
+- atualiza `npm`, `github-actions` e `docker`;
+- agrupa updates por domínio;
+- usa `cooldown`, `rebase-strategy` e `versioning-strategy` para reduzir churn;
+- PRs passam por `dependency-review`, `dependabot-installability` e `security`.
 
-## Anexos e utilitários
+## Secret scanning
 
-- Workflows GitHub Actions e templates de `pre-commit` acompanham este repositório.
+Hoje, **não há um workflow canônico dedicado de secret scanning** no GitHub Actions deste
+repositório.
 
-## Contato
+Portanto, não é correto afirmar que existe um `secret-scan-schedule.yml` ativo.
 
-Equipe de segurança (owner): listar contatos internos e processo de escalonamento.
+Postura atual:
+
+- prevenção local via higiene operacional e revisão de PR;
+- documentação de resposta e remediação permanece válida;
+- um scanner dedicado de segredos continua sendo backlog explícito, não contrato já implantado.
+
+## Fluxo de triagem
+
+1. O workflow identifica findings e publica artefatos.
+2. Se houver `actionable`, o pipeline falha.
+3. Se houver apenas `manual-review`, `unpublished-fix` ou `no-fix`, o pipeline segue e o risco
+   residual fica documentado.
+4. Dependências major, downgrades de mitigação e advisories inconsistentes com o registry exigem
+   decisão humana.
+
+## Regras de manutenção
+
+- Não documentar workflows que não existam na árvore real de `.github/workflows/`.
+- Se um scan mudar de comportamento, atualizar este documento e o runbook em
+  [../OPERACOES/DEPENDENCY_AUTOMATION.md](../OPERACOES/DEPENDENCY_AUTOMATION.md).
+- Não converter risco residual do ecossistema em “falso erro do projeto”.
+
+## Links relacionados
+
+- Runbook operacional: [../OPERACOES/DEPENDENCY_AUTOMATION.md](../OPERACOES/DEPENDENCY_AUTOMATION.md)
+- Segurança operacional do runtime: [../OPERACOES/SECURITY.md](../OPERACOES/SECURITY.md)
+- Hub de auditorias: [README.md](./README.md)
