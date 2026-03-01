@@ -1,22 +1,38 @@
 # Instruções para todos os agentes
 
+**Propósito**: fornecer o baseline curto e permanente para agentes de IA neste workspace.  
+**Status documental**: Canônico.  
+**Público**: agentes de IA e mantenedores do repositório.  
+**Última atualização**: 28 de fevereiro de 2026.
+
 Este arquivo é lido automaticamente por qualquer agente de IA (Copilot, Claude, ChatGPT, etc.) que
-interaja com o workspace. Ele complementa o `.github/copilot-instructions.md` e serve de ponto único
-quando há múltiplos agentes.
+interaja com o workspace. Ele complementa o `.github/copilot-instructions.md` e usa
+`.github/instructions/project-canon.instructions.md` como baseline curto e estável.
 
-Para tarefas gerais de código, trate
-`.github/instructions/project-canon.instructions.md` como o resumo canônico do repositório e
-aplique-o junto com este `AGENTS.md`.
+- Responder em português brasileiro (pt-BR) ao interagir com humanos ou ao escrever documentação.
+- Presumir Node.js 24+ com ESM obrigatório (`import` / `export`).
+- Tratar `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` como a arquitetura oficial.
+- Tratar `DOCUMENTAÇÃO/ARQUITETURA/README.md` como o índice canônico da arquitetura.
+- Aplicar estas instruções junto com `.github/copilot-instructions.md` e os `*.instructions.md`
+  relevantes.
 
-- Responder em português brasileiro (pt‑BR) sempre que comunicar com humanos ou gerar documentação.
-- O projeto roda em Node.js 24+ com módulos ESM obrigatórios; use `import` / `export` e evite
-  `require`.
-- Siga as convenções descritas em `.github/copilot-instructions.md` (arquitetura, estilo,
-  diretórios, etc.).
-- Skills de auditoria e prompts estão em `.github/skills` e `.github/prompts` respectivamente.
-  Use-os quando for relevante para tarefas de auditoria.
-- Em chats que envolvam várias partes do código, aplique todas as instruções relevantes de
-  `copilot-instructions.md`, deste `AGENTS.md` e quaisquer `*.instructions.md` correspondentes.
+## Mapa estável do repositório
+
+- `src/`: código de runtime do produto.
+- Dentro de `src/`, trate `src/agent/` como a camada de workers operacionais do runtime, distinta
+  de `src/missions/` e de `agents/` na raiz.
+- `tests/`: testes, harness, suporte e quarentena em `legacy/`.
+- `scripts/`: automação operacional, manutenção e tooling interno.
+- `DOCUMENTAÇÃO/`: documentação canônica do projeto.
+- `.github/`: instruções permanentes, skills, workflows e agentes.
+
+## Rotas canônicas
+
+- Arquitetura oficial: `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md`
+- Hub de arquitetura: `DOCUMENTAÇÃO/ARQUITETURA/README.md`
+- Status geral da documentação: `DOCUMENTAÇÃO/RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md`
+- Baseline curto: `.github/instructions/project-canon.instructions.md`
+- Guia operacional para agentes: `.github/copilot-instructions.md`
 
 > Estas instruções têm prioridade equivalente às do `copilot-instructions.md` e são carregadas
 > automaticamente pelo VS Code graças a `chat.useAgentsMdFile`.

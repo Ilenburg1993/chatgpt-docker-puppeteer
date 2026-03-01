@@ -1,71 +1,87 @@
 ---
 name: 'Project Canon'
-description: 'Nucleo canonico do repositorio para agentes de IA'
+description: 'Núcleo canônico do repositório para agentes de IA'
 applyTo: '**/*'
 ---
 
 # Project Canon
 
-Este arquivo e o resumo canonico para tarefas gerais de codigo neste repositorio. Aplique-o como
-baseline curto e estavel; consulte as instrucoes detalhadas e as skills apenas quando a tarefa
-exigir aprofundamento.
+**Propósito**: servir como baseline curto e estável para tarefas gerais de código neste repositório.  
+**Status documental**: Canônico.  
+**Público**: agentes de IA e mantenedores.  
+**Última atualização**: 28 de fevereiro de 2026.
 
-## Linguagem e comunicacao
+Este arquivo é o resumo canônico para tarefas gerais de código neste repositório. Aplique-o como
+baseline curto e estável; use `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` quando a tarefa exigir a
+visão oficial completa da arquitetura.
+
+## Linguagem e comunicação
 
 - Responda em pt-BR ao interagir com humanos.
-- Escreva documentacao e instrucoes em pt-BR, salvo exigencia contraria explicita.
+- Escreva documentação e instruções em pt-BR, salvo exigência contrária explícita.
 
-## Runtime e modulos
+## Runtime e módulos
 
 - Presuma Node.js >=24.
-- Este projeto usa ESM como padrao obrigatorio.
-- Preserve `"type": "module"` em [`package.json`](/workspaces/chatgpt-docker-puppeteer/package.json).
-- Em codigo novo JavaScript, use `import` e `export`.
+- Este projeto usa ESM como padrão obrigatório.
+- Preserve `"type": "module"` em `package.json`.
+- Em código novo JavaScript, use `import` e `export`.
 - Evite `require` e `module.exports`, salvo necessidade excepcional e justificada.
 
 ## Estrutura e arquitetura
 
-- [`index.js`](/workspaces/chatgpt-docker-puppeteer/index.js) e apenas a entrada delegada.
-- [`src/main.js`](/workspaces/chatgpt-docker-puppeteer/src/main.js) e o bootstrap canonico.
-- A arquitetura e orientada a eventos, com NERV como barramento principal.
-- Quando o modulo ja estiver nessa topologia, prefira desacoplamento via eventos em vez de acoplamento
-  direto.
+- `index.js` é apenas a entrada delegada.
+- `src/main.js` é o bootstrap canônico.
+- `src/nerv/`, `src/kernel/`, `src/orchestrator/`, `src/agent/`, `src/driver/`, `src/infra/` e
+  `src/server/` formam a espinha dorsal do runtime.
+- `src/agent/` é a camada de workers internos (fila, watchdog, controle, missão e
+  pós-processamento).
+- `src/missions/` modela o domínio de missão; `src/agent/` executa os loops que mantêm esse
+  domínio progredindo.
+- `agents/` na raiz não é equivalente a `src/agent/`.
+- A arquitetura oficial vive em `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md`.
+- O índice canônico da arquitetura vive em `DOCUMENTAÇÃO/ARQUITETURA/README.md`.
+- Quando o módulo já estiver na topologia NERV, prefira desacoplamento via eventos.
 
-## Restricao arquitetural critica
+## Restrição arquitetural crítica
 
-- Nao introduza `puppeteer.launch()` neste processo.
-- Nao adicione gerenciamento local de browser neste processo.
-- A integracao com browser deve usar o Chrome externo e a infraestrutura de DevTools ja existente.
+- Não introduza `puppeteer.launch()` neste processo.
+- Não adicione gerenciamento local de browser neste processo.
+- A integração com browser deve usar o Chrome externo e a infraestrutura de DevTools já existente.
 
-## Convencoes de codigo
+## Convenções de código
 
 - Prefira aliases existentes como `#core/*`, `#infra/*`, `#driver/*` e equivalentes.
 - Mantenha 4 espacos, 120 colunas, aspas simples e ponto-e-virgula.
-- Adicione JSDoc curto em exports publicas relevantes.
-- Evite novas dependencias sem justificativa clara.
+- Adicione JSDoc curto em exports públicas relevantes.
+- Evite novas dependências sem justificativa clara.
 
-## Quality gates minimos
+## Mapa estável de diretórios
 
-- Rode `npm run lint` apos mudancas relevantes.
-- Rode `npm run format:check` apos mudancas relevantes.
+- `tests/`: testes, suporte e quarentena controlada.
+- `scripts/`: automação operacional, auditoria e manutenção.
+- `DOCUMENTAÇÃO/`: documentação canônica do projeto.
+- `.github/`: instruções permanentes, skills, agentes e workflows.
+
+## Quality gates mínimos
+
+- Rode `npm run lint` após mudanças relevantes.
+- Rode `npm run format:check` após mudanças relevantes.
 - Rode `npm run test:unit` como baseline.
-- Se a mudanca tocar `driver`, `kernel` ou `server`, rode tambem `npm run test:integration`.
+- Se a mudança tocar `driver`, `kernel` ou `server`, rode também `npm run test:integration`.
 
 ## Roteamento de contexto
 
-- Consulte skills quando a tarefa casar claramente com uma skill.
-- A origem canonica das skills neste repositorio e [`.github/skills`](/workspaces/chatgpt-docker-puppeteer/.github/skills).
-- Para documentacao externa, use `context7-docs-ops`.
-- Para navegacao ou diagnostico semantico, use `lsp-ops` ou `rag-mcp-lsp-ops`.
-- Para tipagem ou JSDoc, use `jsdoc-authoring`, `typescript-typing` ou
-  `typing-node24-esm-tsserver`.
-- Use skills de auditoria apenas em tarefas de auditoria, triagem ou runbook.
+- Consulte `DOCUMENTAÇÃO/ARQUITETURA/README.md` para navegar pela arquitetura.
+- Consulte `DOCUMENTAÇÃO/RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md` quando a tarefa envolver
+  governança, status ou backlog da documentação.
+- A origem canônica das skills neste repositório é `.github/skills`.
+- Para tipagem ou JSDoc, use as skills apropriadas apenas quando a tarefa pedir isso.
+- Documentos históricos ficam em `DOCUMENTAÇÃO/ARQUIVO_MORTO/` e não formam baseline automático.
 
-## O que nao vira baseline automatico
+## O que não vira baseline automático
 
-- [`.github/prompts/prompts.js`](/workspaces/chatgpt-docker-puppeteer/.github/prompts/prompts.js)
-  e referencia sob demanda, nao leitura obrigatoria em toda tarefa.
-- [`.github/agents/audit-agent.json`](/workspaces/chatgpt-docker-puppeteer/.github/agents/audit-agent.json)
-  e um agente especializado, nao baseline universal.
-- Ignore `AGENTS.md` de dependencias vendorizadas, salvo quando a tarefa tocar diretamente esse
-  subtree.
+- `dist`, `node_modules`, `tmp`, caches e artefatos gerados não devem ser tratados como estrutura
+  estável.
+- Prompts e agentes especializados em `.github/prompts/` e `.github/agents/` são referência sob
+  demanda, não baseline universal.

@@ -1,190 +1,44 @@
-# 📚 Documentação do Projeto
+# 📚 Hub de Documentação
 
-> **chatgpt-docker-puppeteer** - Sistema Autônomo de Controle de LLMs
+Este é o ponto único de navegação da documentação canônica do repositório.
 
----
+## Navegação Rápida
 
-## 🗺️ Navegação Rápida
+- Guias principais: [GUIAS/README.md](./GUIAS/README.md)
+- Testes: [GUIAS/TESTES.md](./GUIAS/TESTES.md)
+- Arquitetura principal: [ARQUITETURA/README.md](./ARQUITETURA/README.md)
+- Referência técnica: [REFERENCIA/README.md](./REFERENCIA/README.md)
+- Operação e deploy: [OPERACOES/README.md](./OPERACOES/README.md)
+- Planos e roadmap: [PLANOS/README.md](./PLANOS/README.md)
+- Status geral da documentação: [RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](./RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md)
+- Auditoria qualitativa das categorias vivas: [RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md](./RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md)
+- Arquivo histórico: [ARQUIVO_MORTO/README.md](./ARQUIVO_MORTO/README.md)
+- Inventário resumido: [INDEX.md](./INDEX.md)
 
-### 🚀 Para Começar
+## Taxonomia Canônica
 
-- **[Quick Start Guide](QUICK_START.md)** - Setup em 10 minutos
-- **[Configuration Guide](CONFIGURATION.md)** - Todas as configurações
-- **[Docker Setup](../DOCKER_SETUP.md)** - Containerização
+- [GUIAS/README.md](./GUIAS/README.md) onboarding, desenvolvimento, testes, troubleshooting e uso diário.
+- [ARQUITETURA/README.md](./ARQUITETURA/README.md) hub oficial de arquitetura, com visão estrutural, diagramas, fluxos e subsistemas.
+- [REFERENCIA/README.md](./REFERENCIA/README.md) APIs, configuração, variáveis, aliases e referência técnica.
+- [OPERACOES/README.md](./OPERACOES/README.md) deploy, PM2, segurança operacional e rotinas de ambiente.
+- [PLANOS/README.md](./PLANOS/README.md) planos ativos, checklists, propostas e roadmaps.
+- [AUDITORIAS/](./AUDITORIAS/) auditorias formais, matrizes e trilhas de bug audit.
+- [RELATORIOS/README.md](./RELATORIOS/README.md) relatórios, sumários, análises e consolidações.
+- [DECISOES/README.md](./DECISOES/README.md) espaço reservado para ADRs e decisões estruturais.
+- [ARQUIVO_MORTO/README.md](./ARQUIVO_MORTO/README.md) histórico, snapshots, importações legadas e superseded.
 
-### 🏗️ Arquitetura
+## Regras da Casa
 
-- **[Architecture Guide](ARCHITECTURE.md)** ⭐ - Visão técnica detalhada
-- **[Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md)** ✨ **NOVO** - 11 diagramas visuais
-- **[Mission Orchestration Plan](MISSION_ORCHESTRATION_PLAN.md)** 🚀 **v2.0** - Plano de
-  orquestração autônoma
-- **[Roadmap](ROADMAP.md)** ✨ **NOVO** - Planejamento até v1.0
-- **[Gap Analysis](GAP_ANALYSIS.md)** ✨ **NOVO** - Análise crítica e plano de ação
+- Documentação canônica do produto deve viver em `DOCUMENTAÇÃO/`.
+- Markdown operacional pode permanecer colocalizado quando serve à ferramenta ou ao diretório.
+- `README.md`, `CHANGELOG.md` e `SECURITY.md` permanecem na raiz por interface pública.
+- Conteúdo histórico não deve competir com o canônico: ele fica em `ARQUIVO_MORTO/`.
 
-### 📖 Referências
+## Rotas Recomendadas
 
-- **[API Documentation](API.md)** - REST API & WebSocket
-- **[Configuration Files](CONFIG_FILES.md)** - config.json, dynamic_rules.json
-- **[Health Endpoint](HEALTH_ENDPOINT.md)** - Monitoramento
-
-### 🔒 Segurança & Deploy
-
-- **[Security Guide](SECURITY.md)** - Boas práticas
-- **[Deployment Guide](DEPLOYMENT.md)** - Produção
-
-### 📋 Outros
-
-- **[Organização da Documentação](ORGANIZACAO_DOCUMENTACAO.md)** - Inventário por última edição e
-  estrutura de arquivamento
-- **[Summary](SUMMARY.md)** ✨ **NOVO** - Resumo executivo da Fase 1
-- **[Contributing](../CONTRIBUTING.md)** - Como contribuir
-- **[Changelog](../CHANGELOG.md)** - Histórico de versões
-
----
-
-## 🎯 Documentos por Persona
-
-### 👨‍💻 Desenvolvedor (Primeiro Uso)
-
-1. [Quick Start](QUICK_START.md) - Setup inicial
-2. [Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md) - Entender o sistema
-3. [API Documentation](API.md) - Integração
-
-### 🏗️ Arquiteto / Tech Lead
-
-1. [Architecture Guide](ARCHITECTURE.md) - Visão técnica
-2. [Architecture Diagrams](ARCHITECTURE_DIAGRAMS.md) - Diagramas C4, fluxos
-3. [Mission Orchestration Plan](MISSION_ORCHESTRATION_PLAN.md) - Plano v2.0 (missões autônomas)
-4. [Roadmap](ROADMAP.md) - Planejamento estratégico
-5. [Gap Analysis](GAP_ANALYSIS.md) - Issues e próximos passos
-
-### 🚀 DevOps / SRE
-
-1. [Deployment Guide](DEPLOYMENT.md) - Deploy em produção
-2. [Docker Setup](../DOCKER_SETUP.md) - Containerização
-3. [Health Endpoint](HEALTH_ENDPOINT.md) - Monitoramento
-4. [Security Guide](SECURITY.md) - Hardening
-
-### 🤝 Contribuidor
-
-1. [Contributing](../CONTRIBUTING.md) - Workflow de contribuição
-2. [Architecture Guide](ARCHITECTURE.md) - Entender codebase
-3. [Gap Analysis](GAP_ANALYSIS.md) - Onde ajudar
-4. [Roadmap](ROADMAP.md) - Prioridades
-
----
-
-## 📊 Estado da Documentação
-
-| Documento                  | Status      | Última Atualização | Cobertura |
-| -------------------------- | ----------- | ------------------ | --------- |
-| Quick Start                | ✅ Completo | Jan 2026           | 100%      |
-| Architecture               | ✅ Completo | 28 Jan 2026        | 95%       |
-| Architecture Diagrams      | ✨ Novo     | 19 Jan 2026        | 100%      |
-| Mission Orchestration Plan | 🚀 v2.0     | 28 Jan 2026        | 100%      |
-| Roadmap                    | ✨ Novo     | 19 Jan 2026        | 100%      |
-| Gap Analysis               | ✨ Novo     | 19 Jan 2026        | 100%      |
-| Summary                    | ✨ Novo     | 19 Jan 2026        | 100%      |
-| API                        | ✅ Completo | Jan 2026           | 90%       |
-| Configuration              | ✅ Completo | Jan 2026           | 100%      |
-| Deployment                 | ✅ Completo | Jan 2026           | 85%       |
-| Security                   | ✅ Completo | Jan 2026           | 80%       |
-
----
-
-## 🛠️ Ferramentas e Utilidades
-
-### Scripts NPM
-
-```bash
-# Setup e Diagnóstico
-npm run setup           # Setup automatizado completo
-npm run doctor          # Diagnóstico do sistema
-
-# Análise
-npm run analyze:deps         # Dependências circulares
-npm run analyze:deps:graph   # Grafo visual (requer graphviz)
-
-# Desenvolvimento
-npm run dev             # Modo desenvolvimento
-npm run test            # Rodar testes
-npm run lint            # Linter
-
-# Queue
-npm run queue:status    # Status da fila
-npm run queue:add       # Adicionar tarefa
-npm run queue:flow      # Flow manager
-
-# Daemon (PM2)
-npm run daemon:start    # Iniciar daemon
-npm run daemon:stop     # Parar daemon
-npm run daemon:logs     # Ver logs
-npm run daemon:status   # Status
-
-# Limpeza
-npm run clean           # Limpar logs/tmp
-npm run clean:queue     # Limpar fila
-npm run reset:hard      # Reset completo
-```
-
-### Visualização de Diagramas
-
-- **VS Code**: Instale extensão `bierner.markdown-mermaid`
-- **GitHub**: Renderização automática
-- **Online**: [mermaid.live](https://mermaid.live/)
-
----
-
-## 📚 Glossário
-
-- **Task**: Unidade de trabalho (prompt + target)
-- **Target**: Destino (ChatGPT, Gemini, etc)
-- **Driver**: Implementação específica para um target
-- **Queue**: Fila de tarefas (file-based)
-- **Lock**: Trava de processamento (PID-based)
-- **DNA**: Identidade do agente
-- **NERV**: Sistema de IPC (Inter-Process Communication)
-- **Backoff**: Estratégia de retry adaptativo
-- **Forensics**: Dump de debug em falhas
-
----
-
-## 🔗 Links Externos
-
-### Tecnologias Utilizadas
-
-- [Puppeteer](https://pptr.dev/) - Browser automation
-- [Express](https://expressjs.com/) - Web framework
-- [Socket.io](https://socket.io/) - Real-time communication
-- [PM2](https://pm2.keymetrics.io/) - Process manager
-- [Mermaid](https://mermaid.js.org/) - Diagramas
-- [Zod](https://zod.dev/) - Schema validation
-
-### Metodologias
-
-- [C4 Model](https://c4model.com/) - Architecture diagrams
-- [Domain-Driven Design](https://martinfowler.com/tags/domain%20driven%20design.html)
-- [Test Pyramid](https://martinfowler.com/articles/practical-test-pyramid.html)
-
----
-
-## 🆘 Ajuda
-
-### FAQ
-
-**Q: Por onde começar?**  
-A: Execute `npm run setup` e depois `npm run doctor` para validar.
-
-**Q: Como visualizar os diagramas?**  
-A: No GitHub basta abrir o arquivo. No VS Code instale a extensão Mermaid.
-
-**Q: Encontrei um bug, o que fazer?**  
-A: Abra uma issue no GitHub com label `bug` e detalhes.
-
-**Q: Como contribuir?**  
-A: Leia [CONTRIBUTING.md](../CONTRIBUTING.md) e escolha uma issue para trabalhar.
-
----
-
-**Última atualização**: 28 de Janeiro de 2026 **Mantido por**: Equipe de Desenvolvimento
-**Licença**: MIT
+- Onboarding técnico: [GUIAS/QUICK_START.md](./GUIAS/QUICK_START.md) → [GUIAS/DEVELOPMENT.md](./GUIAS/DEVELOPMENT.md) → [ARQUITETURA/README.md](./ARQUITETURA/README.md)
+- Operação: [OPERACOES/DEPLOYMENT.md](./OPERACOES/DEPLOYMENT.md) → [OPERACOES/PM2_QUICK_REFERENCE.md](./OPERACOES/PM2_QUICK_REFERENCE.md)
+- Testes: [GUIAS/TESTES.md](./GUIAS/TESTES.md) → [PLANOS/TESTS_CONSOLIDATION_PLAN.md](./PLANOS/TESTS_CONSOLIDATION_PLAN.md)
+- Auditoria: [AUDITORIAS/BUGS/BUG_AUDIT_MASTER.md](./AUDITORIAS/BUGS/BUG_AUDIT_MASTER.md) → [AUDITORIAS/BUGS/CODEX_AUDIT_TRACKER.md](./AUDITORIAS/BUGS/CODEX_AUDIT_TRACKER.md)
+- Governança documental: [RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](./RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md) → [RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md](./RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md) → [PLANOS/PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md](./PLANOS/PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md)
+- Histórico: [ARQUIVO_MORTO/README.md](./ARQUIVO_MORTO/README.md)

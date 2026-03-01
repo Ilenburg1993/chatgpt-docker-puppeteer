@@ -1,5 +1,8 @@
 # 📋 AUDITORIA: ARQUIVOS ROOT (Fundação do Sistema)
 
+> **Nota:** auditoria point-in-time de 20/01/2026. Nomes de arquivos e comandos refletem o estado
+> observado naquele momento e podem divergir do baseline atual.
+
 **Data**: 2026-01-20 **Auditor**: GitHub Copilot (Claude Sonnet 4.5) **Escopo**: Arquivos na pasta
 raiz do projeto (não inclusos em src/) **Status**: 🟢 SAUDÁVEL (com recomendações de limpeza)
 
@@ -155,7 +158,7 @@ apps: [
 - `start` → `node index.js` (produção)
 - `dev` → `nodemon index.js` (desenvolvimento)
 - `watch` → `nodemon --watch src/` (watch mode)
-- `daemon:start` → `pm2 start ecosystem.config.js`
+- `daemon:start` → `npx pm2 start ecosystem.config.cjs`
 - `daemon:stop`, `daemon:restart`, `daemon:logs`, `daemon:status`
 
 ##### 📊 Queue Management (8 scripts)
@@ -263,7 +266,7 @@ apps: [
 **Recomendação**:
 
 - Mover para `scripts/legacy/` com nota: "Use `npm run daemon:start` instead"
-- OU atualizar para ser um wrapper de `pm2 start ecosystem.config.js` com verificações
+- OU atualizar para ser um wrapper de `npx pm2 start ecosystem.config.cjs` com verificações
   Windows-specific
 
 #### Análise `INICIAR_TUDO.BAT`
@@ -280,7 +283,7 @@ call npx pm2 start index.js --name agente-gpt --stop --node-args="--expose-gc"
 **Bugs**:
 
 1. ❌ **Aponta para `server.js`** que não existe mais (renomeado para `src/server/main.js`)
-2. ❌ **Conflito com ecosystem.config.js**: PM2 deve usar `pm2 start ecosystem.config.js` (não
+2. ❌ **Conflito com ecosystem.config.js**: PM2 deve usar `npx pm2 start ecosystem.config.cjs` (não
    scripts individuais)
 3. ❌ **Comando `--stop` inválido**: PM2 não tem flag `--stop` (apenas `pm2 stop <name>` depois)
 4. ❌ **Abre http://localhost:3000** mas porta real é 3008

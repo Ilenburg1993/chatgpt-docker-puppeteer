@@ -36,7 +36,7 @@ operacional, execução controlada, leitura de artefatos e troubleshooting de `p
 ## Inputs / Preconditions
 
 - `npm run audit:preflight`
-- tracker canônico: `DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_TRACKER.md`
+- tracker canônico: `DOCUMENTAÇÃO/AUDITORIAS/BUGS/CODEX_AUDIT_TRACKER.md`
 - artefatos em `artifacts/audit/runs/<run_id>/`
 - referências detalhadas:
   - `references/command-matrix.md`

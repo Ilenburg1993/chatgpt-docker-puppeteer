@@ -1,27 +1,36 @@
 # Configuração do GitHub Copilot
 
+**Propósito**: consolidar as fontes de contexto e a taxonomia permanente do ecossistema de agentes.  
+**Status documental**: Canônico.  
+**Público**: GitHub Copilot, agentes compatíveis e mantenedores.  
+**Última atualização**: 28 de fevereiro de 2026.
+
 Este documento resume as configurações e recomendações específicas do repositório para trabalhar com
-a extensão GitHub Copilot / Copilot Chat no workspace.
+GitHub Copilot e outros agentes compatíveis no workspace.
 
-## Localização de skills e prompts
+## Fontes canônicas para contexto
 
-- Skills de auditoria ficam em `.github/skills/<nome>/SKILL.md`.
-- Prompts compartilhados estão em `.github/prompts/prompts.js`.
-- A configuração de agente do VS Code (`chat.agentSkillsLocations`) deve incluir `.github/skills`
-  para que as skills sejam carregadas.
-- Ative `chat.useAgentsMdFile` para permitir leitura automática de `AGENTS.md`.
-- Armazene qualquer arquivo JSON de agente em `.github/agents/` (ex: `audit-agent.json`).
+Use estas fontes, nesta ordem, como base estável de contexto:
+
+- `.github/AGENTS.md`
+- `.github/instructions/project-canon.instructions.md`
+- `.github/copilot-instructions.md`
+- `DOCUMENTAÇÃO/ARQUITETURA/README.md`
+- `DOCUMENTAÇÃO/RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md`
+
+## Localização de skills, agentes e prompts
+
+- `.github/skills/`: procedimentos especializados e reutilizáveis.
+- `.github/instructions/`: baseline persistente e instruções curtas.
+- `.github/agents/`: agentes especializados do workspace.
+- `.github/workflows/`: CI/CD e automações GitHub.
+- `.github/prompts/`: prompts compartilhados sob demanda.
 
 ## Arquivo AGENTS.md
 
-Criamos um `.github/AGENTS.md` com diretrizes universais; mantenha-o em sincronização com
-`copilot-instructions.md` e use-o quando múltiplos agentes de IA forem usados no workspace.
-
-- O resumo canônico curto para tarefas gerais fica em
-  `.github/instructions/project-canon.instructions.md`.
-
-- Se desejar regras adicionais, adicione arquivos `.instructions.md` em `.github/instructions`
-  (exemplo incluído) e configure `chat.instructionsFilesLocations`.
+O `.github/AGENTS.md` deve permanecer curto, estável e sincronizado com
+`.github/copilot-instructions.md`, sempre apontando para o hub de arquitetura e para o baseline em
+`.github/instructions/project-canon.instructions.md`.
 
 ## Configurações de workspace recomendadas
 
@@ -39,34 +48,25 @@ Adicione ou mantenha as seguintes chaves em `.vscode/settings.json`:
 }
 ```
 
-Essas opções permitem o uso de modelos compatíveis com OpenAI (Ollama, Claude, etc.) via o gateway
-HTTP que o projeto expõe.
-
-Outros campos `github.copilot.*` podem ser habilitados conforme necessário (métricas, autologout,
-políticas de telemetria). Consulte a documentação do VS Code para a lista completa.
-
 ## Variáveis de ambiente
 
-O container de desenvolvimento e os scripts usam variáveis de ambiente para controlar a integração:
+- `OPENAI_API_KEY` ou `GITHUB_COPILOT_OPENAI_API_KEY`: chave do serviço compatível com OpenAI.
+- `COPILOT_CUSTOM_MODEL`: nome do modelo a usar.
 
-- `OPENAI_API_KEY` ou `GITHUB_COPILOT_OPENAI_API_KEY` – chave do serviço do tipo OpenAI usado pelo
-  gateway.
-- `COPILOT_CUSTOM_MODEL` – nome do modelo a usar (ex. `qwen3-coder`).
+## Taxonomia estável do repositório
 
-As instruções para populares estas variáveis estão em `.env.example`.
-
-## Política de organização (opcional)
-
-Se o repositório estiver sob Copilot for Business, um diretório `copilot.policy/` pode conter
-pacotes de política. Não há configuração nesta fase, mas a estrutura deve ser preservada.
+- `src/`: runtime do produto.
+- Dentro de `src/`, `src/agent/` é a camada de workers operacionais; `src/missions/` é o domínio
+  de missão; `agents/` na raiz é suporte externo ao runtime.
+- `tests/`: testes e harness.
+- `scripts/`: automação operacional e manutenção.
+- `DOCUMENTAÇÃO/`: documentação canônica.
+- `.github/`: contrato permanente para agentes e automações.
 
 ## Observações adicionais
 
-- Todos os prompts e SKILLs são escritos em Português, visto que os agentes humanos e automáticos
-  que usam este repositório funcionam em PT‑BR.
-- A equipe deve ativar o Telemetry somente em ambiente de debug; há flags experimentais para
-  desabilitar telemetria em `settings.json`.
-
----
-
-Este arquivo foi gerado automaticamente em 27 fev 2026.
+- Toda documentação e instrução permanente deve ser escrita em pt-BR.
+- A arquitetura oficial vive em `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md`.
+- O índice canônico de arquitetura vive em `DOCUMENTAÇÃO/ARQUITETURA/README.md`.
+- O status transversal e o backlog documental vivem em
+  `DOCUMENTAÇÃO/RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md`.

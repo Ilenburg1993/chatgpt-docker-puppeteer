@@ -7,6 +7,17 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![PM2](https://img.shields.io/badge/PM2-6.0+-red.svg)](https://pm2.keymetrics.io/)
 
+## 📚 Documentação Canônica
+
+A documentação central do projeto agora está organizada em [`DOCUMENTAÇÃO/README.md`](DOCUMENTAÇÃO/README.md).
+
+- Guias e onboarding: [`DOCUMENTAÇÃO/GUIAS/`](DOCUMENTAÇÃO/GUIAS/)
+- Arquitetura e diagramas: [`DOCUMENTAÇÃO/ARQUITETURA/`](DOCUMENTAÇÃO/ARQUITETURA/)
+- Referências e APIs: [`DOCUMENTAÇÃO/REFERENCIA/`](DOCUMENTAÇÃO/REFERENCIA/)
+- Operações e deploy: [`DOCUMENTAÇÃO/OPERACOES/`](DOCUMENTAÇÃO/OPERACOES/)
+- Planos ativos: [`DOCUMENTAÇÃO/PLANOS/`](DOCUMENTAÇÃO/PLANOS/)
+- Relatórios e histórico: [`DOCUMENTAÇÃO/RELATORIOS/`](DOCUMENTAÇÃO/RELATORIOS/) e [`DOCUMENTAÇÃO/ARQUIVO_MORTO/`](DOCUMENTAÇÃO/ARQUIVO_MORTO/)
+
 ## 🚀 Visão Geral
 
 Este sistema automatiza interações complexas com Large Language Models (LLMs) como ChatGPT, Gemini e
@@ -539,10 +550,10 @@ npm run check
 
 ## 📚 Documentação
 
-- **[Arquitetura Completa](DOCUMENTAÇÃO/ARCHITECTURE.md)**
-- **[Guia de Configuração](DOCUMENTAÇÃO/CONFIGURATION.md)**
-- **[API Reference](DOCUMENTAÇÃO/API.md)**
-- **[Guia de Deploy](DOCUMENTAÇÃO/DEPLOYMENT.md)**
+- **[Arquitetura Completa](DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md)**
+- **[Guia de Configuração](DOCUMENTAÇÃO/REFERENCIA/CONFIGURATION.md)**
+- **[API Reference](DOCUMENTAÇÃO/REFERENCIA/API_REFERENCE.md)**
+- **[Guia de Deploy](DOCUMENTAÇÃO/OPERACOES/DEPLOYMENT.md)**
 
 ## 📄 Licença
 

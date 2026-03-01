@@ -1,5 +1,8 @@
 # 🗺️ Plano Mestre: Cobertura Completa de Auditorias
 
+> **Nota:** plano histórico de cobertura das auditorias. Não trate a nomenclatura aqui como
+> baseline atual sem checagem prévia.
+
 **Data**: 2026-01-21 **Versão**: 1.0 **Status**: 📋 Planejamento **Propósito**: Garantir cobertura
 100% do sistema antes de documentação canônica
 

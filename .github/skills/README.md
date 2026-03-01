@@ -40,6 +40,12 @@ Cada skill canônica deve ter:
 - `performance-audit`: auditoria de performance
 - `security-checklist`: auditoria de segurança
 
+## Taxonomia documental
+
+- `documentation-governance`: auditoria, status, taxonomia, hubs e governança contínua da
+  documentação
+- `readme-standardization`: criação e revisão padronizada de `README.md` por pasta
+
 ## Compatibilidade
 
 Ao atualizar uma skill de auditoria aqui:
@@ -47,3 +53,9 @@ Ao atualizar uma skill de auditoria aqui:
 - atualizar assets relevantes em `references/` e `agents/`
 - evitar duplicar o mesmo runbook em outras skills
 - se houver skill equivalente em `.codex/skills`, deixá-la como redirect curto
+
+Ao criar ou revisar uma skill documental aqui:
+
+- manter a distinção entre governança transversal e `README` local
+- preferir templates enxutos e reaproveitáveis
+- evitar que a skill replique o conteúdo inteiro do hub de documentação

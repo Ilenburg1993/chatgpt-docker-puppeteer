@@ -1,0 +1,50 @@
+---
+id: b4e2762f-3207-4e99-9600-5857b28f3414
+---
+flowchart TD
+    main["src/main.js"]
+    core["src/core"]
+    nerv["src/nerv"]
+    kernel["src/kernel"]
+    orchestrator["src/orchestrator"]
+    agent["src/agent"]
+    driver["src/driver"]
+    infra["src/infra"]
+    missions["src/missions"]
+    server["src/server"]
+    dashboard["src/dashboard-ui"]
+    integration["src/integration"]
+    gateway["src/inference_gateway"]
+    audit["src/audit_agent"]
+    support["src/shared / src/state / src/types / src/logic / src/validation"]
+
+    main --> core
+    main --> nerv
+    main --> kernel
+    main --> agent
+    main --> server
+    main --> missions
+    main --> integration
+    main --> gateway
+    main --> audit
+
+    kernel <--> nerv
+    orchestrator <--> nerv
+    agent <--> nerv
+    driver <--> nerv
+    server <--> nerv
+    infra <--> nerv
+
+    kernel --> orchestrator
+    agent --> kernel
+    agent --> missions
+    agent --> infra
+    orchestrator --> driver
+    driver --> infra
+    server --> dashboard
+    integration --> server
+    gateway --> server
+    audit --> server
+    support -. apoio transversal .-> kernel
+    support -. apoio transversal .-> agent
+    support -. apoio transversal .-> server

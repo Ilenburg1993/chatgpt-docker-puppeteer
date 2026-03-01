@@ -1,5 +1,8 @@
 # Plano de Execução: Super Launcher Ecosystem
 
+> **Nota:** plano de execução histórico da onda de 21/01/2026. Para operação atual, consulte
+> `DOCUMENTAÇÃO/OPERACOES/`.
+
 **Status**: 🚀 PRONTO PARA INICIAR **Estratégia**: PM2-First (Opção A maximizada) **Data**: 21 de
 Janeiro de 2026 **Tempo Total**: 5 horas (8 fases)
 
@@ -136,7 +139,7 @@ static exportConfig(outputPath = './chrome-config.json') {
 
 **Objetivo**: Guia completo do super launcher
 
-**Arquivo**: `DOCUMENTAÇÃO/LAUNCHER.md`
+**Arquivo**: `DOCUMENTAÇÃO/OPERACOES/LAUNCHER.md`
 
 **Seções**:
 
@@ -204,7 +207,7 @@ static exportConfig(outputPath = './chrome-config.json') {
 | 3         | Health Endpoints     | ~120      | 0.5h   | src/server/api/health.js        |
 | 4         | Chrome Config Export | ~40       | 0.5h   | ConnectionOrchestrator.js       |
 | 5         | Dashboard HTML       | ~250      | 1h     | scripts/launcher-dashboard.html |
-| 6         | Documentação         | ~400      | 0.5h   | DOCUMENTAÇÃO/LAUNCHER.md        |
+| 6         | Documentação         | ~400      | 0.5h   | DOCUMENTAÇÃO/OPERACOES/LAUNCHER.md |
 | 7         | Roadmap Update       | N/A       | 0.5h   | ROADMAP_LAUNCHER_DASHBOARD.md   |
 | 8         | Testes               | N/A       | 1h     | Validação manual                |
 | **TOTAL** | **8 fases**          | **~1360** | **5h** | **10 arquivos**                 |

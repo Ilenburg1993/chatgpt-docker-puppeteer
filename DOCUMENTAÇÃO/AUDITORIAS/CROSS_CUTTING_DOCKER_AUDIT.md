@@ -1,5 +1,8 @@
 # Auditoria Cross-Cutting: Docker & Containers
 
+> **Nota:** auditoria point-in-time do baseline Docker de 21/01/2026. Comandos e referências a
+> arquivos devem ser validados antes de reutilização.
+
 **Data**: 21/01/2026 01:00 UTC-3 **Auditor**: AI Coding Agent (Claude Sonnet 4.5) **Versão do
 Projeto**: chatgpt-docker-puppeteer (Janeiro 2026) **Audit Level**: 700 — Container Orchestration &
 Runtime Environment **Status**: 🔄 EM PROGRESSO
@@ -133,7 +136,7 @@ cobrindo:
 
 **✅ PM2 Runtime** (não daemon):
 
-- **Comando**: `pm2-runtime start ecosystem.config.js`
+- **Comando**: `pm2-runtime start ecosystem.config.cjs`
 - **Motivo**: Container deve rodar 1 processo principal (PID 1)
 - **Benefício**: Graceful shutdown com SIGTERM do Docker
 
@@ -867,10 +870,10 @@ docker-compose*.yml
 
 ```bash
 # ❌ NÃO usar em container
-pm2 start ecosystem.config.js
+npx pm2 start ecosystem.config.cjs
 
 # ✅ USAR em container
-pm2-runtime start ecosystem.config.js
+pm2-runtime start ecosystem.config.cjs
 ```
 
 **Motivo**:

@@ -1,5 +1,8 @@
 # 📊 Status Atual das Auditorias - 21/01/2026
 
+> **Nota:** snapshot histórico do programa de auditorias em 21/01/2026. O progresso atual do hub
+> documental está consolidado em `DOCUMENTAÇÃO/RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md`.
+
 **Última Atualização**: 21 de Janeiro de 2026, 18:00 **Progresso Geral**: 10/18 auditorias completas
 (55.6%)
 

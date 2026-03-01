@@ -1,5 +1,8 @@
 # Auditoria Cross-Cutting: SECURITY & PERMISSIONS
 
+> **Nota:** auditoria histórica. Recomendações e referências de configuração devem ser conferidas no
+> baseline canônico atual antes de qualquer execução.
+
 **Data**: 21/01/2026 04:30 UTC-3 **Auditor**: AI Coding Agent (Claude Sonnet 4.5) **Versão do
 Projeto**: chatgpt-docker-puppeteer (Janeiro 2026) **Audit Level**: CRITICAL — Security & Data
 Protection **Status**: ✅ COMPLETO

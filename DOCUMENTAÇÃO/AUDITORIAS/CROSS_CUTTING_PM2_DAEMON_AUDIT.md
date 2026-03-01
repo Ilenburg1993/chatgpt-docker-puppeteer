@@ -1,5 +1,8 @@
 # Auditoria Cross-Cutting: PM2 & Daemon Mode
 
+> **Nota:** auditoria de 21/01/2026. As referências abaixo descrevem o baseline auditado naquela
+> data; valide a operação atual em `DOCUMENTAÇÃO/OPERACOES/PM2_QUICK_REFERENCE.md`.
+
 **Data**: 21 de Janeiro de 2026 **Auditor**: Sistema de Análise Automatizada **Escopo**: PM2 Process
 Management & Daemon Mode Lifecycle **Audit Level**: 700 - Infraestrutura Transversal (NASA Standard)
 **Status**: ✅ COMPLETA
@@ -554,7 +557,7 @@ process.on('SIGHUP', async () => {
 
 | Script           | Comando                             | Descrição                           |
 | ---------------- | ----------------------------------- | ----------------------------------- |
-| `daemon:start`   | `pm2 start ecosystem.config.js`     | Inicia 2 apps (agente + dashboard)  |
+| `daemon:start`   | `npx pm2 start ecosystem.config.cjs`     | Inicia 2 apps (agente + dashboard)  |
 | `daemon:stop`    | `pm2 stop agente-gpt dashboard-web` | Para ambos processos                |
 | `daemon:restart` | `pm2 restart all`                   | Reinicia todos processos            |
 | `daemon:reload`  | `pm2 reload all`                    | Reload sem downtime (zero-downtime) |

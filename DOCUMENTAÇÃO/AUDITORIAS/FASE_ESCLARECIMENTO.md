@@ -1,5 +1,8 @@
 # 🔍 Fase de Esclarecimento - Documentação Canônica
 
+> **Nota:** etapa histórica de esclarecimento. Dúvidas e nomes citados aqui refletem a fase de
+> transição e não devem ser lidos como baseline vivo sem validação.
+
 **Data**: 2026-01-21 **Status**: 🏃 EM ANDAMENTO **Metodologia**: Opção A (Cautelosa - resolver
 dúvidas ANTES de escrever)
 

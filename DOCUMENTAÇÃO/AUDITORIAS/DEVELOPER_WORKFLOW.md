@@ -1,5 +1,8 @@
 # Developer Workflow Guide
 
+> **Nota:** auditoria de workflow datada. Os exemplos abaixo devem ser reconciliados com o Makefile
+> e os scripts atuais antes de uso.
+
 **Última atualização:** 22/01/2026 **Versão:** 1.1 (module-alias migration) **Makefile:** v2.4 (573
 linhas, 49+ targets)
 
@@ -153,10 +156,10 @@ make queue-watch
 # 2. Verificar lint durante edição (ESLint on-type ativado no VS Code)
 
 # 3. Formatar código manualmente (se necessário)
-make format-code
+make format
 
 # 4. Rodar testes específicos
-node tests/test_<nome>.js
+node --test tests/<categoria>/<arquivo>.spec.js
 
 # 5. Rodar todos os testes
 make test-all
@@ -172,7 +175,7 @@ make lint
 make lint-fix
 
 # Formatar tudo (ESLint + Prettier)
-make format-code
+make format
 ```
 
 ---
@@ -223,7 +226,7 @@ make ci-lint
 make git-changed
 
 # 2. Formatar código
-make format-code
+make format
 
 # 3. Rodar testes
 make test-integration
@@ -564,7 +567,7 @@ make docker-clean
 
 - **Makefile**: [Makefile](Makefile) (573 linhas, v2.4)
 - **Cross-platform docs**: [CROSS_PLATFORM_SUPPORT.md](CROSS_PLATFORM_SUPPORT.md)
-- **Architecture**: [DOCUMENTAÇÃO/ARCHITECTURE.md](DOCUMENTAÇÃO/ARCHITECTURE.md)
+- **Architecture**: [../ARQUITETURA/README.md](../ARQUITETURA/README.md)
 - **Testing**: [TESTS_STRATEGY.md](TESTS_STRATEGY.md)
 - **Copilot instructions**: [.github/copilot-instructions.md](.github/copilot-instructions.md)
 
@@ -574,7 +577,7 @@ make docker-clean
 
 ### Antes de cada commit
 
-- [ ] `make format-code` - Formatar código
+- [ ] `make format` - Formatar código
 - [ ] `make lint` - Verificar lint
 - [ ] `make test-integration` - Rodar testes
 - [ ] `make git-changed` - Ver mudanças
@@ -637,7 +640,7 @@ git pushsafe    # = make git-push-safe
 
 ### 5. PM2 ecosystem
 
-Configuração em `ecosystem.config.js`:
+Configuração em `ecosystem.config.cjs`:
 
 - Memoria: 512MB max
 - Restart: sempre

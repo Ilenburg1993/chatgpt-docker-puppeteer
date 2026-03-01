@@ -255,10 +255,10 @@ npm run test:coverage -- --help
 
 ## 1.5 Criar Setup/Teardown Globais (30 min)
 
-### Criar tests/setup.js
+### Criar tests/support/setup.js
 
 ```bash
-cat > tests/setup.js << 'EOF'
+cat > tests/support/setup.js << 'EOF'
 /**
  * Global Test Setup
  * Executado UMA VEZ antes de todos os testes
@@ -306,10 +306,10 @@ console.log('✅ Global test setup complete\n');
 EOF
 ```
 
-### Criar tests/teardown.js
+### Criar tests/support/teardown.js
 
 ```bash
-cat > tests/teardown.js << 'EOF'
+cat > tests/support/teardown.js << 'EOF'
 /**
  * Global Test Teardown
  * Executado UMA VEZ depois de todos os testes
@@ -349,14 +349,14 @@ EOF
 
 ```bash
 # Testar setup/teardown
-node tests/setup.js
-node tests/teardown.js
+node tests/support/setup.js
+node tests/support/teardown.js
 ```
 
 ### Checklist
 
-- [ ] Arquivo `tests/setup.js` criado
-- [ ] Arquivo `tests/teardown.js` criado
+- [ ] Arquivo `tests/support/setup.js` criado
+- [ ] Arquivo `tests/support/teardown.js` criado
 - [ ] Diretórios temporários criados
 - [ ] Variáveis de ambiente configuradas
 - [ ] Setup/teardown testados manualmente
@@ -488,7 +488,7 @@ npm run test:unit -- --help
 npm run test:coverage -- --help
 
 # 4. Executar setup
-node tests/setup.js
+node tests/support/setup.js
 
 # 5. Gerar coverage report (vazio por enquanto)
 npm run test:coverage || echo "No tests yet - OK"

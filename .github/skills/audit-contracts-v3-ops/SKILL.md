@@ -66,7 +66,7 @@ de enforcement.
 4. Fechar governança.
 
 - Garantir `owner` em contratos `P0/P1`.
-- Atualizar documentação canônica em `DOCUMENTAÇÃO/BUGS/PLANO_MESTRE_CONTRATOS_V3.md`.
+- Atualizar documentação canônica em `DOCUMENTAÇÃO/AUDITORIAS/BUGS/PLANO_MESTRE_CONTRATOS_V3.md`.
 
 ## Guardrails
 

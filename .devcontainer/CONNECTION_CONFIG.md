@@ -298,7 +298,7 @@ curl http://localhost:9224/json/version
 - **Schema Zod**: Linhas 38-82 (Chrome & Proxy Connection)
 - **Getters**: Linhas 244-266
 - **Documentação de Portas**: [PORTS_TOPOLOGY.md](PORTS_TOPOLOGY.md)
-- **Arquitetura de Conexão**: [CONNECTION_ARCHITECTURE/](../DOCUMENTAÇÃO/CONNECTION_ARCHITECTURE/)
+- **Arquitetura de Conexão**: [CONNECTION_ARCHITECTURE/](../DOCUMENTAÇÃO/ARQUITETURA/CONNECTION_ARCHITECTURE/)
 
 ---
 

@@ -41,7 +41,7 @@ Skill especializada para fechar a proposta técnica de um finding crítico. Ela 
 1. Coletar contexto.
 
 - Finding + `code_context` + `rag` + `lsp` + histórico do master.
-- Vincular com tracker vivo (`DOCUMENTAÇÃO/BUGS/CODEX_AUDIT_TRACKER.md`).
+- Vincular com tracker vivo (`DOCUMENTAÇÃO/AUDITORIAS/BUGS/CODEX_AUDIT_TRACKER.md`).
 
 2. Ranquear causa-raiz.
 

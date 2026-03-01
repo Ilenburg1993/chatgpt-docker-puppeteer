@@ -333,7 +333,7 @@ uma fronteira arquitetural interna.
   - [ecosystem.config.js](../ecosystem.config.js) - PM2 config (proxy)
 
 - **Documentação**:
-  - [CONNECTION_ARCHITECTURE/](../DOCUMENTAÇÃO/CONNECTION_ARCHITECTURE/) - Arquitetura profunda
+  - [CONNECTION_ARCHITECTURE/](../DOCUMENTAÇÃO/ARQUITETURA/CONNECTION_ARCHITECTURE/) - Arquitetura profunda
   - [CHROME_PROXY_SETUP.md](../DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md) - Setup detalhado
 
 ---

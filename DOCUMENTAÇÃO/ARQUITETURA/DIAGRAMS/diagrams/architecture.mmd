@@ -1,0 +1,42 @@
+%% Diagrama de Arquitetura — Alto Nível (baseline vigente)
+flowchart TD
+  main["src/main.js"]
+  core["src/core"]
+  nerv["src/nerv"]
+  kernel["src/kernel"]
+  orchestrator["src/orchestrator"]
+  agent["src/agent"]
+  missions["src/missions"]
+  driver["src/driver"]
+  infra["src/infra"]
+  server["src/server"]
+  dashboard["src/dashboard-ui"]
+  aux["src/integration + src/inference_gateway + src/audit_agent"]
+  support["src/shared + src/state + src/types + src/logic + src/validation"]
+
+  main --> core
+  main --> nerv
+  main --> kernel
+  main --> agent
+  main --> server
+  main --> missions
+  main --> aux
+
+  kernel <--> nerv
+  orchestrator <--> nerv
+  agent <--> nerv
+  driver <--> nerv
+  server <--> nerv
+  infra <--> nerv
+
+  kernel --> orchestrator
+  agent --> kernel
+  agent --> missions
+  orchestrator --> driver
+  driver --> infra
+  server --> dashboard
+  aux --> server
+
+  support -. suporte transversal .-> kernel
+  support -. suporte transversal .-> agent
+  support -. suporte transversal .-> server

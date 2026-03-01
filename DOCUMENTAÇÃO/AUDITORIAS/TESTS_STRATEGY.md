@@ -849,8 +849,8 @@ mkdir -p tests/{unit/{core,nerv,kernel,driver,infra,server,state,logic},integrat
 
 # 3. Criar arquivos de configuração
 # - .c8rc.json
-# - tests/setup.js
-# - tests/teardown.js
+# - tests/support/setup.js
+# - tests/support/teardown.js
 
 # 4. Atualizar package.json com novos scripts
 

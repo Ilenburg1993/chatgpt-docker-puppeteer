@@ -95,7 +95,7 @@ AUDITORIA → PLANEJAMENTO → ESCLARECIMENTO → IMPLEMENTAÇÃO → VALIDAÇÃ
 ##### ✅ **Análises Técnicas**:
 
 17. `ANALISE_TECNICA.md` - Análise técnica
-18. `CONNECTION_ORCHESTRATOR_ANALYSIS.md` - Análise profunda
+18. `DOCUMENTAÇÃO/ARQUIVO_MORTO/ARQUITETURA_HISTORICA/ANALISES/` - Análises históricas profundas
 19. `CRITICAL_CASES_ANALYSIS.md` - Casos críticos V1
 20. `CRITICAL_CASES_ANALYSIS_V2.md` - Casos críticos V2
 21. `DIAGNOSTIC_CONSOLIDADO.md` - Diagnóstico
