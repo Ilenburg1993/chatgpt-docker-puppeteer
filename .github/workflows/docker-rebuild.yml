@@ -47,7 +47,7 @@ jobs:
           docker buildx build --load --no-cache --tag container-test -f .devcontainer/Dockerfile .
 
       - name: Lint Dockerfile with hadolint
-        uses: hadolint/hadolint-action@v4
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: .devcontainer/Dockerfile
 
