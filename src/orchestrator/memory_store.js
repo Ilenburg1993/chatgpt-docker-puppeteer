@@ -30,7 +30,7 @@ class MemoryStore {
         };
 
         if (options.persistToDisk) {
-            log('WARN', '[MemoryStore] persistToDisk=true não está implementado. Padrões serão armazenados apenas em memória.');
+            log('WARN', '[MemoryStore] persistToDisk=true não está implementado. Os patterns serão armazenados apenas em memória.');
         }
 
         // Array de patterns
