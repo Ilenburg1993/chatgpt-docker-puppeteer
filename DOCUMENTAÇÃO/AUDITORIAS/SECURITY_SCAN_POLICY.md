@@ -42,6 +42,8 @@ A fonte de verdade operacional é o wrapper
 Ele:
 
 - roda `npm audit --json`;
+- só promove a `actionable` findings em que o próprio `npm audit` fornece uma versão explícita de
+  correção;
 - confirma com `npm view` se a versão de correção sugerida existe no registry, exigindo
   consistência entre o packument do pacote (`versions` e `time`) e o manifesto da versão exata
   (`dist.tarball`);
@@ -57,6 +59,7 @@ Ele:
 O pipeline só deve falhar automaticamente quando:
 
 - a vulnerabilidade está no threshold de severidade configurado; e
+- o `npm audit` forneceu uma versão explícita de correção; e
 - existe correção publicada; e
 - a correção não exige revisão `semver-major`.
 
@@ -65,13 +68,15 @@ O pipeline só deve falhar automaticamente quando:
 Os cenários abaixo permanecem visíveis no relatório, mas não viram falha automática:
 
 - advisory com “fix” para versão não publicada no registry;
+- advisory que só expõe um teto semver inferido, sem versão explícita;
 - advisory cuja única saída é upgrade major;
 - pacote sem fix disponível.
 
 Esses casos exigem backlog e revisão humana, não `audit fix` cego.
 
-O gate também reduz falsos positivos transitórios de cache/edge do registry: um único `npm view
-<pacote>@<versão>` positivo não basta para classificar o finding como bloqueante.
+O gate também reduz falsos positivos transitórios de cache/edge do registry: advisories baseados
+apenas em ranges não bloqueiam automaticamente, e um único `npm view <pacote>@<versão>` positivo
+também não basta para classificar o finding como bloqueante.
 
 ## Dependabot
 

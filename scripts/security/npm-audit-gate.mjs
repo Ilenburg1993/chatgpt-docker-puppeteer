@@ -357,27 +357,10 @@ async function classifyVulnerability(vulnerability) {
         };
     }
 
-    /** @type {string[]} */
-    const publishedSpecs = [];
-    for (const version of candidates) {
-        const spec = `${vulnerability.name}@${version}`;
-        if (await isPublishedVersion(spec)) {
-            publishedSpecs.push(spec);
-        }
-    }
-
-    if (publishedSpecs.length > 0) {
-        return {
-            state: 'actionable',
-            candidates: publishedSpecs,
-            note: 'Existe pelo menos uma versão de correção publicada para o pacote afetado.',
-        };
-    }
-
     return {
-        state: 'unpublished-fix',
+        state: 'manual-review',
         candidates: [...candidates].map(version => `${vulnerability.name}@${version}`),
-        note: 'O advisory aponta versões de saída, mas nenhuma delas está publicada no registry.',
+        note: 'O advisory só expõe um limite semver inferido; sem versão explícita do npm audit, o finding exige revisão manual e não bloqueia automaticamente.',
     };
 }
 
