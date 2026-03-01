@@ -323,8 +323,9 @@ export class MCPUpstreamStdio extends EventEmitter {
             this.process.once('exit', resolve);
         });
 
+        let _killTimeoutId;
         const timeoutPromise = new Promise(resolve => {
-            setTimeout(() => {
+            _killTimeoutId = setTimeout(() => {
                 console.error('[MCP Upstream] Process did not exit gracefully, killing...');
                 this.process.kill('SIGTERM');
                 resolve();
@@ -332,6 +333,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         });
 
         await Promise.race([exitPromise, timeoutPromise]);
+        clearTimeout(_killTimeoutId);
 
         // Force kill if still alive
         if (!this.process.killed) {
