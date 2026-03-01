@@ -6,82 +6,99 @@ applyTo: '**/*'
 
 # Project Canon
 
-**Propósito**: servir como baseline curto e estável para tarefas gerais de código neste repositório.  
-**Status documental**: Canônico.  
-**Público**: agentes de IA e mantenedores.  
-**Última atualização**: 28 de fevereiro de 2026.
+**Propósito**: baseline curto e estável para tarefas gerais de código neste repositório. **Status**:
+Canônico. **Última atualização**: 1 de março de 2026.
 
-Este arquivo é o resumo canônico para tarefas gerais de código neste repositório. Aplique-o como
-baseline curto e estável; use `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` quando a tarefa exigir a
-visão oficial completa da arquitetura.
+Use `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` quando a tarefa exigir a visão oficial completa.
 
 ## Linguagem e comunicação
 
-- Responda em pt-BR ao interagir com humanos.
-- Escreva documentação e instruções em pt-BR, salvo exigência contrária explícita.
+- Responda em **pt-BR** ao interagir com humanos.
+- Documentação e instruções permanentes devem ser escritas em pt-BR.
 
-## Runtime e módulos
+## Runtime
 
-- Presuma Node.js >=24.
-- Este projeto usa ESM como padrão obrigatório.
-- Preserve `"type": "module"` em `package.json`.
-- Em código novo JavaScript, use `import` e `export`.
-- Evite `require` e `module.exports`, salvo necessidade excepcional e justificada.
+- Node.js >=24, ESM obrigatório. Preserve `"type": "module"` em `package.json`.
+- Use `import`/`export`. Evite `require`/`module.exports` sem justificativa excepcional.
 
-## Estrutura e arquitetura
+## Arquitetura
 
-- `index.js` é apenas a entrada delegada.
-- `src/main.js` é o bootstrap canônico.
-- `src/nerv/`, `src/kernel/`, `src/orchestrator/`, `src/agent/`, `src/driver/`, `src/infra/` e
-  `src/server/` formam a espinha dorsal do runtime.
-- `src/agent/` é a camada de workers internos (fila, watchdog, controle, missão e
-  pós-processamento).
-- `src/missions/` modela o domínio de missão; `src/agent/` executa os loops que mantêm esse
-  domínio progredindo.
-- `agents/` na raiz não é equivalente a `src/agent/`.
-- A arquitetura oficial vive em `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md`.
-- O índice canônico da arquitetura vive em `DOCUMENTAÇÃO/ARQUITETURA/README.md`.
-- Quando o módulo já estiver na topologia NERV, prefira desacoplamento via eventos.
+- `src/main.js` — bootstrap canônico. `src/core/` — contratos centrais.
+- **Espinha dorsal**: `src/nerv/` · `src/kernel/` · `src/orchestrator/` · `src/agent/` ·
+  `src/driver/` · `src/infra/` · `src/server/`.
+- `src/agent/` são workers internos (fila, watchdog, controle, missão, pós-processamento).
+- `src/missions/` é o domínio; `src/agent/` executa os loops.
+- `agents/` na raiz ≠ (diferente) `src/agent/`.
+- Quando o módulo está na topologia NERV, prefira desacoplamento por eventos.
 
-## Restrição arquitetural crítica
+## Restrição crítica
 
 - Não introduza `puppeteer.launch()` neste processo.
-- Não adicione gerenciamento local de browser neste processo.
-- A integração com browser deve usar o Chrome externo e a infraestrutura de DevTools já existente.
+- Browser via Chrome externo e infraestrutura DevTools já existente.
 
-## Convenções de código
+## Código
 
-- Prefira aliases existentes como `#core/*`, `#infra/*`, `#driver/*` e equivalentes.
-- Mantenha 4 espacos, 120 colunas, aspas simples e ponto-e-virgula.
-- Adicione JSDoc curto em exports públicas relevantes.
-- Evite novas dependências sem justificativa clara.
+- Aliases: `#core/*`, `#infra/*`, `#driver/*` → prefira a caminhos relativos profundos.
+- Estilo: 4 espaços, 120 colunas, aspas simples, ponto-e-vírgula.
+- **JSDoc robusto obrigatório**: toda exportação pública deve ter JSDoc com tipos explícitos.
+  - Use `@param {type}`, `@returns {type}`, `@throws {ErrorType}`.
+  - Skill: `jsdoc-authoring` (`.github/skills/jsdoc-authoring/SKILL.md`)
+- **Tipagem**: sempre adicionar tipos via JSDoc ou TypeScript.
+  - Skill: `typing-node24-esm-tsserver` (`.github/skills/typing-node24-esm-tsserver/SKILL.md`)
+  - Run: `npm run typecheck:node` antes de commitar.
+- Novas dependências exigem justificativa clara.
 
-## Mapa estável de diretórios
+## Ferramentas disponíveis no ambiente
 
-- `tests/`: testes, suporte e quarentena controlada.
-- `scripts/`: automação operacional, auditoria e manutenção.
-- `DOCUMENTAÇÃO/`: documentação canônica do projeto.
-- `.github/`: instruções permanentes, skills, agentes e workflows.
+**CLI preferidos** (sempre disponíveis no DevContainer — use em vez de grep/find):
+
+| Ferramenta                               | Uso                                      |
+| ---------------------------------------- | ---------------------------------------- |
+| `rg "padrão" src/`                       | Busca de texto rápida (ripgrep)          |
+| `fd "\.js$" src/`                        | Localização de arquivos rápida (fd-find) |
+| `bat arquivo.js`                         | Leitura com syntax highlighting          |
+| `jq '.chave' arquivo.json`               | Processamento de JSON                    |
+| `yq '.campo' arquivo.yml`                | Processamento de YAML                    |
+| `gh run list`                            | GitHub CLI — runs, PRs, issues           |
+| `actionlint` / `hadolint` / `shellcheck` | Lint de workflows, Dockerfile e scripts  |
+| `hyperfine`                              | Benchmark de comandos                    |
+| `sqlite3`                                | Banco de estado local                    |
+
+**Scripts npm essenciais**:
+
+| Script                            | Propósito                           |
+| --------------------------------- | ----------------------------------- |
+| `npm run lint` / `lint:fix`       | ESLint                              |
+| `npm run format:check` / `format` | Prettier                            |
+| `npm run test:unit`               | Testes unitários (Node.js `--test`) |
+| `npm run test:integration`        | Testes de integração                |
+| `npm run typecheck:node`          | TypeScript via tsserver             |
+| `npm run audit:quick`             | Auditoria rápida                    |
+| `npm run analyze:deps`            | Dependências circulares             |
+| `npm run diagnose`                | Diagnóstico do ambiente             |
+| `npm run rag:health`              | Saúde do sistema RAG                |
+| `npm run lsp:health`              | Saúde do LSP (tsserver)             |
 
 ## Quality gates mínimos
 
-- Rode `npm run lint` após mudanças relevantes.
-- Rode `npm run format:check` após mudanças relevantes.
+- Rode `npm run lint` e `npm run format:check` após mudanças.
 - Rode `npm run test:unit` como baseline.
-- Se a mudança tocar `driver`, `kernel` ou `server`, rode também `npm run test:integration`.
+- Se tocar `driver`, `kernel` ou `server` → `npm run test:integration`.
 
 ## Roteamento de contexto
 
-- Consulte `DOCUMENTAÇÃO/ARQUITETURA/README.md` para navegar pela arquitetura.
-- Consulte `DOCUMENTAÇÃO/RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md` quando a tarefa envolver
-  governança, status ou backlog da documentação.
-- A origem canônica das skills neste repositório é `.github/skills`.
-- Para tipagem ou JSDoc, use as skills apropriadas apenas quando a tarefa pedir isso.
-- Documentos históricos ficam em `DOCUMENTAÇÃO/ARQUIVO_MORTO/` e não formam baseline automático.
+| Precisa de          | Onde ir                                                |
+| ------------------- | ------------------------------------------------------ |
+| Arquitetura oficial | `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md`             |
+| Status documental   | `DOCUMENTAÇÃO/RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md` |
+| Bugs conhecidos     | `DOCUMENTAÇÃO/BUGS/`                                   |
+| CI/CD               | `DOCUMENTAÇÃO/CI_CD/` · `.github/README.md`            |
+| Skills              | `.github/skills/README.md` + cada `SKILL.md`           |
+| Agentes             | `.github/agents/`                                      |
+| Operações           | `DOCUMENTAÇÃO/OPERACOES/`                              |
 
-## O que não vira baseline automático
+## O que não vira baseline
 
-- `dist`, `node_modules`, `tmp`, caches e artefatos gerados não devem ser tratados como estrutura
-  estável.
-- Prompts e agentes especializados em `.github/prompts/` e `.github/agents/` são referência sob
-  demanda, não baseline universal.
+- `dist`, `node_modules`, `tmp`, caches e artefatos gerados.
+- Prompts em `.github/prompts/` e agentes em `.github/agents/` → referência sob demanda.
+- Documentos em `DOCUMENTAÇÃO/ARQUIVO_MORTO/` → histórico, não baseline.
