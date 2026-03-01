@@ -4,6 +4,10 @@ import { readFileSync } from 'fs';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
+    delete process.env.NO_COLOR;
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Verificar se estamos executando de dentro da pasta dist
 const cwd = process.cwd();

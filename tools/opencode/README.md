@@ -82,12 +82,17 @@ Copie um dos templates abaixo para o seu config global do OpenCode:
 
 ## 2.2) Persistência do OpenCode no DevContainer
 
-Por padrão, `~/.config/opencode` vive dentro do filesystem do container e pode sumir em rebuild.
-Para manter persistente:
+No DevContainer atual, `~/.config/opencode` já fica sob o volume compartilhado de
+`/home/node/.config`, então o config do OpenCode persiste entre rebuilds normais.
 
-- opção A (simples): guardar um “source of truth” no repo (templates em `tools/opencode/`) e copiar
-  no início de cada sessão.
-- opção B (melhor): montar um volume para `~/.config/opencode` via DevContainer `mounts`.
+Leitura prática:
+
+- você ainda deve manter um “source of truth” no repo (templates em `tools/opencode/`), porque isso
+  facilita auditoria, versionamento de exemplos e recovery manual;
+- não é mais necessário criar um mount separado só para `~/.config/opencode`, porque o mount
+  canônico de `.config` já cobre esse caminho;
+- se o volume do DevContainer for destruído manualmente, o estado some junto com ele, então os
+  templates do repo continuam sendo o backup operacional correto.
 
 ## 3) Uso neste repositório
 

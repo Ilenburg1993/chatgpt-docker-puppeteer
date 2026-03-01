@@ -31,6 +31,7 @@
 - [BUGS/](./BUGS/)
 - [BUGS/BUG_AUDIT_MASTER.md](./BUGS/BUG_AUDIT_MASTER.md)
 - [BUGS/CODEX_AUDIT_TRACKER.md](./BUGS/CODEX_AUDIT_TRACKER.md)
+- [ENV_STRUCTURE_AUDIT_2026-03-01.md](./ENV_STRUCTURE_AUDIT_2026-03-01.md)
 
 ## Subárvores locais
 
@@ -49,5 +50,6 @@
 ## Links relacionados
 
 - Hub principal: [../README.md](../README.md)
+- Referência de ambiente: [../REFERENCIA/ENV_VARIABLES_GUIDE.md](../REFERENCIA/ENV_VARIABLES_GUIDE.md)
 - Relatórios: [../RELATORIOS/README.md](../RELATORIOS/README.md)
 - Arquivo histórico: [../ARQUIVO_MORTO/README.md](../ARQUIVO_MORTO/README.md)

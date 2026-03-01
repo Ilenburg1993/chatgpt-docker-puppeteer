@@ -3,7 +3,7 @@
 **Propósito**: documentar o contrato atual do ambiente `.devcontainer`, com foco no que a configuração realmente declara hoje e nos pontos de drift que ainda exigem revisão.  
 **Status documental**: Canônico.  
 **Público**: desenvolvimento local, manutenção, DX e agentes de IA.  
-**Última atualização**: 28 de fevereiro de 2026.
+**Última atualização**: 1 de março de 2026.
 
 ## O que é fonte de verdade
 
@@ -31,23 +31,73 @@ O DevContainer usa:
 Isso significa que a imagem final depende do `Dockerfile` do projeto e de argumentos de build
 controlados, não de uma imagem pronta genérica.
 
+### Tooling de imagem já embutido
+
+O `Dockerfile` agora entrega um baseline mais completo e determinístico para o próprio ciclo de
+manutenção do DevContainer:
+
+- `devcontainer` CLI (`@devcontainers/cli`) para `read-configuration`, build e troubleshooting
+  dentro do container;
+- `jsonc-parser` como biblioteca global e o wrapper `jsonc-validate` para validar `.jsonc` reais
+  (`.devcontainer/devcontainer.json`, `settings.json`, templates do OpenCode);
+- `typescript` (que já inclui `tsserver`) e `typescript-language-server`;
+- `npm` alinhado ao baseline do repositório e `pnpm` ativado via Corepack.
+
+Leitura importante:
+
+- `tsserver` não exige pacote separado: ele já vem com `typescript`;
+- `jsonc-parser` não expõe um binário de usuário por padrão, por isso o projeto instala o wrapper
+  `jsonc-validate`;
+- esse tooling canônico de imagem deve viver em `/usr/local/share/npm-global`, não em
+  `~/.npm-global`, porque `~/.npm-global` é um volume nomeado e mascara conteúdo da imagem;
+- os binários críticos também são espelhados em `/usr/local/bin` para evitar drift com ferramentas
+  que chamem caminhos absolutos;
+- o container continua não instalando `bun` como ferramenta base, porque o fluxo canônico segue em
+  `npm` e `bun` hoje é apenas engine aceita, não dependência operacional do runtime.
+
 ### Ambiente
 
-Variáveis relevantes hoje:
+Variáveis relevantes hoje, por camada:
 
-- `NODE_ENV=development`
-- `LOG_LEVEL=debug`
-- `PM2_HOME=/home/node/.pm2`
-- `NPM_CONFIG_CACHE=/home/node/.npm`
-- `PUPPETEER_MODE=connect`
-- `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true`
-- `PUPPETEER_WS_ENDPOINT=http://localhost:9224`
+- Dockerfile `ENV`: `NODE_ENV=development`, `LOG_LEVEL=info`, `PUPPETEER_LOCAL_LAUNCH_DISABLED=true`
+- `containerEnv`: `PM2_HOME=/home/node/.pm2`, `NPM_CONFIG_CACHE=/home/node/.npm`,
+  `PUPPETEER_MODE=connect`, `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true`,
+  `PUPPETEER_WS_ENDPOINT=http://localhost:9224`
+- `remoteEnv`: bridge do host para credenciais e overrides visíveis a terminais/extensões, além de
+  espelhar alguns valores fixos via `${containerEnv:*}` para evitar drift
+- `runArgs --env-file`: `.env.development` injeta o baseline versionado de desenvolvimento,
+  incluindo `LOG_LEVEL=debug`
 
 Leitura importante:
 
 - o contrato do container assume browser externo via proxy;
 - o DevContainer não deve “decidir” topologia por conta própria;
 - o endpoint canônico de Puppeteer dentro do container continua sendo `localhost:9224`.
+- `FORCE_COLOR` não é mais exportado globalmente; cor forçada deve ser por processo.
+- o NSS wrapper agora é híbrido: `nss-gatekeeper` semeia artefatos cedo, `containerEnv` carrega
+  `LD_PRELOAD` e também `NSS_WRAPPER_*` já apontando para os artefatos seedados, e `remoteEnv`
+  mantém a mesma superfície para processos do VS Code; isso cobre a lacuna que `profile.d` sozinho
+  não cobre.
+- `CODEX_HOME` e os paths do NSS não precisam mais ficar duplicados em `remoteEnv`: o arquivo usa
+  `${containerEnv:*}` para reaproveitar a mesma fonte de verdade nesses valores fixos.
+
+### Persistência de estado local
+
+Os mounts atuais já cobrem a persistência do estado das principais ferramentas de operador e de
+assistentes:
+
+- `/home/node/.config` em volume dedicado: cobre `gh`, GitHub Copilot, OpenCode e demais configs
+  XDG;
+- `/home/node/.local/share` em volume dedicado: cobre caches e estado de extensões/ferramentas;
+- `/home/node/.claude` em volume dedicado;
+- `CODEX_HOME` permanece no workspace (`.codex`), por desenho.
+
+Leitura correta:
+
+- `~/.config/opencode` já sobrevive a rebuild do container atual; não é mais necessário criar um
+  mount separado só para OpenCode;
+- credenciais e settings desses diretórios persistem por volume, mas a instalação dos binários
+  continua sendo responsabilidade do `Dockerfile` (ou do método oficial de cada fornecedor).
 
 ### Portas forwardadas
 
@@ -104,6 +154,24 @@ npm run check:env
 make info
 ```
 
+### Verificação do contrato do DevContainer
+
+```bash
+devcontainer --version
+jsonc-validate .devcontainer/devcontainer.json
+bash scripts/check-devcontainer-sync.sh
+```
+
+O `check-devcontainer-sync.sh` agora observa também o `Dockerfile`, o `nss-gatekeeper` e os hooks
+de `.devcontainer/scripts/`, para distinguir melhor quando basta reload, quando um restart resolve
+e quando é rebuild obrigatório.
+
+Se quiser validar a configuração materializada pelo próprio CLI:
+
+```bash
+devcontainer read-configuration --workspace-folder .
+```
+
 ### Verificação de dashboard / port forwarding
 
 ```bash
@@ -136,6 +204,10 @@ Além disso, a documentação antiga desta área já carregava afirmações hoje
 - não documente o DevContainer a partir de memória ou de uma versão anterior do arquivo;
 - não trate comentários históricos do JSON como sinônimo automático de comportamento atual;
 - sempre valide `forwardPorts`, `containerEnv` e `build.args` antes de atualizar docs;
+- sempre valide também a fronteira entre Dockerfile `ENV`, `containerEnv` e `remoteEnv`;
+- sempre valide `.jsonc` reais com `jsonc-validate` quando o parser já estiver presente na imagem;
+- use `devcontainer read-configuration` quando a dúvida for sobre a configuração materializada, não
+  apenas sobre o JSON comentado;
 - se um guia operacional contradizer o `devcontainer.json`, o JSON prevalece.
 
 ## Próxima leitura recomendada

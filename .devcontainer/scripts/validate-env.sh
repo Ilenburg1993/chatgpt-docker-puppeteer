@@ -102,7 +102,7 @@ STRUCTURAL_VARS=(
   "NODE_ENV:^(development|test|production)$:Ambiente de execução"
   "SERVER_MODE:.+:Modo do servidor (ex: standalone|proxy|...)"
   "SERVER_AUTHORITY:.+:Autoridade/identidade do servidor (ex: local|dev|prod)"
-  "BROWSER_MODE:^(launcher|connect|wsEndpoint|auto)$:Modo de conexão do browser"
+  "BROWSER_MODE:^(launcher|connect|wsEndpoint|executablePath|auto|external)$:Modo de conexão do browser"
 )
 
 # INFRASTRUCTURE (FATAL in production, WARNING otherwise)
@@ -122,6 +122,8 @@ OPERATIONAL_VARS=(
   "ALLOW_DEGRADED_MODE:^(true|false)$:Permite modo degradado"
   "ENABLE_STATE_FILE:^(true|false)$:Persistência de estado"
   "DEVCONTAINER_NSS_DIR:.+:Diretório base do NSS wrapper"
+  "NSS_WRAPPER_PASSWD:.+:Arquivo passwd do NSS wrapper"
+  "NSS_WRAPPER_GROUP:.+:Arquivo group do NSS wrapper"
   "DEVCONTAINER_MAKE_TIMEOUT:^[0-9]+$:Timeout do post-start make info (segundos)"
 )
 
@@ -172,7 +174,7 @@ echo ""
 log "STRUCTURAL (FATAL):"
 for entry in "${STRUCTURAL_VARS[@]}"; do
   if ! _validate_entry "${entry}" "true" "STRUCT"; then
-    ((ERRORS++))
+    ((ERRORS += 1))
   fi
 done
 echo ""
@@ -184,11 +186,11 @@ log "INFRASTRUCTURE (${INFRA_MODE}):"
 for entry in "${INFRA_VARS[@]}"; do
   if [[ "${INFRA_MODE}" == "FATAL" ]]; then
     if ! _validate_entry "${entry}" "true" "INFRA"; then
-      ((ERRORS++))
+      ((ERRORS += 1))
     fi
   else
     if ! _validate_entry "${entry}" "false" "INFRA"; then
-      ((WARNINGS++))
+      ((WARNINGS += 1))
     fi
   fi
 done
@@ -201,12 +203,12 @@ log "OPERATIONAL (${OPER_MODE}):"
 for entry in "${OPERATIONAL_VARS[@]}"; do
   if [[ "${OPER_MODE}" == "WARNING" ]]; then
     if ! _validate_entry "${entry}" "false" "OPER"; then
-      ((WARNINGS++))
+      ((WARNINGS += 1))
     fi
   else
     # INFO mode: only warn if invalid/present but bad; missing is info-ish warning
     if ! _validate_entry "${entry}" "false" "OPER"; then
-      ((WARNINGS++))
+      ((WARNINGS += 1))
     fi
   fi
 done
@@ -222,7 +224,7 @@ for entry in "${FLAG_VARS[@]}"; do
   if [[ -n "${val}" ]]; then
     if [[ -n "${pattern}" && ! "${val}" =~ ${pattern} ]]; then
       warn "FLAG: ${var} presente mas inválida (valor='$(_redact_value "${var}" "${val}")', esperado='${pattern}')"
-      ((WARNINGS++))
+      ((WARNINGS += 1))
     else
       ok "FLAG: ${var}=$(_redact_value "${var}" "${val}")"
     fi
@@ -234,16 +236,23 @@ echo ""
 # 5) File hints (informational)
 # ---------------------------------------------------------------------------
 log "Arquivos de configuração (INFO):"
-if [[ -f ".env" ]]; then
+if [[ -f ".env.${NODE_ENV_VAL}.local" ]]; then
+  ok ".env.${NODE_ENV_VAL}.local detectado (override mais específico)"
+elif [[ -f ".env.local" ]]; then
+  ok ".env.local detectado (override local)"
+elif [[ -f ".env" ]]; then
   ok ".env detectado"
 elif [[ -f ".env.${NODE_ENV_VAL}" ]]; then
   warn ".env ausente, mas .env.${NODE_ENV_VAL} encontrado"
   log "→ Considere: cp .env.${NODE_ENV_VAL} .env (se seu fluxo usar .env)"
+elif [[ -f ".env.local.example" ]]; then
+  warn "Nenhum override local detectado, mas .env.local.example existe"
+  log "→ Considere: cp .env.local.example .env.local"
 elif [[ -f ".env.example" ]]; then
   warn ".env ausente, mas .env.example encontrado"
   log "→ Considere: cp .env.example .env"
 else
-  warn "Nenhum arquivo .env detectado (isso pode ser OK; remoteEnv pode ser a fonte)."
+  warn "Nenhum arquivo .env detectado (isso pode ser OK; remoteEnv/containerEnv podem ser a fonte)."
 fi
 echo ""
 
@@ -261,10 +270,10 @@ for name in SERVER_PORT CHROME_PORT CHROME_PROXY_PORT; do
   if [[ -n "${v}" ]]; then
     if ! _is_port "${v}"; then
       warn "Porta inválida: ${name}='${v}' (esperado 1024-65535)"
-      ((WARNINGS++))
+      ((WARNINGS += 1))
       # In production, treat invalid infra port as fatal
       if [[ "${NODE_ENV_VAL}" == "production" ]]; then
-        ((ERRORS++))
+        ((ERRORS += 1))
       fi
     fi
   fi
@@ -278,7 +287,7 @@ if [[ -n "${sp}" && -n "${cp}" && "${sp}" == "${cp}" ]] || \
   error "→ SERVER_PORT=${sp:-<unset>}"
   error "→ CHROME_PORT=${cp:-<unset>}"
   error "→ CHROME_PROXY_PORT=${pp:-<unset>}"
-  ((ERRORS++))
+  ((ERRORS += 1))
 else
   ok "Sem conflito lógico de portas (até onde foi possível avaliar)."
 fi
@@ -294,11 +303,11 @@ if [[ "${BROWSER_MODE_VAL}" == "wsEndpoint" ]]; then
   for v in CHROME_HOST CHROME_PORT CHROME_PROXY_PORT; do
     if [[ -z "${!v:-}" ]]; then
       error "BROWSER_MODE=wsEndpoint requer ${v} (ausente)"
-      ((missing++))
+      ((missing += 1))
     fi
   done
   if [[ "${missing}" -gt 0 ]]; then
-    ((ERRORS++))
+    ((ERRORS += 1))
   else
     ok "BROWSER_MODE=wsEndpoint: dependências satisfeitas."
   fi
@@ -306,7 +315,7 @@ fi
 
 if [[ "${NODE_ENV_VAL}" == "production" && "${ALLOW_DEGRADED_MODE:-false}" == "true" ]]; then
   error "ALLOW_DEGRADED_MODE=true não permitido em produção."
-  ((ERRORS++))
+  ((ERRORS += 1))
 fi
 echo ""
 

@@ -265,7 +265,6 @@ _stop_logger() {
 
   # fecha FD do coproc (se existir) e espera tee drenar
   if [[ -n "${_LOG_FD:-}" ]]; then
-    exec {__tmp_close_fd}>&- 2>/dev/null || true
     # tentar fechar diretamente o fd conhecido
     eval "exec ${_LOG_FD}>&- 2>/dev/null" || true
   fi
@@ -1124,6 +1123,10 @@ fi
 # SECTION 13 — Healthcheck final (informativo) + Commit transacional
 # =============================================================================
 log "Executando healthcheck final (informativo)..."
+
+if [[ -x "${DEVCONTAINER_DIR}/scripts/sync-local-auth.sh" ]]; then
+  "${DEVCONTAINER_DIR}/scripts/sync-local-auth.sh" || warn "sync-local-auth.sh falhou (WARN only)."
+fi
 
 BOOT_END_TIME="$(date +%s 2>/dev/null || echo 0)"
 BOOT_DURATION=$(( BOOT_END_TIME - BOOT_START_TIME ))

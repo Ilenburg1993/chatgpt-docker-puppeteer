@@ -46,6 +46,12 @@ Cada skill canônica deve ter:
   documentação
 - `readme-standardization`: criação e revisão padronizada de `README.md` por pasta
 
+## Taxonomia de configuração e ambiente
+
+- `env-governance`: auditoria, consolidação, expansão e documentação da superfície de variáveis de
+  ambiente, templates `.env*`, schema, precedência e placement entre Dockerfile, `containerEnv` e
+  `remoteEnv`
+
 ## Compatibilidade
 
 Ao atualizar uma skill de auditoria aqui:

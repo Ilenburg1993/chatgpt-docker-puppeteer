@@ -139,9 +139,9 @@ npm install
 
 # Configure variáveis de ambiente
 
-cp .env.example .env.local
+cp .env.local.example .env.local
 
-# Edite .env.local com suas chaves API
+# Edite .env.local com suas chaves API e overrides locais
 
 # Inicie em modo desenvolvimento
 

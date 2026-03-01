@@ -31,14 +31,14 @@ import { log } from './logger.js';
 function validateEnvFile() {
     const requiredEnvVars = ['NODE_ENV'];
 
-    const recommendedEnvVars = ['SERVER_PORT', 'DASHBOARD_PORT', 'CHROME_REMOTE_DEBUGGING_ADDRESS'];
+    const recommendedEnvVars = ['SERVER_PORT', 'BROWSER_MODE', 'CHROME_PROXY_PORT'];
 
     const missing = requiredEnvVars.filter(v => !process.env[v]);
     const missingRecommended = recommendedEnvVars.filter(v => !process.env[v]);
 
     if (missing.length > 0) {
         log('ERROR', `[CONFIG] Missing required env vars: ${missing.join(', ')}`);
-        log('ERROR', '[CONFIG] Copy .env.example to .env and configure');
+        log('ERROR', '[CONFIG] Configure .env/.env.local (or remoteEnv in the devcontainer) before boot');
     }
 
     if (missingRecommended.length > 0) {

@@ -1,13 +1,19 @@
 # ENV Variable Reference Guide
 
-**Version**: 1.0 **Date**: 2026-02-03 **Status**: ✅ Comprehensive Audit Completed
+**Version**: 1.1 **Date**: 2026-03-01 **Status**: Canônico (especializado)
 
 ---
 
 ## 📋 Executive Summary
 
-Este documento cataloga **TODAS** as variáveis utilizadas no sistema DevContainer, classificadas por
-camada de processamento e escopo de expansão.
+Este documento cataloga as variáveis relevantes do sistema DevContainer, classificadas por camada
+de processamento e escopo de expansão.
+
+> **Nota de baseline (1 de março de 2026):**
+> a precedência canônica e o contrato de `.env*` vivem em
+> [`../DOCUMENTAÇÃO/REFERENCIA/ENV_VARIABLES_GUIDE.md`](../DOCUMENTAÇÃO/REFERENCIA/ENV_VARIABLES_GUIDE.md).
+> Este arquivo é a referência especializada da camada `.devcontainer`, não substitui o guia geral de
+> ENV.
 
 ### Camadas de Processamento
 
@@ -28,9 +34,16 @@ camada de processamento e escopo de expansão.
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ LAYER 3: Docker Runtime (Container)                          │
-│ • Expande: ENV variables                                     │
+│ • Expande: Dockerfile ENV + containerEnv + --env-file        │
 │ • Timing: Container execution                                │
-│ • Contexto: Container environment + .env files               │
+│ • Contexto: baseline do container                            │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│ LAYER 4: VS Code Remote Runtime                             │
+│ • Expande: remoteEnv                                         │
+│ • Timing: após attach do DevContainer                        │
+│ • Contexto: terminais, extensões, LSPs e agentes             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -41,23 +54,23 @@ camada de processamento e escopo de expansão.
 ### 1. VS Code DevContainer Variables
 
 **Source**: `.devcontainer/devcontainer.json` **Expansion**: VS Code Extension (Layer 1) **Usage**:
-Passadas como build args, container env, mounts source
+passadas como build args, `remoteEnv` e mounts source
 
 | Variable                            | Type     | Usage                                | Example Value                                        |
 | ----------------------------------- | -------- | ------------------------------------ | ---------------------------------------------------- |
-| `${containerUser}`                  | Built-in | remoteUser, ARG REMOTE_USER          | `node`                                               |
+| `remoteUser`                        | Literal  | build.args `REMOTE_USER`             | `node`                                               |
 | `${containerWorkspaceFolder}`       | Built-in | postCreateCommand, postAttachCommand | `/workspaces/chatgpt-docker-puppeteer`               |
 | `${localWorkspaceFolder}`           | Built-in | mounts source=, .env file paths      | `/home/ilenburg/workspaces/chatgpt-docker-puppeteer` |
 | `${localWorkspaceFolderBasename}`   | Built-in | workspaceFolder, PROJECT_NAME        | `chatgpt-docker-puppeteer`                           |
-| `${localEnv:NODE_ENV}`              | Host Env | containerEnv NODE_ENV                | `development`                                        |
-| `${localEnv:SERVER_PORT}`           | Host Env | containerEnv SERVER_PORT             | `3008`                                               |
-| `${localEnv:CHROME_PROXY_PORT}`     | Host Env | containerEnv CHROME_PROXY_PORT       | `9224`                                               |
-| `${localEnv:CHROME_PORT}`           | Host Env | containerEnv CHROME_PORT             | `9225`                                               |
-| `${localEnv:CHROME_HOST}`           | Host Env | containerEnv CHROME_HOST             | `host.docker.internal`                               |
-| `${localEnv:BROWSER_MODE}`          | Host Env | containerEnv BROWSER_MODE            | `wsEndpoint`                                         |
-| `${localEnv:LOG_LEVEL}`             | Host Env | containerEnv LOG_LEVEL               | `info`                                               |
-| `${localEnv:ENABLE_STATE_FILE}`     | Host Env | containerEnv ENABLE_STATE_FILE       | `true`                                               |
-| `${localEnv:REEXECUTE_POST_CREATE}` | Host Env | containerEnv REEXECUTE_POST_CREATE   | `false`                                              |
+| `${localEnv:NODE_ENV}`              | Host Env | remoteEnv NODE_ENV                   | `development`                                        |
+| `${localEnv:SERVER_PORT}`           | Host Env | remoteEnv SERVER_PORT                | `3008`                                               |
+| `${localEnv:CHROME_PROXY_PORT}`     | Host Env | remoteEnv CHROME_PROXY_PORT          | `9224`                                               |
+| `${localEnv:CHROME_PORT}`           | Host Env | remoteEnv CHROME_PORT                | `9225`                                               |
+| `${localEnv:CHROME_HOST}`           | Host Env | remoteEnv CHROME_HOST                | `host.docker.internal`                               |
+| `${localEnv:BROWSER_MODE}`          | Host Env | remoteEnv BROWSER_MODE               | `wsEndpoint`                                         |
+| `${localEnv:LOG_LEVEL}`             | Host Env | remoteEnv LOG_LEVEL                  | `debug`                                              |
+| `${localEnv:ENABLE_STATE_FILE}`     | Host Env | remoteEnv ENABLE_STATE_FILE          | `true`                                               |
+| `${localEnv:REEXECUTE_POST_CREATE}` | Host Env | remoteEnv REEXECUTE_POST_CREATE      | `false`                                              |
 | `${localEnv:BUILD_DATE}`            | Host Env | build.args BUILD_DATE                | `2026-02-03T10:00:00Z`                               |
 | `${localEnv:GIT_COMMIT}`            | Host Env | build.args VCS_REF                   | `abc1234`                                            |
 | `${localEnv:DOCKER_GID}`            | Host Env | build.args DOCKER_GID                | `999`                                                |
@@ -92,9 +105,9 @@ Passadas como build args, container env, mounts source
 
 | ARG            | Source                            | Default                    | Used In                          | Purpose                           |
 | -------------- | --------------------------------- | -------------------------- | -------------------------------- | --------------------------------- |
-| `REMOTE_USER`  | `${containerUser}`                | `node`                     | ENV USER_NAME, HOME_DIR, APP_DIR | Dynamic identity (reusable image) |
+| `REMOTE_USER`  | `remoteUser` (literal)            | `node`                     | ENV USER_NAME, HOME_DIR, APP_DIR | Dynamic identity (reusable image) |
 | `PROJECT_NAME` | `${localWorkspaceFolderBasename}` | `chatgpt-docker-puppeteer` | ENV APP_DIR                      | Workspace folder name             |
-| `VERSION`      | Static                            | `5.2.0`                    | Image metadata                   | Semantic version                  |
+| `VERSION`      | Static                            | `5.3.1`                    | Image metadata                   | Semantic version                  |
 | `BUILD_DATE`   | `${localEnv:BUILD_DATE}`          | -                          | Image metadata                   | Build timestamp                   |
 | `VCS_REF`      | `${localEnv:GIT_COMMIT}`          | -                          | Image metadata                   | Git commit hash                   |
 | `IMAGE_NAME`   | Static                            | `chatgpt-docker-puppeteer` | Image metadata                   | Image name                        |
@@ -120,15 +133,16 @@ ENV USER_NAME=${REMOTE_USER} \
 **Benefits**:
 
 - ✅ Image reusable with different users (`--build-arg REMOTE_USER=testuser`)
-- ✅ Single source of truth (`remoteUser: "node"` → `${containerUser}` → `ARG REMOTE_USER`)
+- ✅ Single source of truth (`remoteUser: "node"` → `build.args.REMOTE_USER` → `ARG REMOTE_USER`)
 - ✅ No hardcoded "node" strings (DRY principle)
 
 ---
 
 ### 3. Container ENV Variables
 
-**Source**: `.devcontainer/Dockerfile` (Sections 6-8) **Expansion**: Container Runtime (Layer 3)
-**Override**: `devcontainer.json` → `containerEnv` + `.env` files
+**Source**: `.devcontainer/Dockerfile` + `devcontainer.json` (`containerEnv` + `runArgs --env-file`)
+**Expansion**: Container Runtime (Layer 3) **Override**: `remoteEnv` (processos do VS Code) +
+bootstrap `.env*`
 
 #### 3.1 STRUCTURAL ENV (Identity & Paths)
 
@@ -156,9 +170,9 @@ ENV USER_NAME=${REMOTE_USER} \
 
 | ENV                  | Default       | Override                              | Taxonomy    | Purpose                                             |
 | -------------------- | ------------- | ------------------------------------- | ----------- | --------------------------------------------------- |
-| `NODE_ENV`           | `development` | `${localEnv:NODE_ENV:development}`    | OPERATIONAL | Node environment mode                               |
+| `NODE_ENV`           | `development` | `${localEnv:NODE_ENV:development}`    | OPERATIONAL | Default da imagem + override via remoteEnv          |
 | `BROWSER_MODE`       | `wsEndpoint`  | `${localEnv:BROWSER_MODE:wsEndpoint}` | OPERATIONAL | Connection mode (wsEndpoint/launcher/external/auto) |
-| `LOG_LEVEL`          | `info`        | `${localEnv:LOG_LEVEL:info}`          | OPERATIONAL | Logging verbosity                                   |
+| `LOG_LEVEL`          | `info`        | `${localEnv:LOG_LEVEL:debug}`         | OPERATIONAL | Default da imagem + baseline dev no remoteEnv       |
 | `BROWSER_POOL_SIZE`  | `3`           | -                                     | TUNING      | Browser instance pool                               |
 | `WS_IDLE_TIMEOUT_MS` | `300000`      | -                                     | TUNING      | WebSocket timeout (5min)                            |
 
@@ -169,6 +183,7 @@ ENV USER_NAME=${REMOTE_USER} \
 | `ENABLE_STATE_FILE`               | `true`  | `${localEnv:ENABLE_STATE_FILE:true}`      | FLAGS    | Enable state tracking        |
 | `REEXECUTE_POST_CREATE`           | `false` | `${localEnv:REEXECUTE_POST_CREATE:false}` | FLAGS    | Force post-create rerun      |
 | `PUPPETEER_LOCAL_LAUNCH_DISABLED` | `true`  | -                                         | FLAGS    | Disable local browser launch |
+| `FORCE_COLOR`                     | -       | -                                         | RUNTIME  | Não deve ser global; usar apenas por processo |
 
 ---
 
@@ -176,8 +191,8 @@ ENV USER_NAME=${REMOTE_USER} \
 
 | Layer          | Variable                          | Flows To                         | Expansion Timing | Example |
 | -------------- | --------------------------------- | -------------------------------- | ---------------- | ------- |
-| **VS Code**    | `remoteUser: "node"`              | → `${containerUser}`             | Pre-build        | "node"  |
-| **Build Args** | `REMOTE_USER: "${containerUser}"` | → `ARG REMOTE_USER`              | Build-time       | "node"  |
+| **VS Code**    | `remoteUser: "node"`              | → `build.args.REMOTE_USER`       | Pre-build        | "node"  |
+| **Build Args** | `REMOTE_USER: "node"`             | → `ARG REMOTE_USER`              | Build-time       | "node"  |
 | **Dockerfile** | `ARG REMOTE_USER=node`            | → `ENV USER_NAME=${REMOTE_USER}` | Build-time       | "node"  |
 | **Container**  | `USER_NAME=node`                  | Runtime                          | Runtime          | "node"  |
 
@@ -185,7 +200,7 @@ ENV USER_NAME=${REMOTE_USER} \
 
 ```
 remoteUser: "node"
-    ↓ (VS Code expands ${containerUser})
+    ↓ (devcontainer.json mirrors the same literal)
 REMOTE_USER: "node"
     ↓ (Docker build processes ARG)
 ARG REMOTE_USER=node
@@ -201,10 +216,12 @@ USER_NAME=node
 
 ### Synchronization Audit
 
-- [x] `remoteUser` = `${containerUser}` = `ARG REMOTE_USER` = `ENV USER_NAME`
+- [x] `remoteUser` = `build.args.REMOTE_USER` = `ARG REMOTE_USER` = `ENV USER_NAME`
 - [x] All mounts `target=` use literal `/home/node` paths
 - [x] All lifecycle hooks use `${containerWorkspaceFolder}` (expanded by VS Code)
-- [x] All `containerEnv` variables have `${localEnv:*}` fallbacks
+- [x] `containerEnv` contém apenas defaults locais do DevContainer, sem depender de `${localEnv:*}`
+- [x] `remoteEnv` concentra `${localEnv:*}` e também pode referenciar `${containerEnv:*}` para
+      valores fixos da imagem/container (como `CODEX_HOME` e NSS)
 - [x] Dockerfile ENVs derived from ARGs use `${VAR}` syntax
 - [x] No hardcoded "node" strings in Dockerfile (except ARG default)
 
@@ -213,7 +230,7 @@ USER_NAME=node
 - [x] **Mounts source=**: Uses `${localWorkspaceFolder}` (VS Code expands)
 - [x] **Mounts target=**: Uses literal `/home/node` paths (no variables)
 - [x] **Build args**: All values are static or `${localEnv:*}`
-- [x] **Container env**: All values have defaults (`:fallback` syntax)
+- [x] **Container env**: usa valores literais de baseline; fallbacks do host ficam em `remoteEnv`
 - [x] **Lifecycle hooks**: Use `${containerWorkspaceFolder}` (VS Code context)
 
 ### Path Consistency

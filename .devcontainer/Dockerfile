@@ -173,17 +173,43 @@ RUN apt-get update \
 RUN ln -sf /usr/bin/python3 /usr/bin/python
 
 # NPM global prefix + PATH (garante disponibilidade das bins globais)
-ENV PATH="${HOME_DIR}/.npm-global/bin:${HOME_DIR}/.local/bin:${PATH}" \
+#
+# Importante:
+# - `~/.npm-global` é um volume nomeado do DevContainer (runtime/user space).
+# - Tooling canônico de imagem NÃO deve morar ali, senão o volume mascara a camada da imagem.
+# - O prefixo canônico da imagem fica em /usr/local/share/npm-global.
+ENV PATH="/usr/local/share/npm-global/bin:${HOME_DIR}/.npm-global/bin:${HOME_DIR}/.local/bin:${PATH}" \
+    DEVCONTAINER_TOOLING_PREFIX="/usr/local/share/npm-global" \
+    JSONC_PARSER_MODULE_PATH="/usr/local/share/npm-global/lib/node_modules/jsonc-parser" \
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_LOGLEVEL=warn \
     NPM_CONFIG_PREFIX="${HOME_DIR}/.npm-global"
 
-# Ferramentas globais úteis (LSP/edição)
-# - Fail-safe com aviso: evita build quebrar por instabilidade de rede,
-#   mas também não silencia completamente o problema.
-RUN npm install -g typescript@5.9.3 typescript-language-server >/dev/null 2>&1 \
-    || echo "WARN: Falha ao instalar ferramentas globais TS (typescript/typescript-language-server)." >&2
+# Toolchain global canônico (CLI de container + parsing JSONC + TS/LSP)
+# - Alinha npm com o contrato do repo (volta/package.json)
+# - Expõe `devcontainer` para build/read-configuration dentro do próprio container
+# - Expõe `jsonc-parser` para validação real de `devcontainer.json`, `settings.json` e templates .jsonc
+# - Fixa `pnpm` via Corepack para evitar depender do estado da imagem-base
+#
+# NOTA:
+# - Instalar em /usr/local/share/npm-global evita que o volume /home/node/.npm-global
+#   esconda os binários da imagem após rebuild.
+RUN mkdir -p "${HOME_DIR}/.npm-global" /usr/local/share/npm-global \
+    && env NPM_CONFIG_PREFIX=/usr/local/share/npm-global npm install -g \
+    npm@11.8.0 \
+    @devcontainers/cli@0.83.3 \
+    jsonc-parser@3.3.1 \
+    typescript@5.9.3 \
+    typescript-language-server@5.1.3 \
+    && corepack enable \
+    && corepack prepare pnpm@10.28.2 --activate \
+    && ln -sf /usr/local/share/npm-global/bin/npm /usr/local/bin/npm \
+    && ln -sf /usr/local/share/npm-global/bin/npx /usr/local/bin/npx \
+    && ln -sf /usr/local/share/npm-global/bin/devcontainer /usr/local/bin/devcontainer \
+    && ln -sf /usr/local/share/npm-global/bin/tsc /usr/local/bin/tsc \
+    && ln -sf /usr/local/share/npm-global/bin/tsserver /usr/local/bin/tsserver \
+    && ln -sf /usr/local/share/npm-global/bin/typescript-language-server /usr/local/bin/typescript-language-server
 
 
 # =============================================================================
@@ -497,9 +523,13 @@ RUN mkdir -p \
     "${HOME_DIR}/.npm" \
     "${HOME_DIR}/.npm-global" \
     "${HOME_DIR}/.pm2" \
+    "${HOME_DIR}/.copilot" \
+    "${HOME_DIR}/.copilot/skills" \
     "${HOME_DIR}/.config" \
+    "${HOME_DIR}/.config/gh" \
     "${HOME_DIR}/.config/github-copilot" \
     "${HOME_DIR}/.config/GitHub Copilot" \
+    "${HOME_DIR}/.config/opencode" \
     "${HOME_DIR}/.ssh" \
     "${HOME_DIR}/.gnupg" \
     "${HOME_DIR}/.claude" \
@@ -510,6 +540,7 @@ RUN mkdir -p \
     "${HOME_DIR}/.npm" \
     "${HOME_DIR}/.npm-global" \
     "${HOME_DIR}/.pm2" \
+    "${HOME_DIR}/.copilot" \
     "${HOME_DIR}/.config" \
     "${HOME_DIR}/.local" \
     "${HOME_DIR}/.ssh" \
@@ -524,7 +555,13 @@ RUN mkdir -p \
     && chmod 0600 "${HOME_DIR}/.ssh/config" \
     && chown "${USER_NAME}:${USER_NAME}" "${HOME_DIR}/.ssh/config" \
     # Endurecimento adicional (sensíveis mas não secretos por si só)
-    && chmod 0700 "${HOME_DIR}/.config/github-copilot" "${HOME_DIR}/.claude" "/home/${USER_NAME}-history" \
+    && chmod 0700 \
+    "${HOME_DIR}/.copilot" \
+    "${HOME_DIR}/.config/gh" \
+    "${HOME_DIR}/.config/github-copilot" \
+    "${HOME_DIR}/.config/opencode" \
+    "${HOME_DIR}/.claude" \
+    "/home/${USER_NAME}-history" \
     # Permissões relaxadas apenas em bits do usuário (não altera group/other)
     && chmod -R u+rwX \
     "${HOME_DIR}/.vscode-server" \
@@ -541,15 +578,19 @@ RUN mkdir -p \
 # =============================================================================
 # SECTION 8.5 — ENV DEFAULTS (DOCUMENTAÇÃO / SAFE DEFAULTS DEV) — v1.0
 #
-# Hierarquia (maior prioridade -> menor):
-#   1) devcontainer.json: remoteEnv
-#   2) devcontainer.json: runArgs --env-file
-#   3) ENV neste Dockerfile
-#   4) arquivos config (app)
-#   5) fallback hardcoded em código
+# Hierarquia prática (maior prioridade -> menor):
+#   1) devcontainer.json: remoteEnv (processos geridos pelo VS Code)
+#   2) devcontainer.json: containerEnv
+#   3) devcontainer.json: runArgs --env-file
+#   4) ENV neste Dockerfile (defaults da imagem)
+#   5) bootstrap da app: .env -> .env.${NODE_ENV} -> .env.local -> .env.${NODE_ENV}.local
+#   6) config.json (superfície do ConfigurationManager)
+#   7) fallback hardcoded em código
 #
 # Observação:
 #   Estes defaults são DEV. Para produção, use .env.production (fora desta imagem).
+#   `FORCE_COLOR` é intencionalmente omitido aqui para respeitar `NO_COLOR`
+#   e evitar warnings globais no startup do Node.
 # =============================================================================
 
 # STRUCTURAL (identidade do sistema)
@@ -674,7 +715,7 @@ fi
 # Opcional: restringir a interativo
 # case "$-" in *i*) ;; *) return 0 2>/dev/null || exit 0 ;; esac
 
-# Artefatos canônicos (gerados exclusivamente pelo post-create.sh)
+# Artefatos canônicos (seed fallback no entrypoint; post-create pode refinar)
 NSS_BASE_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
 PASSWD_FILE="${NSS_BASE_DIR}/passwd"
 GROUP_FILE="${NSS_BASE_DIR}/group"
@@ -707,12 +748,12 @@ export NSS_WRAPPER_GROUP="${GROUP_FILE}"
 
 # Evitar duplicação em LD_PRELOAD
 case ":${LD_PRELOAD:-}:" in
-  *":${NSS_LIB}:"*) : ;;
+  *":${NSS_LIB}:"*|*":libnss_wrapper.so:"*) : ;;
   *) export LD_PRELOAD="${NSS_LIB}${LD_PRELOAD:+:$LD_PRELOAD}" ;;
 esac
 
 # Debug opt-in (stderr)
-if [ -n "${DEBUG:-}" ]; then
+if [ -n "${DEVCONTAINER_NSS_DEBUG:-}" ]; then
   CURRENT_UID="$(id -u 2>/dev/null || echo unknown)"
   echo "[gatekeeper] NSS active (UID=${CURRENT_UID}, preload=${NSS_LIB})" >&2
 fi
@@ -727,6 +768,11 @@ RUN chmod 0444 /etc/profile.d/10-gatekeeper-nss.sh
 # - Ele pode ativar o ambiente NSS wrapper antes de executar o comando final.
 COPY .devcontainer/nss-gatekeeper.sh /usr/local/bin/nss-gatekeeper
 RUN chmod 0755 /usr/local/bin/nss-gatekeeper
+
+# Healthcheck e utilitário de JSONC (image-level, independentes do workspace)
+COPY .devcontainer/scripts/healthcheck.sh /usr/local/bin/devcontainer-healthcheck.sh
+COPY .devcontainer/scripts/jsonc-validate.cjs /usr/local/bin/jsonc-validate
+RUN chmod 0755 /usr/local/bin/devcontainer-healthcheck.sh /usr/local/bin/jsonc-validate
 
 # [D] UX BASELINE (GLOBAL, READ-ONLY, INTERACTIVE-ONLY, POSIX-SAFE)
 RUN cat > /etc/profile.d/20-devcontainer-ux.sh <<'EOF'

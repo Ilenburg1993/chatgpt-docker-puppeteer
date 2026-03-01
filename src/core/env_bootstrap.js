@@ -4,8 +4,9 @@ import fs from 'node:fs';
 
 /**
  * Environment bootstrap (idempotent):
- * - Loads .env.local first (override=true)
- * - Loads .env second (defaults only)
+ * - Loads .env first (defaults only)
+ * - Then overlays .env.${NODE_ENV}, .env.local and .env.${NODE_ENV}.local
+ * - Later files win when the same key is defined multiple times
  */
 const BOOTSTRAP_FLAG = '__MAESTRO_ENV_BOOTSTRAPPED__';
 

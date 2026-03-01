@@ -9,7 +9,7 @@
 # Design contract (canonical):
 #   • Fail-safe: never blocks container boot; never exits non-zero unless exec fails
 #   • Single source of truth: /etc/profile.d/10-gatekeeper-nss.sh
-#   • Does NOT generate NSS artifacts (passwd/group). That is post-create.sh’s job.
+#   • Seeds fallback NSS artifacts when absent; post-create.sh may refine them later
 #   • Activates NSS only if the profile activates it (profile is artifact-gated)
 #   • Preserves any pre-existing LD_PRELOAD while preventing duplication
 #   • Avoids corrupting stdout/stderr of the real process
@@ -29,7 +29,9 @@ set -euo pipefail
 # ---- helpers ---------------------------------------------------------------
 
 _dc_dbg() {
-  [[ -n "${DEVCONTAINER_NSS_DEBUG:-}" ]] && echo "[nss-gatekeeper] $*" >&2 || true
+  if [[ -n "${DEVCONTAINER_NSS_DEBUG:-}" ]]; then
+    echo "[nss-gatekeeper] $*" >&2
+  fi
 }
 
 # normalize ":"-separated list: remove empties and dedupe preserving order
@@ -74,6 +76,44 @@ _safe_source() {
   . "$f" >/dev/null 2>&1 || true
 }
 
+_seed_nss_artifacts_if_missing() {
+  local base_dir="${DEVCONTAINER_NSS_DIR}"
+  local passwd_file="${base_dir}/passwd"
+  local group_file="${base_dir}/group"
+  local passwd_tmp="${passwd_file}.tmp"
+  local group_tmp="${group_file}.tmp"
+
+  if [[ -s "${passwd_file}" && -s "${group_file}" ]]; then
+    _dc_dbg "artifacts already present"
+    return 0
+  fi
+
+  mkdir -p "${base_dir}" 2>/dev/null || return 0
+  chmod 700 "${base_dir}" 2>/dev/null || true
+
+  if [[ -r /etc/passwd ]]; then
+    cat /etc/passwd > "${passwd_tmp}" 2>/dev/null || true
+    if [[ -s "${passwd_tmp}" ]]; then
+      mv -f "${passwd_tmp}" "${passwd_file}" 2>/dev/null || true
+    else
+      rm -f "${passwd_tmp}" 2>/dev/null || true
+    fi
+  fi
+
+  if [[ -r /etc/group ]]; then
+    cat /etc/group > "${group_tmp}" 2>/dev/null || true
+    if [[ -s "${group_tmp}" ]]; then
+      mv -f "${group_tmp}" "${group_file}" 2>/dev/null || true
+    else
+      rm -f "${group_tmp}" 2>/dev/null || true
+    fi
+  fi
+
+  chmod 600 "${passwd_file}" "${group_file}" 2>/dev/null || true
+  _dc_dbg "fallback artifacts seeded (passwd/group)"
+  return 0
+}
+
 # ---- main ------------------------------------------------------------------
 
 # Must have a command
@@ -90,6 +130,10 @@ fi
 
 # Canonical NSS artifact dir (override allowed for tests/special workflows)
 export DEVCONTAINER_NSS_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
+
+# Seed fallback artifacts early so later remote-exec / VS Code processes can
+# safely preload nss_wrapper without racing a missing file.
+_seed_nss_artifacts_if_missing || true
 
 # Snapshot original env
 OLD_LD_PRELOAD="${LD_PRELOAD:-}"

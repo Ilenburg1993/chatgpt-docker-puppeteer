@@ -72,7 +72,7 @@
       "REMOTE_USER": "node",
       "VCS_REF": "${localEnv:GIT_COMMIT}",
       // --- METADATA & VERSIONING ---
-      "VERSION": "5.2.0"
+      "VERSION": "5.3.1"
     },
     "context": "..",
     "dockerfile": "Dockerfile"
@@ -98,6 +98,20 @@
     "DOCKER_BUILDKIT": "1",
     "DOCKER_HOST_ACCESS": "true",
     "DOCKER_SECURITY_LEVEL": "host-root-equivalent",
+    // Canonical NSS artifact directory.
+    // Used by profile.d + nss-gatekeeper; safe as plain metadata in containerEnv.
+    "DEVCONTAINER_NSS_DIR": "/tmp/devcontainer-nss",
+    // Safe to globalize: libnss_wrapper alone is inert until NSS_WRAPPER_* is set.
+    // This helps base container processes (including VS Code server bootstrap)
+    // inherit the preload without risking missing-file failures at startup.
+    "LD_PRELOAD": "libnss_wrapper.so",
+    // Safe once nss-gatekeeper seeds fallback artifacts during container boot.
+    // This closes the remaining gap for base processes that do not read profile.d
+    // and are not fully governed by remoteEnv.
+    "NSS_WRAPPER_PASSWD": "/tmp/devcontainer-nss/passwd",
+    "NSS_WRAPPER_GROUP": "/tmp/devcontainer-nss/group",
+    // Canonical tooling metadata exported by the image for wrappers/checkers.
+    "JSONC_PARSER_MODULE_PATH": "/usr/local/share/npm-global/lib/node_modules/jsonc-parser",
     // =========================================================
     // SSH VARIABLES (v5.3 - CLEANUP)
     // ---------------------------------------------------------
@@ -109,42 +123,28 @@
     // • VS Code native forwarding não requer essas variáveis
     // • Simplificação da configuração
     // =========================================================
-    "FORCE_COLOR": "1",
+    // Nota estrutural:
+    // • `containerEnv` deve complementar a imagem, não duplicar defaults
+    //   já fixados no Dockerfile (ex.: NODE_ENV, LOG_LEVEL, LANG).
+    // • `FORCE_COLOR` NÃO deve ser global aqui: vários shells exportam
+    //   `NO_COLOR`, e a combinação gera warning no startup do Node.
+    // • Forçar cor deve ficar em env por processo (PM2, testes, helpers).
     // ------------------------------------------------------------
-    // DYNAMIC PATHS (Caminhos Canônicos)
-    // ------------------------------------------------------------
-    // Nota: DevContainers não expande ${containerUserHome} em containerEnv.
-    // Valores literais garantem compatibilidade com todos os scripts.
-    "HOME_DIR": "/home/node",
-    "LANG": "pt_BR.UTF-8",
-    "LOG_LEVEL": "debug",
-    // ------------------------------------------------------------
-    // APP IDENTITY
-    // ------------------------------------------------------------
-    "NODE_ENV": "development",
-    "NPM_CONFIG_AUDIT": "false",
     "NPM_CONFIG_CACHE": "/home/node/.npm",
-    "NPM_CONFIG_FUND": "false",
     // ------------------------------------------------------------
     // RUNTIME TUNING (Performance & Noise)
     // ------------------------------------------------------------
     // NOTA: NODE_OPTIONS removido - cada configuração de launch
     // define seu próprio --max-old-space-size em runtimeArgs
     // para evitar duplicação e conflitos com o debugger
-    "NPM_CONFIG_LOGLEVEL": "warn",
-    "NPM_CONFIG_PREFIX": "/home/node/.npm-global",
     "PM2_HOME": "/home/node/.pm2",
     // Hint semântico (documental, não funcional)
     // • Indica que há uma camada proxy entre container e browser
     "PUPPETEER_ARCHITECTURE": "external-browser-via-proxy",
-    "PUPPETEER_CACHE_DIR": "/home/node/.cache/puppeteer",
     // Timeout de conexão CDP (milissegundos)
     // • Protege contra stalls de rede
     // • NÃO implica que Chrome deva estar ativo
     "PUPPETEER_CONNECT_TIMEOUT": "30000",
-    // Proíbe launch local por contrato
-    // • Puppeteer NÃO pode iniciar browsers implicitamente
-    "PUPPETEER_LOCAL_LAUNCH_DISABLED": "true",
     // ------------------------------------------------------------
     // PUPPETEER & CHROME — INTEGRAÇÃO EXTERNA (CONTRATO CANÔNICO)
     // ------------------------------------------------------------
@@ -236,7 +236,6 @@
     // ============================================================
     // LOCALE & DOCKER ENGINE
     // ============================================================
-    "TZ": "America/Sao_Paulo",
     // Variáveis de instrumentação (estabilidade de telemetria do servidor)
     "VSCODE_INSTRUMENTATION": "true",
     "VSCODE_SERVER_EXPECTED": "true",
@@ -245,10 +244,7 @@
     // FILE WATCHING & VS CODE INTERNALS
     // ============================================================
     // Mantido para garantir que o hot-reload funcione no Windows/Docker
-    "WATCHPACK_POLLING": "true",
-    "XDG_CACHE_HOME": "/home/node/.cache",
-    // XDG Enforcement (Garante que ferramentas CLI obedeçam)
-    "XDG_CONFIG_HOME": "/home/node/.config"
+    "WATCHPACK_POLLING": "true"
   },
   // ============================================================
   // VS CODE CUSTOMIZATIONS
@@ -903,33 +899,78 @@
   //
   // Integração com sistema ENV (150+ variáveis)
   //
-  // Ordem de precedência:
-  // 1. remoteEnv (abaixo) - Injetado pelo VS Code
-  // 2. runArgs --env-file - Carregado do .env.development
-  // 3. config.json - Defaults da aplicação
-  // 4. Código - Fallbacks hardcoded
+  // Papel desta camada:
+  // • `remoteEnv` é a ponte host -> VS Code remoto -> processos do editor.
+  // • Ele é ideal para credenciais e overrides que extensões/LLMs precisam.
+  // • Ele NÃO substitui o bootstrap do app em `.env*`, que ainda pode
+  //   sobrescrever chaves repetidas em runtime.
   //
-  // Documentação: DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md
+  // Ordem prática:
+  // 1. Dockerfile ENV + containerEnv + runArgs --env-file
+  // 2. remoteEnv (processos geridos pelo VS Code)
+  // 3. bootstrap da app: .env -> .env.$NODE_ENV -> .env.local -> .env.$NODE_ENV.local
+  // 4. config.json (para a superfície coberta pelo ConfigurationManager)
+  // 5. Fallbacks hardcoded
+  //
+  // Documentação: DOCUMENTAÇÃO/REFERENCIA/ENV_VARIABLES_GUIDE.md
   // ===========================================================
   "remoteEnv": {
+    // ============================================================
+    // AUTH / TOKENS
+    // ============================================================
+    // Estratégia estrutural:
+    // • `remoteEnv` é a única forma confiável de expor segredos do HOST
+    //   para TODOS os processos geridos pelo VS Code no container
+    //   (extensões, assistentes, shells, language servers).
+    // • `.env.local` continua suportado e é sincronizado por hook para
+    //   shells/login shells e bootstrap do `gh`.
+    // • Nunca commitar valores aqui: apenas referências `${localEnv:*}`.
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
+    "AWS_ACCESS_KEY_ID": "${localEnv:AWS_ACCESS_KEY_ID}",
+    "AWS_DEFAULT_REGION": "${localEnv:AWS_DEFAULT_REGION}",
+    "AWS_REGION": "${localEnv:AWS_REGION}",
+    "AWS_SECRET_ACCESS_KEY": "${localEnv:AWS_SECRET_ACCESS_KEY}",
+    "AWS_SESSION_TOKEN": "${localEnv:AWS_SESSION_TOKEN}",
     // Browser (contrato estrutural)
     "BROWSER_MODE": "${localEnv:BROWSER_MODE:wsEndpoint}",
+    "CLAUDE_API_KEY": "${localEnv:CLAUDE_API_KEY}",
     "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
     "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
     "CHROME_PROXY_BIND": "${localEnv:CHROME_PROXY_BIND:0.0.0.0}",
+    // NSS wrapper for VS Code remote server + subprocesses.
+    // Official Dev Container guidance: remoteEnv reaches VS Code and related
+    // subprocesses, which is exactly the gap not covered by profile-only hooks.
+    "DEVCONTAINER_NSS_DIR": "${containerEnv:DEVCONTAINER_NSS_DIR}",
+    "NSS_WRAPPER_PASSWD": "${containerEnv:NSS_WRAPPER_PASSWD}",
+    "NSS_WRAPPER_GROUP": "${containerEnv:NSS_WRAPPER_GROUP}",
     // Keep Codex state consistent across terminal + extension processes in-container.
     // Contract: this overrides the Dockerfile fallback and must match
     // .vscode/settings.json terminal.integrated.env.linux.CODEX_HOME.
-    "CODEX_HOME": "${containerWorkspaceFolder}/.codex",
+    "CODEX_HOME": "${containerEnv:CODEX_HOME}",
+    "COPILOT_GITHUB_TOKEN": "${localEnv:COPILOT_GITHUB_TOKEN}",
+    "DEEPSEEK_API_KEY": "${localEnv:DEEPSEEK_API_KEY}",
     // PORT deprecated v6.0: Use apenas SERVER_PORT
     "CHROME_PROXY_PORT": "${localEnv:CHROME_PROXY_PORT:9224}",
+    "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}",
     // State & lifecycle
     "ENABLE_STATE_FILE": "${localEnv:ENABLE_STATE_FILE:true}",
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "${localEnv:GITHUB_PERSONAL_ACCESS_TOKEN}",
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+    "GOOGLE_API_KEY": "${localEnv:GOOGLE_API_KEY}",
+    "GOOGLE_GENERATIVE_AI_API_KEY": "${localEnv:GOOGLE_GENERATIVE_AI_API_KEY}",
+    "GROQ_API_KEY": "${localEnv:GROQ_API_KEY}",
     "HOST": "${localEnv:HOST:0.0.0.0}",
     // Logging
-    "LOG_LEVEL": "${localEnv:LOG_LEVEL:info}",
+    "LOG_LEVEL": "${localEnv:LOG_LEVEL:debug}",
+    "MISTRAL_API_KEY": "${localEnv:MISTRAL_API_KEY}",
     // Ambiente
     "NODE_ENV": "${localEnv:NODE_ENV:development}",
+    "OLLAMA_CLOUD_API_KEY": "${localEnv:OLLAMA_CLOUD_API_KEY}",
+    "OLLAMA_CLOUD_BASE_URL": "${localEnv:OLLAMA_CLOUD_BASE_URL}",
+    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
+    "OPENROUTER_API_KEY": "${localEnv:OPENROUTER_API_KEY}",
+    "PERPLEXITY_API_KEY": "${localEnv:PERPLEXITY_API_KEY}",
     "REEXECUTE_POST_CREATE": "${localEnv:REEXECUTE_POST_CREATE:false}",
     // ============================================================
     // SSH AGENT FORWARDING
@@ -965,7 +1006,13 @@
     "SERVER_AUTHORITY": "standalone",
     "SERVER_MODE": "split",
     // Portas (fonte única: SERVER_PORT)
-    "SERVER_PORT": "${localEnv:SERVER_PORT:3008}"
+    "SERVER_PORT": "${localEnv:SERVER_PORT:3008}",
+    "TOGETHER_API_KEY": "${localEnv:TOGETHER_API_KEY}",
+    "VERTEX_AI_LOCATION": "${localEnv:VERTEX_AI_LOCATION}",
+    "VERTEX_AI_PROJECT_ID": "${localEnv:VERTEX_AI_PROJECT_ID}",
+    "XAI_API_KEY": "${localEnv:XAI_API_KEY}",
+    "AZURE_OPENAI_API_KEY": "${localEnv:AZURE_OPENAI_API_KEY}",
+    "AZURE_OPENAI_ENDPOINT": "${localEnv:AZURE_OPENAI_ENDPOINT}"
   },
   // ============================================================
   // SECURITY & USER CONFIGURATION
@@ -1029,7 +1076,7 @@
     "--label",
     "role=devcontainer",
     "--label",
-    "version=5.2.0"
+    "version=5.3.1"
   ],
   // ============================================================
   // LIFECYCLE FINALIZATION

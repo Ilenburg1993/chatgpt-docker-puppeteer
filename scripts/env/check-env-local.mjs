@@ -3,7 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execa } from 'execa';
 
-const ROOT = path.resolve(import.meta.dirname, '..');
+if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
+    delete process.env.NO_COLOR;
+}
+
+const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
 function fail(msg) {
     console.error(`[check-env-local] FAIL: ${msg}`);
@@ -48,6 +52,10 @@ async function main() {
     const examplePath = path.join(ROOT, '.env.local.example');
     if (!fileExists(examplePath)) fail('Missing .env.local.example (template should be committed)');
     ok('.env.local.example exists');
+
+    const expertExamplePath = path.join(ROOT, '.env.expert.example');
+    if (!fileExists(expertExamplePath)) fail('Missing .env.expert.example (expert template should be committed)');
+    ok('.env.expert.example exists');
 
     if (await isTracked('.env.local')) {
         fail('`.env.local` is tracked by git. Remove it from the index and keep it ignored.');

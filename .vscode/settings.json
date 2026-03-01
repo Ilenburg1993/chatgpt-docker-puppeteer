@@ -632,7 +632,7 @@
   // Observabilidade do editor e execucao de tarefas.
   // ===========================================================================
   // Subfase 17.1) Debug e problemas
-  "debug.javascript.autoAttachFilter": "onlyWithFlag",
+  "debug.javascript.autoAttachFilter": "smart",
   "debug.focusEditorOnBreak": true,
   "debug.inlineValues": "on",
   "debug.showBreakpointsInOverviewRuler": true,

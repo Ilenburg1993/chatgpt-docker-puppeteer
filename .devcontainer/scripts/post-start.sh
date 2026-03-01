@@ -16,9 +16,9 @@
 # - Sinais úteis para humanos/agentes sem “auto-repair” destrutivo
 #
 # Nota importante:
-# - Post-create continua sendo a origem canônica dos artefatos NSS.
-# - Este hook pode regenerar artefatos mínimos quando eles estiverem ausentes e o processo não
-#   estiver rodando como root, para manter o ambiente utilizável e observável.
+# - O entrypoint/gatekeeper agora semeia artefatos NSS cedo.
+# - Este hook só repara a superfície de forma defensiva quando os artefatos continuarem ausentes,
+#   preservando o ambiente utilizável e observável.
 # =============================================================================
 
 # Defesa máxima contra herança de shell estrito (fail-safe)
@@ -32,12 +32,14 @@ trap - ERR EXIT INT TERM 2>/dev/null || true
 # ---------------------------------------------------------------------------
 readonly SCRIPT_NAME="post-start.sh"
 readonly SCRIPT_VERSION="1.1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly SCRIPT_DIR
 
 readonly HEALTH_STATUS_FILE="/tmp/devcontainer-health.status"
 
 # Parâmetros configuráveis
 readonly MAKE_INFO_TIMEOUT_SECONDS="${DEVCONTAINER_MAKE_TIMEOUT:-10}"
-readonly ENABLE_SSHD_CHECK="${DEVCONTAINER_ENABLE_SSHD_CHECK:-true}"
+readonly ENABLE_SSHD_CHECK="${DEVCONTAINER_ENABLE_SSHD_CHECK:-false}"
 readonly NSS_BASE_DIR="${DEVCONTAINER_NSS_DIR:-/tmp/devcontainer-nss}"
 
 # ---------------------------------------------------------------------------
@@ -66,6 +68,7 @@ check_ld_preload() {
 
 repair_nss_artifacts() {
   local current_uid current_gid current_user passwd_file group_file
+  local passwd_tmp group_tmp
 
   current_uid="$(id -u 2>/dev/null || echo unknown)"
   if [[ "${current_uid}" == "0" || "${current_uid}" == "unknown" ]]; then
@@ -78,12 +81,29 @@ repair_nss_artifacts() {
 
   passwd_file="${NSS_BASE_DIR}/passwd"
   group_file="${NSS_BASE_DIR}/group"
+  passwd_tmp="${passwd_file}.tmp"
+  group_tmp="${group_file}.tmp"
 
   mkdir -p "${NSS_BASE_DIR}" 2>/dev/null || return 1
-  printf '%s:x:%s:%s:%s user:%s:/bin/bash\n' \
-    "${current_user}" "${current_uid}" "${current_gid}" "${current_user}" "${HOME:-/home/node}" > "${passwd_file}" 2>/dev/null || return 1
-  printf '%s:x:%s:\n' "${current_user}" "${current_gid}" > "${group_file}" 2>/dev/null || return 1
-  chmod 644 "${passwd_file}" "${group_file}" 2>/dev/null || true
+
+  if [[ -r /etc/passwd ]]; then
+    cat /etc/passwd > "${passwd_tmp}" 2>/dev/null || true
+  fi
+  if [[ -r /etc/group ]]; then
+    cat /etc/group > "${group_tmp}" 2>/dev/null || true
+  fi
+
+  if [[ ! -s "${passwd_tmp}" ]]; then
+    printf '%s:x:%s:%s:%s user:%s:/bin/bash\n' \
+      "${current_user}" "${current_uid}" "${current_gid}" "${current_user}" "${HOME:-/home/node}" > "${passwd_tmp}" 2>/dev/null || return 1
+  fi
+  if [[ ! -s "${group_tmp}" ]]; then
+    printf '%s:x:%s:\n' "${current_user}" "${current_gid}" > "${group_tmp}" 2>/dev/null || return 1
+  fi
+
+  mv -f "${passwd_tmp}" "${passwd_file}" 2>/dev/null || return 1
+  mv -f "${group_tmp}" "${group_file}" 2>/dev/null || return 1
+  chmod 600 "${passwd_file}" "${group_file}" 2>/dev/null || true
   log_info "NSS artifacts repaired in post-start: ${NSS_BASE_DIR}"
   return 0
 }
@@ -92,7 +112,6 @@ repair_nss_artifacts() {
 # Diagnóstico: NSS artifacts (somente audit; sem reparo)
 # ---------------------------------------------------------------------------
 audit_nss_artifacts() {
-  local status_ref="$1" # name-ref string (em bash moderno), mas aqui faremos via echo/retcode
   local degraded=0
 
   local passwd_file="${NSS_BASE_DIR}/passwd"
@@ -200,7 +219,7 @@ audit_ssh() {
     if command -v sshd >/dev/null 2>&1; then
       log_info "sshd está instalado."
     else
-      log_warn "sshd não encontrado; acesso inbound via SSH não disponível (WARN only)."
+      log_info "sshd não encontrado; acesso inbound via SSH permanece desabilitado (estado esperado)."
     fi
   fi
 }
@@ -240,6 +259,11 @@ audit_initialized_marker || true
 
 # SSH (WARN only)
 audit_ssh || true
+
+# Local auth/env sync (WARN only)
+if [[ -x "${SCRIPT_DIR}/sync-local-auth.sh" ]]; then
+  "${SCRIPT_DIR}/sync-local-auth.sh" || log_warn "sync-local-auth.sh falhou (WARN only)."
+fi
 
 # Persist status (best-effort)
 printf '%s\n' "${status}" > "${HEALTH_STATUS_FILE}" 2>/dev/null || true

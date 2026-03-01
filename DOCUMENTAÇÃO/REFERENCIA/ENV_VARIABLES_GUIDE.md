@@ -1,781 +1,238 @@
 # Guia de Variáveis de Ambiente
 
-**chatgpt-docker-puppeteer** **Versão**: 1.0 **Data**: 2 de Fevereiro de 2026
+**Status**: Canônico  
+**Data**: 1 de março de 2026  
+**Escopo**: bootstrap de `.env*`, precedência real, integração com DevContainer e validação.
 
----
+## Visão Geral
 
-## 📋 ÍNDICE
+O projeto usa duas camadas complementares de configuração:
 
-1. [Visão Geral](#visão-geral)
-2. [Arquivos ENV](#arquivos-env)
-3. [Hierarquia de Configuração](#hierarquia-de-configuração)
-4. [Categorias de Variáveis](#categorias-de-variáveis)
-5. [Variáveis Críticas](#variáveis-críticas)
-6. [Setup por Ambiente](#setup-por-ambiente)
-7. [Troubleshooting](#troubleshooting)
-8. [FAQ](#faq)
+1. composição de `process.env` a partir do container, shell e arquivos `.env*`;
+2. resolução de configuração em runtime via [`src/core/config.js`](../../src/core/config.js), com
+   `config.json` como override explícito para as chaves cobertas pelo `ConfigSchema`.
 
----
+Os contratos atuais estão implementados em:
 
-## 1. VISÃO GERAL
+- [`src/core/env_bootstrap.js`](../../src/core/env_bootstrap.js)
+- [`src/core/config.js`](../../src/core/config.js)
+- [`.env.schema.json`](../../.env.schema.json)
+- [`.devcontainer/devcontainer.json`](../../.devcontainer/devcontainer.json)
+- [`.devcontainer/scripts/sync-local-auth.sh`](../../.devcontainer/scripts/sync-local-auth.sh)
+- [`.devcontainer/scripts/validate-env.sh`](../../.devcontainer/scripts/validate-env.sh)
 
-Este projeto utiliza variáveis de ambiente para configuração flexível e segura. Todas as
-configurações podem ser ajustadas sem modificar o código.
+## Arquivos de Ambiente
 
-### Arquivos Disponíveis
+| Arquivo | Papel | Versionado | Observação |
+| --- | --- | --- | --- |
+| [`.env.example`](../../.env.example) | template de baseline local | sim | documenta defaults e estrutura do env |
+| [`.env.local.example`](../../.env.local.example) | template de segredos e overrides pessoais | sim | base recomendada para credenciais |
+| [`.env.expert.example`](../../.env.expert.example) | catálogo de knobs especializados | sim | copiar chaves pontuais para `.env.local`/runtime |
+| `.env` | baseline local ativo | não | carregado sem sobrescrever env já existente |
+| [`.env.development`](../../.env.development) | perfil de desenvolvimento | sim | pode ser usado como referência/base |
+| [`.env.production`](../../.env.production) | perfil de produção | sim | template hardened para deploy |
+| [`.env.test`](../../.env.test) | perfil de testes | sim | baseline para testes automatizados |
+| `.env.local` | override local e segredos | não | sobrescreve chaves repetidas |
+| `.env.<NODE_ENV>.local` | override mais específico por ambiente | não | maior prioridade entre arquivos `.env*` |
 
-| Arquivo            | Propósito                          | Commitar? |
-| ------------------ | ---------------------------------- | --------- |
-| `.env.example`     | Template com documentação completa | ✅ SIM    |
-| `.env.development` | Configuração para desenvolvimento  | ❌ NÃO    |
-| `.env.production`  | Configuração para produção         | ❌ NÃO    |
-| `.env.test`        | Configuração para testes           | ❌ NÃO    |
-| `.env`             | Arquivo ativo (criado por você)    | ❌ NÃO    |
+O baseline atual também inclui duas camadas de cobertura:
 
-### Princípios
+- [`.env.schema.json`](../../.env.schema.json) cobre o baseline validado (`.env.development`,
+  `.env.production`, `.env.test` e os contratos promovidos ao fluxo principal);
+- [`.env.example`](../../.env.example) inclui não só o baseline principal, mas também knobs de
+  orquestração, storage e sidecars opcionais;
+- [`.env.expert.example`](../../.env.expert.example) concentra os knobs especializados que
+  permanecem fora do baseline principal;
+- [`scripts/env/audit-env-surface.mjs`](../../scripts/env/audit-env-surface.mjs) é o guardrail que
+  verifica a cobertura total da superfície de `process.env.*` pelos templates commitados.
 
-1. **Segurança**: Nunca commite arquivos `.env` (apenas `.env.example`)
-2. **Flexibilidade**: Suporta múltiplos ambientes (dev, prod, test)
-3. **Documentação**: Cada variável está documentada em `.env.example`
-4. **Fallback**: Sistema de 3 camadas (env → config.json → código)
+## Precedência Real
 
----
+### Etapa 1: composição de `process.env`
 
-## 2. ARQUIVOS ENV
+O bootstrap é idempotente e segue a ordem implementada em
+[`src/core/env_bootstrap.js`](../../src/core/env_bootstrap.js):
 
-### 2.1 `.env.example` (Template Completo)
+1. O processo nasce com o ambiente do container/shell.
+   Fontes típicas: Dockerfile `ENV`, `containerEnv`, `--env-file`, `remoteEnv`, exports manuais e
+   CI.
+2. `.env` é carregado sem `override`.
+   Ele só preenche chaves ainda ausentes.
+3. `.env.<NODE_ENV>` é carregado com `override=true`.
+4. `.env.local` é carregado com `override=true`.
+5. `.env.<NODE_ENV>.local` é carregado com `override=true`.
 
-**Propósito**: Template com todas as variáveis disponíveis e documentação completa.
+Consequência prática:
 
-**Como usar**:
+- variáveis definidas em `.env*.local` sobrescrevem valores vindos do host/`remoteEnv` quando a
+  mesma chave aparece nas duas fontes;
+- `remoteEnv` continua sendo a melhor forma de expor segredos para extensões, LSPs e agentes do VS
+  Code, mas não tem prioridade absoluta sobre `.env*.local`.
 
-```bash
-# Copiar para criar seu .env
-cp .env.example .env
+### Etapa 2: resolução do `ConfigurationManager`
 
-# Editar valores conforme necessário
-nano .env  # ou vim, code, etc.
-```
+Para as chaves cobertas pelo `ConfigSchema` em [`src/core/config.js`](../../src/core/config.js):
 
-**Conteúdo**: 150+ variáveis documentadas, organizadas em 17 categorias.
+1. os defaults do schema podem nascer de `process.env`;
+2. o [`config.json`](../../config.json) é carregado depois;
+3. quando uma chave existe no `config.json`, ela sobrescreve o default derivado do env;
+4. na ausência de valor explícito, prevalece o default do schema/código.
 
----
+Isso significa que a precedência final depende da superfície:
 
-### 2.2 `.env.development` (Desenvolvimento Local)
+- módulos que leem `process.env` diretamente seguem a Etapa 1;
+- módulos que usam `CONFIG`/`ConfigurationManager` seguem a Etapa 2.
 
-**Propósito**: Configuração otimizada para desenvolvimento local.
+## DevContainer e Ferramentas
 
-**Características**:
+### Camadas do DevContainer
 
-- Log level: `debug` (verbose)
-- Browser pool: 2 instâncias (leve)
-- Timeouts: curtos (feedback rápido)
-- CORS: localhost permitido
-- Sem senha no dashboard
+No baseline atual, a fronteira correta é:
 
-**Como usar**:
+- `Dockerfile ENV`: defaults estáveis da imagem e do container, independentes do host.
+- `containerEnv`: complementos específicos do DevContainer que ainda fazem sentido como baseline do
+  container de desenvolvimento.
+- `runArgs --env-file`: baseline versionado de desenvolvimento (`.env.development`) injetado no
+  runtime do container.
+- `remoteEnv`: ponte do host para processos geridos pelo VS Code no container.
 
-```bash
-# Opção 1: Copiar para .env
-cp .env.development .env
+Regra prática:
 
-# Opção 2: Usar diretamente
-NODE_ENV=development npm start
-```
+- se a variável é um default estrutural e não depende do host, prefira Dockerfile;
+- se a variável só precisa existir no DevContainer, mas não é segredo, `containerEnv` é aceitável;
+- se a variável vem do host e precisa alcançar extensões, terminais e agentes, use `remoteEnv`;
+- se a variável é UX/tuning pontual, prefira env por processo e não uma exportação global.
 
----
+### `remoteEnv` e segredos do host
 
-### 2.3 `.env.production` (Produção)
+O DevContainer espelha variáveis do host em `remoteEnv` em
+[`.devcontainer/devcontainer.json`](../../.devcontainer/devcontainer.json).
+Esse é o caminho recomendado para credenciais que precisam chegar a:
 
-**Propósito**: Configuração hardened para produção.
+- terminais do VS Code;
+- extensões;
+- LSPs;
+- agentes/LLMs rodando no lado remoto do editor.
 
-**Características**:
+### `FORCE_COLOR` e `NO_COLOR`
 
-- Log level: `info` (menos verbose)
-- Browser pool: 5 instâncias (throughput)
-- Timeouts: generosos (resiliência)
-- CORS: whitelist estrita (segurança)
-- **DASHBOARD_PASSWORD obrigatório**
+`FORCE_COLOR` não deve ser definido globalmente no `containerEnv` nem no Dockerfile.
 
-**⚠️ CHECKLIST ANTES DE USAR**:
+Motivo:
 
-- [ ] `PUBLIC_IP` configurado
-- [ ] `ALLOWED_ORIGINS` inclui domínios de produção
-- [ ] `DASHBOARD_PASSWORD` definido (senha forte)
-- [ ] `DASHBOARD_ORIGIN` configurado
-- [ ] SSL/TLS habilitado
-- [ ] Monitoramento configurado
+- muitos shells e integrações do operador já exportam `NO_COLOR`;
+- quando `FORCE_COLOR` e `NO_COLOR` chegam juntos ao processo, o Node emite warning no startup;
+- limpar `NO_COLOR` dentro do JavaScript não evita esse warning, porque ele ocorre antes do código
+  do processo rodar.
 
-**Como usar**:
+No baseline atual, `FORCE_COLOR` deve ficar apenas em contextos por processo que realmente precisam
+forçar cor (por exemplo PM2, testes e helpers específicos).
 
-```bash
-# Copiar e ajustar
-cp .env.production .env
-nano .env  # Ajustar [REQUIRED] fields
+### Bootstrap local de shell e `gh`
 
-# Gerar senha forte
-openssl rand -base64 32
+[`sync-local-auth.sh`](../../.devcontainer/scripts/sync-local-auth.sh):
 
-# Deploy
-pm2 restart all --update-env
-```
+- injeta `.env.local` em novos shells via `~/.profile` e `~/.bashrc`;
+- usa `GITHUB_PERSONAL_ACCESS_TOKEN` para persistir autenticação do `gh` em `~/.config/gh`;
+- respeita `GH_TOKEN`/`GITHUB_TOKEN` como auth somente por ambiente, sem persistência.
 
----
+### Validadores
 
-### 2.4 `.env.test` (Testes Automatizados)
+- [`validate-env.sh`](../../.devcontainer/scripts/validate-env.sh): valida variáveis estruturais e
+  dá hints de arquivos locais antes do bootstrap do DevContainer.
+- [`scripts/env/validate-env.js`](../../scripts/env/validate-env.js): valida perfis `.env.*`
+  versionados contra [`.env.schema.json`](../../.env.schema.json).
+- [`scripts/env/check-env-local.mjs`](../../scripts/env/check-env-local.mjs): garante que
+  `.env.local` continua ignorado e que os templates [`.env.local.example`](../../.env.local.example)
+  e [`.env.expert.example`](../../.env.expert.example) existem.
+- [`scripts/env/audit-env-surface.mjs`](../../scripts/env/audit-env-surface.mjs): mapeia
+  `process.env.*` no código e lista o que ainda não está coberto pelos templates commitados.
 
-**Propósito**: Configuração otimizada para CI/CD e testes locais.
+## Regras Operacionais
 
-**Características**:
+### Desenvolvimento local
 
-- Log level: `error` (minimal)
-- Browser pool: 1 instância (leve)
-- MOCK_CHROME: habilitado (sem Chrome real)
-- Portas alternativas (3009, 9234, 9235)
-- Timeouts: mínimos (testes rápidos)
+1. Crie o override local com `cp .env.local.example .env.local`.
+2. Preencha chaves pessoais e segredos apenas em `.env.local`.
+3. Use `.env` apenas quando precisar de um baseline local fora dos templates versionados.
 
-**Como usar**:
+### Produção
 
-```bash
-# Testes locais
-NODE_ENV=test npm test
+1. Parta de [`.env.production`](../../.env.production) ou de variáveis injetadas pelo runtime.
+2. Evite segredos em arquivos versionados.
+3. Prefira segredos por orquestrador, `remoteEnv`, secrets manager ou env do processo.
 
-# CI/CD (GitHub Actions, GitLab CI)
-# Já detectado automaticamente via NODE_ENV=test
-```
+### Higiene de segredos
 
----
+- nunca commit `.env.local` ou `.env.<NODE_ENV>.local`;
+- mantenha apenas templates (`*.example`) no repositório;
+- se a mesma chave existir no host e em `.env.local`, o valor local vence.
 
-## 3. HIERARQUIA DE CONFIGURAÇÃO
+## Limite Deliberado do Template
 
-O sistema resolve configurações em **3 níveis**:
+O template [`.env.example`](../../.env.example) foi consolidado para cobrir o baseline operacional
+e os sidecars opcionais relevantes. Algumas chaves continuam fora dele por design:
 
-```
-1. VARIÁVEL DE AMBIENTE (.env)  [PRIORIDADE MÁXIMA]
-   ↓ (se não definido)
-2. config.json
-   ↓ (se não definido)
-3. VALOR PADRÃO NO CÓDIGO [FALLBACK]
-```
+- variáveis automáticas do runtime/orquestrador (`NODE_APP_INSTANCE`, `PM2_*`, `CHATGPT_ENV_*`);
+- aliases e compatibilidades de baixo valor operacional (`CHROME_WSE`, `CHROME_URL`, etc.);
+- knobs internos de especialista ainda não promovidos ao baseline geral (`ADAPTER_*`, `HANDLE_*`,
+  `RESOLVER_*`, `SPLIT_CONNECT_*`, `NERV_SOCKET_URL`, `MCP_DIAG_URL`).
 
-### Exemplo
+Essas chaves existem no código, mas não foram elevadas ao template principal para evitar poluir o
+baseline com tuning de baixo uso. O catálogo vivo dessas chaves fica em
+[`.env.expert.example`](../../.env.expert.example). Se alguma delas virar contrato recorrente de
+operação, o caminho correto é promovê-la ao `.env.example` e ao schema no mesmo change set.
 
-```javascript
-// src/infra/proxy/chromeProxyService.js (linha 50)
-PROXY_PORT: parseInt(
-  process.env.CHROME_PROXY_PORT || // 1. Env var
-    CONFIG.CHROME_PROXY_PORT || // 2. config.json
-    '9224', // 3. Padrão
-  10
-);
-```
+## Variáveis Estruturais Críticas
 
-**Precedência**:
+As chaves abaixo devem permanecer coerentes entre templates, schema e runtime:
 
-```bash
-# .env
-CHROME_PROXY_PORT=9999  # ← USADO (prioridade 1)
+- `NODE_ENV`
+- `SERVER_MODE`
+- `SERVER_AUTHORITY`
+- `BROWSER_MODE`
+- `SERVER_PORT`
+- `CHROME_HOST`
+- `CHROME_PORT`
+- `CHROME_PROXY_PORT`
 
-# config.json
-"CHROME_PROXY_PORT": 9224  # ← IGNORADO
+Enums relevantes no baseline atual:
 
-# código
-'9224'  # ← IGNORADO
-```
+- `BROWSER_MODE`: `launcher`, `connect`, `wsEndpoint`, `executablePath`, `auto`, `external`
+- `ALLOCATION_STRATEGY`: `round-robin`, `least-loaded`, `target-affinity`
 
----
+## Troubleshooting Rápido
 
-## 4. CATEGORIAS DE VARIÁVEIS
+### O valor do host não apareceu na aplicação
 
-### 4.1 Ambiente e Execução
+Verifique se a mesma chave está definida em `.env.local` ou `.env.<NODE_ENV>.local`.
+Esses arquivos sobrescrevem o valor vindo de `remoteEnv`.
 
-| Variável           | Valores                       | Padrão      | Descrição              |
-| ------------------ | ----------------------------- | ----------- | ---------------------- |
-| `NODE_ENV`         | development, production, test | development | Ambiente de execução   |
-| `SERVER_MODE`      | split, integrated             | split       | Modo do servidor (PM2) |
-| `SERVER_AUTHORITY` | standalone, orchestrated      | standalone  | Autoridade do processo |
+### A extensão/LLM não enxerga a variável, mas o app enxerga
 
----
+Isso normalmente indica que a chave foi carregada apenas via `.env.local`.
+Nesse caso, replique a variável no host para que o `remoteEnv` a propague ao ambiente remoto do VS
+Code.
 
-### 4.2 Portas e Networking
+### O `gh` funciona no shell, mas não em outro processo
 
-| Variável            | Tipo   | Padrão               | Descrição                  |
-| ------------------- | ------ | -------------------- | -------------------------- |
-| `SERVER_PORT`       | number | 3008                 | Porta do Dashboard         |
-| `CHROME_PROXY_PORT` | number | 9224                 | Porta do proxy (container) |
-| `CHROME_PORT`       | number | 9225                 | Porta do Chrome (Windows)  |
-| `CHROME_HOST`       | string | host.docker.internal | Host do Chrome             |
-| `PUBLIC_IP`         | string | auto                 | IP público do container    |
-| `HOST`              | string | 0.0.0.0              | Bind do servidor HTTP      |
+Revise se o token está em `GH_TOKEN`/`GITHUB_TOKEN` (somente runtime) ou em
+`GITHUB_PERSONAL_ACCESS_TOKEN` (persistência em `~/.config/gh`).
 
-**Exemplo Docker Desktop**:
+### Aparece warning de `NO_COLOR` no startup do Node
 
-```bash
-CHROME_HOST=host.docker.internal
-CHROME_PORT=9225
-CHROME_PROXY_PORT=9224
-```
+Revise se algum shell, wrapper ou processo ainda está exportando `FORCE_COLOR` globalmente.
+O baseline do DevContainer não faz mais isso; quando o warning aparece, a origem costuma ser um
+export local/transitório fora do contrato canônico.
 
-**Exemplo WSL2 (bridge custom)**:
+## Auditoria Relacionada
 
-```bash
-CHROME_HOST=172.17.0.1
-CHROME_PORT=9225
-PUBLIC_IP=172.17.0.2
-```
+O diagnóstico estrutural mais recente está em
+[../AUDITORIAS/ENV_STRUCTURE_AUDIT_2026-03-01.md](../AUDITORIAS/ENV_STRUCTURE_AUDIT_2026-03-01.md).
 
----
+## Documentos Relacionados
 
-### 4.3 Chrome Browser
-
-| Variável                          | Valores                             | Padrão     | Descrição                |
-| --------------------------------- | ----------------------------------- | ---------- | ------------------------ |
-| `BROWSER_MODE`                    | launcher, connect, wsEndpoint, auto | wsEndpoint | Modo de conexão          |
-| `PUPPETEER_LOCAL_LAUNCH_DISABLED` | true, false                         | true       | Desabilitar launch local |
-| `MOCK_CHROME`                     | 0, 1                                | 0          | Mock para testes         |
-
-**Modos de conexão**:
-
-- `wsEndpoint`: **RECOMENDADO** - Usa Chrome Proxy, WebSocket direto
-- `connect`: HTTP endpoint (2 requests: HTTP + WS)
-- `launcher`: Puppeteer inicia Chrome (não funciona em Docker)
-- `auto`: Tenta todos com fallback
-
----
-
-### 4.4 Chrome Proxy Service (v2.0)
-
-| Variável             | Tipo    | Padrão             | Descrição                             |
-| -------------------- | ------- | ------------------ | ------------------------------------- |
-| `WS_IDLE_TIMEOUT_MS` | number  | 300000             | Timeout idle WebSocket (5min)         |
-| `ALLOWED_ORIGINS`    | string  | localhost:3008,... | CORS whitelist (separado por vírgula) |
-| `NERV_INTEGRATION`   | boolean | true               | Habilitar integração NERV             |
-
-**Exemplo CORS**:
-
-```bash
-# Desenvolvimento
-ALLOWED_ORIGINS=http://localhost:3008,http://127.0.0.1:3008
-
-# Produção
-ALLOWED_ORIGINS=https://app.exemplo.com,https://www.exemplo.com
-```
-
----
-
-### 4.5 Browser Pool
-
-| Variável                | Tipo    | Padrão      | Descrição                      |
-| ----------------------- | ------- | ----------- | ------------------------------ |
-| `BROWSER_POOL_SIZE`     | number  | 3           | Tamanho do pool                |
-| `ALLOCATION_STRATEGY`   | string  | round-robin | Estratégia de alocação         |
-| `HEALTH_CHECK_INTERVAL` | number  | 30000       | Intervalo de health check (ms) |
-| `ALLOW_DEGRADED_MODE`   | boolean | true        | Continuar sem browser saudável |
-| `AUTO_RETRY_CHROME`     | boolean | true        | Retry automático               |
-| `MAX_AUTO_RETRIES`      | number  | 2           | Máximo de retries              |
-
-**Estratégias**:
-
-- `round-robin`: Distribuição uniforme
-- `least-busy`: Escolhe browser menos ocupado
-- `random`: Aleatório
-
----
-
-### 4.6 Logging e Telemetria
-
-| Variável           | Valores                  | Padrão | Descrição              |
-| ------------------ | ------------------------ | ------ | ---------------------- |
-| `LOG_LEVEL`        | debug, info, warn, error | info   | Nível de log           |
-| `NERV_BUFFER_SIZE` | number                   | 1000   | Buffer de eventos NERV |
-| `NERV_TELEMETRY`   | boolean                  | true   | Telemetria NERV        |
-
-**Níveis de log**:
-
-- `debug`: Muito verbose (desenvolvimento)
-- `info`: Produção padrão
-- `warn`: Apenas avisos
-- `error`: Apenas erros críticos
-
----
-
-### 4.7 Kernel e Context
-
-| Variável                | Tipo   | Padrão         | Descrição               |
-| ----------------------- | ------ | -------------- | ----------------------- |
-| `KERNEL_CYCLE_INTERVAL` | number | 50             | Ciclo do kernel (ms)    |
-| `CONTEXT_STRATEGY`      | string | sliding_window | Estratégia de contexto  |
-| `CONTEXT_MAX_TOKENS`    | number | 100000         | Máximo de tokens        |
-| `SUMMARIZATION_POLICY`  | string | on_overflow    | Política de sumarização |
-
----
-
-### 4.8 Modules (Triage, Frame, Biomechanics, Recovery, Submission)
-
-**150+ variáveis** para fine-tuning de módulos. Veja `.env.example` para lista completa.
-
-**Exemplo Biomechanics**:
-
-```bash
-# Digitação humana
-BIOMECH_HUMAN_TIMEOUT=60000  # 60s (LLM longo)
-
-# Zen Mode (muitos caracteres)
-BIOMECH_ZEN_THRESHOLD=2000
-BIOMECH_ZEN_TIMEOUT=30000
-```
-
----
-
-## 5. VARIÁVEIS CRÍTICAS
-
-### 5.1 Segurança (Produção)
-
-| Variável             | Obrigatório    | Descrição                             |
-| -------------------- | -------------- | ------------------------------------- |
-| `DASHBOARD_PASSWORD` | ✅ SIM         | Senha do dashboard (produção)         |
-| `ALLOWED_ORIGINS`    | ✅ SIM         | Whitelist CORS (domínios de produção) |
-| `PUBLIC_IP`          | ⚠️ Recomendado | IP público do container               |
-| `NODE_ENV`           | ✅ SIM         | Definir como `production`             |
-
-**Gerar senha forte**:
-
-```bash
-openssl rand -base64 32
-```
-
----
-
-### 5.2 Networking (Docker)
-
-| Variável            | Valor Docker Desktop   | Descrição                  |
-| ------------------- | ---------------------- | -------------------------- |
-| `CHROME_HOST`       | `host.docker.internal` | Host do Chrome (Windows)   |
-| `CHROME_PORT`       | `9225`                 | Porta do Chrome            |
-| `CHROME_PROXY_PORT` | `9224`                 | Porta do proxy (container) |
-
-**Validação**:
-
-```bash
-# Verificar se Chrome está acessível
-curl http://host.docker.internal:9225/json/version
-
-# Verificar proxy
-curl http://localhost:9224/health
-```
-
----
-
-### 5.3 Performance (Produção)
-
-| Variável              | Desenvolvimento | Produção | Descrição                     |
-| --------------------- | --------------- | -------- | ----------------------------- |
-| `BROWSER_POOL_SIZE`   | 2               | 5        | Pool maior = mais throughput  |
-| `LOG_LEVEL`           | debug           | info     | Menos logs = mais performance |
-| `ALLOW_DEGRADED_MODE` | true            | false    | Fail-fast em produção         |
-| `WS_IDLE_TIMEOUT_MS`  | 300000          | 300000   | 5min (LLM-friendly)           |
-
----
-
-## 6. SETUP POR AMBIENTE
-
-### 6.1 Desenvolvimento Local (Docker Desktop + Windows)
-
-```bash
-# 1. Copiar template
-cp .env.development .env
-
-# 2. Verificar variáveis (geralmente ok sem ajustes)
-cat .env
-
-# 3. Iniciar Chrome no Windows
-START-CHROME-SIMPLE.bat
-
-# 4. Iniciar sistema
-make start
-# ou
-npx pm2 start ecosystem.config.cjs
-
-# 5. Validar
-curl http://localhost:3008/api/health
-curl http://localhost:9224/health
-```
-
-**Troubleshooting**:
-
-```bash
-# Proxy não conecta ao Chrome
-# → Verifique se Chrome está rodando com --remote-debugging-port=9225
-
-# CORS errors
-# → Adicione origem em ALLOWED_ORIGINS
-
-# Ports ocupados
-# → Ajuste SERVER_PORT, CHROME_PROXY_PORT
-```
-
----
-
-### 6.2 Produção (Cloud/VPS)
-
-```bash
-# 1. Copiar template de produção
-cp .env.production .env
-
-# 2. Ajustar variáveis OBRIGATÓRIAS
-nano .env
-
-# Checklist:
-# - PUBLIC_IP=<IP ou domínio>
-# - ALLOWED_ORIGINS=https://seu-dominio.com
-# - DASHBOARD_PASSWORD=<senha forte>
-# - DASHBOARD_ORIGIN=https://seu-dominio.com
-# - LOG_LEVEL=info
-# - ALLOW_DEGRADED_MODE=false
-
-# 3. Validar config
-node -e "require('dotenv').config(); console.log(process.env.DASHBOARD_PASSWORD)"
-
-# 4. Deploy
-npx pm2 start ecosystem.config.cjs --env production
-
-# 5. Validar
-curl https://seu-dominio.com/api/health
-curl https://seu-dominio.com/api/health/pm2
-```
-
-**Segurança**:
-
-```bash
-# Verificar permissões do .env
-chmod 600 .env  # Apenas owner pode ler/escrever
-
-# Verificar se não está no git
-git status  # .env não deve aparecer
-
-# Verificar .gitignore
-grep "^\.env$" .gitignore  # Deve retornar .env
-```
-
----
-
-### 6.3 CI/CD (GitHub Actions, GitLab CI)
-
-```yaml
-# .github/workflows/test.yml
-name: Tests
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    env:
-      NODE_ENV: test
-      MOCK_CHROME: 1
-      LOG_LEVEL: error
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '20'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run tests
-        run: npm test
-```
-
-**Ou usar .env.test**:
-
-```yaml
-- name: Setup env
-  run: cp .env.test .env
-- name: Run tests
-  run: npm test
-```
-
----
-
-## 7. TROUBLESHOOTING
-
-### 7.1 Chrome Proxy não conecta
-
-**Sintomas**:
-
-```
-Error: Chrome unreachable
-Error: connect ECONNREFUSED 127.0.0.1:9225
-```
-
-**Soluções**:
-
-```bash
-# 1. Verificar se Chrome está rodando (Windows)
-# Executar: START-CHROME-SIMPLE.bat
-
-# 2. Validar porta do Chrome
-netstat -ano | findstr :9225  # Windows
-lsof -i :9225                 # Linux/Mac
-
-# 3. Verificar CHROME_HOST
-# Docker Desktop: host.docker.internal
-# WSL2: IP do host (ex: 172.17.0.1)
-
-# 4. Testar conexão direta
-curl http://host.docker.internal:9225/json/version
-
-# 5. Verificar proxy
-curl http://localhost:9224/health
-```
-
----
-
-### 7.2 CORS Errors
-
-**Sintomas**:
-
-```
-Access to fetch at 'http://localhost:9224' from origin 'http://evil.com'
-has been blocked by CORS policy
-```
-
-**Soluções**:
-
-```bash
-# Adicionar origem em ALLOWED_ORIGINS
-ALLOWED_ORIGINS=http://localhost:3008,http://nova-origem.com
-
-# Verificar formato (separado por vírgula, sem espaços)
-# ✅ Correto
-ALLOWED_ORIGINS=http://localhost:3008,http://localhost:8080
-
-# ❌ Errado (com espaços)
-ALLOWED_ORIGINS=http://localhost:3008, http://localhost:8080
-
-# Restart
-pm2 restart chrome-proxy
-```
-
----
-
-### 7.3 Dashboard Password
-
-**Sintomas**:
-
-```
-Dashboard authentication required
-```
-
-**Soluções**:
-
-```bash
-# Desenvolvimento: sem senha
-DASHBOARD_PASSWORD=
-
-# Produção: definir senha
-DASHBOARD_PASSWORD=$(openssl rand -base64 32)
-
-# Verificar
-echo $DASHBOARD_PASSWORD
-
-# Restart
-pm2 restart dashboard-web --update-env
-```
-
----
-
-### 7.4 Port Already in Use
-
-**Sintomas**:
-
-```
-Error: Port 3008 is already in use
-```
-
-**Soluções**:
-
-```bash
-# Verificar processo usando porta
-lsof -i :3008  # Linux/Mac
-netstat -ano | findstr :3008  # Windows
-
-# Opção 1: Matar processo
-kill <PID>
-
-# Opção 2: Usar porta alternativa
-SERVER_PORT=3009
-
-# Restart
-pm2 restart all
-```
-
----
-
-## 8. FAQ
-
-### Q1: Qual arquivo .env usar?
-
-**A**: Depende do ambiente:
-
-- Desenvolvimento local: `.env.development` ou copie `.env.example`
-- Produção: `.env.production` (ajuste [REQUIRED] fields)
-- Testes: `.env.test` (CI/CD)
-
----
-
-### Q2: Preciso commitar .env?
-
-**A**: ❌ **NUNCA** commite `.env`, `.env.development`, `.env.production`, `.env.test`. ✅
-**Sempre** commite `.env.example` (template).
-
-**Verificação**:
-
-```bash
-# .gitignore deve conter
-.env
-.env.*
-!.env.example
-```
-
----
-
-### Q3: Como atualizar .env em produção sem downtime?
-
-**A**:
-
-```bash
-# 1. Editar .env
-nano .env
-
-# 2. Reload sem downtime (PM2)
-pm2 reload all --update-env
-
-# 3. Validar
-curl http://localhost:3008/health
-```
-
----
-
-### Q4: Posso usar múltiplos .env?
-
-**A**: Sim, com ferramentas:
-
-```bash
-# dotenv-cli
-npm install -g dotenv-cli
-dotenv -e .env.production npm start
-
-# env-cmd
-npm install -g env-cmd
-env-cmd -f .env.production npm start
-
-# direnv (auto-load ao entrar no diretório)
-```
-
----
-
-### Q5: Como validar meu .env?
-
-**A**:
-
-```bash
-# 1. Verificar sintaxe
-grep -v '^#' .env | grep -v '^$' | grep '='
-
-# 2. Testar load
-node -e "require('dotenv').config(); console.log(process.env.SERVER_PORT)"
-
-# 3. Verificar variáveis críticas
-node -e "
-const required = ['CHROME_HOST', 'CHROME_PORT', 'SERVER_PORT'];
-require('dotenv').config();
-required.forEach(v => {
-  if (!process.env[v]) console.error('Missing:', v);
-  else console.log('✓', v, '=', process.env[v]);
-});
-"
-```
-
----
-
-### Q6: Diferença entre .env e config.json?
-
-**A**:
-
-- **`.env`**: Configuração por ambiente (dev, prod, test)
-- **`config.json`**: Configuração compartilhada/base
-
-**Prioridade**: `.env` > `config.json` > código
-
-**Quando usar cada um**:
-
-- **`.env`**: Valores que mudam por ambiente (portas, IPs, senhas)
-- **`config.json`**: Valores estáveis (arquitetura, features flags)
-
----
-
-### Q7: Como debugar variáveis não carregadas?
-
-**A**:
-
-```bash
-# 1. Verificar se .env existe
-ls -la .env
-
-# 2. Verificar conteúdo
-cat .env | grep CHROME_PROXY_PORT
-
-# 3. Testar load manual
-node -e "
-require('dotenv').config();
-console.log('CHROME_PROXY_PORT:', process.env.CHROME_PROXY_PORT);
-"
-
-# 4. Verificar precedência
-# PM2 pode ter env vars que sobrescrevem .env
-pm2 env 0  # Ver env do processo 0
-
-# 5. Verificar se dotenv está instalado
-npm list dotenv
-```
-
----
-
-### Q8: Posso usar .env com Docker Compose?
-
-**A**: Sim:
-
-```yaml
-# docker-compose.yml
-services:
-  app:
-    build: .
-    env_file:
-      - .env.production
-    # ou
-    environment:
-      - NODE_ENV=${NODE_ENV}
-      - SERVER_PORT=${SERVER_PORT}
-```
-
-**Ou passar via CLI**:
-
-```bash
-docker-compose --env-file .env.production up
-```
-
----
-
-## 9. REFERÊNCIAS
-
-- **Documentação oficial dotenv**: https://github.com/motdotla/dotenv
-- **12-Factor App (Config)**: https://12factor.net/config
-- **Guia de segurança**: Nunca commite secrets, use vault em produção
-- **WSL Integration**: `DOCUMENTAÇÃO/WSL_INTEGRATION_GUIDE.md`
-- **Chrome Proxy**: `DOCUMENTAÇÃO/RELATORIOS/RECLASSIFICADOS/CHROME_PROXY_V2_IMPLEMENTATION.md`
-- **Port Architecture**: `DOCUMENTAÇÃO/PORT_ARCHITECTURE_ANALYSIS.md`
-
----
-
-**Versão**: 1.0 **Última atualização**: 2 de Fevereiro de 2026 **Autor**: GitHub Copilot (Claude
-Sonnet 4.5)
+- [CONFIGURATION.md](./CONFIGURATION.md)
+- [README.md](./README.md)
+- [../OPERACOES/DEVCONTAINER.md](../OPERACOES/DEVCONTAINER.md)
+- [../../.devcontainer/ENV_VARIABLE_REFERENCE.md](../../.devcontainer/ENV_VARIABLE_REFERENCE.md)

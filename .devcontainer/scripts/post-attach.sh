@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # PHASE 0 — GUARDA DE EXECUÇÃO (FAIL-SAFE ABSOLUTO)
-# CANONICAL v5.2.0
+# CANONICAL v5.3.1
 #
 # Contrato:
 # - post-attach NUNCA pode falhar
@@ -20,6 +20,10 @@ set +o pipefail 2>/dev/null || true
 
 # Neutraliza traps herdados (defensivo absoluto)
 trap - ERR EXIT INT TERM 2>/dev/null || true
+
+# Versão canônica do hook (fonte única da verdade)
+readonly SCRIPT_NAME="post-attach"
+readonly SCRIPT_VERSION="5.3.1"
 
 # ---------------------------------------------------------------------------
 # CLI options parser
@@ -53,7 +57,7 @@ done
 
 # =============================================================================
 # PHASE 1 — UX HELPERS (API SEMÂNTICA DE OUTPUT)
-# CANONICAL v5.2.0
+# CANONICAL v5.3.1
 #
 # Finalidade:
 #   • Prover API mínima e estável de mensagens humanas
@@ -65,10 +69,6 @@ done
 #   • Nenhuma leitura de estado
 #   • Nenhuma escrita
 # =============================================================================
-
-# Versão canônica do hook (fonte única da verdade)
-readonly SCRIPT_NAME="post-attach"
-readonly SCRIPT_VERSION="5.2.0"
 
 # ---------------------------------------------------------------------------
 # Detecção defensiva de terminal e suporte a cores
@@ -108,9 +108,57 @@ info() { printf "%b\n" "${CYAN}ℹ️  $*${NC}"; }
 ok()   { printf "%b\n" "${GREEN}✅ $*${NC}"; }
 warn() { printf "%b\n" "${YELLOW}⚠️  $*${NC}"; }
 
+# ---------------------------------------------------------------------------
+# Snapshot defensivo de tamanho de diretório
+#
+# Contrato:
+#   • Nunca pode bloquear o attach
+#   • Usa timeout quando disponível
+#   • Se a medição for lenta, devolve marcador sem erro
+# ---------------------------------------------------------------------------
+dir_size_snapshot() {
+    local target_dir="$1"
+    local size=""
+    local rc=0
+
+    if [[ ! -d "${target_dir}" ]]; then
+        printf '%s\n' "?"
+        return 0
+    fi
+
+    if command -v timeout >/dev/null 2>&1; then
+        size="$(timeout 2 du -sh "${target_dir}" 2>/dev/null | awk 'NR==1 {print $1}')"
+        rc=$?
+
+        case "${rc}" in
+            0)
+                printf '%s\n' "${size:-?}"
+                ;;
+            124|137)
+                printf '%s\n' "~(lento)"
+                ;;
+            *)
+                printf '%s\n' "?"
+                ;;
+        esac
+
+        return 0
+    fi
+
+    # Fallback: evitar travar em diretórios sabidamente pesados sem timeout.
+    if [[ "${target_dir}" == "${USER_HOME}/.vscode-server" ]]; then
+        printf '%s\n' "~(skip)"
+        return 0
+    fi
+
+    size="$(du -sh "${target_dir}" 2>/dev/null | awk 'NR==1 {print $1}')"
+    printf '%s\n' "${size:-?}"
+    return 0
+}
+
 # =============================================================================
 # PHASE 2 — BANNER DE ATTACH (IDENTIDADE HUMANA — INICIAL)
-# CANONICAL v5.2.0
+# CANONICAL v5.3.1
 #
 # Finalidade:
 #   • Sinalizar visualmente o evento de attach
@@ -144,7 +192,7 @@ printf "%b\n" "${BLUE}═══════════════════�
 echo ""
 # =============================================================================
 # PHASE 3 — NAMESPACE CANÔNICO DE ESTADO (UX / ATTACH)
-# CANONICAL v5.2.0
+# CANONICAL v5.3.1
 #
 # CONTRATO (NORMATIVO):
 #   • Este namespace armazena APENAS estado HUMANO / UX
@@ -248,7 +296,7 @@ fi
 # =============================================================================
 # PHASE 4 — CONTEXTO BÁSICO DO AMBIENTE (DIAGNÓSTICO HUMANO)
 # additional environment diagnostics including LD_PRELOAD
-# CANONICAL v5.2.0
+# CANONICAL v5.3.1
 #
 # CONTRATO:
 #   • Diagnóstico exclusivamente informativo
@@ -620,8 +668,8 @@ if [ "${IS_FIRST_ATTACH}" = true ]; then
 
     echo "📚 Documentação principal:"
     echo "   • README.md"
-    echo "   • DOCUMENTAÇÃO/ARCHITECTURE.md"
-    echo "   • DOCUMENTAÇÃO/ENV_VARIABLES_GUIDE.md"
+    echo "   • DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md"
+    echo "   • DOCUMENTAÇÃO/REFERENCIA/ENV_VARIABLES_GUIDE.md"
     echo ""
 
     echo "💡 Dica:"
@@ -841,7 +889,7 @@ for vol_entry in "${VOLUMES_TO_CHECK[@]}"; do
     IFS=':' read -r vol_path vol_desc <<< "${vol_entry}"
 
     if [ -d "${vol_path}" ]; then
-        vol_size="$(du -sh "${vol_path}" 2>/dev/null | cut -f1 || echo '?')"
+        vol_size="$(dir_size_snapshot "${vol_path}")"
         printf "  ✅ %-32s %10s\n" "${vol_desc}" "${vol_size}"
     else
         printf "  ⚠️  %-32s %10s\n" "${vol_desc}" "(ausente)"
@@ -982,7 +1030,7 @@ if [ "${IS_FIRST_ATTACH}" = true ]; then
     echo ""
 
     info "Documentação:"
-    echo "  • Arquitetura: ARCHITECTURE.md"
+    echo "  • Arquitetura: DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md"
     echo "  • Chrome Proxy: DOCUMENTAÇÃO/ARQUITETURA/CONNECTION_ARCHITECTURE/"
     echo "  • Onboarding: .github/copilot-instructions.md"
     echo "  • Comandos: make help"
@@ -994,7 +1042,7 @@ else
     echo "  • Iniciar sistema: make start"
     echo "  • Ver logs: make logs-follow"
     echo "  • Healthcheck: make health"
-    echo "  • Documentação: ARCHITECTURE.md"
+    echo "  • Documentação: DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md"
     echo ""
 fi
 

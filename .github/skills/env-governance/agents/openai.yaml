@@ -1,0 +1,4 @@
+interface:
+  display_name: "ENV Governance"
+  short_description: "Auditoria e consolidação estrutural da camada de ENV."
+  default_prompt: "Use $env-governance para auditar a superfície de env, alinhar templates/schema/docs e consolidar a governança de variáveis de ambiente."

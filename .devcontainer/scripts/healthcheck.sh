@@ -3,13 +3,13 @@
 # healthcheck.sh v2.0 — Container Health Check (Dual Browser)
 # =============================================================================
 # Propósito: Validar estado do container para Docker healthcheck
-# Uso: Chamado via docker-compose.yml healthcheck
-# Path: ${CONTAINER_SCRIPTS_PATH}/devcontainer-healthcheck.sh
+# Uso: Chamado por healthchecks locais/containers quando necessário
+# Path: .devcontainer/scripts/healthcheck.sh
 #
 # CASO DE USO:
 # • Host primário: Debian (programação via VS Code + DevContainer)
 # • Host secundário: Windows/WSL2 (desenvolvimento alternativo)
-# • Puppeteer: Controla LLM via Chrome externo (host:9224)
+# • Puppeteer: Controla LLM via proxy/CDP em localhost:9224
 # • Chromium local: Apenas compatibilidade técnica
 #
 # EXIT CODES:
@@ -19,7 +19,7 @@
 # CHECKS:
 # 1. Node.js disponível e funcional (CRÍTICO)
 # 2. VS Code Server instalado (não-bloqueante)
-# 3. Chrome remoto (não-bloqueante, apenas informativo)
+# 3. Endpoint CDP/proxy (não-bloqueante, apenas informativo)
 # 4. Chromium local (não-bloqueante, apenas informativo)
 #
 # FILOSOFIA:
@@ -43,9 +43,10 @@ set -euo pipefail
 # CONFIGURAÇÃO
 # =============================================================================
 
-readonly CHROME_REMOTE_HOST="${CHROME_REMOTE_HOST:-host.docker.internal}"
-readonly CHROME_REMOTE_PORT="${CHROME_REMOTE_PORT:-9224}"
+readonly LEGACY_CHROME_HEALTH_BASE_URL="http://${CHROME_REMOTE_HOST:-${CHROME_HOST:-host.docker.internal}}:${CHROME_REMOTE_PORT:-${CHROME_PROXY_PORT:-9224}}"
+readonly CHROME_HEALTH_BASE_URL="${CHROME_HEALTH_BASE_URL:-${PUPPETEER_WS_ENDPOINT:-${LEGACY_CHROME_HEALTH_BASE_URL}}}"
 readonly CHROMIUM_PATH="/usr/bin/chromium"
+readonly CHECK_TIMEOUT_SECONDS="${HEALTHCHECK_COMMAND_TIMEOUT_SECONDS:-5}"
 
 # Exit codes
 readonly EXIT_HEALTHY=0
@@ -78,6 +79,18 @@ log_warn() {
 
 log_error() {
     echo "[healthcheck] ❌ $*" >&2
+}
+
+run_with_timeout() {
+    local seconds="$1"
+    shift
+
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${seconds}" "$@"
+        return $?
+    fi
+
+    "$@"
 }
 
 # =============================================================================
@@ -113,23 +126,27 @@ check_vscode_server() {
 
 check_chrome_remote() {
     if ! command -v curl >/dev/null 2>&1; then
-        log_info "curl ausente, ignorando check de Chrome remoto"
+        log_info "curl ausente, ignorando check de endpoint CDP"
         return 0
     fi
 
-    if curl -sf --connect-timeout 2 "http://${CHROME_REMOTE_HOST}:${CHROME_REMOTE_PORT}/json/version" >/dev/null 2>&1; then
-        log_ok "Chrome remoto acessível (${CHROME_REMOTE_HOST}:${CHROME_REMOTE_PORT})"
+    local health_url="${CHROME_HEALTH_BASE_URL%/}/json/version"
+
+    if run_with_timeout "${CHECK_TIMEOUT_SECONDS}" \
+        curl -sf --connect-timeout 2 --max-time "${CHECK_TIMEOUT_SECONDS}" \
+        "${health_url}" >/dev/null 2>&1; then
+        log_ok "Endpoint CDP acessível (${CHROME_HEALTH_BASE_URL})"
         return 0
     else
-        log_warn "Chrome remoto indisponível (operacional, não-bloqueante)"
+        log_warn "Endpoint CDP indisponível (operacional, não-bloqueante)"
 
         # Instruções específicas por OS
         if [ "$HOST_OS" = "debian" ]; then
-            log_info "Para iniciar: google-chrome --remote-debugging-port=9224"
+            log_info "Para iniciar o proxy/Chrome externo, valide PUPPETEER_WS_ENDPOINT e CHROME_PROXY_PORT."
         elif [ "$HOST_OS" = "wsl2" ]; then
-                log_info "Para iniciar no Windows: chrome.exe --remote-debugging-port=9224"
+                log_info "Para iniciar no Windows: chrome.exe --remote-debugging-port=9225 e garanta o proxy em localhost:9224"
         else
-                log_info "Para iniciar Chrome remoto: --remote-debugging-port=9224"
+                log_info "Para iniciar o endpoint CDP: confira PUPPETEER_WS_ENDPOINT/CHROME_PROXY_PORT"
         fi
 
         return 0  # Não-bloqueante
@@ -142,7 +159,7 @@ check_chromium_local() {
         return 0  # Não-bloqueante
     fi
 
-    if ! "$CHROMIUM_PATH" --version >/dev/null 2>&1; then
+    if ! run_with_timeout "${CHECK_TIMEOUT_SECONDS}" "$CHROMIUM_PATH" --version >/dev/null 2>&1; then
         log_warn "Chromium local não funcional"
         return 0  # Não-bloqueante
     fi

@@ -3,7 +3,7 @@
 **Propósito**: concentrar APIs, contratos técnicos, configuração, variáveis, aliases e material de consulta estável do projeto.  
 **Status documental**: Canônico.  
 **Público**: engenharia, manutenção, integração e agentes de IA.  
-**Última atualização**: 28 de fevereiro de 2026.
+**Última atualização**: 1 de março de 2026.
 
 ## O que esta pasta contém
 
@@ -25,6 +25,7 @@
 - [API_REFERENCE.md](./API_REFERENCE.md)
 - [CONFIGURATION.md](./CONFIGURATION.md)
 - [ENV_VARIABLES_GUIDE.md](./ENV_VARIABLES_GUIDE.md)
+- [../../.env.expert.example](../../.env.expert.example)
 - [MODULE_ALIASES.md](./MODULE_ALIASES.md)
 - [SCRIPTS.md](./SCRIPTS.md)
 - [GLOSSARY.md](./GLOSSARY.md)
@@ -34,6 +35,10 @@
 - Saúde e readiness:
   - [HEALTH_ENDPOINT.md](./HEALTH_ENDPOINT.md)
   - [REBUILD_READY_CHECKLIST.md](./REBUILD_READY_CHECKLIST.md)
+- Ambiente e configuração:
+  - [ENV_VARIABLES_GUIDE.md](./ENV_VARIABLES_GUIDE.md)
+  - [../AUDITORIAS/ENV_STRUCTURE_AUDIT_2026-03-01.md](../AUDITORIAS/ENV_STRUCTURE_AUDIT_2026-03-01.md)
+  - [../../.devcontainer/ENV_VARIABLE_REFERENCE.md](../../.devcontainer/ENV_VARIABLE_REFERENCE.md)
 - Qualidade e toolchain:
   - [ESLINT_GUIDE.md](./ESLINT_GUIDE.md)
   - [STRICT_MIGRATION_CHECKLIST.md](./STRICT_MIGRATION_CHECKLIST.md)
@@ -76,3 +81,4 @@
 - Hub principal: [../README.md](../README.md)
 - Integrações: [./INTEGRACOES/README.md](./INTEGRACOES/README.md)
 - Arquitetura: [../ARQUITETURA/README.md](../ARQUITETURA/README.md)
+- Auditorias: [../AUDITORIAS/README.md](../AUDITORIAS/README.md)

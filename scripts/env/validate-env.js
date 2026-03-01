@@ -2,10 +2,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
+    delete process.env.NO_COLOR;
+}
+
 // ============================================================================
 // Configuração
 // ============================================================================
-const ROOT = path.resolve(import.meta.dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const SCHEMA_PATH = path.join(ROOT, '.env.schema.json');
 const DEFAULT_ENV_FILES = ['.env.development', '.env.production', '.env.test'];
 
@@ -124,7 +128,6 @@ class EnvValidator {
             }
 
             if (!value) {
-                console.log(`  ${colors.gray}○${colors.reset} ${varName} = ${colors.gray}<UNSET>${colors.reset}`);
                 return;
             }
 
@@ -155,6 +158,22 @@ class EnvValidator {
                 this.errors.push(
                     `${categoryName}: ${varName} deve ser um de [${spec.enum.join(', ')}] (recebido: ${num})`
                 );
+            }
+        }
+
+        if (spec.type === 'number') {
+            const num = Number(value);
+            if (isNaN(num)) {
+                this.errors.push(`${categoryName}: ${varName} deve ser número (recebido: ${value})`);
+                return;
+            }
+
+            if (spec.minimum !== undefined && num < spec.minimum) {
+                this.errors.push(`${categoryName}: ${varName} < ${spec.minimum} (recebido: ${num})`);
+            }
+
+            if (spec.maximum !== undefined && num > spec.maximum) {
+                this.errors.push(`${categoryName}: ${varName} > ${spec.maximum} (recebido: ${num})`);
             }
         }
 
