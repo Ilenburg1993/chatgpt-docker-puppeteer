@@ -21,6 +21,8 @@ jobs:
     name: Setup Copilot Environment
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
       # ── Node.js 24 LTS (versão canônica do projeto) ──────────────────────
