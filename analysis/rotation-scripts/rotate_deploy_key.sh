@@ -22,7 +22,7 @@ pub="$priv.pub"
 ssh-keygen -t ed25519 -f "$priv" -N "" -C "deploy-key-$(date -u +%Y%m%dT%H%M%SZ)"
 
 echo "Uploading new deploy key (read-only=false)"
-res=$(gh api -X POST "/repos/$REPO/keys" -f title="deploy-key-$(date -u +%Y%m%dT%H%M%SZ)" -f key="$(cat $pub)" -f read_only=false)
+res=$(gh api -X POST "/repos/$REPO/keys" -f title="deploy-key-$(date -u +%Y%m%dT%H%M%SZ)" -f key="$(cat "$pub")" -f read_only=false)
 new_id=$(echo "$res" | jq -r .id)
 echo "Uploaded new deploy key id=$new_id"
 

@@ -10,7 +10,7 @@ echo "=========================================="
 echo ""
 
 # Check if Vite is running
-if ! ps aux | grep vite | grep -v grep > /dev/null; then
+if ! pgrep -f "vite" > /dev/null; then
     echo "⚠️  Vite not running. Starting..."
     cd /workspaces/chatgpt-docker-puppeteer/src/dashboard-ui
     nohup npm run dev > /tmp/vite.log 2>&1 &

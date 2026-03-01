@@ -119,8 +119,10 @@ Comando:
 
 Camadas adicionais:
 
-- `rhysd/actionlint@v1` roda no job `validate` de [../../.github/workflows/ci.yml](../../.github/workflows/ci.yml)
+- `raven-actions/actionlint@v2.1.1` roda no job `validate` de [../../.github/workflows/ci.yml](../../.github/workflows/ci.yml)
   para lint semântico de workflows;
+- `reviewdog/action-shellcheck@v1.9.0` roda no job `validate` de [../../.github/workflows/ci.yml](../../.github/workflows/ci.yml)
+  para lint de scripts shell com anotações de `github-check`;
 - [../../scripts/ci/verify-github-workflows.mjs](../../scripts/ci/verify-github-workflows.mjs)
   usa `gh api repos/<owner>/<repo>/actions/workflows` para comparar os workflows versionados locais
   com o que o GitHub reconhece remotamente.
@@ -164,7 +166,8 @@ Comandos:
 - `ci.yml` passou a:
   - preservar summary e artifact do `audit-lite` mesmo quando a etapa de auditoria falha;
   - atualizar um comentário único por PR, em vez de acumular comentários redundantes;
-  - rodar `actionlint` no job `validate`.
+  - rodar `actionlint` no job `validate`;
+  - rodar `shellcheck` no job `validate`, para antecipar falhas de shell antes do `docker-rebuild`.
 - `dependency-hygiene.yml` passou a:
   - limitar a janela de execução com `timeout-minutes`;
   - cancelar a execução anterior quando uma nova for disparada;

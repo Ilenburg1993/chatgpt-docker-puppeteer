@@ -31,7 +31,7 @@ cd /workspaces/chatgpt-docker-puppeteer/src/dashboard-ui
 nohup npm run dev > /tmp/vite.log 2>&1 &
 sleep 3
 
-if ps aux | grep vite | grep -v grep > /dev/null; then
+if pgrep -f "vite" > /dev/null; then
     echo "   ✅ Vite reiniciado com host: '127.0.0.1'"
 else
     echo "   ❌ Falha ao reiniciar"

@@ -10,7 +10,7 @@ echo "=========================================="
 echo ""
 
 # Verificar se Vite está rodando
-if ! ps aux | grep vite | grep -v grep > /dev/null; then
+if ! pgrep -f "vite" > /dev/null; then
     echo "❌ Vite not running. Starting now..."
     cd /workspaces/chatgpt-docker-puppeteer/src/dashboard-ui
     nohup npm run dev > /tmp/vite.log 2>&1 &
@@ -104,7 +104,7 @@ echo ""
 echo "Run this in Windows PowerShell to verify:"
 echo ""
 echo "  cd /path/to/your/project"
-echo "  .\\scripts\\test-dashboard-from-windows.ps1"
+printf '%s\n' '  .\scripts\test-dashboard-from-windows.ps1'
 echo ""
 echo "Or manually test:"
 echo "  Test-NetConnection -ComputerName localhost -Port 5173"

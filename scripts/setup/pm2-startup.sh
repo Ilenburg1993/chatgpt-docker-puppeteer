@@ -131,7 +131,7 @@ for i in {1..10}; do
         break
     fi
 
-    if [ $i -eq 10 ]; then
+    if [ "$i" -eq 10 ]; then
         echo -e "${RED}❌ Servidor HTTP não respondeu após 10s${NC}"
         "${PM2_CMD[@]}" logs dashboard-web --lines 20 --nostream
         exit 1

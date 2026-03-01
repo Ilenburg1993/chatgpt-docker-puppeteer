@@ -61,7 +61,9 @@ locais sem uma decisão explícita de produto.
   - `retention-days` explícito nos artifacts relevantes.
 - A validação de workflows agora é em camadas:
   - `node scripts/ci/validate-workflows.mjs`: contrato estrutural local e governança;
-  - `rhysd/actionlint@v1` dentro do workflow de `CI`: lint semântico de Actions;
+  - `raven-actions/actionlint@v2.1.1` dentro do workflow de `CI`: lint semântico de Actions;
+  - `reviewdog/action-shellcheck@v1.9.0` dentro do workflow de `CI`: lint de shell scripts com
+    anotações em `github-check`;
   - `node scripts/ci/verify-github-workflows.mjs`: verificação opcional via `gh api` para
     confirmar o que o GitHub está reconhecendo remotamente.
 - `dependabot.yml` usa `pull-request-branch-name.separator: "-"` e labels explícitas por

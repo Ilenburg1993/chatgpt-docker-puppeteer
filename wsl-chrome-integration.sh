@@ -126,7 +126,8 @@ validate_node() {
         return 1
     fi
 
-    local node_version=$(node --version)
+    local node_version
+    node_version=$(node --version)
     log_success "Node.js: $node_version"
 
     if ! command -v npm >/dev/null 2>&1; then
@@ -134,7 +135,8 @@ validate_node() {
         return 1
     fi
 
-    local npm_version=$(npm --version)
+    local npm_version
+    npm_version=$(npm --version)
     log_success "npm: $npm_version"
 
     if [ ! -f "package.json" ]; then
@@ -165,9 +167,12 @@ validate_config() {
     log_success "config.json found"
 
     # Validate Chrome Proxy settings
-    local proxy_enabled=$(jq -r '.CHROME_PROXY_ENABLED // false' config.json)
-    local chrome_port=$(jq -r '.CHROME_PORT // 9225' config.json)
-    local proxy_port=$(jq -r '.CHROME_PROXY_PORT // 9224' config.json)
+    local proxy_enabled
+    local chrome_port
+    local proxy_port
+    proxy_enabled=$(jq -r '.CHROME_PROXY_ENABLED // false' config.json)
+    chrome_port=$(jq -r '.CHROME_PORT // 9225' config.json)
+    proxy_port=$(jq -r '.CHROME_PROXY_PORT // 9224' config.json)
 
     log_info "CHROME_PROXY_ENABLED: $proxy_enabled"
     log_info "CHROME_PORT: $chrome_port"

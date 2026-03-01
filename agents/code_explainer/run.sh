@@ -2,4 +2,4 @@
 PYTHON=${PYTHON:-python3}
 ROOT_DIR=$(dirname "${BASH_SOURCE[0]}")/..
 export PYTHONPATH="${ROOT_DIR}:$PYTHONPATH"
-exec $PYTHON ${ROOT_DIR}/agents/code_explainer/cli.py
+exec "$PYTHON" "${ROOT_DIR}/agents/code_explainer/cli.py"

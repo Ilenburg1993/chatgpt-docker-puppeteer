@@ -44,11 +44,11 @@ echo "On Debian/Ubuntu (requires sudo):"
 echo "  sudo apt update && sudo apt install -y python3-pip default-jre jq"
 echo "  python3 -m pip install --user git-filter-repo pre-commit"
 echo "  # GitHub CLI (official): https://cli.github.com/manual/installation"
-echo "  # BFG requires Java (installed above):\n  curl -L -o /tmp/bfg.jar https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar"
+printf '%s\n' "  # BFG requires Java (installed above):" "  curl -L -o /tmp/bfg.jar https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar"
 
 echo
 echo "Notes:"
-echo " - If you don\'t have sudo access, install python packages with 'python3 -m pip install --user ...'"
+printf '%s\n' " - If you don't have sudo access, install python packages with 'python3 -m pip install --user ...'"
 echo " - After installing, add ~/.local/bin to your PATH if not already present"
 
 echo

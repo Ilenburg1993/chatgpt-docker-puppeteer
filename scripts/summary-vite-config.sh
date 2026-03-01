@@ -101,4 +101,4 @@ EOF
 
 echo ""
 echo "Pressione qualquer tecla para continuar..."
-read -n 1 -s
+read -r -n 1 -s

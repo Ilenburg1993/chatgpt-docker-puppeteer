@@ -11,7 +11,7 @@ echo ""
 
 # Check if Vite is running
 echo "1️⃣ Verificando se Vite está rodando..."
-if ps aux | grep vite | grep -v grep > /dev/null; then
+if pgrep -f "vite" > /dev/null; then
     echo "   ✅ Vite is RUNNING"
 else
     echo "   ❌ Vite is NOT running - Starting now..."

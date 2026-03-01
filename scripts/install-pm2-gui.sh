@@ -40,7 +40,7 @@ fi
 if command -v pm2-gui &> /dev/null; then
     echo -e "${COLOR_GREEN}[INFO] pm2-gui já está instalado!${COLOR_RESET}"
     echo ""
-    read -p "Deseja abrir pm2-gui agora? (s/n): " launch
+    read -r -p "Deseja abrir pm2-gui agora? (s/n): " launch
     if [[ "$launch" =~ ^[Ss]$ ]]; then
         echo ""
         echo "Abrindo pm2-gui..."
@@ -51,7 +51,7 @@ fi
 
 echo -e "${COLOR_YELLOW}[INFO] pm2-gui não encontrado no sistema.${COLOR_RESET}"
 echo ""
-read -p "Deseja instalar pm2-gui globalmente? (s/n): " confirm
+read -r -p "Deseja instalar pm2-gui globalmente? (s/n): " confirm
 
 if [[ ! "$confirm" =~ ^[Ss]$ ]]; then
     echo ""
@@ -77,7 +77,7 @@ if npm install -g pm2-gui 2>&1 | tee /tmp/pm2-gui-install.log; then
     echo "Ou use o launcher.sh opção [6]"
     echo ""
 
-    read -p "Deseja abrir pm2-gui agora? (s/n): " launch
+    read -r -p "Deseja abrir pm2-gui agora? (s/n): " launch
     if [[ "$launch" =~ ^[Ss]$ ]]; then
         echo ""
         echo "Abrindo pm2-gui..."

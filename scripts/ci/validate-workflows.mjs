@@ -23,6 +23,13 @@ const workflowsRequiringConcurrency = new Set([
     'ci.yml',
 ]);
 const uploadArtifactPattern = /^actions\/upload-artifact@/;
+const requiredPinnedActionRefs = new Map([
+    ['raven-actions/actionlint', 'v2.1.1'],
+    ['reviewdog/action-shellcheck', 'v1.9.0'],
+    ['hadolint/hadolint-action', 'v3.3.0'],
+    ['dependabot/fetch-metadata', 'v2.5.0'],
+    ['actions/dependency-review-action', 'v4.8.3'],
+]);
 const seenWorkflowNames = new Set();
 
 const files = fs.readdirSync(workflowsDir).filter(file => file.endsWith('.yml') || file.endsWith('.yaml'));
@@ -109,6 +116,16 @@ for (const file of files) {
                 if (typeof step.with['retention-days'] !== 'number') {
                     throw new Error(
                         `[ci] Upload artifact step missing numeric 'retention-days' in ${file} job '${jobName}'`
+                    );
+                }
+            }
+
+            if (typeof step.uses === 'string') {
+                const [actionRef, ref = ''] = step.uses.split('@');
+                const expectedRef = requiredPinnedActionRefs.get(actionRef);
+                if (expectedRef && ref !== expectedRef) {
+                    throw new Error(
+                        `[ci] Action ${actionRef} must be pinned to ${expectedRef} in ${file} job '${jobName}'`
                     );
                 }
             }

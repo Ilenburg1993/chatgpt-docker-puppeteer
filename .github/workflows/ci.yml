@@ -18,6 +18,9 @@ jobs:
     name: Lint, format and tests (Node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -59,7 +62,16 @@ jobs:
         run: node scripts/ci/validate-workflows.mjs
 
       - name: Lint GitHub workflows with actionlint
-        uses: raven-actions/actionlint@v2.0.1
+        uses: raven-actions/actionlint@v2.1.1
+
+      - name: Lint shell scripts with shellcheck
+        uses: reviewdog/action-shellcheck@v1.9.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          shellcheck_flags: "-x"
+          reporter: github-check
+          filter_mode: nofilter
+          fail_level: error
 
       - name: Lint
         run: npm run lint
