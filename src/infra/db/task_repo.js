@@ -221,6 +221,24 @@ function countTasks({ status = null, stage = null, missionId = null } = {}) {
     return /** @type {{ n: number }} */ (row)?.n || 0;
 }
 
+/**
+ * Conta tarefas agrupadas por status numa única query SQL (GROUP BY).
+ * Mais eficiente que chamar countTasks() 8 vezes em paralelo.
+ *
+ * @returns {Record<string, number>} Mapa de status → contagem
+ */
+function countTasksByStatus() {
+    const db = getDb();
+    const rows = db.prepare('SELECT status, COUNT(*) as n FROM tasks GROUP BY status').all();
+    /** @type {Record<string, number>} */
+    const result = {};
+    for (const row of rows) {
+        const r = /** @type {{ status: string, n: number }} */ (row);
+        result[r.status] = r.n;
+    }
+    return result;
+}
+
 /** Função exportada: getTaskDependencies. */
 function getTaskDependencies(taskId) {
     const db = getDb();
@@ -916,6 +934,7 @@ export {
     claimNextEligibleTask,
     clearQueuePreserveRunning,
     countTasks,
+    countTasksByStatus,
     extendTaskLock,
     getTaskById,
     getTaskDependencies,

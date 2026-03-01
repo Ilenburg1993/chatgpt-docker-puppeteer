@@ -16,7 +16,9 @@
 # Princípios:
 #   1. INSTALAR TUDO — o agente nunca deve ter que instalar dependências sozinho
 #   2. VALIDAR ESTADO — cada seção valida que o que instalou realmente funciona
-#   3. FAIL-FAST — erros de setup devem ser visíveis, não silenciosos
+#   3. FAIL-FAST para etapas críticas; OPCIONAL para ferramentas de conveniência
+#      - CRÍTICOS (sem continue-on-error): checkout, Node.js, npm ci do projeto
+#      - OPCIONAIS (continue-on-error: true): GH CLI, build dashboard, testes
 #   4. COMPATIBILIDADE — espelhar o devcontainer Dockerfile ao máximo possível
 
 name: Copilot Setup Steps
@@ -168,7 +170,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────────
       # 4. GH CLI (GitHub CLI — para PRs, issues, releases, etc.)
       # ─────────────────────────────────────────────────────────────────────────
-      - name: Install GitHub CLI (gh)
+      - name: Install GitHub CLI (gh) [opcional — não bloqueia se indisponível]
         run: |
           # Usar script oficial da GitHub para garantir versão mais recente
           type -p curl >/dev/null || sudo apt-get install curl -y
@@ -180,7 +182,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y gh
           gh --version | head -n1
-        continue-on-error: true
+        continue-on-error: true # OPCIONAL: gh CLI é útil mas não bloqueia o agente
 
       # ─────────────────────────────────────────────────────────────────────────
       # 5. DEPENDÊNCIAS DO PROJETO (npm ci com scripts nativos)
@@ -195,7 +197,7 @@ jobs:
           # Usar --ignore-scripts silenciaria esses erros e geraria falhas em runtime.
           npm ci --no-audit --no-fund
 
-      - name: Verify native module compilation
+      - name: Verify native module compilation [opcional — falha não impede o agente]
         run: |
           # Verificar se better-sqlite3 compilou corretamente
           node -e "
@@ -217,7 +219,7 @@ jobs:
               console.log('puppeteer-core import skipped:', e.message);
             }
           EOF
-        continue-on-error: true
+        continue-on-error: true # OPCIONAL: validação de conveniência
 
       # ─────────────────────────────────────────────────────────────────────────
       # 6. PM2 GLOBAL (daemon de produção + gestão de processos)
@@ -249,14 +251,14 @@ jobs:
           npm ci --no-audit --no-fund
           echo "✅ dashboard-ui deps instalados"
 
-      - name: Build dashboard-ui (production)
+      - name: Build dashboard-ui (production) [opcional — agente pode rebuildar manualmente]
         run: |
           cd src/dashboard-ui
           npm run build
           # Verificar que dist/ foi criado
           ls -la dist/ 2>/dev/null || echo "Dashboard dist não encontrado — pode precisar de build manual"
           echo "✅ Dashboard build concluído"
-        continue-on-error: true
+        continue-on-error: true # OPCIONAL: build pode falhar em ambientes sem headless
 
       # ─────────────────────────────────────────────────────────────────────────
       # 9. GIT CONFIG — identidade para commits do agente
@@ -283,16 +285,16 @@ jobs:
               console.log('Node.js', process.versions.node, '— OK');
             "
 
-      - name: Run lint (smoke check — não bloqueia se warnings)
-        run: npm run lint -- --max-warnings 100 || true
+      - name: Run lint (smoke check — não bloqueia o agente)
+        run: npm run lint -- --max-warnings 100 2>&1 || echo "⚠️  Lint concluído com avisos (não crítico)"
 
-      - name: Run unit tests (baseline)
+      - name: Run unit tests (baseline) [opcional — mostra estado inicial]
         run: |
-          npm run test:unit 2>&1 | tee /tmp/test-baseline.txt || true
+          npm run test:unit 2>&1 | tee /tmp/test-baseline.txt
           echo ""
           echo "=== Resumo dos testes ==="
           grep -E "^ℹ (tests|pass|fail|cancelled)" /tmp/test-baseline.txt || true
-        continue-on-error: true
+        continue-on-error: true # OPCIONAL: falhas de testes pré-existentes não bloqueiam
 
       # ─────────────────────────────────────────────────────────────────────────
       # 11. ENVIRONMENT SUMMARY — informações completas para o agente

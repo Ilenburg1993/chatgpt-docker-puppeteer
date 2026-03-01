@@ -233,7 +233,7 @@ class BrowserPoolManager {
                     try {
                         await page.close();
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing invalid page: ${closeErr.message}`);
+                        log('WARN', `[BrowserPool] Error closing invalid page: ${closeErr?.message ?? String(closeErr)}`);
                     }
 
                     const validationError = new Error('PAGE_VALIDATION_FAILED');
@@ -291,7 +291,7 @@ class BrowserPoolManager {
                     try {
                         await page.close();
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing failed page: ${closeErr.message}`);
+                        log('WARN', `[BrowserPool] Error closing failed page: ${closeErr?.message ?? String(closeErr)}`);
                     }
                 }
 
@@ -416,7 +416,7 @@ class BrowserPoolManager {
         try {
             await page.close();
         } catch (closeErr) {
-            log('WARN', `[BrowserPool] page.close() falhou (página pode já estar fechada): ${closeErr.message}`);
+            log('WARN', `[BrowserPool] page.close() falhou (página pode já estar fechada): ${closeErr?.message ?? String(closeErr)}`);
         }
 
         // Remove do registro de forma incondicional (A004: não depender de page.close() ter sucesso)
@@ -1208,7 +1208,7 @@ class BrowserPoolManager {
                             await page.close();
                         }
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing page ${taskId}: ${closeErr.message}`);
+                        log('WARN', `[BrowserPool] Error closing page ${taskId}: ${closeErr?.message ?? String(closeErr)}`);
                     }
 
                     // Remove from pool
