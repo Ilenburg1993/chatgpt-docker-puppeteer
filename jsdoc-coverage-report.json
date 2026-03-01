@@ -204,13 +204,13 @@
       "exports_with_jsdoc": 12,
       "coverage_pct": 100
     },
-    "tests/setup.js": {
+    "tests/support/setup.js": {
       "files": 1,
       "exports_total": 4,
       "exports_with_jsdoc": 4,
       "coverage_pct": 100
     },
-    "tests/teardown.js": {
+    "tests/support/teardown.js": {
       "files": 1,
       "exports_total": 2,
       "exports_with_jsdoc": 2,
@@ -11758,7 +11758,7 @@
       "coverage_pct": 100
     },
     {
-      "file": "tests/setup.js",
+      "file": "tests/support/setup.js",
       "exported_symbols": [
         {
           "export_name": "setup",
@@ -11802,7 +11802,7 @@
       "coverage_pct": 100
     },
     {
-      "file": "tests/teardown.js",
+      "file": "tests/support/teardown.js",
       "exported_symbols": [
         {
           "export_name": "teardown",

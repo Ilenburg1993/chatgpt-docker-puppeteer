@@ -6,7 +6,7 @@ test('impact classifier: docs-only quick smart skips lint/typecheck and keeps pr
     const plan = buildQualityExecutionPlan({
         profile: 'quick',
         qualityMode: 'smart',
-        changedFiles: ['README.md', 'DOCUMENTAÇÃO/BUGS/foo.md'],
+        changedFiles: ['README.md', 'DOCUMENTAÇÃO/AUDITORIAS/BUGS/foo.md'],
     });
 
     assert.equal(plan.strategy, 'changed-only');
