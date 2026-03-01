@@ -440,7 +440,7 @@ class QueueWorker {
                     // Attempt ended before driver start.
                     try {
                         updateAttempt(correlationId, {
-                            status: retryable ? 'FAILED' : 'FAILED',
+                            status: 'FAILED',
                             ended_at_ms: Date.now(),
                             error: msg,
                         });

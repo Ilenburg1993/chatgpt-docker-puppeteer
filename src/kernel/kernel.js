@@ -166,6 +166,10 @@ function createSsotGatewayKernel(config = {}) {
 
             timer = setInterval(() => {
                 step()
+                    .then(() => {
+                        // Reset contador apenas em caso de sucesso (A001: .then() deve vir antes de .catch())
+                        consecutiveStepFailures = 0;
+                    })
                     .catch(err => {
                         consecutiveStepFailures++;
 
@@ -189,10 +193,6 @@ function createSsotGatewayKernel(config = {}) {
                             );
                             stop(); // Parar kernel pump para evitar spam de erros
                         }
-                    })
-                    .then(() => {
-                        // Reset contador em caso de sucesso
-                        consecutiveStepFailures = 0;
                     });
             }, baseIntervalMs);
 

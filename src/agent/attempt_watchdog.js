@@ -299,7 +299,7 @@ class AttemptWatchdog {
                 // Best-effort abort to stop runaway driver execution (if still alive).
                 try {
                     if (this.nerv) {
-                        sendCommand(
+                        await sendCommand(
                             this.nerv,
                             ActorRole.KERNEL,
                             ActionCode.DRIVER_ABORT,
