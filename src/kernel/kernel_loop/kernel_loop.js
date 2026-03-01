@@ -414,8 +414,9 @@ class KernelLoop {
         });
 
         // P9.4: Timeout wrapper para prevenir blocking
+        let timeoutHandle;
         const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Decision application timeout after 5s')), 5000);
+            timeoutHandle = setTimeout(() => reject(new Error('Decision application timeout after 5s')), 5000);
         });
 
         const decisionsPromise = Promise.all(
@@ -432,7 +433,7 @@ class KernelLoop {
             })
         );
 
-        // Race entre decisions e timeout
+        // Race entre decisions e timeout; sempre limpa o timer (A005)
         try {
             await Promise.race([decisionsPromise, timeoutPromise]);
         } catch (error) {
@@ -446,6 +447,8 @@ class KernelLoop {
             } else {
                 throw error;
             }
+        } finally {
+            clearTimeout(timeoutHandle);
         }
     }
 
@@ -509,6 +512,16 @@ class KernelLoop {
 
     /**
      * Agenda próximo ciclo lógico.
+     *
+     * Invariante de scheduling (A010):
+     * - step() é awaited antes de _scheduleNextTick() ser chamado.
+     *   Isso garante que apenas uma execução de step() ocorre por vez.
+     * - Se stop() é chamado durante step(): this._running passa a false,
+     *   _scheduleNextTick() retorna imediatamente (linha 1), e nenhum
+     *   novo timer é criado. Race condition controlada.
+     * - Se stop() é chamado DENTRO de step() (via circuit breaker):
+     *   this._timer já foi limpo por stop(); a sequência
+     *   "await step() → _scheduleNextTick() → return" termina sem agendar.
      */
     _scheduleNextTick() {
         if (!this._running) {
@@ -517,8 +530,10 @@ class KernelLoop {
 
         const delay = this._computeDelay();
 
-        this._timer = this.scheduler.setTimeout(() => {
-            this.step();
+        // A002: step() é async — aguarda conclusão antes de agendar próximo tick
+        // para evitar execuções concorrentes de step() com estado compartilhado.
+        this._timer = this.scheduler.setTimeout(async () => {
+            await this.step();
             this._scheduleNextTick();
         }, delay);
     }

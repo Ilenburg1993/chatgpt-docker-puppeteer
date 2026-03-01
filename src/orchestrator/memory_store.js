@@ -29,6 +29,10 @@ class MemoryStore {
             storePath: options.storePath || './missions/memory_store.json',
         };
 
+        if (options.persistToDisk) {
+            log('WARN', '[MemoryStore] persistToDisk=true não está implementado. Os patterns serão armazenados apenas em memória.');
+        }
+
         // Array de patterns
         this.patterns = [];
 

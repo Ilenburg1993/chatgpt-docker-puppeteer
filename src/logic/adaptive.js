@@ -583,7 +583,7 @@ function getPercentileTimeout(stats, percentile = 95) {
  *
  * @returns {object} Snapshot imutável do estado interno
  */
-export const getSnapshot = () => JSON.parse(JSON.stringify(state));
+export const getSnapshot = () => structuredClone(state);
 /**
  * Força persistência imediata do estado para disco.
  *

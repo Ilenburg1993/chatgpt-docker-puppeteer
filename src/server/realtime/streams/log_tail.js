@@ -43,7 +43,7 @@ function init() {
                          * Reiniciamos o motor para capturar o novo arquivo que será criado.
                          */
                         internalLog('DEBUG', '[LOG_TAIL] Inode alterado (Rotação). Re-anexando handle...');
-                        setTimeout(init, 1000);
+                        retryTimeout = setTimeout(init, 1000);
                         return;
                     }
 

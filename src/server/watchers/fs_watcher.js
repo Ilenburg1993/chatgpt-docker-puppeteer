@@ -99,6 +99,11 @@ function _signalChange() {
  * Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
  */
 function stop() {
+    // B006: cancela debounce pendente para evitar _signalChange() após shutdown
+    if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+    }
     if (fsWatcher) {
         fsWatcher.close();
         fsWatcher = null;

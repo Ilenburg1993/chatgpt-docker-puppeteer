@@ -13,6 +13,9 @@ import { ref, reactive } from 'vue';
 /** @type {import('vue').Ref<Notification[]>} */
 const notifications = ref([]);
 
+/** @type {Map<string, ReturnType<typeof setTimeout>>} */
+const notifTimers = new Map();
+
 /**
  * Composable para gerenciamento de notificações no dashboard
  * Fornece funções para mostrar notificações de sucesso, erro, warning e info
@@ -41,19 +44,26 @@ export function useNotifications() {
 
         // Remove automaticamente após duration (se > 0)
         if (duration > 0) {
-            setTimeout(() => {
+            const timerId = setTimeout(() => {
+                notifTimers.delete(id);
                 removeNotification(id);
             }, duration);
+            notifTimers.set(id, timerId);
         }
 
         return id;
     };
 
     /**
-     * Remove uma notificação pelo ID
+     * Remove uma notificação pelo ID e cancela o timer pendente
      * @param {string} id - ID da notificação a remover
      */
     const removeNotification = id => {
+        const timer = notifTimers.get(id);
+        if (timer !== undefined) {
+            clearTimeout(timer);
+            notifTimers.delete(id);
+        }
         const index = notifications.value.findIndex(n => n.id === id);
         if (index > -1) {
             notifications.value.splice(index, 1);
@@ -97,9 +107,13 @@ export function useNotifications() {
     };
 
     /**
-     * Limpa todas as notificações
+     * Limpa todas as notificações e cancela todos os timers pendentes
      */
     const clearAll = () => {
+        for (const timer of notifTimers.values()) {
+            clearTimeout(timer);
+        }
+        notifTimers.clear();
         notifications.value = [];
     };
 

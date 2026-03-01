@@ -192,7 +192,7 @@ class ConfigValidator {
         }
 
         // Validate PORT is a number
-        if (process.env.PORT && isNaN(parseInt(process.env.PORT))) {
+        if (process.env.PORT && isNaN(parseInt(process.env.PORT, 10))) {
             this.errors.push('PORT must be a valid number');
         }
 

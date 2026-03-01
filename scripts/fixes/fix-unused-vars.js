@@ -37,7 +37,7 @@ unusedVars.forEach(line => {
     if (!changes[file]) {
         changes[file] = [];
     }
-    changes[file].push({ line: parseInt(lineNum), varName, type });
+    changes[file].push({ line: parseInt(lineNum, 10), varName, type });
 });
 
 let filesModified = 0;

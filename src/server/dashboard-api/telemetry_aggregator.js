@@ -98,6 +98,9 @@ class TelemetryAggregator {
         // Interval de coleta
         this.collectionInterval = null;
 
+        // B007: reentrancy guard para _collectAndBroadcast (evita coletas sobrepostas)
+        this._collecting = false;
+
         // Contadores
         this.totalSamples = 0;
         this.startTime = null;
@@ -160,6 +163,11 @@ class TelemetryAggregator {
      * Coleta métricas e envia para dashboards.
      */
     async _collectAndBroadcast() {
+        // B007: evita coletas concorrentes quando o setInterval dispara durante coleta anterior
+        if (this._collecting) {
+            return;
+        }
+        this._collecting = true;
         try {
             const metrics = await this._collectMetrics();
             this.lastMetrics = metrics;
@@ -175,6 +183,8 @@ class TelemetryAggregator {
             this._broadcast(metrics);
         } catch (err) {
             log('ERROR', `[TelemetryAggregator] Erro na coleta: ${err.message}`);
+        } finally {
+            this._collecting = false;
         }
     }
 
@@ -372,9 +382,10 @@ class TelemetryAggregator {
 
     /**
      * API: Retorna métricas atuais.
+     * @returns {Promise<Object>} Métricas coletadas
      */
-    getCurrent() {
-        return this.lastMetrics || this._collectMetrics();
+    async getCurrent() {
+        return this.lastMetrics || await this._collectMetrics();
     }
 
     /**

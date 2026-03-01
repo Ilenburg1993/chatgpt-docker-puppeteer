@@ -233,7 +233,7 @@ class BrowserPoolManager {
                     try {
                         await page.close();
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing invalid page: ${closeErr.message}`);
+                        log('WARN', `[BrowserPool] Error closing invalid page: ${closeErr?.message ?? String(closeErr)}`);
                     }
 
                     const validationError = new Error('PAGE_VALIDATION_FAILED');
@@ -291,7 +291,7 @@ class BrowserPoolManager {
                     try {
                         await page.close();
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing failed page: ${closeErr.message}`);
+                        log('WARN', `[BrowserPool] Error closing failed page: ${closeErr?.message ?? String(closeErr)}`);
                     }
                 }
 
@@ -404,28 +404,27 @@ class BrowserPoolManager {
             return;
         }
 
-        try {
-            // ✅ P0-U2: Cleanup lifecycle monitor
-            const monitor = this.lifecycleMonitors.get(taskId);
-            if (monitor) {
-                monitor.cleanup();
-                this.lifecycleMonitors.delete(taskId);
-                log('DEBUG', `[BrowserPool] Lifecycle monitor cleaned: ${taskId}`);
-            }
-
-            // Fecha a página
-            await page.close();
-
-            // Remove do registro
-            poolEntry.pages.delete(taskId);
-            poolEntry.stats.activeTasks = Math.max(0, poolEntry.stats.activeTasks - 1);
-
-            this.stats.totalReleases++;
-
-            log('DEBUG', `[BrowserPool] Página liberada de ${poolEntryId} (${poolEntry.stats.activeTasks} ativas)`);
-        } catch (error) {
-            log('ERROR', `[BrowserPool] Erro ao liberar página: ${error.message}`);
+        // ✅ P0-U2: Cleanup lifecycle monitor (incondicional)
+        const monitor = this.lifecycleMonitors.get(taskId);
+        if (monitor) {
+            monitor.cleanup();
+            this.lifecycleMonitors.delete(taskId);
+            log('DEBUG', `[BrowserPool] Lifecycle monitor cleaned: ${taskId}`);
         }
+
+        // Fecha a página (A004: best-effort — não deve bloquear limpeza do pool entry)
+        try {
+            await page.close();
+        } catch (closeErr) {
+            log('WARN', `[BrowserPool] page.close() falhou (página pode já estar fechada): ${closeErr?.message ?? String(closeErr)}`);
+        }
+
+        // Remove do registro de forma incondicional (A004: não depender de page.close() ter sucesso)
+        poolEntry.pages.delete(taskId);
+        poolEntry.stats.activeTasks = Math.max(0, poolEntry.stats.activeTasks - 1);
+        this.stats.totalReleases++;
+
+        log('DEBUG', `[BrowserPool] Página liberada de ${poolEntryId} (${poolEntry.stats.activeTasks} ativas)`);
     }
 
     /**
@@ -1209,7 +1208,7 @@ class BrowserPoolManager {
                             await page.close();
                         }
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing page ${taskId}: ${closeErr.message}`);
+                        log('WARN', `[BrowserPool] Error closing page ${taskId}: ${closeErr?.message ?? String(closeErr)}`);
                     }
 
                     // Remove from pool

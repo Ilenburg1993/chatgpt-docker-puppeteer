@@ -422,7 +422,7 @@ class QueueWorker {
                 }
 
                 // Hydrate runtime task: ensure the rendered user_message is what the driver will type.
-                const runtimeTask = JSON.parse(JSON.stringify(task));
+                const runtimeTask = structuredClone(task);
                 runtimeTask.spec = runtimeTask.spec || {};
                 runtimeTask.spec.payload = runtimeTask.spec.payload || {};
                 runtimeTask.spec.payload.user_message = renderedUserMessage;
@@ -440,7 +440,7 @@ class QueueWorker {
                     // Attempt ended before driver start.
                     try {
                         updateAttempt(correlationId, {
-                            status: retryable ? 'FAILED' : 'FAILED',
+                            status: 'FAILED',
                             ended_at_ms: Date.now(),
                             error: msg,
                         });

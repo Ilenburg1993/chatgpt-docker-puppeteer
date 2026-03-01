@@ -14,25 +14,25 @@ import { log } from '#core/logger';
  */
 const BIOMECH_CONFIG = {
     /** Máximo de iterações em waitIfBusy - Default: 50 */
-    MAX_WAIT_ITERATIONS: parseInt(process.env.BIOMECH_MAX_ITERATIONS || '50'),
+    MAX_WAIT_ITERATIONS: parseInt(process.env.BIOMECH_MAX_ITERATIONS || '50', 10),
 
     /** Intervalo de keep-alive (ms) - Default: 25s */
-    KEEP_ALIVE_INTERVAL_MS: parseInt(process.env.BIOMECH_KEEP_ALIVE || '25000'),
+    KEEP_ALIVE_INTERVAL_MS: parseInt(process.env.BIOMECH_KEEP_ALIVE || '25000', 10),
 
     /** Intervalo de polling em wait (ms) - Default: 800ms */
-    WAIT_POLL_INTERVAL_MS: parseInt(process.env.BIOMECH_WAIT_POLL || '800'),
+    WAIT_POLL_INTERVAL_MS: parseInt(process.env.BIOMECH_WAIT_POLL || '800', 10),
 
     /** Máximo de tentativas para stable rect - Default: 10 */
-    STABLE_RECT_MAX_ATTEMPTS: parseInt(process.env.BIOMECH_STABLE_ATTEMPTS || '10'),
+    STABLE_RECT_MAX_ATTEMPTS: parseInt(process.env.BIOMECH_STABLE_ATTEMPTS || '10', 10),
 
     /** Tolerância de estabilidade em pixels - Default: 0.5px */
     STABLE_RECT_TOLERANCE_PX: parseFloat(process.env.BIOMECH_STABLE_TOLERANCE || '0.5'),
 
     /** Intervalo de polling para stable rect (ms) - Default: 60ms */
-    STABLE_RECT_POLL_MS: parseInt(process.env.BIOMECH_STABLE_POLL || '60'),
+    STABLE_RECT_POLL_MS: parseInt(process.env.BIOMECH_STABLE_POLL || '60', 10),
 
     /** Timeout para stable rect (ms) - Default: 5s */
-    STABLE_RECT_TIMEOUT_MS: parseInt(process.env.BIOMECH_STABLE_TIMEOUT || '5000'),
+    STABLE_RECT_TIMEOUT_MS: parseInt(process.env.BIOMECH_STABLE_TIMEOUT || '5000', 10),
 
     /** Ratio de offset de scroll - Default: 0.15 (15% da altura) */
     SCROLL_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_OFFSET || '0.15'),
@@ -41,16 +41,16 @@ const BIOMECH_CONFIG = {
     SCROLL_MAX_OFFSET_RATIO: parseFloat(process.env.BIOMECH_SCROLL_MAX || '0.3'),
 
     /** Delay pós-scroll (ms) - Default: 500ms */
-    POST_SCROLL_DELAY_MS: parseInt(process.env.BIOMECH_POST_SCROLL_DELAY || '500'),
+    POST_SCROLL_DELAY_MS: parseInt(process.env.BIOMECH_POST_SCROLL_DELAY || '500', 10),
 
     /** Threshold de caracteres para zen mode - Default: 2000 */
-    ZEN_MODE_THRESHOLD_CHARS: parseInt(process.env.BIOMECH_ZEN_THRESHOLD || '2000'),
+    ZEN_MODE_THRESHOLD_CHARS: parseInt(process.env.BIOMECH_ZEN_THRESHOLD || '2000', 10),
 
     /** Timeout para zen mode (ms) - Default: 30s */
-    ZEN_MODE_TIMEOUT_MS: parseInt(process.env.BIOMECH_ZEN_TIMEOUT || '30000'),
+    ZEN_MODE_TIMEOUT_MS: parseInt(process.env.BIOMECH_ZEN_TIMEOUT || '30000', 10),
 
     /** Timeout para human type (ms) - Default: 60s */
-    HUMAN_TYPE_TIMEOUT_MS: parseInt(process.env.BIOMECH_HUMAN_TIMEOUT || '60000'),
+    HUMAN_TYPE_TIMEOUT_MS: parseInt(process.env.BIOMECH_HUMAN_TIMEOUT || '60000', 10),
 
     /** Threshold de echo para textos longos - Default: 0.6 (60%) */
     ECHO_THRESHOLD_LONG: parseFloat(process.env.BIOMECH_ECHO_LONG || '0.6'),
@@ -59,7 +59,7 @@ const BIOMECH_CONFIG = {
     ECHO_THRESHOLD_SHORT: parseFloat(process.env.BIOMECH_ECHO_SHORT || '0.5'),
 
     /** TTL do cache de modifier (ms) - Default: 1h */
-    MODIFIER_CACHE_TTL_MS: parseInt(process.env.BIOMECH_MODIFIER_TTL || '3600000'),
+    MODIFIER_CACHE_TTL_MS: parseInt(process.env.BIOMECH_MODIFIER_TTL || '3600000', 10),
 };
 
 /**

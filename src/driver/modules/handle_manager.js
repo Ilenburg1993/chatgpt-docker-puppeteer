@@ -14,13 +14,13 @@ import { withTimeout } from '#infra/abort_controller_utils';
  */
 const HANDLE_CONFIG = {
     /** Timeout máximo para clearAll (ms) - Default: 3 segundos */
-    CLEANUP_TIMEOUT_MS: parseInt(process.env.HANDLE_CLEANUP_TIMEOUT || '3000'),
+    CLEANUP_TIMEOUT_MS: parseInt(process.env.HANDLE_CLEANUP_TIMEOUT || '3000', 10),
 
     /** Timeout para dispose individual (ms) - Default: 1 segundo */
-    DISPOSE_TIMEOUT_MS: parseInt(process.env.HANDLE_DISPOSE_TIMEOUT || '1000'),
+    DISPOSE_TIMEOUT_MS: parseInt(process.env.HANDLE_DISPOSE_TIMEOUT || '1000', 10),
 
     /** Máximo de handles simultâneos - Default: 1000 */
-    MAX_HANDLES: parseInt(process.env.HANDLE_MAX_HANDLES || '1000'),
+    MAX_HANDLES: parseInt(process.env.HANDLE_MAX_HANDLES || '1000', 10),
 };
 
 /* ==========================================================================

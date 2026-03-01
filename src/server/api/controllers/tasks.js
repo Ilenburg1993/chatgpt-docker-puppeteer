@@ -182,8 +182,8 @@ async function _runTaskControlCommand(req, res, command, payload = {}) {
 router.get('/', async (req, res) => {
     try {
         // Parse pagination parameters
-        const page = Math.max(1, parseInt(String(req.query.page)) || 1);
-        const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit)) || 100));
+        const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+        const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit), 10) || 100));
         const offset = (page - 1) * limit;
 
         // Get optional filters

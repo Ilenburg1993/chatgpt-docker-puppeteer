@@ -8,6 +8,7 @@ class SupervisorReconciler {
     constructor() {
         this.checkInterval = null;
         this.isListening = false;
+        this._retryAttachTimer = null;
 
         // Limiares de tolerância operacional (NASA Standard)
         this.HEARTBEAT_THRESHOLD_MS = 30000; // 30s sem sinal = Agente Zumbi
@@ -44,7 +45,13 @@ class SupervisorReconciler {
         const io = /** @type {any} */ (socketHub.getIO());
         if (!io) {
             log('WARN', '[RECONCILER] Barramento indisponível. Re-tentando acoplamento em 5s...');
-            setTimeout(() => this._attachSensoryListeners(), 5000);
+            if (this._retryAttachTimer) {
+                clearTimeout(this._retryAttachTimer);
+            }
+            this._retryAttachTimer = setTimeout(() => {
+                this._retryAttachTimer = null;
+                this._attachSensoryListeners();
+            }, 5000);
             return;
         }
 
@@ -156,6 +163,10 @@ class SupervisorReconciler {
         if (this.checkInterval) {
             clearInterval(this.checkInterval);
             this.checkInterval = null;
+        }
+        if (this._retryAttachTimer) {
+            clearTimeout(this._retryAttachTimer);
+            this._retryAttachTimer = null;
         }
         this.isListening = false;
         log('INFO', '[RECONCILER] Vigilância de estado encerrada.');
