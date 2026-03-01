@@ -36,7 +36,6 @@ jobs:
       - name: Prepare npm environment
         run: |
           mkdir -p "$HOME/.npm"
-          rm -rf node_modules
           npm cache verify || npm cache clean --force
 
       - name: Install dependencies (with retry)
@@ -106,7 +105,6 @@ jobs:
       - name: Prepare npm environment
         run: |
           mkdir -p "$HOME/.npm"
-          rm -rf node_modules
           npm cache verify || npm cache clean --force
 
       - name: Install dependencies (with retry)
@@ -124,6 +122,9 @@ jobs:
             fi
           done
           exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/audit
 
       - name: Run audit quick (JSON artifact)
         id: run_audit_quick
@@ -240,7 +241,6 @@ jobs:
       - name: Prepare npm environment
         run: |
           mkdir -p "$HOME/.npm"
-          rm -rf node_modules
           npm cache verify || npm cache clean --force
 
       - name: Install dependencies (with retry)
@@ -282,7 +282,6 @@ jobs:
       - name: Prepare npm environment
         run: |
           mkdir -p "$HOME/.npm"
-          rm -rf node_modules
           npm cache verify || npm cache clean --force
 
       - name: Install dependencies (with retry)
