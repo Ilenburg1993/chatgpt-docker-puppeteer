@@ -59,7 +59,7 @@ jobs:
         run: node scripts/ci/validate-workflows.mjs
 
       - name: Lint GitHub workflows with actionlint
-        uses: rhysd/actionlint@v1
+        uses: raven-actions/actionlint@v2.0.1
 
       - name: Lint
         run: npm run lint
