@@ -363,6 +363,17 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+# Debian packaging note:
+# - `bat` package exposes `batcat`
+# - `fd-find` package exposes `fdfind`
+# The repo and operator workflows expect the canonical upstream names `bat` and `fd`.
+RUN if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then \
+      ln -sf /usr/bin/batcat /usr/local/bin/bat; \
+    fi \
+    && if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then \
+      ln -sf /usr/bin/fdfind /usr/local/bin/fd; \
+    fi
+
 
 # =============================================================================
 # SECTION 6.5 — POWERSHELL (INSTRUMENTAL / NÃO-CANÔNICO)
@@ -832,6 +843,6 @@ CMD ["sleep", "infinity"]
 # FINAL NOTES (v1.0)
 #   - dockerd NÃO é instalado
 #   - Docker CLI opera via socket do host (bind mount)
-#   - NSS wrapper é configurado apenas em runtime (post-create.sh) via artefatos
+#   - NSS wrapper é ativado em runtime pelo entrypoint/profile e refinado pelos hooks
 #   - Contratos de shell em /etc/profile.d são read-only
 # =============================================================================

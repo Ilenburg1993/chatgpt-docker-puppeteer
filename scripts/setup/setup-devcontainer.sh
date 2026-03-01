@@ -66,7 +66,6 @@ set -euo pipefail
 # ============================================================================
 
 readonly SCRIPT_VERSION="4.0"
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 readonly PROJECT_DIRS=(
     fila
@@ -334,8 +333,9 @@ echo -e "${BLUE}[4/6]${NC} Ajustando permissões de scripts..."
 SCRIPTS_FOUND=0
 SCRIPTS_FAILED=0
 
+shopt -s nullglob
 for pattern in "${EXECUTABLE_SCRIPTS[@]}"; do
-    for script in $WORKSPACE/$pattern 2>/dev/null; do
+    for script in "$WORKSPACE"/$pattern; do
         if [ -f "$script" ]; then
             if chmod +x "$script" 2>/dev/null; then
                 log_success "Executável (projeto): $(basename "$script")"
@@ -349,7 +349,7 @@ for pattern in "${EXECUTABLE_SCRIPTS[@]}"; do
 done
 
 if [ -d "$WORKSPACE/.devcontainer/scripts" ]; then
-    for script in "$WORKSPACE/.devcontainer/scripts"/*.sh 2>/dev/null; do
+    for script in "$WORKSPACE/.devcontainer/scripts"/*.sh; do
         if [ -f "$script" ]; then
             if chmod +x "$script" 2>/dev/null; then
                 log_success "Executável (.devcontainer): $(basename "$script")"
@@ -361,6 +361,7 @@ if [ -d "$WORKSPACE/.devcontainer/scripts" ]; then
         fi
     done
 fi
+shopt -u nullglob
 
 if [ $SCRIPTS_FOUND -eq 0 ]; then
     log_info "Nenhum script encontrado (normal em primeiro setup)"
@@ -452,8 +453,26 @@ else
 fi
 
 for tool in bat fd rg fzf tree; do
-    if has_command "$tool"; then
-        log_success "$tool disponível"
+    resolved="$tool"
+    case "$tool" in
+        bat)
+            if ! has_command bat && has_command batcat; then
+                resolved="batcat"
+            fi
+            ;;
+        fd)
+            if ! has_command fd && has_command fdfind; then
+                resolved="fdfind"
+            fi
+            ;;
+    esac
+
+    if has_command "$resolved"; then
+        if [ "$resolved" = "$tool" ]; then
+            log_success "$tool disponível"
+        else
+            log_success "$tool disponível via alias Debian ($resolved)"
+        fi
         ((TOOLS_OPTIONAL_OK++))
     else
         log_info "$tool não encontrado (opcional)"
