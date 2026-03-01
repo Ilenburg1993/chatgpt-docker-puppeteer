@@ -312,9 +312,9 @@ Respond ONLY in JSON format:
 
         try {
             // Timeout wrapper — timer é cancelado assim que responsePromise resolve/rejeita
-            let _timeoutId;
+            let timeoutId;
             const timeoutPromise = new Promise((_, reject) => {
-                _timeoutId = setTimeout(() => reject(new Error('LLM Judge timeout')), this.timeout);
+                timeoutId = setTimeout(() => reject(new Error('LLM Judge timeout')), this.timeout);
             });
 
             const responsePromise = this.driver.sendPrompt(judgePrompt, {
@@ -328,7 +328,7 @@ Respond ONLY in JSON format:
             try {
                 response = await Promise.race([responsePromise, timeoutPromise]);
             } finally {
-                clearTimeout(_timeoutId);
+                clearTimeout(timeoutId);
             }
             return response;
         } catch (error) {

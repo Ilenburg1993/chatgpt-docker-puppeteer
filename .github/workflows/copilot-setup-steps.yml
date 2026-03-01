@@ -1,0 +1,85 @@
+# copilot-setup-steps.yml
+#
+# GitHub Copilot Coding Agent — bootstrap environment
+#
+# Este workflow é executado automaticamente pelo GitHub Copilot Coding Agent
+# antes de iniciar qualquer sessão de trabalho. Ele prepara o ambiente de
+# desenvolvimento com todas as dependências e ferramentas necessárias.
+#
+# Referência: https://docs.github.com/en/copilot/customizing-copilot/customizing-the-development-environment-for-copilot-coding-agent
+#
+# IMPORTANTE: Os steps aqui são executados no ambiente do agente Copilot.
+# Mantenha este arquivo sincronizado com os requisitos do projeto.
+
+name: Copilot Setup Steps
+
+on:
+  workflow_dispatch:
+
+jobs:
+  copilot-setup-steps:
+    name: Setup Copilot Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── Node.js 24 LTS (versão canônica do projeto) ──────────────────────
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      # ── Ferramentas de sistema úteis para análise e auditoria ─────────────
+      - name: Install system tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            jq \
+            ripgrep \
+            shellcheck \
+            fd-find \
+          2>/dev/null || true
+          # fd-find instala como 'fdfind' em Debian/Ubuntu
+          which fdfind && ln -sf "$(which fdfind)" /usr/local/bin/fd 2>/dev/null || true
+
+      # ── Instalar dependências do projeto ─────────────────────────────────
+      - name: Install project dependencies
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+          # Instalação sem scripts de pós-instalação (browser binaries)
+          # para manter o ambiente leve e rápido
+          npm ci --ignore-scripts --no-audit --no-fund
+
+      # ── Verificar integridade do ambiente ────────────────────────────────
+      - name: Verify Node.js runtime
+        run: node scripts/ci/check-node-version.mjs
+
+      # ── Executar quality gates mínimos (smoke test) ───────────────────────
+      - name: Lint (smoke check)
+        run: npm run lint -- --max-warnings 0 || true
+
+      # ── Executar testes unitários para confirmar baseline ─────────────────
+      - name: Unit tests (baseline verification)
+        run: |
+          npm run test:unit 2>&1 | tee /tmp/test-baseline.txt
+          # Extrair e exibir resumo
+          grep -E "^ℹ (tests|pass|fail)" /tmp/test-baseline.txt || true
+        continue-on-error: true
+
+      # ── Exibir informações do ambiente para o agente ──────────────────────
+      - name: Environment summary
+        run: |
+          echo "=== Node.js Environment ==="
+          node --version
+          npm --version
+          echo ""
+          echo "=== Project Info ==="
+          node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('Name:', p.name, '\nVersion:', p.version, '\nEngine:', JSON.stringify(p.engines))"
+          echo ""
+          echo "=== Installed Test Framework ==="
+          node --test --version 2>/dev/null || node --version
+          echo ""
+          echo "=== Key Scripts Available ==="
+          node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8')); const scripts=Object.keys(p.scripts||{}); console.log(scripts.filter(s=>['test','lint','format','audit','build','start','dev'].some(k=>s.includes(k))).join('\n'))"
