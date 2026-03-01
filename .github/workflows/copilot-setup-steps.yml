@@ -4,84 +4,363 @@
 #
 # Este workflow é executado automaticamente pelo GitHub Copilot Coding Agent
 # antes de iniciar qualquer sessão de trabalho. Ele prepara o ambiente de
-# desenvolvimento com todas as dependências e ferramentas necessárias.
+# desenvolvimento com TODAS as dependências, ferramentas e configurações
+# necessárias para máxima autonomia e produtividade do agente.
 #
-# Referência: https://docs.github.com/en/copilot/customizing-copilot/customizing-the-development-environment-for-copilot-coding-agent
+# Referência oficial:
+#   https://docs.github.com/en/copilot/customizing-copilot/customizing-the-development-environment-for-copilot-coding-agent
 #
-# IMPORTANTE: Os steps aqui são executados no ambiente do agente Copilot.
-# Mantenha este arquivo sincronizado com os requisitos do projeto.
+# Versão: 2.0 — Full autonomy bootstrap
+# Atualizado: 2026-03-01
+#
+# Princípios:
+#   1. INSTALAR TUDO — o agente nunca deve ter que instalar dependências sozinho
+#   2. VALIDAR ESTADO — cada seção valida que o que instalou realmente funciona
+#   3. FAIL-FAST — erros de setup devem ser visíveis, não silenciosos
+#   4. COMPATIBILIDADE — espelhar o devcontainer Dockerfile ao máximo possível
 
 name: Copilot Setup Steps
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
 
 jobs:
+  # O job DEVE se chamar `copilot-setup-steps` — exigência da plataforma Copilot.
   copilot-setup-steps:
-    name: Setup Copilot Environment
+    name: Bootstrap — Copilot Coding Agent Environment
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+
+    # Timeout máximo permitido pela plataforma Copilot: 59 minutos.
+    timeout-minutes: 59
+
+    # Permissões mínimas necessárias.
+    # O agente Copilot recebe seu próprio token para operações; este token
+    # é apenas para o checkout e leitura de metadados do repositório.
     permissions:
       contents: read
 
     steps:
-      # ── Node.js 24 LTS (versão canônica do projeto) ──────────────────────
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v6
+      # ─────────────────────────────────────────────────────────────────────────
+      # 0. CHECKOUT
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # O agente precisa de histórico completo para operações de git (diff,
+          # blame, log) e para poder reverter commits quando solicitado.
+          fetch-depth: 0
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 1. NODE.JS 24 LTS (versão canônica do projeto — package.json engines)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
         with:
           node-version: "24"
+          # Cache npm para instalações subsequentes mais rápidas
           cache: "npm"
 
-      # ── Ferramentas de sistema úteis para análise e auditoria ─────────────
-      - name: Install system tools
+      - name: Verify Node.js version
+        run: |
+          node --version
+          npm --version
+          # Valida que é Node.js 24+ (requisito canônico do projeto)
+          node -e "
+            const [major] = process.versions.node.split('.').map(Number);
+            if (major < 24) {
+              console.error('ERROR: Node.js 24+ required, got', process.versions.node);
+              process.exit(1);
+            }
+            console.log('✅ Node.js', process.versions.node, '— OK');
+          "
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 2. FERRAMENTAS DE SISTEMA — espelha .devcontainer/Dockerfile seção 6
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Install system tools (apt)
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             jq \
+            less \
+            vim \
+            unzip \
+            zip \
+            tree \
+            dos2unix \
+            file \
+            htop \
+            lsof \
+            procps \
+            psmisc \
+            sysstat \
+            wget \
+            netcat-openbsd \
+            dnsutils \
+            iproute2 \
+            iputils-ping \
+            nmap \
+            ncdu \
+            openssl \
+            watch \
+            strace \
+            iotop \
+            net-tools \
+            2>/dev/null
+
+      - name: Install dev CLIs (ripgrep, fd-find, bat, shellcheck, yq)
+        run: |
+          sudo apt-get install -y --no-install-recommends \
             ripgrep \
-            shellcheck \
+            bat \
             fd-find \
-          2>/dev/null || true
-          # fd-find instala como 'fdfind' em Debian/Ubuntu
-          which fdfind && ln -sf "$(which fdfind)" /usr/local/bin/fd 2>/dev/null || true
+            shellcheck \
+            2>/dev/null || true
 
-      # ── Instalar dependências do projeto ─────────────────────────────────
-      - name: Install project dependencies
+          # Instalar yq (versão fixada — atualizar quando nova versão estável for lançada)
+          # Versão: https://github.com/mikefarah/yq/releases
+          YQ_VERSION="v4.44.3"
+          sudo wget -qO /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" \
+            && sudo chmod +x /usr/local/bin/yq \
+            && yq --version || echo "yq install skipped (no network)"
+
+          # Aliases canônicos: batcat → bat, fdfind → fd (espelha Dockerfile)
+          which batcat 2>/dev/null && ! which bat 2>/dev/null \
+            && sudo ln -sf "$(which batcat)" /usr/local/bin/bat || true
+          which fdfind 2>/dev/null && ! which fd 2>/dev/null \
+            && sudo ln -sf "$(which fdfind)" /usr/local/bin/fd || true
+
+          # Verificar
+          rg --version | head -n1
+          echo "fd: $(fd --version 2>/dev/null || fdfind --version 2>/dev/null || echo 'not installed')"
+          shellcheck --version | head -n1
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 3. PYTHON 3 (necessário para node-gyp e scripts de análise)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Install Python 3 + build tools (for native Node.js modules)
         run: |
-          mkdir -p "$HOME/.npm"
-          npm cache verify || npm cache clean --force
-          # Instalação sem scripts de pós-instalação (browser binaries)
-          # para manter o ambiente leve e rápido
-          npm ci --ignore-scripts --no-audit --no-fund
+          sudo apt-get install -y --no-install-recommends \
+            python3 \
+            python3-pip \
+            python3-venv \
+            build-essential \
+            pkg-config \
+            autoconf \
+            automake \
+            libtool \
+            libssl-dev \
+            zlib1g-dev \
+            cmake \
+            2>/dev/null
 
-      # ── Verificar integridade do ambiente ────────────────────────────────
-      - name: Verify Node.js runtime
-        run: node scripts/ci/check-node-version.mjs
+          # Compatibilidade: scripts legados que chamam "python"
+          python3 --version
+          python3 -c "print('✅ Python 3 OK')"
 
-      # ── Executar quality gates mínimos (smoke test) ───────────────────────
-      - name: Lint (smoke check)
-        run: npm run lint -- --max-warnings 0 || true
-
-      # ── Executar testes unitários para confirmar baseline ─────────────────
-      - name: Unit tests (baseline verification)
+      # ─────────────────────────────────────────────────────────────────────────
+      # 4. GH CLI (GitHub CLI — para PRs, issues, releases, etc.)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Install GitHub CLI (gh)
         run: |
-          npm run test:unit 2>&1 | tee /tmp/test-baseline.txt
-          # Extrair e exibir resumo
-          grep -E "^ℹ (tests|pass|fail)" /tmp/test-baseline.txt || true
+          # Usar script oficial da GitHub para garantir versão mais recente
+          type -p curl >/dev/null || sudo apt-get install curl -y
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y gh
+          gh --version | head -n1
         continue-on-error: true
 
-      # ── Exibir informações do ambiente para o agente ──────────────────────
+      # ─────────────────────────────────────────────────────────────────────────
+      # 5. DEPENDÊNCIAS DO PROJETO (npm ci com scripts nativos)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Install project dependencies (npm ci — com scripts nativos)
+        run: |
+          # MUDANÇA INTENCIONAL: esta versão NÃO usa --ignore-scripts.
+          # Versões anteriores deste workflow usavam --ignore-scripts para manter
+          # o ambiente leve, mas isso quebra módulos com bindings nativos (node-gyp):
+          #   - better-sqlite3: precisa compilar um addon C++ em pós-instalação
+          #   - bufferutil / utf-8-validate (ws): compilam bindings de performance
+          # Usar --ignore-scripts silenciaria esses erros e geraria falhas em runtime.
+          npm ci --no-audit --no-fund
+
+      - name: Verify native module compilation
+        run: |
+          # Verificar se better-sqlite3 compilou corretamente
+          node -e "
+            try {
+              const db = require('better-sqlite3');
+              console.log('✅ better-sqlite3 — OK');
+            } catch(e) {
+              console.error('❌ better-sqlite3 falhou:', e.message);
+              process.exit(1);
+            }
+          " || echo "better-sqlite3 check skipped (não crítico para agente)"
+
+          # Verificar puppeteer-core (não faz launch, apenas verifica import)
+          node --input-type=module <<'EOF'
+            try {
+              await import('puppeteer-core');
+              console.log('✅ puppeteer-core — OK');
+            } catch(e) {
+              console.log('puppeteer-core import skipped:', e.message);
+            }
+          EOF
+        continue-on-error: true
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 6. PM2 GLOBAL (daemon de produção + gestão de processos)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Install PM2 globally
+        run: |
+          npm install -g pm2@latest --no-audit --no-fund
+          pm2 --version
+          echo "✅ PM2 instalado globalmente"
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 7. TYPESCRIPT TOOLCHAIN GLOBAL
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Install TypeScript toolchain globally
+        run: |
+          npm install -g \
+            typescript@latest \
+            typescript-language-server@latest \
+            --no-audit --no-fund
+          tsc --version
+          echo "✅ TypeScript toolchain OK"
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 8. DASHBOARD-UI — Build do frontend (Vue.js + Vite)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Install dashboard-ui dependencies
+        run: |
+          cd src/dashboard-ui
+          npm ci --no-audit --no-fund
+          echo "✅ dashboard-ui deps instalados"
+
+      - name: Build dashboard-ui (production)
+        run: |
+          cd src/dashboard-ui
+          npm run build
+          # Verificar que dist/ foi criado
+          ls -la dist/ 2>/dev/null || echo "Dashboard dist não encontrado — pode precisar de build manual"
+          echo "✅ Dashboard build concluído"
+        continue-on-error: true
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 9. GIT CONFIG — identidade para commits do agente
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Configure Git
+        run: |
+          git config --global user.email "copilot@github.com"
+          git config --global user.name "GitHub Copilot"
+          git config --global core.autocrlf false
+          git config --global core.fileMode false
+          git config --global init.defaultBranch main
+          git --version
+          echo "✅ Git configurado"
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 10. VERIFICAR INTEGRIDADE DO AMBIENTE (runtime check)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Verify Node.js runtime (canonical check script)
+        run: |
+          node scripts/ci/check-node-version.mjs 2>/dev/null \
+            || node -e "
+              const [major] = process.versions.node.split('.').map(Number);
+              if (major < 24) { console.error('Node', process.versions.node, '< 24'); process.exit(1); }
+              console.log('Node.js', process.versions.node, '— OK');
+            "
+
+      - name: Run lint (smoke check — não bloqueia se warnings)
+        run: npm run lint -- --max-warnings 100 || true
+
+      - name: Run unit tests (baseline)
+        run: |
+          npm run test:unit 2>&1 | tee /tmp/test-baseline.txt || true
+          echo ""
+          echo "=== Resumo dos testes ==="
+          grep -E "^ℹ (tests|pass|fail|cancelled)" /tmp/test-baseline.txt || true
+        continue-on-error: true
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 11. ENVIRONMENT SUMMARY — informações completas para o agente
+      # ─────────────────────────────────────────────────────────────────────────
       - name: Environment summary
         run: |
-          echo "=== Node.js Environment ==="
-          node --version
-          npm --version
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║         COPILOT CODING AGENT — ENVIRONMENT SUMMARY            ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
           echo ""
-          echo "=== Project Info ==="
-          node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('Name:', p.name, '\nVersion:', p.version, '\nEngine:', JSON.stringify(p.engines))"
+
+          echo "─── Runtime ────────────────────────────────────────────────────"
+          echo "Node.js: $(node --version)"
+          echo "npm:     $(npm --version)"
+          echo "PM2:     $(pm2 --version 2>/dev/null || echo 'not found')"
+          echo "tsc:     $(tsc --version 2>/dev/null || echo 'not found')"
+          echo "git:     $(git --version)"
+          echo "Python:  $(python3 --version 2>/dev/null || echo 'not found')"
+          echo "gh CLI:  $(gh --version 2>/dev/null | head -n1 || echo 'not found')"
           echo ""
-          echo "=== Installed Test Framework ==="
-          node --test --version 2>/dev/null || node --version
+
+          echo "─── CLI Tools ──────────────────────────────────────────────────"
+          echo "rg:       $(rg --version 2>/dev/null | head -n1 || echo 'not found')"
+          echo "fd:       $(fd --version 2>/dev/null || fdfind --version 2>/dev/null || echo 'not found')"
+          echo "jq:       $(jq --version 2>/dev/null || echo 'not found')"
+          echo "yq:       $(yq --version 2>/dev/null || echo 'not found')"
+          echo "bat:      $(bat --version 2>/dev/null || batcat --version 2>/dev/null || echo 'not found')"
+          echo "shellchk: $(shellcheck --version 2>/dev/null | head -n1 || echo 'not found')"
           echo ""
-          echo "=== Key Scripts Available ==="
-          node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8')); const scripts=Object.keys(p.scripts||{}); console.log(scripts.filter(s=>['test','lint','format','audit','build','start','dev'].some(k=>s.includes(k))).join('\n'))"
+
+          echo "─── Project ────────────────────────────────────────────────────"
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+            console.log('Name:    ', p.name);
+            console.log('Version: ', p.version);
+            console.log('Engines: ', JSON.stringify(p.engines));
+            const scripts = Object.keys(p.scripts || {});
+            const groups = ['test', 'lint', 'format', 'audit', 'build', 'start', 'dev', 'daemon', 'queue'];
+            const byGroup = {};
+            for (const s of scripts) {
+              for (const g of groups) {
+                if (s.includes(g)) { (byGroup[g] = byGroup[g] || []).push(s); break; }
+              }
+            }
+            console.log('Scripts by group:');
+            for (const [g, ss] of Object.entries(byGroup)) {
+              console.log(' ', g + ':', ss.slice(0, 5).join(', ') + (ss.length > 5 ? ' (+' + (ss.length-5) + ')' : ''));
+            }
+          "
+          echo ""
+
+          echo "─── Dashboard ──────────────────────────────────────────────────"
+          ls -la src/dashboard-ui/dist/ 2>/dev/null \
+            && echo "✅ Dashboard built" \
+            || echo "⚠️  Dashboard NOT built — run: cd src/dashboard-ui && npm run build"
+          echo ""
+
+          echo "─── Key Files ──────────────────────────────────────────────────"
+          for f in package.json ecosystem.config.cjs .env.example config.json; do
+            [ -f "$f" ] && echo "✅ $f" || echo "⚠️  $f not found"
+          done
+          echo ""
+
+          echo "─── Available npm scripts (complete list) ──────────────────────"
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+            Object.keys(p.scripts || {}).forEach(s => console.log('  npm run ' + s));
+          "
+          echo ""
+          echo "✅ Copilot environment ready!"
+

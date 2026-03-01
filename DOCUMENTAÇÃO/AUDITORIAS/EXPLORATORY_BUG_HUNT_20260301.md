@@ -1,11 +1,11 @@
 # Auditoria Exploratória de Bugs — Bug Hunt
 
-**Versão**: 3.0  
-**Data inicial**: 2026-03-01 | **Atualizado**: 2026-03-01 (Rodada 3)  
+**Versão**: 4.0  
+**Data inicial**: 2026-03-01 | **Atualizado**: 2026-03-01 (Rodada 4)  
 **Auditor**: Copilot SWE Agent (exploratory-bug-hunt v2.0 skill)  
-**Escopo total**: `src/kernel/`, `src/agent/`, `src/nerv/`, `src/driver/`, `src/infra/`, `src/orchestrator/`, `src/server/`, `src/missions/`, `src/shared/`, `src/integration/`, `src/audit_agent/`, `src/inference_gateway/`, `src/logic/`, `src/validation/`, `src/core/`, `src/types/`, `scripts/`  
+**Escopo total**: `src/kernel/`, `src/agent/`, `src/nerv/`, `src/driver/`, `src/infra/`, `src/orchestrator/`, `src/server/`, `src/missions/`, `src/shared/`, `src/integration/`, `src/audit_agent/`, `src/inference_gateway/`, `src/logic/`, `src/validation/`, `src/core/`, `src/types/`, `scripts/`, `src/dashboard-ui/`  
 **Perfil**: `deep`  
-**Arquivos cobertos**: ~130 arquivos lidos em 3 rodadas; grep em ~135 arquivos JS/MJS de `src/` + `scripts/`.  
+**Arquivos cobertos**: ~140 arquivos lidos em 4 rodadas; grep em ~135 arquivos JS/MJS de `src/` + `scripts/` + `src/dashboard-ui/`.  
 **PR associada**: `copilot/audit-code-and-improvements`
 
 ---
@@ -22,6 +22,9 @@ Foram encontrados e registrados achados confirmados em 3 rodadas de auditoria.
 
 **Rodada 3** — `src/integration/`, `src/audit_agent/`, `src/inference_gateway/`, `src/logic/`, `src/validation/`, `src/core/`, `src/types/`, `scripts/` + varredura de codebase completa:  
 15 achados, 15 corrigidos.
+
+**Rodada 4** — `src/dashboard-ui/`, `src/server/api/controllers/`, `src/server/realtime/bus/`, `ecosystem.config.cjs`, `.github/workflows/copilot-setup-steps.yml`:  
+8 achados, 8 corrigidos (incluindo 2 segurança, 2 memory leaks, 1 TODO implementado, 3 PM2).
 
 ---
 
@@ -77,6 +80,19 @@ Foram encontrados e registrados achados confirmados em 3 rodadas de auditoria.
 | C013 | BAIXO     | `src/infra/ConnectionOrchestrator.js`, `src/infra/io.js`, `src/server/api/controllers/tasks.js`, `src/server/api/router.js` | ✅ Corrigido (C6) |
 | C014 | BAIXO     | `scripts/ops/status_fila.js`, `scripts/ops/flow_manager.js`, `scripts/validate_config.js`, `scripts/gerador_tarefa.js`, `scripts/importar_prompts.js`, `scripts/fixes/fix-unused-vars.js` | ✅ Corrigido (C6) |
 | S001 | MÉDIO     | `.github/workflows/copilot-setup-steps.yml`                          | ✅ Corrigido (C7) |
+
+### Rodada 4
+
+| ID   | Severidade | Arquivo                                                              | Status     |
+|------|-----------|----------------------------------------------------------------------|------------|
+| D001 | ALTO      | `src/dashboard-ui/src/composables/useNotifications.js`              | ✅ Corrigido |
+| D002 | ALTO      | `src/server/api/controllers/dashboard.js` (auth brute force)         | ✅ Corrigido |
+| D003 | MÉDIO     | `src/server/realtime/bus/pm2_bridge.js` (MANAGED_PROCESSES)          | ✅ Corrigido |
+| D004 | MÉDIO     | `src/server/api/controllers/metrics.js` (getTaskMetrics 501)         | ✅ Implementado |
+| D005 | MÉDIO     | `src/server/api/router.js` (getTaskMetrics não roteado)               | ✅ Corrigido |
+| D006 | BAIXO     | `ecosystem.config.cjs` (dashboard-web sem autorestart/min_uptime)    | ✅ Corrigido |
+| D007 | BAIXO     | `ecosystem.config.cjs` (chrome-proxy sem exp_backoff)                | ✅ Corrigido |
+| D008 | MÉDIO     | `.github/workflows/copilot-setup-steps.yml` (bootstrap incompleto)  | ✅ Reescrito v2.0 |
 
 ---
 
@@ -610,7 +626,8 @@ Nenhuma regressão introduzida pelas correções de qualquer rodada.
 - Sem SQL injection, path traversal ou dados sensíveis expostos em logs
 - Bugs corrigidos eliminam: crash paths (null dereference), resource leaks (handles PM2, timers, async),
   dados incorretos para clientes (Promise bruta, HTTP 200 indevido), e clones lentos (JSON.parse/stringify)
-- Permissão mínima (least-privilege) adicionada ao workflow do Copilot Coding Agent
+- **Rodada 4**: Auth rate limiting dedicado adicionado ao login (20 req/15min vs 100/min geral)
+- **Rodada 4**: MANAGED_PROCESSES dinâmico no pm2_bridge garante que processos opcionais (audit-agent, inference-gateway, ollama-host-supervisor) sejam monitorados quando ENABLE_AUDIT_AGENT_PM2_PROCESSES=true
 
 ---
 
@@ -618,8 +635,90 @@ Nenhuma regressão introduzida pelas correções de qualquer rodada.
 
 1. **A007** — Integrar `resilient_lock` cleanup com graceful shutdown coordinator.
 2. **A008** — Adicionar TTL ou sweep periódico em `activeExecutions` para detecção de órfãos.
-3. Expandir auditoria para `src/dashboard-ui/` (bundle size, accessibility, auth).
+3. Expandir auditoria para `src/dashboard-ui/` (bundle size, accessibility, coverage tests).
 4. Expandir auditoria para `tests/` (identificar testes quebrados ou com cobertura insuficiente).
-2. Tratar A008 (activeExecutions TTL) para estabilidade em runs longos.
-3. Implementar `persistToDisk` em MemoryStore ou remover a opção.
-4. Expandir auditoria para `src/server/`, `src/missions/` e testes.
+5. Implementar `persistToDisk` em MemoryStore ou remover a opção.
+
+---
+
+## Achados — Rodada 4
+
+### D001 — ALTO | useNotifications: timers setTimeout não rastreados
+
+**Arquivo**: `src/dashboard-ui/src/composables/useNotifications.js`
+
+**Problema**: `addNotification()` criava `setTimeout` sem armazenar o `timerId`. `removeNotification()`
+e `clearAll()` não tinham como cancelar os timers pendentes. Se `clearAll()` fosse chamado antes do
+timer disparar, o timer dispararia em background tentando remover itens que já tinham sido removidos.
+
+**Correção**: Adicionado `Map<string, TimerID> notifTimers` como singleton. `addNotification()` registra
+o timer. `removeNotification()` cancela o timer antes de remover do array. `clearAll()` cancela todos
+os timers pendentes e limpa o Map.
+
+---
+
+### D002 — ALTO | dashboard.js: login sem rate limiting dedicado
+
+**Arquivo**: `src/server/api/controllers/dashboard.js`
+
+**Problema**: O endpoint `POST /api/dashboard/auth/login` herdava apenas o `apiLimiter` geral
+(100 req/min em produção), insuficiente para proteção contra brute force de credenciais.
+
+**Correção**: Adicionado `authLimiter` dedicado com janela de 15 minutos, limite de 20 tentativas
+por IP, e `skipSuccessfulRequests: true`. Aplicado diretamente na rota de login.
+
+---
+
+### D003 — MÉDIO | pm2_bridge: MANAGED_PROCESSES não inclui processos opcionais
+
+**Arquivo**: `src/server/realtime/bus/pm2_bridge.js`
+
+**Problema**: `MANAGED_PROCESSES` era uma lista estática `['agente-gpt', 'dashboard-web', 'chrome-proxy']`.
+Quando `ENABLE_AUDIT_AGENT_PM2_PROCESSES=true`, os processos `audit-agent`, `inference-gateway` e
+`ollama-host-supervisor` eram ignorados pelo PM2 Bridge — seus eventos não chegavam ao Dashboard.
+
+**Correção**: `MANAGED_PROCESSES` agora é calculado dinamicamente incluindo `OPTIONAL_PROCESSES` quando
+a variável de ambiente está ativa. `CORE_PROCESSES` e `OPTIONAL_PROCESSES` são exportados separadamente
+para diagnóstico.
+
+---
+
+### D004 e D005 — MÉDIO | metrics.js: getTaskMetrics retornava 501 + não estava roteado
+
+**Arquivos**: `src/server/api/controllers/metrics.js`, `src/server/api/router.js`
+
+**Problema**: `getTaskMetrics` estava exportado mas retornava `501 Not Implemented` e não estava
+roteado no router (nenhum `app.get('/api/metrics/tasks', ...)` existia).
+
+**Correção**: Implementado `getTaskMetrics()` real usando `countTasks()` do `task_repo` com
+`Promise.all` para contar tasks por cada status de forma eficiente. Adicionada rota
+`GET /api/metrics/tasks` no router.
+
+---
+
+### D006 e D007 — BAIXO | ecosystem.config.cjs: campos PM2 inconsistentes entre processos
+
+**Arquivo**: `ecosystem.config.cjs`
+
+**Problema**: `dashboard-web` não tinha `exp_backoff_restart_delay`, `min_uptime` nem `autorestart`.
+`chrome-proxy` não tinha `exp_backoff_restart_delay`. `agente-gpt` não tinha `min_uptime` nem `autorestart`.
+Isso causava comportamento de restart inconsistente entre processos em caso de crash.
+
+**Correção**: Todos os três processos principais agora têm campos uniformes:
+`autorestart: true`, `exp_backoff_restart_delay: 100`, `min_uptime: '10s'`.
+
+---
+
+### D008 — MÉDIO | copilot-setup-steps.yml: bootstrap incompleto
+
+**Arquivo**: `.github/workflows/copilot-setup-steps.yml`
+
+**Problema**: v1 do workflow tinha apenas 7 steps com `--ignore-scripts` (quebrando módulos nativos),
+sem checkout, sem PM2 global, sem build do dashboard-ui, sem GH CLI, sem ferramentas Python, com timeout
+de apenas 15 minutos.
+
+**Correção**: Reescrito como v2.0 com 11 steps completos: checkout, Node.js 24, system tools
+(correspondendo ao Dockerfile), Python/build-essential para node-gyp, GH CLI, `npm ci` com scripts
+nativos, PM2 global, TypeScript toolchain, build do dashboard-ui, Git config, e environment summary
+detalhado. Timeout aumentado para 59 minutos (máximo permitido pela plataforma).
+

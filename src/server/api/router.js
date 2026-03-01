@@ -90,6 +90,7 @@ async function applyRoutes(app) {
 
     // Metrics endpoint (delegado a `controllers/metrics.js`)
     app.get('/api/metrics', metricsController.getMetrics);
+    app.get('/api/metrics/tasks', metricsController.getTaskMetrics);
 
     /* --------------------------------------------------------------------------
        1. MAPEAMENTO DE DOMÍNIOS SOBERANOS

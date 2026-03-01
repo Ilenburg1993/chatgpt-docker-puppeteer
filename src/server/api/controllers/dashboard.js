@@ -3,6 +3,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { timingSafeEqual } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
+import rateLimit from 'express-rate-limit';
 import { log } from '#core/logger';
 import { getJwtSecret, JWT_SIGN_OPTIONS } from '#core/jwt_config';
 import { getRbacUserByUsername, verifyRbacCredentials } from '#infra/db/rbac_repo';
@@ -19,6 +20,24 @@ import dashboardAuditRouter from './dashboard_audit.js';
 const router = express.Router();
 const DASHBOARD_AUTH_PASSWORD_MIN_LENGTH = 12;
 let telemetryAggregatorPromise = null;
+
+/**
+ * Rate limiter dedicado para endpoints de autenticação.
+ * Mais estrito que o apiLimiter geral para proteção contra brute force.
+ */
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 20, // máximo de 20 tentativas por janela por IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        error: 'Muitas tentativas de autenticação. Tente novamente em 15 minutos.',
+        code: 'AUTH_RATE_LIMIT_EXCEEDED',
+    },
+    skipSuccessfulRequests: true, // logins bem-sucedidos não consomem cota; apenas falhas são
+    // contabilizadas para bloquear ataques de brute force sem penalizar usuários legítimos
+});
 
 async function getTelemetryAggregator() {
     if (!telemetryAggregatorPromise) {
@@ -77,7 +96,7 @@ function getBridgeMetrics() {
  * POST /api/dashboard/auth/login
  * Faz login e retorna token JWT
  */
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', authLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
 
