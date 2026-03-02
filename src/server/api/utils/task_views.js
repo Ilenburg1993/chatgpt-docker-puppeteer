@@ -119,6 +119,21 @@ function taskRowToDetailTask(row) {
 
     task.state = task.state || {};
     task.state.status = row.status;
+
+    // Expose DB columns that are not stored inside task_json so the UI
+    // can show actionable information for BLOCKED/FAILED tasks.
+    task.blocked_reason = row.blocked_reason ?? null;
+    task.blocked_at_ms = row.blocked_at_ms ?? null;
+    task.last_error = row.last_error ?? null;
+    task.blocked_details = null;
+    if (row.blocked_details_json) {
+        try {
+            task.blocked_details = JSON.parse(String(row.blocked_details_json));
+        } catch (_) {
+            task.blocked_details = row.blocked_details_json;
+        }
+    }
+
     task.command_caps = buildTaskCommandCaps(row);
     task.mission_ref = buildMissionRef(row);
 

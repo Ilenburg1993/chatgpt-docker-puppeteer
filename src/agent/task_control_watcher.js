@@ -114,11 +114,6 @@ class TaskControlWatcher {
      * @returns {void}
      * @sideEffects Inicia timer interno e executa tick imediatamente.
      */
-    /**
-     * Inicia o watcher, começando a monitorar tarefas em estados de controle.
-     * @returns {void}
-     * @sideEffects Inicia timer interno e executa tick imediatamente.
-     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -159,19 +154,28 @@ class TaskControlWatcher {
             const db = getDb();
             const now = Date.now();
 
-            // Only tasks that are in a control terminal state AND still claimed/locked might need a DRIVER_ABORT.
+            // Detect tasks needing DRIVER_ABORT in two cases:
+            // 1. Still locked (driver may be running): straightforward — grab all with active lock.
+            // 2. Recently paused/cancelled but lock already released (race: pauseTaskCommand calls
+            //    releaseTaskLock before this watcher runs). Use a 5-minute window so we always get
+            //    at least one watcher cycle. The dedupKey on CONTROL_ABORT_INTENT prevents duplicate
+            //    abort signals for the same user intent, so this is idempotent.
+            const RECENT_WINDOW_MS = 300000; // 5 minutes — covers worst-case watcher interval
             const rows = db
                 .prepare(
                     `
                     SELECT id, status, last_correlation_id, updated_at_ms, paused_at_ms, cancelled_at_ms
                     FROM tasks
                     WHERE status IN ('CANCELLED', 'PAUSED')
-                      AND locked_by IS NOT NULL
+                      AND (
+                        locked_by IS NOT NULL
+                        OR updated_at_ms >= @recentMs
+                      )
                     ORDER BY updated_at_ms DESC
                     LIMIT 50
                 `
                 )
-                .all();
+                .all({ recentMs: now - RECENT_WINDOW_MS });
 
             for (const row of rows) {
                 const taskId = row?.id;
