@@ -555,7 +555,12 @@ class BrowserPoolManager {
      */
     _startHealthChecks() {
         this.healthCheckTimer = setInterval(async () => {
-            await this.runHealthCheck();
+            // BUG-POOL-1: async setInterval without catch causes unhandled rejection in Node.js 24+
+            try {
+                await this.runHealthCheck();
+            } catch (err) {
+                log('ERROR', `[BrowserPool] Health check failed: ${err?.message || String(err)}`);
+            }
         }, this.config.healthCheckInterval);
 
         log('DEBUG', `[BrowserPool] Health checks iniciados (intervalo: ${this.config.healthCheckInterval}ms)`);

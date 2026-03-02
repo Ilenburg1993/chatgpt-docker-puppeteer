@@ -7,6 +7,11 @@ import * as adaptive from '#logic/adaptive';
 import { log } from '#core/logger';
 
 /**
+ * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
+ */
+
+/**
  * Configuração de timeouts, thresholds e delays para biomechanics.
  *
  * @readonly
@@ -456,10 +461,12 @@ class BiomechanicsEngine extends EventEmitter {
      */
     async getStableRect(ctx, selector) {
         // ✅ BUG #4 fix: Timeout protection
-        return Promise.race([
-            this._executeGetStableRect(ctx, selector),
-            this._timeout(BIOMECH_CONFIG.STABLE_RECT_TIMEOUT_MS, 'getStableRect'),
-        ]);
+        const timeoutP = this._timeout(BIOMECH_CONFIG.STABLE_RECT_TIMEOUT_MS, 'getStableRect');
+        try {
+            return await Promise.race([this._executeGetStableRect(ctx, selector), timeoutP]);
+        } finally {
+            timeoutP.cancel();
+        }
     }
 
     /**
@@ -757,10 +764,12 @@ class BiomechanicsEngine extends EventEmitter {
                     ? BIOMECH_CONFIG.ZEN_MODE_TIMEOUT_MS
                     : BIOMECH_CONFIG.HUMAN_TYPE_TIMEOUT_MS;
 
-            await Promise.race([
-                this._executeTypeText(ctx, selector, text, signal),
-                this._timeout(timeout, 'typeText'),
-            ]);
+            const timeoutP = this._timeout(timeout, 'typeText');
+            try {
+                await Promise.race([this._executeTypeText(ctx, selector, text, signal), timeoutP]);
+            } finally {
+                timeoutP.cancel();
+            }
 
             const duration = Date.now() - startTime;
             this.stats.totalTypingDuration += duration;
@@ -823,16 +832,19 @@ class BiomechanicsEngine extends EventEmitter {
      * @private
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para error message)
-     * @returns {Promise<never>} Promise que rejeita após timeout
+     * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        return new Promise((_, reject) => {
-            setTimeout(() => {
+        let timerId;
+        const p = new Promise((_, reject) => {
+            timerId = setTimeout(() => {
                 const error = new Error(`Timeout in ${operation} after ${ms}ms`);
                 error.name = 'TimeoutError';
                 reject(error);
             }, ms);
         });
+        p.cancel = () => clearTimeout(timerId);
+        return p;
     }
 }
 

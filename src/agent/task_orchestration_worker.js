@@ -506,10 +506,16 @@ class TaskOrchestrationWorker {
                     // ✅ P0-2.5: Setup lock extension usando ResilientLock.extend()
                     const ORCHESTRATION_LOCK_TTL_MS = 300000; // 5 minutes
                     const lockExtensionInterval = setInterval(async () => {
-                        await resilientLock.extend(`task:orch:${taskId}`, () => {
-                            extendTaskLock({ taskId, workerId: this.workerId, lockTtlMs: ORCHESTRATION_LOCK_TTL_MS });
-                            return true;
-                        });
+                        // BUG-ORCH-1: async setInterval callback must catch rejections to avoid
+                        // unhandled Promise rejections which crash Node.js 24+ by default.
+                        try {
+                            await resilientLock.extend(`task:orch:${taskId}`, () => {
+                                extendTaskLock({ taskId, workerId: this.workerId, lockTtlMs: ORCHESTRATION_LOCK_TTL_MS });
+                                return true;
+                            });
+                        } catch (extErr) {
+                            log('WARN', `[TaskOrchestrationWorker] lock extension failed for ${taskId}: ${extErr?.message || String(extErr)}`);
+                        }
                     }, 30000); // Extend every 30s
 
                     try {
@@ -629,7 +635,10 @@ class TaskOrchestrationWorker {
             actorType: 'system',
             eventType: 'TASK_ORCHESTRATION_OUTPUT_MISSING',
             payload: { attemptId },
-            dedupKey: `task:${taskId}:orch_output_missing:${attemptId}`,
+            // No dedupKey: each occurrence must be counted independently for threshold detection.
+            // Using INSERT OR IGNORE with a fixed dedupKey would cap the count at 1 per (taskId,attemptId),
+            // preventing the threshold from ever being reached. Without a dedupKey, the COUNT query
+            // can accumulate across ticks and correctly trigger the escalation when the limit is exceeded.
         });
 
         const windowMs = Math.max(60000, Number(this.outputMissingEscalation?.windowMs || 600000) || 600000);
@@ -820,6 +829,20 @@ class TaskOrchestrationWorker {
         }
 
         if (nextIteration >= maxIterations) {
+            // Mark FAILED: max iterations exhausted without passing validation.
+            // Consistent with the "hopeless" branch above which also marks FAILED.
+            // Task staying DONE would be semantically incorrect (it did NOT meet quality criteria).
+            // ✅ P1-17: Safe update with OptimisticLockError handling
+            this._safeUpdateTask(
+                taskId,
+                {
+                    status: 'FAILED',
+                    stage: TASK_STAGES.ARCHIVED,
+                    failed_at_ms: now,
+                    last_error: `MAX_ITERATIONS_REACHED: validation did not pass after ${nextIteration} iterations (max=${maxIterations})`,
+                },
+                { context: 'Mark failed at max iterations' }
+            );
             recordEvent({
                 entityType: 'task',
                 entityId: taskId,

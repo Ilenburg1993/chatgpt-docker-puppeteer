@@ -100,7 +100,11 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
 
             const attempt = input?.attempt ? String(input.attempt) : 'latest';
             const format = input?.format ? String(input.format) : 'text';
-            if (format !== 'text') continue;
+            if (format !== 'text') {
+                // BUG-CONTEXT-INPUT-SILENT-DROP: non-text formats silently ignored → warn for debuggability
+                log('WARN', `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`);
+                continue;
+            }
 
             let text = '';
             if (attempt === 'latest') {
@@ -293,6 +297,16 @@ class QueueWorker {
                         stage: TASK_STAGES.ARCHIVED,
                         last_error: 'TASK_INVALID: spec.payload.user_message missing',
                         failed_at_ms: Date.now(),
+                    });
+                    // BUG-QUEUE-INVALID-NO-EVENT: record event for observability (no attempt created yet)
+                    recordEvent({
+                        entityType: 'task',
+                        entityId: taskId,
+                        tsMs: Date.now(),
+                        actorType: 'system',
+                        eventType: 'TASK_INVALID_REJECTED',
+                        payload: { reason: 'TASK_INVALID', detail: 'spec.payload.user_message missing or empty' },
+                        dedupKey: `task:${taskId}:invalid_rejected:user_message`,
                     });
                     releaseTaskLockForAttempt({ taskId, context: 'queue_invalid_task' });
                     continue;

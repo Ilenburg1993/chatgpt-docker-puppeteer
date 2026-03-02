@@ -72,7 +72,7 @@ class FileScanner {
         let entries;
         try {
             entries = fs.readdirSync(dirPath, { withFileTypes: true });
-        } catch (err) {
+        } catch (_err) {
             console.warn(`⚠️  Não foi possível ler diretório: ${dirPath}`);
             return;
         }
@@ -137,8 +137,6 @@ class VariableParser {
         const exportRegex = /^export\s+(const|let|var|function|class)\s+(\w+)/;
         // export { X, Y }
         const exportNamedRegex = /^export\s*\{([^}]+)\}/;
-        // export default
-        const exportDefaultRegex = /^export\s+default/;
 
         for (let i = 0; i < this.lines.length; i++) {
             const line = this.lines[i].trim();
@@ -161,8 +159,6 @@ class VariableParser {
         // import X from '...'
         // import * as X from '...'
         const importRegex = /^import\s+(?:\{([^}]+)\}|(\w+)|(\*\s+as\s+(\w+)))\s+from\s+['"]([^'"]+)['"]/;
-        // import '...'
-        const sideEffectRegex = /^import\s+['"][^'"]+['"]/;
 
         for (let i = 0; i < this.lines.length; i++) {
             const line = this.lines[i].trim();
@@ -427,9 +423,9 @@ class VariableParser {
 }
 
 // ============================================
-// CLASSE: DependencyMapper
+// CLASSE: DependencyMapper (reservado para uso futuro)
 // ============================================
-class DependencyMapper {
+class _DependencyMapper {
     constructor() {
         this.dependencies = new Map();
     }

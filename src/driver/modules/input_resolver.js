@@ -6,6 +6,11 @@ import CONFIG from '#core/config';
 import { log } from '#core/logger';
 
 /**
+ * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
+ */
+
+/**
  * Configuração de timeouts e cache para input resolution.
  *
  * @readonly
@@ -197,10 +202,13 @@ class InputResolver extends EventEmitter {
 
         try {
             // ✅ Timeout protection (BUG #4 fix)
-            const result = await Promise.race([
-                this._executeResolve(),
-                this._timeout(RESOLVER_CONFIG.RESOLVE_TIMEOUT_MS, 'resolve'),
-            ]);
+            const timeoutP = this._timeout(RESOLVER_CONFIG.RESOLVE_TIMEOUT_MS, 'resolve');
+            let result;
+            try {
+                result = await Promise.race([this._executeResolve(), timeoutP]);
+            } finally {
+                timeoutP.cancel();
+            }
 
             // Success metrics
             this.stats.successfulResolutions++;
@@ -247,34 +255,38 @@ class InputResolver extends EventEmitter {
         // 1. VALIDAÇÃO DE CACHE (Performance O(1) - Multi-Domain)
         const cached = this.protocolCache.get(domain);
         if (cached && Date.now() - cached.timestamp < RESOLVER_CONFIG.CACHE_TTL_MS) {
+            const cacheTimeoutP = this._timeout(RESOLVER_CONFIG.VALIDATION_TIMEOUT_MS, 'cache validation');
+            let ok = false;
             try {
-                const ok = await Promise.race([
+                ok = await Promise.race([
                     analyzer.validateCandidateInteractivity(this.driver.page, cached.protocol),
-                    this._timeout(RESOLVER_CONFIG.VALIDATION_TIMEOUT_MS, 'cache validation'),
+                    cacheTimeoutP,
                 ]);
-
-                if (ok) {
-                    this.stats.cacheHits++;
-
-                    // EventEmitter local
-                    this.emit(RESOLVER_EVENTS.CACHE_HIT, {
-                        domain,
-                        selector: cached.protocol.selector,
-                        confidence: cached.confidence,
-                        timestamp: Date.now(),
-                    });
-
-                    // IPC telemetry
-                    this.driver._emitVital('SADI_PERCEPTION', {
-                        selector: cached.protocol.selector,
-                        status: 'CACHE_HIT',
-                        domain,
-                    });
-
-                    return cached.protocol;
-                }
             } catch (validationErr) {
                 log('WARN', `[INPUT_RESOLVER] Cache validation timeout/error: ${validationErr.message}`, correlationId);
+            } finally {
+                cacheTimeoutP.cancel();
+            }
+
+            if (ok) {
+                this.stats.cacheHits++;
+
+                // EventEmitter local
+                this.emit(RESOLVER_EVENTS.CACHE_HIT, {
+                    domain,
+                    selector: cached.protocol.selector,
+                    confidence: cached.confidence,
+                    timestamp: Date.now(),
+                });
+
+                // IPC telemetry
+                this.driver._emitVital('SADI_PERCEPTION', {
+                    selector: cached.protocol.selector,
+                    status: 'CACHE_HIT',
+                    domain,
+                });
+
+                return cached.protocol;
             }
 
             // Cache inválido - remove
@@ -367,10 +379,16 @@ class InputResolver extends EventEmitter {
             const protocol = typeof item === 'string' ? { selector: item, context: 'root' } : item;
 
             try {
-                const ok = await Promise.race([
-                    analyzer.validateCandidateInteractivity(this.driver.page, protocol),
-                    this._timeout(RESOLVER_CONFIG.VALIDATION_TIMEOUT_MS, 'DNA validation'),
-                ]);
+                const dnaTimeoutP = this._timeout(RESOLVER_CONFIG.VALIDATION_TIMEOUT_MS, 'DNA validation');
+                let ok = false;
+                try {
+                    ok = await Promise.race([
+                        analyzer.validateCandidateInteractivity(this.driver.page, protocol),
+                        dnaTimeoutP,
+                    ]);
+                } finally {
+                    dnaTimeoutP.cancel();
+                }
 
                 if (ok) {
                     return protocol;
@@ -580,16 +598,19 @@ class InputResolver extends EventEmitter {
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para error message)
      *
-     * @returns {Promise<never>} Promise que rejeita após timeout
+     * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        return new Promise((_, reject) => {
-            setTimeout(() => {
+        let timerId;
+        const p = new Promise((_, reject) => {
+            timerId = setTimeout(() => {
                 const error = new Error(`Timeout in ${operation} after ${ms}ms`);
                 error.name = 'TimeoutError';
                 reject(error);
             }, ms);
         });
+        p.cancel = () => clearTimeout(timerId);
+        return p;
     }
 }
 

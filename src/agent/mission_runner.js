@@ -5,6 +5,7 @@ import { getMissionById, listMissions, MISSION_STATUS } from '#infra/db/mission_
 import {
     completeMissionTransition,
     failMissionTransition,
+    pauseMissionTransition,
     updateMissionProgressState,
 } from '#agent/mission_execution_service';
 import { recordEvent } from '#infra/db/events_repo';
@@ -186,8 +187,47 @@ class MissionRunner {
             const row = db.prepare('SELECT status FROM tasks WHERE id = ?').get(progress.current_task_id);
             const status = row?.status || null;
 
-            if (!status || status === 'PENDING' || status === 'RUNNING' || status === 'PAUSED') {
+            // BUG-MISSION-NULL-TASK: task deleted/purged — do not loop forever treating null as "in progress"
+            if (!status) {
+                const nextProgress = {
+                    ...progress,
+                    failed: Array.isArray(progress.failed)
+                        ? [...progress.failed, progress.current_task_id]
+                        : [progress.current_task_id],
+                    current_task_id: null,
+                };
+                const failResult = failMissionTransition({
+                    missionId,
+                    failureReason: `Task ${progress.current_task_id} not found (deleted or purged)`,
+                    contextPatch: { progress: nextProgress },
+                    expectedProgress: { currentTaskId: progress.current_task_id },
+                    actorType: 'system',
+                    dedupKey: `mission:${missionId}:task_not_found:${progress.current_task_id}`,
+                    payload: { task_id: progress.current_task_id, task_status: null },
+                });
+                if (!failResult.ok) {
+                    log('WARN', `[MissionRunner] fail (task_not_found) rejected: ${failResult.code || failResult.error}`);
+                }
+                return;
+            }
+
+            if (status === 'PENDING' || status === 'RUNNING') {
                 // still in progress
+                return;
+            }
+
+            // BUG-MISSION-PAUSED-TASK: task paused individually while mission is RUNNING →
+            // cascade-pause the mission so it doesn't loop forever. User must resume mission to continue.
+            if (status === 'PAUSED') {
+                const pauseResult = pauseMissionTransition({
+                    missionId,
+                    actorType: 'system',
+                    dedupKey: `mission:${missionId}:task_paused_cascade:${progress.current_task_id}`,
+                    payload: { task_id: progress.current_task_id, task_status: status, reason: 'TASK_PAUSED_CASCADE' },
+                });
+                if (!pauseResult.ok && pauseResult.code !== 'MISSION_TRANSITION_NOOP') {
+                    log('WARN', `[MissionRunner] pause (task_paused_cascade) rejected: ${pauseResult.code || pauseResult.error}`);
+                }
                 return;
             }
 
@@ -221,7 +261,22 @@ class MissionRunner {
                 return;
             }
 
-            // Terminal but not DONE
+            // BUG-MISSION-BLOCKED: task BLOCKED means it needs user action (unblock/retry).
+            // Failing the mission immediately is wrong — pause the mission so the user can fix the task.
+            if (status === 'BLOCKED') {
+                const pauseResult = pauseMissionTransition({
+                    missionId,
+                    actorType: 'system',
+                    dedupKey: `mission:${missionId}:task_blocked_pause:${progress.current_task_id}`,
+                    payload: { task_id: progress.current_task_id, task_status: status, reason: 'TASK_BLOCKED' },
+                });
+                if (!pauseResult.ok && pauseResult.code !== 'MISSION_TRANSITION_NOOP') {
+                    log('WARN', `[MissionRunner] pause (task_blocked) rejected: ${pauseResult.code || pauseResult.error}`);
+                }
+                return;
+            }
+
+            // Terminal but not DONE: FAILED, CANCELLED, SKIPPED, etc.
             const nextProgress = {
                 ...progress,
                 failed: Array.isArray(progress.failed)

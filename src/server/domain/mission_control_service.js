@@ -202,6 +202,80 @@ function _cancelMissionTasksCascadeTx(db, missionId) {
     return affectedTaskIds;
 }
 
+/**
+ * Cascades mission pause to PENDING tasks: marks them PAUSED so the queue
+ * worker won't pick them up AND the UI shows a consistent state.
+ * RUNNING tasks are intentionally left running — the SQL gate in
+ * claimNextEligibleTask (mission_id IS NULL OR m.status = 'RUNNING') already
+ * prevents new tasks from being dispatched while the mission is PAUSED.
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} missionId
+ * @returns {string[]} affected task IDs
+ */
+function _pauseMissionPendingTasksTx(db, missionId) {
+    const now = _now();
+    // BUG-CASCADE-RESUME: always set last_error = 'MISSION_PAUSED_CASCADE' regardless of any
+    // pre-existing last_error so that _resumeMissionCascadedTasksTx (which filters on this marker)
+    // can reliably revert the pause. The original error is preserved inside task_json.state and
+    // the events table, so diagnostic info is not lost.
+    db.prepare(
+        `
+        UPDATE tasks
+        SET status = 'PAUSED',
+            paused_at_ms = @now,
+            updated_at_ms = @now,
+            last_error = 'MISSION_PAUSED_CASCADE'
+        WHERE mission_id = @mission_id
+          AND status = 'PENDING'
+          AND stage = 'READY'
+    `
+    ).run({ mission_id: missionId, now });
+
+    const paused = db
+        .prepare(`SELECT id FROM tasks WHERE mission_id = ? AND status = 'PAUSED' AND last_error = 'MISSION_PAUSED_CASCADE'`)
+        .all(missionId);
+    return paused.map(r => String(r.id));
+}
+
+/**
+ * Reverses _pauseMissionPendingTasksTx: restores tasks that were paused
+ * specifically due to the mission cascade back to PENDING so they're
+ * eligible for dispatch again.
+ * Tasks explicitly paused by the user (last_error != 'MISSION_PAUSED_CASCADE')
+ * are intentionally left PAUSED to honour the user's intent.
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} missionId
+ * @returns {string[]} affected task IDs
+ */
+function _resumeMissionCascadedTasksTx(db, missionId) {
+    const now = _now();
+    db.prepare(
+        `
+        UPDATE tasks
+        SET status = 'PENDING',
+            paused_at_ms = NULL,
+            last_error = NULL,
+            updated_at_ms = @now
+        WHERE mission_id = @mission_id
+          AND status = 'PAUSED'
+          AND last_error = 'MISSION_PAUSED_CASCADE'
+          AND stage = 'READY'
+    `
+    ).run({ mission_id: missionId, now });
+
+    const resumed = db
+        .prepare(
+            `SELECT id FROM tasks
+             WHERE mission_id = @mission_id
+               AND status = 'PENDING'
+               AND stage = 'READY'
+               AND paused_at_ms IS NULL
+               AND updated_at_ms >= @since`
+        )
+        .all({ mission_id: missionId, since: now - 5000 });
+    return resumed.map(r => String(r.id));
+}
+
 function _recordMissionEvents({
     missionId,
     actorId,
@@ -337,7 +411,8 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
         });
 
         _setActiveStepsStatusTx(db, missionId, STEP_STATUS.PAUSED);
-        return { before: _rowToMission(row), after: _rowToMission(updatedRow), metadata: {} };
+        const cascadedTaskIds = _pauseMissionPendingTasksTx(db, missionId);
+        return { before: _rowToMission(row), after: _rowToMission(updatedRow), metadata: { cascaded_tasks: cascadedTaskIds } };
     })();
 
     _recordMissionEvents({
@@ -348,6 +423,9 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
         before: result.before,
         after: result.after,
         reason,
+        metadata: {
+            cascaded_tasks_count: result.metadata?.cascaded_tasks?.length || 0,
+        },
     });
 
     return result;
@@ -368,7 +446,8 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
         });
 
         _setActiveStepsStatusTx(db, missionId, STEP_STATUS.RUNNING);
-        return { before: _rowToMission(row), after: _rowToMission(updatedRow), metadata: {} };
+        const cascadedTaskIds = _resumeMissionCascadedTasksTx(db, missionId);
+        return { before: _rowToMission(row), after: _rowToMission(updatedRow), metadata: { cascaded_tasks: cascadedTaskIds } };
     })();
 
     _recordMissionEvents({
@@ -379,6 +458,9 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
         before: result.before,
         after: result.after,
         reason,
+        metadata: {
+            cascaded_tasks_count: result.metadata?.cascaded_tasks?.length || 0,
+        },
     });
 
     return result;
