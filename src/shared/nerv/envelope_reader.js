@@ -71,7 +71,7 @@ function getPayload(envelope) {
  * @sideEffects Nenhum - função pura
  */
 function getTaskIdFromPayload(payload) {
-    if (!payload || typeof payload !== 'object') return null;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
     return payload.taskId || payload.task_id || payload.task?.meta?.id || payload.task?.id || null;
 }
 

@@ -100,6 +100,7 @@ function getDb() {
     migrate(db);
 
     singletonDb = db;
+    registerExitHandler();
     log('INFO', `[DB] SQLite SSOT ready: ${dbPath}`);
     return singletonDb;
 }
@@ -119,15 +120,20 @@ function closeDb() {
 }
 
 // Ensure WAL locks are released on process exit to prevent blocking next instance startup
-process.on('exit', () => {
-    if (singletonDb) {
-        try {
-            singletonDb.close();
-        } catch (_) {
-            /* process is exiting — best-effort */
+let exitHandlerRegistered = false;
+function registerExitHandler() {
+    if (exitHandlerRegistered) return;
+    exitHandlerRegistered = true;
+    process.on('exit', () => {
+        if (singletonDb) {
+            try {
+                singletonDb.close();
+            } catch (_) {
+                /* process is exiting — best-effort */
+            }
+            singletonDb = null;
         }
-        singletonDb = null;
-    }
-});
+    });
+}
 
 export { getDb, closeDb, resolveDbPath };

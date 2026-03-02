@@ -81,7 +81,7 @@ class KernelNERVBridge {
         this.observationStore = observationStore;
         this.telemetry = telemetry;
         this.orchestrator = orchestrator; // V2.0: Motor de orquestração
-        this.workflowBuilder = workflowBuilder || defaultWorkflowBuilder; // V2.0: Injectable, decoupled from #agent/
+        this.workflowBuilder = workflowBuilder ?? defaultWorkflowBuilder; // V2.0: Injectable, decoupled from #agent/
 
         this.started = false;
         this.unsubscribe = null;
