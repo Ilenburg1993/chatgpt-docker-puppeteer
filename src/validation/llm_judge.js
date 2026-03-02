@@ -390,10 +390,11 @@ Respond ONLY in JSON format:
      * @private
      */
     _normalizeScore(score) {
-        if (typeof score !== 'number' || isNaN(score)) {
+        const parsed = typeof score === 'string' ? Number(score) : score;
+        if (typeof parsed !== 'number' || isNaN(parsed)) {
             return 50;
         }
-        return Math.max(0, Math.min(100, Math.round(score)));
+        return Math.max(0, Math.min(100, Math.round(parsed)));
     }
 }
 

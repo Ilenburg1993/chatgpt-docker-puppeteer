@@ -115,6 +115,12 @@ class OrchestratorEngine {
         // ✅ P0-2.4: Se é MULTI_STEP, inicializa workflow state (agora await porque usa lock)
         if (strategy === 'MULTI_STEP') {
             nextTask = await this._initializeWorkflowState(nextTask);
+            if (nextTask._lockFailed) {
+                logger.error(
+                    `[OrchestratorEngine] beforeExecution aborted: workflow lock failed for ${nextTask.meta?.id}`
+                );
+                return nextTask;
+            }
         }
 
         return nextTask;
@@ -261,6 +267,7 @@ class OrchestratorEngine {
         const lockAcquired = await this._acquireWorkflowLock(workflow_id);
         if (!lockAcquired) {
             logger.error(`[OrchestratorEngine] Failed to acquire workflow lock for ${workflow_id}`);
+            task._lockFailed = true;
             return task;
         }
 
@@ -464,7 +471,7 @@ class OrchestratorEngine {
         const lockAcquired = await this._acquireWorkflowLock(workflow_id);
         if (!lockAcquired) {
             logger.error(`[OrchestratorEngine] Failed to acquire workflow lock for ${workflow_id}`);
-            return { action: 'DONE', task, feedback: null };
+            return { action: 'DONE', task, feedback: null, error: 'LOCK_ACQUISITION_FAILED' };
         }
 
         try {
