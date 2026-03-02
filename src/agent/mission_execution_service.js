@@ -293,7 +293,27 @@ function updateMissionProgressState(params) {
         },
     };
 
-    const updated = updateMission(missionId, { context: nextContext });
+    let updated;
+    try {
+        updated = updateMission(missionId, { context: nextContext });
+    } catch (err) {
+        if (err?.code === 'CONFLICT') {
+            return {
+                ok: false,
+                statusCode: err?.status || 409,
+                code: 'MISSION_PROGRESS_CONFLICT',
+                error: err?.message || 'Missão foi atualizada por outro processo',
+                details: { mission_id: missionId },
+            };
+        }
+        return {
+            ok: false,
+            statusCode: 500,
+            code: 'MISSION_PROGRESS_FAILED',
+            error: 'Falha ao atualizar progresso da missão',
+            details: err?.message || String(err),
+        };
+    }
 
     _recordMissionEvent({
         missionId,
