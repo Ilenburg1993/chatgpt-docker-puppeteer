@@ -2,7 +2,7 @@
 
 > **Início**: 2 de março de 2026
 > **Status**: Em andamento
-> **Sessões**: 2 (sessão anterior + sessão atual)
+> **Sessões**: 3 (sessão 1 + sessão 2 + sessão 3)
 
 ---
 
@@ -93,6 +93,18 @@
 | 49 | P1 | Driver | driver_nerv_adapter.js | progressListener sem error handling | ✅ Corrigido |
 | 50 | P1 | Kernel | kernel_nerv_bridge.js | Cross-domain import de #agent/ — agora injectable | ✅ Corrigido |
 
+### Sessão 3 — Dashboard/Server Bugs
+
+| # | Severidade | Módulo | Arquivo | Bug | Status |
+|---|-----------|--------|---------|-----|--------|
+| 51 | P1 | Server | ssot_event_feed.js | Timer sem .unref() — bloqueia process exit | ✅ Corrigido |
+| 52 | P1 | Dashboard | TasksView.vue | window.prompt — deprecated API, blocks UI, no fallback | ✅ Corrigido (→ Modal) |
+| 53 | P1 | Dashboard | Missions.vue | window.prompt — deprecated API, blocks UI | ✅ Corrigido (→ inline form) |
+| 54 | P1 | Dashboard | TasksView.vue | Bulk/quick actions sem try-catch — erros silenciosos | ✅ Corrigido |
+| 55 | P2 | Dashboard | TasksView.vue | Sem loading state durante operações bulk | ✅ Corrigido |
+| 56 | P2 | Dashboard | Missions.vue | Sem validação de campos obrigatórios no create form | ✅ Corrigido |
+| 57 | P2 | Dashboard | DashboardView.vue | Sem realtime updates (useSsotRealtime não integrado) | ✅ Corrigido |
+
 ---
 
 ## Aprimoramentos Sugeridos e Implementados
@@ -112,6 +124,18 @@
 | A11 | Resilience | Auto-destruction timer para temporary drivers (5min) | ✅ Implementado |
 | A12 | Observability | Error handling em execution engine (per-task, policy, interpret) | ✅ Implementado |
 
+### Sessão 3 — Aprimoramentos (Dashboard/Server)
+
+| # | Categoria | Descrição | Status |
+|---|----------|-----------|--------|
+| A13 | Server | SSOTEventFeed timer .unref() (process hang prevention) | ✅ Implementado |
+| A14 | Dashboard | Replaced window.prompt with proper Modal dialogs | ✅ Implementado |
+| A15 | Dashboard | Added try-catch error handling to all API calls | ✅ Implementado |
+| A16 | Dashboard | Added loading states + disabled buttons during async ops | ✅ Implementado |
+| A17 | Dashboard | Added toast feedback system for action results | ✅ Implementado |
+| A18 | Dashboard | SSOT realtime integration (useSsotRealtime) in all views | ✅ Implementado |
+| A19 | Dashboard | Mission create form validation (required fields) | ✅ Implementado |
+
 ---
 
 ## Upgrades Sugeridos e Implementados
@@ -124,6 +148,18 @@
 | U4 | Driver | Auto-destruction timer para temporary drivers (5min) | ✅ Implementado |
 | U5 | Kernel | NERV instance validation obrigatória | ✅ Implementado |
 | U6 | Lifecycle | Signal listeners cleanup no shutdown (delegated mode fix) | ✅ Implementado |
+
+### Sessão 3 — Upgrades (Dashboard/Server)
+
+| # | Categoria | Descrição | Status |
+|---|----------|-----------|--------|
+| U7 | Dashboard Theme | Deep Space v3.0 dark theme (cyberpunk-sober) | ✅ Implementado |
+| U8 | Dashboard Theme | surface-card CSS class, glow effects, stat-card borders | ✅ Implementado |
+| U9 | Dashboard Theme | Enhanced Tailwind config (nerv colors, glow shadows, animations) | ✅ Implementado |
+| U10 | Dashboard | DashboardView telemetry strip (8 metric cards + rates) | ✅ Implementado |
+| U11 | Dashboard | DashboardView NERV status + uptime + system summary | ✅ Implementado |
+| U12 | Dashboard | TasksView proper reason modal (replaces window.prompt) | ✅ Implementado |
+| U13 | Dashboard | Mission create with autonomy descriptions + inline validation | ✅ Implementado |
 
 ---
 
@@ -156,19 +192,21 @@ Migração gradual, não big-bang:
 
 ## Métricas de Progresso
 
-| Métrica | Sessão 1 | Sessão 2 | Meta |
-|---------|----------|----------|------|
-| Bugs corrigidos | 22 | 50 | — |
-| Bugs de segurança corrigidos | 0 | 3 | — |
-| Lint errors | 0 | 0 | 0 |
-| Test pass rate | 798/800 | 798/800 | 798/800 |
-| Silent catch blocks corrigidos | 6 | 13+ | 0 restantes |
-| NERV subsystems cleaned | 7/7 | 7/7 | 7/7 |
-| Silent DB mutations | 2 → 0 | 5+ → 0 | 0 |
-| NERV events adicionados | 2 | 5 | — |
-| Aprimoramentos implementados | 6 | 12 | — |
-| Upgrades implementados | 0 | 6 | — |
+| Métrica | Sessão 1 | Sessão 2 | Sessão 3 | Meta |
+|---------|----------|----------|----------|------|
+| Bugs corrigidos | 22 | 50 | 57 | — |
+| Bugs de segurança corrigidos | 0 | 3 | 3 | — |
+| Lint errors | 0 | 0 | 0 | 0 |
+| Test pass rate | 798/800 | 798/800 | 798/800 | 798/800 |
+| Silent catch blocks corrigidos | 6 | 13+ | 13+ | 0 restantes |
+| NERV subsystems cleaned | 7/7 | 7/7 | 7/7 | 7/7 |
+| Silent DB mutations | 2 → 0 | 5+ → 0 | 5+ → 0 | 0 |
+| NERV events adicionados | 2 | 5 | 5 | — |
+| Aprimoramentos implementados | 6 | 12 | 19 | — |
+| Upgrades implementados | 0 | 6 | 13 | — |
+| Dashboard bugs corrigidos | 0 | 0 | 7 | — |
+| Dashboard upgrades | 0 | 0 | 7 | — |
 
 ---
 
-*Atualizado em: 2 de março de 2026 — Sessão 2*
+*Atualizado em: 2 de março de 2026 — Sessão 3*
