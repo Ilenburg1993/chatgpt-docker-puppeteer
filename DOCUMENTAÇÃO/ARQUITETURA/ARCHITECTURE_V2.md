@@ -415,6 +415,38 @@ ecosystem.config.cjs
 | P1-2   | Cleanup    | Remoção do módulo morto src/state/                  | src/state/ (removido)   |
 | P2-1   | Melhoria   | Health listener limit (max 50 + warning + shutdown) | health.js               |
 
+### Correções Round 2 (Leitura profunda do código)
+
+| ID     | Tipo       | Descrição                                           | Arquivo(s)              |
+| ------ | ---------- | --------------------------------------------------- | ----------------------- |
+| P1-3   | Bug fix    | Policy engine: Date.now() → at parameter            | policy_engine.js        |
+| P1-4   | Bug fix    | Mission repo: optimistic lock via updated_at_ms     | mission_repo.js         |
+| P1-5   | Bug fix    | Adaptive: flush pendente no graceful shutdown        | adaptive.js             |
+| P1-6   | Bug fix    | LLM Judge: score normalization aceita strings        | llm_judge.js            |
+| P1-7   | Melhoria   | Events repo: função pruneEvents com TTL             | events_repo.js          |
+| P1-8   | Bug fix    | Orchestrator: lock failure sinaliza erro             | orchestrator_engine.js  |
+
+### Correções Round 3 (Análise de fluxo completa)
+
+| ID     | Tipo       | Descrição                                           | Arquivo(s)              |
+| ------ | ---------- | --------------------------------------------------- | ----------------------- |
+| P2-2   | Bug fix    | Context manager: token estimation + summary cap     | context_manager.js      |
+| P2-3   | Bug fix    | Checkpoint manager: atomic write + validation       | checkpoint_manager.js   |
+| P2-4   | Bug fix    | Validation service: score logic com null handling    | validation_service.js   |
+| P2-5   | Bug fix    | Mission planner: budget check em transação           | mission_planner_proc.js |
+| P2-6   | Bug fix    | Attempt watchdog: false positive heartbeat fix      | attempt_watchdog.js     |
+| P2-7   | Bug fix    | Queue worker: logging em catch blocks silenciosos    | queue_worker.js         |
+| P2-8   | Bug fix    | Workflow generator: structuredClone + placeholder    | workflow_generator.js   |
+| P2-9   | Bug fix    | Error classifier: case sensitivity no fallback       | error-classifier.mjs    |
+| P2-10  | Bug fix    | LLM Judge: abort controller no timeout              | llm_judge.js            |
+| P2-11  | Bug fix    | Mission manager: error handling na criação           | mission_manager.js      |
+
+### Correções Round 4 (Análise NERV)
+
+| ID     | Tipo       | Descrição                                           | Arquivo(s)              |
+| ------ | ---------- | --------------------------------------------------- | ----------------------- |
+| P3-1   | Auditoria  | Control: event emission para mutations RBAC/prefs   | control.js              |
+
 ### Impacto
 
 | Métrica                  | V1       | V2        |
@@ -423,6 +455,8 @@ ecosystem.config.cjs
 | NERV subsystems cleaned  | 3/7      | 7/7       |
 | Dead modules             | 1        | 0         |
 | Health listener safety   | Nenhuma  | Max 50    |
+| Silent DB mutations      | 2+       | 0         |
+| Bugs corrigidos total    | —        | 21        |
 | Lint errors              | 0        | 0         |
 | Test pass rate           | 798/800  | 798/800   |
 
