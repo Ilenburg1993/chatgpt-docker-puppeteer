@@ -156,7 +156,7 @@ jobs:
       # 3. PREFIXO npm GLOBAL (isolado e cacheável)
       # Usa ~/npm-global em vez de /usr/local para:
       #   • não exigir sudo em npm install -g
-      #   • permitir cache via actions/cache@v4 (step 3)
+      #   • permitir cache via actions/cache@v5 (step 3)
       #   • não conflitar com binários do sistema do runner
       # ═══════════════════════════════════════════════════════════════════════
       - name: Configure npm global prefix (isolated)
@@ -175,7 +175,7 @@ jobs:
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: global npm tools"
         id: cache-npm-global
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/npm-global
           key: ${{ runner.os }}-npm-global-v4-${{ hashFiles('.github/workflows/copilot-setup-steps.yml') }}
@@ -189,7 +189,7 @@ jobs:
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: dashboard-ui node_modules"
         id: cache-dashboard-deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: src/dashboard-ui/node_modules
           key: ${{ runner.os }}-dashboard-ui-v3-${{ hashFiles('src/dashboard-ui/package-lock.json') }}
@@ -200,7 +200,7 @@ jobs:
       # 6. CACHE — packages Python (camada 4 de cache)
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: Python pip"
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements*.txt', 'agents/**/*.py') }}
