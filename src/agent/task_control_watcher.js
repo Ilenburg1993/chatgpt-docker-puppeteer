@@ -140,7 +140,14 @@ class TaskControlWatcher {
 
     /**
      * Executa um ciclo de monitoramento: busca tarefas PAUSED/CANCELLED com locks ativos
-     * e emite comandos DRIVER_ABORT via nerv, liberando locks após.
+     * ou modificadas recentemente (cobrindo race condition onde o lock já foi liberado antes
+     * do watcher rodar), e emite comandos DRIVER_ABORT via nerv, liberando locks após.
+     *
+     * Race condition coberta: `pauseTaskCommand` libera o lock antes que este watcher
+     * possa enviar o DRIVER_ABORT. A janela temporal (`this.intervalMs * 600`) garante que
+     * pelo menos um ciclo do watcher detecte a task mesmo sem lock ativo. A dedupKey em
+     * `CONTROL_ABORT_INTENT` (baseada em `intentAt`) garante idempotência.
+     *
      * @returns {Promise<void>}
      * @throws {Error} Erros são logados mas não relançados.
      * @sideEffects Modifica estado do banco (events, locks) e envia comandos via nerv.
@@ -157,10 +164,12 @@ class TaskControlWatcher {
             // Detect tasks needing DRIVER_ABORT in two cases:
             // 1. Still locked (driver may be running): straightforward — grab all with active lock.
             // 2. Recently paused/cancelled but lock already released (race: pauseTaskCommand calls
-            //    releaseTaskLock before this watcher runs). Use a 5-minute window so we always get
-            //    at least one watcher cycle. The dedupKey on CONTROL_ABORT_INTENT prevents duplicate
-            //    abort signals for the same user intent, so this is idempotent.
-            const RECENT_WINDOW_MS = 300000; // 5 minutes — covers worst-case watcher interval
+            //    releaseTaskLock before this watcher runs). Window = interval * INTERVAL_MULTIPLIER
+            //    (≥MIN_RECENT_WINDOW_MS) so we always cover at least one watcher cycle.
+            //    The dedupKey on CONTROL_ABORT_INTENT prevents duplicate abort signals.
+            const MIN_RECENT_WINDOW_MS = 300000; // 5 minutes — floor regardless of interval
+            const INTERVAL_MULTIPLIER = 600;     // e.g. 500ms * 600 = 5 min; 1000ms * 600 = 10 min
+            const RECENT_WINDOW_MS = Math.max(MIN_RECENT_WINDOW_MS, this.intervalMs * INTERVAL_MULTIPLIER);
             const rows = db
                 .prepare(
                     `

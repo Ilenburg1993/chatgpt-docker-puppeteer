@@ -1,5 +1,5 @@
 // @ts-check
-
+import { log } from '#core/logger';
 function _preview(text, maxChars) {
     const s = typeof text === 'string' ? text : String(text ?? '');
     if (s.length <= maxChars) return s;
@@ -122,14 +122,19 @@ function taskRowToDetailTask(row) {
 
     // Expose DB columns that are not stored inside task_json so the UI
     // can show actionable information for BLOCKED/FAILED tasks.
+    /** @type {string|null} Reason code set when task was blocked (e.g. 'ENV_UNAVAILABLE_LONG'). */
     task.blocked_reason = row.blocked_reason ?? null;
+    /** @type {number|null} Timestamp (ms) when task was blocked. */
     task.blocked_at_ms = row.blocked_at_ms ?? null;
+    /** @type {string|null} Last error text from most recent failed attempt. */
     task.last_error = row.last_error ?? null;
+    /** @type {Record<string,any>|string|null} Parsed blocked_details_json, or raw string if invalid JSON. */
     task.blocked_details = null;
     if (row.blocked_details_json) {
         try {
             task.blocked_details = JSON.parse(String(row.blocked_details_json));
         } catch (_) {
+            log('WARN', `[task_views] blocked_details_json is not valid JSON for task ${row.id} — using raw string`);
             task.blocked_details = row.blocked_details_json;
         }
     }

@@ -133,8 +133,9 @@ class HeartbeatWatchdog {
                 const staleDurationMs = now - lastHeartbeat;
                 const errorMsg = `WATCHDOG: heartbeat timeout (${Math.floor(staleDurationMs / 1000)}s without heartbeat)`;
 
-                // BUG-HB-DEDUP: stable dedupKey (no ${now}) — one event per (task, attempt).
-                const dedupKey = `watchdog:hb:${taskId}:${attemptId}:heartbeat_timeout`;
+                // Stable dedupKey (no ${now}) — one event per (task, attempt), aligned with
+                // AttemptWatchdog convention: watchdog:<reason>:<taskId>:<attemptId>.
+                const dedupKey = `watchdog:heartbeat_timeout:${taskId}:${attemptId}`;
                 const firstTime = recordEvent({
                     entityType: 'task',
                     entityId: taskId,

@@ -36,6 +36,23 @@ const siblingTasks = computed(() => detail.value?.siblings || []);
 const commandReason = ref('');
 const reassignMissionId = ref('');
 
+// Formatted blocked_details for display — avoids complex inline expression in template
+const formattedBlockedDetails = computed(() => {
+    const d = task.value?.blocked_details;
+    if (!d) return null;
+    return typeof d === 'object' ? JSON.stringify(d, null, 2) : String(d);
+});
+
+// Quality score display — null-safe (overall_score may be absent)
+const qualityScoreDisplay = computed(() => {
+    const score = task.value?.state?.quality_metrics?.overall_score;
+    if (score === null || score === undefined || !Number.isFinite(Number(score))) return null;
+    return (Number(score) * 100).toFixed(0);
+});
+const qualityValidationPassed = computed(() => {
+    return task.value?.state?.quality_metrics?.validation_passed ?? null;
+});
+
 const edit = ref({
     stage: 'READY',
     status: 'PENDING',
@@ -331,8 +348,8 @@ watch(taskId, () => void fetchDetail());
                         <span class="text-amber-400 font-semibold text-sm">⚠ Task bloqueada</span>
                         <Badge size="sm" variant="warning">{{ task.blocked_reason }}</Badge>
                     </div>
-                    <div v-if="task.blocked_details" class="text-xs text-amber-300/80 font-mono whitespace-pre-wrap break-all">
-                        {{ typeof task.blocked_details === 'object' ? JSON.stringify(task.blocked_details, null, 2) : task.blocked_details }}
+                    <div v-if="formattedBlockedDetails" class="text-xs text-amber-300/80 font-mono whitespace-pre-wrap break-all">
+                        {{ formattedBlockedDetails }}
                     </div>
                     <div class="text-xs text-slate-400">
                         Use <strong>Desbloquear</strong> para retomar, ou <strong>Reexecutar</strong> para nova tentativa.
@@ -378,9 +395,9 @@ watch(taskId, () => void fetchDetail());
                             >Tentativas →</Button>
                         </div>
                     </div>
-                    <div v-if="task.state?.quality_metrics" class="mt-2 text-xs text-slate-400 flex items-center gap-3">
-                        <span>Score: <strong class="text-emerald-400">{{ (task.state.quality_metrics.overall_score * 100).toFixed(0) }}%</strong></span>
-                        <span>Validação: <strong :class="task.state.quality_metrics.validation_passed ? 'text-emerald-400' : 'text-amber-400'">{{ task.state.quality_metrics.validation_passed ? 'Passou' : 'Pendente' }}</strong></span>
+                    <div v-if="qualityScoreDisplay !== null" class="mt-2 text-xs text-slate-400 flex items-center gap-3">
+                        <span>Score: <strong class="text-emerald-400">{{ qualityScoreDisplay }}%</strong></span>
+                        <span v-if="qualityValidationPassed !== null">Validação: <strong :class="qualityValidationPassed ? 'text-emerald-400' : 'text-red-400'">{{ qualityValidationPassed ? 'Passou' : 'Falhou' }}</strong></span>
                     </div>
                 </div>
 
