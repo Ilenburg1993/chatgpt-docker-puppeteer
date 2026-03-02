@@ -91,6 +91,8 @@ class AgentLoop {
         this._timer = null;
         this._running = false;
         this._stopped = false;
+        this._stepStartedAt = 0;
+        this._stepTimeoutMs = Math.max(5000, Number(intervals.stepTimeoutMs ?? 30000) || 30000);
 
         const now = Date.now();
         this._next = {
@@ -140,8 +142,20 @@ class AgentLoop {
      */
     async step() {
         if (this._stopped) return;
-        if (this._running) return;
+        // Guard against concurrent execution + timeout recovery for hung steps
+        if (this._running) {
+            if (this._stepStartedAt > 0 && Date.now() - this._stepStartedAt > this._stepTimeoutMs) {
+                log(
+                    'ERROR',
+                    `[AgentLoop] step() hung for ${Date.now() - this._stepStartedAt}ms — force-resetting _running flag`
+                );
+                this._running = false;
+            } else {
+                return;
+            }
+        }
         this._running = true;
+        this._stepStartedAt = Date.now();
 
         try {
             const now = Date.now();
@@ -220,6 +234,7 @@ class AgentLoop {
             }
         } finally {
             this._running = false;
+            this._stepStartedAt = 0;
         }
     }
 }
