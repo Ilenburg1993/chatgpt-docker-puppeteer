@@ -102,7 +102,10 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
             const format = input?.format ? String(input.format) : 'text';
             if (format !== 'text') {
                 // BUG-CONTEXT-INPUT-SILENT-DROP: non-text formats silently ignored → warn for debuggability
-                log('WARN', `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`);
+                log(
+                    'WARN',
+                    `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`
+                );
                 continue;
             }
 
@@ -394,8 +397,8 @@ class QueueWorker {
                         });
                         this._safeUpdateTask(taskId, { prompt_template_artifact_id: artId });
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log('WARN', `[QueueWorker] Prompt template artifact storage failed for ${taskId}: ${err?.message}`);
                 }
 
                 // Render prompt for this attempt (supports optional context.inputs).
@@ -431,7 +434,8 @@ class QueueWorker {
                         latest_attempt_id: correlationId,
                         latest_rendered_prompt_artifact_id: renderedPromptArtifactId,
                     });
-                } catch (_) {
+                } catch (err) {
+                    log('WARN', `[QueueWorker] Rendered prompt artifact failed for ${taskId}: ${err?.message}`);
                     renderedPromptArtifactId = null;
                 }
 
@@ -458,8 +462,8 @@ class QueueWorker {
                             ended_at_ms: Date.now(),
                             error: msg,
                         });
-                    } catch (_) {
-                        /* ignore */
+                    } catch (err) {
+                        log('WARN', `[QueueWorker] Attempt update failed for ${taskId}: ${err?.message}`);
                     }
 
                     if (retryable) {

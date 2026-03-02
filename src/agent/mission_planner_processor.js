@@ -310,74 +310,83 @@ class MissionPlannerProcessor {
 
         const db = getDb();
         const maxTotal = Number(mission.policy?.max_tasks_total || 200) || 200;
-        const existingCount = db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(missionId)?.c || 0;
-        let remaining = Math.max(0, maxTotal - existingCount);
-        if (remaining <= 0) {
-            return;
-        }
 
-        const workflow = mission.context?.workflow || null;
-        const nowIso = new Date().toISOString();
+        // Wrap count + inserts in a transaction to prevent budget overrun race
+        const insertInTransaction = db.transaction(() => {
+            const existingCount =
+                db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(missionId)?.c || 0;
+            let remaining = Math.max(0, maxTotal - existingCount);
+            if (remaining <= 0) {
+                return;
+            }
 
-        for (const proposal of proposals) {
-            if (remaining <= 0) break;
+            const workflow = mission.context?.workflow || null;
+            const nowIso = new Date().toISOString();
 
-            const userMessage = typeof proposal?.user_message === 'string' ? proposal.user_message.trim() : '';
-            if (!userMessage) continue;
+            for (const proposal of proposals) {
+                if (remaining <= 0) break;
 
-            const proposalTags = Array.isArray(proposal?.tags) ? proposal.tags.map(t => String(t)) : [];
+                const userMessage = typeof proposal?.user_message === 'string' ? proposal.user_message.trim() : '';
+                if (!userMessage) continue;
 
-            const autoApprove = _shouldAutoApprove({ mission, proposalTags });
-            const stage = autoApprove ? TASK_STAGES.READY : TASK_STAGES.PROPOSED;
+                const proposalTags = Array.isArray(proposal?.tags) ? proposal.tags.map(t => String(t)) : [];
 
-            const taskIdNew = `task-${uuidv4()}`;
-            const target = _pickTarget({
-                requested: proposal?.target,
-                allowedTargets: mission.policy?.allowed_targets,
-            });
-            const priority = Number.isFinite(Number(proposal?.priority)) ? Number(proposal.priority) : 5;
+                const autoApprove = _shouldAutoApprove({ mission, proposalTags });
+                const stage = autoApprove ? TASK_STAGES.READY : TASK_STAGES.PROPOSED;
 
-            const taskV5 = schemas.core.TaskSchemaV5.parse({
-                meta: {
-                    id: taskIdNew,
-                    version: '5.0',
-                    created_at: nowIso,
-                    priority,
-                    source: 'self_generated',
-                    mission_id: missionId,
-                    workflow_id: workflow?.id || undefined,
-                    tags: proposalTags,
-                },
-                spec: {
-                    target,
-                    payload: {
-                        system_message: typeof proposal?.system_message === 'string' ? proposal.system_message : '',
-                        user_message: userMessage,
-                        context: {
-                            proposal_title: typeof proposal?.title === 'string' ? proposal.title : undefined,
-                            from_planner_task_id: taskId,
+                const taskIdNew = `task-${uuidv4()}`;
+                const target = _pickTarget({
+                    requested: proposal?.target,
+                    allowedTargets: mission.policy?.allowed_targets,
+                });
+                const priority = Number.isFinite(Number(proposal?.priority)) ? Number(proposal.priority) : 5;
+
+                const taskV5 = schemas.core.TaskSchemaV5.parse({
+                    meta: {
+                        id: taskIdNew,
+                        version: '5.0',
+                        created_at: nowIso,
+                        priority,
+                        source: 'self_generated',
+                        mission_id: missionId,
+                        workflow_id: workflow?.id || undefined,
+                        tags: proposalTags,
+                    },
+                    spec: {
+                        target,
+                        payload: {
+                            system_message: typeof proposal?.system_message === 'string' ? proposal.system_message : '',
+                            user_message: userMessage,
+                            context: {
+                                proposal_title: typeof proposal?.title === 'string' ? proposal.title : undefined,
+                                from_planner_task_id: taskId,
+                            },
                         },
                     },
-                },
-                policy: {
-                    dependencies: Array.isArray(proposal?.depends_on) ? proposal.depends_on.map(d => String(d)) : [],
-                    execute_after: null,
-                },
-                mission: {
-                    mission_id: missionId,
-                    step_id: null,
-                    step_index: 0,
-                    step_dependencies: [],
-                    mission_context: mission.context?.mission_context || {},
-                    is_checkpoint: false,
-                },
-                state: { status: 'PENDING' },
-                result: {},
-            });
+                    policy: {
+                        dependencies: Array.isArray(proposal?.depends_on)
+                            ? proposal.depends_on.map(d => String(d))
+                            : [],
+                        execute_after: null,
+                    },
+                    mission: {
+                        mission_id: missionId,
+                        step_id: null,
+                        step_index: 0,
+                        step_dependencies: [],
+                        mission_context: mission.context?.mission_context || {},
+                        is_checkpoint: false,
+                    },
+                    state: { status: 'PENDING' },
+                    result: {},
+                });
 
-            insertTask(taskV5, { stage, status: 'PENDING', actor: 'llm' });
-            remaining--;
-        }
+                insertTask(taskV5, { stage, status: 'PENDING', actor: 'llm' });
+                remaining--;
+            }
+        });
+
+        insertInTransaction();
     }
 }
 

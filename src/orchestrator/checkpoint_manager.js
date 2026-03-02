@@ -68,13 +68,18 @@ class CheckpointManager {
         const checkpointsDir = path.join(this.baseDir, missionId, 'checkpoints');
         await fs.mkdir(checkpointsDir, { recursive: true });
 
-        // Salva checkpoint com timestamp
+        // Salva checkpoint com timestamp (atomic: write tmp then rename)
         const checkpointPath = path.join(checkpointsDir, `${checkpointId}.json`);
-        await fs.writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2));
+        const tmpCheckpointPath = checkpointPath + '.tmp';
+        const checkpointJson = JSON.stringify(checkpoint, null, 2);
+        await fs.writeFile(tmpCheckpointPath, checkpointJson);
+        await fs.rename(tmpCheckpointPath, checkpointPath);
 
-        // Atualiza checkpoint-latest.json (para acesso rápido)
+        // Atualiza checkpoint-latest.json (atomic: write tmp then rename)
         const latestPath = path.join(checkpointsDir, 'checkpoint-latest.json');
-        await fs.writeFile(latestPath, JSON.stringify(checkpoint, null, 2));
+        const tmpLatestPath = latestPath + '.tmp';
+        await fs.writeFile(tmpLatestPath, checkpointJson);
+        await fs.rename(tmpLatestPath, latestPath);
 
         logger.info(
             `[CheckpointManager] Checkpoint saved: ${missionId} (step ${stepIndex}, checkpoint: ${checkpointId})`
@@ -107,6 +112,12 @@ class CheckpointManager {
         try {
             const data = await fs.readFile(latestPath, 'utf-8');
             const checkpoint = JSON.parse(data);
+
+            // Validate checkpoint structure integrity
+            if (!checkpoint || !checkpoint.checkpoint_id || typeof checkpoint.step_index !== 'number') {
+                logger.error(`[CheckpointManager] Corrupted checkpoint for ${missionId}: missing required fields`);
+                return null;
+            }
 
             logger.info(
                 `[CheckpointManager] Checkpoint loaded: ${missionId} (step ${checkpoint.step_index}, checkpoint: ${checkpoint.checkpoint_id})`

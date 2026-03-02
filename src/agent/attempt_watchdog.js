@@ -176,7 +176,10 @@ class AttemptWatchdog {
                       AND t.lock_expires_at_ms > @now
                       AND a.status = 'RUNNING'
                       AND a.ended_at_ms IS NULL
-                      AND (a.last_heartbeat_at_ms IS NULL OR a.last_heartbeat_at_ms <= @runningCutoff)
+                      AND (
+                          (a.last_heartbeat_at_ms IS NOT NULL AND a.last_heartbeat_at_ms <= @runningCutoff)
+                          OR (a.last_heartbeat_at_ms IS NULL AND a.created_at_ms <= @runningCutoff)
+                      )
                     ORDER BY COALESCE(a.last_heartbeat_at_ms, a.created_at_ms) ASC
                     LIMIT @limit
                 `
