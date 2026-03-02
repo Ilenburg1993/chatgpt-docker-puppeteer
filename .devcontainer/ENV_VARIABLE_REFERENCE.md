@@ -6,11 +6,10 @@
 
 ## 📋 Executive Summary
 
-Este documento cataloga as variáveis relevantes do sistema DevContainer, classificadas por camada
-de processamento e escopo de expansão.
+Este documento cataloga as variáveis relevantes do sistema DevContainer, classificadas por camada de
+processamento e escopo de expansão.
 
-> **Nota de baseline (1 de março de 2026):**
-> a precedência canônica e o contrato de `.env*` vivem em
+> **Nota de baseline (1 de março de 2026):** a precedência canônica e o contrato de `.env*` vivem em
 > [`../DOCUMENTAÇÃO/REFERENCIA/ENV_VARIABLES_GUIDE.md`](../DOCUMENTAÇÃO/REFERENCIA/ENV_VARIABLES_GUIDE.md).
 > Este arquivo é a referência especializada da camada `.devcontainer`, não substitui o guia geral de
 > ENV.
@@ -178,23 +177,23 @@ bootstrap `.env*`
 
 #### 3.4 FEATURE FLAGS ENV
 
-| ENV                               | Default | Override                                  | Taxonomy | Purpose                      |
-| --------------------------------- | ------- | ----------------------------------------- | -------- | ---------------------------- |
-| `ENABLE_STATE_FILE`               | `true`  | `${localEnv:ENABLE_STATE_FILE:true}`      | FLAGS    | Enable state tracking        |
-| `REEXECUTE_POST_CREATE`           | `false` | `${localEnv:REEXECUTE_POST_CREATE:false}` | FLAGS    | Force post-create rerun      |
-| `PUPPETEER_LOCAL_LAUNCH_DISABLED` | `true`  | -                                         | FLAGS    | Disable local browser launch |
+| ENV                               | Default | Override                                  | Taxonomy | Purpose                                       |
+| --------------------------------- | ------- | ----------------------------------------- | -------- | --------------------------------------------- |
+| `ENABLE_STATE_FILE`               | `true`  | `${localEnv:ENABLE_STATE_FILE:true}`      | FLAGS    | Enable state tracking                         |
+| `REEXECUTE_POST_CREATE`           | `false` | `${localEnv:REEXECUTE_POST_CREATE:false}` | FLAGS    | Force post-create rerun                       |
+| `PUPPETEER_LOCAL_LAUNCH_DISABLED` | `true`  | -                                         | FLAGS    | Disable local browser launch                  |
 | `FORCE_COLOR`                     | -       | -                                         | RUNTIME  | Não deve ser global; usar apenas por processo |
 
 ---
 
 ## 🔒 Variable Synchronization Matrix
 
-| Layer          | Variable                          | Flows To                         | Expansion Timing | Example |
-| -------------- | --------------------------------- | -------------------------------- | ---------------- | ------- |
-| **VS Code**    | `remoteUser: "node"`              | → `build.args.REMOTE_USER`       | Pre-build        | "node"  |
-| **Build Args** | `REMOTE_USER: "node"`             | → `ARG REMOTE_USER`              | Build-time       | "node"  |
-| **Dockerfile** | `ARG REMOTE_USER=node`            | → `ENV USER_NAME=${REMOTE_USER}` | Build-time       | "node"  |
-| **Container**  | `USER_NAME=node`                  | Runtime                          | Runtime          | "node"  |
+| Layer          | Variable               | Flows To                         | Expansion Timing | Example |
+| -------------- | ---------------------- | -------------------------------- | ---------------- | ------- |
+| **VS Code**    | `remoteUser: "node"`   | → `build.args.REMOTE_USER`       | Pre-build        | "node"  |
+| **Build Args** | `REMOTE_USER: "node"`  | → `ARG REMOTE_USER`              | Build-time       | "node"  |
+| **Dockerfile** | `ARG REMOTE_USER=node` | → `ENV USER_NAME=${REMOTE_USER}` | Build-time       | "node"  |
+| **Container**  | `USER_NAME=node`       | Runtime                          | Runtime          | "node"  |
 
 **Flow Diagram**:
 

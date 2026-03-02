@@ -213,7 +213,7 @@ class ValidationService {
         // Se nenhum validator retornou score numérico mas todos passaram individualmente,
         // considera bypass graceful (score 100). Previne bloqueio quando judge está offline.
         const allIndividuallyPassed = issues.length === 0;
-        const overall_score = scoredValidators > 0 ? totalScore / scoredValidators : (allIndividuallyPassed ? 100 : 0);
+        const overall_score = scoredValidators > 0 ? totalScore / scoredValidators : allIndividuallyPassed ? 100 : 0;
 
         // Verifica se passou baseado no score mínimo
         const min_quality_score = criteria.min_quality_score || 70;

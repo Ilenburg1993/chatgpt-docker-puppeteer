@@ -1,6 +1,7 @@
 # TECHNICAL
 
-**Propósito**: concentrar notas técnicas de trabalho, materiais de migração e análises ainda não promovidas ao baseline canônico da arquitetura.  
+**Propósito**: concentrar notas técnicas de trabalho, materiais de migração e análises ainda não
+promovidas ao baseline canônico da arquitetura.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -40,4 +41,5 @@
 
 - Hub de arquitetura: [../README.md](../README.md)
 - Arquitetura oficial: [../ARCHITECTURE.md](../ARCHITECTURE.md)
-- Histórico arquivado: [../../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md](../../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md)
+- Histórico arquivado:
+  [../../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md](../../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md)

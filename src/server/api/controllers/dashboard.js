@@ -78,8 +78,12 @@ function safeCredentialMatch(input, expected) {
     // Hash both values to normalize buffer length, preventing length-based timing side-channels.
     // timingSafeEqual requires equal-length buffers; SHA-256 digests are always 32 bytes.
     // An early-return on length mismatch would leak the expected credential's length to timing attacks.
-    const hashA = createHash('sha256').update(String(input || '')).digest();
-    const hashB = createHash('sha256').update(String(expected || '')).digest();
+    const hashA = createHash('sha256')
+        .update(String(input || ''))
+        .digest();
+    const hashB = createHash('sha256')
+        .update(String(expected || ''))
+        .digest();
     return timingSafeEqual(hashA, hashB);
 }
 

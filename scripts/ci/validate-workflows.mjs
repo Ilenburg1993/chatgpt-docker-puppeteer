@@ -109,9 +109,7 @@ for (const file of files) {
 
             if (typeof step.uses === 'string' && uploadArtifactPattern.test(step.uses)) {
                 if (!step.with || typeof step.with !== 'object') {
-                    throw new Error(
-                        `[ci] Upload artifact step missing 'with' block in ${file} job '${jobName}'`
-                    );
+                    throw new Error(`[ci] Upload artifact step missing 'with' block in ${file} job '${jobName}'`);
                 }
                 if (typeof step.with['retention-days'] !== 'number') {
                     throw new Error(
@@ -174,9 +172,7 @@ for (const [index, update] of dependabotParsed.updates.entries()) {
         throw new Error(`[ci] updates[${index}] must declare at least one label in .github/dependabot.yml`);
     }
     if (typeof update['open-pull-requests-limit'] !== 'number') {
-        throw new Error(
-            `[ci] updates[${index}] missing numeric 'open-pull-requests-limit' in .github/dependabot.yml`
-        );
+        throw new Error(`[ci] updates[${index}] missing numeric 'open-pull-requests-limit' in .github/dependabot.yml`);
     }
     if (!update['pull-request-branch-name'] || !update['pull-request-branch-name'].separator) {
         throw new Error(

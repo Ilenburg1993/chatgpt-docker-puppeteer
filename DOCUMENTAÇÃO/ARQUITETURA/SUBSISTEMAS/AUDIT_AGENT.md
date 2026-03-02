@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento do serviço auxiliar `src/audit_agent/`.  
-**Quando consultar**: ao alterar jobs de auditoria, triagem LLM, patch authoring, persistência ou a API HTTP do agente de auditoria.  
+**Quando consultar**: ao alterar jobs de auditoria, triagem LLM, patch authoring, persistência ou a
+API HTTP do agente de auditoria.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # AUDIT AGENT

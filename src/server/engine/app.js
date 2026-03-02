@@ -428,7 +428,7 @@ app.use((err, req, res, next) => {
     log('ERROR', `[APP] Unhandled error: ${err?.message || String(err)}${err?.stack ? `\n${err.stack}` : ''}`);
 
     res.status(status).json({
-        error: status >= 500 ? 'Internal server error' : (err.message || 'Request failed'),
+        error: status >= 500 ? 'Internal server error' : err.message || 'Request failed',
         request_id: req.id || null,
     });
 });

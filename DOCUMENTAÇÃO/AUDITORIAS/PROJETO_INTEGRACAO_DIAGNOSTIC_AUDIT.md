@@ -61,10 +61,10 @@ O sistema possui atualmente dois agentes separados:
 
 ### 2.1 Documentos Principais
 
-| Documento                  | Caminho                                                                                                    | Descrição                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| **Arquitetura do Sistema** | [`DOCUMENTAÇÃO/ARQUITETURA_SISTEMA_COMPLETO.md`](ARQUITETURA_SISTEMA_COMPLETO.md)                          | Visão completa da arquitetura    |
-| **Plano de Migração**      | [`DOCUMENTAÇÃO/PLANO_MIGRACAO_DIAGNOSTIC_PARA_AUDIT.md`](PLANO_MIGRACAO_DIAGNOSTIC_PARA_AUDIT.md)          | Detalhamento técnico da migração |
+| Documento                  | Caminho                                                                                                                          | Descrição                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| **Arquitetura do Sistema** | [`DOCUMENTAÇÃO/ARQUITETURA_SISTEMA_COMPLETO.md`](ARQUITETURA_SISTEMA_COMPLETO.md)                                                | Visão completa da arquitetura    |
+| **Plano de Migração**      | [`DOCUMENTAÇÃO/PLANO_MIGRACAO_DIAGNOSTIC_PARA_AUDIT.md`](PLANO_MIGRACAO_DIAGNOSTIC_PARA_AUDIT.md)                                | Detalhamento técnico da migração |
 | **Audit Tracker**          | [`DOCUMENTAÇÃO/AUDITORIAS/BUGS/CODEX_AUDIT_TRACKER.md`](DOCUMENTAÇÃO/AUDITORIAS/BUGS/CODEX_AUDIT_TRACKER.md)                     | Estado atual do Audit Agent      |
 | **Master Plan Audit**      | [`DOCUMENTAÇÃO/AUDITORIAS/BUGS/CODEX_AUDIT_AGENT_MASTER_PLAN.md`](DOCUMENTAÇÃO/AUDITORIAS/BUGS/CODEX_AUDIT_AGENT_MASTER_PLAN.md) | Roadmap do Audit Agent           |
 

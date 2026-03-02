@@ -1,23 +1,22 @@
 # Análise Arquitetural Profunda — Versão 1.0
 
-> **Data**: 2 de março de 2026
-> **Escopo**: Análise completa do codebase `chatgpt-docker-puppeteer`
+> **Data**: 2 de março de 2026 **Escopo**: Análise completa do codebase `chatgpt-docker-puppeteer`
 > **Metodologia**: Inspeção estática de 287 arquivos JS/MJS (87.512 LOC)
 
 ---
 
 ## 1. Visão Geral
 
-| Métrica               | Valor                                              |
-| --------------------- | -------------------------------------------------- |
-| **Arquivos JS**       | 287 (.js) + 15 (.mjs) = 302 totais                |
-| **Linhas de Código**  | ~87.500 LOC (src/ apenas)                          |
-| **Módulos**           | 20 domínios sob `src/`                             |
-| **Testes**            | 800 specs (798 passing, 2 falhas pré-existentes)   |
-| **Runtime**           | Node.js 24+ (ESM obrigatório)                      |
-| **Validação**         | Zod 4.x para schemas, Pino para logging            |
-| **Browser**           | Puppeteer 24+ (conexão a Chrome externo via DevTools)|
-| **Dependências**      | 33 prod + 27 dev                                   |
+| Métrica              | Valor                                                 |
+| -------------------- | ----------------------------------------------------- |
+| **Arquivos JS**      | 287 (.js) + 15 (.mjs) = 302 totais                    |
+| **Linhas de Código** | ~87.500 LOC (src/ apenas)                             |
+| **Módulos**          | 20 domínios sob `src/`                                |
+| **Testes**           | 800 specs (798 passing, 2 falhas pré-existentes)      |
+| **Runtime**          | Node.js 24+ (ESM obrigatório)                         |
+| **Validação**        | Zod 4.x para schemas, Pino para logging               |
+| **Browser**          | Puppeteer 24+ (conexão a Chrome externo via DevTools) |
+| **Dependências**     | 33 prod + 27 dev                                      |
 
 ## 2. Mapa de Módulos
 
@@ -59,14 +58,14 @@ graph TD
     style G fill:#00cc00
 ```
 
-| Fase | Responsabilidade                                    | Falha = |
-| ---- | --------------------------------------------------- | ------- |
-| 0    | `.env.local`, validação de variáveis, defaults      | Exit    |
-| 1    | `CONFIG.reload()`, `identityManager.initialize()`   | Exit    |
-| 2    | NERV event bus (local + Socket.io híbrido)          | Exit    |
-| 3    | Chrome DevTools (porta 9224, 3 instâncias)          | Retry×10|
-| 4    | Execution engine, policy system, kernel loop 20Hz   | Exit    |
-| 5    | Driver↔NERV bridge, Server↔NERV bridge, HTTP:3008  | Exit    |
+| Fase | Responsabilidade                                  | Falha =  |
+| ---- | ------------------------------------------------- | -------- |
+| 0    | `.env.local`, validação de variáveis, defaults    | Exit     |
+| 1    | `CONFIG.reload()`, `identityManager.initialize()` | Exit     |
+| 2    | NERV event bus (local + Socket.io híbrido)        | Exit     |
+| 3    | Chrome DevTools (porta 9224, 3 instâncias)        | Retry×10 |
+| 4    | Execution engine, policy system, kernel loop 20Hz | Exit     |
+| 5    | Driver↔NERV bridge, Server↔NERV bridge, HTTP:3008 | Exit     |
 
 ### Shutdown Sequence
 
@@ -105,11 +104,11 @@ SIGTERM/SIGINT → triggerShutdown()
 
 ### Fluxo de Mensagens
 
-| Padrão             | Exemplo                                           |
-| ------------------ | ------------------------------------------------- |
-| **emit → onEvent** | `Driver → NERV → Kernel` (task completed)         |
-| **emitCommand**    | `Server → NERV → Kernel` (suspend task)           |
-| **emitAck**        | `Kernel → NERV → Requestor` (command acknowledged)|
+| Padrão             | Exemplo                                            |
+| ------------------ | -------------------------------------------------- |
+| **emit → onEvent** | `Driver → NERV → Kernel` (task completed)          |
+| **emitCommand**    | `Server → NERV → Kernel` (suspend task)            |
+| **emitAck**        | `Kernel → NERV → Requestor` (command acknowledged) |
 
 ### Tipos de Envelope
 
@@ -124,16 +123,16 @@ SIGTERM/SIGINT → triggerShutdown()
 
 ## 5. Kernel — Motor de Decisão
 
-| Componente             | Responsabilidade                              |
-| ---------------------- | --------------------------------------------- |
-| `kernel.js`            | Factory SSOT-first com gateway mode           |
-| `kernel_loop.js`       | Loop 20Hz (50ms ticks), state machine         |
-| `execution_engine.js`  | Execução de tasks, retry logic                |
-| `policy_engine.js`     | Rate limits, resource caps                    |
-| `task_runtime.js`      | Estados: ACTIVE, SUSPENDED, COMPLETED, ERROR  |
-| `observation_store.js` | Log de observações para histórico             |
-| `kernel_telemetry.js`  | Métricas de performance                       |
-| `kernel_nerv_bridge.js`| Adaptador NERV, recebe comandos               |
+| Componente              | Responsabilidade                             |
+| ----------------------- | -------------------------------------------- |
+| `kernel.js`             | Factory SSOT-first com gateway mode          |
+| `kernel_loop.js`        | Loop 20Hz (50ms ticks), state machine        |
+| `execution_engine.js`   | Execução de tasks, retry logic               |
+| `policy_engine.js`      | Rate limits, resource caps                   |
+| `task_runtime.js`       | Estados: ACTIVE, SUSPENDED, COMPLETED, ERROR |
+| `observation_store.js`  | Log de observações para histórico            |
+| `kernel_telemetry.js`   | Métricas de performance                      |
+| `kernel_nerv_bridge.js` | Adaptador NERV, recebe comandos              |
 
 ### Modelo de Execução
 
@@ -160,6 +159,7 @@ Driver/
 ```
 
 **Padrões-chave**:
+
 - Módulos como serviços (cada módulo é independente)
 - Recovery com exponential backoff
 - Comportamento humano (ghost-cursor)
@@ -169,25 +169,25 @@ Driver/
 
 ### Database (SQLite via better-sqlite3)
 
-| Repositório          | Tabela(s)                        |
-| -------------------- | -------------------------------- |
-| `task_repo`          | tasks                            |
-| `mission_repo`       | missions                         |
-| `mission_step_repo`  | mission_steps                    |
-| `artifact_repo`      | artifacts                        |
-| `event_repo`         | events                           |
-| `audit_job_repo`     | audit_jobs                       |
-| `inference_model_repo`| inference_models                |
+| Repositório            | Tabela(s)        |
+| ---------------------- | ---------------- |
+| `task_repo`            | tasks            |
+| `mission_repo`         | missions         |
+| `mission_step_repo`    | mission_steps    |
+| `artifact_repo`        | artifacts        |
+| `event_repo`           | events           |
+| `audit_job_repo`       | audit_jobs       |
+| `inference_model_repo` | inference_models |
 
 ### Browser Pool
 
-| Componente             | Papel                               |
-| ---------------------- | ----------------------------------- |
-| `pool_manager`         | Pool de conexões Chrome (3 instâncias)|
-| `circuit_breaker`      | Detecção de falhas                  |
-| `PageValidator`        | Health checks de página             |
-| `PeriodicHealthMonitor`| Probes periódicos                   |
-| `puppeteer_guard`      | Impede `puppeteer.launch()`         |
+| Componente              | Papel                                  |
+| ----------------------- | -------------------------------------- |
+| `pool_manager`          | Pool de conexões Chrome (3 instâncias) |
+| `circuit_breaker`       | Detecção de falhas                     |
+| `PageValidator`         | Health checks de página                |
+| `PeriodicHealthMonitor` | Probes periódicos                      |
+| `puppeteer_guard`       | Impede `puppeteer.launch()`            |
 
 ### Queue & Locks
 
@@ -226,40 +226,40 @@ Server/
 
 ### Controllers (14 endpoints)
 
-| Controller         | Rota base      | Autenticação |
-| ------------------ | -------------- | ------------ |
-| `tasks`            | /api/tasks     | JWT          |
-| `missions`         | /api/missions  | JWT          |
-| `control`          | /api/control   | JWT          |
-| `health`           | /api/health    | Público      |
-| `dna`              | /api/dna       | JWT          |
-| `dashboard_*`      | /api/dashboard | JWT          |
-| `audit`            | /api/audit     | JWT          |
-| `metrics`          | /api/metrics   | JWT          |
+| Controller    | Rota base      | Autenticação |
+| ------------- | -------------- | ------------ |
+| `tasks`       | /api/tasks     | JWT          |
+| `missions`    | /api/missions  | JWT          |
+| `control`     | /api/control   | JWT          |
+| `health`      | /api/health    | Público      |
+| `dna`         | /api/dna       | JWT          |
+| `dashboard_*` | /api/dashboard | JWT          |
+| `audit`       | /api/audit     | JWT          |
+| `metrics`     | /api/metrics   | JWT          |
 
 ## 9. Agent Workers
 
-| Worker                        | Tick (ms) | Papel                            |
-| ----------------------------- | --------- | -------------------------------- |
-| `queue_worker`                | 250       | Polling de fila de tasks         |
-| `task_control_watcher`        | 500       | Monitoramento de sinais          |
-| `mission_runner`              | 1000      | Execução de missões              |
-| `task_orchestration_worker`   | 1250      | Orquestração de tasks            |
-| `attempt_watchdog`            | 1500      | Timeout de tentativas            |
-| `mission_planner_processor`   | 1500      | Planejamento de missões          |
-| `heartbeat_watchdog`          | —         | Heartbeat do processo            |
+| Worker                      | Tick (ms) | Papel                    |
+| --------------------------- | --------- | ------------------------ |
+| `queue_worker`              | 250       | Polling de fila de tasks |
+| `task_control_watcher`      | 500       | Monitoramento de sinais  |
+| `mission_runner`            | 1000      | Execução de missões      |
+| `task_orchestration_worker` | 1250      | Orquestração de tasks    |
+| `attempt_watchdog`          | 1500      | Timeout de tentativas    |
+| `mission_planner_processor` | 1500      | Planejamento de missões  |
+| `heartbeat_watchdog`        | —         | Heartbeat do processo    |
 
 Coordenação via `AgentLoop` com intervals independentes. Cada worker é async-safe.
 
 ## 10. Integrations
 
-| Integração         | Arquivos | Protocolo    |
-| ------------------ | -------- | ------------ |
-| **MCP**            | 4 (.mjs) | stdio/HTTP   |
-| **LSP**            | 2 (.mjs) | tsserver     |
-| **RAG**            | 2 (.mjs) | LanceDB      |
-| **Ollama**         | 3 (.mjs) | HTTP/REST    |
-| **Error Classifier**| 1 (.mjs)| Internal     |
+| Integração           | Arquivos | Protocolo  |
+| -------------------- | -------- | ---------- |
+| **MCP**              | 4 (.mjs) | stdio/HTTP |
+| **LSP**              | 2 (.mjs) | tsserver   |
+| **RAG**              | 2 (.mjs) | LanceDB    |
+| **Ollama**           | 3 (.mjs) | HTTP/REST  |
+| **Error Classifier** | 1 (.mjs) | Internal   |
 
 ## 11. Aliases de Import
 
@@ -282,11 +282,11 @@ Coordenação via `AgentLoop` com intervals independentes. Cada worker é async-
 
 ## 12. Modos de Deploy
 
-| Modo            | Descrição                                    |
-| --------------- | -------------------------------------------- |
-| **Integrado**   | Processo único, HTTP embutido (padrão Docker)|
-| **Split**       | Maestro + HTTP server separados (PM2)        |
-| **Delegated**   | Multi-instância com autoridade delegada      |
+| Modo          | Descrição                                     |
+| ------------- | --------------------------------------------- |
+| **Integrado** | Processo único, HTTP embutido (padrão Docker) |
+| **Split**     | Maestro + HTTP server separados (PM2)         |
+| **Delegated** | Multi-instância com autoridade delegada       |
 
 ---
 
@@ -295,29 +295,33 @@ Coordenação via `AgentLoop` com intervals independentes. Cada worker é async-
 ### 13.1 Problemas Críticos (P0)
 
 #### P0-1: JSON.parse Error Swallowing
+
 **Localização**: `src/infra/db/task_repo.js` (linhas 129-143)
 
 ```javascript
 // blocked_details_json — erro silenciado
 try {
-    task.state.blocked_details = JSON.parse(row.blocked_details_json);
+  task.state.blocked_details = JSON.parse(row.blocked_details_json);
 } catch (_) {
-    task.state.blocked_details = row.blocked_details_json; // fallback silencioso
+  task.state.blocked_details = row.blocked_details_json; // fallback silencioso
 }
 
 // result_json — mesmo padrão
 try {
-    task.result_db = JSON.parse(row.result_json);
+  task.result_db = JSON.parse(row.result_json);
 } catch (_) {
-    task.result_db = row.result_json; // fallback silencioso
+  task.result_db = row.result_json; // fallback silencioso
 }
 ```
 
-**Impacto**: Corrupção de dados passa despercebida. Tasks com JSON inválido continuam operando com strings raw, causando erros downstream difíceis de diagnosticar.
+**Impacto**: Corrupção de dados passa despercebida. Tasks com JSON inválido continuam operando com
+strings raw, causando erros downstream difíceis de diagnosticar.
 
-**Ocorrências similares**: `dashboard_tasks.js`, `dashboard_missions.js` (padrão de fallback em payloads JSON).
+**Ocorrências similares**: `dashboard_tasks.js`, `dashboard_missions.js` (padrão de fallback em
+payloads JSON).
 
 #### P0-2: NERV Shutdown Incompleto
+
 **Localização**: `src/nerv/nerv.js` (linhas 177-187)
 
 ```javascript
@@ -329,48 +333,60 @@ async shutdown() {
 }
 ```
 
-**Impacto**: Subsistemas internos (health listeners, buffers pendentes, telemetria) não são limpos no shutdown, podendo causar resource leaks em processos de longa duração.
+**Impacto**: Subsistemas internos (health listeners, buffers pendentes, telemetria) não são limpos
+no shutdown, podendo causar resource leaks em processos de longa duração.
 
 ### 13.2 Problemas Altos (P1)
 
 #### P1-1: Main.js Tight Coupling
+
 **Localização**: `src/main.js` (linhas 41-57)
 
-17 imports diretos criam acoplamento forte entre o bootstrap e todos os subsistemas. O main.js funciona como "God Object" com ~1200+ LOC no boot sequence.
+17 imports diretos criam acoplamento forte entre o bootstrap e todos os subsistemas. O main.js
+funciona como "God Object" com ~1200+ LOC no boot sequence.
 
 **Mitigação proposta**: Extrair `BootstrapFactory` ou `BootPhaseRunner`.
 
 #### P1-2: Módulo `src/state/` Morto
+
 **Localização**: `src/state/` — contém apenas `README.md`
 
-Módulo vazio referenciado na documentação mas sem implementação. Confunde desenvolvedores e polui a árvore de diretórios.
+Módulo vazio referenciado na documentação mas sem implementação. Confunde desenvolvedores e polui a
+árvore de diretórios.
 
 #### P1-3: Inconsistência .js/.mjs
+
 **Localização**: `src/integration/` — 15 arquivos .mjs vs resto do projeto em .js
 
-O projeto inteiro é ESM (`"type": "module"`), tornando a extensão .mjs redundante. Cria inconsistência e confusão nos aliases de import.
+O projeto inteiro é ESM (`"type": "module"`), tornando a extensão .mjs redundante. Cria
+inconsistência e confusão nos aliases de import.
 
 ### 13.3 Problemas Médios (P2)
 
 #### P2-1: Health Listeners Sem Limite
+
 **Localização**: `src/nerv/health/health.js` (linha 89)
 
 ```javascript
 const listeners = new Set();
 ```
 
-Listeners são adicionados via `onChange()` que retorna unsubscribe, mas não há limite máximo de listeners nem logging quando o Set cresce excessivamente.
+Listeners são adicionados via `onChange()` que retorna unsubscribe, mas não há limite máximo de
+listeners nem logging quando o Set cresce excessivamente.
 
 #### P2-2: Hardcoded Socket URL
+
 **Localização**: `src/nerv/nerv.js` (linha 35)
 
 ```javascript
 url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3008',
 ```
 
-O fallback `http://localhost:3008` é razoável para dev, mas pode causar conexões espúrias em produção se a env var não for definida.
+O fallback `http://localhost:3008` é razoável para dev, mas pode causar conexões espúrias em
+produção se a env var não for definida.
 
-#### P2-3: Dashboard Tasks Controller — _parseJson sem Logging
+#### P2-3: Dashboard Tasks Controller — \_parseJson sem Logging
+
 **Localização**: `src/server/api/controllers/dashboard_tasks.js`
 
 Função `_parseJson()` faz fallback silencioso sem logging, similar ao task_repo.
@@ -379,41 +395,41 @@ Função `_parseJson()` faz fallback silencioso sem logging, similar ao task_rep
 
 ### Módulos com Cobertura
 
-| Módulo           | Arquivos de Teste | Status    |
-| ---------------- | ----------------- | --------- |
-| core/            | 6 specs           | ✅ Coberto |
-| driver/          | 3 specs           | ✅ Coberto |
-| nerv/            | 3 specs           | ✅ Coberto |
-| server/          | 11+ specs         | ✅ Coberto |
-| kernel/          | 6 specs           | ✅ Coberto |
-| orchestrator/    | 3 specs           | ✅ Coberto |
-| agent/           | 3 specs           | ✅ Coberto |
-| audit_agent/     | 7 specs           | ✅ Coberto |
-| inference_gateway/| 6 specs          | ✅ Coberto |
-| infra/ (parcial) | 2 specs           | ⚠️ Parcial |
-| shared/ (parcial)| 2 specs           | ⚠️ Parcial |
-| integration/     | 2 specs           | ⚠️ Mínimo  |
+| Módulo             | Arquivos de Teste | Status     |
+| ------------------ | ----------------- | ---------- |
+| core/              | 6 specs           | ✅ Coberto |
+| driver/            | 3 specs           | ✅ Coberto |
+| nerv/              | 3 specs           | ✅ Coberto |
+| server/            | 11+ specs         | ✅ Coberto |
+| kernel/            | 6 specs           | ✅ Coberto |
+| orchestrator/      | 3 specs           | ✅ Coberto |
+| agent/             | 3 specs           | ✅ Coberto |
+| audit_agent/       | 7 specs           | ✅ Coberto |
+| inference_gateway/ | 6 specs           | ✅ Coberto |
+| infra/ (parcial)   | 2 specs           | ⚠️ Parcial |
+| shared/ (parcial)  | 2 specs           | ⚠️ Parcial |
+| integration/       | 2 specs           | ⚠️ Mínimo  |
 
 ### Módulos SEM Testes
 
-| Módulo      | Criticidade | Risco     |
-| ----------- | ----------- | --------- |
-| logic/      | Alta        | 🔴 Alto   |
-| validation/ | Alta        | 🔴 Alto   |
-| missions/   | Média       | 🟡 Médio  |
-| infra/db/   | Crítica     | 🔴 Crítico|
-| infra/proxy/| Média       | 🟡 Médio  |
+| Módulo       | Criticidade | Risco      |
+| ------------ | ----------- | ---------- |
+| logic/       | Alta        | 🔴 Alto    |
+| validation/  | Alta        | 🔴 Alto    |
+| missions/    | Média       | 🟡 Médio   |
+| infra/db/    | Crítica     | 🔴 Crítico |
+| infra/proxy/ | Média       | 🟡 Médio   |
 
 ## 15. Métricas de Qualidade
 
-| Métrica                    | Valor    | Meta     | Status |
-| -------------------------- | -------- | -------- | ------ |
-| Lint (ESLint)              | 0 erros  | 0 erros  | ✅     |
-| Testes passando            | 798/800  | 100%     | ⚠️     |
-| Módulos com testes         | 11/20    | 20/20    | ⚠️     |
-| JSDoc coverage             | ~80%     | 100%     | ⚠️     |
-| Circular deps              | ~0       | 0        | ✅     |
-| Dead modules               | 1        | 0        | ⚠️     |
+| Métrica            | Valor   | Meta    | Status |
+| ------------------ | ------- | ------- | ------ |
+| Lint (ESLint)      | 0 erros | 0 erros | ✅     |
+| Testes passando    | 798/800 | 100%    | ⚠️     |
+| Módulos com testes | 11/20   | 20/20   | ⚠️     |
+| JSDoc coverage     | ~80%    | 100%    | ⚠️     |
+| Circular deps      | ~0      | 0       | ✅     |
+| Dead modules       | 1       | 0       | ⚠️     |
 
 ## 16. Pontos Fortes da Arquitetura V1
 
@@ -439,4 +455,4 @@ Função `_parseJson()` faz fallback silencioso sem logging, similar ao task_rep
 
 ---
 
-*Documento gerado por análise automatizada do codebase. Atualizado em 2 de março de 2026.*
+_Documento gerado por análise automatizada do codebase. Atualizado em 2 de março de 2026._

@@ -267,8 +267,8 @@ class OrchestratorEngine {
         const lockAcquired = await this._acquireWorkflowLock(workflow_id);
         if (!lockAcquired) {
             logger.error(`[OrchestratorEngine] Failed to acquire workflow lock for ${workflow_id}`);
-            task._lockFailed = true;
-            return task;
+            // Return new object with lock failure flag instead of mutating frozen object
+            return { ...task, _lockFailed: true };
         }
 
         try {

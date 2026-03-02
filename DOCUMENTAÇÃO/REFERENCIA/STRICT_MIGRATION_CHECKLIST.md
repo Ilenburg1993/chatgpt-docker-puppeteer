@@ -1,8 +1,8 @@
 # Migração incremental para `strict` 🛡️
 
 Este documento descreve o processo incremental de expansão do `strict` no projeto e os passos
-subsequentes para garantir que a base permaneça tipo-segura. O baseline atual continua em
-JavaScript com `checkJs`, enquanto a trilha de endurecimento progressivo passa a viver em
+subsequentes para garantir que a base permaneça tipo-segura. O baseline atual continua em JavaScript
+com `checkJs`, enquanto a trilha de endurecimento progressivo passa a viver em
 `tsconfig.strict.json`. Use as caixas de seleção para acompanhar o progresso.
 
 > **Observação**: este é um fluxograma incremental. Não precisa concluir tudo de uma só vez. O

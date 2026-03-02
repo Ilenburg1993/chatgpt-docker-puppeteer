@@ -68,8 +68,8 @@ atualizar o Dockerfile, **atualize também as variáveis `env:` do workflow**.
 
 ## Estrutura dos steps (v3.0)
 
-| #   | Step                                 | Crítico?  | Tempo (cold) | Tempo (warm) |
-| --- | ------------------------------------ | --------- | ------------ | ------------ |
+| #   | Step                                 | Crítico?   | Tempo (cold) | Tempo (warm) |
+| --- | ------------------------------------ | ---------- | ------------ | ------------ |
 | 0   | Checkout (`fetch-depth:0`)           | ✅ Sim     | ~5s          | ~5s          |
 | 1   | Setup Node.js 24 + npm cache         | ✅ Sim     | ~10s         | ~3s          |
 | –   | Verify Node.js runtime               | ✅ Sim     | ~1s          | ~1s          |
@@ -310,14 +310,14 @@ Ao atualizar o `.devcontainer/Dockerfile` com novas versões de ferramentas:
 
 ### v3.1 (2026-03-02) — Correção de bugs críticos
 
-| Bug | Descrição | Correção |
-|-----|-----------|----------|
-| `actions/checkout@v4` | Versão desatualizada inconsistente com os demais workflows | Atualizado para `@v6` |
-| `actions/setup-node@v4` | Versão desatualizada | Atualizado para `@v6` |
-| `actions/cache@v5` | Tag `@v5` não existe — causa falha silenciosa | Corrigido para `@v4` |
-| `NPM_GLOBAL_PREFIX` em `env:` | Variável `$HOME` não expande em blocos YAML `env:` | Movido para step shell via `$GITHUB_ENV` |
-| Nomes de steps com `${VAR}` | `${{ env.VAR }}` não expande em campo `name:` do YAML | Nomes limpos, sem interpolação |
-| `snapshot: true` | Causa falso positivo no actionlint | Comentado com explicação inline |
+| Bug                           | Descrição                                                  | Correção                                 |
+| ----------------------------- | ---------------------------------------------------------- | ---------------------------------------- |
+| `actions/checkout@v4`         | Versão desatualizada inconsistente com os demais workflows | Atualizado para `@v6`                    |
+| `actions/setup-node@v4`       | Versão desatualizada                                       | Atualizado para `@v6`                    |
+| `actions/cache@v5`            | Tag `@v5` não existe — causa falha silenciosa              | Corrigido para `@v4`                     |
+| `NPM_GLOBAL_PREFIX` em `env:` | Variável `$HOME` não expande em blocos YAML `env:`         | Movido para step shell via `$GITHUB_ENV` |
+| Nomes de steps com `${VAR}`   | `${{ env.VAR }}` não expande em campo `name:` do YAML      | Nomes limpos, sem interpolação           |
+| `snapshot: true`              | Causa falso positivo no actionlint                         | Comentado com explicação inline          |
 
 ### v3.0 (2026-03-01) — Release inicial
 

@@ -1,11 +1,13 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento do subsistema `src/orchestrator/`.  
-**Quando consultar**: ao alterar estratégias `SINGLE_SHOT`/`ITERATIVE`/`MULTI_STEP`, contexto de missão, checkpoints, memória adaptativa ou validação pós-execução.  
+**Quando consultar**: ao alterar estratégias `SINGLE_SHOT`/`ITERATIVE`/`MULTI_STEP`, contexto de
+missão, checkpoints, memória adaptativa ou validação pós-execução.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # ORCHESTRATOR
 
-**Propósito**: documentar `src/orchestrator/` como a camada de estratégia e coordenação de execução acima do kernel.  
+**Propósito**: documentar `src/orchestrator/` como a camada de estratégia e coordenação de execução
+acima do kernel.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

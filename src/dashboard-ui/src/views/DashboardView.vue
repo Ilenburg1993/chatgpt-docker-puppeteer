@@ -118,15 +118,9 @@ onUnmounted(() => {
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <div class="text-xs font-mono text-slate-500">
-                    uptime {{ uptimeFormatted }}
-                </div>
-                <Button variant="secondary" size="sm" @click="refresh" :disabled="loading">
-                    Atualizar
-                </Button>
-                <Button variant="primary" size="sm" @click="router.push('/tasks')">
-                    Ir para tarefas
-                </Button>
+                <div class="text-xs font-mono text-slate-500">uptime {{ uptimeFormatted }}</div>
+                <Button variant="secondary" size="sm" @click="refresh" :disabled="loading"> Atualizar </Button>
+                <Button variant="primary" size="sm" @click="router.push('/tasks')"> Ir para tarefas </Button>
             </div>
         </div>
 
@@ -200,8 +194,10 @@ onUnmounted(() => {
                     </div>
                     <div class="text-xs text-slate-500 mt-0.5">refreshes: {{ refreshCount }}</div>
                 </div>
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center"
-                     :class="isConnected ? 'bg-emerald-500/10' : 'bg-red-500/10'">
+                <div
+                    class="w-10 h-10 rounded-lg flex items-center justify-center"
+                    :class="isConnected ? 'bg-emerald-500/10' : 'bg-red-500/10'"
+                >
                     <span :class="isConnected ? 'text-emerald-400' : 'text-red-400'" class="text-lg">🔗</span>
                 </div>
             </div>
@@ -213,7 +209,9 @@ onUnmounted(() => {
             <div class="surface-card overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-800/50 flex items-center justify-between">
                     <div class="text-sm font-semibold text-slate-200">Tarefas recentes</div>
-                    <Button variant="ghost" size="sm" @click="router.push('/tasks')" class="text-xs">Ver todas →</Button>
+                    <Button variant="ghost" size="sm" @click="router.push('/tasks')" class="text-xs"
+                        >Ver todas →</Button
+                    >
                 </div>
                 <div class="p-3">
                     <div v-if="tasks.items.length === 0" class="text-sm text-slate-500 py-4 text-center">
@@ -229,11 +227,15 @@ onUnmounted(() => {
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0 flex-1">
                                     <div class="text-xs font-mono text-slate-300 truncate">{{ t.id }}</div>
-                                    <div class="text-xs text-slate-500 truncate mt-0.5">{{ t.spec_user_message_preview || '—' }}</div>
+                                    <div class="text-xs text-slate-500 truncate mt-0.5">
+                                        {{ t.spec_user_message_preview || '—' }}
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-1.5 flex-shrink-0">
                                     <Badge size="sm">{{ t.stage }}</Badge>
-                                    <Badge size="sm" :variant="statusVariant(t.unified_status)">{{ t.unified_status }}</Badge>
+                                    <Badge size="sm" :variant="statusVariant(t.unified_status)">{{
+                                        t.unified_status
+                                    }}</Badge>
                                 </div>
                             </div>
                         </div>
@@ -245,7 +247,9 @@ onUnmounted(() => {
             <div class="surface-card overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-800/50 flex items-center justify-between">
                     <div class="text-sm font-semibold text-slate-200">Missões</div>
-                    <Button variant="ghost" size="sm" @click="router.push('/missions')" class="text-xs">Ver todas →</Button>
+                    <Button variant="ghost" size="sm" @click="router.push('/missions')" class="text-xs"
+                        >Ver todas →</Button
+                    >
                 </div>
                 <div class="p-3">
                     <div v-if="missions.items.length === 0" class="text-sm text-slate-500 py-4 text-center">
@@ -260,14 +264,22 @@ onUnmounted(() => {
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0 flex-1">
-                                    <div class="text-sm font-semibold text-slate-200 truncate">{{ m.title || '(sem título)' }}</div>
+                                    <div class="text-sm font-semibold text-slate-200 truncate">
+                                        {{ m.title || '(sem título)' }}
+                                    </div>
                                     <div class="text-xs text-slate-500 truncate font-mono">{{ m.id }}</div>
                                 </div>
                                 <div class="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                                     <Badge size="sm" :variant="statusVariant(m.status)">{{ m.status }}</Badge>
-                                    <Badge v-if="m.counts?.running > 0" size="sm" variant="info">{{ m.counts.running }} run</Badge>
-                                    <Badge v-if="m.counts?.done > 0" size="sm" variant="success">{{ m.counts.done }} done</Badge>
-                                    <Badge v-if="m.counts?.failed > 0" size="sm" variant="error">{{ m.counts.failed }} fail</Badge>
+                                    <Badge v-if="m.counts?.running > 0" size="sm" variant="info"
+                                        >{{ m.counts.running }} run</Badge
+                                    >
+                                    <Badge v-if="m.counts?.done > 0" size="sm" variant="success"
+                                        >{{ m.counts.done }} done</Badge
+                                    >
+                                    <Badge v-if="m.counts?.failed > 0" size="sm" variant="error"
+                                        >{{ m.counts.failed }} fail</Badge
+                                    >
                                 </div>
                             </div>
                         </div>

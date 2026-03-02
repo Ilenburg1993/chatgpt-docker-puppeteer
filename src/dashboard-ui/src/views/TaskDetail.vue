@@ -348,26 +348,36 @@ watch(taskId, () => void fetchDetail());
                         <span class="text-amber-400 font-semibold text-sm">⚠ Task bloqueada</span>
                         <Badge size="sm" variant="warning">{{ task.blocked_reason }}</Badge>
                     </div>
-                    <div v-if="formattedBlockedDetails" class="text-xs text-amber-300/80 font-mono whitespace-pre-wrap break-all">
+                    <div
+                        v-if="formattedBlockedDetails"
+                        class="text-xs text-amber-300/80 font-mono whitespace-pre-wrap break-all"
+                    >
                         {{ formattedBlockedDetails }}
                     </div>
                     <div class="text-xs text-slate-400">
-                        Use <strong>Desbloquear</strong> para retomar, ou <strong>Reexecutar</strong> para nova tentativa.
+                        Use <strong>Desbloquear</strong> para retomar, ou <strong>Reexecutar</strong> para nova
+                        tentativa.
                     </div>
                 </div>
 
                 <!-- last_error: only show when task is failed/blocked and has an error message -->
                 <div
-                    v-if="task.last_error && ['FAILED','BLOCKED','CANCELLED'].includes(task.unified_status)"
+                    v-if="task.last_error && ['FAILED', 'BLOCKED', 'CANCELLED'].includes(task.unified_status)"
                     class="mt-3 p-3 rounded-lg border border-red-500/30 bg-red-950/20"
                 >
                     <div class="text-xs text-red-400 font-semibold mb-1">Último erro</div>
-                    <div class="text-xs text-red-300 font-mono whitespace-pre-wrap break-all">{{ task.last_error }}</div>
+                    <div class="text-xs text-red-300 font-mono whitespace-pre-wrap break-all">
+                        {{ task.last_error }}
+                    </div>
                 </div>
 
                 <!-- LLM response preview: show link to latest attempt response when task is DONE -->
                 <div
-                    v-if="task.unified_status === 'DONE' && attempts.length > 0 && (attempts[0].response_text_artifact_id || attempts[0].response_v2_json_artifact_id)"
+                    v-if="
+                        task.unified_status === 'DONE' &&
+                        attempts.length > 0 &&
+                        (attempts[0].response_text_artifact_id || attempts[0].response_v2_json_artifact_id)
+                    "
                     class="mt-3 p-3 rounded-lg border border-emerald-500/30 bg-emerald-950/20"
                 >
                     <div class="flex items-center justify-between">
@@ -379,25 +389,34 @@ watch(taskId, () => void fetchDetail());
                                 size="sm"
                                 class="h-6 px-2 text-xs"
                                 @click="router.push(`/artifacts/${attempts[0].response_text_artifact_id}`)"
-                            >Ver texto</Button>
+                                >Ver texto</Button
+                            >
                             <Button
                                 v-if="attempts[0].response_v2_json_artifact_id"
                                 variant="ghost"
                                 size="sm"
                                 class="h-6 px-2 text-xs"
                                 @click="router.push(`/artifacts/${attempts[0].response_v2_json_artifact_id}`)"
-                            >Ver JSON</Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="h-6 px-2 text-xs"
-                                @click="tab = 'attempts'"
-                            >Tentativas →</Button>
+                                >Ver JSON</Button
+                            >
+                            <Button variant="ghost" size="sm" class="h-6 px-2 text-xs" @click="tab = 'attempts'"
+                                >Tentativas →</Button
+                            >
                         </div>
                     </div>
-                    <div v-if="qualityScoreDisplay !== null" class="mt-2 text-xs text-slate-400 flex items-center gap-3">
-                        <span>Score: <strong class="text-emerald-400">{{ qualityScoreDisplay }}%</strong></span>
-                        <span v-if="qualityValidationPassed !== null">Validação: <strong :class="qualityValidationPassed ? 'text-emerald-400' : 'text-red-400'">{{ qualityValidationPassed ? 'Passou' : 'Falhou' }}</strong></span>
+                    <div
+                        v-if="qualityScoreDisplay !== null"
+                        class="mt-2 text-xs text-slate-400 flex items-center gap-3"
+                    >
+                        <span
+                            >Score: <strong class="text-emerald-400">{{ qualityScoreDisplay }}%</strong></span
+                        >
+                        <span v-if="qualityValidationPassed !== null"
+                            >Validação:
+                            <strong :class="qualityValidationPassed ? 'text-emerald-400' : 'text-red-400'">{{
+                                qualityValidationPassed ? 'Passou' : 'Falhou'
+                            }}</strong></span
+                        >
                     </div>
                 </div>
 

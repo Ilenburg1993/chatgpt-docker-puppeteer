@@ -23,8 +23,8 @@ Este hub cobre:
 
 ## O que pode aparecer no GitHub Actions e não morar aqui
 
-A página de Actions do GitHub pode exibir execuções que **não** correspondem a arquivos
-versionados em `.github/workflows/`.
+A página de Actions do GitHub pode exibir execuções que **não** correspondem a arquivos versionados
+em `.github/workflows/`.
 
 Casos observados:
 
@@ -64,17 +64,17 @@ locais sem uma decisão explícita de produto.
   - `raven-actions/actionlint@v2.1.1` dentro do workflow de `CI`: lint semântico de Actions;
   - `reviewdog/action-shellcheck@v1.9.0` dentro do workflow de `CI`: lint de shell scripts com
     anotações em `github-check`;
-  - `node scripts/ci/verify-github-workflows.mjs`: verificação opcional via `gh api` para
-    confirmar o que o GitHub está reconhecendo remotamente.
+  - `node scripts/ci/verify-github-workflows.mjs`: verificação opcional via `gh api` para confirmar
+    o que o GitHub está reconhecendo remotamente.
 - `dependabot.yml` usa `pull-request-branch-name.separator: "-"` e labels explícitas por
   ecossistema, incluindo `dependabot`, para reduzir branch names com `/` e estabilizar a triagem.
 
 ## Regras de manutenção
 
-- Antes de criar um workflow novo, verificar se a necessidade já é atendida por workflow dinâmico
-  da plataforma ou por integração externa.
+- Antes de criar um workflow novo, verificar se a necessidade já é atendida por workflow dinâmico da
+  plataforma ou por integração externa.
 - Toda mudança estrutural em `.github/workflows/` deve atualizar a documentação canônica em
   `DOCUMENTAÇÃO/OPERACOES/`.
-- `AGENTS.md` deve permanecer curto, estável e voltado a baseline; detalhes extensos vivem em docs
-  e skills.
+- `AGENTS.md` deve permanecer curto, estável e voltado a baseline; detalhes extensos vivem em docs e
+  skills.
 - `dependabot.yml` e workflows de segurança/dependência devem permanecer coerentes entre si.

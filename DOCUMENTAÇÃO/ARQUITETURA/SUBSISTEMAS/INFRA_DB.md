@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da camada `src/infra/db/` e do SSOT SQLite.  
-**Quando consultar**: ao alterar schema, repositórios, locks em nível de task, RBAC, eventos SSOT ou persistência de auditoria/inferência.  
+**Quando consultar**: ao alterar schema, repositórios, locks em nível de task, RBAC, eventos SSOT ou
+persistência de auditoria/inferência.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # INFRA DB
@@ -65,8 +66,7 @@ O baseline observável já cobre:
 ### Núcleo operacional
 
 - `task_repo.js`: CRUD de tasks, estágios/status, claim/release de locks, retries e limpeza de fila.
-- `task_attempt_repo.js`: tentativa por dispatch/correlation, heartbeat, status de execução e
-  erro.
+- `task_attempt_repo.js`: tentativa por dispatch/correlation, heartbeat, status de execução e erro.
 - `events_repo.js`: trilha de eventos SSOT consumida pelo realtime.
 - `mission_repo.js`: CRUD e estado de missões.
 - `mission_step_repo.js`: granularidade de etapas dentro da missão.
@@ -122,8 +122,8 @@ Responsabilidades observáveis:
 - fazer claim transacional da próxima task elegível;
 - manter `execute_after_ms`, contadores de `attempts`, locks, `blocked_reason` e timestamps.
 
-Qualquer mudança de semântica em task precisa avaliar este arquivo antes de alterar kernel,
-workers ou API.
+Qualquer mudança de semântica em task precisa avaliar este arquivo antes de alterar kernel, workers
+ou API.
 
 ### `events_repo.js`
 

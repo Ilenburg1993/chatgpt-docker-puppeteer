@@ -1,6 +1,7 @@
 # DEPRECADO
 
-**Propósito**: concentrar material explicitamente deprecated, preservado apenas por rastreabilidade.  
+**Propósito**: concentrar material explicitamente deprecated, preservado apenas por
+rastreabilidade.  
 **Status documental**: Histórico.  
 **Público**: engenharia, manutenção e auditoria.  
 **Última atualização**: 28 de fevereiro de 2026.

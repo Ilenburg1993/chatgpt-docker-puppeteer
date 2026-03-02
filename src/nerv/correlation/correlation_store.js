@@ -85,11 +85,12 @@ function createCorrelationStore({ telemetry, limits = {} }) {
             if (MAX_CORRELATIONS && keys.length >= MAX_CORRELATIONS) {
                 const sortedIds = keys.sort((a, b) => store[a].createdAt - store[b].createdAt);
                 const evictCount = Math.max(1, Math.ceil(MAX_CORRELATIONS * 0.1)); // Evict 10%
-                for (let i = 0; i < evictCount && i < sortedIds.length; i++) {
+                const actualEvictCount = Math.min(evictCount, sortedIds.length); // Count actual evicted items
+                for (let i = 0; i < actualEvictCount; i++) {
                     delete store[sortedIds[i]];
                 }
                 telemetry.emit('nerv:correlation:evicted_overflow', {
-                    evicted: evictCount,
+                    evicted: actualEvictCount,
                     limit: MAX_CORRELATIONS,
                 });
             }

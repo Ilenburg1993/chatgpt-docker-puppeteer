@@ -1,6 +1,7 @@
 # GUIAS
 
-**Propósito**: concentrar a documentação de uso diário, onboarding, desenvolvimento, testes e troubleshooting do projeto.  
+**Propósito**: concentrar a documentação de uso diário, onboarding, desenvolvimento, testes e
+troubleshooting do projeto.  
 **Status documental**: Canônico.  
 **Público**: engenharia, onboarding técnico, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

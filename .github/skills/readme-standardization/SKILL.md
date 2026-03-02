@@ -1,6 +1,8 @@
 ---
 name: readme-standardization
-description: Use esta skill quando o trabalho for criar ou revisar README.md padronizados por pasta, com template consistente, escopo claro e navegação local previsível.
+description:
+  Use esta skill quando o trabalho for criar ou revisar README.md padronizados por pasta, com
+  template consistente, escopo claro e navegação local previsível.
 license: MIT
 ---
 
@@ -83,6 +85,7 @@ O `README` está bom quando:
 # Related Skills
 
 - `documentation-governance`: usar para decidir a ordem e as ondas de rollout.
-- `jsdoc-authoring`: não é a mesma coisa; usar apenas quando a tarefa for documentação de API em código.
+- `jsdoc-authoring`: não é a mesma coisa; usar apenas quando a tarefa for documentação de API em
+  código.
 
 Consulte o template base em [assets/README_TEMPLATE.md](./assets/README_TEMPLATE.md).

@@ -1,6 +1,7 @@
 # PM2: Referência Rápida
 
-**Propósito**: concentrar os comandos canônicos de PM2 e deixar explícitos os pontos de drift entre `npm scripts`, `Makefile` e scripts auxiliares legados.  
+**Propósito**: concentrar os comandos canônicos de PM2 e deixar explícitos os pontos de drift entre
+`npm scripts`, `Makefile` e scripts auxiliares legados.  
 **Status documental**: Canônico.  
 **Público**: operação local, manutenção, desenvolvimento e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -53,7 +54,8 @@ make pm2-startup
 
 Leitura correta:
 
-- `make start/stop/reload/status/logs/monit` já delegam ao fluxo atual baseado em `npm run daemon:*`;
+- `make start/stop/reload/status/logs/monit` já delegam ao fluxo atual baseado em
+  `npm run daemon:*`;
 - `make health` usa `scripts/ops/pm2-check.sh`;
 - alguns alvos auxiliares ainda carregam drift e não devem ser tratados como baseline cego.
 
@@ -123,8 +125,8 @@ definem o caminho canônico de operação.
 
 Leitura correta:
 
-- o baseline operacional está alinhado entre `package.json`, `Makefile`, `ecosystem.config.cjs` e
-  os scripts PM2 principais;
+- o baseline operacional está alinhado entre `package.json`, `Makefile`, `ecosystem.config.cjs` e os
+  scripts PM2 principais;
 - referências antigas a `ecosystem.config.js` devem ser tratadas como históricas, especializadas ou
   ainda não consolidadas.
 

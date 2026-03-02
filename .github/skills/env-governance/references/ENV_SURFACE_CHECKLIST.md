@@ -24,8 +24,8 @@ camada:
 - não duplicar no `containerEnv` o que já é default estável do Dockerfile sem necessidade;
 - não usar `remoteEnv` para esconder segredos em arquivos versionados, apenas para referenciar
   `${localEnv:*}`;
-- não promover para global flags de UX que conflitam com o ambiente do operador
-  (`FORCE_COLOR`, `NO_COLOR`, toggles de debug transitórios);
+- não promover para global flags de UX que conflitam com o ambiente do operador (`FORCE_COLOR`,
+  `NO_COLOR`, toggles de debug transitórios);
 - quando uma variável muda de camada, atualizar a documentação canônica e o comentário de
   precedência.
 

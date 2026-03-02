@@ -402,8 +402,8 @@ npm run queue:status   # Status da fila
 
 ### Q: Por onde começar?
 
-**A**: Execute `npm run diagnose` para ver o estado atual, depois `npm run check:pre-flight` para garantir que
-tudo está configurado.
+**A**: Execute `npm run diagnose` para ver o estado atual, depois `npm run check:pre-flight` para
+garantir que tudo está configurado.
 
 ### Q: Como contribuir com o roadmap?
 

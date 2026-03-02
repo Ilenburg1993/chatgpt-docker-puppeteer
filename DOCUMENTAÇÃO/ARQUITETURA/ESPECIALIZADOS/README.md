@@ -1,11 +1,13 @@
 **Status**: Especializado.  
 **Escopo**: índice local dos aprofundamentos não-baseline da pasta `ESPECIALIZADOS/`.  
-**Quando consultar**: ao investigar recortes técnicos úteis, mas que não são a fonte canônica principal.  
+**Quando consultar**: ao investigar recortes técnicos úteis, mas que não são a fonte canônica
+principal.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # Especializados
 
-**Propósito**: agrupar materiais úteis de arquitetura que aprofundam recortes específicos sem competir com o baseline oficial.  
+**Propósito**: agrupar materiais úteis de arquitetura que aprofundam recortes específicos sem
+competir com o baseline oficial.  
 **Status documental**: Especializado.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -14,7 +16,8 @@
 
 - Nada aqui substitui [ARCHITECTURE.md](../ARCHITECTURE.md).
 - Use esta pasta para análises, visões integradas e recortes especializados ainda úteis.
-- Se um documento passar a definir contrato canônico recorrente, ele deve sair daqui e subir para a raiz ou `SUBSISTEMAS/`.
+- Se um documento passar a definir contrato canônico recorrente, ele deve sair daqui e subir para a
+  raiz ou `SUBSISTEMAS/`.
 
 ## Documentos
 

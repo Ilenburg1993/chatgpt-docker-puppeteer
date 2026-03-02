@@ -21,4 +21,5 @@ documental.
 ## Links relacionados
 
 - Índice de docs históricos: [../README.md](../README.md)
-- Integrações vivas: [../../../REFERENCIA/INTEGRACOES/README.md](../../../REFERENCIA/INTEGRACOES/README.md)
+- Integrações vivas:
+  [../../../REFERENCIA/INTEGRACOES/README.md](../../../REFERENCIA/INTEGRACOES/README.md)

@@ -218,6 +218,7 @@ class ConfigurationManager extends EventEmitter {
         super();
         // Inicializa o estado em RAM com os valores padrão (Baseline)
         this.currentConfig = ConfigSchema.parse({});
+        this._frozenConfigCache = null; // Cached frozen snapshot for .all getter
         this.isInitialized = false;
         this._envValidationDone = false;
         this._deprecationWarningShown = false;
@@ -255,6 +256,7 @@ class ConfigurationManager extends EventEmitter {
 
                 // [ATOMIC SWAP] Atualiza o cache apenas após validação total
                 this.currentConfig = result.data;
+                this._frozenConfigCache = Object.freeze({ ...result.data }); // Invalidate and recreate frozen cache
                 this.isInitialized = true;
 
                 log('INFO', '[CONFIG] Cache paramétrico atualizado.', correlationId);
@@ -282,7 +284,11 @@ class ConfigurationManager extends EventEmitter {
      * Permitem leitura síncrona de alta performance pelo Kernel.
      */
     get all() {
-        return Object.freeze({ ...this.currentConfig });
+        // Return cached frozen object to avoid recreating on every access
+        if (!this._frozenConfigCache) {
+            this._frozenConfigCache = Object.freeze({ ...this.currentConfig });
+        }
+        return this._frozenConfigCache;
     }
 
     get IDLE_SLEEP() {

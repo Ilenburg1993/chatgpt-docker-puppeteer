@@ -1,6 +1,7 @@
 # PLANOS
 
-**Propósito**: concentrar planos ativos, roadmaps, checklists, propostas e trilhas de coordenação ainda úteis para execução futura.  
+**Propósito**: concentrar planos ativos, roadmaps, checklists, propostas e trilhas de coordenação
+ainda úteis para execução futura.  
 **Status documental**: Canônico.  
 **Público**: engenharia, coordenação técnica, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -66,5 +67,6 @@
 ## Links relacionados
 
 - Hub principal: [../README.md](../README.md)
-- Relatório de status documental: [../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md)
+- Relatório de status documental:
+  [../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md)
 - Arquivo legado: [./LEGADO_PLANO/README.md](./LEGADO_PLANO/README.md)

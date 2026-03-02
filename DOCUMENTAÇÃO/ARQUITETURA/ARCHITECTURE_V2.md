@@ -1,9 +1,7 @@
 # Arquitetura 2.0 — Documentação Oficial
 
-> **Data**: 2 de março de 2026
-> **Versão**: 2.0.0
-> **Base**: Evolução da Arquitetura 1.0 com correções de gaps identificados
-> **Referência**: ARCHITECTURE_V1_ANALYSIS.md, ARCHITECTURE_V2_PROPOSAL.md
+> **Data**: 2 de março de 2026 **Versão**: 2.0.0 **Base**: Evolução da Arquitetura 1.0 com correções
+> de gaps identificados **Referência**: ARCHITECTURE_V1_ANALYSIS.md, ARCHITECTURE_V2_PROPOSAL.md
 
 ---
 
@@ -15,16 +13,16 @@ foco em confiabilidade operacional.
 
 ### Métricas do Codebase
 
-| Métrica               | Valor                                              |
-| --------------------- | -------------------------------------------------- |
-| **Arquivos fonte**    | 302 (.js + .mjs)                                   |
-| **Linhas de código**  | ~87.500 LOC                                        |
-| **Módulos**           | 19 domínios sob `src/`                             |
-| **Testes**            | 800 specs (798 passando)                           |
-| **Runtime**           | Node.js 24+ (ESM obrigatório)                      |
-| **Database**          | SQLite (better-sqlite3) — SSOT                     |
-| **Browser**           | Puppeteer 24+ → Chrome externo via DevTools        |
-| **Process Manager**   | PM2 6.0+                                           |
+| Métrica              | Valor                                       |
+| -------------------- | ------------------------------------------- |
+| **Arquivos fonte**   | 302 (.js + .mjs)                            |
+| **Linhas de código** | ~87.500 LOC                                 |
+| **Módulos**          | 19 domínios sob `src/`                      |
+| **Testes**           | 800 specs (798 passando)                    |
+| **Runtime**          | Node.js 24+ (ESM obrigatório)               |
+| **Database**         | SQLite (better-sqlite3) — SSOT              |
+| **Browser**          | Puppeteer 24+ → Chrome externo via DevTools |
+| **Process Manager**  | PM2 6.0+                                    |
 
 ### Princípios Arquiteturais
 
@@ -64,8 +62,8 @@ src/
 └── dashboard-ui/   (18+ files)# Frontend Vue.js/Vite (workspace separado)
 ```
 
-> **Nota V2**: O módulo `src/state/` (anteriormente vazio) foi **removido**. O state management
-> é feito inteiramente via SSOT no SQLite, com broadcast via NERV.
+> **Nota V2**: O módulo `src/state/` (anteriormente vazio) foi **removido**. O state management é
+> feito inteiramente via SSOT no SQLite, com broadcast via NERV.
 
 ## 3. Topologia de Comunicação
 
@@ -98,12 +96,12 @@ src/
 
 ### Fluxo de Mensagens
 
-| Padrão             | Direção                          | Exemplo                      |
-| ------------------ | -------------------------------- | ---------------------------- |
-| **emit → onEvent** | Driver → NERV → Kernel           | Task completed               |
-| **emitCommand**    | Server → NERV → Kernel           | Suspend task                 |
-| **emitAck**        | Kernel → NERV → Requestor        | Command acknowledged         |
-| **onActor**        | Qualquer → NERV → Target actor   | Actor-specific handler       |
+| Padrão             | Direção                        | Exemplo                |
+| ------------------ | ------------------------------ | ---------------------- |
+| **emit → onEvent** | Driver → NERV → Kernel         | Task completed         |
+| **emitCommand**    | Server → NERV → Kernel         | Suspend task           |
+| **emitAck**        | Kernel → NERV → Requestor      | Command acknowledged   |
+| **onActor**        | Qualquer → NERV → Target actor | Actor-specific handler |
 
 ### Envelope NERV (Formato Canônico)
 
@@ -167,23 +165,23 @@ SIGTERM/SIGINT → triggerShutdown()
 ```
 
 > **Melhoria V2**: NERV shutdown agora limpa **todos** os subsistemas internos (health, buffers,
-> telemetria), não apenas os transportes. Cada cleanup é try-catched isoladamente para garantir
-> que uma falha em um subsistema não impede o cleanup dos demais.
+> telemetria), não apenas os transportes. Cada cleanup é try-catched isoladamente para garantir que
+> uma falha em um subsistema não impede o cleanup dos demais.
 
 ## 5. Kernel — Motor de Decisão
 
 ### Componentes
 
-| Componente             | Responsabilidade                                    |
-| ---------------------- | --------------------------------------------------- |
-| `kernel.js`            | Factory SSOT-first com gateway mode                 |
-| `kernel_loop.js`       | Loop 20Hz (50ms ticks), state machine               |
-| `execution_engine.js`  | Execução de tasks, retry logic                      |
-| `policy_engine.js`     | Rate limits, resource caps, políticas               |
-| `task_runtime.js`      | Estados: ACTIVE, SUSPENDED, COMPLETED, ERROR        |
-| `observation_store.js` | Log de observações para histórico de decisões       |
-| `kernel_telemetry.js`  | Métricas de performance do kernel                   |
-| `kernel_nerv_bridge.js`| Adaptador NERV, recebe e despacha comandos          |
+| Componente              | Responsabilidade                              |
+| ----------------------- | --------------------------------------------- |
+| `kernel.js`             | Factory SSOT-first com gateway mode           |
+| `kernel_loop.js`        | Loop 20Hz (50ms ticks), state machine         |
+| `execution_engine.js`   | Execução de tasks, retry logic                |
+| `policy_engine.js`      | Rate limits, resource caps, políticas         |
+| `task_runtime.js`       | Estados: ACTIVE, SUSPENDED, COMPLETED, ERROR  |
+| `observation_store.js`  | Log de observações para histórico de decisões |
+| `kernel_telemetry.js`   | Métricas de performance do kernel             |
+| `kernel_nerv_bridge.js` | Adaptador NERV, recebe e despacha comandos    |
 
 ### Modelo de Execução
 
@@ -227,37 +225,37 @@ Driver/
 
 ### Restrição Arquitetural
 
-> **NUNCA** usar `puppeteer.launch()` neste processo. O browser é fornecido externamente via
-> Chrome DevTools Protocol. O `puppeteer_guard.js` intercepta e bloqueia chamadas a `launch()`.
+> **NUNCA** usar `puppeteer.launch()` neste processo. O browser é fornecido externamente via Chrome
+> DevTools Protocol. O `puppeteer_guard.js` intercepta e bloqueia chamadas a `launch()`.
 
 ## 7. Infraestrutura
 
 ### Database (SQLite — SSOT)
 
-| Repositório            | Tabela(s)            | Propósito                    |
-| ---------------------- | -------------------- | ---------------------------- |
-| `task_repo`            | tasks                | Estado e ciclo de vida       |
-| `mission_repo`         | missions             | Missões e workflows          |
-| `mission_step_repo`    | mission_steps        | Passos de missão             |
-| `artifact_repo`        | artifacts            | Artefatos de resposta        |
-| `event_repo`           | events               | Eventos SSOT audit trail     |
-| `audit_job_repo`       | audit_jobs           | Jobs de auditoria            |
-| `inference_model_repo` | inference_models     | Modelos LLM disponíveis      |
-| `task_attempt_repo`    | task_attempts        | Tentativas de execução       |
+| Repositório            | Tabela(s)        | Propósito                |
+| ---------------------- | ---------------- | ------------------------ |
+| `task_repo`            | tasks            | Estado e ciclo de vida   |
+| `mission_repo`         | missions         | Missões e workflows      |
+| `mission_step_repo`    | mission_steps    | Passos de missão         |
+| `artifact_repo`        | artifacts        | Artefatos de resposta    |
+| `event_repo`           | events           | Eventos SSOT audit trail |
+| `audit_job_repo`       | audit_jobs       | Jobs de auditoria        |
+| `inference_model_repo` | inference_models | Modelos LLM disponíveis  |
+| `task_attempt_repo`    | task_attempts    | Tentativas de execução   |
 
 > **Melhoria V2**: JSON.parse em `task_repo.js` agora faz **logging estruturado** quando encontra
-> dados malformados, em vez de silenciar o erro. Isso permite diagnosticar corrupção de dados
-> que antes passava despercebida.
+> dados malformados, em vez de silenciar o erro. Isso permite diagnosticar corrupção de dados que
+> antes passava despercebida.
 
 ### Browser Pool
 
-| Componente              | Papel                                     |
-| ----------------------- | ----------------------------------------- |
-| `pool_manager`          | Pool de conexões Chrome (3 instâncias)    |
-| `circuit_breaker`       | Detecção automática de falhas             |
-| `PageValidator`         | Health checks de página                   |
-| `PeriodicHealthMonitor` | Probes periódicos de saúde                |
-| `puppeteer_guard`       | Impede `puppeteer.launch()` no runtime    |
+| Componente              | Papel                                  |
+| ----------------------- | -------------------------------------- |
+| `pool_manager`          | Pool de conexões Chrome (3 instâncias) |
+| `circuit_breaker`       | Detecção automática de falhas          |
+| `PageValidator`         | Health checks de página                |
+| `PeriodicHealthMonitor` | Probes periódicos de saúde             |
+| `puppeteer_guard`       | Impede `puppeteer.launch()` no runtime |
 
 ### Queue & Locks
 
@@ -300,18 +298,18 @@ Server/
 
 ### Endpoints Principais
 
-| Controller          | Rota            | Auth | Operações               |
-| ------------------- | --------------- | ---- | ----------------------- |
-| `tasks`             | /api/tasks      | JWT  | CRUD + control commands |
-| `missions`          | /api/missions   | JWT  | CRUD + step management  |
-| `control`           | /api/control    | JWT  | System commands         |
-| `health`            | /api/health     | —    | Health check público    |
-| `dna`               | /api/dna        | JWT  | Config + DNA management |
-| `dashboard_tasks`   | /api/dashboard  | JWT  | Dashboard task views    |
-| `dashboard_missions`| /api/dashboard  | JWT  | Dashboard mission views |
-| `dashboard_events`  | /api/dashboard  | JWT  | SSOT event feed         |
-| `metrics`           | /api/metrics    | JWT  | Prometheus metrics      |
-| `audit`             | /api/audit      | JWT  | Audit job management    |
+| Controller           | Rota           | Auth | Operações               |
+| -------------------- | -------------- | ---- | ----------------------- |
+| `tasks`              | /api/tasks     | JWT  | CRUD + control commands |
+| `missions`           | /api/missions  | JWT  | CRUD + step management  |
+| `control`            | /api/control   | JWT  | System commands         |
+| `health`             | /api/health    | —    | Health check público    |
+| `dna`                | /api/dna       | JWT  | Config + DNA management |
+| `dashboard_tasks`    | /api/dashboard | JWT  | Dashboard task views    |
+| `dashboard_missions` | /api/dashboard | JWT  | Dashboard mission views |
+| `dashboard_events`   | /api/dashboard | JWT  | SSOT event feed         |
+| `metrics`            | /api/metrics   | JWT  | Prometheus metrics      |
+| `audit`              | /api/audit     | JWT  | Audit job management    |
 
 > **Melhoria V2**: Helpers `_parseJson()` nos controllers de dashboard agora fazem **logging
 > debug-level** quando encontram JSON malformado, melhorando a observabilidade.
@@ -333,6 +331,7 @@ AgentLoop (orquestrador)
 ```
 
 Cada worker é:
+
 - **Async-safe**: Não bloqueia outros workers
 - **Idempotent**: Pode ser re-executado sem efeitos colaterais
 - **NERV-driven**: Reage a eventos do barramento
@@ -344,13 +343,14 @@ Cada worker é:
 
 ```javascript
 // API pública (observacional)
-health.report(type, data)   // Ingestão genérica de eventos técnicos
-health.getStatus()          // Snapshot atual de saúde
-health.onChange(handler)    // Registra handler de mudanças
-health.shutdown()           // V2: Limpa todos os listeners
+health.report(type, data); // Ingestão genérica de eventos técnicos
+health.getStatus(); // Snapshot atual de saúde
+health.onChange(handler); // Registra handler de mudanças
+health.shutdown(); // V2: Limpa todos os listeners
 ```
 
 > **Melhoria V2**: O módulo de health agora tem:
+>
 > - **Limite de listeners**: Máximo 50 handlers com warning via telemetria
 > - **Método shutdown()**: Limpa todos os listeners registrados
 > - Integrado ao NERV shutdown lifecycle
@@ -358,6 +358,7 @@ health.shutdown()           // V2: Limpa todos os listeners
 ### Telemetria de Anomalias
 
 O health module detecta e emite automaticamente:
+
 - `nerv:health:anomaly` — Buffer pressure (inbound/outbound acima do threshold)
 - `nerv:health:listener_overflow` — **(V2)** Excesso de listeners registrados
 - `nerv:health:update` — Snapshot de cada mudança de estado
@@ -365,11 +366,11 @@ O health module detecta e emite automaticamente:
 
 ## 11. Modos de Deploy
 
-| Modo           | Processos           | Uso                           |
-| -------------- | ------------------- | ----------------------------- |
-| **Integrado**  | 1 (maestro + HTTP)  | Docker, desenvolvimento       |
-| **Split**      | 2 (maestro + HTTP)  | PM2, escalabilidade HTTP      |
-| **Delegated**  | N (1 primary + N-1) | Multi-instância, HA           |
+| Modo          | Processos           | Uso                      |
+| ------------- | ------------------- | ------------------------ |
+| **Integrado** | 1 (maestro + HTTP)  | Docker, desenvolvimento  |
+| **Split**     | 2 (maestro + HTTP)  | PM2, escalabilidade HTTP |
+| **Delegated** | N (1 primary + N-1) | Multi-instância, HA      |
 
 ### PM2 Processes
 
@@ -407,89 +408,95 @@ ecosystem.config.cjs
 
 ### Correções Implementadas
 
-| ID     | Tipo       | Descrição                                           | Arquivo(s)              |
-| ------ | ---------- | --------------------------------------------------- | ----------------------- |
-| P0-1   | Bug fix    | Logging em JSON.parse catch blocks                  | task_repo.js            |
-| P0-1b  | Bug fix    | Logging em _parseJson helpers                       | dashboard_*.js (3)      |
-| P0-2   | Bug fix    | NERV shutdown lifecycle completo                    | nerv.js                 |
-| P1-2   | Cleanup    | Remoção do módulo morto src/state/                  | src/state/ (removido)   |
-| P2-1   | Melhoria   | Health listener limit (max 50 + warning + shutdown) | health.js               |
+| ID    | Tipo     | Descrição                                           | Arquivo(s)            |
+| ----- | -------- | --------------------------------------------------- | --------------------- |
+| P0-1  | Bug fix  | Logging em JSON.parse catch blocks                  | task_repo.js          |
+| P0-1b | Bug fix  | Logging em \_parseJson helpers                      | dashboard\_\*.js (3)  |
+| P0-2  | Bug fix  | NERV shutdown lifecycle completo                    | nerv.js               |
+| P1-2  | Cleanup  | Remoção do módulo morto src/state/                  | src/state/ (removido) |
+| P2-1  | Melhoria | Health listener limit (max 50 + warning + shutdown) | health.js             |
 
 ### Correções Round 2 (Leitura profunda do código)
 
-| ID     | Tipo       | Descrição                                           | Arquivo(s)              |
-| ------ | ---------- | --------------------------------------------------- | ----------------------- |
-| P1-3   | Bug fix    | Policy engine: Date.now() → at parameter            | policy_engine.js        |
-| P1-4   | Bug fix    | Mission repo: optimistic lock via updated_at_ms     | mission_repo.js         |
-| P1-5   | Bug fix    | Adaptive: flush pendente no graceful shutdown        | adaptive.js             |
-| P1-6   | Bug fix    | LLM Judge: score normalization aceita strings        | llm_judge.js            |
-| P1-7   | Melhoria   | Events repo: função pruneEvents com TTL             | events_repo.js          |
-| P1-8   | Bug fix    | Orchestrator: lock failure sinaliza erro             | orchestrator_engine.js  |
+| ID   | Tipo     | Descrição                                       | Arquivo(s)             |
+| ---- | -------- | ----------------------------------------------- | ---------------------- |
+| P1-3 | Bug fix  | Policy engine: Date.now() → at parameter        | policy_engine.js       |
+| P1-4 | Bug fix  | Mission repo: optimistic lock via updated_at_ms | mission_repo.js        |
+| P1-5 | Bug fix  | Adaptive: flush pendente no graceful shutdown   | adaptive.js            |
+| P1-6 | Bug fix  | LLM Judge: score normalization aceita strings   | llm_judge.js           |
+| P1-7 | Melhoria | Events repo: função pruneEvents com TTL         | events_repo.js         |
+| P1-8 | Bug fix  | Orchestrator: lock failure sinaliza erro        | orchestrator_engine.js |
 
 ### Correções Round 3 (Análise de fluxo completa)
 
-| ID     | Tipo       | Descrição                                           | Arquivo(s)              |
-| ------ | ---------- | --------------------------------------------------- | ----------------------- |
-| P2-2   | Bug fix    | Context manager: token estimation + summary cap     | context_manager.js      |
-| P2-3   | Bug fix    | Checkpoint manager: atomic write + validation       | checkpoint_manager.js   |
-| P2-4   | Bug fix    | Validation service: score logic com null handling    | validation_service.js   |
-| P2-5   | Bug fix    | Mission planner: budget check em transação           | mission_planner_proc.js |
-| P2-6   | Bug fix    | Attempt watchdog: false positive heartbeat fix      | attempt_watchdog.js     |
-| P2-7   | Bug fix    | Queue worker: logging em catch blocks silenciosos    | queue_worker.js         |
-| P2-8   | Bug fix    | Workflow generator: structuredClone + placeholder    | workflow_generator.js   |
-| P2-9   | Bug fix    | Error classifier: case sensitivity no fallback       | error-classifier.mjs    |
-| P2-10  | Bug fix    | LLM Judge: abort controller no timeout              | llm_judge.js            |
-| P2-11  | Bug fix    | Mission manager: error handling na criação           | mission_manager.js      |
+| ID    | Tipo    | Descrição                                         | Arquivo(s)              |
+| ----- | ------- | ------------------------------------------------- | ----------------------- |
+| P2-2  | Bug fix | Context manager: token estimation + summary cap   | context_manager.js      |
+| P2-3  | Bug fix | Checkpoint manager: atomic write + validation     | checkpoint_manager.js   |
+| P2-4  | Bug fix | Validation service: score logic com null handling | validation_service.js   |
+| P2-5  | Bug fix | Mission planner: budget check em transação        | mission_planner_proc.js |
+| P2-6  | Bug fix | Attempt watchdog: false positive heartbeat fix    | attempt_watchdog.js     |
+| P2-7  | Bug fix | Queue worker: logging em catch blocks silenciosos | queue_worker.js         |
+| P2-8  | Bug fix | Workflow generator: structuredClone + placeholder | workflow_generator.js   |
+| P2-9  | Bug fix | Error classifier: case sensitivity no fallback    | error-classifier.mjs    |
+| P2-10 | Bug fix | LLM Judge: abort controller no timeout            | llm_judge.js            |
+| P2-11 | Bug fix | Mission manager: error handling na criação        | mission_manager.js      |
 
 ### Correções Round 4 (Análise NERV)
 
-| ID     | Tipo       | Descrição                                           | Arquivo(s)              |
-| ------ | ---------- | --------------------------------------------------- | ----------------------- |
-| P3-1   | Auditoria  | Control: event emission para mutations RBAC/prefs   | control.js              |
+| ID   | Tipo      | Descrição                                         | Arquivo(s) |
+| ---- | --------- | ------------------------------------------------- | ---------- |
+| P3-1 | Auditoria | Control: event emission para mutations RBAC/prefs | control.js |
 
 ### Impacto
 
-| Métrica                  | V1       | V2        |
-| ------------------------ | -------- | --------- |
-| Silent catch blocks      | 6+       | 0         |
-| NERV subsystems cleaned  | 3/7      | 7/7       |
-| Dead modules             | 1        | 0         |
-| Health listener safety   | Nenhuma  | Max 50    |
-| Silent DB mutations      | 2+       | 0         |
-| Bugs corrigidos total    | —        | 21        |
-| Lint errors              | 0        | 0         |
-| Test pass rate           | 798/800  | 798/800   |
+| Métrica                 | V1      | V2      |
+| ----------------------- | ------- | ------- |
+| Silent catch blocks     | 6+      | 0       |
+| NERV subsystems cleaned | 3/7     | 7/7     |
+| Dead modules            | 1       | 0       |
+| Health listener safety  | Nenhuma | Max 50  |
+| Silent DB mutations     | 2+      | 0       |
+| Bugs corrigidos total   | —       | 21      |
+| Lint errors             | 0       | 0       |
+| Test pass rate          | 798/800 | 798/800 |
 
 ## 14. Decisões Arquiteturais (ADRs)
 
 ### ADR-001: SSOT via SQLite (Mantida)
+
 - **Decisão**: Manter SQLite como SSOT para todo o estado do sistema
 - **Motivo**: Simplicidade, zero-config, ACID compliance, performance suficiente
 - **Trade-off**: Não escala horizontalmente (aceitável para single-agent)
 
 ### ADR-002: NERV como Único Canal (Mantida)
+
 - **Decisão**: Toda comunicação inter-módulo via NERV event bus
 - **Motivo**: Zero-coupling, testabilidade, observabilidade
 - **Trade-off**: Overhead de serialização em mensagens locais (negligível)
 
 ### ADR-003: Browser Externo Obrigatório (Mantida)
+
 - **Decisão**: Nunca `puppeteer.launch()`, sempre Chrome externo
 - **Motivo**: Separação de concerns, estabilidade, reuso de sessão
 - **Trade-off**: Requer Chrome rodando externamente (gerenciado por PM2/Docker)
 
 ### ADR-004: Remoção de src/state/ (Nova V2)
+
 - **Decisão**: Remover módulo vazio em favor do SSOT via DB
 - **Motivo**: Módulo sem implementação, confuso, sem imports
 - **Trade-off**: Nenhum — funcionalidade já atendida pelo DB
 
 ### ADR-005: NERV Lifecycle Completo (Nova V2)
+
 - **Decisão**: Shutdown do NERV limpa todos os 7 subsistemas
 - **Motivo**: Prevenir resource leaks em processos de longa duração
 - **Trade-off**: Shutdown marginalmente mais lento (~1ms)
 
 ## 15. Limitações Conhecidas
 
-1. **Main.js tem 17 imports**: Boot sequence ainda centralizado (extração para `src/boot/` planejada)
+1. **Main.js tem 17 imports**: Boot sequence ainda centralizado (extração para `src/boot/`
+   planejada)
 2. **Extensões .mjs em integration/**: Coexistência com .js (projeto ESM); padronização futura
 3. **Módulos sem testes**: logic/, validation/, missions/ sem cobertura unitária
 4. **2 testes falhando**: devcontainer scripts (NSS checks) — não relacionados ao runtime
@@ -504,5 +511,5 @@ ecosystem.config.cjs
 
 ---
 
-*Documento canônico da Arquitetura 2.0. Atualizado em 2 de março de 2026.*
-*Baseline: 800 testes, 0 lint errors, 19 módulos ativos.*
+_Documento canônico da Arquitetura 2.0. Atualizado em 2 de março de 2026._ _Baseline: 800 testes, 0
+lint errors, 19 módulos ativos._

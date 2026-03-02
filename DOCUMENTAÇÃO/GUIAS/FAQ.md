@@ -1,6 +1,7 @@
 # FAQ
 
-**Propósito**: responder rapidamente às dúvidas recorrentes sem repetir versões antigas da documentação nem apontar para caminhos obsoletos.  
+**Propósito**: responder rapidamente às dúvidas recorrentes sem repetir versões antigas da
+documentação nem apontar para caminhos obsoletos.  
 **Status documental**: Canônico.  
 **Público**: onboarding, operação local, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -117,8 +118,8 @@ camadas auxiliares como `integration`, `inference_gateway`, `audit_agent` e ferr
 ## Preciso criar diretórios manualmente (`fila`, `logs`, etc.)?
 
 Não trate isso como etapa canônica obrigatória.  
-Se algum fluxo específico exigir inicialização auxiliar, ele deve vir dos scripts e do runtime atual,
-não de uma lista manual herdada de documentação antiga.
+Se algum fluxo específico exigir inicialização auxiliar, ele deve vir dos scripts e do runtime
+atual, não de uma lista manual herdada de documentação antiga.
 
 ## Onde vejo o estado da documentação?
 

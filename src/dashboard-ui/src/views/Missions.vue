@@ -40,7 +40,10 @@ let feedbackTimer = null;
 function showFeedback(message, type = 'success') {
     actionFeedback.value = { message, type };
     if (feedbackTimer) clearTimeout(feedbackTimer);
-    feedbackTimer = setTimeout(() => { actionFeedback.value = null; feedbackTimer = null; }, 4000);
+    feedbackTimer = setTimeout(() => {
+        actionFeedback.value = null;
+        feedbackTimer = null;
+    }, 4000);
 }
 
 async function refresh() {
@@ -84,7 +87,10 @@ async function createMission() {
 onMounted(refresh);
 
 onUnmounted(() => {
-    if (feedbackTimer) { clearTimeout(feedbackTimer); feedbackTimer = null; }
+    if (feedbackTimer) {
+        clearTimeout(feedbackTimer);
+        feedbackTimer = null;
+    }
 });
 </script>
 
@@ -99,7 +105,9 @@ onUnmounted(() => {
                 </h1>
                 <p class="text-sm text-slate-400 mt-0.5">
                     Gerencie missões, policy/autonomia e proposals
-                    <span v-if="items.length > 0" class="ml-2 font-mono text-slate-500">{{ items.length }} registros</span>
+                    <span v-if="items.length > 0" class="ml-2 font-mono text-slate-500"
+                        >{{ items.length }} registros</span
+                    >
                 </p>
             </div>
             <div class="flex items-center gap-2">
@@ -116,11 +124,15 @@ onUnmounted(() => {
 
         <!-- Feedback Toast -->
         <Transition name="slide">
-            <div v-if="actionFeedback"
-                 class="fixed top-4 right-4 z-50 px-4 py-3 rounded-lg border text-sm shadow-lg max-w-md"
-                 :class="actionFeedback.type === 'error'
-                    ? 'bg-red-950/90 border-red-500/30 text-red-200'
-                    : 'bg-emerald-950/90 border-emerald-500/30 text-emerald-200'">
+            <div
+                v-if="actionFeedback"
+                class="fixed top-4 right-4 z-50 px-4 py-3 rounded-lg border text-sm shadow-lg max-w-md"
+                :class="
+                    actionFeedback.type === 'error'
+                        ? 'bg-red-950/90 border-red-500/30 text-red-200'
+                        : 'bg-emerald-950/90 border-emerald-500/30 text-emerald-200'
+                "
+            >
                 {{ actionFeedback.message }}
             </div>
         </Transition>
@@ -172,9 +184,7 @@ onUnmounted(() => {
 
         <!-- Missions List -->
         <div v-else class="surface-card overflow-hidden">
-            <div v-if="items.length === 0" class="p-8 text-center text-slate-500">
-                Nenhuma missão encontrada.
-            </div>
+            <div v-if="items.length === 0" class="p-8 text-center text-slate-500">Nenhuma missão encontrada.</div>
             <div v-else class="divide-y divide-slate-800/50">
                 <div
                     v-for="m in items"
@@ -185,7 +195,9 @@ onUnmounted(() => {
                     <div class="min-w-0 flex-1">
                         <div class="text-sm font-semibold text-slate-200 truncate">{{ m.title || '(sem título)' }}</div>
                         <div class="text-xs text-slate-500 truncate font-mono mt-0.5">{{ m.id }}</div>
-                        <div v-if="m.description" class="text-xs text-slate-400 truncate mt-0.5 max-w-md">{{ m.description }}</div>
+                        <div v-if="m.description" class="text-xs text-slate-400 truncate mt-0.5 max-w-md">
+                            {{ m.description }}
+                        </div>
                     </div>
                     <div class="flex items-center gap-2 flex-wrap justify-end flex-shrink-0">
                         <Badge size="sm" :variant="statusVariant(m.status)">{{ m.status }}</Badge>
@@ -195,7 +207,9 @@ onUnmounted(() => {
                         <Badge v-if="m.counts?.running > 0" size="sm" variant="info">run: {{ m.counts.running }}</Badge>
                         <Badge v-if="m.counts?.done > 0" size="sm" variant="success">done: {{ m.counts.done }}</Badge>
                         <Badge v-if="m.counts?.failed > 0" size="sm" variant="error">fail: {{ m.counts.failed }}</Badge>
-                        <Badge v-if="m.counts?.blocked > 0" size="sm" variant="warning">blk: {{ m.counts.blocked }}</Badge>
+                        <Badge v-if="m.counts?.blocked > 0" size="sm" variant="warning"
+                            >blk: {{ m.counts.blocked }}</Badge
+                        >
                     </div>
                 </div>
             </div>
@@ -203,7 +217,12 @@ onUnmounted(() => {
 
         <!-- Load More -->
         <div v-if="store.hasMore" class="flex justify-center">
-            <Button variant="secondary" size="sm" @click="store.fetchNextPage({ limit: 100 })" :disabled="store.loadingMore">
+            <Button
+                variant="secondary"
+                size="sm"
+                @click="store.fetchNextPage({ limit: 100 })"
+                :disabled="store.loadingMore"
+            >
                 {{ store.loadingMore ? 'Carregando...' : 'Carregar mais' }}
             </Button>
         </div>
@@ -221,7 +240,8 @@ onUnmounted(() => {
                 <div>
                     <label class="text-sm text-slate-300 font-medium">Descrição</label>
                     <textarea
-                        v-model="createForm.description" rows="3"
+                        v-model="createForm.description"
+                        rows="3"
                         class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/40 text-slate-200 text-sm focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
                         placeholder="Descreva os objetivos e escopo da missão..."
                     />
@@ -235,14 +255,16 @@ onUnmounted(() => {
                         <option value="USER_ONLY">USER_ONLY — Controle manual total</option>
                         <option value="LLM_SUGGEST">LLM_SUGGEST — LLM sugere, você aprova</option>
                         <option value="LLM_CREATE_DRAFTS">LLM_CREATE_DRAFTS — LLM cria rascunhos</option>
-                        <option value="LLM_AUTO_APPROVE_WITH_BUDGET">LLM_AUTO_APPROVE — Automático com orçamento</option>
+                        <option value="LLM_AUTO_APPROVE_WITH_BUDGET">
+                            LLM_AUTO_APPROVE_WITH_BUDGET — Automático com orçamento
+                        </option>
                     </select>
-                    <div class="text-xs text-slate-500 mt-1">
-                        Define o nível de automação da LLM para esta missão.
-                    </div>
+                    <div class="text-xs text-slate-500 mt-1">Define o nível de automação da LLM para esta missão.</div>
                 </div>
                 <div>
-                    <label class="text-sm text-slate-300 font-medium">Motivo operacional <span class="text-red-400">*</span></label>
+                    <label class="text-sm text-slate-300 font-medium"
+                        >Motivo operacional <span class="text-red-400">*</span></label
+                    >
                     <Input v-model="createForm.reason" placeholder="Ex: iniciar nova frente para cliente X" />
                     <div class="text-xs text-slate-500 mt-1">Obrigatório para audit trail.</div>
                 </div>
@@ -261,8 +283,18 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.slide-enter-active { transition: all 0.3s ease-out; }
-.slide-leave-active { transition: all 0.3s ease-in; }
-.slide-enter-from { opacity: 0; transform: translateY(-20px); }
-.slide-leave-to { opacity: 0; transform: translateY(-20px); }
+.slide-enter-active {
+    transition: all 0.3s ease-out;
+}
+.slide-leave-active {
+    transition: all 0.3s ease-in;
+}
+.slide-enter-from {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+.slide-leave-to {
+    opacity: 0;
+    transform: translateY(-20px);
+}
 </style>

@@ -2,11 +2,11 @@
 name: semantic-logic-audit
 user-invokable: true
 description: >-
-  Skill para auditoria profunda de lógica e semântica: verifica se o código faz o que deveria
-  fazer, independente de sintaxe, padrões ou lint. Lê código com profundidade para detectar bugs
-  de lógica, condições invertidas, invariantes violados, fluxos de estado quebrados e gaps
-  entre intenção e implementação. Use quando quiser saber se o código FUNCIONA CORRETAMENTE,
-  não apenas se está bem escrito.
+  Skill para auditoria profunda de lógica e semântica: verifica se o código faz o que deveria fazer,
+  independente de sintaxe, padrões ou lint. Lê código com profundidade para detectar bugs de lógica,
+  condições invertidas, invariantes violados, fluxos de estado quebrados e gaps entre intenção e
+  implementação. Use quando quiser saber se o código FUNCIONA CORRETAMENTE, não apenas se está bem
+  escrito.
 ---
 
 # semantic-logic-audit
@@ -15,11 +15,11 @@ description: >-
 
 Esta skill é fundamentalmente diferente das demais. Enquanto `code-audit-and-fix`,
 `exploratory-bug-hunt` e `reactive-bug-audit` dependem de **padrões grep** (timer leaks,
-addEventListener, parseInt sem radix etc.), a `semantic-logic-audit` exige **leitura profunda**
-do código para entender o que ele deve fazer e verificar se realmente faz.
+addEventListener, parseInt sem radix etc.), a `semantic-logic-audit` exige **leitura profunda** do
+código para entender o que ele deve fazer e verificar se realmente faz.
 
-> **Regra de ouro**: nenhuma ferramenta automatizada consegue encontrar os bugs cobertos por
-> esta skill. Apenas uma LLM lendo o código com atenção semântica completa pode identificá-los.
+> **Regra de ouro**: nenhuma ferramenta automatizada consegue encontrar os bugs cobertos por esta
+> skill. Apenas uma LLM lendo o código com atenção semântica completa pode identificá-los.
 
 ### Tipos de bug descobertos por esta skill (não encontrados por grep)
 
@@ -61,8 +61,8 @@ do código para entender o que ele deve fazer e verificar se realmente faz.
 
 ### Fase 1 — Entender o Objetivo do Sistema (ANTES de ler o código)
 
-Esta é a fase mais importante e mais ignorada. Sem entender o OBJETIVO, não é possível
-verificar se o código o cumpre.
+Esta é a fase mais importante e mais ignorada. Sem entender o OBJETIVO, não é possível verificar se
+o código o cumpre.
 
 **Perguntas obrigatórias antes de ler o código:**
 
@@ -70,12 +70,14 @@ verificar se o código o cumpre.
 2. **Quais são os invariantes críticos?** O que NUNCA pode acontecer?
    - Ex: "uma task jamais deve ficar em DONE se não passou na validação"
    - Ex: "um lock jamais deve ser mantido se o processamento falhou"
-3. **Quais são os estados terminais corretos?** Para cada resultado possível, qual estado é esperado?
+3. **Quais são os estados terminais corretos?** Para cada resultado possível, qual estado é
+   esperado?
 4. **Quais são os contratos entre módulos?** O que o produtor garante? O que o consumidor espera?
 5. **Qual é o caminho feliz?** Trace-o mentalmente antes de olhar o código.
 6. **Quais são os caminhos de erro?** Como o sistema deve se comportar em cada falha?
 
 **Fontes para responder essas perguntas:**
+
 ```
 DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md
 README.md, CLAUDE.MD
@@ -95,6 +97,7 @@ Com o objetivo em mente, trace o fluxo completo **sem executar o código**:
 5. **Verificar loops e recursão**: quando terminam? Há casos de loop infinito?
 
 **Ferramenta de rastreamento — criar mapa mental de estados:**
+
 ```
 Estado A → [condição X] → Estado B (✓ correto?)
 Estado A → [condição Y] → Estado C (✓ correto?)
@@ -116,41 +119,48 @@ Para cada módulo no escopo:
 3. **Perguntas específicas por tipo de construção:**
 
 **Para funções de threshold/contagem:**
+
 - A contagem pode ser bloqueada por deduplicação ou cache?
 - A janela de tempo está sendo aplicada corretamente?
 - O valor inicial é o esperado (0 vs null vs undefined)?
 - O threshold usa `<` quando deveria usar `<=` (ou vice-versa)?
 
 **Para state machines (PENDING → RUNNING → DONE/FAILED):**
+
 - Todos os caminhos de entrada em um estado também saem dele?
 - Há estados terminais ambíguos (DONE quando deveria ser FAILED)?
 - Uma transição de estado errada pode deixar o sistema em loop?
 - Um estado intermediário pode se tornar terminal se uma operação falhar?
 
 **Para deduplicação e idempotência:**
+
 - A dedup key é suficientemente granular para o caso de uso?
 - A dedup key impede eventos DIFERENTES de serem registrados?
 - A dedup previne operação necessária de ser executada múltiplas vezes (correto)?
 - Ou a dedup previne eventos de monitoramento de serem registrados cada vez (errado)?
 
 **Para locking e concorrência:**
+
 - O lock é liberado em TODOS os caminhos de saída (incluindo exceções)?
 - O lock é adquirido antes de verificar a pré-condição que o lock deveria proteger?
 - O lock TTL é compatível com o tempo máximo da operação?
 - Há janelas onde dois workers podem processar o mesmo item?
 
 **Para retry e backoff:**
+
 - A condição de parada do retry é alcançável?
 - O backoff aumenta corretamente a cada tentativa?
 - Retry + dedup podem criar situação onde o sistema fica "preso" sem progredir?
 - O número máximo de tentativas é checado ANTES ou DEPOIS de tentar?
 
 **Para persistência e atomicidade:**
+
 - Estado parcial é persistido antes de uma operação crítica que pode falhar?
 - Se a operação crítica falhar, o estado parcial persiste e cria inconsistência?
 - Transações de DB são usadas quando múltiplas escritas devem ser atômicas?
 
 **Para comunicação assíncrona (eventos/NERV):**
+
 - O listener está registrado ANTES de o evento poder ser emitido?
 - O evento emitido tem o mesmo formato que o listener espera?
 - Eventos "stale" (atrasados) são descartados corretamente?
@@ -160,12 +170,16 @@ Para cada módulo no escopo:
 
 Para cada interface entre módulos no escopo:
 
-1. **Produtor**: o que este módulo produz? (tipo de dados, campos obrigatórios, semântica dos valores)
+1. **Produtor**: o que este módulo produz? (tipo de dados, campos obrigatórios, semântica dos
+   valores)
 2. **Consumidor**: o que este módulo espera? (mesmo tipo? mesmo campo? mesma semântica?)
-3. **Gaps**: há campos produzidos que o consumidor ignora? Campos esperados que o produtor não fornece?
+3. **Gaps**: há campos produzidos que o consumidor ignora? Campos esperados que o produtor não
+   fornece?
 
 Especialmente verificar:
-- Funções que retornam `true/false` vs funções que retornam `{success: bool}` — chamadores confundem?
+
+- Funções que retornam `true/false` vs funções que retornam `{success: bool}` — chamadores
+  confundem?
 - Funções que lançam exceção vs funções que retornam null — chamadores tratam ambos?
 - Formatos de ID (string vs number) — conversões implícitas criam bugs?
 
@@ -187,9 +201,8 @@ Para cada bug confirmado:
 3. Rodar `npm run test:unit` após cada grupo de correções
 4. Rodar `npm run lint` para verificar estilo
 
-**Critério de mínima mudança:** prefira adicionar uma linha a refatorar um método. Prefira mudar
-um parâmetro a reestruturar a lógica. Só refatore se a refatoração é necessária para corrigir
-o bug.
+**Critério de mínima mudança:** prefira adicionar uma linha a refatorar um método. Prefira mudar um
+parâmetro a reestruturar a lógica. Só refatore se a refatoração é necessária para corrigir o bug.
 
 ### Fase 7 — Documentar Relatório de Auditoria
 
@@ -205,23 +218,24 @@ Criar relatório em `DOCUMENTAÇÃO/AUDITORIAS/` com:
 
 Use como checklist mental ao ler cada módulo:
 
-| Categoria | Pergunta |
-|-----------|----------|
-| **Threshold** | A contagem pode ser zerada/bloqueada por dedup ou cache? |
-| **Estado terminal** | O estado final reflete o resultado real (DONE vs FAILED)? |
-| **Loop de saída** | O critério de parada do loop/retry é sempre alcançável? |
-| **Lock** | O lock é liberado em TODOS os caminhos, incluindo exceções? |
-| **Dedup** | A dedup key impede evento necessário de ser registrado múltiplas vezes? |
-| **Comparação** | A comparação usa `>=` onde deveria usar `>` (ou vice-versa)? |
-| **Resultado** | O resultado de funções críticas está sendo verificado/usado? |
-| **Contrato** | O que o produtor envia tem exatamente o formato que o consumidor espera? |
-| **Persistência** | Estado parcial persiste se a operação crítica falhar? |
-| **Evento** | O listener está registrado antes do evento poder ser emitido? |
+| Categoria           | Pergunta                                                                 |
+| ------------------- | ------------------------------------------------------------------------ |
+| **Threshold**       | A contagem pode ser zerada/bloqueada por dedup ou cache?                 |
+| **Estado terminal** | O estado final reflete o resultado real (DONE vs FAILED)?                |
+| **Loop de saída**   | O critério de parada do loop/retry é sempre alcançável?                  |
+| **Lock**            | O lock é liberado em TODOS os caminhos, incluindo exceções?              |
+| **Dedup**           | A dedup key impede evento necessário de ser registrado múltiplas vezes?  |
+| **Comparação**      | A comparação usa `>=` onde deveria usar `>` (ou vice-versa)?             |
+| **Resultado**       | O resultado de funções críticas está sendo verificado/usado?             |
+| **Contrato**        | O que o produtor envia tem exatamente o formato que o consumidor espera? |
+| **Persistência**    | Estado parcial persiste se a operação crítica falhar?                    |
+| **Evento**          | O listener está registrado antes do evento poder ser emitido?            |
 
 ## Guardrails
 
 - **NUNCA fazer grep como substituto para leitura** — grep não vê semântica.
-- **NUNCA reportar bug sem evidência de fluxo completo** — um trecho de código fora de contexto pode parecer bugado mas estar correto.
+- **NUNCA reportar bug sem evidência de fluxo completo** — um trecho de código fora de contexto pode
+  parecer bugado mas estar correto.
 - **NUNCA confundir "código feio" com "código com bug"** — o objetivo é funcionalidade, não estilo.
 - **SEMPRE ler o chamador** antes de julgar a função chamada — o bug pode estar no chamador.
 - **SEMPRE verificar se downstream "conserta" o problema** antes de reportar como bug.
@@ -237,11 +251,11 @@ Use como checklist mental ao ler cada módulo:
 
 ## Diferença desta skill vs as demais
 
-| Skill | Abordagem | O que encontra |
-|-------|-----------|----------------|
-| `exploratory-bug-hunt` | grep-first + padrões | Timers sem clear, parseInt sem radix, TODOs |
-| `code-audit-and-fix` | grep + patches | Padrões estruturais + aplicação de correções |
-| `reactive-bug-audit` | parte de sintoma | Causa raiz de bug já observado |
+| Skill                      | Abordagem            | O que encontra                                               |
+| -------------------------- | -------------------- | ------------------------------------------------------------ |
+| `exploratory-bug-hunt`     | grep-first + padrões | Timers sem clear, parseInt sem radix, TODOs                  |
+| `code-audit-and-fix`       | grep + patches       | Padrões estruturais + aplicação de correções                 |
+| `reactive-bug-audit`       | parte de sintoma     | Causa raiz de bug já observado                               |
 | **`semantic-logic-audit`** | **leitura profunda** | **Lógica incorreta, invariantes violados, fluxos quebrados** |
 
 ## Related Skills

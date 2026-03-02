@@ -12,8 +12,8 @@ Este documento detalha **todos os parâmetros de configuração** do sistema
 por ambiente.
 
 > **Nota de baseline (1 de março de 2026):** a precedência real de `.env*`, `remoteEnv` e
-> `config.json` foi rebaselineada em
-> [`ENV_VARIABLES_GUIDE.md`](./ENV_VARIABLES_GUIDE.md) e auditada em
+> `config.json` foi rebaselineada em [`ENV_VARIABLES_GUIDE.md`](./ENV_VARIABLES_GUIDE.md) e auditada
+> em
 > [`../AUDITORIAS/ENV_STRUCTURE_AUDIT_2026-03-01.md`](../AUDITORIAS/ENV_STRUCTURE_AUDIT_2026-03-01.md).
 > Use esses dois documentos como referência canônica para variáveis de ambiente antes de seguir os
 > exemplos legados deste guia amplo de configuração.

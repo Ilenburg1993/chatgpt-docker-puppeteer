@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento do subsistema de execução browser e seus contratos.  
-**Quando consultar**: ao alterar factory, drivers, adapter NERV, pooling de drivers ou módulos de execução em página.  
+**Quando consultar**: ao alterar factory, drivers, adapter NERV, pooling de drivers ou módulos de
+execução em página.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # DRIVER

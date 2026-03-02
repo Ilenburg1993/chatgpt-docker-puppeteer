@@ -200,17 +200,17 @@ static exportConfig(outputPath = './chrome-config.json') {
 
 ## 📊 Resumo de Entregáveis
 
-| Fase      | Componente           | LOC       | Tempo  | Arquivos                        |
-| --------- | -------------------- | --------- | ------ | ------------------------------- |
-| 1         | Super Launcher .BAT  | ~350      | 1.5h   | INICIAR_TUDO.BAT                |
-| 2         | Scripts Utilitários  | ~200      | 1h     | scripts/\*.bat (4 arquivos)     |
-| 3         | Health Endpoints     | ~120      | 0.5h   | src/server/api/health.js        |
-| 4         | Chrome Config Export | ~40       | 0.5h   | ConnectionOrchestrator.js       |
-| 5         | Dashboard HTML       | ~250      | 1h     | scripts/launcher-dashboard.html |
+| Fase      | Componente           | LOC       | Tempo  | Arquivos                           |
+| --------- | -------------------- | --------- | ------ | ---------------------------------- |
+| 1         | Super Launcher .BAT  | ~350      | 1.5h   | INICIAR_TUDO.BAT                   |
+| 2         | Scripts Utilitários  | ~200      | 1h     | scripts/\*.bat (4 arquivos)        |
+| 3         | Health Endpoints     | ~120      | 0.5h   | src/server/api/health.js           |
+| 4         | Chrome Config Export | ~40       | 0.5h   | ConnectionOrchestrator.js          |
+| 5         | Dashboard HTML       | ~250      | 1h     | scripts/launcher-dashboard.html    |
 | 6         | Documentação         | ~400      | 0.5h   | DOCUMENTAÇÃO/OPERACOES/LAUNCHER.md |
-| 7         | Roadmap Update       | N/A       | 0.5h   | ROADMAP_LAUNCHER_DASHBOARD.md   |
-| 8         | Testes               | N/A       | 1h     | Validação manual                |
-| **TOTAL** | **8 fases**          | **~1360** | **5h** | **10 arquivos**                 |
+| 7         | Roadmap Update       | N/A       | 0.5h   | ROADMAP_LAUNCHER_DASHBOARD.md      |
+| 8         | Testes               | N/A       | 1h     | Validação manual                   |
+| **TOTAL** | **8 fases**          | **~1360** | **5h** | **10 arquivos**                    |
 
 ---
 

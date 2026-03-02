@@ -1,6 +1,7 @@
 # DECISOES_CONCLUIDAS
 
-**Propósito**: preservar decisões arquiteturais concluídas que hoje têm valor histórico, mas não comandam mais o baseline vigente.  
+**Propósito**: preservar decisões arquiteturais concluídas que hoje têm valor histórico, mas não
+comandam mais o baseline vigente.  
 **Status documental**: Histórico.  
 **Público**: engenharia, arquitetura e auditoria.  
 **Última atualização**: 28 de fevereiro de 2026.

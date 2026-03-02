@@ -1,7 +1,7 @@
 # 🔍 Auditoria de Configurações do Projeto - Chatgpt Docker Puppeteer
 
-> **Nota:** auditoria de configuração datada. Use este documento como diagnóstico histórico e
-> valide o contrato vigente nos documentos canônicos antes de aplicar qualquer ação.
+> **Nota:** auditoria de configuração datada. Use este documento como diagnóstico histórico e valide
+> o contrato vigente nos documentos canônicos antes de aplicar qualquer ação.
 
 **Versão:** 1.0.0 (pre-release) **Data:** 2026-01-20 **Objetivo:** Check-up completo de
 configurações (código + ferramentas) para identificar otimizações

@@ -1,7 +1,7 @@
 # Networking e Gestão de Portas
 
-**Propósito**: documentar o contrato atual de bind, forwarding, portas expostas e endpoints de
-saúde do runtime.  
+**Propósito**: documentar o contrato atual de bind, forwarding, portas expostas e endpoints de saúde
+do runtime.  
 **Status documental**: Canônico.  
 **Público**: engenharia, operação, troubleshooting e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -122,7 +122,8 @@ Em desenvolvimento com DevContainer, o contrato observado é:
 
 ## Bind e port hunting
 
-O bind real do servidor é controlado por [server.js](/workspaces/chatgpt-docker-puppeteer/src/server/engine/server.js).
+O bind real do servidor é controlado por
+[server.js](/workspaces/chatgpt-docker-puppeteer/src/server/engine/server.js).
 
 ### Host de bind
 

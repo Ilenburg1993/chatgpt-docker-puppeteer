@@ -1,9 +1,11 @@
 # Subsistemas do Runtime
 
-**Propósito**: inventariar os subsistemas atuais do runtime com foco em responsabilidade real de cada diretório.  
+**Propósito**: inventariar os subsistemas atuais do runtime com foco em responsabilidade real de
+cada diretório.  
 **Status documental**: Canônico de apoio.  
 **Escopo**: detalhar a topologia operacional sem substituir o baseline de `ARCHITECTURE.md`.  
-**Quando consultar**: ao decidir onde uma mudança deve viver ou ao explicar a função de uma pasta do runtime.  
+**Quando consultar**: ao decidir onde uma mudança deve viver ou ao explicar a função de uma pasta do
+runtime.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](./ARCHITECTURE.md).  
 **Última atualização**: 28 de fevereiro de 2026.
 
@@ -20,7 +22,8 @@ O runtime atual não é apenas “kernel + driver”. Ele está organizado em pl
 - domínio de missão;
 - superfícies externas e serviços auxiliares.
 
-Os deep-dives por subsistema agora ficam concentrados em [SUBSISTEMAS/README.md](./SUBSISTEMAS/README.md).
+Os deep-dives por subsistema agora ficam concentrados em
+[SUBSISTEMAS/README.md](./SUBSISTEMAS/README.md).
 
 ## Núcleo estrutural
 

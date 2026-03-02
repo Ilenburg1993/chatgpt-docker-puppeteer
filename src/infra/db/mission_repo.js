@@ -211,8 +211,12 @@ function updateMission(missionId, updates = {}) {
         });
 
     if (result.changes === 0) {
-        // Concurrent modification detected — re-read and return current state
-        return getMissionById(missionId);
+        // Concurrent modification detected — throw conflict error for caller to handle
+        const error = new Error('Concurrent modification detected — mission was updated by another process');
+        error.code = 'CONFLICT';
+        error.status = 409;
+        error.missionId = missionId;
+        throw error;
     }
 
     return getMissionById(missionId);

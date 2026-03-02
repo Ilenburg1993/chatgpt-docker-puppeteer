@@ -1,14 +1,14 @@
-> **Status**: Histórico
-> **Este documento está arquivado** e não define o baseline oficial.
-> **Referência vigente**: [../../../ARQUITETURA/ARCHITECTURE.md](../../../ARQUITETURA/ARCHITECTURE.md).
+> **Status**: Histórico **Este documento está arquivado** e não define o baseline oficial.
+> **Referência vigente**:
+> [../../../ARQUITETURA/ARCHITECTURE.md](../../../ARQUITETURA/ARCHITECTURE.md).
 
 # 🏗️ Arquitetura do Sistema chatgpt-docker-puppeteer
 
 ## Sistema Autônomo de Controle de LLMs para Missões de Longo Prazo
 
 **Versão**: 4.0 (Mission-Oriented Architecture - Complete Rewrite) **Última Atualização**: 01 de
-Fevereiro de 2026 **Status**: 📝 Documento histórico arquivado **Linhas Estimadas**: ~4,500-5,000 linhas
-técnicas
+Fevereiro de 2026 **Status**: 📝 Documento histórico arquivado **Linhas Estimadas**: ~4,500-5,000
+linhas técnicas
 
 ---
 
