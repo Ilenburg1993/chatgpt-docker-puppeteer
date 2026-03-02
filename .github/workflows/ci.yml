@@ -64,7 +64,7 @@ jobs:
         uses: raven-actions/actionlint@v2.1.1
 
       - name: Lint shell scripts with shellcheck
-        uses: reviewdog/action-shellcheck@v1.9.0
+        uses: reviewdog/action-shellcheck@v1.32.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           shellcheck_flags: "-x"
