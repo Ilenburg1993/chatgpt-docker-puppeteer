@@ -195,6 +195,16 @@ function transitionMission(params) {
         });
         _applyTaskMutation(params.taskMutation, now);
     } catch (err) {
+        if (err?.code === 'CONFLICT') {
+            return {
+                ok: false,
+                statusCode: err?.status || 409,
+                code: 'MISSION_UPDATE_CONFLICT',
+                error: err?.message || 'Missão foi atualizada por outro processo',
+                details: { mission_id: missionId },
+            };
+        }
+
         return {
             ok: false,
             statusCode: 500,
