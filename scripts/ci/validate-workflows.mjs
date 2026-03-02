@@ -16,16 +16,24 @@ const requiredCiScripts = ['validate-workflows.mjs', 'verify-github-workflows.mj
 const requiredScheduledWorkflowKeys = ['concurrency'];
 const workflowsRequiringConcurrency = new Set([
     'audit-nightly.yml',
+    'ci.yml',
+    'code-quality.yml',
+    'copilot-setup-steps.yml',
+    'coverage.yml',
+    'dashboard-build.yml',
     'dependency-hygiene.yml',
     'dependency-review.yml',
     'docker-rebuild.yml',
+    'jsdoc-typing.yml',
+    'release.yml',
     'security.yml',
-    'ci.yml',
+    'semantic-analysis.yml',
+    'stale.yml',
 ]);
 const uploadArtifactPattern = /^actions\/upload-artifact@/;
 const requiredPinnedActionRefs = new Map([
     ['raven-actions/actionlint', 'v2.1.1'],
-    ['reviewdog/action-shellcheck', 'v1.9.0'],
+    ['reviewdog/action-shellcheck', 'v1.32.0'],
     ['hadolint/hadolint-action', 'v3.3.0'],
     ['dependabot/fetch-metadata', 'v2.5.0'],
     ['actions/dependency-review-action', 'v4.8.3'],

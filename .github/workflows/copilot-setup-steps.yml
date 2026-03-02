@@ -52,6 +52,19 @@ on:
     paths:
       - .github/workflows/copilot-setup-steps.yml
 
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+concurrency:
+  group: copilot-setup-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Nome OBRIGATÓRIO pela plataforma Copilot — não renomear.
   # actionlint:ignore unknown-prop
@@ -156,7 +169,7 @@ jobs:
       # 3. PREFIXO npm GLOBAL (isolado e cacheável)
       # Usa ~/npm-global em vez de /usr/local para:
       #   • não exigir sudo em npm install -g
-      #   • permitir cache via actions/cache@v4 (step 3)
+      #   • permitir cache via actions/cache@v5 (step 3)
       #   • não conflitar com binários do sistema do runner
       # ═══════════════════════════════════════════════════════════════════════
       - name: Configure npm global prefix (isolated)
@@ -175,7 +188,7 @@ jobs:
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: global npm tools"
         id: cache-npm-global
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/npm-global
           key: ${{ runner.os }}-npm-global-v4-${{ hashFiles('.github/workflows/copilot-setup-steps.yml') }}
@@ -189,7 +202,7 @@ jobs:
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: dashboard-ui node_modules"
         id: cache-dashboard-deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: src/dashboard-ui/node_modules
           key: ${{ runner.os }}-dashboard-ui-v3-${{ hashFiles('src/dashboard-ui/package-lock.json') }}
@@ -200,7 +213,7 @@ jobs:
       # 6. CACHE — packages Python (camada 4 de cache)
       # ═══════════════════════════════════════════════════════════════════════
       - name: "Cache: Python pip"
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements*.txt', 'agents/**/*.py') }}
@@ -257,10 +270,12 @@ jobs:
           # Aliases canônicos (espelha Dockerfile SECTION 6):
           #   batcat → bat  (Debian/Ubuntu expõe como batcat)
           #   fdfind → fd   (Debian/Ubuntu expõe como fdfind)
-          which batcat 2>/dev/null && ! which bat 2>/dev/null \
-            && sudo ln -sf "$(which batcat)" /usr/local/bin/bat || true
-          which fdfind 2>/dev/null && ! which fd 2>/dev/null \
-            && sudo ln -sf "$(which fdfind)" /usr/local/bin/fd || true
+          if which batcat 2>/dev/null && ! which bat 2>/dev/null; then
+            sudo ln -sf "$(which batcat)" /usr/local/bin/bat
+          fi
+          if which fdfind 2>/dev/null && ! which fd 2>/dev/null; then
+            sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
+          fi
 
           echo "✅ Ferramentas base instaladas"
 

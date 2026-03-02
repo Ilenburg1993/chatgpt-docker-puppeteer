@@ -1,7 +1,7 @@
 # Architecture 2.0 — Changelog Completo
 
-> **Início**: 2 de março de 2026 **Status**: Em andamento **Sessões**: 3 + revisão de código (sessão 1 + sessão 2 +
-> sessão 3 + correções de review)
+> **Início**: 2 de março de 2026 **Status**: Em andamento **Sessões**: 3 + revisão de código (sessão
+> 1 + sessão 2 + sessão 3 + correções de review)
 
 ---
 
@@ -165,72 +165,88 @@
 
 ## Correções de Review de Código
 
-Após Sessão 3, o PR passou por revisões automáticas (copilot, claude, codex) que identificaram e corrigiram issues adicionais.
+Após Sessão 3, o PR passou por revisões automáticas (copilot, claude, codex) que identificaram e
+corrigiram issues adicionais.
 
 ### Correções Aplicadas em Review (commits b12b75c, 229bc24, revisão final)
 
-| #   | Severidade | Módulo        | Arquivo                               | Problema                                                                                     | Status       |
-| --- | ---------- | ------------- | ------------------------------------- | -------------------------------------------------------------------------------------------- | ------------ |
-| R1  | P1         | Dashboard     | TasksView.vue                         | `confirmReasonAndExecute()` chamava callback async sem await/try-catch → unhandled rejection | ✅ Corrigido |
-| R2  | P1         | Infra/DB      | mission_repo.js                       | Optimistic lock com `result.changes===0` não sinalizava conflito ao chamador                 | ✅ Corrigido |
-| R3  | P2         | Repo          | arquivo `60` (raiz)                   | Log de devcontainer versionado acidentalmente                                                | ✅ Removido  |
-| R4  | P1         | Dashboard     | TasksView.vue                         | Ações destrutivas executavam com 1 confirmação (regressão de segurança)                      | ✅ Corrigido |
-| R5  | P2         | Dashboard     | Missions.vue                          | Label do option não correspondia ao enum `LLM_AUTO_APPROVE_WITH_BUDGET`                      | ✅ Corrigido |
-| R6  | P2         | NERV          | correlation_store.js                  | Telemetria reportava `evicted: evictCount` mesmo quando menos itens existiam                 | ✅ Corrigido |
-| R7  | P1         | NERV          | health.js                             | `onChange()` emitia `listener_overflow` repetidamente sem latch                              | ✅ Corrigido |
-| R8  | P2         | Core          | config.js                             | Getter `.all` criava novo objeto + `Object.freeze()` a cada acesso (hot-path overhead)       | ✅ Corrigido |
-| R9  | P1         | Orchestrator  | orchestrator_engine.js                | `task._lockFailed = true` mutava objeto frozen → possível TypeError                          | ✅ Corrigido |
-| R10 | P1         | Agent         | mission_execution_service.js          | `transitionMission()` não propagava erro CONFLICT de `updateMission` ao chamador             | ✅ Corrigido |
-| R11 | P1         | Agent         | mission_execution_service.js          | `updateMissionProgressState()` chamava `updateMission` sem try-catch → CONFLICT vazava       | ✅ Corrigido |
-| R12 | P2         | Server/API    | controllers/missions.js               | Endpoint `POST /feedback` retornava 500 para erros CONFLICT em vez de 409                   | ✅ Corrigido |
+| #   | Severidade | Módulo       | Arquivo                      | Problema                                                                                     | Status       |
+| --- | ---------- | ------------ | ---------------------------- | -------------------------------------------------------------------------------------------- | ------------ |
+| R1  | P1         | Dashboard    | TasksView.vue                | `confirmReasonAndExecute()` chamava callback async sem await/try-catch → unhandled rejection | ✅ Corrigido |
+| R2  | P1         | Infra/DB     | mission_repo.js              | Optimistic lock com `result.changes===0` não sinalizava conflito ao chamador                 | ✅ Corrigido |
+| R3  | P2         | Repo         | arquivo `60` (raiz)          | Log de devcontainer versionado acidentalmente                                                | ✅ Removido  |
+| R4  | P1         | Dashboard    | TasksView.vue                | Ações destrutivas executavam com 1 confirmação (regressão de segurança)                      | ✅ Corrigido |
+| R5  | P2         | Dashboard    | Missions.vue                 | Label do option não correspondia ao enum `LLM_AUTO_APPROVE_WITH_BUDGET`                      | ✅ Corrigido |
+| R6  | P2         | NERV         | correlation_store.js         | Telemetria reportava `evicted: evictCount` mesmo quando menos itens existiam                 | ✅ Corrigido |
+| R7  | P1         | NERV         | health.js                    | `onChange()` emitia `listener_overflow` repetidamente sem latch                              | ✅ Corrigido |
+| R8  | P2         | Core         | config.js                    | Getter `.all` criava novo objeto + `Object.freeze()` a cada acesso (hot-path overhead)       | ✅ Corrigido |
+| R9  | P1         | Orchestrator | orchestrator_engine.js       | `task._lockFailed = true` mutava objeto frozen → possível TypeError                          | ✅ Corrigido |
+| R10 | P1         | Agent        | mission_execution_service.js | `transitionMission()` não propagava erro CONFLICT de `updateMission` ao chamador             | ✅ Corrigido |
+| R11 | P1         | Agent        | mission_execution_service.js | `updateMissionProgressState()` chamava `updateMission` sem try-catch → CONFLICT vazava       | ✅ Corrigido |
+| R12 | P2         | Server/API   | controllers/missions.js      | Endpoint `POST /feedback` retornava 500 para erros CONFLICT em vez de 409                    | ✅ Corrigido |
 
 ### Detalhes das Correções
 
 **R1 — async confirmReasonAndExecute (TasksView.vue)**
+
 - Tornou a função `async` e adicionou `try-catch` para capturar rejeições do callback
 - Estado é limpo em sequência correta para evitar dupla-execução em caso de erro
 
 **R2 — Optimistic Lock CONFLICT em mission_repo.js**
-- `updateMission()` agora lança `Error` com `code: 'CONFLICT'`, `status: 409` quando `result.changes === 0`
+
+- `updateMission()` agora lança `Error` com `code: 'CONFLICT'`, `status: 409` quando
+  `result.changes === 0`
 - Permite que camadas superiores detectem e tratem concorrência explicitamente
 
 **R3 — Remoção do arquivo `60`**
+
 - Arquivo era log de execução do devcontainer, não deve ser versionado
 - Adicionado ao `.gitignore` para prevenir futuras inclusões acidentais
 
 **R4 — 2-step confirmation em TasksView.vue**
+
 - Fluxo de 2 confirmações restaurado: step 1 coleta motivo (modal), step 2 confirma ação com resumo
 - Mantém consistência de segurança com TaskDetail/MissionDetail
 
 **R5 — Label LLM_AUTO_APPROVE_WITH_BUDGET em Missions.vue**
-- Label corrigido para exibir nome completo do enum: `LLM_AUTO_APPROVE_WITH_BUDGET — Automático com orçamento`
+
+- Label corrigido para exibir nome completo do enum:
+  `LLM_AUTO_APPROVE_WITH_BUDGET — Automático com orçamento`
 
 **R6 — actualEvictCount em correlation_store.js**
+
 - Usa `Math.min(evictCount, sortedIds.length)` para emitir métrica precisa de evictions
 - Evita confusão em diagnósticos quando há menos itens que o alvo de eviction
 
 **R7 — Latch overflowWarningEmitted em health.js**
-- Flag `overflowWarningEmitted` garante que o evento `nerv:health:listener_overflow` é emitido apenas uma vez
+
+- Flag `overflowWarningEmitted` garante que o evento `nerv:health:listener_overflow` é emitido
+  apenas uma vez
 - Novos listeners acima do limite são recusados (retorna no-op unsubscribe)
 - Latch é resetado quando listeners voltam abaixo do limite
 
 **R8 — Frozen config cache em config.js**
+
 - Campo `_frozenConfigCache` criado uma vez por reload e retornado em cada acesso ao getter `.all`
 - Elimina overhead de `Object.freeze()` + spread no hot-path
 
 **R9 — Sem mutação de frozen task em orchestrator_engine.js**
+
 - Substituído `task._lockFailed = true` por `return { ...task, _lockFailed: true }`
 - Evita TypeError em objetos frozen/imutáveis
 
 **R10 — Propagação de CONFLICT em transitionMission**
+
 - `transitionMission()` agora envolve `updateMission()` em try-catch
 - Retorna `{ ok: false, statusCode: 409, code: 'MISSION_UPDATE_CONFLICT' }` para conflitos
 
 **R11 — Propagação de CONFLICT em updateMissionProgressState**
+
 - `updateMissionProgressState()` agora envolve `updateMission()` em try-catch
 - Retorna `{ ok: false, statusCode: 409, code: 'MISSION_PROGRESS_CONFLICT' }` para conflitos
 
 **R12 — Feedback endpoint retorna 409 para CONFLICT**
+
 - Catch block do `POST /api/missions/:id/feedback` diferencia erro CONFLICT de erro interno
 - Retorna 409 com mensagem clara quando detecta concorrência
 

@@ -11,6 +11,12 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
 
 jobs:
   dependency-review:

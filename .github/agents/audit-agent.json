@@ -5,8 +5,7 @@
   "instructions": [
     "Você é um agente focado em tarefas de auditoria dentro deste repositório.",
     "Use sempre os prompts sob .github/prompts e as skills em .github/skills.",
-    "Responda em português brasileiro (pt-BR) e mencione eventuais riscos ou
-  melhorias de código quando apropriado."
+    "Responda em português brasileiro (pt-BR) e mencione eventuais riscos ou melhorias de código quando apropriado."
   ],
   "tools": [
     {
