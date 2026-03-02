@@ -74,6 +74,21 @@
 | 40 | P1 | Infra | sqlite.js | Sem WAL checkpoint strategy + sem process exit handler | ✅ Corrigido |
 | 41 | P1 | Core | config.js | Config.all retorna objeto mutável (bypass schema) | ✅ Corrigido |
 
+### Sessão 2 — Bugs de Segurança
+
+| # | Severidade | Módulo | Arquivo | Bug | Status |
+|---|-----------|--------|---------|-----|--------|
+| 42 | P0 🔴 | Server | tasks.js, missions.js | Unauthenticated requests → role:'admin' fallback | ✅ Corrigido (→ 'anonymous') |
+| 43 | P1 | Server | authorize.js | Permission names expostos na resposta de erro | ✅ Corrigido |
+| 44 | P1 | Server | app.js | Error handler expõe stack traces/mensagens internas | ✅ Corrigido |
+
+### Sessão 2 — Bugs no NERV
+
+| # | Severidade | Módulo | Arquivo | Bug | Status |
+|---|-----------|--------|---------|-----|--------|
+| 45 | P1 | NERV | correlation_store.js | Correlations crescem sem limite (memory leak) | ✅ Corrigido |
+| 46 | P1 | NERV | correlation_store.js | MAX_ENTRIES apenas emite evento, não evicta | ✅ Corrigido |
+
 ---
 
 ## Aprimoramentos Sugeridos e Implementados
@@ -139,12 +154,13 @@ Migração gradual, não big-bang:
 
 | Métrica | Sessão 1 | Sessão 2 | Meta |
 |---------|----------|----------|------|
-| Bugs corrigidos | 22 | 41 | 45+ |
+| Bugs corrigidos | 22 | 46 | — |
+| Bugs de segurança corrigidos | 0 | 3 | — |
 | Lint errors | 0 | 0 | 0 |
 | Test pass rate | 798/800 | 798/800 | 798/800 |
 | Silent catch blocks corrigidos | 6 | 13+ | 0 restantes |
 | NERV subsystems cleaned | 7/7 | 7/7 | 7/7 |
-| Silent DB mutations | 2 → 0 | 3+ → 0 | 0 |
+| Silent DB mutations | 2 → 0 | 5+ → 0 | 0 |
 | NERV events adicionados | 2 | 5 | — |
 | Aprimoramentos implementados | 6 | 12 | — |
 | Upgrades implementados | 0 | 6 | — |

@@ -173,7 +173,7 @@ async function _runMissionControlCommand(req, res, command, payload = {}) {
                 idempotency_key:
                     payload.idempotency_key || `${req.id}:${command}:${payload.mission_id || req.params.id}`,
             },
-            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] },
+            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'anonymous', permissions: [] },
         });
 
         return result;

@@ -406,7 +406,8 @@ app.get('/ready', (req, res) => {
         );
         res.json(payload);
     } catch (err) {
-        res.status(500).json({ status: 'unknown', error: err && err.message ? err.message : String(err) });
+        log('ERROR', `[STATUS] Health check failed: ${err?.message || String(err)}`);
+        res.status(500).json({ status: 'unknown', error: 'Internal server error' });
     }
 });
 
@@ -424,9 +425,10 @@ app.use((req, res, next) => {
 -------------------------------------------------------------------------- */
 app.use((err, req, res, next) => {
     const status = err.status || 500;
+    log('ERROR', `[APP] Unhandled error: ${err?.message || String(err)}${err?.stack ? `\n${err.stack}` : ''}`);
 
     res.status(status).json({
-        error: err.message || 'Internal server error',
+        error: status >= 500 ? 'Internal server error' : (err.message || 'Request failed'),
         request_id: req.id || null,
     });
 });
