@@ -128,11 +128,11 @@ jobs:
               `| Unit tests | ${icon(uo)} ${uo} |`,
               '',
               ...suggestions,
-              suggestions.length ? '' : '',
+              '',
               allOk
                 ? '> Todos os checks passaram. ✅'
                 : '> Falhas acima **bloqueiam** o merge.',
-            ].filter((l) => l !== undefined).join('\n');
+            ].join('\n');
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,

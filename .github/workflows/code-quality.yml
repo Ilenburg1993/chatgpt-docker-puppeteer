@@ -171,9 +171,9 @@ jobs:
               `| code_graph | ${icon(go)} ${go} | — |`,
               '',
               ...suggestions,
-              suggestions.length ? '' : '',
+              '',
               '> Falhas são informativas e não bloqueiam o merge.',
-            ].filter((l) => l !== undefined).join('\n');
+            ].join('\n');
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
