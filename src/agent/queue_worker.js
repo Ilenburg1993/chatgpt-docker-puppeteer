@@ -102,7 +102,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
             const format = input?.format ? String(input.format) : 'text';
             if (format !== 'text') {
                 // BUG-CONTEXT-INPUT-SILENT-DROP: non-text formats silently ignored → warn for debuggability
-                log('WARN', `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported`);
+                log('WARN', `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`);
                 continue;
             }
 

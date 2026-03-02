@@ -525,7 +525,9 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     _assertIfVersion(row, ifVersion);
 
     const status = String(row.status || '').toUpperCase();
-    if (!['PAUSED', 'BLOCKED', 'CANCELLED', 'FAILED', 'DONE'].includes(status)) {
+    // BUG-RESUME-DONE: DONE is a terminal success state — it should not be resumable.
+    // Use TASK_RETRY to intentionally re-execute a completed task.
+    if (!['PAUSED', 'BLOCKED', 'CANCELLED', 'FAILED'].includes(status)) {
         throw _error(409, 'TASK_RESUME_INVALID', `Task em status ${status} não pode ser retomada`);
     }
 

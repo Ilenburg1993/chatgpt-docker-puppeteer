@@ -18,6 +18,12 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
  * Responsável por notificar drivers quando tarefas são canceladas ou pausadas pelo usuário.
  */
 class TaskControlWatcher {
+    /** Minimum recent-window to detect PAUSED/CANCELLED tasks regardless of interval (ms). */
+    static MIN_RECENT_WINDOW_MS = 300000; // 5 minutes floor
+
+    /** Multiplier applied to intervalMs to compute the recent-window ceiling. */
+    static INTERVAL_MULTIPLIER = 600; // e.g. 500ms * 600 = 5 min; 1000ms * 600 = 10 min
+
     /**
      * Cria um watcher para monitorar controles de tarefas.
      * @param {TaskControlWatcherOptions} options - Opções de configuração.
@@ -167,9 +173,10 @@ class TaskControlWatcher {
             //    releaseTaskLock before this watcher runs). Window = interval * INTERVAL_MULTIPLIER
             //    (≥MIN_RECENT_WINDOW_MS) so we always cover at least one watcher cycle.
             //    The dedupKey on CONTROL_ABORT_INTENT prevents duplicate abort signals.
-            const MIN_RECENT_WINDOW_MS = 300000; // 5 minutes — floor regardless of interval
-            const INTERVAL_MULTIPLIER = 600;     // e.g. 500ms * 600 = 5 min; 1000ms * 600 = 10 min
-            const RECENT_WINDOW_MS = Math.max(MIN_RECENT_WINDOW_MS, this.intervalMs * INTERVAL_MULTIPLIER);
+            const RECENT_WINDOW_MS = Math.max(
+                TaskControlWatcher.MIN_RECENT_WINDOW_MS,
+                this.intervalMs * TaskControlWatcher.INTERVAL_MULTIPLIER
+            );
             const rows = db
                 .prepare(
                     `

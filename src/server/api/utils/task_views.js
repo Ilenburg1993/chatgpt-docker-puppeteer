@@ -134,7 +134,7 @@ function taskRowToDetailTask(row) {
         try {
             task.blocked_details = JSON.parse(String(row.blocked_details_json));
         } catch (_) {
-            log('WARN', `[task_views] blocked_details_json is not valid JSON for task ${row.id} — using raw string`);
+            log('WARN', `[task_views] malformed JSON in blocked_details_json for task ${row.id} — using raw string fallback`);
             task.blocked_details = row.blocked_details_json;
         }
     }

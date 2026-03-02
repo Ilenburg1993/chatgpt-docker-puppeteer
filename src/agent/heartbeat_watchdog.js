@@ -199,8 +199,8 @@ class HeartbeatWatchdog {
 
                     try {
                         releaseTaskLock({ taskId });
-                    } catch (_) {
-                        /* best-effort */
+                    } catch (lockErr) {
+                        log('DEBUG', `[HeartbeatWatchdog] lock release skipped for ${taskId}: ${lockErr?.message || String(lockErr)}`);
                     }
                 }
 

@@ -506,10 +506,16 @@ class TaskOrchestrationWorker {
                     // ✅ P0-2.5: Setup lock extension usando ResilientLock.extend()
                     const ORCHESTRATION_LOCK_TTL_MS = 300000; // 5 minutes
                     const lockExtensionInterval = setInterval(async () => {
-                        await resilientLock.extend(`task:orch:${taskId}`, () => {
-                            extendTaskLock({ taskId, workerId: this.workerId, lockTtlMs: ORCHESTRATION_LOCK_TTL_MS });
-                            return true;
-                        });
+                        // BUG-ORCH-1: async setInterval callback must catch rejections to avoid
+                        // unhandled Promise rejections which crash Node.js 24+ by default.
+                        try {
+                            await resilientLock.extend(`task:orch:${taskId}`, () => {
+                                extendTaskLock({ taskId, workerId: this.workerId, lockTtlMs: ORCHESTRATION_LOCK_TTL_MS });
+                                return true;
+                            });
+                        } catch (extErr) {
+                            log('WARN', `[TaskOrchestrationWorker] lock extension failed for ${taskId}: ${extErr?.message || String(extErr)}`);
+                        }
                     }, 30000); // Extend every 30s
 
                     try {
