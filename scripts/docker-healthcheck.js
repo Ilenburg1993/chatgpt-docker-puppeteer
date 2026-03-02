@@ -9,11 +9,11 @@
  *
  * Uso no Dockerfile:
  *   HEALTHCHECK CMD node scripts/docker-healthcheck.js
+ *
+ * @module docker-healthcheck
  */
 
-'use strict';
-
-const http = require('http');
+import http from 'node:http';
 
 /** @type {number} */
 const port = Number(process.env.PORT) || 3008;

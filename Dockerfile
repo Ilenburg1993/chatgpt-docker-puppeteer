@@ -10,8 +10,13 @@
 #   1) Imagem mínima: apenas o necessário para executar node index.js
 #   2) Usuário não-root: corre como "nodejs" (UID 1001)
 #   3) Chrome externo: PUPPETEER_SKIP_DOWNLOAD=true (usa CDP para Chrome externo)
-#   4) Multi-estágio: separa deps, build e runtime para cache otimizado
-#   5) Segurança: sem secrets no build, sem ferramentas de dev
+#   4) Multi-estágio: deps-prod → dashboard-builder → production
+#   5) Segurança: sem secrets no build, sem ferramentas de dev na imagem final
+#
+# STAGES:
+#   deps-prod         — instala dependências de produção (omit=dev)
+#   dashboard-builder — instala todas as deps + compila o dashboard Vite
+#   production        — imagem final mínima (deps + dist + código)
 #
 # USO:
 #   docker build -t chatgpt-docker-puppeteer .
@@ -24,17 +29,13 @@
 #   Ver .env.example para a lista completa de variáveis de ambiente.
 #   Mínimo: CHROME_REMOTE_URL (URL do Chrome externo via CDP)
 #
-# VERSÃO: 1.0.0
+# VERSÃO: 1.1.0
 # =============================================================================
 
 # =============================================================================
-# STAGE 1 — deps: instala apenas dependências de produção
+# STAGE 1 — deps-prod: instala apenas dependências de produção
 # =============================================================================
-FROM node:24-bookworm-slim AS deps
-
-# Metadados OCI
-LABEL org.opencontainers.image.title="ChatGPT Docker Puppeteer (deps)"
-LABEL org.opencontainers.image.description="Dependency installation stage"
+FROM node:24-bookworm-slim AS deps-prod
 
 WORKDIR /app
 
@@ -48,7 +49,34 @@ RUN PUPPETEER_SKIP_DOWNLOAD=true \
     && npm cache clean --force
 
 # =============================================================================
-# STAGE 2 — production: imagem final mínima
+# STAGE 2 — dashboard-builder: compila o dashboard Vue/Vite
+#
+# O servidor em produção serve o dashboard a partir de src/dashboard-ui/dist.
+# Como dist/ está no .gitignore e .dockerignore, é necessário compilar aqui.
+# Este stage instala ALL deps (incluindo devDependencies) para ter Vite disponível.
+# =============================================================================
+FROM node:24-bookworm-slim AS dashboard-builder
+
+WORKDIR /app
+
+# Copia manifests raiz e do workspace para instalar todas as deps
+COPY package.json package-lock.json ./
+COPY src/dashboard-ui/package.json src/dashboard-ui/
+
+# Instala todas as dependências (incluindo devDependencies do workspace Vite)
+# PUPPETEER_SKIP_DOWNLOAD: evita download desnecessário de Chromium no builder
+RUN PUPPETEER_SKIP_DOWNLOAD=true \
+    npm ci --no-audit --no-fund \
+    && npm cache clean --force
+
+# Copia o código-fonte do dashboard para compilar
+COPY src/dashboard-ui/ src/dashboard-ui/
+
+# Compila o dashboard (saída em src/dashboard-ui/dist)
+RUN npm run dashboard:build
+
+# =============================================================================
+# STAGE 3 — production: imagem final mínima
 # =============================================================================
 FROM node:24-bookworm-slim AS production
 
@@ -72,11 +100,14 @@ RUN groupadd --gid 1001 nodejs \
 
 WORKDIR /app
 
-# Copia dependências do stage anterior
-COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
+# Copia dependências de produção do stage deps-prod
+COPY --from=deps-prod --chown=nodejs:nodejs /app/node_modules ./node_modules
 
-# Copia o código da aplicação
-# Não copia: .env*, node_modules, dist, logs, fila, backups (ver .dockerignore)
+# Copia o dashboard compilado do stage dashboard-builder
+# (src/dashboard-ui/dist é servido pelo servidor em /dashboard)
+COPY --from=dashboard-builder --chown=nodejs:nodejs /app/src/dashboard-ui/dist ./src/dashboard-ui/dist
+
+# Copia o código da aplicação (excluindo o que está no .dockerignore)
 COPY --chown=nodejs:nodejs . .
 
 # Variáveis de ambiente de produção
