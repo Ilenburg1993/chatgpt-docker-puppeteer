@@ -8,14 +8,16 @@
  * - Network partition previne entrega de eventos NERV
  * - Deadlock no driver trava execução
  *
- * Mitigation: Query periódica de attempts com status=RUNNING e heartbeat > threshold,
- * emitindo DRIVER_TASK_FAILED para forçar transição via projector.
+ * IMPLEMENTAÇÃO: aplica updateTask+updateAttempt+releaseTaskLock diretamente no DB.
+ * Não usa recordEvent para "disparar" o projector — o projector escuta o NERV bus,
+ * não a tabela de eventos, portanto essa abordagem anterior era inefetiva.
  */
 
 import { log } from '#core/logger';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
-import { ActionCode } from '#shared/nerv/constants';
+import { updateAttempt } from '#infra/db/task_attempt_repo';
+import { releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 
 function _now() {
     return Date.now();
@@ -129,47 +131,79 @@ class HeartbeatWatchdog {
                 const attemptId = String(row.attempt_id);
                 const lastHeartbeat = Number(row.last_heartbeat_at_ms) || Number(row.created_at_ms);
                 const staleDurationMs = now - lastHeartbeat;
+                const errorMsg = `WATCHDOG: heartbeat timeout (${Math.floor(staleDurationMs / 1000)}s without heartbeat)`;
+
+                // BUG-HB-DEDUP: stable dedupKey (no ${now}) — one event per (task, attempt).
+                const dedupKey = `watchdog:hb:${taskId}:${attemptId}:heartbeat_timeout`;
+                const firstTime = recordEvent({
+                    entityType: 'task',
+                    entityId: taskId,
+                    tsMs: now,
+                    actorType: 'system',
+                    eventType: 'TASK_WATCHDOG_HEARTBEAT_TIMEOUT',
+                    payload: {
+                        task_id: taskId,
+                        attempt_id: attemptId,
+                        last_heartbeat_at_ms: lastHeartbeat,
+                        stale_duration_ms: staleDurationMs,
+                        threshold_ms: this.staleThresholdMs,
+                        watchdog_worker_id: this.workerId,
+                    },
+                    dedupKey,
+                });
+
+                if (!firstTime) {
+                    // Already processed this attempt — AttemptWatchdog or a previous tick handled it.
+                    continue;
+                }
 
                 log(
                     'WARN',
                     `[HeartbeatWatchdog] Force-failing stale task (task_id=${taskId}, attempt_id=${attemptId}, stale_ms=${staleDurationMs})`
                 );
 
-                // Emit synthetic DRIVER_TASK_FAILED event to trigger state transition via projector.
-                // Use ENV_UNAVAILABLE reason_class to avoid consuming retry budget.
-                const inserted = recordEvent({
-                    entityType: 'task',
-                    entityId: taskId,
-                    tsMs: now,
-                    actorType: 'system',
-                    eventType: ActionCode.DRIVER_TASK_FAILED,
-                    payload: {
-                        task_id: taskId,
-                        correlation_id: attemptId, // Use attempt ID as correlation to route to correct attempt
+                // BUG-HB-WATCHDOG: recordEvent(eventType=DRIVER_TASK_FAILED) was used previously,
+                // but the TaskStateProjector listens to the NERV bus — not the events table — so the
+                // old approach never caused a state transition. We now apply the state change directly
+                // (same pattern as AttemptWatchdog) to actually unblock the task.
+
+                // Close the stale attempt.
+                try {
+                    updateAttempt(attemptId, {
+                        status: 'FAILED',
+                        ended_at_ms: now,
+                        error: errorMsg,
                         reason_class: 'ENV_UNAVAILABLE',
+                        count_attempt: 0, // Don't consume retry budget for infrastructure failures
                         reason_code: 'HEARTBEAT_TIMEOUT',
                         cause_layer: 'WATCHDOG',
-                        reason: `Driver heartbeat timeout (${Math.floor(staleDurationMs / 1000)}s without heartbeat)`,
-                        retryable: true,
-                        count_attempt: false, // Don't consume retry budget for infrastructure failures
-                        details: {
-                            last_heartbeat_at_ms: lastHeartbeat,
-                            stale_duration_ms: staleDurationMs,
-                            threshold_ms: this.staleThresholdMs,
-                            watchdog_worker_id: this.workerId,
-                        },
-                    },
-                    dedupKey: `watchdog:${taskId}:${attemptId}:heartbeat_timeout:${now}`,
-                });
-
-                if (inserted) {
-                    log(
-                        'INFO',
-                        `[HeartbeatWatchdog] Emitted DRIVER_TASK_FAILED for task ${taskId} (attempt ${attemptId})`
-                    );
-                } else {
-                    log('WARN', `[HeartbeatWatchdog] Failed to emit event for task ${taskId} (dedup or error)`);
+                    });
+                } catch (attemptErr) {
+                    log('WARN', `[HeartbeatWatchdog] updateAttempt failed for ${attemptId}: ${attemptErr?.message || String(attemptErr)}`);
                 }
+
+                // Reschedule the task for retry (only if task is in a non-terminal state).
+                const taskStatus = String(row.task_status || '');
+                if (taskStatus === 'RUNNING' || taskStatus === 'PENDING') {
+                    try {
+                        updateTask(taskId, {
+                            stage: TASK_STAGES.READY,
+                            status: 'PENDING',
+                            execute_after_ms: now + 5000,
+                            last_error: errorMsg,
+                        });
+                    } catch (taskErr) {
+                        log('WARN', `[HeartbeatWatchdog] updateTask failed for ${taskId}: ${taskErr?.message || String(taskErr)}`);
+                    }
+
+                    try {
+                        releaseTaskLock({ taskId });
+                    } catch (_) {
+                        /* best-effort */
+                    }
+                }
+
+                log('INFO', `[HeartbeatWatchdog] Task ${taskId} rescheduled after heartbeat timeout (attempt ${attemptId})`);
             }
         } catch (err) {
             log('ERROR', `[HeartbeatWatchdog] tick failed: ${err?.message || String(err)}`);

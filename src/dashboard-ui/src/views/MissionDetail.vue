@@ -420,7 +420,37 @@ watch(missionId, () => void loadAll());
                     </div>
                 </template>
 
-                <div class="flex items-center gap-2 flex-wrap">
+                <!-- Contextual alert when mission is PAUSED due to a blocked/paused task (system-triggered) -->
+                <div
+                    v-if="mission.status === 'PAUSED' && progress?.current_task_id"
+                    class="mt-3 p-3 rounded-lg border border-amber-500/40 bg-amber-950/20 space-y-2"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="text-amber-400 font-semibold text-sm">⏸ Missão pausada aguardando resolução de task</span>
+                    </div>
+                    <div class="text-xs text-amber-300/80">
+                        Task ativa:
+                        <button
+                            class="font-mono underline-offset-2 hover:underline text-sky-300"
+                            @click="router.push(`/tasks/${progress.current_task_id}`)"
+                        >{{ progress.current_task_id }}</button>
+                        — verifique o status da task e, após resolver (desbloquear/reexecutar), retome a missão.
+                    </div>
+                    <div v-if="(liveCounts?.blocked ?? 0) > 0" class="text-xs text-amber-300/80">
+                        {{ liveCounts?.blocked }} task(s) bloqueada(s) nesta missão requerem ação.
+                    </div>
+                </div>
+
+                <!-- Failure reason when mission FAILED -->
+                <div
+                    v-if="mission.status === 'FAILED' && mission.context?.failure_reason"
+                    class="mt-3 p-3 rounded-lg border border-red-500/30 bg-red-950/20"
+                >
+                    <div class="text-xs text-red-400 font-semibold mb-1">Motivo da falha</div>
+                    <div class="text-xs text-red-300 font-mono whitespace-pre-wrap break-all">{{ mission.context.failure_reason }}</div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap mt-3">
                     <Button variant="primary" size="sm" @click="executeMission" :disabled="mission.status === 'RUNNING' || isTerminal"
                         >Executar</Button
                     >
