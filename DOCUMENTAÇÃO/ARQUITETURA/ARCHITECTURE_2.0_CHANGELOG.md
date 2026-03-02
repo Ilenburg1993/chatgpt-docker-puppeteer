@@ -69,6 +69,10 @@
 | 35 | P1 | Agent | task_state_projector.js | Attempt COMPLETED sem NERV event (success path) | ✅ Corrigido |
 | 36 | P1 | Agent | task_orchestration_worker.js | Artifact insertion sem NERV event | ✅ Corrigido |
 | 37 | P2 | Infra | pool_manager.js | Health check interval sem .unref() (process hang) | ✅ Corrigido |
+| 38 | P1 | Core | forensics.js | Visual capture sem page guard + error handling | ✅ Corrigido |
+| 39 | P0 | Core | infra_failure_policy.js | Null type não validado em _executeManeuver + _getPID silencioso | ✅ Corrigido |
+| 40 | P1 | Infra | sqlite.js | Sem WAL checkpoint strategy + sem process exit handler | ✅ Corrigido |
+| 41 | P1 | Core | config.js | Config.all retorna objeto mutável (bypass schema) | ✅ Corrigido |
 
 ---
 
@@ -135,10 +139,10 @@ Migração gradual, não big-bang:
 
 | Métrica | Sessão 1 | Sessão 2 | Meta |
 |---------|----------|----------|------|
-| Bugs corrigidos | 22 | 37 | 40+ |
+| Bugs corrigidos | 22 | 41 | 45+ |
 | Lint errors | 0 | 0 | 0 |
 | Test pass rate | 798/800 | 798/800 | 798/800 |
-| Silent catch blocks corrigidos | 6 | 11+ | 0 restantes |
+| Silent catch blocks corrigidos | 6 | 13+ | 0 restantes |
 | NERV subsystems cleaned | 7/7 | 7/7 | 7/7 |
 | Silent DB mutations | 2 → 0 | 3+ → 0 | 0 |
 | NERV events adicionados | 2 | 5 | — |

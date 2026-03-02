@@ -282,7 +282,7 @@ class ConfigurationManager extends EventEmitter {
      * Permitem leitura síncrona de alta performance pelo Kernel.
      */
     get all() {
-        return this.currentConfig;
+        return Object.freeze({ ...this.currentConfig });
     }
 
     get IDLE_SLEEP() {

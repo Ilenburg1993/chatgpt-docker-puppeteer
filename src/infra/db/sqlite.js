@@ -30,6 +30,7 @@ function applyPragmas(db) {
     db.pragma('synchronous = NORMAL');
     db.pragma('foreign_keys = ON');
     db.pragma('busy_timeout = 5000');
+    db.pragma('wal_autocheckpoint = 1000');
 }
 
 /**
@@ -116,5 +117,17 @@ function closeDb() {
         singletonDb = null;
     }
 }
+
+// Ensure WAL locks are released on process exit to prevent blocking next instance startup
+process.on('exit', () => {
+    if (singletonDb) {
+        try {
+            singletonDb.close();
+        } catch (_) {
+            /* process is exiting — best-effort */
+        }
+        singletonDb = null;
+    }
+});
 
 export { getDb, closeDb, resolveDbPath };

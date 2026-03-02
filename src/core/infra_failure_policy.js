@@ -82,6 +82,10 @@ class InfraFailurePolicy {
      * Executa a manobra física e reporta para a malha sensorial (IPC).
      */
     async _executeManeuver(type, pid, correlationId, ctx, forceKill = false) {
+        if (!type || typeof type !== 'string') {
+            log('ERROR', `[POLICY] Invalid maneuver type: ${type}`, correlationId);
+            return;
+        }
         // A. Notifica o Dashboard e o Supervisor sobre a crise de infraestrutura via NERV (ONDA 2 - Migrado)
         if (nervInstance) {
             try {
@@ -136,7 +140,8 @@ class InfraFailurePolicy {
                 const proc = ctx.browser.process();
                 return proc ? proc.pid : null;
             }
-        } catch (_) {
+        } catch (err) {
+            log('DEBUG', `[POLICY] Failed to extract PID: ${err?.message || String(err)}`);
             return null;
         }
         return null;

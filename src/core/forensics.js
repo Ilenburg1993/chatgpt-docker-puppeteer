@@ -146,24 +146,30 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
  */
 /* global document */
 async function _captureVisualEvidence(page, folder, _correlationId) {
-    // A. Screenshot (JPEG comprimido para performance)
-    await page.screenshot({
-        path: path.join(folder, 'screenshot.jpg'),
-        quality: 40,
-        type: 'jpeg',
-    });
+    try {
+        if (!page || page.isClosed?.()) return;
 
-    // B. Snapshot do DOM (Legibilidade Preservada)
-    // Removemos scripts e iframes, mas mantemos o CSS para análise visual humana.
-    const html = await page.evaluate(() => {
-        const clone = /** @type {Element} */ (document.documentElement.cloneNode(true));
-        // Limpeza de elementos ativos que podem quebrar o visualizador offline
-        const selectorsToRemove = 'script, iframe, noscript, link[rel="prefetch"], link[rel="preload"]';
-        clone.querySelectorAll(selectorsToRemove).forEach(e => e.remove());
-        return clone.outerHTML;
-    });
+        // A. Screenshot (JPEG comprimido para performance)
+        await page.screenshot({
+            path: path.join(folder, 'screenshot.jpg'),
+            quality: 40,
+            type: 'jpeg',
+        });
 
-    await fs.writeFile(path.join(folder, 'dom_snapshot.html'), html, 'utf-8');
+        // B. Snapshot do DOM (Legibilidade Preservada)
+        // Removemos scripts e iframes, mas mantemos o CSS para análise visual humana.
+        const html = await page.evaluate(() => {
+            const clone = /** @type {Element} */ (document.documentElement.cloneNode(true));
+            // Limpeza de elementos ativos que podem quebrar o visualizador offline
+            const selectorsToRemove = 'script, iframe, noscript, link[rel="prefetch"], link[rel="preload"]';
+            clone.querySelectorAll(selectorsToRemove).forEach(e => e.remove());
+            return clone.outerHTML;
+        });
+
+        await fs.writeFile(path.join(folder, 'dom_snapshot.html'), html, 'utf-8');
+    } catch (err) {
+        log('WARN', `[FORENSICS] Visual capture failed: ${err?.message || String(err)}`, _correlationId);
+    }
 }
 
 export { createCrashDump, setNERV };
