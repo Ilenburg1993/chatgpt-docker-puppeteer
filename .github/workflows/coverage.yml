@@ -118,7 +118,7 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const { readFileSync, existsSync } = await import('node:fs');
+            const { readFileSync, existsSync } = require('node:fs');
             const summaryPath = 'artifacts/coverage/summary.md';
             if (!existsSync(summaryPath)) {
               core.info('coverage/summary.md not found, skipping PR comment');

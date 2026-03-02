@@ -136,7 +136,7 @@ jobs:
           GRAPH_OUTCOME: ${{ steps.code_graph.outcome }}
         with:
           script: |
-            const { readFileSync, existsSync } = await import('node:fs');
+            const { readFileSync, existsSync } = require('node:fs');
             const marker = '<!-- code-quality-summary -->';
             const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';
             const co = process.env.CIRCULAR_OUTCOME || 'unknown';
@@ -146,7 +146,7 @@ jobs:
 
             const lineCount = (file) => {
               try { return readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).length; }
-              catch { return 0; }
+              catch (err) { console.warn('Failed to read', file, err.message); return 0; }
             };
             const circularLines = lineCount('artifacts/code-quality/circular-deps.txt');
             const orphanLines = lineCount('artifacts/code-quality/orphans.txt');

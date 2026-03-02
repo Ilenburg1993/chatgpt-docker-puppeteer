@@ -148,7 +148,7 @@ jobs:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
         with:
           script: |
-            const { readFileSync, existsSync } = await import('node:fs');
+            const { readFileSync, existsSync } = require('node:fs');
             const marker = '<!-- dashboard-build-summary -->';
             const buildOutcome = process.env.BUILD_OUTCOME || 'unknown';
             const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';

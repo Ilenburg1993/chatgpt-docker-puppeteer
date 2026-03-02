@@ -256,7 +256,7 @@ jobs:
           CONSOLE_OUTCOME: ${{ steps.jsdoc_console.outcome }}
         with:
           script: |
-            const { readFileSync, existsSync } = await import('node:fs');
+            const { readFileSync, existsSync } = require('node:fs');
             const marker = '<!-- jsdoc-coverage-summary -->';
             const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';
             const jsonOutcome = process.env.JSON_OUTCOME || 'unknown';
@@ -265,12 +265,13 @@ jobs:
             let coverageDetail = '(relatório não gerado)';
             try {
               const raw = readFileSync('artifacts/jsdoc/coverage-raw.log', 'utf8');
-              const match = raw.match(/\{[\s\S]*?\}/);
-              if (match) {
-                const data = JSON.parse(match[0]);
+              // Find the first line that looks like a JSON object (starts with '{')
+              const jsonLine = raw.split('\n').find((l) => l.trimStart().startsWith('{'));
+              if (jsonLine) {
+                const data = JSON.parse(jsonLine.trim());
                 coverageDetail = `${data.percent ?? '?'}% (${data.documented ?? '?'}/${data.total ?? '?'} exports)`;
               }
-            } catch { /* ignore */ }
+            } catch { /* ignore parse errors — log may be empty or malformed */ }
 
             const body = [
               marker,
