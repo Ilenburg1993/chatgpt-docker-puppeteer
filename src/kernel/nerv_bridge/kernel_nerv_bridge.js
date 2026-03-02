@@ -2,7 +2,7 @@
 import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 import { getCorrelationId, getMessageType, getMsgId, getPayload } from '#shared/nerv/envelope_reader';
-import { buildWorkflowNextStepTask } from '#agent/workflow_next_step_builder';
+import { buildWorkflowNextStepTask as defaultWorkflowBuilder } from '#agent/workflow_next_step_builder';
 import { recordEvent } from '#infra/db/events_repo';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
 
@@ -59,7 +59,7 @@ function extractEnvelopeData(envelope) {
  * Instância do OrchestratorEngine (V2.0 - opcional para backward compatibility).
  */
 class KernelNERVBridge {
-    constructor({ nerv, taskRuntime, observationStore, telemetry, orchestrator = null }) {
+    constructor({ nerv, taskRuntime, observationStore, telemetry, orchestrator = null, workflowBuilder = null }) {
         if (!nerv) {
             throw new Error('KernelNERVBridge requer instância do NERV');
         }
@@ -81,6 +81,7 @@ class KernelNERVBridge {
         this.observationStore = observationStore;
         this.telemetry = telemetry;
         this.orchestrator = orchestrator; // V2.0: Motor de orquestração
+        this.workflowBuilder = workflowBuilder || defaultWorkflowBuilder; // V2.0: Injectable, decoupled from #agent/
 
         this.started = false;
         this.unsubscribe = null;
@@ -552,7 +553,7 @@ class KernelNERVBridge {
             at: now,
         });
 
-        const { childTask, childId, nextStepId, workflowId } = buildWorkflowNextStepTask({
+        const { childTask, childId, nextStepId, workflowId } = this.workflowBuilder({
             parentTask: task,
             parentTaskId: taskId,
             attemptId,

@@ -88,6 +88,10 @@
 |---|-----------|--------|---------|-----|--------|
 | 45 | P1 | NERV | correlation_store.js | Correlations crescem sem limite (memory leak) | ✅ Corrigido |
 | 46 | P1 | NERV | correlation_store.js | MAX_ENTRIES apenas emite evento, não evicta | ✅ Corrigido |
+| 47 | P1 | NERV | envelope.js | ACK null payload causa TypeError em Object.keys() | ✅ Corrigido |
+| 48 | P2 | NERV | envelope_reader.js | getTaskIdFromPayload sem type guard | ✅ Corrigido |
+| 49 | P1 | Driver | driver_nerv_adapter.js | progressListener sem error handling | ✅ Corrigido |
+| 50 | P1 | Kernel | kernel_nerv_bridge.js | Cross-domain import de #agent/ — agora injectable | ✅ Corrigido |
 
 ---
 
@@ -154,7 +158,7 @@ Migração gradual, não big-bang:
 
 | Métrica | Sessão 1 | Sessão 2 | Meta |
 |---------|----------|----------|------|
-| Bugs corrigidos | 22 | 46 | — |
+| Bugs corrigidos | 22 | 50 | — |
 | Bugs de segurança corrigidos | 0 | 3 | — |
 | Lint errors | 0 | 0 | 0 |
 | Test pass rate | 798/800 | 798/800 | 798/800 |
