@@ -78,6 +78,48 @@ jobs:
             cat artifacts/security/npm-audit-summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Comment PR with security audit results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { readFileSync, existsSync } = require('node:fs');
+            const marker = '<!-- security-npm-audit-summary -->';
+            const summaryPath = 'artifacts/security/npm-audit-summary.md';
+            const content = existsSync(summaryPath)
+              ? readFileSync(summaryPath, 'utf8')
+              : '_(npm audit summary not generated — check the workflow logs)_\n';
+            const body = `${marker}\n## 🔒 Security — NPM Audit (prod)\n\n${content}`;
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find((c) =>
+                c.user?.type === 'Bot' && c.body?.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Failed to post PR comment: ${err.message}. Results available in the workflow step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }
+
       - name: Upload security audit artifacts
         if: always()
         uses: actions/upload-artifact@v7
