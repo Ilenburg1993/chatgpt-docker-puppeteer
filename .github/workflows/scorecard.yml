@@ -1,0 +1,101 @@
+name: OSSF Scorecard
+
+# Avalia práticas de segurança do repositório usando o OpenSSF Scorecard.
+# Resultados são enviados ao GitHub Security tab (SARIF) e disponíveis como badge.
+#
+# O que é avaliado:
+#   - Branch-Protection: proteção de branches principais
+#   - Code-Review: exigência de code review em PRs
+#   - Dependency-Update-Tool: uso de Dependabot/Renovate
+#   - CI-Tests: presença e uso de testes no CI
+#   - SAST: análise estática de segurança (CodeQL, Semgrep, etc.)
+#   - Vulnerabilities: ausência de vulnerabilidades conhecidas
+#   - License: presença de licença
+#   - Maintained: atividade recente no repositório
+#   - Token-Permissions: uso mínimo de permissões em workflows
+#   - Dangerous-Workflow: ausência de padrões perigosos em workflows
+#   - Binary-Artifacts: ausência de binários comprometidos no repositório
+#   - Pinned-Dependencies: uso de versões exatas em actions e deps
+#
+# Referência: https://github.com/ossf/scorecard-action
+# Badge: https://api.securityscorecards.dev/projects/github.com/Ilenburg1993/chatgpt-docker-puppeteer
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Toda quarta-feira às 02:17 UTC (evitar horário redondo)
+    - cron: "17 2 * * 3"
+  workflow_dispatch:
+
+concurrency:
+  group: scorecard-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  # Requerido para ler o conteúdo do repositório
+  contents: read
+  # Requerido para publicar resultados no GitHub Security tab
+  security-events: write
+  # Requerido para OIDC token (publicar no banco de dados do Scorecard)
+  id-token: write
+  # Requerido para ler configurações das branches
+  actions: read
+  checks: read
+
+jobs:
+  scorecard:
+    name: OpenSSF Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          # Fetch completo para análise de histórico de commits (scoring de manutenção)
+          fetch-depth: 0
+
+      - name: Run OSSF Scorecard
+        uses: ossf/scorecard-action@v2.4.3
+        with:
+          results_file: scorecard.sarif
+          results_format: sarif
+          # Publica resultados no banco de dados público do Scorecard (requer id-token: write)
+          # Desabilitar se o repositório for privado
+          publish_results: true
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: scorecard.sarif
+          category: ossf-scorecard
+
+      - name: Upload Scorecard artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: scorecard-${{ github.run_id }}
+          path: scorecard.sarif
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish Scorecard summary
+        if: always()
+        run: |
+          echo "## 🏆 OSSF Scorecard" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Análise de práticas de segurança concluída." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 🔍 **Resultados**: disponíveis no [Security tab](../../security/code-scanning)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 🏷️ **Badge**: [securityscorecards.dev](https://api.securityscorecards.dev/projects/github.com/${{ github.repository }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 📖 **Documentação**: [github.com/ossf/scorecard](https://github.com/ossf/scorecard)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Como melhorar o score" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Check | Ação para melhorar |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------------------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branch-Protection | Habilite branch protection rules no GitHub Settings |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Pinned-Dependencies | Use SHA fixo em GitHub Actions (ex: actions/checkout@abc123) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Code-Review | Exija pelo menos 1 reviewer em PRs |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| SAST | CodeQL e Trivy já estão configurados ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Dependency-Update-Tool | Dependabot já está configurado ✅ |" >> "$GITHUB_STEP_SUMMARY"
