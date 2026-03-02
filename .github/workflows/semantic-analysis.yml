@@ -100,7 +100,7 @@ jobs:
         id: audit_security
         continue-on-error: true
         run: |
-          npm run audit:preflight || true
+          npm run audit:preflight || echo "::warning::audit:preflight retornou erro; continuando análise sem contexto semântico pré-carregado."
           rc=0
           timeout --signal=INT --kill-after=30s 10m \
             npm run audit:security -- \

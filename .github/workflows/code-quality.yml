@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: code-quality-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref || github.run_id }}
+  group: code-quality-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:

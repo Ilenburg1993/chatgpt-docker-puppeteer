@@ -117,14 +117,14 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const fs = require('node:fs');
+            const { readFileSync, existsSync } = await import('node:fs');
             const summaryPath = 'artifacts/coverage/summary.md';
-            if (!fs.existsSync(summaryPath)) {
+            if (!existsSync(summaryPath)) {
               core.info('coverage/summary.md not found, skipping PR comment');
               return;
             }
             const marker = '<!-- coverage-summary -->';
-            const body = `${marker}\n${fs.readFileSync(summaryPath, 'utf8')}`;
+            const body = `${marker}\n${readFileSync(summaryPath, 'utf8')}`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,

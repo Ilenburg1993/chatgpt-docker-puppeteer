@@ -75,7 +75,7 @@ jobs:
       - name: Build dashboard (non-blocking)
         id: dashboard_build
         continue-on-error: true
-        run: npm run dashboard:build 2>&1 | tee /tmp/dashboard-build.log
+        run: npm run dashboard:build
 
       - name: Create GitHub Release
         uses: actions/github-script@v8
