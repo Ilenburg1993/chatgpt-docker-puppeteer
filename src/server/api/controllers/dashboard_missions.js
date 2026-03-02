@@ -24,7 +24,8 @@ function _normalizeAutonomy(value) {
 function _parseJson(raw, fallback) {
     try {
         return raw ? JSON.parse(String(raw)) : fallback;
-    } catch (_) {
+    } catch (err) {
+        log.debug({ error: err?.message }, '[dashboard_missions] _parseJson fallback to default');
         return fallback;
     }
 }

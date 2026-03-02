@@ -1,6 +1,7 @@
 # Dashboard e Port Forwarding
 
-**Propósito**: documentar o acesso ao dashboard Vite em ambiente devcontainer/VS Code com base no `vite.config.js`, no `devcontainer.json` e nos scripts de diagnóstico atuais.  
+**Propósito**: documentar o acesso ao dashboard Vite em ambiente devcontainer/VS Code com base no
+`vite.config.js`, no `devcontainer.json` e nos scripts de diagnóstico atuais.  
 **Status documental**: Canônico.  
 **Público**: desenvolvimento, operação local em container e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -101,8 +102,8 @@ como guia operacional assistido para esse fluxo.
 
 ## Scripts úteis
 
-- [../../scripts/check-dashboard-access.sh](../../scripts/check-dashboard-access.sh): diagnóstico
-  de acessibilidade do Vite
+- [../../scripts/check-dashboard-access.sh](../../scripts/check-dashboard-access.sh): diagnóstico de
+  acessibilidade do Vite
 - [../../scripts/guide-port-forwarding.sh](../../scripts/guide-port-forwarding.sh): instruções de
   forward manual
 - [../../scripts/open-dashboard-browser.sh](../../scripts/open-dashboard-browser.sh): tentativa de

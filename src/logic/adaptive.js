@@ -146,6 +146,23 @@ function debouncedPersist() {
     }, 5000); // 5s debounce
 }
 
+/**
+ * Flush pendente: cancela debounce e persiste imediatamente.
+ * Chamado durante graceful shutdown para não perder métricas.
+ */
+async function flushBeforeShutdown() {
+    if (persistTimeout) {
+        clearTimeout(persistTimeout);
+        persistTimeout = null;
+    }
+    await persist();
+}
+
+// Graceful shutdown: flush metrics before exit
+process.once('beforeExit', () => {
+    flushBeforeShutdown().catch(() => {});
+});
+
 async function persist() {
     if (persistLock) {
         pendingPersist = true;

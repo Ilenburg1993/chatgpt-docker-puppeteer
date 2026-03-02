@@ -1,6 +1,7 @@
 # NERV
 
-**Propósito**: concentrar análises técnicas intermediárias específicas do barramento NERV, ainda não promovidas ao baseline.  
+**Propósito**: concentrar análises técnicas intermediárias específicas do barramento NERV, ainda não
+promovidas ao baseline.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

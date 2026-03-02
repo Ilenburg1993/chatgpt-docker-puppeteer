@@ -1,6 +1,7 @@
 # RESUMOS_TECNICOS
 
-**Propósito**: concentrar resumos técnicos agregados, tanto os canônicos por domínio quanto o material legado consolidado por subpastas.  
+**Propósito**: concentrar resumos técnicos agregados, tanto os canônicos por domínio quanto o
+material legado consolidado por subpastas.  
 **Status documental**: Canônico.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

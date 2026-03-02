@@ -441,7 +441,11 @@ class RecoverySystem extends EventEmitter {
         const page = this.driver.page;
 
         if (!page) {
-            log('WARN', '[RECOVERY] Cannot perform Tier 3 recovery: driver is in UNATTACHED state (page is null)', correlationId);
+            log(
+                'WARN',
+                '[RECOVERY] Cannot perform Tier 3 recovery: driver is in UNATTACHED state (page is null)',
+                correlationId
+            );
             throw recoveryErr;
         }
 

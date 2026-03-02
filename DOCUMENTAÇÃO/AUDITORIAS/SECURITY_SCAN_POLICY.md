@@ -44,9 +44,8 @@ Ele:
 - roda `npm audit --json`;
 - só promove a `actionable` findings em que o próprio `npm audit` fornece uma versão explícita de
   correção;
-- confirma com `npm view` se a versão de correção sugerida existe no registry, exigindo
-  consistência entre o packument do pacote (`versions` e `time`) e o manifesto da versão exata
-  (`dist.tarball`);
+- confirma com `npm view` se a versão de correção sugerida existe no registry, exigindo consistência
+  entre o packument do pacote (`versions` e `time`) e o manifesto da versão exata (`dist.tarball`);
 - valida também a alcançabilidade real do tarball antes de classificar o finding como bloqueante;
 - separa findings entre:
   - `actionable`
@@ -118,6 +117,7 @@ Postura atual:
 
 ## Links relacionados
 
-- Runbook operacional: [../OPERACOES/DEPENDENCY_AUTOMATION.md](../OPERACOES/DEPENDENCY_AUTOMATION.md)
+- Runbook operacional:
+  [../OPERACOES/DEPENDENCY_AUTOMATION.md](../OPERACOES/DEPENDENCY_AUTOMATION.md)
 - Segurança operacional do runtime: [../OPERACOES/SECURITY.md](../OPERACOES/SECURITY.md)
 - Hub de auditorias: [README.md](./README.md)

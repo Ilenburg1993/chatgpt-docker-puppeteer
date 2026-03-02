@@ -1,6 +1,7 @@
 # Guia de Integração do Chrome Proxy
 
-**Propósito**: explicar como o runtime consome o Chrome Proxy hoje, com base no comportamento real do serviço e do ambiente PM2, sem depender de `config.json` antigo ou de um IP público fixo.  
+**Propósito**: explicar como o runtime consome o Chrome Proxy hoje, com base no comportamento real
+do serviço e do ambiente PM2, sem depender de `config.json` antigo ou de um IP público fixo.  
 **Status documental**: Canônico.  
 **Público**: desenvolvimento, operação local, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -47,8 +48,8 @@ O processo `chrome-proxy` recebe, por padrão:
 
 ### 2. O runtime valida a conectividade
 
-O runtime e os checks de saúde usam o endpoint de proxy como fronteira operacional, e não a porta
-do Chrome real.
+O runtime e os checks de saúde usam o endpoint de proxy como fronteira operacional, e não a porta do
+Chrome real.
 
 Valide com:
 

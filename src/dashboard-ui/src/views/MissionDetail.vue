@@ -398,10 +398,18 @@ watch(missionId, () => void loadAll());
                             <Badge size="sm">{{ mission.autonomy_mode }}</Badge>
                             <Badge size="sm">prop: {{ mission.counts?.proposed ?? 0 }}</Badge>
                             <Badge size="sm">pend: {{ liveCounts?.pending ?? mission.counts?.pending ?? 0 }}</Badge>
-                            <Badge size="sm" variant="info">run: {{ liveCounts?.running ?? mission.counts?.running ?? 0 }}</Badge>
-                            <Badge size="sm" variant="success">done: {{ liveCounts?.done ?? mission.counts?.done ?? 0 }}</Badge>
-                            <Badge size="sm" variant="error">fail: {{ liveCounts?.failed ?? mission.counts?.failed ?? 0 }}</Badge>
-                            <Badge size="sm" variant="warning">blk: {{ liveCounts?.blocked ?? mission.counts?.blocked ?? 0 }}</Badge>
+                            <Badge size="sm" variant="info"
+                                >run: {{ liveCounts?.running ?? mission.counts?.running ?? 0 }}</Badge
+                            >
+                            <Badge size="sm" variant="success"
+                                >done: {{ liveCounts?.done ?? mission.counts?.done ?? 0 }}</Badge
+                            >
+                            <Badge size="sm" variant="error"
+                                >fail: {{ liveCounts?.failed ?? mission.counts?.failed ?? 0 }}</Badge
+                            >
+                            <Badge size="sm" variant="warning"
+                                >blk: {{ liveCounts?.blocked ?? mission.counts?.blocked ?? 0 }}</Badge
+                            >
                         </div>
                     </div>
 
@@ -409,7 +417,11 @@ watch(missionId, () => void loadAll());
                     <div v-if="progressPercent !== null" class="mt-3">
                         <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
                             <span>Progresso do workflow</span>
-                            <span>{{ progressPercent }}% (step {{ progress?.current_step_index ?? 0 }}/{{ progress?.total_steps ?? 0 }})</span>
+                            <span
+                                >{{ progressPercent }}% (step {{ progress?.current_step_index ?? 0 }}/{{
+                                    progress?.total_steps ?? 0
+                                }})</span
+                            >
                         </div>
                         <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
                             <div
@@ -426,14 +438,18 @@ watch(missionId, () => void loadAll());
                     class="mt-3 p-3 rounded-lg border border-amber-500/40 bg-amber-950/20 space-y-2"
                 >
                     <div class="flex items-center gap-2">
-                        <span class="text-amber-400 font-semibold text-sm">⏸ Missão pausada aguardando resolução de task</span>
+                        <span class="text-amber-400 font-semibold text-sm"
+                            >⏸ Missão pausada aguardando resolução de task</span
+                        >
                     </div>
                     <div class="text-xs text-amber-300/80">
                         Task ativa:
                         <button
                             class="font-mono underline-offset-2 hover:underline text-sky-300"
                             @click="router.push(`/tasks/${progress.current_task_id}`)"
-                        >{{ progress.current_task_id }}</button>
+                        >
+                            {{ progress.current_task_id }}
+                        </button>
                         — verifique o status da task e, após resolver (desbloquear/reexecutar), retome a missão.
                     </div>
                     <div v-if="(liveCounts?.blocked ?? 0) > 0" class="text-xs text-amber-300/80">
@@ -447,11 +463,17 @@ watch(missionId, () => void loadAll());
                     class="mt-3 p-3 rounded-lg border border-red-500/30 bg-red-950/20"
                 >
                     <div class="text-xs text-red-400 font-semibold mb-1">Motivo da falha</div>
-                    <div class="text-xs text-red-300 font-mono whitespace-pre-wrap break-all">{{ mission.context.failure_reason }}</div>
+                    <div class="text-xs text-red-300 font-mono whitespace-pre-wrap break-all">
+                        {{ mission.context.failure_reason }}
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-2 flex-wrap mt-3">
-                    <Button variant="primary" size="sm" @click="executeMission" :disabled="mission.status === 'RUNNING' || isTerminal"
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        @click="executeMission"
+                        :disabled="mission.status === 'RUNNING' || isTerminal"
                         >Executar</Button
                     >
                     <Button variant="secondary" size="sm" @click="pauseMission" :disabled="mission.status !== 'RUNNING'"
@@ -461,7 +483,9 @@ watch(missionId, () => void loadAll());
                         >Retomar</Button
                     >
                     <Button variant="danger" size="sm" @click="cancelMission" :disabled="isTerminal">Cancelar</Button>
-                    <Button variant="ghost" size="sm" @click="showCreateTask = true" :disabled="isTerminal">Adicionar tarefa</Button>
+                    <Button variant="ghost" size="sm" @click="showCreateTask = true" :disabled="isTerminal"
+                        >Adicionar tarefa</Button
+                    >
                     <Button
                         v-if="canSuggestTasks"
                         variant="ghost"
@@ -489,7 +513,9 @@ watch(missionId, () => void loadAll());
                     >Eventos</Button
                 >
                 <Button size="sm" variant="ghost" @click="tab = 'policy'" :disabled="tab === 'policy'">Policy</Button>
-                <Button size="sm" variant="ghost" @click="tab = 'feedback'" :disabled="tab === 'feedback'">Feedback</Button>
+                <Button size="sm" variant="ghost" @click="tab = 'feedback'" :disabled="tab === 'feedback'"
+                    >Feedback</Button
+                >
             </div>
 
             <div v-if="tab === 'resumo'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -535,7 +561,9 @@ watch(missionId, () => void loadAll());
                 </Card>
 
                 <Card>
-                    <template #header><div class="text-sm font-semibold text-slate-200">Contagens em tempo real</div></template>
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">Contagens em tempo real</div></template
+                    >
                     <div v-if="liveCounts" class="grid grid-cols-2 gap-3">
                         <div class="text-center p-3 rounded-lg bg-slate-900/40 border border-slate-800">
                             <div class="text-2xl font-bold text-slate-100">{{ liveCounts.total }}</div>
@@ -677,7 +705,8 @@ watch(missionId, () => void loadAll());
                         </Button>
                     </div>
                     <p class="text-xs text-slate-500 mt-2">
-                        Cria uma planner task que retorna proposals JSON. Recarregue após a execução para ver as propostas.
+                        Cria uma planner task que retorna proposals JSON. Recarregue após a execução para ver as
+                        propostas.
                     </p>
                 </Card>
 
@@ -791,7 +820,9 @@ watch(missionId, () => void loadAll());
             <!-- Feedback tab -->
             <div v-else-if="tab === 'feedback'" class="space-y-4">
                 <Card>
-                    <template #header><div class="text-sm font-semibold text-slate-200">Adicionar feedback</div></template>
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">Adicionar feedback</div></template
+                    >
                     <div class="space-y-3">
                         <textarea
                             v-model="feedbackText"
@@ -815,8 +846,12 @@ watch(missionId, () => void loadAll());
 
                 <!-- Feedback history -->
                 <Card>
-                    <template #header><div class="text-sm font-semibold text-slate-200">Histórico de feedback</div></template>
-                    <div v-if="!mission.context?.feedback?.length" class="text-sm text-slate-400">Nenhum feedback registrado.</div>
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">Histórico de feedback</div></template
+                    >
+                    <div v-if="!mission.context?.feedback?.length" class="text-sm text-slate-400">
+                        Nenhum feedback registrado.
+                    </div>
                     <div v-else class="space-y-3">
                         <div
                             v-for="(fb, i) in [...(mission.context?.feedback || [])].reverse()"

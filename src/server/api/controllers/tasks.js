@@ -154,7 +154,7 @@ async function _runTaskControlCommand(req, res, command, payload = {}) {
                     payload.idempotency_key ||
                     `${req.id}:${command}:${payload.task_id || (Array.isArray(payload.ids) ? payload.ids.join(',') : 'n/a')}`,
             },
-            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] },
+            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'anonymous', permissions: [] },
         });
 
         return result;

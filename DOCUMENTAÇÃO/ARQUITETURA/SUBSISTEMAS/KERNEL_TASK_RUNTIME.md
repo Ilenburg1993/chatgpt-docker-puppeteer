@@ -1,11 +1,13 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/kernel/task_runtime/`.  
-**Quando consultar**: ao alterar FSM de tasks em memória, observação técnica, stalled-cycle tracking ou a ponte entre execução e telemetria do kernel.  
+**Quando consultar**: ao alterar FSM de tasks em memória, observação técnica, stalled-cycle tracking
+ou a ponte entre execução e telemetria do kernel.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # KERNEL TASK RUNTIME
 
-**Propósito**: documentar `src/kernel/task_runtime/` como camada de estado técnico transitório do kernel.  
+**Propósito**: documentar `src/kernel/task_runtime/` como camada de estado técnico transitório do
+kernel.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

@@ -9,8 +9,8 @@
 
 - O documento-mestre oficial é [ARCHITECTURE.md](./ARCHITECTURE.md).
 - O baseline atual cobre explicitamente `src/main.js`, `src/core/`, `src/nerv/`, `src/kernel/`,
-  `src/orchestrator/`, `src/agent/`, `src/driver/`, `src/infra/`, `src/missions/`,
-  `src/server/`, `src/dashboard-ui/` e os serviços auxiliares.
+  `src/orchestrator/`, `src/agent/`, `src/driver/`, `src/infra/`, `src/missions/`, `src/server/`,
+  `src/dashboard-ui/` e os serviços auxiliares.
 - A raiz de `ARQUITETURA/` mantém os entrypoints e os documentos estruturais; os deep-dives
   canônicos foram agrupados em [SUBSISTEMAS/README.md](./SUBSISTEMAS/README.md) e os recortes
   não-baseline em [ESPECIALIZADOS/README.md](./ESPECIALIZADOS/README.md).
@@ -112,7 +112,8 @@
 
 ## Documentos históricos / superseded
 
-- Histórico arquivado: [../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md](../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md)
+- Histórico arquivado:
+  [../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md](../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md)
 - Versões antigas não são baseline e não devem guiar novas decisões estruturais.
 
 ## Como manter esta seção
@@ -126,9 +127,9 @@
 - A cobertura oficial agora já inclui `src/infra/storage/`, `src/infra/locks/`,
   `src/server/middleware/`, `src/server/handlers/` e `src/server/watchers/`.
 - As lacunas mais relevantes migraram para subtrilhas ainda sem deep-dive próprio, em especial
-  `src/infra/fs/`, `src/server/api/controllers/`, `src/server/engine/`, `src/missions/templates/`
-  e `src/dashboard-ui/src/stores/`.
-- `src/agent/` permanece uma trilha plana no baseline atual; não existe `src/agent/workers/`
-  como subárvore real nesta revisão.
+  `src/infra/fs/`, `src/server/api/controllers/`, `src/server/engine/`, `src/missions/templates/` e
+  `src/dashboard-ui/src/stores/`.
+- `src/agent/` permanece uma trilha plana no baseline atual; não existe `src/agent/workers/` como
+  subárvore real nesta revisão.
 - A trilha `TECHNICAL/` e parte dos docs especializados ainda não foram normalizados no mesmo nível
   de profundidade destes documentos de apoio.

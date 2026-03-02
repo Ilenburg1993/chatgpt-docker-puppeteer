@@ -1,6 +1,7 @@
 # RELATORIOS
 
-**Propósito**: concentrar relatórios, sumários, análises, consolidações e registros de implementação com valor de consulta contínua.  
+**Propósito**: concentrar relatórios, sumários, análises, consolidações e registros de implementação
+com valor de consulta contínua.  
 **Status documental**: Canônico.  
 **Público**: engenharia, manutenção, auditoria e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

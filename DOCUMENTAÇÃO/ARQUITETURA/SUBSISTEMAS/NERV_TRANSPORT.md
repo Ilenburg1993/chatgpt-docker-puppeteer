@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/nerv/transport/`.  
-**Quando consultar**: ao alterar framing, conexão física, reconexão, transporte híbrido ou adapters de envio/recepção do barramento.  
+**Quando consultar**: ao alterar framing, conexão física, reconexão, transporte híbrido ou adapters
+de envio/recepção do barramento.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # NERV TRANSPORT

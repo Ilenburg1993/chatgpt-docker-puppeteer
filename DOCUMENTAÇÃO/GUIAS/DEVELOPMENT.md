@@ -1,6 +1,7 @@
 # Guia de Desenvolvimento
 
-**Propósito**: documentar o fluxo canônico de desenvolvimento local, validação e debug com base no runtime real do repositório atual.  
+**Propósito**: documentar o fluxo canônico de desenvolvimento local, validação e debug com base no
+runtime real do repositório atual.  
 **Status documental**: Canônico.  
 **Público**: desenvolvimento, manutenção, revisão técnica e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -139,8 +140,8 @@ npm run test:watch
 npm run test:coverage
 ```
 
-O agregador `npm test` encadeia `unit + integration + regression`. Se algum processo ficar
-pendurado por handles abertos, trate isso como problema a investigar, não como comportamento normal.
+O agregador `npm test` encadeia `unit + integration + regression`. Se algum processo ficar pendurado
+por handles abertos, trate isso como problema a investigar, não como comportamento normal.
 
 ## Estrutura que realmente importa
 
@@ -198,8 +199,8 @@ Outras rotas de debug existentes:
 - `npm run debug:performance`
 - `npm run debug:race-condition`
 
-O backend responde em `3008` por padrão. O frontend Vite, quando isolado, usa o workspace próprio
-de `dashboard-ui`.
+O backend responde em `3008` por padrão. O frontend Vite, quando isolado, usa o workspace próprio de
+`dashboard-ui`.
 
 ## Drift legado que ainda existe
 

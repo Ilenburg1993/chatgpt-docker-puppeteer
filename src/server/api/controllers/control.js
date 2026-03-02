@@ -3,6 +3,7 @@ import { COMMANDS, executeCommand, validateCommand } from '#server/domain/contro
 import { RBAC_PERMISSIONS, RBAC_ROLES, getRbacUserByUsername, upsertRbacUser } from '#infra/db/rbac_repo';
 import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_repo';
 import { getControlOperationById, listControlOperations } from '#infra/db/control_operation_repo';
+import { recordEvent } from '#infra/db/events_repo';
 import express from 'express';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/auth.js';
@@ -155,6 +156,15 @@ router.patch('/preferences/me', authenticate, schemaGuard(prefsPatchSchema), (re
     const userId = req.user?.username || req.user?.id;
     const prefs = upsertUserPreferences(userId, req.body || {});
 
+    recordEvent({
+        entityType: 'user',
+        entityId: String(userId),
+        eventType: 'USER_PREFERENCES_UPDATED',
+        actorType: 'user',
+        actorId: userId,
+        payload: { fields: Object.keys(req.body || {}) },
+    });
+
     res.json({
         success: true,
         preferences: prefs,
@@ -190,6 +200,15 @@ router.put(
             password: req.body.password,
             role: req.body.role,
             active: req.body.active !== false,
+        });
+
+        recordEvent({
+            entityType: 'rbac_user',
+            entityId: String(req.params.username),
+            eventType: 'RBAC_USER_UPSERTED',
+            actorType: 'user',
+            actorId: req.user?.username || req.user?.id,
+            payload: { role: req.body.role, active: req.body.active !== false },
         });
 
         res.json({

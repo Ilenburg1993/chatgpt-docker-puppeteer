@@ -1,6 +1,8 @@
 **Status**: Canônico de apoio.  
-**Escopo**: aprofundamento de `src/shared/` como base transversal de contratos e helpers reutilizáveis.  
-**Quando consultar**: ao alterar helpers compartilhados entre subsistemas, protocolo NERV compartilhado, biomecânica, estabilização de página ou utilitários transversais.  
+**Escopo**: aprofundamento de `src/shared/` como base transversal de contratos e helpers
+reutilizáveis.  
+**Quando consultar**: ao alterar helpers compartilhados entre subsistemas, protocolo NERV
+compartilhado, biomecânica, estabilização de página ou utilitários transversais.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # SHARED
@@ -12,8 +14,8 @@
 
 ## Papel arquitetural
 
-`src/shared/` existe para evitar duplicação de contratos e algoritmos entre subsistemas. Essa
-trilha concentra:
+`src/shared/` existe para evitar duplicação de contratos e algoritmos entre subsistemas. Essa trilha
+concentra:
 
 - vocabulário compartilhado;
 - helpers utilitários;

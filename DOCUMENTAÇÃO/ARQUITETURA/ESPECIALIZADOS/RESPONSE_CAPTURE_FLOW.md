@@ -1,6 +1,5 @@
-> **Status**: Especializado
-> **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md) como fonte oficial.
-> **Quando consultar**: apenas para aprofundamento deste recorte.
+> **Status**: Especializado **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md)
+> como fonte oficial. **Quando consultar**: apenas para aprofundamento deste recorte.
 
 # 🔄 Fluxo de Captura de Resposta da LLM
 
@@ -696,8 +695,8 @@ if (lastResponseSelector && isValidSelector(lastResponseSelector)) {
 
 ## 📚 Referências
 
-1. **[ChatGPTDriver.js](../../../src/driver/targets/ChatGPTDriver.js)** - Implementação completa (linhas
-   336-560)
+1. **[ChatGPTDriver.js](../../../src/driver/targets/ChatGPTDriver.js)** - Implementação completa
+   (linhas 336-560)
 2. **[SADI Analyzer](../../../src/shared/sadi/analyzer.js)** - Growth detection (linhas 622-700)
 3. **[Triage Module](../../../src/driver/modules/triage.js)** - Diagnóstico de bloqueios
 4. **[BaseDriver](../../../src/driver/core/BaseDriver.js)** - Orquestração de execução

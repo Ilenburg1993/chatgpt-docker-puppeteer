@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da trilha `src/logic/`.  
-**Quando consultar**: ao alterar heurísticas adaptativas, validação de resultados em arquivo ou regras semânticas não pertencentes a um único subsistema.  
+**Quando consultar**: ao alterar heurísticas adaptativas, validação de resultados em arquivo ou
+regras semânticas não pertencentes a um único subsistema.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # LOGIC
@@ -13,8 +14,7 @@
 ## Papel arquitetural
 
 `src/logic/` abriga regras de cálculo, auditoria e decisão que não pertencem integralmente a
-`kernel`, `driver`, `server` ou `orchestrator`, mas que ainda são parte do comportamento do
-sistema.
+`kernel`, `driver`, `server` ou `orchestrator`, mas que ainda são parte do comportamento do sistema.
 
 ## Componentes principais
 

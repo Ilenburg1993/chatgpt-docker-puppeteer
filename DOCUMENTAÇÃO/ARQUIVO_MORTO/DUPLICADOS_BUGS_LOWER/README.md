@@ -1,6 +1,7 @@
 # DUPLICADOS_BUGS_LOWER
 
-**Propósito**: isolar material duplicado de bugs preservado apenas para rastreabilidade de consolidação.  
+**Propósito**: isolar material duplicado de bugs preservado apenas para rastreabilidade de
+consolidação.  
 **Status documental**: Histórico.  
 **Público**: engenharia e auditoria.  
 **Última atualização**: 28 de fevereiro de 2026.

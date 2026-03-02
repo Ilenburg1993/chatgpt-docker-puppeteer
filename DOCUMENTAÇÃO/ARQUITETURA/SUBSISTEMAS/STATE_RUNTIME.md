@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da área `src/state/` como raiz de estado runtime em disco.  
-**Quando consultar**: ao alterar persistência local de estado transitório, checkpoints em filesystem ou layout de state on-disk fora do SQLite.  
+**Quando consultar**: ao alterar persistência local de estado transitório, checkpoints em filesystem
+ou layout de state on-disk fora do SQLite.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # STATE RUNTIME
@@ -12,8 +13,8 @@
 
 ## Papel arquitetural
 
-`src/state/` é uma área auxiliar de persistência local para estado transitório ou recuperável fora do
-SQLite. No snapshot atual do repositório, ela está representada principalmente por
+`src/state/` é uma área auxiliar de persistência local para estado transitório ou recuperável fora
+do SQLite. No snapshot atual do repositório, ela está representada principalmente por
 `src/state/README.md`, que descreve a estrutura esperada de runtime.
 
 Essa trilha existe para:
@@ -33,8 +34,8 @@ Essa trilha existe para:
 - `memory/`
 - `kernel/`
 
-No baseline atual, esses diretórios são descritos como áreas de estado JSON com escrita atômica,
-mas não aparecem versionados como código-fonte nesta árvore.
+No baseline atual, esses diretórios são descritos como áreas de estado JSON com escrita atômica, mas
+não aparecem versionados como código-fonte nesta árvore.
 
 ## Relação com outros subsistemas
 

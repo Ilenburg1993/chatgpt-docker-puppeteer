@@ -173,7 +173,7 @@ async function _runMissionControlCommand(req, res, command, payload = {}) {
                 idempotency_key:
                     payload.idempotency_key || `${req.id}:${command}:${payload.mission_id || req.params.id}`,
             },
-            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] },
+            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'anonymous', permissions: [] },
         });
 
         return result;
@@ -646,6 +646,14 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
             request_id: req.id,
         });
     } catch (err) {
+        if (err?.code === 'CONFLICT') {
+            return res.status(409).json({
+                success: false,
+                error: 'Conflito de concorrência ao salvar feedback',
+                details: err?.message || String(err),
+                request_id: req.id,
+            });
+        }
         log('ERROR', `[MISSIONS_API] Erro ao adicionar feedback: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,

@@ -13,13 +13,20 @@ export function buildPhasePlan(options) {
     const includeStatic = ['reactive_bug', 'exploratory_bug', 'contracts', 'security', 'architecture'].includes(
         auditMode
     );
-    const includeRuntime = ['observability', 'reactive_bug', 'exploratory_bug', 'security', 'performance', 'architecture'].includes(
-        auditMode
-    );
+    const includeRuntime = [
+        'observability',
+        'reactive_bug',
+        'exploratory_bug',
+        'security',
+        'performance',
+        'architecture',
+    ].includes(auditMode);
     const includeTests = ['observability', 'reactive_bug', 'exploratory_bug', 'security', 'performance'].includes(
         auditMode
     );
-    const includeChaos = options.profile === 'nightly' && ['exploratory_bug', 'reactive_bug', 'security', 'performance'].includes(auditMode);
+    const includeChaos =
+        options.profile === 'nightly' &&
+        ['exploratory_bug', 'reactive_bug', 'security', 'performance'].includes(auditMode);
     const includeSecurity = auditMode === 'security';
     const includePerformance = ['exploratory_bug', 'performance'].includes(auditMode);
     const includeArchitecture = ['exploratory_bug', 'performance', 'architecture'].includes(auditMode);
@@ -99,7 +106,12 @@ export function buildPhasePlan(options) {
     phases.push({
         id: AUDIT_PHASES.COLLECT_RUNTIME,
         planned_steps: includeRuntime
-            ? ['runtime.mcp_diagnose', 'runtime.rag_health', 'runtime.lsp_health', ...(options.profile === 'quick' ? [] : ['runtime.smoke'])]
+            ? [
+                  'runtime.mcp_diagnose',
+                  'runtime.rag_health',
+                  'runtime.lsp_health',
+                  ...(options.profile === 'quick' ? [] : ['runtime.smoke']),
+              ]
             : [],
     });
 

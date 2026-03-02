@@ -311,17 +311,22 @@ Respond ONLY in JSON format:
         }
 
         try {
-            // Timeout wrapper — timer é cancelado assim que responsePromise resolve/rejeita
+            // Timeout wrapper com AbortController para cancelar promise órfã
+            const abortCtrl = signal ? null : new AbortController();
+            const effectiveSignal = signal || abortCtrl?.signal;
             let timeoutId;
             const timeoutPromise = new Promise((_, reject) => {
-                timeoutId = setTimeout(() => reject(new Error('LLM Judge timeout')), this.timeout);
+                timeoutId = setTimeout(() => {
+                    if (abortCtrl) abortCtrl.abort();
+                    reject(new Error('LLM Judge timeout'));
+                }, this.timeout);
             });
 
             const responsePromise = this.driver.sendPrompt(judgePrompt, {
                 model: this.model,
                 temperature: 0.3, // Baixa temperature para validação consistente
                 maxTokens: 500, // Resposta curta (JSON)
-                signal,
+                signal: effectiveSignal,
             });
 
             let response;
@@ -390,10 +395,11 @@ Respond ONLY in JSON format:
      * @private
      */
     _normalizeScore(score) {
-        if (typeof score !== 'number' || isNaN(score)) {
+        const parsed = typeof score === 'string' ? Number(score) : score;
+        if (typeof parsed !== 'number' || isNaN(parsed)) {
             return 50;
         }
-        return Math.max(0, Math.min(100, Math.round(score)));
+        return Math.max(0, Math.min(100, Math.round(parsed)));
     }
 }
 

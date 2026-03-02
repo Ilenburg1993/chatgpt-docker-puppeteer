@@ -73,7 +73,7 @@ function createEnvelope({ actor, messageType, actionCode, payload = {}, correlat
     assert(Object.values(ActionCode).includes(actionCode), `Invalid action code: ${actionCode}`);
 
     if (messageType === MessageType.ACK) {
-        assert(Object.keys(payload).length === 0, 'ACK must not carry semantic payload');
+        assert(!payload || Object.keys(payload).length === 0, 'ACK must not carry semantic payload');
     }
 
     /* ------------------------------------------------------------------------

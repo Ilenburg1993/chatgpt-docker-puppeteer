@@ -337,6 +337,7 @@ function start(options) {
             }
         });
     }, interval);
+    _timer.unref();
     void _tick({ socketHub, batchLimit: lim });
 
     log('INFO', `[SSOTEventFeed] started (interval=${interval}ms, batchLimit=${lim})`);

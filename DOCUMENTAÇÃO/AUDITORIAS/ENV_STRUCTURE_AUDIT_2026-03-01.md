@@ -83,8 +83,8 @@ Uma terceira passagem endureceu a camada `.devcontainer`:
 - Atualizado [`.env.schema.json`](../../.env.schema.json) para bater com o runtime:
   - `BROWSER_MODE` agora aceita `executablePath` e `external`;
   - `ALLOCATION_STRATEGY` agora usa `round-robin`, `least-loaded` e `target-affinity`.
-- Isso elimina divergência entre o schema usado por `scripts/env/validate-env.js` e o
-  `ConfigSchema` real.
+- Isso elimina divergência entre o schema usado por `scripts/env/validate-env.js` e o `ConfigSchema`
+  real.
 
 ### 3. Validação do DevContainer
 
@@ -94,17 +94,16 @@ Uma terceira passagem endureceu a camada `.devcontainer`:
   - `.env.<NODE_ENV>.local`
   - `.env.local`
   - `.env.local.example`
-- O script também foi ajustado para documentar corretamente que `remoteEnv` e `containerEnv`
-  podem ser a fonte do ambiente.
+- O script também foi ajustado para documentar corretamente que `remoteEnv` e `containerEnv` podem
+  ser a fonte do ambiente.
 - Os utilitários [`scripts/env/validate-env.js`](../../scripts/env/validate-env.js) e
   [`scripts/env/check-env-local.mjs`](../../scripts/env/check-env-local.mjs) tiveram a resolução da
   raiz corrigida de `scripts/` para a raiz real do projeto.
 
 ### 4. Templates `.env*`
 
-- [`.env.example`](../../.env.example) agora documenta a resolução real em duas etapas:
-  composição de `process.env` e override posterior por `config.json` para chaves do
-  `ConfigurationManager`.
+- [`.env.example`](../../.env.example) agora documenta a resolução real em duas etapas: composição
+  de `process.env` e override posterior por `config.json` para chaves do `ConfigurationManager`.
 - [`.env.example`](../../.env.example) e [`.env.local.example`](../../.env.local.example) foram
   atualizados para refletir:
   - uso preferencial de `.env.local` para segredos;
@@ -117,10 +116,9 @@ Uma terceira passagem endureceu a camada `.devcontainer`:
 
 ### 5. Bootstrap de autenticação local
 
-- O comentário contratual de
-  [`sync-local-auth.sh`](../../.devcontainer/scripts/sync-local-auth.sh) foi corrigido para deixar
-  explícito que `remoteEnv` não tem precedência absoluta: `.env*.local` sobrescreve chaves
-  duplicadas quando presente.
+- O comentário contratual de [`sync-local-auth.sh`](../../.devcontainer/scripts/sync-local-auth.sh)
+  foi corrigido para deixar explícito que `remoteEnv` não tem precedência absoluta: `.env*.local`
+  sobrescreve chaves duplicadas quando presente.
 
 ### 6. Documentação canônica
 
@@ -140,10 +138,10 @@ Uma terceira passagem endureceu a camada `.devcontainer`:
 - O `containerEnv` foi reduzido para o que realmente complementa a imagem; defaults estáveis como
   `NODE_ENV`, `LOG_LEVEL`, `LANG`, `PUPPETEER_LOCAL_LAUNCH_DISABLED` e parte do bloco `NPM_CONFIG_*`
   permanecem no Dockerfile como baseline primário.
-- O fallback de `LOG_LEVEL` no `remoteEnv` foi alinhado com o baseline de desenvolvimento
-  (`debug`), reduzindo drift entre processos do VS Code e o `.env.development`.
-- O comentário contratual do Dockerfile foi corrigido para refletir a precedência real,
-  incluindo `containerEnv`, bootstrap `.env*` e `config.json`.
+- O fallback de `LOG_LEVEL` no `remoteEnv` foi alinhado com o baseline de desenvolvimento (`debug`),
+  reduzindo drift entre processos do VS Code e o `.env.development`.
+- O comentário contratual do Dockerfile foi corrigido para refletir a precedência real, incluindo
+  `containerEnv`, bootstrap `.env*` e `config.json`.
 
 ## Estado Final da Precedência
 
@@ -163,11 +161,10 @@ Uma terceira passagem endureceu a camada `.devcontainer`:
 
 ## Riscos Residuais
 
-- O projeto ainda possui documentos históricos e relatórios antigos que citam hierarquias legadas
-  de `.env`; eles devem ser tratados como material histórico, não como baseline operacional.
+- O projeto ainda possui documentos históricos e relatórios antigos que citam hierarquias legadas de
+  `.env`; eles devem ser tratados como material histórico, não como baseline operacional.
 - A precedência atual de `config.json` sobre defaults derivados de env é intencional no desenho
-  vigente, mas pode surpreender quem espera “env sempre vence”. Isso foi documentado, não
-  alterado.
+  vigente, mas pode surpreender quem espera “env sempre vence”. Isso foi documentado, não alterado.
 - O schema agora cobre o baseline versionado (`.env.development`, `.env.production` e `.env.test`)
   sem avisos de `Extras not in schema`, mas ainda existem knobs de especialista fora do template
   principal por decisão consciente (por exemplo `ADAPTER_*`, `HANDLE_*`, `RESOLVER_*` e

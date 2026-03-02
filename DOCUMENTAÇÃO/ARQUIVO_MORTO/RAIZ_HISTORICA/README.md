@@ -1,6 +1,7 @@
 # RAIZ_HISTORICA
 
-**Propósito**: preservar documentação que antes ficava solta na raiz do repositório e hoje é mantida apenas por contexto histórico.  
+**Propósito**: preservar documentação que antes ficava solta na raiz do repositório e hoje é mantida
+apenas por contexto histórico.  
 **Status documental**: Histórico.  
 **Público**: engenharia e manutenção.  
 **Última atualização**: 28 de fevereiro de 2026.

@@ -1,6 +1,7 @@
 # CHECKLISTS_HISTORICOS
 
-**Propósito**: preservar checklists antigos mantidos apenas por consulta histórica e rastreabilidade.  
+**Propósito**: preservar checklists antigos mantidos apenas por consulta histórica e
+rastreabilidade.  
 **Status documental**: Histórico.  
 **Público**: engenharia e auditoria.  
 **Última atualização**: 28 de fevereiro de 2026.

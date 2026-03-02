@@ -68,6 +68,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
     const store = emptyMap();
 
     const MAX_ENTRIES = typeof limits.maxEntries === 'number' ? limits.maxEntries : null;
+    const MAX_CORRELATIONS = typeof limits.maxCorrelations === 'number' ? limits.maxCorrelations : 10000;
     const TTL = limits.ttl || 3600000; // 1 hora default
 
     /* ===========================
@@ -79,6 +80,21 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      */
     function ensureCorrelation(correlationId) {
         if (!store[correlationId]) {
+            // Evict oldest correlations if limit exceeded
+            const keys = Object.keys(store);
+            if (MAX_CORRELATIONS && keys.length >= MAX_CORRELATIONS) {
+                const sortedIds = keys.sort((a, b) => store[a].createdAt - store[b].createdAt);
+                const evictCount = Math.max(1, Math.ceil(MAX_CORRELATIONS * 0.1)); // Evict 10%
+                const actualEvictCount = Math.min(evictCount, sortedIds.length); // Count actual evicted items
+                for (let i = 0; i < actualEvictCount; i++) {
+                    delete store[sortedIds[i]];
+                }
+                telemetry.emit('nerv:correlation:evicted_overflow', {
+                    evicted: actualEvictCount,
+                    limit: MAX_CORRELATIONS,
+                });
+            }
+
             store[correlationId] = {
                 createdAt: now(),
                 entries: [],
@@ -162,11 +178,13 @@ function createCorrelationStore({ telemetry, limits = {} }) {
             size: records.length,
         });
 
-        // Limite técnico opcional (não causal)
+        // Limite técnico opcional — evict oldest entries when exceeded
         if (MAX_ENTRIES && records.length > MAX_ENTRIES) {
+            const evictCount = records.length - MAX_ENTRIES;
+            records.splice(0, evictCount);
             telemetry.emit('nerv:correlation:size_exceeded', {
                 correlation_id: correlationId,
-                size: records.length,
+                evicted: evictCount,
                 limit: MAX_ENTRIES,
             });
         }

@@ -124,7 +124,7 @@ class PolicyEngine {
         this._assessDuplication(observations, alerts);
 
         // 5. Avaliação de risco configuracional
-        this._assessConfigurationRisk(task, observations, alerts);
+        this._assessConfigurationRisk(task, observations, at, alerts);
 
         // 6. Avaliação de estagnação
         this._assessStagnation(task, observations, at, alerts);
@@ -259,7 +259,7 @@ class PolicyEngine {
     /**
      * Avalia risco configuracional.
      */
-    _assessConfigurationRisk(task, observations, alerts) {
+    _assessConfigurationRisk(task, observations, at, alerts) {
         // Tarefa suspensa com observações acumuladas
         if (task.state === 'SUSPENDED' && observations.length > 0) {
             alerts.push(
@@ -273,7 +273,7 @@ class PolicyEngine {
         }
 
         // Tarefa criada há muito tempo sem ativação
-        const ageMs = Date.now() - task.createdAt;
+        const ageMs = at - task.createdAt;
         if (task.state === 'CREATED' && ageMs > 60000) {
             // 1 minuto
             alerts.push(

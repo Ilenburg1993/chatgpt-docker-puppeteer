@@ -1,6 +1,7 @@
 # IMPORTADO_DOCUMENTOS
 
-**Propósito**: preservar o material legado importado da antiga árvore `DOCUMENTOS/`, já fora da navegação canônica.  
+**Propósito**: preservar o material legado importado da antiga árvore `DOCUMENTOS/`, já fora da
+navegação canônica.  
 **Status documental**: Histórico.  
 **Público**: engenharia, manutenção e auditoria.  
 **Última atualização**: 28 de fevereiro de 2026.

@@ -1,6 +1,10 @@
 ---
 name: env-governance
-description: Use esta skill quando o trabalho envolver auditoria, consolidação, expansão, validação ou documentação estrutural da superfície de variáveis de ambiente, templates `.env*`, schema de ENV, precedência, segredos, integração com DevContainer ou placement entre Dockerfile/containerEnv/remoteEnv.
+description:
+  Use esta skill quando o trabalho envolver auditoria, consolidação, expansão, validação ou
+  documentação estrutural da superfície de variáveis de ambiente, templates `.env*`, schema de ENV,
+  precedência, segredos, integração com DevContainer ou placement entre
+  Dockerfile/containerEnv/remoteEnv.
 license: MIT
 ---
 

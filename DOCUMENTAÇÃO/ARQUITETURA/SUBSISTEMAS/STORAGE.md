@@ -1,19 +1,21 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/infra/storage/`.  
-**Quando consultar**: ao alterar persistência de artifacts, respostas, DNA, snapshots de tarefa ou contratos de escrita em disco.  
+**Quando consultar**: ao alterar persistência de artifacts, respostas, DNA, snapshots de tarefa ou
+contratos de escrita em disco.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # STORAGE
 
-**Propósito**: documentar `src/infra/storage/` como a camada de materialização em disco do runtime.  
+**Propósito**: documentar `src/infra/storage/` como a camada de materialização em disco do
+runtime.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, manutenção, auditoria e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
 
 ## Papel arquitetural
 
-`src/infra/storage/` é a camada que transforma resultados de execução em arquivos concretos. Ela
-não substitui o SSOT do banco, mas fornece a persistência física complementar que:
+`src/infra/storage/` é a camada que transforma resultados de execução em arquivos concretos. Ela não
+substitui o SSOT do banco, mas fornece a persistência física complementar que:
 
 - guarda artifacts textuais, JSON e binários;
 - armazena respostas renderizadas em múltiplos formatos;

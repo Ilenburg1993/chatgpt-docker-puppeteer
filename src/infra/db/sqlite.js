@@ -30,6 +30,7 @@ function applyPragmas(db) {
     db.pragma('synchronous = NORMAL');
     db.pragma('foreign_keys = ON');
     db.pragma('busy_timeout = 5000');
+    db.pragma('wal_autocheckpoint = 1000');
 }
 
 /**
@@ -99,6 +100,7 @@ function getDb() {
     migrate(db);
 
     singletonDb = db;
+    registerExitHandler();
     log('INFO', `[DB] SQLite SSOT ready: ${dbPath}`);
     return singletonDb;
 }
@@ -115,6 +117,23 @@ function closeDb() {
     } finally {
         singletonDb = null;
     }
+}
+
+// Ensure WAL locks are released on process exit to prevent blocking next instance startup
+let exitHandlerRegistered = false;
+function registerExitHandler() {
+    if (exitHandlerRegistered) return;
+    exitHandlerRegistered = true;
+    process.on('exit', () => {
+        if (singletonDb) {
+            try {
+                singletonDb.close();
+            } catch (_) {
+                /* process is exiting — best-effort */
+            }
+            singletonDb = null;
+        }
+    });
 }
 
 export { getDb, closeDb, resolveDbPath };

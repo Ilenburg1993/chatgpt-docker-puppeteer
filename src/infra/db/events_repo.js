@@ -72,4 +72,36 @@ function recordEvent(params) {
     return Boolean(res?.changes);
 }
 
-export { recordEvent };
+/**
+ * Prune events older than the specified retention period.
+ * Keeps events table bounded to prevent unbounded disk growth.
+ *
+ * @param {object} [options={}]
+ * @param {number} [options.retentionMs=604800000] - Retention period in ms (default: 7 days)
+ * @param {number} [options.maxRows=100000] - Max rows to keep regardless of age
+ * @returns {{ deleted: number }} Number of rows deleted
+ */
+function pruneEvents(options = {}) {
+    const { retentionMs = 7 * 24 * 60 * 60 * 1000, maxRows = 100000 } = options;
+    const db = getDb();
+    const cutoff = Date.now() - retentionMs;
+
+    // Phase 1: Delete events older than retention period
+    const res1 = db.prepare('DELETE FROM events WHERE ts_ms < @cutoff').run({ cutoff });
+
+    // Phase 2: If still over maxRows, delete oldest events beyond limit
+    const countRow = db.prepare('SELECT COUNT(*) as cnt FROM events').get();
+    const count = /** @type {{ cnt: number }} */ (countRow)?.cnt ?? 0;
+    let res2Changes = 0;
+    if (count > maxRows) {
+        const excess = count - maxRows;
+        const res2 = db
+            .prepare('DELETE FROM events WHERE rowid IN (SELECT rowid FROM events ORDER BY ts_ms ASC LIMIT @excess)')
+            .run({ excess });
+        res2Changes = res2?.changes ?? 0;
+    }
+
+    return { deleted: (res1?.changes ?? 0) + res2Changes };
+}
+
+export { recordEvent, pruneEvents };

@@ -1,6 +1,7 @@
 # rodadas
 
-**Propósito**: registrar rodadas históricas de auditoria e varredura de bugs quando essa trilha precisar voltar a armazenar snapshots nomeados.  
+**Propósito**: registrar rodadas históricas de auditoria e varredura de bugs quando essa trilha
+precisar voltar a armazenar snapshots nomeados.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, auditoria e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

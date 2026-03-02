@@ -1,11 +1,13 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da trilha `src/validation/`.  
-**Quando consultar**: ao alterar validação semântica via LLM, critérios de aceite qualitativo ou a integração entre validação opcional e fluxo principal.  
+**Quando consultar**: ao alterar validação semântica via LLM, critérios de aceite qualitativo ou a
+integração entre validação opcional e fluxo principal.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # VALIDATION
 
-**Propósito**: documentar `src/validation/` como trilha dedicada a validação semântica especializada.  
+**Propósito**: documentar `src/validation/` como trilha dedicada a validação semântica
+especializada.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

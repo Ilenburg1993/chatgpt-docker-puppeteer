@@ -1,6 +1,6 @@
-> **Status**: Histórico
-> **Este documento está arquivado** e não define o baseline oficial.
-> **Referência vigente**: [../../../ARQUITETURA/ARCHITECTURE.md](../../../ARQUITETURA/ARCHITECTURE.md).
+> **Status**: Histórico **Este documento está arquivado** e não define o baseline oficial.
+> **Referência vigente**:
+> [../../../ARQUITETURA/ARCHITECTURE.md](../../../ARQUITETURA/ARCHITECTURE.md).
 
 # 🏗️ Arquitetura do Sistema (v3.0 - Mission-Oriented)
 

@@ -1,6 +1,7 @@
 # DevContainer
 
-**Propósito**: documentar o contrato atual do ambiente `.devcontainer`, com foco no que a configuração realmente declara hoje e nos pontos de drift que ainda exigem revisão.  
+**Propósito**: documentar o contrato atual do ambiente `.devcontainer`, com foco no que a
+configuração realmente declara hoje e nos pontos de drift que ainda exigem revisão.  
 **Status documental**: Canônico.  
 **Público**: desenvolvimento local, manutenção, DX e agentes de IA.  
 **Última atualização**: 1 de março de 2026.
@@ -61,8 +62,8 @@ Leitura importante:
   `~/.npm-global`, porque `~/.npm-global` é um volume nomeado e mascara conteúdo da imagem;
 - os binários críticos também são espelhados em `/usr/local/bin` para evitar drift com ferramentas
   que chamem caminhos absolutos;
-- `gh`, `actionlint` e `hadolint` são ferramentas curadas: ficam pinadas no `Dockerfile` por
-  versão estável e devem ser atualizadas deliberadamente, não “por acaso” via `apt`;
+- `gh`, `actionlint` e `hadolint` são ferramentas curadas: ficam pinadas no `Dockerfile` por versão
+  estável e devem ser atualizadas deliberadamente, não “por acaso” via `apt`;
 - os downloads upstream dessas ferramentas passam por validação de checksum durante o build;
 - o container continua não instalando `bun` como ferramenta base, porque o fluxo canônico segue em
   `npm` e `bun` hoje é apenas engine aceita, não dependência operacional do runtime.
@@ -87,8 +88,8 @@ Leitura importante:
 - o endpoint canônico de Puppeteer dentro do container continua sendo `localhost:9224`.
 - `FORCE_COLOR` não é mais exportado globalmente; cor forçada deve ser por processo.
 - o NSS wrapper agora é híbrido: `nss-gatekeeper` semeia artefatos cedo, `containerEnv` e
-  `remoteEnv` expõem uma baseline segura (`LD_PRELOAD` + `NSS_WRAPPER_*` apontando para `/etc`) e
-  o fluxo de profile/hook pode promover isso para os artefatos dinâmicos em `/tmp`; isso cobre a
+  `remoteEnv` expõem uma baseline segura (`LD_PRELOAD` + `NSS_WRAPPER_*` apontando para `/etc`) e o
+  fluxo de profile/hook pode promover isso para os artefatos dinâmicos em `/tmp`; isso cobre a
   lacuna que `profile.d` sozinho não cobre sem depender de arquivos efêmeros no bootstrap.
 - `CODEX_HOME` e os paths do NSS não precisam mais ficar duplicados em `remoteEnv`: o arquivo usa
   `${containerEnv:*}` para reaproveitar a mesma fonte de verdade nesses valores fixos.
@@ -177,9 +178,9 @@ jsonc-validate .devcontainer/devcontainer.json
 bash scripts/check-devcontainer-sync.sh
 ```
 
-O `check-devcontainer-sync.sh` agora observa também o `Dockerfile`, o `nss-gatekeeper` e os hooks
-de `.devcontainer/scripts/`, para distinguir melhor quando basta reload, quando um restart resolve
-e quando é rebuild obrigatório.
+O `check-devcontainer-sync.sh` agora observa também o `Dockerfile`, o `nss-gatekeeper` e os hooks de
+`.devcontainer/scripts/`, para distinguir melhor quando basta reload, quando um restart resolve e
+quando é rebuild obrigatório.
 
 Se quiser validar a configuração materializada pelo próprio CLI:
 

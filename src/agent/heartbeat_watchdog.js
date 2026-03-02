@@ -180,7 +180,10 @@ class HeartbeatWatchdog {
                         cause_layer: 'WATCHDOG',
                     });
                 } catch (attemptErr) {
-                    log('WARN', `[HeartbeatWatchdog] updateAttempt failed for ${attemptId}: ${attemptErr?.message || String(attemptErr)}`);
+                    log(
+                        'WARN',
+                        `[HeartbeatWatchdog] updateAttempt failed for ${attemptId}: ${attemptErr?.message || String(attemptErr)}`
+                    );
                 }
 
                 // Reschedule the task for retry (only if task is in a non-terminal state).
@@ -194,17 +197,26 @@ class HeartbeatWatchdog {
                             last_error: errorMsg,
                         });
                     } catch (taskErr) {
-                        log('WARN', `[HeartbeatWatchdog] updateTask failed for ${taskId}: ${taskErr?.message || String(taskErr)}`);
+                        log(
+                            'WARN',
+                            `[HeartbeatWatchdog] updateTask failed for ${taskId}: ${taskErr?.message || String(taskErr)}`
+                        );
                     }
 
                     try {
                         releaseTaskLock({ taskId });
                     } catch (lockErr) {
-                        log('DEBUG', `[HeartbeatWatchdog] lock release skipped for ${taskId}: ${lockErr?.message || String(lockErr)}`);
+                        log(
+                            'DEBUG',
+                            `[HeartbeatWatchdog] lock release skipped for ${taskId}: ${lockErr?.message || String(lockErr)}`
+                        );
                     }
                 }
 
-                log('INFO', `[HeartbeatWatchdog] Task ${taskId} rescheduled after heartbeat timeout (attempt ${attemptId})`);
+                log(
+                    'INFO',
+                    `[HeartbeatWatchdog] Task ${taskId} rescheduled after heartbeat timeout (attempt ${attemptId})`
+                );
             }
         } catch (err) {
             log('ERROR', `[HeartbeatWatchdog] tick failed: ${err?.message || String(err)}`);

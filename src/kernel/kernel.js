@@ -62,14 +62,19 @@ function _makeRetryableEmitError(err) {
 function createSsotGatewayKernel(config = {}) {
     const { nerv, telemetry: telemetryOptions = {}, pump: pumpOptions = {} } = config;
 
+    if (!nerv) {
+        throw new Error('[Kernel] NERV instance is required for createSsotGatewayKernel');
+    }
+
     const telemetry = new KernelTelemetry({
         nerv,
         source: ActorRole.KERNEL.toLowerCase(),
-        retention: 1000,
+        retention: telemetryOptions.retention ?? 1000,
         ...telemetryOptions,
     });
 
     const baseIntervalMs = Math.max(10, Number(pumpOptions.baseIntervalMs ?? 50) || 50);
+    const drainBatchSize = Math.max(1, Number(pumpOptions.drainBatchSize ?? 100) || 100);
 
     let running = false;
     let timer = null;
@@ -94,7 +99,7 @@ function createSsotGatewayKernel(config = {}) {
         // Inbound drain (optional): processes raw frames/envelopes placed into NERV inbound buffer.
         if (buffers && typeof buffers.dequeueInbound === 'function' && typeof nerv.receive === 'function') {
             let drained = 0;
-            while (drained < 100) {
+            while (drained < drainBatchSize) {
                 const raw = buffers.dequeueInbound();
                 if (!raw) break;
                 try {
@@ -112,7 +117,7 @@ function createSsotGatewayKernel(config = {}) {
         // Outbound drain: sends envelopes to transport. In HYBRID mode, transport.send(envelope) is the right contract.
         if (buffers && typeof buffers.dequeueOutbound === 'function') {
             let drained = 0;
-            while (drained < 100) {
+            while (drained < drainBatchSize) {
                 const envelope = buffers.dequeueOutbound();
                 if (!envelope) break;
 

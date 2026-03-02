@@ -232,7 +232,9 @@ function _pauseMissionPendingTasksTx(db, missionId) {
     ).run({ mission_id: missionId, now });
 
     const paused = db
-        .prepare(`SELECT id FROM tasks WHERE mission_id = ? AND status = 'PAUSED' AND last_error = 'MISSION_PAUSED_CASCADE'`)
+        .prepare(
+            `SELECT id FROM tasks WHERE mission_id = ? AND status = 'PAUSED' AND last_error = 'MISSION_PAUSED_CASCADE'`
+        )
         .all(missionId);
     return paused.map(r => String(r.id));
 }
@@ -412,7 +414,11 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
 
         _setActiveStepsStatusTx(db, missionId, STEP_STATUS.PAUSED);
         const cascadedTaskIds = _pauseMissionPendingTasksTx(db, missionId);
-        return { before: _rowToMission(row), after: _rowToMission(updatedRow), metadata: { cascaded_tasks: cascadedTaskIds } };
+        return {
+            before: _rowToMission(row),
+            after: _rowToMission(updatedRow),
+            metadata: { cascaded_tasks: cascadedTaskIds },
+        };
     })();
 
     _recordMissionEvents({
@@ -447,7 +453,11 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
 
         _setActiveStepsStatusTx(db, missionId, STEP_STATUS.RUNNING);
         const cascadedTaskIds = _resumeMissionCascadedTasksTx(db, missionId);
-        return { before: _rowToMission(row), after: _rowToMission(updatedRow), metadata: { cascaded_tasks: cascadedTaskIds } };
+        return {
+            before: _rowToMission(row),
+            after: _rowToMission(updatedRow),
+            metadata: { cascaded_tasks: cascadedTaskIds },
+        };
     })();
 
     _recordMissionEvents({
