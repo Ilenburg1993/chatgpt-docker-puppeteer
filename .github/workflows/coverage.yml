@@ -71,6 +71,7 @@ jobs:
         id: coverage
         continue-on-error: true
         run: |
+          set -o pipefail
           npx c8 \
             --reporter=text \
             --reporter=json-summary \

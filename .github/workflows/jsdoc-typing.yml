@@ -71,12 +71,16 @@ jobs:
       - name: TypeScript typecheck (node)
         id: typecheck_node
         continue-on-error: true
-        run: npm run typecheck:node 2>&1 | tee artifacts/typecheck/typecheck-node.log
+        run: |
+          set -o pipefail
+          npm run typecheck:node 2>&1 | tee artifacts/typecheck/typecheck-node.log
 
       - name: TypeScript typecheck (tools)
         id: typecheck_tools
         continue-on-error: true
-        run: npm run typecheck:tools 2>&1 | tee artifacts/typecheck/typecheck-tools.log
+        run: |
+          set -o pipefail
+          npm run typecheck:tools 2>&1 | tee artifacts/typecheck/typecheck-tools.log
 
       - name: Build typecheck summary
         if: always()
@@ -98,6 +102,60 @@ jobs:
           path: artifacts/typecheck
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Comment PR with typecheck results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          NODE_OUTCOME: ${{ steps.typecheck_node.outcome }}
+          TOOLS_OUTCOME: ${{ steps.typecheck_tools.outcome }}
+        with:
+          script: |
+            const marker = '<!-- jsdoc-typecheck-summary -->';
+            const nodeOutcome = process.env.NODE_OUTCOME || 'unknown';
+            const toolsOutcome = process.env.TOOLS_OUTCOME || 'unknown';
+            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';
+            const fix = (o, cmd) =>
+              o === 'failure' ? `\n  > 💡 Sugestão: rode \`${cmd}\` localmente para ver os erros.` : '';
+
+            const body = [
+              marker,
+              '## 🔍 TypeScript Typecheck (non-blocking)',
+              '',
+              `| Check | Status |`,
+              `|---|---|`,
+              `| typecheck:node | ${icon(nodeOutcome)} ${nodeOutcome} |`,
+              `| typecheck:tools | ${icon(toolsOutcome)} ${toolsOutcome} |`,
+              fix(nodeOutcome, 'npm run typecheck:node'),
+              fix(toolsOutcome, 'npm run typecheck:tools'),
+              '',
+              '> Falhas são informativas e não bloqueiam o merge.',
+            ].filter((l) => l !== '').join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) =>
+              c.user?.type === 'Bot' && c.body?.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
   jsdoc-coverage:
     name: JSDoc coverage (non-blocking)
@@ -142,12 +200,16 @@ jobs:
       - name: Run JSDoc coverage (JSON)
         id: jsdoc_json
         continue-on-error: true
-        run: npm run jsdoc:coverage:json 2>&1 | tee artifacts/jsdoc/coverage-raw.log
+        run: |
+          set -o pipefail
+          npm run jsdoc:coverage:json 2>&1 | tee artifacts/jsdoc/coverage-raw.log
 
       - name: Run JSDoc coverage (console)
         id: jsdoc_console
         continue-on-error: true
-        run: npm run jsdoc:coverage 2>&1 | tee artifacts/jsdoc/coverage.txt
+        run: |
+          set -o pipefail
+          npm run jsdoc:coverage 2>&1 | tee artifacts/jsdoc/coverage.txt
 
       - name: Build JSDoc summary
         if: always()
@@ -185,3 +247,68 @@ jobs:
           path: artifacts/jsdoc
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Comment PR with JSDoc coverage
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          JSON_OUTCOME: ${{ steps.jsdoc_json.outcome }}
+          CONSOLE_OUTCOME: ${{ steps.jsdoc_console.outcome }}
+        with:
+          script: |
+            const { readFileSync, existsSync } = await import('node:fs');
+            const marker = '<!-- jsdoc-coverage-summary -->';
+            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';
+            const jsonOutcome = process.env.JSON_OUTCOME || 'unknown';
+            const consoleOutcome = process.env.CONSOLE_OUTCOME || 'unknown';
+
+            let coverageDetail = '(relatório não gerado)';
+            try {
+              const raw = readFileSync('artifacts/jsdoc/coverage-raw.log', 'utf8');
+              const match = raw.match(/\{[\s\S]*?\}/);
+              if (match) {
+                const data = JSON.parse(match[0]);
+                coverageDetail = `${data.percent ?? '?'}% (${data.documented ?? '?'}/${data.total ?? '?'} exports)`;
+              }
+            } catch { /* ignore */ }
+
+            const body = [
+              marker,
+              '## 📝 JSDoc Coverage (non-blocking)',
+              '',
+              `| Check | Status |`,
+              `|---|---|`,
+              `| jsdoc:coverage:json | ${icon(jsonOutcome)} ${jsonOutcome} |`,
+              `| jsdoc:coverage | ${icon(consoleOutcome)} ${consoleOutcome} |`,
+              `| cobertura | **${coverageDetail}** |`,
+              '',
+              jsonOutcome === 'failure' || consoleOutcome === 'failure'
+                ? '> 💡 Sugestão: rode `npm run jsdoc:coverage` localmente para ver os exports sem JSDoc.\n>'
+                : '',
+              '> Falhas são informativas e não bloqueiam o merge.',
+            ].filter((l) => l !== '').join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) =>
+              c.user?.type === 'Bot' && c.body?.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

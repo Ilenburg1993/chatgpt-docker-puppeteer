@@ -115,6 +115,7 @@ jobs:
           if [ "$rc" -eq 124 ]; then
             echo "Security audit hit enforced timeout." >&2
           fi
+          exit $rc
 
       # ── Architecture audit: acoplamento, drift, dependências cross-domain ──────
       - name: Architecture drift audit
@@ -135,6 +136,7 @@ jobs:
           if [ "$rc" -eq 124 ]; then
             echo "Architecture audit hit enforced timeout." >&2
           fi
+          exit $rc
 
       # ── Contract coverage: violações de contratos de domínio ─────────────────
       - name: Contract coverage audit
@@ -155,6 +157,7 @@ jobs:
           if [ "$rc" -eq 124 ]; then
             echo "Contracts audit hit enforced timeout." >&2
           fi
+          exit $rc
 
       # ── Performance audit (apenas no modo full) ───────────────────────────────
       - name: Performance pattern audit (full mode only)
@@ -176,6 +179,7 @@ jobs:
           if [ "$rc" -eq 124 ]; then
             echo "Performance audit hit enforced timeout." >&2
           fi
+          exit $rc
 
       # ── Build summary ─────────────────────────────────────────────────────────
       - name: Build semantic analysis summary

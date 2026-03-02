@@ -77,7 +77,9 @@ jobs:
       - name: Build dashboard (Vite)
         id: build
         continue-on-error: true
-        run: npm run dashboard:build 2>&1 | tee artifacts/dashboard/build.log
+        run: |
+          set -o pipefail
+          npm run dashboard:build 2>&1 | tee artifacts/dashboard/build.log
 
       - name: Analyze bundle sizes
         if: always()
@@ -91,7 +93,7 @@ jobs:
             find "$dist_dir" -type f \( -name "*.js" -o -name "*.css" \) | \
               while IFS= read -r f; do
                 size=$(wc -c < "$f" 2>/dev/null || echo 0)
-                printf '%10d bytes  %s\n' "$size" "${f#$dist_dir/}"
+                printf '%10d bytes  %s\n' "$size" "${f#"$dist_dir/"}"
               done | sort -rn | head -25 | tee artifacts/dashboard/bundle-sizes.txt
           else
             echo "dist directory not found (build may have failed)" | tee artifacts/dashboard/bundle-sizes.txt
@@ -138,3 +140,68 @@ jobs:
           path: artifacts/dashboard
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Comment PR with dashboard build result
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+        with:
+          script: |
+            const { readFileSync, existsSync } = await import('node:fs');
+            const marker = '<!-- dashboard-build-summary -->';
+            const buildOutcome = process.env.BUILD_OUTCOME || 'unknown';
+            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';
+
+            const sizesPath = 'artifacts/dashboard/bundle-sizes.txt';
+            const totalPath = 'artifacts/dashboard/bundle-total.txt';
+            const total = existsSync(totalPath) ? readFileSync(totalPath, 'utf8').trim() : '(não disponível)';
+            const sizes = existsSync(sizesPath)
+              ? readFileSync(sizesPath, 'utf8').trim().split('\n').slice(0, 10).join('\n')
+              : '(não disponível)';
+
+            const suggestion = buildOutcome === 'failure'
+              ? '\n> 💡 Sugestão: rode `npm run dashboard:build` localmente para ver o erro de compilação.'
+              : '';
+
+            const body = [
+              marker,
+              '## 🖥️ Dashboard Build (non-blocking)',
+              '',
+              `| Item | Valor |`,
+              `|---|---|`,
+              `| build | ${icon(buildOutcome)} ${buildOutcome} |`,
+              `| bundle total | ${total} |`,
+              '',
+              '**Top arquivos por tamanho:**',
+              '```',
+              sizes,
+              '```',
+              suggestion,
+              '> Falhas são informativas e não bloqueiam o merge.',
+            ].filter((l) => l !== '').join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) =>
+              c.user?.type === 'Bot' && c.body?.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

@@ -18,6 +18,7 @@ const workflowsRequiringConcurrency = new Set([
     'audit-nightly.yml',
     'ci.yml',
     'code-quality.yml',
+    'copilot-setup-steps.yml',
     'coverage.yml',
     'dashboard-build.yml',
     'dependency-hygiene.yml',

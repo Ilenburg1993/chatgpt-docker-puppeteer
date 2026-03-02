@@ -61,6 +61,10 @@ permissions:
   security-events: write
   statuses: write
 
+concurrency:
+  group: copilot-setup-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Nome OBRIGATÓRIO pela plataforma Copilot — não renomear.
   # actionlint:ignore unknown-prop
@@ -266,10 +270,12 @@ jobs:
           # Aliases canônicos (espelha Dockerfile SECTION 6):
           #   batcat → bat  (Debian/Ubuntu expõe como batcat)
           #   fdfind → fd   (Debian/Ubuntu expõe como fdfind)
-          which batcat 2>/dev/null && ! which bat 2>/dev/null \
-            && sudo ln -sf "$(which batcat)" /usr/local/bin/bat || true
-          which fdfind 2>/dev/null && ! which fd 2>/dev/null \
-            && sudo ln -sf "$(which fdfind)" /usr/local/bin/fd || true
+          if which batcat 2>/dev/null && ! which bat 2>/dev/null; then
+            sudo ln -sf "$(which batcat)" /usr/local/bin/bat
+          fi
+          if which fdfind 2>/dev/null && ! which fd 2>/dev/null; then
+            sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
+          fi
 
           echo "✅ Ferramentas base instaladas"
 
