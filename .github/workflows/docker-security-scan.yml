@@ -64,7 +64,7 @@ jobs:
         run: mkdir -p artifacts/trivy
 
       - name: Trivy — Scan filesystem (SARIF)
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -79,7 +79,7 @@ jobs:
           exit-code: "0"
 
       - name: Trivy — Scan filesystem (JSON para PR comment)
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -154,7 +154,7 @@ jobs:
           exit-code: "0"
 
       - name: Trivy — Scan container image (JSON para PR comment)
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           scan-type: "image"
           image-ref: "chatgpt-docker-puppeteer:scan-${{ github.sha }}"
@@ -166,7 +166,7 @@ jobs:
           exit-code: "0"
 
       - name: Trivy — Scan container image (table para step summary)
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           scan-type: "image"
           image-ref: "chatgpt-docker-puppeteer:scan-${{ github.sha }}"
