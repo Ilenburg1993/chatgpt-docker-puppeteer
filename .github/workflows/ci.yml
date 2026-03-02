@@ -77,15 +77,98 @@ jobs:
           reporter: github-check
           filter_mode: nofilter
           fail_level: error
+          path: "."
+          exclude: |
+            ./node_modules/*
+            ./src/dashboard-ui/node_modules/*
+            ./.git/*
 
       - name: Lint
+        id: lint
+        continue-on-error: true
         run: npm run lint
 
       - name: Prettier check
+        id: prettier
+        continue-on-error: true
         run: npm run format:check
 
       - name: Unit tests
+        id: unit_tests
+        continue-on-error: true
         run: npm run test:unit
+
+      - name: CI Summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          PRETTIER_OUTCOME: ${{ steps.prettier.outcome }}
+          UNIT_OUTCOME: ${{ steps.unit_tests.outcome }}
+        with:
+          script: |
+            const marker = '<!-- ci-validate-summary -->';
+            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : o === 'skipped' ? '⏭️' : '⚠️';
+            const lo = process.env.LINT_OUTCOME || 'unknown';
+            const po = process.env.PRETTIER_OUTCOME || 'unknown';
+            const uo = process.env.UNIT_OUTCOME || 'unknown';
+            const allOk = lo === 'success' && po === 'success' && uo === 'success';
+            const suggestions = [];
+            if (lo === 'failure') suggestions.push('💡 `npm run lint:fix` para corrigir lint automaticamente.');
+            if (po === 'failure') suggestions.push('💡 `npm run format` para corrigir formatação.');
+            if (uo === 'failure') suggestions.push('💡 `npm run test:unit` localmente para ver as falhas.');
+            const body = [
+              marker,
+              `## ${allOk ? '✅' : '❌'} CI — Validate (Node 24)`,
+              '',
+              '| Check | Status |',
+              '|---|---|',
+              `| ESLint | ${icon(lo)} ${lo} |`,
+              `| Prettier | ${icon(po)} ${po} |`,
+              `| Unit tests | ${icon(uo)} ${uo} |`,
+              '',
+              ...suggestions,
+              suggestions.length ? '' : '',
+              allOk
+                ? '> Todos os checks passaram. ✅'
+                : '> Falhas acima **bloqueiam** o merge.',
+            ].filter((l) => l !== undefined).join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) =>
+              c.user?.type === 'Bot' &&
+              typeof c.body === 'string' &&
+              c.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if any check failed
+        if: always()
+        run: |
+          if [ "${{ steps.lint.outcome }}" = "failure" ] || \
+             [ "${{ steps.prettier.outcome }}" = "failure" ] || \
+             [ "${{ steps.unit_tests.outcome }}" = "failure" ]; then
+            echo "::error::One or more checks failed. See CI Summary comment on the PR."
+            exit 1
+          fi
 
   audit-lite:
     name: Audit lite (non-blocking)
@@ -198,7 +281,7 @@ jobs:
               per_page: 100
             });
             const existing = comments.find((comment) =>
-              comment.user?.login === 'github-actions[bot]' &&
+              comment.user?.type === 'Bot' &&
               typeof comment.body === 'string' &&
               comment.body.includes(marker)
             );
