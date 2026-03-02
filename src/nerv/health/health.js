@@ -87,6 +87,7 @@ function createHealth({ telemetry, thresholds = {} }) {
     };
 
     const listeners = new Set();
+    const MAX_HEALTH_LISTENERS = 50;
 
     /* =========================================================
      Operações internas
@@ -221,11 +222,25 @@ function createHealth({ telemetry, thresholds = {} }) {
             throw new Error('onChange requer função');
         }
 
+        if (listeners.size >= MAX_HEALTH_LISTENERS) {
+            telemetry.emit('nerv:health:listener_overflow', {
+                count: listeners.size,
+                limit: MAX_HEALTH_LISTENERS,
+            });
+        }
+
         listeners.add(handler);
 
         return () => {
             listeners.delete(handler);
         };
+    }
+
+    /**
+     * Shutdown: limpa listeners registrados.
+     */
+    function shutdown() {
+        listeners.clear();
     }
 
     /* =========================================================
@@ -236,6 +251,7 @@ function createHealth({ telemetry, thresholds = {} }) {
         report,
         getStatus,
         onChange,
+        shutdown,
     });
 }
 
