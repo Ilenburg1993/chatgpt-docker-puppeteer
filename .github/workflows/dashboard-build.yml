@@ -1,0 +1,140 @@
+name: Dashboard Build
+
+# Verifica que o dashboard Vue/Vite compila sem erros e analisa o tamanho do
+# bundle. Executado apenas quando arquivos do dashboard ou o próprio workflow
+# são alterados. Não-bloqueante: falhas são informativas.
+#
+# Jobs:
+#   build — build Vite do dashboard, análise de bundle, upload de artefatos
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/dashboard-ui/**"
+      - ".github/workflows/dashboard-build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/dashboard-ui/**"
+      - ".github/workflows/dashboard-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: dashboard-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  build:
+    name: Dashboard build + bundle analysis (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/dashboard
+
+      - name: Build dashboard (Vite)
+        id: build
+        continue-on-error: true
+        run: npm run dashboard:build 2>&1 | tee artifacts/dashboard/build.log
+
+      - name: Analyze bundle sizes
+        if: always()
+        run: |
+          dist_dir="src/dashboard-ui/dist"
+          if [ -d "$dist_dir" ]; then
+            # Total size
+            du -sh "$dist_dir" | tee artifacts/dashboard/bundle-total.txt
+
+            # Per-file sizes (JS + CSS), sorted largest first
+            find "$dist_dir" -type f \( -name "*.js" -o -name "*.css" \) | \
+              while IFS= read -r f; do
+                size=$(wc -c < "$f" 2>/dev/null || echo 0)
+                printf '%10d bytes  %s\n' "$size" "${f#$dist_dir/}"
+              done | sort -rn | head -25 | tee artifacts/dashboard/bundle-sizes.txt
+          else
+            echo "dist directory not found (build may have failed)" | tee artifacts/dashboard/bundle-sizes.txt
+          fi
+
+      - name: Build dashboard summary
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          node --input-type=module -e '
+            import fs from "node:fs";
+
+            const buildOutcome = process.env.BUILD_OUTCOME || "unknown";
+            const sizesPath = "artifacts/dashboard/bundle-sizes.txt";
+            const totalPath = "artifacts/dashboard/bundle-total.txt";
+
+            const sizes = fs.existsSync(sizesPath) ? fs.readFileSync(sizesPath, "utf8").trim() : "(não disponível)";
+            const total = fs.existsSync(totalPath) ? fs.readFileSync(totalPath, "utf8").trim() : "(não disponível)";
+
+            const lines = [
+              "## Dashboard Build (non-blocking)",
+              "",
+              `- build_outcome: ${buildOutcome}`,
+              `- bundle_total: ${total}`,
+              "",
+              "### Top arquivos por tamanho",
+              "```",
+              sizes,
+              "```",
+              "",
+              "> Falhas acima são informativas e não bloqueiam o merge.",
+            ];
+            fs.writeFileSync("artifacts/dashboard/summary.md", lines.join("\n") + "\n");
+          '
+          cat artifacts/dashboard/summary.md >> "$GITHUB_STEP_SUMMARY"
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+
+      - name: Upload dashboard artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dashboard-build-${{ github.run_id }}
+          path: artifacts/dashboard
+          if-no-files-found: warn
+          retention-days: 7

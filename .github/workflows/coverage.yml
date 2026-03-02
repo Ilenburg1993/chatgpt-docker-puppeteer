@@ -1,0 +1,162 @@
+name: Test Coverage
+
+# Relatório de cobertura de testes com c8. Não-bloqueante: gera relatórios e
+# artefatos para rastreamento de tendências, mas não impede merges.
+#
+# Métricas reportadas: lines, branches, functions, statements por arquivo e total.
+# Artefatos: coverage-summary.json, lcov.info, cobertura.txt (texto), summary.md
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  coverage:
+    name: Test coverage — c8 (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/coverage
+
+      - name: Run unit tests with c8 coverage
+        id: coverage
+        continue-on-error: true
+        run: |
+          npx c8 \
+            --reporter=text \
+            --reporter=json-summary \
+            --reporter=lcov \
+            --report-dir=artifacts/coverage \
+            npm run test:unit 2>&1 | tee artifacts/coverage/output.log
+
+      - name: Build coverage summary
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const summaryPath = "artifacts/coverage/coverage-summary.json";
+            let total = null;
+            if (fs.existsSync(summaryPath)) {
+              try {
+                const data = JSON.parse(fs.readFileSync(summaryPath, "utf8"));
+                total = data?.total;
+              } catch { /* ignore parse errors */ }
+            }
+            const fmt = (v) => v !== undefined ? `${v.pct}% (${v.covered}/${v.total})` : "n/a";
+            const lines = [
+              "## Test Coverage — c8 (non-blocking)",
+              "",
+              `- outcome: ${process.env.COVERAGE_OUTCOME || "unknown"}`,
+              total ? [
+                `- lines:      ${fmt(total.lines)}`,
+                `- branches:   ${fmt(total.branches)}`,
+                `- functions:  ${fmt(total.functions)}`,
+                `- statements: ${fmt(total.statements)}`,
+              ].join("\n") : "- (coverage-summary.json not generated — ver output.log)",
+              "",
+              "> Cobertura abaixo de 80% é informativa e não bloqueia o merge.",
+            ];
+            fs.writeFileSync("artifacts/coverage/summary.md", lines.join("\n") + "\n");
+          '
+          cat artifacts/coverage/summary.md >> "$GITHUB_STEP_SUMMARY"
+        env:
+          COVERAGE_OUTCOME: ${{ steps.coverage.outcome }}
+
+      - name: Comment PR with coverage summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('node:fs');
+            const summaryPath = 'artifacts/coverage/summary.md';
+            if (!fs.existsSync(summaryPath)) {
+              core.info('coverage/summary.md not found, skipping PR comment');
+              return;
+            }
+            const marker = '<!-- coverage-summary -->';
+            const body = `${marker}\n${fs.readFileSync(summaryPath, 'utf8')}`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) =>
+              c.user?.type === 'Bot' &&
+              typeof c.body === 'string' &&
+              c.body.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ github.run_id }}
+          path: artifacts/coverage
+          if-no-files-found: warn
+          retention-days: 14

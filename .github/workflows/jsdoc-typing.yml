@@ -1,0 +1,187 @@
+name: JSDoc & Typing
+
+# Verifica cobertura de JSDoc e tipagem TypeScript em PRs e push ao main.
+# Totalmente não-bloqueante: falhas geram relatórios mas não bloqueiam o merge.
+#
+# Jobs:
+#   typecheck  — tsc --noEmit em modo node (tsconfig.node.json) e tools
+#   jsdoc      — cobertura de JSDoc via scripts/analysis/jsdoc_coverage_cli.mjs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: jsdoc-typing-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  typecheck:
+    name: TypeScript typecheck (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/typecheck
+
+      - name: TypeScript typecheck (node)
+        id: typecheck_node
+        continue-on-error: true
+        run: npm run typecheck:node 2>&1 | tee artifacts/typecheck/typecheck-node.log
+
+      - name: TypeScript typecheck (tools)
+        id: typecheck_tools
+        continue-on-error: true
+        run: npm run typecheck:tools 2>&1 | tee artifacts/typecheck/typecheck-tools.log
+
+      - name: Build typecheck summary
+        if: always()
+        run: |
+          {
+            echo "## TypeScript Typecheck (non-blocking)"
+            echo ""
+            echo "- typecheck:node → ${{ steps.typecheck_node.outcome }}"
+            echo "- typecheck:tools → ${{ steps.typecheck_tools.outcome }}"
+            echo ""
+            echo "> Falhas acima são informativas e não bloqueiam o merge."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload typecheck artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: typecheck-${{ github.run_id }}
+          path: artifacts/typecheck
+          if-no-files-found: warn
+          retention-days: 7
+
+  jsdoc-coverage:
+    name: JSDoc coverage (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/jsdoc
+
+      - name: Run JSDoc coverage (JSON)
+        id: jsdoc_json
+        continue-on-error: true
+        run: npm run jsdoc:coverage:json 2>&1 | tee artifacts/jsdoc/coverage-raw.log
+
+      - name: Run JSDoc coverage (console)
+        id: jsdoc_console
+        continue-on-error: true
+        run: npm run jsdoc:coverage 2>&1 | tee artifacts/jsdoc/coverage.txt
+
+      - name: Build JSDoc summary
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const raw = "artifacts/jsdoc/coverage-raw.log";
+            let covered = null;
+            if (fs.existsSync(raw)) {
+              try {
+                const content = fs.readFileSync(raw, "utf8");
+                const jsonMatch = content.match(/\{[\s\S]*\}/);
+                if (jsonMatch) covered = JSON.parse(jsonMatch[0]);
+              } catch { /* ignore */ }
+            }
+            const lines = [
+              "## JSDoc Coverage (non-blocking)",
+              "",
+              covered
+                ? `- total_exports: ${covered.total ?? "n/a"} | documented: ${covered.documented ?? "n/a"} | coverage: ${covered.percent ?? "n/a"}%`
+                : "- (JSON report not available — see coverage.txt artifact)",
+              "",
+              "> Falhas acima são informativas e não bloqueiam o merge.",
+            ];
+            fs.writeFileSync("artifacts/jsdoc/summary.md", lines.join("\n") + "\n");
+          '
+          cat artifacts/jsdoc/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload JSDoc artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jsdoc-coverage-${{ github.run_id }}
+          path: artifacts/jsdoc
+          if-no-files-found: warn
+          retention-days: 7

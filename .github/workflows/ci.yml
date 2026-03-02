@@ -12,6 +12,12 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
 
 jobs:
   validate:
@@ -64,7 +70,7 @@ jobs:
         uses: raven-actions/actionlint@v2.1.1
 
       - name: Lint shell scripts with shellcheck
-        uses: reviewdog/action-shellcheck@v1.9.0
+        uses: reviewdog/action-shellcheck@v1.32.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           shellcheck_flags: "-x"
@@ -214,7 +220,7 @@ jobs:
 
       - name: Upload audit artifacts
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: audit-lite-${{ github.run_id }}
           path: artifacts/audit

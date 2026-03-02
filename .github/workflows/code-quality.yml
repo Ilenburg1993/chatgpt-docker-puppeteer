@@ -1,0 +1,123 @@
+name: Code Quality
+
+# Análise estática de qualidade além de sintaxe: dependências circulares,
+# módulos órfãos, padrões proibidos e grafo de código.
+# Totalmente não-bloqueante: falhas geram relatórios, não bloqueiam o merge.
+#
+# Jobs:
+#   static-analysis — circular deps, orphan modules, forbidden patterns, code graph
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Semanal na quarta-feira 02:41 UTC
+    - cron: "41 2 * * 3"
+  workflow_dispatch:
+
+concurrency:
+  group: code-quality-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  static-analysis:
+    name: Static code analysis (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/code-quality
+
+      - name: Detect circular dependencies
+        id: circular
+        continue-on-error: true
+        run: |
+          npm run analyze:circular 2>&1 | tee artifacts/code-quality/circular-deps.txt
+
+      - name: Detect orphan modules
+        id: orphans
+        continue-on-error: true
+        run: |
+          npm run analyze:orphans 2>&1 | tee artifacts/code-quality/orphans.txt
+
+      - name: Check forbidden patterns
+        id: forbidden
+        continue-on-error: true
+        run: |
+          npm run check:forbidden 2>&1 | tee artifacts/code-quality/forbidden-patterns.txt
+
+      - name: Analyze code graph (stats + NERV)
+        id: code_graph
+        continue-on-error: true
+        run: |
+          npm run analyze:graph:full 2>&1 | tee artifacts/code-quality/code-graph.txt
+
+      - name: Build code quality summary
+        if: always()
+        run: |
+          circular_lines=$(wc -l < artifacts/code-quality/circular-deps.txt 2>/dev/null || echo 0)
+          orphan_lines=$(wc -l < artifacts/code-quality/orphans.txt 2>/dev/null || echo 0)
+          {
+            echo "## Code Quality — Static Analysis (non-blocking)"
+            echo ""
+            echo "| Check | Outcome |"
+            echo "|---|---|"
+            echo "| circular_deps | ${{ steps.circular.outcome }} (${circular_lines} linhas) |"
+            echo "| orphan_modules | ${{ steps.orphans.outcome }} (${orphan_lines} linhas) |"
+            echo "| forbidden_patterns | ${{ steps.forbidden.outcome }} |"
+            echo "| code_graph | ${{ steps.code_graph.outcome }} |"
+            echo ""
+            echo "> Falhas acima são informativas e não bloqueiam o merge."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload code quality artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: code-quality-${{ github.run_id }}
+          path: artifacts/code-quality
+          if-no-files-found: warn
+          retention-days: 14
