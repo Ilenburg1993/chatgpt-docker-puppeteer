@@ -50,20 +50,25 @@
 |---|-----------|--------|---------|-----|--------|
 | 22 | P1 | Server | control.js | Mutations RBAC/preferences sem event emission | ✅ Corrigido |
 
-### Sessão 2 — Bugs Novos Encontrados
+### Sessão 2 — Bugs Encontrados e Corrigidos
 
 | # | Severidade | Módulo | Arquivo | Bug | Status |
 |---|-----------|--------|---------|-----|--------|
-| 23 | P0 | Kernel | kernel.js | NERV instance não validada em createSsotGatewayKernel | 🔲 Pendente |
-| 24 | P0 | Driver | factory.js | Temporary drivers nunca destruídos (resource leak) | 🔲 Pendente |
-| 25 | P1 | Agent | agent_loop.js | Race condition: step() sem await, múltiplas execuções | 🔲 Pendente |
-| 26 | P1 | Agent | agent_loop.js | _running flag nunca resetado se step() hang | 🔲 Pendente |
-| 27 | P1 | Kernel | execution_engine.js | Error swallowing em evaluate() sem try-catch | 🔲 Pendente |
-| 28 | P1 | Kernel | execution_engine.js | Métodos assess/interpret/synthesize sem error handling | 🔲 Pendente |
-| 29 | P1 | Driver | factory.js | Missing null check no entry após pool.find() | 🔲 Pendente |
-| 30 | P2 | Kernel | kernel.js | Hardcoded drain limits (100) sem configuração | 🔲 Pendente |
-| 31 | P2 | Kernel | kernel.js | Hardcoded retention (1000) no telemetry | 🔲 Pendente |
-| 32 | P2 | Driver | factory.js | temporaryDriversCreated sem counterpart destroyed | 🔲 Pendente |
+| 23 | P0 | Kernel | kernel.js | NERV instance não validada em createSsotGatewayKernel | ✅ Corrigido |
+| 24 | P0 | Driver | factory.js | Temporary drivers nunca destruídos (resource leak) | ✅ Corrigido |
+| 25 | P1 | Agent | agent_loop.js | step() sem timeout guard — _running fica preso se step() hang | ✅ Corrigido |
+| 26 | P1 | Agent | agent_loop.js | _running flag nunca resetado se step() hang (timeout guard) | ✅ Corrigido |
+| 27 | P1 | Kernel | execution_engine.js | Error swallowing em evaluate() sem try-catch | ✅ Corrigido |
+| 28 | P1 | Kernel | execution_engine.js | Métodos assess/interpret/synthesize sem error handling | ✅ Corrigido |
+| 29 | P1 | Server | lifecycle.js | Signal listeners não limpos após shutdown em delegated mode | ✅ Corrigido |
+| 30 | P2 | Kernel | kernel.js | Hardcoded drain limits (100) sem configuração | ✅ Corrigido |
+| 31 | P2 | Kernel | kernel.js | Hardcoded retention (1000) no telemetry | ✅ Corrigido |
+| 32 | P2 | Driver | factory.js | temporaryDriversCreated sem counterpart destroyed | ✅ Corrigido |
+| 33 | P2 | Agent | task_state_projector.js | 5 catch blocks silenciosos em state transitions | ✅ Corrigido |
+| 34 | P1 | Agent | task_state_projector.js | Attempt RUNNING transition sem NERV event | ✅ Corrigido |
+| 35 | P1 | Agent | task_state_projector.js | Attempt COMPLETED sem NERV event (success path) | ✅ Corrigido |
+| 36 | P1 | Agent | task_orchestration_worker.js | Artifact insertion sem NERV event | ✅ Corrigido |
+| 37 | P2 | Infra | pool_manager.js | Health check interval sem .unref() (process hang) | ✅ Corrigido |
 
 ---
 
@@ -73,10 +78,16 @@
 |---|----------|-----------|--------|
 | A1 | NERV | Shutdown lifecycle completo (7/7 subsistemas) | ✅ Implementado |
 | A2 | NERV | Health listener limit (max 50 + warning) | ✅ Implementado |
-| A3 | NERV | Event emission para mutations silenciosas | ✅ Implementado |
+| A3 | NERV | Event emission para mutations silenciosas (control.js) | ✅ Implementado |
 | A4 | Cleanup | Remoção do módulo morto src/state/ | ✅ Implementado |
 | A5 | Infra | Função pruneEvents com TTL configurável | ✅ Implementado |
-| A6 | Observability | Logging em catch blocks silenciosos | ✅ Implementado |
+| A6 | Observability | Logging em catch blocks silenciosos (task_repo, dashboard) | ✅ Implementado |
+| A7 | NERV | Event emission para attempt transitions (STARTED, COMPLETED) | ✅ Implementado |
+| A8 | NERV | Event emission para orchestration artifacts | ✅ Implementado |
+| A9 | Observability | 5 silent catch blocks convertidos em logging no projector | ✅ Implementado |
+| A10 | Resilience | Timeout guard no agent loop step() (30s default) | ✅ Implementado |
+| A11 | Resilience | Auto-destruction timer para temporary drivers (5min) | ✅ Implementado |
+| A12 | Observability | Error handling em execution engine (per-task, policy, interpret) | ✅ Implementado |
 
 ---
 
@@ -84,10 +95,12 @@
 
 | # | Categoria | Descrição | Status |
 |---|----------|-----------|--------|
-| U1 | NERV-Only | Migrar mutations silenciosas para emitir eventos | 🔲 Em progresso |
-| U2 | Kernel | Configuração externalizável de drain/retention | 🔲 Pendente |
-| U3 | Agent | Timeout guard em agent_loop para step() | 🔲 Pendente |
-| U4 | Driver | Auto-destruction timer para temporary drivers | 🔲 Pendente |
+| U1 | NERV-Only | Event emission em mutations silenciosas (control.js, projector, orchestrator) | ✅ Implementado |
+| U2 | Kernel | Configuração externalizável de drain batch size e retention | ✅ Implementado |
+| U3 | Agent | Timeout guard em agent_loop para step() (30s default, configurável) | ✅ Implementado |
+| U4 | Driver | Auto-destruction timer para temporary drivers (5min) | ✅ Implementado |
+| U5 | Kernel | NERV instance validation obrigatória | ✅ Implementado |
+| U6 | Lifecycle | Signal listeners cleanup no shutdown (delegated mode fix) | ✅ Implementado |
 
 ---
 
@@ -122,13 +135,16 @@ Migração gradual, não big-bang:
 
 | Métrica | Sessão 1 | Sessão 2 | Meta |
 |---------|----------|----------|------|
-| Bugs corrigidos | 22 | 22+ | 35+ |
+| Bugs corrigidos | 22 | 37 | 40+ |
 | Lint errors | 0 | 0 | 0 |
 | Test pass rate | 798/800 | 798/800 | 798/800 |
-| Silent catch blocks | 0 (era 6+) | 0 | 0 |
+| Silent catch blocks corrigidos | 6 | 11+ | 0 restantes |
 | NERV subsystems cleaned | 7/7 | 7/7 | 7/7 |
-| Silent DB mutations | 0 (era 2+) | 0 | 0 |
+| Silent DB mutations | 2 → 0 | 3+ → 0 | 0 |
+| NERV events adicionados | 2 | 5 | — |
+| Aprimoramentos implementados | 6 | 12 | — |
+| Upgrades implementados | 0 | 6 | — |
 
 ---
 
-*Atualizado em: 2 de março de 2026*
+*Atualizado em: 2 de março de 2026 — Sessão 2*
