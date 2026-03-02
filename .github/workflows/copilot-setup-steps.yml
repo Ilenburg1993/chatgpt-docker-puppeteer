@@ -52,6 +52,9 @@ on:
     paths:
       - .github/workflows/copilot-setup-steps.yml
 
+permissions:
+  contents: read
+
 jobs:
   # Nome OBRIGATÓRIO pela plataforma Copilot — não renomear.
   # actionlint:ignore unknown-prop
