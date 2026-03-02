@@ -1,8 +1,8 @@
 # chatgpt-docker-puppeteer — Guia de Estilo para Revisão de Código
 
-Este guia instrui o Gemini Code Assist a priorizar as convenções e padrões específicos deste
-projeto ao revisar pull requests. O projeto é um sistema Node.js 24+ (ESM obrigatório) que orquestra
-missões de longa duração com LLMs via automação de browser, com arquitetura orientada a eventos.
+Este guia instrui o Gemini Code Assist a priorizar as convenções e padrões específicos deste projeto
+ao revisar pull requests. O projeto é um sistema Node.js 24+ (ESM obrigatório) que orquestra missões
+de longa duração com LLMs via automação de browser, com arquitetura orientada a eventos.
 
 ---
 
@@ -12,7 +12,8 @@ missões de longa duração com LLMs via automação de browser, com arquitetura
 - **ESM obrigatório.** Todo código deve usar `import`/`export`. Nunca aceitar `require()` ou
   `module.exports` sem justificativa explícita e documentada.
 - O arquivo `package.json` deve sempre manter `"type": "module"`.
-- Flags de Node obrigatórias em produção: `--enable-source-maps --trace-warnings --unhandled-rejections=strict`.
+- Flags de Node obrigatórias em produção:
+  `--enable-source-maps --trace-warnings --unhandled-rejections=strict`.
 
 ## 2. Formatação e Estilo
 
@@ -45,14 +46,16 @@ missões de longa duração com LLMs via automação de browser, com arquitetura
 ## 5. Arquitetura e Acoplamento
 
 ### Barramento de eventos (NERV)
+
 - Componentes dentro da topologia NERV (`src/nerv/`, `src/kernel/`, `src/driver/`, `src/server/`)
   devem comunicar-se **exclusivamente via eventos NERV**, nunca por importação direta cruzada.
-- Detectar e sinalizar como **HIGH** qualquer importação de `src/kernel/` dentro de `src/agent/`
-  ou vice-versa sem passar pelo barramento.
+- Detectar e sinalizar como **HIGH** qualquer importação de `src/kernel/` dentro de `src/agent/` ou
+  vice-versa sem passar pelo barramento.
 - Todo evento emitido deve ter um nome constante de `src/core/constants/`. Strings literais de
   evento em `nerv.emit()` são padrões proibidos.
 
 ### Domínios
+
 - `src/agent/` → workers internos (fila, watchdog, controle, missão, pós-processamento)
 - `src/missions/` → domínio de negócio (não executar loops aqui)
 - `agents/` na raiz ≠ `src/agent/` — confusão entre os dois é um bug de nomenclatura
@@ -62,6 +65,7 @@ missões de longa duração com LLMs via automação de browser, com arquitetura
   - `src/driver/` importando de `src/infra/` fora do padrão de injeção de dependência
 
 ### Browser
+
 - **Nunca usar `puppeteer.launch()`** no processo principal. O browser é controlado via Chrome
   externo por DevTools Protocol. Qualquer uso de `puppeteer.launch()` é uma regressão **CRITICAL**.
 
@@ -69,14 +73,14 @@ missões de longa duração com LLMs via automação de browser, com arquitetura
 
 - Nunca usar `catch(e) {}` vazio — sempre logar ou re-throw com contexto.
 - Nunca expor `error.stack` em respostas de API (vazamento de informação sensível — **HIGH**).
-- Usar classes de erro específicas do domínio. `new Error('mensagem genérica')` em código de
-  domínio deve ser sinalizado como **LOW**.
+- Usar classes de erro específicas do domínio. `new Error('mensagem genérica')` em código de domínio
+  deve ser sinalizado como **LOW**.
 - Callbacks assíncronas devem sempre ter `try/catch` ou encadeamento de `.catch()`.
 
 ## 7. Segurança
 
-- **Nunca commitar secrets, tokens, API keys ou senhas** em qualquer arquivo (incluindo `.env.example`
-  com valores reais). Sinalizar como **CRITICAL**.
+- **Nunca commitar secrets, tokens, API keys ou senhas** em qualquer arquivo (incluindo
+  `.env.example` com valores reais). Sinalizar como **CRITICAL**.
 - Validar todos os inputs de API com Zod ou validação explícita antes de processar.
 - Headers de segurança HTTP obrigatórios: `Content-Security-Policy`, `X-Frame-Options`,
   `X-Content-Type-Options`, `Strict-Transport-Security`.
@@ -90,8 +94,8 @@ missões de longa duração com LLMs via automação de browser, com arquitetura
   `removeEventListener`) — padrão de vazamento de memória — **HIGH**.
 - Detectar queries N+1 em loops (chamadas de banco de dados ou API dentro de `for`/`forEach` sem
   batching) — **MEDIUM**.
-- `setInterval`/`setTimeout` sem referência para `clearInterval`/`clearTimeout` em código de
-  módulo são vazamentos — **MEDIUM**.
+- `setInterval`/`setTimeout` sem referência para `clearInterval`/`clearTimeout` em código de módulo
+  são vazamentos — **MEDIUM**.
 - Evitar uso de `JSON.parse(JSON.stringify(obj))` para clone profundo — usar `structuredClone()`.
 
 ## 9. Testes

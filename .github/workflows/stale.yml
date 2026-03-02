@@ -50,7 +50,6 @@ jobs:
             Esta issue foi fechada automaticamente por inatividade prolongada.
             Reabra caso o problema ainda seja válido.
           exempt-issue-labels: "pinned,security,blocked,in-progress,bug,enhancement"
-
           # ── PRs ─────────────────────────────────────────────────────────────
           days-before-pr-stale: 30
           days-before-pr-close: 7
@@ -63,7 +62,6 @@ jobs:
             Este PR foi fechado automaticamente por inatividade prolongada.
             Reabra caso ainda seja relevante ou as dependências precisem ser atualizadas.
           exempt-pr-labels: "pinned,security,blocked,in-progress,deps:major"
-
           # ── Configurações gerais ────────────────────────────────────────────
           # Não fechar issues/PRs com milestone
           exempt-milestones: true
