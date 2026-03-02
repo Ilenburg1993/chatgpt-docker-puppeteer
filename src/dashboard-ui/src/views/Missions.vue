@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Plus, RefreshCw } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { useMissionsVNextStore } from '@/stores/missions_vnext';
@@ -35,9 +35,12 @@ function statusVariant(status) {
     return 'default';
 }
 
+let feedbackTimer = null;
+
 function showFeedback(message, type = 'success') {
     actionFeedback.value = { message, type };
-    setTimeout(() => { actionFeedback.value = null; }, 4000);
+    if (feedbackTimer) clearTimeout(feedbackTimer);
+    feedbackTimer = setTimeout(() => { actionFeedback.value = null; feedbackTimer = null; }, 4000);
 }
 
 async function refresh() {
@@ -79,6 +82,10 @@ async function createMission() {
 }
 
 onMounted(refresh);
+
+onUnmounted(() => {
+    if (feedbackTimer) { clearTimeout(feedbackTimer); feedbackTimer = null; }
+});
 </script>
 
 <template>

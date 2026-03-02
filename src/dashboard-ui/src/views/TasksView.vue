@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Plus, RefreshCw } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import Button from '@/components/ui/Button.vue';
@@ -56,9 +56,12 @@ function statusVariant(status) {
     return 'default';
 }
 
+let feedbackTimer = null;
+
 function showFeedback(message, type = 'success') {
     actionFeedback.value = { message, type };
-    setTimeout(() => { actionFeedback.value = null; }, 4000);
+    if (feedbackTimer) clearTimeout(feedbackTimer);
+    feedbackTimer = setTimeout(() => { actionFeedback.value = null; feedbackTimer = null; }, 4000);
 }
 
 function requestReason(action, callback) {
@@ -196,6 +199,10 @@ async function createTask() {
 
 onMounted(async () => {
     await Promise.all([missions.fetchFirstPage({ limit: 200 }), refresh()]);
+});
+
+onUnmounted(() => {
+    if (feedbackTimer) { clearTimeout(feedbackTimer); feedbackTimer = null; }
 });
 </script>
 
