@@ -7,6 +7,11 @@ import * as adaptive from '#logic/adaptive';
 import { log } from '#core/logger';
 
 /**
+ * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
+ */
+
+/**
  * Configuração de timeouts, thresholds e delays para biomechanics.
  *
  * @readonly
@@ -827,7 +832,7 @@ class BiomechanicsEngine extends EventEmitter {
      * @private
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para error message)
-     * @returns {Promise<never>} Promise que rejeita após timeout
+     * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
         let timerId;

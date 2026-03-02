@@ -214,13 +214,17 @@ function _cancelMissionTasksCascadeTx(db, missionId) {
  */
 function _pauseMissionPendingTasksTx(db, missionId) {
     const now = _now();
+    // BUG-CASCADE-RESUME: always set last_error = 'MISSION_PAUSED_CASCADE' regardless of any
+    // pre-existing last_error so that _resumeMissionCascadedTasksTx (which filters on this marker)
+    // can reliably revert the pause. The original error is preserved inside task_json.state and
+    // the events table, so diagnostic info is not lost.
     db.prepare(
         `
         UPDATE tasks
         SET status = 'PAUSED',
             paused_at_ms = @now,
             updated_at_ms = @now,
-            last_error = CASE WHEN last_error IS NULL OR last_error = '' THEN 'MISSION_PAUSED_CASCADE' ELSE last_error END
+            last_error = 'MISSION_PAUSED_CASCADE'
         WHERE mission_id = @mission_id
           AND status = 'PENDING'
           AND stage = 'READY'

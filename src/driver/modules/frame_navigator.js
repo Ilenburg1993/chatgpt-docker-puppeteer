@@ -4,6 +4,11 @@ import { log } from '#core/logger';
 import { ERROR_NAMES } from '#core/constants';
 
 /**
+ * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
+ */
+
+/**
  * Configuração de navegação em frames (timeouts, depth limit, retry).
  *
  * @readonly
@@ -549,7 +554,7 @@ class FrameNavigator extends EventEmitter {
      * @private
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para error message)
-     * @returns {Promise<never>} Promise que rejeita após timeout
+     * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
         let timerId;
