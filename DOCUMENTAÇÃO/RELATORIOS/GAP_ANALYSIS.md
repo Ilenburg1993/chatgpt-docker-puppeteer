@@ -3,8 +3,8 @@
 > **Documento de planejamento estratégico** - Janeiro 2026  
 > Análise crítica do estado atual e plano de ação imediato
 >
-> **Nota:** este documento registra uma fotografia de transição. Para execução atual, valide comandos
-> e caminhos na documentação canônica viva.
+> **Nota:** este documento registra uma fotografia de transição. Para execução atual, valide
+> comandos e caminhos na documentação canônica viva.
 
 ---
 

@@ -123,15 +123,25 @@ class MissionManager {
             }
         };
 
-        const state = await this.stateManager.createMission(mission);
+        let state;
+        try {
+            state = await this.stateManager.createMission(mission);
 
-        // Inicializa contexto para a missão
-        this.contextManager.initializeContext(missionId, {
-            metadata: {
-                template: templateId,
-                params
-            }
-        });
+            // Inicializa contexto para a missão
+            this.contextManager.initializeContext(missionId, {
+                metadata: {
+                    template: templateId,
+                    params,
+                },
+            });
+        } catch (err) {
+            // Rollback: if context init fails after mission created, log and rethrow
+            logger.log(
+                'ERROR',
+                `[MissionManager] Mission ${missionId} creation failed during context init: ${err?.message}`
+            );
+            throw err;
+        }
 
         logger.log('INFO', `[MissionManager] Missão criada: ${missionId} (${workflow.steps.length} steps)`);
         return state;

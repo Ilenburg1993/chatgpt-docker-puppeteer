@@ -233,7 +233,10 @@ class BrowserPoolManager {
                     try {
                         await page.close();
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing invalid page: ${closeErr?.message ?? String(closeErr)}`);
+                        log(
+                            'WARN',
+                            `[BrowserPool] Error closing invalid page: ${closeErr?.message ?? String(closeErr)}`
+                        );
                     }
 
                     const validationError = new Error('PAGE_VALIDATION_FAILED');
@@ -291,7 +294,10 @@ class BrowserPoolManager {
                     try {
                         await page.close();
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing failed page: ${closeErr?.message ?? String(closeErr)}`);
+                        log(
+                            'WARN',
+                            `[BrowserPool] Error closing failed page: ${closeErr?.message ?? String(closeErr)}`
+                        );
                     }
                 }
 
@@ -416,7 +422,10 @@ class BrowserPoolManager {
         try {
             await page.close();
         } catch (closeErr) {
-            log('WARN', `[BrowserPool] page.close() falhou (página pode já estar fechada): ${closeErr?.message ?? String(closeErr)}`);
+            log(
+                'WARN',
+                `[BrowserPool] page.close() falhou (página pode já estar fechada): ${closeErr?.message ?? String(closeErr)}`
+            );
         }
 
         // Remove do registro de forma incondicional (A004: não depender de page.close() ter sucesso)
@@ -555,13 +564,13 @@ class BrowserPoolManager {
      */
     _startHealthChecks() {
         this.healthCheckTimer = setInterval(async () => {
-            // BUG-POOL-1: async setInterval without catch causes unhandled rejection in Node.js 24+
             try {
                 await this.runHealthCheck();
             } catch (err) {
                 log('ERROR', `[BrowserPool] Health check failed: ${err?.message || String(err)}`);
             }
         }, this.config.healthCheckInterval);
+        this.healthCheckTimer.unref?.();
 
         log('DEBUG', `[BrowserPool] Health checks iniciados (intervalo: ${this.config.healthCheckInterval}ms)`);
     }
@@ -1213,7 +1222,10 @@ class BrowserPoolManager {
                             await page.close();
                         }
                     } catch (closeErr) {
-                        log('WARN', `[BrowserPool] Error closing page ${taskId}: ${closeErr?.message ?? String(closeErr)}`);
+                        log(
+                            'WARN',
+                            `[BrowserPool] Error closing page ${taskId}: ${closeErr?.message ?? String(closeErr)}`
+                        );
                     }
 
                     // Remove from pool

@@ -10,8 +10,8 @@ setTimeout(() => this._attachSensoryListeners(), 5000);
 
 // CORREÇÃO:
 this._retryTimer = setTimeout(() => {
-    this._retryTimer = null;
-    this._attachSensoryListeners();
+  this._retryTimer = null;
+  this._attachSensoryListeners();
 }, 5000);
 // E em stop(): clearTimeout(this._retryTimer)
 ```
@@ -21,12 +21,12 @@ this._retryTimer = setTimeout(() => {
 ```js
 // PROBLEMA: unhandled rejection se fn() lançar
 setTimeout(async () => {
-    await fn();
+  await fn();
 }, delay);
 
 // CORREÇÃO:
 setTimeout(() => {
-    fn().catch(err => log('ERROR', err.message));
+  fn().catch(err => log('ERROR', err.message));
 }, delay);
 ```
 
@@ -35,15 +35,19 @@ setTimeout(() => {
 ```js
 // PROBLEMA: múltiplas coletas concorrentes
 setInterval(async () => {
-    await collect(); // se demorar mais que o intervalo = concorrência
+  await collect(); // se demorar mais que o intervalo = concorrência
 }, 1000);
 
 // CORREÇÃO:
 let _collecting = false;
 setInterval(async () => {
-    if (_collecting) return;
-    _collecting = true;
-    try { await collect(); } finally { _collecting = false; }
+  if (_collecting) return;
+  _collecting = true;
+  try {
+    await collect();
+  } finally {
+    _collecting = false;
+  }
 }, 1000);
 ```
 
@@ -55,7 +59,9 @@ const browser = this.driver.page.browser();
 
 // CORREÇÃO:
 const page = this.driver.page;
-if (!page) { throw err; }
+if (!page) {
+  throw err;
+}
 const browser = page.browser();
 ```
 
@@ -64,23 +70,31 @@ const browser = page.browser();
 ```js
 // PROBLEMA: .catch reseta antes de .then verificar
 promise
-    .catch(() => { failures++; })
-    .then(() => { failures = 0; }); // executa mesmo após catch!
+  .catch(() => {
+    failures++;
+  })
+  .then(() => {
+    failures = 0;
+  }); // executa mesmo após catch!
 
 // CORREÇÃO:
 promise
-    .then(() => { failures = 0; })
-    .catch(() => { failures++; });
+  .then(() => {
+    failures = 0;
+  })
+  .catch(() => {
+    failures++;
+  });
 ```
 
 ## parseInt sem radix (C6)
 
 ```js
 // PROBLEMA: comportamento ambíguo com strings "0x" ou "08"
-parseInt(process.env.PORT || '3000')
+parseInt(process.env.PORT || '3000');
 
 // CORREÇÃO:
-parseInt(process.env.PORT || '3000', 10)
+parseInt(process.env.PORT || '3000', 10);
 ```
 
 ## HTTP 200 para não-implementado (C10)
@@ -102,9 +116,9 @@ await Promise.race([op(), _timeout(5000)]);
 // CORREÇÃO:
 const t = _timeout(5000);
 try {
-    await Promise.race([op(), t.promise]);
+  await Promise.race([op(), t.promise]);
 } finally {
-    t.cancel();
+  t.cancel();
 }
 ```
 

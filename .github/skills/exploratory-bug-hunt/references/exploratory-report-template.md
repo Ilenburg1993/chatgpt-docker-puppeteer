@@ -20,12 +20,12 @@
 
 ## Status dos Achados
 
-| ID | Severidade | Arquivo | Linha | Status |
-|----|-----------|---------|-------|--------|
-| C001 | CRÍTICO | `src/...` | L123 | ✅ Corrigido |
-| A001 | ALTO | `src/...` | L456 | ✅ Corrigido |
-| M001 | MÉDIO | `src/...` | L789 | ⏳ Backlog |
-| B001 | BAIXO | `src/...` | L012 | ✅ Corrigido |
+| ID   | Severidade | Arquivo   | Linha | Status       |
+| ---- | ---------- | --------- | ----- | ------------ |
+| C001 | CRÍTICO    | `src/...` | L123  | ✅ Corrigido |
+| A001 | ALTO       | `src/...` | L456  | ✅ Corrigido |
+| M001 | MÉDIO      | `src/...` | L789  | ⏳ Backlog   |
+| B001 | BAIXO      | `src/...` | L012  | ✅ Corrigido |
 
 ---
 
@@ -37,16 +37,14 @@
 
 **Categoria**: C1 / C2 / C3 / C4 / C5 / C6 / C7 / C8 / C9 / C10
 
-**Problema**:
-[Descrição objetiva do bug com trecho de código evidenciando o problema]
+**Problema**: [Descrição objetiva do bug com trecho de código evidenciando o problema]
 
 ```js
 // CÓDIGO COM PROBLEMA (antes):
 código problemático aqui
 ```
 
-**Correção**:
-[Descrição da correção aplicada ou proposta]
+**Correção**: [Descrição da correção aplicada ou proposta]
 
 ```js
 // CÓDIGO CORRIGIDO (depois):
@@ -59,8 +57,8 @@ código correto aqui
 
 ## Backlog (Não Corrigidos Nesta Rodada)
 
-| ID | Sev. | Arquivo | Razão do Adiamento |
-|----|------|---------|-------------------|
+| ID   | Sev.  | Arquivo   | Razão do Adiamento                       |
+| ---- | ----- | --------- | ---------------------------------------- |
 | M001 | MÉDIO | `src/...` | Requer refatoração maior — escopo futuro |
 
 ---

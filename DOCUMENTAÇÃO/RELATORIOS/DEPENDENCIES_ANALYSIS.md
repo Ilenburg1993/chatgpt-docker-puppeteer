@@ -40,7 +40,7 @@ winston (3 novos pacotes)
 | `openai`                         | ^6.16.0  | Futuro suporte API                                                  | ✅ OK       |
 | `p-limit`                        | ^3.1.0   | Concurrency control                                                 | ✅ OK       |
 | `pino`                           | ^8.20.0  | **⚠️ NÃO USADO NO CÓDIGO** (mas declarado)                          | ⚠️ OPTIONAL |
-| `pm2`                            | ^6.0.14  | `src/infra/system.js`, `ecosystem.config.cjs`                      | ✅ OK       |
+| `pm2`                            | ^6.0.14  | `src/infra/system.js`, `ecosystem.config.cjs`                       | ✅ OK       |
 | `prom-client`                    | ^14.1.0  | Prometheus metrics                                                  | ✅ OK       |
 | `puppeteer`                      | ^24.36.0 | Core automation                                                     | ✅ OK       |
 | `puppeteer-extra`                | ^3.3.6   | Plugins system                                                      | ✅ OK       |
@@ -459,7 +459,8 @@ grep -r "@core\\|@infra\\|@shared\\|@nerv" src/ | wc -l
 
 1. [package.json](../package.json) - Node dependencies
 2. [Dockerfile](.devcontainer/Dockerfile) - System packages
-3. [RECLASSIFICADOS/DEVCONTAINER_REBUILD_ANALYSIS.md](./RECLASSIFICADOS/DEVCONTAINER_REBUILD_ANALYSIS.md) - Análise prévia
+3. [RECLASSIFICADOS/DEVCONTAINER_REBUILD_ANALYSIS.md](./RECLASSIFICADOS/DEVCONTAINER_REBUILD_ANALYSIS.md) -
+   Análise prévia
 4. [validate-env.sh](.devcontainer/scripts/validate-env.sh) - ENV validator (usa jq, bash)
 
 ---

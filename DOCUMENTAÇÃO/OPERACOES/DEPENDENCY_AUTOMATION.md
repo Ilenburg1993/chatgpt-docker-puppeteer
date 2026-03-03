@@ -20,11 +20,15 @@ Ele não substitui a documentação geral de segurança do runtime em [SECURITY.
 ## Arquivos canônicos
 
 - Dependabot: [../../.github/dependabot.yml](../../.github/dependabot.yml)
-- Review de dependências: [../../.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml)
-- Higiene periódica: [../../.github/workflows/dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.yml)
+- Review de dependências:
+  [../../.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml)
+- Higiene periódica:
+  [../../.github/workflows/dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.yml)
 - Segurança: [../../.github/workflows/security.yml](../../.github/workflows/security.yml)
-- Gate de auditoria npm: [../../scripts/security/npm-audit-gate.mjs](../../scripts/security/npm-audit-gate.mjs)
-- Auditor de superfície declarada/usada: [../../scripts/analysis/audit-dependencies.js](../../scripts/analysis/audit-dependencies.js)
+- Gate de auditoria npm:
+  [../../scripts/security/npm-audit-gate.mjs](../../scripts/security/npm-audit-gate.mjs)
+- Auditor de superfície declarada/usada:
+  [../../scripts/analysis/audit-dependencies.js](../../scripts/analysis/audit-dependencies.js)
 - Hub de automação GitHub: [GITHUB_AUTOMATION.md](./GITHUB_AUTOMATION.md)
 
 ## Stack de automação atual
@@ -93,8 +97,8 @@ O workflow [dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.y
 
 - roda auditoria completa (`prod + dev`) com severidade mínima `moderate`;
 - executa o auditor de dependências declaradas vs. usadas;
-- gera artefatos para revisão periódica da saúde da árvore de dependências, mesmo quando o gate
-  de `npm audit` encontra issues acionáveis.
+- gera artefatos para revisão periódica da saúde da árvore de dependências, mesmo quando o gate de
+  `npm audit` encontra issues acionáveis.
 
 Esse fluxo é deliberadamente separado do `security.yml`:
 
@@ -139,9 +143,9 @@ Os cenários abaixo geram risco residual documentado, mas não falha automática
 
 Essa regra evita tratar advisory inconsistente do ecossistema como erro de CI do projeto.
 
-Ela também reduz falsos positivos transitórios de cache/edge do registry: advisories baseados só
-em ranges (`<x.y.z`) não bloqueiam automaticamente, e um único `npm view <pacote>@<versão>`
-positivo também não basta para tornar o finding bloqueante.
+Ela também reduz falsos positivos transitórios de cache/edge do registry: advisories baseados só em
+ranges (`<x.y.z`) não bloqueiam automaticamente, e um único `npm view <pacote>@<versão>` positivo
+também não basta para tornar o finding bloqueante.
 
 ## Comandos operacionais
 
@@ -161,8 +165,8 @@ Mesmo com automação, ainda exigem revisão humana:
 
 ## Risco residual conhecido em 1 de março de 2026
 
-Na revisão atual, ainda existem advisories relevantes cujo “fix” publicado pelo `npm audit` não
-está disponível no registry público no momento da validação.
+Na revisão atual, ainda existem advisories relevantes cujo “fix” publicado pelo `npm audit` não está
+disponível no registry público no momento da validação.
 
 Exemplos observados:
 

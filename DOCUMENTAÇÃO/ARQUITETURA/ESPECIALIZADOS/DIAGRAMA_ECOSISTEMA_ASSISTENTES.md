@@ -1,6 +1,5 @@
-> **Status**: Especializado
-> **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md) como fonte oficial.
-> **Quando consultar**: apenas para aprofundamento deste recorte.
+> **Status**: Especializado **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md)
+> como fonte oficial. **Quando consultar**: apenas para aprofundamento deste recorte.
 
 # Diagrama: Ecossistema de Assistentes (Copilot/OpenCode) + Ollama + Runtime (Puppeteer)
 

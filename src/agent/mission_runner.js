@@ -206,7 +206,10 @@ class MissionRunner {
                     payload: { task_id: progress.current_task_id, task_status: null },
                 });
                 if (!failResult.ok) {
-                    log('WARN', `[MissionRunner] fail (task_not_found) rejected: ${failResult.code || failResult.error}`);
+                    log(
+                        'WARN',
+                        `[MissionRunner] fail (task_not_found) rejected: ${failResult.code || failResult.error}`
+                    );
                 }
                 return;
             }
@@ -226,7 +229,10 @@ class MissionRunner {
                     payload: { task_id: progress.current_task_id, task_status: status, reason: 'TASK_PAUSED_CASCADE' },
                 });
                 if (!pauseResult.ok && pauseResult.code !== 'MISSION_TRANSITION_NOOP') {
-                    log('WARN', `[MissionRunner] pause (task_paused_cascade) rejected: ${pauseResult.code || pauseResult.error}`);
+                    log(
+                        'WARN',
+                        `[MissionRunner] pause (task_paused_cascade) rejected: ${pauseResult.code || pauseResult.error}`
+                    );
                 }
                 return;
             }
@@ -271,7 +277,10 @@ class MissionRunner {
                     payload: { task_id: progress.current_task_id, task_status: status, reason: 'TASK_BLOCKED' },
                 });
                 if (!pauseResult.ok && pauseResult.code !== 'MISSION_TRANSITION_NOOP') {
-                    log('WARN', `[MissionRunner] pause (task_blocked) rejected: ${pauseResult.code || pauseResult.error}`);
+                    log(
+                        'WARN',
+                        `[MissionRunner] pause (task_blocked) rejected: ${pauseResult.code || pauseResult.error}`
+                    );
                 }
                 return;
             }

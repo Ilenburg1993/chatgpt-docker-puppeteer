@@ -1,0 +1,327 @@
+name: JSDoc & Typing
+
+# Verifica cobertura de JSDoc e tipagem TypeScript em PRs e push ao main.
+# Totalmente não-bloqueante: falhas geram relatórios mas não bloqueiam o merge.
+#
+# Jobs:
+#   typecheck  — tsc --noEmit em modo node (tsconfig.node.json) e tools
+#   jsdoc      — cobertura de JSDoc via scripts/analysis/jsdoc_coverage_cli.mjs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: jsdoc-typing-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  typecheck:
+    name: TypeScript typecheck (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/typecheck
+
+      - name: TypeScript typecheck (node)
+        id: typecheck_node
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run typecheck:node 2>&1 | tee artifacts/typecheck/typecheck-node.log
+
+      - name: TypeScript typecheck (tools)
+        id: typecheck_tools
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run typecheck:tools 2>&1 | tee artifacts/typecheck/typecheck-tools.log
+
+      - name: Build typecheck summary
+        if: always()
+        run: |
+          {
+            echo "## TypeScript Typecheck (non-blocking)"
+            echo ""
+            echo "- typecheck:node → ${{ steps.typecheck_node.outcome }}"
+            echo "- typecheck:tools → ${{ steps.typecheck_tools.outcome }}"
+            echo ""
+            echo "> Falhas acima são informativas e não bloqueiam o merge."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload typecheck artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: typecheck-${{ github.run_id }}
+          path: artifacts/typecheck
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Comment PR with typecheck results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          NODE_OUTCOME: ${{ steps.typecheck_node.outcome }}
+          TOOLS_OUTCOME: ${{ steps.typecheck_tools.outcome }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = '<!-- jsdoc-typecheck-summary -->';
+            const nodeOutcome = process.env.NODE_OUTCOME || 'unknown';
+            const toolsOutcome = process.env.TOOLS_OUTCOME || 'unknown';
+            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';
+            const fix = (o, cmd) =>
+              o === 'failure' ? `\n  > 💡 Sugestão: rode \`${cmd}\` localmente para ver os erros.` : '';
+
+            const body = [
+              marker,
+              '## 🔍 TypeScript Typecheck (non-blocking)',
+              '',
+              `| Check | Status |`,
+              `|---|---|`,
+              `| typecheck:node | ${icon(nodeOutcome)} ${nodeOutcome} |`,
+              `| typecheck:tools | ${icon(toolsOutcome)} ${toolsOutcome} |`,
+              fix(nodeOutcome, 'npm run typecheck:node'),
+              fix(toolsOutcome, 'npm run typecheck:tools'),
+              '',
+              '> Falhas são informativas e não bloqueiam o merge.',
+            ].filter((l) => l !== '').join('\n');
+
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find((c) =>
+                c.user?.type === 'Bot' && c.body?.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Failed to post PR comment: ${err.message}. Results available in the workflow step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }
+
+  jsdoc-coverage:
+    name: JSDoc coverage (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/jsdoc
+
+      - name: Run JSDoc coverage (JSON)
+        id: jsdoc_json
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run jsdoc:coverage:json 2>&1 | tee artifacts/jsdoc/coverage-raw.log
+
+      - name: Run JSDoc coverage (console)
+        id: jsdoc_console
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run jsdoc:coverage 2>&1 | tee artifacts/jsdoc/coverage.txt
+
+      - name: Build JSDoc summary
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const raw = "artifacts/jsdoc/coverage-raw.log";
+            let covered = null;
+            if (fs.existsSync(raw)) {
+              try {
+                const content = fs.readFileSync(raw, "utf8");
+                const jsonMatch = content.match(/\{[\s\S]*\}/);
+                if (jsonMatch) covered = JSON.parse(jsonMatch[0]);
+              } catch { /* ignore */ }
+            }
+            const lines = [
+              "## JSDoc Coverage (non-blocking)",
+              "",
+              covered
+                ? `- total_exports: ${covered.total ?? "n/a"} | documented: ${covered.documented ?? "n/a"} | coverage: ${covered.percent ?? "n/a"}%`
+                : "- (JSON report not available — see coverage.txt artifact)",
+              "",
+              "> Falhas acima são informativas e não bloqueiam o merge.",
+            ];
+            fs.writeFileSync("artifacts/jsdoc/summary.md", lines.join("\n") + "\n");
+          '
+          cat artifacts/jsdoc/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload JSDoc artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jsdoc-coverage-${{ github.run_id }}
+          path: artifacts/jsdoc
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Comment PR with JSDoc coverage
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          JSON_OUTCOME: ${{ steps.jsdoc_json.outcome }}
+          CONSOLE_OUTCOME: ${{ steps.jsdoc_console.outcome }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const { readFileSync, existsSync } = require('node:fs');
+            const marker = '<!-- jsdoc-coverage-summary -->';
+            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';
+            const jsonOutcome = process.env.JSON_OUTCOME || 'unknown';
+            const consoleOutcome = process.env.CONSOLE_OUTCOME || 'unknown';
+
+            let coverageDetail = '(relatório não gerado)';
+            try {
+              const raw = readFileSync('artifacts/jsdoc/coverage-raw.log', 'utf8');
+              // Find the first line that looks like a JSON object (starts with '{')
+              const jsonLine = raw.split('\n').find((l) => l.trimStart().startsWith('{'));
+              if (jsonLine) {
+                const data = JSON.parse(jsonLine.trim());
+                coverageDetail = `${data.percent ?? '?'}% (${data.documented ?? '?'}/${data.total ?? '?'} exports)`;
+              }
+            } catch { /* ignore parse errors — log may be empty or malformed */ }
+
+            const body = [
+              marker,
+              '## 📝 JSDoc Coverage (non-blocking)',
+              '',
+              `| Check | Status |`,
+              `|---|---|`,
+              `| jsdoc:coverage:json | ${icon(jsonOutcome)} ${jsonOutcome} |`,
+              `| jsdoc:coverage | ${icon(consoleOutcome)} ${consoleOutcome} |`,
+              `| cobertura | **${coverageDetail}** |`,
+              '',
+              jsonOutcome === 'failure' || consoleOutcome === 'failure'
+                ? '> 💡 Sugestão: rode `npm run jsdoc:coverage` localmente para ver os exports sem JSDoc.\n>'
+                : '',
+              '> Falhas são informativas e não bloqueiam o merge.',
+            ].filter((l) => l !== '').join('\n');
+
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find((c) =>
+                c.user?.type === 'Bot' && c.body?.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Failed to post PR comment: ${err.message}. Results available in the workflow step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }

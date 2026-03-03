@@ -1,6 +1,6 @@
-> **Status**: Histórico
-> **Este documento está arquivado** e não define o baseline oficial.
-> **Referência vigente**: [../../../ARQUITETURA/ARCHITECTURE.md](../../../ARQUITETURA/ARCHITECTURE.md).
+> **Status**: Histórico **Este documento está arquivado** e não define o baseline oficial.
+> **Referência vigente**:
+> [../../../ARQUITETURA/ARCHITECTURE.md](../../../ARQUITETURA/ARCHITECTURE.md).
 
 # 🔍 Driver Flow Analysis v3.0 - Pool-Ready Architecture
 

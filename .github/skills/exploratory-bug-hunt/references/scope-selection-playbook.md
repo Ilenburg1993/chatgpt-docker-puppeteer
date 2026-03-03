@@ -10,25 +10,25 @@
 
 ## Mapa de Cobertura por Rodada
 
-| Módulo | Rodada 1 | Rodada 2 | Rodada 3+ |
-|--------|----------|----------|-----------|
-| `src/kernel/` | ✅ | - | revisitar suspeitos |
-| `src/agent/` | ✅ | - | revisitar suspeitos |
-| `src/infra/` | ✅ | - | revisitar suspeitos |
-| `src/orchestrator/` | ✅ | - | revisitar suspeitos |
-| `src/nerv/` | ✅ | - | revisitar suspeitos |
-| `src/driver/` | ✅ | ✅ | revisitar targets/ e extractors/ |
-| `src/server/` | - | ✅ | revisitar handlers/ e domain/ |
-| `src/missions/` | - | ✅ | - |
-| `src/shared/` | - | ✅ | - |
-| `src/integration/` | - | - | ⏳ Prioridade Rodada 3 |
-| `src/audit_agent/` | - | - | ⏳ Prioridade Rodada 3 |
-| `src/inference_gateway/` | - | - | ⏳ Prioridade Rodada 3 |
-| `src/logic/` | - | - | ⏳ Prioridade Rodada 3 |
-| `src/validation/` | - | - | ⏳ Prioridade Rodada 3 |
-| `src/state/` | - | - | ⏳ Prioridade Rodada 3 |
-| `src/core/` | parcial | - | ⏳ completo Rodada 3 |
-| `src/types/` | - | - | ⏳ Prioridade Rodada 3 |
+| Módulo                   | Rodada 1 | Rodada 2 | Rodada 3+                        |
+| ------------------------ | -------- | -------- | -------------------------------- |
+| `src/kernel/`            | ✅       | -        | revisitar suspeitos              |
+| `src/agent/`             | ✅       | -        | revisitar suspeitos              |
+| `src/infra/`             | ✅       | -        | revisitar suspeitos              |
+| `src/orchestrator/`      | ✅       | -        | revisitar suspeitos              |
+| `src/nerv/`              | ✅       | -        | revisitar suspeitos              |
+| `src/driver/`            | ✅       | ✅       | revisitar targets/ e extractors/ |
+| `src/server/`            | -        | ✅       | revisitar handlers/ e domain/    |
+| `src/missions/`          | -        | ✅       | -                                |
+| `src/shared/`            | -        | ✅       | -                                |
+| `src/integration/`       | -        | -        | ⏳ Prioridade Rodada 3           |
+| `src/audit_agent/`       | -        | -        | ⏳ Prioridade Rodada 3           |
+| `src/inference_gateway/` | -        | -        | ⏳ Prioridade Rodada 3           |
+| `src/logic/`             | -        | -        | ⏳ Prioridade Rodada 3           |
+| `src/validation/`        | -        | -        | ⏳ Prioridade Rodada 3           |
+| `src/state/`             | -        | -        | ⏳ Prioridade Rodada 3           |
+| `src/core/`              | parcial  | -        | ⏳ completo Rodada 3             |
+| `src/types/`             | -        | -        | ⏳ Prioridade Rodada 3           |
 
 ## Heurística de Exclusão
 

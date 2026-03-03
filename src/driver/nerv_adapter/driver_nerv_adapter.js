@@ -1093,18 +1093,22 @@ class DriverNERVAdapter extends EventEmitter {
         listeners.push({ event: 'state_change', listener: stateChangeListener });
 
         const progressListener = data => {
-            this._bufferTelemetry(
-                ActionCode.DRIVER_VITAL,
-                {
-                    taskId,
-                    vitalType: 'PROGRESS',
-                    data,
-                    timestamp: new Date().toISOString(),
-                },
-                correlationId
-            );
+            try {
+                this._bufferTelemetry(
+                    ActionCode.DRIVER_VITAL,
+                    {
+                        taskId,
+                        vitalType: 'PROGRESS',
+                        data,
+                        timestamp: new Date().toISOString(),
+                    },
+                    correlationId
+                );
 
-            this.stats.vitalsEmitted++;
+                this.stats.vitalsEmitted++;
+            } catch (err) {
+                log('WARN', `[DriverNERVAdapter] Progress telemetry buffer failed: ${err?.message || String(err)}`);
+            }
         };
         driver.on('progress', progressListener);
         listeners.push({ event: 'progress', listener: progressListener });

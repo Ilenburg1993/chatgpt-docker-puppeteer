@@ -1,6 +1,7 @@
 # SCRIP_EXEMPLO
 
-**Propósito**: concentrar artefatos e exemplos de código ligados a planos legados, usados como apoio ilustrativo e não como fonte canônica de implementação.  
+**Propósito**: concentrar artefatos e exemplos de código ligados a planos legados, usados como apoio
+ilustrativo e não como fonte canônica de implementação.  
 **Status documental**: Histórico.  
 **Público**: engenharia e manutenção.  
 **Última atualização**: 28 de fevereiro de 2026.

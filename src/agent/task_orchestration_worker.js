@@ -510,11 +510,18 @@ class TaskOrchestrationWorker {
                         // unhandled Promise rejections which crash Node.js 24+ by default.
                         try {
                             await resilientLock.extend(`task:orch:${taskId}`, () => {
-                                extendTaskLock({ taskId, workerId: this.workerId, lockTtlMs: ORCHESTRATION_LOCK_TTL_MS });
+                                extendTaskLock({
+                                    taskId,
+                                    workerId: this.workerId,
+                                    lockTtlMs: ORCHESTRATION_LOCK_TTL_MS,
+                                });
                                 return true;
                             });
                         } catch (extErr) {
-                            log('WARN', `[TaskOrchestrationWorker] lock extension failed for ${taskId}: ${extErr?.message || String(extErr)}`);
+                            log(
+                                'WARN',
+                                `[TaskOrchestrationWorker] lock extension failed for ${taskId}: ${extErr?.message || String(extErr)}`
+                            );
                         }
                     }, 30000); // Extend every 30s
 
@@ -976,6 +983,20 @@ class TaskOrchestrationWorker {
             created_by: 'system',
             created_at_ms: now,
         });
+
+        // NERV audit: emit event for orchestration feedback artifact creation
+        try {
+            recordEvent({
+                entityType: 'artifact',
+                entityId: String(artId),
+                tsMs: now,
+                actorType: 'system',
+                eventType: 'ORCHESTRATION_FEEDBACK_STORED',
+                payload: { taskId, attemptId, kind: 'orchestration_feedback' },
+            });
+        } catch (_) {
+            /* best-effort */
+        }
 
         return artId;
     }

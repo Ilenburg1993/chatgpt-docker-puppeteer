@@ -1,6 +1,7 @@
 # Status Geral da Documentação
 
-**Propósito**: consolidar o estado atual da documentação canônica, registrar o que já foi feito, o que ainda falta e como continuar a evolução com governança.  
+**Propósito**: consolidar o estado atual da documentação canônica, registrar o que já foi feito, o
+que ainda falta e como continuar a evolução com governança.  
 **Status documental**: Canônico.  
 **Público**: engenharia, manutenção, governança documental e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -183,19 +184,19 @@ Essa lacuna agora já está auditada em detalhe em:
 
 Estado mais recente desta frente:
 
-- `OPERACOES/NETWORKING.md`, `OPERACOES/SECURITY.md` e `OPERACOES/LAUNCHER.md` já foram
-  reescritos com base no código atual;
+- `OPERACOES/NETWORKING.md`, `OPERACOES/SECURITY.md` e `OPERACOES/LAUNCHER.md` já foram reescritos
+  com base no código atual;
 - o lote principal de `GUIAS/` (`QUICK_START`, `DEVELOPMENT`, `TROUBLESHOOTING`, `FAQ`,
   `MONITORING_GUIDE`) também já foi reescrito com checagem rigorosa;
 - `GUIAS/CONTRIBUTING.md` também já foi reescrito com base nos templates e comandos reais;
 - `OPERACOES/CHROME_PROXY_SETUP.md`, `OPERACOES/CHROME_PROXY_INTEGRATION_GUIDE.md` e
-  `OPERACOES/DASHBOARD_PORT_FORWARDING.md` também já foram reescritos com base nos scripts e
-  configs atuais;
+  `OPERACOES/DASHBOARD_PORT_FORWARDING.md` também já foram reescritos com base nos scripts e configs
+  atuais;
 - `OPERACOES/DEVCONTAINER.md` e `OPERACOES/PM2_QUICK_REFERENCE.md` também já foram reescritos com
   base no estado atual observado, incluindo os drifts remanescentes;
 - os drifts principais do `Makefile` e dos scripts PM2 também já foram corrigidos;
-- o próximo foco recomendado é uma passada global de link hygiene e, em seguida, revisão dos
-  helpers legados que ainda mantêm diferenças de comportamento.
+- o próximo foco recomendado é uma passada global de link hygiene e, em seguida, revisão dos helpers
+  legados que ainda mantêm diferenças de comportamento.
 
 ### 3. Governança de `DECISOES/`
 
@@ -322,9 +323,10 @@ Para diretórios históricos:
 
 ### Imediatas
 
-- Executar o [PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md](../PLANOS/PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md)
-  a partir do rewrite dos documentos vivos prioritários e da revisão de links após a
-  reclassificação já aplicada.
+- Executar o
+  [PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md](../PLANOS/PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md) a
+  partir do rewrite dos documentos vivos prioritários e da revisão de links após a reclassificação
+  já aplicada.
 - Revisar a qualidade e a profundidade dos `README.md` criados nas três ondas.
 - Definir o primeiro lote canônico de ADRs em `DECISOES/`.
 
@@ -337,8 +339,8 @@ Para diretórios históricos:
 
 Atualização de progresso:
 
-- `OPERACOES/NETWORKING.md`, `OPERACOES/SECURITY.md` e `OPERACOES/LAUNCHER.md` já foram
-  reescritos contra o código atual;
+- `OPERACOES/NETWORKING.md`, `OPERACOES/SECURITY.md` e `OPERACOES/LAUNCHER.md` já foram reescritos
+  contra o código atual;
 - o próximo lote prioritário de rewrite ficou concentrado em `GUIAS/` e nos guias operacionais
   especializados restantes.
 
@@ -347,7 +349,10 @@ Atualização de progresso:
 - Hub principal: [../README.md](../README.md)
 - Índice técnico: [../INDEX.md](../INDEX.md)
 - Arquitetura oficial: [../ARQUITETURA/README.md](../ARQUITETURA/README.md)
-- Plano de rollout de `README`s: [../PLANOS/PLANO_READMES_PADRONIZADOS.md](../PLANOS/PLANO_READMES_PADRONIZADOS.md)
-- Auditoria qualitativa das categorias vivas: [./AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md](./AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md)
+- Plano de rollout de `README`s:
+  [../PLANOS/PLANO_READMES_PADRONIZADOS.md](../PLANOS/PLANO_READMES_PADRONIZADOS.md)
+- Auditoria qualitativa das categorias vivas:
+  [./AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md](./AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md)
 - Relatórios reclassificados: [./RECLASSIFICADOS/README.md](./RECLASSIFICADOS/README.md)
-- Plano de consolidação: [../PLANOS/PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md](../PLANOS/PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md)
+- Plano de consolidação:
+  [../PLANOS/PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md](../PLANOS/PLANO_CONSOLIDACAO_CATEGORIAS_VIVAS.md)

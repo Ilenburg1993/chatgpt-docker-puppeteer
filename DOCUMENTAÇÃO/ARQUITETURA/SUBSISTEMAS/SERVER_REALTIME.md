@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/server/realtime/`.  
-**Quando consultar**: ao alterar feeds SSOT, streaming de logs, telemetria de hardware, bridge com PM2 ou broadcast contínuo para o dashboard.  
+**Quando consultar**: ao alterar feeds SSOT, streaming de logs, telemetria de hardware, bridge com
+PM2 ou broadcast contínuo para o dashboard.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # SERVER REALTIME

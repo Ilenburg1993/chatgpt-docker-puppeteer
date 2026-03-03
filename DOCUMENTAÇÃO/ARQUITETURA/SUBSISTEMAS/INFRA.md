@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da infraestrutura persistente e operacional do runtime.  
-**Quando consultar**: ao alterar DB, browser pool, storage, locks, queue, proxy, transporte ou conexão com o ambiente browser.  
+**Quando consultar**: ao alterar DB, browser pool, storage, locks, queue, proxy, transporte ou
+conexão com o ambiente browser.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # INFRA

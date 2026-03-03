@@ -208,9 +208,7 @@ async function getPackageRegistryMetadata(packageName) {
         ? parsed.versions.filter(version => typeof version === 'string' && version.length > 0)
         : [];
     const time =
-        parsed.time && typeof parsed.time === 'object'
-            ? /** @type {Record<string, unknown>} */ (parsed.time)
-            : {};
+        parsed.time && typeof parsed.time === 'object' ? /** @type {Record<string, unknown>} */ (parsed.time) : {};
     const metadata = { versions: new Set(versions), time };
     PACKAGE_METADATA_CACHE.set(packageName, metadata);
     return metadata;
@@ -265,19 +263,14 @@ async function isPublishedVersion(spec) {
         npmViewJson([spec, 'version', 'dist.tarball']),
     ]);
 
-    const manifest =
-        manifestResponse.exitCode === 0 ? tryParseJson(manifestResponse.stdout.trim()) : null;
+    const manifest = manifestResponse.exitCode === 0 ? tryParseJson(manifestResponse.stdout.trim()) : null;
     const listed = Boolean(packument?.versions.has(parsedSpec.version));
     const timed = typeof packument?.time?.[parsedSpec.version] === 'string';
     const exactVersion = manifest?.version;
     const tarball = manifest?.['dist.tarball'];
     const tarballReachable =
         typeof tarball === 'string' && tarball.length > 0 ? await isReachableTarball(tarball) : false;
-    const published =
-        listed &&
-        timed &&
-        exactVersion === parsedSpec.version &&
-        tarballReachable;
+    const published = listed && timed && exactVersion === parsedSpec.version && tarballReachable;
 
     PUBLISHED_VERSION_CACHE.set(spec, published);
     return published;

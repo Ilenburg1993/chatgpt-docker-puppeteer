@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento do domínio de missões e workflow em `src/missions/`.  
-**Quando consultar**: ao alterar templates, geração de workflow, estado de missão, feedback ou lifecycle de missão de longa duração.  
+**Quando consultar**: ao alterar templates, geração de workflow, estado de missão, feedback ou
+lifecycle de missão de longa duração.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # MISSIONS

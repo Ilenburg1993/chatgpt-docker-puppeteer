@@ -1,7 +1,8 @@
 # PM2 Sovereign Implementation - Summary
 
-> **Nota:** sumário de implementação concluída. O conteúdo registra o baseline do momento da entrega;
-> para operação atual, valide tudo contra `DOCUMENTAÇÃO/OPERACOES/` e `ecosystem.config.cjs`.
+> **Nota:** sumário de implementação concluída. O conteúdo registra o baseline do momento da
+> entrega; para operação atual, valide tudo contra `DOCUMENTAÇÃO/OPERACOES/` e
+> `ecosystem.config.cjs`.
 
 > **Sumário Executivo das Implementações PM2 Sovereign (v3.0)**
 

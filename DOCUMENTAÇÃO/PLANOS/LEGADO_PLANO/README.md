@@ -1,6 +1,7 @@
 # LEGADO_PLANO
 
-**Propósito**: concentrar material de planejamento legado que ainda pode ter valor histórico ou comparativo, mas não deve competir com os planos ativos.  
+**Propósito**: concentrar material de planejamento legado que ainda pode ter valor histórico ou
+comparativo, mas não deve competir com os planos ativos.  
 **Status documental**: Histórico.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

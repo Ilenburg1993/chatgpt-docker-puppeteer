@@ -97,8 +97,8 @@ Resultado esperado:
 Status desta frente:
 
 - já iniciada;
-- `OPERACOES/NETWORKING.md`, `OPERACOES/SECURITY.md` e `OPERACOES/LAUNCHER.md` foram reescritos
-  com base no código atual;
+- `OPERACOES/NETWORKING.md`, `OPERACOES/SECURITY.md` e `OPERACOES/LAUNCHER.md` foram reescritos com
+  base no código atual;
 - o lote principal de `GUIAS/` já foi reescrito com checagem contra `package.json`, `Makefile`,
   scripts de health/env e rotas reais do backend;
 - o lote principal de `OPERACOES/` especializado também já foi reescrito com checagem contra
@@ -176,6 +176,8 @@ Resultado esperado:
 
 ## Referências relacionadas
 
-- Auditoria-base: [../RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md](../RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md)
-- Status geral: [../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md)
+- Auditoria-base:
+  [../RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md](../RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md)
+- Status geral:
+  [../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md)
 - Hub principal: [../README.md](../README.md)

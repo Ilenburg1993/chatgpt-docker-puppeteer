@@ -109,15 +109,33 @@ class ExecutionEngine {
 
         const proposals = [];
 
-        // Obtém todas as tarefas existentes
-        const tasks = this.taskRuntime.listTasks();
+        let tasks;
+        try {
+            tasks = this.taskRuntime.listTasks();
+        } catch (err) {
+            this.telemetry.warning('execution_engine_list_tasks_failed', {
+                error: err?.message || String(err),
+                tickId,
+                at: Date.now(),
+            });
+            return proposals;
+        }
 
         // Avalia cada tarefa individualmente
         for (const task of tasks) {
-            const taskProposals = this._evaluateTask(task, { tickId, at });
+            try {
+                const taskProposals = this._evaluateTask(task, { tickId, at });
 
-            if (Array.isArray(taskProposals)) {
-                proposals.push(...taskProposals);
+                if (Array.isArray(taskProposals)) {
+                    proposals.push(...taskProposals);
+                }
+            } catch (err) {
+                this.telemetry.warning('execution_engine_task_evaluation_failed', {
+                    taskId: task?.taskId || task?.meta?.id,
+                    error: err?.message || String(err),
+                    tickId,
+                    at: Date.now(),
+                });
             }
         }
 
@@ -151,22 +169,45 @@ class ExecutionEngine {
 
         // 1. Recupera observações correlacionadas
         const observations = task.metadata?.correlationId
-            ? this.observationStore.getByCorrelation(task.metadata.correlationId)
+            ? (this.observationStore.getByCorrelation(task.metadata.correlationId) ?? [])
             : [];
 
         // 2. Avaliação normativa via PolicyEngine
-        const policyAssessment = this.policyEngine.assess({
-            task,
-            observations,
-            at,
-        });
+        let policyAssessment;
+        try {
+            policyAssessment = this.policyEngine.assess({
+                task,
+                observations,
+                at,
+            });
+        } catch (err) {
+            this.telemetry.warning('execution_engine_policy_assess_failed', {
+                taskId: task?.taskId || task?.meta?.id,
+                error: err?.message || String(err),
+            });
+            policyAssessment = { alerts: [] };
+        }
 
         // 3. Interpretação semântica
-        const semanticDecisions = this._interpretObservations({
-            task,
-            observations,
-            at,
-        });
+        let semanticDecisions;
+        try {
+            semanticDecisions = this._interpretObservations({
+                task,
+                observations,
+                at,
+            });
+        } catch (err) {
+            this.telemetry.warning('execution_engine_interpret_failed', {
+                taskId: task?.taskId || task?.meta?.id,
+                error: err?.message || String(err),
+            });
+            semanticDecisions = {
+                hasCompletionSignal: false,
+                hasErrorSignal: false,
+                hasProgressSignal: false,
+                lastObservationAt: null,
+            };
+        }
 
         // 4. Combinação de avaliação normativa + semântica
         const proposal = this._synthesizeProposal({

@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento de `src/types/` e da camada de contratos para type checking.  
-**Quando consultar**: ao alterar tipos globais, augmentations, JSDoc centralizado, guards de tipo ou contratos de domínio usados por IDE e validação estática.  
+**Quando consultar**: ao alterar tipos globais, augmentations, JSDoc centralizado, guards de tipo ou
+contratos de domínio usados por IDE e validação estática.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # TYPES

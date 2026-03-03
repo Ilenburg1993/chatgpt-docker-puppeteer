@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento do barramento NERV e de seus contratos de emissão/recepção.  
-**Quando consultar**: ao alterar envelopes, buffers, emissão, recepção, transporte híbrido ou integrações baseadas em `ActionCode`.  
+**Quando consultar**: ao alterar envelopes, buffers, emissão, recepção, transporte híbrido ou
+integrações baseadas em `ActionCode`.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # NERV

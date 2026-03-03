@@ -16,16 +16,26 @@ const requiredCiScripts = ['validate-workflows.mjs', 'verify-github-workflows.mj
 const requiredScheduledWorkflowKeys = ['concurrency'];
 const workflowsRequiringConcurrency = new Set([
     'audit-nightly.yml',
+    'ci.yml',
+    'code-quality.yml',
+    'copilot-setup-steps.yml',
+    'coverage.yml',
+    'dashboard-build.yml',
     'dependency-hygiene.yml',
     'dependency-review.yml',
     'docker-rebuild.yml',
+    'docker-security-scan.yml',
+    'jsdoc-typing.yml',
+    'release.yml',
+    'scorecard.yml',
     'security.yml',
-    'ci.yml',
+    'semantic-analysis.yml',
+    'stale.yml',
 ]);
 const uploadArtifactPattern = /^actions\/upload-artifact@/;
 const requiredPinnedActionRefs = new Map([
-    ['raven-actions/actionlint', 'v2.1.1'],
-    ['reviewdog/action-shellcheck', 'v1.9.0'],
+    ['raven-actions/actionlint', 'v2.1.2'],
+    ['reviewdog/action-shellcheck', 'v1.32.0'],
     ['hadolint/hadolint-action', 'v3.3.0'],
     ['dependabot/fetch-metadata', 'v2.5.0'],
     ['actions/dependency-review-action', 'v4.8.3'],
@@ -109,9 +119,7 @@ for (const file of files) {
 
             if (typeof step.uses === 'string' && uploadArtifactPattern.test(step.uses)) {
                 if (!step.with || typeof step.with !== 'object') {
-                    throw new Error(
-                        `[ci] Upload artifact step missing 'with' block in ${file} job '${jobName}'`
-                    );
+                    throw new Error(`[ci] Upload artifact step missing 'with' block in ${file} job '${jobName}'`);
                 }
                 if (typeof step.with['retention-days'] !== 'number') {
                     throw new Error(
@@ -174,9 +182,7 @@ for (const [index, update] of dependabotParsed.updates.entries()) {
         throw new Error(`[ci] updates[${index}] must declare at least one label in .github/dependabot.yml`);
     }
     if (typeof update['open-pull-requests-limit'] !== 'number') {
-        throw new Error(
-            `[ci] updates[${index}] missing numeric 'open-pull-requests-limit' in .github/dependabot.yml`
-        );
+        throw new Error(`[ci] updates[${index}] missing numeric 'open-pull-requests-limit' in .github/dependabot.yml`);
     }
     if (!update['pull-request-branch-name'] || !update['pull-request-branch-name'].separator) {
         throw new Error(

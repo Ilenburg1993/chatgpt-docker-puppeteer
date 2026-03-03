@@ -1,0 +1,116 @@
+name: Release
+
+# Cria automaticamente um GitHub Release quando uma tag v* é publicada.
+# Executa os testes unitários antes de criar o release para garantir que
+# a tag está apontando para um estado válido do código.
+#
+# Processo:
+#   1. Checkout com histórico completo (para release notes automáticas)
+#   2. Instalar dependências e rodar testes unitários (bloqueante)
+#   3. Build do dashboard Vue/Vite (não-bloqueante)
+#   4. Criar GitHub Release com release notes geradas automaticamente
+#
+# Tags de pré-release: qualquer tag contendo -rc, -beta ou -alpha é marcada
+# como pré-release automaticamente.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout (full history for release notes)
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Run unit tests (gate)
+        run: npm run test:unit
+
+      - name: Build dashboard (non-blocking)
+        id: dashboard_build
+        continue-on-error: true
+        run: npm run dashboard:build
+
+      - name: Create GitHub Release
+        uses: actions/github-script@v8
+        env:
+          DASHBOARD_BUILD_OUTCOME: ${{ steps.dashboard_build.outcome }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const isPrerelease =
+              tag.includes('-rc') ||
+              tag.includes('-beta') ||
+              tag.includes('-alpha') ||
+              tag.includes('-preview');
+
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: tag,
+              generate_release_notes: true,
+              draft: false,
+              prerelease: isPrerelease,
+            });
+
+            const dashboardNote = process.env.DASHBOARD_BUILD_OUTCOME === 'success'
+              ? '✅ Dashboard build: success'
+              : `⚠️ Dashboard build: ${process.env.DASHBOARD_BUILD_OUTCOME || 'unknown'}`;
+
+            core.notice(`Release created: ${release.html_url}`);
+            core.info(dashboardNote);
+
+            await core.summary
+              .addHeading(`Release ${tag}`)
+              .addRaw(`- url: ${release.html_url}\n`, true)
+              .addRaw(`- prerelease: ${isPrerelease}\n`, true)
+              .addRaw(`- ${dashboardNote}\n`, true)
+              .write();

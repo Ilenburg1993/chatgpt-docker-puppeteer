@@ -87,6 +87,8 @@ function createHealth({ telemetry, thresholds = {} }) {
     };
 
     const listeners = new Set();
+    const MAX_HEALTH_LISTENERS = 50;
+    let overflowWarningEmitted = false; // Latch to emit overflow warning only once
 
     /* =========================================================
      Operações internas
@@ -221,11 +223,34 @@ function createHealth({ telemetry, thresholds = {} }) {
             throw new Error('onChange requer função');
         }
 
+        if (listeners.size >= MAX_HEALTH_LISTENERS) {
+            if (!overflowWarningEmitted) {
+                telemetry.emit('nerv:health:listener_overflow', {
+                    count: listeners.size,
+                    limit: MAX_HEALTH_LISTENERS,
+                });
+                overflowWarningEmitted = true;
+            }
+            // Refuse to add new listeners above the limit to prevent memory issues
+            return () => {}; // Return no-op unsubscribe function
+        }
+
         listeners.add(handler);
 
         return () => {
             listeners.delete(handler);
+            // Reset latch if we're back below the limit
+            if (listeners.size < MAX_HEALTH_LISTENERS && overflowWarningEmitted) {
+                overflowWarningEmitted = false;
+            }
         };
+    }
+
+    /**
+     * Shutdown: limpa listeners registrados.
+     */
+    function shutdown() {
+        listeners.clear();
     }
 
     /* =========================================================
@@ -236,6 +261,7 @@ function createHealth({ telemetry, thresholds = {} }) {
         report,
         getStatus,
         onChange,
+        shutdown,
     });
 }
 

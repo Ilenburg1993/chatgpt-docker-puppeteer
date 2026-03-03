@@ -10,16 +10,16 @@ e estratégias de migração para atualizações de dependências
 
 ## 📊 Matriz de Risco Geral
 
-| Dependência        | Atual       | Target              | Risco      | Prioridade   | Recomendação             |
-| ------------------ | ----------- | ------------------- | ---------- | ------------ | ------------------------ |
-| **Dockerfile CMD** | src/main.js | ecosystem.config.cjs | 🔴 CRÍTICO | **IMEDIATO** | ✅ **FAZER AGORA**      |
-| **Puppeteer**      | 21.11.0     | 24.35.0             | 🟡 MÉDIO   | ALTA         | ✅ **Fazer com cautela** |
-| **PM2**            | 5.4.3       | 6.0.14              | 🟢 BAIXO   | MÉDIA        | ✅ **Fazer**             |
-| **Zod**            | 3.25.76     | 4.3.5               | 🟢 BAIXO   | BAIXA        | ✅ **Fazer**             |
-| **uuid**           | 11.1.0      | 13.0.0              | 🟢 BAIXO   | BAIXA        | ✅ **Fazer**             |
-| **cross-env**      | 7.0.3       | 10.1.0              | 🟢 BAIXO   | BAIXA        | ✅ **Fazer**             |
-| **Socket.io**      | 4.8.3       | 4.8.3               | ✅ N/A     | -            | ✅ Já atualizado         |
-| **Express**        | 4.22.1      | 5.2.1               | 🔴 ALTO    | BAIXA        | ⚠️ **NÃO FAZER AGORA**   |
+| Dependência        | Atual       | Target               | Risco      | Prioridade   | Recomendação             |
+| ------------------ | ----------- | -------------------- | ---------- | ------------ | ------------------------ |
+| **Dockerfile CMD** | src/main.js | ecosystem.config.cjs | 🔴 CRÍTICO | **IMEDIATO** | ✅ **FAZER AGORA**       |
+| **Puppeteer**      | 21.11.0     | 24.35.0              | 🟡 MÉDIO   | ALTA         | ✅ **Fazer com cautela** |
+| **PM2**            | 5.4.3       | 6.0.14               | 🟢 BAIXO   | MÉDIA        | ✅ **Fazer**             |
+| **Zod**            | 3.25.76     | 4.3.5                | 🟢 BAIXO   | BAIXA        | ✅ **Fazer**             |
+| **uuid**           | 11.1.0      | 13.0.0               | 🟢 BAIXO   | BAIXA        | ✅ **Fazer**             |
+| **cross-env**      | 7.0.3       | 10.1.0               | 🟢 BAIXO   | BAIXA        | ✅ **Fazer**             |
+| **Socket.io**      | 4.8.3       | 4.8.3                | ✅ N/A     | -            | ✅ Já atualizado         |
+| **Express**        | 4.22.1      | 5.2.1                | 🔴 ALTO    | BAIXA        | ⚠️ **NÃO FAZER AGORA**   |
 
 ---
 

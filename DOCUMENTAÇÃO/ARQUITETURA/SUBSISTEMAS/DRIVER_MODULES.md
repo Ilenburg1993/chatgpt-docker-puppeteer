@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/driver/modules/`.  
-**Quando consultar**: ao alterar o pipeline de interação em página, navegação em frames, triagem, recuperação ou submissão.  
+**Quando consultar**: ao alterar o pipeline de interação em página, navegação em frames, triagem,
+recuperação ou submissão.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # DRIVER MODULES
@@ -144,8 +145,8 @@ Responsabilidades:
 
 ### Driver Modules x Shared
 
-- `biomechanics_engine.js` consome helpers de `src/shared/biomechanics/`,
-  `src/shared/sadi/` e `src/shared/page_stability/`.
+- `biomechanics_engine.js` consome helpers de `src/shared/biomechanics/`, `src/shared/sadi/` e
+  `src/shared/page_stability/`.
 - Isso mostra que a trilha depende de primitivas compartilhadas, mas continua pertencendo ao
   subsistema de driver.
 

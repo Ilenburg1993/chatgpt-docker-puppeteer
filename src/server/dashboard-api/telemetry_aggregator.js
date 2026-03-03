@@ -385,7 +385,7 @@ class TelemetryAggregator {
      * @returns {Promise<Object>} Métricas coletadas
      */
     async getCurrent() {
-        return this.lastMetrics || await this._collectMetrics();
+        return this.lastMetrics || (await this._collectMetrics());
     }
 
     /**

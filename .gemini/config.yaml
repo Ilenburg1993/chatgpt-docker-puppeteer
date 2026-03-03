@@ -1,0 +1,88 @@
+# Gemini Code Assist — config.yaml
+# Documentação: https://developers.google.com/gemini-code-assist/docs/customize-gemini-behavior-github
+
+# Ativa recursos opcionais de leveza/humor nas respostas
+have_fun: false
+
+# Configuração de memória persistente (melhora respostas ao longo do tempo)
+memory_config:
+  disabled: false
+
+# Configuração de revisão de código
+code_review:
+  # Não desabilitar — queremos revisão automática em todos os PRs
+  disable: false
+
+  # Mostrar apenas comentários de severidade MEDIUM ou maior.
+  # MEDIUM reduz ruído em PRs pequenos. Use LOW durante período inicial de
+  # calibração para entender o volume de comentários, depois ajuste para MEDIUM.
+  comment_severity_threshold: MEDIUM
+
+  # Sem limite de comentários por PR (usa -1 para ilimitado)
+  max_review_comments: -1
+
+  # Comportamento quando uma PR é aberta
+  pull_request_opened:
+    # Não postar mensagem de ajuda na abertura (reduz noise)
+    help: false
+
+    # Postar resumo automático do PR ao abrir
+    summary: true
+
+    # Postar revisão de código automática ao abrir
+    code_review: true
+
+    # Incluir PRs em rascunho (draft) na revisão — útil para feedback antecipado
+    include_drafts: true
+
+# Padrões glob de arquivos/diretórios a ignorar nas revisões
+# (gerados, binários, dados, segredos, dependências)
+ignore_patterns:
+  # Dependências
+  - "node_modules/**"
+  - "src/dashboard-ui/node_modules/**"
+
+  # Build artifacts
+  - "dist/**"
+  - "src/dashboard-ui/dist/**"
+  - "*.min.js"
+  - "*.min.css"
+  - "*.map"
+
+  # Logs e temporários
+  - "logs/**"
+  - "tmp/**"
+  - "*.log"
+  - "*.lock"
+  - "RUNNING.lock"
+
+  # Dados de runtime (não são código)
+  - "fila/**"
+  - "respostas/**"
+  - "artifacts/**"
+  - "controle.json"
+
+  # Arquivos de banco de dados
+  - "*.db"
+  - "*.sqlite"
+  - "*.sqlite3"
+  - "*.db-shm"
+  - "*.db-wal"
+
+  # Backups gerados automaticamente
+  - "backups/**"
+
+  # Snapshots de auditoria (grandes, gerados)
+  - "DOCUMENTAÇÃO/AUDITORIA/**"
+  - "DOCUMENTAÇÃO/RELATORIOS/**"
+  - "DOCUMENTAÇÃO/ARQUIVO_MORTO/**"
+
+  # Arquivos de configuração de ambiente local
+  - ".env"
+  - ".env.local"
+  - ".env.*.local"
+
+  # RAG e índices vetoriais
+  - "tools/rag/data/**"
+  - "tools/rag/*.index"
+  - "tools/rag/*.faiss"

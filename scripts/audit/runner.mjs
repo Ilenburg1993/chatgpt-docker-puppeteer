@@ -421,7 +421,12 @@ async function main() {
     let abortMessage = '';
     let fatalMessage = '';
     /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
-    let securityResult = { findings: [], errors: [], warnings: [], telemetry: { contracts_scanned: 0, files_scanned: 0, checks: [], findings_by_kind: {} } };
+    let securityResult = {
+        findings: [],
+        errors: [],
+        warnings: [],
+        telemetry: { contracts_scanned: 0, files_scanned: 0, checks: [], findings_by_kind: {} },
+    };
     /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
     let performanceResult = { findings: [], errors: [], warnings: [], telemetry: { score: null, categories: {} } };
     /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
@@ -1236,7 +1241,11 @@ async function main() {
             async () => ({ ok: true, fallbacks: qualityResult.telemetry.fallbacks })
         );
     } else {
-        markStepSkipped(AUDIT_PHASES.COLLECT_QUALITY, 'quality.fallback_resolution', 'Sem fallback de quality nesta execução');
+        markStepSkipped(
+            AUDIT_PHASES.COLLECT_QUALITY,
+            'quality.fallback_resolution',
+            'Sem fallback de quality nesta execução'
+        );
     }
     for (const skipped of qualityResult.telemetry?.steps_skipped || []) {
         markStepSkipped(AUDIT_PHASES.COLLECT_QUALITY, skipped.step, skipped.reason);
@@ -1248,7 +1257,16 @@ async function main() {
     const staticResult = { findings: [], errors: [], warnings: [], telemetry: {} };
     if (!shouldRunPhase(AUDIT_PHASES.COLLECT_STATIC)) {
         startPhase(AUDIT_PHASES.COLLECT_STATIC);
-        for (const stepId of ['static.syntax', 'static.forbidden', 'static.lint', 'static.typecheck', 'static.madge', 'static.depcruise', 'static.jscpd', 'static.semgrep']) {
+        for (const stepId of [
+            'static.syntax',
+            'static.forbidden',
+            'static.lint',
+            'static.typecheck',
+            'static.madge',
+            'static.depcruise',
+            'static.jscpd',
+            'static.semgrep',
+        ]) {
             markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, stepId, `Step skipped by audit_mode=${auditMode}`);
         }
         finishPhase(AUDIT_PHASES.COLLECT_STATIC, 'skipped');
@@ -1263,24 +1281,37 @@ async function main() {
                 contractsMode,
                 skipQuickSyntax: qualityCollectorActive,
                 skipLintTypecheck: qualityCollectorActive,
-                exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_STATIC, stepId, command, args, opts),
+                exec: (stepId, command, args, opts) =>
+                    execStep(AUDIT_PHASES.COLLECT_STATIC, stepId, command, args, opts),
             })
         );
         rawFindings = rawFindings.concat(staticResult.findings);
         errors.push(...staticResult.errors);
         warnings.push(...staticResult.warnings);
         if (profile === 'quick' && qualityCollectorActive) {
-            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.syntax', 'Step moved to collect-quality (quality.node_check)');
+            markStepSkipped(
+                AUDIT_PHASES.COLLECT_STATIC,
+                'static.syntax',
+                'Step moved to collect-quality (quality.node_check)'
+            );
         } else if (profile !== 'quick' && qualityCollectorActive) {
             markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.lint', 'Step moved to collect-quality (quality.lint)');
-            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.typecheck', 'Step moved to collect-quality (quality.typecheck_*)');
+            markStepSkipped(
+                AUDIT_PHASES.COLLECT_STATIC,
+                'static.typecheck',
+                'Step moved to collect-quality (quality.typecheck_*)'
+            );
         }
         if (
             staticResult.warnings.some(
                 item => item.source === 'dependency-cruiser' && /not installed/i.test(String(item.message || ''))
             )
         ) {
-            markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.depcruise', 'Step skipped: dependency-cruiser não instalado');
+            markStepSkipped(
+                AUDIT_PHASES.COLLECT_STATIC,
+                'static.depcruise',
+                'Step skipped: dependency-cruiser não instalado'
+            );
         }
         if (
             staticResult.warnings.some(
@@ -1317,7 +1348,8 @@ async function main() {
             await collectRuntimeFindings({
                 profile,
                 contracts: activeContracts,
-                exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_RUNTIME, stepId, command, args, opts),
+                exec: (stepId, command, args, opts) =>
+                    execStep(AUDIT_PHASES.COLLECT_RUNTIME, stepId, command, args, opts),
             })
         );
         rawFindings = rawFindings.concat(runtimeResult.findings);
@@ -1340,7 +1372,8 @@ async function main() {
             testsResult,
             await collectTestFindings({
                 profile,
-                exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_TESTS, stepId, command, args, opts),
+                exec: (stepId, command, args, opts) =>
+                    execStep(AUDIT_PHASES.COLLECT_TESTS, stepId, command, args, opts),
             })
         );
         rawFindings = rawFindings.concat(testsResult.findings);
@@ -1364,7 +1397,11 @@ async function main() {
     };
     if (!shouldRunPhase(AUDIT_PHASES.COLLECT_CHAOS)) {
         startPhase(AUDIT_PHASES.COLLECT_CHAOS);
-        markStepSkipped(AUDIT_PHASES.COLLECT_CHAOS, 'chaos.contract_nightly', `Step skipped by audit_mode=${auditMode} or profile=${profile}`);
+        markStepSkipped(
+            AUDIT_PHASES.COLLECT_CHAOS,
+            'chaos.contract_nightly',
+            `Step skipped by audit_mode=${auditMode} or profile=${profile}`
+        );
         finishPhase(AUDIT_PHASES.COLLECT_CHAOS, 'skipped');
     } else {
         startPhase(AUDIT_PHASES.COLLECT_CHAOS);
@@ -1375,7 +1412,8 @@ async function main() {
                 chaosProfile,
                 contracts: activeContracts,
                 runDir,
-                exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_CHAOS, stepId, command, args, opts),
+                exec: (stepId, command, args, opts) =>
+                    execStep(AUDIT_PHASES.COLLECT_CHAOS, stepId, command, args, opts),
             })
         );
         rawFindings = rawFindings.concat(
@@ -1412,7 +1450,11 @@ async function main() {
         warnings.push(...securityResult.warnings);
         markStepSkipped(AUDIT_PHASES.COLLECT_SECURITY, 'security.http_surface', 'Covered by collectSecurityFindings');
         markStepSkipped(AUDIT_PHASES.COLLECT_SECURITY, 'security.headers', 'Covered by collectSecurityFindings');
-        if (securityResult.findings.length > 0 || securityResult.warnings.length > 0 || securityResult.errors.length > 0) {
+        if (
+            securityResult.findings.length > 0 ||
+            securityResult.warnings.length > 0 ||
+            securityResult.errors.length > 0
+        ) {
             logger.emit({
                 level: 'info',
                 event_type: AUDIT_EVENT_TYPES.SECURITY_ANALYSIS_COMPLETED,
@@ -1430,7 +1472,11 @@ async function main() {
     // performance
     if (!shouldRunPhase(AUDIT_PHASES.COLLECT_PERFORMANCE)) {
         startPhase(AUDIT_PHASES.COLLECT_PERFORMANCE);
-        markStepSkipped(AUDIT_PHASES.COLLECT_PERFORMANCE, 'performance.analysis', `Step skipped by audit_mode=${auditMode}`);
+        markStepSkipped(
+            AUDIT_PHASES.COLLECT_PERFORMANCE,
+            'performance.analysis',
+            `Step skipped by audit_mode=${auditMode}`
+        );
         finishPhase(AUDIT_PHASES.COLLECT_PERFORMANCE, 'skipped');
     } else {
         startPhase(AUDIT_PHASES.COLLECT_PERFORMANCE);
@@ -1456,7 +1502,11 @@ async function main() {
     // architecture
     if (!shouldRunPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE)) {
         startPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE);
-        markStepSkipped(AUDIT_PHASES.COLLECT_ARCHITECTURE, 'architecture.analysis', `Step skipped by audit_mode=${auditMode}`);
+        markStepSkipped(
+            AUDIT_PHASES.COLLECT_ARCHITECTURE,
+            'architecture.analysis',
+            `Step skipped by audit_mode=${auditMode}`
+        );
         finishPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE, 'skipped');
     } else {
         startPhase(AUDIT_PHASES.COLLECT_ARCHITECTURE);

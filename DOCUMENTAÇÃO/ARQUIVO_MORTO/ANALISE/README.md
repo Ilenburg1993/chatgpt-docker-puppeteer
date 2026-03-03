@@ -1,6 +1,7 @@
 # ANALISE
 
-**Propósito**: concentrar artefatos analíticos históricos isolados fora das trilhas canônicas atuais.  
+**Propósito**: concentrar artefatos analíticos históricos isolados fora das trilhas canônicas
+atuais.  
 **Status documental**: Histórico.  
 **Público**: engenharia, auditoria e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

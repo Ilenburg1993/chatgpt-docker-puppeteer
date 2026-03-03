@@ -1,6 +1,7 @@
 # Guia de Contribuição
 
-**Propósito**: documentar o fluxo canônico de contribuição para código, documentação e automação, usando os templates, scripts e restrições reais do repositório atual.  
+**Propósito**: documentar o fluxo canônico de contribuição para código, documentação e automação,
+usando os templates, scripts e restrições reais do repositório atual.  
 **Status documental**: Canônico.  
 **Público**: contribuidores internos, colaboradores externos e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -34,7 +35,8 @@ Quando a mudança for estrutural, prefira alinhar o racional antes de expandir o
 O repositório já possui templates em `.github`:
 
 - bug: [bug_report.yml](/workspaces/chatgpt-docker-puppeteer/.github/ISSUE_TEMPLATE/bug_report.yml)
-- feature: [feature_request.yml](/workspaces/chatgpt-docker-puppeteer/.github/ISSUE_TEMPLATE/feature_request.yml)
+- feature:
+  [feature_request.yml](/workspaces/chatgpt-docker-puppeteer/.github/ISSUE_TEMPLATE/feature_request.yml)
 - melhorias de missão/configuração adicionais também vivem em `.github/ISSUE_TEMPLATE/`
 
 Para PRs, o template ativo é:

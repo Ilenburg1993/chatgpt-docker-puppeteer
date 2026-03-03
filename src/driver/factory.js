@@ -881,6 +881,18 @@ class DriverFactory extends EventEmitter {
                         /** @type {unknown} */ (tempDriver)
                     )._isTemporary = true;
                     this.metrics.temporaryDriversCreated++;
+
+                    // Auto-destruction guard: destroy temporary driver after timeout if caller doesn't
+                    const tempDestroyTimeoutMs = 5 * 60 * 1000; // 5 minutes max lifetime
+                    const autoDestroyTimer = setTimeout(() => {
+                        if (!tempDriver.destroyed) {
+                            log('WARN', `[FACTORY] Auto-destroying leaked temporary driver (${key})`);
+                            this.metrics.temporaryDriversDestroyed = (this.metrics.temporaryDriversDestroyed || 0) + 1;
+                            tempDriver.destroy().catch(() => {});
+                        }
+                    }, tempDestroyTimeoutMs);
+                    autoDestroyTimer.unref?.();
+
                     return tempDriver;
                 }
 

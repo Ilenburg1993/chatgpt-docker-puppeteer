@@ -1,6 +1,7 @@
 # INTEGRACOES
 
-**Propósito**: concentrar a referência de integrações estáveis e playbooks técnicos ligados a ferramentas externas.  
+**Propósito**: concentrar a referência de integrações estáveis e playbooks técnicos ligados a
+ferramentas externas.  
 **Status documental**: Canônico.  
 **Público**: engenharia, integração e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -31,4 +32,5 @@
 ## Links relacionados
 
 - Índice de referência: [../README.md](../README.md)
-- Arquitetura de integrações: [../../ARQUITETURA/SUBSISTEMAS/INTEGRATION.md](../../ARQUITETURA/SUBSISTEMAS/INTEGRATION.md)
+- Arquitetura de integrações:
+  [../../ARQUITETURA/SUBSISTEMAS/INTEGRATION.md](../../ARQUITETURA/SUBSISTEMAS/INTEGRATION.md)

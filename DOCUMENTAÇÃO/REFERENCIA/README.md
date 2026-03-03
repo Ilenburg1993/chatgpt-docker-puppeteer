@@ -1,6 +1,7 @@
 # REFERENCIA
 
-**Propósito**: concentrar APIs, contratos técnicos, configuração, variáveis, aliases e material de consulta estável do projeto.  
+**Propósito**: concentrar APIs, contratos técnicos, configuração, variáveis, aliases e material de
+consulta estável do projeto.  
 **Status documental**: Canônico.  
 **Público**: engenharia, manutenção, integração e agentes de IA.  
 **Última atualização**: 1 de março de 2026.
@@ -65,7 +66,8 @@
 - A primeira etapa da consolidação já foi aplicada: `API.md` e `CONFIG_FILES.md` foram rebaixados
   para compatibilidade, enquanto `API_REFERENCE.md` e `CONFIGURATION.md` permanecem como baseline.
 - A segunda etapa da consolidação também já foi aplicada: os relatórios de aliases foram
-  reclassificados para [../RELATORIOS/RECLASSIFICADOS/README.md](../RELATORIOS/RECLASSIFICADOS/README.md).
+  reclassificados para
+  [../RELATORIOS/RECLASSIFICADOS/README.md](../RELATORIOS/RECLASSIFICADOS/README.md).
 
 ## Regras de manutenção
 

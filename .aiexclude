@@ -1,0 +1,73 @@
+# .aiexclude — Gemini Code Assist context exclusions
+# Segue a mesma sintaxe de .gitignore.
+# Documentação: https://developers.google.com/gemini-code-assist/docs/create-aiexclude-file
+
+# ── Segredos e credenciais ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cert
+*.secret
+secrets/
+credentials/
+
+# ── Dependências (grandes, irrelevantes para contexto de código) ──────────────
+node_modules/
+src/dashboard-ui/node_modules/
+.pnpm-store/
+
+# ── Build artifacts ───────────────────────────────────────────────────────────
+dist/
+src/dashboard-ui/dist/
+*.min.js
+*.min.css
+*.map
+build/
+
+# ── Bancos de dados e estado runtime ─────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+fila/
+respostas/
+controle.json
+
+# ── Logs e arquivos temporários ───────────────────────────────────────────────
+logs/
+tmp/
+*.log
+RUNNING.lock
+crash_reports/
+
+# ── RAG e índices vetoriais (binários/grandes) ────────────────────────────────
+tools/rag/data/
+tools/rag/*.index
+tools/rag/*.faiss
+tools/rag/*.bin
+
+# ── Artifacts de CI/auditoria (gerados, não são código) ──────────────────────
+artifacts/
+backups/
+
+# ── Documentação arquivada (histórico, não é baseline) ───────────────────────
+DOCUMENTAÇÃO/ARQUIVO_MORTO/
+
+# ── Dados de perfil e coverage (binários/gerados) ────────────────────────────
+*.cpuprofile
+*.heapsnapshot
+*.heapprofile
+coverage/
+.c8/
+
+# ── Cache ─────────────────────────────────────────────────────────────────────
+.npm/
+.cache/
+.parcel-cache/
+.vite/

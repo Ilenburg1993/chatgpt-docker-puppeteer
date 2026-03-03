@@ -1,6 +1,5 @@
-> **Status**: Especializado
-> **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md) como fonte oficial.
-> **Quando consultar**: apenas para aprofundamento deste recorte.
+> **Status**: Especializado **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md)
+> como fonte oficial. **Quando consultar**: apenas para aprofundamento deste recorte.
 
 # ConnectionOrchestrator - Guia Completo
 

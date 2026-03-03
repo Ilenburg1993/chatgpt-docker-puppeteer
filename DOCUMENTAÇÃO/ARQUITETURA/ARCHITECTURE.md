@@ -47,8 +47,7 @@ O runtime principal cobre:
 - infraestrutura persistente e de recursos (`src/infra/`);
 - domínio de missão (`src/missions/`);
 - API, dashboard e supervisão (`src/server/`, `src/dashboard-ui/`);
-- serviços auxiliares do produto (`src/integration/`, `src/inference_gateway/`,
-  `src/audit_agent/`).
+- serviços auxiliares do produto (`src/integration/`, `src/inference_gateway/`, `src/audit_agent/`).
 
 ### Toolchain, suporte e contexto auxiliar
 
@@ -432,8 +431,8 @@ Essa separação é central para entender a arquitetura atual.
 
 ### Áreas auxiliares
 
-- `assistant/`, `agents/`, `tools/`: suporte, inventários e componentes auxiliares fora do núcleo
-  do runtime.
+- `assistant/`, `agents/`, `tools/`: suporte, inventários e componentes auxiliares fora do núcleo do
+  runtime.
 
 ## 9. Decisões e restrições obrigatórias
 
@@ -476,7 +475,8 @@ Essa separação é central para entender a arquitetura atual.
 - Materialização em disco: [SUBSISTEMAS/STORAGE.md](./SUBSISTEMAS/STORAGE.md)
 - Coordenação concorrente: [SUBSISTEMAS/LOCKS.md](./SUBSISTEMAS/LOCKS.md)
 - Kernel: [SUBSISTEMAS/KERNEL.md](./SUBSISTEMAS/KERNEL.md)
-- Runtime técnico de tasks: [SUBSISTEMAS/KERNEL_TASK_RUNTIME.md](./SUBSISTEMAS/KERNEL_TASK_RUNTIME.md)
+- Runtime técnico de tasks:
+  [SUBSISTEMAS/KERNEL_TASK_RUNTIME.md](./SUBSISTEMAS/KERNEL_TASK_RUNTIME.md)
 - NERV: [SUBSISTEMAS/NERV.md](./SUBSISTEMAS/NERV.md)
 - Transporte físico do NERV: [SUBSISTEMAS/NERV_TRANSPORT.md](./SUBSISTEMAS/NERV_TRANSPORT.md)
 - Server: [SUBSISTEMAS/SERVER.md](./SUBSISTEMAS/SERVER.md)
@@ -485,9 +485,11 @@ Essa separação é central para entender a arquitetura atual.
 - Guardrails HTTP do server: [SUBSISTEMAS/SERVER_MIDDLEWARE.md](./SUBSISTEMAS/SERVER_MIDDLEWARE.md)
 - Protocolos expostos do server: [SUBSISTEMAS/SERVER_HANDLERS.md](./SUBSISTEMAS/SERVER_HANDLERS.md)
 - Sensores reativos do server: [SUBSISTEMAS/SERVER_WATCHERS.md](./SUBSISTEMAS/SERVER_WATCHERS.md)
-- Assistentes e LLM services: [SUBSISTEMAS/ARQUITETURA_ASSISTENTES_E_LLM_SERVICES.md](./SUBSISTEMAS/ARQUITETURA_ASSISTENTES_E_LLM_SERVICES.md)
+- Assistentes e LLM services:
+  [SUBSISTEMAS/ARQUITETURA_ASSISTENTES_E_LLM_SERVICES.md](./SUBSISTEMAS/ARQUITETURA_ASSISTENTES_E_LLM_SERVICES.md)
 - Materiais não-baseline: [ESPECIALIZADOS/README.md](./ESPECIALIZADOS/README.md)
-- Histórico arquivado: [../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md](../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md)
+- Histórico arquivado:
+  [../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md](../ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md)
 
 ## 11. Status e manutenção documental
 

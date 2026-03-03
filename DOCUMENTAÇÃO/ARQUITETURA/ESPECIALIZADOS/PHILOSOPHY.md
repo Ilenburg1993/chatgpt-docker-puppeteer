@@ -1,6 +1,5 @@
-> **Status**: Especializado
-> **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md) como fonte oficial.
-> **Quando consultar**: apenas para aprofundamento deste recorte.
+> **Status**: Especializado **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md)
+> como fonte oficial. **Quando consultar**: apenas para aprofundamento deste recorte.
 
 # 🧠 Filosofia e Decisões Arquiteturais
 
@@ -761,7 +760,8 @@ function sanitizePrompt(text) {
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - Visão sistêmica do projeto
 - [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md) - Diagramas C4 detalhados
 - [PATTERNS.md](PATTERNS.md) - Padrões arquiteturais aplicados
-- [CROSS_PLATFORM_SUPPORT.md](../../AUDITORIAS/CROSS_PLATFORM_SUPPORT.md) - Guia cross-platform completo
+- [CROSS_PLATFORM_SUPPORT.md](../../AUDITORIAS/CROSS_PLATFORM_SUPPORT.md) - Guia cross-platform
+  completo
 
 ### Auditorias Relevantes
 

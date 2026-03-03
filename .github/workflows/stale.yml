@@ -1,0 +1,75 @@
+name: Stale
+
+# Gerencia automaticamente issues e PRs parados, reduzindo o ruído de
+# pull requests antigos do Dependabot e issues sem atividade.
+#
+# Política:
+#   Issues:  stale após 60 dias sem atividade → fechado após 14 dias
+#   PRs:     stale após 30 dias sem atividade → fechado após 7 dias
+#   Isentos: pinned, security, blocked, in-progress, dependabot
+
+on:
+  schedule:
+    # Diariamente 03:23 UTC
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: stale-${{ github.workflow }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  stale:
+    name: Stale issues and PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Mark and close stale items
+        uses: actions/stale@v10
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # ── Issues ──────────────────────────────────────────────────────────
+          days-before-issue-stale: 60
+          days-before-issue-close: 14
+          stale-issue-label: stale
+          stale-issue-message: >
+            Esta issue ficou sem atividade por 60 dias e foi marcada como *stale*.
+            Se ainda for relevante, adicione um comentário ou remova o label `stale`.
+            Será fechada automaticamente em 14 dias se não houver nova atividade.
+          close-issue-message: >
+            Esta issue foi fechada automaticamente por inatividade prolongada.
+            Reabra caso o problema ainda seja válido.
+          exempt-issue-labels: "pinned,security,blocked,in-progress,bug,enhancement"
+          # ── PRs ─────────────────────────────────────────────────────────────
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
+          stale-pr-label: stale
+          stale-pr-message: >
+            Este PR ficou sem atividade por 30 dias e foi marcado como *stale*.
+            Se ainda estiver em andamento, adicione um comentário ou remova o label `stale`.
+            Será fechado automaticamente em 7 dias se não houver nova atividade.
+          close-pr-message: >
+            Este PR foi fechado automaticamente por inatividade prolongada.
+            Reabra caso ainda seja relevante ou as dependências precisem ser atualizadas.
+          exempt-pr-labels: "pinned,security,blocked,in-progress,deps:major"
+          # ── Configurações gerais ────────────────────────────────────────────
+          # Não fechar issues/PRs com milestone
+          exempt-milestones: true
+          # Não fechar issues/PRs com todos os assignees ativos
+          exempt-all-assignees: false
+          # Quantos itens processar por execução (evita rate limit)
+          operations-per-run: 100
+          # Remover o label stale quando houver nova atividade
+          remove-stale-when-updated: true
+          # Logar ações para debug
+          debug-only: false

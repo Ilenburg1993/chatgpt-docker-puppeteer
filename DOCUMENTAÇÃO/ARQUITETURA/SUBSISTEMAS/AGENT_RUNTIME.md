@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da camada de workers operacionais do runtime (`src/agent/`).  
-**Quando consultar**: ao alterar loops periódicos, workers SSOT, watchdogs, controle de task ou progressão operacional de missões.  
+**Quando consultar**: ao alterar loops periódicos, workers SSOT, watchdogs, controle de task ou
+progressão operacional de missões.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # AGENT RUNTIME
@@ -20,8 +21,8 @@
 
 Ela não é um “agente” no sentido externo do termo. É a camada operacional interna do runtime.
 
-No baseline atual, essa trilha é plana: os workers vivem diretamente em `src/agent/`. Não existe
-uma subárvore `src/agent/workers/` versionada nesta revisão.
+No baseline atual, essa trilha é plana: os workers vivem diretamente em `src/agent/`. Não existe uma
+subárvore `src/agent/workers/` versionada nesta revisão.
 
 ## Componentes principais
 

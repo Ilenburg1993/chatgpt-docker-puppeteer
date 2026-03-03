@@ -1,11 +1,13 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento do pacote `src/dashboard-ui/`.  
-**Quando consultar**: ao alterar a UI operacional, rotas Vue, stores, composables, consumo de API ou integração Socket.io do dashboard.  
+**Quando consultar**: ao alterar a UI operacional, rotas Vue, stores, composables, consumo de API ou
+integração Socket.io do dashboard.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # DASHBOARD UI
 
-**Propósito**: documentar `src/dashboard-ui/` como frontend operacional separado do backend server.  
+**Propósito**: documentar `src/dashboard-ui/` como frontend operacional separado do backend
+server.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia frontend, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -166,8 +168,8 @@ Isso conecta diretamente o frontend ao plano `src/server/realtime/`.
 - `dist/`
 - `node_modules/`
 
-Esses diretórios são artefatos de build e dependências locais. Eles não fazem parte do mapa
-canônico da arquitetura e não devem ser tratados como baseline estrutural.
+Esses diretórios são artefatos de build e dependências locais. Eles não fazem parte do mapa canônico
+da arquitetura e não devem ser tratados como baseline estrutural.
 
 ## Relação com outros subsistemas
 

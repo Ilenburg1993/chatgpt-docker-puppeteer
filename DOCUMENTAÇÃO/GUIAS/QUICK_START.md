@@ -1,6 +1,7 @@
 # Quick Start
 
-**Propósito**: orientar o primeiro boot local do projeto com o menor caminho seguro possível, usando os contratos reais do repositório atual.  
+**Propósito**: orientar o primeiro boot local do projeto com o menor caminho seguro possível, usando
+os contratos reais do repositório atual.  
 **Status documental**: Canônico.  
 **Público**: onboarding técnico, manutenção, desenvolvimento local e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

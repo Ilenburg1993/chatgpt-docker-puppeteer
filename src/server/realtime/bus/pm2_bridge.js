@@ -20,9 +20,7 @@ const OPTIONAL_PROCESSES = ['inference-gateway', 'ollama-host-supervisor', 'audi
  */
 const MANAGED_PROCESSES = [
     ...CORE_PROCESSES,
-    ...(String(process.env.ENABLE_AUDIT_AGENT_PM2_PROCESSES || '').toLowerCase() === 'true'
-        ? OPTIONAL_PROCESSES
-        : []),
+    ...(String(process.env.ENABLE_AUDIT_AGENT_PM2_PROCESSES || '').toLowerCase() === 'true' ? OPTIONAL_PROCESSES : []),
 ];
 
 /**
@@ -233,7 +231,10 @@ function stop() {
     try {
         pm2Raw.disconnect();
     } catch (disconnectErr) {
-        log('DEBUG', `[PM2_BRIDGE] Disconnect error during stop: ${disconnectErr && disconnectErr.message ? disconnectErr.message : String(disconnectErr)}`);
+        log(
+            'DEBUG',
+            `[PM2_BRIDGE] Disconnect error during stop: ${disconnectErr && disconnectErr.message ? disconnectErr.message : String(disconnectErr)}`
+        );
     }
     log('INFO', '[PM2_BRIDGE] Ponte de eventos encerrada.');
 }

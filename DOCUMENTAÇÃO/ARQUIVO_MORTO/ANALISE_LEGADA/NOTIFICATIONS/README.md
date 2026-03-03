@@ -1,6 +1,7 @@
 # NOTIFICATIONS
 
-**Propósito**: preservar notificações, avisos e drafts operacionais antigos ligados a análises legadas.  
+**Propósito**: preservar notificações, avisos e drafts operacionais antigos ligados a análises
+legadas.  
 **Status documental**: Histórico.  
 **Público**: engenharia e auditoria.  
 **Última atualização**: 28 de fevereiro de 2026.

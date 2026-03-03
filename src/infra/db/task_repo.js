@@ -1,4 +1,5 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
 import { getDb } from './sqlite.js';
 
@@ -129,7 +130,11 @@ function _rowToTask(row) {
     if (row.blocked_details_json) {
         try {
             task.state.blocked_details = JSON.parse(row.blocked_details_json);
-        } catch (_) {
+        } catch (err) {
+            log.warn(
+                { taskId: task.id, field: 'blocked_details_json', error: err?.message },
+                '[task_repo] Fallback to raw string for malformed JSON'
+            );
             task.state.blocked_details = row.blocked_details_json;
         }
     }
@@ -138,7 +143,11 @@ function _rowToTask(row) {
     if (row.result_json) {
         try {
             task.result_db = JSON.parse(row.result_json);
-        } catch (_) {
+        } catch (err) {
+            log.warn(
+                { taskId: task.id, field: 'result_json', error: err?.message },
+                '[task_repo] Fallback to raw string for malformed JSON'
+            );
             task.result_db = row.result_json;
         }
     }
