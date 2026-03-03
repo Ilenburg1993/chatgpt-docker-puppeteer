@@ -60,7 +60,7 @@ jobs:
       - name: Lint shell scripts with shellcheck
         uses: reviewdog/action-shellcheck@v1.32.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           shellcheck_flags: "-x"
           reporter: github-check
           filter_mode: nofilter

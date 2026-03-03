@@ -34,7 +34,7 @@ const workflowsRequiringConcurrency = new Set([
 ]);
 const uploadArtifactPattern = /^actions\/upload-artifact@/;
 const requiredPinnedActionRefs = new Map([
-    ['raven-actions/actionlint', 'v2.1.1'],
+    ['raven-actions/actionlint', 'v2.1.2'],
     ['reviewdog/action-shellcheck', 'v1.32.0'],
     ['hadolint/hadolint-action', 'v3.3.0'],
     ['dependabot/fetch-metadata', 'v2.5.0'],

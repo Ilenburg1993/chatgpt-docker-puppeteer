@@ -110,6 +110,7 @@ jobs:
           NODE_OUTCOME: ${{ steps.typecheck_node.outcome }}
           TOOLS_OUTCOME: ${{ steps.typecheck_tools.outcome }}
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const marker = '<!-- jsdoc-typecheck-summary -->';
             const nodeOutcome = process.env.NODE_OUTCOME || 'unknown';
@@ -260,6 +261,7 @@ jobs:
           JSON_OUTCOME: ${{ steps.jsdoc_json.outcome }}
           CONSOLE_OUTCOME: ${{ steps.jsdoc_console.outcome }}
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const { readFileSync, existsSync } = require('node:fs');
             const marker = '<!-- jsdoc-coverage-summary -->';

@@ -147,6 +147,7 @@ jobs:
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const { readFileSync, existsSync } = require('node:fs');
             const marker = '<!-- dashboard-build-summary -->';

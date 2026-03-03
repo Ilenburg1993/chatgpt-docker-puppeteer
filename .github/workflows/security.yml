@@ -82,6 +82,7 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v8
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const { readFileSync, existsSync } = require('node:fs');
             const marker = '<!-- security-npm-audit-summary -->';
