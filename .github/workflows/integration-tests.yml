@@ -1,0 +1,178 @@
+name: Integration Tests
+
+# Executa os testes de integração em cada push ao main e em PRs.
+# Bloqueante: falhas impedem o merge e são comentadas no PR com a saída completa do runner.
+#
+# Jobs:
+#   integration-tests — npm run test:integration com captura de output e PR comment detalhado
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: integration-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  integration-tests:
+    name: Integration tests (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Integration tests
+        id: integration_tests
+        continue-on-error: true
+        run: |
+          npm run test:integration 2>&1 | tee /tmp/integration-test-output.txt
+          TEST_EXIT=${PIPESTATUS[0]}
+          exit $TEST_EXIT
+
+      - name: Build step summary
+        if: always()
+        run: |
+          INT_OK="${{ steps.integration_tests.outcome }}"
+          {
+            echo "## $([ "$INT_OK" = "success" ] && echo "✅" || echo "❌") Integration Tests (Node 24)"
+            echo ""
+            echo "| Check | Status |"
+            echo "|---|---|"
+            echo "| Integration tests | $([ "$INT_OK" = "success" ] && echo "✅ passed" || echo "❌ failed") |"
+            echo ""
+            if [ -f /tmp/integration-test-output.txt ]; then
+              echo "### Output (tail)"
+              echo '```'
+              tail -100 /tmp/integration-test-output.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment PR with integration test results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          INT_OUTCOME: ${{ steps.integration_tests.outcome }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('node:fs');
+            const intOk = process.env.INT_OUTCOME === 'success';
+            const icon = (ok) => ok ? '✅' : '❌';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const marker = '<!-- integration-tests-summary -->';
+
+            let intOut = '';
+            try {
+              const txt = fs.readFileSync('/tmp/integration-test-output.txt', 'utf8').trim();
+              intOut = txt.length > 4000 ? '...(truncated)\n' + txt.slice(-4000) : txt;
+            } catch { /* file may not exist */ }
+
+            const details = [];
+            if (!intOk && intOut) {
+              details.push(
+                `<details>\n<summary>📋 Integration test output</summary>\n\n` +
+                `\`\`\`\n${intOut}\n\`\`\`\n</details>`
+              );
+            }
+
+            const body = [
+              marker,
+              `## ${icon(intOk)} Integration Tests (Node 24)`,
+              '',
+              `| Check | Status |`,
+              `|---|---|`,
+              `| Integration tests | ${icon(intOk)} ${intOk ? 'passou' : 'falhou'} |`,
+              '',
+              ...details,
+              ...(intOk ? [] : ['💡 Execute `npm run test:integration` localmente para ver as falhas.']),
+              '',
+              intOk
+                ? '> ✅ Todos os testes passaram.'
+                : `> ❌ Falhas acima **bloqueiam** o merge. [Ver logs completos](${runUrl}).`,
+            ].join('\n');
+
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find(
+                (c) => c.user?.type === 'Bot' && typeof c.body === 'string' && c.body.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Falha ao postar PR comment: ${err.message}. Resultado disponível no workflow step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }
+
+      - name: Fail if integration tests failed
+        if: always()
+        run: |
+          if [ "${{ steps.integration_tests.outcome }}" = "failure" ]; then
+            echo "::error::Integration tests failed. See PR comment for details."
+            exit 1
+          fi

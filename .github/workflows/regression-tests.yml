@@ -1,0 +1,178 @@
+name: Regression Tests
+
+# Executa os testes de regressão em cada push ao main e em PRs.
+# Bloqueante: falhas impedem o merge e são comentadas no PR com a saída completa do runner.
+#
+# Jobs:
+#   regression-tests — npm run test:regression com captura de output e PR comment detalhado
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: regression-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  regression-tests:
+    name: Regression tests (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Regression tests
+        id: regression_tests
+        continue-on-error: true
+        run: |
+          npm run test:regression 2>&1 | tee /tmp/regression-test-output.txt
+          TEST_EXIT=${PIPESTATUS[0]}
+          exit $TEST_EXIT
+
+      - name: Build step summary
+        if: always()
+        run: |
+          REG_OK="${{ steps.regression_tests.outcome }}"
+          {
+            echo "## $([ "$REG_OK" = "success" ] && echo "✅" || echo "❌") Regression Tests (Node 24)"
+            echo ""
+            echo "| Check | Status |"
+            echo "|---|---|"
+            echo "| Regression tests | $([ "$REG_OK" = "success" ] && echo "✅ passed" || echo "❌ failed") |"
+            echo ""
+            if [ -f /tmp/regression-test-output.txt ]; then
+              echo "### Output (tail)"
+              echo '```'
+              tail -100 /tmp/regression-test-output.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment PR with regression test results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          REG_OUTCOME: ${{ steps.regression_tests.outcome }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('node:fs');
+            const regOk = process.env.REG_OUTCOME === 'success';
+            const icon = (ok) => ok ? '✅' : '❌';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const marker = '<!-- regression-tests-summary -->';
+
+            let regOut = '';
+            try {
+              const txt = fs.readFileSync('/tmp/regression-test-output.txt', 'utf8').trim();
+              regOut = txt.length > 4000 ? '...(truncated)\n' + txt.slice(-4000) : txt;
+            } catch { /* file may not exist */ }
+
+            const details = [];
+            if (!regOk && regOut) {
+              details.push(
+                `<details>\n<summary>📋 Regression test output</summary>\n\n` +
+                `\`\`\`\n${regOut}\n\`\`\`\n</details>`
+              );
+            }
+
+            const body = [
+              marker,
+              `## ${icon(regOk)} Regression Tests (Node 24)`,
+              '',
+              `| Check | Status |`,
+              `|---|---|`,
+              `| Regression tests | ${icon(regOk)} ${regOk ? 'passou' : 'falhou'} |`,
+              '',
+              ...details,
+              ...(regOk ? [] : ['💡 Execute `npm run test:regression` localmente para ver as falhas.']),
+              '',
+              regOk
+                ? '> ✅ Todos os testes passaram.'
+                : `> ❌ Falhas acima **bloqueiam** o merge. [Ver logs completos](${runUrl}).`,
+            ].join('\n');
+
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find(
+                (c) => c.user?.type === 'Bot' && typeof c.body === 'string' && c.body.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Falha ao postar PR comment: ${err.message}. Resultado disponível no workflow step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }
+
+      - name: Fail if regression tests failed
+        if: always()
+        run: |
+          if [ "${{ steps.regression_tests.outcome }}" = "failure" ]; then
+            echo "::error::Regression tests failed. See PR comment for details."
+            exit 1
+          fi

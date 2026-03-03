@@ -1,13 +1,12 @@
 name: CI
 
-# Pipeline principal: validação do ambiente, testes unitários/integração/regressão e audit lite.
+# Pipeline principal: validação do ambiente e audit lite.
+# Testes → unit-tests.yml | integration-tests.yml | regression-tests.yml
 # Lint (ESLint + Prettier) → lint.yml | Shell lint (ShellCheck + actionlint) → shellcheck.yml
 #
 # Jobs:
-#   validate    — validação do Node, YAML dos workflows e testes unitários (bloqueante)
-#   audit-lite  — auditoria rápida não-bloqueante (artefatos + PR comment)
-#   integration — testes de integração (needs: validate)
-#   regression  — testes de regressão (needs: integration)
+#   validate   — validação do Node runtime e YAMLs dos workflows (bloqueante)
+#   audit-lite — auditoria rápida não-bloqueante (artefatos + PR comment)
 
 on:
   push:
@@ -30,7 +29,7 @@ permissions:
 
 jobs:
   validate:
-    name: Tests & Validation (Node 24)
+    name: Validation (Node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -77,85 +76,37 @@ jobs:
       - name: Validate workflow YAMLs
         run: node scripts/ci/validate-workflows.mjs
 
-      - name: Unit tests
-        id: unit_tests
-        continue-on-error: true
-        run: |
-          npm run test:unit 2>&1 | tee /tmp/unit-test-output.txt
-          TEST_EXIT=${PIPESTATUS[0]}
-          exit $TEST_EXIT
-
       - name: Build step summary
         if: always()
         run: |
-          UNIT_OK="${{ steps.unit_tests.outcome }}"
           {
-            echo "## $([ "$UNIT_OK" = "success" ] && echo "✅" || echo "❌") CI — Tests & Validation (Node 24)"
+            echo "## ✅ CI — Validation (Node 24)"
             echo ""
             echo "| Check | Status |"
             echo "|---|---|"
             echo "| Validate Node runtime | ✅ passed |"
             echo "| Validate workflow YAMLs | ✅ passed |"
-            echo "| Unit tests | $([ "$UNIT_OK" = "success" ] && echo "✅ passed" || echo "❌ failed") |"
-            echo ""
-            if [ "$UNIT_OK" != "success" ] && [ -f /tmp/unit-test-output.txt ]; then
-              echo "### Unit test output (tail)"
-              echo '```'
-              tail -80 /tmp/unit-test-output.txt
-              echo '```'
-            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: CI Summary
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v8
-        env:
-          UNIT_OUTCOME: ${{ steps.unit_tests.outcome }}
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('node:fs');
             const marker = '<!-- ci-validate-summary -->';
-            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : o === 'skipped' ? '⏭️' : '⚠️';
-            const uo = process.env.UNIT_OUTCOME || 'unknown';
-            const allOk = uo === 'success';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-
-            // Read captured test output — take the LAST max chars (failures are at the end)
-            const readOutput = (p, max = 4000) => {
-              try {
-                const txt = fs.readFileSync(p, 'utf8').trim();
-                return txt.length > max ? '...(truncated)\n' + txt.slice(-max) : txt;
-              } catch { return ''; }
-            };
-            const unitOut = readOutput('/tmp/unit-test-output.txt');
-
-            const details = [];
-            if (uo === 'failure' && unitOut) {
-              details.push(
-                `<details>\n<summary>📋 Unit test output</summary>\n\n` +
-                `\`\`\`\n${unitOut}\n\`\`\`\n</details>`
-              );
-            }
-
             const body = [
               marker,
-              `## ${allOk ? '✅' : '❌'} CI — Tests & Validation (Node 24)`,
+              `## ✅ CI — Validation (Node 24)`,
               '',
               '| Check | Status |',
               '|---|---|',
               '| Validate Node runtime | ✅ passed |',
               '| Validate workflow YAMLs | ✅ passed |',
-              `| Unit tests | ${icon(uo)} ${uo} |`,
               '',
-              ...details,
-              ...(uo === 'failure' ? ['💡 Execute `npm run test:unit` localmente para ver as falhas.'] : []),
-              '',
-              allOk
-                ? '> ✅ Todos os checks passaram.'
-                : `> ❌ Falhas acima **bloqueiam** o merge. [Ver logs completos](${runUrl}).`,
+              `> ✅ Validação do ambiente passou. [Ver logs](${runUrl}).`,
             ].join('\n');
-
             try {
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
@@ -187,14 +138,6 @@ jobs:
               core.warning(`Failed to post PR comment: ${err.message}. Results available in the workflow step summary.`);
               await core.summary.addRaw(body, true).write();
             }
-
-      - name: Fail if unit tests failed
-        if: always()
-        run: |
-          if [ "${{ steps.unit_tests.outcome }}" = "failure" ]; then
-            echo "::error::Unit tests failed. See CI Summary comment on the PR."
-            exit 1
-          fi
 
   audit-lite:
     name: Audit lite (non-blocking)
@@ -341,85 +284,3 @@ jobs:
           path: artifacts/audit
           if-no-files-found: warn
           retention-days: 7
-
-  integration:
-    name: Integration tests (Node 24)
-    runs-on: ubuntu-latest
-    needs: validate
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          cache: "npm"
-
-      - name: Prepare npm environment
-        run: |
-          mkdir -p "$HOME/.npm"
-          npm cache verify || npm cache clean --force
-
-      - name: Install dependencies (with retry)
-        run: |
-          for attempt in 1 2; do
-            echo "npm ci attempt $attempt"
-            if npm ci --prefer-online --no-audit --no-fund; then
-              exit 0
-            fi
-
-            if [ "$attempt" -lt 2 ]; then
-              echo "Retrying npm ci after cache cleanup..."
-              rm -rf node_modules
-              npm cache clean --force
-            fi
-          done
-          exit 1
-
-      - name: Integration tests
-        run: npm run test:integration
-
-  regression:
-    name: Regression tests (Node 24)
-    runs-on: ubuntu-latest
-    needs: integration
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          cache: "npm"
-
-      - name: Prepare npm environment
-        run: |
-          mkdir -p "$HOME/.npm"
-          npm cache verify || npm cache clean --force
-
-      - name: Install dependencies (with retry)
-        run: |
-          for attempt in 1 2; do
-            echo "npm ci attempt $attempt"
-            if npm ci --prefer-online --no-audit --no-fund; then
-              exit 0
-            fi
-
-            if [ "$attempt" -lt 2 ]; then
-              echo "Retrying npm ci after cache cleanup..."
-              rm -rf node_modules
-              npm cache clean --force
-            fi
-          done
-          exit 1
-
-      - name: Regression tests
-        run: npm run test:regression
