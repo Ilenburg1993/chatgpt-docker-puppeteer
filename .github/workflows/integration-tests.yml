@@ -74,7 +74,7 @@ jobs:
         run: |
           npm run test:integration 2>&1 | tee /tmp/integration-test-output.txt
           TEST_EXIT=${PIPESTATUS[0]}
-          exit $TEST_EXIT
+          exit "$TEST_EXIT"
 
       - name: Build step summary
         if: always()

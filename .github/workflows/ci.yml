@@ -71,41 +71,61 @@ jobs:
           exit 1
 
       - name: Validate Node runtime
+        id: node_check
         run: node scripts/ci/check-node-version.mjs
 
       - name: Validate workflow YAMLs
+        id: yaml_check
         run: node scripts/ci/validate-workflows.mjs
 
       - name: Build step summary
         if: always()
+        env:
+          NODE_OUTCOME: ${{ steps.node_check.outcome }}
+          YAML_OUTCOME: ${{ steps.yaml_check.outcome }}
         run: |
+          icon() { if [ "$1" = "success" ]; then echo "✅"; else echo "❌"; fi; }
+          if [ "$NODE_OUTCOME" != "success" ] || [ "$YAML_OUTCOME" != "success" ]; then
+            ALL_OK="failure"
+          else
+            ALL_OK="success"
+          fi
           {
-            echo "## ✅ CI — Validation (Node 24)"
+            echo "## $(icon "$ALL_OK") CI — Validation (Node 24)"
             echo ""
             echo "| Check | Status |"
             echo "|---|---|"
-            echo "| Validate Node runtime | ✅ passed |"
-            echo "| Validate workflow YAMLs | ✅ passed |"
+            echo "| Validate Node runtime | $(icon "$NODE_OUTCOME") $NODE_OUTCOME |"
+            echo "| Validate workflow YAMLs | $(icon "$YAML_OUTCOME") $YAML_OUTCOME |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: CI Summary
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v8
+        env:
+          NODE_OUTCOME: ${{ steps.node_check.outcome }}
+          YAML_OUTCOME: ${{ steps.yaml_check.outcome }}
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
+            const nodeOk = process.env.NODE_OUTCOME === 'success';
+            const yamlOk = process.env.YAML_OUTCOME === 'success';
+            const allOk = nodeOk && yamlOk;
+            const icon = (ok) => ok ? '✅' : '❌';
             const marker = '<!-- ci-validate-summary -->';
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = [
               marker,
-              `## ✅ CI — Validation (Node 24)`,
+              `## ${icon(allOk)} CI — Validation (Node 24)`,
               '',
               '| Check | Status |',
               '|---|---|',
-              '| Validate Node runtime | ✅ passed |',
-              '| Validate workflow YAMLs | ✅ passed |',
+              `| Validate Node runtime | ${icon(nodeOk)} ${nodeOk ? 'passed' : 'failed'} |`,
+              `| Validate workflow YAMLs | ${icon(yamlOk)} ${yamlOk ? 'passed' : 'failed'} |`,
               '',
-              `> ✅ Validação do ambiente passou. [Ver logs](${runUrl}).`,
+              allOk
+                ? `> ✅ Validação do ambiente passou. [Ver logs](${runUrl}).`
+                : `> ❌ Falhas na validação. [Ver logs completos](${runUrl}).`,
             ].join('\n');
             try {
               const comments = await github.paginate(github.rest.issues.listComments, {

@@ -18,9 +18,9 @@ para GitHub Actions:
 - name: Lint shell scripts with shellcheck
   uses: reviewdog/action-shellcheck@v1.32.0
   with: ...
-  id: lint                    # ← pertencia ao próximo step
-  continue-on-error: true     # ← pertencia ao próximo step
-  run: npm run lint            # ← pertencia ao próximo step
+  id: lint # ← pertencia ao próximo step
+  continue-on-error: true # ← pertencia ao próximo step
+  run: npm run lint # ← pertencia ao próximo step
 ```
 
 Causa: dois steps (shellcheck e eslint) foram acidentalmente mesclados em um único bloco.
@@ -29,19 +29,20 @@ Causa: dois steps (shellcheck e eslint) foram acidentalmente mesclados em um ún
 
 O job `validate` de `ci.yml` acumula tarefas heterogêneas:
 
-| Tarefa | Deve estar em |
-|---|---|
-| ShellCheck em scripts | `shellcheck.yml` |
-| actionlint em workflows | `shellcheck.yml` |
-| ESLint no código | `lint.yml` |
-| Prettier (format check) | `lint.yml` |
-| Unit tests | `ci.yml` |
-| Validação do Node runtime | `ci.yml` |
-| Validação dos YAMLs de workflow | `ci.yml` |
+| Tarefa                          | Deve estar em    |
+| ------------------------------- | ---------------- |
+| ShellCheck em scripts           | `shellcheck.yml` |
+| actionlint em workflows         | `shellcheck.yml` |
+| ESLint no código                | `lint.yml`       |
+| Prettier (format check)         | `lint.yml`       |
+| Unit tests                      | `ci.yml`         |
+| Validação do Node runtime       | `ci.yml`         |
+| Validação dos YAMLs de workflow | `ci.yml`         |
 
 ### 1.3 PR comments pouco informativos
 
 Comentários existentes mostram apenas ✅/❌ por categoria, sem:
+
 - Saída real dos erros (ESLint, ShellCheck, Prettier)
 - Link direto para o workflow run
 - Sugestões de correção por tipo de erro
@@ -88,7 +89,8 @@ Comentários existentes mostram apenas ✅/❌ por categoria, sem:
 
 ## 4. Atualização do Validator
 
-`scripts/ci/validate-workflows.mjs` deve incluir os novos workflows em `workflowsRequiringConcurrency`:
+`scripts/ci/validate-workflows.mjs` deve incluir os novos workflows em
+`workflowsRequiringConcurrency`:
 
 ```js
 const workflowsRequiringConcurrency = new Set([
@@ -102,26 +104,26 @@ const workflowsRequiringConcurrency = new Set([
 
 ## 5. Inventário de Workflows Após a Execução
 
-| Arquivo | Foco | Bloqueante | PR Comment |
-|---|---|---|---|
-| `ci.yml` | Tests + workflow validation | ✅ sim | ✅ |
-| `lint.yml` | ESLint + Prettier | ✅ sim | ✅ |
-| `shellcheck.yml` | ShellCheck + actionlint | ❌ não (informativo) | ✅ |
-| `code-quality.yml` | Análise estática (circular deps, orphans) | ❌ não | ✅ |
-| `jsdoc-typing.yml` | TypeScript + JSDoc coverage | ❌ não | ✅ |
-| `coverage.yml` | Cobertura de testes | ❌ não | ✅ |
-| `dashboard-build.yml` | Build Vite do dashboard | ❌ não | ✅ |
-| `security.yml` | npm audit + CodeQL | ❌ não | ✅ |
-| `docker-security-scan.yml` | Trivy filesystem + container | ❌ não | ✅ |
-| `docker-rebuild.yml` | Build + lint do DevContainer | ❌ não | ❌ |
-| `dependency-review.yml` | Revisão de dependências em PRs | ✅ sim | ✅ |
-| `dependency-hygiene.yml` | Saúde do grafo de deps | ❌ não | ❌ |
-| `audit-nightly.yml` | Auditoria profunda noturna | ❌ não | ❌ |
-| `semantic-analysis.yml` | Análise semântica profunda | ❌ não | ❌ |
-| `scorecard.yml` | OSSF Scorecard | ❌ não | ❌ |
-| `stale.yml` | Gestão de issues/PRs parados | ❌ não | ❌ |
-| `release.yml` | Release automático via tag | ✅ sim | ❌ |
-| `copilot-setup-steps.yml` | Bootstrap do Copilot Agent | N/A | ❌ |
+| Arquivo                    | Foco                                      | Bloqueante           | PR Comment |
+| -------------------------- | ----------------------------------------- | -------------------- | ---------- |
+| `ci.yml`                   | Tests + workflow validation               | ✅ sim               | ✅         |
+| `lint.yml`                 | ESLint + Prettier                         | ✅ sim               | ✅         |
+| `shellcheck.yml`           | ShellCheck + actionlint                   | ❌ não (informativo) | ✅         |
+| `code-quality.yml`         | Análise estática (circular deps, orphans) | ❌ não               | ✅         |
+| `jsdoc-typing.yml`         | TypeScript + JSDoc coverage               | ❌ não               | ✅         |
+| `coverage.yml`             | Cobertura de testes                       | ❌ não               | ✅         |
+| `dashboard-build.yml`      | Build Vite do dashboard                   | ❌ não               | ✅         |
+| `security.yml`             | npm audit + CodeQL                        | ❌ não               | ✅         |
+| `docker-security-scan.yml` | Trivy filesystem + container              | ❌ não               | ✅         |
+| `docker-rebuild.yml`       | Build + lint do DevContainer              | ❌ não               | ❌         |
+| `dependency-review.yml`    | Revisão de dependências em PRs            | ✅ sim               | ✅         |
+| `dependency-hygiene.yml`   | Saúde do grafo de deps                    | ❌ não               | ❌         |
+| `audit-nightly.yml`        | Auditoria profunda noturna                | ❌ não               | ❌         |
+| `semantic-analysis.yml`    | Análise semântica profunda                | ❌ não               | ❌         |
+| `scorecard.yml`            | OSSF Scorecard                            | ❌ não               | ❌         |
+| `stale.yml`                | Gestão de issues/PRs parados              | ❌ não               | ❌         |
+| `release.yml`              | Release automático via tag                | ✅ sim               | ❌         |
+| `copilot-setup-steps.yml`  | Bootstrap do Copilot Agent                | N/A                  | ❌         |
 
 ---
 
@@ -149,6 +151,7 @@ try { ... } catch (err) {
 
 Token padrão: `${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}`  
 Permissões mínimas obrigatórias em jobs que postam comentários:
+
 - `issues: write`
 - `pull-requests: write`
 
