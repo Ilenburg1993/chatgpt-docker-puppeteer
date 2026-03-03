@@ -29,8 +29,8 @@ atualizações.
 
 ## Áreas de Melhoria / Upgrades Propostos
 
-| Item                        | Descrição                                                                                                                    | Benefício                                                            | Prioridade       |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------- |
+| Item                        | Descrição                                                                                                                    | Benefício                                                            | Prioridade        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------- |
 | **Dependência TS**          | Atualizar para `^5.10` ou superior quando lançado.                                                                           | Correções de bugs, novas flags `strict` etc.                         | 🚩 alta           |
 | **Métodos LSP**             | Implementar `completion`, `signatureHelp`, `rename`, `formatDocument`, `semanticTokens`, `implementation`.                   | Editor mais rico (VSCode, Neovim etc.) oferece experiência completa. | 🔧 média          |
 | **Atualização incremental** | Expor `updateFile(path, content)` + `refresh` para permitir edições em tempo real.                                           | Permite uso em IDEs que modificam buffer sem salvar.                 | 🔧 média          |

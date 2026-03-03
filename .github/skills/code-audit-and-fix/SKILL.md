@@ -12,11 +12,11 @@ description:
 ## Overview
 
 Skill que unifica exploração proativa e aplicação de patches. Diferente de `exploratory-bug-hunt`
-(que apenas descobre e registra) e `reactive-bug-audit` (que parte de pistas existentes),
-esta skill completa o ciclo: descobre, prioriza e **corrige** bugs na mesma sessão.
+(que apenas descobre e registra) e `reactive-bug-audit` (que parte de pistas existentes), esta skill
+completa o ciclo: descobre, prioriza e **corrige** bugs na mesma sessão.
 
-Ela é a skill canônica para sessões de "bug hunt + fix" onde o objetivo é entregar código
-corrigido e testado, não apenas um relatório.
+Ela é a skill canônica para sessões de "bug hunt + fix" onde o objetivo é entregar código corrigido
+e testado, não apenas um relatório.
 
 ## When To Use
 
@@ -104,12 +104,12 @@ Confirmar: sem regressões (pass >= baseline, fail <= baseline).
 
 ## Checklist de Severidade Rápida
 
-| Severidade | Exemplos | Ação |
-|-----------|---------|------|
-| CRÍTICO | Data corruption, crash em produção, lógica invertida que nunca funciona | Corrigir imediatamente |
-| ALTO | Resource leak, unhandled rejection, null dereference em caminho comum | Corrigir nesta sessão |
-| MÉDIO | Timer sem referência, reentrância não protegida, parseInt sem radix | Corrigir se possível, backlog se não |
-| BAIXO | HTTP 200 para 501, comentário JSDoc incorreto, nit estilo | Backlog |
+| Severidade | Exemplos                                                                | Ação                                 |
+| ---------- | ----------------------------------------------------------------------- | ------------------------------------ |
+| CRÍTICO    | Data corruption, crash em produção, lógica invertida que nunca funciona | Corrigir imediatamente               |
+| ALTO       | Resource leak, unhandled rejection, null dereference em caminho comum   | Corrigir nesta sessão                |
+| MÉDIO      | Timer sem referência, reentrância não protegida, parseInt sem radix     | Corrigir se possível, backlog se não |
+| BAIXO      | HTTP 200 para 501, comentário JSDoc incorreto, nit estilo               | Backlog                              |
 
 ## Validation / Done Criteria
 

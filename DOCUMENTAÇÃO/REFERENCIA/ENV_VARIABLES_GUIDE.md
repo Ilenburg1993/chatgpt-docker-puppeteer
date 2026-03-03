@@ -23,17 +23,17 @@ Os contratos atuais estão implementados em:
 
 ## Arquivos de Ambiente
 
-| Arquivo | Papel | Versionado | Observação |
-| --- | --- | --- | --- |
-| [`.env.example`](../../.env.example) | template de baseline local | sim | documenta defaults e estrutura do env |
-| [`.env.local.example`](../../.env.local.example) | template de segredos e overrides pessoais | sim | base recomendada para credenciais |
-| [`.env.expert.example`](../../.env.expert.example) | catálogo de knobs especializados | sim | copiar chaves pontuais para `.env.local`/runtime |
-| `.env` | baseline local ativo | não | carregado sem sobrescrever env já existente |
-| [`.env.development`](../../.env.development) | perfil de desenvolvimento | sim | pode ser usado como referência/base |
-| [`.env.production`](../../.env.production) | perfil de produção | sim | template hardened para deploy |
-| [`.env.test`](../../.env.test) | perfil de testes | sim | baseline para testes automatizados |
-| `.env.local` | override local e segredos | não | sobrescreve chaves repetidas |
-| `.env.<NODE_ENV>.local` | override mais específico por ambiente | não | maior prioridade entre arquivos `.env*` |
+| Arquivo                                            | Papel                                     | Versionado | Observação                                       |
+| -------------------------------------------------- | ----------------------------------------- | ---------- | ------------------------------------------------ |
+| [`.env.example`](../../.env.example)               | template de baseline local                | sim        | documenta defaults e estrutura do env            |
+| [`.env.local.example`](../../.env.local.example)   | template de segredos e overrides pessoais | sim        | base recomendada para credenciais                |
+| [`.env.expert.example`](../../.env.expert.example) | catálogo de knobs especializados          | sim        | copiar chaves pontuais para `.env.local`/runtime |
+| `.env`                                             | baseline local ativo                      | não        | carregado sem sobrescrever env já existente      |
+| [`.env.development`](../../.env.development)       | perfil de desenvolvimento                 | sim        | pode ser usado como referência/base              |
+| [`.env.production`](../../.env.production)         | perfil de produção                        | sim        | template hardened para deploy                    |
+| [`.env.test`](../../.env.test)                     | perfil de testes                          | sim        | baseline para testes automatizados               |
+| `.env.local`                                       | override local e segredos                 | não        | sobrescreve chaves repetidas                     |
+| `.env.<NODE_ENV>.local`                            | override mais específico por ambiente     | não        | maior prioridade entre arquivos `.env*`          |
 
 O baseline atual também inclui duas camadas de cobertura:
 
@@ -53,11 +53,9 @@ O baseline atual também inclui duas camadas de cobertura:
 O bootstrap é idempotente e segue a ordem implementada em
 [`src/core/env_bootstrap.js`](../../src/core/env_bootstrap.js):
 
-1. O processo nasce com o ambiente do container/shell.
-   Fontes típicas: Dockerfile `ENV`, `containerEnv`, `--env-file`, `remoteEnv`, exports manuais e
-   CI.
-2. `.env` é carregado sem `override`.
-   Ele só preenche chaves ainda ausentes.
+1. O processo nasce com o ambiente do container/shell. Fontes típicas: Dockerfile `ENV`,
+   `containerEnv`, `--env-file`, `remoteEnv`, exports manuais e CI.
+2. `.env` é carregado sem `override`. Ele só preenche chaves ainda ausentes.
 3. `.env.<NODE_ENV>` é carregado com `override=true`.
 4. `.env.local` é carregado com `override=true`.
 5. `.env.<NODE_ENV>.local` é carregado com `override=true`.
@@ -106,8 +104,8 @@ Regra prática:
 ### `remoteEnv` e segredos do host
 
 O DevContainer espelha variáveis do host em `remoteEnv` em
-[`.devcontainer/devcontainer.json`](../../.devcontainer/devcontainer.json).
-Esse é o caminho recomendado para credenciais que precisam chegar a:
+[`.devcontainer/devcontainer.json`](../../.devcontainer/devcontainer.json). Esse é o caminho
+recomendado para credenciais que precisam chegar a:
 
 - terminais do VS Code;
 - extensões;
@@ -170,8 +168,8 @@ forçar cor (por exemplo PM2, testes e helpers específicos).
 
 ## Limite Deliberado do Template
 
-O template [`.env.example`](../../.env.example) foi consolidado para cobrir o baseline operacional
-e os sidecars opcionais relevantes. Algumas chaves continuam fora dele por design:
+O template [`.env.example`](../../.env.example) foi consolidado para cobrir o baseline operacional e
+os sidecars opcionais relevantes. Algumas chaves continuam fora dele por design:
 
 - variáveis automáticas do runtime/orquestrador (`NODE_APP_INSTANCE`, `PM2_*`, `CHATGPT_ENV_*`);
 - aliases e compatibilidades de baixo valor operacional (`CHROME_WSE`, `CHROME_URL`, etc.);
@@ -205,14 +203,13 @@ Enums relevantes no baseline atual:
 
 ### O valor do host não apareceu na aplicação
 
-Verifique se a mesma chave está definida em `.env.local` ou `.env.<NODE_ENV>.local`.
-Esses arquivos sobrescrevem o valor vindo de `remoteEnv`.
+Verifique se a mesma chave está definida em `.env.local` ou `.env.<NODE_ENV>.local`. Esses arquivos
+sobrescrevem o valor vindo de `remoteEnv`.
 
 ### A extensão/LLM não enxerga a variável, mas o app enxerga
 
-Isso normalmente indica que a chave foi carregada apenas via `.env.local`.
-Nesse caso, replique a variável no host para que o `remoteEnv` a propague ao ambiente remoto do VS
-Code.
+Isso normalmente indica que a chave foi carregada apenas via `.env.local`. Nesse caso, replique a
+variável no host para que o `remoteEnv` a propague ao ambiente remoto do VS Code.
 
 ### O `gh` funciona no shell, mas não em outro processo
 
@@ -221,9 +218,9 @@ Revise se o token está em `GH_TOKEN`/`GITHUB_TOKEN` (somente runtime) ou em
 
 ### Aparece warning de `NO_COLOR` no startup do Node
 
-Revise se algum shell, wrapper ou processo ainda está exportando `FORCE_COLOR` globalmente.
-O baseline do DevContainer não faz mais isso; quando o warning aparece, a origem costuma ser um
-export local/transitório fora do contrato canônico.
+Revise se algum shell, wrapper ou processo ainda está exportando `FORCE_COLOR` globalmente. O
+baseline do DevContainer não faz mais isso; quando o warning aparece, a origem costuma ser um export
+local/transitório fora do contrato canônico.
 
 ## Auditoria Relacionada
 

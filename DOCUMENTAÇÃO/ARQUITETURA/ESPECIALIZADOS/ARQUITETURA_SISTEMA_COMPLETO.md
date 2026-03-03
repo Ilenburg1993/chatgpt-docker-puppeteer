@@ -1,8 +1,8 @@
-> **Status**: Especializado
-> **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md) como fonte oficial.
-> **Quando consultar**: apenas para aprofundamento deste recorte.
+> **Status**: Especializado **Não é baseline principal**: use [ARCHITECTURE.md](../ARCHITECTURE.md)
+> como fonte oficial. **Quando consultar**: apenas para aprofundamento deste recorte.
 
-**Propósito**: consolidar uma visão integrada e aprofundada do sistema sem substituir o baseline oficial.  
+**Propósito**: consolidar uma visão integrada e aprofundada do sistema sem substituir o baseline
+oficial.  
 **Status documental**: Especializado.  
 **Público**: engenharia, manutenção, auditoria e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

@@ -85,7 +85,12 @@ arquivo atual por uma versão enxuta, mais exibível e fácil de manter.
     { "label": "pm2:start", "type": "shell", "command": "make start" },
     { "label": "pm2:stop", "type": "shell", "command": "make stop" },
     { "label": "pm2:status", "type": "shell", "command": "make status" },
-    { "label": "pm2:monitor", "type": "shell", "command": "npm run daemon:monit", "isBackground": true },
+    {
+      "label": "pm2:monitor",
+      "type": "shell",
+      "command": "npm run daemon:monit",
+      "isBackground": true
+    },
 
     { "label": "logs:follow", "type": "shell", "command": "make logs", "isBackground": true },
 

@@ -359,8 +359,8 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_) {
-                /* ignore */
+            } catch (err) {
+                log('WARN', `[PROJECTOR] heartbeat/accepted attempt failed: ${err?.message || String(err)}`);
             }
 
             if (isStaleAttempt) {
@@ -405,8 +405,23 @@ class TaskStateProjector {
                         });
                     }
                 }
+            } catch (err) {
+                log('WARN', `[PROJECTOR] RUNNING attempt transition failed: ${err?.message || String(err)}`);
+            }
+
+            // NERV audit: emit event for attempt state transition
+            try {
+                recordEvent({
+                    entityType: 'attempt',
+                    entityId: attemptId,
+                    tsMs: now,
+                    actorType: 'system',
+                    eventType: 'ATTEMPT_STARTED',
+                    payload: { taskId, actionCode },
+                    dedupKey: `attempt-started:${attemptId}:${now}`,
+                });
             } catch (_) {
-                /* ignore */
+                /* best-effort */
             }
 
             if (isStaleAttempt) {
@@ -573,6 +588,21 @@ class TaskStateProjector {
                 }
             }
 
+            // NERV audit: emit event for attempt completion
+            try {
+                recordEvent({
+                    entityType: 'attempt',
+                    entityId: attemptId,
+                    tsMs: now,
+                    actorType: 'system',
+                    eventType: 'ATTEMPT_COMPLETED',
+                    payload: { taskId, actionCode, hasArtifacts: Boolean(artifactIds.text || artifactIds.md) },
+                    dedupKey: `attempt-done:${attemptId}:${now}`,
+                });
+            } catch (_) {
+                /* best-effort */
+            }
+
             if (isStaleAttempt) {
                 markStaleAttemptIgnored('task_completed');
                 return;
@@ -614,8 +644,8 @@ class TaskStateProjector {
                     if (row?.status === 'PAUSED') {
                         nextStatus = 'PAUSED';
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log('WARN', `[PROJECTOR] ABORTED attempt registration failed: ${err?.message || String(err)}`);
                 }
             }
 
@@ -1163,8 +1193,8 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log('WARN', `[PROJECTOR] diagnostic artifact registration failed: ${err?.message || String(err)}`);
                 }
 
                 releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
@@ -1211,8 +1241,8 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_) {
-                /* ignore */
+            } catch (err) {
+                log('WARN', `[PROJECTOR] attempt state update failed: ${err?.message || String(err)}`);
             }
             releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });
         }

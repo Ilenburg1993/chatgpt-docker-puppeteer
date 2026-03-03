@@ -15,7 +15,7 @@ function requirePermission(permission) {
         if (!hasPermission(req.user, permission)) {
             return res.status(403).json({
                 success: false,
-                error: `Permissão insuficiente: ${permission}`,
+                error: 'Permissão insuficiente',
                 code: 'FORBIDDEN',
                 request_id: req.id,
             });

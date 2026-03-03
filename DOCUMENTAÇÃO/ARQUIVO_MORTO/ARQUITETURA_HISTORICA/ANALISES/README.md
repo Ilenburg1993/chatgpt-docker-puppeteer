@@ -1,6 +1,7 @@
 # ANALISES
 
-**Propósito**: preservar análises históricas de arquitetura que deixaram de ser baseline, mas continuam úteis como rastreabilidade.  
+**Propósito**: preservar análises históricas de arquitetura que deixaram de ser baseline, mas
+continuam úteis como rastreabilidade.  
 **Status documental**: Histórico.  
 **Público**: engenharia, arquitetura e auditoria.  
 **Última atualização**: 28 de fevereiro de 2026.

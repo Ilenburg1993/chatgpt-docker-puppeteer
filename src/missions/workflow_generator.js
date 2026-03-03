@@ -178,7 +178,13 @@ class WorkflowGenerator {
                 const numChapters = context.num_chapters || 1;
 
                 for (let i = 1; i <= numChapters; i++) {
-                    const expandedStep = structuredClone(step); // Deep clone
+                    let expandedStep;
+                    try {
+                        expandedStep = structuredClone(step);
+                    } catch (cloneErr) {
+                        logger.error(`[WorkflowGenerator] structuredClone failed for step ${step.id}: ${cloneErr?.message}`);
+                        expandedStep = JSON.parse(JSON.stringify(step)); // Fallback to JSON clone
+                    }
                     delete expandedStep.repeat_for_each;
 
                     // Substitui {{chapter_num}} no ID
@@ -252,13 +258,15 @@ class WorkflowGenerator {
      * Ex: "Write chapter {{chapter_num}}" → "Write chapter 5"
      */
     _replacePlaceholdersInString(str, context) {
-        return str.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        const result = str.replace(/\{\{(\w+)\}\}/g, (match, key) => {
             if (key in context) {
                 return String(context[key]);
             }
-            // Se placeholder não encontrado, mantém original
+            // Se placeholder não encontrado, log warning e mantém original
+            logger.warn(`[WorkflowGenerator] Unresolved placeholder: ${match}`);
             return match;
         });
+        return result;
     }
 
     /**

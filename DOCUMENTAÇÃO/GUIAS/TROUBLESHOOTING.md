@@ -1,6 +1,7 @@
 # Troubleshooting
 
-**Propósito**: registrar diagnósticos e correções seguras para os problemas mais recorrentes do ambiente atual, sem recorrer a procedimentos destrutivos ou pressupostos antigos.  
+**Propósito**: registrar diagnósticos e correções seguras para os problemas mais recorrentes do
+ambiente atual, sem recorrer a procedimentos destrutivos ou pressupostos antigos.  
 **Status documental**: Canônico.  
 **Público**: desenvolvimento, operação local, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

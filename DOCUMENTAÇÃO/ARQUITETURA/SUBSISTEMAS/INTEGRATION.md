@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento das integrações técnicas em `src/integration/`.  
-**Quando consultar**: ao alterar MCP, LSP, tool registry, ferramentas expostas a LLMs ou políticas de circuit breaker para integrações.  
+**Quando consultar**: ao alterar MCP, LSP, tool registry, ferramentas expostas a LLMs ou políticas
+de circuit breaker para integrações.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # INTEGRATION
@@ -65,8 +66,8 @@ Peça principal:
 Responsabilidades:
 
 - manter um daemon lógico para operações com TypeScript;
-- suportar `definition`, `references`, `hover`, `document_symbols`,
-  `workspace_symbols`, `diagnostics`, `code_actions`, `apply_code_action`;
+- suportar `definition`, `references`, `hover`, `document_symbols`, `workspace_symbols`,
+  `diagnostics`, `code_actions`, `apply_code_action`;
 - enfileirar requisições e aplicar timeout/cancelamento;
 - garantir que os caminhos operados permaneçam dentro do workspace.
 
@@ -148,8 +149,8 @@ Responsável por normalização/classificação de falhas de integração.
 
 ## Lacunas e observações
 
-- `src/integration/` é uma área ampla e merece, numa próxima passada, docs especializados por
-  trilha (`MCP`, `LSP`, `RAG tools`, `Ollama tools`) se o objetivo for documentação máxima.
+- `src/integration/` é uma área ampla e merece, numa próxima passada, docs especializados por trilha
+  (`MCP`, `LSP`, `RAG tools`, `Ollama tools`) se o objetivo for documentação máxima.
 
 ## Referências no código
 

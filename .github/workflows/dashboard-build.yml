@@ -1,0 +1,213 @@
+name: Dashboard Build
+
+# Verifica que o dashboard Vue/Vite compila sem erros e analisa o tamanho do
+# bundle. Executado apenas quando arquivos do dashboard ou o próprio workflow
+# são alterados. Não-bloqueante: falhas são informativas.
+#
+# Jobs:
+#   build — build Vite do dashboard, análise de bundle, upload de artefatos
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/dashboard-ui/**"
+      - ".github/workflows/dashboard-build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/dashboard-ui/**"
+      - ".github/workflows/dashboard-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: dashboard-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  build:
+    name: Dashboard build + bundle analysis (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/dashboard
+
+      - name: Build dashboard (Vite)
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run dashboard:build 2>&1 | tee artifacts/dashboard/build.log
+
+      - name: Analyze bundle sizes
+        if: always()
+        run: |
+          dist_dir="src/dashboard-ui/dist"
+          if [ -d "$dist_dir" ]; then
+            # Total size
+            du -sh "$dist_dir" | tee artifacts/dashboard/bundle-total.txt
+
+            # Per-file sizes (JS + CSS), sorted largest first
+            find "$dist_dir" -type f \( -name "*.js" -o -name "*.css" \) | \
+              while IFS= read -r f; do
+                size=$(wc -c < "$f" 2>/dev/null || echo 0)
+                printf '%10d bytes  %s\n' "$size" "${f#"$dist_dir/"}"
+              done | sort -rn | head -25 | tee artifacts/dashboard/bundle-sizes.txt
+          else
+            echo "dist directory not found (build may have failed)" | tee artifacts/dashboard/bundle-sizes.txt
+          fi
+
+      - name: Build dashboard summary
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          node --input-type=module -e '
+            import fs from "node:fs";
+
+            const buildOutcome = process.env.BUILD_OUTCOME || "unknown";
+            const sizesPath = "artifacts/dashboard/bundle-sizes.txt";
+            const totalPath = "artifacts/dashboard/bundle-total.txt";
+
+            const sizes = fs.existsSync(sizesPath) ? fs.readFileSync(sizesPath, "utf8").trim() : "(não disponível)";
+            const total = fs.existsSync(totalPath) ? fs.readFileSync(totalPath, "utf8").trim() : "(não disponível)";
+
+            const lines = [
+              "## Dashboard Build (non-blocking)",
+              "",
+              `- build_outcome: ${buildOutcome}`,
+              `- bundle_total: ${total}`,
+              "",
+              "### Top arquivos por tamanho",
+              "```",
+              sizes,
+              "```",
+              "",
+              "> Falhas acima são informativas e não bloqueiam o merge.",
+            ];
+            fs.writeFileSync("artifacts/dashboard/summary.md", lines.join("\n") + "\n");
+          '
+          cat artifacts/dashboard/summary.md >> "$GITHUB_STEP_SUMMARY"
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+
+      - name: Upload dashboard artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dashboard-build-${{ github.run_id }}
+          path: artifacts/dashboard
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Comment PR with dashboard build result
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const { readFileSync, existsSync } = require('node:fs');
+            const marker = '<!-- dashboard-build-summary -->';
+            const buildOutcome = process.env.BUILD_OUTCOME || 'unknown';
+            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : '⚠️';
+
+            const sizesPath = 'artifacts/dashboard/bundle-sizes.txt';
+            const totalPath = 'artifacts/dashboard/bundle-total.txt';
+            const total = existsSync(totalPath) ? readFileSync(totalPath, 'utf8').trim() : '(não disponível)';
+            const sizes = existsSync(sizesPath)
+              ? readFileSync(sizesPath, 'utf8').trim().split('\n').slice(0, 10).join('\n')
+              : '(não disponível)';
+
+            const suggestion = buildOutcome === 'failure'
+              ? '\n> 💡 Sugestão: rode `npm run dashboard:build` localmente para ver o erro de compilação.'
+              : '';
+
+            const body = [
+              marker,
+              '## 🖥️ Dashboard Build (non-blocking)',
+              '',
+              `| Item | Valor |`,
+              `|---|---|`,
+              `| build | ${icon(buildOutcome)} ${buildOutcome} |`,
+              `| bundle total | ${total} |`,
+              '',
+              '**Top arquivos por tamanho:**',
+              '```',
+              sizes,
+              '```',
+              suggestion,
+              '> Falhas são informativas e não bloqueiam o merge.',
+            ].filter((l) => l !== '').join('\n');
+
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find((c) =>
+                c.user?.type === 'Bot' && c.body?.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Failed to post PR comment: ${err.message}. Results available in the workflow step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }

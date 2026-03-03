@@ -3,7 +3,8 @@
 **Propósito**: oferecer uma referência visual alinhada à topologia atual do runtime.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, manutenção, auditoria e agentes de IA.  
-**Quando consultar**: ao precisar visualizar a relação entre `kernel`, `orchestrator`, `agent`, `driver`, `infra` e as superfícies externas.  
+**Quando consultar**: ao precisar visualizar a relação entre `kernel`, `orchestrator`, `agent`,
+`driver`, `infra` e as superfícies externas.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](./ARCHITECTURE.md).  
 **Última atualização**: 28 de fevereiro de 2026.
 
@@ -159,6 +160,5 @@ flowchart LR
 - Se um novo plano estrutural surgir, ele deve aparecer aqui.
 - Se `src/agent/` ganhar novos loops centrais, atualize o diagrama de fluxo.
 - Se a taxonomia física de `ARQUITETURA/` mudar, atualize o mapa documental acima.
-- Mantenha `DIAGRAMS/diagrama.mmd` e `DIAGRAMS/diagrams/architecture.mmd` coerentes com esta
-  página.
+- Mantenha `DIAGRAMS/diagrama.mmd` e `DIAGRAMS/diagrams/architecture.mmd` coerentes com esta página.
 - Não reintroduza diagramas históricos como se fossem baseline atual.

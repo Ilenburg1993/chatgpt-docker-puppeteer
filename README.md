@@ -9,14 +9,16 @@
 
 ## 📚 Documentação Canônica
 
-A documentação central do projeto agora está organizada em [`DOCUMENTAÇÃO/README.md`](DOCUMENTAÇÃO/README.md).
+A documentação central do projeto agora está organizada em
+[`DOCUMENTAÇÃO/README.md`](DOCUMENTAÇÃO/README.md).
 
 - Guias e onboarding: [`DOCUMENTAÇÃO/GUIAS/`](DOCUMENTAÇÃO/GUIAS/)
 - Arquitetura e diagramas: [`DOCUMENTAÇÃO/ARQUITETURA/`](DOCUMENTAÇÃO/ARQUITETURA/)
 - Referências e APIs: [`DOCUMENTAÇÃO/REFERENCIA/`](DOCUMENTAÇÃO/REFERENCIA/)
 - Operações e deploy: [`DOCUMENTAÇÃO/OPERACOES/`](DOCUMENTAÇÃO/OPERACOES/)
 - Planos ativos: [`DOCUMENTAÇÃO/PLANOS/`](DOCUMENTAÇÃO/PLANOS/)
-- Relatórios e histórico: [`DOCUMENTAÇÃO/RELATORIOS/`](DOCUMENTAÇÃO/RELATORIOS/) e [`DOCUMENTAÇÃO/ARQUIVO_MORTO/`](DOCUMENTAÇÃO/ARQUIVO_MORTO/)
+- Relatórios e histórico: [`DOCUMENTAÇÃO/RELATORIOS/`](DOCUMENTAÇÃO/RELATORIOS/) e
+  [`DOCUMENTAÇÃO/ARQUIVO_MORTO/`](DOCUMENTAÇÃO/ARQUIVO_MORTO/)
 
 ## 🚀 Visão Geral
 
@@ -91,8 +93,8 @@ pip install -r agents/code_explainer/requirements.txt \
             -r agents/cooking_ai/requirements.txt
 ````
 
-> **Nota:** neste DevContainer o suporte a `venv` faz parte da imagem. A pasta `.venv/` é um artefato
-> local, fica ignorada pelo Git e não deve ser tratada como parte do código do projeto.
+> **Nota:** neste DevContainer o suporte a `venv` faz parte da imagem. A pasta `.venv/` é um
+> artefato local, fica ignorada pelo Git e não deve ser tratada como parte do código do projeto.
 >
 > Em ambientes externos, a criação de venv ainda pode falhar devido à falta de `python3-venv` ou
 > políticas de "externally-managed environment".

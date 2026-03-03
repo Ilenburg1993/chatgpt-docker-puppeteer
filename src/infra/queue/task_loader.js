@@ -73,7 +73,7 @@ async function loadNextTask(targetFilter = null) {
 
             if (hasFailedParent) {
                 if (!isModified) {
-                task = structuredClone(originalTask);
+                    task = structuredClone(originalTask);
                 }
 
                 task.state.status = STATUS_VALUES.SKIPPED;

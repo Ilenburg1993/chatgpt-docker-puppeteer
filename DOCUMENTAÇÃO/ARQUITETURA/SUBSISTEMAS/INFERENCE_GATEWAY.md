@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento do serviço auxiliar `src/inference_gateway/`.  
-**Quando consultar**: ao alterar políticas de inferência, roteamento de backend/modelo, métricas ou a API HTTP do gateway de inferência.  
+**Quando consultar**: ao alterar políticas de inferência, roteamento de backend/modelo, métricas ou
+a API HTTP do gateway de inferência.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # INFERENCE GATEWAY

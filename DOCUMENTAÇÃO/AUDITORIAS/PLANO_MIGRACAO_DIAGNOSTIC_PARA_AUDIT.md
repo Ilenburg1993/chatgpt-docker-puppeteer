@@ -329,11 +329,11 @@ curl -X POST http://localhost:3000/api/control/commands \
 
 ### 6.4 Documentação a Atualizar
 
-| Documento                                            | Ação                                    |
-| ---------------------------------------------------- | --------------------------------------- |
+| Documento                                                       | Ação                                    |
+| --------------------------------------------------------------- | --------------------------------------- |
 | `DOCUMENTAÇÃO/AUDITORIAS/BUGS/CODEX_AUDIT_TRACKER.md`           | Atualizar status                        |
 | `DOCUMENTAÇÃO/AUDITORIAS/BUGS/CODEX_AUDIT_AGENT_MASTER_PLAN.md` | Documentar nova funcionalidade          |
-| `README.md`                                          | Remover referências ao Diagnostic Agent |
+| `README.md`                                                     | Remover referências ao Diagnostic Agent |
 
 ---
 

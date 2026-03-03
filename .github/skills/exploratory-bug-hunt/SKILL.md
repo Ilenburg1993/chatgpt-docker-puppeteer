@@ -3,7 +3,8 @@ name: exploratory-bug-hunt
 user-invokable: true
 description:
   'Skill para caça proativa de bugs e gaps sem pistas iniciais; gera relatório versionado e aplica
-  correções. v2.0: 10 categorias de inspeção obrigatórias, checklists técnicos e grep-first approach.'
+  correções. v2.0: 10 categorias de inspeção obrigatórias, checklists técnicos e grep-first
+  approach.'
 ---
 
 # exploratory-bug-hunt
@@ -93,40 +94,47 @@ grep -rn "not implemented\|Not Implemented" src/ --include="*.js" | grep -v "501
 Para cada arquivo do escopo, verificar:
 
 **C1 — Resource Leaks (Timers e Listeners)**
+
 - Cada `setInterval` tem `clearInterval` correspondente?
 - Cada `addEventListener` tem `removeEventListener` no teardown?
 - Timers com referência salva para cancelamento?
 - Conexões abertas (TCP, WebSocket, file handles) fechadas?
 
 **C2 — Async e Concorrência**
+
 - `async` callback em `setInterval/setTimeout` tem `.catch()` ou `try/catch`?
 - Funções `async` chamadas sem `await` onde deveria aguardar?
 - Race conditions em recursos compartilhados sem guard?
 - Reentrância em loops periódicos (guard flag ou Promise serial)?
 
 **C3 — Error Handling e Robustez**
+
 - `try/catch` vazio ou silencioso sem logging?
 - `.catch(() => {})` suprimindo erros que não deveriam ser ignorados?
 - HTTP responses verificadas antes de `.json()` ou `.text()`?
 - Erros de terceiros (PM2, DB, filesystem) tratados graciosamente?
 
 **C4 — Null / Undefined Dereference**
+
 - Acesso a propriedade de objeto potencialmente nulo sem optional chaining?
 - Destructuring sem default values em objetos opcionais?
 - Array methods em variáveis que podem ser `null`/`undefined`?
 
 **C5 — Lógica de Controle**
+
 - Condicionais com ramos impossíveis (dead code)?
 - Ternários com ambos os branches iguais?
 - Flags de estado nunca resetadas ou sempre no mesmo valor?
 - Circuit breakers com lógica invertida?
 
 **C6 — Parsing e Serialização**
+
 - `JSON.parse()` sem `try/catch`?
 - `parseInt()` sem radix `10`?
 - Dados externos usados sem sanitização?
 
 **C7 — Segurança**
+
 - Segredos hardcoded (tokens, passwords, keys)?
 - Logs expondo dados sensíveis (tokens, senhas, PII)?
 - SQL injection (template literals em queries)?
@@ -134,17 +142,20 @@ Para cada arquivo do escopo, verificar:
 - CORS permissivo demais ou CSP ausente?
 
 **C8 — Compatibilidade ESM e Node.js 24+**
+
 - `require()` ou `module.exports` em arquivos `.js`?
 - `__dirname` / `__filename` em ESM sem `import.meta.url`?
 - APIs deprecated em Node.js 24?
 
 **C9 — Performance e Eficiência**
+
 - N+1 queries (loop com DB calls dentro)?
 - `JSON.parse(JSON.stringify(x))` como clone (use `structuredClone`)?
 - Processamento síncrono bloqueante no event loop?
 - Caches sem limite de tamanho (memory leak potencial)?
 
 **C10 — Completude Funcional**
+
 - TODOs/FIXMEs em código ativo que afetam comportamento?
 - HTTP 200 para endpoints não implementados?
 - Validações de input ausentes em handlers públicos?

@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/server/watchers/`.  
-**Quando consultar**: ao alterar sensores de filesystem, reação a mudanças de fila, monitoramento de log ou integração desses sinais com o dashboard e o agent.  
+**Quando consultar**: ao alterar sensores de filesystem, reação a mudanças de fila, monitoramento de
+log ou integração desses sinais com o dashboard e o agent.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # SERVER WATCHERS
@@ -92,8 +93,8 @@ Ele não faz streaming do conteúdo em si; ele garante que a vigilância sobre o
 ## Restrições e guardrails
 
 - Watchers devem continuar leves e não executar regra de negócio complexa.
-- Debounce e reconnect são parte do contrato de robustez e não devem ser removidos sem
-  substituição equivalente.
+- Debounce e reconnect são parte do contrato de robustez e não devem ser removidos sem substituição
+  equivalente.
 - O watcher de log deve continuar tolerante à rotação física do arquivo.
 - O watcher de fila deve permanecer focado em sinalizar, não em processar tarefas.
 

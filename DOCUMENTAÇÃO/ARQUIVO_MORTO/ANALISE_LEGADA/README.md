@@ -1,6 +1,7 @@
 # ANALISE_LEGADA
 
-**Propósito**: organizar análises legadas reclassificadas por tipo, preservando contexto histórico sem competir com a documentação viva.  
+**Propósito**: organizar análises legadas reclassificadas por tipo, preservando contexto histórico
+sem competir com a documentação viva.  
 **Status documental**: Histórico.  
 **Público**: engenharia, auditoria e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

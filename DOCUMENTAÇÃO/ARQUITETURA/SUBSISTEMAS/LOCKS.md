@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/infra/locks/`.  
-**Quando consultar**: ao alterar exclusão mútua, recuperação de locks órfãos, cleanup em crash ou proteção de concorrência entre processos.  
+**Quando consultar**: ao alterar exclusão mútua, recuperação de locks órfãos, cleanup em crash ou
+proteção de concorrência entre processos.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # LOCKS
@@ -58,8 +59,7 @@ Sem ele, a trilha correria o risco de apagar locks válidos.
 Responsabilidades:
 
 - registrar locks ativos em memória;
-- anexar handlers de `SIGINT`, `SIGTERM`, `beforeExit`, `uncaughtException` e
-  `unhandledRejection`;
+- anexar handlers de `SIGINT`, `SIGTERM`, `beforeExit`, `uncaughtException` e `unhandledRejection`;
 - liberar todos os locks conhecidos em cenários de falha;
 - registrar estatísticas de aquisição/liberação e pico de concorrência;
 - evitar que o próprio helper assuma controle indevido do lifecycle do processo.
@@ -111,8 +111,8 @@ Responsabilidades:
 ## Restrições e guardrails
 
 - O owner do lock deve continuar identificável por PID e metadados.
-- `fs.link()` é parte importante da atomicidade; não deve ser trocado por uma estratégia que
-  permita overwrite silencioso.
+- `fs.link()` é parte importante da atomicidade; não deve ser trocado por uma estratégia que permita
+  overwrite silencioso.
 - Break de lock só pode ocorrer após verificação de processo órfão.
 - `resilient_lock.js` pode limpar recursos, mas não deve tomar posse do lifecycle completo do
   processo.

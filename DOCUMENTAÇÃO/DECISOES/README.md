@@ -1,6 +1,7 @@
 # DECISOES
 
-**Propósito**: servir como espaço canônico para ADRs e registros explícitos de decisões estruturais do projeto.  
+**Propósito**: servir como espaço canônico para ADRs e registros explícitos de decisões estruturais
+do projeto.  
 **Status documental**: Canônico.  
 **Público**: engenharia, manutenção, governança técnica e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

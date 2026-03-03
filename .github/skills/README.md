@@ -36,7 +36,9 @@ Cada skill canônica deve ter:
 - `reactive-bug-audit`: bug reportado / incidente com pista inicial
 - `exploratory-bug-hunt`: caça proativa sem pista inicial (grep-first, padrões)
 - `code-audit-and-fix`: ciclo completo exploração + patches (padrões + aplicação)
-- **`semantic-logic-audit`: auditoria profunda de lógica e semântica — verifica se o código faz o que deve, independente de padrões ou lint. Use para fluxos completos, state machines, invariantes.**
+- **`semantic-logic-audit`: auditoria profunda de lógica e semântica — verifica se o código faz o
+  que deve, independente de padrões ou lint. Use para fluxos completos, state machines,
+  invariantes.**
 - `audit-proposal-deep-triage`: causa-raiz e proposta P0/P1
 - `audit-contracts-v3-ops`: contratos e governança
 - `audit-system-analysis-planning`: análise e planejamento arquitetural

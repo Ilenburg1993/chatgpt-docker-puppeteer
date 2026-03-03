@@ -1,6 +1,7 @@
 # Plano de READMEs Padronizados
 
-**Propósito**: orientar a criação futura de `README.md` em cada pasta da documentação e, quando fizer sentido, em outras áreas estruturais do repositório.  
+**Propósito**: orientar a criação futura de `README.md` em cada pasta da documentação e, quando
+fizer sentido, em outras áreas estruturais do repositório.  
 **Status documental**: Canônico.  
 **Público**: engenharia, governança documental e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -125,5 +126,6 @@ Com a cobertura estrutural concluída, a próxima fase deixa de ser “criar REA
 
 ## Referências relacionadas
 
-- Status geral da documentação: [../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md)
+- Status geral da documentação:
+  [../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md](../RELATORIOS/STATUS_GERAL_DOCUMENTACAO.md)
 - Hub principal: [../README.md](../README.md)

@@ -26,17 +26,17 @@ npm run dev            # Desenvolvimento (auto-restart em mudanças)
 
 Scripts para gerenciar processos via PM2 (produção).
 
-| Script           | Comando                             | Descrição                                   |
-| ---------------- | ----------------------------------- | ------------------------------------------- |
-| `daemon:start`   | `npx pm2 start ecosystem.config.cjs` | Inicia os processos PM2 definidos no baseline atual |
-| `daemon:stop`    | `npx pm2 stop agente-gpt dashboard-web chrome-proxy` | Para os processos principais |
-| `daemon:restart` | `npx pm2 restart agente-gpt dashboard-web chrome-proxy` | Reinicia os processos principais |
-| `daemon:reload`  | `npx pm2 reload agente-gpt dashboard-web chrome-proxy` | Reload sem downtime |
-| `daemon:monit`   | `npx pm2 monit` | Monitor interativo em tempo real |
-| `daemon:logs`    | `npx pm2 logs --lines 50` | Últimas 50 linhas de logs |
-| `daemon:flush`   | `npx pm2 flush` | Limpa logs do PM2 |
-| `daemon:kill`    | `npx pm2 delete all` | Remove todos processos (kill) |
-| `daemon:status`  | `npx pm2 status` | Status de todos processos |
+| Script           | Comando                                                 | Descrição                                           |
+| ---------------- | ------------------------------------------------------- | --------------------------------------------------- |
+| `daemon:start`   | `npx pm2 start ecosystem.config.cjs`                    | Inicia os processos PM2 definidos no baseline atual |
+| `daemon:stop`    | `npx pm2 stop agente-gpt dashboard-web chrome-proxy`    | Para os processos principais                        |
+| `daemon:restart` | `npx pm2 restart agente-gpt dashboard-web chrome-proxy` | Reinicia os processos principais                    |
+| `daemon:reload`  | `npx pm2 reload agente-gpt dashboard-web chrome-proxy`  | Reload sem downtime                                 |
+| `daemon:monit`   | `npx pm2 monit`                                         | Monitor interativo em tempo real                    |
+| `daemon:logs`    | `npx pm2 logs --lines 50`                               | Últimas 50 linhas de logs                           |
+| `daemon:flush`   | `npx pm2 flush`                                         | Limpa logs do PM2                                   |
+| `daemon:kill`    | `npx pm2 delete all`                                    | Remove todos processos (kill)                       |
+| `daemon:status`  | `npx pm2 status`                                        | Status de todos processos                           |
 
 **Exemplos**:
 

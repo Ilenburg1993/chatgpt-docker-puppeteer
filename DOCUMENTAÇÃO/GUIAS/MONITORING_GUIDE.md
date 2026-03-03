@@ -1,6 +1,7 @@
 # Guia de Monitoramento
 
-**Propósito**: documentar a malha canônica de monitoramento e verificação do runtime atual, priorizando fontes observáveis reais em vez de descrições antigas ou excessivamente idealizadas.  
+**Propósito**: documentar a malha canônica de monitoramento e verificação do runtime atual,
+priorizando fontes observáveis reais em vez de descrições antigas ou excessivamente idealizadas.  
 **Status documental**: Canônico.  
 **Público**: operação local, manutenção, desenvolvimento e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -44,8 +45,8 @@ Processos que normalmente aparecem no runtime padrão:
 - `dashboard-web`
 - `chrome-proxy`
 
-Em cenários específicos, processos auxiliares adicionais podem aparecer, como `inference-gateway`
-ou `audit-agent`, dependendo do modo de execução.
+Em cenários específicos, processos auxiliares adicionais podem aparecer, como `inference-gateway` ou
+`audit-agent`, dependendo do modo de execução.
 
 ## Camada 2: Health HTTP
 

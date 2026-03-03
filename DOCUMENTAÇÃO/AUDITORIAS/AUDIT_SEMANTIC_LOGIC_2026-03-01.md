@@ -10,8 +10,8 @@
 
 ## Objetivo do Sistema (como entendido)
 
-O sistema é um **agente autônomo de automação de LLMs** (ChatGPT, Gemini, etc.) via browser.
-O fluxo principal de tasks:
+O sistema é um **agente autônomo de automação de LLMs** (ChatGPT, Gemini, etc.) via browser. O fluxo
+principal de tasks:
 
 1. **Task é criada** com `spec.payload.user_message` e opcionalmente `system_message`
 2. **QueueWorker** reivindica tasks elegíveis do banco (stage=READY, status=PENDING, sem lock)
@@ -25,15 +25,15 @@ O fluxo principal de tasks:
 
 ## Invariantes Identificados
 
-| # | Invariante | Status |
-|---|-----------|--------|
-| I1 | `status=DONE` implica que a task cumpriu seus critérios de qualidade | ⚠️ **Violado pelo BUG #2** |
-| I2 | Uma task que atingiu max_iterations sem passar validação deve ser `FAILED` | ⚠️ **Violado pelo BUG #2** |
-| I3 | Uma task com output ausente repetidamente deve ser bloqueada após N ocorrências | ⚠️ **Violado pelo BUG #1** |
-| I4 | Locks são liberados em todos os caminhos de saída | ✅ OK (`resilientLock.release` em `finally`) |
-| I5 | Eventos stale/duplicados de dispatch são ignorados pelo correlationId | ✅ OK (idempotência por correlationId) |
-| I6 | max_attempts é verificado antes do dispatch (não após) | ✅ OK |
-| I7 | Estado de workflow (accumulated_context) é corretamente propagado para task filha | ✅ OK |
+| #   | Invariante                                                                        | Status                                       |
+| --- | --------------------------------------------------------------------------------- | -------------------------------------------- |
+| I1  | `status=DONE` implica que a task cumpriu seus critérios de qualidade              | ⚠️ **Violado pelo BUG #2**                   |
+| I2  | Uma task que atingiu max_iterations sem passar validação deve ser `FAILED`        | ⚠️ **Violado pelo BUG #2**                   |
+| I3  | Uma task com output ausente repetidamente deve ser bloqueada após N ocorrências   | ⚠️ **Violado pelo BUG #1**                   |
+| I4  | Locks são liberados em todos os caminhos de saída                                 | ✅ OK (`resilientLock.release` em `finally`) |
+| I5  | Eventos stale/duplicados de dispatch são ignorados pelo correlationId             | ✅ OK (idempotência por correlationId)       |
+| I6  | max_attempts é verificado antes do dispatch (não após)                            | ✅ OK                                        |
+| I7  | Estado de workflow (accumulated_context) é corretamente propagado para task filha | ✅ OK                                        |
 
 ---
 
@@ -47,30 +47,31 @@ O fluxo principal de tasks:
 
 **Descrição do problema:**
 
-O método `_handleMissingOutput` é chamado quando a task completou (DONE) mas o output
-do attempt não está disponível. A intenção é: se isso acontecer N vezes (`threshold=3`)
-dentro de uma janela de tempo (`windowMs`), a task deve ser bloqueada (`BLOCKED`).
+O método `_handleMissingOutput` é chamado quando a task completou (DONE) mas o output do attempt não
+está disponível. A intenção é: se isso acontecer N vezes (`threshold=3`) dentro de uma janela de
+tempo (`windowMs`), a task deve ser bloqueada (`BLOCKED`).
 
 **Fluxo com o bug:**
 
 ```
 Tick 1: recordEvent(dedupKey='task:X:orch_output_missing:A') → INSERT OK (count=1)
          COUNT query: 1 < threshold(3) → return false
-         
+
 Tick 2: recordEvent(dedupKey='task:X:orch_output_missing:A') → INSERT OR IGNORE (count=1)
          COUNT query: 1 < threshold(3) → return false ← NUNCA AVANÇA!
-         
+
 Tick 3, 4, 5...: idem — count sempre 1, threshold nunca atingido
 ```
 
 **Por que falha semanticamente:**
 
-`recordEvent` usa `INSERT OR IGNORE` no SQL. Se `dedup_key` já existe, o evento é silenciado
-e a função retorna `false` (sem erro). Como a `dedupKey` inclui apenas `taskId` e `attemptId`
-(fixos durante todo o processamento de um attempt), o segundo insert em diante é sempre ignorado.
-O `COUNT` query conta eventos reais — mas como só 1 existe, nunca atinge threshold=3.
+`recordEvent` usa `INSERT OR IGNORE` no SQL. Se `dedup_key` já existe, o evento é silenciado e a
+função retorna `false` (sem erro). Como a `dedupKey` inclui apenas `taskId` e `attemptId` (fixos
+durante todo o processamento de um attempt), o segundo insert em diante é sempre ignorado. O `COUNT`
+query conta eventos reais — mas como só 1 existe, nunca atinge threshold=3.
 
 **Evidência:**
+
 ```javascript
 // events_repo.js linha 52-60:
 const res = db.prepare(`INSERT OR IGNORE INTO events ... `).run({...});
@@ -85,8 +86,8 @@ const recent = db.prepare(`SELECT COUNT(1) FROM events WHERE event_type = 'TASK_
 // ↑ COUNT é sempre 1, threshold é 3 → task NUNCA é bloqueada
 ```
 
-**Impacto:** Tasks com output permanentemente ausente ficam num loop infinito, sendo
-"processadas" a cada tick sem progredir nem serem bloqueadas. O `BLOCKED` state nunca é atingido.
+**Impacto:** Tasks com output permanentemente ausente ficam num loop infinito, sendo "processadas" a
+cada tick sem progredir nem serem bloqueadas. O `BLOCKED` state nunca é atingido.
 
 **Correção aplicada:**
 
@@ -111,9 +112,9 @@ recordEvent({
 
 **Descrição do problema:**
 
-Quando uma task `ITERATIVE` atinge `max_iterations` sem que a validação passe, o sistema
-registrava apenas um evento `TASK_ORCHESTRATION_MAX_ITERATIONS_REACHED` e retornava,
-**deixando a task no status `DONE`**.
+Quando uma task `ITERATIVE` atinge `max_iterations` sem que a validação passe, o sistema registrava
+apenas um evento `TASK_ORCHESTRATION_MAX_ITERATIONS_REACHED` e retornava, **deixando a task no
+status `DONE`**.
 
 **Fluxo com o bug:**
 
@@ -129,12 +130,13 @@ Task ITERATIVE com max_iterations=3, validação nunca passa:
 
 **Violação de invariante:**
 
-O invariante I1 afirma: "status=DONE implica que a task cumpriu seus critérios de qualidade".
-Com o bug, `status=DONE` pode significar "executou N vezes sem passar validação".
+O invariante I1 afirma: "status=DONE implica que a task cumpriu seus critérios de qualidade". Com o
+bug, `status=DONE` pode significar "executou N vezes sem passar validação".
 
 **Inconsistência com o bloco "hopeless":**
 
 O bloco imediatamente acima (score < MIN_SCORE_THRESHOLD) corretamente marca como FAILED:
+
 ```javascript
 // Bloco hopeless (correto):
 this._safeUpdateTask(taskId, {
@@ -145,11 +147,12 @@ this._safeUpdateTask(taskId, {
 ```
 
 Mas o bloco max_iterations apenas registrava o evento sem atualizar o status:
+
 ```javascript
 // ANTES (bug):
 if (nextIteration >= maxIterations) {
-    recordEvent({ eventType: 'TASK_ORCHESTRATION_MAX_ITERATIONS_REACHED' });
-    return;  // ← task fica DONE sem atualizar status
+  recordEvent({ eventType: 'TASK_ORCHESTRATION_MAX_ITERATIONS_REACHED' });
+  return; // ← task fica DONE sem atualizar status
 }
 ```
 
@@ -173,32 +176,32 @@ if (nextIteration >= maxIterations) {
 
 ## Áreas Verificadas e Sem Bugs
 
-| Área | Verificado | Resultado |
-|------|-----------|-----------|
-| `QueueWorker.tick()` — inflight count | ✅ | OK: query correta, loop de slots funciona |
-| `QueueWorker` — max_attempts check | ✅ | OK: `>= maxAttempts` correto (`attempts` = tentativas JÁ feitas) |
-| `QueueWorker` — correlationId como attemptId | ✅ | OK: gerado antes de upsertAttempt, consistente |
-| `_handleIterative` — update de estado antes de retry | ✅ | OK: state persisted, então task rearmed |
-| `_handleMultiStep` — propagação de accumulatedContext | ✅ | OK: contexto propagado para task filha corretamente |
-| `buildWorkflowNextStepTask` — task_id em inputs | ✅ | OK: usa taskId do step correto do accumulatedContext |
-| `_setOrReplaceInput` — semântica AND vs OR | ✅ | OK: AND correto para o caso de uso (replace por (type, label)) |
-| `TaskExecutionOrchestrator` — idempotência | ✅ | OK: processedExecutionEvents guarda por (taskId, correlationId) |
-| `TaskExecutionOrchestrator` — stale events | ✅ | OK: correlationId mismatch descarta evento |
-| Lock management no TaskOrchestrationWorker | ✅ | OK: resilientLock.release em finally |
+| Área                                                  | Verificado | Resultado                                                        |
+| ----------------------------------------------------- | ---------- | ---------------------------------------------------------------- |
+| `QueueWorker.tick()` — inflight count                 | ✅         | OK: query correta, loop de slots funciona                        |
+| `QueueWorker` — max_attempts check                    | ✅         | OK: `>= maxAttempts` correto (`attempts` = tentativas JÁ feitas) |
+| `QueueWorker` — correlationId como attemptId          | ✅         | OK: gerado antes de upsertAttempt, consistente                   |
+| `_handleIterative` — update de estado antes de retry  | ✅         | OK: state persisted, então task rearmed                          |
+| `_handleMultiStep` — propagação de accumulatedContext | ✅         | OK: contexto propagado para task filha corretamente              |
+| `buildWorkflowNextStepTask` — task_id em inputs       | ✅         | OK: usa taskId do step correto do accumulatedContext             |
+| `_setOrReplaceInput` — semântica AND vs OR            | ✅         | OK: AND correto para o caso de uso (replace por (type, label))   |
+| `TaskExecutionOrchestrator` — idempotência            | ✅         | OK: processedExecutionEvents guarda por (taskId, correlationId)  |
+| `TaskExecutionOrchestrator` — stale events            | ✅         | OK: correlationId mismatch descarta evento                       |
+| Lock management no TaskOrchestrationWorker            | ✅         | OK: resilientLock.release em finally                             |
 
 ---
 
 ## Sobre a Skill `semantic-logic-audit`
 
-Esta auditoria inaugurou a skill `semantic-logic-audit`. Os dois bugs encontrados são
-**exemplares** do tipo de bug que a skill cobre:
+Esta auditoria inaugurou a skill `semantic-logic-audit`. Os dois bugs encontrados são **exemplares**
+do tipo de bug que a skill cobre:
 
-- **BUG-SEM-1**: não aparece em lint, não tem padrão grep identificável, passa em todos os
-  testes unitários. É visível apenas quando se entende a semântica do `INSERT OR IGNORE`
-  e a relação entre dedupKey e o sistema de threshold.
+- **BUG-SEM-1**: não aparece em lint, não tem padrão grep identificável, passa em todos os testes
+  unitários. É visível apenas quando se entende a semântica do `INSERT OR IGNORE` e a relação entre
+  dedupKey e o sistema de threshold.
 
-- **BUG-SEM-2**: não aparece em lint ou grep. É visível apenas quando se entende o invariante
-  "DONE implica qualidade aprovada" e se compara com o comportamento do bloco "hopeless" vizinho.
+- **BUG-SEM-2**: não aparece em lint ou grep. É visível apenas quando se entende o invariante "DONE
+  implica qualidade aprovada" e se compara com o comportamento do bloco "hopeless" vizinho.
 
 Ambos só foram encontrados por leitura profunda com foco no comportamento esperado vs. real.
 
@@ -206,6 +209,6 @@ Ambos só foram encontrados por leitura profunda com foco no comportamento esper
 
 ## Security Summary
 
-Nenhuma vulnerabilidade de segurança encontrada neste escopo. Os bugs corrigidos são
-de natureza operacional (estado incorreto, threshold inoperante), sem impacto na superfície
-de segurança do sistema.
+Nenhuma vulnerabilidade de segurança encontrada neste escopo. Os bugs corrigidos são de natureza
+operacional (estado incorreto, threshold inoperante), sem impacto na superfície de segurança do
+sistema.

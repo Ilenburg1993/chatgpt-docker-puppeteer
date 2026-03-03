@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento do subsistema de decisão e execução do runtime.  
-**Quando consultar**: ao alterar pump, execução de tarefas, políticas ou a ponte entre NERV e driver.  
+**Quando consultar**: ao alterar pump, execução de tarefas, políticas ou a ponte entre NERV e
+driver.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # KERNEL

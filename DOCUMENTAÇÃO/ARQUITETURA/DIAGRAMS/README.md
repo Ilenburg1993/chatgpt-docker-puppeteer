@@ -32,7 +32,8 @@
 
 ## Regras de manutenção
 
-- A fonte visual deve permanecer coerente com [ARCHITECTURE_DIAGRAMS.md](../ARCHITECTURE_DIAGRAMS.md).
+- A fonte visual deve permanecer coerente com
+  [ARCHITECTURE_DIAGRAMS.md](../ARCHITECTURE_DIAGRAMS.md).
 - Se a topologia oficial mudar, atualize primeiro a fonte e depois o documento renderizado.
 - Arquivos desta pasta são fonte de manutenção, não substituem a explicação textual do hub de
   arquitetura.

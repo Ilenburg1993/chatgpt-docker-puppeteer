@@ -14,8 +14,8 @@ a avançado) **Tempo de Leitura**: ~20 min
 
 Este documento detalha os **fluxos de dados** através do sistema `chatgpt-docker-puppeteer`: como
 informações transitam entre componentes, transformações aplicadas, e pontos de persistência.
-Complementa [ARCHITECTURE.md](./ARCHITECTURE.md) e [SYSTEM_DESIGN.md](./ESPECIALIZADOS/SYSTEM_DESIGN.md) com foco em
-**dados**, não estrutura.
+Complementa [ARCHITECTURE.md](./ARCHITECTURE.md) e
+[SYSTEM_DESIGN.md](./ESPECIALIZADOS/SYSTEM_DESIGN.md) com foco em **dados**, não estrutura.
 
 ### O Que Este Documento Cobre
 

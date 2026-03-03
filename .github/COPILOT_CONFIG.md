@@ -1,6 +1,7 @@
 # Configuração do GitHub Copilot
 
-**Propósito**: consolidar as fontes de contexto e a taxonomia permanente do ecossistema de agentes.  
+**Propósito**: consolidar as fontes de contexto e a taxonomia permanente do ecossistema de
+agentes.  
 **Status documental**: Canônico.  
 **Público**: GitHub Copilot, agentes compatíveis e mantenedores.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -57,8 +58,8 @@ Adicione ou mantenha as seguintes chaves em `.vscode/settings.json`:
 ## Taxonomia estável do repositório
 
 - `src/`: runtime do produto.
-- Dentro de `src/`, `src/agent/` é a camada de workers operacionais; `src/missions/` é o domínio
-  de missão; `agents/` na raiz é suporte externo ao runtime.
+- Dentro de `src/`, `src/agent/` é a camada de workers operacionais; `src/missions/` é o domínio de
+  missão; `agents/` na raiz é suporte externo ao runtime.
 - `tests/`: testes e harness.
 - `scripts/`: automação operacional e manutenção.
 - `DOCUMENTAÇÃO/`: documentação canônica.

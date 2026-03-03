@@ -15,7 +15,8 @@ function _asInt(raw, fallback) {
 function _safeParsePayloadJson(raw) {
     try {
         return raw ? JSON.parse(String(raw)) : {};
-    } catch (_) {
+    } catch (err) {
+        log.debug({ error: err?.message }, '[dashboard_events] _safeParsePayloadJson fallback to raw');
         return raw ?? {};
     }
 }

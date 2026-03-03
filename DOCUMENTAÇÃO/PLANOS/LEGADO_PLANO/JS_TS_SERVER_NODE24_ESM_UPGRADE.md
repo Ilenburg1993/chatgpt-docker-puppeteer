@@ -140,7 +140,8 @@ Validar manualmente no editor:
 
 Expansão futura:
 
-- mover tests e ferramentas ainda não tipadas para `tsconfig.tools.json` apenas após saneamento local
+- mover tests e ferramentas ainda não tipadas para `tsconfig.tools.json` apenas após saneamento
+  local
 - não abrir um gate vermelho massivo nesta rodada
 
 ## Rollback

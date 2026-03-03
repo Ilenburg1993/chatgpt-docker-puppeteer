@@ -179,8 +179,10 @@ function updateMission(missionId, updates = {}) {
                 : null
             : (existing.completed_at_ms ?? null);
 
-    db.prepare(
-        `
+    // Optimistic lock: verify no concurrent update occurred between SELECT and UPDATE
+    const result = db
+        .prepare(
+            `
         UPDATE missions SET
             title = @title,
             description = @description,
@@ -191,20 +193,31 @@ function updateMission(missionId, updates = {}) {
             updated_at_ms = @updated_at_ms,
             started_at_ms = @started_at_ms,
             completed_at_ms = @completed_at_ms
-        WHERE id = @id
+        WHERE id = @id AND updated_at_ms = @expected_updated_at_ms
     `
-    ).run({
-        id: missionId,
-        title: updates.title !== undefined ? String(updates.title) : existing.title,
-        description: updates.description !== undefined ? String(updates.description || '') : existing.description,
-        status,
-        autonomy_mode,
-        policy_json: JSON.stringify(policy),
-        context_json: JSON.stringify(context ?? {}),
-        updated_at_ms: now,
-        started_at_ms: startedAtMs,
-        completed_at_ms: completedAtMs,
-    });
+        )
+        .run({
+            id: missionId,
+            title: updates.title !== undefined ? String(updates.title) : existing.title,
+            description: updates.description !== undefined ? String(updates.description || '') : existing.description,
+            status,
+            autonomy_mode,
+            policy_json: JSON.stringify(policy),
+            context_json: JSON.stringify(context ?? {}),
+            updated_at_ms: now,
+            started_at_ms: startedAtMs,
+            completed_at_ms: completedAtMs,
+            expected_updated_at_ms: existing.updated_at_ms,
+        });
+
+    if (result.changes === 0) {
+        // Concurrent modification detected — throw conflict error for caller to handle
+        const error = new Error('Concurrent modification detected — mission was updated by another process');
+        error.code = 'CONFLICT';
+        error.status = 409;
+        error.missionId = missionId;
+        throw error;
+    }
 
     return getMissionById(missionId);
 }
