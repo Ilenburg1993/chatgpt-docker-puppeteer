@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chatgpt-docker-puppeteer.local/schemas/typing/jsdoc-coverage-report.schema.json",
+  "title": "JSDoc Coverage Report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "scope",
+    "files_scanned",
+    "files_with_exports",
+    "exports_total",
+    "exports_with_jsdoc",
+    "coverage_pct",
+    "functions_total",
+    "functions_with_returns_tag",
+    "functions_missing_returns_tag",
+    "function_returns_coverage_pct",
+    "functions_with_complete_param_tags",
+    "functions_missing_param_tags",
+    "functions_with_options_typedef",
+    "functions_missing_options_typedef",
+    "unsafe_generic_tags_total",
+    "public_symbols_using_import_types",
+    "public_symbols_using_template_tags",
+    "by_path_prefix",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "3.0.0"
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["changed", "full"]
+    },
+    "files_scanned": {
+      "type": "number"
+    },
+    "files_with_exports": {
+      "type": "number"
+    },
+    "exports_total": {
+      "type": "number"
+    },
+    "exports_with_jsdoc": {
+      "type": "number"
+    },
+    "coverage_pct": {
+      "type": "number"
+    },
+    "functions_total": {
+      "type": "number"
+    },
+    "functions_with_returns_tag": {
+      "type": "number"
+    },
+    "functions_missing_returns_tag": {
+      "type": "number"
+    },
+    "function_returns_coverage_pct": {
+      "type": "number"
+    },
+    "functions_with_complete_param_tags": {
+      "type": "number"
+    },
+    "functions_missing_param_tags": {
+      "type": "number"
+    },
+    "functions_with_options_typedef": {
+      "type": "number"
+    },
+    "functions_missing_options_typedef": {
+      "type": "number"
+    },
+    "unsafe_generic_tags_total": {
+      "type": "number"
+    },
+    "public_symbols_using_import_types": {
+      "type": "number"
+    },
+    "public_symbols_using_template_tags": {
+      "type": "number"
+    },
+    "by_path_prefix": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/pathPrefixReport"
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fileReport"
+      }
+    }
+  },
+  "$defs": {
+    "exportAssessment": {
+      "type": "object",
+      "required": [
+        "export_name",
+        "kind",
+        "has_jsdoc",
+        "tags_present",
+        "missing_tags",
+        "quality_level",
+        "line",
+        "param_count",
+        "param_tags_count",
+        "has_complete_param_tags",
+        "has_options_param",
+        "has_options_typedef",
+        "unsafe_generic_tags_count",
+        "public_any_tags_count",
+        "public_unknown_tags_count",
+        "uses_import_types",
+        "uses_template_tags"
+      ],
+      "properties": {
+        "export_name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "has_jsdoc": {
+          "type": "boolean"
+        },
+        "tags_present": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "quality_level": {
+          "type": "string",
+          "enum": ["none", "minimal", "complete"]
+        },
+        "line": {
+          "type": ["number", "null"]
+        },
+        "param_count": {
+          "type": "number"
+        },
+        "param_tags_count": {
+          "type": "number"
+        },
+        "has_complete_param_tags": {
+          "type": "boolean"
+        },
+        "has_options_param": {
+          "type": "boolean"
+        },
+        "has_options_typedef": {
+          "type": "boolean"
+        },
+        "unsafe_generic_tags_count": {
+          "type": "number"
+        },
+        "public_any_tags_count": {
+          "type": "number"
+        },
+        "public_unknown_tags_count": {
+          "type": "number"
+        },
+        "uses_import_types": {
+          "type": "boolean"
+        },
+        "uses_template_tags": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "pathPrefixReport": {
+      "type": "object",
+      "required": [
+        "files",
+        "exports_total",
+        "exports_with_jsdoc",
+        "coverage_pct",
+        "functions_total",
+        "functions_with_returns_tag",
+        "functions_missing_returns_tag",
+        "function_returns_coverage_pct",
+        "functions_with_complete_param_tags",
+        "functions_missing_param_tags",
+        "functions_with_options_typedef",
+        "functions_missing_options_typedef",
+        "unsafe_generic_tags_total",
+        "public_symbols_using_import_types",
+        "public_symbols_using_template_tags"
+      ],
+      "properties": {
+        "files": {
+          "type": "number"
+        },
+        "exports_total": {
+          "type": "number"
+        },
+        "exports_with_jsdoc": {
+          "type": "number"
+        },
+        "coverage_pct": {
+          "type": "number"
+        },
+        "functions_total": {
+          "type": "number"
+        },
+        "functions_with_returns_tag": {
+          "type": "number"
+        },
+        "functions_missing_returns_tag": {
+          "type": "number"
+        },
+        "function_returns_coverage_pct": {
+          "type": "number"
+        },
+        "functions_with_complete_param_tags": {
+          "type": "number"
+        },
+        "functions_missing_param_tags": {
+          "type": "number"
+        },
+        "functions_with_options_typedef": {
+          "type": "number"
+        },
+        "functions_missing_options_typedef": {
+          "type": "number"
+        },
+        "unsafe_generic_tags_total": {
+          "type": "number"
+        },
+        "public_symbols_using_import_types": {
+          "type": "number"
+        },
+        "public_symbols_using_template_tags": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    },
+    "fileReport": {
+      "type": "object",
+      "required": [
+        "file",
+        "exported_symbols",
+        "exports_total",
+        "exports_with_jsdoc",
+        "coverage_pct",
+        "functions_total",
+        "functions_with_returns_tag",
+        "functions_missing_returns_tag",
+        "function_returns_coverage_pct",
+        "functions_with_complete_param_tags",
+        "functions_missing_param_tags",
+        "functions_with_options_typedef",
+        "functions_missing_options_typedef",
+        "unsafe_generic_tags_total",
+        "public_symbols_using_import_types",
+        "public_symbols_using_template_tags"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "exported_symbols": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exportAssessment"
+          }
+        },
+        "exports_total": {
+          "type": "number"
+        },
+        "exports_with_jsdoc": {
+          "type": "number"
+        },
+        "coverage_pct": {
+          "type": "number"
+        },
+        "functions_total": {
+          "type": "number"
+        },
+        "functions_with_returns_tag": {
+          "type": "number"
+        },
+        "functions_missing_returns_tag": {
+          "type": "number"
+        },
+        "function_returns_coverage_pct": {
+          "type": "number"
+        },
+        "functions_with_complete_param_tags": {
+          "type": "number"
+        },
+        "functions_missing_param_tags": {
+          "type": "number"
+        },
+        "functions_with_options_typedef": {
+          "type": "number"
+        },
+        "functions_missing_options_typedef": {
+          "type": "number"
+        },
+        "unsafe_generic_tags_total": {
+          "type": "number"
+        },
+        "public_symbols_using_import_types": {
+          "type": "number"
+        },
+        "public_symbols_using_template_tags": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

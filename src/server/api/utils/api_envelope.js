@@ -2,7 +2,30 @@
 import { Buffer } from 'node:buffer';
 
 /**
- * Função exportada: ok.
+ * @typedef {Record<string, unknown> & { id?: string|null }} ApiRequestLike
+ */
+
+/**
+ * @typedef {{
+ *   json(payload: unknown): void,
+ *   status(code: number): ApiResponseLike
+ * }} ApiResponseLike
+ */
+
+/**
+ * @typedef {Record<string, unknown> & {
+ *   code?: string,
+ *   error?: string,
+ *   details?: unknown
+ * }} FailureOptions
+ */
+
+/**
+ * Sends a successful JSON envelope with the request identifier.
+ * @param {ApiResponseLike} res
+ * @param {ApiRequestLike} req
+ * @param {unknown} data
+ * @param {Record<string, unknown>} [meta={}]
  * @returns {void}
  */
 function ok(res, req, data, meta = {}) {
@@ -15,11 +38,15 @@ function ok(res, req, data, meta = {}) {
 }
 
 /**
- * Função exportada: fail.
+ * Sends a failed JSON envelope with a stable error shape.
+ * @param {ApiResponseLike} res
+ * @param {ApiRequestLike} req
+ * @param {number} httpStatus
+ * @param {FailureOptions} [options={}]
  * @returns {void}
  */
 function fail(res, req, httpStatus, options = {}) {
-    const { code, error, details } = /** @type {{code?: string, error?: string, details?: any}} */ (options);
+    const { code, error, details } = options;
     res.status(httpStatus).json({
         success: false,
         request_id: req.id,
@@ -30,8 +57,9 @@ function fail(res, req, httpStatus, options = {}) {
 }
 
 /**
- * Função exportada: encodeCursor.
- * @returns {any}
+ * Encodes a cursor object as base64 JSON.
+ * @param {Record<string, unknown>|null|undefined} obj
+ * @returns {string|null}
  */
 function encodeCursor(obj) {
     if (!obj || typeof obj !== 'object') return null;
@@ -44,23 +72,25 @@ function encodeCursor(obj) {
 }
 
 /**
- * Função exportada: decodeCursor.
- * @returns {any}
+ * Decodes a base64 cursor payload into an object.
+ * @param {unknown} cursor
+ * @returns {Record<string, unknown>|null}
  */
 function decodeCursor(cursor) {
     if (!cursor) return null;
     try {
         const raw = Buffer.from(String(cursor), 'base64').toString('utf8');
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : null;
+        const parsed = /** @type {unknown} */ (JSON.parse(raw));
+        return parsed && typeof parsed === 'object' ? /** @type {Record<string, unknown>} */ (parsed) : null;
     } catch (_) {
         return null;
     }
 }
 
 /**
- * Função exportada: parseIncludeParam.
- * @returns {any}
+ * Parses a comma-separated include list into a normalized set.
+ * @param {unknown} raw
+ * @returns {Set<string>}
  */
 function parseIncludeParam(raw) {
     const value = raw ? String(raw) : '';

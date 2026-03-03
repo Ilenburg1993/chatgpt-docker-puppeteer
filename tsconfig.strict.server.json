@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.server.tsbuildinfo",
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "useUnknownInCatchVariables": true,
+    "composite": true
+  },
+  "include": ["src/server/api/utils/api_envelope.js"]
+}

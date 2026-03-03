@@ -1,30 +1,20 @@
-# Contrato TS Server (Node 24 + ESM + NodeNext)
+# tsserver Wrapper Contract
 
-## Invariantes obrigatórios
+The repository does not use raw `tsserver` JSON over stdio as the user-facing contract.
 
-1. `tsconfig.json` é canônico; `jsconfig.json` apenas herda.
-2. `module=NodeNext` e `moduleResolution=NodeNext`.
-3. Arquivos ESM usam `import/export`; sem `require/module.exports`.
-4. Import relativo em ESM com extensão `.js`.
-5. `allowJs=true` e `checkJs=true` para cobertura do código JS do projeto.
-6. Tipos globais e augmentations em `src/types/**/*.d.ts`.
+Instead, it exposes a local wrapper with a smaller operation set defined by:
 
-## Critérios de compatibilidade TS Server
+- [`schemas/typing/tsserver-tool-contract.schema.json`](../../../../schemas/typing/tsserver-tool-contract.schema.json)
+- [`src/integration/lsp/tsserver-daemon.mjs`](../../../../src/integration/lsp/tsserver-daemon.mjs)
 
-1. Diagnóstico do editor deve ser reproduzível por `tsc -p tsconfig.json`.
-2. Mudanças de `paths` no `tsconfig` devem refletir aliases runtime válidos.
-3. Símbolos exportados/importados devem resolver sem ambiguidade CJS/ESM.
-4. Ajustes em `jsconfig` não podem divergir semântica de `compilerOptions` canônicos.
+Authoritative semantic source:
 
-## Anti-padrões
+- `node_modules/typescript/lib/typescript.d.ts`
+- namespace `ts.server.protocol`
+- symbol `CommandTypes`
 
-- Import sem extensão em arquivo ESM NodeNext.
-- Tipo implícito em borda de API pública (handlers, adapters, services).
-- Cast duplo (`/** @type {any} */ (...)`) para suprimir erro sem causa tratada.
-- `@ts-ignore` sem justificativa e sem issue de rastreio.
+Rule:
 
-## Checklist rápido
-
-- `npm run -s typecheck:node`
-- `npm run -s lint`
-- `npm run -s test:unit`
+- keep the wrapper schema aligned with the daemon;
+- keep the skill docs aligned with both;
+- do not document operations that do not exist in the daemon dispatch table.

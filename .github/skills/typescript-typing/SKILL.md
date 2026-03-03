@@ -1,161 +1,68 @@
 ---
 name: typescript-typing
 description:
-  Adicione tipagem TypeScript robusta (interfaces, types, generics) em JS via JSDoc ou migração
-  progressiva para TS. Use quando o pedido envolver "tipar", "TypeScript", "interface", "type",
-  "migração TS", "definir tipos", ou "fortalecer sistema de tipos" no projeto. Siga o padrão de
-  @typedef do projeto e use @ts-check onde apropriado.
+  Incremental TypeScript typing for a JS-first repository. Use for JSDoc, shared typedefs, .d.ts
+  promotion, declaration validation, and safer narrowing without broad TS migration.
 license: MIT
 ---
 
-# Skill — TypeScript Typing (Rigorosa e Robusta)
+# Skill — TypeScript Typing (JS-First)
 
-## Objetivo
+## Overview
 
-Adicionar tipagem robusta ao código JavaScript do projeto:
+This skill governs incremental typing in a JS-first codebase.
 
-- **Interfaces e Types**: Definir estruturas de dados
-- **Generics**: Para funções e classes genéricas
-- **Unions e Intersections**: Para tipos variantes
-- **Type Guards**: Para narrowing de tipos
-- **Migração progressiva**: JS → TS com JSDoc
+The default path is:
 
-## Premissas do projeto (obrigatórias)
+- JSDoc in source files
+- `// @ts-check`
+- shared `.d.ts` only when a type is reused across modules
+- declaration validation through `emitDeclarationOnly`
 
-- **Runtime:** Node.js 24
-- **Módulos:** **ESM** (`import`/`export`)
-- **Padrão de tipos:** JSDoc com `@typedef`, `@type`, `@template`
-- **TypeScript:** Suportado via `// @ts-check` e arquivos `.ts`
+## When To Use
 
-## Quando invocar (gatilhos)
+- Adding or strengthening types in JavaScript
+- Extracting repeated contracts into shared typedefs or `.d.ts`
+- Replacing `any` with something narrower
+- Building type guards and discriminated unions
+- Aligning static typing with JSON Schema or runtime schema boundaries
 
-Invocar quando o usuário pedir ou o contexto exigir:
+## When Not To Use
 
-- "tipar", "TypeScript", "interface", "type"
-- "migração TS", "migrar para TypeScript"
-- "definir tipos", "fortalecer sistema de tipos"
-- "generics", "union type", "type guard"
-- objetos sem tipagem (identificados na análise de variáveis)
+- The task is purely documentation with no structural type change
+- The task is strict-lane stabilization across configs; use `typing-node24-esm-tsserver`
 
-Não invocar quando:
+## Inputs / Preconditions
 
-- o usuário quer apenas explicação conceitual
-- o arquivo já tem tipagem robusta e consistente
+- Confirm whether the type is local or shared
+- Prefer existing contracts in `src/types/**/*.d.ts` when they already exist
+- Keep runtime behavior unchanged unless the task explicitly asks otherwise
 
-## Regras obrigatórias (não negociáveis)
+## Workflow
 
-### 1. Preferir Interfaces para objetos
+1. Start in JS with JSDoc.
+2. Narrow `unknown` with type guards or shape checks instead of dropping to `any`.
+3. Promote only genuinely shared types to `src/types/**/*.d.ts`.
+4. Keep file-local types local when they serve one module.
+5. Use declaration emit (`typecheck:declarations`) to validate public JS APIs.
+6. Align JSON payload artifacts with JSON Schema, not with ad-hoc object comments alone.
 
-```javascript
-/**
- * @typedef {Object} TaskConfig
- * @property {string} taskId
- * @property {number} priority
- * @property {boolean} isEnabled
- */
-```
+## Guardrails
 
-### 2. Usar Types para uniões e interseções
+- JS-first, TS later: do not migrate files to `.ts` unless there is a concrete payoff.
+- Do not replace dynamic but valid contracts with fake certainty.
+- Do not spread identical typedefs across multiple files.
+- Do not introduce `@ts-ignore`.
 
-```javascript
-/** @typedef {'PENDING'|'ACTIVE'|'TERMINATED'} TaskState */
+## Validation / Done Criteria
 
-/** @typedef {{
- *   id: string,
- *   status: TaskState
- * } & BaseConfig} TaskWithBase */
-```
+- Types are narrower than `any` where feasible.
+- Shared types live in one place.
+- Public contracts stay consistent with declaration emit and schema layers.
+- `typecheck:repo` remains green.
 
-### 3. Generics para funções genéricas
+## Related Skills
 
-```javascript
-/**
- * @template T
- * @param {T[]} items
- * @returns {T | undefined}
- */
-function first(items) {
-  return items[0];
-}
-```
-
-### 4. Type Guards para narrowing
-
-```javascript
-/**
- * @param {unknown} value
- * @returns {value is string}
- */
-function isString(value) {
-  return typeof value === 'string';
-}
-```
-
-### 5. Nunca usar `any`
-
-- Usar `unknown` para tipos genéricos
-- Usar `never` para tipos impossíveis
-- Usar unions para tipos variantes
-
-### 6. Consistência com constantes existentes
-
-- Usar ENUMs de `#core/constants` quando possível
-- Manter consistência de nomenclatura
-
-## Procedimento (passo a passo)
-
-### 1) Análise do código-alvo
-
-- Identificar objetos e funções que precisam de tipagem
-- Verificar se já existem tipos canônicos no projeto
-- Mapear dependências de tipos
-
-### 2) Definir tipos no topo do arquivo
-
-Após imports:
-
-- `@typedef` para objetos
-- `@type` para aliases
-- `@template` para generics
-
-### 3) Aplicar tipos às funções/classes
-
-- Parâmetros tipados
-- Retornos tipados
-- Propriedades de classes
-
-### 4) Testar com @ts-check
-
-- Habilitar `// @ts-check` se não existir
-- Resolver warnings com melhores tipos
-- Não usar `any` para "silenciar"
-
-## Padrões de nomenclatura
-
-| Tipo      | Padrão                | Exemplo                     |
-| --------- | --------------------- | --------------------------- |
-| Interface | PascalCase descritivo | `TaskConfig`, `DriverState` |
-| Type      | PascalCase descritivo | `TaskStateUnion`            |
-| Enum      | SCREAMING_SNAKE_CASE  | `TASK_STATES`               |
-| Generic   | T, U, K, V            | `@template T`               |
-
-## Formato de entrega (output)
-
-Ao aplicar no arquivo:
-
-- Incluir diff se pedido "corrigir/atualizar"
-- Caso contrário, devolver arquivo completo
-- Incluir 3–7 bullets finais:
-  - tipos criados/definicões
-  - interfaces adicionadas
-  - generics implementados
-  - type guards (se aplicável)
-
-## Critérios de aceitação (Definition of Done)
-
-- Todas as funções/export têm tipagem de parâmetros e retorno
-- Objetos têm @typedef com @property
-- Generics usados onde apropriado
-- Nenhum `any` novo
-- Consistência com tipos existentes do projeto
-- @ts-check funcionando sem erros críticos
+- [`../jsdoc-authoring/SKILL.md`](../jsdoc-authoring/SKILL.md)
+- [`../typing-node24-esm-tsserver/SKILL.md`](../typing-node24-esm-tsserver/SKILL.md)
+- [`../schema-contract-governance/SKILL.md`](../schema-contract-governance/SKILL.md)

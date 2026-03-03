@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Sample JavaScript file for testing code chunking
  * This file contains various code patterns that should be detected
@@ -7,6 +8,17 @@ export const CONFIG_VALUE = 42;
 
 /** Constante/valor exportado: CHROME_PROXY_PORT. */
 export const CHROME_PROXY_PORT = 9224;
+
+/**
+ * @typedef {object} ConfigOptions
+ * @property {number} [maxSize] - Maximum size
+ * @property {boolean} [enabled] - Enable/disable flag
+ * @property {number} [timeout] - Timeout in milliseconds
+ */
+
+/**
+ * @typedef {Record<string, unknown> & { processed: true }} ProcessedItem
+ */
 
 /**
  * Main function that does something important
@@ -20,11 +32,18 @@ export function processInput(input) {
 
 /** Classe exportada: DataProcessor. */
 export class DataProcessor {
+    /**
+     * @param {ConfigOptions} [options={}]
+     */
     constructor(options = {}) {
         this.maxSize = options.maxSize || 1000;
         this.enabled = options.enabled !== false;
     }
 
+    /**
+     * @param {Array<Record<string, unknown>>} data
+     * @returns {Promise<ProcessedItem[]>}
+     */
     async process(data) {
         if (!this.enabled) {
             throw new Error('Processor is disabled');
@@ -34,6 +53,10 @@ export class DataProcessor {
         return result;
     }
 
+    /**
+     * @param {Array<Record<string, unknown>>} data
+     * @returns {ProcessedItem[]}
+     */
     transform(data) {
         return data.map(item => ({
             ...item,
@@ -41,13 +64,6 @@ export class DataProcessor {
         }));
     }
 }
-
-/**
- * @typedef {Object} ConfigOptions
- * @property {number} [maxSize] - Maximum size
- * @property {boolean} [enabled] - Enable/disable flag
- * @property {number} [timeout] - Timeout in milliseconds
- */
 
 function internalHelper() {
     return 'helper';

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -172,6 +173,8 @@ for (const item of selected) {
 }
 
 const out = {
+    mode: 'triage-only',
+    schema_version: String(report.schema_version || 'unknown'),
     report: path.relative(process.cwd(), reportPath).replace(/\\/g, '/'),
     apply: applyMode,
     total_candidate_files: targets.length,

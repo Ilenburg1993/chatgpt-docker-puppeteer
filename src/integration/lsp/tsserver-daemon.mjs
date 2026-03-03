@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'node:fs';
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
@@ -524,8 +525,8 @@ class TsserverDaemon {
 let singleton = null;
 
 /**
- * Função exportada: getTsserverDaemon.
- * @returns {any}
+ * Returns the singleton wrapper around the local tsserver-backed language service.
+ * @returns {import('./tsserver-contract.d.ts').TsserverDaemonFacade}
  */
 export function getTsserverDaemon() {
     if (!singleton) {
@@ -538,8 +539,9 @@ export function getTsserverDaemon() {
 }
 
 /**
- * Função exportada: startTsserverDaemon.
- * @returns {Promise<any>}
+ * Starts the singleton daemon and applies the optional timeout override.
+ * @param {import('./tsserver-contract.d.ts').TsserverDaemonOptions} [options={}]
+ * @returns {Promise<import('./tsserver-contract.d.ts').TsserverStartResult>}
  */
 export async function startTsserverDaemon(options = {}) {
     const daemon = getTsserverDaemon();
@@ -550,8 +552,8 @@ export async function startTsserverDaemon(options = {}) {
 }
 
 /**
- * Função exportada: stopTsserverDaemon.
- * @returns {Promise<any>}
+ * Stops the singleton daemon and aborts any queued in-flight request.
+ * @returns {Promise<import('./tsserver-contract.d.ts').TsserverStopResult>}
  */
 export async function stopTsserverDaemon() {
     if (!singleton) return { stopped: true };

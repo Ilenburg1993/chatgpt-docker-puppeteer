@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chatgpt-docker-puppeteer.local/schemas/typing/tsserver-tool-contract.schema.json",
+  "title": "Tsserver Tool Contract",
+  "type": "object",
+  "required": ["schema_version", "operation", "params"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "definition",
+        "references",
+        "hover",
+        "document_symbols",
+        "workspace_symbols",
+        "diagnostics",
+        "code_actions",
+        "completion",
+        "updateFile",
+        "apply_code_action"
+      ]
+    },
+    "params": {
+      "type": "object"
+    },
+    "result": {
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "definition"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/positionRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "references"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/positionRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "hover"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/positionRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "document_symbols"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/fileRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "workspace_symbols"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/workspaceSymbolsRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "diagnostics"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/fileRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "completion"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/positionRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "code_actions"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/codeActionsRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "updateFile"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/updateFileRequest"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "apply_code_action"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "$ref": "#/$defs/applyCodeActionRequest"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "fileRequest": {
+      "type": "object",
+      "required": ["filePath"],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "positionRequest": {
+      "type": "object",
+      "required": ["filePath", "line", "character"],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        },
+        "line": {
+          "type": "number",
+          "minimum": 1
+        },
+        "character": {
+          "type": "number",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "workspaceSymbolsRequest": {
+      "type": "object",
+      "required": ["query"],
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "maxResults": {
+          "type": "number",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "codeActionsRequest": {
+      "type": "object",
+      "required": ["filePath", "line", "character"],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        },
+        "line": {
+          "type": "number",
+          "minimum": 1
+        },
+        "character": {
+          "type": "number",
+          "minimum": 1
+        },
+        "endLine": {
+          "type": "number",
+          "minimum": 1
+        },
+        "endCharacter": {
+          "type": "number",
+          "minimum": 1
+        },
+        "maxResults": {
+          "type": "number",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "updateFileRequest": {
+      "type": "object",
+      "required": ["filePath", "content"],
+      "properties": {
+        "filePath": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "applyCodeActionRequest": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["preview", "apply"]
+        },
+        "confirmationToken": {
+          "type": "string"
+        },
+        "action": {
+          "type": "object",
+          "required": ["edits"],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "edits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["filePath", "start", "length", "newText"],
+                "properties": {
+                  "filePath": {
+                    "type": "string"
+                  },
+                  "start": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "length": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "newText": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "x-tool-contract": {
+    "protocol_source": {
+      "typescript_dts": "node_modules/typescript/lib/typescript.d.ts",
+      "namespace": "ts.server.protocol",
+      "command_types_symbol": "CommandTypes"
+    },
+    "limits": {
+      "timeout_env": "LSP_TOOL_TIMEOUT_MS",
+      "max_results_env": "LSP_MAX_RESULTS",
+      "max_patch_bytes": 204800
+    },
+    "operations": {
+      "definition": {
+        "request": "#/$defs/positionRequest",
+        "response": "location[]"
+      },
+      "references": {
+        "request": "#/$defs/positionRequest",
+        "response": "reference[]"
+      },
+      "hover": {
+        "request": "#/$defs/positionRequest",
+        "response": "hover | null"
+      },
+      "document_symbols": {
+        "request": "#/$defs/fileRequest",
+        "response": "documentSymbol[]"
+      },
+      "workspace_symbols": {
+        "request": "#/$defs/workspaceSymbolsRequest",
+        "response": "workspaceSymbol[]"
+      },
+      "diagnostics": {
+        "request": "#/$defs/fileRequest",
+        "response": "diagnostic[]"
+      },
+      "code_actions": {
+        "request": "#/$defs/codeActionsRequest",
+        "response": "codeAction[]"
+      },
+      "completion": {
+        "request": "#/$defs/positionRequest",
+        "response": "completion[]"
+      },
+      "updateFile": {
+        "request": "#/$defs/updateFileRequest",
+        "response": "updateResult"
+      },
+      "apply_code_action": {
+        "request": "#/$defs/applyCodeActionRequest",
+        "response": "previewResult | applyResult"
+      }
+    }
+  },
+  "additionalProperties": true
+}

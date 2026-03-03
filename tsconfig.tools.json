@@ -16,6 +16,10 @@
     "scripts/analysis/jsdoc_coverage_cli.mjs",
     "scripts/analysis/jsdoc_coverage_engine.mjs",
     "scripts/analysis/jsdoc_backfill_missing_exports.mjs",
+    "scripts/analysis/typing_hardening_audit.mjs",
+    "scripts/analysis/tsserver_contract_audit.mjs",
+    "scripts/ci/verify-github-workflows.mjs",
+    "scripts/ci/verify-skills-governance.mjs",
     "eslint.config.mjs",
     ".puppeteerrc.cjs"
   ],

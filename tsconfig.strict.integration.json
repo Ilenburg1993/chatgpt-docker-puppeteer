@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.integration.tsbuildinfo",
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "useUnknownInCatchVariables": true,
+    "composite": true
+  },
+  "include": ["src/integration/lsp/tsserver-contract.d.ts"]
+}

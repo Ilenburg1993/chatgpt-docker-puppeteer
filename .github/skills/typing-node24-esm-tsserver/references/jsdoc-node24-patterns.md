@@ -1,67 +1,17 @@
-# Padrões JSDoc para Node 24 ESM
+# JSDoc Node 24 Patterns
 
-## Tipar função simples
+Preferred phase 2 patterns:
 
-```js
-/**
- * @param {string} id
- * @returns {Promise<{ ok: boolean, id: string }>}
- */
-export async function loadById(id) {
-  return { ok: true, id };
-}
-```
+- `@typedef {object} Options` plus `@property`
+- `@returns {Promise<T>}` for async APIs
+- `@template T` only when the API is actually generic
+- inline `import('./file').Type` or `@import` for shared types
+- `@satisfies` for object literals that must match a stable shared contract
 
-## Typedef reutilizável
+Avoid in public contracts:
 
-```js
-/**
- * @typedef {object} ShutdownResult
- * @property {boolean} ok
- * @property {number} durationMs
- * @property {string[]} warnings
- */
-```
-
-## Callback/eventos
-
-```js
-/**
- * @callback OnStateChange
- * @param {{ phase: string, progress: number }} evt
- * @returns {void}
- */
-```
-
-## Genéricos em JS
-
-```js
-/**
- * @template T
- * @param {T} value
- * @returns {T}
- */
-export function identity(value) {
-  return value;
-}
-```
-
-## Satisfies para shape de configuração
-
-```js
-/** @satisfies {{ mode: 'quick'|'deep', retries: number }} */
-const AUDIT_OPTIONS = { mode: 'quick', retries: 2 };
-```
-
-## Import de tipo em JSDoc
-
-```js
-/** @typedef {import('#server/engine/lifecycle.js').LifecycleState} LifecycleState */
-```
-
-## Regras práticas
-
-1. Tipar fronteiras: entrada/saída de módulo, handlers, adapters.
-2. Não tipar em excesso dentro de bloco local trivial.
-3. Extrair typedef quando o objeto aparece 2+ vezes.
-4. Para união literal, preferir enum-like constante + typedef derivado.
+- `Object`
+- `Array`
+- `Function`
+- `Promise<any>`
+- `any` unless the contract is intentionally dynamic and explicitly justified

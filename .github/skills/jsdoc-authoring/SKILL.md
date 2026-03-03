@@ -1,134 +1,71 @@
 ---
 name: jsdoc-authoring
 description:
-  Crie/revise JSDoc completo e verificável (TypeScript em JS via // @ts-check) assumindo Node.js 24
-  + ESM (import/export). Use quando o pedido envolver "adicionar JSDoc", "documentar API", "melhorar
-  IntelliSense", "tipar JS sem migrar para TS", ou padronizar contratos (params/returns/throws) em
-  módulos ESM do projeto. Rode LINT e NODE CHECK após a tipagem no arquivo.
+  Phase 2 JSDoc authoring for this repository. Use for robust JS-first contracts in Node 24 + ESM,
+  with @ts-check, explicit @param/@returns, options typedefs, and no weak public tags.
 license: MIT
 ---
 
-# Skill — JSDoc Authoring (Node 24 + ESM, rigoroso e verificável)
+# Skill — JSDoc Authoring (Phase 2)
 
-## Objetivo
+## Overview
 
-Gerar JSDoc que:
+Use this skill when the task is to author or harden JSDoc in `.js/.mjs/.cjs` without migrating the
+runtime wholesale to `.ts`.
 
-- documenta **contratos explícitos** (inputs/outputs, invariantes, side-effects)
-- melhora IntelliSense e **checagem estática** em `.js` com `// @ts-check`
-- respeita o **padrão do projeto: Node.js 24 + ESM** (`import`/`export`)
+This phase assumes:
 
-## Premissas do projeto (obrigatórias)
+- Node.js 24
+- ESM / `NodeNext`
+- `allowJs + checkJs`
+- JSDoc as the public contract layer
 
-- **Runtime:** Node.js 24
-- **Módulos:** **ESM** (NUNCA sugerir `require`, `module.exports`, `__dirname` clássico)
-- **Compatibilidade de tipos:** JSDoc deve funcionar bem com TypeScript em `checkJs`
+## When To Use
 
-## Quando invocar (gatilhos)
+- Missing or weak public JSDoc
+- Exported functions missing `@param` or `@returns`
+- Options objects documented as raw `object` / `Object`
+- Need to introduce `@import`, `@template`, or `@satisfies`
+- Need stronger IntelliSense without changing runtime semantics
 
-Invocar quando o usuário pedir ou o contexto exigir:
+## When Not To Use
 
-- “criar/adicionar jsdoc”, “documentar”, “comentar tipos”
-- “melhorar IntelliSense / autocomplete”
-- “// @ts-check”, “checkJs”, “tipar JavaScript”
-- funções com options object (`fn(params = {})`) sem typedef
-- payloads genéricos, dedup/idempotência, unidades (ms/bytes), erros implícitos
-- exports sem documentação (API pública)
+- The task is only conceptual and no file changes are needed
+- The problem is a full strict-type failure better handled by `typing-node24-esm-tsserver`
 
-Não invocar quando:
+## Inputs / Preconditions
 
-- o usuário quer apenas explicação conceitual sem alterar arquivo
-- o arquivo já tem JSDoc consistente e o pedido não é sobre docs/tipos
+- Read the target module first
+- Inventory exports before editing
+- Prefer official TypeScript-supported JSDoc, not generic JSDoc patterns that TS ignores
 
-## Regras obrigatórias (não negociáveis)
+## Workflow
 
-1. **Exports primeiro**: todo `export` (named/default) recebe JSDoc completo.
-2. **Options object ⇒ typedef**: se a função recebe objeto de opções (`params`, `options`), crie
-   `@typedef` com `@property` e use `@param {Type} params`.
-3. **Evitar `any`**: use `unknown`, `Record<string, unknown>`, uniões literais, ou genéricos
-   (`@template`) quando adequado.
-4. **Unidades explícitas**: ms vs s, bytes, etc.
-5. **Side-effects explícitos**: DB/FS/HTTP/event emit/mutações.
-6. **`@throws` só se real**: declarar apenas quando o fluxo realmente pode lançar (ou quando
-   dependências propagam).
-7. **Defaults explícitos**: documentar valores default (ex.: `tsMs=Date.now()`).
-8. **Não alterar semântica**: mudanças permitidas só para ajudar a tipagem (ex.: `/** @type */`,
-   casts pontuais), sem mudar comportamento.
-9. **ESM-only**:
-   - manter `import`/`export`
-   - se precisar de caminho, preferir `import.meta.url` + `fileURLToPath` (quando relevante)
-   - nunca orientar `__dirname`/`__filename` sem adaptação ESM
+1. Add or preserve `// @ts-check` at the top when the file is in scope.
+2. Document every exported function with complete `@param` and `@returns`.
+3. For options objects, create a named `@typedef {object}` and use it in the `@param`.
+4. Prefer `Record<string, unknown>`, unions, and local typedefs over `any`.
+5. Use `@import` or inline `import('./file').Type` when the type already exists elsewhere.
+6. Use `@template` only when the API is truly generic.
+7. Use `@satisfies` for object literals that must match a shared type without widening.
 
-## Procedimento (passo a passo)
+## Guardrails
 
-### 1) Inventário da API (ESM)
+- Do not use `Object`, `Array`, or `Function` in a public contract when a real shape is knowable.
+- Do not add `@throws` unless the code path genuinely throws or propagates.
+- Do not use generated placeholder comments as the canonical result.
+- Do not change runtime behavior just to simplify the docs.
 
-- Liste todos os exports (`export function`, `export class`, `export default`).
-- Marque quais são “públicos” vs internos.
-- Para cada export, identifique:
-  - parâmetros (incluindo defaults)
-  - retornos (sync/async)
-  - side-effects (I/O, DB, rede, eventos)
-  - erros prováveis (validação, I/O, SQL, rede)
+## Validation / Done Criteria
 
-### 2) Modelagem de tipos canônicos (no topo do arquivo)
+- Export presence remains 100% documented.
+- Exported functions have `@returns`.
+- Public parameters are fully tagged.
+- Options objects use a named typedef when applicable.
+- Public JSDoc avoids weak generic tags unless the dynamic contract is intentional.
 
-Criar `@typedef` após imports para:
+## Related Skills
 
-- tipos recorrentes (IDs, enums literais)
-- payloads (preferir `unknown` / `Record<string, unknown>`)
-- options objects (ex.: `RecordEventParams`)
-- tipos de retorno quando ajudam a leitura (`Result`, `DbRow`, etc.)
-
-### 3) Anotar exports (contrato)
-
-Para cada export:
-
-- 1–2 linhas do que faz
-- bloco “Semântica” quando houver:
-  - side-effect
-  - unidades
-  - idempotência/dedup
-- `@param`, `@returns`, `@throws` (se aplicável)
-- `@example` curto apenas se reduzir ambiguidade
-
-### 4) Helpers relevantes (privados)
-
-- Documentar apenas se codificam regra crítica (normalização, dedup, parsing, validação).
-- Evitar JSDoc prolixo em helpers triviais.
-
-### 5) Ajustes para `@ts-check` (quando necessário)
-
-- Resolver warnings com:
-  - typedefs melhores
-  - `/** @type {T} */` em variáveis
-  - casts pontuais (`/** @type {T} */ (value)`)
-- Não introduzir `any` para “silenciar”.
-
-## Padrões de escrita (JSDoc)
-
-- Preferir `@typedef {object} Name` + `@property`
-- Usar `T|null` quando `null` é permitido
-- Para payload genérico: `Record<string, unknown> | unknown`
-- Async: `@returns {Promise<T>}`
-- Se houver eventos (`EventEmitter`), documentar nomes/semântica de eventos no export público
-
-## Formato de entrega (output)
-
-Ao aplicar no arquivo:
-
-- Preferir **diff patch (unified diff)** se o pedido for “corrija/atualize”.
-- Caso contrário, devolver o arquivo completo revisado.
-- Incluir 3–7 bullets finais:
-  - typedefs criados
-  - exports documentados
-  - micro-ajustes de tipagem (se houver)
-
-## Critérios de aceitação (Definition of Done)
-
-- Todos os exports documentados.
-- Options objects tipados com typedef.
-- Nenhum `any` novo (salvo justificativa explícita e local).
-- Unidades, defaults e side-effects explícitos.
-- `@throws` correto (nem ausente quando necessário, nem inventado).
-- Nenhuma sugestão/alteração que viole Node 24 + ESM.
+- [`../typescript-typing/SKILL.md`](../typescript-typing/SKILL.md)
+- [`../typing-node24-esm-tsserver/SKILL.md`](../typing-node24-esm-tsserver/SKILL.md)
+- [`../schema-contract-governance/SKILL.md`](../schema-contract-governance/SKILL.md)

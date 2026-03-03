@@ -51,6 +51,8 @@ Cada skill canônica deve ter:
 - `documentation-governance`: auditoria, status, taxonomia, hubs e governança contínua da
   documentação
 - `readme-standardization`: criação e revisão padronizada de `README.md` por pasta
+- `schema-contract-governance`: escolha e governança das camadas de contrato entre JSDoc, `.d.ts`,
+  JSON Schema, Zod e `ts.server.protocol`
 
 ## Taxonomia de configuração e ambiente
 

@@ -1,12 +1,28 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "./tsconfig.node.json",
-  "compilerOptions": {
-    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.tsbuildinfo",
-    "strict": true,
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
-    "useUnknownInCatchVariables": true
-  },
-  "include": ["src/audit_agent/context_builder.js"]
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.strict.core.json"
+    },
+    {
+      "path": "./tsconfig.strict.server.json"
+    },
+    {
+      "path": "./tsconfig.strict.infra.json"
+    },
+    {
+      "path": "./tsconfig.strict.integration.json"
+    },
+    {
+      "path": "./tsconfig.strict.audit.json"
+    },
+    {
+      "path": "./tsconfig.strict.tools.json"
+    },
+    {
+      "path": "./tsconfig.strict.tests.json"
+    }
+  ],
+  "display": "strict workspace solution"
 }
