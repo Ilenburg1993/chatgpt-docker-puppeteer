@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 
 /**
  * @fileoverview Configuração visual do ambiente no terminal

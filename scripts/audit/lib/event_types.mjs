@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Enum canônico de eventos emitidos pelo runner de auditoria.
  * Consumido por logger, timeline de fases e análise posterior de artefatos.

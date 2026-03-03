@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Helper utilities for kernel integration tests
  * TODO: Implement actual test helpers

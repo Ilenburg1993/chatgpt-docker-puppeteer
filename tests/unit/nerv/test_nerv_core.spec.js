@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { criarNERVMock } from '../../mocks/mock_nerv.js';

@@ -1,3 +1,4 @@
+// @ts-check
 import { setTimeout as sleep } from 'node:timers/promises';
 import { buildContextPack } from './triage/context_pack.mjs';
 import { rankRootCauses } from './triage/root_cause_ranker.mjs';

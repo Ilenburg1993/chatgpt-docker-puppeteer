@@ -1,3 +1,4 @@
+// @ts-check
 /** Reexport público: default. */
 export default {
     plugins: {

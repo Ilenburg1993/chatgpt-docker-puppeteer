@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Optional: Import tools from an upstream MCP server (HTTP JSON-RPC) and register
  * them into the local Tool Registry with a namespace/prefix.

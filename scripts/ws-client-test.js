@@ -1,4 +1,5 @@
 #!/usr/bin/env node'use strict';
+// @ts-check
 
 import WebSocket from 'ws';
 

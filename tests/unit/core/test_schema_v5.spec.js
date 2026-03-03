@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { TaskSchemaV5 } from '#core/schemas/task_schema_v5';

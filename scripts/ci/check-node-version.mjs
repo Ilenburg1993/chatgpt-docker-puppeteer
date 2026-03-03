@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import process from 'node:process';
 
 const major = Number.parseInt(process.versions.node.split('.')[0], 10);

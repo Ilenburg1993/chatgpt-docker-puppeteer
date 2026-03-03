@@ -1,4 +1,5 @@
 #!/usr/bin/env node'use strict';
+// @ts-check
 
 import http from 'node:http';
 import WebSocket from 'ws';

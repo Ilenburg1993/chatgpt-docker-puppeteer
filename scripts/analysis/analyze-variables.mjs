@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Script de Análise de Variáveis e Constantes
  * Analisa todo o código-fonte e identifica variáveis, categorizando por tipo e escopo

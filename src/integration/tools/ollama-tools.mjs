@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Ollama Tools for Tool Registry (v5.1 - Cloud-first non-embedding)
  *

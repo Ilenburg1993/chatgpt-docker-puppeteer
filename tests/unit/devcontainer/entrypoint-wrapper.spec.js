@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, it } from 'node:test';
 import { strict as assert } from 'assert';
 import { execSync } from 'child_process';

@@ -1,3 +1,4 @@
+// @ts-check
 import { parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
 import { evaluateRuntimeSignals } from '../contracts/evaluate_runtime.mjs';
 import fs from 'node:fs';

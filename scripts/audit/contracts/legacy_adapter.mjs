@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @typedef {import('./load_registry.mjs').ContractDefinitionV1} ContractDefinitionV1
  */

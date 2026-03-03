@@ -1,3 +1,4 @@
+// @ts-check
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveInferencePolicy, validateInferenceRoute } from '../../../src/inference_gateway/policy_config.js';

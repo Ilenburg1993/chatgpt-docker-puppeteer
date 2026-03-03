@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @typedef {'P0'|'P1'|'P2'|'P3'} Severity
  * @typedef {'novo'|'confirmado'|'patch-proposto'|'corrigido'|'validado'|'descartado'} FindingStatus

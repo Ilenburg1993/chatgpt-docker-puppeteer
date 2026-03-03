@@ -1,3 +1,4 @@
+// @ts-check
 import { defineStore } from 'pinia';
 import { http } from '@/lib/http';
 import { formatHttpError } from '@/lib/http';

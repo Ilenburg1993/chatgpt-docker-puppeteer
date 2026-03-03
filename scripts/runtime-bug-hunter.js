@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * Runtime Bug Hunter - Foco em Cenários Críticos
  *

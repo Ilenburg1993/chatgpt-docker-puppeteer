@@ -1,3 +1,4 @@
+// @ts-check
 import puppeteer from 'puppeteer-core';
 
 import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondition, sleep } from './helpers.js';

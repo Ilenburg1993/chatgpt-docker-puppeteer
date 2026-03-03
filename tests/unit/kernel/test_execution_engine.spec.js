@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { STATUS_VALUES } from '#core/constants/tasks';

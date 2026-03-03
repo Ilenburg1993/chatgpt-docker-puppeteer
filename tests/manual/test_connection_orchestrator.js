@@ -1,3 +1,4 @@
+// @ts-check
 import { ConnectionOrchestrator, STATES } from '#infra/ConnectionOrchestrator';
 
 console.log('🔌 Teste Completo do ConnectionOrchestrator\n');

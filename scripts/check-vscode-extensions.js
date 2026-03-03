@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 

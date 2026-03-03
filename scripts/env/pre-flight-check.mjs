@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 
 /**
  * @fileoverview Validação pré-voo para ambiente de produção

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import http from 'node:http';
 import { v4 as uuidv4 } from 'uuid';
 

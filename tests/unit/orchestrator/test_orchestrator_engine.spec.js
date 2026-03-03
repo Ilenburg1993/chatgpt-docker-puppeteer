@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';

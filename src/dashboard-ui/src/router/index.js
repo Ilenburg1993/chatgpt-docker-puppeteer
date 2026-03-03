@@ -1,3 +1,4 @@
+// @ts-check
 import { createRouter, createWebHistory } from 'vue-router';
 
 /** @type {import('vue-router').RouteRecordRaw[]} */

@@ -1,3 +1,4 @@
+// @ts-check
 import { computed, ref } from 'vue';
 import { http } from '@/lib/http';
 import { useAuth } from '@/composables/useAuth';

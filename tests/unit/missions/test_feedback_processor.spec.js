@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert';
 import { describe, it, beforeEach } from 'node:test';
 import { FeedbackProcessor, FEEDBACK_CATEGORY, INJECTION_FORMAT } from '#missions/feedback_processor';

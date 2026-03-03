@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { performance } from 'node:perf_hooks';

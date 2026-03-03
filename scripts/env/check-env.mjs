@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';

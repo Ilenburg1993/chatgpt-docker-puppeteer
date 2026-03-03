@@ -1,3 +1,4 @@
+// @ts-check
 import axios from 'axios';
 
 const DEFAULT_TIMEOUT_MS = 15000;

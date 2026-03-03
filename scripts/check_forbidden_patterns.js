@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { evaluateStaticContracts } from './audit/contracts/evaluate_static.mjs';

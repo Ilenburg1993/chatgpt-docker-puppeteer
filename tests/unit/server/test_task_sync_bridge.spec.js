@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { TaskSyncBridge, UnifiedStatus } from '#server/dashboard-api/task_sync_bridge';

@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
  * @param {ReturnType<import('./root_cause_ranker.mjs').rankRootCauses>} rankedCauses

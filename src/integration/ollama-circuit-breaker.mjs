@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Circuit Breaker for Ollama API Calls
  *

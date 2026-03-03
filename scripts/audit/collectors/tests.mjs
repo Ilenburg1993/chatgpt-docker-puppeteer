@@ -1,3 +1,4 @@
+// @ts-check
 import { runCommand } from '../lib/exec.mjs';
 
 /**

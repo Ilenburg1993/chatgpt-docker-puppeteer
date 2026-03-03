@@ -1,3 +1,4 @@
+// @ts-check
 import { getTsserverDaemon, startTsserverDaemon } from '../lsp/tsserver-daemon.mjs';
 
 function formatListResult(title, list, maxPreview = 10) {

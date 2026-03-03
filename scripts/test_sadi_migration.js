@@ -1,4 +1,5 @@
 #!/usr/bin/env nodeconsole.log('Testing SADI migration...\n');
+// @ts-check
 
 try {
     // Test 1: SADI module loads

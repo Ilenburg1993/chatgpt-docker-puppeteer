@@ -1,3 +1,4 @@
+// @ts-check
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createOllamaHostSupervisor } from '../../../src/inference_gateway/ollama_host_supervisor.js';

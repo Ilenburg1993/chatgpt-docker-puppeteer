@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Minimal MCP (Model Context Protocol) JSON-RPC 2.0 client over HTTP.
  *

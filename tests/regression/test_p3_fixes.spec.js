@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';

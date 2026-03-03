@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert';
 import http from 'node:http';
 import { after, before, describe, it } from 'node:test';

@@ -1,4 +1,5 @@
 #!/usr/bin/env node'use strict';
+// @ts-check
 
 import fs from 'node:fs';
 import path from 'node:path';

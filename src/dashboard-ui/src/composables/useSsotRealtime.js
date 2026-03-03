@@ -1,3 +1,4 @@
+// @ts-check
 import { onMounted, onUnmounted } from 'vue';
 import { useSocket } from '@/composables/useSocket';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';

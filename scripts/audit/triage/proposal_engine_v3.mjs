@@ -1,3 +1,4 @@
+// @ts-check
 import { buildSuggestedDiff } from './diff_builder.mjs';
 import { scoreConfidence } from './confidence_model.mjs';
 import { buildTestPlan } from './test_planner.mjs';

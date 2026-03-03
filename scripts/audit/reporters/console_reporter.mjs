@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @param {{ runId: string, profile: string, progress: any, eta: any, phase: string, message: string }} payload
   * @returns {void}

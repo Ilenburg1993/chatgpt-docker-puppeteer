@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
 (async () => {
     try {

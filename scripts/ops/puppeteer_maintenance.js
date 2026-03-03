@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
 import fs from 'node:fs';
 import path from 'node:path';

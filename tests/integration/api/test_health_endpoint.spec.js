@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import http from 'node:http';
 
 console.log('\n=== TEST: Health Endpoint Validation ===');

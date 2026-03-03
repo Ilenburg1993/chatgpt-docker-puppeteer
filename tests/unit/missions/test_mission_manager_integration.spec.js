@@ -1,3 +1,4 @@
+// @ts-check
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs/promises';

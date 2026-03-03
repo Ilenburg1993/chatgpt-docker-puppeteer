@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 import { BLAST_RADIUS, FINDING_STATUS, FINDING_TYPES, SEVERITIES } from '../lib/schema.mjs';
 import { getMaxBugId, makeBugId, makeFingerprint } from '../lib/fingerprint.mjs';

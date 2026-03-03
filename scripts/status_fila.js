@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 
 /**
  * @fileoverview Proxy de compatibilidade para status_fila.js

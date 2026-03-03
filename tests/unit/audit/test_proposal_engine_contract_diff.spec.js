@@ -1,3 +1,4 @@
+// @ts-check
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildProposalV3 } from '../../../scripts/audit/triage/proposal_engine_v3.mjs';

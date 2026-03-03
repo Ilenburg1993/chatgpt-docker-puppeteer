@@ -1,3 +1,4 @@
+// @ts-check
 /* global document, window, CSS, Node, NodeFilter, MutationObserver, navigator, HTMLElement */
 import puppeteer from 'puppeteer-core';
 

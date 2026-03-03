@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { acquireLock, releaseLock } from '#infra/locks/lock_manager';

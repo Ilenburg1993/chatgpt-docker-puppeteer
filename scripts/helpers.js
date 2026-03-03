@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Helper utilities for scripts
  */

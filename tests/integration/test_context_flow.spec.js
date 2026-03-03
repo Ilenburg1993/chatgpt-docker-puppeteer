@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { ContextManager, CHUNKING_STRATEGY } from '#orchestrator/context_manager';

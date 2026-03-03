@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @fileoverview Chrome Proxy Service v3.1 - Production-grade HTTP/WebSocket proxy for Chrome DevTools Protocol
  *

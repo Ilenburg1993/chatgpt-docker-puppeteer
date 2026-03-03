@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Ollama Timeout & Performance Test
  *

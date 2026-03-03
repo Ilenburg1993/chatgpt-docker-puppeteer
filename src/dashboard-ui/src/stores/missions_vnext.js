@@ -1,3 +1,4 @@
+// @ts-check
 import { defineStore } from 'pinia';
 import { http, formatHttpError } from '@/lib/http';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';

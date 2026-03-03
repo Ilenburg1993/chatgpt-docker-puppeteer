@@ -1,3 +1,4 @@
+// @ts-check
 import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 
 (async () => {

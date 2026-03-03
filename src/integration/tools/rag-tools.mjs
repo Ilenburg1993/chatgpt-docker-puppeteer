@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * RAG Tools for Tool Registry
  *

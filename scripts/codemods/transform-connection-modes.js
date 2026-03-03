@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 
 function getImportPath(filePath, targetPath) {

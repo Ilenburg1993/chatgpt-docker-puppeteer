@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * MCP Upstream Stdio Handler
  *

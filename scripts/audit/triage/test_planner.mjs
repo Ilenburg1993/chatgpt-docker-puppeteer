@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
   * @returns {any}

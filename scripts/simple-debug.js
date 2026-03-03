@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 /**
  * Runtime Debug - Versão Simplificada
  * Teste básico sem Node inspect para validar funcionamento

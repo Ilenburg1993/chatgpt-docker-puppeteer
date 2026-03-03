@@ -1,3 +1,4 @@
+// @ts-check
 import { ref, computed } from 'vue';
 
 /** @typedef {{ baseUrl?: string }} UseAuditOptions */

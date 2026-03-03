@@ -1,3 +1,4 @@
+// @ts-check
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';

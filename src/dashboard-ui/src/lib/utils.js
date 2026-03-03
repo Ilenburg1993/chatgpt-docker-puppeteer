@@ -1,3 +1,4 @@
+// @ts-check
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 

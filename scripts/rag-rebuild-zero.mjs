@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import 'dotenv/config';
 import { parseArgs } from 'node:util';
 import { spawn } from 'node:child_process';

@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @param {any} finding
  * @param {{ sourceConvergence?: number, hasContract?: boolean, hasRuntimeEvidence?: boolean }} [signals]

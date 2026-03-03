@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Função exportada: requireReason.
  * @returns {any}

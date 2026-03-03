@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * @param {{ stepsTotal: number, startedAt?: number }} options
   * @returns {any}

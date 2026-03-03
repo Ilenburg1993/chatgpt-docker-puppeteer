@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Pinia Store: Tasks
  *

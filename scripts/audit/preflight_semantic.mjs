@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import { parseArgs } from 'node:util';
 import { parseJsonFromMixedOutput, runCommand } from './lib/exec.mjs';
 

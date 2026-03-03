@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'node:fs';
 
 const PRETTIER_EXT_RE = /\.(js|mjs|cjs|json|md|vue|yml|yaml|css|html)$/i;

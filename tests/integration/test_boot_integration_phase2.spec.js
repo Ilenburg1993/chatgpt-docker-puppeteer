@@ -1,3 +1,4 @@
+// @ts-check
 import assert from 'node:assert';
 import { describe, it, before } from 'node:test';
 import { MissionManager } from '#missions/mission_manager';

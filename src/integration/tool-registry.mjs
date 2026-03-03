@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Tool Registry (DRY Architecture)
  *

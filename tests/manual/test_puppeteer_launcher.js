@@ -1,3 +1,4 @@
+// @ts-check
 import puppeteer from 'puppeteer-core';
 
 (async () => {

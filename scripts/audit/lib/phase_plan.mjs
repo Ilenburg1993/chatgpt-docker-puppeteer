@@ -1,3 +1,4 @@
+// @ts-check
 import { AUDIT_PHASES } from './event_types.mjs';
 
 /**

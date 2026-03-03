@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Error Classification for Tool Execution Retry Logic
  *

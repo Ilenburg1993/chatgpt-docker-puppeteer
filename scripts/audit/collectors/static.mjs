@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 import { commandExists, parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
