@@ -44,11 +44,11 @@ function safeCall(handler, payload) {
 /**
  * Cria uma conexão física genérica.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
+ * @param {object} deps
+ * @param {object} deps.telemetry
  * Interface de telemetria do NERV.
  *
- * @param {Object} deps.adapter
+ * @param {object} deps.adapter
  * Adaptador físico concreto (ex.: IPC, socket, pipe).
  * Deve expor:
  *  - start()
@@ -56,7 +56,7 @@ function safeCall(handler, payload) {
  *  - send(frame)
  *  - onReceive(handler)
  *  - onError(handler) [opcional]
-  * @returns {any}
+  * @returns {object}
  */
 function createConnection({ telemetry, adapter }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
@@ -137,7 +137,7 @@ function createConnection({ telemetry, adapter }) {
     /**
      * Envia frame opaco pelo meio físico.
      *
-     * @param {*} frame
+     * @param {object} frame
      */
     function send(frame) {
         telemetry.emit('nerv:transport:send', {
@@ -152,7 +152,7 @@ function createConnection({ telemetry, adapter }) {
     /**
      * Registra handler de recepção de frames.
      *
-     * @param {Function} handler
+     * @param {function} handler
      */
     function onReceive(handler) {
         if (typeof handler !== 'function') {

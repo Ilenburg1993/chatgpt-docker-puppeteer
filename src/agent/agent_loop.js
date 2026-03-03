@@ -3,7 +3,7 @@ import { log } from '#core/logger';
 
 /**
  * Opções de configuração para intervalos do AgentLoop.
- * @typedef {Object} AgentLoopIntervals
+ * @typedef {object} AgentLoopIntervals
  * @property {number} [kernelMs=50] - Intervalo para kernel.step() em ms.
  * @property {number} [queueMs=250] - Intervalo para queueWorker.tick() em ms.
  * @property {number} [controlMs=500] - Intervalo para taskControlWatcher.tick() em ms.
@@ -16,22 +16,22 @@ import { log } from '#core/logger';
 
 /**
  * Opções do construtor do AgentLoop.
- * @typedef {Object} AgentLoopOptions
- * @property {Object} kernel - Instância do kernel com método step() (obrigatório).
- * @property {Object} [browserPool=null] - Pool de browsers com circuit breaker.
- * @property {Object} [queueWorker=null] - Worker da fila com método tick().
- * @property {Object} [taskControlWatcher=null] - Watcher de controle de tarefas.
- * @property {Object} [missionRunner=null] - Runner de missões.
- * @property {Object} [missionPlannerProcessor=null] - Processador de planejamento.
- * @property {Object} [attemptWatchdog=null] - Watchdog de tentativas.
- * @property {Object} [taskOrchestrationWorker=null] - Worker de orquestração.
+ * @typedef {object} AgentLoopOptions
+ * @property {object} kernel - Instância do kernel com método step() (obrigatório).
+ * @property {object} [browserPool=null] - Pool de browsers com circuit breaker.
+ * @property {object} [queueWorker=null] - Worker da fila com método tick().
+ * @property {object} [taskControlWatcher=null] - Watcher de controle de tarefas.
+ * @property {object} [missionRunner=null] - Runner de missões.
+ * @property {object} [missionPlannerProcessor=null] - Processador de planejamento.
+ * @property {object} [attemptWatchdog=null] - Watchdog de tentativas.
+ * @property {object} [taskOrchestrationWorker=null] - Worker de orquestração.
  * @property {AgentLoopIntervals} [intervals={}] - Configuração de intervalos.
  * @property {number} [baseTickMs=25] - Intervalo base do loop principal em ms.
  */
 
 /**
  * Estado interno dos próximos ticks do AgentLoop.
- * @typedef {Object} AgentLoopNextTicks
+ * @typedef {object} AgentLoopNextTicks
  * @property {number} kernelAt - Timestamp do próximo tick do kernel.
  * @property {number} queueAt - Timestamp do próximo tick da fila.
  * @property {number} controlAt - Timestamp do próximo tick do controle.

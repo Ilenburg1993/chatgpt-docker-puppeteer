@@ -87,7 +87,7 @@ class TriageError extends Error {
      *
      * @param {string} type - Tipo do erro (TIMEOUT, ABORTED, INVALID_PAGE, SCAN_FAILED, LAG_MEASUREMENT_FAILED)
      * @param {string} message - Mensagem de erro
-     * @param {Object} context - Contexto adicional
+     * @param {object} context - Contexto adicional
      */
     constructor(type, message, context) {
         super(message);
@@ -146,8 +146,8 @@ class Triage extends EventEmitter {
     /**
      * Cria uma instância do Triage.
      *
-     * @param {Object} page - Puppeteer Page instance
-     * @param {Function} page.evaluate - Método para executar código no browser
+     * @param {object} page - Puppeteer Page instance
+     * @param {function} page.evaluate - Método para executar código no browser
      * @param {string} [langCode='en'] - Código de idioma para análise semântica
      *
      * @throws {Error} Se page não for fornecido
@@ -260,7 +260,7 @@ class Triage extends EventEmitter {
      *
      * @private
      * @param {AbortSignal} signal - AbortSignal para cancelamento
-     * @returns {Promise<Object>} Resultado do diagnóstico
+     * @returns {Promise<object>} Resultado do diagnóstico
      */
     async _executeDiagnosis(signal) {
         // ✅ BUG #7 fix: AbortSignal check
@@ -562,7 +562,7 @@ class Triage extends EventEmitter {
      * 9. LOGICAL_LOOP (spinning without progress)
      *
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
-     * @returns {Promise<Object>} Diagnóstico estruturado
+     * @returns {Promise<object>} Diagnóstico estruturado
      * Propriedades do objeto retornado:
      *   - type (string): Tipo de diagnóstico
      *   - severity (string): Severidade (CRITICAL, HIGH, MEDIUM, NONE)
@@ -649,7 +649,7 @@ class Triage extends EventEmitter {
     /**
      * Retorna estatísticas de diagnóstico.
      *
-     * @returns {Object} Objeto com métricas de diagnóstico
+     * @returns {object} Objeto com métricas de diagnóstico
      * Propriedades do objeto retornado:
      *   - totalDiagnoses (number): Total de diagnósticos
      *   - successfulDiagnoses (number): Diagnósticos bem-sucedidos
@@ -729,7 +729,7 @@ class Triage extends EventEmitter {
 /**
  * Factory function para criar instância de Triage.
  *
- * @param {Object} page - Puppeteer page instance
+ * @param {object} page - Puppeteer page instance
  * @param {string} [langCode='en'] - Código de idioma
  * @returns {Triage} Nova instância
  *
@@ -746,9 +746,9 @@ function create(page, langCode = 'en') {
  *
  * Preserva a API original v1.x (function export).
  *
- * @param {Object} page - Puppeteer Page instance
+ * @param {object} page - Puppeteer Page instance
  * @param {string} [langCode='en'] - Código de idioma
- * @returns {Promise<Object>} Resultado do diagnóstico
+ * @returns {Promise<object>} Resultado do diagnóstico
  *
  * @deprecated Use new Triage(page, langCode).diagnose() instead
  *

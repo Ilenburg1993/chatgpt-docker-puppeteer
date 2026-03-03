@@ -46,7 +46,7 @@ function _rowToPolicy(row) {
 
 /**
  * Função exportada: upsertInferenceClientPolicy.
- * @returns {any}
+ * @returns {InferenceClientPolicy|null}
  */
 function upsertInferenceClientPolicy(input = {}) {
     const db = getDb();
@@ -109,7 +109,7 @@ function upsertInferenceClientPolicy(input = {}) {
 
 /**
  * Função exportada: getInferenceClientPolicyByTag.
- * @returns {any}
+ * @returns {InferenceClientPolicy|null}
  */
 function getInferenceClientPolicyByTag(clientTag) {
     const db = getDb();
@@ -120,7 +120,7 @@ function getInferenceClientPolicyByTag(clientTag) {
 
 /**
  * Função exportada: listInferenceClientPolicies.
- * @returns {any}
+ * @returns {InferenceClientPolicy[]}
  */
 function listInferenceClientPolicies({ enabledOnly = false, limit = 100 } = {}) {
     const db = getDb();

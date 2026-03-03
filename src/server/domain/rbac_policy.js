@@ -8,7 +8,7 @@ function toArray(value) {
 
 /**
  * Função exportada: hasPermission.
- * @returns {any}
+ * @returns {object}
  */
 function hasPermission(user, permission) {
     if (!user) return false;
@@ -37,7 +37,7 @@ function assertPermission(user, permission) {
 
 /**
  * Função exportada: normalizeActor.
- * @returns {any}
+ * @returns {object}
  */
 function normalizeActor(user) {
     return {

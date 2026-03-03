@@ -17,7 +17,7 @@ import { useSocket } from './useSocket';
 
 /**
  * Composable para integração real-time com stores
-  * @returns {any}
+  * @returns {object}
  */
 export function useRealtime(options = {}) {
     const { subscribe, unsubscribe, isConnected } = useSocket();

@@ -1,6 +1,9 @@
 ---
 name: typing-node24-esm-tsserver
-description: Full-Strict Roadmap orchestration skill for typing hardening in this repository. Covers strict multi-lane configs, declaration emit, JSDoc coverage, tsserver wrapper contracts, dashboard vue-tsc, and CI gates.
+description:
+  Full-Strict Roadmap orchestration skill for typing hardening in this repository. Covers strict
+  multi-lane configs, declaration emit, JSDoc coverage, tsserver wrapper contracts, dashboard
+  vue-tsc, and CI gates.
 license: MIT
 ---
 

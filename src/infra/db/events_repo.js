@@ -2,14 +2,14 @@
 import { getDb } from './sqlite.js';
 
 /**
- * @typedef {Object} RecordEventParams
+ * @typedef {object} RecordEventParams
  * @property {string} entityType - The type of entity (e.g., 'task', 'queue')
  * @property {string} entityId - The entity ID
  * @property {number} [tsMs] - Timestamp in ms (defaults to Date.now())
  * @property {string} [actorType='system'] - Actor type
- * @property {any} [actorId=null] - Actor ID
+ * @property {unknown} [actorId=null] - Actor ID
  * @property {string} eventType - Event type
- * @property {any} [payload={}] - Event payload (JSON-serializable)
+ * @property {unknown} [payload={}] - Event payload (JSON-serializable)
  * @property {string|null} [dedupKey=null] - Deduplication key
  */
 

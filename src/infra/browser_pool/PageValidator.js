@@ -56,9 +56,9 @@ class PageValidator {
      *
      * @param {Page} page - Puppeteer Page instance
      * @param {string} [target] - Target name (chatgpt, gemini, etc) para domain validation
-     * @returns {Promise<Object>} Validation result
+     * @returns {Promise<object>} Validation result
      * @property {boolean} valid - true se pode alocar, false se bloqueado
-     * @property {Array<Object>} issues - Lista de problemas detectados
+     * @property {Array<object>} issues - Lista de problemas detectados
      * @property {number} timestamp - Timestamp da validação
      *
      * @example

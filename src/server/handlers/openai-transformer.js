@@ -17,7 +17,7 @@
 /**
  * Validates OpenAI Chat Completions request body
  *
- * @param {Object} body - Request body from client
+ * @param {object} body - Request body from client
  * @throws {Error} with openaiError property if validation fails
  * @returns {true} if validation passes
  *
@@ -52,13 +52,13 @@ export function validateOpenAIRequest(body) {
 /**
  * Translates OpenAI Chat Completions request to Ollama /api/generate format
  *
- * @param {Object} openaiReq - OpenAI request body
+ * @param {object} openaiReq - OpenAI request body
  * @param {Array<{role: string, content: string}>} openaiReq.messages - Messages array
  * @param {string} [openaiReq.model] - Model name
  * @param {number} [openaiReq.temperature] - Temperature (0-1)
  * @param {number} [openaiReq.max_tokens] - Max tokens to generate
  * @param {number} [openaiReq.top_p] - Top-p sampling (0-1)
- * @returns {Object} Ollama request body
+ * @returns {object} Ollama request body
  *
  * @example
  * translateRequestToOllama({
@@ -105,12 +105,12 @@ export function translateRequestToOllama(openaiReq) {
 /**
  * Translates Ollama /api/generate response to OpenAI Chat Completions format
  *
- * @param {Object} ollamaResp - Ollama response body
+ * @param {object} ollamaResp - Ollama response body
  * @param {string} ollamaResp.response - Generated text
  * @param {string} ollamaResp.model - Model used
- * @param {Object} originalReq - Original OpenAI request (for token estimation)
- * @param {Array} originalReq.messages - Messages array
- * @returns {Object} OpenAI Chat Completions response
+ * @param {object} originalReq - Original OpenAI request (for token estimation)
+ * @param {unknown[]} originalReq.messages - Messages array
+ * @returns {object} OpenAI Chat Completions response
  *
  * @example
  * translateResponseToOpenAI(
@@ -176,7 +176,7 @@ export function translateResponseToOpenAI(ollamaResp, originalReq) {
  * @param {string} message - Error message
  * @param {string} [type='invalid_request_error'] - Error type
  * @param {number} [code=400] - HTTP status code
- * @returns {Object} OpenAI error object
+ * @returns {object} OpenAI error object
  *
  * @example
  * buildOpenAIError('Missing model parameter', 'invalid_request_error', 400)

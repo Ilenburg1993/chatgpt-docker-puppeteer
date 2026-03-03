@@ -154,7 +154,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     /**
      * Envia mensagem (local via EventEmitter, remoto via Socket.io com circuit breaker).
      *
-     * @param {Object} envelope - Envelope NERV normalizado
+     * @param {object} envelope - Envelope NERV normalizado
      */
     function send(envelope) {
         // 1. SEMPRE emite local (fast-path para mesmos processo)
@@ -199,8 +199,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     /**
      * Registra handler para receber mensagens.
      *
-     * @param {(envelope: any) => void} handler - (envelope) => void
-     * @returns {Function} Unsubscribe function
+     * @param {(envelope: unknown) => void} handler - (envelope) => void
+     * @returns {function} Unsubscribe function
      */
     function onReceive(handler) {
         if (typeof handler !== 'function') {
@@ -224,8 +224,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
      * Registra listener para actionCode específico.
      *
      * @param {string} actionCode - Código de ação (ex: 'TASK_START')
-     * @param {(envelope: any) => void} handler - (envelope) => void
-     * @returns {Function} Unsubscribe function
+     * @param {(envelope: unknown) => void} handler - (envelope) => void
+     * @returns {function} Unsubscribe function
      */
     function onEvent(actionCode, handler) {
         if (typeof actionCode !== 'string' || !actionCode.trim()) {
@@ -249,8 +249,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
      * Registra listener para actor específico.
      *
      * @param {string} actor - Actor (ex: 'KERNEL', 'DRIVER', 'SERVER')
-     * @param {Function} handler - (envelope) => void
-     * @returns {Function} Unsubscribe function
+     * @param {function} handler - (envelope) => void
+     * @returns {function} Unsubscribe function
      */
     function onActor(actor, handler) {
         if (typeof handler !== 'function') {

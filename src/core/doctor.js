@@ -14,7 +14,7 @@ const LOG_DIR = path.join(ROOT, 'logs');
 const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
 
 /**
- * @typedef {Object} ChromeConnectionStatus
+ * @typedef {object} ChromeConnectionStatus
  * @property {boolean} connected - Se a conexão com Chrome foi estabelecida.
  * @property {string} [endpoint] - Endpoint HTTP usado para conexão.
  * @property {string} [error] - Mensagem de erro se não conectado.
@@ -26,7 +26,7 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
  */
 
 /**
- * @typedef {Object} HardwareMetrics
+ * @typedef {object} HardwareMetrics
  * @property {string} cpu_load - [LEGACY] Carga de CPU em porcentagem.
  * @property {string} cpu_usage_percent - Uso real de CPU em porcentagem.
  * @property {string} cpu_load_1min - Load average de 1 minuto.
@@ -39,65 +39,65 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
  */
 
 /**
- * @typedef {Object} Trends
+ * @typedef {object} Trends
  * @property {number[]} ram - Histórico de uso de RAM.
  * @property {number[]} cpu - Histórico de carga de CPU.
  * @property {number[]} io - Histórico de latência de I/O.
  */
 
 /**
- * @typedef {Object} StorageSLA
+ * @typedef {object} StorageSLA
  * @property {number} latency_ms - Latência de I/O em ms.
  * @property {boolean} write_ok - Se a escrita foi bem-sucedida.
  * @property {string} disk_info_raw - Informações brutas do disco.
  */
 
 /**
- * @typedef {Object} DNASanity
+ * @typedef {object} DNASanity
  * @property {boolean} ok - Se o DNA está íntegro.
  * @property {string} [msg] - Mensagem de erro se não íntegro.
  * @property {number} [version] - Versão do DNA.
  */
 
 /**
- * @typedef {Object} NetworkProbe
+ * @typedef {object} NetworkProbe
  * @property {boolean} ok - Se a conexão foi bem-sucedida.
  * @property {string|number} status - Status da resposta ou 'OFFLINE'/'TIMEOUT'.
  * @property {number} ms - Tempo de resposta em ms.
  */
 
 /**
- * @typedef {Object} QueueStats
+ * @typedef {object} QueueStats
  * @property {number} pending - Número de tarefas pendentes.
  * @property {number} running - Número de tarefas em execução.
  * @property {number} total - Total de tarefas.
  */
 
 /**
- * @typedef {Object} RecoveryStep
+ * @typedef {object} RecoveryStep
  * @property {string} op - Operação sugerida.
  * @property {string} target - Alvo da operação.
  * @property {string} impact - Impacto ('low'|'medium'|'high'|'critical').
  */
 
 /**
- * @typedef {Object} FullCheckResult
- * @property {Object} meta - Metadados do diagnóstico.
+ * @typedef {object} FullCheckResult
+ * @property {object} meta - Metadados do diagnóstico.
  * @property {string} meta.version - Versão do engine.
  * @property {string} meta.engine - Nome do engine.
  * @property {string} meta.timestamp - Timestamp ISO.
  * @property {number} meta.duration_ms - Duração em ms.
- * @property {Object} health - Status de saúde.
+ * @property {object} health - Status de saúde.
  * @property {number} health.score - Pontuação de saúde (0-100).
  * @property {string} health.status - Status ('HEALTHY'|'DEGRADED'|'CRITICAL').
- * @property {Object} telemetry - Dados de telemetria.
+ * @property {object} telemetry - Dados de telemetria.
  * @property {NetworkProbe[]} telemetry.network - Resultados de rede.
  * @property {StorageSLA} telemetry.storage - Dados de armazenamento.
  * @property {DNASanity} telemetry.dna - Status do DNA.
- * @property {ChromeConnectionStatus & {proxyReport: any}} telemetry.chrome - Status do Chrome + relatório proxy.
+ * @property {ChromeConnectionStatus & {proxyReport: unknown}} telemetry.chrome - Status do Chrome + relatório proxy.
  * @property {QueueStats} telemetry.queue - Estatísticas da fila.
  * @property {HardwareMetrics & {event_loop_lag_ms: number, uptime_seconds: number}} telemetry.system - Métricas do sistema.
- * @property {Object} recovery_manifest - Manifesto de recuperação.
+ * @property {object} recovery_manifest - Manifesto de recuperação.
  * @property {string[]} recovery_manifest.detected_issues - Problemas detectados.
  * @property {RecoveryStep[]} recovery_manifest.suggested_steps - Passos sugeridos.
  * @property {boolean} recovery_manifest.can_auto_fix - Se pode corrigir automaticamente.
@@ -359,7 +359,7 @@ async function runFullCheck() {
     // Estatísticas da fila
     let queueStats = { pending: 0, running: 0, total: 0 };
     try {
-        const tasks = /** @type {any[]} */ (await io.loadAllTasks());
+        const tasks = /** @type {unknown[]} */ (await io.loadAllTasks());
         queueStats = {
             pending: tasks.filter(t => t.status === STATUS_VALUES.PENDING).length,
             running: tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length,

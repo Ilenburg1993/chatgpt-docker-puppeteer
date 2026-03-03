@@ -4,7 +4,7 @@ import path from 'node:path';
 
 /**
  * @param {{ historyPath: string, scopeKey?: string, ewmaAlpha?: number }} options
-  * @returns {any}
+  * @returns {object}
  */
 export function createEtaEstimator(options) {
     const historyPath = options.historyPath;

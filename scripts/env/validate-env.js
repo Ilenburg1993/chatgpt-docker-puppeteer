@@ -29,7 +29,7 @@ const colors = {
 // ============================================================================
 /**
  * Função exportada: parseEnvFile.
- * @returns {any}
+ * @returns {object}
  */
 function parseEnvFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');

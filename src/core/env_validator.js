@@ -3,7 +3,7 @@ import { log } from '#core/logger';
 
 /**
  * Esquema de validação para variável de ambiente.
- * @typedef {Object} EnvVariableSpec
+ * @typedef {object} EnvVariableSpec
  * @property {'FATAL'|'ERROR'|'WARN'} level - Nível de criticidade da variável.
  * @property {(val: string) => boolean} validator - Função validadora para o valor.
  * @property {string} default - Valor padrão se não definido.
@@ -12,7 +12,7 @@ import { log } from '#core/logger';
 
 /**
  * Resultado da validação de ambiente.
- * @typedef {Object} ValidationResult
+ * @typedef {object} ValidationResult
  * @property {boolean} valid - Se todas as validações passaram.
  * @property {Array<{key: string, level: string, message: string}>} errors - Lista de erros de validação.
  * @property {Array<{key: string, level: string, message: string}>} warnings - Lista de avisos de validação.
@@ -21,7 +21,7 @@ import { log } from '#core/logger';
 
 /**
  * Opções para validação de ambiente.
- * @typedef {Object} ValidationOptions
+ * @typedef {object} ValidationOptions
  * @property {boolean} [throwOnError=true] - Lançar erro se validação FATAL/ERROR falhar.
  * @property {boolean} [applyDefaults=true] - Aplicar valores padrão para variáveis faltantes.
  * @property {boolean} [verbose=false] - Logar todos os resultados de validação.

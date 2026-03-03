@@ -111,7 +111,7 @@ function upsertAttempt(input) {
 
 /**
  * Função exportada: updateAttempt.
- * @returns {any}
+ * @returns {TaskAttempt|null}
  */
 function updateAttempt(attemptId, updates = {}) {
     const db = getDb();
@@ -125,7 +125,8 @@ function updateAttempt(attemptId, updates = {}) {
 
 /**
  * Função exportada: getAttemptById.
- * @returns {any}
+ * @param {string} attemptId Unique identifier.
+ * @returns {TaskAttempt|null}
  */
 function getAttemptById(attemptId) {
     const db = getDb();
@@ -134,7 +135,7 @@ function getAttemptById(attemptId) {
 
 /**
  * Função exportada: listAttemptsByTask.
- * @returns {any}
+ * @returns {TaskAttempt[]}
  */
 function listAttemptsByTask(taskId, { limit = 200 } = {}) {
     const db = getDb();

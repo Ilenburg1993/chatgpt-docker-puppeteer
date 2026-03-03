@@ -75,7 +75,7 @@ async function _syncMissionAndTasksContext(missionId) {
  * Deriva o ifVersion do objeto de missão retornado pela API.
  * A API retorna `updated_at` como ISO string; convertemos para ms via Date.parse
  * para enviar ao control plane (que compara com updated_at_ms no DB).
- * @param {any} mission
+ * @param {object} mission
  * @returns {number|null}
  */
 function _resolveIfVersion(mission) {
@@ -94,7 +94,7 @@ function _resolveIfVersion(mission) {
 /** Constante/valor exportado: useMissionsVNextStore. */
 export const useMissionsVNextStore = defineStore('missions_vnext', {
     state: () => ({
-        items: /** @type {any[]} */ ([]),
+        items: /** @type {unknown[]} */ ([]),
         byId: /** @type {Map<string, any>} */ (new Map()),
         cursor: null,
         hasMore: false,
@@ -107,7 +107,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             search: '',
         },
         selected: null,
-        selectedProgress: /** @type {any} */ (null),
+        selectedProgress: /** @type {unknown} */ (null),
         selectedTasks: [],
         selectedProposals: [],
         selectedGraph: null,
@@ -349,7 +349,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
         /**
          * Aceita proposals como tasks READY via REST (não passa pelo control plane).
          * @param {string} missionId
-         * @param {{ proposals: any[] }} payload
+         * @param {{ proposals: unknown[] }} payload
          */
         async acceptProposals(missionId, payload) {
             const res = await http.post(`/api/missions/${missionId}/proposals/accept`, payload);

@@ -12,7 +12,7 @@ function sanitizePathToken(value) {
 
 /**
  * @param {{ runId: string, runDir: string, logLevel?: 'info'|'debug', logFormat?: 'jsonl'|'console', enableConsole?: boolean }} options
-  * @returns {any}
+  * @returns {object}
  */
 export function createAuditLogger(options) {
     const runDir = options.runDir;
@@ -31,11 +31,11 @@ export function createAuditLogger(options) {
     fs.mkdirSync(stepsDir, { recursive: true });
 
     /**
-     * @param {Record<string, any>} event
+     * @param {Record<string, unknown>} event
      */
     function emit(event) {
         const validationErrors = validateEvent(event);
-        const payload = /** @type {Record<string, any>} */ ({
+        const payload = /** @type {Record<string, unknown>} */ ({
             seq: ++seq,
             ts: new Date().toISOString(),
             run_id: runId,
@@ -75,7 +75,7 @@ export function createAuditLogger(options) {
     }
 
     /**
-     * @param {{ phase: string, stepId: string, command: string, args: string[], stdout: string, stderr: string, result: any }} input
+     * @param {{ phase: string, stepId: string, command: string, args: string[], stdout: string, stderr: string, result: unknown }} input
      */
     function writeStepArtifacts(input) {
         const safeStep = sanitizePathToken(input.stepId);
@@ -136,7 +136,7 @@ export function createAuditLogger(options) {
 }
 
 /**
- * @param {Record<string, any>} event
+ * @param {Record<string, unknown>} event
  * @returns {string[]}
  */
 function validateEvent(event) {

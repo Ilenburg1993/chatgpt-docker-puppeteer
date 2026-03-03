@@ -3,7 +3,7 @@ import { hasPermission } from '#server/domain/rbac_policy';
 
 /**
  * Função exportada: requirePermission.
- * @returns {any}
+ * @returns {void}
  */
 function requirePermission(permission) {
     return (req, res, next) => {

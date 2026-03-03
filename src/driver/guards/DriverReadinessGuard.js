@@ -71,15 +71,15 @@ class DriverReadinessGuard {
      * 4. Domain validation
      * 5. Session health
      *
-     * @param {Object} [options={}] - Validation options
+     * @param {object} [options={}] - Validation options
      * @param {number} [options.stabilityTimeout=10000] - Stabilizer timeout
      * @param {boolean} [options.skipTriage=false] - Skip triage scan (fast mode)
      * @param {boolean} [options.skipSession=false] - Skip session health check
      *
-     * @returns {Promise<Object>} Validation result
+     * @returns {Promise<object>} Validation result
      * @property {boolean} ready - true se pode executar
-     * @property {Object} checks - Status de cada check (pass/fail)
-     * @property {Array<Object>} issues - Lista de problemas detectados
+     * @property {object} checks - Status de cada check (pass/fail)
+     * @property {Array<object>} issues - Lista de problemas detectados
      * @property {number} duration - Duração da validação (ms)
      *
      * @throws {Error} Se validation encontra FATAL issues
@@ -386,7 +386,7 @@ class DriverReadinessGuard {
     /**
      * Retorna última validação executada.
      *
-     * @returns {Object|null} Last validation result
+     * @returns {object|null} Last validation result
      */
     getLastValidation() {
         return this.lastValidation;

@@ -10,7 +10,7 @@ import { withTimeout } from '#infra/abort_controller_utils';
 /**
  * Configurações do HandleManager.
  * Todas são configuráveis via variáveis de ambiente.
- * @constant {Object} HANDLE_CONFIG
+ * @constant {object} HANDLE_CONFIG
  */
 const HANDLE_CONFIG = {
     /** Timeout máximo para clearAll (ms) - Default: 3 segundos */
@@ -30,7 +30,7 @@ const HANDLE_CONFIG = {
 /**
  * Eventos emitidos pelo HandleManager (EventEmitter local).
  * Subscribers podem escutar estes eventos para observar lifecycle.
- * @constant {Object} HANDLE_EVENTS
+ * @constant {object} HANDLE_EVENTS
  */
 const HANDLE_EVENTS = {
     /** Handle registrado no manager */
@@ -95,7 +95,7 @@ class HandleManager extends EventEmitter {
      * Cria HandleManager instance.
      *
      * @constructor
-     * @param {Object} driver - Driver Puppeteer (para referência)
+     * @param {object} driver - Driver Puppeteer (para referência)
      *
      * @example
      * const manager = new HandleManager(driver);
@@ -105,21 +105,21 @@ class HandleManager extends EventEmitter {
 
         /**
          * Referência ao driver Puppeteer.
-         * @type {Object}
+         * @type {object}
          * @private
          */
         this.driver = driver;
 
         /**
          * Array de handles ativos (aguardando cleanup).
-         * @type {Array<Object>}
+         * @type {Array<object>}
          * @private
          */
         this.activeHandles = [];
 
         /**
          * Métricas de lifecycle.
-         * @type {Object}
+         * @type {object}
          * @private
          */
         this.stats = {
@@ -156,8 +156,8 @@ class HandleManager extends EventEmitter {
      * - Handle deve ter método dispose() (Puppeteer JSHandle)
      * - Limite MAX_HANDLES não pode ser ultrapassado
      *
-     * @param {Object} handle - Handle Puppeteer (JSHandle com método dispose)
-     * @returns {Object} Handle registrado (para chaining)
+     * @param {object} handle - Handle Puppeteer (JSHandle com método dispose)
+     * @returns {object} Handle registrado (para chaining)
      * @throws {Error} Se handle inválido ou limite atingido
      *
      * @emits HANDLE_EVENTS.HANDLE_REGISTERED - Handle registrado com sucesso
@@ -238,7 +238,7 @@ class HandleManager extends EventEmitter {
      * evitando promises órfãs rodando indefinidamente em background.
      *
      * @async
-     * @returns {Promise<Object>} Resultado do cleanup
+     * @returns {Promise<object>} Resultado do cleanup
      *
      * Propriedades do objeto retornado:
      *   - cleaned (number): Handles limpos com sucesso
@@ -380,7 +380,7 @@ class HandleManager extends EventEmitter {
      * Útil quando handle específico não é mais necessário.
      *
      * @async
-     * @param {Object} handle - Handle a limpar
+     * @param {object} handle - Handle a limpar
      * @returns {Promise<boolean>} True se limpo, false se não encontrado
      *
      * @emits HANDLE_EVENTS.HANDLE_CLEARED - Handle limpo com sucesso
@@ -463,7 +463,7 @@ class HandleManager extends EventEmitter {
      *
      * v2.0 New Method - introspection completa para debugging/monitoring.
      *
-     * @returns {Object} Stats object com todas as métricas
+     * @returns {object} Stats object com todas as métricas
      *
      * Propriedades do objeto retornado:
      *   - handlesRegistered (number): Total registrados (histórico)

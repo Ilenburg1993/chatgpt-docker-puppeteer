@@ -14,12 +14,12 @@ import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
 import crypto from 'node:crypto';
 
 /**
- * @typedef {Object} MissionRunnerOptions
+ * @typedef {object} MissionRunnerOptions
  * @property {number} [intervalMs=1000] - Intervalo entre ticks em ms.
  */
 
 /**
- * @typedef {Object} MissionProgress
+ * @typedef {object} MissionProgress
  * @property {number} current_step_index - Índice do passo atual.
  * @property {string|null} current_task_id - ID da tarefa atual.
  * @property {string[]} completed - IDs de tarefas completadas.
@@ -30,16 +30,16 @@ import crypto from 'node:crypto';
  */
 
 /**
- * @typedef {Object} MissionContext
- * @property {Object} [workflow] - Workflow da missão.
- * @property {Object[]} [workflow.steps] - Passos do workflow.
+ * @typedef {object} MissionContext
+ * @property {object} [workflow] - Workflow da missão.
+ * @property {object[]} [workflow.steps] - Passos do workflow.
  * @property {MissionProgress} [progress] - Progresso da missão.
- * @property {Object} [mission_context] - Contexto da missão.
+ * @property {object} [mission_context] - Contexto da missão.
  * @property {string} [target] - Target padrão.
  */
 
 /**
- * @typedef {Object} MissionPolicy
+ * @typedef {object} MissionPolicy
  * @property {number} [max_tasks_total] - Máximo de tarefas totais.
  */
 

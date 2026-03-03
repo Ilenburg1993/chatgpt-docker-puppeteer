@@ -35,9 +35,9 @@ const SHUTDOWN_BROADCAST_DELAY_MS = 1500;
  */
 class ServerNERVAdapter {
     /**
-     * @param {Object} nerv      Instância NERV (obrigatória)
-     * @param {Object} socketHub Hub Socket (obrigatório — wrapper, não raw io)
-     * @param {Object} config    Configuração do sistema
+     * @param {object} nerv      Instância NERV (obrigatória)
+     * @param {object} socketHub Hub Socket (obrigatório — wrapper, não raw io)
+     * @param {object} config    Configuração do sistema
      */
     constructor(nerv, socketHub, config) {
         /* ---------------- validações de contrato ---------------- */
@@ -316,7 +316,7 @@ class ServerNERVAdapter {
 
     async _broadcastEvent(envelope) {
         const actionCode = getActionCode(envelope);
-        if (!actionCode || PRIVATE_EVENTS.has(/** @type {any} */ (actionCode))) return;
+        if (!actionCode || PRIVATE_EVENTS.has(/** @type {unknown} */ (actionCode))) return;
 
         const socketEvent = this._translateEventName(actionCode);
         const payload = getPayload(envelope);

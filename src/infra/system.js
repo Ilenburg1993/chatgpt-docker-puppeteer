@@ -78,7 +78,7 @@ const pm2p = {
 /**
  * Retorna o status detalhado do processo do Agente.
  * Mapeia os dados brutos do PM2 para um contrato limpo.
-  * @returns {Promise<any>}
+  * @returns {Promise<void>}
  */
 async function getAgentStatus() {
     try {
@@ -105,7 +105,7 @@ async function getAgentStatus() {
 /**
  * Executa uma ação de controle no Agente (start/stop/restart/kill_daemon).
  * Contém a inteligência de decisão de comando baseada no estado atual.
-  * @returns {Promise<any>}
+  * @returns {Promise<void>}
  */
 async function controlAgent(action) {
     try {
@@ -244,7 +244,7 @@ async function killProcess(pid) {
 
 /**
  * Mata TODOS os processos do Chrome (Fallback Nuclear).
-  * @returns {Promise<any>}
+  * @returns {Promise<void>}
  */
 async function killChromeGlobal() {
     log('WARN', 'Executando Kill Global no Chrome (Fallback)...');

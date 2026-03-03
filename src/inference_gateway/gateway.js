@@ -52,12 +52,12 @@ export function getInferenceEnvBootstrapPolicy() {
 export class InferenceGateway {
     /**
      * @param {{
-     *   ollamaClient?: any,
+     *   ollamaClient?: unknown,
      *   now?: () => number,
-     *   globalPolicy?: any,
-     *   profilePolicies?: Record<string, any>,
-     *   clientPolicies?: Record<string, any>,
-     *   defaults?: any,
+     *   globalPolicy?: unknown,
+     *   profilePolicies?: Record<string, unknown>,
+     *   clientPolicies?: Record<string, unknown>,
+     *   defaults?: unknown,
      * }} [options]
      */
     constructor(options = {}) {
@@ -85,7 +85,7 @@ export class InferenceGateway {
 
     /**
      * Atualiza policies em memória (reload explícito, sem reiniciar processo).
-     * @param {{ globalPolicy?: any, profilePolicies?: Record<string, any>, clientPolicies?: Record<string, any> }} input
+     * @param {{ globalPolicy?: unknown, profilePolicies?: Record<string, unknown>, clientPolicies?: Record<string, unknown> }} input
      */
     setPolicies(input = {}) {
         if (input.globalPolicy !== undefined) this.globalPolicy = input.globalPolicy || null;
@@ -117,8 +117,8 @@ export class InferenceGateway {
         const current = this._inFlightByClient.get(clientTag) || 0;
         if (current >= maxParallel) {
             const err = new Error(`limite de concorrência excedido para ${clientTag}`);
-            /** @type {any} */ (err).code = 'INFERENCE_CONCURRENCY_LIMIT';
-            /** @type {any} */ (err).statusCode = 429;
+            /** @type {unknown} */ (err).code = 'INFERENCE_CONCURRENCY_LIMIT';
+            /** @type {unknown} */ (err).statusCode = 429;
             throw err;
         }
         this._inFlightByClient.set(clientTag, current + 1);
@@ -134,15 +134,15 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, overrides?: any }} options
+     * @param {{ clientTag: unknown, profileName?: string, overrides?: unknown }} options
      */
     resolvePolicy(options) {
         const clientTag = requireInferenceClientTag(options?.clientTag);
         const clientPolicy = this.clientPolicies[clientTag] || null;
         const profileName = String(
             options?.profileName ||
-                /** @type {any} */ (clientPolicy)?.profile_name ||
-                /** @type {any} */ (clientPolicy)?.profileName ||
+                /** @type {unknown} */ (clientPolicy)?.profile_name ||
+                /** @type {unknown} */ (clientPolicy)?.profileName ||
                 ''
         ).trim();
         return resolveInferencePolicy({
@@ -157,7 +157,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, model?: string, backend?: string, policyOverrides?: any }} request
+     * @param {{ clientTag: unknown, profileName?: string, model?: string, backend?: string, policyOverrides?: unknown }} request
      */
     validateGenerate(request) {
         const policy = this.resolvePolicy({
@@ -184,7 +184,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, prompt: string, model?: string, backend?: string, maxTokens?: number, runtime?: 'auto'|'cloud'|'local', profileName?: string, policyOverrides?: any }} request
+     * @param {{ clientTag: unknown, prompt: string, model?: string, backend?: string, maxTokens?: number, runtime?: 'auto'|'cloud'|'local', profileName?: string, policyOverrides?: unknown }} request
      */
     async generate(request) {
         const policy = this.resolvePolicy({
@@ -199,8 +199,8 @@ export class InferenceGateway {
         });
         if (!routeCheck.ok) {
             const err = new Error(routeCheck.reason || 'rota inválida');
-            /** @type {any} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
-            /** @type {any} */ (err).statusCode = 403;
+            /** @type {unknown} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
+            /** @type {unknown} */ (err).statusCode = 403;
             throw err;
         }
 
@@ -229,7 +229,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, text: string, model?: string, backend?: string, runtime?: 'auto'|'cloud'|'local', profileName?: string, policyOverrides?: any }} request
+     * @param {{ clientTag: unknown, text: string, model?: string, backend?: string, runtime?: 'auto'|'cloud'|'local', profileName?: string, policyOverrides?: unknown }} request
      */
     async embed(request) {
         const policy = this.resolvePolicy({
@@ -244,8 +244,8 @@ export class InferenceGateway {
         });
         if (!routeCheck.ok) {
             const err = new Error(routeCheck.reason || 'rota inválida');
-            /** @type {any} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
-            /** @type {any} */ (err).statusCode = 403;
+            /** @type {unknown} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
+            /** @type {unknown} */ (err).statusCode = 403;
             throw err;
         }
 
@@ -271,7 +271,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, policyOverrides?: any }} request
+     * @param {{ clientTag: unknown, profileName?: string, policyOverrides?: unknown }} request
      */
     async listModels(request) {
         const policy = this.resolvePolicy({

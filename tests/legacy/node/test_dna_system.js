@@ -1,3 +1,4 @@
+// @ts-check
 import * as io from '#infra/io';
 import identityManager from '#core/identity_manager';
 
@@ -11,7 +12,7 @@ console.log('========================================\n');
 
 /**
  * Função exportada: runTests.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function runTests() {
     // Test 1: Capabilities atualizadas no IdentityManager

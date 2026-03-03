@@ -42,7 +42,8 @@ function _rowToRun(row) {
 
 /**
  * Função exportada: createAuditJobRun.
- * @returns {any}
+ * @param {object} input Input data for the AuditJobRun record.
+ * @returns {AuditJobRun|null}
  */
 function createAuditJobRun(input = {}) {
     const db = getDb();
@@ -79,7 +80,8 @@ function createAuditJobRun(input = {}) {
 
 /**
  * Função exportada: getAuditJobRunById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {AuditJobRun|null}
  */
 function getAuditJobRunById(id) {
     const db = getDb();
@@ -89,7 +91,7 @@ function getAuditJobRunById(id) {
 
 /**
  * Função exportada: updateAuditJobRun.
- * @returns {any}
+ * @returns {AuditJobRun|null}
  */
 function updateAuditJobRun(id, updates = {}) {
     const existing = getAuditJobRunById(id);
@@ -152,7 +154,7 @@ function updateAuditJobRun(id, updates = {}) {
 
 /**
  * Função exportada: listAuditJobRunsByJobId.
- * @returns {any}
+ * @returns {AuditJobRun[]}
  */
 function listAuditJobRunsByJobId(jobId, { limit = 50 } = {}) {
     const db = getDb();

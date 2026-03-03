@@ -11,8 +11,8 @@ import { promises as fs } from 'node:fs';
 
 /**
  * Opções do construtor do QueueWorker.
- * @typedef {Object} QueueWorkerOptions
- * @property {Object} kernel - Instância do kernel com método executeTask() (obrigatório).
+ * @typedef {object} QueueWorkerOptions
+ * @property {object} kernel - Instância do kernel com método executeTask() (obrigatório).
  * @property {string} workerId - ID único do worker (obrigatório).
  * @property {number} [intervalMs=250] - Intervalo entre ticks em ms.
  * @property {number} [lockTtlMs=60000] - TTL do lock em ms.
@@ -21,7 +21,7 @@ import { promises as fs } from 'node:fs';
 
 /**
  * Parâmetros para composição de prompt do driver.
- * @typedef {Object} DriverPromptParams
+ * @typedef {object} DriverPromptParams
  * @property {string} [systemMessage] - Mensagem do sistema.
  * @property {string} [userMessage] - Mensagem do usuário.
  */

@@ -11,10 +11,10 @@ const RESPONSE_DIR = path.join(ROOT, 'respostas');
  * Salva response (detecta V1 ou V2 automaticamente)
  *
  * @param {string} taskId - Task ID
- * @param {string|Object} response - Response V1 (string) ou V2 (object)
- * @param {Object} task - Task object (para preencher result)
+ * @param {string|object} response - Response V1 (string) ou V2 (object)
+ * @param {object} task - Task object (para preencher result)
  * @param {string=} attemptId - attempt/correlation id (opcional)
- * @returns {Promise<Object>} - { storage, format }
+ * @returns {Promise<object>} - { storage, format }
  */
 async function saveResponse(taskId, response, task, attemptId) {
     try {
@@ -48,10 +48,10 @@ async function saveResponse(taskId, response, task, attemptId) {
  * Salva response V2 e preenche task.result
  *
  * @param {string} taskId - Task ID
- * @param {Object} responseV2 - Response V2 object
- * @param {Object} task - Task object
+ * @param {object} responseV2 - Response V2 object
+ * @param {object} task - Task object
  * @param {string=} attemptId - attempt/correlation id (opcional)
- * @returns {Promise<Object>} - { storage, format }
+ * @returns {Promise<object>} - { storage, format }
  * @private
  */
 async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
@@ -99,7 +99,7 @@ async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
 /**
  * Detecta se response é V2 (object) ou V1 (string)
  *
- * @param {any} response - Response para verificar
+ * @param {object} response - Response para verificar
  * @returns {boolean} - true se V2, false se V1
  * @private
  */
@@ -119,8 +119,8 @@ function isResponseV2(response) {
  * Converte response V1 (string) para V2 (object)
  *
  * @param {string} responseText - Response V1 (texto plano)
- * @param {Object} task - Task object (para metadata)
- * @returns {Object} - Response V2
+ * @param {object} task - Task object (para metadata)
+ * @returns {object} - Response V2
  * @private
  */
 function convertV1toV2(responseText, task) {
@@ -167,7 +167,7 @@ function convertV1toV2(responseText, task) {
  *
  * @param {string} taskId - Task ID
  * @param {string} format - Formato desejado ('text', 'markdown', 'json', 'html')
- * @returns {Promise<string|Object|null>} - Response content
+ * @returns {Promise<string|object|null>} - Response content
  */
 async function loadResponse(taskId, format) {
     format = format || 'text';

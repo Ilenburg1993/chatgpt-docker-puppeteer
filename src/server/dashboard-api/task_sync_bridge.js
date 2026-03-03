@@ -89,7 +89,7 @@ class TaskSyncBridge extends EventEmitter {
 
         /**
          * Unsubscribers NERV (para cleanup/robustez em testes).
-         * @type {Array<Function>}
+         * @type {Array<function>}
          */
         this._nervUnsubscribers = [];
 
@@ -111,9 +111,9 @@ class TaskSyncBridge extends EventEmitter {
      * Inicializa o bridge com dependências.
      * Deve ser chamado após boot do sistema.
      *
-     * @param {Object} [options]
-     * @param {Object} [options.socketHub] - Socket.io Hub para notificações
-     * @param {Object} [options.nervClient] - Cliente NERV para eventos
+     * @param {object} [options]
+     * @param {object} [options.socketHub] - Socket.io Hub para notificações
+     * @param {object} [options.nervClient] - Cliente NERV para eventos
      * @param {boolean} [options.force=false] - Força reinicialização se já inicializado
      */
     initialize(options = {}) {
@@ -182,7 +182,7 @@ class TaskSyncBridge extends EventEmitter {
 
     /**
      * Extrai contexto normalizado de envelope NERV.
-     * @param {Object} envelope
+     * @param {object} envelope
      * @returns {{payload: Record<string, unknown>, taskId: string|null, correlationId: string|null, eventTimestamp: number}}
      */
     _extractEnvelopeContext(envelope) {
@@ -448,7 +448,7 @@ class TaskSyncBridge extends EventEmitter {
      * Não lança exceção para não quebrar fluxo realtime.
      *
      * @param {string} taskId
-     * @param {Object} runtimeState
+     * @param {object} runtimeState
      */
     async _persistRuntimeState(taskId, runtimeState) {
         try {
@@ -533,7 +533,7 @@ class TaskSyncBridge extends EventEmitter {
      * Retorna lista unificada de todas as tasks.
      * Combina dados do disco com estado do kernel.
      *
-     * @returns {Promise<Array>} Lista de tasks unificadas
+     * @returns {Promise<unknown[]>} Lista de tasks unificadas
      */
     async getUnifiedTasks() {
         // Busca tasks do disco
@@ -548,7 +548,7 @@ class TaskSyncBridge extends EventEmitter {
      * Retorna uma task unificada por ID.
      *
      * @param {string} taskId - ID da task
-     * @returns {Promise<Object|null>} Task unificada ou null
+     * @returns {Promise<object|null>} Task unificada ou null
      */
     async getUnifiedTask(taskId) {
         if (!taskId) return null;
@@ -579,8 +579,8 @@ class TaskSyncBridge extends EventEmitter {
     /**
      * Combina task do disco com estado do kernel.
      *
-     * @param {Object} diskTask - Task do Queue Cache
-     * @returns {Object} Task unificada
+     * @param {object} diskTask - Task do Queue Cache
+     * @returns {object} Task unificada
      */
     _unifyTask(diskTask) {
         const taskId = diskTask.meta?.id || diskTask.id;

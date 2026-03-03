@@ -134,7 +134,7 @@ function ensureBaseRbacData() {
 
 /**
  * @param {{username:string, password:string, role?: string, active?: boolean}} params
-  * @returns {any}
+  * @returns {object}
  */
 function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active = true }) {
     const db = getDb();
@@ -223,7 +223,7 @@ function getRbacUserByUsername(username) {
 
 /**
  * Função exportada: verifyRbacCredentials.
- * @returns {any}
+ * @returns {object}
  */
 function verifyRbacCredentials(username, password) {
     const db = getDb();

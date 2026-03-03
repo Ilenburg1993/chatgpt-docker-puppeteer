@@ -51,10 +51,10 @@ function safeCall(handler, payload) {
 /**
  * Cria o sistema de telemetria do NERV.
  *
- * @param {Object} config
+ * @param {object} config
  * Configuração estritamente técnica (opcional):
  * - enabled: boolean
-  * @returns {any}
+  * @returns {object}
  */
 function createIPCTelemetry(config = {}) {
     const enabled = config.enabled !== false;
@@ -107,7 +107,7 @@ function createIPCTelemetry(config = {}) {
      * @param {string} type
      * Nome do evento técnico (ex.: nerv:envelope:sent)
      *
-     * @param {Object} [meta]
+     * @param {object} [meta]
      * Metadados técnicos opcionais (nunca semânticos)
      */
     function emit(type, meta = null) {
@@ -134,7 +134,7 @@ function createIPCTelemetry(config = {}) {
     /**
      * Subscrição passiva a eventos de telemetria.
      *
-     * @param {Function} handler
+     * @param {function} handler
      */
     function on(handler) {
         if (typeof handler !== 'function') {

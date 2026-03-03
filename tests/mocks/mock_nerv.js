@@ -6,7 +6,7 @@ import EventEmitter from 'node:events';
  * Helper para extrair nome do evento de um envelope NERV.
  * Suporta múltiplos formatos de envelope (novo/legado).
  *
- * @param {Object} envelope - Envelope NERV estruturado
+ * @param {object} envelope - Envelope NERV estruturado
  * @returns {string} Nome do evento
  */
 function extrairNomeEvento(envelope) {
@@ -31,7 +31,7 @@ function extrairNomeEvento(envelope) {
 
 /**
  * Cria um NERV mockado com EventEmitter real
- * @returns {Object} NERV mockado
+ * @returns {object} NERV mockado
  */
 function criarNERVMock() {
     const emitter = new EventEmitter();
@@ -44,7 +44,7 @@ function criarNERVMock() {
 
         /**
          * emit() - Método de baixo nível que aceita envelope completo
-         * @param {Object} envelope - Envelope NERV estruturado
+         * @param {object} envelope - Envelope NERV estruturado
          * @returns {boolean} true se emitido com sucesso
          */
         emit: sinon.spy(envelope => {
@@ -56,7 +56,7 @@ function criarNERVMock() {
 
         /**
          * emitCommand() - Emite envelope de comando
-         * @param {Object} envelope - Envelope de comando
+         * @param {object} envelope - Envelope de comando
          * @returns {boolean} true se emitido com sucesso
          */
         emitCommand: sinon.spy(envelope => {
@@ -68,7 +68,7 @@ function criarNERVMock() {
 
         /**
          * emitEvent() - Emite envelope de evento
-         * @param {Object} envelope - Envelope de evento
+         * @param {object} envelope - Envelope de evento
          * @returns {boolean} true se emitido com sucesso
          */
         emitEvent: sinon.spy(envelope => {
@@ -80,7 +80,7 @@ function criarNERVMock() {
 
         /**
          * emitAck() - Emite envelope de ACK
-         * @param {Object} envelope - Envelope de ACK
+         * @param {object} envelope - Envelope de ACK
          * @returns {boolean} true se emitido com sucesso
          */
         emitAck: sinon.spy(envelope => {
@@ -104,7 +104,7 @@ function criarNERVMock() {
         /**
          * Obtém envelopes emitidos, opcionalmente filtrados por actionCode
          * @param {string} [actionCode] - Código de ação para filtrar (opcional)
-         * @returns {Array} Lista de envelopes emitidos
+         * @returns {unknown[]} Lista de envelopes emitidos
          */
         obterEventosEmitidos: function (actionCode) {
             const calls = this.emit.getCalls();
@@ -156,7 +156,7 @@ function criarNERVMock() {
          * Aguarda por um envelope com determinado actionCode
          * @param {string} actionCode - Código de ação para aguardar
          * @param {number} [timeout=5000] - Timeout em ms
-         * @returns {Promise<Object>} Envelope recebido
+         * @returns {Promise<object>} Envelope recebido
          */
         aguardarEvento: function (actionCode, timeout = 5000) {
             return new Promise((resolve, reject) => {
@@ -178,7 +178,7 @@ function criarNERVMock() {
 /**
  * Cria um NERV simplificado (sem EventEmitter)
  * Útil para testes que só precisam verificar chamadas
-  * @returns {any}
+  * @returns {object}
  */
 function criarNERVSimples() {
     return {

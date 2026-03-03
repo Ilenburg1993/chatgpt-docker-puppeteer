@@ -8,11 +8,11 @@ import { asRecord } from '#types/guards';
 /**
  * @typedef {{
  *  ok: boolean,
- *  mission?: any,
+ *  mission?: object,
  *  statusCode?: number,
  *  code?: string,
  *  error?: string,
- *  details?: any,
+ *  details?: unknown,
  * }} MissionTransitionResult
  */
 
@@ -140,15 +140,15 @@ function _applyTaskMutation(taskMutation, nowMs) {
  *  allowedFrom: string[],
  *  startedAtMs?: number|null,
  *  completedAtMs?: number|null,
- *  contextPatch?: Record<string, any>|null,
+ *  contextPatch?: Record<string, unknown>|null,
  *  failureReason?: string|null,
  *  expectedProgress?: { currentTaskId?: string|null, currentStepIndex?: number }|null,
  *  actorType?: string,
  *  actorId?: string|null,
  *  eventType?: string,
  *  dedupKey?: string|null,
- *  payload?: Record<string, any>,
- *  taskMutation?: ((db: any, nowMs: number) => void)|null,
+ *  payload?: Record<string, unknown>,
+ *  taskMutation?: ((db: object, nowMs: number) => void)|null,
  * }} params
  * @returns {MissionTransitionResult}
  */
@@ -235,14 +235,14 @@ function transitionMission(params) {
  *
  * @param {{
  *  missionId: string,
- *  progress: Record<string, any>,
- *  contextPatch?: Record<string, any>|null,
+ *  progress: Record<string, unknown>,
+ *  contextPatch?: Record<string, unknown>|null,
  *  expectedProgress?: { currentTaskId?: string|null, currentStepIndex?: number }|null,
  *  actorType?: string,
  *  actorId?: string|null,
  *  eventType?: string,
  *  dedupKey?: string|null,
- *  payload?: Record<string, any>,
+ *  payload?: Record<string, unknown>,
  * }} params
  * @returns {MissionTransitionResult}
  */
@@ -329,7 +329,7 @@ function updateMissionProgressState(params) {
 
 /**
  * Função exportada: executeMissionTransition.
- * @returns {any}
+ * @returns {MissionTransitionResult}
  */
 function executeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     const mission = getMissionById(missionId);
@@ -349,7 +349,7 @@ function executeMissionTransition({ missionId, actorType = 'user', actorId = nul
 
 /**
  * Função exportada: pauseMissionTransition.
- * @returns {any}
+ * @returns {MissionTransitionResult}
  */
 function pauseMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     return transitionMission({
@@ -379,7 +379,7 @@ function pauseMissionTransition({ missionId, actorType = 'user', actorId = null,
 
 /**
  * Função exportada: resumeMissionTransition.
- * @returns {any}
+ * @returns {MissionTransitionResult}
  */
 function resumeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     const mission = getMissionById(missionId);
@@ -412,7 +412,7 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
 
 /**
  * Função exportada: cancelMissionTransition.
- * @returns {any}
+ * @returns {MissionTransitionResult}
  */
 function cancelMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     return transitionMission({
@@ -443,7 +443,7 @@ function cancelMissionTransition({ missionId, actorType = 'user', actorId = null
 
 /**
  * Função exportada: failMissionTransition.
- * @returns {any}
+ * @returns {MissionTransitionResult}
  */
 function failMissionTransition({
     missionId,
@@ -473,7 +473,7 @@ function failMissionTransition({
 
 /**
  * Função exportada: completeMissionTransition.
- * @returns {any}
+ * @returns {MissionTransitionResult}
  */
 function completeMissionTransition({
     missionId,

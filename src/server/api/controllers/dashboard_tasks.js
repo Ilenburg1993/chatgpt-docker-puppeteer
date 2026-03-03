@@ -90,7 +90,7 @@ function _buildMissionContext(db, missionId) {
  */
 function _buildTasksWhere({ status, stage, missionId, target, blocked, search, priorityGte } = {}) {
     const where = [];
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, unknown>} */
     const params = {};
 
     if (status) {
@@ -404,7 +404,7 @@ router.get('/tasks/:id', async (req, res) => {
                 artifactIds.add(String(row.latest_response_v2_json_artifact_id));
 
             const attempts = include.has('attempts')
-                ? /** @type {any} */ (data).attempts
+                ? /** @type {unknown} */ (data).attempts
                 : listAttemptsByTask(taskId, { limit: 50 });
             for (const a of attempts || []) {
                 for (const k of [
@@ -550,7 +550,7 @@ router.get('/tasks/:id/events', async (req, res) => {
         const eventType = req.query.event_type ? String(req.query.event_type) : null;
 
         const where = ["entity_type = 'task'", 'entity_id = @entity_id'];
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const params = { entity_id: taskId, limit: limit + 1 };
 
         if (eventType) {

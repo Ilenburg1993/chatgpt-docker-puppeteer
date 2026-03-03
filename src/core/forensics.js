@@ -20,17 +20,17 @@ const CAPTURE_TIMEOUT_MS = 5000;
 
 /**
  * Metadados técnicos do dump de erro.
- * @typedef {Object} CrashDumpMeta
+ * @typedef {object} CrashDumpMeta
  * @property {string} id - ID único do dump.
  * @property {string} robot_id - ID do robô.
  * @property {string} instance_id - ID da instância.
  * @property {string} taskId - ID da tarefa.
  * @property {string} correlation_id - ID de correlação.
- * @property {Object} error - Informações do erro.
+ * @property {object} error - Informações do erro.
  * @property {string} error.message - Mensagem do erro.
  * @property {string} error.stack - Stack trace do erro.
  * @property {string} error.code - Código do erro.
- * @property {Object} context - Contexto da captura.
+ * @property {object} context - Contexto da captura.
  * @property {string} context.url - URL da página.
  * @property {string} context.timestamp - Timestamp ISO da captura.
  */
@@ -39,7 +39,7 @@ const CAPTURE_TIMEOUT_MS = 5000;
  * Injeta instância do NERV para emissão de eventos (ONDA 2).
  * Side-effects: Modifica estado global nervInstance.
  * Deve ser chamado no boot antes de usar forensics.
- * @param {Object} nerv - Instância do NERV para notificações.
+ * @param {object} nerv - Instância do NERV para notificações.
   * @returns {void}
  */
 function setNERV(nerv) {
@@ -49,7 +49,7 @@ function setNERV(nerv) {
 /**
  * Cria um pacote de evidências (Dump) de um erro catastrófico.
  * Side-effects: Cria diretório em PATHS.REPORTS, escreve arquivos, emite evento NERV.
- * @param {Object} page - Instância da página Puppeteer.
+ * @param {object} page - Instância da página Puppeteer.
  * @param {Error} error - Erro que causou o crash.
  * @param {string} [taskId='unknown'] - ID da tarefa relacionada.
  * @param {string} [correlationId='unknown'] - ID de correlação para rastreamento.
@@ -139,7 +139,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
 /**
  * Captura Screenshot e Snapshot do DOM de forma inteligente.
  * Side-effects: Escreve arquivos screenshot.jpg e dom_snapshot.html no folder.
- * @param {Object} page - Instância da página Puppeteer.
+ * @param {object} page - Instância da página Puppeteer.
  * @param {string} folder - Caminho do diretório para salvar evidências.
  * @param {string} _correlationId - ID de correlação para logs.
  * @returns {Promise<void>}

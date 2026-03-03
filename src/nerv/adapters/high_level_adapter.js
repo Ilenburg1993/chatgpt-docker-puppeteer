@@ -4,7 +4,7 @@ import { MessageType } from '#shared/nerv/constants';
 
 /**
  * Função exportada: makeEnvelope.
- * @returns {any}
+ * @returns {object}
  */
 function makeEnvelope({ actor, target = null, messageType, actionCode, payload = {}, correlationId = null }) {
     return createEnvelope({ actor, target, messageType, actionCode, payload, correlationId });

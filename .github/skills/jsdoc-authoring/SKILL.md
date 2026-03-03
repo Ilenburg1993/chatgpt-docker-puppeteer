@@ -1,6 +1,8 @@
 ---
 name: jsdoc-authoring
-description: JSDoc authoring skill for this repository. Use for robust JS-first contracts in Node 24 + ESM, with @ts-check, explicit @param/@returns, options typedefs, and no weak public tags.
+description:
+  JSDoc authoring skill for this repository. Use for robust JS-first contracts in Node 24 + ESM,
+  with @ts-check, explicit @param/@returns, options typedefs, and no weak public tags.
 license: MIT
 ---
 
@@ -62,21 +64,21 @@ This phase assumes:
 
 Metas numéricas do programa full-strict (todas devem ser `= 0` simultaneamente):
 
-| Métrica                       | Alvo |
-| ----------------------------- | ---- |
-| `functions_missing_param_tags` | 0    |
-| `functions_missing_returns`    | 0    |
-| `unsafe_generic_tags_total`    | 0    |
-| `public_any_tags_total`        | 0    |
-| `options_objects_without_typedef` | 0 |
+| Métrica                           | Alvo |
+| --------------------------------- | ---- |
+| `functions_missing_param_tags`    | 0    |
+| `functions_missing_returns`       | 0    |
+| `unsafe_generic_tags_total`       | 0    |
+| `public_any_tags_total`           | 0    |
+| `options_objects_without_typedef` | 0    |
 
 Critérios qualitativos (aplica em toda PR):
 
 - Cada exportação pública tem `@returns` documentado.
 - Parâmetros públicos estão totalmente tagueados com `@param {type}`.
 - Objetos de opções usam `@typedef {object}` nomeado, nunca `Object` genérico.
-- JSDoc público evita tags genéricas fracas (`any`, `object`, `Function`) salvo contrato
-  dinâmico intencional e documentado.
+- JSDoc público evita tags genéricas fracas (`any`, `object`, `Function`) salvo contrato dinâmico
+  intencional e documentado.
 
 ## Related Skills
 

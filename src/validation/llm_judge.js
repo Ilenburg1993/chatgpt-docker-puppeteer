@@ -33,7 +33,7 @@ class LLMJudge {
      * @param {string} prompt - Prompt original do usuário
      * @param {string} response - Resposta da LLM
      * @param {AbortSignal} signal - Abort signal
-     * @returns {Promise<Object|null>} - { completeness, relevance, quality, recommendation }
+     * @returns {Promise<object|null>} - { completeness, relevance, quality, recommendation }
      */
     async validate(prompt, response, signal) {
         if (!this.enabled) {
@@ -102,7 +102,7 @@ class LLMJudge {
      * @param {string} prompt - Prompt original
      * @param {string} response - Resposta
      * @param {AbortSignal} signal - Abort signal
-     * @returns {Promise<Object>} - { score, reasoning, isComplete }
+     * @returns {Promise<object>} - { score, reasoning, isComplete }
      * @private
      */
     async _checkCompleteness(prompt, response, signal) {
@@ -131,7 +131,7 @@ class LLMJudge {
      * @param {string} prompt - Prompt original
      * @param {string} response - Resposta
      * @param {AbortSignal} signal - Abort signal
-     * @returns {Promise<Object>} - { score, reasoning, isRelevant }
+     * @returns {Promise<object>} - { score, reasoning, isRelevant }
      * @private
      */
     async _checkRelevance(prompt, response, signal) {
@@ -159,7 +159,7 @@ class LLMJudge {
      *
      * @param {string} response - Resposta
      * @param {AbortSignal} signal - Abort signal
-     * @returns {Promise<Object>} - { score, reasoning }
+     * @returns {Promise<object>} - { score, reasoning }
      * @private
      */
     async _checkQuality(response, signal) {
@@ -348,7 +348,7 @@ Respond ONLY in JSON format:
      * Parseia resultado do julgamento (JSON)
      *
      * @param {string} result - Resposta do LLM
-     * @returns {Object} - { score, reasoning }
+     * @returns {object} - { score, reasoning }
      * @private
      */
     _parseJudgmentResult(result) {

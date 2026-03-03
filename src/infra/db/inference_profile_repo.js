@@ -43,7 +43,7 @@ function _rowToProfile(row) {
 
 /**
  * Função exportada: upsertInferenceProfile.
- * @returns {any}
+ * @returns {InferenceProfile|null}
  */
 function upsertInferenceProfile(input = {}) {
     const db = getDb();
@@ -98,7 +98,8 @@ function upsertInferenceProfile(input = {}) {
 
 /**
  * Função exportada: getInferenceProfileById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {InferenceProfile|null}
  */
 function getInferenceProfileById(id) {
     const db = getDb();
@@ -107,7 +108,7 @@ function getInferenceProfileById(id) {
 
 /**
  * Função exportada: listInferenceProfiles.
- * @returns {any}
+ * @returns {InferenceProfile[]}
  */
 function listInferenceProfiles({ enabledOnly = false, limit = 100 } = {}) {
     const db = getDb();

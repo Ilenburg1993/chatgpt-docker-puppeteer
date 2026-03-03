@@ -10,7 +10,7 @@ import { HandleManager } from '#driver/modules/handle_manager';
 
 /**
  * Função exportada: testShutdownPhaseIsolation.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testShutdownPhaseIsolation() {
     console.log('\n=== TEST 1: Shutdown - Isolamento de Erros ===');
@@ -136,7 +136,7 @@ async function testShutdownPhaseIsolation() {
 
 /**
  * Função exportada: testHandleManagerAbort.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testHandleManagerAbort() {
     console.log('\n=== TEST 2: HandleManager - AbortController ===');
@@ -210,7 +210,7 @@ async function testHandleManagerAbort() {
 
 /**
  * Função exportada: testHandleManagerComplete.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testHandleManagerComplete() {
     console.log('\n=== TEST 3: HandleManager - Cleanup Completo ===');
@@ -272,7 +272,7 @@ async function testHandleManagerComplete() {
 
 /**
  * Função exportada: testHandleManagerWithErrors.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testHandleManagerWithErrors() {
     console.log('\n=== TEST 4: HandleManager - Handles com Erros Individuais ===');
@@ -340,7 +340,7 @@ async function testHandleManagerWithErrors() {
 
 /**
  * Função exportada: testCodeValidation.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testCodeValidation() {
     console.log('\n=== TEST 5: Validação de Código Modificado ===');

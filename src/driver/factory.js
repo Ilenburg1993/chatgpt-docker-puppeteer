@@ -102,7 +102,7 @@ class DriverFactory extends EventEmitter {
          *   totalUses: number
          * }
          *
-         * @type {Map<string, Array<Object>>}
+         * @type {Map<string, Array<object>>}
          * @private
          */
         this.pool = new Map();
@@ -119,7 +119,7 @@ class DriverFactory extends EventEmitter {
         /**
          * Métricas de performance e uso.
          *
-         * @type {Object}
+         * @type {object}
          * @private
          */
         this.metrics = {
@@ -154,14 +154,14 @@ class DriverFactory extends EventEmitter {
 
         /**
          * ✅ v3.0: Global driver config (usado para criar novos drivers)
-         * @type {Object}
+         * @type {object}
          * @private
          */
         this.config = {};
 
         /**
          * ✅ v3.1: Browser Pool reference (Hot Pool support)
-         * @type {Object | null}
+         * @type {object | null}
          * @private
          */
         this.browserPool = null;
@@ -574,7 +574,7 @@ class DriverFactory extends EventEmitter {
      * - Use driver.attachContext(page, signal) antes de executar
      *
      * @param {string} targetName - Nome da IA alvo (ex: 'chatgpt', 'gemini')
-     * @param {Object} config - Configuração do driver
+     * @param {object} config - Configuração do driver
      * @param {string} [config.target] - Target específico (auto preenchido pelo factory)
      * @param {number} [config.timeout] - Timeout em milissegundos
      *
@@ -1263,7 +1263,7 @@ class DriverFactory extends EventEmitter {
      * Obtém metadata de um driver específico.
      *
      * @param {string} targetName - Nome do target
-     * @returns {Object|null} Metadata { path, className } ou null se não existe
+     * @returns {object|null} Metadata { path, className } ou null se não existe
      */
     getDriverMetadata(targetName) {
         const key = (targetName || '').toLowerCase();
@@ -1273,7 +1273,7 @@ class DriverFactory extends EventEmitter {
     /**
      * Obtém metadata de todos os drivers.
      *
-     * @returns {Object} Clone do registry completo
+     * @returns {object} Clone do registry completo
      */
     getAllDriversMetadata() {
         return { ...this.registry };
@@ -1385,7 +1385,7 @@ class DriverFactory extends EventEmitter {
     /**
      * Obtém métricas de performance.
      *
-     * @returns {Object} Métricas completas
+     * @returns {object} Métricas completas
      */
     getMetrics() {
         return { ...this.metrics };
@@ -1492,7 +1492,7 @@ class DriverFactory extends EventEmitter {
      * ✅ v3.1: Define o pool de browsers para uso em Hot Pool.
      * Deve ser chamado durante o bootstrap (main.js).
      *
-     * @param {Object} pool - Instância de BrowserPoolManager
+     * @param {object} pool - Instância de BrowserPoolManager
      */
     setBrowserPool(pool) {
         if (!pool) {
@@ -1530,7 +1530,7 @@ class DriverFactory extends EventEmitter {
      * Orquestra a criação do driver E a alocação de página do BrowserPool.
      *
      * @param {string} target - Target do driver (ex: 'chatgpt')
-     * @returns {Promise<any>} Driver em estado IDLE (com página anexa)
+     * @returns {Promise<void>} Driver em estado IDLE (com página anexa)
      * @private
      */
     async _createHotDriver(target) {
@@ -1596,13 +1596,13 @@ export const createDriver = factory.createDriver.bind(factory);
 
 /**
  * Inicializa lifecycle explícito da factory.
- * @type {function(Object=): Promise<void>}
+ * @type {function(object=): Promise<void>}
  */
 export const start = factory.start.bind(factory);
 
 /**
  * Garante factory pronta de forma lazy.
- * @type {function(Object=): Promise<void>}
+ * @type {function(object=): Promise<void>}
  */
 export const ensureReady = factory.ensureReady.bind(factory);
 

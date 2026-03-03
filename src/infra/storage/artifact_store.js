@@ -24,7 +24,7 @@ const MAX_BINARY_ARTIFACT_BYTES = Number(process.env.MAX_BINARY_ARTIFACT_BYTES) 
 const MAX_JSON_ARTIFACT_BYTES = Number(process.env.MAX_JSON_ARTIFACT_BYTES) || 10 * 1024 * 1024; // 10 MB
 
 /**
- * @typedef {Object} PutArtifactResult
+ * @typedef {object} PutArtifactResult
  * @property {string} kind
  * @property {string} mime
  * @property {string} storageUri
@@ -129,7 +129,7 @@ function _toFullPath(root, rel) {
 /**
  * Internal: supports either sync or async repo implementations.
  * @param {string} artifactId
- * @returns {Promise<any|null>}
+ * @returns {Promise<unknown|null>}
  */
 async function _getArtifactRow(artifactId) {
     return await Promise.resolve(getArtifactById(artifactId));
@@ -138,7 +138,7 @@ async function _getArtifactRow(artifactId) {
 /**
  * Writes a text artifact file and returns storage pointers/metadata (no DB write).
  *
- * @param {Object} [params]
+ * @param {object} [params]
  * @param {string} [params.kind]
  * @param {string} [params.text]
  * @param {string} [params.relPath]
@@ -185,7 +185,7 @@ async function putText({ kind, text, relPath, ext = 'txt', mime = 'text/plain', 
 /**
  * Writes a binary artifact file and returns storage pointers/metadata (no DB write).
  *
- * @param {Object} [params]
+ * @param {object} [params]
  * @param {string} [params.kind]
  * @param {Buffer|Uint8Array|string} [params.buffer]
  * @param {string} [params.relPath]
@@ -250,9 +250,9 @@ async function putBuffer({
 /**
  * Stores JSON data as an artifact (pretty-printed).
  *
- * @param {Object} [params]
+ * @param {object} [params]
  * @param {string} [params.kind]
- * @param {any} [params.json]
+ * @param {object} [params.json]
  * @param {string} [params.relPath]
  * @param {string} [params.ext='json']
  * @param {string} [params.mime='application/json']
@@ -334,7 +334,7 @@ async function readBuffer(artifactId) {
 /**
  * Returns DB row + fsStat when available; flags unavailable when storage uri is missing or outside root.
  * @param {string} artifactId
- * @returns {Promise<any|null>}
+ * @returns {Promise<unknown|null>}
  */
 async function stat(artifactId) {
     const row = await _getArtifactRow(artifactId);

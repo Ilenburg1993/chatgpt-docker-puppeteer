@@ -55,7 +55,7 @@ function _setBackendEnabled(id, enabled) {
 
 /**
  * Função exportada: upsertInferenceBackend.
- * @returns {any}
+ * @returns {InferenceBackend|null}
  */
 function upsertInferenceBackend(input = {}) {
     const db = getDb();
@@ -105,7 +105,8 @@ function upsertInferenceBackend(input = {}) {
 
 /**
  * Função exportada: getInferenceBackendById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {InferenceBackend|null}
  */
 function getInferenceBackendById(id) {
     const db = getDb();
@@ -114,7 +115,7 @@ function getInferenceBackendById(id) {
 
 /**
  * Função exportada: listInferenceBackends.
- * @returns {any}
+ * @returns {InferenceBackend[]}
  */
 function listInferenceBackends({ enabledOnly = false, limit = 100 } = {}) {
     const db = getDb();
@@ -133,7 +134,7 @@ function listInferenceBackends({ enabledOnly = false, limit = 100 } = {}) {
 
 /**
  * Função exportada: setInferenceBackendEnabled.
- * @returns {any}
+ * @returns {InferenceBackend|null}
  */
 function setInferenceBackendEnabled(id, enabled) {
     return _setBackendEnabled(id, Boolean(enabled));

@@ -21,7 +21,7 @@ function _makeArtifactId() {
  *   created_at_ms?: number,
  *   created_by?: string|null,
  * }} ArtifactInsert
-  * @returns {any}
+  * @returns {object|null}
  */
 
 function insertArtifact(input) {
@@ -53,7 +53,7 @@ function insertArtifact(input) {
 
 /**
  * Função exportada: getArtifactById.
- * @returns {any}
+ * @returns {object|null}
  */
 function getArtifactById(artifactId) {
     const db = getDb();

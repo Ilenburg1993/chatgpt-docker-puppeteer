@@ -66,7 +66,7 @@ function _fetchMissionCounts(db, missionIds) {
         )
         .all(...missionIds, ...missionIds);
 
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, unknown>} */
     const out = {};
     for (const r of rows) {
         const mid = String(r.mission_id);

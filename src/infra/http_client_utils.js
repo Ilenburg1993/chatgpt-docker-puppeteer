@@ -18,12 +18,12 @@ import https from 'node:https';
  * Ensures request is destroyed on timeout, error, or completion.
  *
  * @param {string|URL} url - The URL to request
- * @param {Object} [options={}] - Request options
+ * @param {object} [options={}] - Request options
  * @param {number} [options.timeout=5000] - Timeout in milliseconds
  * @param {string} [options.method='GET'] - HTTP method
- * @param {Object} [options.headers] - Request headers
- * @param {*} [options.body] - Request body (for POST/PUT)
- * @returns {Promise<{statusCode: number, headers: Object, body: string}>}
+ * @param {object} [options.headers] - Request headers
+ * @param {object} [options.body] - Request body (for POST/PUT)
+ * @returns {Promise<{statusCode: number, headers: object, body: string}>}
  * @throws {Error} If request fails or times out
  *
  * @example
@@ -171,8 +171,8 @@ export async function checkUrlHealth(url, timeout = 5000) {
  * Fetches JSON from a URL with automatic parsing.
  *
  * @param {string|URL} url - URL to fetch
- * @param {Object} [options] - Request options (see safeHttpRequest)
- * @returns {Promise<Object>} Parsed JSON response
+ * @param {object} [options] - Request options (see safeHttpRequest)
+ * @returns {Promise<object>} Parsed JSON response
  * @throws {Error} If request fails or JSON parsing fails
  *
  * @example
@@ -202,11 +202,11 @@ export async function fetchJson(url, options = {}) {
  * Retries an HTTP request with exponential backoff.
  *
  * @param {string|URL} url - URL to request
- * @param {Object} [options={}] - Request options
+ * @param {object} [options={}] - Request options
  * @param {number} [options.maxRetries=3] - Maximum retry attempts
  * @param {number} [options.backoffMs=100] - Base backoff delay in ms
- * @param {Function} [options.shouldRetry] - Function to determine if error is retryable
- * @returns {Promise<Object>} Response object
+ * @param {function} [options.shouldRetry] - Function to determine if error is retryable
+ * @returns {Promise<object>} Response object
  *
  * @example
  * const response = await retryHttpRequest('http://unstable-service/api', {
@@ -256,7 +256,7 @@ export async function retryHttpRequest(url, options = {}) {
  * Useful for waiting for services to start up.
  *
  * @param {string|URL} url - URL to poll
- * @param {Object} [options={}] - Polling options
+ * @param {object} [options={}] - Polling options
  * @param {number} [options.maxWaitMs=30000] - Maximum time to wait
  * @param {number} [options.intervalMs=500] - Polling interval
  * @param {number} [options.requestTimeout=2000] - Timeout per request
@@ -295,8 +295,8 @@ export async function pollUntilHealthy(url, options = {}) {
 /**
  * Makes multiple HTTP requests in parallel with proper cleanup.
  *
- * @param {Array<{url: string, options?: Object}>} requests - Array of request configs
- * @returns {Promise<Array<Object>>} Array of responses
+ * @param {Array<{url: string, options?: object}>} requests - Array of request configs
+ * @returns {Promise<Array<object>>} Array of responses
  *
  * @example
  * const results = await batchHttpRequests([

@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * @param {{ stepsTotal: number, startedAt?: number }} options
-  * @returns {any}
+  * @returns {object}
  */
 export function createProgressTracker(options) {
     let stepsTotal = Math.max(1, Number(options.stepsTotal || 1));

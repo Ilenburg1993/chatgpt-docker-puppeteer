@@ -25,11 +25,11 @@ function buildSignalMap(contracts) {
  *   contracts: ContractDefinitionV1[],
  *   signals: Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>,
  * }} options
-  * @returns {any}
+  * @returns {object}
  */
 export function evaluateRuntimeSignals(options) {
     const signalMap = buildSignalMap(options.contracts || []);
-    /** @type {Array<Record<string, any>>} */
+    /** @type {Array<Record<string, unknown>>} */
     const findings = [];
 
     for (const entry of options.signals || []) {

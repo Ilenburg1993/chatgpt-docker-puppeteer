@@ -41,7 +41,7 @@ export async function fileExists(filePath) {
 /**
  * Reads a JSON file
  * @param {string} filePath
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 export async function readJson(filePath) {
     const content = await fs.readFile(filePath, 'utf8');
@@ -51,7 +51,7 @@ export async function readJson(filePath) {
 /**
  * Writes a JSON file
  * @param {string} filePath
- * @param {any} data
+ * @param {object} data
   * @returns {Promise<void>}
  */
 export async function writeJson(filePath, data) {

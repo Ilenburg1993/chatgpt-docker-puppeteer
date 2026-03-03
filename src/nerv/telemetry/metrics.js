@@ -45,7 +45,7 @@ function emptyMap() {
 /**
  * Cria um repositório técnico de métricas.
  *
- * @returns {Object}
+ * @returns {object}
  * Estrutura contendo operações puramente técnicas.
  */
 function createMetrics() {

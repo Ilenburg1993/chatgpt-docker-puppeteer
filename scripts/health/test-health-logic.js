@@ -1,3 +1,4 @@
+// @ts-check
 // @ts-nocheck
 import path from 'node:path';
 

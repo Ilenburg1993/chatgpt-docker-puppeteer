@@ -7,13 +7,13 @@ import './env_bootstrap.js';
 import { log } from './logger.js';
 
 /**
- * @typedef {Object} BrowserEndpoint
+ * @typedef {object} BrowserEndpoint
  * @property {string} url - URL do endpoint do browser.
  * @property {string} [wsEndpoint] - Endpoint WebSocket opcional.
  */
 
 /**
- * @typedef {Object} ConfigUpdateEvent
+ * @typedef {object} ConfigUpdateEvent
  * @property {Record<string, unknown>} new - Nova configuração.
  * @property {Record<string, unknown>} old - Configuração anterior.
  * @property {number} ts - Timestamp da atualização.
@@ -584,8 +584,8 @@ class ConfigurationManager extends EventEmitter {
      * Also falls back to process.env when the requested key exists there.
      *
      * @param {string} key - The key or dot-path to retrieve from the current configuration.
-     * @param {any} [fallback] - Value to return when the key is not present.
-     * @returns {any} The value from configuration, environment, or the provided fallback.
+     * @param {object} [fallback] - Value to return when the key is not present.
+     * @returns {object} The value from configuration, environment, or the provided fallback.
      */
     get(key, fallback) {
         try {

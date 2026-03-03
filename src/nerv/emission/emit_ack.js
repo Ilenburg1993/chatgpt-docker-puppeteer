@@ -33,7 +33,7 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope ACK técnico.
      *
-     * @param {Object} envelope
+     * @param {object} envelope
      * Envelope estruturalmente válido do tipo ACK.
      */
     function emitAck(envelope) {

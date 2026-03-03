@@ -21,7 +21,7 @@ const REQUIRED_LSP_TOOLS = [
  * @param {string} method
  * @param {object} params
  * @param {number} id
- * @returns {Promise<{ ok: boolean, status: number, json: any, text: string }>}
+ * @returns {Promise<{ ok: boolean, status: number, json: unknown, text: string }>}
  */
 async function callMcp(base, method, params, id) {
     const url = `${base}/api/mcp`;
@@ -49,7 +49,7 @@ async function fetchHealth(base) {
 }
 
 /**
- * @param {any} payload
+ * @param {object} payload
  * @returns {string[]}
  */
 function toolNamesFromList(payload) {
@@ -61,7 +61,7 @@ function toolNamesFromList(payload) {
 }
 
 /**
- * @param {any} response
+ * @param {object} response
  * @param {string} op
  */
 function evaluateFunctionalResponse(response, op) {

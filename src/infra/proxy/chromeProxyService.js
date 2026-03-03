@@ -29,7 +29,7 @@ import * as promClient from 'prom-client';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * @typedef {Object} ChromeProxyServiceConfig
+ * @typedef {object} ChromeProxyServiceConfig
  * @property {number} PROXY_PORT - Proxy listening port (default: 9224)
  * @property {string} CHROME_HOST - Chrome host address (default: host.docker.internal)
  * @property {number} CHROME_PORT - Chrome debugging port (default: 9225)
@@ -41,14 +41,14 @@ import { v4 as uuidv4 } from 'uuid';
  */
 
 /**
- * @typedef {Object} CircuitBreakerState
+ * @typedef {object} CircuitBreakerState
  * @property {'CLOSED' | 'OPEN' | 'HALF_OPEN'} state - Current circuit breaker state
  * @property {number} failures - Number of consecutive failures
  * @property {number} nextAttempt - Milliseconds remaining until next attempt (0 if not waiting)
  */
 
 /**
- * @typedef {Object} ProxyStats
+ * @typedef {object} ProxyStats
  * @property {number} httpRequests - Total HTTP requests proxied
  * @property {number} wsUpgrades - Total WebSocket upgrades
  * @property {number} errors - Total errors encountered
@@ -461,7 +461,7 @@ class ChromeProxyService {
             }
         }
 
-        // Fallback: any non-internal IPv4
+        // Fallback: unknown non-internal IPv4
         for (const name in interfaces) {
             const ipv4 = interfaces[name].find(iface => iface.family === 'IPv4' && !iface.internal);
             if (ipv4) return ipv4.address;
@@ -1428,10 +1428,10 @@ class ChromeProxyService {
         const nervEnabled = (process.env.NERV_INTEGRATION || 'true').toString().toLowerCase() !== 'false';
         if (nervEnabled) {
             try {
-                const nervModule = /** @type {any} */ (await import('#nerv/nerv'));
+                const nervModule = /** @type {unknown} */ (await import('#nerv/nerv'));
                 createNERV = nervModule?.createNERV || null;
-                HighLevelNERV = /** @type {any} */ (await import('#nerv/adapters/high_level_adapter'));
-                const nervConsts = /** @type {any} */ (await import('#shared/nerv/constants'));
+                HighLevelNERV = /** @type {unknown} */ (await import('#nerv/adapters/high_level_adapter'));
+                const nervConsts = /** @type {unknown} */ (await import('#shared/nerv/constants'));
                 ActionCode = nervConsts?.ActionCode || null;
                 ActorRole = nervConsts?.ActorRole || {};
 

@@ -162,7 +162,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      * Registra um envelope em sua correlação.
      *
      * @param {string} correlationId
-     * @param {Object} envelope
+     * @param {object} envelope
      */
     function append(correlationId, envelope) {
         if (typeof correlationId !== 'string') {
@@ -195,7 +195,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      * Retorna cópia do histórico de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {Array}
+     * @returns {unknown[]}
      */
     function get(correlationId) {
         if (!store[correlationId]) {

@@ -47,7 +47,7 @@ const _VALID_MODELS = ['gpt-5', 'gpt-4o', 'o1-preview', 'gemini-1.5-pro', 'claud
 /**
  * Parseia argumentos da linha de comando para opções de criação de tarefa.
  * @param {string[]} args - Array de argumentos da linha de comando.
- * @returns {Object} Opções parseadas com valores padrão.
+ * @returns {object} Opções parseadas com valores padrão.
  * @property {number} prio - Prioridade da tarefa (0-100).
  * @property {string} model - Modelo de IA a ser utilizado.
  * @property {string} target - Plataforma alvo (chatgpt, gemini, etc).
@@ -122,7 +122,7 @@ function parseSchedule(input) {
 /**
  * Cria uma nova tarefa e a salva no diretório de fila.
  * Side-effects: Cria arquivo JSON no diretório de fila, imprime informações no console.
- * @param {Object} opts - Opções da tarefa.
+ * @param {object} opts - Opções da tarefa.
  * @param {number} opts.prio - Prioridade da tarefa (0-100).
  * @param {string} opts.model - Modelo de IA a ser utilizado.
  * @param {string} opts.target - Plataforma alvo (chatgpt, gemini, etc).

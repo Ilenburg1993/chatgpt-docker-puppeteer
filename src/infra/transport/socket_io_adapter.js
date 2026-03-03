@@ -8,7 +8,7 @@ import EventEmitter from 'node:events';
  * * @param {object} config
  * @param {string} config.url - URL do servidor (ex: http://localhost:3000).
  * @param {object} [config.options] - Opções nativas do socket.io-client.
-  * @returns {any}
+  * @returns {object}
  */
 function createSocketAdapter(config) {
     // Bus de eventos para comunicar mudanças de estado ao NERV Core
@@ -135,7 +135,7 @@ function createSocketAdapter(config) {
 
     /**
      * Registra a função que o NERV usará para processar o que chega.
-     * @param {Function} handler - Função (frame) => void
+     * @param {function} handler - Função (frame) => void
      */
     function onReceive(handler) {
         inboundHandler = handler;

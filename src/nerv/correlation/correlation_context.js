@@ -73,7 +73,7 @@ function createCorrelationContext({ store, telemetry }) {
      * Retorna o histórico completo de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {Array<Object>}
+     * @returns {Array<object>}
      */
     function getHistory(correlationId) {
         if (!isNonEmptyString(correlationId)) {

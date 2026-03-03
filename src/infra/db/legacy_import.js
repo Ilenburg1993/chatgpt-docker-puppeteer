@@ -19,7 +19,7 @@ async function _listLegacyQueueFiles() {
 
 /**
  * Função exportada: importLegacyQueueFromDisk.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
     const files = await _listLegacyQueueFiles();

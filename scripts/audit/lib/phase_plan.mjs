@@ -7,7 +7,7 @@ import { AUDIT_PHASES } from './event_types.mjs';
  *   refreshContextMode: 'smart'|'force'|'skip',
  *   auditMode?: 'observability'|'reactive_bug'|'exploratory_bug'|'contracts'|'security'|'performance'|'architecture'
  * }} options
-  * @returns {any}
+  * @returns {object}
  */
 export function buildPhasePlan(options) {
     const phases = [];
@@ -163,7 +163,7 @@ export function buildPhasePlan(options) {
 
 /**
  * @param {Array<{ id: string, planned_steps: string[] }>} phases
-  * @returns {any}
+  * @returns {object}
  */
 export function flattenPlannedStepKeys(phases) {
     const keys = [];

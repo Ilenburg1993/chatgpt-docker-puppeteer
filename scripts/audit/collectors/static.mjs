@@ -233,7 +233,7 @@ function parseMadgeOutput(output) {
 }
 
 /**
- * @param {any} depcruiseJson
+ * @param {object} depcruiseJson
  * @returns {RawFinding[]}
  */
 function parseDepCruiseOutput(depcruiseJson) {
@@ -325,7 +325,7 @@ function parseJscpdReport(jscpdJsonPath) {
  *   contractsMode?: 'legacy'|'hybrid'|'strict',
  *   skipQuickSyntax?: boolean,
  *   skipLintTypecheck?: boolean,
- *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
+ *   exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
  *   commandExistsFn?: (binary: string, stepId?: string) => Promise<boolean>,
  * }} options
  * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: Record<string,any>}>}

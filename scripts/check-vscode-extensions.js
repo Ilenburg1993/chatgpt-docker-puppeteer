@@ -6,7 +6,7 @@ import { execSync } from 'node:child_process';
 /**
  * Remove comentários do formato JSONC para converter para JSON válido.
  * @param {string} content - Conteúdo JSONC como string.
- * @returns {any} Objeto JSON resultante após remoção dos comentários.
+ * @returns {object} Objeto JSON resultante após remoção dos comentários.
  */
 function parseJSONC(content) {
     const lines = content.split('\n').filter(line => {

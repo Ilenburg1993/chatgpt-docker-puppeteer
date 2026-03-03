@@ -71,7 +71,7 @@ function _fetchCountsForMissions(db, missionIds) {
         )
         .all(...missionIds);
 
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, unknown>} */
     const out = {};
     for (const r of rows) {
         const mid = String(r.mission_id);
@@ -114,7 +114,7 @@ router.get('/missions', async (req, res) => {
         const search = req.query.search ? String(req.query.search) : null;
 
         const where = [];
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const params = { limit: limit + 1 };
 
         if (status) {
@@ -287,7 +287,7 @@ router.get('/missions/:id/tasks', async (req, res) => {
         const status = req.query.status ? String(req.query.status).toUpperCase().trim() : null;
 
         const where = ['t.mission_id = @mission_id'];
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const params = { mission_id: missionId, limit: limit + 1 };
 
         if (stage) {
@@ -356,7 +356,7 @@ router.get('/missions/:id/proposals', async (req, res) => {
         const cursor = decodeCursor(req.query.cursor);
 
         const where = ['t.mission_id = @mission_id', "t.stage = 'PROPOSED'"];
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const params = { mission_id: missionId, limit: limit + 1 };
 
         const cUpdated = cursor && Number(cursor.updated_at_ms);
@@ -417,7 +417,7 @@ router.get('/missions/:id/events', async (req, res) => {
         const eventType = req.query.event_type ? String(req.query.event_type) : null;
 
         const where = ["entity_type = 'mission'", 'entity_id = @entity_id'];
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const params = { entity_id: missionId, limit: limit + 1 };
 
         if (eventType) {
@@ -503,7 +503,7 @@ router.get('/missions/:id/graph', async (req, res) => {
             )
             .all(...taskIds);
 
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const workflows = {};
         for (const t of tasks) {
             const wid = t.workflow_id || null;

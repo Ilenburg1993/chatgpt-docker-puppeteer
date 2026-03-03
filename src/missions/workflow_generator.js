@@ -21,7 +21,7 @@ class WorkflowGenerator {
      * Carrega um template do disco.
      *
      * @param {string} templateId - ID do template (ex: 'book_writing')
-     * @returns {Promise<Object>} - Template carregado
+     * @returns {Promise<object>} - Template carregado
      */
     async loadTemplate(templateId) {
         // Verifica cache
@@ -55,8 +55,8 @@ class WorkflowGenerator {
      * Gera um workflow a partir de um template.
      *
      * @param {string} templateId - ID do template
-     * @param {Object} params - Parâmetros fornecidos pelo usuário
-     * @returns {Promise<Object>} - Workflow estruturado
+     * @param {object} params - Parâmetros fornecidos pelo usuário
+     * @returns {Promise<object>} - Workflow estruturado
      */
     async generateWorkflow(templateId, params = {}) {
         const template = await this.loadTemplate(templateId);

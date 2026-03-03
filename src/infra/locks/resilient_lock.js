@@ -160,9 +160,9 @@ class ResilientLockManager {
      * Acquires a lock and registers it for automatic cleanup.
      *
      * @param {string} lockKey - Unique identifier for the lock
-     * @param {Function} acquireFn - Async function to acquire the lock, returns Promise<boolean>
-     * @param {Function} releaseFn - Async function to release the lock, returns Promise<void>
-     * @param {Object} [metadata={}] - Optional metadata for debugging (e.g., taskId, workerId)
+     * @param {function} acquireFn - Async function to acquire the lock, returns Promise<boolean>
+     * @param {function} releaseFn - Async function to release the lock, returns Promise<void>
+     * @param {object} [metadata={}] - Optional metadata for debugging (e.g., taskId, workerId)
      * @returns {Promise<boolean>} True if lock was acquired successfully
      *
      * @example
@@ -323,7 +323,7 @@ class ResilientLockManager {
      * Lists all active locks with their metadata.
      * Useful for debugging and monitoring.
      *
-     * @returns {Array<Object>} Array of active lock information
+     * @returns {Array<object>} Array of active lock information
      *
      * @example
      * const activeLocks = resilientLock.listActiveLocks();
@@ -343,7 +343,7 @@ class ResilientLockManager {
     /**
      * Gets statistics about lock operations.
      *
-     * @returns {Object} Lock statistics
+     * @returns {object} Lock statistics
      *
      * @example
      * const stats = resilientLock.getStats();
@@ -375,7 +375,7 @@ class ResilientLockManager {
      * Gets metadata for a specific lock.
      *
      * @param {string} lockKey - Lock identifier
-     * @returns {Object|null} Lock metadata or null if not found
+     * @returns {object|null} Lock metadata or null if not found
      *
      * @example
      * const metadata = resilientLock.getLockMetadata(`task:${taskId}`);
@@ -393,7 +393,7 @@ class ResilientLockManager {
      * Useful for long-running operations that need periodic lock refresh.
      *
      * @param {string} lockKey - Lock identifier
-     * @param {Function} extendFn - Function to extend the lock, returns Promise<boolean>
+     * @param {function} extendFn - Function to extend the lock, returns Promise<boolean>
      * @returns {Promise<boolean>} True if lock was extended successfully
      *
      * @example

@@ -156,7 +156,7 @@ class ChatGPTDriver extends BaseDriver {
      * Executa 1 prompt → 1 resposta (contrato do TargetDriver).
      *
      * @param {string} prompt
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      * @override
      */
     async execute(prompt) {
@@ -416,7 +416,7 @@ class ChatGPTDriver extends BaseDriver {
      *
      * @param {number} startSnapshot - Estado inicial (message count)
      * @param {AbortSignal} [signal] - Sinal de cancelamento externo
-     * @returns {Promise<any>} Resposta completa com metadados de captura
+     * @returns {Promise<void>} Resposta completa com metadados de captura
      * @throws {Error} OPERATION_ABORTED, STALL_DETECTED, LIMIT_REACHED, EMPTY_RESPONSE, etc
      * @override
      */

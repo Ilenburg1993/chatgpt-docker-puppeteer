@@ -74,35 +74,35 @@ function mergeLayer(target, layer) {
 
     if ('timeoutMs' in src || 'timeout_ms' in src) {
         target.timeoutMs = asPositiveInt(
-            /** @type {any} */ (src).timeoutMs ?? /** @type {any} */ (src).timeout_ms,
+            /** @type {unknown} */ (src).timeoutMs ?? /** @type {unknown} */ (src).timeout_ms,
             target.timeoutMs
         );
     }
     if ('maxParallel' in src || 'max_parallel' in src) {
         target.maxParallel = asPositiveInt(
-            /** @type {any} */ (src).maxParallel ?? /** @type {any} */ (src).max_parallel,
+            /** @type {unknown} */ (src).maxParallel ?? /** @type {unknown} */ (src).max_parallel,
             target.maxParallel
         );
     }
     if ('maxTokens' in src || 'max_tokens' in src) {
         target.maxTokens = asNonNegativeIntOrNull(
-            /** @type {any} */ (src).maxTokens ?? /** @type {any} */ (src).max_tokens,
+            /** @type {unknown} */ (src).maxTokens ?? /** @type {unknown} */ (src).max_tokens,
             target.maxTokens
         );
     }
     if ('allowedModels' in src || 'allowed_models' in src) {
-        const models = asStringArray(/** @type {any} */ (src).allowedModels ?? /** @type {any} */ (src).allowed_models);
+        const models = asStringArray(/** @type {unknown} */ (src).allowedModels ?? /** @type {unknown} */ (src).allowed_models);
         if (models !== null) target.allowedModels = models;
     }
     if ('allowedBackends' in src || 'allowed_backends' in src) {
         const backends = asStringArray(
-            /** @type {any} */ (src).allowedBackends ?? /** @type {any} */ (src).allowed_backends
+            /** @type {unknown} */ (src).allowedBackends ?? /** @type {unknown} */ (src).allowed_backends
         );
         if (backends !== null) target.allowedBackends = backends;
     }
     if ('degradedBehavior' in src || 'degraded_behavior' in src) {
         target.degradedBehavior = normalizeDegradedBehavior(
-            /** @type {any} */ (src).degradedBehavior ?? /** @type {any} */ (src).degraded_behavior,
+            /** @type {unknown} */ (src).degradedBehavior ?? /** @type {unknown} */ (src).degraded_behavior,
             target.degradedBehavior
         );
     }

@@ -66,7 +66,7 @@ class RecoverySystem extends EventEmitter {
      * Cria RecoverySystem instance v2.0
      *
      * @constructor
-     * @param {Object} driver - Driver Puppeteer (BaseDriver instance)
+     * @param {object} driver - Driver Puppeteer (BaseDriver instance)
      * @throws {Error} Se driver inválido ou missing methods
      *
      * @example
@@ -564,7 +564,7 @@ class RecoverySystem extends EventEmitter {
      *
      * v2.0 Feature (BUG #5 fix)
      *
-     * @returns {Object} Stats completas
+     * @returns {object} Stats completas
      *
      * Propriedades do objeto retornado:
      *   - tier0Applied (number): Tier 0 aplicados
@@ -609,7 +609,7 @@ export const create = driver => new RecoverySystem(driver);
  * **Semântica:** Classe principal para implementação de sistema de recuperação de falhas.
  * **Unidades:** N/A
  *
- * @type {Function}
+ * @type {function}
  */
 export { RecoverySystem };
 

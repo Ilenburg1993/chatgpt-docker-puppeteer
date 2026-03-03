@@ -22,7 +22,7 @@ import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../.
  * - Multi-signal reranking (6 signals)
  * - MMR diversity (avoids redundant results)
  *
- * @param {Object} params - Search parameters
+ * @param {object} params - Search parameters
  * @param {string} params.query - Search query (natural language or exact terms)
  * @param {number} params.topK - Number of results (default: 5, max: 20)
  * @param {string} params.pathPrefix - Optional: Filter by path (e.g., "src/kernel")
@@ -60,7 +60,7 @@ async function ragSearchHandler({
 
     try {
         const result = await ragHybridSearch(
-            /** @type {any} */ ({
+            /** @type {unknown} */ ({
                 query,
                 topK: validTopK,
                 profile,
@@ -329,7 +329,7 @@ async function ragHealthHandler() {
 async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'lines' }) {
     console.error(`[RAG Tool] rag_expand: chunk_id=${chunk_id} mode=${mode}`);
 
-    const expanded = /** @type {any} */ (
+    const expanded = /** @type {unknown} */ (
         await ragExpand({
             chunkId: chunk_id,
             beforeLines: before_lines,
@@ -389,7 +389,7 @@ async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'l
 /**
  * Register RAG tools in the Tool Registry
  *
- * @param {any} registry - Tool registry instance
+ * @param {object} registry - Tool registry instance
   * @returns {Promise<void>}
  */
 export async function registerRagTools(registry) {

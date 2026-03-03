@@ -39,7 +39,7 @@ function sanitizeToolMetadata(tool) {
 
 /**
  * Função exportada: registerUpstreamMcpTools.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 export async function registerUpstreamMcpTools(registry, options = {}) {
     const enabled = options.enabled ?? process.env.MCP_UPSTREAM_ENABLED === 'true';

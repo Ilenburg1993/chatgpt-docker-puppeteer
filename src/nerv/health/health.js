@@ -141,7 +141,7 @@ function createHealth({ telemetry, thresholds = {} }) {
      * Não interpreta, apenas atualiza estado.
      *
      * @param {string} type
-     * @param {Object} data
+     * @param {object} data
      */
     function report(type, data = {}) {
         switch (type) {

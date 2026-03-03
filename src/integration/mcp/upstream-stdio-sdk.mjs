@@ -54,7 +54,7 @@ export class MCPStdioUpstreamClient {
 
         const client = new Client(
             { name: 'chatgpt-docker-upstream', version: '1.0.0' },
-            /** @type {any} */ ({ capabilities: { tools: {} } })
+            /** @type {unknown} */ ({ capabilities: { tools: {} } })
         );
 
         try {

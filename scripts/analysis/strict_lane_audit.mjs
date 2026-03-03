@@ -36,13 +36,13 @@ function listEligibleFiles() {
             'fd -e js -e mjs -e cjs -e ts -e tsx -e vue . src scripts tests agents tools' +
                 ' --exclude node_modules --exclude dist --exclude coverage --exclude tmp' +
                 ' --exclude backups',
-            { encoding: 'utf8' },
+            { encoding: 'utf8' }
         );
         return raw
             .trim()
             .split('\n')
             .filter(Boolean)
-            .map((f) => relative(ROOT, resolve(f)));
+            .map(f => relative(ROOT, resolve(f)));
     } catch {
         return [];
     }
@@ -75,7 +75,7 @@ function getCoveredFiles(laneFile) {
     /** @type {Set<string>} */
     const covered = new Set();
     try {
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const config = JSON.parse(readFileSync(laneFile, 'utf8'));
         const files = /** @type {string[]} */ (config.files ?? []);
         const includes = /** @type {string[]} */ (config.include ?? []);
@@ -128,13 +128,13 @@ export function runStrictLaneAudit() {
         }
     }
 
-    const uncovered = eligibleFiles.filter((f) => !isCovered(f, allCovered));
+    const uncovered = eligibleFiles.filter(f => !isCovered(f, allCovered));
 
     return {
         strict_uncovered_files_total: uncovered.length,
         strict_uncovered_files: uncovered,
         lane_count: lanes.length,
-        lanes: lanes.map((l) => relative(ROOT, resolve(l))),
+        lanes: lanes.map(l => relative(ROOT, resolve(l))),
     };
 }
 

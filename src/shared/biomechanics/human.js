@@ -827,7 +827,7 @@ async function humanClick(...args) {
         throw new TypeError('humanClick: selector is required');
     }
 
-    const page = /** @type {any} */ (driver.page);
+    const page = /** @type {unknown} */ (driver.page);
     const signal = options.signal || null;
 
     if (signal?.aborted) {
@@ -933,7 +933,7 @@ async function humanType(...args) {
         return true;
     }
 
-    const page = /** @type {any} */ (driver.page);
+    const page = /** @type {unknown} */ (driver.page);
     const signal = options.signal || null;
     const profile = options.profile || 'balanced';
     const profileConfig = _resolveTypingProfile(profile);

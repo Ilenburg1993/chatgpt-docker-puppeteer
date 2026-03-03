@@ -69,10 +69,10 @@ export function _resetSecretCache() {
  * Centralizado para garantir consistência entre sign e verify.
  *
 /**
- * JWT sign options (cast to any to keep JSDoc simple).
- * @type {any}
+ * JWT sign options (cast to unknown to keep JSDoc simple).
+ * @type {unknown}
  */
-export const JWT_SIGN_OPTIONS = /** @type {any} */ (
+export const JWT_SIGN_OPTIONS = /** @type {unknown} */ (
     Object.freeze({
         expiresIn: process.env.JWT_EXPIRY || '24h',
         algorithm: 'HS256',

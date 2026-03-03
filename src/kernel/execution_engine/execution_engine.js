@@ -46,17 +46,17 @@ const DecisionKind = Object.freeze({
 /** Classe exportada: ExecutionEngine. */
 class ExecutionEngine {
     /**
-     * @param {Object} params
-     * @param {Object} params.taskRuntime
+     * @param {object} params
+     * @param {object} params.taskRuntime
      * Gerenciador de vida das tarefas.
      *
-     * @param {Object} params.observationStore
+     * @param {object} params.observationStore
      * Registro de EVENTs recebidos.
      *
-     * @param {Object} params.policyEngine
+     * @param {object} params.policyEngine
      * Motor normativo consultivo.
      *
-     * @param {Object} params.telemetry
+     * @param {object} params.telemetry
      * Canal de telemetria.
      */
     constructor({ taskRuntime, observationStore, policyEngine, telemetry }) {
@@ -91,14 +91,14 @@ class ExecutionEngine {
      *
      * Chamado exclusivamente pelo KernelLoop a cada ciclo.
      *
-     * @param {Object} context
+     * @param {object} context
      * @param {number} context.tickId
      * Identificador do ciclo lógico.
      *
      * @param {number} context.at
      * Timestamp do ciclo.
      *
-     * @returns {Array<Object>}
+     * @returns {Array<object>}
      * Lista de propostas de decisão.
      */
     evaluate({ tickId, at }) {
@@ -155,13 +155,13 @@ class ExecutionEngine {
     /**
      * Avalia uma tarefa específica.
      *
-     * @param {Object} task
+     * @param {object} task
      * Snapshot imutável da tarefa.
      *
-     * @param {Object} context
+     * @param {object} context
      * Contexto do ciclo.
      *
-     * @returns {Array<Object>}
+     * @returns {Array<object>}
      * Propostas geradas para esta tarefa.
      */
     _evaluateTask(task, { tickId, at }) {
@@ -239,12 +239,12 @@ class ExecutionEngine {
     /**
      * Interpreta semanticamente as observações de uma tarefa.
      *
-     * @param {Object} params
-     * @param {Object} params.task
-     * @param {Array} params.observations
+     * @param {object} params
+     * @param {object} params.task
+     * @param {unknown[]} params.observations
      * @param {number} params.at
      *
-     * @returns {Object}
+     * @returns {object}
      * Resultado da interpretação semântica.
      */
     _interpretObservations({ task, observations, at }) {
@@ -305,8 +305,8 @@ class ExecutionEngine {
      * - Interpretação semântica (observações)
      * - Estado atual da tarefa
      *
-     * @param {Object} params
-     * @returns {Object|null}
+     * @param {object} params
+     * @returns {object|null}
      * Proposta de decisão ou null se nenhuma ação necessária.
      */
     _synthesizeProposal({ task, observations: _, policyAssessment, semanticDecisions, at }) {

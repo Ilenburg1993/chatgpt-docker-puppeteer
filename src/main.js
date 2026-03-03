@@ -312,22 +312,22 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
  * Em caso de falha, executa cleanup parcial antes de re-throw.
  *
  * @async
- * @returns {Promise<Object>} Contexto de runtime com todas as instâncias ativas
- * @returns {Object} returns.nerv - Sistema de comunicação NERV
- * @returns {Object} returns.browserPool - Pool de browsers Chrome
- * @returns {Object} returns.kernel - Instância do KERNEL
- * @returns {Object} returns.driverAdapter - Adaptador NERV do driver
- * @returns {Object} returns.serverAdapter - Adaptador NERV do servidor
- * @returns {Object} returns.httpServer - Servidor HTTP (se autoridade)
+ * @returns {Promise<object>} Contexto de runtime com todas as instâncias ativas
+ * @returns {object} returns.nerv - Sistema de comunicação NERV
+ * @returns {object} returns.browserPool - Pool de browsers Chrome
+ * @returns {object} returns.kernel - Instância do KERNEL
+ * @returns {object} returns.driverAdapter - Adaptador NERV do driver
+ * @returns {object} returns.serverAdapter - Adaptador NERV do servidor
+ * @returns {object} returns.httpServer - Servidor HTTP (se autoridade)
  * @returns {boolean} returns.httpAuthority - Se este processo é dono do bind HTTP
- * @returns {Object} returns.queueWorker - Worker da fila SSOT
- * @returns {Object} returns.taskProjector - Projetor de estado de tarefas
- * @returns {Object} returns.taskControlWatcher - Watcher de controle de tarefas
- * @returns {Object} returns.missionRunner - Executor de missões
- * @returns {Object} returns.missionPlannerProcessor - Processador de planejamento
- * @returns {Object} returns.attemptWatchdog - Watchdog de tentativas
- * @returns {Object} returns.heartbeatWatchdog - Watchdog de heartbeat
- * @returns {Object} returns.agentLoop - Loop principal do agente
+ * @returns {object} returns.queueWorker - Worker da fila SSOT
+ * @returns {object} returns.taskProjector - Projetor de estado de tarefas
+ * @returns {object} returns.taskControlWatcher - Watcher de controle de tarefas
+ * @returns {object} returns.missionRunner - Executor de missões
+ * @returns {object} returns.missionPlannerProcessor - Processador de planejamento
+ * @returns {object} returns.attemptWatchdog - Watchdog de tentativas
+ * @returns {object} returns.heartbeatWatchdog - Watchdog de heartbeat
+ * @returns {object} returns.agentLoop - Loop principal do agente
  *
  * @throws {Error} Se qualquer fase crítica falhar na inicialização
  *
@@ -1280,25 +1280,25 @@ async function boot() {
  * 9. TempProfiles (limpeza final)
  *
  * @async
- * @param {Object} context - Contexto de runtime retornado por boot()
- * @param {Object} context.serverAdapter - Adaptador do servidor NERV
- * @param {Object} context.driverAdapter - Adaptador do driver NERV
- * @param {Object} context.kernel - Instância do KERNEL
- * @param {Object} context.browserPool - Pool de browsers
- * @param {Object} context.nerv - Sistema de comunicação NERV
- * @param {Object} context.httpServer - Servidor HTTP (se integrado)
+ * @param {object} context - Contexto de runtime retornado por boot()
+ * @param {object} context.serverAdapter - Adaptador do servidor NERV
+ * @param {object} context.driverAdapter - Adaptador do driver NERV
+ * @param {object} context.kernel - Instância do KERNEL
+ * @param {object} context.browserPool - Pool de browsers
+ * @param {object} context.nerv - Sistema de comunicação NERV
+ * @param {object} context.httpServer - Servidor HTTP (se integrado)
  * @param {boolean} context.httpAuthority - Se este processo é dono do bind HTTP
- * @param {Object} context.serverLifecycle - Módulo de lifecycle do server (opcional)
+ * @param {object} context.serverLifecycle - Módulo de lifecycle do server (opcional)
  * @param {boolean} context.serverLifecycleManaged - Se lifecycle do server deve coordenar teardown de infraestrutura
- * @param {Object} context.queueWorker - Worker da fila SSOT
- * @param {Object} context.taskProjector - Projetor de estado de tarefas
- * @param {Object} context.taskControlWatcher - Watcher de controle de tarefas
- * @param {Object} context.missionRunner - Executor de missões
- * @param {Object} context.missionPlannerProcessor - Processador de planejamento de missões
- * @param {Object} context.attemptWatchdog - Watchdog de tentativas
- * @param {Object} context.heartbeatWatchdog - Watchdog de heartbeat
- * @param {Object} context.agentLoop - Loop principal do agente
- * @param {Object} [options] - Opções de shutdown
+ * @param {object} context.queueWorker - Worker da fila SSOT
+ * @param {object} context.taskProjector - Projetor de estado de tarefas
+ * @param {object} context.taskControlWatcher - Watcher de controle de tarefas
+ * @param {object} context.missionRunner - Executor de missões
+ * @param {object} context.missionPlannerProcessor - Processador de planejamento de missões
+ * @param {object} context.attemptWatchdog - Watchdog de tentativas
+ * @param {object} context.heartbeatWatchdog - Watchdog de heartbeat
+ * @param {object} context.agentLoop - Loop principal do agente
+ * @param {object} [options] - Opções de shutdown
  * @param {boolean} [options.exitOnComplete=false] - Se verdadeiro, encerra processo ao concluir
  * @returns {Promise<{ok: boolean, failedPhases: number, totalPhases: number, duration: number}>}
  *
@@ -1802,7 +1802,7 @@ function cleanupSignalHandlers() {
  * - SIGHUP: Inicia shutdown gracioso (terminal hangup)
  * - SIGUSR2: Inicia shutdown gracioso (PM2 graceful reload)
  *
- * @param {Object} context - Contexto de runtime retornado por boot()
+ * @param {object} context - Contexto de runtime retornado por boot()
  * @returns {void}
  *
  * @sideEffects

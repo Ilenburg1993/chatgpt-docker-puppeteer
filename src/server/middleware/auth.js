@@ -31,7 +31,7 @@ export function authenticate(req, res, next) {
 
     try {
         // Verificar token JWT usando secret centralizado e validado
-        const decoded = /** @type {{[k:string]: any}} */ (
+        const decoded = /** @type {{[k:string]: unknown}} */ (
             jwt.verify(token, getJwtSecret(), /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS))
         );
 
@@ -109,7 +109,7 @@ export function optionalAuthenticate(req, res, next) {
         const token = authHeader.substring(7);
 
         try {
-            const decoded = /** @type {{[k:string]: any}} */ (
+            const decoded = /** @type {{[k:string]: unknown}} */ (
                 jwt.verify(
                     token,
                     getJwtSecret(),

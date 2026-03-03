@@ -49,7 +49,8 @@ function _rowToAuditJob(row) {
 
 /**
  * Função exportada: createAuditJob.
- * @returns {any}
+ * @param {object} input Input data for the AuditJob record.
+ * @returns {AuditJob|null}
  */
 function createAuditJob(input = {}) {
     const db = getDb();
@@ -96,7 +97,8 @@ function createAuditJob(input = {}) {
 
 /**
  * Função exportada: getAuditJobById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {AuditJob|null}
  */
 function getAuditJobById(id) {
     const db = getDb();
@@ -106,7 +108,7 @@ function getAuditJobById(id) {
 
 /**
  * Função exportada: listAuditJobs.
- * @returns {any}
+ * @returns {AuditJob[]}
  */
 function listAuditJobs({ status = null, limit = 100 } = {}) {
     const db = getDb();
@@ -129,7 +131,7 @@ function listAuditJobs({ status = null, limit = 100 } = {}) {
 
 /**
  * Função exportada: updateAuditJob.
- * @returns {any}
+ * @returns {AuditJob|null}
  */
 function updateAuditJob(id, updates = {}) {
     const existing = getAuditJobById(id);
@@ -223,7 +225,7 @@ function updateAuditJob(id, updates = {}) {
 
 /**
  * Função exportada: upsertAuditJobSnapshot.
- * @returns {any}
+ * @returns {AuditJob|null}
  */
 function upsertAuditJobSnapshot(job) {
     const existing = getAuditJobById(job?.id);

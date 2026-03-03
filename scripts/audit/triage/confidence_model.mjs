@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * @param {any} finding
+ * @param {object} finding
  * @param {{ sourceConvergence?: number, hasContract?: boolean, hasRuntimeEvidence?: boolean }} [signals]
-  * @returns {any}
+  * @returns {object}
  */
 export function scoreConfidence(finding, signals = {}) {
     let score = 0.45;

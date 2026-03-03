@@ -55,20 +55,20 @@ import { DecisionKind } from '../execution_engine/execution_engine.js';
 
 class KernelLoop {
     /**
-     * @param {Object} params
-     * @param {Object} params.executionEngine
+     * @param {object} params
+     * @param {object} params.executionEngine
      * Motor semântico que avalia e produz decisões.
      *
-     * @param {Object} params.nervBridge
+     * @param {object} params.nervBridge
      * Ponte de integração com NERV (para drenagem de buffers).
      *
-     * @param {Object} params.telemetry
+     * @param {object} params.telemetry
      * Canal de telemetria do Kernel.
      *
-     * @param {Object} [params.browserPool]
+     * @param {object} [params.browserPool]
      * Browser Pool Manager (para checar Circuit Breaker).
      *
-     * @param {Object} [params.scheduler]
+     * @param {object} [params.scheduler]
      * Scheduler técnico (padrão: global).
      *
      * @param {number} [params.baseIntervalMs]
@@ -396,10 +396,10 @@ class KernelLoop {
      * [P3.2 CORREÇÃO] Aplica propostas em paralelo quando possível
      * [P9.4 CORREÇÃO] Adiciona timeout de 5s para prevenir kernel loop blocking
      *
-     * @param {Array<Object>} proposals
+     * @param {Array<object>} proposals
      * Lista de propostas de decisão.
      *
-     * @param {Object} context
+     * @param {object} context
      * Contexto do ciclo atual.
      */
     async _applyDecisions(proposals, context) {

@@ -17,9 +17,9 @@ import { STATUS_VALUES } from '#core/constants/tasks';
 /**
  * Filtra e ordena as tarefas elegíveis para execução imediata.
  *
- * @param {Array} allTasks - Snapshot estável da fila carregado em RAM.
+ * @param {unknown[]} allTasks - Snapshot estável da fila carregado em RAM.
  * @param {string|null} targetFilter - Nome da IA alvo (ex: 'chatgpt').
- * @returns {Array} Lista de tarefas prontas para o motor de execução.
+ * @returns {unknown[]} Lista de tarefas prontas para o motor de execução.
  */
 function getNextEligible(allTasks, targetFilter = null) {
     // 1. BLINDAGEM DEFENSIVA

@@ -33,7 +33,7 @@ export class MCPUpstreamStdio extends EventEmitter {
      *
      * @param {string} command - Command to spawn (e.g., 'npx', 'node')
      * @param {string[]} args - Command arguments
-     * @param {Object} env - Environment variables (merged with process.env)
+     * @param {object} env - Environment variables (merged with process.env)
      */
     constructor(command, args, env = {}) {
         super();
@@ -162,13 +162,13 @@ export class MCPUpstreamStdio extends EventEmitter {
     /**
      * Handle parsed JSON-RPC message
      *
-     * @param {Object} msg - Parsed JSON-RPC message
+     * @param {object} msg - Parsed JSON-RPC message
      * @param {string} msg.jsonrpc - JSON-RPC version (should be "2.0")
      * @param {number|string} msg.id - Request ID (undefined for notifications)
-     * @param {Object} msg.result - Result (for responses)
-     * @param {Object} msg.error - Error (for error responses)
+     * @param {object} msg.result - Result (for responses)
+     * @param {object} msg.error - Error (for error responses)
      * @param {string} [msg.method] - Notification method
-     * @param {Object} [msg.params] - Notification params
+     * @param {object} [msg.params] - Notification params
      * @private
      */
     _handleMessage(msg) {
@@ -201,9 +201,9 @@ export class MCPUpstreamStdio extends EventEmitter {
      * Send JSON-RPC request and wait for response
      *
      * @param {string} method - JSON-RPC method name
-     * @param {Object} params - Method parameters
+     * @param {object} params - Method parameters
      * @param {number} timeout - Timeout in milliseconds (default: 30s)
-     * @returns {Promise<any>} Response result
+     * @returns {Promise<void>} Response result
      * @private
      */
     _sendRequest(method, params = {}, timeout = 30000) {
@@ -252,7 +252,7 @@ export class MCPUpstreamStdio extends EventEmitter {
      * Send JSON-RPC notification (no response expected)
      *
      * @param {string} method - JSON-RPC method name
-     * @param {Object} params - Method parameters
+     * @param {object} params - Method parameters
      * @private
      */
     _sendNotification(method, params = {}) {
@@ -284,8 +284,8 @@ export class MCPUpstreamStdio extends EventEmitter {
      * Call a tool on the upstream server
      *
      * @param {string} name - Tool name
-     * @param {Object} args - Tool arguments
-     * @returns {Promise<any>} Tool result
+     * @param {object} args - Tool arguments
+     * @returns {Promise<void>} Tool result
      * @throws {Error} If not initialized or tool call fails
      */
     async callTool(name, args = {}) {

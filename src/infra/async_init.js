@@ -14,8 +14,8 @@
  * Creates a lazy initialization pattern that runs async setup once.
  * Subsequent calls wait for the same initialization promise.
  *
- * @param {Function} initFn - Async function to run on first access
- * @returns {{ready: Promise<void>, reset: Function, isInitialized: () => boolean}} Initialization control
+ * @param {function} initFn - Async function to run on first access
+ * @returns {{ready: Promise<void>, reset: function, isInitialized: () => boolean}} Initialization control
  *
  * @example
  * const { ready } = createAsyncInit(async () => {
@@ -68,7 +68,7 @@ export function createAsyncInit(initFn) {
  * Creates a top-level async initialization that starts immediately.
  * Safer than using IIFEs because it handles errors properly.
  *
- * @param {Function} initFn - Async function to run immediately
+ * @param {function} initFn - Async function to run immediately
  * @returns {Promise<void>} Promise that resolves when initialization completes
  *
  * @example
@@ -100,7 +100,7 @@ export function createTopLevelInit(initFn) {
  * Handles EEXIST errors gracefully (common in multi-process scenarios).
  *
  * @param {string} dirPath - Directory path to create
- * @param {Object} [options] - mkdir options
+ * @param {object} [options] - mkdir options
  * @returns {Promise<void>}
  *
  * @example
@@ -161,7 +161,7 @@ export async function ensureFile(filePath, defaultContent = '') {
  * Creates a synchronized initialization guard that prevents concurrent execution.
  * Uses a promise-based mutex pattern.
  *
- * @returns {{acquire: Function, release: Function}}
+ * @returns {{acquire: function, release: function}}
  *
  * @example
  * const initGuard = createInitGuard();
@@ -216,8 +216,8 @@ export function createInitGuard() {
  * Useful for class methods that need resources to be ready.
  *
  * @param {Promise} initPromise - Initialization promise to wait for
- * @param {Function} fn - Function to wrap
- * @returns {Function} Wrapped function
+ * @param {function} fn - Function to wrap
+ * @returns {function} Wrapped function
  *
  * @example
  * const dbReady = initDatabase();
@@ -262,7 +262,7 @@ export function combineInits(...initPromises) {
  * Creates an initialization with timeout.
  * Fails if initialization takes too long.
  *
- * @param {Function} initFn - Initialization function
+ * @param {function} initFn - Initialization function
  * @param {number} timeoutMs - Timeout in milliseconds
  * @param {string} [name='Initialization'] - Name for error messages
  * @returns {Promise<void>}
@@ -299,10 +299,10 @@ export async function initWithTimeout(initFn, timeoutMs, name = 'Initialization'
  * Creates an initialization with health check callback.
  * Periodically checks if initialization is still valid.
  *
- * @param {Function} initFn - Initialization function
- * @param {Function} healthCheckFn - Function that returns Promise<boolean>
+ * @param {function} initFn - Initialization function
+ * @param {function} healthCheckFn - Function that returns Promise<boolean>
  * @param {number} [intervalMs=60000] - Health check interval
- * @returns {{ready: Promise<void>, stop: Function, isHealthy: () => boolean}} Init control
+ * @returns {{ready: Promise<void>, stop: function, isHealthy: () => boolean}} Init control
  *
  * @example
  * const { ready, stop } = initWithHealthCheck(

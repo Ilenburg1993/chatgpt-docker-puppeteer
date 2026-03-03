@@ -121,13 +121,13 @@ export class AuditAgentRuntime {
      *     saveJob?: (job:any)=>unknown,
      *     onRunStart?: (job:any)=>unknown,
      *     onRunFinish?: (job:any)=>unknown
-     *     saveFindings?: (jobId:string, findings:any[])=>unknown,
-     *     savePatchProposals?: (jobId:string, patches:any[])=>unknown,
-     *     listJobs?: (opts?:any)=>any[],
+     *     saveFindings?: (jobId:string, findings:unknown[])=>unknown,
+     *     savePatchProposals?: (jobId:string, patches:unknown[])=>unknown,
+     *     listJobs?: (opts?:any)=>unknown[],
      *   }|null
-     *   contextBuilder?: { collectQuickContext?: (job?:any)=>Promise<{context?:any, findings?:any[], patches?:any[]}> }|null
-     *   triageClient?: { runTriage?: (job:any, contextPack:any)=>Promise<any>, isEnabled?: ()=>boolean }|null
-     *   patchAuthorClient?: { runPatchAuthor?: (job:any, contextPack:any, llmTriage:any)=>Promise<any>, isEnabled?: ()=>boolean }|null
+     *   contextBuilder?: { collectQuickContext?: (job?:any)=>Promise<{context?:any, findings?:unknown[], patches?:unknown[]}> }|null
+     *   triageClient?: { runTriage?: (job:any, contextPack:any)=>Promise<void>, isEnabled?: ()=>boolean }|null
+     *   patchAuthorClient?: { runPatchAuthor?: (job:any, contextPack:any, llmTriage:any)=>Promise<void>, isEnabled?: ()=>boolean }|null
      *   diagnosticClient?: { runDiagnostic?: (jobKind:string, params?:any)=>Promise<{success:boolean, data?:any, error?:string, durationMs?:number}>, isEnabled?: ()=>boolean }|null
      * }} [options]
      */
@@ -240,7 +240,7 @@ export class AuditAgentRuntime {
     }
 
     /**
-     * @param {{ kind?: string, trigger_type?: string, scope?: any, priority?: number, created_by?: string }} input
+     * @param {{ kind?: string, trigger_type?: string, scope?: unknown, priority?: number, created_by?: string }} input
      */
     createJob(input = {}) {
         const kind = input.kind || AUDIT_JOB_KIND.QUICK_AUDIT;
@@ -478,7 +478,7 @@ export class AuditAgentRuntime {
         job.updated_at_ms = endTs;
         job.history.push({ ts: endTs, event: 'done', status: job.status, step: job.current_step });
         this._persistJob(job);
-        /** @type {any[]} */
+        /** @type {unknown[]} */
         const findingsToPersist = Array.isArray(contextPack?.findings) ? [...contextPack.findings] : [];
         if (llmTriage?.ok) {
             findingsToPersist.push({
@@ -532,7 +532,7 @@ export class AuditAgentRuntime {
         this._persistFindings(job.id, findingsToPersist);
         if (patchLike) {
             const defaultPatch = _derivePatchDraftFromContext(job, contextPack);
-            /** @type {any[]} */
+            /** @type {unknown[]} */
             const patches = [];
             if (
                 llmPatchAuthor?.ok &&

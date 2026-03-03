@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 import fs from 'node:fs';
 import { parseTask } from '#core/schemas';
@@ -588,7 +589,7 @@ async function testFullE2EFlow() {
 
 /**
  * Função exportada: runAllTests.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));

@@ -48,7 +48,7 @@ async function _saveToServer(preset) {
 
 /**
  * Função exportada: useUiPreferences.
- * @returns {any}
+ * @returns {object}
  */
 export function useUiPreferences() {
     const { isAuthenticated } = useAuth();

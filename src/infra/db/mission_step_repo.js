@@ -35,7 +35,7 @@ function _rowToStep(row) {
 
 /**
  * Função exportada: listMissionSteps.
- * @returns {any}
+ * @returns {MissionStep[]}
  */
 function listMissionSteps(missionId) {
     const db = getDb();
@@ -55,7 +55,7 @@ function listMissionSteps(missionId) {
 
 /**
  * Função exportada: getMissionStep.
- * @returns {any}
+ * @returns {MissionStep|null}
  */
 function getMissionStep(missionId, stepId, attemptSeq = null) {
     const db = getDb();
@@ -92,7 +92,7 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
 
 /**
  * Função exportada: syncMissionStepsFromWorkflow.
- * @returns {any}
+ * @returns {MissionStep|null}
  */
 function syncMissionStepsFromWorkflow(missionId, workflow) {
     const db = getDb();
@@ -168,7 +168,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
 
 /**
  * Função exportada: markMissionStepStatus.
- * @returns {any}
+ * @returns {MissionStep|null}
  */
 function markMissionStepStatus({
     missionId,
@@ -211,7 +211,7 @@ function markMissionStepStatus({
 
 /**
  * Função exportada: createNextStepAttempt.
- * @returns {any}
+ * @returns {MissionStep|null}
  */
 function createNextStepAttempt({ missionId, stepId, title = '', stepIndex = 0 }) {
     const db = getDb();

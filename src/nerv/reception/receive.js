@@ -75,7 +75,7 @@ function createReception({ envelopes, correlation, telemetry }) {
      * Recebe um frame inbound já desserializado
      * (objeto bruto ou buffer convertido).
      *
-     * @param {*} raw
+     * @param {object} raw
      */
     function receive(raw) {
         telemetry.emit('nerv:reception:frame_received');
@@ -124,7 +124,7 @@ function createReception({ envelopes, correlation, telemetry }) {
     /**
      * Registra handler de recepção.
      *
-     * @param {Function} handler
+     * @param {function} handler
      */
     function onReceive(handler) {
         if (typeof handler !== 'function') {

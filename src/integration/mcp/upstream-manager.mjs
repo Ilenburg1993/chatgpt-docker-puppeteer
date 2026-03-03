@@ -172,7 +172,7 @@ function setOneStatus(next) {
 
 /**
  * Função exportada: getUpstreamStatus.
- * @returns {any}
+ * @returns {Promise<object>}
  */
 export function getUpstreamStatus() {
     // Return a shallow clone to avoid accidental mutation
@@ -182,7 +182,7 @@ export function getUpstreamStatus() {
 /**
  * Parse upstreams from ENV.
  *
- * @param {Record<string, any>} env
+ * @param {Record<string, unknown>} env
  * @returns {UpstreamConfig[]}
  */
 export function parseUpstreamsFromEnv(env = process.env) {
@@ -310,7 +310,7 @@ function clearRetry(alias) {
 /**
  * @param {UpstreamConfig} cfg
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
- * @param {Record<string, any>} env
+ * @param {Record<string, unknown>} env
  * @param {{ refresh: boolean, force: boolean, restart: ReturnType<typeof getRestartConfig> }} options
  */
 function scheduleRetry(cfg, registry, env, options) {
@@ -347,7 +347,7 @@ function scheduleRetry(cfg, registry, env, options) {
 /**
  * @param {UpstreamConfig} cfg
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
- * @param {Record<string, any>} env
+ * @param {Record<string, unknown>} env
  * @param {{ refresh: boolean, force: boolean, restart: ReturnType<typeof getRestartConfig> }} options
  * @returns {Promise<{ status: UpstreamStatus }>}
  */
@@ -544,7 +544,7 @@ function markUpstreamCallFailure(cfg, err, registry, env, restart) {
  * Register tools from all enabled upstreams into the local registry.
  *
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
- * @param {{ env?: Record<string, any>, installShutdownHook?: boolean }} [options]
+ * @param {{ env?: Record<string, unknown>, installShutdownHook?: boolean }} [options]
  * @returns {Promise<{upstreams: UpstreamStatus[]}>}
  */
 export async function registerUpstreams(registry, options = {}) {

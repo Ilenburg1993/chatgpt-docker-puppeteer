@@ -33,7 +33,7 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope EVENT.
      *
-     * @param {Object} envelope
+     * @param {object} envelope
      * Envelope estruturalmente válido.
      */
     function emitEvent(envelope) {

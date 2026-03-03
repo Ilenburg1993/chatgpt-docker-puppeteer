@@ -4,7 +4,7 @@ import v8 from 'node:v8';
 
 /**
  * Estatísticas detalhadas de heap memory do V8.
- * @typedef {Object} HeapStats
+ * @typedef {object} HeapStats
  * @property {number} heap_used_mb - Memória heap usada em MB.
  * @property {number} heap_total_mb - Memória heap total em MB.
  * @property {number} heap_limit_mb - Limite de heap em MB.
@@ -53,7 +53,7 @@ function getHeapStats() {
 
 /**
  * Estatísticas de CPU do sistema.
- * @typedef {Object} CPUStats
+ * @typedef {object} CPUStats
  * @property {string} model - Modelo do processador.
  * @property {number} cores - Número de núcleos.
  * @property {number} usage_percent - Uso de CPU em percentual real (0..100).
@@ -135,7 +135,7 @@ function getCPUStats() {
 
 /**
  * Estatísticas de memória do sistema.
- * @typedef {Object} MemoryStats
+ * @typedef {object} MemoryStats
  * @property {number} total_mb - Memória total em MB.
  * @property {number} free_mb - Memória livre em MB.
  * @property {number} used_mb - Memória usada em MB.
@@ -161,7 +161,7 @@ function getMemoryStats() {
 
 /**
  * Informações gerais do sistema.
- * @typedef {Object} SystemInfo
+ * @typedef {object} SystemInfo
  * @property {string} platform - Plataforma do sistema operacional.
  * @property {string} arch - Arquitetura do processador.
  * @property {string} hostname - Nome do host.
@@ -187,7 +187,7 @@ function getSystemInfo() {
 
 /**
  * Todas as métricas de hardware consolidadas.
- * @typedef {Object} HardwareMetrics
+ * @typedef {object} HardwareMetrics
  * @property {number} timestamp - Timestamp da coleta em ms.
  * @property {HeapStats} heap - Estatísticas do heap V8.
  * @property {MemoryStats} memory - Estatísticas de memória do sistema.

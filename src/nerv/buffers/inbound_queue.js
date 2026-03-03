@@ -39,13 +39,13 @@ function createQueue() {
 /**
  * Cria a fila técnica de entrada.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
+ * @param {object} deps
+ * @param {object} deps.telemetry
  * Interface de telemetria do NERV (observação técnica).
  *
  * @param {number|null} deps.maxSize
  * Limite máximo técnico da fila (opcional).
-  * @returns {any}
+  * @returns {object}
  */
 function createInboundQueue({ telemetry, maxSize = null }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
@@ -72,7 +72,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
     /**
      * Enfileira item na fila inbound.
      *
-     * @param {*} item
+     * @param {object} item
      * Item opaco (frame ou estrutura técnica)
      * @returns {boolean} true se aceito, false se recusado por pressão
      */
@@ -97,7 +97,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
     /**
      * Remove e retorna o próximo item da fila.
      *
-     * @returns {*} item ou null se vazio
+     * @returns {object} item ou null se vazio
      */
     function dequeue() {
         if (queue.length === 0) {

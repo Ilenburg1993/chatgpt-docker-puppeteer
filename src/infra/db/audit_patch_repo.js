@@ -91,7 +91,8 @@ function _updatePatch(id, fields = {}) {
 
 /**
  * Função exportada: createAuditPatchProposal.
- * @returns {any}
+ * @param {object} input Input data for the AuditPatch record.
+ * @returns {AuditPatch|null}
  */
 function createAuditPatchProposal(input = {}) {
     const db = getDb();
@@ -132,7 +133,8 @@ function createAuditPatchProposal(input = {}) {
 
 /**
  * Função exportada: getAuditPatchProposalById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {AuditPatch|null}
  */
 function getAuditPatchProposalById(id) {
     const db = getDb();
@@ -141,7 +143,7 @@ function getAuditPatchProposalById(id) {
 
 /**
  * Função exportada: listAuditPatchProposalsByJobId.
- * @returns {any}
+ * @returns {AuditPatch[]}
  */
 function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
     const db = getDb();
@@ -160,7 +162,7 @@ function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
 
 /**
  * Função exportada: updateAuditPatchProposal.
- * @returns {any}
+ * @returns {AuditPatch|null}
  */
 function updateAuditPatchProposal(id, fields = {}) {
     return _updatePatch(id, fields);

@@ -21,7 +21,7 @@ const VALID_ENFORCE_LEVELS = new Set(['off', 'warn', 'p1', 'p0']);
  * @property {'static'|'runtime'|'protocol'|'operational'|'chaos'} kind
  * @property {'P0'|'P1'|'P2'|'P3'} severity_default
  * @property {'bug'|'gap'|'falha de contrato'|'incompletude'|'upgrade'} type_default
- * @property {Record<string, any>} matcher
+ * @property {Record<string, unknown>} matcher
  * @property {{ files?: string[], allowlist_id?: string, allowlist_key?: string }} [allowlist]
  * @property {string[]} test_recipe
  * @property {string} owner
@@ -33,7 +33,7 @@ const VALID_ENFORCE_LEVELS = new Set(['off', 'warn', 'p1', 'p0']);
 
 /**
  * @param {string} filePath
- * @returns {any}
+ * @returns {object}
  */
 function readJson(filePath) {
     const raw = fs.readFileSync(filePath, 'utf8');
@@ -82,7 +82,7 @@ function validateContract(contract, index, sourcePath) {
  * @param {{ registryPath?: string, domainsFilter?: string[] }} [options]
  * @returns {{
  *   registryPath: string,
- *   registry: any,
+ *   registry: unknown,
  *   contracts: ContractDefinitionV1[],
  *   byId: Map<string, ContractDefinitionV1>,
  *   allowlists: Record<string, Record<string, string[]>>,

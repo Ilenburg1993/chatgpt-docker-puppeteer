@@ -35,7 +35,7 @@ function testFailureFinding(sourceTool, evidence, contractId) {
 /**
  * @param {{
  *   profile: 'quick'|'deep'|'nightly',
- *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
+ *   exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
  * }} options
  * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: Record<string,any>}>}
  */

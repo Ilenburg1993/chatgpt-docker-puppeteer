@@ -16,8 +16,8 @@ class PolicyEngine {
      * O Método Principal de Julgamento.
      * Chamado pelo Core a cada tick.
      * * @param {object} state - Snapshot da memória de longo prazo (TaskStore).
-     * @param {Array} observations - Lista de novos eventos (ObservationStore).
-     * @returns {Array} Lista de Propostas (Decisões).
+     * @param {unknown[]} observations - Lista de novos eventos (ObservationStore).
+     * @returns {unknown[]} Lista de Propostas (Decisões).
      */
     evaluate(state, observations) {
         const proposals = [];

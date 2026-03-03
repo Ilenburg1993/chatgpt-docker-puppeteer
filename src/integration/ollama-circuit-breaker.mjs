@@ -57,7 +57,7 @@ const CircuitState = Object.freeze({
  */
 export class OllamaCircuitBreaker {
     /**
-     * @param {Object} options - Circuit breaker configuration
+     * @param {object} options - Circuit breaker configuration
      * @param {number} [options.failureThreshold=5] - Consecutive failures to open circuit
      * @param {number} [options.successThreshold=2] - Consecutive successes to close circuit (from half-open)
      * @param {number} [options.timeout=60000] - Milliseconds before trying half-open (60s)
@@ -196,7 +196,7 @@ export class OllamaCircuitBreaker {
     /**
      * Get current circuit breaker status
      *
-     * @returns {Object} Status object with current state and metrics
+     * @returns {object} Status object with current state and metrics
      */
     getStatus() {
         const now = Date.now();
@@ -265,7 +265,7 @@ const circuitBreakers = new Map();
  * Get circuit breaker for endpoint (singleton)
  *
  * @param {string} endpoint - Endpoint identifier ('cloud' or 'local')
- * @param {Object} [options] - Circuit breaker options (only used if creating new instance)
+ * @param {object} [options] - Circuit breaker options (only used if creating new instance)
  * @returns {OllamaCircuitBreaker} Circuit breaker instance
  *
  * @example
@@ -296,7 +296,7 @@ export function getCircuitBreaker(endpoint, options = {}) {
 /**
  * Get all circuit breaker statuses
  *
- * @returns {Object} Map of endpoint → status
+ * @returns {object} Map of endpoint → status
  *
  * @example
  * const statuses = getAllStatuses();

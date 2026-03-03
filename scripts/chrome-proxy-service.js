@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 import * as dns from 'node:dns/promises';
 
 /**
- * @typedef {Object} ChromeProxyConfig
+ * @typedef {object} ChromeProxyConfig
  * @property {string | null} [PUBLIC_IP] - Public IP address (auto-detect if null)
  * @property {number} CHROME_PORT - Chrome debugging port (default: 9225)
  * @property {number} PROXY_PORT - Proxy listening port (default: 9224)
@@ -15,7 +15,7 @@ import * as dns from 'node:dns/promises';
  */
 
 /**
- * @typedef {Object} ParseIntSafeOptions
+ * @typedef {object} ParseIntSafeOptions
  * @property {number} [min] - Minimum allowed value (default: 1)
  * @property {number} [max] - Maximum allowed value (default: 65535)
  */

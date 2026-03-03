@@ -108,8 +108,8 @@ class CircuitBreakerManager {
      *
      * @param {string} instanceId - ID da instância (ex: "browser-0")
      * @param {Error} error - Erro capturado
-     * @param {Object} context - Contexto adicional (browser version, PID, etc.)
-     * @returns {Object} - { cause, shouldPause, policy }
+     * @param {object} context - Contexto adicional (browser version, PID, etc.)
+     * @returns {object} - { cause, shouldPause, policy }
      */
     registerFailure(instanceId, error, context = {}) {
         const timestamp = Date.now();
@@ -173,7 +173,7 @@ class CircuitBreakerManager {
      * Detecta causa da falha baseado em sintomas.
      *
      * @param {Error} error - Erro capturado
-     * @param {Object} context - Contexto (browser, version, PID, etc.)
+     * @param {object} context - Contexto (browser, version, PID, etc.)
      * @returns {string} - FailureCause
      */
     _detectFailureCause(error, context = {}) {

@@ -38,7 +38,7 @@ function _rowToAuditDiff(row) {
 
 /**
  * Função exportada: insertAuditDiff.
- * @returns {any}
+ * @returns {AuditDiff|null}
  */
 function insertAuditDiff({ operationId, entityType, entityId, before = {}, after = {} }) {
     const db = getDb();
@@ -70,7 +70,8 @@ function insertAuditDiff({ operationId, entityType, entityId, before = {}, after
 
 /**
  * Função exportada: getAuditDiffById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {AuditDiff|null}
  */
 function getAuditDiffById(id) {
     const db = getDb();
@@ -80,7 +81,7 @@ function getAuditDiffById(id) {
 
 /**
  * Função exportada: listAuditDiffsByOperation.
- * @returns {any}
+ * @returns {AuditDiff[]}
  */
 function listAuditDiffsByOperation(operationId) {
     const db = getDb();
@@ -100,7 +101,7 @@ function listAuditDiffsByOperation(operationId) {
 
 /**
  * Função exportada: listAuditDiffsByEntity.
- * @returns {any}
+ * @returns {AuditDiff[]}
  */
 function listAuditDiffsByEntity(entityType, entityId, limit = 100) {
     const db = getDb();

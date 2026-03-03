@@ -34,7 +34,7 @@ import {
  * @example
  * const { setupOpenAIHandler } = await import('./openai-handler.js');
  * setupOpenAIHandler(app);
-  * @returns {any}
+  * @returns {object}
  */
 export function setupOpenAIHandler(app) {
     console.error('[OpenAI Handler] setupOpenAIHandler() called, registering routes...');

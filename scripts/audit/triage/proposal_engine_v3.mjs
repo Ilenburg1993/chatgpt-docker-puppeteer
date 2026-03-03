@@ -4,9 +4,9 @@ import { scoreConfidence } from './confidence_model.mjs';
 import { buildTestPlan } from './test_planner.mjs';
 
 /**
- * @param {any} finding
- * @param {{ rankedCauses?: Array<{ cause: string, score: number }>, proposeDiffs?: boolean, depth?: 'basic'|'standard'|'deep', contextPack?: any }} [options]
-  * @returns {any}
+ * @param {object} finding
+ * @param {{ rankedCauses?: Array<{ cause: string, score: number }>, proposeDiffs?: boolean, depth?: 'basic'|'standard'|'deep', contextPack?: unknown }} [options]
+  * @returns {object}
  */
 export function buildProposalV3(finding, options = {}) {
     const depth = options.depth || 'standard';

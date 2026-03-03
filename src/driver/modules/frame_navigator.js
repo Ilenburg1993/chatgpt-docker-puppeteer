@@ -74,7 +74,7 @@ class FrameNavError extends Error {
      *
      * @param {string} type - Tipo do erro (TIMEOUT, BARRIER, INVALID_PATH, MAX_DEPTH)
      * @param {string} message - Mensagem de erro
-     * @param {Object} context - Contexto adicional
+     * @param {object} context - Contexto adicional
      */
     constructor(type, message, context) {
         super(message);
@@ -130,11 +130,11 @@ class FrameNavigator extends EventEmitter {
     /**
      * Cria uma instância do FrameNavigator.
      *
-     * @param {Object} driver - Instância do BaseDriver
-     * @param {Object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
-     * @param {Function} driver._emitVital - Método IPC para telemetria vital
-     * @param {Object} driver.handles - HandleManager para cleanup
-     * @param {Function} driver.handles.register - Método para registrar handles
+     * @param {object} driver - Instância do BaseDriver
+     * @param {object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
+     * @param {function} driver._emitVital - Método IPC para telemetria vital
+     * @param {object} driver.handles - HandleManager para cleanup
+     * @param {function} driver.handles.register - Método para registrar handles
      * @param {string} driver.correlationId - ID de correlação para logs
      *
      * @throws {Error} Se driver não for fornecido
@@ -183,7 +183,7 @@ class FrameNavigator extends EventEmitter {
      * Tenta dispose até DISPOSE_RETRY_ATTEMPTS vezes com backoff.
      *
      * @private
-     * @param {Object} handle - JSHandle ou ElementHandle para dispose
+     * @param {object} handle - JSHandle ou ElementHandle para dispose
      * @param {string} [handleName='unknown'] - Nome do handle (para logs)
      * @returns {Promise<boolean>} true se dispose bem-sucedido, false caso contrário
      *
@@ -220,9 +220,9 @@ class FrameNavigator extends EventEmitter {
      * Executa navegação interna (sem timeout wrapper).
      *
      * @private
-     * @param {Object} protocol - Protocolo SADI contendo framePath
+     * @param {object} protocol - Protocolo SADI contendo framePath
      * @param {AbortSignal} signal - AbortSignal para cancelamento
-     * @returns {Promise<Object>} Contexto de execução
+     * @returns {Promise<object>} Contexto de execução
      */
     async _executeGetExecutionContext(protocol, signal) {
         const result = {
@@ -398,11 +398,11 @@ class FrameNavigator extends EventEmitter {
      * Navega através da hierarquia de frames definida em `protocol.framePath`,
      * acumulando offsets físicos (bounding boxes) e registrando handles.
      *
-     * @param {Object} protocol - Protocolo SADI contendo framePath
+     * @param {object} protocol - Protocolo SADI contendo framePath
      * @param {string} protocol.framePath - Path de frames (formato: "IFRAME#id > IFRAME[name='x']")
      * @param {string} protocol.context - Contexto ('root' ou 'frame')
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
-     * @returns {Promise<Object>} Contexto de execução
+     * @returns {Promise<object>} Contexto de execução
      * Propriedades do objeto retornado:
      *   - ctx (Object): Context (page ou frame)
      *   - offsetX (number): Offset horizontal acumulado
@@ -507,7 +507,7 @@ class FrameNavigator extends EventEmitter {
     /**
      * Retorna estatísticas de navegação de frames.
      *
-     * @returns {Object} Objeto com métricas de navegação
+     * @returns {object} Objeto com métricas de navegação
      * Propriedades do objeto retornado:
      *   - totalNavigations (number): Total de navegações
      *   - successfulNavigations (number): Navegações bem-sucedidas
@@ -577,7 +577,7 @@ class FrameNavigator extends EventEmitter {
 /**
  * Factory function para criar instância de FrameNavigator.
  *
- * @param {Object} driver - Instância do driver
+ * @param {object} driver - Instância do driver
  * @returns {FrameNavigator} Nova instância
  *
  * @example

@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 import fs from 'node:fs';
 import { saveResponse, loadResponse } from '#infra/storage/response_adapter';
@@ -63,7 +64,7 @@ async function runTest(name, testFn) {
 
 /**
  * Função exportada: runAllTests.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));

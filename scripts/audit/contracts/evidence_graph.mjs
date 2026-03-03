@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @param {any} finding
+ * @param {object} finding
  */
 function groupKey(finding) {
     if (finding.contract_id) {
@@ -18,11 +18,11 @@ function groupKey(finding) {
 }
 
 /**
- * @param {Array<any>} findings
-  * @returns {any}
+ * @param {unknown[]} findings
+  * @returns {object}
  */
 export function buildEvidenceGraph(findings) {
-    /** @type {Map<string, any[]>} */
+    /** @type {Map<string, unknown[]>} */
     const groups = new Map();
     for (const finding of findings) {
         const key = groupKey(finding);

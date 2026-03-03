@@ -4,7 +4,7 @@ import { STATUS_VALUES } from '#core/constants/tasks';
 
 /**
  * Função exportada: checkControlPause.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function checkControlPause() {
     try {

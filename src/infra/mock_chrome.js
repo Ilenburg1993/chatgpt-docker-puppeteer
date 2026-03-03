@@ -62,7 +62,7 @@ function createMockPage() {
 
 /**
  * Função exportada: createMockBrowser.
- * @returns {any}
+ * @returns {object}
  */
 function createMockBrowser() {
     const pages = [createMockPage()];

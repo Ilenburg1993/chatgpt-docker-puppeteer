@@ -27,7 +27,7 @@ function violation(message) {
 
 /**
  * Verifica se valor é um objeto plano (não array, não null)
- * @param {*} obj - Valor a ser verificado
+ * @param {object} obj - Valor a ser verificado
  * @returns {boolean} true se for objeto plano
  * @sideEffects Nenhum - função pura
  */
@@ -51,7 +51,7 @@ function isUUID(value) {
 
 /**
  * Valida a estrutura básica de um envelope NERV canônico
- * @param {any} envelope - Envelope a ser validado
+ * @param {object} envelope - Envelope a ser validado
  * @throws {Error} Se a estrutura violar o esquema
  * @sideEffects Pode lançar erro - função de validação
  */
@@ -97,7 +97,7 @@ function validateStructure(envelope) {
 
 /**
  * Valida a ontologia e semântica de um envelope NERV
- * @param {any} envelope - Envelope a ser validado
+ * @param {object} envelope - Envelope a ser validado
  * @throws {Error} Se a ontologia violar as regras do protocolo
  * @sideEffects Pode lançar erro - função de validação
  */
@@ -158,7 +158,7 @@ const FORBIDDEN_FIELDS = ['status', 'result', 'success', 'error', 'response', 'r
 
 /**
  * Valida proibições semânticas em envelope NERV (campos proibidos)
- * @param {any} envelope - Envelope a ser verificado
+ * @param {object} envelope - Envelope a ser verificado
  * @throws {Error} Se encontrar campos semânticos proibidos
  * @sideEffects Pode lançar erro - função de validação negativa
  */

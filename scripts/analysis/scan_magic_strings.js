@@ -93,7 +93,7 @@ const PATTERNS = [
 
 /**
  * Scan a single file for magic string patterns
-  * @returns {any}
+  * @returns {object}
  */
 function scanFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
@@ -125,7 +125,7 @@ function scanFile(filePath) {
 
 /**
  * Recursively scan directory for JS files
-  * @returns {any}
+  * @returns {object}
  */
 function scanDirectory(dir, results = [], excludeDirs = DEFAULT_EXCLUDES) {
     const items = fs.readdirSync(dir);

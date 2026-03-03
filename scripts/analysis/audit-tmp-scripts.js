@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import fs from 'node:fs';
 // @ts-nocheck
 import path from 'node:path';
@@ -19,7 +20,7 @@ const PATTERNS = {
 
 /**
  * Função exportada: classifyScript.
- * @returns {any}
+ * @returns {object}
  */
 function classifyScript(filename, content) {
     // System files - ignore
@@ -93,7 +94,7 @@ function classifyScript(filename, content) {
 
 /**
  * Função exportada: auditTmpScripts.
- * @returns {any}
+ * @returns {object}
  */
 function auditTmpScripts() {
     console.log('🔍 AUDITING /tmp/ JAVASCRIPT FILES\n');

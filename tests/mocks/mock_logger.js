@@ -3,7 +3,7 @@ import sinon from 'sinon';
 
 /**
  * Cria um logger mockado com todos os métodos
- * @returns {Object} Logger mockado com spies do sinon
+ * @returns {object} Logger mockado com spies do sinon
  */
 function criarLoggerMock() {
     return {
@@ -39,7 +39,7 @@ function criarLoggerMock() {
 /**
  * Cria um logger silencioso (noop)
  * Útil quando você não quer poluir a saída dos testes
-  * @returns {any}
+  * @returns {object}
  */
 function criarLoggerSilencioso() {
     return {

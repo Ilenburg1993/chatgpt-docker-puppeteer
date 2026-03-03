@@ -6,7 +6,7 @@ import { ref, computed } from 'vue';
 /**
  * Composable para interação com APIs do Audit Agent
  * @param {UseAuditOptions} options
-  * @returns {any}
+  * @returns {object}
  */
 export function useAudit(options = {}) {
     const baseUrl = options.baseUrl || '/api/dashboard';
@@ -30,7 +30,7 @@ export function useAudit(options = {}) {
      * Fetch wrapper com error handling
      * @param {string} url
      * @param {RequestInit} opts
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function fetchApi(url, opts = {}) {
         const res = await fetch(`${baseUrl}${url}`, {
@@ -72,7 +72,7 @@ export function useAudit(options = {}) {
      * Detalhes de um job específico
      * @param {string} jobId
      * @param {object} [query]
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function getJob(jobId, query = {}) {
         loading.value = true;
@@ -94,7 +94,7 @@ export function useAudit(options = {}) {
     /**
      * Cria um novo job de auditoria
      * @param {object} payload
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function createJob(payload) {
         loading.value = true;
@@ -116,7 +116,7 @@ export function useAudit(options = {}) {
     /**
      * Executa um job existente
      * @param {string} jobId
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function runJob(jobId) {
         loading.value = true;
@@ -137,7 +137,7 @@ export function useAudit(options = {}) {
     /**
      * Cancela um job em execução
      * @param {string} jobId
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function cancelJob(jobId) {
         loading.value = true;
@@ -184,7 +184,7 @@ export function useAudit(options = {}) {
      * Detalhes de um patch específico
      * @param {string} patchId
      * @param {object} [query]
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function getPatch(patchId, query = {}) {
         loading.value = true;
@@ -205,7 +205,7 @@ export function useAudit(options = {}) {
     /**
      * Aprova um patch
      * @param {string} patchId
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function approvePatch(patchId) {
         loading.value = true;
@@ -226,7 +226,7 @@ export function useAudit(options = {}) {
     /**
      * Rejeita um patch
      * @param {string} patchId
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function rejectPatch(patchId) {
         loading.value = true;
@@ -247,7 +247,7 @@ export function useAudit(options = {}) {
     /**
      * Aplica um patch aprovado
      * @param {string} patchId
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function applyPatch(patchId) {
         loading.value = true;
@@ -268,7 +268,7 @@ export function useAudit(options = {}) {
     /**
      * Valida readiness de apply
      * @param {string} patchId
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function getPatchApplyReadiness(patchId) {
         loading.value = true;
@@ -330,7 +330,7 @@ export function useAudit(options = {}) {
     /**
      * Cria ou atualiza watch rule
      * @param {object} payload
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function upsertWatchRule(payload) {
         loading.value = true;
@@ -352,7 +352,7 @@ export function useAudit(options = {}) {
     /**
      * Toggle watch rule
      * @param {string} ruleId
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function toggleWatchRule(ruleId) {
         loading.value = true;
@@ -446,7 +446,7 @@ export function useAudit(options = {}) {
 
     /**
      * Resumo de inferência
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      */
     async function getInferenceSummary() {
         loading.value = true;

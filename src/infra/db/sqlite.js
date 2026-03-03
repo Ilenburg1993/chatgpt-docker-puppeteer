@@ -11,7 +11,7 @@ let singletonDb = null;
 
 /**
  * Função exportada: resolveDbPath.
- * @returns {any}
+ * @returns {object|null}
  */
 function resolveDbPath() {
     const fromEnv = process.env.MAESTRO_DB_PATH || process.env.DB_PATH || null;
@@ -84,7 +84,7 @@ function migrate(db) {
 
 /**
  * Função exportada: getDb.
- * @returns {any}
+ * @returns {object|null}
  */
 function getDb() {
     if (singletonDb) {

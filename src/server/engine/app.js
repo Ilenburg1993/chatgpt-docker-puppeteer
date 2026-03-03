@@ -165,8 +165,8 @@ function updateCorsOrigins() {
 
 // Inicializa e escuta mudanças
 updateCorsOrigins();
-if (typeof (/** @type {any} */ (CONFIG).on) === 'function') {
-    /** @type {any} */ (CONFIG).on('updated', updateCorsOrigins);
+if (typeof (/** @type {unknown} */ (CONFIG).on) === 'function') {
+    /** @type {unknown} */ (CONFIG).on('updated', updateCorsOrigins);
 }
 
 app.use(

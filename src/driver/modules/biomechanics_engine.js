@@ -191,10 +191,10 @@ class BiomechanicsEngine extends EventEmitter {
     /**
      * Cria uma instância do BiomechanicsEngine.
      *
-     * @param {Object} driver - Instância do BaseDriver
-     * @param {Object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
-     * @param {Function} driver._emitVital - Método IPC para telemetria vital
-     * @param {Function} driver._assertPageAlive - Validação de page alive
+     * @param {object} driver - Instância do BaseDriver
+     * @param {object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
+     * @param {function} driver._emitVital - Método IPC para telemetria vital
+     * @param {function} driver._assertPageAlive - Validação de page alive
      * @param {string} driver.correlationId - ID de correlação para logs
      * @param {AbortSignal} [driver.signal] - AbortSignal para cancelamento (pode ser null até attachContext)
      * @param {string} [driver.currentDomain] - Domínio atual da sessão (opcional)
@@ -411,9 +411,9 @@ class BiomechanicsEngine extends EventEmitter {
      * Tolerância: STABLE_RECT_TOLERANCE_PX (default: 0.5px).
      *
      * @private
-     * @param {Object} ctx - Context (page ou frame)
+     * @param {object} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do elemento
-     * @returns {Promise<Object|null>} Rect { x, y, w, h } ou null
+     * @returns {Promise<object|null>} Rect { x, y, w, h } ou null
      *
      * @example
      * const rect = await this._executeGetStableRect(ctx, '#button');
@@ -450,9 +450,9 @@ class BiomechanicsEngine extends EventEmitter {
     /**
      * Obtém bounding rect estável do elemento com timeout protection.
      *
-     * @param {Object} ctx - Context (page ou frame)
+     * @param {object} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do elemento
-     * @returns {Promise<Object|null>} Rect { x, y, w, h } ou null
+     * @returns {Promise<object|null>} Rect { x, y, w, h } ou null
      *
      * @throws {Error} Se timeout exceder STABLE_RECT_TIMEOUT_MS
      *
@@ -474,8 +474,8 @@ class BiomechanicsEngine extends EventEmitter {
      *
      * Scroll element into view em todos os níveis de frame hierarchy.
      *
-     * @param {Object} ctx - Context (page ou frame)
-     * @param {Array} frameStack - Stack de frames (nested)
+     * @param {object} ctx - Context (page ou frame)
+     * @param {unknown[]} frameStack - Stack de frames (nested)
      * @param {string} selector - Seletor CSS do elemento
      * @returns {Promise<void>}
      *
@@ -532,9 +532,9 @@ class BiomechanicsEngine extends EventEmitter {
     /**
      * Prepara elemento para interação (scroll + click humanizado + focus).
      *
-     * @param {Object} execContext - Execution context
-     * @param {Object} execContext.ctx - Context (page ou frame)
-     * @param {Array} execContext.frameStack - Stack de frames
+     * @param {object} execContext - Execution context
+     * @param {object} execContext.ctx - Context (page ou frame)
+     * @param {unknown[]} execContext.frameStack - Stack de frames
      * @param {number} execContext.offsetX - Offset X para click
      * @param {number} execContext.offsetY - Offset Y para click
      * @param {string} selector - Seletor CSS do elemento
@@ -581,7 +581,7 @@ class BiomechanicsEngine extends EventEmitter {
     /**
      * Limpa input (cross-platform: keyboard select-all + evaluate clear).
      *
-     * @param {Object} ctx - Context (page ou frame)
+     * @param {object} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do input
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
      * @returns {Promise<void>}
@@ -645,7 +645,7 @@ class BiomechanicsEngine extends EventEmitter {
      * Executa digitação interna (zen mode ou human mode).
      *
      * @private
-     * @param {Object} ctx - Context (page ou frame)
+     * @param {object} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do input
      * @param {string} text - Texto a digitar
      * @param {AbortSignal} signal - AbortSignal para cancelamento
@@ -728,7 +728,7 @@ class BiomechanicsEngine extends EventEmitter {
      * - **Zen Mode**: textos > ZEN_MODE_THRESHOLD_CHARS (default: 2000)
      * - **Human Mode**: textos <= threshold (digitação biomimética com velocidade variável)
      *
-     * @param {Object} ctx - Context (page ou frame)
+     * @param {object} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do input
      * @param {string} text - Texto a digitar
      * @param {AbortSignal} signal - AbortSignal para cancelamento
@@ -789,7 +789,7 @@ class BiomechanicsEngine extends EventEmitter {
     /**
      * Retorna estatísticas de biomechanics.
      *
-     * @returns {Object} Objeto com métricas de biomechanics
+     * @returns {object} Objeto com métricas de biomechanics
      * Propriedades do objeto retornado:
      *   - totalClicks (number): Total de cliques executados
      *   - totalTyping (number): Total de digitações
@@ -853,7 +853,7 @@ class BiomechanicsEngine extends EventEmitter {
 /**
  * Factory function para criar instância de BiomechanicsEngine.
  *
- * @param {Object} driver - Instância do driver
+ * @param {object} driver - Instância do driver
  * @returns {BiomechanicsEngine} Nova instância
  *
  * @example

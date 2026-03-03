@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import path from 'node:path';
 
 console.log('\n🧪 SADI Analyzer v4.0 - Upgrade Validation\n');

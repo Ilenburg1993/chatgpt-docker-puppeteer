@@ -56,7 +56,7 @@ function _setModelEnabled(id, enabled) {
 
 /**
  * Função exportada: upsertInferenceModel.
- * @returns {any}
+ * @returns {InferenceModel|null}
  */
 function upsertInferenceModel(input = {}) {
     const db = getDb();
@@ -110,7 +110,8 @@ function upsertInferenceModel(input = {}) {
 
 /**
  * Função exportada: getInferenceModelById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {InferenceModel|null}
  */
 function getInferenceModelById(id) {
     const db = getDb();
@@ -119,7 +120,7 @@ function getInferenceModelById(id) {
 
 /**
  * Função exportada: listInferenceModels.
- * @returns {any}
+ * @returns {InferenceModel[]}
  */
 function listInferenceModels({ backendId = null, enabledOnly = false, limit = 200 } = {}) {
     const db = getDb();
@@ -143,7 +144,7 @@ function listInferenceModels({ backendId = null, enabledOnly = false, limit = 20
 
 /**
  * Função exportada: setInferenceModelEnabled.
- * @returns {any}
+ * @returns {InferenceModel|null}
  */
 function setInferenceModelEnabled(id, enabled) {
     return _setModelEnabled(id, Boolean(enabled));

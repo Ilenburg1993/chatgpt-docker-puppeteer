@@ -22,8 +22,8 @@ const TelemetrySeverity = Object.freeze({
 /** Classe exportada: KernelTelemetry. */
 class KernelTelemetry {
     /**
-     * @param {Object} [config]
-     * @param {Object} [config.nerv]
+     * @param {object} [config]
+     * @param {object} [config.nerv]
      * Instância do NERV para emissão de eventos (OBRIGATÓRIO após ONDA 2).
      *
      * @param {string} [config.source]
@@ -75,13 +75,13 @@ class KernelTelemetry {
      * @param {string} type
      * Tipo canônico do evento (ex.: 'task_created').
      *
-     * @param {Object} [payload]
+     * @param {object} [payload]
      * Dados observáveis.
      *
      * @param {string} [severity]
      * Severidade (INFO, WARNING, CRITICAL).
      *
-     * @returns {Promise<Object>}
+     * @returns {Promise<object>}
      * Evento criado.
      */
     async emitEvent(type, payload = {}, severity = TelemetrySeverity.INFO) {
@@ -291,10 +291,10 @@ class KernelTelemetry {
      * Registra observador de telemetria via NERV.
      * ONDA 2.5: Usa NERV.onEvent() ao invés de EventEmitter interno.
      *
-     * @param {Function} handler
+     * @param {function} handler
      * Função chamada para cada evento de telemetria do Kernel.
      *
-     * @returns {Function}
+     * @returns {function}
      * Função de unsubscribe.
      */
     onEvent(handler) {

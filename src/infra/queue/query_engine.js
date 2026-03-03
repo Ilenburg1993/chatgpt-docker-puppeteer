@@ -5,7 +5,7 @@ import { STATUS_VALUES } from '#core/constants/tasks';
 /**
  * Filtra e ordena as tarefas concluídas de um projeto específico.
  * @param {string} projectId - Identificador do projeto.
- * @returns {Promise<Array>} Lista ordenada (Mais recente primeiro).
+ * @returns {Promise<Array<object>>} Lista ordenada (Mais recente primeiro).
  */
 async function getProjectContext(projectId) {
     // Adquire snapshot estável e imutável
@@ -36,7 +36,7 @@ async function getProjectContext(projectId) {
 /**
  * Localiza uma tarefa específica pelo seu Identificador Único (UUID).
  * @param {string} taskId - ID da tarefa.
-  * @returns {Promise<any>}
+  * @returns {Promise<object[]>}
  */
 async function findById(taskId) {
     if (!taskId) {
@@ -50,7 +50,7 @@ async function findById(taskId) {
 
 /**
  * Localiza a última tarefa concluída com sucesso em um projeto.
-  * @returns {Promise<any>}
+  * @returns {Promise<object[]>}
  */
 async function findLast(projectId) {
     const context = await getProjectContext(projectId);
@@ -59,7 +59,7 @@ async function findLast(projectId) {
 
 /**
  * Localiza a última tarefa concluída que possui uma tag específica.
-  * @returns {Promise<any>}
+  * @returns {Promise<object[]>}
  */
 async function findLastByTag(projectId, tag) {
     if (!tag) {
@@ -73,7 +73,7 @@ async function findLastByTag(projectId, tag) {
 
 /**
  * Localiza a primeira tarefa (mais antiga) concluída com uma tag específica.
-  * @returns {Promise<any>}
+  * @returns {Promise<object[]>}
  */
 async function findFirstByTag(projectId, tag) {
     if (!tag) {

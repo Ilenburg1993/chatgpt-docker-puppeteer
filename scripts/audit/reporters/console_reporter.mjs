@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @param {{ runId: string, profile: string, progress: any, eta: any, phase: string, message: string }} payload
+ * @param {{ runId: string, profile: string, progress: unknown, eta: unknown, phase: string, message: string }} payload
   * @returns {void}
  */
 export function printProgress(payload) {

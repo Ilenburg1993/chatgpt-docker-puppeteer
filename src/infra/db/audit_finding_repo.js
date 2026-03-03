@@ -40,7 +40,7 @@ function _rowToFinding(row) {
 
 /**
  * Função exportada: upsertAuditFinding.
- * @returns {any}
+ * @returns {AuditFinding|null}
  */
 function upsertAuditFinding(input = {}) {
     const db = getDb();
@@ -104,7 +104,8 @@ function upsertAuditFinding(input = {}) {
 
 /**
  * Função exportada: getAuditFindingById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {AuditFinding|null}
  */
 function getAuditFindingById(id) {
     const db = getDb();
@@ -113,7 +114,7 @@ function getAuditFindingById(id) {
 
 /**
  * Função exportada: listAuditFindingsByJobId.
- * @returns {any}
+ * @returns {AuditFinding[]}
  */
 function listAuditFindingsByJobId(jobId, { limit = 200 } = {}) {
     const db = getDb();

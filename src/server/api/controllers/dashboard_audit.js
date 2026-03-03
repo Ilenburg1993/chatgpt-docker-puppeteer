@@ -235,8 +235,8 @@ function _isDiagnosticKind(kind) {
 
 /**
  * Filter diagnostic jobs from list
- * @param {Array} jobs
- * @returns {Array}
+ * @param {unknown[]} jobs
+ * @returns {unknown[]}
  */
 function _filterDiagnosticJobs(jobs) {
     return (jobs || []).filter(job => _isDiagnosticKind(job.kind));

@@ -45,11 +45,11 @@ export const RetryStrategy = Object.freeze({
  * Classify error for retry decision
  *
  * @param {Error} error - Error object from tool execution
- * @param {Object} context - Execution context
+ * @param {object} context - Execution context
  * @param {string} [context.tool] - Tool name (e.g., 'ollama_generate')
  * @param {string} [context.model] - Model being used (for fallback suggestion)
  * @param {number} [context.attempt] - Current attempt number
- * @returns {Object} Classification result with strategy
+ * @returns {object} Classification result with strategy
  *
  * @example
  * const classification = classifyError(new Error('ECONNREFUSED'), {
@@ -305,7 +305,7 @@ export function calculateBackoff(attempt, baseDelayMs, maxDelayMs = 60000) {
  * Check if error is retryable based on classification
  *
  * @param {Error} error - Error to check
- * @param {Object} context - Context for classification
+ * @param {object} context - Context for classification
  * @returns {boolean} True if error is retryable
  *
  * @example
@@ -321,7 +321,7 @@ export function isRetryable(error, context = {}) {
  * Get human-readable error summary
  *
  * @param {Error} error - Error to summarize
- * @param {Object} context - Context for classification
+ * @param {object} context - Context for classification
  * @returns {string} Human-readable summary
  *
  * @example

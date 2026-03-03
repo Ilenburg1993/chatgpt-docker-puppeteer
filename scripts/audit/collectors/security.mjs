@@ -41,7 +41,7 @@ function collectJsFiles(currentDir, files) {
 }
 
 /**
- * @param {{ rootDir: string, contracts?: any[] }} options
+ * @param {{ rootDir: string, contracts?: unknown[] }} options
  * @returns {Promise<{
  *   findings: RawFinding[],
  *   errors: Array<{source:string,message:string}>,

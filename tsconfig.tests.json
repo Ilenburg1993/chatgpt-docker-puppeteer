@@ -9,13 +9,8 @@
     "types": ["node"]
   },
   "include": [
-    "tests/unit/audit/test_impact_classifier_scope_matrix.spec.js",
-    "tests/unit/audit/test_jsdoc_coverage_engine_exports_detection.spec.js",
-    "tests/unit/audit/test_jsdoc_coverage_engine_tag_validation.spec.js",
-    "tests/unit/audit/test_quality_collector_smart_plan_resolution.spec.js",
-    "tests/unit/audit/test_quality_collector_fallback_rules.spec.js",
-    "tests/unit/audit/test_quality_parsers_eslint_json.spec.js",
-    "tests/unit/audit/test_quality_parsers_prettier_check.spec.js"
+    "tests/unit/audit/**/*.js",
+    "tests/unit/audit/**/*.mjs"
   ],
   "exclude": [
     "node_modules",

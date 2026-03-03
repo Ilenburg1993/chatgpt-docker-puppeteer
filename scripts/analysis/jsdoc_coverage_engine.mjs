@@ -4,7 +4,7 @@ import path from 'node:path';
 import ts from 'typescript';
 
 /** Schema version for the JSON report emitted by the JSDoc coverage tooling. */
-export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.0.0';
+export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.1.0';
 
 /** @typedef {'none'|'minimal'|'complete'} JSDocQualityLevel */
 /** @typedef {'function'|'class'|'const'|'typedef'|'reexport'|'unknown'} ExportKind */
@@ -90,6 +90,8 @@ export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.0.0';
  *   functions_with_options_typedef: number,
  *   functions_missing_options_typedef: number,
  *   unsafe_generic_tags_total: number,
+ *   public_any_tags_total: number,
+ *   public_unknown_tags_total: number,
  *   public_symbols_using_import_types: number,
  *   public_symbols_using_template_tags: number,
  *   by_path_prefix: Record<string, PathPrefixReport>,
@@ -107,8 +109,30 @@ const TYPEDEF_OBJECT_RE = /@typedef\s+\{(?:object|Object)\}\s+([A-Za-z_$][\w$]*)
 const PARAM_TYPE_RE = /@param\s+\{([^}]+)\}\s+(?:\[)?([A-Za-z_$][\w$]*)/g;
 const ANY_TAG_RE = /\bany\b/g;
 const UNKNOWN_TAG_RE = /\bunknown\b/g;
-const UNSAFE_GENERIC_RE = /\b(?:Object|Array|Function)\b|Promise<\s*any\s*>|\bany\b/g;
+/** Matches unsafe generic types ONLY within JSDoc type annotation positions ({...}).
+ *  - Object: bare (not Object.<T> or Object<T>) — use Record<K,V> or object instead.
+ *  - Array: bare without type argument — Array<string> is fine, bare Array is not.
+ *  - Function: bare (any casing) — prefer typed function signatures.
+ *  - any: as a type (not in description text — enforced by extractTypeAnnotations).
+ *  Avoids false positives from natural-language uses of "any" in descriptions. */
+const UNSAFE_GENERIC_IN_TYPE_RE = /\bObject\b(?!\s*[.<])|Promise<\s*any\s*>|\bArray\b(?!\s*<)|\bFunction\b|\bany\b/g;
 const IMPORT_TYPE_RE = /\bimport\s*\(/;
+
+/**
+ * Extracts the concatenated content of all `{...}` type annotations from a JSDoc block.
+ * Used to scope `UNSAFE_GENERIC_IN_TYPE_RE` checks to type-position text only.
+ * @param {string} jsdocText
+ * @returns {string}
+ */
+function extractTypeAnnotations(jsdocText) {
+    const parts = [];
+    const re = /\{([^}]+)\}/g;
+    let m;
+    while ((m = re.exec(jsdocText)) !== null) {
+        parts.push(m[1]);
+    }
+    return parts.join(' ');
+}
 
 /** @param {string} input */
 function norm(input) {
@@ -376,7 +400,8 @@ function buildAssessment(node, sourceFile, exportName, kind, declaredTypedefs) {
     const optionParamNames = collectOptionParamNames(node);
     const hasOptionsParam = optionParamNames.length > 0;
     const hasOptionsTypedefValue = hasOptionsTypedef(jsdocText, optionParamNames, declaredTypedefs);
-    const unsafeGenericTagsCount = countMatches(jsdocText, UNSAFE_GENERIC_RE);
+    const typeAnnotationsText = extractTypeAnnotations(jsdocText);
+    const unsafeGenericTagsCount = countMatches(typeAnnotationsText, UNSAFE_GENERIC_IN_TYPE_RE);
     const publicAnyTagsCount = countMatches(jsdocText, ANY_TAG_RE);
     const publicUnknownTagsCount = countMatches(jsdocText, UNKNOWN_TAG_RE);
     const usesImportTypes = IMPORT_TYPE_RE.test(jsdocText);
@@ -595,6 +620,17 @@ export function analyzeJSDocCoverage(options) {
         (total, item) => total + item.public_symbols_using_template_tags,
         0
     );
+    const publicAnyTagsTotal = fileReports.reduce(
+        (total, fileReport) =>
+            total + fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
+        0
+    );
+    const publicUnknownTagsTotal = fileReports.reduce(
+        (total, fileReport) =>
+            total +
+            fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_unknown_tags_count, 0),
+        0
+    );
 
     /** @type {Record<string, PathPrefixReport>} */
     const byPathPrefix = {};
@@ -661,6 +697,8 @@ export function analyzeJSDocCoverage(options) {
         functions_with_options_typedef: functionsWithOptionsTypedef,
         functions_missing_options_typedef: functionsMissingOptionsTypedef,
         unsafe_generic_tags_total: unsafeGenericTagsTotal,
+        public_any_tags_total: publicAnyTagsTotal,
+        public_unknown_tags_total: publicUnknownTagsTotal,
         public_symbols_using_import_types: publicSymbolsUsingImportTypes,
         public_symbols_using_template_tags: publicSymbolsUsingTemplateTags,
         by_path_prefix: byPathPrefix,

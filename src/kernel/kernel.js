@@ -13,30 +13,30 @@ import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
 
 /**
  * Opções para createSsotGatewayKernel.
- * @typedef {Object} SsotGatewayKernelOptions
- * @property {Object} [nerv] - Instância do sistema NERV.
- * @property {Object} [telemetry] - Opções de telemetria.
- * @property {Object} [pump] - Opções do pump.
+ * @typedef {object} SsotGatewayKernelOptions
+ * @property {object} [nerv] - Instância do sistema NERV.
+ * @property {object} [telemetry] - Opções de telemetria.
+ * @property {object} [pump] - Opções do pump.
  * @property {number} [pump.baseIntervalMs] - Intervalo base em ms.
  * @property {number} [pump.drainBatchSize] - Quantidade máxima drenada por tick.
- * @property {Object} [browserPool] - Pool de browsers.
- * @property {Object} [scheduler] - Scheduler de tarefas.
+ * @property {object} [browserPool] - Pool de browsers.
+ * @property {object} [scheduler] - Scheduler de tarefas.
  * @property {Function} [onActivateTask] - Callback para ativação de tarefa.
  * @property {Function} [onTerminateTask] - Callback para terminação de tarefa.
  * @property {Function} [onSuspendTask] - Callback para suspensão de tarefa.
- * @property {Object} [loop] - Opções do loop.
+ * @property {object} [loop] - Opções do loop.
  * @property {string} [mode] - Modo do kernel.
  */
 
 /**
  * Opções para createKernel.
- * @typedef {Object} KernelOptions
+ * @typedef {object} KernelOptions
  * @property {string} [mode='ssot_gateway'] - Modo do kernel.
- * @property {Object} [nerv] - Instância do sistema NERV.
- * @property {Object} [contextManager] - Gerenciador de contexto.
- * @property {Object} [telemetry] - Opções de telemetria.
- * @property {Object} [policy] - Políticas de execução.
- * @property {Object} [loop] - Configuração do loop.
+ * @property {object} [nerv] - Instância do sistema NERV.
+ * @property {object} [contextManager] - Gerenciador de contexto.
+ * @property {object} [telemetry] - Opções de telemetria.
+ * @property {object} [policy] - Políticas de execução.
+ * @property {object} [loop] - Configuração do loop.
  */
 
 /* ===========================
@@ -57,7 +57,7 @@ function _makeRetryableEmitError(err) {
 /**
  * Cria um kernel SSOT-first com gateway de execução e pump NERV.
  * @param {SsotGatewayKernelOptions} [config={}] - Configuração do kernel.
- * @returns {Object} Instância do kernel com métodos start/stop/executeTask.
+ * @returns {object} Instância do kernel com métodos start/stop/executeTask.
  * @throws {Error} Se nerv não for fornecido.
  */
 function createSsotGatewayKernel(config = {}) {
@@ -157,7 +157,7 @@ function createSsotGatewayKernel(config = {}) {
     /**
      * Inicia o kernel e seu loop automático se especificado.
      * Side-effects: Define a variável running como verdadeira, inicia timer se autoLoop for verdadeiro.
-     * @param {Object} [options] - Opções de inicialização.
+     * @param {object} [options] - Opções de inicialização.
      * @param {boolean} [options.autoLoop=true] - Se deve iniciar o loop automático.
      */
     function start({ autoLoop = true } = {}) {
@@ -225,7 +225,7 @@ function createSsotGatewayKernel(config = {}) {
 
     /**
      * Executa uma tarefa através do driver.
-     * @param {Object} task - Tarefa a ser executada.
+     * @param {object} task - Tarefa a ser executada.
      * @param {string} [correlationId] - ID de correlação para rastreamento.
      * @returns {Promise<void>}
      * @throws {Error} Se task.meta.id não for válido ou se ocorrer erro na emissão do comando.
@@ -264,7 +264,7 @@ function createSsotGatewayKernel(config = {}) {
         executeTask,
         /**
          * Obtém o status atual do kernel.
-         * @returns {Object} Status do kernel com informações sobre pump, nerv e telemetria.
+         * @returns {object} Status do kernel com informações sobre pump, nerv e telemetria.
          */
         getStatus() {
             const status = {
@@ -297,19 +297,19 @@ function createSsotGatewayKernel(config = {}) {
 /**
  * Cria e compõe o Kernel de forma explícita e determinística.
  *
- * @param {Object} [config] - Configurações estruturais do Kernel
- * @param {Object} [config.nerv] - Instância do NERV já configurada e conectada (obrigatório)
- * @param {Object} [config.contextManager] - Context manager opcional (injeção externa)
- * @param {Object} [config.telemetry] - Opções da telemetria do Kernel
+ * @param {object} [config] - Configurações estruturais do Kernel
+ * @param {object} [config.nerv] - Instância do NERV já configurada e conectada (obrigatório)
+ * @param {object} [config.contextManager] - Context manager opcional (injeção externa)
+ * @param {object} [config.telemetry] - Opções da telemetria do Kernel
  * @param {string} [config.telemetry.source='kernel'] - Identificador da fonte de telemetria
  * @param {number} [config.telemetry.retention=1000] - Número de eventos a reter em memória
- * @param {Object} [config.policy] - Limites e políticas normativas
+ * @param {object} [config.policy] - Limites e políticas normativas
  * @param {number} [config.policy.maxConcurrentTasks] - Número máximo de tarefas concorrentes
  * @param {number} [config.policy.taskTimeout] - Timeout padrão para tarefas em ms
- * @param {Object} [config.loop] - Opções do kernel_loop (intervalo, scheduler)
+ * @param {object} [config.loop] - Opções do kernel_loop (intervalo, scheduler)
  * @param {number} [config.loop.interval] - Intervalo do loop em ms
  *
- * @returns {Object} Interface pública do Kernel
+ * @returns {object} Interface pública do Kernel
  *
  * @throws {Error} Se NERV não for fornecido
  */
@@ -399,7 +399,7 @@ function createLegacyKernel({
      8. TASK EXECUTION ORCHESTRATOR — Orquestração V5 (V2.0)
   ========================================================= */
 
-    /** @type {Map<string, {task: Object, correlationId: string}>} */
+    /** @type {Map<string, {task: object, correlationId: string}>} */
     const pendingDispatch = new Map();
 
     /** @type {TaskExecutionOrchestrator|null} */
@@ -417,7 +417,7 @@ function createLegacyKernel({
     /**
      * Termina uma tarefa em execução no runtime.
      * Side-effects: Aplica transição de estado para TERMINATED, remove tarefa do runtime.
-     * @param {Object} params - Parâmetros da operação.
+     * @param {object} params - Parâmetros da operação.
      * @param {string} params.taskId - ID da tarefa a ser terminada.
      * @param {string} [params.reason] - Razão para a terminação.
      * @returns {Promise<void>}
@@ -452,7 +452,7 @@ function createLegacyKernel({
     /**
      * Suspende uma tarefa em execução no runtime.
      * Side-effects: Aplica transição de estado para SUSPENDED se aplicável.
-     * @param {Object} params - Parâmetros da operação.
+     * @param {object} params - Parâmetros da operação.
      * @param {string} params.taskId - ID da tarefa a ser suspensa.
      * @param {string} [params.reason] - Razão para a suspensão.
      * @returns {Promise<void>}
@@ -473,7 +473,7 @@ function createLegacyKernel({
     /**
      * Ativa uma tarefa no runtime do kernel.
      * Side-effects: Aplica transição de estado para ACTIVE, despacha tarefa para executor.
-     * @param {Object} params - Parâmetros da operação.
+     * @param {object} params - Parâmetros da operação.
      * @param {string} params.taskId - ID da tarefa a ser ativada.
      * @param {string} [params.reason] - Razão para a ativação.
      * @returns {Promise<void>}
@@ -550,7 +550,7 @@ function createLegacyKernel({
      9. KERNEL LOOP — Tempo soberano e ciclo executivo
   ========================================================= */
 
-    const kernelLoopOptions = /** @type {any} */ ({
+    const kernelLoopOptions = /** @type {unknown} */ ({
         executionEngine,
         nervBridge,
         telemetry,
@@ -585,7 +585,7 @@ function createLegacyKernel({
         /**
          * Inicia o kernel e seus componentes.
          * Side-effects: Inicia nervBridge e kernelLoop.
-         * @param {Object} [options] - Opções de inicialização.
+         * @param {object} [options] - Opções de inicialização.
          * @param {boolean} [options.autoLoop=true] - Se deve iniciar o loop automático.
          */
         start({ autoLoop = true } = {}) {
@@ -615,7 +615,7 @@ function createLegacyKernel({
 
         /**
          * Obtém o status atual do kernel.
-         * @returns {Object} Status do kernel com informações sobre loop, tarefas, observações, nerv e telemetria.
+         * @returns {object} Status do kernel com informações sobre loop, tarefas, observações, nerv e telemetria.
          */
         getStatus() {
             return Object.freeze({
@@ -640,10 +640,10 @@ function createLegacyKernel({
 
         /**
          * Cria uma nova tarefa no runtime.
-         * @param {Object} params - Parâmetros da tarefa.
+         * @param {object} params - Parâmetros da tarefa.
          * @param {string} params.taskId - ID da tarefa.
-         * @param {Object} [params.metadata={}] - Metadados adicionais.
-         * @returns {Object} Tarefa criada.
+         * @param {object} [params.metadata={}] - Metadados adicionais.
+         * @returns {object} Tarefa criada.
          */
         createTask({ taskId, metadata = {} }) {
             return taskRuntime.createTask({ taskId, metadata });
@@ -652,7 +652,7 @@ function createLegacyKernel({
         /**
          * Obtém uma tarefa específica do runtime.
          * @param {string} taskId - ID da tarefa.
-         * @returns {Object|null} Tarefa correspondente ou null se não encontrada.
+         * @returns {object|null} Tarefa correspondente ou null se não encontrada.
          */
         getTask(taskId) {
             return taskRuntime.getTask(taskId);
@@ -660,7 +660,7 @@ function createLegacyKernel({
 
         /**
          * Lista todas as tarefas no runtime.
-         * @returns {Array<Object>} Lista de tarefas.
+         * @returns {Array<object>} Lista de tarefas.
          */
         listTasks() {
             return taskRuntime.listTasks();
@@ -669,7 +669,7 @@ function createLegacyKernel({
         /**
          * Executa uma tarefa no kernel.
          * Side-effects: Cria ou atualiza runtime da tarefa, adiciona à fila de despacho pendente.
-         * @param {Object} task - Tarefa a ser executada.
+         * @param {object} task - Tarefa a ser executada.
          * @param {string} [correlationId] - ID de correlação para rastreamento.
          * @returns {Promise<void>}
          * @throws {Error} Se task.meta.id não for válido.
@@ -743,7 +743,7 @@ function createLegacyKernel({
  * - Opcional: Kernel legado "decisor soberano" (mode='legacy')
  *
  * @param {KernelOptions|SsotGatewayKernelOptions} [config={}] - Configuração do kernel.
- * @returns {Object} Instância do kernel configurado.
+ * @returns {object} Instância do kernel configurado.
  * Side-effects: Cria e inicializa os componentes do kernel conforme a configuração.
  */
 function createKernel(config = {}) {

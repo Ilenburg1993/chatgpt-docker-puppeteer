@@ -75,8 +75,8 @@ function ensureConfigUpdatedListener() {
         log('INFO', `[HUB] Socket CORS allowlist atualizada (${dashboardAllowedOrigins.size} origens)`);
     };
 
-    if (typeof (/** @type {any} */ (CONFIG).on) === 'function') {
-        /** @type {any} */ (CONFIG).on('updated', configUpdatedHandler);
+    if (typeof (/** @type {unknown} */ (CONFIG).on) === 'function') {
+        /** @type {unknown} */ (CONFIG).on('updated', configUpdatedHandler);
     }
 }
 
@@ -84,8 +84,8 @@ function removeConfigUpdatedListener() {
     if (!configUpdatedHandler) {
         return;
     }
-    if (typeof (/** @type {any} */ (CONFIG).off) === 'function') {
-        /** @type {any} */ (CONFIG).off('updated', configUpdatedHandler);
+    if (typeof (/** @type {unknown} */ (CONFIG).off) === 'function') {
+        /** @type {unknown} */ (CONFIG).off('updated', configUpdatedHandler);
     }
     configUpdatedHandler = null;
 }
@@ -105,7 +105,7 @@ function verifyDashboardToken(token) {
     }
 
     try {
-        const decoded = /** @type {any} */ (
+        const decoded = /** @type {unknown} */ (
             jwt.verify(token, getJwtSecret(), /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS))
         );
         const jti = decoded?.jti;
@@ -261,7 +261,7 @@ function init(httpServer) {
                 }
 
                 if (policy.authRequired) {
-                    const dashboardUser = /** @type {any} */ (socket.dashboardUser);
+                    const dashboardUser = /** @type {unknown} */ (socket.dashboardUser);
                     const userRole = dashboardUser?.role || null;
                     const roleAllowed = userRole === policy.commandRole || userRole === 'owner';
                     const permAllowed = hasPermission(dashboardUser, RBAC_PERMISSIONS.DASHBOARD_COMMAND);
@@ -482,7 +482,7 @@ async function stop() {
 
 /**
  * Notify: Broadcast global informativo para todos os conectados.
-  * @returns {any}
+  * @returns {void}
  */
 function notify(event, data) {
     if (!ioInstance) {
@@ -495,7 +495,7 @@ function notify(event, data) {
 /**
  * Notify agents (system room) with a lightweight signal event.
  * Used for wake-ups (e.g. cache invalidation) without a full IPC envelope.
-  * @returns {any}
+  * @returns {void}
  */
 function notifyAgent(event, data = {}) {
     if (!ioInstance) {
@@ -509,8 +509,8 @@ function notifyAgent(event, data = {}) {
  * P9.8: Broadcast de task update com debouncing de 50ms.
  * Acumula updates em buffer e envia em batch para reduzir overhead.
  *
- * @param {string|Object} taskId - ID da task ou objeto {taskId, state}
- * @param {Object} [data] - Dados do update (opcional se taskId for objeto)
+ * @param {string|object} taskId - ID da task ou objeto {taskId, state}
+ * @param {object} [data] - Dados do update (opcional se taskId for objeto)
   * @returns {void}
  */
 function broadcastTaskUpdate(taskId, data) {

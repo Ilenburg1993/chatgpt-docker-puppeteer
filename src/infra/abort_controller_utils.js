@@ -14,10 +14,10 @@
  * Executes an operation with a timeout using Promise.race and AbortController.
  * Guarantees proper cleanup of timers and signals abort on completion or error.
  *
- * @param {Function} operation - Function that returns a Promise
+ * @param {function} operation - Function that returns a Promise
  * @param {number} timeoutMs - Timeout in milliseconds
  * @param {string} [timeoutMessage='Operation timed out'] - Error message for timeout
- * @returns {Promise<*>} Result of the operation
+ * @returns {Promise<unknown>} Result of the operation
  * @throws {Error} If timeout occurs or operation fails
  *
  * @example
@@ -63,10 +63,10 @@ export async function withTimeout(operation, timeoutMs, timeoutMessage = 'Operat
  * Executes an operation that accepts an AbortSignal with automatic timeout.
  * The operation receives the signal and should respect it for cancellation.
  *
- * @param {Function} operation - Function that accepts AbortSignal and returns Promise
+ * @param {function} operation - Function that accepts AbortSignal and returns Promise
  * @param {number} timeoutMs - Timeout in milliseconds
  * @param {string} [timeoutMessage='Operation aborted'] - Error message for timeout
- * @returns {Promise<*>} Result of the operation
+ * @returns {Promise<unknown>} Result of the operation
  * @throws {Error} If timeout occurs or operation fails
  *
  * @example
@@ -112,7 +112,7 @@ export async function withAbort(operation, timeoutMs, timeoutMessage = 'Operatio
  *
  * @param {number} timeoutMs - Timeout in milliseconds
  * @param {string} [timeoutMessage='Operation timed out'] - Error message for timeout
- * @returns {{promise: Promise<any>, controller: AbortController, cleanup: Function}}
+ * @returns {{promise: Promise<void>, controller: AbortController, cleanup: function}}
  *
  * @example
  * const { promise: timeoutPromise, cleanup } = createSharedTimeout(5000, 'FOCUS_TIMEOUT');
@@ -154,10 +154,10 @@ export function createSharedTimeout(timeoutMs, timeoutMessage = 'Operation timed
  * Wraps multiple operations in a single timeout context.
  * If any operation exceeds the total timeout, all are aborted.
  *
- * @param {Array<Function>} operations - Array of functions returning Promises
+ * @param {Array<function>} operations - Array of functions returning Promises
  * @param {number} timeoutMs - Total timeout for all operations
  * @param {string} [timeoutMessage='Operations timed out'] - Error message
- * @returns {Promise<Array>} Array of results from all operations
+ * @returns {Promise<unknown[]>} Array of results from all operations
  * @throws {Error} If timeout occurs or any operation fails
  *
  * @example
@@ -189,13 +189,13 @@ export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 
  * Executes an operation with retries and timeout per attempt.
  * Each retry gets a fresh timeout, and exponential backoff is applied.
  *
- * @param {Function} operation - Function that returns a Promise
- * @param {Object} options - Configuration options
+ * @param {function} operation - Function that returns a Promise
+ * @param {object} options - Configuration options
  * @param {number} [options.maxRetries] - Maximum number of retry attempts (default: 3)
  * @param {number} [options.timeoutMs] - Timeout per attempt in milliseconds (default: 5000)
  * @param {number} [options.backoffMs] - Base backoff delay in milliseconds (default: 100)
- * @param {Function} [options.shouldRetry] - Function to determine if error is retryable (default: all errors retry)
- * @returns {Promise<*>} Result of the operation
+ * @param {function} [options.shouldRetry] - Function to determine if error is retryable (default: all errors retry)
+ * @returns {Promise<unknown>} Result of the operation
  * @throws {Error} If all retries fail
  *
  * @example
@@ -269,8 +269,8 @@ export function isAbortError(error) {
  * Creates a cancellable operation that can be manually aborted.
  * Returns the operation promise and a cancel function.
  *
- * @param {Function} operation - Function that accepts AbortSignal and returns Promise
- * @returns {{promise: Promise<*>, cancel: Function}}
+ * @param {function} operation - Function that accepts AbortSignal and returns Promise
+ * @returns {{promise: Promise<unknown>, cancel: function}}
  *
  * @example
  * const { promise, cancel } = createCancellable(async (signal) => {

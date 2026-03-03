@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import fs from 'node:fs';
 // @ts-nocheck
 import path from 'node:path';
@@ -99,9 +100,9 @@ class ConfigValidator {
     /**
      * Valida um arquivo de configuração específico com base em sua especificação.
      * @param {string} filename - Nome do arquivo a ser validado.
-     * @param {Object} spec - Especificação de validação do arquivo.
+     * @param {object} spec - Especificação de validação do arquivo.
      * @param {boolean} spec.required - Indica se o arquivo é obrigatório.
-     * @param {Object} [spec.schema] - Schema de validação para arquivos JSON.
+     * @param {object} [spec.schema] - Schema de validação para arquivos JSON.
      * @param {string} [spec.warning] - Mensagem de aviso para arquivos opcionais.
      * @returns {boolean} Verdadeiro se o arquivo é válido, falso caso contrário.
      */

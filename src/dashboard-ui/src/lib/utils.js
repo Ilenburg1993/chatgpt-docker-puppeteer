@@ -5,7 +5,7 @@ import { twMerge } from 'tailwind-merge';
 /**
  * Utility para combinar classes Tailwind CSS
  * Remove classes duplicadas e resolve conflitos
-  * @returns {any}
+  * @returns {object}
  */
 export function cn(...inputs) {
     return twMerge(clsx(inputs));

@@ -28,7 +28,7 @@ function asPlainObject(value, fallback = {}) {
 
 /**
  * Converte profile persistido para layer compatível com `resolveInferencePolicy`.
- * @param {any} profile
+ * @param {object} profile
  */
 function profileToPolicyLayer(profile) {
     const generation = asPlainObject(profile?.generation_params_json, {});
@@ -47,7 +47,7 @@ function profileToPolicyLayer(profile) {
 
 /**
  * Converte policy de cliente persistida para layer compatível com `resolveInferencePolicy`.
- * @param {any} policy
+ * @param {object} policy
  */
 function clientPolicyToLayer(policy) {
     const degraded = asPlainObject(policy?.degraded_behavior_json, {});

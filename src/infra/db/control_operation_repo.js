@@ -55,7 +55,7 @@ function _rowToOperation(row) {
 
 /**
  * Função exportada: createControlOperation.
- * @returns {any}
+ * @returns {ControlOperation|null}
  */
 function createControlOperation({
     command,
@@ -109,7 +109,8 @@ function createControlOperation({
 
 /**
  * Função exportada: getControlOperationById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {ControlOperation|null}
  */
 function getControlOperationById(id) {
     const db = getDb();
@@ -119,7 +120,7 @@ function getControlOperationById(id) {
 
 /**
  * Função exportada: getControlOperationByIdempotencyKey.
- * @returns {any}
+ * @returns {ControlOperation|null}
  */
 function getControlOperationByIdempotencyKey(idempotencyKey) {
     const db = getDb();
@@ -131,7 +132,7 @@ function getControlOperationByIdempotencyKey(idempotencyKey) {
 
 /**
  * Função exportada: updateControlOperation.
- * @returns {any}
+ * @returns {ControlOperation|null}
  */
 function updateControlOperation(id, updates = {}) {
     const db = getDb();
@@ -169,7 +170,7 @@ function updateControlOperation(id, updates = {}) {
 
 /**
  * Função exportada: listControlOperations.
- * @returns {any}
+ * @returns {ControlOperation[]}
  */
 function listControlOperations({ limit = 100, entityType = null, entityId = null } = {}) {
     const db = getDb();

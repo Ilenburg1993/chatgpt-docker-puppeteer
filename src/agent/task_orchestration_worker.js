@@ -20,8 +20,8 @@ import fs from 'node:fs/promises';
 
 /**
  * Options for `TaskOrchestrationWorker` constructor.
- * @typedef {Object} WorkerOptions
- * @property {any} [browserPool] - Browser pool instance used for circuit-breaker checks.
+ * @typedef {object} WorkerOptions
+ * @property {unknown} [browserPool] - Browser pool instance used for circuit-breaker checks.
  * @property {string} [workerId] - Optional worker identifier.
  * @property {number} [intervalMs] - Tick interval in milliseconds.
  * @property {number} [batchSize] - Maximum number of tasks to fetch per tick.
@@ -30,25 +30,25 @@ import fs from 'node:fs/promises';
  */
 
 /**
- * @typedef {Object} OutputMissingEscalation
+ * @typedef {object} OutputMissingEscalation
  * @property {number} windowMs - Time window in milliseconds to count missing-output events.
  * @property {number} threshold - Number of occurrences in window before blocking the task.
  */
 
 /**
  * Row returned by the worker's DB query in `tick()`.
- * @typedef {Object} TaskRow
- * @property {any} id
- * @property {any} mission_id
+ * @typedef {object} TaskRow
+ * @property {unknown} id
+ * @property {unknown} mission_id
  * @property {string|null} task_json
  * @property {string|null} result_json
- * @property {any} latest_attempt_id
+ * @property {unknown} latest_attempt_id
  * @property {number} updated_at_ms
  */
 
 /**
  * Minimal in-memory Task shape (parsed from task_json). Fields are optional and dynamic.
- * @typedef {Object} Task
+ * @typedef {object} Task
  * @property {Object<string, any>} [spec]
  * @property {Object<string, any>} [meta]
  * @property {Object<string, any>} [state]
@@ -58,15 +58,15 @@ import fs from 'node:fs/promises';
 
 /**
  * Partial Attempt record shape.
- * @typedef {Object} Attempt
- * @property {any} id
- * @property {any} response_v2_json_artifact_id
- * @property {any} response_text_artifact_id
+ * @typedef {object} Attempt
+ * @property {unknown} id
+ * @property {unknown} response_v2_json_artifact_id
+ * @property {unknown} response_text_artifact_id
  */
 
 /**
  * Result returned by ValidationService.validate().
- * @typedef {Object} ValidationResult
+ * @typedef {object} ValidationResult
  * @property {boolean} passed
  * @property {number} overall_score
  * @property {Array<string|Object>} issues
@@ -74,7 +74,7 @@ import fs from 'node:fs/promises';
 
 /**
  * Workflow orchestration state stored inside `task.state.workflow_state`.
- * @typedef {Object} WorkflowState
+ * @typedef {object} WorkflowState
  * @property {number} current_step_index
  * @property {string[]} completed_steps
  * @property {string[]} failed_steps
@@ -83,7 +83,7 @@ import fs from 'node:fs/promises';
 
 /**
  * Return shape from `putText()` used to create artifacts.
- * @typedef {Object} PutTextResult
+ * @typedef {object} PutTextResult
  * @property {string} mime
  * @property {number} sizeBytes
  * @property {string} sha256
@@ -92,7 +92,7 @@ import fs from 'node:fs/promises';
 
 /**
  * Shape of event records passed to `recordEvent()`.
- * @typedef {Object} EventRecord
+ * @typedef {object} EventRecord
  * @property {string} entityType
  * @property {string|number} entityId
  * @property {number} tsMs
@@ -104,8 +104,8 @@ import fs from 'node:fs/promises';
 
 /**
  * Minimal DB interface expected from `getDb()` (better-sqlite3-like).
- * @typedef {Object} DBInterface
- * @property {function(string): {get: function(...any): any, all: function(...any): any[], run: function(...any): {changes?: number}}} prepare
+ * @typedef {object} DBInterface
+ * @property {function(string): {get: function(...any): unknown, all: function(...any): unknown[], run: function(...any): {changes?: number}}} prepare
  */
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -242,8 +242,8 @@ function _ensureArray(value) {
 /**
  * Add or replace an input object into an inputs array by matching `type` or `label`.
  * @private
- * @param {{inputs?: Array<Object>, next?: Object}} [opts]
- * @returns {Array<Object>}
+ * @param {{inputs?: Array<object>, next?: object}} [opts]
+ * @returns {Array<object>}
  */
 function _setOrReplaceInput({ inputs, next } = {}) {
     const list = _ensureArray(inputs).filter(Boolean);
@@ -403,7 +403,7 @@ class TaskOrchestrationWorker {
     /**
      * Check events table to see whether orchestration was already applied for a given task+attempt.
      * @private
-     * @param {{taskId?: any, attemptId?: any}} [opts]
+     * @param {{taskId?: unknown, attemptId?: unknown}} [opts]
      * @returns {boolean}
      */
     _hasAppliedOrchestration({ taskId, attemptId } = {}) {
@@ -416,7 +416,7 @@ class TaskOrchestrationWorker {
      * Try to claim orchestration lock on a task row using ResilientLockManager.
      * ✅ P0-2.5: Usa ResilientLockManager para garantir cleanup automático em crash.
      * @private
-     * @param {{taskId?: any, nowMs?: number, lockTtlMs?: number}} [opts]
+     * @param {{taskId?: unknown, nowMs?: number, lockTtlMs?: number}} [opts]
      * @returns {Promise<boolean>} True when lock was acquired.
      */
     async _claimOrchestrationLock({ taskId, nowMs, lockTtlMs = 300000 } = {}) {
@@ -628,7 +628,7 @@ class TaskOrchestrationWorker {
     /**
      * Handle missing output for an attempt. If threshold exceeded inside window, blocks the task.
      * @private
-     * @param {{taskId?: any, attemptId?: any}} [opts]
+     * @param {{taskId?: unknown, attemptId?: unknown}} [opts]
      * @returns {Promise<boolean>} True if task was blocked due to missing output.
      */
     async _handleMissingOutput({ taskId, attemptId } = {}) {
@@ -698,7 +698,7 @@ class TaskOrchestrationWorker {
     /**
      * Handle ITERATIVE orchestration: validate output, persist iteration_state, schedule retry or block.
      * @private
-     * @param {{taskId?: any, attemptId?: any, task?: any, outputText?: any}} [opts]
+     * @param {{taskId?: unknown, attemptId?: unknown, task?: unknown, outputText?: unknown}} [opts]
      * @returns {Promise<void>}
      */
     async _handleIterative({ taskId, attemptId, task, outputText } = {}) {
@@ -942,8 +942,8 @@ class TaskOrchestrationWorker {
     /**
      * Persist a human-readable feedback artifact and register it in the artifacts repo.
      * @private
-     * @param {{taskId?: any, attemptId?: any, validationResult?: any, outputPreview?: any}} [opts]
-     * @returns {Promise<any>} Artifact id returned by insertArtifact().
+     * @param {{taskId?: unknown, attemptId?: unknown, validationResult?: unknown, outputPreview?: unknown}} [opts]
+     * @returns {Promise<void>} Artifact id returned by insertArtifact().
      */
     async _persistFeedbackArtifact({ taskId, attemptId, validationResult, outputPreview } = {}) {
         const now = _now();
@@ -1004,7 +1004,7 @@ class TaskOrchestrationWorker {
     /**
      * Handle MULTI_STEP orchestration: update workflow_state, persist completed step and create child task for next step.
      * @private
-     * @param {{taskId?: any, attemptId?: any, task?: any, outputText?: any}} [opts]
+     * @param {{taskId?: unknown, attemptId?: unknown, task?: unknown, outputText?: unknown}} [opts]
      * @returns {Promise<void>}
      */
     async _handleMultiStep({ taskId, attemptId, task, outputText } = {}) {

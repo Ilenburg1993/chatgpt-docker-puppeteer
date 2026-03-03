@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // @ts-nocheck
 import ts from 'typescript';
 import fs from 'node:fs';
@@ -372,8 +373,8 @@ if (options.exportJson) {
     const output = {
         timestamp: new Date().toISOString(),
         stats: moduleStats,
-        dependencies: Object.fromEntries(dependencyGraph),
-        reverseDependencies: Object.fromEntries(reverseGraph),
+        dependencies: object.fromEntries(dependencyGraph),
+        reverseDependencies: object.fromEntries(reverseGraph),
         nervEvents,
         circular: options.findCircular ? findCircularDependencies() : [],
         orphans: options.findOrphans ? findOrphans() : [],

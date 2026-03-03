@@ -24,7 +24,7 @@ const THRESHOLD = 0;
 const allowlist = existsSync(ALLOWLIST_PATH) ? JSON.parse(readFileSync(ALLOWLIST_PATH, 'utf8')) : [];
 
 /** @type {Set<string>} */
-const allowedFiles = new Set(allowlist.map((e) => e.file));
+const allowedFiles = new Set(allowlist.map(e => e.file));
 
 /** @type {string} */
 let rawOutput = '';
@@ -33,9 +33,9 @@ try {
     rawOutput = execSync(
         'rg --json "@ts-expect-error" --glob "*.{js,mjs,cjs,ts,tsx,vue}" ' +
             '--glob "!node_modules" --glob "!dist" --glob "!coverage" --glob "!tmp" .',
-        { encoding: 'utf8' },
+        { encoding: 'utf8' }
     );
-} catch (/** @type {any} */ e) {
+} catch (/** @type {unknown} */ e) {
     // rg retorna exit 1 se não encontrou matches — isso é o resultado esperado (zero ocorrências).
     rawOutput = e.stdout ?? '';
 }
@@ -65,7 +65,7 @@ for (const line of rawOutput.trim().split('\n').filter(Boolean)) {
 
 if (matches.length > THRESHOLD) {
     console.error(
-        `\n❌ check-ts-expect-error: ${matches.length} ocorrência(s) não-allowlistada(s) de @ts-expect-error:\n`,
+        `\n❌ check-ts-expect-error: ${matches.length} ocorrência(s) não-allowlistada(s) de @ts-expect-error:\n`
     );
     for (const m of matches) {
         console.error(`  ${m.file}:${m.line}  →  ${m.text}`);

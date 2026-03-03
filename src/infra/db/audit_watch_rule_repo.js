@@ -39,7 +39,8 @@ function _rowToRule(row) {
 
 /**
  * Função exportada: getAuditWatchRuleById.
- * @returns {any}
+ * @param {string} id Unique identifier.
+ * @returns {AuditWatchRule|null}
  */
 function getAuditWatchRuleById(id) {
     const db = getDb();
@@ -48,7 +49,7 @@ function getAuditWatchRuleById(id) {
 
 /**
  * Função exportada: listAuditWatchRules.
- * @returns {any}
+ * @returns {AuditWatchRule[]}
  */
 function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
     const db = getDb();
@@ -67,7 +68,7 @@ function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
 
 /**
  * Função exportada: upsertAuditWatchRule.
- * @returns {any}
+ * @returns {AuditWatchRule|null}
  */
 function upsertAuditWatchRule(input = {}) {
     const db = getDb();

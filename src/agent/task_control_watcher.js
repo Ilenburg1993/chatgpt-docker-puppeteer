@@ -8,8 +8,8 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 /**
  * Opções do construtor do TaskControlWatcher.
- * @typedef {Object} TaskControlWatcherOptions
- * @property {Object} nerv - Instância do sistema nerv para comunicação.
+ * @typedef {object} TaskControlWatcherOptions
+ * @property {object} nerv - Instância do sistema nerv para comunicação.
  * @property {number} [intervalMs=500] - Intervalo entre ticks em ms.
  */
 

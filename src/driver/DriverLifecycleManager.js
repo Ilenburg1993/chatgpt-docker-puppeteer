@@ -4,10 +4,10 @@ import * as driverFactory from './factory.js';
 
 /**
  * Opções do construtor do DriverLifecycleManager.
- * @typedef {Object} DriverLifecycleOptions
+ * @typedef {object} DriverLifecycleOptions
  * @property {string|null} [taskId] - ID da tarefa associada.
  * @property {string|null} [target] - Nome do target do driver.
- * @property {Object} [driverConfig] - Configuração adicional do driver.
+ * @property {object} [driverConfig] - Configuração adicional do driver.
  */
 
 /**
@@ -45,7 +45,7 @@ export class DriverLifecycleManager {
 
     /**
      * Cria/adquire um driver. Não faz attach a página por conta própria.
-     * @returns {Promise<any>} Instância do driver adquirido.
+     * @returns {Promise<void>} Instância do driver adquirido.
      * @throws {Error} Se falhar ao adquirir driver do pool ou criar novo.
      */
     async acquire() {

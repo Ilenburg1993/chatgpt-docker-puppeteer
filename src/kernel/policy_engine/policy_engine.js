@@ -61,11 +61,11 @@ const PolicyAlertType = Object.freeze({
 /** Classe exportada: PolicyEngine. */
 class PolicyEngine {
     /**
-     * @param {Object} params
-     * @param {Object} params.telemetry
+     * @param {object} params
+     * @param {object} params.telemetry
      * Canal de telemetria do Kernel.
      *
-     * @param {Object} [params.limits]
+     * @param {object} [params.limits]
      * Limites técnicos/configuracionais.
      */
     constructor({ telemetry, limits = {} }) {
@@ -95,17 +95,17 @@ class PolicyEngine {
     /**
      * Avalia normativamente uma tarefa no contexto atual.
      *
-     * @param {Object} params
-     * @param {Object} params.task
+     * @param {object} params
+     * @param {object} params.task
      * Snapshot imutável da tarefa.
      *
-     * @param {Array} params.observations
+     * @param {unknown[]} params.observations
      * Lista de observações correlacionadas.
      *
      * @param {number} params.at
      * Timestamp do ciclo lógico.
      *
-     * @returns {Object}
+     * @returns {object}
      * Avaliação normativa consultiva.
      */
     assess({ task, observations, at }) {
@@ -339,7 +339,7 @@ class PolicyEngine {
     /**
      * Calcula nível normativo a partir dos alertas.
      *
-     * @param {Array<Object>} alerts
+     * @param {Array<object>} alerts
      * @returns {string}
      */
     _computeLevel(alerts) {
@@ -381,7 +381,7 @@ class PolicyEngine {
     /**
      * Atualiza limites normativos em tempo de execução.
      *
-     * @param {Object} newLimits
+     * @param {object} newLimits
      */
     updateLimits(newLimits) {
         Object.assign(this.limits, newLimits);
@@ -395,7 +395,7 @@ class PolicyEngine {
     /**
      * Retorna limites atuais.
      *
-     * @returns {Object}
+     * @returns {object}
      */
     getLimits() {
         return Object.freeze({ ...this.limits });

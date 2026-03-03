@@ -12,7 +12,7 @@ const LOCK_DIR = ROOT;
 
 /**
  * Função exportada: testLockTwoPhaseCommit.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testLockTwoPhaseCommit() {
     console.log('\n=== TEST 1: Lock Manager - Two-Phase Commit ===');
@@ -75,7 +75,7 @@ async function testLockTwoPhaseCommit() {
 
 /**
  * Função exportada: testLockConcurrency.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testLockConcurrency() {
     console.log('\n=== TEST 2: Lock Manager - Concorrência (10 tentativas simultâneas) ===');
@@ -135,7 +135,7 @@ async function testLockConcurrency() {
 
 /**
  * Função exportada: testLockNoTempOrphans.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testLockNoTempOrphans() {
     console.log('\n=== TEST 3: Lock Manager - Sem arquivos .tmp órfãos ===');
@@ -179,7 +179,7 @@ async function testLockNoTempOrphans() {
 
 /**
  * Função exportada: testBrowserPoolMemoization.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testBrowserPoolMemoization() {
     console.log('\n=== TEST 4: BrowserPool - Promise Memoization ===');
@@ -264,7 +264,7 @@ async function testBrowserPoolMemoization() {
 
 /**
  * Função exportada: testIntegrationValidation.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function testIntegrationValidation() {
     console.log('\n=== TEST 5: Validação de Integração ===');

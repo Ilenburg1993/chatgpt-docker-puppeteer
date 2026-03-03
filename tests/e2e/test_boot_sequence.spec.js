@@ -1,3 +1,4 @@
+// @ts-check
 // @ts-nocheck
 // NOTE: This test requires external Chrome proxy availability.
 

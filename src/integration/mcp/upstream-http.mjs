@@ -30,7 +30,7 @@ function normalizeHeaders(extraHeaders) {
 export class MCPUpstreamError extends Error {
     /**
      * @param {string} message
-     * @param {{ code?: number|string, data?: any, status?: number }} [meta]
+     * @param {{ code?: number|string, data?: unknown, status?: number }} [meta]
      */
     constructor(message, { code, data, status } = {}) {
         super(message);
@@ -43,7 +43,7 @@ export class MCPUpstreamError extends Error {
 
 /**
  * @param {{ url?: string, headers?: Headers | Record<string, string> }} [config]
-  * @returns {any}
+  * @returns {Promise<object>}
  */
 export function createMcpHttpClient(config = {}) {
     const { url, headers } = /** @type {{ url?: string, headers?: Headers | Record<string, string> }} */ (config);

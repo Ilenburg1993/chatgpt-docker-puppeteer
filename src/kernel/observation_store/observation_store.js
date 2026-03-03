@@ -10,8 +10,8 @@ import EventEmitter from 'node:events';
  * Cria registro imutável de uma observação.
  * P9.5: Adiciona memoization de JSON serialization
  *
- * @param {Object} params
- * @returns {Object}
+ * @param {object} params
+ * @returns {object}
  */
 function createObservationRecord({ msgId, correlationId, source, payload, originalTimestamp }) {
     let payloadSerialized;
@@ -41,8 +41,8 @@ function createObservationRecord({ msgId, correlationId, source, payload, origin
  */
 class ObservationStore extends EventEmitter {
     /**
-     * @param {Object} params
-     * @param {Object} params.telemetry
+     * @param {object} params
+     * @param {object} params.telemetry
      * Canal de telemetria do Kernel.
      *
      * @param {number} [params.maxObservationsPerCorrelation]
@@ -84,7 +84,7 @@ class ObservationStore extends EventEmitter {
     /**
      * Ingere um EVENT como fato observado.
      *
-     * @param {Object} eventEnvelope
+     * @param {object} eventEnvelope
      * Envelope IPC do tipo EVENT.
      *
      * Regras:
@@ -92,7 +92,7 @@ class ObservationStore extends EventEmitter {
      * - EVENT nunca é rejeitado por duplicação
      * - EVENT nunca é interpretado
      *
-     * @returns {Object}
+     * @returns {object}
      * Registro criado.
      */
     ingestEvent(eventEnvelope) {
@@ -191,7 +191,7 @@ class ObservationStore extends EventEmitter {
      * Retorna todas as observações de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {ReadonlyArray<Object>}
+     * @returns {ReadonlyArray<object>}
      * Lista imutável de observações.
      */
     getByCorrelation(correlationId) {
@@ -206,10 +206,10 @@ class ObservationStore extends EventEmitter {
     /**
      * Retorna observações em intervalo temporal.
      *
-     * @param {Object} params
+     * @param {object} params
      * @param {number} params.startAt
      * @param {number} params.endAt
-     * @returns {ReadonlyArray<Object>}
+     * @returns {ReadonlyArray<object>}
      */
     getByTimeRange({ startAt, endAt }) {
         const results = [];
@@ -228,7 +228,7 @@ class ObservationStore extends EventEmitter {
      * Retorna última observação de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {Object|null}
+     * @returns {object|null}
      */
     getLastObservation(correlationId) {
         const list = this.byCorrelation.get(correlationId);
@@ -263,7 +263,7 @@ class ObservationStore extends EventEmitter {
     /**
      * Lista todas as observações (uso em auditoria).
      *
-     * @returns {ReadonlyArray<Object>}
+     * @returns {ReadonlyArray<object>}
      */
     listAll() {
         const all = [];
@@ -285,7 +285,7 @@ class ObservationStore extends EventEmitter {
     /**
      * Retorna estatísticas técnicas.
      *
-     * @returns {Object}
+     * @returns {object}
      */
     getStats() {
         let totalObservations = 0;
@@ -330,7 +330,7 @@ class ObservationStore extends EventEmitter {
     /**
      * Limpa observações antigas por critério temporal.
      *
-     * @param {Object} params
+     * @param {object} params
      * @param {number} params.olderThan
      * Timestamp limite.
      */

@@ -81,7 +81,7 @@ function ensureDir(dir) {
 /**
  * @param {string} cacheDir
  * @param {string} stepKey
- * @param {any} cacheInput
+ * @param {object} cacheInput
  */
 function makeCachePath(cacheDir, stepKey, cacheInput) {
     const hash = sha256(
@@ -169,7 +169,7 @@ function finding(
 
 /**
  * @param {string} output
- * @returns {any}
+ * @returns {object}
  */
 export function parseTypecheckOutput(output) {
     /** @type {RawFinding[]} */
@@ -199,7 +199,7 @@ export function parseTypecheckOutput(output) {
 
 /**
  * @param {string} output
- * @returns {any}
+ * @returns {object}
  */
 export function parsePrettierCheckOutput(output) {
     /** @type {RawFinding[]} */
@@ -231,7 +231,7 @@ export function parsePrettierCheckOutput(output) {
 
 /**
  * @param {string} output
- * @returns {any}
+ * @returns {object}
  */
 export function parseEslintJsonOutput(output) {
     const parsed = parseJsonFromMixedOutput(String(output || ''));
@@ -283,14 +283,14 @@ function parseNodeCheckFailure(file, stderr) {
 
 /**
  * @param {string} stdout
-  * @returns {any}
+  * @returns {object}
  */
 export function parseJSDocCoverageReport(stdout) {
     return parseJsonFromMixedOutput(String(stdout || ''));
 }
 
 /**
- * @param {any} report
+ * @param {object} report
  * @param {string} contractId
  * @returns {RawFinding[]}
  */
@@ -369,9 +369,9 @@ export function parseTsIgnoreFindings(stdout, scopeFiles) {
  *  qualityCache?: boolean,
  *  qualityCacheDir?: string,
  *  qualityParallelism?: 'auto'|'serial',
- *  exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
+ *  exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
  * }} options
-  * @returns {Promise<any>}
+  * @returns {Promise<void>}
  */
 export async function collectQualityFindings(options) {
     /** @type {RawFinding[]} */
@@ -456,7 +456,7 @@ export async function collectQualityFindings(options) {
      * @template T
      * @param {string} stepId
      * @param {() => Promise<T>} markerExec
-     * @param {any} cacheInput
+     * @param {object} cacheInput
      * @param {() => Promise<T>} producer
      * @returns {Promise<{ value: T, cacheHit: boolean }>}
      */

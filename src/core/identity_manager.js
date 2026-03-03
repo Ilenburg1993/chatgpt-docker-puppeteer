@@ -6,20 +6,20 @@ import { v4 as uuidv4 } from 'uuid';
 import { log } from './logger.js';
 
 /**
- * @typedef {Object} RobotIdentity
+ * @typedef {object} RobotIdentity
  * @property {string} robot_id - ID único e persistente do robô.
  * @property {string} instance_id - ID efêmero da instância atual.
  * @property {string} role - Papel do ator no sistema NERV.
  * @property {string} version - Versão do protocolo.
  * @property {string[]} capabilities - Lista de capacidades suportadas.
- * @property {Object} metadata - Metadados da instância.
+ * @property {object} metadata - Metadados da instância.
  * @property {string} metadata.platform - Plataforma do sistema.
  * @property {string} metadata.node_version - Versão do Node.js.
  * @property {string} metadata.started_at - Timestamp de inicialização.
  */
 
 /**
- * @typedef {Object} StoredIdentity
+ * @typedef {object} StoredIdentity
  * @property {string} robot_id - ID do robô armazenado.
  * @property {string} [born_at] - Data de nascimento do robô.
  * @property {string} [protocol] - Versão do protocolo.

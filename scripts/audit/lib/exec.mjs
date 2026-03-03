@@ -14,7 +14,7 @@ import { spawn } from 'node:child_process';
  *   maxStderrBytes?: number,
  *   truncationHeadRatio?: number,
  *   shell?: boolean,
- *   stdio?: any,
+ *   stdio?: unknown,
  *   onStdout?: (chunk: string) => void,
  *   onStderr?: (chunk: string) => void,
  * }} [options]
@@ -194,7 +194,7 @@ function sliceByUtf8Bytes(text, maxBytes, fromEnd) {
 
 /**
  * @param {string} binary
- * @param {(command: string, args: string[], options?: any) => Promise<{ ok: boolean }>} [execFn]
+ * @param {(command: string, args: string[], options?: unknown) => Promise<{ ok: boolean }>} [execFn]
  * @returns {Promise<boolean>}
  */
 export async function commandExists(binary, execFn = runCommand) {
@@ -205,7 +205,7 @@ export async function commandExists(binary, execFn = runCommand) {
 
 /**
  * @param {string} text
- * @returns {any|null}
+ * @returns {unknown|null}
  */
 function tryParseJson(text) {
     try {
@@ -284,7 +284,7 @@ function extractBalancedJsonBlocks(text) {
  * Attempts to parse a JSON object from noisy stdout.
  * @param {string} stdout
  * @param {{ preferLast?: boolean }} [options]
- * @returns {any|null}
+ * @returns {unknown|null}
  */
 export function parseJsonFromMixedOutput(stdout, options = {}) {
     const text = String(stdout || '')
@@ -304,7 +304,7 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
     // Prefer complete JSON blocks. By default, parse the last valid block first.
     const blocks = extractBalancedJsonBlocks(text);
     const orderedBlocks = preferLast ? [...blocks].reverse() : blocks;
-    /** @type {any[]} */
+    /** @type {unknown[]} */
     const parsedCandidates = [];
     for (const block of orderedBlocks) {
         const parsed = tryParseJson(block);

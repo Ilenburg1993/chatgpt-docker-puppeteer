@@ -264,7 +264,7 @@ function _isTaskBoundToMissionStep(db, row, task) {
 
 /**
  * Função exportada: createTaskCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = false }) {
     const actorView = asRecord(actor);
@@ -300,7 +300,7 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
 
 /**
  * Função exportada: patchTaskCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const patchView = asRecord(patch);
@@ -375,7 +375,7 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
         blocked_details_json:
             patchView.blocked_details !== undefined ? JSON.stringify(patchView.blocked_details ?? null) : undefined,
     });
-    const updatedView = /** @type {any} */ (updated);
+    const updatedView = /** @type {unknown} */ (updated);
 
     _recordTaskEvent({
         taskId,
@@ -397,7 +397,7 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
 
 /**
  * Função exportada: reassignTaskMissionCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifVersion = null }) {
     const destinationMissionId = missionId === null || missionId === undefined ? '' : String(missionId).trim();
@@ -499,7 +499,7 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
 
 /**
  * Função exportada: pauseTaskCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -532,7 +532,7 @@ function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
 /**
  * Função exportada: resumeTaskCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -576,7 +576,7 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
 /**
  * Função exportada: cancelTaskCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -614,7 +614,7 @@ function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
 /**
  * Função exportada: retryTaskCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -656,7 +656,7 @@ function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
 /**
  * Função exportada: purgeTaskCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function purgeTaskCommand({ taskId, actor = {}, reason }) {
     const before = getTaskById(taskId);
@@ -680,7 +680,7 @@ function purgeTaskCommand({ taskId, actor = {}, reason }) {
 
 /**
  * Função exportada: bulkTaskActionCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reason }) {
     const normalized = Array.isArray(ids) ? ids.map(id => String(id)).filter(Boolean) : [];

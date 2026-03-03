@@ -5,11 +5,13 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import ts from 'typescript';
 import { analyzeJSDocCoverage, collectJsSourceFiles } from './jsdoc_coverage_engine.mjs';
+import { runStrictLaneAudit } from './strict_lane_audit.mjs';
 
 const { values } = parseArgs({
     options: {
         format: { type: 'string', default: 'console' },
         scope: { type: 'string', default: 'full' },
+        'show-gaps': { type: 'boolean', default: false },
     },
 });
 
@@ -17,27 +19,22 @@ const AREA_THRESHOLDS = {
     src: 100,
     scripts: 95,
     tests: 90,
-    overall: 90,
+    overall: 100,
 };
 
 const PUBLIC_ROOTS = ['src/shared', 'src/inference_gateway', 'src/audit_agent', 'src/server/api', 'src/integration/lsp'];
 
-const STRICT_CONFIGS = [
-    'tsconfig.strict.public.json',
-    'tsconfig.strict.core.json',
-    'tsconfig.strict.server.json',
-    'tsconfig.strict.infra.json',
-    'tsconfig.strict.integration.json',
-    'tsconfig.strict.audit.json',
-    'tsconfig.strict.tools.json',
-    'tsconfig.strict.tests.json',
-];
+/** Descobre dinamicamente todas as lanes strict presentes na raiz do projeto. */
+const STRICT_CONFIGS = fs
+    .readdirSync('.')
+    .filter(f => f.startsWith('tsconfig.strict.') && f.endsWith('.json'))
+    .sort();
 
 /**
  * @param {string} file
  * @returns {boolean}
  */
-function isLegacyExcluded(file) {
+function isLegacyFile(file) {
     const normalized = file.replace(/\\/g, '/');
     return normalized.includes('/legacy/') || normalized.startsWith('scripts/legacy/') || normalized.startsWith('tests/legacy/');
 }
@@ -93,12 +90,21 @@ function countDirective(files) {
     return total;
 }
 
-const sourceFiles = collectJsSourceFiles(['src']).filter(file => !isLegacyExcluded(file));
-const scriptFiles = collectJsSourceFiles(['scripts']).filter(file => !isLegacyExcluded(file));
-const testFiles = collectJsSourceFiles(['tests']).filter(file => !isLegacyExcluded(file));
+// Active files (excluindo legacy) para cálculo de cobertura de thresholds
+const sourceFiles = collectJsSourceFiles(['src']).filter(file => !isLegacyFile(file));
+const scriptFiles = collectJsSourceFiles(['scripts']).filter(file => !isLegacyFile(file));
+const testFiles = collectJsSourceFiles(['tests']).filter(file => !isLegacyFile(file));
 const combinedFiles = [...new Set([...sourceFiles, ...scriptFiles, ...testFiles])];
+
+// Legacy files rastreados como gap explícito (nunca ignorados)
+const legacyFiles = [
+    ...collectJsSourceFiles(['src']).filter(isLegacyFile),
+    ...collectJsSourceFiles(['scripts']).filter(isLegacyFile),
+    ...collectJsSourceFiles(['tests']).filter(isLegacyFile),
+];
+
 const requestedScope = String(values.scope || 'full').trim().toLowerCase() === 'public' ? 'public' : 'full';
-const publicScopeFiles = collectJsSourceFiles(PUBLIC_ROOTS).filter(file => !isLegacyExcluded(file));
+const publicScopeFiles = collectJsSourceFiles(PUBLIC_ROOTS).filter(file => !isLegacyFile(file));
 const jsdocReport = analyzeJSDocCoverage({ files: combinedFiles, scope: 'full' });
 const publicJSDocReport = analyzeJSDocCoverage({ files: publicScopeFiles, scope: 'full' });
 const srcCoverage = summarizeTsCheck(sourceFiles);
@@ -107,6 +113,14 @@ const testsCoverage = summarizeTsCheck(testFiles);
 const overallCoverage = summarizeTsCheck(combinedFiles);
 const publicCoverage = summarizeTsCheck(publicScopeFiles);
 const tsExpectErrorCount = countDirective(combinedFiles);
+
+// Arquivos sem @ts-check (gap explícito)
+const jsMissingTsCheck = combinedFiles.filter(file => !hasTsCheckDirective(file));
+const legacyMissingTsCheck = legacyFiles.filter(file => !hasTsCheckDirective(file));
+const allMissingTsCheck = [...jsMissingTsCheck, ...legacyMissingTsCheck];
+
+// Análise de lanes strict
+const strictLaneAudit = runStrictLaneAudit();
 
 /** @type {Record<string, { files: number, fileNames: string[] }>} */
 const strictLanes = {};
@@ -168,6 +182,10 @@ const report = {
         tests: testsCoverage,
         overall: overallCoverage,
     },
+    js_files_missing_ts_check_total: allMissingTsCheck.length,
+    js_files_missing_ts_check: allMissingTsCheck,
+    strict_uncovered_files_total: strictLaneAudit.strict_uncovered_files_total,
+    strict_uncovered_files: strictLaneAudit.strict_uncovered_files,
     public_scope: {
         files: publicCoverage.total,
         with_ts_check: publicCoverage.withTsCheck,
@@ -190,6 +208,7 @@ const report = {
         ts_expect_error_total: tsExpectErrorCount,
     },
     strict_lanes: strictLanes,
+    strict_lane_audit: strictLaneAudit,
     passes,
 };
 
@@ -232,6 +251,30 @@ if (String(values.format || 'console').toLowerCase() === 'json') {
     }
     for (const [config, lane] of Object.entries(strictLanes)) {
         console.log(`- ${config}: ${lane.files} file(s)`);
+    }
+
+    if (values['show-gaps']) {
+        console.log('');
+        console.log('='.repeat(80));
+        console.log('GAPS — arquivos sem @ts-check');
+        console.log('='.repeat(80));
+        if (allMissingTsCheck.length === 0) {
+            console.log('✅ Nenhum arquivo sem @ts-check.');
+        } else {
+            for (const f of allMissingTsCheck) {
+                console.log(`  MISSING_TS_CHECK  ${f}`);
+            }
+        }
+        console.log('');
+        console.log('GAPS — arquivos sem cobertura strict');
+        console.log('='.repeat(80));
+        if (strictLaneAudit.strict_uncovered_files_total === 0) {
+            console.log('✅ Todos os arquivos elegíveis cobertos por alguma lane strict.');
+        } else {
+            for (const f of strictLaneAudit.strict_uncovered_files) {
+                console.log(`  UNCOVERED_STRICT  ${f}`);
+            }
+        }
     }
 }
 

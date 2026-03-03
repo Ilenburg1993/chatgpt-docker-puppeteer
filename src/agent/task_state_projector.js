@@ -63,7 +63,7 @@ function _statSizeBytes(filePath) {
 }
 
 /**
- * @param {{ storage?: Record<string, any>|null, actor?: string }} [arg0]
+ * @param {{ storage?: Record<string, unknown>|null, actor?: string }} [arg0]
  */
 function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
     /** @type {Record<string, string|null>} */
@@ -105,7 +105,7 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
 }
 
 /**
- * @param {{ storage?: Record<string, any>|null, actor?: string }} [arg0]
+ * @param {{ storage?: Record<string, unknown>|null, actor?: string }} [arg0]
  */
 function _registerResponseArtifacts({ storage, actor = 'system' } = {}) {
     /** @type {Record<string, string|null>} */
@@ -168,8 +168,8 @@ function _getMissionIdForTask(taskId) {
 
 /**
  * Opções do construtor do TaskStateProjector.
- * @typedef {Object} TaskStateProjectorOptions
- * @property {Object} nerv - Instância do sistema nerv com método onReceive.
+ * @typedef {object} TaskStateProjectorOptions
+ * @property {object} nerv - Instância do sistema nerv com método onReceive.
  * @property {string|null} [workerId] - ID opcional do worker.
  */
 
@@ -202,7 +202,7 @@ class TaskStateProjector {
      *
      * @private
      * @param {string} taskId - Task ID to update
-     * @param {Record<string, any>} updates - Update payload (status, stage, timestamps, etc.)
+     * @param {Record<string, unknown>} updates - Update payload (status, stage, timestamps, etc.)
      * @param {{ critical?: boolean, context?: string }} [options] - Options
      * @returns {boolean} True if update succeeded, false if conflict occurred (non-critical only)
      * @throws {Error} Re-throws OptimisticLockError if options.critical=true
@@ -268,7 +268,7 @@ class TaskStateProjector {
     /**
      * Processa um envelope NERV, projetando estado de tarefa no SQLite se for evento suportado.
      * @private
-     * @param {Object} envelope - Envelope NERV contendo mensagem.
+     * @param {object} envelope - Envelope NERV contendo mensagem.
      * @returns {void}
      * @sideEffects Modifica estado do banco de dados baseado no evento.
      */

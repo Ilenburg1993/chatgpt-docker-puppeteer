@@ -1,3 +1,4 @@
+// @ts-check
 // @ts-nocheck
 import * as io from '#infra/io';
 

@@ -123,8 +123,8 @@ class TelemetryAggregator {
     /**
      * Inicializa o agregador e começa coleta.
      *
-     * @param {Object} [options]
-     * @param {Object} [options.socketHub] - Socket.io Hub para broadcast
+     * @param {object} [options]
+     * @param {object} [options.socketHub] - Socket.io Hub para broadcast
      * @param {number} [options.intervalMs] - Intervalo de coleta em ms (default: 1000)
      */
     start(options = {}) {
@@ -382,7 +382,7 @@ class TelemetryAggregator {
 
     /**
      * API: Retorna métricas atuais.
-     * @returns {Promise<Object>} Métricas coletadas
+     * @returns {Promise<object>} Métricas coletadas
      */
     async getCurrent() {
         return this.lastMetrics || (await this._collectMetrics());

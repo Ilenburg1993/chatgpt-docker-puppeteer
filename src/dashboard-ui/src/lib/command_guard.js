@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * Função exportada: requireReason.
- * @returns {any}
+ * @returns {object}
  */
 export function requireReason(reason, fallbackMessage = 'Motivo operacional é obrigatório para este comando.') {
     const normalized = String(reason || '').trim();
@@ -13,7 +13,7 @@ export function requireReason(reason, fallbackMessage = 'Motivo operacional é o
 
 /**
  * Função exportada: confirmTwoStepAction.
- * @returns {any}
+ * @returns {object}
  */
 export function confirmTwoStepAction({ actionLabel, reason, firstMessage = null, secondMessage = null }) {
     const normalizedReason = requireReason(reason);

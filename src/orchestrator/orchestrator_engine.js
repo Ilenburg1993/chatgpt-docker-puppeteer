@@ -8,8 +8,8 @@ import { ValidationService } from './validation/validation_service.js';
 
 /**
  * Opções do construtor do OrchestratorEngine.
- * @typedef {Object} OrchestratorEngineOptions
- * @property {Object} nerv - Instância do sistema NERV.
+ * @typedef {object} OrchestratorEngineOptions
+ * @property {object} nerv - Instância do sistema NERV.
  * @property {ContextManager} [contextManager] - Gerenciador de contexto opcional.
  */
 
@@ -72,7 +72,7 @@ class OrchestratorEngine {
 
     /**
      * Verifica se task precisa de orquestração especial baseada na estratégia de execução.
-     * @param {Object} task - Task V5 com spec.execution.strategy.
+     * @param {object} task - Task V5 com spec.execution.strategy.
      * @returns {boolean} True se a estratégia for ITERATIVE ou MULTI_STEP.
      */
     shouldOrchestrate(task) {

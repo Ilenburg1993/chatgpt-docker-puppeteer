@@ -8,10 +8,10 @@ import { asRecord } from '#types/guards';
 /**
  * Resultado canônico de decisões de boot relacionadas ao Browser Pool.
  *
- * @typedef {Object} BrowserPoolDecision
+ * @typedef {object} BrowserPoolDecision
  * @property {boolean} success - Indica se o boot pode continuar
  * @property {'full'|'degraded'|'abort'} mode - Modo operacional resultante
- * @property {Object|null} [browserPool] - Instância ativa ou null em modo degradado
+ * @property {object|null} [browserPool] - Instância ativa ou null em modo degradado
  */
 
 /**
@@ -75,9 +75,9 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
  * Centraliza a lógica de construção para evitar divergência
  * entre boot normal, retry automático e retry manual.
  *
- * @param {Object} config
- * @param {Object} [nerv] - NERV bus para Circuit Breaker (opcional)
- * @returns {Promise<Object>} BrowserPoolManager inicializado
+ * @param {object} config
+ * @param {object} [nerv] - NERV bus para Circuit Breaker (opcional)
+ * @returns {Promise<object>} BrowserPoolManager inicializado
  */
 async function createBrowserPool(config, nerv = null) {
     const { default: BrowserPoolManager } = await import('#infra/browser_pool/pool_manager');
@@ -85,7 +85,7 @@ async function createBrowserPool(config, nerv = null) {
 
     // ✅ Injeta NERV no Circuit Breaker
     if (nerv && pool.circuitBreaker) {
-        /** @type {any} */ (pool.circuitBreaker).nerv = nerv;
+        /** @type {unknown} */ (pool.circuitBreaker).nerv = nerv;
         log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
     }
 
@@ -224,7 +224,7 @@ function getChromeInstructions(errorMessage) {
  * Oferece opções ao usuário e tenta recuperação automática.
  *
  * @param {Error} error - Erro original do Browser Pool
- * @param {Object} options - Opções de configuração
+ * @param {object} options - Opções de configuração
  * @param {boolean} [options.allowDegradedMode=true] - Permite boot sem browser
  * @param {boolean} [options.autoRetry=true] - Tenta iniciar Chrome automaticamente
  * @param {number} [options.maxAutoRetries=2] - Máximo de tentativas automáticas
@@ -255,7 +255,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                     // Chrome iniciado! Tenta reconectar Browser Pool usando createBrowserPool
                     try {
                         const { default: CONFIG } = await import('./config.js');
-                        const all = asRecord(/** @type {any} */ (CONFIG).all);
+                        const all = asRecord(/** @type {unknown} */ (CONFIG).all);
 
                         const browserPool = await createBrowserPool({
                             poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
@@ -342,7 +342,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
 
                 try {
                     const { default: CONFIG } = await import('./config.js');
-                    const all = asRecord(/** @type {any} */ (CONFIG).all);
+                    const all = asRecord(/** @type {unknown} */ (CONFIG).all);
 
                     const browserPool = await createBrowserPool({
                         poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
@@ -393,10 +393,10 @@ async function handleBrowserPoolFailure(error, options = {}) {
  * Wrapper resiliente para inicialização de Browser Pool.
  * Substitui a inicialização direta no boot sequence.
  *
- * @param {Object} config - Configuração do Browser Pool
- * @param {Object} [options] - Opções de resiliência
- * @param {Object} [options.nerv] - NERV bus para Circuit Breaker (opcional)
- * @returns {Promise<Object>} - Resultado da inicialização
+ * @param {object} config - Configuração do Browser Pool
+ * @param {object} [options] - Opções de resiliência
+ * @param {object} [options.nerv] - NERV bus para Circuit Breaker (opcional)
+ * @returns {Promise<object>} - Resultado da inicialização
  */
 async function initializeBrowserPoolResilient(config, options = {}) {
     const { nerv = null, ...resilienceOptions } = options;
@@ -407,7 +407,7 @@ async function initializeBrowserPoolResilient(config, options = {}) {
 
         // ✅ Injeta NERV no Circuit Breaker
         if (nerv && browserPool.circuitBreaker) {
-            /** @type {any} */ (browserPool.circuitBreaker).nerv = nerv;
+            /** @type {unknown} */ (browserPool.circuitBreaker).nerv = nerv;
             log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
         }
 

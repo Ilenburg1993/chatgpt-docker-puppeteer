@@ -26,9 +26,9 @@ class StructuredExtractor {
     /**
      * Extrai resposta em múltiplos formatos
      *
-     * @param {any} page - Puppeteer page instance
-     * @param {any} protocol - SADI protocol (selector, etc)
-     * @returns {Promise<Object>} - { text, markdown, html, json }
+     * @param {object} page - Puppeteer page instance
+     * @param {object} protocol - SADI protocol (selector, etc)
+     * @returns {Promise<object>} - { text, markdown, html, json }
      */
     async extract(page, protocol) {
         try {
@@ -72,8 +72,8 @@ class StructuredExtractor {
     /**
      * Extrai HTML do browser (browser-side function)
      *
-     * @param {Object} protocol - SADI protocol
-     * @returns {Object} - { html, text, thoughtBlocksRemoved }
+     * @param {object} protocol - SADI protocol
+     * @returns {object} - { html, text, thoughtBlocksRemoved }
      * @private
      */
     _extractHTML(protocol) {
@@ -135,7 +135,7 @@ class StructuredExtractor {
      * Parseia HTML para JSON estruturado
      *
      * @param {string} html - HTML bruto
-     * @returns {Object} - { sections, codeBlocks, links, images, tables }
+     * @returns {object} - { sections, codeBlocks, links, images, tables }
      * @private
      */
     _parseStructured(html) {
@@ -164,8 +164,8 @@ class StructuredExtractor {
     /**
      * Extrai seções (headings)
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ level, text, content }]
+     * @param {object} root - Parsed HTML
+     * @returns {unknown[]} - [{ level, text, content }]
      * @private
      */
     _extractSections(root) {
@@ -197,8 +197,8 @@ class StructuredExtractor {
     /**
      * Extrai code blocks
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ language, code, isInline }]
+     * @param {object} root - Parsed HTML
+     * @returns {unknown[]} - [{ language, code, isInline }]
      * @private
      */
     _extractCodeBlocks(root) {
@@ -240,7 +240,7 @@ class StructuredExtractor {
     /**
      * Detecta linguagem de code block
      *
-     * @param {any} codeEl - Code element
+     * @param {object} codeEl - Code element
      * @returns {string} - Language (python, javascript, etc)
      * @private
      */
@@ -265,8 +265,8 @@ class StructuredExtractor {
     /**
      * Extrai links
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ text, href, title }]
+     * @param {object} root - Parsed HTML
+     * @returns {unknown[]} - [{ text, href, title }]
      * @private
      */
     _extractLinks(root) {
@@ -289,8 +289,8 @@ class StructuredExtractor {
     /**
      * Extrai images
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ src, alt, title }]
+     * @param {object} root - Parsed HTML
+     * @returns {unknown[]} - [{ src, alt, title }]
      * @private
      */
     _extractImages(root) {
@@ -313,8 +313,8 @@ class StructuredExtractor {
     /**
      * Extrai tables
      *
-     * @param {any} root - Parsed HTML
-     * @returns {Array} - [{ headers, rows }]
+     * @param {object} root - Parsed HTML
+     * @returns {unknown[]} - [{ headers, rows }]
      * @private
      */
     _extractTables(root) {
@@ -355,8 +355,8 @@ class StructuredExtractor {
      * Gera preview estruturado
      *
      * @param {string} text - Texto plano
-     * @param {Object} structured - Dados estruturados
-     * @returns {Object} - { text, sections_count, code_blocks_count, links_count, images_count }
+     * @param {object} structured - Dados estruturados
+     * @returns {object} - { text, sections_count, code_blocks_count, links_count, images_count }
      * @private
      */
     _generatePreview(text, structured) {
@@ -375,7 +375,7 @@ class StructuredExtractor {
     /**
      * Resposta vazia (fallback)
      *
-     * @returns {Object}
+     * @returns {object}
      * @private
      */
     _emptyResponse() {

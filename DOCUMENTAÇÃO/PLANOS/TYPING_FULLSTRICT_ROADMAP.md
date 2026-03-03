@@ -1,18 +1,18 @@
 # Roadmap — JSDoc Completo + Full Strict em 100% do Repositório
 
 > **Convenção de evolução deste plano**: Este documento vive no branch
-> `feat/typing-fullstrict-roadmap` e é atualizado **continuamente** à medida que
-> cada tarefa é implementada. A regra é:
+> `feat/typing-fullstrict-roadmap` e é atualizado **continuamente** à medida que cada tarefa é
+> implementada. A regra é:
 >
 > - Todo artefato produzido (skill, script, tsconfig, npm script, target Makefile, update de
->   workflow) é commitado no mesmo PR, junto com o tick **✅** na checklist correspondente
->   deste documento.
-> - Nenhum artefato é considerado "feito" até que o item correspondente esteja marcado
->   **e commitado**.
-> - Revisão deste documento é obrigatória antes do merge: o estado final do documento deve
->   refletir exatamente o estado final do código.
-> - O PR só é mergeado quando as três condições de encerramento do programa estão
->   simultaneamente verdes na CI.
+>   workflow) é commitado no mesmo PR, junto com o tick **✅** na checklist correspondente deste
+>   documento.
+> - Nenhum artefato é considerado "feito" até que o item correspondente esteja marcado **e
+>   commitado**.
+> - Revisão deste documento é obrigatória antes do merge: o estado final do documento deve refletir
+>   exatamente o estado final do código.
+> - O PR só é mergeado quando as três condições de encerramento do programa estão simultaneamente
+>   verdes na CI.
 
 ## Contexto e baseline
 
@@ -69,30 +69,72 @@
 
 ---
 
+## Plano de execução — Fases 0 (conclusão), 1 e 2
+
+> Seção criada na sessão de trabalho de 2026-03-xx. Registra as subfases e critérios de conclusão
+> usados para guiar a execução automática. Atualizada conforme progresso.
+
+### Fase 0 — Conclusão da instrumentação
+
+| Subfase | Artefato                              | Critério de conclusão                                               |
+| ------- | ------------------------------------- | ------------------------------------------------------------------- |
+| 0.a     | `typing_hardening_audit.mjs`          | `--show-gaps` funcional; `overall=100`; `js_files_missing_ts_check[]` emitido |
+| 0.b     | `jsdoc_coverage_engine.mjs`           | `public_any_tags_total` + `public_unknown_tags_total` no shape; schema `3.1.0` |
+| 0.c     | `jsdoc_coverage_cli.mjs`             | `--gaps` lista arquivos bloqueadores; `--fail-on-any-gap` sai 1 |
+| 0.d     | `schemas/typing/jsdoc-coverage-report.schema.json` | Versão `3.1.0`; `public_any_tags_total`, `public_unknown_tags_total` nos `required` |
+| 0.e     | `scripts/ci/verify-skills-governance.mjs` | Verifica `strict-lane-governance` e `vue-tsc-dashboard` |
+| 0.f     | Verificação de saída                  | `analyze:typing:gaps` lista 29 arquivos; `jsdoc:coverage:gaps` lista 891 issues |
+
+### Fase 1 — Cobertura total de superfície
+
+| Subfase | Escopo                                | Critério de conclusão                                               |
+| ------- | ------------------------------------- | ------------------------------------------------------------------- |
+| 1.a     | 15 arquivos ativos sem `@ts-check`    | Diretiva adicionada na primeira linha de cada arquivo               |
+| 1.b     | 14 arquivos `tests/legacy/`           | `@ts-check` + `@ts-ignore` com comentário justificativo onde irrecuperável |
+| 1.c     | `tsconfig.tools.json` + `tsconfig.tests.json` | Substituição de listas explícitas por glob `include`; `tsconfig.node.json` sem duplicatas |
+
+### Fase 2 — Fechamento do backlog JSDoc
+
+| Subfase | Módulo            | Issues | Prioridade |
+| ------- | ----------------- | ------ | ---------- |
+| 2.a     | `src/infra`       | 318    | 1 — maior backlog |
+| 2.b     | `scripts/audit`   | 121    | 2 |
+| 2.c     | `src/server`      | 86     | 3 |
+| 2.d     | `src/core`        | 82     | 4 |
+| 2.e     | `src/agent`       | 55     | 5 |
+| 2.f     | `src/nerv`        | 46     | 6 |
+| 2.g     | `src/integration` | 29     | 7 |
+| 2.h     | `src/dashboard-ui`| 24     | 8 |
+| 2.i     | Módulos menores (`src/driver`, `src/kernel`, `src/logic`, `tests/helpers`, `scripts/analysis`, `scripts/ops`) | ~65 | 9 |
+
+Critério de saída da Fase 2: `jsdoc:coverage:gaps --fail-on-any-gap` sai com código `0`.
+
+---
+
 ## Fase 0 — Instrumentação do gap real
 
 **Objetivo**: tornar impossível "achar que está 100 %" sem estar.
 
 ### Tarefas
 
-- [ ] Expandir `scripts/analysis/typing_hardening_audit.mjs`:
-  - [ ] Emitir `strict_uncovered_files_total` + `strict_uncovered_files[]`
-  - [ ] Emitir `js_files_missing_ts_check_total` + `js_files_missing_ts_check[]`
-  - [ ] Atualizar `AREA_THRESHOLDS.overall` de `90` → `100`
-- [ ] Expandir `scripts/analysis/jsdoc_coverage_engine.mjs` e
+- [x] Expandir `scripts/analysis/typing_hardening_audit.mjs`:
+  - [x] Emitir `strict_uncovered_files_total` + `strict_uncovered_files[]`
+  - [x] Emitir `js_files_missing_ts_check_total` + `js_files_missing_ts_check[]`
+  - [x] Atualizar `AREA_THRESHOLDS.overall` de `90` → `100`
+- [x] Expandir `scripts/analysis/jsdoc_coverage_engine.mjs` e
       `scripts/analysis/jsdoc_coverage_cli.mjs`:
-  - [ ] Adicionar `public_any_tags_total` e `public_unknown_tags_total` explicitamente no topo do
+  - [x] Adicionar `public_any_tags_total` e `public_unknown_tags_total` explicitamente no topo do
         relatório
-  - [ ] Implementar flag `--gaps` que lista símbolos bloqueadores por lote (saída executável)
-  - [ ] Bump de schema para `3.1.0`
-- [ ] Atualizar `schemas/typing/jsdoc-coverage-report.schema.json` com os novos campos
+  - [x] Implementar flag `--gaps` que lista símbolos bloqueadores por lote (saída executável)
+  - [x] Bump de schema para `3.1.0`
+- [x] Atualizar `schemas/typing/jsdoc-coverage-report.schema.json` com os novos campos
       (`public_any_tags_total`, `public_unknown_tags_total`, `strict_uncovered_files_total`)
-- [ ] Adicionar scripts no `package.json`:
-  - [ ] `analyze:typing:gaps` →
+- [x] Adicionar scripts no `package.json`:
+  - [x] `analyze:typing:gaps` →
         `node scripts/analysis/typing_hardening_audit.mjs --format console     --show-gaps`
-  - [ ] `jsdoc:coverage:gaps` →
+  - [x] `jsdoc:coverage:gaps` →
         `node scripts/analysis/jsdoc_coverage_cli.mjs --scope full --format     console --gaps`
-- [ ] Classificar os 14 arquivos de `tests/legacy/` como gap explícito na auditoria (não ignorados,
+- [x] Classificar os 14 arquivos de `tests/legacy/` como gap explícito na auditoria (não ignorados,
       não fora de escopo)
 
 ### Tarefas — Skills de tipagem e JSDoc
@@ -100,17 +142,17 @@
 Para cada skill abaixo, carregar o `SKILL.md`, atualizar referências ao roadmap, commands, critérios
 de done e seções de related skills:
 
-- [ ] **`typing-node24-esm-tsserver`** — atualizar:
+- [x] **`typing-node24-esm-tsserver`** — atualizar:
   - [x] Description frontmatter: "Phase 2 → Full-Strict Roadmap orchestration skill"
   - [x] Workflow: adicionar `typecheck:dashboard`, `jsdoc:coverage:gaps`, `check:ts-expect-error`,
         `check:base-strict` como steps canônicos
   - [x] Validation / Done Criteria: substituir critérios de "Phase 2" pelos do programa full-strict
   - [x] Related Skills: adicionar `strict-lane-governance` e `vue-tsc-dashboard`
-- [ ] **`jsdoc-authoring`** — atualizar:
+- [x] **`jsdoc-authoring`** — atualizar:
   - [x] Description frontmatter: remover "Phase 2"; tornar atemporal
-  - [x] Validation / Done Criteria: substituir critérios qualitativos pelos numéricos
-        (`= 0` para cada indicador de gap)
-- [ ] **`typescript-typing`** — atualizar:
+  - [x] Validation / Done Criteria: substituir critérios qualitativos pelos numéricos (`= 0` para
+        cada indicador de gap)
+- [x] **`typescript-typing`** — atualizar:
   - [x] Workflow: adicionar Step 7 — tipagem Vue/SFC via `vue-tsc` para `src/dashboard-ui`
   - [x] Related Skills: adicionar `vue-tsc-dashboard` e `strict-lane-governance`
 
@@ -128,20 +170,20 @@ de done e seções de related skills:
       emite `strict_uncovered_files_total` + lista de arquivos
 - [x] **`scripts/ci/check-ts-expect-error.mjs`** _(novo)_ — gate de CI: conta `@ts-expect-error`
       fora da allowlist; falha com exit 1 se count > threshold (default: 0)
-- [x] **`scripts/ci/check-base-strict.mjs`** _(novo)_ — gate de CI: verifica
-      `tsconfig.base.json` com `strict: true`
-- [ ] Atualizar **`scripts/analysis/typing_hardening_audit.mjs`**:
-  - [ ] Importar `strict_lane_audit.mjs` para popular `strict_uncovered_files[]`
-  - [ ] Adicionar `js_files_missing_ts_check[]` com lista completa
-  - [ ] Atualizar `AREA_THRESHOLDS.overall` de `90` → `100`
-- [ ] Atualizar **`scripts/analysis/jsdoc_coverage_engine.mjs`**:
-  - [ ] Adicionar `public_any_tags_total` e `public_unknown_tags_total` no shape do relatório
-- [ ] Atualizar **`scripts/analysis/jsdoc_coverage_cli.mjs`**:
-  - [ ] Implementar flag `--gaps` (lista símbolos bloqueadores por lote)
-  - [ ] Implementar flag `--fail-on-any-gap` (exit 1 se qualquer métrica > 0)
-  - [ ] Bump de schema para `3.1.0`
-- [ ] Atualizar **`scripts/ci/verify-skills-governance.mjs`**:
-  - [ ] Verificar que `strict-lane-governance` e `vue-tsc-dashboard` existem e têm `SKILL.md`
+- [x] **`scripts/ci/check-base-strict.mjs`** _(novo)_ — gate de CI: verifica `tsconfig.base.json`
+      com `strict: true`
+- [x] Atualizar **`scripts/analysis/typing_hardening_audit.mjs`**:
+  - [x] Importar `strict_lane_audit.mjs` para popular `strict_uncovered_files[]`
+  - [x] Adicionar `js_files_missing_ts_check[]` com lista completa
+  - [x] Atualizar `AREA_THRESHOLDS.overall` de `90` → `100`
+- [x] Atualizar **`scripts/analysis/jsdoc_coverage_engine.mjs`**:
+  - [x] Adicionar `public_any_tags_total` e `public_unknown_tags_total` no shape do relatório
+- [x] Atualizar **`scripts/analysis/jsdoc_coverage_cli.mjs`**:
+  - [x] Implementar flag `--gaps` (lista símbolos bloqueadores por lote)
+  - [x] Implementar flag `--fail-on-any-gap` (exit 1 se qualquer métrica > 0)
+  - [x] Bump de schema para `3.1.0`
+- [x] Atualizar **`scripts/ci/verify-skills-governance.mjs`**:
+  - [x] Verificar que `strict-lane-governance` e `vue-tsc-dashboard` existem e têm `SKILL.md`
 
 ### Tarefas — package.json e Makefile
 
@@ -158,9 +200,9 @@ de done e seções de related skills:
 
 ### Critério de saída da Fase 0
 
-- [ ] `analyze:typing:gaps` lista exatamente os 29 arquivos sem check (15 ativos + 14 legacy)
-- [ ] `jsdoc:coverage:gaps` lista todos os 891 issues abertos
-- [ ] Schema validado na versão `3.1.0`
+- [x] `analyze:typing:gaps` lista exatamente os 29 arquivos sem check (15 ativos + 14 legacy)
+- [x] `jsdoc:coverage:gaps` lista todos os 891 issues abertos
+- [x] Schema validado na versão `3.1.0`
 
 ---
 
@@ -171,65 +213,71 @@ radar.
 
 ### Tarefas — `@ts-check`
 
-- [ ] Adicionar `// @ts-check` nos **15 arquivos ativos** sem cobertura:
-  - [ ] `scripts/analysis/analyze-code-graph.js`
-  - [ ] `scripts/analysis/audit-tmp-scripts.js`
-  - [ ] `scripts/health/test-health-logic.js`
-  - [ ] `scripts/ops/rotate-profiles.js`
-  - [ ] `scripts/validate_config.js`
-  - [ ] `tests/e2e/test_ariadne_thread.spec.js`
-  - [ ] `tests/e2e/test_boot_sequence.spec.js`
-  - [ ] `tests/e2e/test_integration_complete.spec.js`
-  - [ ] `tests/integration/rag/test_multi_llm_integration.spec.js`
-  - [ ] `tests/manual/test_chrome_proxy_integration.js`
-  - [ ] `tests/unit/agent/test_artifacts_attempts.spec.js`
-  - [ ] `tests/unit/agent/test_ssot_consolidation.spec.js`
-  - [ ] `tests/unit/agent/test_ssot_orchestration_worker.spec.js`
-  - [ ] `tests/unit/nerv/test_envelope.spec.js`
-  - [ ] `tests/unit/server/test_api_workflow_results_breaking.spec.js`
-- [ ] Adicionar `// @ts-check` nos **14 arquivos de `tests/legacy/`**; suprimir erros irrecuperáveis
+- [x] Adicionar `// @ts-check` nos **15 arquivos ativos** sem cobertura:
+  - [x] `scripts/analysis/analyze-code-graph.js`
+  - [x] `scripts/analysis/audit-tmp-scripts.js`
+  - [x] `scripts/health/test-health-logic.js`
+  - [x] `scripts/ops/rotate-profiles.js`
+  - [x] `scripts/validate_config.js`
+  - [x] `tests/e2e/test_ariadne_thread.spec.js`
+  - [x] `tests/e2e/test_boot_sequence.spec.js`
+  - [x] `tests/e2e/test_integration_complete.spec.js`
+  - [x] `tests/integration/rag/test_multi_llm_integration.spec.js`
+  - [x] `tests/manual/test_chrome_proxy_integration.js`
+  - [x] `tests/unit/agent/test_artifacts_attempts.spec.js`
+  - [x] `tests/unit/agent/test_ssot_consolidation.spec.js`
+  - [x] `tests/unit/agent/test_ssot_orchestration_worker.spec.js`
+  - [x] `tests/unit/nerv/test_envelope.spec.js`
+  - [x] `tests/unit/server/test_api_workflow_results_breaking.spec.js`
+- [x] Adicionar `// @ts-check` nos **14 arquivos de `tests/legacy/`**; suprimir erros irrecuperáveis
       com `// @ts-ignore` + comentário justificando (proibido suprimir sem contexto)
 
 ### Tarefas — tsconfigs
 
-- [ ] **`tsconfig.tools.json`**: substituir lista de 14 arquivos explícitos por
+- [x] **`tsconfig.tools.json`**: substituir lista de 14 arquivos explícitos por
       `include: ["scripts/**/*"]` com `exclude` padronizado para `dist/`, `coverage/`, `tmp/`,
       `node_modules/`
-- [ ] **`tsconfig.tests.json`**: substituir lista de 7 arquivos por `include: ["tests/**/*"]` com
+- [x] **`tsconfig.tests.json`**: substituir lista de 7 arquivos por `include: ["tests/**/*"]` com
       exclude adequado
-- [ ] **`tsconfig.node.json`**: remover os 7 arquivos de scripts que sobrepõem com
+- [x] **`tsconfig.node.json`**: remover os 7 arquivos de scripts que sobrepõem com
       `tsconfig.tools.json` — cobrir apenas `src/**/*` + `*.config.*` + `.puppeteerrc.cjs`
 
 ### Tarefas — Dashboard Vue
 
-- [ ] Instalar no workspace `src/dashboard-ui`:
+- [x] Instalar no workspace `src/dashboard-ui`:
   ```
   npm install -D vue-tsc @vue/tsconfig --workspace src/dashboard-ui
   ```
-- [ ] Criar `src/dashboard-ui/tsconfig.json`:
+- [x] Criar `src/dashboard-ui/tsconfig.json`:
   - `extends: "@vue/tsconfig/tsconfig.dom.json"`
   - `compilerOptions.strict: true`, `verbatimModuleSyntax: true`, `allowImportingTsExtensions: true`
   - `include: ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "src/**/*.js"]`
-- [ ] Adicionar `typecheck:dashboard` no `package.json` raiz:
+- [x] Adicionar `typecheck:dashboard` no `package.json` raiz:
   ```
   npm --workspace src/dashboard-ui exec -- vue-tsc --noEmit -p src/dashboard-ui/tsconfig.json
   ```
-- [ ] Expandir `typecheck:repo` para incluir `typecheck:dashboard`
-- [ ] Tipar configs do dashboard:
-  - [ ] `src/dashboard-ui/vite.config.js`: `@ts-check` + `import { defineConfig } from 'vite'`
-  - [ ] `src/dashboard-ui/tailwind.config.js`: `/** @type {import('tailwindcss').Config} */`
-  - [ ] `src/dashboard-ui/postcss.config.js`: `/** @type {Record<string, object>} */`
+- [x] Expandir `typecheck:repo` para incluir `typecheck:dashboard`
+- [x] Tipar configs do dashboard:
+  - [x] `src/dashboard-ui/vite.config.js`: `@ts-check` + `import { defineConfig } from 'vite'`
+  - [x] `src/dashboard-ui/tailwind.config.js`: `/** @type {import('tailwindcss').Config} */`
+  - [x] `src/dashboard-ui/postcss.config.js`: `/** @type {Record<string, object>} */`
 
 ### Critério de saída da Fase 1
 
-- [ ] `@ts-check` = 100 % em todos os `.js/.mjs/.cjs` elegíveis
-- [ ] `typecheck:dashboard` executa `vue-tsc --noEmit` sem pânico de config ausente
-- [ ] `typecheck:repo` (expandido) passa por todas as superfícies
-- [ ] `strict_uncovered_files_total = 0` (todo arquivo ativo em algum config)
+- [x] `@ts-check` = 100 % em todos os `.js/.mjs/.cjs` elegíveis
+- [x] `typecheck:dashboard` executa `vue-tsc --noEmit` sem pânico de config ausente
+- [x] `typecheck:repo` (expandido) passa por todas as superfícies
+- [x] `strict_uncovered_files_total = 0` (todo arquivo ativo em algum config)
 
 ---
 
 ## Fase 2 — Fechamento do backlog JSDoc por pasta
+
+> **Status** (atualizado): **Subfase 2.a concluída** — `unsafe_generic_tags_total: 586 → 0` ✅.
+> Engine atualizada: `UNSAFE_GENERIC_IN_TYPE_RE` agora analisa apenas posições de tipo (`{...}`),
+> evitando falsos positivos de descrições. **Pendente** para próximas sessões:
+> - `functions_missing_param_tags: 118` (Subfase 2.c)
+> - `functions_missing_options_typedef: 171` (Subfase 2.b)
 
 **Objetivo**: zerar os três indicadores de qualidade em cada pasta antes de avançar para a próxima.
 

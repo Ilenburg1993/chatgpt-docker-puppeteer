@@ -13,12 +13,12 @@ import { resolve } from 'node:path';
 
 const TSCONFIG_BASE = resolve('tsconfig.base.json');
 
-/** @type {Record<string, any>} */
+/** @type {Record<string, unknown>} */
 let config;
 
 try {
     config = JSON.parse(readFileSync(TSCONFIG_BASE, 'utf8'));
-} catch (/** @type {any} */ e) {
+} catch (/** @type {unknown} */ e) {
     console.error(`❌ check-base-strict: não foi possível ler ${TSCONFIG_BASE}: ${e.message}`);
     process.exit(1);
 }

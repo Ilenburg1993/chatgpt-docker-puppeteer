@@ -1,3 +1,4 @@
+// @ts-check
 // @ts-nocheck
 // NOTE: This suite is E2E and requires Chrome proxy + external services.
 // It is not executed by default `npm test`.

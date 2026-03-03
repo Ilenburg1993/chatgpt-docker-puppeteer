@@ -97,13 +97,13 @@ function generateJSDoc(funcName, funcType) {
     // Dependendo do tipo, podemos inferir diferentes coisas
     switch (funcType) {
         case 'async-function':
-            returns = '\n * @returns {Promise<any>} ';
+            returns = '\n * @returns {Promise<void>} ';
             break;
         case 'constructor':
             returns = '';
             break;
         default:
-            returns = '\n * @returns {any} ';
+            returns = '\n * @returns {object} ';
     }
 
     return `/**
@@ -172,7 +172,7 @@ function processFile(filepath) {
 /**
  * Processa todos os arquivos JS/TS em um diretório recursivamente.
  * @param {string} dir - Diretório para processar.
- * @returns {Object} Estatísticas de processamento.
+ * @returns {object} Estatísticas de processamento.
  */
 function processDirectory(dir) {
     let totalAdded = 0;

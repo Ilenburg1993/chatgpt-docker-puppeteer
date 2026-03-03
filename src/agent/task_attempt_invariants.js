@@ -49,7 +49,7 @@ function evaluateAttemptInvariants({ taskId, attemptId = null }) {
  *   msgId?: string|null,
  *   context?: string
  * }} params
-  * @returns {any}
+  * @returns {object}
  */
 function emitStaleAttemptIgnoredEvent({
     taskId,

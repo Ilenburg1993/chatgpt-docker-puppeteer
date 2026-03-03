@@ -37,7 +37,7 @@ function ensureDirs() {
 // GERA TAREFA NO FORMATO SCHEMA V3
 /**
  * Função exportada: writeTask.
- * @returns {any}
+ * @returns {object}
  */
 function writeTask(options) {
     ensureDirs();
@@ -80,7 +80,7 @@ function writeTask(options) {
 
 /**
  * Função exportada: readTask.
- * @returns {any}
+ * @returns {object}
  */
 function readTask(id) {
     try {
@@ -124,7 +124,7 @@ function cleanTmp() {
 
 /**
  * Função exportada: readLatestGlobalLogTail.
- * @returns {any}
+ * @returns {object}
  */
 function readLatestGlobalLogTail(lines = 50) {
     try {
@@ -140,7 +140,7 @@ function readLatestGlobalLogTail(lines = 50) {
 
 /**
  * Função exportada: startAgent.
- * @returns {any}
+ * @returns {object}
  */
 function startAgent(timeoutMs = 15000) {
     ensureDirs();
@@ -212,7 +212,7 @@ function stopAgent(proc) {
 
 /**
  * Função exportada: waitForCondition.
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 async function waitForCondition(fn, timeout = 10000, interval = 500) {
     const end = Date.now() + timeout;

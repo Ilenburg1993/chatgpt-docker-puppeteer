@@ -40,8 +40,8 @@ const INJECTION_FORMAT = {
  */
 class FeedbackProcessor {
     /**
-     * @param {Object} options
-     * @param {Object} [options.contextManager] - ContextManager para armazenar patterns
+     * @param {object} options
+     * @param {object} [options.contextManager] - ContextManager para armazenar patterns
      */
     constructor({ contextManager = null } = {}) {
         this.contextManager = contextManager;
@@ -96,8 +96,8 @@ class FeedbackProcessor {
      * Processa feedback textual bruto do usuário.
      *
      * @param {string} feedbackText - Texto do feedback
-     * @param {Object} [metadata={}] - Metadata adicional (mission_id, step_id, etc)
-     * @returns {Object} Feedback processado com categorização e patterns
+     * @param {object} [metadata={}] - Metadata adicional (mission_id, step_id, etc)
+     * @returns {object} Feedback processado com categorização e patterns
      *
      * @example
      * const processed = feedbackProcessor.processFeedback(
@@ -194,8 +194,8 @@ class FeedbackProcessor {
      * Injeta feedback processado em prompt de step.
      *
      * @param {string} stepPrompt - Prompt original do step
-     * @param {Object} processedFeedback - Feedback processado (resultado de processFeedback)
-     * @param {Object} [options={}] - Opções de injeção
+     * @param {object} processedFeedback - Feedback processado (resultado de processFeedback)
+     * @param {object} [options={}] - Opções de injeção
      * @param {string} [options.format='default'] - Formato: 'default', 'inline', 'structured'
      * @param {boolean} [options.includeCategory=true] - Incluir categoria do feedback
      * @param {boolean} [options.includeActionItems=true] - Incluir action items

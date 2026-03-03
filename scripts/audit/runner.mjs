@@ -91,7 +91,7 @@ const cliOptions = {
     'quality-parallelism': { type: 'string', default: 'auto' },
 };
 
-/** @type {Record<string, any>} */
+/** @type {Record<string, unknown>} */
 let values = {};
 /** @type {Error|null} */
 let cliParseError = null;
@@ -421,16 +421,16 @@ async function main() {
     let abortRequested = false;
     let abortMessage = '';
     let fatalMessage = '';
-    /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
+    /** @type {{ findings: unknown[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: unknown }} */
     let securityResult = {
         findings: [],
         errors: [],
         warnings: [],
         telemetry: { contracts_scanned: 0, files_scanned: 0, checks: [], findings_by_kind: {} },
     };
-    /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
+    /** @type {{ findings: unknown[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: unknown }} */
     let performanceResult = { findings: [], errors: [], warnings: [], telemetry: { score: null, categories: {} } };
-    /** @type {{ findings: any[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: any }} */
+    /** @type {{ findings: unknown[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: unknown }} */
     let architectureResult = { findings: [], errors: [], warnings: [], telemetry: { findings_by_kind: {} } };
     const plannedStartEta = etaEstimator.estimateRemaining(plannedStepKeys);
     /** @type {{ stdout_bytes_total: number, stderr_bytes_total: number, stdout_truncated_steps: string[], stderr_truncated_steps: string[], steps_with_overflow: number, max_stdout_bytes: number, max_stderr_bytes: number }} */
@@ -775,7 +775,7 @@ async function main() {
      * @param {string} stepId
      * @param {string} command
      * @param {string[]} args
-     * @param {any} [runOptions]
+     * @param {object} [runOptions]
      */
     async function execStep(phase, stepId, command, args, runOptions = {}) {
         if (abortRequested) {

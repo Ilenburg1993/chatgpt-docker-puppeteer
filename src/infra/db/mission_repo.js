@@ -47,7 +47,7 @@ function _normalizePolicy(policy) {
  *   policy?: Record<string, unknown>,
  *   context?: Record<string, unknown>
  * }} [input={}]
-  * @returns {any}
+  * @returns {Mission|null}
  */
 function createMission({
     title,
@@ -91,7 +91,7 @@ function createMission({
 
 /**
  * Função exportada: listMissions.
- * @returns {any}
+ * @returns {Mission[]}
  */
 function listMissions({ status = null, limit = 500 } = {}) {
     const db = getDb();
@@ -111,7 +111,8 @@ function listMissions({ status = null, limit = 500 } = {}) {
 
 /**
  * Função exportada: getMissionById.
- * @returns {any}
+ * @param {string} missionId Unique identifier.
+ * @returns {Mission|null}
  */
 function getMissionById(missionId) {
     const db = getDb();
@@ -161,7 +162,7 @@ function _rowToMission(row) {
 
 /**
  * Função exportada: updateMission.
- * @returns {any}
+ * @returns {Mission|null}
  */
 function updateMission(missionId, updates = {}) {
     const db = getDb();
@@ -236,7 +237,7 @@ function updateMission(missionId, updates = {}) {
 
 /**
  * Função exportada: deleteMission.
- * @returns {any}
+ * @returns {boolean}
  */
 function deleteMission(missionId) {
     const db = getDb();

@@ -310,7 +310,7 @@ function _recordMissionEvents({
 
 /**
  * Função exportada: createMissionCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function createMissionCommand({ actor = {}, reason, payload = {} }) {
     const actorView = asRecord(actor);
@@ -368,7 +368,7 @@ function createMissionCommand({ actor = {}, reason, payload = {} }) {
 
 /**
  * Função exportada: executeMissionCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' }) {
     const actorView = asRecord(actor);
@@ -406,7 +406,7 @@ function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null
 
 /**
  * Função exportada: pauseMissionCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
@@ -448,7 +448,7 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
 
 /**
  * Função exportada: resumeMissionCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
@@ -490,7 +490,7 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
 
 /**
  * Função exportada: cancelMissionCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -558,7 +558,7 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
 
 /**
  * Função exportada: patchMissionCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const actorView = asRecord(actor);
@@ -599,7 +599,7 @@ function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, 
 
 /**
  * Função exportada: setMissionPolicyCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function setMissionPolicyCommand({
     missionId,
@@ -653,7 +653,7 @@ function setMissionPolicyCommand({
 
 /**
  * Função exportada: reorderMissionStepsCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion = null, stepOrder = [] }) {
     const actorView = asRecord(actor);

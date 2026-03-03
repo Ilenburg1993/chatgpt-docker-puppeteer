@@ -27,10 +27,10 @@
 /**
  * Cria um observador técnico de backpressure.
  *
- * @param {Object} deps
- * @param {Object} deps.telemetry
+ * @param {object} deps
+ * @param {object} deps.telemetry
  * Interface de telemetria do NERV.
-  * @returns {any}
+  * @returns {object}
  */
 function createBackpressure({ telemetry }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
@@ -40,7 +40,7 @@ function createBackpressure({ telemetry }) {
     /**
      * Emite sinal técnico de pressão.
      *
-     * @param {Object} info
+     * @param {object} info
      * @param {string} info.buffer
      * Nome do buffer (ex.: inbound, outbound)
      *

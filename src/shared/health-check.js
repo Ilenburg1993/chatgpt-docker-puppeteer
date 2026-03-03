@@ -296,13 +296,13 @@ export function calculateOverallStatus(ollama, gateway, system) {
     const systemState = system && typeof system === 'object' ? /** @type {Record<string, unknown>} */ (system) : {};
     /** @type {string[]} */
     const statuses = [
-        Boolean(ollamaState.connected) ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.UNHEALTHY,
+        ollamaState.connected ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.UNHEALTHY,
         typeof systemState.status === 'string' ? systemState.status : HEALTH_STATUS.UNKNOWN,
     ];
 
     // Gateway é opcional, então só considera se estiver conectado
     if (gatewayState.connected !== undefined) {
-        statuses.push(Boolean(gatewayState.connected) ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED);
+        statuses.push(gatewayState.connected ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED);
     }
 
     if (statuses.includes(HEALTH_STATUS.UNHEALTHY)) {

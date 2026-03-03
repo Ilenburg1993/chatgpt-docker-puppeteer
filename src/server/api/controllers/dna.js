@@ -144,7 +144,7 @@ router.put('/dna', denyIfDelegated, async (req, res) => {
  * GET /dna/history
  * Retorna histórico de backups do DNA (últimas 10 versões).
  *
- * @returns {Array} history - Array de backups com timestamp, version, author
+ * @returns {unknown[]} history - Array de backups com timestamp, version, author
  */
 router.get('/dna/history', async (req, res) => {
     try {
@@ -215,7 +215,7 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
  * GET /dna/stats
  * Retorna estatísticas de evolução do DNA (session counters).
  *
- * @returns {Object} stats - Evolution counters per domain
+ * @returns {object} stats - Evolution counters per domain
  */
 router.get('/dna/stats', async (req, res) => {
     try {

@@ -157,7 +157,8 @@ function _rowToTask(row) {
 
 /**
  * Função exportada: getTaskById.
- * @returns {any}
+ * @param {string} taskId Task identifier.
+ * @returns {TaskRow|null}
  */
 function getTaskById(taskId) {
     const db = getDb();
@@ -171,7 +172,7 @@ function getTaskById(taskId) {
  * o máximo retornável a 500 por chamada (vs 20.000 anterior).
  *
  * @param {{ status?: string|null, stage?: string|null, missionId?: string|null, limit?: number, offset?: number }} [opts]
-  * @returns {any}
+  * @returns {TaskRow[]}
  */
 function listTasks({ status = null, stage = null, missionId = null, limit = 100, offset = 0 } = {}) {
     const db = getDb();
@@ -254,7 +255,7 @@ function countTasksByStatus() {
 
 /**
  * Função exportada: getTaskDependencies.
- * @returns {any}
+ * @returns {TaskRow|null}
  */
 function getTaskDependencies(taskId) {
     const db = getDb();
@@ -274,14 +275,14 @@ function getTaskDependencies(taskId) {
 
 /**
  * Inserts a task into the database.
- * @param {any} rawTask - The raw task object
+ * @param {object} rawTask - The raw task object
  * @param {object} [options={}] - Options
  * @param {string} [options.stage='READY'] - The task stage
  * @param {string} [options.status='PENDING'] - The task status
  * @param {string} [options.actor='system'] - The actor performing the action
  * @param {boolean} [options.ifNotExists=false] - Whether to insert only if not exists
  * @param {string|null} [options.promptTemplateArtifactId=null] - Prompt template artifact ID
-  * @returns {any}
+  * @returns {TaskRow|null}
  */
 function insertTask(
     rawTask,
@@ -725,7 +726,7 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
 
 /**
  * Função exportada: setTaskStage.
- * @returns {any}
+ * @returns {TaskRow|null}
  */
 function setTaskStage(taskId, stage) {
     return updateTask(taskId, { stage });
@@ -733,7 +734,7 @@ function setTaskStage(taskId, stage) {
 
 /**
  * Função exportada: setTaskStatus.
- * @returns {any}
+ * @returns {TaskRow|null}
  */
 function setTaskStatus(taskId, status, extra = {}) {
     return updateTask(taskId, { status, ...extra });
@@ -833,7 +834,7 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
  * @param {string} params.taskId - The task ID
  * @param {string} [params.workerId] - The worker ID (optional, for safety)
  * @param {string} [params.expectedAttemptId] - Expected latest attempt/correlation for lock-causality guard
-  * @returns {any}
+  * @returns {TaskRow|null}
  */
 function releaseTaskLock(
     /** @type {{ taskId: string, workerId?: string, expectedAttemptId?: string }} */ {
@@ -872,7 +873,7 @@ function releaseTaskLock(
  * @param {string} params.workerId - The worker ID
  * @param {number} [params.nowMs] - Current timestamp in ms
  * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
-  * @returns {any}
+  * @returns {TaskRow|null}
  */
 function extendTaskLock(
     /** @type {{ taskId: string, workerId: string, nowMs?: number, lockTtlMs?: number }} */ {
@@ -905,7 +906,7 @@ function extendTaskLock(
 
 /**
  * Função exportada: retryFailedTasks.
- * @returns {any}
+ * @returns {TaskRow|null}
  */
 function retryFailedTasks() {
     const db = getDb();
@@ -927,7 +928,7 @@ function retryFailedTasks() {
 
 /**
  * Função exportada: incrementTaskAttempts.
- * @returns {any}
+ * @returns {TaskRow|null}
  */
 function incrementTaskAttempts(taskId, delta = 1) {
     const db = getDb();
@@ -948,7 +949,7 @@ function incrementTaskAttempts(taskId, delta = 1) {
 
 /**
  * Função exportada: clearQueuePreserveRunning.
- * @returns {any}
+ * @returns {TaskRow|null}
  */
 function clearQueuePreserveRunning() {
     const db = getDb();
@@ -959,7 +960,7 @@ function clearQueuePreserveRunning() {
 
 /**
  * Função exportada: purgeTask.
- * @returns {any}
+ * @returns {TaskRow|null}
  */
 function purgeTask(taskId) {
     const db = getDb();

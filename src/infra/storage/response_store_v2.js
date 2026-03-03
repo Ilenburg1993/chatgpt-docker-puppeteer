@@ -18,13 +18,13 @@ function _responseDir() {
  * Salva resposta em múltiplos formatos
  *
  * @param {string} taskId - Task ID
- * @param {Object} responseData - Response V2 data
- * @param {Object} responseData.content - { text, markdown, html, json }
- * @param {Object} responseData.generation - Generation metadata
- * @param {Object} responseData.validation - Validation (nullable)
- * @param {Object} responseData.preview - Preview estruturado
+ * @param {object} responseData - Response V2 data
+ * @param {object} responseData.content - { text, markdown, html, json }
+ * @param {object} responseData.generation - Generation metadata
+ * @param {object} responseData.validation - Validation (nullable)
+ * @param {object} responseData.preview - Preview estruturado
  * @param {{ attemptId?: string|null, writeLegacyLatest?: boolean }=} opts
- * @returns {Promise<Object>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile, htmlFile} }
+ * @returns {Promise<object>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile, htmlFile} }
  */
 async function saveResponseV2(taskId, responseData, opts = {}) {
     try {
@@ -108,7 +108,7 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
  * @param {string} taskId - Task ID
  * @param {string} format - Formato desejado ('text', 'markdown', 'json', 'html')
  * @param {{ attemptId?: string|null }=} opts
- * @returns {Promise<string|Object>} - Conteúdo da resposta
+ * @returns {Promise<string|object>} - Conteúdo da resposta
  */
 async function loadResponseV2(taskId, format, opts = {}) {
     format = format || 'text';

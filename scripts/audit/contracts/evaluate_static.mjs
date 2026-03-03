@@ -289,7 +289,7 @@ function resolveAllowlistedFiles(contract, allowlists) {
  *   contracts: ContractDefinitionV1[],
  *   allowlists?: Record<string, Record<string, string[]>>,
  * }} options
-  * @returns {any}
+  * @returns {object}
  */
 export function evaluateStaticContracts(options) {
     const rootDir = path.resolve(options.rootDir);
@@ -320,7 +320,7 @@ export function evaluateStaticContracts(options) {
         });
     }
 
-    /** @type {Array<Record<string, any>>} */
+    /** @type {Array<Record<string, unknown>>} */
     const findings = [];
     /** @type {Record<string, number>} */
     const hitsByContract = {};

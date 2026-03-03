@@ -217,7 +217,7 @@ export class OllamaHostSupervisor {
             this._last = {
                 ok: false,
                 version: null,
-                statusCode: /** @type {any} */ (error)?.statusCode ?? null,
+                statusCode: /** @type {unknown} */ (error)?.statusCode ?? null,
                 checkedAt: this.now(),
                 error: error?.message || String(error),
                 circuitOpen: this.circuitEnabled && this.now() < this._circuitOpenUntil,

@@ -42,20 +42,20 @@ function extractEnvelopeData(envelope) {
 /**
  * Cria a ponte de integração entre Kernel e NERV.
  *
- * @param {Object} deps
- * @param {Object} deps.nerv
+ * @param {object} deps
+ * @param {object} deps.nerv
  * Instância do NERV já configurada.
  *
- * @param {Object} deps.taskRuntime
+ * @param {object} deps.taskRuntime
  * Instância do TaskRuntime.
  *
- * @param {Object} deps.observationStore
+ * @param {object} deps.observationStore
  * Instância do ObservationStore.
  *
- * @param {Object} deps.telemetry
+ * @param {object} deps.telemetry
  * Canal de telemetria do Kernel.
  *
- * @param {Object} [deps.orchestrator]
+ * @param {object} [deps.orchestrator]
  * Instância do OrchestratorEngine (V2.0 - opcional para backward compatibility).
  */
 class KernelNERVBridge {
@@ -235,14 +235,14 @@ class KernelNERVBridge {
     /**
      * Emite um COMMAND via NERV.
      *
-     * @param {Object} params
+     * @param {object} params
      * @param {string} params.target
      * Destinatário do comando (ex.: 'driver', 'server').
      *
      * @param {string} params.correlationId
      * ID de correlação (vincula a uma tarefa).
      *
-     * @param {Object} params.payload
+     * @param {object} params.payload
      * Payload opaco do comando.
      */
     /**
@@ -287,14 +287,14 @@ class KernelNERVBridge {
     /**
      * Emite um EVENT via NERV.
      *
-     * @param {Object} params
+     * @param {object} params
      * @param {string} [params.target]
      * Destinatário opcional (broadcast se ausente).
      *
      * @param {string} params.correlationId
      * ID de correlação.
      *
-     * @param {Object} params.payload
+     * @param {object} params.payload
      * Payload opaco do evento.
      */
     /**
@@ -345,8 +345,8 @@ class KernelNERVBridge {
      * Hook: Intercepta task ANTES da execução.
      * Permite orchestrator preparar task (ITERATIVE, MULTI_STEP).
      *
-     * @param {Object} task - Task V5
-     * @returns {Promise<Object>} - Task modificada (se orquestrada)
+     * @param {object} task - Task V5
+     * @returns {Promise<object>} - Task modificada (se orquestrada)
      */
     async beforeTaskExecution(task) {
         if (!this.orchestrator) {
@@ -386,9 +386,9 @@ class KernelNERVBridge {
      * Hook: Intercepta task APÓS a execução.
      * Permite orchestrator decidir próxima ação (DONE/RETRY/NEXT_STEP).
      *
-     * @param {Object} task - Task V5
-     * @param {Object} executionResult - Resultado da execução do driver
-     * @returns {Promise<Object>} - Decisão { action, task, feedback, nextStep }
+     * @param {object} task - Task V5
+     * @param {object} executionResult - Resultado da execução do driver
+     * @returns {Promise<object>} - Decisão { action, task, feedback, nextStep }
      */
     async afterTaskExecution(task, executionResult) {
         if (!this.orchestrator) {
@@ -429,7 +429,7 @@ class KernelNERVBridge {
      * Processa decisão do orchestrator.
      * Aplica ação: RETRY → reenviar task, NEXT_STEP → criar nova task, DONE → finalizar.
      *
-     * @param {Object} decision - Decisão do orchestrator
+     * @param {object} decision - Decisão do orchestrator
      * @param {string} correlationId - ID de correlação NERV
      * @returns {Promise<void>}
      */

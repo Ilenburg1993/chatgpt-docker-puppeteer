@@ -136,7 +136,7 @@ function _computeProgressView(mission) {
     };
 }
 
-function _pickAllowedTarget(options = /** @type {{requested?: any, allowedTargets?: any}} */ ({})) {
+function _pickAllowedTarget(options = /** @type {{requested?: unknown, allowedTargets?: unknown}} */ ({})) {
     const { requested, allowedTargets = null } = options;
     const requestedNormalized = requested ? String(requested).toLowerCase().trim() : null;
     const allowed = Array.isArray(allowedTargets) ? allowedTargets.map(t => String(t).toLowerCase().trim()) : null;
@@ -271,7 +271,7 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
             })
         );
 
-        const missionRecord = /** @type {any} */ (mission);
+        const missionRecord = /** @type {unknown} */ (mission);
 
         recordEvent({
             entityType: 'mission',
@@ -1163,6 +1163,6 @@ function setMissionManager(_) {
  * **Semântica:** Interface legado mantida para compatibilidade, mas ignorada.
  * **Unidades:** N/A
  *
- * @param {*} _ - Parâmetro ignorado (interface legado)
+ * @param {object} _ - Parâmetro ignorado (interface legado)
  */
 export { setMissionManager };

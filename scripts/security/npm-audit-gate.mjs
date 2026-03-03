@@ -383,7 +383,7 @@ if (!auditResult.stdout.trim()) {
     process.exit(2);
 }
 
-/** @type {{ vulnerabilities?: Record<string, any>, metadata?: any }} */
+/** @type {{ vulnerabilities?: Record<string, unknown>, metadata?: unknown }} */
 let payload;
 try {
     payload = JSON.parse(auditResult.stdout);

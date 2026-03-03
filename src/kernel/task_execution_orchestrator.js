@@ -33,9 +33,9 @@ import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#sh
  */
 class TaskExecutionOrchestrator {
     /**
-     * @param {Object} params
-     * @param {Object} params.nerv - Instância do NERV
-     * @param {Object} params.nervBridge - KernelNERVBridge
+     * @param {object} params
+     * @param {object} params.nerv - Instância do NERV
+     * @param {object} params.nervBridge - KernelNERVBridge
      * @param {TaskRetryRequestedCallback|null} [params.onTaskRetryRequested] - callback retry
      * @param {TaskPermanentFailureCallback|null} [params.onTaskPermanentFailure] - callback failure permanente
      * @param {TaskCompletedCallback|null} [params.onTaskCompleted] - callback conclusão

@@ -22,7 +22,7 @@ import { putBuffer, putJson, putText } from '#infra/storage/artifact_store';
  * Configuração do DriverNERVAdapter.
  * Todas as constantes configuráveis via environment variables.
  *
- * @const {Object} ADAPTER_CONFIG
+ * @const {object} ADAPTER_CONFIG
  */
 const ADAPTER_CONFIG = {
     /** Timeout máximo para execução de task (ms) - Default: 5 minutos */
@@ -81,7 +81,7 @@ const ADAPTER_CONFIG = {
  * Estes são eventos LOCAIS (subscribers no mesmo processo).
  * Para eventos NERV (IPC), usar ActionCode.DRIVER_*.
  *
- * @const {Object} ADAPTER_EVENTS
+ * @const {object} ADAPTER_EVENTS
  */
 const ADAPTER_EVENTS = {
     TASK_STARTED: 'adapter:task_started',
@@ -1268,7 +1268,7 @@ class DriverNERVAdapter extends EventEmitter {
                 }
             });
 
-            // Rebuild buffer: failed items + any new items added after batch was captured
+            // Rebuild buffer: failed items + unknown new items added after batch was captured
             this.telemetryBuffer = [...failedItems, ...this.telemetryBuffer.slice(batch.length)];
 
             const successCount = batch.length - failedItems.length;
@@ -1324,10 +1324,10 @@ class DriverNERVAdapter extends EventEmitter {
      *   taskId?: string,
      *   correlationId?: string,
      *   target?: string,
-     *   driver?: any,
-     *   page?: any,
+     *   driver?: unknown,
+     *   page?: unknown,
      *   phase?: string,
-     *   diagnosis?: any
+     *   diagnosis?: unknown
      * }} [context={}]
      */
     async _captureDiagnostics({
@@ -1457,9 +1457,9 @@ class DriverNERVAdapter extends EventEmitter {
      * Executa preflight mínimo antes do driver entrar no loop principal.
      *
      * @param {{
-     *   driver?: any,
-     *   page?: any,
-     *   task?: any,
+     *   driver?: unknown,
+     *   page?: unknown,
+     *   task?: unknown,
      *   taskId?: string,
      *   target?: string,
      *   signal?: AbortSignal | null
@@ -2349,7 +2349,7 @@ export const create = (nerv, browserPool, config) => {
  * **Semântica:** Classe principal para adaptação entre sistema NERV e drivers de LLM.
  * **Unidades:** N/A
  *
- * @type {Function}
+ * @type {function}
  */
 export { DriverNERVAdapter };
 

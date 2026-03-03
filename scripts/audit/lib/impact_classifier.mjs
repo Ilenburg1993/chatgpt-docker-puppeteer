@@ -12,7 +12,7 @@ import {
 /** @typedef {'skip'|'changed-only'|'full'} StepMode */
 
 /**
- * @param {{ mode: StepMode, [k:string]: any }} step
+ * @param {{ mode: StepMode, [k:string]: unknown }} step
  */
 function step(step) {
     return step;
@@ -20,7 +20,7 @@ function step(step) {
 
 /**
  * @param {{ profile: Profile, changedFiles?: string[], qualityMode?: QualityMode, qualityJsdoc?: boolean, qualityPrettier?: boolean }} options
-  * @returns {any}
+  * @returns {object}
  */
 export function buildQualityExecutionPlan(options) {
     const profile = options.profile;

@@ -105,7 +105,7 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
     /**
      * Registra handler para frames recebidos.
      *
-     * @param {Function} handler
+     * @param {function} handler
      */
     function onReceive(handler) {
         connection.onReceive(handler);

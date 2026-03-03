@@ -65,7 +65,7 @@ export const ENDPOINTS = Object.freeze([
  * @property {number} [port]
  * @property {string} [baseUrl]
  */
-/** @typedef {{ ok: boolean, status: number, text: string, json: any }} GatewayJsonResponse */
+/** @typedef {{ ok: boolean, status: number, text: string, json: unknown }} GatewayJsonResponse */
 /**
  * @typedef {object} CreateGatewayClientOptions
  * @property {string} [clientTag]

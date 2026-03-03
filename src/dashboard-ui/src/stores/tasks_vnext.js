@@ -254,7 +254,7 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             }
 
             let bulkAction = normalizedAction;
-            const bulkParams = /** @type {Record<string, any>} */ ({ ...(params || {}) });
+            const bulkParams = /** @type {Record<string, unknown>} */ ({ ...(params || {}) });
 
             if (normalizedAction === 'APPROVE') {
                 bulkAction = 'PATCH';

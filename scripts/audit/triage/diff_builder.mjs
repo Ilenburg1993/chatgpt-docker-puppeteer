@@ -28,7 +28,7 @@ function getIndentation(line) {
 }
 
 /**
- * @param {any} finding
+ * @param {object} finding
  * @param {string} oldLine
  * @param {string} fallback
  */
@@ -61,9 +61,9 @@ function buildContractAwareReplacement(finding, oldLine, fallback) {
 }
 
 /**
- * @param {any} finding
+ * @param {object} finding
  * @param {{ title?: string, cause?: string, replacementHint?: string }} [context]
-  * @returns {any}
+  * @returns {object}
  */
 export function buildSuggestedDiff(finding, context = {}) {
     if (!finding?.file) {

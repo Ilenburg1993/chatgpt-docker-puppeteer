@@ -45,7 +45,7 @@ export const atomicWrite = fsCore.atomicWrite;
 
 /**
  * Lê JSON de forma segura com fallbacks.
- * @type {function(string, *): Promise<*>}
+ * @type {function(string, *): Promise<unknown>}
  */
 export const safeReadJSON = fsCore.safeReadJSON;
 

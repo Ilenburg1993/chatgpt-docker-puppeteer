@@ -38,7 +38,7 @@ function _rowToPrefs(row) {
 
 /**
  * Função exportada: getUserPreferences.
- * @returns {any}
+ * @returns {object|null}
  */
 function getUserPreferences(userId) {
     const db = getDb();
@@ -48,7 +48,7 @@ function getUserPreferences(userId) {
 
 /**
  * Função exportada: upsertUserPreferences.
- * @returns {any}
+ * @returns {object|null}
  */
 function upsertUserPreferences(userId, patch = {}) {
     const db = getDb();

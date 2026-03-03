@@ -43,13 +43,13 @@ class MissionStateManager {
     /**
      * Cria uma nova missão no filesystem.
      *
-     * @param {Object} mission - Dados da missão
+     * @param {object} mission - Dados da missão
      * @param {string} mission.id - ID único da missão
      * @param {string} mission.title - Título descritivo
      * @param {string} mission.description - Descrição detalhada
-     * @param {Object} mission.workflow - Workflow estruturado
-     * @param {Object} mission.config - Configuração (template, params)
-     * @returns {Promise<Object>} - State completo da missão
+     * @param {object} mission.workflow - Workflow estruturado
+     * @param {object} mission.config - Configuração (template, params)
+     * @returns {Promise<object>} - State completo da missão
      */
     async createMission(mission) {
         if (!mission || !mission.id) {
@@ -113,7 +113,7 @@ class MissionStateManager {
      * Lê o estado de uma missão.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<Object|null>} - State da missão ou null se não existir
+     * @returns {Promise<object|null>} - State da missão ou null se não existir
      */
     async getMission(missionId) {
         try {
@@ -132,7 +132,7 @@ class MissionStateManager {
     /**
      * Lista todas as missões.
      *
-     * @param {Object} filters - Filtros opcionais
+     * @param {object} filters - Filtros opcionais
      * @param {string} [filters.status] - Filtrar por status
      * @returns {Promise<Object[]>} - Array de states
      */
@@ -168,8 +168,8 @@ class MissionStateManager {
      * Atualiza o estado de uma missão.
      *
      * @param {string} missionId - ID da missão
-     * @param {Object} updates - Campos a atualizar
-     * @returns {Promise<Object>} - State atualizado
+     * @param {object} updates - Campos a atualizar
+     * @returns {Promise<object>} - State atualizado
      */
     async updateMission(missionId, updates) {
         const state = await this.getMission(missionId);
@@ -266,7 +266,7 @@ class MissionStateManager {
      * Salva checkpoint da missão.
      *
      * @param {string} missionId - ID da missão
-     * @param {Object} checkpoint - Dados do checkpoint
+     * @param {object} checkpoint - Dados do checkpoint
      */
     async saveCheckpoint(missionId, checkpoint) {
         const checkpointPath = path.join(this.baseDir, missionId, 'checkpoints', 'checkpoint-latest.json');
@@ -293,7 +293,7 @@ class MissionStateManager {
      * Carrega último checkpoint.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<Object|null>} - Checkpoint ou null
+     * @returns {Promise<object|null>} - Checkpoint ou null
      */
     async loadCheckpoint(missionId) {
         const checkpointPath = path.join(this.baseDir, missionId, 'checkpoints', 'checkpoint-latest.json');
@@ -314,7 +314,7 @@ class MissionStateManager {
      *
      * @param {string} missionId - ID da missão
      * @param {string} feedback - Feedback textual
-     * @param {Object} [metadata={}] - Metadata adicional (processed_id, category, action_items, patterns)
+     * @param {object} [metadata={}] - Metadata adicional (processed_id, category, action_items, patterns)
      */
     async addFeedback(missionId, feedback, metadata = {}) {
         const state = await this.getMission(missionId);

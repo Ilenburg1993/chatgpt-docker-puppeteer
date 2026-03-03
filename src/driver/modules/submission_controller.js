@@ -110,10 +110,10 @@ class SubmissionController extends EventEmitter {
     /**
      * Cria uma instância do SubmissionController.
      *
-     * @param {Object} driver - Instância do driver (BaseDriver ou subclasses)
-     * @param {Function} driver._emitVital - Método IPC para telemetria vital
+     * @param {object} driver - Instância do driver (BaseDriver ou subclasses)
+     * @param {function} driver._emitVital - Método IPC para telemetria vital
      * @param {string} driver.correlationId - ID de correlação para logs
-     * @param {Object} driver.page - Instância Puppeteer Page
+     * @param {object} driver.page - Instância Puppeteer Page
      * @param {string} driver.currentDomain - Domain atual para adaptive timeout
      *
      * @throws {Error} Se driver não for fornecido
@@ -162,7 +162,7 @@ class SubmissionController extends EventEmitter {
      * 7. Synthetic fallback (se physical falhou, retry loop)
      * 8. Post-send stabilization (POST_SEND_DELAY_MS)
      *
-     * @param {Object} ctx - Context (Page ou Frame) para execução
+     * @param {object} ctx - Context (Page ou Frame) para execução
      * @param {string} selector - Seletor CSS do campo de input
      * @param {string} taskId - ID da task para telemetria
      *
@@ -234,7 +234,7 @@ class SubmissionController extends EventEmitter {
      * Executa lógica interna de submission (sem timeout wrapper).
      *
      * @private
-     * @param {Object} ctx - Context (Page/Frame)
+     * @param {object} ctx - Context (Page/Frame)
      * @param {string} selector - Seletor CSS
      * @param {string} taskId - Task ID
      * @param {string} correlationId - Correlation ID para logs
@@ -366,7 +366,7 @@ class SubmissionController extends EventEmitter {
      * Verifica se campo foi esvaziado (confirmação de submission).
      *
      * @private
-     * @param {Object} ctx - Context (Page/Frame)
+     * @param {object} ctx - Context (Page/Frame)
      * @param {string} selector - Seletor CSS
      *
      * @returns {Promise<boolean>} true se campo vazio, false caso contrário
@@ -383,7 +383,7 @@ class SubmissionController extends EventEmitter {
      * Executa fallback sintético com retry logic.
      *
      * @private
-     * @param {Object} ctx - Context (Page/Frame)
+     * @param {object} ctx - Context (Page/Frame)
      * @param {string} selector - Seletor CSS
      * @param {string} correlationId - Correlation ID para logs
      *
@@ -487,7 +487,7 @@ class SubmissionController extends EventEmitter {
     /**
      * Retorna estatísticas de submission.
      *
-     * @returns {Object} Objeto com métricas de submission
+     * @returns {object} Objeto com métricas de submission
      * Propriedades do objeto retornado:
      *   - totalSubmissions (number): Total de submissions executadas
      *   - successfulSubmissions (number): Submissions bem-sucedidas
@@ -538,7 +538,7 @@ class SubmissionController extends EventEmitter {
 /**
  * Factory function para criar instância de SubmissionController.
  *
- * @param {Object} driver - Instância do driver
+ * @param {object} driver - Instância do driver
  * @returns {SubmissionController} Nova instância
  *
  * @example

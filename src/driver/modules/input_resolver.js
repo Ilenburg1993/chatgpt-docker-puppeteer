@@ -19,7 +19,7 @@ import { log } from '#core/logger';
 const RESOLVER_CONFIG = {
     /** Cache TTL para protocolos (ms) - Default: 60s */
     CACHE_TTL_MS: parseInt(
-        process.env.RESOLVER_CACHE_TTL || String(/** @type {any} */ (CONFIG)?.all?.INPUT_CACHE_TTL || '60000'),
+        process.env.RESOLVER_CACHE_TTL || String(/** @type {unknown} */ (CONFIG)?.all?.INPUT_CACHE_TTL || '60000'),
         10
     ),
 
@@ -115,13 +115,13 @@ class InputResolver extends EventEmitter {
     /**
      * Cria uma instância do InputResolver.
      *
-     * @param {Object} driver - Instância do driver (BaseDriver ou subclasses)
-     * @param {Function} driver._emitVital - Método IPC para telemetria vital
-     * @param {Function} driver._assertPageAlive - Validação de page alive
+     * @param {object} driver - Instância do driver (BaseDriver ou subclasses)
+     * @param {function} driver._emitVital - Método IPC para telemetria vital
+     * @param {function} driver._assertPageAlive - Validação de page alive
      * @param {string} driver.correlationId - ID de correlação para logs
-     * @param {Object} [driver.page] - Instância Puppeteer Page (pode ser null até attachContext)
+     * @param {object} [driver.page] - Instância Puppeteer Page (pode ser null até attachContext)
      * @param {string} [driver.currentDomain] - Domain atual
-     * @param {Object} [driver.handles] - HandleManager para cleanup (injetado após instanciar)
+     * @param {object} [driver.handles] - HandleManager para cleanup (injetado após instanciar)
      *
      * @throws {Error} Se driver não for fornecido
      * @throws {Error} Se driver._emitVital não for uma função
@@ -172,7 +172,7 @@ class InputResolver extends EventEmitter {
      * 4. Heuristic Second (analyzer.findChatInputSelector com retry)
      * 5. Finalize discovery (resolve sendButton + cache update)
      *
-     * @returns {Promise<Object>} Protocolo resolvido
+     * @returns {Promise<object>} Protocolo resolvido
      * Propriedades do objeto retornado:
      *   - selector (string): Seletor CSS do input
      *   - context (string): Contexto do seletor ('root' ou frame)
@@ -239,7 +239,7 @@ class InputResolver extends EventEmitter {
      * Executa lógica interna de resolução (sem timeout wrapper).
      *
      * @private
-     * @returns {Promise<Object>} Protocolo resolvido
+     * @returns {Promise<object>} Protocolo resolvido
      */
     async _executeResolve() {
         this.driver._assertPageAlive();
@@ -366,7 +366,7 @@ class InputResolver extends EventEmitter {
      *
      * @private
      * @param {string | Object | Array<string|Object>} inputRules - Lista de seletores ou protocolos
-     * @returns {Promise<Object|null>} Protocolo válido ou null
+     * @returns {Promise<object|null>} Protocolo válido ou null
      *
      * @example
      * const protocol = await this._tryKnownSelectors(['#prompt', 'textarea']);
@@ -406,12 +406,12 @@ class InputResolver extends EventEmitter {
      * Consolida a descoberta, resolve o botão de envio e atualiza o cache.
      *
      * @private
-     * @param {Object} protocol - Protocolo resolvido
+     * @param {object} protocol - Protocolo resolvido
      * @param {string} source - Fonte da resolução ('DNA_MATCH' ou 'HEURISTIC_MATCH')
-     * @param {Object} dnaRules - Regras DNA do domínio
+     * @param {object} dnaRules - Regras DNA do domínio
      * @param {number} [confidence=1.0] - Nível de confiança (0-1)
      *
-     * @returns {Promise<Object>} Protocolo final com sendButton
+     * @returns {Promise<object>} Protocolo final com sendButton
      *
      * @emits RESOLVER_EVENTS.DNA_MATCH
      * @emits RESOLVER_EVENTS.HEURISTIC_MATCH
@@ -488,7 +488,7 @@ class InputResolver extends EventEmitter {
      *
      * @private
      * @param {string} domain - Domain atual
-     * @param {Object} protocol - Protocolo a cachear
+     * @param {object} protocol - Protocolo a cachear
      * @param {number} confidence - Nível de confiança
      *
      * @example
@@ -561,7 +561,7 @@ class InputResolver extends EventEmitter {
     /**
      * Retorna estatísticas de resolution.
      *
-     * @returns {Object} Objeto com métricas de resolution
+     * @returns {object} Objeto com métricas de resolution
      * Propriedades do objeto retornado:
      *   - totalResolutions (number): Total de resoluções executadas
      *   - successfulResolutions (number): Resoluções bem-sucedidas
@@ -619,7 +619,7 @@ class InputResolver extends EventEmitter {
 /**
  * Factory function para criar instância de InputResolver.
  *
- * @param {Object} driver - Instância do driver
+ * @param {object} driver - Instância do driver
  * @returns {InputResolver} Nova instância
  *
  * @example

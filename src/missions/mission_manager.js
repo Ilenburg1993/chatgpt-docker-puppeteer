@@ -22,14 +22,14 @@ function _hashId(input) {
  */
 class MissionManager {
     /**
-     * @param {Object} deps
-     * @param {Object} deps.kernel - Instância do Kernel (para executar tasks)
-     * @param {Object} deps.nerv - Instância do NERV (para escutar eventos)
-     * @param {Object} [deps.stateManager] - MissionStateManager (opcional, cria se não fornecido)
-     * @param {Object} [deps.workflowGenerator] - WorkflowGenerator (opcional)
-     * @param {Object} [deps.contextManager] - ContextManager (opcional)
-     * @param {Object} [deps.feedbackProcessor] - FeedbackProcessor (opcional)
-     * @param {Object} [deps.checkpointManager] - CheckpointManager (opcional)
+     * @param {object} deps
+     * @param {object} deps.kernel - Instância do Kernel (para executar tasks)
+     * @param {object} deps.nerv - Instância do NERV (para escutar eventos)
+     * @param {object} [deps.stateManager] - MissionStateManager (opcional, cria se não fornecido)
+     * @param {object} [deps.workflowGenerator] - WorkflowGenerator (opcional)
+     * @param {object} [deps.contextManager] - ContextManager (opcional)
+     * @param {object} [deps.feedbackProcessor] - FeedbackProcessor (opcional)
+     * @param {object} [deps.checkpointManager] - CheckpointManager (opcional)
      */
     constructor({ kernel = null, nerv, stateManager = null, workflowGenerator = null, contextManager = null, feedbackProcessor = null, checkpointManager = null }) {
         if (!nerv) {
@@ -92,12 +92,12 @@ class MissionManager {
     /**
      * Cria uma nova missão.
      *
-     * @param {Object} options
+     * @param {object} options
      * @param {string} options.title - Título da missão
      * @param {string} options.description - Descrição
      * @param {string} options.templateId - ID do template (ex: 'book_writing')
-     * @param {Object} options.params - Parâmetros para o template
-     * @returns {Promise<Object>} - State da missão criada
+     * @param {object} options.params - Parâmetros para o template
+     * @returns {Promise<object>} - State da missão criada
      */
     async createMission({ title, description, templateId, params }) {
         // 1. Valida entrada
@@ -151,7 +151,7 @@ class MissionManager {
      * Lê uma missão.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<Object|null>} - State ou null
+     * @returns {Promise<object|null>} - State ou null
      */
     async getMission(missionId) {
         return this.stateManager.getMission(missionId);
@@ -160,7 +160,7 @@ class MissionManager {
     /**
      * Lista todas as missões.
      *
-     * @param {Object} filters - Filtros opcionais
+     * @param {object} filters - Filtros opcionais
      * @returns {Promise<Object[]>} - Array de states
      */
     async listMissions(filters = {}) {
@@ -299,7 +299,7 @@ class MissionManager {
      *
      * @param {string} missionId - ID da missão
      * @param {string} feedback - Feedback textual
-     * @returns {Promise<Object>} Feedback processado
+     * @returns {Promise<object>} Feedback processado
      */
     async addFeedback(missionId, feedback) {
         const mission = await this.getMission(missionId);
@@ -330,7 +330,7 @@ class MissionManager {
      * Retorna progresso da missão.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<Object>} - Objeto com progresso
+     * @returns {Promise<object>} - Objeto com progresso
      */
     async getMissionProgress(missionId) {
         const state = await this.getMission(missionId);

@@ -20,7 +20,7 @@ import * as logger from '#core/logger';
  */
 class CheckpointManager {
     /**
-     * @param {Object} options
+     * @param {object} options
      * @param {string} [options.baseDir='missions'] - Diretório base de missões
      * @param {number} [options.keepLast=10] - Quantos checkpoints manter por missão
      * @param {boolean} [options.autoCleanup=true] - Limpar checkpoints antigos automaticamente
@@ -38,8 +38,8 @@ class CheckpointManager {
      *
      * @param {string} missionId - ID da missão
      * @param {number} stepIndex - Índice do step completado
-     * @param {Object} missionState - Estado completo da missão
-     * @param {Object} [metadata={}] - Metadata adicional (reason, created_by, etc)
+     * @param {object} missionState - Estado completo da missão
+     * @param {object} [metadata={}] - Metadata adicional (reason, created_by, etc)
      * @returns {Promise<string>} - ID do checkpoint criado
      *
      * @example
@@ -97,7 +97,7 @@ class CheckpointManager {
      * Carrega último checkpoint de uma missão.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<Object|null>} - Checkpoint ou null se não existir
+     * @returns {Promise<object|null>} - Checkpoint ou null se não existir
      *
      * @example
      * const checkpoint = await checkpointManager.loadCheckpoint('mission-123');
@@ -140,7 +140,7 @@ class CheckpointManager {
      *
      * @param {string} missionId - ID da missão
      * @param {string} checkpointId - ID do checkpoint
-     * @returns {Promise<Object|null>} - Checkpoint ou null
+     * @returns {Promise<object|null>} - Checkpoint ou null
      */
     async loadCheckpointById(missionId, checkpointId) {
         const checkpointPath = path.join(this.baseDir, missionId, 'checkpoints', `${checkpointId}.json`);
@@ -287,7 +287,7 @@ class CheckpointManager {
      * Retorna estatísticas do CheckpointManager.
      *
      * @param {string} [missionId] - ID da missão (opcional, se omitido retorna stats globais)
-     * @returns {Promise<Object>} - Estatísticas
+     * @returns {Promise<object>} - Estatísticas
      */
     async getStats(missionId = null) {
         if (missionId) {

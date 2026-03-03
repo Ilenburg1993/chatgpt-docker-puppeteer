@@ -108,7 +108,7 @@ function openObservationWindow() {
  * API PÚBLICA: Retorna o snapshot atual da fila.
  * Implementa o Heartbeat de segurança para garantir consistência eventual.
  * P9.6: Adiciona tracking de cache hits/misses
-  * @returns {Promise<any>}
+  * @returns {Promise<void>}
  */
 async function getQueue() {
     const now = Date.now();
@@ -144,7 +144,7 @@ function markDirty() {
 
 /**
  * P9.6: Retorna métricas de cache para observabilidade.
- * @returns {Object} Cache metrics
+ * @returns {object} Cache metrics
  */
 function getCacheMetrics() {
     const total = cacheHits + cacheMisses;

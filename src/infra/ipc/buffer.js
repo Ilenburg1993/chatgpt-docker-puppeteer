@@ -31,7 +31,7 @@ class IPCBuffer {
      * Extrai todas as mensagens acumuladas para transmissão.
      * Limpa a fila atômicamente após a leitura.
      *
-     * @returns {Array} Lista de envelopes em ordem cronológica.
+     * @returns {unknown[]} Lista de envelopes em ordem cronológica.
      */
     flush() {
         if (this.queue.length === 0) {

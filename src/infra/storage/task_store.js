@@ -28,7 +28,7 @@ async function saveTask(task) {
         }
 
         // Valida schema V5 (parseTask já usa V5 se meta.version === '5.0')
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const validatedTask = parseTask(taskV5);
         const filepath = path.join(PATHS.QUEUE, `${validatedTask.meta.id}.json`);
 

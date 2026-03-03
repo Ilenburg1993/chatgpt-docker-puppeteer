@@ -952,7 +952,7 @@ function _executeAuditPatchApply(patchId, before, actorId) {
 /**
  * Cria um diff de rollback a partir do estado anterior dos arquivos.
  * Gera um diff reverso que pode ser aplicado para restaurar o estado anterior.
- * @param {Array<{file: string, content: string}>} beforeState - Estado anterior dos arquivos
+ * @param {{file: string, content: string}[]} beforeState - Estado anterior dos arquivos
  * @returns {string} Diff reverso no formato unificado
  */
 function _createRollbackDiff(beforeState) {
@@ -1485,7 +1485,7 @@ function _dispatch(command, payload, actor) {
 
 /**
  * Função exportada: validateCommand.
- * @returns {any}
+ * @returns {Promise<object>|object|null}
  */
 function validateCommand({ command, payload = {}, actor = null }) {
     const normalized = _normalizeCommand(command);
@@ -1534,7 +1534,7 @@ function validateCommand({ command, payload = {}, actor = null }) {
 
 /**
  * Função exportada: executeCommand.
- * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function executeCommand({ command, payload = {}, actor = null, dryRun = false }) {
     const normalized = _normalizeCommand(command);
@@ -1721,7 +1721,7 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
         wrapped.statusCode = err?.statusCode || 500;
         wrapped.code = err?.code || 'CONTROL_COMMAND_FAILED';
         wrapped.details = err?.details || null;
-        /** @type {any} */ (wrapped).operation = failedOperation;
+        /** @type {object} */ (wrapped).operation = failedOperation;
         throw wrapped;
     }
 }

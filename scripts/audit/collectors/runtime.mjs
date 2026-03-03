@@ -12,7 +12,7 @@ import path from 'node:path';
  * @param {{
  *   profile: 'quick'|'deep'|'nightly',
  *   contracts?: import('../contracts/load_registry.mjs').ContractDefinitionV1[],
- *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
+ *   exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
  * }} options
  * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: { mcp: { ok: boolean, details?: string }, rag: { ok: boolean, available?: boolean|null, degraded?: boolean|null }, lsp: { ok: boolean, details?: string } } }>}
  */
@@ -573,7 +573,7 @@ function detectControlPlaneSignals(rootDir) {
 
 /**
  * @param {string} rootDir
- * @param {(stepId: string, command: string, args: string[], options?: any) => Promise<any>} exec
+ * @param {(stepId: string, command: string, args: string[], options?: unknown) => Promise<void>} exec
  */
 async function detectBootAndLifecycleSignals(rootDir, exec) {
     const results = [];

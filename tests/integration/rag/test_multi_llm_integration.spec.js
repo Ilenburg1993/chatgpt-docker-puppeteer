@@ -1,3 +1,4 @@
+// @ts-check
 // @ts-nocheck
 /**
  * Integration Tests: RAG v4.0 Multi-LLM Integration

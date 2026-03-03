@@ -23,8 +23,8 @@ function _now() {
 
 /**
  * Converte row para DiagnosticJob
- * @param {Object} row
- * @returns {Object|null}
+ * @param {object} row
+ * @returns {object|null}
  */
 function _rowToJob(row) {
     if (!row) return null;
@@ -53,8 +53,8 @@ function _rowToJob(row) {
 
 /**
  * Converte row para DiagnosticReport
- * @param {Object} row
- * @returns {Object|null}
+ * @param {object} row
+ * @returns {object|null}
  */
 function _rowToReport(row) {
     if (!row) return null;
@@ -78,8 +78,8 @@ function _rowToReport(row) {
 
 /**
  * Cria um novo job de diagnóstico
- * @param {Object} input
- * @returns {Object}
+ * @param {object} input
+ * @returns {object}
  */
 export function createDiagnosticJob(input) {
     const db = getDb();
@@ -132,7 +132,7 @@ export function createDiagnosticJob(input) {
 /**
  * Obtém um job de diagnóstico pelo ID
  * @param {string} id
- * @returns {Object|null}
+ * @returns {object|null}
  */
 export function getDiagnosticJobById(id) {
     const db = getDb();
@@ -142,13 +142,13 @@ export function getDiagnosticJobById(id) {
 
 /**
  * Lista jobs de diagnóstico com filtros opcionais
- * @param {Object} [filters]
+ * @param {object} [filters]
  * @param {string} [filters.status]
  * @param {string} [filters.kind]
  * @param {string} [filters.triggerType]
  * @param {number} [filters.limit]
  * @param {number} [filters.offset]
- * @returns {Object[]}
+ * @returns {object[]}
  */
 export function listDiagnosticJobs(filters = {}) {
     const db = getDb();
@@ -195,8 +195,8 @@ export function listDiagnosticJobs(filters = {}) {
 /**
  * Atualiza um job de diagnóstico
  * @param {string} id
- * @param {Object} updates
- * @returns {Object|null}
+ * @param {object} updates
+ * @returns {object|null}
  */
 export function updateDiagnosticJob(id, updates = {}) {
     const db = getDb();
@@ -270,8 +270,8 @@ export function updateDiagnosticJob(id, updates = {}) {
 
 /**
  * Cria um novo relatório de diagnóstico
- * @param {Object} input
- * @returns {Object}
+ * @param {object} input
+ * @returns {object}
  */
 export function createDiagnosticReport(input) {
     const db = getDb();
@@ -315,7 +315,7 @@ export function createDiagnosticReport(input) {
 /**
  * Obtém um relatório pelo ID
  * @param {string} id
- * @returns {Object|null}
+ * @returns {object|null}
  */
 export function getDiagnosticReportById(id) {
     const db = getDb();
@@ -326,7 +326,7 @@ export function getDiagnosticReportById(id) {
 /**
  * Lista relatórios por job
  * @param {string} jobId
- * @returns {Object[]}
+ * @returns {object[]}
  */
 export function listDiagnosticReportsByJob(jobId) {
     const db = getDb();

@@ -131,7 +131,7 @@ const CAPABILITIES_SCHEMA = Object.freeze([
  * @fires TargetDriver#CONTEXT_DETACHED - Context detached
  */
 class TargetDriver extends EventEmitter {
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, unknown>} */
     config;
 
     /** @type {string} */
@@ -751,7 +751,7 @@ class TargetDriver extends EventEmitter {
      * Retorna histórico de transições de estado.
      * ✅ v2.0: State history tracking
      *
-     * @returns {Array} Últimas transições (max 20)
+     * @returns {unknown[]} Últimas transições (max 20)
      */
     getStateHistory() {
         return [...this._stateHistory];
@@ -965,7 +965,7 @@ class TargetDriver extends EventEmitter {
      * Envia prompt para LLM.
      * @abstract
      * @param {string} _text - Texto do prompt
-     * @param {any} _taskId - ID da task ou objeto de opções
+     * @param {object} _taskId - ID da task ou objeto de opções
      * @param {AbortSignal} _signal - Sinal de cancelamento
      * @returns {Promise<void>}
      * @throws {Error} Sempre - deve ser implementado
@@ -982,7 +982,7 @@ class TargetDriver extends EventEmitter {
      * @abstract
      * @param {object} _startSnapshot - Snapshot inicial
      * @param {AbortSignal} _signal - Sinal de cancelamento
-     * @returns {Promise<any>}
+     * @returns {Promise<void>}
      * @throws {Error} Sempre - deve ser implementado
      */
     async waitForCompletion(_startSnapshot, _signal) {

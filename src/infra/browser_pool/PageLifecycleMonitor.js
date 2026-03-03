@@ -33,7 +33,7 @@ class PageLifecycleMonitor {
     /**
      * Cria monitor para página.
      *
-     * @param {any} page - Puppeteer Page instance
+     * @param {object} page - Puppeteer Page instance
      * @param {BrowserPoolManager} poolManager - Pool manager reference
      * @param {string} taskId - Task ID associado à página
      * @param {{ emit?: (event: unknown) => void } | null} [nerv=null] - NERV event bus (opcional)
@@ -289,7 +289,7 @@ class PageLifecycleMonitor {
     /**
      * Retorna status do monitor.
      *
-     * @returns {Object} Status object
+     * @returns {object} Status object
      */
     getStatus() {
         return {

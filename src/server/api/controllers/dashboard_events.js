@@ -43,7 +43,7 @@ router.get('/events', async (req, res) => {
         const eventType = req.query.event_type ? String(req.query.event_type).trim() : null;
 
         const where = [];
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const params = { limit: limit + 1 };
 
         if (entityType) {

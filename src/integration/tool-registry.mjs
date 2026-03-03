@@ -32,21 +32,21 @@
 
 /**
  * Tool definition structure
- * @typedef {Object} ToolDefinition
- * @property {Object} metadata - Tool metadata for MCP/LSP
+ * @typedef {object} ToolDefinition
+ * @property {object} metadata - Tool metadata for MCP/LSP
  * @property {string} metadata.description - Human-readable description
- * @property {Object} metadata.inputSchema - JSON Schema for parameters
+ * @property {object} metadata.inputSchema - JSON Schema for parameters
  * @property {boolean} [metadata.allowMutations=false] - Tool may mutate files/state
  * @property {boolean} [metadata.requiresConfirmationToken=false] - Tool requires explicit confirmation token
- * @property {Function} handler - Async function (params) => Promise<string|Object>
+ * @property {function} handler - Async function (params) => Promise<string|object>
  */
 
 /**
- * Normalize any tool output to a structured shape used by MCP adapters.
+ * Normalize unknown tool output to a structured shape used by MCP adapters.
  * Backward-compatible: plain strings/objects are still accepted.
  *
- * @param {any} value
- * @returns {{ text: string, json?: any, flags: { degraded: boolean, mutating: boolean, partial: boolean } }}
+ * @param {object} value
+ * @returns {{ text: string, json?: unknown, flags: { degraded: boolean, mutating: boolean, partial: boolean } }}
  */
 export function normalizeToolResultPayload(value) {
     if (value && typeof value === 'object' && Array.isArray(value.content)) {
@@ -112,8 +112,8 @@ export class ToolRegistry {
      * Register a tool in the registry
      *
      * @param {string} name - Tool name (e.g., 'rag_search', 'ollama_generate')
-     * @param {Object} metadata - Tool metadata (description, inputSchema)
-     * @param {Function} handler - Async function to execute the tool
+     * @param {object} metadata - Tool metadata (description, inputSchema)
+     * @param {function} handler - Async function to execute the tool
      *
      * @example
      * registry.register('rag_search', {
@@ -160,9 +160,9 @@ export class ToolRegistry {
      * Execute a tool by name (with optional retry, adaptive timeout, circuit breaker)
      *
      * @param {string} name - Tool name
-     * @param {Object} params - Tool parameters (validated against inputSchema)
-     * @param {Object} options - Execution options (signal for cancellation, etc.)
-     * @returns {Promise<string|Object>} Tool result
+     * @param {object} params - Tool parameters (validated against inputSchema)
+     * @param {object} options - Execution options (signal for cancellation, etc.)
+     * @returns {Promise<string|object>} Tool result
      *
      * @throws {Error} If tool not found or execution fails
      *
@@ -251,7 +251,7 @@ export class ToolRegistry {
             const timeoutId = setTimeout(() => internalController.abort(), toolTimeout);
 
             try {
-                // Combine external signal (if any) with internal timeout signal
+                // Combine external signal (if unknown) with internal timeout signal
                 const combinedSignal = options.signal
                     ? AbortSignal.any([options.signal, internalController.signal])
                     : internalController.signal;
@@ -351,7 +351,7 @@ export class ToolRegistry {
     /**
      * Get all tool metadata (for MCP tools/list, LSP capabilities)
      *
-     * @returns {Array<{name: string, description: string, inputSchema: Object}>}
+     * @returns {Array<{name: string, description: string, inputSchema: object}>}
      *
      * @example
      * const tools = registry.getAllMetadata();
@@ -371,7 +371,7 @@ export class ToolRegistry {
      * Get metadata for a specific tool
      *
      * @param {string} name - Tool name
-     * @returns {Object|null} Tool metadata or null if not found
+     * @returns {object|null} Tool metadata or null if not found
      */
     getMetadata(name) {
         const tool = this.tools.get(name);
@@ -422,7 +422,7 @@ export class ToolRegistry {
     /**
      * Get registry stats
      *
-     * @returns {Object} Stats object
+     * @returns {object} Stats object
      */
     getStats() {
         return {

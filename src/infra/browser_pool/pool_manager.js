@@ -720,7 +720,7 @@ class BrowserPoolManager {
         let zombieCount = 0;
 
         for (const poolEntry of this.pool) {
-            /** @type {Array<{ taskId: string, page: any, reason: string, age: number | 'unknown' }>} */
+            /** @type {Array<{ taskId: string, page: unknown, reason: string, age: number | 'unknown' }>} */
             const zombiePages = [];
 
             // Find pages that exceeded TTL

@@ -24,7 +24,7 @@ function _now() {
 }
 
 /**
- * @typedef {Object} HeartbeatWatchdogConfig
+ * @typedef {object} HeartbeatWatchdogConfig
  * @property {string|null} [workerId]
  * @property {number} [intervalMs]
  * @property {number} [staleThresholdMs]

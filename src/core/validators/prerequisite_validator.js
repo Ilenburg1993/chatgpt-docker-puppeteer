@@ -22,7 +22,7 @@ const ValidationResult = {
  * Valida se a página está em URL utilizável para um provedor LLM suportado.
  *
  * @param {PuppeteerPage} page - Puppeteer Page
- * @returns {Promise<Object>} ValidationResult
+ * @returns {Promise<object>} ValidationResult
  */
 async function validateLLMPage(page) {
     if (!page) {
@@ -79,7 +79,7 @@ async function validateLLMPage(page) {
  * Usa SADI (Sensory Analysis Deep Intelligence) via analyzer.js.
  *
  * @param {PuppeteerPage} page - Puppeteer Page
- * @returns {Promise<Object>} ValidationResult
+ * @returns {Promise<object>} ValidationResult
  */
 async function validateLLMInterface(page) {
     const pageValidation = await validateLLMPage(page);
@@ -149,7 +149,7 @@ async function validateLLMInterface(page) {
  * Valida se Browser Pool está disponível e funcional.
  *
  * @param {BrowserPoolManager} browserPool
- * @returns {Object} ValidationResult
+ * @returns {object} ValidationResult
  */
 function validateBrowserPool(browserPool) {
     if (!browserPool) {
@@ -203,8 +203,8 @@ function validateBrowserPool(browserPool) {
 /**
  * Valida se browser instance está conectada e utilizável.
  *
- * @param {any} browser - Puppeteer Browser
- * @returns {Object} ValidationResult
+ * @param {object} browser - Puppeteer Browser
+ * @returns {object} ValidationResult
  */
 function validateBrowserConnection(browser) {
     if (!browser) {
@@ -213,7 +213,7 @@ function validateBrowserConnection(browser) {
         });
     }
 
-    if (!(/** @type {any} */ (browser).isConnected())) {
+    if (!(/** @type {unknown} */ (browser).isConnected())) {
         return ValidationResult.fail('BROWSER_DISCONNECTED', {
             message: 'Browser não está conectado',
             suggestion: 'Verifique se Chrome está rodando e acessível',
@@ -227,10 +227,10 @@ function validateBrowserConnection(browser) {
  * Valida pré-requisitos para execução de Driver.
  * Verifica: Browser Pool, Circuit Breaker, Página, Interface LLM.
  *
- * @param {Object} options
+ * @param {object} options
  * @param {BrowserPoolManager} options.browserPool
  * @param {PuppeteerPage} options.page
- * @returns {Promise<Object>} ValidationResult
+ * @returns {Promise<object>} ValidationResult
  */
 async function validateDriverExecution({ browserPool, page }) {
     // 1. Valida Browser Pool
@@ -257,11 +257,11 @@ async function validateDriverExecution({ browserPool, page }) {
 /**
  * Valida pré-requisitos para execução do Kernel Loop.
  *
- * @param {Object} options
- * @param {any} options.executionEngine
- * @param {any} options.nervBridge
- * @param {any} options.telemetry
- * @returns {Object} ValidationResult
+ * @param {object} options
+ * @param {object} options.executionEngine
+ * @param {object} options.nervBridge
+ * @param {object} options.telemetry
+ * @returns {object} ValidationResult
  */
 function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {
     if (!executionEngine) {

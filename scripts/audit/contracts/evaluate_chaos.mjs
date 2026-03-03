@@ -9,9 +9,9 @@ import { evaluateRuntimeSignals } from './evaluate_runtime.mjs';
  *   chaosProfile: 'off'|'light'|'full',
  *   contracts: import('./load_registry.mjs').ContractDefinitionV1[],
  *   runDir: string,
- *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
+ *   exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
  * }} options
-  * @returns {Promise<any>}
+  * @returns {Promise<void>}
  */
 export async function evaluateChaosContracts(options) {
     /** @type {Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>} */

@@ -2,7 +2,7 @@
 /**
  * Helper utilities for kernel integration tests
  * TODO: Implement actual test helpers
-  * @returns {any}
+  * @returns {object}
  */
 
 export function createMockKernel() {
@@ -11,7 +11,7 @@ export function createMockKernel() {
 
 /**
  * Função exportada: sleep.
- * @returns {any}
+ * @returns {object}
  */
 export function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));

@@ -116,8 +116,8 @@ async function gracefulShutdown(signal) {
             import('#server/dashboard-api/task_sync_bridge'),
             import('#server/dashboard-api/telemetry_aggregator'),
         ]);
-        const taskSyncBridge = /** @type {any} */ (taskSyncBridgeModule?.default);
-        const telemetryAggregator = /** @type {any} */ (telemetryAggregatorModule?.default);
+        const taskSyncBridge = /** @type {unknown} */ (taskSyncBridgeModule?.default);
+        const telemetryAggregator = /** @type {unknown} */ (telemetryAggregatorModule?.default);
 
         if (
             !stopResults.some(result => result.id === 'task_sync_bridge' && result.ok) &&

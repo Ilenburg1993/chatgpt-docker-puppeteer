@@ -693,8 +693,8 @@ async function bootstrap(options = {}) {
         try {
             if (options.missionManager) {
                 const missionsController = await import('./api/controllers/missions.js').then(m => m.default ?? m);
-                if (typeof (/** @type {any} */ (missionsController).setMissionManager) === 'function') {
-                    /** @type {any} */ (missionsController).setMissionManager(options.missionManager);
+                if (typeof (/** @type {unknown} */ (missionsController).setMissionManager) === 'function') {
+                    /** @type {unknown} */ (missionsController).setMissionManager(options.missionManager);
                     log('DEBUG', '[BOOT] MissionManager injetado via options.missionManager');
                 }
             }
@@ -816,7 +816,7 @@ async function bootstrap(options = {}) {
                 const { createOllamaHostSupervisor } = await import('../inference_gateway/ollama_host_supervisor.js');
                 const probeSupervisor = createOllamaHostSupervisor({
                     retryEnabled: false,
-                    setIntervalFn: () => /** @type {any} */ (null),
+                    setIntervalFn: () => /** @type {unknown} */ (null),
                     clearIntervalFn: () => {},
                 });
                 const ollamaState = await probeSupervisor.pollOnce();

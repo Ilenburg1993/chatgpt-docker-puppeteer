@@ -124,7 +124,7 @@ async function getDna() {
  *
  * @param {object} dna - Novo objeto de DNA.
  * @param {string} author - Identificador da entidade que evoluiu o DNA (ex: 'SADI_V19').
-  * @returns {Promise<any>}
+  * @returns {Promise<void>}
  */
 async function saveDna(dna, author = 'system') {
     try {

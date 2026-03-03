@@ -13,8 +13,8 @@ function _sleep(ms) {
 
 /**
  * Opções do construtor do AttemptWatchdog.
- * @typedef {Object} AttemptWatchdogOptions
- * @property {Object|null} [nerv] - Instância do sistema nerv para comunicação.
+ * @typedef {object} AttemptWatchdogOptions
+ * @property {object|null} [nerv] - Instância do sistema nerv para comunicação.
  * @property {number} [intervalMs=1500] - Intervalo entre ticks em ms.
  * @property {number} [dispatchedStuckMs=30000] - Timeout para estado DISPATCHED em ms.
  * @property {number} [acceptedStuckMs=120000] - Timeout para estado ACCEPTED em ms.

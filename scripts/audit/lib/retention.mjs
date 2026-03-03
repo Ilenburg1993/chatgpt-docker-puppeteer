@@ -8,7 +8,7 @@ import path from 'node:path';
  *   maxRuns?: number,
  *   keepRunId?: string,
  * }} options
-  * @returns {any}
+  * @returns {object}
  */
 export function pruneAuditRuns(options) {
     const runsRoot = String(options.runsRoot || '').trim();

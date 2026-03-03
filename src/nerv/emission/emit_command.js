@@ -33,7 +33,7 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope COMMAND.
      *
-     * @param {Object} envelope
+     * @param {object} envelope
      * Envelope estruturalmente válido.
      */
     function emitCommand(envelope) {
