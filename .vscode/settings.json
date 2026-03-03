@@ -916,5 +916,9 @@
   "kilo-code.newTaskRequireTodos": true,
   "kilo-code.preventCompletionWithOpenTodos": true,
   "makefile.configureOnOpen": false,
-  "notebook.defaultFormatter": "rvest.vs-code-prettier-eslint"
+  "notebook.defaultFormatter": "rvest.vs-code-prettier-eslint",
+  "git-graph.repository.sign.tags": false,
+  "git-graph.repository.useMailmap": false,
+  "git-graph.date.format": "Date & Time",
+  "git-graph.dialog.addTag.pushToRemote": true
 }
