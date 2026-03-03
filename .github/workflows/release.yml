@@ -82,6 +82,7 @@ jobs:
         env:
           DASHBOARD_BUILD_OUTCOME: ${{ steps.dashboard_build.outcome }}
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const tag = context.ref.replace('refs/tags/', '');
             const isPrerelease =

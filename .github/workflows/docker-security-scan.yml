@@ -232,14 +232,14 @@ jobs:
     if: always() && github.event_name == 'pull_request'
     steps:
       - name: Download filesystem artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v8
         with:
           name: trivy-filesystem-${{ github.run_id }}
           path: artifacts/trivy/fs
         continue-on-error: true
 
       - name: Download container artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v8
         with:
           name: trivy-container-${{ github.run_id }}
           path: artifacts/trivy/container
@@ -251,6 +251,7 @@ jobs:
           FS_JOB_STATUS: ${{ needs.trivy-filesystem.result }}
           CONTAINER_JOB_STATUS: ${{ needs.trivy-container.result }}
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const { readFileSync, existsSync } = require('fs');
             const marker = '<!-- docker-security-scan-summary -->';

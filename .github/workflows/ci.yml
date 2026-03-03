@@ -69,12 +69,12 @@ jobs:
         run: node scripts/ci/validate-workflows.mjs
 
       - name: Lint GitHub workflows with actionlint
-        uses: raven-actions/actionlint@v2.1.1
+        uses: raven-actions/actionlint@v2.1.2
 
       - name: Lint shell scripts with shellcheck
         uses: reviewdog/action-shellcheck@v1.32.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           shellcheck_flags: "-x"
           reporter: github-check
           filter_mode: nofilter
@@ -84,8 +84,6 @@ jobs:
             ./node_modules/*
             ./src/dashboard-ui/node_modules/*
             ./.git/*
-
-      - name: Lint
         id: lint
         continue-on-error: true
         run: npm run lint
@@ -108,6 +106,7 @@ jobs:
           PRETTIER_OUTCOME: ${{ steps.prettier.outcome }}
           UNIT_OUTCOME: ${{ steps.unit_tests.outcome }}
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const marker = '<!-- ci-validate-summary -->';
             const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : o === 'skipped' ? '⏭️' : '⚠️';
@@ -272,6 +271,7 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v8
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('node:fs');
             const summaryPath = 'artifacts/audit/audit-summary.md';

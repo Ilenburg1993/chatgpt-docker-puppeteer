@@ -135,6 +135,7 @@ jobs:
           FORBIDDEN_OUTCOME: ${{ steps.forbidden.outcome }}
           GRAPH_OUTCOME: ${{ steps.code_graph.outcome }}
         with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
             const { readFileSync, existsSync } = require('node:fs');
             const marker = '<!-- code-quality-summary -->';
