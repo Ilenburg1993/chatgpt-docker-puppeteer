@@ -9,7 +9,7 @@
 
 | Arquivo | Descrição |
 |---|---|
-| `query_normalizer.mjs` | Normaliza queries (lowercase, stemming, remoção de stopwords) para melhor recall |
+| `query_normalizer.mjs` | Normaliza queries (lowercase, colapso de espaços, remoção de caracteres especiais) e expande com sinônimos semânticos |
 
 ## Links relacionados
 

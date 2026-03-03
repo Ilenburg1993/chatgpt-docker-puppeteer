@@ -64,7 +64,7 @@ jobs:
         run: mkdir -p artifacts/trivy
 
       - name: Trivy — Scan filesystem (SARIF)
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -79,7 +79,7 @@ jobs:
           exit-code: "0"
 
       - name: Trivy — Scan filesystem (JSON para PR comment)
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -141,7 +141,7 @@ jobs:
         run: mkdir -p artifacts/trivy
 
       - name: Trivy — Scan container image (SARIF)
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: "image"
           image-ref: "chatgpt-docker-puppeteer:scan-${{ github.sha }}"
@@ -154,7 +154,7 @@ jobs:
           exit-code: "0"
 
       - name: Trivy — Scan container image (JSON para PR comment)
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: "image"
           image-ref: "chatgpt-docker-puppeteer:scan-${{ github.sha }}"
@@ -166,7 +166,7 @@ jobs:
           exit-code: "0"
 
       - name: Trivy — Scan container image (table para step summary)
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           scan-type: "image"
           image-ref: "chatgpt-docker-puppeteer:scan-${{ github.sha }}"
@@ -187,24 +187,26 @@ jobs:
       - name: Publish container scan summary
         if: always()
         run: |
-          echo "## 🐳 Trivy — Container Scan Results" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**Image**: \`chatgpt-docker-puppeteer:scan-${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ -f artifacts/trivy/trivy-container.txt ]; then
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            LINES=$(wc -l < artifacts/trivy/trivy-container.txt)
-            head -100 artifacts/trivy/trivy-container.txt >> "$GITHUB_STEP_SUMMARY"
-            if [ "$LINES" -gt 100 ]; then
-              echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "_⚠️ Output truncado: exibindo 100 de $LINES linhas. Veja o artifact completo abaixo._" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## 🐳 Trivy — Container Scan Results"
+            echo ""
+            echo "**Image**: \`chatgpt-docker-puppeteer:scan-${{ github.sha }}\`"
+            echo ""
+            if [ -f artifacts/trivy/trivy-container.txt ]; then
+              echo '```'
+              LINES=$(wc -l < artifacts/trivy/trivy-container.txt)
+              head -100 artifacts/trivy/trivy-container.txt
+              if [ "$LINES" -gt 100 ]; then
+                echo ""
+                echo "_⚠️ Output truncado: exibindo 100 de $LINES linhas. Veja o artifact completo abaixo._"
+              fi
+              echo '```'
+              echo ""
+              echo "📂 Full results available in the [artifacts](./artifacts) of this run."
+            else
+              echo "_Container scan output not generated — check the workflow logs_"
             fi
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "📂 Full results available in the [artifacts](./artifacts) of this run." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "_Container scan output not generated — check the workflow logs_" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Trivy container artifacts
         if: always()

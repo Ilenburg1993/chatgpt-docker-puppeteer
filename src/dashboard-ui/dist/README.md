@@ -1,27 +1,22 @@
-# src/dashboard-ui/dist/
+# src/dashboard-ui/public/
 
-**Propósito**: Build de produção do dashboard frontend — gerado pelo Vite a partir do código-fonte em `src/dashboard-ui/src/`. Servido como conteúdo estático pelo servidor Express.  
-**Status**: Artefato de runtime (build).  
-**Público**: Servidor Express (uso interno). Desenvolvedores que fazem deploy do dashboard.  
+**Propósito**: Arquivos estáticos públicos do dashboard frontend — servidos diretamente pelo Vite sem processamento, copiados para `dist/` durante o build.  
+**Status**: Canônico de apoio.  
+**Público**: Desenvolvedores que trabalham no frontend do dashboard.  
 **Última atualização**: 2 de março de 2026.
-
-## ⚠️ Não comitar o conteúdo desta pasta
-
-Os arquivos aqui são gerados automaticamente pelo build e **não devem ser commitados**. Estão incluídos no `.gitignore`.
 
 ## O que esta pasta contém
 
-- `index.html` — Entry point do SPA (com variantes comprimidas `.br`, `.gz`)
-- `assets/` — JavaScript, CSS e outros assets compilados e otimizados
-- `vite.svg` — Ícone do Vite
+| Arquivo | Descrição |
+|---|---|
+| `vite.svg` | Ícone padrão do Vite (substituir pelo ícone do projeto) |
 
-## Regras de manutenção
+## O que não deve ficar aqui
 
-- Regenerar com `npm run build` dentro de `src/dashboard-ui/`
-- Os arquivos `.br` e `.gz` são versões pré-comprimidas para serving otimizado
+- Arquivos que precisam de processamento (CSS, JS que importam módulos) — ficam em `src/`
+- Artefatos de build (ficam em `dist/`)
 
 ## Links relacionados
 
-- Código-fonte: [`src/dashboard-ui/src/`](../src/)
-- Assets compilados: [`src/dashboard-ui/dist/assets/`](./assets/README.md)
-- Servidor: [`src/server/`](../../server/)
+- Dashboard UI: [`src/dashboard-ui/`](../)
+- Build output: [`src/dashboard-ui/dist/`](../dist/)

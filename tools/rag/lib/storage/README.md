@@ -13,7 +13,7 @@
 
 ## Regras de manutenção
 
-- Banco LanceDB em disco — localização configurável via `RAG_DB_PATH`.
+- Banco LanceDB em disco — localização canônica em `/home/node/.local/share/rag-db`; configurável via override de opções em `getRagPaths()` em `tools/rag/lib/paths.mjs`.
 - Migrations em `tools/rag/lib/migrations/` ao alterar schema.
 
 ## Links relacionados
