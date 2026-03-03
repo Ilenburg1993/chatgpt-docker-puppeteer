@@ -409,6 +409,10 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
 }
 
 /**
+ * @typedef {object} GetToolTimeoutOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Calcula timeout adaptativo para execução de MCP tools baseado em histórico.
  *
  * **Side-effects:** Pode acionar circuit breaker para tools muito lentos.
@@ -416,7 +420,7 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
  * **Unidades:** Retorna timeout em ms, min 10s, max 300s (5min).
  *
  * @param {string} toolName - Nome do tool (e.g., 'ollama_generate', 'rag_search')
- * @param {object} [options={}] - Opções de contexto
+ * @param {GetToolTimeoutOptions} [options={}] - Opções de contexto
  * @param {number} [options.contextSize=0] - Tamanho do contexto em bytes
  * @returns {Promise<AdaptiveTimeoutResult>} Objeto com timeout calculado e metadados
  */
@@ -567,12 +571,16 @@ async function getHealthStatus() {
 }
 
 /**
+ * @typedef {object} GetPercentileTimeoutStats
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Calcula timeout baseado em percentil estatístico assumindo distribuição normal.
  *
  * **Semântica:** Usa tabela Z para calcular percentil (P50, P95, P99, P99.7).
  * **Unidades:** Retorna timeout em ms baseado em avg + z*std.
  *
- * @param {object} stats - Estatísticas com avg e var
+ * @param {GetPercentileTimeoutStats} stats - Estatísticas com avg e var
  * @param {number} [percentile=95] - Percentil desejado (50|95|99|99.7)
  * @returns {number} Timeout calculado em ms
  */

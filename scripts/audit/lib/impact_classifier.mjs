@@ -12,14 +12,27 @@ import {
 /** @typedef {'skip'|'changed-only'|'full'} StepMode */
 
 /**
- * @param {{ mode: StepMode, [k:string]: unknown }} step
+ * @typedef {object} StepStep
+ * @property {StepMode} mode
+ * @property {string]: unknown} k
+ */
+/**
+ * @param {StepStep} step
  */
 function step(step) {
     return step;
 }
 
 /**
- * @param {{ profile: Profile, changedFiles?: string[], qualityMode?: QualityMode, qualityJsdoc?: boolean, qualityPrettier?: boolean }} options
+ * @typedef {object} BuildQualityExecutionPlanOptions
+ * @property {Profile} profile
+ * @property {string[]} changedFiles
+ * @property {QualityMode} qualityMode
+ * @property {boolean} qualityJsdoc
+ * @property {boolean} qualityPrettier
+ */
+/**
+ * @param {BuildQualityExecutionPlanOptions} options
   * @returns {object}
  */
 export function buildQualityExecutionPlan(options) {

@@ -72,10 +72,14 @@ async function _syncMissionAndTasksContext(missionId) {
 }
 
 /**
+ * @typedef {object} ResolveIfVersionMission
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Deriva o ifVersion do objeto de missão retornado pela API.
  * A API retorna `updated_at` como ISO string; convertemos para ms via Date.parse
  * para enviar ao control plane (que compara com updated_at_ms no DB).
- * @param {object} mission
+ * @param {ResolveIfVersionMission} mission
  * @returns {number|null}
  */
 function _resolveIfVersion(mission) {

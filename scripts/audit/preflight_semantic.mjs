@@ -4,7 +4,14 @@ import { parseArgs } from 'node:util';
 import { parseJsonFromMixedOutput, runCommand } from './lib/exec.mjs';
 
 /**
- * @param {{ ok: boolean, exitCode: number|null, stdout: string, stderr: string }} result
+ * @typedef {object} SummarizeResultResult
+ * @property {boolean} ok
+ * @property {number|null} exitCode
+ * @property {string} stdout
+ * @property {string} stderr
+ */
+/**
+ * @param {SummarizeResultResult} result
  */
 function summarizeResult(result) {
     return {

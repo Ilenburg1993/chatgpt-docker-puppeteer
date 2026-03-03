@@ -15,15 +15,27 @@ function _responseDir() {
 }
 
 /**
+ * @typedef {object} SaveResponseV2Options
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} SaveResponseV2ResponseData
+ * @property {object} content
+ * @property {object} generation
+ * @property {object} validation
+ * @property {object} preview
+ */
+/**
  * Salva resposta em múltiplos formatos
  *
  * @param {string} taskId - Task ID
- * @param {object} responseData - Response V2 data
+ * @param {SaveResponseV2ResponseData} responseData - Response V2 data
  * @param {object} responseData.content - { text, markdown, html, json }
  * @param {object} responseData.generation - Generation metadata
  * @param {object} responseData.validation - Validation (nullable)
  * @param {object} responseData.preview - Preview estruturado
  * @param {{ attemptId?: string|null, writeLegacyLatest?: boolean }=} opts
+ * @param {SaveResponseV2Options} [opts]
  * @returns {Promise<object>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile, htmlFile} }
  */
 async function saveResponseV2(taskId, responseData, opts = {}) {
@@ -103,11 +115,16 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
 }
 
 /**
+ * @typedef {object} LoadResponseV2Options
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Carrega resposta (backward compatible)
  *
  * @param {string} taskId - Task ID
  * @param {string} format - Formato desejado ('text', 'markdown', 'json', 'html')
  * @param {{ attemptId?: string|null }=} opts
+ * @param {LoadResponseV2Options} [opts]
  * @returns {Promise<string|object>} - Conteúdo da resposta
  */
 async function loadResponseV2(taskId, format, opts = {}) {

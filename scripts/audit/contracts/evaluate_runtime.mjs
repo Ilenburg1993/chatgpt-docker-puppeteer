@@ -21,10 +21,16 @@ function buildSignalMap(contracts) {
 }
 
 /**
- * @param {{
- *   contracts: ContractDefinitionV1[],
- *   signals: Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>,
- * }} options
+ * @typedef {object} EvaluateRuntimeSignalsOptions
+ * @property {ContractDefinitionV1[]} contracts
+ * @property {Array<{ signal: string} signals
+ * @property {string} evidence
+ * @property {string} source_tool
+ * @property {string|null} file
+ * @property {number|null} line
+ */
+/**
+ * @param {EvaluateRuntimeSignalsOptions} options
   * @returns {object}
  */
 export function evaluateRuntimeSignals(options) {

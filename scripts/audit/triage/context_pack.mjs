@@ -57,8 +57,15 @@ function readMasterHistoryHints(masterPath, contractId) {
 }
 
 /**
+ * @typedef {object} BuildContextPackSources
+ * @property {unknown} [rag]
+ * @property {unknown} [lsp]
+ * @property {unknown} [history]
+ * @property {string} [masterPath]
+ */
+/**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
- * @param {{ rag?: unknown, lsp?: unknown, history?: unknown, masterPath?: string }} sources
+ * @param {BuildContextPackSources} sources
   * @returns {object}
  */
 export function buildContextPack(finding, sources = {}) {

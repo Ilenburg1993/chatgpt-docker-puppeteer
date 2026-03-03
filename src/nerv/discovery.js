@@ -4,14 +4,22 @@ import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 /**
+ * @typedef {object} PublishServerReadyNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} PublishServerReadyInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Publica evento SERVER_READY para descoberta de serviço.
  *
  * **Side-effects:** Envia evento via NERV ou registra estado (modo legado).
  * **Semântica:** Sinaliza que servidor está pronto para aceitar conexões.
  * **Unidades:** Timeout em milissegundos.
  *
- * @param {object} [nerv] - Instância NERV para publicação (opcional)
- * @param {object} [payload={}] - Payload adicional do evento
+ * @param {PublishServerReadyNerv} [nerv] - Instância NERV para publicação (opcional)
+ * @param {PublishServerReadyInput} [payload={}] - Payload adicional do evento
  * @returns {Promise<object|null>} Envelope enviado ou null se falhar
  */
 async function publishServerReady(nerv, payload = {}) {
@@ -44,14 +52,22 @@ function unpublishServerReady() {
 }
 
 /**
+ * @typedef {object} WaitForServerReadyNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} WaitForServerReadyOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Aguarda o primeiro evento SERVER_READY via NERV.
  *
  * **Side-effects:** Registra listener temporário no NERV, configura timeout.
  * **Semântica:** Promise que resolve quando servidor sinaliza prontidão.
  * **Unidades:** timeoutMs em milissegundos (padrão 10000).
  *
- * @param {object} nerv - Instância NERV com método onEvent
- * @param {object} [options={}] - Opções de configuração
+ * @param {WaitForServerReadyNerv} nerv - Instância NERV com método onEvent
+ * @param {WaitForServerReadyOptions} [options={}] - Opções de configuração
  * @param {number} [options.timeoutMs=10000] - Timeout em milissegundos
  * @returns {Promise<object>} Payload do envelope SERVER_READY
  * @throws {Error} Se NERV não tem onEvent ou timeout expirar
@@ -89,13 +105,17 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
 }
 
 /**
+ * @typedef {object} ListenForServerReadyNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Escuta continuamente eventos SERVER_READY e chama handler.
  *
  * **Side-effects:** Registra listener permanente no NERV.
  * **Semântica:** Observador contínuo de eventos de prontidão do servidor.
  * **Unidades:** N/A
  *
- * @param {object} nerv - Instância NERV com método onEvent
+ * @param {ListenForServerReadyNerv} nerv - Instância NERV com método onEvent
  * @param {function(object): void} handler - Callback invocado para cada SERVER_READY
  * @returns {function(): void} Função de unsubscribe para remover listener
  * @throws {Error} Se NERV não tem onEvent ou handler não é função

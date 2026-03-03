@@ -14,11 +14,15 @@ import http from 'node:http';
 import https from 'node:https';
 
 /**
+ * @typedef {object} SafeHttpRequestOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Makes an HTTP/HTTPS request with guaranteed cleanup of resources.
  * Ensures request is destroyed on timeout, error, or completion.
  *
  * @param {string|URL} url - The URL to request
- * @param {object} [options={}] - Request options
+ * @param {SafeHttpRequestOptions} [options={}] - Request options
  * @param {number} [options.timeout=5000] - Timeout in milliseconds
  * @param {string} [options.method='GET'] - HTTP method
  * @param {object} [options.headers] - Request headers
@@ -168,10 +172,14 @@ export async function checkUrlHealth(url, timeout = 5000) {
 }
 
 /**
+ * @typedef {object} FetchJsonOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Fetches JSON from a URL with automatic parsing.
  *
  * @param {string|URL} url - URL to fetch
- * @param {object} [options] - Request options (see safeHttpRequest)
+ * @param {FetchJsonOptions} [options] - Request options (see safeHttpRequest)
  * @returns {Promise<object>} Parsed JSON response
  * @throws {Error} If request fails or JSON parsing fails
  *
@@ -199,10 +207,14 @@ export async function fetchJson(url, options = {}) {
 }
 
 /**
+ * @typedef {object} RetryHttpRequestOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Retries an HTTP request with exponential backoff.
  *
  * @param {string|URL} url - URL to request
- * @param {object} [options={}] - Request options
+ * @param {RetryHttpRequestOptions} [options={}] - Request options
  * @param {number} [options.maxRetries=3] - Maximum retry attempts
  * @param {number} [options.backoffMs=100] - Base backoff delay in ms
  * @param {function} [options.shouldRetry] - Function to determine if error is retryable
@@ -252,11 +264,15 @@ export async function retryHttpRequest(url, options = {}) {
 }
 
 /**
+ * @typedef {object} PollUntilHealthyOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Polls a URL until it becomes healthy or timeout is reached.
  * Useful for waiting for services to start up.
  *
  * @param {string|URL} url - URL to poll
- * @param {object} [options={}] - Polling options
+ * @param {PollUntilHealthyOptions} [options={}] - Polling options
  * @param {number} [options.maxWaitMs=30000] - Maximum time to wait
  * @param {number} [options.intervalMs=500] - Polling interval
  * @param {number} [options.requestTimeout=2000] - Timeout per request
@@ -296,6 +312,7 @@ export async function pollUntilHealthy(url, options = {}) {
  * Makes multiple HTTP requests in parallel with proper cleanup.
  *
  * @param {Array<{url: string, options?: object}>} requests - Array of request configs
+ * @param {*} requests
  * @returns {Promise<Array<object>>} Array of responses
  *
  * @example

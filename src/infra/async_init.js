@@ -96,11 +96,15 @@ export function createTopLevelInit(initFn) {
 }
 
 /**
+ * @typedef {object} InitDirectoryOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Creates a thread-safe directory initialization.
  * Handles EEXIST errors gracefully (common in multi-process scenarios).
  *
  * @param {string} dirPath - Directory path to create
- * @param {object} [options] - mkdir options
+ * @param {InitDirectoryOptions} [options] - mkdir options
  * @returns {Promise<void>}
  *
  * @example

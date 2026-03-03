@@ -11,17 +11,19 @@ function _makeArtifactId() {
 }
 
 /**
- * @typedef {{
- *   id?: string,
- *   kind: string,
- *   mime: string,
- *   size_bytes: number,
- *   sha256?: string|null,
- *   storage_uri: string,
- *   created_at_ms?: number,
- *   created_by?: string|null,
- * }} ArtifactInsert
-  * @returns {object|null}
+ * @typedef {object} ArtifactInsert
+ * @property {string} [id] - ID do artefato (gerado se omitido)
+ * @property {string} kind - Tipo do artefato
+ * @property {string} mime - MIME type
+ * @property {number} size_bytes - Tamanho em bytes
+ * @property {string|null} [sha256] - Hash SHA-256
+ * @property {string} storage_uri - URI de armazenamento
+ * @property {number} [created_at_ms] - Timestamp de criação
+ * @property {string|null} [created_by] - ID do criador
+ */
+/**
+ * @param {ArtifactInsert} input
+ * @returns {object|null}
  */
 
 function insertArtifact(input) {
@@ -53,6 +55,7 @@ function insertArtifact(input) {
 
 /**
  * Função exportada: getArtifactById.
+ * @param {*} artifactId
  * @returns {object|null}
  */
 function getArtifactById(artifactId) {

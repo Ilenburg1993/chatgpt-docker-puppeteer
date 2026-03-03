@@ -2327,15 +2327,27 @@ class DriverNERVAdapter extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreateConfig
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
+ * @typedef {object} CreateNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} CreateBrowserPool
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância do DriverNERVAdapter
  *
  * **Side-effects:** N/A
  * **Semântica:** Cria nova instância do DriverNERVAdapter conectada ao NERV e pool de browsers.
  * **Unidades:** N/A
  *
- * @param {object} nerv - Instância do sistema NERV
- * @param {object} browserPool - Pool de browsers para alocação
- * @param {object} config - Configuração do adapter
+ * @param {CreateNerv} nerv - Instância do sistema NERV
+ * @param {CreateBrowserPool} browserPool - Pool de browsers para alocação
+ * @param {CreateConfig} config - Configuração do adapter
  * @returns {DriverNERVAdapter} Nova instância do DriverNERVAdapter
  */
 export const create = (nerv, browserPool, config) => {

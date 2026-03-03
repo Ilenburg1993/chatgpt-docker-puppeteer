@@ -38,6 +38,9 @@ async function cleanupTestDna() {
 
 /**
  * Verifica se selector está no DNA
+ * @param {*} domain
+ * @param {*} intent
+ * @param {*} selector
  */
 async function isSelectorInDna(domain, intent, selector) {
     const dna = await io.getDna();

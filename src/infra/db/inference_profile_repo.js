@@ -42,7 +42,12 @@ function _rowToProfile(row) {
 }
 
 /**
+ * @typedef {object} UpsertInferenceProfileInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: upsertInferenceProfile.
+ * @param {UpsertInferenceProfileInput} [input]
  * @returns {InferenceProfile|null}
  */
 function upsertInferenceProfile(input = {}) {
@@ -107,7 +112,13 @@ function getInferenceProfileById(id) {
 }
 
 /**
+ * @typedef {object} ListInferenceProfilesOptions
+ * @property {*} [enabledOnly]
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listInferenceProfiles.
+ * @param {ListInferenceProfilesOptions} [options]
  * @returns {InferenceProfile[]}
  */
 function listInferenceProfiles({ enabledOnly = false, limit = 100 } = {}) {

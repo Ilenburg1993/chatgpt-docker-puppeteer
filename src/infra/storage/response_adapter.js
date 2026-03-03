@@ -8,11 +8,15 @@ import { ROOT } from '#infra/fs/paths';
 const RESPONSE_DIR = path.join(ROOT, 'respostas');
 
 /**
+ * @typedef {object} SaveResponseTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Salva response (detecta V1 ou V2 automaticamente)
  *
  * @param {string} taskId - Task ID
  * @param {string|object} response - Response V1 (string) ou V2 (object)
- * @param {object} task - Task object (para preencher result)
+ * @param {SaveResponseTask} task - Task object (para preencher result)
  * @param {string=} attemptId - attempt/correlation id (opcional)
  * @returns {Promise<object>} - { storage, format }
  */
@@ -45,11 +49,19 @@ async function saveResponse(taskId, response, task, attemptId) {
 }
 
 /**
+ * @typedef {object} SaveResponseV2FormatResponseV2
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} SaveResponseV2FormatTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Salva response V2 e preenche task.result
  *
  * @param {string} taskId - Task ID
- * @param {object} responseV2 - Response V2 object
- * @param {object} task - Task object
+ * @param {SaveResponseV2FormatResponseV2} responseV2 - Response V2 object
+ * @param {SaveResponseV2FormatTask} task - Task object
  * @param {string=} attemptId - attempt/correlation id (opcional)
  * @returns {Promise<object>} - { storage, format }
  * @private
@@ -97,9 +109,13 @@ async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
 }
 
 /**
+ * @typedef {object} IsResponseV2Response
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Detecta se response é V2 (object) ou V1 (string)
  *
- * @param {object} response - Response para verificar
+ * @param {IsResponseV2Response} response - Response para verificar
  * @returns {boolean} - true se V2, false se V1
  * @private
  */
@@ -116,10 +132,14 @@ function isResponseV2(response) {
 }
 
 /**
+ * @typedef {object} ConvertV1toV2Task
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Converte response V1 (string) para V2 (object)
  *
  * @param {string} responseText - Response V1 (texto plano)
- * @param {object} task - Task object (para metadata)
+ * @param {ConvertV1toV2Task} task - Task object (para metadata)
  * @returns {object} - Response V2
  * @private
  */

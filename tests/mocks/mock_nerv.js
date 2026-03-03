@@ -3,10 +3,14 @@ import sinon from 'sinon';
 import EventEmitter from 'node:events';
 
 /**
+ * @typedef {object} ExtrairNomeEventoEnvelope
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Helper para extrair nome do evento de um envelope NERV.
  * Suporta múltiplos formatos de envelope (novo/legado).
  *
- * @param {object} envelope - Envelope NERV estruturado
+ * @param {ExtrairNomeEventoEnvelope} envelope - Envelope NERV estruturado
  * @returns {string} Nome do evento
  */
 function extrairNomeEvento(envelope) {

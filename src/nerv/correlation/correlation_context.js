@@ -27,6 +27,7 @@
 
 /**
  * Verifica se valor é string não vazia.
+ * @param {*} value
  */
 function isNonEmptyString(value) {
     return typeof value === 'string' && value.length > 0;
@@ -34,6 +35,7 @@ function isNonEmptyString(value) {
 
 /**
  * Clona array de registros de forma segura.
+ * @param {*} records
  */
 function cloneRecords(records) {
     return Array.isArray(records) ? records.slice() : [];
@@ -44,15 +46,26 @@ function cloneRecords(records) {
 =========================== */
 
 /**
+ * @typedef {object} CreateCorrelationContextDeps
+ * @property {object} store
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateCorrelationContextOptions
+ * @property {*} [store]
+ * @property {*} [telemetry]
+ */
+/**
  * Cria o contexto de leitura de correlações.
  *
  * **Side-effects:** Emite telemetria para operações de leitura.
  * **Semântica:** Camada de leitura/auditoria sobre correlações históricas.
  * **Unidades:** correlationId como string não vazia, histórico como array de registros.
  *
- * @param {object} deps - Dependências do contexto
+ * @param {CreateCorrelationContextDeps} deps - Dependências do contexto
  * @param {object} deps.store - Instância de correlation_store
  * @param {object} deps.telemetry - Interface de telemetria NERV
+ * @param {CreateCorrelationContextOptions} [options]
  * @returns {object} Contexto com métodos getHistory, getLatest, getStats
  * @throws {Error} Se store ou telemetry forem inválidos
  */

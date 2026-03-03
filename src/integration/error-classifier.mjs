@@ -42,10 +42,14 @@ export const RetryStrategy = Object.freeze({
 });
 
 /**
+ * @typedef {object} ClassifyErrorContext
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Classify error for retry decision
  *
  * @param {Error} error - Error object from tool execution
- * @param {object} context - Execution context
+ * @param {ClassifyErrorContext} context - Execution context
  * @param {string} [context.tool] - Tool name (e.g., 'ollama_generate')
  * @param {string} [context.model] - Model being used (for fallback suggestion)
  * @param {number} [context.attempt] - Current attempt number
@@ -302,10 +306,14 @@ export function calculateBackoff(attempt, baseDelayMs, maxDelayMs = 60000) {
 }
 
 /**
+ * @typedef {object} IsRetryableContext
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Check if error is retryable based on classification
  *
  * @param {Error} error - Error to check
- * @param {object} context - Context for classification
+ * @param {IsRetryableContext} context - Context for classification
  * @returns {boolean} True if error is retryable
  *
  * @example
@@ -318,10 +326,14 @@ export function isRetryable(error, context = {}) {
 }
 
 /**
+ * @typedef {object} GetErrorSummaryContext
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Get human-readable error summary
  *
  * @param {Error} error - Error to summarize
- * @param {object} context - Context for classification
+ * @param {GetErrorSummaryContext} context - Context for classification
  * @returns {string} Human-readable summary
  *
  * @example

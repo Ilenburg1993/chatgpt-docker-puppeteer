@@ -33,10 +33,15 @@ function testFailureFinding(sourceTool, evidence, contractId) {
 }
 
 /**
- * @param {{
- *   profile: 'quick'|'deep'|'nightly',
- *   exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
- * }} options
+ * @typedef {object} CollectTestFindingsOptions
+ * @property {'quick'|'deep'|'nightly'} profile
+ * @property {(stepId: string} exec
+ * @property {string} command
+ * @property {string[]} args
+ * @property {unknown) => Promise<void>} options
+ */
+/**
+ * @param {CollectTestFindingsOptions} options
  * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: Record<string,any>}>}
  */
 export async function collectTestFindings(options) {

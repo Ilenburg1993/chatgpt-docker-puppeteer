@@ -1,8 +1,20 @@
 // @ts-check
 /**
- * @param {Record<string, { total: number, violated: number, covered: number, covered_by_run?: number, covered_by_tests?: number }>} coverage
- * @param {Record<string, unknown>} [drift]
-  * @returns {object}
+ * @typedef {object} ContractCoverageMap
+ * @property {number} total
+ * @property {number} violated
+ * @property {number} covered
+ * @property {number} [covered_by_run]
+ * @property {number} [covered_by_tests]
+ */
+/**
+ * @typedef {object} ContractDrift
+ * @property {unknown} [key] - Chave de drift detectado
+ */
+/**
+ * @param {Record<string, ContractCoverageMap>} coverage
+ * @param {ContractDrift} [drift]
+ * @returns {string[]}
  */
 export function renderContractCoverage(coverage, drift = {}) {
     const lines = ['## Contract Coverage'];

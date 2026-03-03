@@ -66,14 +66,16 @@ function isPm2ExecPathMatch(importMetaUrl, env = process.env) {
 }
 
 /**
+ * @typedef {object} ShouldAutobootEntrypointOptions
+ * @property {string} importMetaUrl
+ * @property {NodeJS.ProcessEnv} env
+ * @property {string|null} explicitAutostartEnv
+ * @property {boolean} allowPm2ExecPathMatch
+ */
+/**
  * Decide se o entrypoint deve auto-bootstrap no import atual.
  *
- * @param {{
- *   importMetaUrl: string,
- *   env?: NodeJS.ProcessEnv,
- *   explicitAutostartEnv?: string|null,
- *   allowPm2ExecPathMatch?: boolean,
- * }} options
+ * @param {ShouldAutobootEntrypointOptions} options
  * @returns {boolean}
  */
 function shouldAutobootEntrypoint({

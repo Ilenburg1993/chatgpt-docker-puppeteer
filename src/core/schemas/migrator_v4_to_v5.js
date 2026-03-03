@@ -3,8 +3,12 @@ import * as logger from '../logger.js';
 import { TaskSchemaV5 } from './task_schema_v5.js';
 
 /**
+ * @typedef {object} IsV4TaskTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Detecta se task é V4 baseado na versão.
- * @param {object} task - Task object
+ * @param {IsV4TaskTask} task - Task object
  * @returns {boolean} - true se V4, false caso contrário
  */
 function isV4Task(task) {
@@ -12,14 +16,22 @@ function isV4Task(task) {
 }
 
 /**
+ * @typedef {object} IsV5TaskTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Detecta se task é V5 baseado na versão.
- * @param {object} task - Task object
+ * @param {IsV5TaskTask} task - Task object
  * @returns {boolean} - true se V5, false caso contrário
  */
 function isV5Task(task) {
     return task?.meta?.version === '5.0';
 }
 
+/**
+ * @typedef {object} MigrateTaskV4toV5TaskV4
+ * @property {*} _ Propriedades definidas em runtime.
+ */
 /**
  * Migra task individual de V4 para V5.
  *
@@ -39,7 +51,7 @@ function isV5Task(task) {
  * - result.subtask_results: []
  * - result.validation_results: []
  *
- * @param {object} taskV4 - Task V4 object
+ * @param {MigrateTaskV4toV5TaskV4} taskV4 - Task V4 object
  * @returns {object} - Task V5 object
  * @throws {Error} - Se migração falhar
  */
@@ -273,8 +285,12 @@ function migrateBatchV4toV5(tasksV4) {
 }
 
 /**
+ * @typedef {object} ValidateV5TaskTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida se task está em formato V5 válido.
- * @param {object} task - Task object
+ * @param {ValidateV5TaskTask} task - Task object
  * @returns {boolean} - true se válido, false caso contrário
  */
 function validateV5Task(task) {
@@ -288,10 +304,14 @@ function validateV5Task(task) {
 }
 
 /**
+ * @typedef {object} DowngradeV5toV4TaskV5
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Converte task V5 de volta para V4 (downgrade).
  * ATENÇÃO: Perde informações de missões/workflows/execution context/result V2!
  *
- * @param {object} taskV5 - Task V5 object
+ * @param {DowngradeV5toV4TaskV5} taskV5 - Task V5 object
  * @returns {object} - Task V4 object
  */
 function downgradeV5toV4(taskV5) {
@@ -359,8 +379,12 @@ function downgradeV5toV4(taskV5) {
 }
 
 /**
+ * @typedef {object} AutoMigrateTaskTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Migra automaticamente task, detectando versão.
- * @param {object} task - Task de qualquer versão
+ * @param {AutoMigrateTaskTask} task - Task de qualquer versão
  * @returns {object} - Task V5
  */
 function autoMigrateTask(task) {

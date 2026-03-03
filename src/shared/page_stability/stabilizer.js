@@ -72,9 +72,13 @@ class StabilizerAbortError extends Error {
 }
 
 /**
+ * @typedef {object} MeasureEventLoopLagPage
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Mede o atraso (lag) do Event Loop no contexto do Browser.
  * v2.0: Added retry logic and error logging.
- * @param {object} page - Puppeteer Page instance
+ * @param {MeasureEventLoopLagPage} page - Puppeteer Page instance
  * @param {number} retries - Max retry attempts (default: 3)
  * @returns {Promise<number>} Event loop lag in ms
  */
@@ -109,9 +113,13 @@ async function measureEventLoopLag(page, retries = STABILIZER_CONFIG.HELPER_RETR
 }
 
 /**
+ * @typedef {object} GetPageLoadStatusPage
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Verifica a presença de indicadores de carregamento (spinners) e tráfego de rede.
  * v2.0: Enhanced error handling, false positive filter, optimizations.
- * @param {object} page - Puppeteer Page instance
+ * @param {GetPageLoadStatusPage} page - Puppeteer Page instance
  * @param {number} retries - Max retry attempts (default: 3)
  * @returns {Promise<boolean>} `true` quando ainda há atividade de carregamento
  */
@@ -200,9 +208,13 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
 // ============================================
 
 /**
+ * @typedef {object} WaitForStabilityDriver
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Orquestra a estabilização multi-fase da página.
  * v2.0: Added validation, telemetry, abort support, enriched return value.
- * @param {object} driver - Instância do BaseDriver (required)
+ * @param {WaitForStabilityDriver} driver - Instância do BaseDriver (required)
  * @param {number} timeoutMs - Tempo máximo de espera (default: 30000)
  * @param {AbortSignal} signal - Optional abort signal
  * @returns {Promise<object>} Result object with success, duration, phases, etc.

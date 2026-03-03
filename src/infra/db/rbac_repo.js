@@ -133,7 +133,22 @@ function ensureBaseRbacData() {
 }
 
 /**
- * @param {{username:string, password:string, role?: string, active?: boolean}} params
+ * @typedef {object} UpsertRbacUserParams
+ * @property {string} username
+ * @property {string} password
+ * @property {string} role
+ * @property {boolean} active
+ */
+/**
+ * @typedef {object} UpsertRbacUserOptions
+ * @property {*} [username]
+ * @property {*} [password]
+ * @property {*} [role]
+ * @property {*} [active]
+ */
+/**
+ * @param {UpsertRbacUserParams} params
+ * @param {UpsertRbacUserOptions} [options]
   * @returns {object}
  */
 function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active = true }) {
@@ -223,6 +238,8 @@ function getRbacUserByUsername(username) {
 
 /**
  * Função exportada: verifyRbacCredentials.
+ * @param {*} username
+ * @param {*} password
  * @returns {object}
  */
 function verifyRbacCredentials(username, password) {

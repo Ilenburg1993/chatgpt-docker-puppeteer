@@ -27,6 +27,9 @@ const TRANSFORM_TYPES = {
 
 /**
  * Pipeline de Transformação: Mapeia o token de transformação para a lógica real.
+ * @param {*} content
+ * @param {*} transform
+ * @param {*} targetTask
  */
 async function applyTransform(content, transform, targetTask) {
     const type = (transform || TRANSFORM_TYPES.RAW).toUpperCase();

@@ -617,9 +617,13 @@ class InputResolver extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreateDriver
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância de InputResolver.
  *
- * @param {object} driver - Instância do driver
+ * @param {CreateDriver} driver - Instância do driver
  * @returns {InputResolver} Nova instância
  *
  * @example

@@ -1,7 +1,17 @@
 // @ts-check
 /**
- * @param {object} finding
- * @param {{ sourceConvergence?: number, hasContract?: boolean, hasRuntimeEvidence?: boolean }} [signals]
+ * @typedef {object} ScoreConfidenceSignals
+ * @property {number} [sourceConvergence]
+ * @property {boolean} [hasContract]
+ * @property {boolean} [hasRuntimeEvidence]
+ */
+/**
+ * @typedef {object} ScoreConfidenceFinding
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {ScoreConfidenceFinding} finding
+ * @param {ScoreConfidenceSignals} [signals]
   * @returns {object}
  */
 export function scoreConfidence(finding, signals = {}) {

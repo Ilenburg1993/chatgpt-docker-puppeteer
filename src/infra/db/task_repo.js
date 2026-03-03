@@ -167,11 +167,20 @@ function getTaskById(taskId) {
 }
 
 /**
+ * @typedef {object} ListTasksOptions
+ * @property {string|null} status
+ * @property {string|null} stage
+ * @property {string|null} missionId
+ * @property {number} limit
+ * @property {number} offset
+ */
+/**
  * Lista tasks com suporte a filtros, paginação e limite seguro.
  * PERF-01 FIX: Adicionado parâmetro `offset` para paginação e limitado
  * o máximo retornável a 500 por chamada (vs 20.000 anterior).
  *
- * @param {{ status?: string|null, stage?: string|null, missionId?: string|null, limit?: number, offset?: number }} [opts]
+ * @param {ListTasksOptions} [opts]
+ * @param {ListTasksOptions} [options]
   * @returns {TaskRow[]}
  */
 function listTasks({ status = null, stage = null, missionId = null, limit = 100, offset = 0 } = {}) {
@@ -207,8 +216,15 @@ function listTasks({ status = null, stage = null, missionId = null, limit = 100,
 }
 
 /**
+ * @typedef {object} CountTasksOptions
+ * @property {string|null} status
+ * @property {string|null} stage
+ * @property {string|null} missionId
+ */
+/**
  * Conta o total de tasks com filtros (para paginação).
- * @param {{ status?: string|null, stage?: string|null, missionId?: string|null }} [opts]
+ * @param {CountTasksOptions} [opts]
+ * @param {CountTasksOptions} [options]
  * @returns {number}
  */
 function countTasks({ status = null, stage = null, missionId = null } = {}) {
@@ -255,6 +271,7 @@ function countTasksByStatus() {
 
 /**
  * Função exportada: getTaskDependencies.
+ * @param {*} taskId
  * @returns {TaskRow|null}
  */
 function getTaskDependencies(taskId) {
@@ -274,9 +291,17 @@ function getTaskDependencies(taskId) {
 }
 
 /**
+ * @typedef {object} InsertTaskRawTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} InsertTaskOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Inserts a task into the database.
- * @param {object} rawTask - The raw task object
- * @param {object} [options={}] - Options
+ * @param {InsertTaskRawTask} rawTask - The raw task object
+ * @param {InsertTaskOptions} [options={}] - Options
  * @param {string} [options.stage='READY'] - The task stage
  * @param {string} [options.status='PENDING'] - The task status
  * @param {string} [options.actor='system'] - The actor performing the action
@@ -419,11 +444,15 @@ function insertTask(
 }
 
 /**
+ * @typedef {object} UpdateTaskUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Updates a task with optimistic locking (retries up to 3 times on version conflict).
  * FIXED (P0-2.6): Agora throws em conflito permanente ao invés de retornar null
  *
  * @param {string} taskId
- * @param {object} updates
+ * @param {UpdateTaskUpdates} updates
  * @param {number} [_retryCount=0] - Internal retry counter
  * @returns {TaskRow} - Task atualizado (nunca null em conflito)
  * @throws {Error} OptimisticLockError se max retries excedido
@@ -726,6 +755,8 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
 
 /**
  * Função exportada: setTaskStage.
+ * @param {*} taskId
+ * @param {*} stage
  * @returns {TaskRow|null}
  */
 function setTaskStage(taskId, stage) {
@@ -733,7 +764,14 @@ function setTaskStage(taskId, stage) {
 }
 
 /**
+ * @typedef {object} SetTaskStatusExtra
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: setTaskStatus.
+ * @param {*} taskId
+ * @param {*} status
+ * @param {SetTaskStatusExtra} [extra]
  * @returns {TaskRow|null}
  */
 function setTaskStatus(taskId, status, extra = {}) {
@@ -741,11 +779,20 @@ function setTaskStatus(taskId, status, extra = {}) {
 }
 
 /**
+ * @typedef {object} ClaimNextEligibleTaskParams
+ * @property {string} workerId
+ */
+/**
+ * @typedef {object} ClaimNextEligibleTaskOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Atomically claims next eligible task (READY + PENDING).
- * @param {object} params - Parameters
+ * @param {ClaimNextEligibleTaskParams} params - Parameters
  * @param {string} params.workerId - The worker ID
  * @param {number} [params.nowMs] - Current timestamp in ms
  * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
+ * @param {ClaimNextEligibleTaskOptions} [options]
  * @returns {object|null} { task, row } or null
  */
 function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) {
@@ -829,12 +876,16 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
 }
 
 /**
+ * @typedef {object} ReleaseTaskLockParams
+ * @property {string} taskId
+ */
+/**
  * Releases the lock on a task.
- * @param {object} params - Parameters
+ * @param {ReleaseTaskLockParams} params - Parameters
  * @param {string} params.taskId - The task ID
  * @param {string} [params.workerId] - The worker ID (optional, for safety)
  * @param {string} [params.expectedAttemptId] - Expected latest attempt/correlation for lock-causality guard
-  * @returns {TaskRow|null}
+ * @returns {TaskRow|null}
  */
 function releaseTaskLock(
     /** @type {{ taskId: string, workerId?: string, expectedAttemptId?: string }} */ {
@@ -867,13 +918,18 @@ function releaseTaskLock(
 }
 
 /**
+ * @typedef {object} ExtendTaskLockParams
+ * @property {string} taskId
+ * @property {string} workerId
+ */
+/**
  * Extends the lock on a task.
- * @param {object} params - Parameters
+ * @param {ExtendTaskLockParams} params - Parameters
  * @param {string} params.taskId - The task ID
  * @param {string} params.workerId - The worker ID
  * @param {number} [params.nowMs] - Current timestamp in ms
  * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
-  * @returns {TaskRow|null}
+ * @returns {TaskRow|null}
  */
 function extendTaskLock(
     /** @type {{ taskId: string, workerId: string, nowMs?: number, lockTtlMs?: number }} */ {
@@ -928,6 +984,8 @@ function retryFailedTasks() {
 
 /**
  * Função exportada: incrementTaskAttempts.
+ * @param {*} taskId
+ * @param {*} [delta]
  * @returns {TaskRow|null}
  */
 function incrementTaskAttempts(taskId, delta = 1) {
@@ -960,6 +1018,7 @@ function clearQueuePreserveRunning() {
 
 /**
  * Função exportada: purgeTask.
+ * @param {*} taskId
  * @returns {TaskRow|null}
  */
 function purgeTask(taskId) {

@@ -50,6 +50,7 @@ async function findById(taskId) {
 
 /**
  * Localiza a última tarefa concluída com sucesso em um projeto.
+ * @param {*} projectId
   * @returns {Promise<object[]>}
  */
 async function findLast(projectId) {
@@ -59,6 +60,8 @@ async function findLast(projectId) {
 
 /**
  * Localiza a última tarefa concluída que possui uma tag específica.
+ * @param {*} projectId
+ * @param {*} tag
   * @returns {Promise<object[]>}
  */
 async function findLastByTag(projectId, tag) {
@@ -73,6 +76,8 @@ async function findLastByTag(projectId, tag) {
 
 /**
  * Localiza a primeira tarefa (mais antiga) concluída com uma tag específica.
+ * @param {*} projectId
+ * @param {*} tag
   * @returns {Promise<object[]>}
  */
 async function findFirstByTag(projectId, tag) {

@@ -48,8 +48,12 @@ function _rowToAuditJob(row) {
 }
 
 /**
+ * @typedef {object} CreateAuditJobInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: createAuditJob.
- * @param {object} input Input data for the AuditJob record.
+ * @param {CreateAuditJobInput} input Input data for the AuditJob record.
  * @returns {AuditJob|null}
  */
 function createAuditJob(input = {}) {
@@ -107,7 +111,13 @@ function getAuditJobById(id) {
 }
 
 /**
+ * @typedef {object} ListAuditJobsOptions
+ * @property {*} [status]
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listAuditJobs.
+ * @param {ListAuditJobsOptions} [options]
  * @returns {AuditJob[]}
  */
 function listAuditJobs({ status = null, limit = 100 } = {}) {
@@ -130,7 +140,13 @@ function listAuditJobs({ status = null, limit = 100 } = {}) {
 }
 
 /**
+ * @typedef {object} UpdateAuditJobUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: updateAuditJob.
+ * @param {string} id
+ * @param {UpdateAuditJobUpdates} [updates]
  * @returns {AuditJob|null}
  */
 function updateAuditJob(id, updates = {}) {
@@ -225,6 +241,7 @@ function updateAuditJob(id, updates = {}) {
 
 /**
  * Função exportada: upsertAuditJobSnapshot.
+ * @param {*} job
  * @returns {AuditJob|null}
  */
 function upsertAuditJobSnapshot(job) {

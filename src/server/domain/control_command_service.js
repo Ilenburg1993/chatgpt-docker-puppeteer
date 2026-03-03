@@ -440,10 +440,14 @@ async function _postJson(url, body, timeoutMs = 5000) {
 }
 
 /**
+ * @typedef {object} DispatchDiagnosticCommandPayload
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Envia comandos DIAGNOSTIC_* para o Audit Agent (diagnóstico integrado ao Audit Agent).
  * O Diagnostic Agent standalone foi removido; DIAGNOSTIC_* agora roteia para Audit Agent.
  * @param {string} command - Comando a executar
- * @param {object} payload - Payload do comando
+ * @param {DispatchDiagnosticCommandPayload} payload - Payload do comando
  * @returns {Promise<object>} Resultado da operação
  */
 async function _dispatchDiagnosticCommand(command, payload) {
@@ -795,9 +799,13 @@ async function _dispatchAuditPatchCommand(command, payload, actor) {
 }
 
 /**
+ * @typedef {object} ExecuteAuditPatchApplyBefore
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Executa a aplicação real do patch com rollback em caso de falha.
  * @param {string} patchId - ID do patch
- * @param {object} before - Estado atual do patch
+ * @param {ExecuteAuditPatchApplyBefore} before - Estado atual do patch
  * @param {string|null} actorId - ID do usuário que executou
  * @returns {object} Resultado da operação
  */
@@ -953,6 +961,7 @@ function _executeAuditPatchApply(patchId, before, actorId) {
  * Cria um diff de rollback a partir do estado anterior dos arquivos.
  * Gera um diff reverso que pode ser aplicado para restaurar o estado anterior.
  * @param {{file: string, content: string}[]} beforeState - Estado anterior dos arquivos
+ * @param {*} beforeState
  * @returns {string} Diff reverso no formato unificado
  */
 function _createRollbackDiff(beforeState) {
@@ -1484,7 +1493,13 @@ function _dispatch(command, payload, actor) {
 }
 
 /**
+ * @typedef {object} ValidateCommandOptions
+ * @property {*} [command]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: validateCommand.
+ * @param {ValidateCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function validateCommand({ command, payload = {}, actor = null }) {
@@ -1533,7 +1548,13 @@ function validateCommand({ command, payload = {}, actor = null }) {
 }
 
 /**
+ * @typedef {object} ExecuteCommandOptions
+ * @property {*} [command]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: executeCommand.
+ * @param {ExecuteCommandOptions} [options]
  * @returns {Promise<void>}
  */
 async function executeCommand({ command, payload = {}, actor = null, dryRun = false }) {

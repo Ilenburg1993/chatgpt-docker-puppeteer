@@ -136,15 +136,29 @@ async function _getArtifactRow(artifactId) {
 }
 
 /**
+ * @typedef {object} PutTextOptions
+ * @property {*} [kind]
+ * @property {*} [text]
+ * @property {*} [relPath]
+ * @property {*} [ext]
+ * @property {*} [mime]
+ * @property {*} [computeSha256]
+ */
+/**
+ * @typedef {object} PutTextParams
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Writes a text artifact file and returns storage pointers/metadata (no DB write).
  *
- * @param {object} [params]
+ * @param {PutTextParams} [params]
  * @param {string} [params.kind]
  * @param {string} [params.text]
  * @param {string} [params.relPath]
  * @param {string} [params.ext='txt']
  * @param {string} [params.mime='text/plain']
  * @param {boolean} [params.computeSha256=false]
+ * @param {PutTextOptions} [options]
  * @returns {Promise<PutArtifactResult>}
  */
 async function putText({ kind, text, relPath, ext = 'txt', mime = 'text/plain', computeSha256 = false } = {}) {
@@ -183,15 +197,29 @@ async function putText({ kind, text, relPath, ext = 'txt', mime = 'text/plain', 
 }
 
 /**
+ * @typedef {object} PutBufferOptions
+ * @property {*} [kind]
+ * @property {*} [buffer]
+ * @property {*} [relPath]
+ * @property {*} [ext]
+ * @property {*} [mime]
+ * @property {*} [computeSha256]
+ */
+/**
+ * @typedef {object} PutBufferParams
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Writes a binary artifact file and returns storage pointers/metadata (no DB write).
  *
- * @param {object} [params]
+ * @param {PutBufferParams} [params]
  * @param {string} [params.kind]
  * @param {Buffer|Uint8Array|string} [params.buffer]
  * @param {string} [params.relPath]
  * @param {string} [params.ext='bin']
  * @param {string} [params.mime='application/octet-stream']
  * @param {boolean} [params.computeSha256=false]
+ * @param {PutBufferOptions} [options]
  * @returns {Promise<PutArtifactResult>}
  */
 async function putBuffer({
@@ -248,15 +276,29 @@ async function putBuffer({
 }
 
 /**
+ * @typedef {object} PutJsonOptions
+ * @property {*} [kind]
+ * @property {*} [json]
+ * @property {*} [relPath]
+ * @property {*} [ext]
+ * @property {*} [mime]
+ * @property {*} [computeSha256]
+ */
+/**
+ * @typedef {object} PutJsonParams
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Stores JSON data as an artifact (pretty-printed).
  *
- * @param {object} [params]
+ * @param {PutJsonParams} [params]
  * @param {string} [params.kind]
  * @param {object} [params.json]
  * @param {string} [params.relPath]
  * @param {string} [params.ext='json']
  * @param {string} [params.mime='application/json']
  * @param {boolean} [params.computeSha256=false]
+ * @param {PutJsonOptions} [options]
  * @returns {Promise<PutArtifactResult>}
  */
 async function putJson({ kind, json, relPath, ext = 'json', mime = 'application/json', computeSha256 = false } = {}) {

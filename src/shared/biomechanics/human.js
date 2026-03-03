@@ -243,8 +243,12 @@ async function detectKeyboardLayout(page) {
 // ELEMENT RETRY HELPER (v2.0 - Phase 2)
 // ============================================
 /**
+ * @typedef {object} GetElementRectContext
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Retry element lookup with exponential backoff.
- * @param {object} ctx - Execution context
+ * @param {GetElementRectContext} ctx - Execution context
  * @param {string} selector - CSS selector
  * @param {number} retries - Max retry attempts
  * @param {number} delayMs - Base delay between retries
@@ -280,8 +284,12 @@ async function getElementRect(
 // ============================================
 
 /**
+ * @typedef {object} WakeUpMovePage
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Executa movimento de "acordar" o mouse para posição aleatória na viewport
- * @param {object} page - Instância da página Puppeteer
+ * @param {WakeUpMovePage} page - Instância da página Puppeteer
  * @returns {Promise<void>} Completa quando movimento terminar ou falhar silenciosamente
  * @sideEffects Move mouse para posição aleatória - operação I/O
  */
@@ -314,9 +322,17 @@ async function wakeUpMove(page) {
 // HUMAN CLICK (v2.0 - Enhanced with validation)
 // ============================================
 /**
+ * @typedef {object} HumanClickCoreContext
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
+ * @typedef {object} HumanClickCorePage
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Realiza um clique humano com variância gaussiana.
- * @param {object} page - Puppeteer Page instance (required)
- * @param {object} ctx - Execution context (Page or Frame) (required)
+ * @param {HumanClickCorePage} page - Puppeteer Page instance (required)
+ * @param {HumanClickCoreContext} ctx - Execution context (Page or Frame) (required)
  * @param {string} selector - CSS selector (required)
  * @param {number} offsetX - X offset for frame navigation (default: 0)
  * @param {number} offsetY - Y offset for frame navigation (default: 0)

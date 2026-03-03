@@ -25,6 +25,7 @@ function topModules(report) {
 
 /**
  * @param {Record<string, { total: number, violated: number, covered: number, covered_by_run?: number, covered_by_tests?: number }>} coverage
+ * @param {*} coverage
  */
 function coverageLines(coverage) {
     const domains = Object.keys(coverage || {}).sort();
@@ -180,7 +181,11 @@ function upsert(content, section) {
 }
 
 /**
- * @param {{ masterPath: string }} options
+ * @typedef {object} EnsureMasterOptions
+ * @property {string} masterPath
+ */
+/**
+ * @param {EnsureMasterOptions} options
  */
 function ensureMaster(options) {
     if (fs.existsSync(options.masterPath)) {
@@ -210,8 +215,12 @@ function ensureMaster(options) {
 }
 
 /**
+ * @typedef {object} PublishMasterMarkdownOptions
+ * @property {string} masterPath
+ */
+/**
  * @param {import('./lib/schema.mjs').AuditRunV3} report
- * @param {{ masterPath: string }} options
+ * @param {PublishMasterMarkdownOptions} options
  * @returns {{ path: string }}
  */
 export function publishMasterMarkdown(report, options) {

@@ -166,8 +166,12 @@ function deepFreeze(obj) {
 // envelope ({ actor, messageType, actionCode, payload, correlationId, target })
 // and returns a canonical, validated envelope.
 /**
+ * @typedef {object} NormalizeEnvelope
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Normaliza envelopes NERV de diferentes formatos para o formato canônico
- * @param {object} envelope - Envelope a ser normalizado (canônico ou legado)
+ * @param {NormalizeEnvelope} envelope - Envelope a ser normalizado (canônico ou legado)
  * @returns {object} Envelope NERV canônico e validado
  * @throws {Error} Se o envelope não puder ser normalizado
  * @sideEffects Nenhum - função pura
@@ -220,8 +224,12 @@ function normalize(envelope) {
 }
 
 /**
+ * @typedef {object} AssertValidEnvelope
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida envelope NERV (canônico ou achatado) lançando erro se inválido
- * @param {object} envelope - Envelope a ser validado
+ * @param {AssertValidEnvelope} envelope - Envelope a ser validado
  * @returns {boolean} true se válido
  * @throws {Error} Se o envelope for inválido
  * @sideEffects Pode lançar erro - função de validação

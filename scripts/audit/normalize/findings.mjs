@@ -78,7 +78,12 @@ function mapType(value) {
 }
 
 /**
- * @param {{ severity: string, type: string }} finding
+ * @typedef {object} InferChannelFinding
+ * @property {string} severity
+ * @property {string} type
+ */
+/**
+ * @param {InferChannelFinding} finding
  */
 function inferChannel(finding) {
     const criticalType = finding.type === 'bug' || finding.type === 'gap' || finding.type === 'falha de contrato';
@@ -87,8 +92,13 @@ function inferChannel(finding) {
 }
 
 /**
+ * @typedef {object} NormalizeFindingsOptions
+ * @property {string} masterPath
+ * @property {Date} now
+ */
+/**
  * @param {RawFinding[]} rawFindings
- * @param {{ masterPath: string, now?: Date }} options
+ * @param {NormalizeFindingsOptions} options
  * @returns {import('../lib/schema.mjs').AuditFindingV3[]}
  */
 export function normalizeFindings(rawFindings, options) {

@@ -10,9 +10,21 @@ function _ensureArray(value) {
 }
 
 /**
+ * @typedef {object} BuildWorkflowNextStepTaskParams
+ * @property {Record<string, unknown>} parentTask
+ * @property {string} parentTaskId
+ */
+/**
+ * @typedef {object} BuildWorkflowNextStepTaskOptions
+ * @property {*} [parentTask]
+ * @property {*} [parentTaskId]
+ * @property {*} [attemptId]
+ * @property {*} [nextStep]
+ */
+/**
  * Cria task filha determinística para o próximo step de workflow.
  *
- * @param {object} params
+ * @param {BuildWorkflowNextStepTaskParams} params
  * @param {Record<string, unknown>} params.parentTask
  * @param {string} params.parentTaskId
  * @param {string|null} [params.attemptId]
@@ -23,6 +35,7 @@ function _ensureArray(value) {
  * @param {Record<string, unknown>} [params.accumulatedContext]
  * @param {number} [params.nowMs]
  * @param {string} [params.source='self_generated']
+ * @param {BuildWorkflowNextStepTaskOptions} [options]
  * @returns {{
  *   childTask: Record<string, unknown>,
  *   childId: string,

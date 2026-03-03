@@ -851,9 +851,13 @@ class BiomechanicsEngine extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreateDriver
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância de BiomechanicsEngine.
  *
- * @param {object} driver - Instância do driver
+ * @param {CreateDriver} driver - Instância do driver
  * @returns {BiomechanicsEngine} Nova instância
  *
  * @example

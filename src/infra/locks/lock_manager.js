@@ -14,6 +14,7 @@ const MAX_ORPHAN_RECOVERY_ATTEMPTS = 3;
 
 /**
  * Gera o caminho absoluto para o arquivo de trava de um alvo.
+ * @param {*} target
  */
 function getLockPath(target) {
     const safeTarget = (target || 'global').toLowerCase();

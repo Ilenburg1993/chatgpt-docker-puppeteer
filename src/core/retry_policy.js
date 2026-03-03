@@ -30,15 +30,20 @@ function computeExponentialBackoffDelay(attempt, baseDelayMs, maxDelayMs, jitter
 }
 
 /**
+ * @typedef {object} RetryWithBackoffConfig
+ * @property {number} maxAttempts
+ * @property {number} baseDelayMs
+ * @property {number} maxDelayMs
+ * @property {number} jitterRatio
+ * @property {(ctx: { attempt: number} onRetry
+ * @property {number} maxAttempts
+ * @property {unknown} error
+ * @property {number} delayMs
+ */
+/**
  * @template T
  * @param {() => Promise<T>} operation
- * @param {{
- *   maxAttempts: number,
- *   baseDelayMs: number,
- *   maxDelayMs: number,
- *   jitterRatio?: number,
- *   onRetry?: (ctx: { attempt: number, maxAttempts: number, error: unknown, delayMs: number }) => Promise<void>|void
- * }} config
+ * @param {RetryWithBackoffConfig} config
  * @returns {Promise<T>}
  */
 async function retryWithBackoff(operation, config) {

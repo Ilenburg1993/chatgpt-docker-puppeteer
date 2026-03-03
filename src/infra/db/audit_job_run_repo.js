@@ -41,8 +41,12 @@ function _rowToRun(row) {
 }
 
 /**
+ * @typedef {object} CreateAuditJobRunInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: createAuditJobRun.
- * @param {object} input Input data for the AuditJobRun record.
+ * @param {CreateAuditJobRunInput} input Input data for the AuditJobRun record.
  * @returns {AuditJobRun|null}
  */
 function createAuditJobRun(input = {}) {
@@ -90,7 +94,13 @@ function getAuditJobRunById(id) {
 }
 
 /**
+ * @typedef {object} UpdateAuditJobRunUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: updateAuditJobRun.
+ * @param {string} id
+ * @param {UpdateAuditJobRunUpdates} [updates]
  * @returns {AuditJobRun|null}
  */
 function updateAuditJobRun(id, updates = {}) {
@@ -153,7 +163,13 @@ function updateAuditJobRun(id, updates = {}) {
 }
 
 /**
+ * @typedef {object} ListAuditJobRunsByJobIdOptions
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listAuditJobRunsByJobId.
+ * @param {*} jobId
+ * @param {ListAuditJobRunsByJobIdOptions} [options]
  * @returns {AuditJobRun[]}
  */
 function listAuditJobRunsByJobId(jobId, { limit = 50 } = {}) {

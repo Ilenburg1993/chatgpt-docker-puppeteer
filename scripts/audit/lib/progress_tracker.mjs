@@ -1,6 +1,11 @@
 // @ts-check
 /**
- * @param {{ stepsTotal: number, startedAt?: number }} options
+ * @typedef {object} CreateProgressTrackerOptions
+ * @property {number} stepsTotal
+ * @property {number} startedAt
+ */
+/**
+ * @param {CreateProgressTrackerOptions} options
   * @returns {object}
  */
 export function createProgressTracker(options) {

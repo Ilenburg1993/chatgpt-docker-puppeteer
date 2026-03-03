@@ -575,9 +575,13 @@ class FrameNavigator extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreateDriver
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância de FrameNavigator.
  *
- * @param {object} driver - Instância do driver
+ * @param {CreateDriver} driver - Instância do driver
  * @returns {FrameNavigator} Nova instância
  *
  * @example

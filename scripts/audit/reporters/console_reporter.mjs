@@ -1,6 +1,15 @@
 // @ts-check
 /**
- * @param {{ runId: string, profile: string, progress: unknown, eta: unknown, phase: string, message: string }} payload
+ * @typedef {object} PrintProgressPayload
+ * @property {string} runId
+ * @property {string} profile
+ * @property {unknown} progress
+ * @property {unknown} eta
+ * @property {string} phase
+ * @property {string} message
+ */
+/**
+ * @param {PrintProgressPayload} payload
   * @returns {void}
  */
 export function printProgress(payload) {
@@ -19,8 +28,14 @@ export function printProgress(payload) {
 }
 
 /**
+ * @typedef {object} PrintFinalReportOutputs
+ * @property {string} jsonPath
+ * @property {string|null} [masterPath]
+ * @property {string|null} [snapshotPath]
+ */
+/**
  * @param {import('../lib/schema.mjs').AuditRunV3} report
- * @param {{ jsonPath: string, masterPath?: string|null, snapshotPath?: string|null }} outputs
+ * @param {PrintFinalReportOutputs} outputs
   * @returns {void}
  */
 export function printFinalReport(report, outputs) {

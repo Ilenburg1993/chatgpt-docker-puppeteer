@@ -3,7 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * @param {{ historyPath: string, scopeKey?: string, ewmaAlpha?: number }} options
+ * @typedef {object} CreateEtaEstimatorOptions
+ * @property {string} historyPath
+ * @property {string} scopeKey
+ * @property {number} ewmaAlpha
+ */
+/**
+ * @param {CreateEtaEstimatorOptions} options
   * @returns {object}
  */
 export function createEtaEstimator(options) {

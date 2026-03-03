@@ -40,13 +40,23 @@ function _normalizePolicy(policy) {
 }
 
 /**
- * @param {{
- *   title?: string,
- *   description?: string,
- *   autonomy_mode?: string,
- *   policy?: Record<string, unknown>,
- *   context?: Record<string, unknown>
- * }} [input={}]
+ * @typedef {object} CreateMissionOptions
+ * @property {*} [title]
+ * @property {*} [description]
+ * @property {*} [autonomy_mode]
+ * @property {*} [policy]
+ */
+/**
+ * @typedef {object} CreateMissionInput
+ * @property {string} [title]
+ * @property {string} [description]
+ * @property {string} [autonomy_mode]
+ * @property {Record<string} [policy]
+ * @property {Record<string} [context]
+ */
+/**
+ * @param {CreateMissionInput} input={}]
+ * @param {CreateMissionOptions} [options]
   * @returns {Mission|null}
  */
 function createMission({
@@ -90,7 +100,13 @@ function createMission({
 }
 
 /**
+ * @typedef {object} ListMissionsOptions
+ * @property {*} [status]
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listMissions.
+ * @param {ListMissionsOptions} [options]
  * @returns {Mission[]}
  */
 function listMissions({ status = null, limit = 500 } = {}) {
@@ -161,7 +177,13 @@ function _rowToMission(row) {
 }
 
 /**
+ * @typedef {object} UpdateMissionUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: updateMission.
+ * @param {*} missionId
+ * @param {UpdateMissionUpdates} [updates]
  * @returns {Mission|null}
  */
 function updateMission(missionId, updates = {}) {
@@ -237,6 +259,7 @@ function updateMission(missionId, updates = {}) {
 
 /**
  * Função exportada: deleteMission.
+ * @param {*} missionId
  * @returns {boolean}
  */
 function deleteMission(missionId) {

@@ -12,8 +12,12 @@ import { buildProposalV3 } from './triage/proposal_engine_v3.mjs';
 const MCP_URL = process.env.MCP_DIAG_URL ? `${process.env.MCP_DIAG_URL}/api/mcp` : 'http://localhost:3008/api/mcp';
 
 /**
+ * @typedef {object} CallMcpParams
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * @param {string} method
- * @param {object} params
+ * @param {CallMcpParams} params
  * @param {number} id
  * @returns {Promise<any|null>}
  */
@@ -41,12 +45,14 @@ async function callMcp(method, params, id) {
 }
 
 /**
+ * @typedef {object} DeterministicFallbackOptions
+ * @property {boolean} proposeDiffs
+ * @property {'basic'|'standard'|'deep'} proposalDepth
+ * @property {string} masterPath
+ */
+/**
  * @param {AuditFindingV3} finding
- * @param {{
- *   proposeDiffs: boolean,
- *   proposalDepth: 'basic'|'standard'|'deep',
- *   masterPath?: string,
- * }} options
+ * @param {DeterministicFallbackOptions} options
  */
 function deterministicFallback(finding, options) {
     if (!finding.proposal || typeof finding.proposal !== 'object') {
@@ -143,25 +149,25 @@ function deterministicFallback(finding, options) {
 }
 
 /**
+ * @typedef {object} TriageFindingsOptions
+ * @property {boolean} enabled
+ * @property {number} maxMcpFindings
+ * @property {boolean} proposeDiffs
+ * @property {'bug-first'|'all'} focusMode
+ * @property {'basic'|'standard'|'deep'} proposalDepth
+ * @property {'off'|'on'} cloudFallback
+ * @property {string} masterPath
+ * @property {number} maxDurationMs
+ * @property {(payload: { phase: 'triage-intelligence'} onProgress
+ * @property {number} processed
+ * @property {number} total
+ * @property {number} percent
+ * @property {'mcp'|'fallback'|'disabled'|'timeout'} mode
+ * @property {string|null} findingId
+ */
+/**
  * @param {AuditFindingV3[]} findings
- * @param {{
- *   enabled?: boolean,
- *   maxMcpFindings?: number,
- *   proposeDiffs?: boolean,
- *   focusMode?: 'bug-first'|'all',
- *   proposalDepth?: 'basic'|'standard'|'deep',
- *   cloudFallback?: 'off'|'on',
- *   masterPath?: string,
- *   maxDurationMs?: number,
- *   onProgress?: (payload: {
- *     phase: 'triage-intelligence',
- *     processed: number,
- *     total: number,
- *     percent: number,
- *     mode: 'mcp'|'fallback'|'disabled'|'timeout',
- *     findingId: string|null
- *   }) => void,
- * }} [options]
+ * @param {TriageFindingsOptions} [options]
  * @returns {Promise<{ findings: AuditFindingV3[], usedMcp: boolean, degraded: boolean, warnings: string[] }>}
  */
 export async function triageFindings(findings, options = {}) {

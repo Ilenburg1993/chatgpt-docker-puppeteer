@@ -18,7 +18,12 @@ async function _listLegacyQueueFiles() {
 }
 
 /**
+ * @typedef {object} ImportLegacyQueueFromDiskOptions
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: importLegacyQueueFromDisk.
+ * @param {ImportLegacyQueueFromDiskOptions} [options]
  * @returns {Promise<void>}
  */
 async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {

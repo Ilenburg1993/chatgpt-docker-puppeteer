@@ -234,16 +234,18 @@ function generateSuggestions(snippetFile) {
 }
 
 /**
- * @param {{
- *   snippetFile: string,
- *   roots: string[],
- *   maxImports: number,
- *   maxCandidates: number,
- *   maxBlocks: number,
- *   minBlockOccurrences: number,
- *   minScore: number,
- *   insertMissing: boolean
- * }} options
+ * @typedef {object} GenerateLearningReportOptions
+ * @property {string} snippetFile
+ * @property {string[]} roots
+ * @property {number} maxImports
+ * @property {number} maxCandidates
+ * @property {number} maxBlocks
+ * @property {number} minBlockOccurrences
+ * @property {number} minScore
+ * @property {boolean} insertMissing
+ */
+/**
+ * @param {GenerateLearningReportOptions} options
  */
 function generateLearningReport({ snippetFile, roots, maxImports, maxCandidates, maxBlocks, minBlockOccurrences, minScore, insertMissing }) {
     const catalog = JSON.parse(fs.readFileSync(snippetFile, 'utf8'));
@@ -372,19 +374,21 @@ function generateLearningReport({ snippetFile, roots, maxImports, maxCandidates,
 }
 
 /**
- * @param {{
- *   snippetFile: string,
- *   format: string,
- *   name: string,
- *   prefix: string,
- *   scope: string,
- *   description: string,
- *   template: string,
- *   include: string,
- *   exclude: string,
- *   fileTemplate: boolean,
- *   insert: boolean
- * }} options
+ * @typedef {object} RunScaffoldOptions
+ * @property {string} snippetFile
+ * @property {string} format
+ * @property {string} name
+ * @property {string} prefix
+ * @property {string} scope
+ * @property {string} description
+ * @property {string} template
+ * @property {string} include
+ * @property {string} exclude
+ * @property {boolean} fileTemplate
+ * @property {boolean} insert
+ */
+/**
+ * @param {RunScaffoldOptions} options
  */
 function runScaffold(options) {
     const name = options.name.trim();
@@ -638,16 +642,18 @@ function parseCsvList(value) {
 }
 
 /**
- * @param {{
- *   name: string,
- *   prefix: string,
- *   template: string,
- *   scope: string,
- *   description: string,
- *   include: string,
- *   exclude: string,
- *   fileTemplate: boolean
- * }} options
+ * @typedef {object} BuildSnippetDefinitionOptions
+ * @property {string} name
+ * @property {string} prefix
+ * @property {string} template
+ * @property {string} scope
+ * @property {string} description
+ * @property {string} include
+ * @property {string} exclude
+ * @property {boolean} fileTemplate
+ */
+/**
+ * @param {BuildSnippetDefinitionOptions} options
  */
 function buildSnippetDefinition(options) {
     const defaults = getTemplateDefaults(options.template.trim().toLowerCase());
@@ -675,7 +681,12 @@ function buildSnippetDefinition(options) {
 }
 
 /**
+ * @typedef {object} AnalyzeRepositorySignalsOptions
+ * @property {*} [minBlockOccurrences]
+ */
+/**
  * @param {string[]} roots
+ * @param {AnalyzeRepositorySignalsOptions} [options]
  */
 function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
     const files = collectSourceFiles(roots);
@@ -757,6 +768,7 @@ function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
  * @param {string} text
  * @param {string} file
  * @param {Map<string, {signature: string, hits: number, files: string[], example: string[]}>} repeatedBlockMap
+ * @param {*} repeatedBlockMap
  */
 function collectRepeatedBlockWindows(text, file, repeatedBlockMap) {
     const lines = text
@@ -818,12 +830,17 @@ function normalizeBlockLines(lines) {
 }
 
 /**
- * @param {{
- *   candidate: { imports?: string[], patterns?: string[], sequences?: string[], minHits: number },
- *   importHits: number,
- *   patternHits: number,
- *   sequenceHits: number
- * }} options
+ * @typedef {object} ScoreLearningCandidateOptions
+ * @property {{ imports?: string[]} candidate
+ * @property {string[]} patterns
+ * @property {string[]} sequences
+ * @property {number} minHits
+ * @property {number} importHits
+ * @property {number} patternHits
+ * @property {number} sequenceHits
+ */
+/**
+ * @param {ScoreLearningCandidateOptions} options
  */
 function scoreLearningCandidate({ candidate, importHits, patternHits, sequenceHits }) {
     const weightedParts = [];
@@ -862,6 +879,7 @@ function scoreLearningCandidate({ candidate, importHits, patternHits, sequenceHi
  * @param {{ signature: string, hits: number, files: string[], example: string[] }[]} blocks
  * @param {Set<string>} catalogPrefixes
  * @param {number} maxCandidates
+ * @param {*} blocks
  */
 function suggestBlockOpportunities(blocks, catalogPrefixes, maxCandidates) {
     const opportunities = [];

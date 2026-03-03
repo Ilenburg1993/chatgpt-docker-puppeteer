@@ -29,6 +29,7 @@ const colors = {
 // ============================================================================
 /**
  * Função exportada: parseEnvFile.
+ * @param {*} filePath
  * @returns {object}
  */
 function parseEnvFile(filePath) {

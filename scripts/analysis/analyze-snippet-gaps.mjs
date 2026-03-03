@@ -114,7 +114,12 @@ if (strict && (report.issues.length > 0 || report.gaps.length > 0)) {
 }
 
 /**
- * @param {{ snippetFile: string, expectedFamilies: string[] }} options
+ * @typedef {object} AnalyzeSnippetCatalogOptions
+ * @property {string} snippetFile
+ * @property {string[]} expectedFamilies
+ */
+/**
+ * @param {AnalyzeSnippetCatalogOptions} options
  */
 function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
     /** @type {Record<string, SnippetDefinition>} */
@@ -240,6 +245,7 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
 
 /**
  * @param {{ prefix: string, snippet: string }[]} prefixes
+ * @param {*} prefixes
  */
 function collectDuplicatePrefixes(prefixes) {
     const map = new Map();

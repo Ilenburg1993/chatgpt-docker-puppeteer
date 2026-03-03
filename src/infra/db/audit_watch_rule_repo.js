@@ -48,7 +48,13 @@ function getAuditWatchRuleById(id) {
 }
 
 /**
+ * @typedef {object} ListAuditWatchRulesOptions
+ * @property {*} [enabledOnly]
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listAuditWatchRules.
+ * @param {ListAuditWatchRulesOptions} [options]
  * @returns {AuditWatchRule[]}
  */
 function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
@@ -67,7 +73,12 @@ function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
 }
 
 /**
+ * @typedef {object} UpsertAuditWatchRuleInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: upsertAuditWatchRule.
+ * @param {UpsertAuditWatchRuleInput} [input]
  * @returns {AuditWatchRule|null}
  */
 function upsertAuditWatchRule(input = {}) {

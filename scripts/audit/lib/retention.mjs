@@ -3,11 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * @param {{
- *   runsRoot: string,
- *   maxRuns?: number,
- *   keepRunId?: string,
- * }} options
+ * @typedef {object} PruneAuditRunsOptions
+ * @property {string} runsRoot
+ * @property {number} maxRuns
+ * @property {string} keepRunId
+ */
+/**
+ * @param {PruneAuditRunsOptions} options
   * @returns {object}
  */
 export function pruneAuditRuns(options) {

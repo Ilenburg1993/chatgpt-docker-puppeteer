@@ -4,9 +4,13 @@ import { runSinglePassValidation } from './scan_engine.js';
 import { log } from '#core/logger';
 
 /**
+ * @typedef {object} ValidateTaskResultTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Realiza a auditoria completa de qualidade de um resultado em disco.
  *
- * @param {object} task - Objeto da tarefa (Schema V4).
+ * @param {ValidateTaskResultTask} task - Objeto da tarefa (Schema V4).
  * @param {string} filePath - Caminho absoluto para o arquivo de resposta.
  * @param {AbortSignal} [signal] - Sinal soberano para interrupção imediata.
  * @returns {Promise<object>} { ok: boolean, reason: string|null }

@@ -15,9 +15,13 @@
  */
 
 /**
+ * @typedef {object} ValidateOpenAIRequestBody
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Validates OpenAI Chat Completions request body
  *
- * @param {object} body - Request body from client
+ * @param {ValidateOpenAIRequestBody} body - Request body from client
  * @throws {Error} with openaiError property if validation fails
  * @returns {true} if validation passes
  *
@@ -50,9 +54,13 @@ export function validateOpenAIRequest(body) {
 }
 
 /**
+ * @typedef {object} TranslateRequestToOllamaOpenaiReq
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Translates OpenAI Chat Completions request to Ollama /api/generate format
  *
- * @param {object} openaiReq - OpenAI request body
+ * @param {TranslateRequestToOllamaOpenaiReq} openaiReq - OpenAI request body
  * @param {Array<{role: string, content: string}>} openaiReq.messages - Messages array
  * @param {string} [openaiReq.model] - Model name
  * @param {number} [openaiReq.temperature] - Temperature (0-1)
@@ -103,12 +111,21 @@ export function translateRequestToOllama(openaiReq) {
 }
 
 /**
+ * @typedef {object} TranslateResponseToOpenAIOllamaResp
+ * @property {string} response
+ * @property {string} model
+ */
+/**
+ * @typedef {object} TranslateResponseToOpenAIOriginalReq
+ * @property {unknown[]} messages
+ */
+/**
  * Translates Ollama /api/generate response to OpenAI Chat Completions format
  *
- * @param {object} ollamaResp - Ollama response body
+ * @param {TranslateResponseToOpenAIOllamaResp} ollamaResp - Ollama response body
  * @param {string} ollamaResp.response - Generated text
  * @param {string} ollamaResp.model - Model used
- * @param {object} originalReq - Original OpenAI request (for token estimation)
+ * @param {TranslateResponseToOpenAIOriginalReq} originalReq - Original OpenAI request (for token estimation)
  * @param {unknown[]} originalReq.messages - Messages array
  * @returns {object} OpenAI Chat Completions response
  *
@@ -201,6 +218,7 @@ export function buildOpenAIError(message, type = 'invalid_request_error', code =
 /**
  * Helper: Creates validation error with OpenAI error format attached
  * @private
+ * @param {*} message
  */
 function buildValidationError(message) {
     const err = new Error(message);

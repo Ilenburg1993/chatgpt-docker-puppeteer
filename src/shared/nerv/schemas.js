@@ -26,8 +26,12 @@ function violation(message) {
 }
 
 /**
+ * @typedef {object} IsPlainObjectObj
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Verifica se valor é um objeto plano (não array, não null)
- * @param {object} obj - Valor a ser verificado
+ * @param {IsPlainObjectObj} obj - Valor a ser verificado
  * @returns {boolean} true se for objeto plano
  * @sideEffects Nenhum - função pura
  */
@@ -50,8 +54,12 @@ function isUUID(value) {
  * ------------------------------------------------------------------------ */
 
 /**
+ * @typedef {object} ValidateStructureEnvelope
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida a estrutura básica de um envelope NERV canônico
- * @param {object} envelope - Envelope a ser validado
+ * @param {ValidateStructureEnvelope} envelope - Envelope a ser validado
  * @throws {Error} Se a estrutura violar o esquema
  * @sideEffects Pode lançar erro - função de validação
  */
@@ -96,8 +104,12 @@ function validateStructure(envelope) {
  * ------------------------------------------------------------------------ */
 
 /**
+ * @typedef {object} ValidateOntologyEnvelope
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida a ontologia e semântica de um envelope NERV
- * @param {object} envelope - Envelope a ser validado
+ * @param {ValidateOntologyEnvelope} envelope - Envelope a ser validado
  * @throws {Error} Se a ontologia violar as regras do protocolo
  * @sideEffects Pode lançar erro - função de validação
  */
@@ -157,8 +169,12 @@ function validateOntology(envelope) {
 const FORBIDDEN_FIELDS = ['status', 'result', 'success', 'error', 'response', 'return_value', 'exception', 'completed'];
 
 /**
+ * @typedef {object} ValidateProhibitionsEnvelope
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida proibições semânticas em envelope NERV (campos proibidos)
- * @param {object} envelope - Envelope a ser verificado
+ * @param {ValidateProhibitionsEnvelope} envelope - Envelope a ser verificado
  * @throws {Error} Se encontrar campos semânticos proibidos
  * @sideEffects Pode lançar erro - função de validação negativa
  */
@@ -183,8 +199,12 @@ function validateProhibitions(envelope) {
  * ------------------------------------------------------------------------ */
 
 /**
+ * @typedef {object} ValidateEnvelopeEnvelope
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida completamente um envelope NERV (estrutura + ontologia + proibições)
- * @param {object} envelope - Envelope NERV canônico a ser validado
+ * @param {ValidateEnvelopeEnvelope} envelope - Envelope NERV canônico a ser validado
  * @returns {boolean} true se válido
  * @throws {Error} Se qualquer aspecto do envelope violar o esquema
  * @sideEffects Pode lançar erro - função de validação completa
@@ -232,8 +252,12 @@ function validateRobotIdentity(identity) {
 }
 
 /**
+ * @typedef {object} ValidateIPCEnvelopeEnvelope
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida um envelope de IPC (InterProcess Communication) - wrapper legado
- * @param {object} envelope - Envelope IPC a ser validado
+ * @param {ValidateIPCEnvelopeEnvelope} envelope - Envelope IPC a ser validado
  * @returns {boolean} true se válido
  * @throws {Error} Se o envelope violar o esquema
  * @sideEffects Pode lançar erro - função de validação

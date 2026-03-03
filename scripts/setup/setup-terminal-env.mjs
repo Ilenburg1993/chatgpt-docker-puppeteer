@@ -34,8 +34,12 @@ function detectEnvironment() {
 }
 
 /**
+ * @typedef {object} GeneratePromptConfigEnv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Gera configuração do prompt do terminal
- * @param {object} env - Informações do ambiente
+ * @param {GeneratePromptConfigEnv} env - Informações do ambiente
  * @returns {string} Comando para configurar o prompt
  */
 function generatePromptConfig(env) {
@@ -59,8 +63,12 @@ export PROMPT_COMMAND='echo -e "\\e[1;32m💻 Ambiente de Desenvolvimento\\e[0m"
 }
 
 /**
+ * @typedef {object} GenerateAliasesEnv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Gera aliases úteis baseados no ambiente
- * @param {object} env - Informações do ambiente
+ * @param {GenerateAliasesEnv} env - Informações do ambiente
  * @returns {string} Comandos de alias
  */
 function generateAliases(env) {

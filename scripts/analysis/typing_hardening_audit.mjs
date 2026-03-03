@@ -22,7 +22,13 @@ const AREA_THRESHOLDS = {
     overall: 100,
 };
 
-const PUBLIC_ROOTS = ['src/shared', 'src/inference_gateway', 'src/audit_agent', 'src/server/api', 'src/integration/lsp'];
+const PUBLIC_ROOTS = [
+    'src/shared',
+    'src/inference_gateway',
+    'src/audit_agent',
+    'src/server/api',
+    'src/integration/lsp',
+];
 
 /** Descobre dinamicamente todas as lanes strict presentes na raiz do projeto. */
 const STRICT_CONFIGS = fs
@@ -36,7 +42,11 @@ const STRICT_CONFIGS = fs
  */
 function isLegacyFile(file) {
     const normalized = file.replace(/\\/g, '/');
-    return normalized.includes('/legacy/') || normalized.startsWith('scripts/legacy/') || normalized.startsWith('tests/legacy/');
+    return (
+        normalized.includes('/legacy/') ||
+        normalized.startsWith('scripts/legacy/') ||
+        normalized.startsWith('tests/legacy/')
+    );
 }
 
 /**
@@ -103,7 +113,12 @@ const legacyFiles = [
     ...collectJsSourceFiles(['tests']).filter(isLegacyFile),
 ];
 
-const requestedScope = String(values.scope || 'full').trim().toLowerCase() === 'public' ? 'public' : 'full';
+const requestedScope =
+    String(values.scope || 'full')
+        .trim()
+        .toLowerCase() === 'public'
+        ? 'public'
+        : 'full';
 const publicScopeFiles = collectJsSourceFiles(PUBLIC_ROOTS).filter(file => !isLegacyFile(file));
 const jsdocReport = analyzeJSDocCoverage({ files: combinedFiles, scope: 'full' });
 const publicJSDocReport = analyzeJSDocCoverage({ files: publicScopeFiles, scope: 'full' });
@@ -130,8 +145,7 @@ for (const config of STRICT_CONFIGS) {
 
 const publicAnyTagsTotal = jsdocReport.files.reduce(
     (total, fileReport) =>
-        total +
-        fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
+        total + fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
     0
 );
 
@@ -144,8 +158,7 @@ const publicUnknownTagsTotal = jsdocReport.files.reduce(
 
 const publicScopePublicAnyTagsTotal = publicJSDocReport.files.reduce(
     (total, fileReport) =>
-        total +
-        fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
+        total + fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
     0
 );
 
@@ -238,7 +251,9 @@ if (String(values.format || 'console').toLowerCase() === 'json') {
         console.log(
             `@ts-check scripts: ${scriptsCoverage.withTsCheck}/${scriptsCoverage.total} (${scriptsCoverage.coveragePct}%)`
         );
-        console.log(`@ts-check tests: ${testsCoverage.withTsCheck}/${testsCoverage.total} (${testsCoverage.coveragePct}%)`);
+        console.log(
+            `@ts-check tests: ${testsCoverage.withTsCheck}/${testsCoverage.total} (${testsCoverage.coveragePct}%)`
+        );
         console.log(
             `@ts-check overall: ${overallCoverage.withTsCheck}/${overallCoverage.total} (${overallCoverage.coveragePct}%)`
         );

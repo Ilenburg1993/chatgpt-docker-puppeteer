@@ -54,7 +54,12 @@ function _setBackendEnabled(id, enabled) {
 }
 
 /**
+ * @typedef {object} UpsertInferenceBackendInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: upsertInferenceBackend.
+ * @param {UpsertInferenceBackendInput} [input]
  * @returns {InferenceBackend|null}
  */
 function upsertInferenceBackend(input = {}) {
@@ -114,7 +119,13 @@ function getInferenceBackendById(id) {
 }
 
 /**
+ * @typedef {object} ListInferenceBackendsOptions
+ * @property {*} [enabledOnly]
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listInferenceBackends.
+ * @param {ListInferenceBackendsOptions} [options]
  * @returns {InferenceBackend[]}
  */
 function listInferenceBackends({ enabledOnly = false, limit = 100 } = {}) {
@@ -134,6 +145,8 @@ function listInferenceBackends({ enabledOnly = false, limit = 100 } = {}) {
 
 /**
  * Função exportada: setInferenceBackendEnabled.
+ * @param {string} id
+ * @param {boolean} enabled
  * @returns {InferenceBackend|null}
  */
 function setInferenceBackendEnabled(id, enabled) {

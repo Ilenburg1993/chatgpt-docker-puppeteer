@@ -262,10 +262,14 @@ export class OllamaCircuitBreaker {
 const circuitBreakers = new Map();
 
 /**
+ * @typedef {object} GetCircuitBreakerOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Get circuit breaker for endpoint (singleton)
  *
  * @param {string} endpoint - Endpoint identifier ('cloud' or 'local')
- * @param {object} [options] - Circuit breaker options (only used if creating new instance)
+ * @param {GetCircuitBreakerOptions} [options] - Circuit breaker options (only used if creating new instance)
  * @returns {OllamaCircuitBreaker} Circuit breaker instance
  *
  * @example

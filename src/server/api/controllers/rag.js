@@ -25,19 +25,28 @@ import { resolveRagScopeConfig } from '../../../../tools/rag/lib/scope_config.mj
 import { asRecord } from '#types/guards';
 
 /**
+ * @typedef {object} HandleRagAskReq
+ * @property {object} body
+ * @property {string} body
+ */
+/**
+ * @typedef {object} HandleRagAskRes
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Handler para POST /api/rag/ask - Busca semântica com output em Markdown.
  *
  * **Side-effects:** Consulta cache RAG, pode executar busca vetorial.
  * **Semântica:** Formata resultados como documento Markdown coeso para LLMs.
  *
- * @param {object} req - Request Express
+ * @param {HandleRagAskReq} req - Request Express
  * @param {object} req.body - Body com parâmetros de busca
  * @param {string} req.body.query - Query de busca obrigatória
  * @param {number} [req.body.topK=8] - Número máximo de chunks
  * @param {string} [req.body.pathPrefix] - Filtro por prefixo de caminho
  * @param {string|string[]} [req.body.ext] - Filtro por extensão de arquivo
  * @param {string|string[]} [req.body.tags] - Filtro por tags
- * @param {object} res - Response Express
+ * @param {HandleRagAskRes} res - Response Express
  * @returns {Promise<void>}
  */
 export async function handleRagAsk(req, res) {
@@ -81,17 +90,26 @@ export async function handleRagAsk(req, res) {
 }
 
 /**
+ * @typedef {object} HandleRagQueryReq
+ * @property {object} body
+ * @property {string} body
+ */
+/**
+ * @typedef {object} HandleRagQueryRes
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Handler para POST /api/rag/query - Busca raw com resultados estruturados.
  *
  * **Side-effects:** Consulta cache RAG, pode executar busca vetorial.
  * **Semântica:** Retorna chunks estruturados sem formatação Markdown.
  *
- * @param {object} req - Request Express
+ * @param {HandleRagQueryReq} req - Request Express
  * @param {object} req.body - Body com parâmetros de busca
  * @param {string} req.body.query - Query de busca obrigatória
  * @param {number} [req.body.topK=8] - Número máximo de resultados
  * @param {object} [req.body.filters] - Filtros adicionais de busca
- * @param {object} res - Response Express
+ * @param {HandleRagQueryRes} res - Response Express
  * @returns {Promise<void>}
  */
 export async function handleRagQuery(req, res) {
@@ -150,13 +168,21 @@ export async function handleRagQuery(req, res) {
 }
 
 /**
+ * @typedef {object} HandleRagHealthReq
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} HandleRagHealthRes
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Handler para GET /api/rag/health - Health check do sistema RAG.
  *
  * **Side-effects:** Verifica conectividade com Ollama e LanceDB.
  * **Semântica:** Status operacional completo do sistema RAG.
  *
- * @param {object} req - Request Express
- * @param {object} res - Response Express
+ * @param {HandleRagHealthReq} req - Request Express
+ * @param {HandleRagHealthRes} res - Response Express
  * @returns {Promise<void>}
  */
 export async function handleRagHealth(req, res) {
@@ -178,15 +204,23 @@ export async function handleRagHealth(req, res) {
 }
 
 /**
+ * @typedef {object} HandleRagIndexReq
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} HandleRagIndexRes
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Handler para POST /api/rag/index - Trigger reindexação em background.
  *
  * **Side-effects:** Inicia processo de indexação assíncrono (não bloqueante).
  * **Semântica:** Reindexa workspace completo para atualizar cache RAG.
  *
- * @param {object} req - Request Express
+ * @param {HandleRagIndexReq} req - Request Express
  * @param {object} [req.body] - Body opcional
  * @param {string} [req.body.root] - Diretório raiz para indexação
- * @param {object} res - Response Express
+ * @param {HandleRagIndexRes} res - Response Express
  * @returns {Promise<void>}
  */
 export async function handleRagIndex(req, res) {
@@ -246,12 +280,21 @@ export async function handleRagIndex(req, res) {
 }
 
 /**
+ * @typedef {object} HandleRagHybridSearchReq
+ * @property {object} body
+ * @property {string} body
+ */
+/**
+ * @typedef {object} HandleRagHybridSearchRes
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Handler para POST /api/rag/hybrid - Busca híbrida (Vetor + FTS + Reranking + MMR).
  *
  * **Side-effects:** Executa busca vetorial, full-text search e reranking.
  * **Semântica:** Combina múltiplas estratégias de busca para máxima relevância.
  *
- * @param {object} req - Request Express
+ * @param {HandleRagHybridSearchReq} req - Request Express
  * @param {object} req.body - Body com parâmetros de busca híbrida
  * @param {string} req.body.query - Query de busca obrigatória
  * @param {number} [req.body.topK] - Número máximo de resultados
@@ -262,7 +305,7 @@ export async function handleRagIndex(req, res) {
  * @param {object} [req.body.rerankWeights] - Pesos para reranking
  * @param {boolean} [req.body.mmr] - Habilitar MMR (Maximal Marginal Relevance)
  * @param {number} [req.body.mmrLambda] - Lambda para MMR
- * @param {object} res - Response Express
+ * @param {HandleRagHybridSearchRes} res - Response Express
  * @returns {Promise<void>}
  */
 export async function handleRagHybridSearch(req, res) {
@@ -345,13 +388,21 @@ export async function handleRagHybridSearch(req, res) {
 }
 
 /**
+ * @typedef {object} HandleRagStatsReq
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} HandleRagStatsRes
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Handler para GET /api/rag/stats - Estatísticas do cache de embeddings.
  *
  * **Side-effects:** Lê estatísticas do cache RAG.
  * **Semântica:** Métricas de performance e eficiência do sistema de cache.
  *
- * @param {object} req - Request Express
- * @param {object} res - Response Express
+ * @param {HandleRagStatsReq} req - Request Express
+ * @param {HandleRagStatsRes} res - Response Express
  * @returns {Promise<void>}
  */
 export async function handleRagStats(req, res) {

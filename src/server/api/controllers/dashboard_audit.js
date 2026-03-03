@@ -109,10 +109,14 @@ function _enrichPatch(patch) {
 }
 
 /**
+ * @typedef {object} FetchApplyReadinessActor
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Avalia readiness de apply para um patch usando o control plane.
  * Retorna null se patch não for encontrado ou em caso de erro.
  * @param {string} patchId
- * @param {object} actor
+ * @param {FetchApplyReadinessActor} actor
  * @returns {Promise<object|null>}
  */
 async function _fetchApplyReadiness(patchId, actor) {

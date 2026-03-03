@@ -51,6 +51,7 @@ const moduleStats = {
 
 /**
  * Normalize file path relative to root
+ * @param {*} filePath
  */
 function normalizePath(filePath) {
     return path.relative(ROOT, filePath).replace(/\\/g, '/');
@@ -58,6 +59,7 @@ function normalizePath(filePath) {
 
 /**
  * Get module category (nerv, kernel, driver, etc.)
+ * @param {*} filePath
  */
 function getModuleCategory(filePath) {
     const normalized = normalizePath(filePath);
@@ -90,6 +92,7 @@ function getModuleCategory(filePath) {
 
 /**
  * Extract dependencies from a source file
+ * @param {*} sourceFile
  */
 function extractDependencies(sourceFile) {
     const _filePath = normalizePath(sourceFile.fileName);
@@ -123,6 +126,7 @@ function extractDependencies(sourceFile) {
 
 /**
  * Extract NERV event emissions and listeners
+ * @param {*} sourceFile
  */
 function extractNervEvents(sourceFile) {
     const _filePath = normalizePath(sourceFile.fileName);
@@ -245,6 +249,8 @@ function findCircularDependencies() {
 
 /**
  * Resolve import path
+ * @param {*} fromFile
+ * @param {*} importPath
  */
 function resolveImport(fromFile, importPath) {
     if (importPath.startsWith('.')) {

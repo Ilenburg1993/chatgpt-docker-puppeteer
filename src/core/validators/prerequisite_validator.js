@@ -201,9 +201,13 @@ function validateBrowserPool(browserPool) {
 }
 
 /**
+ * @typedef {object} ValidateBrowserConnectionBrowser
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida se browser instance está conectada e utilizável.
  *
- * @param {object} browser - Puppeteer Browser
+ * @param {ValidateBrowserConnectionBrowser} browser - Puppeteer Browser
  * @returns {object} ValidationResult
  */
 function validateBrowserConnection(browser) {
@@ -224,10 +228,15 @@ function validateBrowserConnection(browser) {
 }
 
 /**
+ * @typedef {object} ValidateDriverExecutionOptions
+ * @property {BrowserPoolManager} browserPool
+ * @property {PuppeteerPage} page
+ */
+/**
  * Valida pré-requisitos para execução de Driver.
  * Verifica: Browser Pool, Circuit Breaker, Página, Interface LLM.
  *
- * @param {object} options
+ * @param {ValidateDriverExecutionOptions} options
  * @param {BrowserPoolManager} options.browserPool
  * @param {PuppeteerPage} options.page
  * @returns {Promise<object>} ValidationResult
@@ -255,9 +264,15 @@ async function validateDriverExecution({ browserPool, page }) {
 }
 
 /**
+ * @typedef {object} ValidateKernelExecutionOptions
+ * @property {object} executionEngine
+ * @property {object} nervBridge
+ * @property {object} telemetry
+ */
+/**
  * Valida pré-requisitos para execução do Kernel Loop.
  *
- * @param {object} options
+ * @param {ValidateKernelExecutionOptions} options
  * @param {object} options.executionEngine
  * @param {object} options.nervBridge
  * @param {object} options.telemetry

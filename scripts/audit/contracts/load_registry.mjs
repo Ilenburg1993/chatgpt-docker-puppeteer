@@ -79,7 +79,12 @@ function validateContract(contract, index, sourcePath) {
 }
 
 /**
- * @param {{ registryPath?: string, domainsFilter?: string[] }} [options]
+ * @typedef {object} LoadContractRegistryOptions
+ * @property {string} registryPath
+ * @property {string[]} domainsFilter
+ */
+/**
+ * @param {LoadContractRegistryOptions} [options]
  * @returns {{
  *   registryPath: string,
  *   registry: unknown,

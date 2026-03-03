@@ -60,6 +60,8 @@ const sleep = ms =>
 
 /**
  * Escrita Atômica com Retry (Proteção Windows EPERM)
+ * @param {*} filepath
+ * @param {*} content
  */
 async function atomicWrite(filepath, content) {
     const tmp = `${filepath}.tmp.${crypto.randomBytes(4).toString('hex')}`;
@@ -89,6 +91,7 @@ async function atomicWrite(filepath, content) {
 
 /**
  * Normaliza códigos de idioma (ex: 'pt-BR' -> 'pt', 'EN_US' -> 'en')
+ * @param {*} langCode
  */
 function normalizeLang(langCode) {
     if (!langCode || typeof langCode !== 'string') {
@@ -129,6 +132,8 @@ async function loadVocab() {
 
 /**
  * Retorna termos de uma categoria com fallback hierárquico para o Inglês.
+ * @param {*} category
+ * @param {*} [langCode]
   * @returns {Promise<void>}
  */
 async function getTerms(category, langCode = 'en') {
@@ -153,6 +158,9 @@ async function getTerms(category, langCode = 'en') {
 
 /**
  * Aprende e persiste um novo termo após validação semântica.
+ * @param {*} langCode
+ * @param {*} category
+ * @param {*} term
   * @returns {Promise<void>}
  */
 async function learnTerm(langCode, category, term) {

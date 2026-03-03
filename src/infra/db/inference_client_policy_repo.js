@@ -45,7 +45,12 @@ function _rowToPolicy(row) {
 }
 
 /**
+ * @typedef {object} UpsertInferenceClientPolicyInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: upsertInferenceClientPolicy.
+ * @param {UpsertInferenceClientPolicyInput} [input]
  * @returns {InferenceClientPolicy|null}
  */
 function upsertInferenceClientPolicy(input = {}) {
@@ -109,6 +114,7 @@ function upsertInferenceClientPolicy(input = {}) {
 
 /**
  * Função exportada: getInferenceClientPolicyByTag.
+ * @param {*} clientTag
  * @returns {InferenceClientPolicy|null}
  */
 function getInferenceClientPolicyByTag(clientTag) {
@@ -119,7 +125,13 @@ function getInferenceClientPolicyByTag(clientTag) {
 }
 
 /**
+ * @typedef {object} ListInferenceClientPoliciesOptions
+ * @property {*} [enabledOnly]
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listInferenceClientPolicies.
+ * @param {ListInferenceClientPoliciesOptions} [options]
  * @returns {InferenceClientPolicy[]}
  */
 function listInferenceClientPolicies({ enabledOnly = false, limit = 100 } = {}) {

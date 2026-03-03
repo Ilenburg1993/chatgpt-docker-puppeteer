@@ -106,6 +106,7 @@ import fs from 'node:fs/promises';
  * Minimal DB interface expected from `getDb()` (better-sqlite3-like).
  * @typedef {object} DBInterface
  * @property {function(string): {get: function(...any): unknown, all: function(...any): unknown[], run: function(...any): {changes?: number}}} prepare
+ * @param {number} ms
  */
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -137,11 +138,20 @@ function _computeBackoffMs({ iteration = 1, minMs = 2000, maxMs = 120000 } = {})
 }
 
 /**
+ * @typedef {object} ReadAttemptOutputTextOptions
+ * @property {string|number} taskId
+ * @property {string|number} attemptId
+ * @property {string|Object} resultJson
+ * @property {number} maxRetries
+ * @property {number} retryDelayMs
+ */
+/**
  * Read the most relevant textual output for an attempt.
  * ✅ P0-14: Retry logic para lidar com race entre putText() e read.
  * Sources checked: response_v2_json artifact, response_text artifact, legacy result_json storage file.
  * @private
- * @param {{taskId?: string|number, attemptId?: string|number, resultJson?: string|Object, maxRetries?: number, retryDelayMs?: number}} [opts]
+ * @param {ReadAttemptOutputTextOptions} [opts]
+ * @param {ReadAttemptOutputTextOptions} [options]
  * @returns {Promise<string>} Returns empty string when no output is available.
  */
 async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetries = 3, retryDelayMs = 50 } = {}) {
@@ -240,9 +250,15 @@ function _ensureArray(value) {
 }
 
 /**
+ * @typedef {object} SetOrReplaceInputOptions
+ * @property {Array<object>} inputs
+ * @property {object} next
+ */
+/**
  * Add or replace an input object into an inputs array by matching `type` or `label`.
  * @private
- * @param {{inputs?: Array<object>, next?: object}} [opts]
+ * @param {SetOrReplaceInputOptions} [opts]
+ * @param {SetOrReplaceInputOptions} [options]
  * @returns {Array<object>}
  */
 function _setOrReplaceInput({ inputs, next } = {}) {

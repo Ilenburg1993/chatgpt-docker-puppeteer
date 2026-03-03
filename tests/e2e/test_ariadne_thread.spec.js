@@ -19,6 +19,9 @@ let context = null;
 
 /**
  * Helper para executar testes com timeout
+ * @param {string} name
+ * @param {*} testFn
+ * @param {*} [timeoutMs]
  */
 async function runTest(name, testFn, timeoutMs = 5000) {
     process.stdout.write(`\n=== ${name} ===\n`);

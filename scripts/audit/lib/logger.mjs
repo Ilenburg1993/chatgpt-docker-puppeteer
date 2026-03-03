@@ -11,7 +11,15 @@ function sanitizePathToken(value) {
 }
 
 /**
- * @param {{ runId: string, runDir: string, logLevel?: 'info'|'debug', logFormat?: 'jsonl'|'console', enableConsole?: boolean }} options
+ * @typedef {object} CreateAuditLoggerOptions
+ * @property {string} runId
+ * @property {string} runDir
+ * @property {'info'|'debug'} logLevel
+ * @property {'jsonl'|'console'} logFormat
+ * @property {boolean} enableConsole
+ */
+/**
+ * @param {CreateAuditLoggerOptions} options
   * @returns {object}
  */
 export function createAuditLogger(options) {

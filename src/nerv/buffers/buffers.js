@@ -8,9 +8,18 @@ import createBackpressure from './backpressure.js';
 =========================== */
 
 /**
+ * @typedef {object} CreateBuffersDeps
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateBuffersOptions
+ * @property {*} [telemetry]
+ * @property {*} [limits]
+ */
+/**
  * Cria o subsistema de buffers do NERV.
  *
- * @param {object} deps
+ * @param {CreateBuffersDeps} deps
  * @param {object} deps.telemetry
  * Interface de telemetria do NERV.
  *
@@ -19,6 +28,7 @@ import createBackpressure from './backpressure.js';
  * - outbound: Limite de fila outbound
  * - inbound: Limite de fila inbound
  * - blockOnPressure: Se true, bloqueia quando buffer cheio (default: false)
+ * @param {CreateBuffersOptions} [options]
   * @returns {object}
  */
 function createBuffers({ telemetry, limits = {} }) {

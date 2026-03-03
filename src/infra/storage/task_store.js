@@ -11,11 +11,15 @@ import * as PATHS from '../fs/paths.js';
 const fsp = fs.promises;
 
 /**
+ * @typedef {object} SaveTaskTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Salva uma tarefa no disco após validação V5.
  *
  * MUDANÇA V5: Sempre salva em formato V5 (auto-upgrade de V4 se necessário).
  *
- * @param {object} task - Objeto da tarefa (V4 ou V5).
+ * @param {SaveTaskTask} task - Objeto da tarefa (V4 ou V5).
  * @returns {Promise<object>} Tarefa validada e persistida (V5).
  */
 async function saveTask(task) {

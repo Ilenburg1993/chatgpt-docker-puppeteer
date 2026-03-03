@@ -309,7 +309,12 @@ function _recordMissionEvents({
 }
 
 /**
+ * @typedef {object} CreateMissionCommandOptions
+ * @property {*} [actor]
+ */
+/**
  * Função exportada: createMissionCommand.
+ * @param {CreateMissionCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function createMissionCommand({ actor = {}, reason, payload = {} }) {
@@ -367,7 +372,13 @@ function createMissionCommand({ actor = {}, reason, payload = {} }) {
 }
 
 /**
+ * @typedef {object} ExecuteMissionCommandOptions
+ * @property {*} [missionId]
+ * @property {*} [actor]
+ */
+/**
  * Função exportada: executeMissionCommand.
+ * @param {ExecuteMissionCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' }) {
@@ -405,7 +416,13 @@ function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null
 }
 
 /**
+ * @typedef {object} PauseMissionCommandOptions
+ * @property {*} [missionId]
+ * @property {*} [actor]
+ */
+/**
  * Função exportada: pauseMissionCommand.
+ * @param {PauseMissionCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
@@ -447,7 +464,13 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
 }
 
 /**
+ * @typedef {object} ResumeMissionCommandOptions
+ * @property {*} [missionId]
+ * @property {*} [actor]
+ */
+/**
  * Função exportada: resumeMissionCommand.
+ * @param {ResumeMissionCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
@@ -489,7 +512,13 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
 }
 
 /**
+ * @typedef {object} CancelMissionCommandOptions
+ * @property {*} [missionId]
+ * @property {*} [actor]
+ */
+/**
  * Função exportada: cancelMissionCommand.
+ * @param {CancelMissionCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
@@ -557,7 +586,13 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
 }
 
 /**
+ * @typedef {object} PatchMissionCommandOptions
+ * @property {*} [missionId]
+ * @property {*} [actor]
+ */
+/**
  * Função exportada: patchMissionCommand.
+ * @param {PatchMissionCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, patch = {} }) {
@@ -598,7 +633,13 @@ function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, 
 }
 
 /**
+ * @typedef {object} SetMissionPolicyCommandOptions
+ * @property {*} [missionId]
+ * @property {*} [actor]
+ */
+/**
  * Função exportada: setMissionPolicyCommand.
+ * @param {SetMissionPolicyCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function setMissionPolicyCommand({
@@ -652,7 +693,13 @@ function setMissionPolicyCommand({
 }
 
 /**
+ * @typedef {object} ReorderMissionStepsCommandOptions
+ * @property {*} [missionId]
+ * @property {*} [actor]
+ */
+/**
  * Função exportada: reorderMissionStepsCommand.
+ * @param {ReorderMissionStepsCommandOptions} [options]
  * @returns {Promise<object>|object|null}
  */
 function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion = null, stepOrder = [] }) {

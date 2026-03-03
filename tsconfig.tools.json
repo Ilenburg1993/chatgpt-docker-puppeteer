@@ -8,13 +8,7 @@
     "lib": ["ES2024", "ES2022.Error", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": [
-    "scripts/**/*.mjs",
-    "scripts/**/*.cjs",
-    "scripts/**/*.js",
-    "eslint.config.mjs",
-    ".puppeteerrc.cjs"
-  ],
+  "include": ["scripts/**/*.mjs", "scripts/**/*.cjs", "scripts/**/*.js", "eslint.config.mjs", ".puppeteerrc.cjs"],
   "exclude": [
     "node_modules",
     "dist",

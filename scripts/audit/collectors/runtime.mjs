@@ -9,11 +9,16 @@ import path from 'node:path';
  */
 
 /**
- * @param {{
- *   profile: 'quick'|'deep'|'nightly',
- *   contracts?: import('../contracts/load_registry.mjs').ContractDefinitionV1[],
- *   exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
- * }} options
+ * @typedef {object} CollectRuntimeFindingsOptions
+ * @property {'quick'|'deep'|'nightly'} profile
+ * @property {import('../contracts/load_registry.mjs').ContractDefinitionV1[]} contracts
+ * @property {(stepId: string} exec
+ * @property {string} command
+ * @property {string[]} args
+ * @property {unknown) => Promise<void>} options
+ */
+/**
+ * @param {CollectRuntimeFindingsOptions} options
  * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: { mcp: { ok: boolean, details?: string }, rag: { ok: boolean, available?: boolean|null, degraded?: boolean|null }, lsp: { ok: boolean, details?: string } } }>}
  */
 export async function collectRuntimeFindings(options) {

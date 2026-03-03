@@ -308,10 +308,16 @@ function clearRetry(alias) {
 }
 
 /**
+ * @typedef {object} ScheduleRetryOptions
+ * @property {boolean} refresh
+ * @property {boolean} force
+ * @property {ReturnType<typeof getRestartConfig>} restart
+ */
+/**
  * @param {UpstreamConfig} cfg
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
  * @param {Record<string, unknown>} env
- * @param {{ refresh: boolean, force: boolean, restart: ReturnType<typeof getRestartConfig> }} options
+ * @param {ScheduleRetryOptions} options
  */
 function scheduleRetry(cfg, registry, env, options) {
     const { restart } = options;
@@ -345,10 +351,16 @@ function scheduleRetry(cfg, registry, env, options) {
 }
 
 /**
+ * @typedef {object} RegisterOneUpstreamOptions
+ * @property {boolean} refresh
+ * @property {boolean} force
+ * @property {ReturnType<typeof getRestartConfig>} restart
+ */
+/**
  * @param {UpstreamConfig} cfg
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
  * @param {Record<string, unknown>} env
- * @param {{ refresh: boolean, force: boolean, restart: ReturnType<typeof getRestartConfig> }} options
+ * @param {RegisterOneUpstreamOptions} options
  * @returns {Promise<{ status: UpstreamStatus }>}
  */
 async function registerOneUpstream(cfg, registry, env, options) {
@@ -541,10 +553,15 @@ function markUpstreamCallFailure(cfg, err, registry, env, restart) {
 }
 
 /**
+ * @typedef {object} RegisterUpstreamsOptions
+ * @property {Record<string} env
+ * @property {boolean} installShutdownHook
+ */
+/**
  * Register tools from all enabled upstreams into the local registry.
  *
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
- * @param {{ env?: Record<string, unknown>, installShutdownHook?: boolean }} [options]
+ * @param {RegisterUpstreamsOptions} [options]
  * @returns {Promise<{upstreams: UpstreamStatus[]}>}
  */
 export async function registerUpstreams(registry, options = {}) {

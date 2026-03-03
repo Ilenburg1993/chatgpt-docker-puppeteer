@@ -16,7 +16,12 @@ import { onMounted, onUnmounted, watch } from 'vue';
 import { useSocket } from './useSocket';
 
 /**
+ * @typedef {object} UseRealtimeOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Composable para integração real-time com stores
+ * @param {UseRealtimeOptions} [options]
   * @returns {object}
  */
 export function useRealtime(options = {}) {

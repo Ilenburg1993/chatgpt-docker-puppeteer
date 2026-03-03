@@ -35,6 +35,7 @@ const signalHandlers = {
 
 /**
  * Função exportada: setAllowProcessExit.
+ * @param {*} flag
  * @returns {void}
  */
 function setAllowProcessExit(flag) {

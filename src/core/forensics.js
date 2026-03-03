@@ -36,10 +36,14 @@ const CAPTURE_TIMEOUT_MS = 5000;
  */
 
 /**
+ * @typedef {object} SetNERVNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Injeta instância do NERV para emissão de eventos (ONDA 2).
  * Side-effects: Modifica estado global nervInstance.
  * Deve ser chamado no boot antes de usar forensics.
- * @param {object} nerv - Instância do NERV para notificações.
+ * @param {SetNERVNerv} nerv - Instância do NERV para notificações.
   * @returns {void}
  */
 function setNERV(nerv) {
@@ -47,9 +51,13 @@ function setNERV(nerv) {
 }
 
 /**
+ * @typedef {object} CreateCrashDumpPage
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Cria um pacote de evidências (Dump) de um erro catastrófico.
  * Side-effects: Cria diretório em PATHS.REPORTS, escreve arquivos, emite evento NERV.
- * @param {object} page - Instância da página Puppeteer.
+ * @param {CreateCrashDumpPage} page - Instância da página Puppeteer.
  * @param {Error} error - Erro que causou o crash.
  * @param {string} [taskId='unknown'] - ID da tarefa relacionada.
  * @param {string} [correlationId='unknown'] - ID de correlação para rastreamento.

@@ -120,9 +120,13 @@ async function getDna() {
 }
 
 /**
+ * @typedef {object} SaveDnaDna
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Persiste a evolução do DNA, atualizando metadados e invalidando o cache.
  *
- * @param {object} dna - Novo objeto de DNA.
+ * @param {SaveDnaDna} dna - Novo objeto de DNA.
  * @param {string} author - Identificador da entidade que evoluiu o DNA (ex: 'SADI_V19').
   * @returns {Promise<void>}
  */

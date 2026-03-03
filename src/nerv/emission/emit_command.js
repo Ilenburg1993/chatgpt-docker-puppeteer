@@ -7,17 +7,32 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
 =========================== */
 
 /**
+ * @typedef {object} CreateEmitCommandDeps
+ * @property {object} envelopes
+ * @property {object} buffers
+ * @property {object} correlation
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateEmitCommandOptions
+ * @property {*} [envelopes]
+ * @property {*} [buffers]
+ * @property {*} [correlation]
+ * @property {*} [telemetry]
+ */
+/**
  * Cria o emissor técnico de COMMANDs.
  *
  * **Side-effects:** Registra emissão na correlação histórica.
  * **Semântica:** Emissor especializado para mensagens de comando NERV.
  * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {object} deps - Dependências do emissor
+ * @param {CreateEmitCommandDeps} deps - Dependências do emissor
  * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
  * @param {object} deps.buffers - Subsistema de buffers outbound
  * @param {object} deps.correlation - Sistema de correlação histórica
  * @param {object} deps.telemetry - Interface de telemetria NERV
+ * @param {CreateEmitCommandOptions} [options]
  * @returns {object} Emissor com método emitCommand
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

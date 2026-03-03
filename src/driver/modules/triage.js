@@ -727,9 +727,13 @@ class Triage extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreatePage
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância de Triage.
  *
- * @param {object} page - Puppeteer page instance
+ * @param {CreatePage} page - Puppeteer page instance
  * @param {string} [langCode='en'] - Código de idioma
  * @returns {Triage} Nova instância
  *
@@ -742,11 +746,15 @@ function create(page, langCode = 'en') {
 }
 
 /**
+ * @typedef {object} DiagnoseStallPage
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Legacy function para backward compatibility.
  *
  * Preserva a API original v1.x (function export).
  *
- * @param {object} page - Puppeteer Page instance
+ * @param {DiagnoseStallPage} page - Puppeteer Page instance
  * @param {string} [langCode='en'] - Código de idioma
  * @returns {Promise<object>} Resultado do diagnóstico
  *

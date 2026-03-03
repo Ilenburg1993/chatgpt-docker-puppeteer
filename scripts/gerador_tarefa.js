@@ -120,9 +120,18 @@ function parseSchedule(input) {
 }
 
 /**
+ * @typedef {object} CreateTaskOptions
+ * @property {number} prio
+ * @property {string} model
+ * @property {string} target
+ * @property {string} system
+ * @property {string} after
+ * @property {string[]} tags
+ */
+/**
  * Cria uma nova tarefa e a salva no diretório de fila.
  * Side-effects: Cria arquivo JSON no diretório de fila, imprime informações no console.
- * @param {object} opts - Opções da tarefa.
+ * @param {CreateTaskOptions} opts - Opções da tarefa.
  * @param {number} opts.prio - Prioridade da tarefa (0-100).
  * @param {string} opts.model - Modelo de IA a ser utilizado.
  * @param {string} opts.target - Plataforma alvo (chatgpt, gemini, etc).

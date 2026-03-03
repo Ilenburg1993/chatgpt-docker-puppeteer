@@ -73,10 +73,14 @@ function recordEvent(params) {
 }
 
 /**
+ * @typedef {object} PruneEventsOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Prune events older than the specified retention period.
  * Keeps events table bounded to prevent unbounded disk growth.
  *
- * @param {object} [options={}]
+ * @param {PruneEventsOptions} [options={}]
  * @param {number} [options.retentionMs=604800000] - Retention period in ms (default: 7 days)
  * @param {number} [options.maxRows=100000] - Max rows to keep regardless of age
  * @returns {{ deleted: number }} Number of rows deleted

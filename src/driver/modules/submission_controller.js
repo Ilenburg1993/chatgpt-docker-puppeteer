@@ -536,9 +536,13 @@ class SubmissionController extends EventEmitter {
 }
 
 /**
+ * @typedef {object} CreateDriver
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Factory function para criar instância de SubmissionController.
  *
- * @param {object} driver - Instância do driver
+ * @param {CreateDriver} driver - Instância do driver
  * @returns {SubmissionController} Nova instância
  *
  * @example

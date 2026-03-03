@@ -186,13 +186,7 @@ function getJSDocBlocks(node) {
  */
 function getJSDocTags(node) {
     const tags = ts.getJSDocTags(node) || [];
-    return Array.from(
-        new Set(
-            tags
-                .map(tag => String(tag.tagName?.escapedText || '').trim())
-                .filter(Boolean)
-        )
-    );
+    return Array.from(new Set(tags.map(tag => String(tag.tagName?.escapedText || '').trim()).filter(Boolean)));
 }
 
 /**
@@ -283,10 +277,13 @@ function collectOptionParamNames(node) {
  */
 function hasOptionsTypedef(jsdocText, optionParamNames, declaredTypedefs) {
     if (optionParamNames.length === 0) return false;
+    const hasDestructured = optionParamNames.includes('destructured');
     for (const match of jsdocText.matchAll(PARAM_TYPE_RE)) {
         const rawType = String(match[1] || '').trim();
         const rawName = String(match[2] || '').trim();
-        if (!optionParamNames.includes(rawName) && !(rawName === 'destructured' && optionParamNames.includes('destructured'))) {
+        // For destructured params, accept any @param {TypeName} where TypeName is a typedef,
+        // regardless of the documented param name (options, opts, config, payload, etc.).
+        if (!optionParamNames.includes(rawName) && !hasDestructured) {
             continue;
         }
         const typeName = rawType.replace(/[\[\]\(\)\|?]/g, '').trim();
@@ -315,7 +312,14 @@ function isFunctionExport(node, kind) {
  * @param {number} unsafeGenericTagsCount
  * @returns {{ missing: string[], quality: JSDocQualityLevel }}
  */
-function assessQuality(kind, hasReturnsTag, hasCompleteParamTags, hasOptionsParam, hasOptionsTypedef, unsafeGenericTagsCount) {
+function assessQuality(
+    kind,
+    hasReturnsTag,
+    hasCompleteParamTags,
+    hasOptionsParam,
+    hasOptionsTypedef,
+    unsafeGenericTagsCount
+) {
     /** @type {string[]} */
     const missing = [];
     if (kind === 'function') {
@@ -477,7 +481,9 @@ function collectExportsFromSourceFile(sourceFile) {
         }
 
         if (ts.isTypeAliasDeclaration(statement) && isExportedStatement(statement)) {
-            exportedSymbols.push(buildAssessment(statement, sourceFile, statement.name.text, 'typedef', declaredTypedefs));
+            exportedSymbols.push(
+                buildAssessment(statement, sourceFile, statement.name.text, 'typedef', declaredTypedefs)
+            );
             continue;
         }
 
@@ -485,7 +491,9 @@ function collectExportsFromSourceFile(sourceFile) {
             if (ts.isIdentifier(statement.expression)) {
                 const local = localTargets.get(statement.expression.text);
                 if (local) {
-                    exportedSymbols.push(buildAssessment(local.node, sourceFile, 'default', local.kind, declaredTypedefs));
+                    exportedSymbols.push(
+                        buildAssessment(local.node, sourceFile, 'default', local.kind, declaredTypedefs)
+                    );
                     continue;
                 }
             }
@@ -506,7 +514,9 @@ function collectExportsFromSourceFile(sourceFile) {
                         continue;
                     }
                 }
-                exportedSymbols.push(buildAssessment(statement, sourceFile, element.name.text, 'reexport', declaredTypedefs));
+                exportedSymbols.push(
+                    buildAssessment(statement, sourceFile, element.name.text, 'reexport', declaredTypedefs)
+                );
             }
         }
     }
@@ -540,7 +550,10 @@ function parseFile(file) {
     const functionsMissingOptionsTypedef = functionExports.filter(
         symbol => symbol.has_options_param && !symbol.has_options_typedef
     ).length;
-    const unsafeGenericTagsTotal = exportedSymbols.reduce((total, symbol) => total + symbol.unsafe_generic_tags_count, 0);
+    const unsafeGenericTagsTotal = exportedSymbols.reduce(
+        (total, symbol) => total + symbol.unsafe_generic_tags_count,
+        0
+    );
     const publicSymbolsUsingImportTypes = exportedSymbols.filter(symbol => symbol.uses_import_types).length;
     const publicSymbolsUsingTemplateTags = exportedSymbols.filter(symbol => symbol.uses_template_tags).length;
 
@@ -565,7 +578,12 @@ function parseFile(file) {
 }
 
 /**
- * @param {{ files: string[], scope?: 'changed'|'full' }} options
+ * @typedef {object} AnalyzeJSDocCoverageOptions
+ * @property {string[]} files
+ * @property {'changed'|'full'} scope
+ */
+/**
+ * @param {AnalyzeJSDocCoverageOptions} options
  * @returns {JSDocCoverageReport}
  */
 export function analyzeJSDocCoverage(options) {
@@ -622,7 +640,8 @@ export function analyzeJSDocCoverage(options) {
     );
     const publicAnyTagsTotal = fileReports.reduce(
         (total, fileReport) =>
-            total + fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
+            total +
+            fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
         0
     );
     const publicUnknownTagsTotal = fileReports.reduce(

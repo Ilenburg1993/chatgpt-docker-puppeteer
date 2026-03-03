@@ -76,36 +76,36 @@
 
 ### Fase 0 — Conclusão da instrumentação
 
-| Subfase | Artefato                              | Critério de conclusão                                               |
-| ------- | ------------------------------------- | ------------------------------------------------------------------- |
-| 0.a     | `typing_hardening_audit.mjs`          | `--show-gaps` funcional; `overall=100`; `js_files_missing_ts_check[]` emitido |
-| 0.b     | `jsdoc_coverage_engine.mjs`           | `public_any_tags_total` + `public_unknown_tags_total` no shape; schema `3.1.0` |
-| 0.c     | `jsdoc_coverage_cli.mjs`             | `--gaps` lista arquivos bloqueadores; `--fail-on-any-gap` sai 1 |
+| Subfase | Artefato                                           | Critério de conclusão                                                               |
+| ------- | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 0.a     | `typing_hardening_audit.mjs`                       | `--show-gaps` funcional; `overall=100`; `js_files_missing_ts_check[]` emitido       |
+| 0.b     | `jsdoc_coverage_engine.mjs`                        | `public_any_tags_total` + `public_unknown_tags_total` no shape; schema `3.1.0`      |
+| 0.c     | `jsdoc_coverage_cli.mjs`                           | `--gaps` lista arquivos bloqueadores; `--fail-on-any-gap` sai 1                     |
 | 0.d     | `schemas/typing/jsdoc-coverage-report.schema.json` | Versão `3.1.0`; `public_any_tags_total`, `public_unknown_tags_total` nos `required` |
-| 0.e     | `scripts/ci/verify-skills-governance.mjs` | Verifica `strict-lane-governance` e `vue-tsc-dashboard` |
-| 0.f     | Verificação de saída                  | `analyze:typing:gaps` lista 29 arquivos; `jsdoc:coverage:gaps` lista 891 issues |
+| 0.e     | `scripts/ci/verify-skills-governance.mjs`          | Verifica `strict-lane-governance` e `vue-tsc-dashboard`                             |
+| 0.f     | Verificação de saída                               | `analyze:typing:gaps` lista 29 arquivos; `jsdoc:coverage:gaps` lista 891 issues     |
 
 ### Fase 1 — Cobertura total de superfície
 
-| Subfase | Escopo                                | Critério de conclusão                                               |
-| ------- | ------------------------------------- | ------------------------------------------------------------------- |
-| 1.a     | 15 arquivos ativos sem `@ts-check`    | Diretiva adicionada na primeira linha de cada arquivo               |
-| 1.b     | 14 arquivos `tests/legacy/`           | `@ts-check` + `@ts-ignore` com comentário justificativo onde irrecuperável |
+| Subfase | Escopo                                        | Critério de conclusão                                                                     |
+| ------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1.a     | 15 arquivos ativos sem `@ts-check`            | Diretiva adicionada na primeira linha de cada arquivo                                     |
+| 1.b     | 14 arquivos `tests/legacy/`                   | `@ts-check` + `@ts-ignore` com comentário justificativo onde irrecuperável                |
 | 1.c     | `tsconfig.tools.json` + `tsconfig.tests.json` | Substituição de listas explícitas por glob `include`; `tsconfig.node.json` sem duplicatas |
 
 ### Fase 2 — Fechamento do backlog JSDoc
 
-| Subfase | Módulo            | Issues | Prioridade |
-| ------- | ----------------- | ------ | ---------- |
-| 2.a     | `src/infra`       | 318    | 1 — maior backlog |
-| 2.b     | `scripts/audit`   | 121    | 2 |
-| 2.c     | `src/server`      | 86     | 3 |
-| 2.d     | `src/core`        | 82     | 4 |
-| 2.e     | `src/agent`       | 55     | 5 |
-| 2.f     | `src/nerv`        | 46     | 6 |
-| 2.g     | `src/integration` | 29     | 7 |
-| 2.h     | `src/dashboard-ui`| 24     | 8 |
-| 2.i     | Módulos menores (`src/driver`, `src/kernel`, `src/logic`, `tests/helpers`, `scripts/analysis`, `scripts/ops`) | ~65 | 9 |
+| Subfase | Módulo                                                                                                        | Issues | Prioridade        |
+| ------- | ------------------------------------------------------------------------------------------------------------- | ------ | ----------------- |
+| 2.a     | `src/infra`                                                                                                   | 318    | 1 — maior backlog |
+| 2.b     | `scripts/audit`                                                                                               | 121    | 2                 |
+| 2.c     | `src/server`                                                                                                  | 86     | 3                 |
+| 2.d     | `src/core`                                                                                                    | 82     | 4                 |
+| 2.e     | `src/agent`                                                                                                   | 55     | 5                 |
+| 2.f     | `src/nerv`                                                                                                    | 46     | 6                 |
+| 2.g     | `src/integration`                                                                                             | 29     | 7                 |
+| 2.h     | `src/dashboard-ui`                                                                                            | 24     | 8                 |
+| 2.i     | Módulos menores (`src/driver`, `src/kernel`, `src/logic`, `tests/helpers`, `scripts/analysis`, `scripts/ops`) | ~65    | 9                 |
 
 Critério de saída da Fase 2: `jsdoc:coverage:gaps --fail-on-any-gap` sai com código `0`.
 
@@ -276,6 +276,7 @@ radar.
 > **Status** (atualizado): **Subfase 2.a concluída** — `unsafe_generic_tags_total: 586 → 0` ✅.
 > Engine atualizada: `UNSAFE_GENERIC_IN_TYPE_RE` agora analisa apenas posições de tipo (`{...}`),
 > evitando falsos positivos de descrições. **Pendente** para próximas sessões:
+>
 > - `functions_missing_param_tags: 118` (Subfase 2.c)
 > - `functions_missing_options_typedef: 171` (Subfase 2.b)
 

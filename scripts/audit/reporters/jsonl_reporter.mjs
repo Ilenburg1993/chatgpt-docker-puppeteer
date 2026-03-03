@@ -2,7 +2,12 @@
 import fs from 'node:fs';
 
 /**
- * @param {{ filePath: string, payload: Record<string, unknown> }} options
+ * @typedef {object} AppendJsonlOptions
+ * @property {string} filePath
+ * @property {Record<string} payload
+ */
+/**
+ * @param {AppendJsonlOptions} options
   * @returns {void}
  */
 export function appendJsonl(options) {

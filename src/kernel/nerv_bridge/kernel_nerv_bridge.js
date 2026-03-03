@@ -12,6 +12,7 @@ import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
 
 /**
  * Valida envelope recebido do NERV.
+ * @param {*} envelope
  */
 function isValidEnvelope(envelope) {
     if (!envelope || typeof envelope !== 'object') return false;
@@ -23,6 +24,7 @@ function isValidEnvelope(envelope) {
 
 /**
  * Extrai dados estruturais do envelope de forma segura.
+ * @param {*} envelope
  */
 function extractEnvelopeData(envelope) {
     return {

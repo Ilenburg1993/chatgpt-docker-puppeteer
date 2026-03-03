@@ -233,7 +233,11 @@ function parseMadgeOutput(output) {
 }
 
 /**
- * @param {object} depcruiseJson
+ * @typedef {object} ParseDepCruiseOutputDepcruiseJson
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {ParseDepCruiseOutputDepcruiseJson} depcruiseJson
  * @returns {RawFinding[]}
  */
 function parseDepCruiseOutput(depcruiseJson) {
@@ -318,16 +322,22 @@ function parseJscpdReport(jscpdJsonPath) {
 }
 
 /**
- * @param {{
- *   profile: 'quick'|'deep'|'nightly',
- *   changedFiles: string[],
- *   artifactsDir?: string,
- *   contractsMode?: 'legacy'|'hybrid'|'strict',
- *   skipQuickSyntax?: boolean,
- *   skipLintTypecheck?: boolean,
- *   exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
- *   commandExistsFn?: (binary: string, stepId?: string) => Promise<boolean>,
- * }} options
+ * @typedef {object} CollectStaticFindingsOptions
+ * @property {'quick'|'deep'|'nightly'} profile
+ * @property {string[]} changedFiles
+ * @property {string} artifactsDir
+ * @property {'legacy'|'hybrid'|'strict'} contractsMode
+ * @property {boolean} skipQuickSyntax
+ * @property {boolean} skipLintTypecheck
+ * @property {(stepId: string} exec
+ * @property {string} command
+ * @property {string[]} args
+ * @property {unknown) => Promise<void>} options
+ * @property {(binary: string} commandExistsFn
+ * @property {string) => Promise<boolean>} stepId
+ */
+/**
+ * @param {CollectStaticFindingsOptions} options
  * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: Record<string,any>}>}
  */
 export async function collectStaticFindings(options) {

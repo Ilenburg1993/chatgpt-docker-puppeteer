@@ -28,7 +28,13 @@ function getDashboardToken() {
 }
 
 /**
+ * @typedef {object} GetSocketInstanceOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Cria ou retorna instância existente do Socket.io
+ * @param {string} [url]
+ * @param {GetSocketInstanceOptions} [options]
  */
 function getSocketInstance(url = '', options = {}) {
     if (!socketInstance) {
@@ -47,7 +53,12 @@ function getSocketInstance(url = '', options = {}) {
 }
 
 /**
+ * @typedef {object} UseSocketOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Composable para gerenciar conexão Socket.io
+ * @param {UseSocketOptions} [options]
   * @returns {object}
  */
 export function useSocket(options = {}) {

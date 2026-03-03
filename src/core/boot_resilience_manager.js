@@ -71,12 +71,20 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
     }
 }
 /**
+ * @typedef {object} CreateBrowserPoolConfig
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
+ * @typedef {object} CreateBrowserPoolNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Cria e inicializa um BrowserPoolManager de forma canônica.
  * Centraliza a lógica de construção para evitar divergência
  * entre boot normal, retry automático e retry manual.
  *
- * @param {object} config
- * @param {object} [nerv] - NERV bus para Circuit Breaker (opcional)
+ * @param {CreateBrowserPoolConfig} config
+ * @param {CreateBrowserPoolNerv} [nerv] - NERV bus para Circuit Breaker (opcional)
  * @returns {Promise<object>} BrowserPoolManager inicializado
  */
 async function createBrowserPool(config, nerv = null) {
@@ -220,11 +228,15 @@ function getChromeInstructions(errorMessage) {
 }
 
 /**
+ * @typedef {object} HandleBrowserPoolFailureOptions
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Trata falha no Browser Pool durante boot.
  * Oferece opções ao usuário e tenta recuperação automática.
  *
  * @param {Error} error - Erro original do Browser Pool
- * @param {object} options - Opções de configuração
+ * @param {HandleBrowserPoolFailureOptions} options - Opções de configuração
  * @param {boolean} [options.allowDegradedMode=true] - Permite boot sem browser
  * @param {boolean} [options.autoRetry=true] - Tenta iniciar Chrome automaticamente
  * @param {number} [options.maxAutoRetries=2] - Máximo de tentativas automáticas
@@ -390,11 +402,19 @@ async function handleBrowserPoolFailure(error, options = {}) {
 }
 
 /**
+ * @typedef {object} InitializeBrowserPoolResilientConfig
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
+ * @typedef {object} InitializeBrowserPoolResilientOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Wrapper resiliente para inicialização de Browser Pool.
  * Substitui a inicialização direta no boot sequence.
  *
- * @param {object} config - Configuração do Browser Pool
- * @param {object} [options] - Opções de resiliência
+ * @param {InitializeBrowserPoolResilientConfig} config - Configuração do Browser Pool
+ * @param {InitializeBrowserPoolResilientOptions} [options] - Opções de resiliência
  * @param {object} [options.nerv] - NERV bus para Circuit Breaker (opcional)
  * @returns {Promise<object>} - Resultado da inicialização
  */

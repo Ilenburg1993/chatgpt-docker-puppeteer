@@ -49,9 +49,13 @@ export async function readJson(filePath) {
 }
 
 /**
+ * @typedef {object} WriteJsonData
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Writes a JSON file
  * @param {string} filePath
- * @param {object} data
+ * @param {WriteJsonData} data
   * @returns {Promise<void>}
  */
 export async function writeJson(filePath, data) {

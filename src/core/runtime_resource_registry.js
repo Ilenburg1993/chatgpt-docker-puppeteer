@@ -76,6 +76,7 @@ async function runWithTimeout(operation, timeoutMs) {
 
 /**
  * @param {Partial<RuntimeResource> & {id: string}} resource
+ * @param {*} resource
  * @returns {RuntimeResource}
  */
 function upsertRuntimeResource(resource) {
@@ -103,10 +104,19 @@ function upsertRuntimeResource(resource) {
 }
 
 /**
+ * @typedef {object} SetRuntimeResourceStateDetails
+ * @property {string} [owner] - Proprietário do recurso
+ * @property {string} [criticality] - Criticidade do recurso
+ * @property {string} [reasonCode] - Código de motivo da mudança
+ * @property {string} [message] - Mensagem descritiva
+ * @property {boolean} [stop] - Se verdadeiro, o recurso deve parar
+ * @property {string} [health] - Estado de saúde do recurso
+ */
+/**
  * @param {string} id
  * @param {RuntimeResourceState} state
- * @param {Partial<RuntimeResource>} [details]
-  * @returns {object}
+ * @param {SetRuntimeResourceStateDetails} [details]
+ * @returns {void}
  */
 function setRuntimeResourceState(id, state, details = {}) {
     return upsertRuntimeResource({
@@ -122,9 +132,13 @@ function setRuntimeResourceState(id, state, details = {}) {
 }
 
 /**
+ * @typedef {object} GetRuntimeResourcesSnapshotOptions
+ * @property {string|null} owner
+ */
+/**
  * Retorna snapshot serializável dos recursos runtime registrados.
  *
- * @param {{ owner?: string|null }} [options]
+ * @param {GetRuntimeResourcesSnapshotOptions} [options]
  * @returns {Array<{id:string, owner:string, criticality:RuntimeResourceCriticality, state:RuntimeResourceState, reasonCode:string|null, message:string|null, updatedAt:number, health:unknown}>}
  */
 function getRuntimeResourcesSnapshot({ owner = null } = {}) {
@@ -154,9 +168,15 @@ function getRuntimeResourcesSnapshot({ owner = null } = {}) {
 }
 
 /**
+ * @typedef {object} GetRuntimeReadinessSummaryOptions
+ * @property {string|null} owner
+ * @property {string[]} requiredComponents
+ * @property {boolean} allowDegradedReady
+ */
+/**
  * Consolida readiness/degraded/not-ready a partir do registry de recursos runtime.
  *
- * @param {{ owner?: string|null, requiredComponents?: string[], allowDegradedReady?: boolean }} [options]
+ * @param {GetRuntimeReadinessSummaryOptions} [options]
  * @returns {{
  *   status: 'ready'|'degraded'|'not-ready',
  *   required_components: Array<{id:string,state:string,reasonCode:string|null,message:string|null}>,
@@ -212,9 +232,16 @@ function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], all
 }
 
 /**
+ * @typedef {object} StopRuntimeResourcesOptions
+ * @property {string|null} owner
+ * @property {number} timeoutMs
+ * @property {((level: string} logger
+ * @property {string) => void)|null} message
+ */
+/**
  * Para recursos registrados em ordem reversa de criação, com timeout por recurso.
  *
- * @param {{ owner?: string|null, timeoutMs?: number, logger?: ((level: string, message: string) => void)|null }} [options]
+ * @param {StopRuntimeResourcesOptions} [options]
  * @returns {Promise<Array<{id:string, ok:boolean, error?:string, timeout?:boolean}>>}
  */
 async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = null } = {}) {

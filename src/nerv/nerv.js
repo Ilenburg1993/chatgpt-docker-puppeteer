@@ -27,6 +27,7 @@ import createTransport from './transport/transport.js';
 
 /**
  * Bootstrap: Socket.io adapter para modo híbrido
+ * @param {*} config
  */
 async function bootstrapSocketAdapter(config) {
     const { default: createSocketAdapter } = await import('#infra/transport/socket_io_adapter');
@@ -45,7 +46,14 @@ async function bootstrapSocketAdapter(config) {
 }
 
 /**
+ * @typedef {object} BootstrapHybridTransportOptions
+ * @property {*} [mode]
+ * @property {*} [socketAdapter]
+ * @property {*} [telemetry]
+ */
+/**
  * Bootstrap: Hybrid transport (local + Socket.io)
+ * @param {BootstrapHybridTransportOptions} [options]
  */
 function bootstrapHybridTransport({ mode, socketAdapter, telemetry }) {
     if (mode === CONNECTION_MODES.LOCAL || mode === CONNECTION_MODES.HYBRID) {
@@ -62,7 +70,14 @@ function bootstrapHybridTransport({ mode, socketAdapter, telemetry }) {
 }
 
 /**
+ * @typedef {object} BootstrapTransportOptions
+ * @property {*} [hybridTransport]
+ * @property {*} [config]
+ * @property {*} [telemetry]
+ */
+/**
  * Bootstrap: Transport físico (híbrido ou customizado)
+ * @param {BootstrapTransportOptions} [options]
  */
 function bootstrapTransport({ hybridTransport, config, telemetry }) {
     // ONDA 2.6: Usa hybridTransport se local/hybrid, ou transport customizado
@@ -79,7 +94,19 @@ function bootstrapTransport({ hybridTransport, config, telemetry }) {
 }
 
 /**
+ * @typedef {object} BuildPublicAPIOptions
+ * @property {*} [hybridTransport]
+ * @property {*} [emission]
+ * @property {*} [reception]
+ * @property {*} [buffers]
+ * @property {*} [transport]
+ * @property {*} [health]
+ * @property {*} [telemetry]
+ * @property {*} [socketAdapter]
+ */
+/**
  * Constrói a interface pública do NERV
+ * @param {BuildPublicAPIOptions} [options]
  */
 function buildPublicAPI({
     hybridTransport,

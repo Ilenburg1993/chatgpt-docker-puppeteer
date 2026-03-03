@@ -14,6 +14,34 @@
 import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../../tools/rag/lib/facade.mjs';
 
 /**
+ * @typedef {object} RagSearchHandlerParams
+ * @property {string} query
+ * @property {number} topK
+ * @property {string} pathPrefix
+ * @property {string} ext
+ * @property {'core'|'dev'|'full'} profile
+ * @property {'hybrid'|'lexical-only'|'auto'} mode
+ * @property {'code-first'|'docs-first'|'all'} intent_scope
+ * @property {boolean} auto_expand
+ * @property {'lines'|'symbol'} expand_mode
+ * @property {number} expand_top_n
+ * @property {boolean} includeDiagnostics
+ */
+/**
+ * @typedef {object} RagSearchHandlerOptions
+ * @property {*} [query]
+ * @property {*} [topK]
+ * @property {*} [pathPrefix]
+ * @property {*} [ext]
+ * @property {*} [profile]
+ * @property {*} [mode]
+ * @property {*} [intent_scope]
+ * @property {*} [auto_expand]
+ * @property {*} [expand_mode]
+ * @property {*} [expand_top_n]
+ * @property {*} [includeDiagnostics]
+ */
+/**
  * rag_search tool: Hybrid semantic search
  *
  * Searches the chatgpt-docker-puppeteer codebase using:
@@ -22,7 +50,7 @@ import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../.
  * - Multi-signal reranking (6 signals)
  * - MMR diversity (avoids redundant results)
  *
- * @param {object} params - Search parameters
+ * @param {RagSearchHandlerParams} params - Search parameters
  * @param {string} params.query - Search query (natural language or exact terms)
  * @param {number} params.topK - Number of results (default: 5, max: 20)
  * @param {string} params.pathPrefix - Optional: Filter by path (e.g., "src/kernel")
@@ -34,6 +62,7 @@ import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../.
  * @param {'lines'|'symbol'} params.expand_mode - Expansion mode
  * @param {number} params.expand_top_n - Number of top chunks to auto-expand
  * @param {boolean} params.includeDiagnostics - Include diagnostic details in text output
+ * @param {RagSearchHandlerOptions} [options]
  * @returns {Promise<{text:string,json?:any,flags:any}>} Structured tool result
  */
 async function ragSearchHandler({
@@ -387,9 +416,13 @@ async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'l
 }
 
 /**
+ * @typedef {object} RegisterRagToolsRegistry
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Register RAG tools in the Tool Registry
  *
- * @param {object} registry - Tool registry instance
+ * @param {RegisterRagToolsRegistry} registry - Tool registry instance
   * @returns {Promise<void>}
  */
 export async function registerRagTools(registry) {

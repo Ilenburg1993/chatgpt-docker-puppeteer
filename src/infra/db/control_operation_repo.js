@@ -54,7 +54,19 @@ function _rowToOperation(row) {
 }
 
 /**
+ * @typedef {object} CreateControlOperationOptions
+ * @property {*} [command]
+ * @property {*} [entityType]
+ * @property {*} [entityId]
+ * @property {*} [actorId]
+ * @property {*} [actorRole]
+ * @property {*} [reason]
+ * @property {*} [idempotencyKey]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: createControlOperation.
+ * @param {CreateControlOperationOptions} [options]
  * @returns {ControlOperation|null}
  */
 function createControlOperation({
@@ -120,6 +132,7 @@ function getControlOperationById(id) {
 
 /**
  * Função exportada: getControlOperationByIdempotencyKey.
+ * @param {*} idempotencyKey
  * @returns {ControlOperation|null}
  */
 function getControlOperationByIdempotencyKey(idempotencyKey) {
@@ -131,7 +144,13 @@ function getControlOperationByIdempotencyKey(idempotencyKey) {
 }
 
 /**
+ * @typedef {object} UpdateControlOperationUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: updateControlOperation.
+ * @param {string} id
+ * @param {UpdateControlOperationUpdates} [updates]
  * @returns {ControlOperation|null}
  */
 function updateControlOperation(id, updates = {}) {
@@ -169,7 +188,14 @@ function updateControlOperation(id, updates = {}) {
 }
 
 /**
+ * @typedef {object} ListControlOperationsOptions
+ * @property {*} [limit]
+ * @property {*} [entityType]
+ * @property {*} [entityId]
+ */
+/**
  * Função exportada: listControlOperations.
+ * @param {ListControlOperationsOptions} [options]
  * @returns {ControlOperation[]}
  */
 function listControlOperations({ limit = 100, entityType = null, entityId = null } = {}) {

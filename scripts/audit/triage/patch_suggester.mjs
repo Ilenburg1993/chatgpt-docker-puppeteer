@@ -1,8 +1,12 @@
 // @ts-check
 /**
+ * @typedef {object} SuggestPatchOptions
+ * @property {boolean} proposeDiffs
+ */
+/**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
  * @param {ReturnType<import('./root_cause_ranker.mjs').rankRootCauses>} rankedCauses
- * @param {{ proposeDiffs: boolean }} options
+ * @param {SuggestPatchOptions} options
   * @returns {object}
  */
 export function suggestPatch(finding, rankedCauses, options) {

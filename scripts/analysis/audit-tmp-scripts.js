@@ -20,6 +20,8 @@ const PATTERNS = {
 
 /**
  * Função exportada: classifyScript.
+ * @param {*} filename
+ * @param {*} content
  * @returns {object}
  */
 function classifyScript(filename, content) {

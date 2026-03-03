@@ -183,10 +183,14 @@ function flushTaskUpdates() {
 }
 
 /**
+ * @typedef {object} InitHttpServer
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Inicializa o barramento de eventos acoplando-o ao motor HTTP.
  * Implementa lógica de reset automático para suporte a testes e reconexões.
  *
- * @param {object} httpServer - Instância ativa do servidor HTTP.
+ * @param {InitHttpServer} httpServer - Instância ativa do servidor HTTP.
  * @returns {object} A instância do Socket.io configurada.
  */
 function init(httpServer) {
@@ -317,6 +321,7 @@ function init(httpServer) {
 /**
  * Protocolo de Comunicação Soberana para o Maestro.
  * Implementa Handshake, Promoção de Estado e Roteamento de Envelopes.
+ * @param {*} socket
  */
 function _setupMaestroProtocol(socket) {
     /**
@@ -407,10 +412,14 @@ function _setupMaestroProtocol(socket) {
 ========================================================================== */
 
 /**
+ * @typedef {object} SendCommandPayload
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Envia um comando estruturado para um robô específico ou para todos.
  *
  * @param {string} command - Constante ActionCode (ex: ENGINE_PAUSE).
- * @param {object} payload - Conteúdo útil do comando.
+ * @param {SendCommandPayload} payload - Conteúdo útil do comando.
  * @param {string} [robotId] - ID do robô alvo. Se nulo, envia para todos (Broadcast).
  * @returns {string} O msg_id gerado para rastreamento de ACK.
  */
@@ -449,7 +458,7 @@ function sendCommand(command, payload, robotId = null) {
  * Encerramento atômico do Hub.
  * Garante desconexão forçada de todos os agentes e limpeza total de memória.
  * Essencial para o ciclo de vida NASA Standard.
-  * @returns {Promise<void>}
+ * @returns {Promise<void>}
  */
 async function stop() {
     if (taskUpdateTimer) {
@@ -482,7 +491,9 @@ async function stop() {
 
 /**
  * Notify: Broadcast global informativo para todos os conectados.
-  * @returns {void}
+ * @param {*} event
+ * @param {*} data
+ * @returns {void}
  */
 function notify(event, data) {
     if (!ioInstance) {
@@ -493,9 +504,15 @@ function notify(event, data) {
 }
 
 /**
+ * @typedef {object} NotifyAgentInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Notify agents (system room) with a lightweight signal event.
  * Used for wake-ups (e.g. cache invalidation) without a full IPC envelope.
-  * @returns {void}
+ * @param {*} event
+ * @param {NotifyAgentInput} [data]
+ * @returns {void}
  */
 function notifyAgent(event, data = {}) {
     if (!ioInstance) {
@@ -506,12 +523,16 @@ function notifyAgent(event, data = {}) {
 }
 
 /**
+ * @typedef {object} BroadcastTaskUpdateInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * P9.8: Broadcast de task update com debouncing de 50ms.
  * Acumula updates em buffer e envia em batch para reduzir overhead.
  *
  * @param {string|object} taskId - ID da task ou objeto {taskId, state}
- * @param {object} [data] - Dados do update (opcional se taskId for objeto)
-  * @returns {void}
+ * @param {BroadcastTaskUpdateInput} [data] - Dados do update (opcional se taskId for objeto)
+ * @returns {void}
  */
 function broadcastTaskUpdate(taskId, data) {
     if (!ioInstance) {
@@ -557,17 +578,32 @@ export const getRegistry = () =>
     }));
 /** Constante/valor exportado: getIO. */
 export const getIO = () => ioInstance;
-/** Constante/valor exportado: on. */
+/** Constante/valor exportado: on.
+ * @param {string|symbol} eventName
+ * @param {function(...unknown): void} handler
+ */
 export const on = (eventName, handler) => internalEmitter.on(eventName, handler);
-/** Constante/valor exportado: once. */
+/** Constante/valor exportado: once.
+ * @param {string|symbol} eventName
+ * @param {function(...unknown): void} handler
+ */
 export const once = (eventName, handler) => internalEmitter.once(eventName, handler);
-/** Constante/valor exportado: off. */
+/** Constante/valor exportado: off.
+ * @param {string|symbol} eventName
+ * @param {function(...unknown): void} handler
+ */
 export const off = (eventName, handler) => internalEmitter.off(eventName, handler);
-/** Constante/valor exportado: emit. */
+/** Constante/valor exportado: emit.
+ * @param {*} eventName
+ */
 export const emit = (eventName, ...args) =>
     /** @type {import('node:events').EventEmitter} */ (internalEmitter).emit(eventName, ...args);
 
-/** Constante/valor exportado: sendToClient. */
+/** Constante/valor exportado: sendToClient.
+ * @param {*} clientId
+ * @param {*} eventName
+ * @param {*} data
+ */
 export const sendToClient = (clientId, eventName, data) => {
     if (!ioInstance) {
         log('WARN', '[HUB] Tentativa de enviar evento sem io instance');
@@ -581,7 +617,9 @@ export const sendToClient = (clientId, eventName, data) => {
     }
 };
 
-/** Constante/valor exportado: connectExternal. */
+/** Constante/valor exportado: connectExternal.
+ * @param {*} [port]
+ */
 export const connectExternal = async (port = 3008) => {
     const { io: ioClient } = await import('socket.io-client');
     const url = `http://localhost:${port}`;
@@ -740,7 +778,7 @@ export const connectExternal = async (port = 3008) => {
 /**
  * Notifica todos os clientes conectados sobre shutdown iminente do servidor.
  * @param {number} timeoutMs - Tempo em ms até o shutdown forçado
-  * @returns {void}
+ * @returns {void}
  */
 function notifyShutdown(timeoutMs) {
     if (!ioInstance) {

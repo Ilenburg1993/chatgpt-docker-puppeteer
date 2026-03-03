@@ -28,7 +28,11 @@ function getIndentation(line) {
 }
 
 /**
- * @param {object} finding
+ * @typedef {object} BuildContractAwareReplacementFinding
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {BuildContractAwareReplacementFinding} finding
  * @param {string} oldLine
  * @param {string} fallback
  */
@@ -61,8 +65,18 @@ function buildContractAwareReplacement(finding, oldLine, fallback) {
 }
 
 /**
- * @param {object} finding
- * @param {{ title?: string, cause?: string, replacementHint?: string }} [context]
+ * @typedef {object} BuildSuggestedDiffContext
+ * @property {string} title
+ * @property {string} cause
+ * @property {string} replacementHint
+ */
+/**
+ * @typedef {object} BuildSuggestedDiffFinding
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {BuildSuggestedDiffFinding} finding
+ * @param {BuildSuggestedDiffContext} [context]
   * @returns {object}
  */
 export function buildSuggestedDiff(finding, context = {}) {

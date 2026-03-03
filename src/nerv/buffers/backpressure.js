@@ -25,11 +25,20 @@
 =========================== */
 
 /**
+ * @typedef {object} CreateBackpressureDeps
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateBackpressureOptions
+ * @property {*} [telemetry]
+ */
+/**
  * Cria um observador técnico de backpressure.
  *
- * @param {object} deps
+ * @param {CreateBackpressureDeps} deps
  * @param {object} deps.telemetry
  * Interface de telemetria do NERV.
+ * @param {CreateBackpressureOptions} [options]
   * @returns {object}
  */
 function createBackpressure({ telemetry }) {

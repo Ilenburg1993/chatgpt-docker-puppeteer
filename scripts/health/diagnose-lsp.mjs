@@ -17,9 +17,13 @@ const REQUIRED_LSP_TOOLS = [
 ];
 
 /**
+ * @typedef {object} CallMcpParams
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * @param {string} base
  * @param {string} method
- * @param {object} params
+ * @param {CallMcpParams} params
  * @param {number} id
  * @returns {Promise<{ ok: boolean, status: number, json: unknown, text: string }>}
  */
@@ -49,7 +53,11 @@ async function fetchHealth(base) {
 }
 
 /**
- * @param {object} payload
+ * @typedef {object} ToolNamesFromListPayload
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
+ * @param {ToolNamesFromListPayload} payload
  * @returns {string[]}
  */
 function toolNamesFromList(payload) {
@@ -61,7 +69,11 @@ function toolNamesFromList(payload) {
 }
 
 /**
- * @param {object} response
+ * @typedef {object} EvaluateFunctionalResponseResponse
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {EvaluateFunctionalResponseResponse} response
  * @param {string} op
  */
 function evaluateFunctionalResponse(response, op) {

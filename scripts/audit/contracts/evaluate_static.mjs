@@ -283,12 +283,14 @@ function resolveAllowlistedFiles(contract, allowlists) {
 }
 
 /**
- * @param {{
- *   rootDir: string,
- *   scanDir?: string,
- *   contracts: ContractDefinitionV1[],
- *   allowlists?: Record<string, Record<string, string[]>>,
- * }} options
+ * @typedef {object} EvaluateStaticContractsOptions
+ * @property {string} rootDir
+ * @property {string} scanDir
+ * @property {ContractDefinitionV1[]} contracts
+ * @property {Record<string} allowlists
+ */
+/**
+ * @param {EvaluateStaticContractsOptions} options
   * @returns {object}
  */
 export function evaluateStaticContracts(options) {

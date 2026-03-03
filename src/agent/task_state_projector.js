@@ -63,7 +63,18 @@ function _statSizeBytes(filePath) {
 }
 
 /**
- * @param {{ storage?: Record<string, unknown>|null, actor?: string }} [arg0]
+ * @typedef {object} RegisterResponseArtifactsOptions
+ * @property {*} [storage]
+ * @property {*} [actor]
+ */
+/**
+ * @typedef {object} RegisterResponseArtifactsArg0
+ * @property {Record<string} [storage]
+ * @property {string} [actor]
+ */
+/**
+ * @param {RegisterResponseArtifactsArg0} [arg0]
+ * @param {RegisterResponseArtifactsOptions} [options]
  */
 function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
     /** @type {Record<string, string|null>} */
@@ -105,7 +116,18 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
 }
 
 /**
- * @param {{ storage?: Record<string, unknown>|null, actor?: string }} [arg0]
+ * @typedef {object} RegisterDiagnosticArtifactsOptions
+ * @property {*} [storage]
+ * @property {*} [actor]
+ */
+/**
+ * @typedef {object} RegisterDiagnosticArtifactsArg0
+ * @property {Record<string} [storage]
+ * @property {string} [actor]
+ */
+/**
+ * @param {RegisterDiagnosticArtifactsArg0} [arg0]
+ * @param {RegisterDiagnosticArtifactsOptions} [options]
  */
 function _registerResponseArtifacts({ storage, actor = 'system' } = {}) {
     /** @type {Record<string, string|null>} */

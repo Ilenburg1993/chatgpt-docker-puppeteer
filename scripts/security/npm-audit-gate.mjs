@@ -278,14 +278,18 @@ async function isPublishedVersion(spec) {
 }
 
 /**
- * @param {{
- *   name: string,
- *   severity: string,
- *   fixAvailable?: boolean | { name?: string, version?: string, isSemVerMajor?: boolean },
- *   via?: unknown,
- *   nodes?: string[],
- *   isDirect?: boolean,
- * }} vulnerability
+ * @typedef {object} ClassifyVulnerabilityVulnerability
+ * @property {string} name
+ * @property {string} severity
+ * @property {boolean | { name?: string} [fixAvailable]
+ * @property {string} [version]
+ * @property {boolean} [isSemVerMajor]
+ * @property {unknown} [via]
+ * @property {string[]} [nodes]
+ * @property {boolean} [isDirect]
+ */
+/**
+ * @param {ClassifyVulnerabilityVulnerability} vulnerability
  * @returns {Promise<{
  *   state: 'actionable' | 'unpublished-fix' | 'no-fix' | 'manual-review',
  *   candidates: string[],

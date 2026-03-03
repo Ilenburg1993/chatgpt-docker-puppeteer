@@ -35,6 +35,10 @@ const MAX_EVOLUTIONS_PER_DOMAIN = 5;
 const evolutionCounter = new Map();
 
 /**
+ * @typedef {object} EvolveWithSadiProtocolProtocol
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Evolui o DNA automaticamente quando SADI descobre novo selector.
  *
  * Critérios de Aceitação:
@@ -42,7 +46,7 @@ const evolutionCounter = new Map();
  * - Selector não existe no DNA atual
  * - Não exceder MAX_EVOLUTIONS_PER_DOMAIN por sessão
  *
- * @param {object} protocol - Protocolo SADI com selector descoberto
+ * @param {EvolveWithSadiProtocolProtocol} protocol - Protocolo SADI com selector descoberto
  * @param {string} domain - Domínio (ex: 'chatgpt.com')
  * @param {string} intent - Intenção (ex: 'input_box', 'send_button')
  * @returns {Promise<{accepted: boolean, reason?: string, stats?: object, error?: string}>}
@@ -143,10 +147,14 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
 }
 
 /**
+ * @typedef {object} EvolveWithFullProtocolFullProtocol
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Evolui DNA com protocolo SADI completo (incluindo metadata).
  * Substitui array de strings por protocolo estruturado.
  *
- * @param {object} fullProtocol - Protocolo completo com context, isShadow, etc
+ * @param {EvolveWithFullProtocolFullProtocol} fullProtocol - Protocolo completo com context, isShadow, etc
  * @param {string} domain - Domínio
  * @param {string} intent - Intenção
  * @returns {Promise<boolean>} - true se evoluiu

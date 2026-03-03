@@ -16,11 +16,15 @@ const METADATA_TYPES = {
 };
 
 /**
+ * @typedef {object} ExtractTaskMetadataTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Extrai propriedades específicas do estado da tarefa.
  * Usado por transformadores {{REF:LAST|STATUS}}, {{REF:LAST|METRICS}}, {{REF:LAST|ERROR}}.
  *
  * @function extractTaskMetadata
- * @param {object} task - Objeto Task completo com propriedade `state`
+ * @param {ExtractTaskMetadataTask} task - Objeto Task completo com propriedade `state`
  * @param {string} transformType - Tipo de metadado a extrair (STATUS, METRICS, ERROR)
  * @returns {string} Metadado extraído ou valor padrão (UNKNOWN, NONE, {})
  *

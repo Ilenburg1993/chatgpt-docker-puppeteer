@@ -37,14 +37,25 @@ function createQueue() {
 =========================== */
 
 /**
+ * @typedef {object} CreateOutboundQueueDeps
+ * @property {object} telemetry
+ * @property {number|null} maxSize
+ */
+/**
+ * @typedef {object} CreateOutboundQueueOptions
+ * @property {*} [telemetry]
+ * @property {*} [maxSize]
+ */
+/**
  * Cria a fila técnica de saída.
  *
- * @param {object} deps
+ * @param {CreateOutboundQueueDeps} deps
  * @param {object} deps.telemetry
  * Interface de telemetria do NERV (observação técnica).
  *
  * @param {number|null} deps.maxSize
  * Limite máximo técnico da fila (opcional).
+ * @param {CreateOutboundQueueOptions} [options]
   * @returns {object}
  */
 function createOutboundQueue({ telemetry, maxSize = null }) {

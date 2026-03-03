@@ -10,6 +10,7 @@ let nervInstance = null;
 /**
  * Injeta instância do NERV para emissão de eventos (ONDA 2).
  * Deve ser chamado no boot antes de usar infra_failure_policy.
+ * @param {*} nerv
   * @returns {void}
  */
 function setNERV(nerv) {

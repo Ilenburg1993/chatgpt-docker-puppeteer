@@ -18,6 +18,16 @@ import {
 ========================================================================== */
 
 /**
+ * @typedef {object} PersistServerStateDeps
+ * @property {typeof import('#nerv/discovery')} discovery
+ * @property {string} protocolVersion
+ * @property {string} singularityMode
+ */
+/**
+ * @typedef {object} PersistServerStateNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Persiste estado mínimo do processo SERVER para descoberta por outros
  * processos (ex: Maestro).
  *
@@ -26,8 +36,8 @@ import {
  *   ✔ Commit atômico via arquivo temporário (fallback)
  *   ✔ Nunca retorna estado parcialmente gravado
  *
- * @param {{discovery: typeof import('#nerv/discovery'), protocolVersion: string, singularityMode: string}} deps
- * @param {object} nerv - Instância NERV para publicação de eventos
+ * @param {PersistServerStateDeps} deps
+ * @param {PersistServerStateNerv} nerv - Instância NERV para publicação de eventos
  * @param {number} port - Porta efetivamente bound pelo HTTP engine
  * @param {'standalone'|'delegated'} [authority='standalone'] - Modo de autoridade do servidor
  * @sideEffects - Publica estado via Discovery (NERV-first, file fallback)

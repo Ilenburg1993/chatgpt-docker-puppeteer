@@ -37,7 +37,15 @@ function _rowToAuditDiff(row) {
 }
 
 /**
+ * @typedef {object} InsertAuditDiffOptions
+ * @property {*} [operationId]
+ * @property {*} [entityType]
+ * @property {*} [entityId]
+ * @property {*} [before]
+ */
+/**
  * Função exportada: insertAuditDiff.
+ * @param {InsertAuditDiffOptions} [options]
  * @returns {AuditDiff|null}
  */
 function insertAuditDiff({ operationId, entityType, entityId, before = {}, after = {} }) {
@@ -81,6 +89,7 @@ function getAuditDiffById(id) {
 
 /**
  * Função exportada: listAuditDiffsByOperation.
+ * @param {*} operationId
  * @returns {AuditDiff[]}
  */
 function listAuditDiffsByOperation(operationId) {
@@ -101,6 +110,9 @@ function listAuditDiffsByOperation(operationId) {
 
 /**
  * Função exportada: listAuditDiffsByEntity.
+ * @param {*} entityType
+ * @param {*} entityId
+ * @param {number} [limit]
  * @returns {AuditDiff[]}
  */
 function listAuditDiffsByEntity(entityType, entityId, limit = 100) {

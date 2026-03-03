@@ -38,7 +38,13 @@ function sanitizeToolMetadata(tool) {
 }
 
 /**
+ * @typedef {object} RegisterUpstreamMcpToolsOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: registerUpstreamMcpTools.
+ * @param {*} registry
+ * @param {RegisterUpstreamMcpToolsOptions} [options]
  * @returns {Promise<void>}
  */
 export async function registerUpstreamMcpTools(registry, options = {}) {

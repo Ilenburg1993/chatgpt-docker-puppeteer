@@ -22,8 +22,12 @@ function _now() {
 }
 
 /**
+ * @typedef {object} RowToJobRow
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Converte row para DiagnosticJob
- * @param {object} row
+ * @param {RowToJobRow} row
  * @returns {object|null}
  */
 function _rowToJob(row) {
@@ -52,8 +56,12 @@ function _rowToJob(row) {
 }
 
 /**
+ * @typedef {object} RowToReportRow
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Converte row para DiagnosticReport
- * @param {object} row
+ * @param {RowToReportRow} row
  * @returns {object|null}
  */
 function _rowToReport(row) {
@@ -77,8 +85,12 @@ function _rowToReport(row) {
 }
 
 /**
+ * @typedef {object} CreateDiagnosticJobInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Cria um novo job de diagnóstico
- * @param {object} input
+ * @param {CreateDiagnosticJobInput} input
  * @returns {object}
  */
 export function createDiagnosticJob(input) {
@@ -141,8 +153,12 @@ export function getDiagnosticJobById(id) {
 }
 
 /**
+ * @typedef {object} ListDiagnosticJobsFilters
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Lista jobs de diagnóstico com filtros opcionais
- * @param {object} [filters]
+ * @param {ListDiagnosticJobsFilters} [filters]
  * @param {string} [filters.status]
  * @param {string} [filters.kind]
  * @param {string} [filters.triggerType]
@@ -193,9 +209,13 @@ export function listDiagnosticJobs(filters = {}) {
 }
 
 /**
+ * @typedef {object} UpdateDiagnosticJobUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Atualiza um job de diagnóstico
  * @param {string} id
- * @param {object} updates
+ * @param {UpdateDiagnosticJobUpdates} updates
  * @returns {object|null}
  */
 export function updateDiagnosticJob(id, updates = {}) {
@@ -269,8 +289,12 @@ export function updateDiagnosticJob(id, updates = {}) {
 }
 
 /**
+ * @typedef {object} CreateDiagnosticReportInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Cria um novo relatório de diagnóstico
- * @param {object} input
+ * @param {CreateDiagnosticReportInput} input
  * @returns {object}
  */
 export function createDiagnosticReport(input) {

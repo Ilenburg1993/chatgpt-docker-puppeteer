@@ -134,11 +134,13 @@ export async function checkOllamaHealth(depth = 'quick') {
         if (response.ok) {
             result.connected = true;
             const data = await response.json();
-            result.models = (Array.isArray(data.models) ? data.models : []).map(/** @param {Record<string, unknown>} m */ m => ({
-                name: m.name,
-                size: m.size,
-                modified_at: m.modified_at,
-            }));
+            result.models = (Array.isArray(data.models) ? data.models : []).map(
+                /** @param {Record<string, unknown>} m */ m => ({
+                    name: m.name,
+                    size: m.size,
+                    modified_at: m.modified_at,
+                })
+            );
 
             if (depth === 'deep') {
                 result.version = await getOllamaVersion(ollamaHost);
@@ -364,13 +366,17 @@ export async function checkHealth(options = {}) {
     const results = await Promise.all(checks);
 
     const ollama =
-        includeOllama && results.length > 0 ? results.shift() || { connected: false, error: 'disabled' } : { connected: false, error: 'disabled' };
+        includeOllama && results.length > 0
+            ? results.shift() || { connected: false, error: 'disabled' }
+            : { connected: false, error: 'disabled' };
     const gateway =
         includeGateway && results.length > 0
             ? results.shift() || { connected: false, error: 'disabled' }
             : { connected: false, error: 'disabled' };
     const system =
-        includeSystem && results.length > 0 ? results.shift() || { status: HEALTH_STATUS.UNKNOWN } : { status: HEALTH_STATUS.UNKNOWN };
+        includeSystem && results.length > 0
+            ? results.shift() || { status: HEALTH_STATUS.UNKNOWN }
+            : { status: HEALTH_STATUS.UNKNOWN };
 
     const status = calculateOverallStatus(ollama, gateway, system);
 

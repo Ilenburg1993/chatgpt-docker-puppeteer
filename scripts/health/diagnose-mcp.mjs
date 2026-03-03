@@ -41,8 +41,14 @@ async function fetchJson(url, init) {
 }
 
 /**
+ * @typedef {object} PrintResultResult
+ * @property {boolean} ok
+ * @property {number} status
+ * @property {string} text
+ */
+/**
  * @param {string} label
- * @param {{ ok: boolean, status: number, text: string }} result
+ * @param {PrintResultResult} result
  */
 function printResult(label, result) {
     const status = `${result.status}${result.ok ? ' OK' : ' FAIL'}`;
@@ -56,10 +62,14 @@ function printResult(label, result) {
 }
 
 /**
+ * @typedef {object} CallToolParams
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * @param {string} base
  * @param {number} id
  * @param {string} name
- * @param {object} args
+ * @param {CallToolParams} args
  */
 async function callTool(base, id, name, args) {
     return fetchJson(`${base}/api/mcp`, {

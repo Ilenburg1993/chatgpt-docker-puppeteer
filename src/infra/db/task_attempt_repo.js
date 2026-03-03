@@ -6,32 +6,34 @@ function _now() {
 }
 
 /**
- * @typedef {{
- *   id: string,
- *   task_id: string,
- *   mission_id?: string|null,
- *   status: string,
- *   worker_id?: string|null,
- *   created_at_ms?: number,
- *   started_at_ms?: number|null,
- *   ended_at_ms?: number|null,
- *   rendered_prompt_artifact_id?: string|null,
- *   response_text_artifact_id?: string|null,
- *   response_v2_json_artifact_id?: string|null,
- *   response_md_artifact_id?: string|null,
- *   response_html_artifact_id?: string|null,
- *   error?: string|null,
- *   driver_target?: string|null,
- *   model?: string|null,
- *   reason_class?: string|null,
- *   count_attempt?: number|null,
- *   last_heartbeat_at_ms?: number|null,
- *   reason_code?: string|null,
- *   cause_layer?: string|null,
- *   diagnostic_artifacts_json?: string|null,
- *   diagnosis_json?: string|null,
- * }} AttemptUpsert
-  * @returns {void}
+ * @typedef {object} AttemptUpsert
+ * @property {string} id
+ * @property {string} task_id
+ * @property {string|null} [mission_id]
+ * @property {string} status
+ * @property {string|null} [worker_id]
+ * @property {number} [created_at_ms]
+ * @property {number|null} [started_at_ms]
+ * @property {number|null} [ended_at_ms]
+ * @property {string|null} [rendered_prompt_artifact_id]
+ * @property {string|null} [response_text_artifact_id]
+ * @property {string|null} [response_v2_json_artifact_id]
+ * @property {string|null} [response_md_artifact_id]
+ * @property {string|null} [response_html_artifact_id]
+ * @property {string|null} [error]
+ * @property {string|null} [driver_target]
+ * @property {string|null} [model]
+ * @property {string|null} [reason_class]
+ * @property {number|null} [count_attempt]
+ * @property {number|null} [last_heartbeat_at_ms]
+ * @property {string|null} [reason_code]
+ * @property {string|null} [cause_layer]
+ * @property {string|null} [diagnostic_artifacts_json]
+ * @property {string|null} [diagnosis_json]
+ */
+/**
+ * @param {AttemptUpsert} input
+ * @returns {void}
  */
 
 function upsertAttempt(input) {
@@ -110,7 +112,13 @@ function upsertAttempt(input) {
 }
 
 /**
+ * @typedef {object} UpdateAttemptUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: updateAttempt.
+ * @param {*} attemptId
+ * @param {UpdateAttemptUpdates} [updates]
  * @returns {TaskAttempt|null}
  */
 function updateAttempt(attemptId, updates = {}) {
@@ -134,7 +142,13 @@ function getAttemptById(attemptId) {
 }
 
 /**
+ * @typedef {object} ListAttemptsByTaskOptions
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listAttemptsByTask.
+ * @param {*} taskId
+ * @param {ListAttemptsByTaskOptions} [options]
  * @returns {TaskAttempt[]}
  */
 function listAttemptsByTask(taskId, { limit = 200 } = {}) {

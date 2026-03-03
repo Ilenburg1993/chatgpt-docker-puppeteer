@@ -14,6 +14,8 @@ const results = [];
 
 /**
  * Helper para executar testes
+ * @param {string} name
+ * @param {*} testFn
  */
 function runTest(name, testFn) {
     process.stdout.write(`\n=== ${name} ===\n`);

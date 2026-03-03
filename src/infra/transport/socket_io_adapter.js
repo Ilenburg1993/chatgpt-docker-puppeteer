@@ -4,8 +4,12 @@ import { io } from 'socket.io-client';
 import EventEmitter from 'node:events';
 
 /**
+ * @typedef {object} CreateSocketAdapterConfig
+ * @property {string} url
+ */
+/**
  * Cria uma instância do adaptador de transporte para Socket.io.
- * * @param {object} config
+ * * @param {CreateSocketAdapterConfig} config
  * @param {string} config.url - URL do servidor (ex: http://localhost:3000).
  * @param {object} [config.options] - Opções nativas do socket.io-client.
   * @returns {object}

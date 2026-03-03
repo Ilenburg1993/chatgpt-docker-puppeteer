@@ -7,17 +7,32 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
 =========================== */
 
 /**
+ * @typedef {object} CreateEmitEventDeps
+ * @property {object} envelopes
+ * @property {object} buffers
+ * @property {object} correlation
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateEmitEventOptions
+ * @property {*} [envelopes]
+ * @property {*} [buffers]
+ * @property {*} [correlation]
+ * @property {*} [telemetry]
+ */
+/**
  * Cria o emissor técnico de EVENTs.
  *
  * **Side-effects:** Registra emissão na correlação histórica.
  * **Semântica:** Emissor especializado para mensagens de evento NERV.
  * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {object} deps - Dependências do emissor
+ * @param {CreateEmitEventDeps} deps - Dependências do emissor
  * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
  * @param {object} deps.buffers - Subsistema de buffers outbound
  * @param {object} deps.correlation - Sistema de correlação histórica
  * @param {object} deps.telemetry - Interface de telemetria NERV
+ * @param {CreateEmitEventOptions} [options]
  * @returns {object} Emissor com método emitEvent
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

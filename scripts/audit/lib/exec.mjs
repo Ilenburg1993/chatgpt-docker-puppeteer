@@ -2,22 +2,24 @@
 import { spawn } from 'node:child_process';
 
 /**
+ * @typedef {object} RunCommandOptions
+ * @property {string} cwd
+ * @property {Record<string} env
+ * @property {number} timeoutMs
+ * @property {number[]} acceptExitCodes
+ * @property {number} maxStdoutBytes
+ * @property {number} maxStderrBytes
+ * @property {number} truncationHeadRatio
+ * @property {boolean} shell
+ * @property {unknown} stdio
+ * @property {(chunk: string) => void} onStdout
+ * @property {(chunk: string) => void} onStderr
+ */
+/**
  * Runs a command and captures stdout/stderr without throwing.
  * @param {string} command
  * @param {string[]} args
- * @param {{
- *   cwd?: string,
- *   env?: Record<string,string|undefined>,
- *   timeoutMs?: number,
- *   acceptExitCodes?: number[],
- *   maxStdoutBytes?: number,
- *   maxStderrBytes?: number,
- *   truncationHeadRatio?: number,
- *   shell?: boolean,
- *   stdio?: unknown,
- *   onStdout?: (chunk: string) => void,
- *   onStderr?: (chunk: string) => void,
- * }} [options]
+ * @param {RunCommandOptions} [options]
  * @returns {Promise<{ ok: boolean, exitCode: number|null, stdout: string, stderr: string, durationMs: number, timedOut: boolean, command: string, stdoutBytes: number, stderrBytes: number, stdoutTruncated: boolean, stderrTruncated: boolean }>}
  */
 export async function runCommand(command, args = [], options = {}) {
@@ -138,15 +140,17 @@ export async function runCommand(command, args = [], options = {}) {
 }
 
 /**
- * @param {{
- *   current: string,
- *   incoming: string,
- *   previousBytes: number,
- *   limitBytes: number,
- *   wasTruncated: boolean,
- *   headRatio: number,
- *   marker: string,
- * }} input
+ * @typedef {object} AppendBoundedOutputInput
+ * @property {string} current
+ * @property {string} incoming
+ * @property {number} previousBytes
+ * @property {number} limitBytes
+ * @property {boolean} wasTruncated
+ * @property {number} headRatio
+ * @property {string} marker
+ */
+/**
+ * @param {AppendBoundedOutputInput} input
  */
 function appendBoundedOutput(input) {
     const incomingBytes = Buffer.byteLength(input.incoming, 'utf8');
@@ -195,6 +199,7 @@ function sliceByUtf8Bytes(text, maxBytes, fromEnd) {
 /**
  * @param {string} binary
  * @param {(command: string, args: string[], options?: unknown) => Promise<{ ok: boolean }>} [execFn]
+ * @param {*} [execFn]
  * @returns {Promise<boolean>}
  */
 export async function commandExists(binary, execFn = runCommand) {
@@ -281,9 +286,13 @@ function extractBalancedJsonBlocks(text) {
 }
 
 /**
+ * @typedef {object} ParseJsonFromMixedOutputOptions
+ * @property {boolean} preferLast
+ */
+/**
  * Attempts to parse a JSON object from noisy stdout.
  * @param {string} stdout
- * @param {{ preferLast?: boolean }} [options]
+ * @param {ParseJsonFromMixedOutputOptions} [options]
  * @returns {unknown|null}
  */
 export function parseJsonFromMixedOutput(stdout, options = {}) {

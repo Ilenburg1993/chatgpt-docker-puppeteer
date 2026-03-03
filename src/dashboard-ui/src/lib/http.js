@@ -40,6 +40,7 @@ http.interceptors.response.use(
 
 /**
  * Função exportada: formatHttpError.
+ * @param {*} error
  * @returns {object}
  */
 export function formatHttpError(error) {

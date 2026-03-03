@@ -134,22 +134,26 @@ function _applyTaskMutation(taskMutation, nowMs) {
 }
 
 /**
- * @param {{
- *  missionId: string,
- *  toStatus: string,
- *  allowedFrom: string[],
- *  startedAtMs?: number|null,
- *  completedAtMs?: number|null,
- *  contextPatch?: Record<string, unknown>|null,
- *  failureReason?: string|null,
- *  expectedProgress?: { currentTaskId?: string|null, currentStepIndex?: number }|null,
- *  actorType?: string,
- *  actorId?: string|null,
- *  eventType?: string,
- *  dedupKey?: string|null,
- *  payload?: Record<string, unknown>,
- *  taskMutation?: ((db: object, nowMs: number) => void)|null,
- * }} params
+ * @typedef {object} TransitionMissionParams
+ * @property {string} missionId
+ * @property {string} toStatus
+ * @property {string[]} allowedFrom
+ * @property {number|null} startedAtMs
+ * @property {number|null} completedAtMs
+ * @property {Record<string} contextPatch
+ * @property {string|null} failureReason
+ * @property {{ currentTaskId?: string|null} expectedProgress
+ * @property {number} currentStepIndex
+ * @property {string} actorType
+ * @property {string|null} actorId
+ * @property {string} eventType
+ * @property {string|null} dedupKey
+ * @property {Record<string} payload
+ * @property {((db: object} taskMutation
+ * @property {number) => void)|null} nowMs
+ */
+/**
+ * @param {TransitionMissionParams} params
  * @returns {MissionTransitionResult}
  */
 function transitionMission(params) {
@@ -231,19 +235,22 @@ function transitionMission(params) {
 }
 
 /**
+ * @typedef {object} UpdateMissionProgressStateParams
+ * @property {string} missionId
+ * @property {Record<string} progress
+ * @property {Record<string} contextPatch
+ * @property {{ currentTaskId?: string|null} expectedProgress
+ * @property {number} currentStepIndex
+ * @property {string} actorType
+ * @property {string|null} actorId
+ * @property {string} eventType
+ * @property {string|null} dedupKey
+ * @property {Record<string} payload
+ */
+/**
  * Atualiza progresso/contexto da missão em caminho único de domínio.
  *
- * @param {{
- *  missionId: string,
- *  progress: Record<string, unknown>,
- *  contextPatch?: Record<string, unknown>|null,
- *  expectedProgress?: { currentTaskId?: string|null, currentStepIndex?: number }|null,
- *  actorType?: string,
- *  actorId?: string|null,
- *  eventType?: string,
- *  dedupKey?: string|null,
- *  payload?: Record<string, unknown>,
- * }} params
+ * @param {UpdateMissionProgressStateParams} params
  * @returns {MissionTransitionResult}
  */
 function updateMissionProgressState(params) {
@@ -328,7 +335,16 @@ function updateMissionProgressState(params) {
 }
 
 /**
+ * @typedef {object} ExecuteMissionTransitionOptions
+ * @property {*} [missionId]
+ * @property {*} [actorType]
+ * @property {*} [actorId]
+ * @property {*} [dedupKey]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: executeMissionTransition.
+ * @param {ExecuteMissionTransitionOptions} [options]
  * @returns {MissionTransitionResult}
  */
 function executeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
@@ -348,7 +364,16 @@ function executeMissionTransition({ missionId, actorType = 'user', actorId = nul
 }
 
 /**
+ * @typedef {object} PauseMissionTransitionOptions
+ * @property {*} [missionId]
+ * @property {*} [actorType]
+ * @property {*} [actorId]
+ * @property {*} [dedupKey]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: pauseMissionTransition.
+ * @param {PauseMissionTransitionOptions} [options]
  * @returns {MissionTransitionResult}
  */
 function pauseMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
@@ -378,7 +403,16 @@ function pauseMissionTransition({ missionId, actorType = 'user', actorId = null,
 }
 
 /**
+ * @typedef {object} ResumeMissionTransitionOptions
+ * @property {*} [missionId]
+ * @property {*} [actorType]
+ * @property {*} [actorId]
+ * @property {*} [dedupKey]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: resumeMissionTransition.
+ * @param {ResumeMissionTransitionOptions} [options]
  * @returns {MissionTransitionResult}
  */
 function resumeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
@@ -411,7 +445,16 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
 }
 
 /**
+ * @typedef {object} CancelMissionTransitionOptions
+ * @property {*} [missionId]
+ * @property {*} [actorType]
+ * @property {*} [actorId]
+ * @property {*} [dedupKey]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: cancelMissionTransition.
+ * @param {CancelMissionTransitionOptions} [options]
  * @returns {MissionTransitionResult}
  */
 function cancelMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
@@ -442,7 +485,19 @@ function cancelMissionTransition({ missionId, actorType = 'user', actorId = null
 }
 
 /**
+ * @typedef {object} FailMissionTransitionOptions
+ * @property {*} [missionId]
+ * @property {*} [failureReason]
+ * @property {*} [contextPatch]
+ * @property {*} [expectedProgress]
+ * @property {*} [actorType]
+ * @property {*} [actorId]
+ * @property {*} [dedupKey]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: failMissionTransition.
+ * @param {FailMissionTransitionOptions} [options]
  * @returns {MissionTransitionResult}
  */
 function failMissionTransition({
@@ -472,7 +527,18 @@ function failMissionTransition({
 }
 
 /**
+ * @typedef {object} CompleteMissionTransitionOptions
+ * @property {*} [missionId]
+ * @property {*} [contextPatch]
+ * @property {*} [expectedProgress]
+ * @property {*} [actorType]
+ * @property {*} [actorId]
+ * @property {*} [dedupKey]
+ * @property {*} [payload]
+ */
+/**
  * Função exportada: completeMissionTransition.
+ * @param {CompleteMissionTransitionOptions} [options]
  * @returns {MissionTransitionResult}
  */
 function completeMissionTransition({

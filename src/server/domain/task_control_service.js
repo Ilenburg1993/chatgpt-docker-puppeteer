@@ -263,7 +263,15 @@ function _isTaskBoundToMissionStep(db, row, task) {
 }
 
 /**
- * Função exportada: createTaskCommand.
+ * @typedef {object} CreateTaskCommandOptions
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo do comando.
+ * @property {object} [payload={}] - Dados adicionais da tarefa.
+ * @property {boolean} [ifNotExists=false] - Criar somente se ainda não existir.
+ */
+/**
+ * Cria um novo comando de task no sistema.
+ * @param {CreateTaskCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = false }) {
@@ -299,7 +307,16 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
 }
 
 /**
- * Função exportada: patchTaskCommand.
+ * @typedef {object} PatchTaskCommandOptions
+ * @property {string} taskId - ID da task a alterar.
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo da alteração.
+ * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ * @property {object} [patch={}] - Campos a alterar.
+ */
+/**
+ * Aplica um patch parcial a uma task existente.
+ * @param {PatchTaskCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch = {} }) {
@@ -396,7 +413,16 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
 }
 
 /**
- * Função exportada: reassignTaskMissionCommand.
+ * @typedef {object} ReassignTaskMissionCommandOptions
+ * @property {string} taskId - ID da task.
+ * @property {string|null} missionId - ID da missão destino (null para desassociar).
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo da reassociação.
+ * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ */
+/**
+ * Reassocia uma task a outra missão.
+ * @param {ReassignTaskMissionCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifVersion = null }) {
@@ -498,7 +524,15 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
 }
 
 /**
- * Função exportada: pauseTaskCommand.
+ * @typedef {object} PauseTaskCommandOptions
+ * @property {string} taskId - ID da task a pausar.
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo da pausa.
+ * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ */
+/**
+ * Pausa a execução de uma task.
+ * @param {PauseTaskCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
@@ -531,7 +565,15 @@ function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 }
 
 /**
- * Função exportada: resumeTaskCommand.
+ * @typedef {object} ResumeTaskCommandOptions
+ * @property {string} taskId - ID da task a retomar.
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo da retomada.
+ * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ */
+/**
+ * Retoma a execução de uma task pausada.
+ * @param {ResumeTaskCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
@@ -575,7 +617,15 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 }
 
 /**
- * Função exportada: cancelTaskCommand.
+ * @typedef {object} CancelTaskCommandOptions
+ * @property {string} taskId - ID da task a cancelar.
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo do cancelamento.
+ * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ */
+/**
+ * Cancela uma task ativa.
+ * @param {CancelTaskCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
@@ -613,7 +663,15 @@ function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 }
 
 /**
- * Função exportada: retryTaskCommand.
+ * @typedef {object} RetryTaskCommandOptions
+ * @property {string} taskId - ID da task a retentar.
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo da retentativa.
+ * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ */
+/**
+ * Retenta uma task falha ou cancelada.
+ * @param {RetryTaskCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
@@ -655,7 +713,14 @@ function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 }
 
 /**
- * Função exportada: purgeTaskCommand.
+ * @typedef {object} PurgeTaskCommandOptions
+ * @property {string} taskId - ID da task a purgar.
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo da purga.
+ */
+/**
+ * Remove permanentemente uma task do sistema.
+ * @param {PurgeTaskCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function purgeTaskCommand({ taskId, actor = {}, reason }) {
@@ -679,7 +744,16 @@ function purgeTaskCommand({ taskId, actor = {}, reason }) {
 }
 
 /**
- * Função exportada: bulkTaskActionCommand.
+ * @typedef {object} BulkTaskActionCommandOptions
+ * @property {string[]} [ids=[]] - Lista de IDs de tasks.
+ * @property {string} action - Ação a executar (ex: cancel, pause, retry).
+ * @property {object} [params={}] - Parâmetros adicionais da ação.
+ * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string} [reason] - Motivo da ação em massa.
+ */
+/**
+ * Executa uma ação em lote sobre múltiplas tasks.
+ * @param {BulkTaskActionCommandOptions} options
  * @returns {Promise<object>|object|null}
  */
 function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reason }) {

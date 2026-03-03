@@ -90,8 +90,12 @@ function _updatePatch(id, fields = {}) {
 }
 
 /**
+ * @typedef {object} CreateAuditPatchProposalInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: createAuditPatchProposal.
- * @param {object} input Input data for the AuditPatch record.
+ * @param {CreateAuditPatchProposalInput} input Input data for the AuditPatch record.
  * @returns {AuditPatch|null}
  */
 function createAuditPatchProposal(input = {}) {
@@ -142,7 +146,13 @@ function getAuditPatchProposalById(id) {
 }
 
 /**
+ * @typedef {object} ListAuditPatchProposalsByJobIdOptions
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listAuditPatchProposalsByJobId.
+ * @param {*} jobId
+ * @param {ListAuditPatchProposalsByJobIdOptions} [options]
  * @returns {AuditPatch[]}
  */
 function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
@@ -161,7 +171,13 @@ function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
 }
 
 /**
+ * @typedef {object} UpdateAuditPatchProposalFields
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: updateAuditPatchProposal.
+ * @param {string} id
+ * @param {UpdateAuditPatchProposalFields} [fields]
  * @returns {AuditPatch|null}
  */
 function updateAuditPatchProposal(id, fields = {}) {

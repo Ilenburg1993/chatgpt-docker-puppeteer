@@ -42,10 +42,14 @@
  */
 
 /**
+ * @typedef {object} NormalizeToolResultPayloadValue
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Normalize unknown tool output to a structured shape used by MCP adapters.
  * Backward-compatible: plain strings/objects are still accepted.
  *
- * @param {object} value
+ * @param {NormalizeToolResultPayloadValue} value
  * @returns {{ text: string, json?: unknown, flags: { degraded: boolean, mutating: boolean, partial: boolean } }}
  */
 export function normalizeToolResultPayload(value) {

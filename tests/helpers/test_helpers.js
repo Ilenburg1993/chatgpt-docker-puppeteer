@@ -36,7 +36,16 @@ function ensureDirs() {
 
 // GERA TAREFA NO FORMATO SCHEMA V3
 /**
+ * @typedef {object} WriteTaskOptions
+ * @property {string} [id] - ID explícito da tarefa (default: gerado automaticamente)
+ * @property {string} type - Tipo da tarefa
+ * @property {string} [target] - Target URL
+ * @property {*} [prompt] - Prompt da tarefa
+ * @property {*} [context] - Contexto adicional
+ */
+/**
  * Função exportada: writeTask.
+ * @param {WriteTaskOptions} options
  * @returns {object}
  */
 function writeTask(options) {
@@ -80,6 +89,7 @@ function writeTask(options) {
 
 /**
  * Função exportada: readTask.
+ * @param {string} id
  * @returns {object}
  */
 function readTask(id) {
@@ -124,6 +134,7 @@ function cleanTmp() {
 
 /**
  * Função exportada: readLatestGlobalLogTail.
+ * @param {*} [lines]
  * @returns {object}
  */
 function readLatestGlobalLogTail(lines = 50) {
@@ -140,6 +151,7 @@ function readLatestGlobalLogTail(lines = 50) {
 
 /**
  * Função exportada: startAgent.
+ * @param {*} [timeoutMs]
  * @returns {object}
  */
 function startAgent(timeoutMs = 15000) {
@@ -190,6 +202,7 @@ function startAgent(timeoutMs = 15000) {
 
 /**
  * Função exportada: stopAgent.
+ * @param {*} proc
  * @returns {void}
  */
 function stopAgent(proc) {
@@ -212,6 +225,9 @@ function stopAgent(proc) {
 
 /**
  * Função exportada: waitForCondition.
+ * @param {function(): Promise<boolean>|boolean} fn
+ * @param {number} [timeout]
+ * @param {number} [interval]
  * @returns {Promise<unknown>}
  */
 async function waitForCondition(fn, timeout = 10000, interval = 500) {

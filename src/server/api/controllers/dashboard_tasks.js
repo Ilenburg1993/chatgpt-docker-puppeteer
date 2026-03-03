@@ -78,15 +78,28 @@ function _buildMissionContext(db, missionId) {
 }
 
 /**
- * @param {{
- *   status?: string | null,
- *   stage?: string | null,
- *   missionId?: string | null,
- *   target?: string | null,
- *   blocked?: boolean | null,
- *   search?: string | null,
- *   priorityGte?: number | string | null
- * }} [filters={}]
+ * @typedef {object} BuildTasksWhereOptions
+ * @property {*} [status]
+ * @property {*} [stage]
+ * @property {*} [missionId]
+ * @property {*} [target]
+ * @property {*} [blocked]
+ * @property {*} [search]
+ * @property {*} [priorityGte]
+ */
+/**
+ * @typedef {object} BuildTasksWhereFilters
+ * @property {string | null} [status]
+ * @property {string | null} [stage]
+ * @property {string | null} [missionId]
+ * @property {string | null} [target]
+ * @property {boolean | null} [blocked]
+ * @property {string | null} [search]
+ * @property {number | string | null} [priorityGte]
+ */
+/**
+ * @param {BuildTasksWhereFilters} filters={}]
+ * @param {BuildTasksWhereOptions} [options]
  */
 function _buildTasksWhere({ status, stage, missionId, target, blocked, search, priorityGte } = {}) {
     const where = [];

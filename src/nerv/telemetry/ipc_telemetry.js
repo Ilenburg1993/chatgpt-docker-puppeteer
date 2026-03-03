@@ -35,6 +35,8 @@ function now() {
 /**
  * Garante execução segura de handlers de telemetria.
  * Qualquer erro é isolado e ignorado.
+ * @param {Function} handler
+ * @param {*} payload
  */
 function safeCall(handler, payload) {
     try {
@@ -49,9 +51,13 @@ function safeCall(handler, payload) {
 =========================== */
 
 /**
+ * @typedef {object} CreateIPCTelemetryConfig
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Cria o sistema de telemetria do NERV.
  *
- * @param {object} config
+ * @param {CreateIPCTelemetryConfig} config
  * Configuração estritamente técnica (opcional):
  * - enabled: boolean
   * @returns {object}

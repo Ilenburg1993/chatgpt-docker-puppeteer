@@ -1266,6 +1266,30 @@ async function boot() {
 ========================================================================== */
 
 /**
+ * @typedef {object} ShutdownContext
+ * @property {object} serverAdapter
+ * @property {object} driverAdapter
+ * @property {object} kernel
+ * @property {object} browserPool
+ * @property {object} nerv
+ * @property {object} httpServer
+ * @property {boolean} httpAuthority
+ * @property {object} serverLifecycle
+ * @property {boolean} serverLifecycleManaged
+ * @property {object} queueWorker
+ * @property {object} taskProjector
+ * @property {object} taskControlWatcher
+ * @property {object} missionRunner
+ * @property {object} missionPlannerProcessor
+ * @property {object} attemptWatchdog
+ * @property {object} heartbeatWatchdog
+ * @property {object} agentLoop
+ */
+/**
+ * @typedef {object} ShutdownOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Executa shutdown gracioso coordenado do sistema.
  *
  * Ordem de encerramento (crítica para evitar race conditions):
@@ -1280,7 +1304,7 @@ async function boot() {
  * 9. TempProfiles (limpeza final)
  *
  * @async
- * @param {object} context - Contexto de runtime retornado por boot()
+ * @param {ShutdownContext} context - Contexto de runtime retornado por boot()
  * @param {object} context.serverAdapter - Adaptador do servidor NERV
  * @param {object} context.driverAdapter - Adaptador do driver NERV
  * @param {object} context.kernel - Instância do KERNEL
@@ -1298,7 +1322,7 @@ async function boot() {
  * @param {object} context.attemptWatchdog - Watchdog de tentativas
  * @param {object} context.heartbeatWatchdog - Watchdog de heartbeat
  * @param {object} context.agentLoop - Loop principal do agente
- * @param {object} [options] - Opções de shutdown
+ * @param {ShutdownOptions} [options] - Opções de shutdown
  * @param {boolean} [options.exitOnComplete=false] - Se verdadeiro, encerra processo ao concluir
  * @returns {Promise<{ok: boolean, failedPhases: number, totalPhases: number, duration: number}>}
  *
@@ -1790,6 +1814,10 @@ function cleanupSignalHandlers() {
  * Shutdown sempre passa pelo coordenador único.
  */
 /**
+ * @typedef {object} SetupSignalHandlersContext
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Registra signal handlers para graceful shutdown.
  *
  * Handlers registrados:
@@ -1802,7 +1830,7 @@ function cleanupSignalHandlers() {
  * - SIGHUP: Inicia shutdown gracioso (terminal hangup)
  * - SIGUSR2: Inicia shutdown gracioso (PM2 graceful reload)
  *
- * @param {object} context - Contexto de runtime retornado por boot()
+ * @param {SetupSignalHandlersContext} context - Contexto de runtime retornado por boot()
  * @returns {void}
  *
  * @sideEffects

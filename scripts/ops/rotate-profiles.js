@@ -123,6 +123,7 @@ async function cleanOldBackups() {
 
 /**
  * Calcula tamanho total de um diretório (recursivo)
+ * @param {*} dirPath
   * @returns {Promise<void>}
  */
 async function getDirectorySize(dirPath) {

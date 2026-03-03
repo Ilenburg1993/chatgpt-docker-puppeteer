@@ -4,8 +4,20 @@ import { scoreConfidence } from './confidence_model.mjs';
 import { buildTestPlan } from './test_planner.mjs';
 
 /**
- * @param {object} finding
- * @param {{ rankedCauses?: Array<{ cause: string, score: number }>, proposeDiffs?: boolean, depth?: 'basic'|'standard'|'deep', contextPack?: unknown }} [options]
+ * @typedef {object} BuildProposalV3Options
+ * @property {Array<{ cause: string} rankedCauses
+ * @property {number} score
+ * @property {boolean} proposeDiffs
+ * @property {'basic'|'standard'|'deep'} depth
+ * @property {unknown} contextPack
+ */
+/**
+ * @typedef {object} BuildProposalV3Finding
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {BuildProposalV3Finding} finding
+ * @param {BuildProposalV3Options} [options]
   * @returns {object}
  */
 export function buildProposalV3(finding, options = {}) {

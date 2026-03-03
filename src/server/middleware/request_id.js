@@ -8,10 +8,18 @@ import crypto from 'node:crypto';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * @typedef {object} RequestIdReq
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} RequestIdRes
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Middleware de Injeção de Identidade de Requisição.
  *
- * @param {object} req - Request Express.
- * @param {object} res - Response Express.
+ * @param {RequestIdReq} req - Request Express.
+ * @param {RequestIdRes} res - Response Express.
  * @param {function} next - Próximo middleware.
   * @returns {void}
  */

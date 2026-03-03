@@ -295,9 +295,19 @@ function createSsotGatewayKernel(config = {}) {
 }
 
 /**
+ * @typedef {object} CreateLegacyKernelOptions
+ * @property {*} [nerv]
+ * @property {*} [contextManager]
+ * @property {*} [telemetry]
+ */
+/**
+ * @typedef {object} CreateLegacyKernelConfig
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Cria e compõe o Kernel de forma explícita e determinística.
  *
- * @param {object} [config] - Configurações estruturais do Kernel
+ * @param {CreateLegacyKernelConfig} [config] - Configurações estruturais do Kernel
  * @param {object} [config.nerv] - Instância do NERV já configurada e conectada (obrigatório)
  * @param {object} [config.contextManager] - Context manager opcional (injeção externa)
  * @param {object} [config.telemetry] - Opções da telemetria do Kernel
@@ -309,6 +319,7 @@ function createSsotGatewayKernel(config = {}) {
  * @param {object} [config.loop] - Opções do kernel_loop (intervalo, scheduler)
  * @param {number} [config.loop.interval] - Intervalo do loop em ms
  *
+ * @param {CreateLegacyKernelOptions} [options]
  * @returns {object} Interface pública do Kernel
  *
  * @throws {Error} Se NERV não for fornecido
@@ -742,7 +753,7 @@ function createLegacyKernel({
  * - Padrão: Gateway de execução SSOT-first + pump NERV
  * - Opcional: Kernel legado "decisor soberano" (mode='legacy')
  *
- * @param {KernelOptions|SsotGatewayKernelOptions} [config={}] - Configuração do kernel.
+ * @param {KernelOptions} [config={}] - Configuração do kernel.
  * @returns {object} Instância do kernel configurado.
  * Side-effects: Cria e inicializa os componentes do kernel conforme a configuração.
  */

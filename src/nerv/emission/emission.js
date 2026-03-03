@@ -8,17 +8,32 @@ import createEmitEvent from './emit_event.js';
 =========================== */
 
 /**
+ * @typedef {object} CreateEmissionDeps
+ * @property {object} envelopes
+ * @property {object} buffers
+ * @property {object} correlation
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateEmissionOptions
+ * @property {*} [envelopes]
+ * @property {*} [buffers]
+ * @property {*} [correlation]
+ * @property {*} [telemetry]
+ */
+/**
  * Cria o módulo de emissão do NERV.
  *
  * **Side-effects:** Inicializa emissores de comandos, eventos e acknowledgments.
  * **Semântica:** Composição de subsistemas de emissão para comunicação neural.
  * **Unidades:** Dependências seguem contratos NERV (envelopes, buffers, correlation, telemetry).
  *
- * @param {object} deps - Dependências do módulo
+ * @param {CreateEmissionDeps} deps - Dependências do módulo
  * @param {object} deps.envelopes - Sistema de envelopes (normalização + validação)
  * @param {object} deps.buffers - Subsistema de buffers (fila outbound)
  * @param {object} deps.correlation - Sistema de correlação histórica
  * @param {object} deps.telemetry - Interface de telemetria do NERV
+ * @param {CreateEmissionOptions} [options]
  * @returns {object} Módulo de emissão com métodos sendCommand, sendEvent, sendAck
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

@@ -41,7 +41,12 @@ function collectJsFiles(currentDir, files) {
 }
 
 /**
- * @param {{ rootDir: string, contracts?: unknown[] }} options
+ * @typedef {object} CollectSecurityFindingsOptions
+ * @property {string} rootDir
+ * @property {unknown[]} contracts
+ */
+/**
+ * @param {CollectSecurityFindingsOptions} options
  * @returns {Promise<{
  *   findings: RawFinding[],
  *   errors: Array<{source:string,message:string}>,

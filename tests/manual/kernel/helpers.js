@@ -11,6 +11,7 @@ export function createMockKernel() {
 
 /**
  * Função exportada: sleep.
+ * @param {number} ms
  * @returns {object}
  */
 export function sleep(ms) {

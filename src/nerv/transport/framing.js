@@ -26,6 +26,7 @@
 
 /**
  * Converte inteiro para buffer de 4 bytes (big-endian).
+ * @param {*} value
  */
 function intToBuffer(value) {
     const buf = Buffer.allocUnsafe(4);
@@ -35,6 +36,7 @@ function intToBuffer(value) {
 
 /**
  * Lê inteiro de buffer de 4 bytes (big-endian).
+ * @param {*} buf
  */
 function bufferToInt(buf) {
     return buf.readUInt32BE(0);

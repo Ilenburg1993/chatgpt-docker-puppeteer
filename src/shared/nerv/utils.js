@@ -29,8 +29,12 @@ import { log } from '#core/logger';
  */
 
 /**
+ * @typedef {object} IsValidNERVNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Valida se uma instância NERV é válida e segura para uso
- * @param {object} [nerv] - Instância do NERV a validar
+ * @param {IsValidNERVNerv} [nerv] - Instância do NERV a validar
  * @returns {boolean} true se o NERV é válido, false caso contrário
  */
 export function isValidNERV(nerv) {

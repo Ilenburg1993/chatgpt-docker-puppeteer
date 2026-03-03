@@ -13,16 +13,27 @@ const CIRCUIT_STATES = {
 };
 
 /**
+ * @typedef {object} CreateHybridTransportConfig
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateHybridTransportOptions
+ * @property {*} [mode]
+ * @property {*} [socketAdapter]
+ * @property {*} [telemetry]
+ */
+/**
  * Cria transporte híbrido com suporte local + remoto + circuit breaker.
  *
  * **Side-effects:** Inicializa EventEmitter local, conecta Socket.io se híbrido.
  * **Semântica:** Abstração unificada de transporte local/remoto via NERV com resiliência.
  * **Unidades:** mode segue CONNECTION_MODES, handlerId como contador incremental.
  *
- * @param {object} config - Configuração do transporte híbrido
+ * @param {CreateHybridTransportConfig} config - Configuração do transporte híbrido
  * @param {string} [config.mode='LOCAL'] - Modo de conexão ('LOCAL'|'HYBRID')
  * @param {object} [config.socketAdapter=null] - Adapter Socket.io para modo híbrido
  * @param {object} config.telemetry - Interface de telemetria NERV
+ * @param {CreateHybridTransportOptions} [options]
  * @returns {object} Transporte híbrido com métodos send, onReceive, start, stop
  * @throws {Error} Se telemetry não for fornecida
  */

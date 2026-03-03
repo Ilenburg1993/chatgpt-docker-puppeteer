@@ -7,17 +7,32 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
 =========================== */
 
 /**
+ * @typedef {object} CreateEmitAckDeps
+ * @property {object} envelopes
+ * @property {object} buffers
+ * @property {object} correlation
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateEmitAckOptions
+ * @property {*} [envelopes]
+ * @property {*} [buffers]
+ * @property {*} [correlation]
+ * @property {*} [telemetry]
+ */
+/**
  * Cria o emissor técnico de ACKs.
  *
  * **Side-effects:** Registra emissão na correlação histórica.
  * **Semântica:** Emissor especializado para acknowledgments NERV.
  * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {object} deps - Dependências do emissor
+ * @param {CreateEmitAckDeps} deps - Dependências do emissor
  * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
  * @param {object} deps.buffers - Subsistema de buffers outbound
  * @param {object} deps.correlation - Sistema de correlação histórica
  * @param {object} deps.telemetry - Interface de telemetria NERV
+ * @param {CreateEmitAckOptions} [options]
  * @returns {object} Emissor com método emitAck
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

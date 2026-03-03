@@ -38,6 +38,7 @@ function _rowToPrefs(row) {
 
 /**
  * Função exportada: getUserPreferences.
+ * @param {*} userId
  * @returns {object|null}
  */
 function getUserPreferences(userId) {
@@ -47,7 +48,13 @@ function getUserPreferences(userId) {
 }
 
 /**
+ * @typedef {object} UpsertUserPreferencesUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: upsertUserPreferences.
+ * @param {*} userId
+ * @param {UpsertUserPreferencesUpdates} [patch]
  * @returns {object|null}
  */
 function upsertUserPreferences(userId, patch = {}) {

@@ -118,6 +118,7 @@ export function getLegacyStaticContracts() {
 
 /**
  * @param {{ id: string }[]} contracts
+ * @param {*} contracts
   * @returns {object}
  */
 export function indexByContractId(contracts) {

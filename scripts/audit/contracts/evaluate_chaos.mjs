@@ -4,13 +4,18 @@ import path from 'node:path';
 import { evaluateRuntimeSignals } from './evaluate_runtime.mjs';
 
 /**
- * @param {{
- *   profile: 'quick'|'deep'|'nightly',
- *   chaosProfile: 'off'|'light'|'full',
- *   contracts: import('./load_registry.mjs').ContractDefinitionV1[],
- *   runDir: string,
- *   exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
- * }} options
+ * @typedef {object} EvaluateChaosContractsOptions
+ * @property {'quick'|'deep'|'nightly'} profile
+ * @property {'off'|'light'|'full'} chaosProfile
+ * @property {import('./load_registry.mjs').ContractDefinitionV1[]} contracts
+ * @property {string} runDir
+ * @property {(stepId: string} exec
+ * @property {string} command
+ * @property {string[]} args
+ * @property {unknown) => Promise<void>} options
+ */
+/**
+ * @param {EvaluateChaosContractsOptions} options
   * @returns {Promise<void>}
  */
 export async function evaluateChaosContracts(options) {

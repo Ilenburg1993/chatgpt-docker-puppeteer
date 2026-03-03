@@ -31,6 +31,9 @@ import { getCorrelationId, getMessageType } from '#shared/nerv/envelope_reader';
 /**
  * Executa handlers de forma isolada.
  * Falhas são capturadas e observadas.
+ * @param {Function} handler
+ * @param {*} envelope
+ * @param {*} telemetry
  */
 function safeCall(handler, envelope, telemetry) {
     try {
@@ -47,16 +50,29 @@ function safeCall(handler, envelope, telemetry) {
 =========================== */
 
 /**
+ * @typedef {object} CreateReceptionDeps
+ * @property {object} envelopes
+ * @property {object} correlation
+ * @property {object} telemetry
+ */
+/**
+ * @typedef {object} CreateReceptionOptions
+ * @property {*} [envelopes]
+ * @property {*} [correlation]
+ * @property {*} [telemetry]
+ */
+/**
  * Cria o módulo de recepção bruta do NERV.
  *
  * **Side-effects:** Registra envelopes na correlação histórica, notifica handlers.
  * **Semântica:** Receptor técnico que processa frames inbound desserializados.
  * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
- * @param {object} deps - Dependências do receptor
+ * @param {CreateReceptionDeps} deps - Dependências do receptor
  * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
  * @param {object} deps.correlation - Sistema de correlação histórica
  * @param {object} deps.telemetry - Interface de telemetria NERV
+ * @param {CreateReceptionOptions} [options]
  * @returns {object} Receptor com métodos onMessage, receive
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

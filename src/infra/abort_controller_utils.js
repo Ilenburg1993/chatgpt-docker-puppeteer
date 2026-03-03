@@ -186,11 +186,15 @@ export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 
 }
 
 /**
+ * @typedef {object} WithRetryOptions
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
  * Executes an operation with retries and timeout per attempt.
  * Each retry gets a fresh timeout, and exponential backoff is applied.
  *
  * @param {function} operation - Function that returns a Promise
- * @param {object} options - Configuration options
+ * @param {WithRetryOptions} options - Configuration options
  * @param {number} [options.maxRetries] - Maximum number of retry attempts (default: 3)
  * @param {number} [options.timeoutMs] - Timeout per attempt in milliseconds (default: 5000)
  * @param {number} [options.backoffMs] - Base backoff delay in milliseconds (default: 100)

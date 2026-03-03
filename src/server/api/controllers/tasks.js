@@ -44,11 +44,19 @@ function _safeId(raw) {
 }
 
 /**
+ * @typedef {object} SafeUpdateTaskUpdates
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} SafeUpdateTaskOptions
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * ✅ P1-17: Safe wrapper for _safeUpdateTask() that catches OptimisticLockError.
  * Returns null on conflict, allowing API to return 409 Conflict.
  * @param {string} taskId - Task ID
- * @param {object} updates - Updates
- * @param {object} [options] - Options
+ * @param {SafeUpdateTaskUpdates} updates - Updates
+ * @param {SafeUpdateTaskOptions} [options] - Options
  * @param {boolean} [options.throwOnConflict=false] - If true, re-throws
  * @returns {object|null} Updated task or null on conflict
  */
@@ -384,6 +392,8 @@ router.post('/', async (req, res) => {
 /**
  * PUT /:id
  * Atualização parcial ou total de uma tarefa existente.
+ * @param {*} req
+ * @param {*} res
  */
 async function handleTaskUpdate(req, res) {
     try {

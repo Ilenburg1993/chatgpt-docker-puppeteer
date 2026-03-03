@@ -8,16 +8,28 @@ import createReconnect from './reconnect.js';
 =========================== */
 
 /**
+ * @typedef {object} CreateTransportDeps
+ * @property {object} telemetry
+ * @property {object} adapter
+ */
+/**
+ * @typedef {object} CreateTransportOptions
+ * @property {*} [telemetry]
+ * @property {*} [adapter]
+ * @property {*} [reconnect]
+ */
+/**
  * Cria o subsistema de transporte físico do NERV.
  *
  * **Side-effects:** Inicializa framing, conexão e reconexão automática.
  * **Semântica:** Composição completa do plano físico de comunicação.
  * **Unidades:** Políticas de reconexão seguem typedef de createReconnect.
  *
- * @param {object} deps - Dependências do transporte
+ * @param {CreateTransportDeps} deps - Dependências do transporte
  * @param {object} deps.telemetry - Interface de telemetria do NERV
  * @param {object} deps.adapter - Adaptador físico (IPC, socket, pipe)
  * @param {object} [deps.reconnect] - Política de reconexão opcional
+ * @param {CreateTransportOptions} [options]
  * @returns {object} Transporte com métodos send, start, stop, onReceive
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

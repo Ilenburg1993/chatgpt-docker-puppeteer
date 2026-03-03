@@ -153,10 +153,20 @@ export function resolveInferencePolicy(input = {}) {
 }
 
 /**
+ * @typedef {object} ValidateInferenceRouteEffective
+ * @property {string[]|null} allowedModels
+ * @property {string[]|null} allowedBackends
+ */
+/**
+ * @typedef {object} ValidateInferenceRouteRequest
+ * @property {string|null} [model]
+ * @property {string|null} [backend]
+ */
+/**
  * Valida se uma policy efetiva permite usar backend/model específicos.
  *
- * @param {{ allowedModels: string[]|null, allowedBackends: string[]|null }} effective
- * @param {{ model?: string|null, backend?: string|null }} request
+ * @param {ValidateInferenceRouteEffective} effective
+ * @param {ValidateInferenceRouteRequest} request
  * @returns {{ ok: boolean, reason?: string }}
  */
 export function validateInferenceRoute(effective, request) {

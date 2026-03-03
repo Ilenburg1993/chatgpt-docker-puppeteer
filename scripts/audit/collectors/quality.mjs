@@ -79,9 +79,13 @@ function ensureDir(dir) {
 }
 
 /**
+ * @typedef {object} MakeCachePathCacheInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * @param {string} cacheDir
  * @param {string} stepKey
- * @param {object} cacheInput
+ * @param {MakeCachePathCacheInput} cacheInput
  */
 function makeCachePath(cacheDir, stepKey, cacheInput) {
     const hash = sha256(
@@ -119,6 +123,12 @@ function writeCacheEntry(filePath, payload) {
 }
 
 /**
+ * @typedef {object} FindingMeta
+ * @property {string|null} [contractId]
+ * @property {string} [owner]
+ * @property {'off'|'warn'|'p1'|'p0'} [enforcement]
+ */
+/**
  * @param {string} sourceTool
  * @param {string|null} file
  * @param {number|null} line
@@ -130,7 +140,7 @@ function writeCacheEntry(filePath, payload) {
  * @param {string} rootCause
  * @param {string} suggestedPatch
  * @param {string} testStrategy
- * @param {{ contractId?: string|null, owner?: string, enforcement?: 'off'|'warn'|'p1'|'p0' }} [meta]
+ * @param {FindingMeta} [meta]
  * @returns {RawFinding}
  */
 function finding(
@@ -290,7 +300,11 @@ export function parseJSDocCoverageReport(stdout) {
 }
 
 /**
- * @param {object} report
+ * @typedef {object} ParseJSDocCoverageFindingsFromReportReport
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {ParseJSDocCoverageFindingsFromReportReport} report
  * @param {string} contractId
  * @returns {RawFinding[]}
  */
@@ -359,18 +373,23 @@ export function parseTsIgnoreFindings(stdout, scopeFiles) {
 }
 
 /**
- * @param {{
- *  profile: 'quick'|'deep'|'nightly',
- *  changedFiles: string[],
- *  qualityMode?: 'smart'|'full'|'changed'|'off',
- *  qualityJsdoc?: boolean,
- *  qualityPrettier?: boolean,
- *  qualityJsdocFullThresholdPct?: number,
- *  qualityCache?: boolean,
- *  qualityCacheDir?: string,
- *  qualityParallelism?: 'auto'|'serial',
- *  exec?: (stepId: string, command: string, args: string[], options?: unknown) => Promise<void>,
- * }} options
+ * @typedef {object} CollectQualityFindingsOptions
+ * @property {'quick'|'deep'|'nightly'} profile
+ * @property {string[]} changedFiles
+ * @property {'smart'|'full'|'changed'|'off'} qualityMode
+ * @property {boolean} qualityJsdoc
+ * @property {boolean} qualityPrettier
+ * @property {number} qualityJsdocFullThresholdPct
+ * @property {boolean} qualityCache
+ * @property {string} qualityCacheDir
+ * @property {'auto'|'serial'} qualityParallelism
+ * @property {(stepId: string} exec
+ * @property {string} command
+ * @property {string[]} args
+ * @property {unknown) => Promise<void>} options
+ */
+/**
+ * @param {CollectQualityFindingsOptions} options
   * @returns {Promise<void>}
  */
 export async function collectQualityFindings(options) {

@@ -105,6 +105,7 @@ async function getAgentStatus() {
 /**
  * Executa uma ação de controle no Agente (start/stop/restart/kill_daemon).
  * Contém a inteligência de decisão de comando baseada no estado atual.
+ * @param {*} action
   * @returns {Promise<void>}
  */
 async function controlAgent(action) {
@@ -189,6 +190,7 @@ async function controlAgent(action) {
 
 /**
  * Mata um processo específico e sua árvore de filhos com SIGKILL.
+ * @param {*} pid
   * @returns {Promise<void>}
  */
 async function killProcess(pid) {

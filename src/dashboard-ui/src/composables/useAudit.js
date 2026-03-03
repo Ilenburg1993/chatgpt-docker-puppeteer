@@ -4,9 +4,13 @@ import { ref, computed } from 'vue';
 /** @typedef {{ baseUrl?: string }} UseAuditOptions */
 
 /**
+ * @typedef {object} UseAuditOptions
+ * @property {string} [baseUrl] - Base URL para a API do Audit Agent
+ */
+/**
  * Composable para interação com APIs do Audit Agent
  * @param {UseAuditOptions} options
-  * @returns {object}
+ * @returns {object}
  */
 export function useAudit(options = {}) {
     const baseUrl = options.baseUrl || '/api/dashboard';

@@ -8,10 +8,18 @@
 ========================================================================== */
 
 /**
+ * @typedef {object} CheckPhysicalIntegrityTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @typedef {object} CheckPhysicalIntegrityStats
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Verifica se o arquivo atende aos requisitos físicos mínimos.
  *
- * @param {object} task - Objeto da tarefa (Schema V4).
- * @param {object} stats - Objeto fs.Stats do arquivo em disco.
+ * @param {CheckPhysicalIntegrityTask} task - Objeto da tarefa (Schema V4).
+ * @param {CheckPhysicalIntegrityStats} stats - Objeto fs.Stats do arquivo em disco.
  * @returns {object} { ok: boolean, reason: string|null }
  */
 function checkPhysicalIntegrity(task, stats) {

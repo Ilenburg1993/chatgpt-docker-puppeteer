@@ -14,9 +14,13 @@ import fs from 'node:fs';
  */
 
 /**
+ * @typedef {object} FillExecutionContextTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Preenche execution context de uma task V5.
  *
- * @param {object} task - Task V5 object (mutável)
+ * @param {FillExecutionContextTask} task - Task V5 object (mutável)
  * @param {FillExecutionContextOptions} options - Opções de preenchimento
  * @returns {object} Task com execution context preenchido
  */
@@ -120,8 +124,12 @@ function _detectContainer() {
 }
 
 /**
+ * @typedef {object} GetChromeVersionBrowserPool
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Obtém versão do Chrome do BrowserPool.
- * @param {object} browserPool - BrowserPool manager
+ * @param {GetChromeVersionBrowserPool} browserPool - BrowserPool manager
  * @returns {Promise<string>} Chrome version ou 'unknown'
  * @private
  */
@@ -147,10 +155,14 @@ async function _getChromeVersion(browserPool) {
 }
 
 /**
+ * @typedef {object} IncrementTacticalAttemptsTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Incrementa tactical_attempts (retry Driver).
  * Usado durante retry loop no Driver.
  *
- * @param {object} task - Task V5 object
+ * @param {IncrementTacticalAttemptsTask} task - Task V5 object
  * @param {string} [errorRecovered] - Erro recuperado (opcional)
  * @param {number} [backoffMs=0] - Tempo aguardado neste backoff
   * @returns {void}
@@ -185,10 +197,14 @@ function incrementTacticalAttempts(task, errorRecovered, backoffMs) {
 }
 
 /**
+ * @typedef {object} IncrementStrategicAttemptsTask
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Incrementa strategic_attempts (retry Kernel - reagendamento).
  * Usado quando Kernel reagenda task após falha.
  *
- * @param {object} task - Task V5 object
+ * @param {IncrementStrategicAttemptsTask} task - Task V5 object
  * @param {string} [errorRecovered] - Erro recuperado (opcional)
  * @param {number} [backoffMs=0] - Tempo aguardado neste backoff
   * @returns {void}

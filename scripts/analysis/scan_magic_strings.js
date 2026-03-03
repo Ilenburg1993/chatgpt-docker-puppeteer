@@ -93,6 +93,7 @@ const PATTERNS = [
 
 /**
  * Scan a single file for magic string patterns
+ * @param {*} filePath
   * @returns {object}
  */
 function scanFile(filePath) {
@@ -125,6 +126,9 @@ function scanFile(filePath) {
 
 /**
  * Recursively scan directory for JS files
+ * @param {*} dir
+ * @param {*} [results]
+ * @param {*} [excludeDirs]
   * @returns {object}
  */
 function scanDirectory(dir, results = [], excludeDirs = DEFAULT_EXCLUDES) {
@@ -151,6 +155,8 @@ function scanDirectory(dir, results = [], excludeDirs = DEFAULT_EXCLUDES) {
 
 /**
  * Print results grouped by file
+ * @param {*} results
+ * @param {*} label
  */
 function printResults(results, label) {
     if (results.length === 0) {

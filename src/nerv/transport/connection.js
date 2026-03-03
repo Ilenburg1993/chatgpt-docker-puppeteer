@@ -28,6 +28,8 @@
 /**
  * Executa handlers de forma segura.
  * Falhas são isoladas e ignoradas.
+ * @param {Function} handler
+ * @param {*} payload
  */
 function safeCall(handler, payload) {
     try {
@@ -42,9 +44,19 @@ function safeCall(handler, payload) {
 =========================== */
 
 /**
+ * @typedef {object} CreateConnectionDeps
+ * @property {object} telemetry
+ * @property {object} adapter
+ */
+/**
+ * @typedef {object} CreateConnectionOptions
+ * @property {*} [telemetry]
+ * @property {*} [adapter]
+ */
+/**
  * Cria uma conexão física genérica.
  *
- * @param {object} deps
+ * @param {CreateConnectionDeps} deps
  * @param {object} deps.telemetry
  * Interface de telemetria do NERV.
  *
@@ -56,6 +68,7 @@ function safeCall(handler, payload) {
  *  - send(frame)
  *  - onReceive(handler)
  *  - onError(handler) [opcional]
+ * @param {CreateConnectionOptions} [options]
   * @returns {object}
  */
 function createConnection({ telemetry, adapter }) {

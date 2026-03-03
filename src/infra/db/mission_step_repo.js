@@ -35,6 +35,7 @@ function _rowToStep(row) {
 
 /**
  * Função exportada: listMissionSteps.
+ * @param {*} missionId
  * @returns {MissionStep[]}
  */
 function listMissionSteps(missionId) {
@@ -55,6 +56,9 @@ function listMissionSteps(missionId) {
 
 /**
  * Função exportada: getMissionStep.
+ * @param {*} missionId
+ * @param {*} stepId
+ * @param {*} [attemptSeq]
  * @returns {MissionStep|null}
  */
 function getMissionStep(missionId, stepId, attemptSeq = null) {
@@ -92,6 +96,8 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
 
 /**
  * Função exportada: syncMissionStepsFromWorkflow.
+ * @param {*} missionId
+ * @param {*} workflow
  * @returns {MissionStep|null}
  */
 function syncMissionStepsFromWorkflow(missionId, workflow) {
@@ -167,7 +173,17 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
 }
 
 /**
+ * @typedef {object} MarkMissionStepStatusOptions
+ * @property {*} [missionId]
+ * @property {*} [stepId]
+ * @property {*} [attemptSeq]
+ * @property {*} [status]
+ * @property {*} [currentTaskId]
+ * @property {*} [lastTaskId]
+ */
+/**
  * Função exportada: markMissionStepStatus.
+ * @param {MarkMissionStepStatusOptions} [options]
  * @returns {MissionStep|null}
  */
 function markMissionStepStatus({
@@ -210,7 +226,15 @@ function markMissionStepStatus({
 }
 
 /**
+ * @typedef {object} CreateNextStepAttemptOptions
+ * @property {*} [missionId]
+ * @property {*} [stepId]
+ * @property {*} [title]
+ * @property {*} [stepIndex]
+ */
+/**
  * Função exportada: createNextStepAttempt.
+ * @param {CreateNextStepAttemptOptions} [options]
  * @returns {MissionStep|null}
  */
 function createNextStepAttempt({ missionId, stepId, title = '', stepIndex = 0 }) {

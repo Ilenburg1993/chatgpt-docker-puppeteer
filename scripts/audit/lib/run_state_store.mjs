@@ -3,7 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * @param {{ runDir: string }} options
+ * @typedef {object} CreateRunStateStoreOptions
+ * @property {string} runDir
+ */
+/**
+ * @param {CreateRunStateStoreOptions} options
   * @returns {object}
  */
 export function createRunStateStore(options) {

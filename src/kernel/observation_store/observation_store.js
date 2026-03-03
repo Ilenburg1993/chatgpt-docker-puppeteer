@@ -7,10 +7,23 @@ import EventEmitter from 'node:events';
 =========================== */
 
 /**
+ * @typedef {object} CreateObservationRecordParams
+ * @property {*} _ Propriedades definidas via runtime.
+ */
+/**
+ * @typedef {object} CreateObservationRecordOptions
+ * @property {*} [msgId]
+ * @property {*} [correlationId]
+ * @property {*} [source]
+ * @property {*} [payload]
+ * @property {*} [originalTimestamp]
+ */
+/**
  * Cria registro imutável de uma observação.
  * P9.5: Adiciona memoization de JSON serialization
  *
- * @param {object} params
+ * @param {CreateObservationRecordParams} params
+ * @param {CreateObservationRecordOptions} [options]
  * @returns {object}
  */
 function createObservationRecord({ msgId, correlationId, source, payload, originalTimestamp }) {

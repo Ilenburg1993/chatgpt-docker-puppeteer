@@ -8,6 +8,8 @@ function toArray(value) {
 
 /**
  * Função exportada: hasPermission.
+ * @param {*} user
+ * @param {*} permission
  * @returns {object}
  */
 function hasPermission(user, permission) {
@@ -24,6 +26,8 @@ function hasPermission(user, permission) {
 
 /**
  * Função exportada: assertPermission.
+ * @param {*} user
+ * @param {*} permission
  * @returns {void}
  */
 function assertPermission(user, permission) {
@@ -37,6 +41,7 @@ function assertPermission(user, permission) {
 
 /**
  * Função exportada: normalizeActor.
+ * @param {*} user
  * @returns {object}
  */
 function normalizeActor(user) {

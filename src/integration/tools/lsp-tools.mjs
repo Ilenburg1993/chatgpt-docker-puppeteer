@@ -94,6 +94,7 @@ async function lspApplyCodeActionHandler(params, ctx) {
 
 /**
  * Função exportada: registerLspTools.
+ * @param {*} registry
  * @returns {Promise<void>}
  */
 export async function registerLspTools(registry) {

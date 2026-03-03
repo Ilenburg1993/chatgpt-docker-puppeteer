@@ -92,6 +92,7 @@ function validateRegex(content, patternStr, signal = null) {
 
 /**
  * Valida se o conteúdo respeita o formato Markdown (presença de blocos de código).
+ * @param {*} content
   * @returns {boolean}
  */
 function validateMarkdownCode(content) {

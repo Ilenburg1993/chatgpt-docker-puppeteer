@@ -1,6 +1,10 @@
 // @ts-check
 /**
- * @param {object} finding
+ * @typedef {object} GroupKeyFinding
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
+ * @param {GroupKeyFinding} finding
  */
 function groupKey(finding) {
     if (finding.contract_id) {
@@ -19,7 +23,7 @@ function groupKey(finding) {
 
 /**
  * @param {unknown[]} findings
-  * @returns {object}
+ * @returns {object}
  */
 export function buildEvidenceGraph(findings) {
     /** @type {Map<string, unknown[]>} */

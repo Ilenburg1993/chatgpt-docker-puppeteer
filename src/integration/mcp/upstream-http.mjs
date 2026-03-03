@@ -42,7 +42,12 @@ export class MCPUpstreamError extends Error {
 }
 
 /**
- * @param {{ url?: string, headers?: Headers | Record<string, string> }} [config]
+ * @typedef {object} CreateMcpHttpClientConfig
+ * @property {string} url
+ * @property {Headers | Record<string} headers
+ */
+/**
+ * @param {CreateMcpHttpClientConfig} [config]
   * @returns {Promise<object>}
  */
 export function createMcpHttpClient(config = {}) {

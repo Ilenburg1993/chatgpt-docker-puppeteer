@@ -78,8 +78,12 @@ async function collectSystemMetrics() {
 }
 
 /**
+ * @typedef {object} CollectNervMetricsNerv
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Coleta métricas do NERV
- * @param {object} [nerv] - Instância do NERV
+ * @param {CollectNervMetricsNerv} [nerv] - Instância do NERV
  * @returns {Promise<object>}
  */
 async function collectNervMetrics(nerv) {
@@ -114,8 +118,12 @@ async function collectPm2Metrics() {
 }
 
 /**
+ * @typedef {object} CollectKernelMetricsKernel
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Coleta métricas do Kernel
- * @param {object} [kernel] - Instância do Kernel
+ * @param {CollectKernelMetricsKernel} [kernel] - Instância do Kernel
  * @returns {Promise<object>}
  */
 async function collectKernelMetrics(kernel) {
@@ -139,8 +147,12 @@ async function collectKernelMetrics(kernel) {
 }
 
 /**
+ * @typedef {object} CollectBrowserMetricsBrowserPool
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Coleta métricas do Browser Pool
- * @param {object} [browserPool] - Instância do Browser Pool
+ * @param {CollectBrowserMetricsBrowserPool} [browserPool] - Instância do Browser Pool
  * @returns {Promise<object>}
  */
 async function collectBrowserMetrics(browserPool) {

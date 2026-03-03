@@ -3,11 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import {
-    JSDOC_COVERAGE_SCHEMA_VERSION,
-    analyzeJSDocCoverage,
-    collectJsSourceFiles,
-} from './jsdoc_coverage_engine.mjs';
+import { JSDOC_COVERAGE_SCHEMA_VERSION, analyzeJSDocCoverage, collectJsSourceFiles } from './jsdoc_coverage_engine.mjs';
 
 const DEFAULT_SCHEMA_PATH = path.resolve('schemas/typing/jsdoc-coverage-report.schema.json');
 
@@ -156,7 +152,8 @@ const roots = String(values.roots || 'src,scripts,tests')
     .split(',')
     .map(item => item.trim())
     .filter(Boolean);
-const expectedSchemaVersion = String(values['schema-version'] || JSDOC_COVERAGE_SCHEMA_VERSION).trim() || JSDOC_COVERAGE_SCHEMA_VERSION;
+const expectedSchemaVersion =
+    String(values['schema-version'] || JSDOC_COVERAGE_SCHEMA_VERSION).trim() || JSDOC_COVERAGE_SCHEMA_VERSION;
 const quiet = Boolean(values.quiet);
 
 const files = filesArg
@@ -172,7 +169,10 @@ if (String(values['output-json'] || '').trim()) {
 }
 
 if (values['validate-schema']) {
-    const issues = [...validateSchemaFile(expectedSchemaVersion), ...validateReportShape(report, expectedSchemaVersion)];
+    const issues = [
+        ...validateSchemaFile(expectedSchemaVersion),
+        ...validateReportShape(report, expectedSchemaVersion),
+    ];
     if (issues.length > 0) {
         for (const issue of issues) {
             console.error(`[jsdoc-schema] ${issue}`);
@@ -246,7 +246,9 @@ if (values.gaps) {
         const fileGaps = [];
         for (const symbol of fileReport.exported_symbols) {
             if (symbol.missing_tags.length > 0) {
-                fileGaps.push(`  ${symbol.export_name}:${symbol.line ?? '?'}  missing=[${symbol.missing_tags.join(',')}]`);
+                fileGaps.push(
+                    `  ${symbol.export_name}:${symbol.line ?? '?'}  missing=[${symbol.missing_tags.join(',')}]`
+                );
                 gapCount++;
             }
         }

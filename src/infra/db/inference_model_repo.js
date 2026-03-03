@@ -55,7 +55,12 @@ function _setModelEnabled(id, enabled) {
 }
 
 /**
+ * @typedef {object} UpsertInferenceModelInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: upsertInferenceModel.
+ * @param {UpsertInferenceModelInput} [input]
  * @returns {InferenceModel|null}
  */
 function upsertInferenceModel(input = {}) {
@@ -119,7 +124,14 @@ function getInferenceModelById(id) {
 }
 
 /**
+ * @typedef {object} ListInferenceModelsOptions
+ * @property {*} [backendId]
+ * @property {*} [enabledOnly]
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listInferenceModels.
+ * @param {ListInferenceModelsOptions} [options]
  * @returns {InferenceModel[]}
  */
 function listInferenceModels({ backendId = null, enabledOnly = false, limit = 200 } = {}) {
@@ -144,6 +156,8 @@ function listInferenceModels({ backendId = null, enabledOnly = false, limit = 20
 
 /**
  * Função exportada: setInferenceModelEnabled.
+ * @param {string} id
+ * @param {boolean} enabled
  * @returns {InferenceModel|null}
  */
 function setInferenceModelEnabled(id, enabled) {

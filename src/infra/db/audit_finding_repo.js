@@ -39,7 +39,12 @@ function _rowToFinding(row) {
 }
 
 /**
+ * @typedef {object} UpsertAuditFindingInput
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Função exportada: upsertAuditFinding.
+ * @param {UpsertAuditFindingInput} [input]
  * @returns {AuditFinding|null}
  */
 function upsertAuditFinding(input = {}) {
@@ -113,7 +118,13 @@ function getAuditFindingById(id) {
 }
 
 /**
+ * @typedef {object} ListAuditFindingsByJobIdOptions
+ * @property {*} [limit]
+ */
+/**
  * Função exportada: listAuditFindingsByJobId.
+ * @param {*} jobId
+ * @param {ListAuditFindingsByJobIdOptions} [options]
  * @returns {AuditFinding[]}
  */
 function listAuditFindingsByJobId(jobId, { limit = 200 } = {}) {

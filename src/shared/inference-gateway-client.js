@@ -165,9 +165,13 @@ function _parseJsonMaybe(text) {
 }
 
 /**
+ * @typedef {object} PostJsonBody
+ * @property {*} _ Propriedades definidas em runtime.
+ */
+/**
  * Faz um POST JSON para o Gateway
  * @param {string} url
- * @param {object} body
+ * @param {PostJsonBody} body
  * @param {number} timeoutMs
  * @returns {Promise<GatewayJsonResponse>}
  */
