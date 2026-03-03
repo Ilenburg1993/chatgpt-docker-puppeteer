@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/server/middleware/`.  
-**Quando consultar**: ao alterar autenticação, autorização, IDs de requisição, schema guards, bloqueios em modo delegated ou tratamento global de erro da API.  
+**Quando consultar**: ao alterar autenticação, autorização, IDs de requisição, schema guards,
+bloqueios em modo delegated ou tratamento global de erro da API.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # SERVER MIDDLEWARE

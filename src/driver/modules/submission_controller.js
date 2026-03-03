@@ -4,6 +4,11 @@ import * as adaptive from '#logic/adaptive';
 import { log } from '#core/logger';
 
 /**
+ * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
+ */
+
+/**
  * Configuração de timeouts e delays para submission.
  *
  * @readonly
@@ -11,25 +16,25 @@ import { log } from '#core/logger';
  */
 const SUBMISSION_CONFIG = {
     /** Lock duration para anti-race condition (ms) - Default: 3s */
-    LOCK_DURATION_MS: parseInt(process.env.SUBMISSION_LOCK_DURATION || '3000'),
+    LOCK_DURATION_MS: parseInt(process.env.SUBMISSION_LOCK_DURATION || '3000', 10),
 
     /** Delay pré-press biomecânico (ms) - Default: 300ms */
-    PRE_PRESS_DELAY_MS: parseInt(process.env.SUBMISSION_PRE_PRESS || '300'),
+    PRE_PRESS_DELAY_MS: parseInt(process.env.SUBMISSION_PRE_PRESS || '300', 10),
 
     /** Debounce delay fallback (ms) - Default: 400ms */
-    DEBOUNCE_FALLBACK_MS: parseInt(process.env.SUBMISSION_DEBOUNCE || '400'),
+    DEBOUNCE_FALLBACK_MS: parseInt(process.env.SUBMISSION_DEBOUNCE || '400', 10),
 
     /** Debounce delay máximo (ms) - Default: 600ms */
-    DEBOUNCE_MAX_MS: parseInt(process.env.SUBMISSION_DEBOUNCE_MAX || '600'),
+    DEBOUNCE_MAX_MS: parseInt(process.env.SUBMISSION_DEBOUNCE_MAX || '600', 10),
 
     /** Delay pós-envio (ms) - Default: 500ms */
-    POST_SEND_DELAY_MS: parseInt(process.env.SUBMISSION_POST_SEND || '500'),
+    POST_SEND_DELAY_MS: parseInt(process.env.SUBMISSION_POST_SEND || '500', 10),
 
     /** Timeout para submit completo (ms) - Default: 10s */
-    SUBMIT_TIMEOUT_MS: parseInt(process.env.SUBMISSION_TIMEOUT || '10000'),
+    SUBMIT_TIMEOUT_MS: parseInt(process.env.SUBMISSION_TIMEOUT || '10000', 10),
 
     /** Máximo de retries em synthetic fallback - Default: 2 */
-    MAX_SYNTHETIC_RETRIES: parseInt(process.env.SUBMISSION_MAX_RETRIES || '2'),
+    MAX_SYNTHETIC_RETRIES: parseInt(process.env.SUBMISSION_MAX_RETRIES || '2', 10),
 };
 
 /**
@@ -196,11 +201,9 @@ class SubmissionController extends EventEmitter {
         const correlationId = this.driver.correlationId;
 
         // ✅ Timeout protection (BUG #4 fix)
+        const timeoutP = this._timeout(SUBMISSION_CONFIG.SUBMIT_TIMEOUT_MS, 'submit');
         try {
-            await Promise.race([
-                this._executeSubmit(ctx, selector, taskId, correlationId),
-                this._timeout(SUBMISSION_CONFIG.SUBMIT_TIMEOUT_MS, 'submit'),
-            ]);
+            await Promise.race([this._executeSubmit(ctx, selector, taskId, correlationId), timeoutP]);
         } catch (err) {
             this.stats.failedSubmissions++;
 
@@ -222,6 +225,7 @@ class SubmissionController extends EventEmitter {
             log('ERROR', `[SUBMISSION] Falha no processo de envio: ${err.message}`, correlationId);
             throw err;
         } finally {
+            timeoutP.cancel();
             this.submissionLock = null;
         }
     }
@@ -513,16 +517,19 @@ class SubmissionController extends EventEmitter {
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para error message)
      *
-     * @returns {Promise<never>} Promise que rejeita após timeout
+     * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        return new Promise((_, reject) => {
-            setTimeout(() => {
+        let timerId;
+        const p = new Promise((_, reject) => {
+            timerId = setTimeout(() => {
                 const error = new Error(`Timeout in ${operation} after ${ms}ms`);
                 error.name = 'TimeoutError';
                 reject(error);
             }, ms);
         });
+        p.cancel = () => clearTimeout(timerId);
+        return p;
     }
 }
 

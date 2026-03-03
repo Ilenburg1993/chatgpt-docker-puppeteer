@@ -1,6 +1,7 @@
 # SUPERSEDED
 
-**Propósito**: preservar variantes substituídas que foram mantidas por rastreabilidade, comparação e auditoria.  
+**Propósito**: preservar variantes substituídas que foram mantidas por rastreabilidade, comparação e
+auditoria.  
 **Status documental**: Histórico.  
 **Público**: engenharia, manutenção e auditoria.  
 **Última atualização**: 28 de fevereiro de 2026.

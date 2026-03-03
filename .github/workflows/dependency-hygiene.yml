@@ -11,6 +11,12 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
 
 jobs:
   dependency-hygiene:
@@ -32,7 +38,6 @@ jobs:
       - name: Prepare npm environment
         run: |
           mkdir -p "$HOME/.npm"
-          rm -rf node_modules
           npm cache verify || npm cache clean --force
 
       - name: Install dependencies (with retry)
@@ -50,6 +55,9 @@ jobs:
             fi
           done
           exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/dependency-hygiene
 
       - name: Run full npm audit gate
         id: npm_audit_gate
@@ -101,7 +109,7 @@ jobs:
 
       - name: Upload dependency hygiene artifacts
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dependency-hygiene-${{ github.run_id }}
           path: artifacts/dependency-hygiene

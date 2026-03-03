@@ -555,17 +555,17 @@ process.on('SIGHUP', async () => {
 
 #### Scripts Disponíveis
 
-| Script           | Comando                             | Descrição                           |
-| ---------------- | ----------------------------------- | ----------------------------------- |
-| `daemon:start`   | `npx pm2 start ecosystem.config.cjs`     | Inicia 2 apps (agente + dashboard)  |
-| `daemon:stop`    | `pm2 stop agente-gpt dashboard-web` | Para ambos processos                |
-| `daemon:restart` | `pm2 restart all`                   | Reinicia todos processos            |
-| `daemon:reload`  | `pm2 reload all`                    | Reload sem downtime (zero-downtime) |
-| `daemon:monit`   | `pm2 monit`                         | Monitor interativo em tempo real    |
-| `daemon:logs`    | `pm2 logs --lines 50`               | Últimas 50 linhas de logs           |
-| `daemon:flush`   | `pm2 flush`                         | Limpa logs do PM2                   |
-| `daemon:kill`    | `pm2 delete all`                    | Remove todos processos (hard kill)  |
-| `daemon:status`  | `pm2 status`                        | Status de todos processos           |
+| Script           | Comando                              | Descrição                           |
+| ---------------- | ------------------------------------ | ----------------------------------- |
+| `daemon:start`   | `npx pm2 start ecosystem.config.cjs` | Inicia 2 apps (agente + dashboard)  |
+| `daemon:stop`    | `pm2 stop agente-gpt dashboard-web`  | Para ambos processos                |
+| `daemon:restart` | `pm2 restart all`                    | Reinicia todos processos            |
+| `daemon:reload`  | `pm2 reload all`                     | Reload sem downtime (zero-downtime) |
+| `daemon:monit`   | `pm2 monit`                          | Monitor interativo em tempo real    |
+| `daemon:logs`    | `pm2 logs --lines 50`                | Últimas 50 linhas de logs           |
+| `daemon:flush`   | `pm2 flush`                          | Limpa logs do PM2                   |
+| `daemon:kill`    | `pm2 delete all`                     | Remove todos processos (hard kill)  |
+| `daemon:status`  | `pm2 status`                         | Status de todos processos           |
 
 #### Análise de Scripts
 

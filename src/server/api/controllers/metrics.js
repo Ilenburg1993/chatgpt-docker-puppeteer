@@ -1,5 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
+import { countTasksByStatus } from '#infra/db/task_repo';
 
 /**
  * GET /api/metrics - Métricas gerais do sistema
@@ -24,14 +25,23 @@ async function getMetrics(req, res) {
 }
 
 /**
- * GET /api/metrics/tasks - Métricas de tasks
+ * GET /api/metrics/tasks - Métricas de tasks por status
+ *
+ * Usa uma única query SQL com GROUP BY status para contar todas as tarefas
+ * por status de forma eficiente (evita N+1 queries).
  */
 async function getTaskMetrics(req, res) {
     try {
-        // TODO: Implementar métricas reais de tasks
+        const byStatus = countTasksByStatus();
+        const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
+
         res.json({
-            status: 'unknown',
-            message: 'Task metrics not implemented yet',
+            status: 'ok',
+            timestamp: Date.now(),
+            metrics: {
+                by_status: byStatus,
+                total,
+            },
         });
     } catch (err) {
         log('ERROR', `[METRICS] Erro ao obter métricas de tasks: ${err.message}`);

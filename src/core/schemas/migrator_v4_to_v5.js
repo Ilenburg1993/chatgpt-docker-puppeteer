@@ -61,7 +61,7 @@ function migrateTaskV4toV5(taskV4) {
         logger.info(`Migrando task ${taskV4.meta.id} de V4 → V5...`);
 
         // Cria task V5 base clonando V4
-        const taskV5 = JSON.parse(JSON.stringify(taskV4));
+        const taskV5 = structuredClone(taskV4);
 
         // ==========================================
         // 1. META: Atualiza versão + adiciona novos campos
@@ -299,7 +299,7 @@ function downgradeV5toV4(taskV5) {
         `Downgrade V5 → V4 para task ${taskV5.meta.id}. ATENÇÃO: Perda de dados de execution/mission/result V2!`
     );
 
-    const taskV4 = JSON.parse(JSON.stringify(taskV5));
+    const taskV4 = structuredClone(taskV5);
 
     // Remove campos V5 do META
     taskV4.meta.version = '4.0';

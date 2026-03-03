@@ -136,3 +136,20 @@ describe('Dockerfile mount documentation', () => {
         assert(docker.includes('políticas de mount são auditadas de forma centralizada'));
     });
 });
+
+describe('devcontainer NSS bootstrap contract', () => {
+    it('uses a complete stable baseline before runtime hooks materialize /tmp artifacts', () => {
+        const config = execSync('cat .devcontainer/devcontainer.json', { encoding: 'utf8' });
+        assert(config.includes('"LD_PRELOAD": "${containerEnv:LD_PRELOAD}"'));
+        assert(config.includes('"NSS_WRAPPER_PASSWD": "/etc/passwd"'));
+        assert(config.includes('"NSS_WRAPPER_GROUP": "/etc/group"'));
+        assert(!config.includes('"NSS_WRAPPER_PASSWD": "/tmp/devcontainer-nss/passwd"'));
+        assert(!config.includes('"NSS_WRAPPER_GROUP": "/tmp/devcontainer-nss/group"'));
+    });
+
+    it('omits an empty features block to avoid generated BASE_IMAGE wrapper warnings', () => {
+        const config = execSync('cat .devcontainer/devcontainer.json', { encoding: 'utf8' });
+        assert(!/^\s*"features"\s*:/m.test(config));
+        assert(config.includes('Dockerfile intermediário desnecessário'));
+    });
+});

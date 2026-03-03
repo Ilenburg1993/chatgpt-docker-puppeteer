@@ -4,6 +4,11 @@ import { log } from '#core/logger';
 import { ERROR_NAMES } from '#core/constants';
 
 /**
+ * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
+ */
+
+/**
  * Configuração de navegação em frames (timeouts, depth limit, retry).
  *
  * @readonly
@@ -11,19 +16,19 @@ import { ERROR_NAMES } from '#core/constants';
  */
 const FRAME_NAV_CONFIG = {
     /** Profundidade máxima de frames - Default: 10 */
-    MAX_DEPTH: parseInt(process.env.FRAME_NAV_MAX_DEPTH || '10'),
+    MAX_DEPTH: parseInt(process.env.FRAME_NAV_MAX_DEPTH || '10', 10),
 
     /** Timeout de traversal completo (ms) - Default: 15s */
-    TRAVERSAL_TIMEOUT_MS: parseInt(process.env.FRAME_NAV_TIMEOUT || '15000'),
+    TRAVERSAL_TIMEOUT_MS: parseInt(process.env.FRAME_NAV_TIMEOUT || '15000', 10),
 
     /** Timeout de boundingBox (ms) - Default: 2s */
-    BOUNDING_BOX_TIMEOUT_MS: parseInt(process.env.FRAME_NAV_BBOX_TIMEOUT || '2000'),
+    BOUNDING_BOX_TIMEOUT_MS: parseInt(process.env.FRAME_NAV_BBOX_TIMEOUT || '2000', 10),
 
     /** Tentativas de retry para dispose - Default: 3 */
-    DISPOSE_RETRY_ATTEMPTS: parseInt(process.env.FRAME_NAV_DISPOSE_RETRIES || '3'),
+    DISPOSE_RETRY_ATTEMPTS: parseInt(process.env.FRAME_NAV_DISPOSE_RETRIES || '3', 10),
 
     /** Delay entre retries de dispose (ms) - Default: 100ms */
-    DISPOSE_RETRY_DELAY_MS: parseInt(process.env.FRAME_NAV_DISPOSE_DELAY || '100'),
+    DISPOSE_RETRY_DELAY_MS: parseInt(process.env.FRAME_NAV_DISPOSE_DELAY || '100', 10),
 };
 
 /**
@@ -439,10 +444,13 @@ class FrameNavigator extends EventEmitter {
 
         try {
             // ✅ BUG #4 fix: Timeout protection
-            const result = await Promise.race([
-                this._executeGetExecutionContext(protocol, signal),
-                this._timeout(FRAME_NAV_CONFIG.TRAVERSAL_TIMEOUT_MS, 'getExecutionContext'),
-            ]);
+            const timeoutP = this._timeout(FRAME_NAV_CONFIG.TRAVERSAL_TIMEOUT_MS, 'getExecutionContext');
+            let result;
+            try {
+                result = await Promise.race([this._executeGetExecutionContext(protocol, signal), timeoutP]);
+            } finally {
+                timeoutP.cancel();
+            }
 
             const duration = Date.now() - startTime;
             this.stats.totalNavigationDuration += duration;
@@ -546,11 +554,12 @@ class FrameNavigator extends EventEmitter {
      * @private
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para error message)
-     * @returns {Promise<never>} Promise que rejeita após timeout
+     * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        return new Promise((_, reject) => {
-            setTimeout(() => {
+        let timerId;
+        const p = new Promise((_, reject) => {
+            timerId = setTimeout(() => {
                 const error = new FrameNavError('TIMEOUT', `Timeout in ${operation} after ${ms}ms`, {
                     timeout: ms,
                     operation,
@@ -558,6 +567,8 @@ class FrameNavigator extends EventEmitter {
                 reject(error);
             }, ms);
         });
+        p.cancel = () => clearTimeout(timerId);
+        return p;
     }
 }
 

@@ -450,7 +450,8 @@ setInfraPolicyNERV(nerv);
 
 - `createNERV` ([src/nerv/nerv.js](../../src/nerv/nerv.js))
 - `forensics` ([src/core/forensics.js](../../src/core/forensics.js))
-- `infra_failure_policy` ([src/core/infra_failure_policy.js](../../src/core/infra_failure_policy.js))
+- `infra_failure_policy`
+  ([src/core/infra_failure_policy.js](../../src/core/infra_failure_policy.js))
 
 **Saídas**:
 
@@ -622,7 +623,8 @@ const contextManager = new ContextManager({
 
 **Componente**:
 
-- `ContextManager` ([src/orchestrator/context_manager.js](../../src/orchestrator/context_manager.js))
+- `ContextManager`
+  ([src/orchestrator/context_manager.js](../../src/orchestrator/context_manager.js))
 
 **Propósito**: Gerenciar contexto de missões (100k tokens, janela deslizante)
 
@@ -724,7 +726,8 @@ const missionManager = new MissionManager({
 
 **Componentes**:
 
-- `FeedbackProcessor` ([src/missions/feedback_processor.js](../../src/missions/feedback_processor.js))
+- `FeedbackProcessor`
+  ([src/missions/feedback_processor.js](../../src/missions/feedback_processor.js))
 - `MissionManager` ([src/missions/mission_manager.js](../../src/missions/mission_manager.js))
 
 ---
@@ -899,9 +902,11 @@ snapshot.start(intervalMs);
 
 **Componentes**:
 
-- `pm2Bridge` ([src/server/realtime/bus/pm2_bridge.js](../../src/server/realtime/bus/pm2_bridge.js)) -
-  PM2 event bus
-- `logTail` ([src/server/realtime/streams/log_tail.js](../../src/server/realtime/streams/log_tail.js))
+- `pm2Bridge`
+  ([src/server/realtime/bus/pm2_bridge.js](../../src/server/realtime/bus/pm2_bridge.js)) - PM2 event
+  bus
+- `logTail`
+  ([src/server/realtime/streams/log_tail.js](../../src/server/realtime/streams/log_tail.js))
 - `hardwareTelemetry`
   ([src/server/realtime/telemetry/hardware.js](../../src/server/realtime/telemetry/hardware.js))
 - `snapshot` ([src/server/telemetry/snapshot.js](../../src/server/telemetry/snapshot.js))
@@ -919,8 +924,8 @@ logWatcher.init();
 
 - `fsWatcher` ([src/server/watchers/fs_watcher.js](../../src/server/watchers/fs_watcher.js)) - File
   changes
-- `logWatcher` ([src/server/watchers/log_watcher.js](../../src/server/watchers/log_watcher.js)) - Log
-  rotation
+- `logWatcher` ([src/server/watchers/log_watcher.js](../../src/server/watchers/log_watcher.js)) -
+  Log rotation
 
 ---
 

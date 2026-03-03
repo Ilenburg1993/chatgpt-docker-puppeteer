@@ -100,7 +100,14 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
 
             const attempt = input?.attempt ? String(input.attempt) : 'latest';
             const format = input?.format ? String(input.format) : 'text';
-            if (format !== 'text') continue;
+            if (format !== 'text') {
+                // BUG-CONTEXT-INPUT-SILENT-DROP: non-text formats silently ignored → warn for debuggability
+                log(
+                    'WARN',
+                    `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`
+                );
+                continue;
+            }
 
             let text = '';
             if (attempt === 'latest') {
@@ -294,6 +301,16 @@ class QueueWorker {
                         last_error: 'TASK_INVALID: spec.payload.user_message missing',
                         failed_at_ms: Date.now(),
                     });
+                    // BUG-QUEUE-INVALID-NO-EVENT: record event for observability (no attempt created yet)
+                    recordEvent({
+                        entityType: 'task',
+                        entityId: taskId,
+                        tsMs: Date.now(),
+                        actorType: 'system',
+                        eventType: 'TASK_INVALID_REJECTED',
+                        payload: { reason: 'TASK_INVALID', detail: 'spec.payload.user_message missing or empty' },
+                        dedupKey: `task:${taskId}:invalid_rejected:user_message`,
+                    });
                     releaseTaskLockForAttempt({ taskId, context: 'queue_invalid_task' });
                     continue;
                 }
@@ -380,8 +397,8 @@ class QueueWorker {
                         });
                         this._safeUpdateTask(taskId, { prompt_template_artifact_id: artId });
                     }
-                } catch (_) {
-                    /* ignore */
+                } catch (err) {
+                    log('WARN', `[QueueWorker] Prompt template artifact storage failed for ${taskId}: ${err?.message}`);
                 }
 
                 // Render prompt for this attempt (supports optional context.inputs).
@@ -417,12 +434,13 @@ class QueueWorker {
                         latest_attempt_id: correlationId,
                         latest_rendered_prompt_artifact_id: renderedPromptArtifactId,
                     });
-                } catch (_) {
+                } catch (err) {
+                    log('WARN', `[QueueWorker] Rendered prompt artifact failed for ${taskId}: ${err?.message}`);
                     renderedPromptArtifactId = null;
                 }
 
                 // Hydrate runtime task: ensure the rendered user_message is what the driver will type.
-                const runtimeTask = JSON.parse(JSON.stringify(task));
+                const runtimeTask = structuredClone(task);
                 runtimeTask.spec = runtimeTask.spec || {};
                 runtimeTask.spec.payload = runtimeTask.spec.payload || {};
                 runtimeTask.spec.payload.user_message = renderedUserMessage;
@@ -440,12 +458,12 @@ class QueueWorker {
                     // Attempt ended before driver start.
                     try {
                         updateAttempt(correlationId, {
-                            status: retryable ? 'FAILED' : 'FAILED',
+                            status: 'FAILED',
                             ended_at_ms: Date.now(),
                             error: msg,
                         });
-                    } catch (_) {
-                        /* ignore */
+                    } catch (err) {
+                        log('WARN', `[QueueWorker] Attempt update failed for ${taskId}: ${err?.message}`);
                     }
 
                     if (retryable) {

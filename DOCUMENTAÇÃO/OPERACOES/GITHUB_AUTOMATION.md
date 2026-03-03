@@ -1,7 +1,7 @@
 # GitHub Automation
 
-**Propósito**: documentar a superfície viva de automação versionada em `.github/` e sua relação
-com integrações externas vistas no GitHub Actions.  
+**Propósito**: documentar a superfície viva de automação versionada em `.github/` e sua relação com
+integrações externas vistas no GitHub Actions.  
 **Status documental**: Canônico.  
 **Público**: engenharia, manutenção, revisão de CI/CD e agentes de IA.  
 **Última atualização**: 1 de março de 2026.
@@ -13,15 +13,16 @@ Este documento cobre:
 - workflows versionados em `.github/workflows/`;
 - política de updates em `.github/dependabot.yml`;
 - baseline local para agentes em `.github/`;
-- distinção entre workflows do repositório e execuções dinâmicas/externas mostradas na UI do
-  GitHub Actions.
+- distinção entre workflows do repositório e execuções dinâmicas/externas mostradas na UI do GitHub
+  Actions.
 
 ## Arquivos canônicos
 
 - Hub local de `.github`: [../../.github/README.md](../../.github/README.md)
 - Dependabot: [../../.github/dependabot.yml](../../.github/dependabot.yml)
 - Workflows: [../../.github/workflows](../../.github/workflows)
-- Validador de automação: [../../scripts/ci/validate-workflows.mjs](../../scripts/ci/validate-workflows.mjs)
+- Validador de automação:
+  [../../scripts/ci/validate-workflows.mjs](../../scripts/ci/validate-workflows.mjs)
 
 ## Workflows versionados atuais
 
@@ -37,12 +38,21 @@ Este documento cobre:
 
 ### Dependency Review
 
-- arquivo: [../../.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml)
+- arquivo:
+  [../../.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml)
 - função: review de PR de dependências, installability e triagem automática de PR do Dependabot
+
+Observação operacional:
+
+- quando o `GITHUB_TOKEN` vier read-only no contexto do Dependabot, a triagem automática não tenta
+  derrubar o workflow por `403`;
+- nesse caso, labels/comentários viram operação best-effort e o resumo vai para
+  `GITHUB_STEP_SUMMARY`.
 
 ### Dependency Hygiene
 
-- arquivo: [../../.github/workflows/dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.yml)
+- arquivo:
+  [../../.github/workflows/dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.yml)
 - função: auditoria periódica do grafo completo e da superfície declarada vs. usada
 
 Contrato atual:
@@ -113,11 +123,14 @@ Comando:
 
 Camadas adicionais:
 
-- `rhysd/actionlint@v1` roda no job `validate` de [../../.github/workflows/ci.yml](../../.github/workflows/ci.yml)
-  para lint semântico de workflows;
-- [../../scripts/ci/verify-github-workflows.mjs](../../scripts/ci/verify-github-workflows.mjs)
-  usa `gh api repos/<owner>/<repo>/actions/workflows` para comparar os workflows versionados locais
-  com o que o GitHub reconhece remotamente.
+- `raven-actions/actionlint@v2.1.1` roda no job `validate` de
+  [../../.github/workflows/ci.yml](../../.github/workflows/ci.yml) para lint semântico de workflows;
+- `reviewdog/action-shellcheck@v1.9.0` roda no job `validate` de
+  [../../.github/workflows/ci.yml](../../.github/workflows/ci.yml) para lint de scripts shell com
+  anotações de `github-check`;
+- [../../scripts/ci/verify-github-workflows.mjs](../../scripts/ci/verify-github-workflows.mjs) usa
+  `gh api repos/<owner>/<repo>/actions/workflows` para comparar os workflows versionados locais com
+  o que o GitHub reconhece remotamente.
 
 Comandos:
 
@@ -138,8 +151,8 @@ Comandos:
   - `timeout-minutes` em todos os jobs;
   - `retention-days` para artifacts efêmeros;
   - `concurrency` para evitar sobreposição desnecessária.
-- os steps de `actions/checkout` passaram a usar `persist-credentials: false` por padrão, já que
-  os workflows não fazem `git push` e não precisam reter credenciais no checkout.
+- os steps de `actions/checkout` passaram a usar `persist-credentials: false` por padrão, já que os
+  workflows não fazem `git push` e não precisam reter credenciais no checkout.
 - `docker-rebuild.yml` deixou de fazer um “healthcheck” inválido em um container com
   `sleep infinity` e passou a executar smoke test real de tooling com o workspace montado.
 - `docker-rebuild.yml` também passou a:
@@ -158,7 +171,8 @@ Comandos:
 - `ci.yml` passou a:
   - preservar summary e artifact do `audit-lite` mesmo quando a etapa de auditoria falha;
   - atualizar um comentário único por PR, em vez de acumular comentários redundantes;
-  - rodar `actionlint` no job `validate`.
+  - rodar `actionlint` no job `validate`;
+  - rodar `shellcheck` no job `validate`, para antecipar falhas de shell antes do `docker-rebuild`.
 - `dependency-hygiene.yml` passou a:
   - limitar a janela de execução com `timeout-minutes`;
   - cancelar a execução anterior quando uma nova for disparada;

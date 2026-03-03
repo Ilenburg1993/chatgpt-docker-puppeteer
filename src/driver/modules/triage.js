@@ -14,31 +14,31 @@ import { log } from '#core/logger';
  */
 const TRIAGE_CONFIG = {
     /** Threshold de event loop lag (ms) - Default: 1500ms */
-    LAG_THRESHOLD_MS: parseInt(process.env.TRIAGE_LAG_THRESHOLD || '1500'),
+    LAG_THRESHOLD_MS: parseInt(process.env.TRIAGE_LAG_THRESHOLD || '1500', 10),
 
     /** Tentativas de retry para lag measurement - Default: 3 */
-    LAG_RETRY_ATTEMPTS: parseInt(process.env.TRIAGE_LAG_RETRIES || '3'),
+    LAG_RETRY_ATTEMPTS: parseInt(process.env.TRIAGE_LAG_RETRIES || '3', 10),
 
     /** Delay entre snapshots para detecção de entropia (ms) - Default: 600ms */
-    SNAPSHOT_DELAY_MS: parseInt(process.env.TRIAGE_SNAPSHOT_DELAY || '600'),
+    SNAPSHOT_DELAY_MS: parseInt(process.env.TRIAGE_SNAPSHOT_DELAY || '600', 10),
 
     /** Máximo de text parts para coleta (limite de memória) - Default: 1000 */
-    MAX_TEXT_PARTS: parseInt(process.env.TRIAGE_MAX_TEXT_PARTS || '1000'),
+    MAX_TEXT_PARTS: parseInt(process.env.TRIAGE_MAX_TEXT_PARTS || '1000', 10),
 
     /** Profundidade máxima de scan (Shadow DOM + IFrames) - Default: 15 */
-    MAX_SCAN_DEPTH: parseInt(process.env.TRIAGE_MAX_DEPTH || '15'),
+    MAX_SCAN_DEPTH: parseInt(process.env.TRIAGE_MAX_DEPTH || '15', 10),
 
     /** Timeout total de diagnóstico (ms) - Default: 10s */
-    DIAGNOSIS_TIMEOUT_MS: parseInt(process.env.TRIAGE_TIMEOUT || '10000'),
+    DIAGNOSIS_TIMEOUT_MS: parseInt(process.env.TRIAGE_TIMEOUT || '10000', 10),
 
     /** Timeout de scan individual (ms) - Default: 5s */
-    SCAN_TIMEOUT_MS: parseInt(process.env.TRIAGE_SCAN_TIMEOUT || '5000'),
+    SCAN_TIMEOUT_MS: parseInt(process.env.TRIAGE_SCAN_TIMEOUT || '5000', 10),
 
     /** Threshold de cor vermelha (RGB.r) - Default: 180 */
-    ERROR_COLOR_RED_THRESHOLD: parseInt(process.env.TRIAGE_RED_THRESHOLD || '180'),
+    ERROR_COLOR_RED_THRESHOLD: parseInt(process.env.TRIAGE_RED_THRESHOLD || '180', 10),
 
     /** Threshold de cor laranja (RGB.r) - Default: 200 */
-    ERROR_COLOR_ORANGE_THRESHOLD: parseInt(process.env.TRIAGE_ORANGE_THRESHOLD || '200'),
+    ERROR_COLOR_ORANGE_THRESHOLD: parseInt(process.env.TRIAGE_ORANGE_THRESHOLD || '200', 10),
 
     /** Threshold de tamanho de iframe (% viewport) - Default: 0.4 (40%) */
     IFRAME_SIZE_THRESHOLD: parseFloat(process.env.TRIAGE_IFRAME_THRESHOLD || '0.4'),

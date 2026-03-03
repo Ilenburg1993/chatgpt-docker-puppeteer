@@ -45,7 +45,7 @@ async function loadNextTask(targetFilter = null) {
 
             if (!isNaN(startedAt) && now - startedAt > recoveryThreshold) {
                 // Clone-on-Write: Isolamento para não sujar o cache prematuramente
-                task = JSON.parse(JSON.stringify(originalTask));
+                task = structuredClone(originalTask);
 
                 task.state.status = STATUS_VALUES.FAILED;
                 task.state.last_error = 'RECOVERY_TRIGGERED: Timeout de execução (Zumbi)';
@@ -73,7 +73,7 @@ async function loadNextTask(targetFilter = null) {
 
             if (hasFailedParent) {
                 if (!isModified) {
-                    task = JSON.parse(JSON.stringify(originalTask));
+                    task = structuredClone(originalTask);
                 }
 
                 task.state.status = STATUS_VALUES.SKIPPED;
@@ -125,7 +125,7 @@ async function bulkRetryFailed() {
     let count = 0;
     for (const originalTask of failedTasks) {
         try {
-            const task = JSON.parse(JSON.stringify(originalTask));
+            const task = structuredClone(originalTask);
 
             task.state.status = STATUS_VALUES.PENDING;
             task.state.last_error = null;

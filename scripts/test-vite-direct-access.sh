@@ -34,7 +34,7 @@ nohup npm run dev > /tmp/vite-test.log 2>&1 &
 sleep 3
 
 # Check if started
-if ps aux | grep vite | grep -v grep > /dev/null; then
+if pgrep -f "vite" > /dev/null; then
     echo "   ✅ Vite reiniciado"
 else
     echo "   ❌ Falha ao iniciar Vite"

@@ -193,8 +193,8 @@ contaminação por material analítico.
 `OPERACOES/` é a categoria com maior mistura entre documentação operacional viva e relatórios de
 implementação já encerrada.
 
-Há material claramente útil para operar o sistema, mas também há muitos arquivos que descrevem o
-que foi implementado, o que mudou, ou o resultado de uma análise pontual.
+Há material claramente útil para operar o sistema, mas também há muitos arquivos que descrevem o que
+foi implementado, o que mudou, ou o resultado de uma análise pontual.
 
 #### Manter como baseline operacional
 
@@ -349,4 +349,5 @@ Estado:
 
 - Hub principal: [../README.md](../README.md)
 - Status geral: [./STATUS_GERAL_DOCUMENTACAO.md](./STATUS_GERAL_DOCUMENTACAO.md)
-- Plano de `README`s: [../PLANOS/PLANO_READMES_PADRONIZADOS.md](../PLANOS/PLANO_READMES_PADRONIZADOS.md)
+- Plano de `README`s:
+  [../PLANOS/PLANO_READMES_PADRONIZADOS.md](../PLANOS/PLANO_READMES_PADRONIZADOS.md)

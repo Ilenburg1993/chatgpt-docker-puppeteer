@@ -1,0 +1,350 @@
+name: Docker Security Scan
+
+# Escaneia a imagem Docker de produção e o filesystem do repositório usando Trivy.
+# Resultados são enviados ao GitHub Security tab (SARIF) e comentados nos PRs.
+#
+# Jobs:
+#   trivy-filesystem — Escaneia dependências, configurações e IaC do repositório
+#   trivy-container  — Constrói a imagem de produção e escaneia vulnerabilidades
+#   summary          — Consolida resultados e posta comentário no PR
+#
+# Referência: https://github.com/aquasecurity/trivy-action
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - ".devcontainer/**"
+      - "package*.json"
+      - "src/**"
+      - ".github/workflows/docker-security-scan.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - ".devcontainer/**"
+      - "package*.json"
+      - "src/**"
+      - ".github/workflows/docker-security-scan.yml"
+  schedule:
+    # Toda segunda-feira às 06:37 UTC (evitar horário redondo)
+    - cron: "37 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: docker-security-scan-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Escaneia o filesystem do repositório (deps, config, IaC, secrets)
+  # ---------------------------------------------------------------------------
+  trivy-filesystem:
+    name: Trivy — Filesystem scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/trivy
+
+      - name: Trivy — Scan filesystem (SARIF)
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "artifacts/trivy/trivy-fs.sarif"
+          # Reporta apenas vulnerabilidades CRITICAL e HIGH para reduzir ruído
+          severity: "CRITICAL,HIGH"
+          # Escaneia vulnerabilidades de pacotes, configurações inseguras e segredos
+          scanners: "vuln,secret,misconfig"
+          # Ignora vulnerabilidades sem fix disponível (reduz ruído em pull_request)
+          ignore-unfixed: ${{ github.event_name == 'pull_request' }}
+          exit-code: "0"
+
+      - name: Trivy — Scan filesystem (JSON para PR comment)
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "json"
+          output: "artifacts/trivy/trivy-fs.json"
+          severity: "CRITICAL,HIGH,MEDIUM"
+          scanners: "vuln,secret,misconfig"
+          ignore-unfixed: ${{ github.event_name == 'pull_request' }}
+          exit-code: "0"
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: artifacts/trivy/trivy-fs.sarif
+          category: trivy-filesystem
+
+      - name: Upload Trivy filesystem artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-filesystem-${{ github.run_id }}
+          path: artifacts/trivy/trivy-fs.*
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Constrói a imagem de produção e escaneia vulnerabilidades
+  # ---------------------------------------------------------------------------
+  trivy-container:
+    name: Trivy — Container scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: chatgpt-docker-puppeteer:scan-${{ github.sha }}
+          # Cache para acelerar builds repetidos no CI
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/trivy
+
+      - name: Trivy — Scan container image (SARIF)
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          scan-type: "image"
+          image-ref: "chatgpt-docker-puppeteer:scan-${{ github.sha }}"
+          format: "sarif"
+          output: "artifacts/trivy/trivy-container.sarif"
+          severity: "CRITICAL,HIGH"
+          # Escaneia vulnerabilidades de OS e linguagem
+          scanners: "vuln,secret"
+          ignore-unfixed: ${{ github.event_name == 'pull_request' }}
+          exit-code: "0"
+
+      - name: Trivy — Scan container image (JSON para PR comment)
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          scan-type: "image"
+          image-ref: "chatgpt-docker-puppeteer:scan-${{ github.sha }}"
+          format: "json"
+          output: "artifacts/trivy/trivy-container.json"
+          severity: "CRITICAL,HIGH,MEDIUM"
+          scanners: "vuln,secret"
+          ignore-unfixed: ${{ github.event_name == 'pull_request' }}
+          exit-code: "0"
+
+      - name: Trivy — Scan container image (table para step summary)
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          scan-type: "image"
+          image-ref: "chatgpt-docker-puppeteer:scan-${{ github.sha }}"
+          format: "table"
+          output: "artifacts/trivy/trivy-container.txt"
+          severity: "CRITICAL,HIGH,MEDIUM"
+          scanners: "vuln,secret"
+          ignore-unfixed: ${{ github.event_name == 'pull_request' }}
+          exit-code: "0"
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: artifacts/trivy/trivy-container.sarif
+          category: trivy-container
+
+      - name: Publish container scan summary
+        if: always()
+        run: |
+          {
+            echo "## 🐳 Trivy — Container Scan Results"
+            echo ""
+            echo "**Image**: \`chatgpt-docker-puppeteer:scan-${{ github.sha }}\`"
+            echo ""
+            if [ -f artifacts/trivy/trivy-container.txt ]; then
+              echo '```'
+              LINES=$(wc -l < artifacts/trivy/trivy-container.txt)
+              head -100 artifacts/trivy/trivy-container.txt
+              if [ "$LINES" -gt 100 ]; then
+                echo ""
+                echo "_⚠️ Output truncado: exibindo 100 de $LINES linhas. Veja o artifact completo abaixo._"
+              fi
+              echo '```'
+              echo ""
+              echo "📂 Full results available in the [artifacts](./artifacts) of this run."
+            else
+              echo "_Container scan output not generated — check the workflow logs_"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Trivy container artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-container-${{ github.run_id }}
+          path: artifacts/trivy/trivy-container.*
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Cleanup Docker image
+        if: always()
+        run: docker rmi "chatgpt-docker-puppeteer:scan-${{ github.sha }}" || true
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Posta comentário consolidado no PR com os resultados de segurança
+  # ---------------------------------------------------------------------------
+  summary:
+    name: PR Security Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [trivy-filesystem, trivy-container]
+    if: always() && github.event_name == 'pull_request'
+    steps:
+      - name: Download filesystem artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: trivy-filesystem-${{ github.run_id }}
+          path: artifacts/trivy/fs
+        continue-on-error: true
+
+      - name: Download container artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: trivy-container-${{ github.run_id }}
+          path: artifacts/trivy/container
+        continue-on-error: true
+
+      - name: Post PR comment with security summary
+        uses: actions/github-script@v8
+        env:
+          FS_JOB_STATUS: ${{ needs.trivy-filesystem.result }}
+          CONTAINER_JOB_STATUS: ${{ needs.trivy-container.result }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const { readFileSync, existsSync } = require('fs');
+            const marker = '<!-- docker-security-scan-summary -->';
+
+            // Monta o status de cada job
+            const fsStatus = process.env.FS_JOB_STATUS === 'success' ? '✅' : '⚠️';
+            const containerStatus = process.env.CONTAINER_JOB_STATUS === 'success' ? '✅' : '⚠️';
+
+            // Tenta ler o JSON do scan de filesystem para extrair contagens
+            let fsFindings = '_Artifacts não disponíveis — verifique os logs do workflow_';
+            const fsJsonPath = 'artifacts/trivy/fs/trivy-fs.json';
+            if (existsSync(fsJsonPath)) {
+              try {
+                const data = JSON.parse(readFileSync(fsJsonPath, 'utf8'));
+                const results = data.Results || [];
+                let critical = 0, high = 0, medium = 0;
+                for (const r of results) {
+                  for (const v of (r.Vulnerabilities || [])) {
+                    if (v.Severity === 'CRITICAL') critical++;
+                    else if (v.Severity === 'HIGH') high++;
+                    else if (v.Severity === 'MEDIUM') medium++;
+                  }
+                }
+                fsFindings = `🔴 **${critical}** CRITICAL | 🟠 **${high}** HIGH | 🟡 **${medium}** MEDIUM`;
+              } catch (e) {
+                fsFindings = `_Erro ao processar JSON: ${e.message}_`;
+              }
+            }
+
+            // Tenta ler o JSON do scan de container para extrair contagens
+            let containerFindings = '_Artifacts não disponíveis — verifique os logs do workflow_';
+            const containerJsonPath = 'artifacts/trivy/container/trivy-container.json';
+            if (existsSync(containerJsonPath)) {
+              try {
+                const data = JSON.parse(readFileSync(containerJsonPath, 'utf8'));
+                const results = data.Results || [];
+                let critical = 0, high = 0, medium = 0;
+                for (const r of results) {
+                  for (const v of (r.Vulnerabilities || [])) {
+                    if (v.Severity === 'CRITICAL') critical++;
+                    else if (v.Severity === 'HIGH') high++;
+                    else if (v.Severity === 'MEDIUM') medium++;
+                  }
+                }
+                containerFindings = `🔴 **${critical}** CRITICAL | 🟠 **${high}** HIGH | 🟡 **${medium}** MEDIUM`;
+              } catch (e) {
+                containerFindings = `_Erro ao processar JSON: ${e.message}_`;
+              }
+            }
+
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const body = [
+              marker,
+              '## 🔒 Docker Security Scan',
+              '',
+              '| Scanner | Status | Findings (CRITICAL/HIGH/MEDIUM) |',
+              '|---------|--------|----------------------------------|',
+              `| 🗂️ Filesystem (Trivy) | ${fsStatus} \`${process.env.FS_JOB_STATUS}\` | ${fsFindings} |`,
+              `| 🐳 Container (Trivy) | ${containerStatus} \`${process.env.CONTAINER_JOB_STATUS}\` | ${containerFindings} |`,
+              '',
+              `> 📋 **Detalhes completos**: [Workflow run #${context.runId}](${runUrl})`,
+              '> 🔍 **Resultados no Security tab**: [GitHub Security](../../security/code-scanning)',
+              '',
+              '_Vulnerabilidades sem fix disponível são filtradas em PRs (apenas runs agendados e push para main mostram todos)_',
+            ].join('\n');
+
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find(
+                (c) => c.user?.type === 'Bot' && c.body?.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Falha ao postar comentário no PR: ${err.message}. Resultados disponíveis no step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }

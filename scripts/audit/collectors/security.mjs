@@ -94,7 +94,8 @@ export async function collectSecurityFindings(options) {
         const content = fs.readFileSync(absoluteFile, 'utf8');
         const relFile = normalizeRelative(path.relative(rootDir, absoluteFile));
         const routeMatches = content.match(/\b(app|router)\.(get|post|put|patch|delete)\s*\(/g) || [];
-        const authSignals = content.match(/\b(requireAuth|authenticate|authMiddleware|verifyJwt|rbac|Authorization|Bearer)\b/g) || [];
+        const authSignals =
+            content.match(/\b(requireAuth|authenticate|authMiddleware|verifyJwt|rbac|Authorization|Bearer)\b/g) || [];
         const headerSignals =
             content.match(/\b(helmet\s*\(|Content-Security-Policy|X-Frame-Options|X-Content-Type-Options)\b/g) || [];
 
@@ -115,8 +116,10 @@ export async function collectSecurityFindings(options) {
                 severity_hint: 'P1',
                 type: 'gap',
                 impact: 'Superfícies HTTP sem autenticação explícita aumentam o risco de acesso indevido.',
-                root_cause: 'Arquivo de rotas/controlador sem evidência local de middleware ou validação de autenticação.',
-                suggested_patch: 'Adicionar middleware/camada explícita de autenticação/autorização ou documentar o caminho seguro.',
+                root_cause:
+                    'Arquivo de rotas/controlador sem evidência local de middleware ou validação de autenticação.',
+                suggested_patch:
+                    'Adicionar middleware/camada explícita de autenticação/autorização ou documentar o caminho seguro.',
                 test_strategy: 'Revisar rotas e validar a presença de middleware auth nos endpoints expostos.',
                 regression_risk: 'Médio',
             });
@@ -130,12 +133,14 @@ export async function collectSecurityFindings(options) {
             domain: 'security',
             file: 'src/server',
             line: null,
-            evidence: 'Nenhum sinal explícito de headers de segurança (CSP/XFO/XCTO/helmet) foi encontrado no subtree do server.',
+            evidence:
+                'Nenhum sinal explícito de headers de segurança (CSP/XFO/XCTO/helmet) foi encontrado no subtree do server.',
             severity_hint: 'P2',
             type: 'upgrade',
             impact: 'Ausência de headers explícitos reduz defesa em profundidade na superfície HTTP.',
             root_cause: 'O subtree do server não expõe configuração evidente de headers de segurança.',
-            suggested_patch: 'Adicionar middleware central de security headers ou documentar o enforcement já existente.',
+            suggested_patch:
+                'Adicionar middleware central de security headers ou documentar o enforcement já existente.',
             test_strategy: 'Validar respostas HTTP e confirmar headers de segurança obrigatórios.',
             regression_risk: 'Baixo',
         });

@@ -46,7 +46,6 @@ function allowFile(file, includes, excludes) {
  * @returns {string[]}
  */
 function buildCommentLines(indent, exportsAtLine) {
-    const names = exportsAtLine.map(item => item.export_name);
     const kinds = new Set(exportsAtLine.map(item => item.kind));
 
     let text = 'Export público do módulo.';

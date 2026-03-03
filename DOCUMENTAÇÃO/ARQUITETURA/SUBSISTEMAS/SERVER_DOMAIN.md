@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/server/domain/`.  
-**Quando consultar**: ao alterar comandos de controle, mutações de task/missão, RBAC, operações administrativas ou integrações de controle expostas pelo backend.  
+**Quando consultar**: ao alterar comandos de controle, mutações de task/missão, RBAC, operações
+administrativas ou integrações de controle expostas pelo backend.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # SERVER DOMAIN
@@ -63,8 +64,8 @@ Responsabilidades:
 
 Responsabilidades observáveis:
 
-- expor um vocabulário canônico de comandos (`MISSION_*`, `TASK_*`, `AUDIT_*`,
-  `INFERENCE_*`, `DIAGNOSTIC_*`);
+- expor um vocabulário canônico de comandos (`MISSION_*`, `TASK_*`, `AUDIT_*`, `INFERENCE_*`,
+  `DIAGNOSTIC_*`);
 - mapear comandos para permissões;
 - validar requisitos como `ifVersion` e `entityId`;
 - delegar para `task_control_service.js` e `mission_control_service.js`;

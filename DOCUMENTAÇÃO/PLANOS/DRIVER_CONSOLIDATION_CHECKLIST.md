@@ -264,7 +264,9 @@ class ChatGPTDriver extends TargetDriver {
   - [ ] Diagrams: Atualizar para mostrar Pool
   - [ ] Responsabilidades: Clarificar Factory vs Adapter
 - [ ] **DRIVER_CONSOLIDATION_PLAN.md**: Marcar Fase 2 como COMPLETA
-- [ ] **Registro histórico da decisão de pool**: revisar `DOCUMENTAÇÃO/ARQUIVO_MORTO/ARQUITETURA_HISTORICA/DECISOES_CONCLUIDAS/` e confirmar status como IMPLEMENTED
+- [ ] **Registro histórico da decisão de pool**: revisar
+      `DOCUMENTAÇÃO/ARQUIVO_MORTO/ARQUITETURA_HISTORICA/DECISOES_CONCLUIDAS/` e confirmar status
+      como IMPLEMENTED
 
 ### Criar Documentação Nova
 

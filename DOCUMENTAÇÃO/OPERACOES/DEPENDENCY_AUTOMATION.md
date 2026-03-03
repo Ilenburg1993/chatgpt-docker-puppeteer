@@ -20,11 +20,15 @@ Ele não substitui a documentação geral de segurança do runtime em [SECURITY.
 ## Arquivos canônicos
 
 - Dependabot: [../../.github/dependabot.yml](../../.github/dependabot.yml)
-- Review de dependências: [../../.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml)
-- Higiene periódica: [../../.github/workflows/dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.yml)
+- Review de dependências:
+  [../../.github/workflows/dependency-review.yml](../../.github/workflows/dependency-review.yml)
+- Higiene periódica:
+  [../../.github/workflows/dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.yml)
 - Segurança: [../../.github/workflows/security.yml](../../.github/workflows/security.yml)
-- Gate de auditoria npm: [../../scripts/security/npm-audit-gate.mjs](../../scripts/security/npm-audit-gate.mjs)
-- Auditor de superfície declarada/usada: [../../scripts/analysis/audit-dependencies.js](../../scripts/analysis/audit-dependencies.js)
+- Gate de auditoria npm:
+  [../../scripts/security/npm-audit-gate.mjs](../../scripts/security/npm-audit-gate.mjs)
+- Auditor de superfície declarada/usada:
+  [../../scripts/analysis/audit-dependencies.js](../../scripts/analysis/audit-dependencies.js)
 - Hub de automação GitHub: [GITHUB_AUTOMATION.md](./GITHUB_AUTOMATION.md)
 
 ## Stack de automação atual
@@ -68,6 +72,9 @@ Na triagem automática, o workflow:
 - publica ou atualiza um comentário de triagem na PR;
 - explicita que patches/minors seguem fast-path após checks verdes e majors ficam em revisão manual.
 
+Quando o run herda `GITHUB_TOKEN` read-only do contexto do Dependabot, a triagem degrada para
+`GITHUB_STEP_SUMMARY` e não falha o job por `403 Resource not accessible by integration`.
+
 Observação importante:
 
 - o GitHub Actions também pode exibir um item chamado `Dependabot Updates` com `on: dynamic`;
@@ -90,8 +97,8 @@ O workflow [dependency-hygiene.yml](../../.github/workflows/dependency-hygiene.y
 
 - roda auditoria completa (`prod + dev`) com severidade mínima `moderate`;
 - executa o auditor de dependências declaradas vs. usadas;
-- gera artefatos para revisão periódica da saúde da árvore de dependências, mesmo quando o gate
-  de `npm audit` encontra issues acionáveis.
+- gera artefatos para revisão periódica da saúde da árvore de dependências, mesmo quando o gate de
+  `npm audit` encontra issues acionáveis.
 
 Esse fluxo é deliberadamente separado do `security.yml`:
 
@@ -107,7 +114,10 @@ O `npm audit` puro não é a fonte de verdade operacional final neste repositór
 O wrapper [npm-audit-gate.mjs](../../scripts/security/npm-audit-gate.mjs):
 
 - roda `npm audit --json`;
-- cruza os “fixes” com `npm view`, para verificar se a versão sugerida realmente existe no registry;
+- só trata como bloqueio automático correções em que o próprio `npm audit` expõe uma versão
+  explícita;
+- quando há versão explícita, cruza o fix com `npm view`, exigindo evidência consistente no
+  packument do pacote, no manifesto da versão exata e no tarball publicado;
 - separa findings em:
   - `actionable`
   - `manual-review`
@@ -118,6 +128,7 @@ O wrapper [npm-audit-gate.mjs](../../scripts/security/npm-audit-gate.mjs):
 
 O pipeline só falha quando há finding `actionable`:
 
+- o `npm audit` forneceu versão explícita para a correção;
 - existe correção publicada;
 - a correção não exige revisão semver major.
 
@@ -126,10 +137,15 @@ O pipeline só falha quando há finding `actionable`:
 Os cenários abaixo geram risco residual documentado, mas não falha automática:
 
 - advisory aponta “fix” para versão não publicada no registry (`unpublished-fix`);
+- advisory só expõe um teto semver inferido, sem versão explícita (`manual-review`);
 - a correção existe, mas exige upgrade major (`manual-review`);
 - o próprio `npm audit` informa que não há correção (`no-fix`).
 
 Essa regra evita tratar advisory inconsistente do ecossistema como erro de CI do projeto.
+
+Ela também reduz falsos positivos transitórios de cache/edge do registry: advisories baseados só em
+ranges (`<x.y.z`) não bloqueiam automaticamente, e um único `npm view <pacote>@<versão>` positivo
+também não basta para tornar o finding bloqueante.
 
 ## Comandos operacionais
 
@@ -149,8 +165,8 @@ Mesmo com automação, ainda exigem revisão humana:
 
 ## Risco residual conhecido em 1 de março de 2026
 
-Na revisão atual, ainda existem advisories relevantes cujo “fix” publicado pelo `npm audit` não
-está disponível no registry público no momento da validação.
+Na revisão atual, ainda existem advisories relevantes cujo “fix” publicado pelo `npm audit` não está
+disponível no registry público no momento da validação.
 
 Exemplos observados:
 
@@ -158,6 +174,21 @@ Exemplos observados:
 - `systeminformation`
 - `minimatch`
 - faixas específicas de `ajv`
+
+Estado de ancoragem aplicado no projeto nesta revisão:
+
+- `basic-ftp` fixado em `5.1.0` via `overrides` (última versão estável efetivamente publicada hoje);
+- `systeminformation` fixado em `5.30.7` via `overrides` (última versão estável efetivamente
+  publicada hoje);
+- `glob` moderno disponível no topo da árvore em `13.0.2` para uso explícito de tooling;
+- `minimatch` moderno disponível no topo da árvore em `10.1.2` para uso explícito de tooling.
+
+Importante:
+
+- a presença de `glob`/`minimatch` modernos no topo não remove automaticamente subárvores legadas
+  transitivas;
+- consumers antigos, como `rimraf@3` dentro de dependências de terceiros, ainda podem carregar
+  `glob@7`/`minimatch@3` até que os fornecedores publiquem uma cadeia compatível.
 
 Esse estado deve ser tratado como dependência do ecossistema, não como correção local pendente.
 

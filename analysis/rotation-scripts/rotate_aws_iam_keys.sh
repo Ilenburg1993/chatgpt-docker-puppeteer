@@ -28,7 +28,8 @@ read -r _
 echo "Listing existing keys for $USER"
 aws iam list-access-keys --user-name "$USER" | jq -r '.AccessKeyMetadata[] | .AccessKeyId' > /tmp/keys.$$ || true
 
-for kid in $(cat /tmp/keys.$$); do
+while IFS= read -r kid; do
+  [ -n "$kid" ] || continue
   if [ "$kid" = "$access_key_id" ]; then continue; fi
   echo "Deactivating old key: $kid"
   aws iam update-access-key --user-name "$USER" --access-key-id "$kid" --status Inactive
@@ -38,9 +39,9 @@ for kid in $(cat /tmp/keys.$$); do
     aws iam delete-access-key --user-name "$USER" --access-key-id "$kid"
     echo "Deleted $kid"
   else
-    echo "Left $kid inactive. Consider deleting after testing new key." 
+    echo "Left $kid inactive. Consider deleting after testing new key."
   fi
-done
+done < /tmp/keys.$$
 
 rm -f /tmp/keys.$$
 echo "AWS key rotation complete. Update any services to use the new key." 

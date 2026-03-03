@@ -173,8 +173,18 @@ function buildPublicAPI({
             return { mode: CONNECTION_MODES.LOCAL, status: 'active' };
         },
 
-        /* Shutdown gracioso */
+        /* Shutdown gracioso — limpa TODOS os subsistemas */
         async shutdown() {
+            try {
+                if (health && typeof health.shutdown === 'function') health.shutdown();
+            } catch (_) {
+                /* health cleanup best-effort */
+            }
+            try {
+                if (buffers && typeof buffers.shutdown === 'function') buffers.shutdown();
+            } catch (_) {
+                /* buffers cleanup best-effort */
+            }
             if (hybridTransport) {
                 hybridTransport.stop();
             }
@@ -183,6 +193,11 @@ function buildPublicAPI({
             }
             if (socketAdapter && socketAdapter.stop) {
                 socketAdapter.stop();
+            }
+            try {
+                if (telemetry && typeof telemetry.shutdown === 'function') telemetry.shutdown();
+            } catch (_) {
+                /* telemetry cleanup best-effort */
             }
         },
     };

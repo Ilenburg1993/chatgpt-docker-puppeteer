@@ -21,7 +21,7 @@ const missionId = computed(() => String(route.params.id || ''));
 
 const loading = ref(false);
 const error = ref(null);
-const tab = ref('resumo'); // resumo|tasks|propostas|grafo|eventos|policy
+const tab = ref('resumo'); // resumo|tasks|propostas|grafo|eventos|policy|feedback
 const commandReason = ref('');
 
 const showCreateTask = ref(false);
@@ -41,14 +41,46 @@ const editForm = ref({ title: '', description: '', autonomy_mode: 'USER_ONLY' })
 const policyText = ref('');
 const policyAutonomy = ref('USER_ONLY');
 
+// Suggest-tasks state
+const suggestingTasks = ref(false);
+const suggestMaxProposals = ref(5);
+const suggestTarget = ref('auto');
+
+// Feedback state
+const feedbackText = ref('');
+const sendingFeedback = ref(false);
+
 const mission = computed(() => missions.selected);
 const proposals = computed(() => missions.selectedProposals || []);
 const missionTasks = computed(() => missions.selectedTasks || []);
 const graph = computed(() => missions.selectedGraph);
 const missionEvents = computed(() => missions.selectedEvents || []);
+const progress = computed(() => missions.selectedProgress?.progress || null);
+const liveCounts = computed(() => missions.selectedProgress?.live_counts || null);
+
 const canEditMission = computed(() => {
     const status = String(mission.value?.status || '').toUpperCase();
     return status === 'PAUSED' || status === 'READY';
+});
+
+const isRunning = computed(() => String(mission.value?.status || '').toUpperCase() === 'RUNNING');
+const isTerminal = computed(() => {
+    const s = String(mission.value?.status || '').toUpperCase();
+    return s === 'DONE' || s === 'FAILED' || s === 'CANCELLED';
+});
+
+const canSuggestTasks = computed(() => {
+    if (!isRunning.value) return false;
+    const autonomy = String(mission.value?.autonomy_mode || '').toUpperCase();
+    return autonomy !== 'USER_ONLY';
+});
+
+// Progress bar percentage from live DB counts
+const progressPercent = computed(() => {
+    const p = progress.value;
+    if (!p) return null;
+    if (p.percent !== undefined) return Number(p.percent) || 0;
+    return null;
 });
 
 function resolveReason(defaultReason, errorMessage) {
@@ -81,11 +113,14 @@ async function loadAll() {
     loading.value = true;
     error.value = null;
     try {
-        await missions.fetchDetail(missionId.value);
-        await missions.fetchMissionProposals(missionId.value);
-        await missions.fetchMissionTasks(missionId.value);
-        await missions.fetchMissionGraph(missionId.value);
-        await missions.fetchMissionEvents(missionId.value);
+        await Promise.all([
+            missions.fetchDetail(missionId.value),
+            missions.fetchMissionProposals(missionId.value),
+            missions.fetchMissionTasks(missionId.value),
+            missions.fetchMissionGraph(missionId.value),
+            missions.fetchMissionEvents(missionId.value),
+            missions.fetchMissionProgress(missionId.value),
+        ]);
 
         editForm.value = {
             title: mission.value?.title || '',
@@ -217,10 +252,47 @@ async function bulkRejectProposals() {
         'Rejeição em lote de propostas da missão',
         'Motivo obrigatório para rejeitar proposals.'
     );
-    if (!confirmTwoStepAction({ actionLabel: `TASK_BULK_ACTION.reject (${ids.length})`, reason })) return;
-    await tasks.bulkAction({ ids, action: 'reject', reason });
-    selectedProposalIds.value = new Set();
-    await loadAll();
+    if (!confirmTwoStepAction({ actionLabel: `PROPOSALS_REJECT (${ids.length})`, reason })) return;
+    try {
+        // Use the dedicated /proposals/reject endpoint (not the generic task bulk action)
+        await missions.rejectProposals(missionId.value, { task_ids: ids });
+        selectedProposalIds.value = new Set();
+        await loadAll();
+    } catch (err) {
+        alert(`Erro ao rejeitar proposals: ${err?.response?.data?.error || err?.message || String(err)}`);
+    }
+}
+
+async function suggestTasksFromLLM() {
+    if (!canSuggestTasks.value) return;
+    suggestingTasks.value = true;
+    try {
+        const res = await missions.suggestTasks(missionId.value, {
+            max_proposals: Number(suggestMaxProposals.value) || 5,
+            target: suggestTarget.value || 'auto',
+        });
+        alert(`Planner task criada: ${res?.task_id || 'ok'}. Aguarde execução e recarregue para ver proposals.`);
+        await loadAll();
+    } catch (err) {
+        alert(`Erro ao sugerir tasks: ${err?.response?.data?.error || err?.message || String(err)}`);
+    } finally {
+        suggestingTasks.value = false;
+    }
+}
+
+async function sendFeedback() {
+    const fb = feedbackText.value.trim();
+    if (!fb) return;
+    sendingFeedback.value = true;
+    try {
+        await missions.addFeedback(missionId.value, fb);
+        feedbackText.value = '';
+        await loadAll();
+    } catch (err) {
+        alert(`Erro ao enviar feedback: ${err?.response?.data?.error || err?.message || String(err)}`);
+    } finally {
+        sendingFeedback.value = false;
+    }
 }
 
 const graphNodes = computed(() => {
@@ -324,17 +396,84 @@ watch(missionId, () => void loadAll());
                         <div class="flex items-center gap-2 flex-wrap justify-end">
                             <Badge size="sm" :variant="statusVariant(mission.status)">{{ mission.status }}</Badge>
                             <Badge size="sm">{{ mission.autonomy_mode }}</Badge>
-                            <Badge size="sm">propostas: {{ mission.counts?.proposed ?? 0 }}</Badge>
-                            <Badge size="sm">pend: {{ mission.counts?.pending ?? 0 }}</Badge>
-                            <Badge size="sm">run: {{ mission.counts?.running ?? 0 }}</Badge>
-                            <Badge size="sm">done: {{ mission.counts?.done ?? 0 }}</Badge>
-                            <Badge size="sm">blk: {{ mission.counts?.blocked ?? 0 }}</Badge>
+                            <Badge size="sm">prop: {{ mission.counts?.proposed ?? 0 }}</Badge>
+                            <Badge size="sm">pend: {{ liveCounts?.pending ?? mission.counts?.pending ?? 0 }}</Badge>
+                            <Badge size="sm" variant="info"
+                                >run: {{ liveCounts?.running ?? mission.counts?.running ?? 0 }}</Badge
+                            >
+                            <Badge size="sm" variant="success"
+                                >done: {{ liveCounts?.done ?? mission.counts?.done ?? 0 }}</Badge
+                            >
+                            <Badge size="sm" variant="error"
+                                >fail: {{ liveCounts?.failed ?? mission.counts?.failed ?? 0 }}</Badge
+                            >
+                            <Badge size="sm" variant="warning"
+                                >blk: {{ liveCounts?.blocked ?? mission.counts?.blocked ?? 0 }}</Badge
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Progress bar (workflow-based) -->
+                    <div v-if="progressPercent !== null" class="mt-3">
+                        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+                            <span>Progresso do workflow</span>
+                            <span
+                                >{{ progressPercent }}% (step {{ progress?.current_step_index ?? 0 }}/{{
+                                    progress?.total_steps ?? 0
+                                }})</span
+                            >
+                        </div>
+                        <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
+                            <div
+                                class="h-2 rounded-full bg-indigo-500 transition-all duration-500"
+                                :style="{ width: progressPercent + '%' }"
+                            />
                         </div>
                     </div>
                 </template>
 
-                <div class="flex items-center gap-2 flex-wrap">
-                    <Button variant="primary" size="sm" @click="executeMission" :disabled="mission.status === 'RUNNING'"
+                <!-- Contextual alert when mission is PAUSED due to a blocked/paused task (system-triggered) -->
+                <div
+                    v-if="mission.status === 'PAUSED' && progress?.current_task_id"
+                    class="mt-3 p-3 rounded-lg border border-amber-500/40 bg-amber-950/20 space-y-2"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="text-amber-400 font-semibold text-sm"
+                            >⏸ Missão pausada aguardando resolução de task</span
+                        >
+                    </div>
+                    <div class="text-xs text-amber-300/80">
+                        Task ativa:
+                        <button
+                            class="font-mono underline-offset-2 hover:underline text-sky-300"
+                            @click="router.push(`/tasks/${progress.current_task_id}`)"
+                        >
+                            {{ progress.current_task_id }}
+                        </button>
+                        — verifique o status da task e, após resolver (desbloquear/reexecutar), retome a missão.
+                    </div>
+                    <div v-if="(liveCounts?.blocked ?? 0) > 0" class="text-xs text-amber-300/80">
+                        {{ liveCounts?.blocked }} task(s) bloqueada(s) nesta missão requerem ação.
+                    </div>
+                </div>
+
+                <!-- Failure reason when mission FAILED -->
+                <div
+                    v-if="mission.status === 'FAILED' && mission.context?.failure_reason"
+                    class="mt-3 p-3 rounded-lg border border-red-500/30 bg-red-950/20"
+                >
+                    <div class="text-xs text-red-400 font-semibold mb-1">Motivo da falha</div>
+                    <div class="text-xs text-red-300 font-mono whitespace-pre-wrap break-all">
+                        {{ mission.context.failure_reason }}
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap mt-3">
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        @click="executeMission"
+                        :disabled="mission.status === 'RUNNING' || isTerminal"
                         >Executar</Button
                     >
                     <Button variant="secondary" size="sm" @click="pauseMission" :disabled="mission.status !== 'RUNNING'"
@@ -343,8 +482,19 @@ watch(missionId, () => void loadAll());
                     <Button variant="secondary" size="sm" @click="resumeMission" :disabled="mission.status !== 'PAUSED'"
                         >Retomar</Button
                     >
-                    <Button variant="danger" size="sm" @click="cancelMission">Cancelar</Button>
-                    <Button variant="ghost" size="sm" @click="showCreateTask = true">Adicionar tarefa</Button>
+                    <Button variant="danger" size="sm" @click="cancelMission" :disabled="isTerminal">Cancelar</Button>
+                    <Button variant="ghost" size="sm" @click="showCreateTask = true" :disabled="isTerminal"
+                        >Adicionar tarefa</Button
+                    >
+                    <Button
+                        v-if="canSuggestTasks"
+                        variant="ghost"
+                        size="sm"
+                        @click="tab = 'propostas'"
+                        class="border border-indigo-500/40 text-indigo-300"
+                    >
+                        Sugerir tasks (LLM)
+                    </Button>
                 </div>
                 <div class="mt-3">
                     <label class="text-xs text-slate-400">Motivo operacional (audit trail)</label>
@@ -363,6 +513,9 @@ watch(missionId, () => void loadAll());
                     >Eventos</Button
                 >
                 <Button size="sm" variant="ghost" @click="tab = 'policy'" :disabled="tab === 'policy'">Policy</Button>
+                <Button size="sm" variant="ghost" @click="tab = 'feedback'" :disabled="tab === 'feedback'"
+                    >Feedback</Button
+                >
             </div>
 
             <div v-if="tab === 'resumo'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -408,11 +561,36 @@ watch(missionId, () => void loadAll());
                 </Card>
 
                 <Card>
-                    <template #header><div class="text-sm font-semibold text-slate-200">Ações rápidas</div></template>
-                    <div class="text-sm text-slate-300 space-y-2">
-                        <div>Use “Propostas” para aprovar/rejeitar tasks em `stage=PROPOSED`.</div>
-                        <div>Use “Policy” para controlar autonomia/budget sem perder SSOT.</div>
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">Contagens em tempo real</div></template
+                    >
+                    <div v-if="liveCounts" class="grid grid-cols-2 gap-3">
+                        <div class="text-center p-3 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <div class="text-2xl font-bold text-slate-100">{{ liveCounts.total }}</div>
+                            <div class="text-xs text-slate-400">Total tasks</div>
+                        </div>
+                        <div class="text-center p-3 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <div class="text-2xl font-bold text-indigo-400">{{ liveCounts.running }}</div>
+                            <div class="text-xs text-slate-400">Em execução</div>
+                        </div>
+                        <div class="text-center p-3 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <div class="text-2xl font-bold text-green-400">{{ liveCounts.done }}</div>
+                            <div class="text-xs text-slate-400">Concluídas</div>
+                        </div>
+                        <div class="text-center p-3 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <div class="text-2xl font-bold text-red-400">{{ liveCounts.failed }}</div>
+                            <div class="text-xs text-slate-400">Falharam</div>
+                        </div>
+                        <div class="text-center p-3 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <div class="text-2xl font-bold text-yellow-400">{{ liveCounts.blocked }}</div>
+                            <div class="text-xs text-slate-400">Bloqueadas</div>
+                        </div>
+                        <div class="text-center p-3 rounded-lg bg-slate-900/40 border border-slate-800">
+                            <div class="text-2xl font-bold text-slate-300">{{ liveCounts.pending }}</div>
+                            <div class="text-xs text-slate-400">Pendentes</div>
+                        </div>
                     </div>
+                    <div v-else class="text-sm text-slate-400">Dados de progresso não disponíveis.</div>
                 </Card>
             </div>
 
@@ -487,7 +665,51 @@ watch(missionId, () => void loadAll());
                 </div>
             </div>
 
-            <div v-else-if="tab === 'propostas'" class="space-y-3">
+            <div v-else-if="tab === 'propostas'" class="space-y-4">
+                <!-- Suggest tasks panel (LLM autonomy modes) -->
+                <Card v-if="canSuggestTasks">
+                    <template #header>
+                        <div class="text-sm font-semibold text-indigo-300">Sugerir tasks via LLM</div>
+                    </template>
+                    <div class="flex items-end gap-3 flex-wrap">
+                        <div>
+                            <label class="text-xs text-slate-400">Nº de propostas</label>
+                            <input
+                                v-model.number="suggestMaxProposals"
+                                type="number"
+                                min="1"
+                                max="25"
+                                class="w-20 px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400">Target</label>
+                            <select
+                                v-model="suggestTarget"
+                                class="px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200 text-sm"
+                            >
+                                <option value="auto">auto</option>
+                                <option value="chatgpt">chatgpt</option>
+                                <option value="gemini">gemini</option>
+                                <option value="claude">claude</option>
+                                <option value="ollama">ollama</option>
+                            </select>
+                        </div>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            @click="suggestTasksFromLLM"
+                            :disabled="suggestingTasks || !canSuggestTasks"
+                        >
+                            {{ suggestingTasks ? 'Aguardando LLM…' : 'Pedir sugestões à LLM' }}
+                        </Button>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">
+                        Cria uma planner task que retorna proposals JSON. Recarregue após a execução para ver as
+                        propostas.
+                    </p>
+                </Card>
+
                 <Card>
                     <template #header>
                         <div class="flex items-center justify-between">
@@ -498,14 +720,14 @@ watch(missionId, () => void loadAll());
                                     variant="secondary"
                                     @click="bulkApproveProposals"
                                     :disabled="selectedProposalIds.size === 0"
-                                    >Aprovar</Button
+                                    >Aprovar selecionadas</Button
                                 >
                                 <Button
                                     size="sm"
                                     variant="danger"
                                     @click="bulkRejectProposals"
                                     :disabled="selectedProposalIds.size === 0"
-                                    >Rejeitar</Button
+                                    >Rejeitar selecionadas</Button
                                 >
                             </div>
                         </div>
@@ -591,6 +813,54 @@ watch(missionId, () => void loadAll());
                         <Button size="sm" variant="primary" @click="savePolicy" :disabled="!canEditMission"
                             >Salvar policy</Button
                         >
+                    </div>
+                </Card>
+            </div>
+
+            <!-- Feedback tab -->
+            <div v-else-if="tab === 'feedback'" class="space-y-4">
+                <Card>
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">Adicionar feedback</div></template
+                    >
+                    <div class="space-y-3">
+                        <textarea
+                            v-model="feedbackText"
+                            rows="4"
+                            placeholder="Escreva instruções, observações ou correções para guiar a missão..."
+                            class="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700/50 text-slate-200"
+                            :disabled="isTerminal"
+                        />
+                        <div class="flex justify-end">
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                @click="sendFeedback"
+                                :disabled="sendingFeedback || !feedbackText.trim() || isTerminal"
+                            >
+                                {{ sendingFeedback ? 'Enviando…' : 'Enviar feedback' }}
+                            </Button>
+                        </div>
+                    </div>
+                </Card>
+
+                <!-- Feedback history -->
+                <Card>
+                    <template #header
+                        ><div class="text-sm font-semibold text-slate-200">Histórico de feedback</div></template
+                    >
+                    <div v-if="!mission.context?.feedback?.length" class="text-sm text-slate-400">
+                        Nenhum feedback registrado.
+                    </div>
+                    <div v-else class="space-y-3">
+                        <div
+                            v-for="(fb, i) in [...(mission.context?.feedback || [])].reverse()"
+                            :key="i"
+                            class="p-3 rounded-lg bg-slate-900/40 border border-slate-800"
+                        >
+                            <div class="text-xs text-slate-500 mb-1">{{ new Date(fb.ts_ms).toLocaleString() }}</div>
+                            <div class="text-sm text-slate-200 whitespace-pre-wrap">{{ fb.text }}</div>
+                        </div>
                     </div>
                 </Card>
             </div>

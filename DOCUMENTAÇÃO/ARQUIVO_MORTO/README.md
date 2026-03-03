@@ -6,7 +6,8 @@ documentação canônica em `DOCUMENTAÇÃO/`.
 ## Regras
 
 - O conteúdo aqui é histórico, não canônico.
-- Arquivos só são removidos quando houver duplicata exata, placeholder vazio ou wrapper sem valor próprio.
+- Arquivos só são removidos quando houver duplicata exata, placeholder vazio ou wrapper sem valor
+  próprio.
 - Em caso de dúvida entre apagar e manter, o padrão é manter e reclassificar.
 
 ## Taxonomia Histórica

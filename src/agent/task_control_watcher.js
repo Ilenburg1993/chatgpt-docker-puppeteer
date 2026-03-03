@@ -18,6 +18,12 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
  * Responsável por notificar drivers quando tarefas são canceladas ou pausadas pelo usuário.
  */
 class TaskControlWatcher {
+    /** Minimum recent-window to detect PAUSED/CANCELLED tasks regardless of interval (ms). */
+    static MIN_RECENT_WINDOW_MS = 300000; // 5 minutes floor
+
+    /** Multiplier applied to intervalMs to compute the recent-window ceiling. */
+    static INTERVAL_MULTIPLIER = 600; // e.g. 500ms * 600 = 5 min; 1000ms * 600 = 10 min
+
     /**
      * Cria um watcher para monitorar controles de tarefas.
      * @param {TaskControlWatcherOptions} options - Opções de configuração.
@@ -114,11 +120,6 @@ class TaskControlWatcher {
      * @returns {void}
      * @sideEffects Inicia timer interno e executa tick imediatamente.
      */
-    /**
-     * Inicia o watcher, começando a monitorar tarefas em estados de controle.
-     * @returns {void}
-     * @sideEffects Inicia timer interno e executa tick imediatamente.
-     */
     start() {
         if (this._timer) return;
         this._stopped = false;
@@ -145,7 +146,14 @@ class TaskControlWatcher {
 
     /**
      * Executa um ciclo de monitoramento: busca tarefas PAUSED/CANCELLED com locks ativos
-     * e emite comandos DRIVER_ABORT via nerv, liberando locks após.
+     * ou modificadas recentemente (cobrindo race condition onde o lock já foi liberado antes
+     * do watcher rodar), e emite comandos DRIVER_ABORT via nerv, liberando locks após.
+     *
+     * Race condition coberta: `pauseTaskCommand` libera o lock antes que este watcher
+     * possa enviar o DRIVER_ABORT. A janela temporal (`this.intervalMs * 600`) garante que
+     * pelo menos um ciclo do watcher detecte a task mesmo sem lock ativo. A dedupKey em
+     * `CONTROL_ABORT_INTENT` (baseada em `intentAt`) garante idempotência.
+     *
      * @returns {Promise<void>}
      * @throws {Error} Erros são logados mas não relançados.
      * @sideEffects Modifica estado do banco (events, locks) e envia comandos via nerv.
@@ -159,19 +167,31 @@ class TaskControlWatcher {
             const db = getDb();
             const now = Date.now();
 
-            // Only tasks that are in a control terminal state AND still claimed/locked might need a DRIVER_ABORT.
+            // Detect tasks needing DRIVER_ABORT in two cases:
+            // 1. Still locked (driver may be running): straightforward — grab all with active lock.
+            // 2. Recently paused/cancelled but lock already released (race: pauseTaskCommand calls
+            //    releaseTaskLock before this watcher runs). Window = interval * INTERVAL_MULTIPLIER
+            //    (≥MIN_RECENT_WINDOW_MS) so we always cover at least one watcher cycle.
+            //    The dedupKey on CONTROL_ABORT_INTENT prevents duplicate abort signals.
+            const RECENT_WINDOW_MS = Math.max(
+                TaskControlWatcher.MIN_RECENT_WINDOW_MS,
+                this.intervalMs * TaskControlWatcher.INTERVAL_MULTIPLIER
+            );
             const rows = db
                 .prepare(
                     `
                     SELECT id, status, last_correlation_id, updated_at_ms, paused_at_ms, cancelled_at_ms
                     FROM tasks
                     WHERE status IN ('CANCELLED', 'PAUSED')
-                      AND locked_by IS NOT NULL
+                      AND (
+                        locked_by IS NOT NULL
+                        OR updated_at_ms >= @recentMs
+                      )
                     ORDER BY updated_at_ms DESC
                     LIMIT 50
                 `
                 )
-                .all();
+                .all({ recentMs: now - RECENT_WINDOW_MS });
 
             for (const row of rows) {
                 const taskId = row?.id;

@@ -11,9 +11,9 @@ echo ""
 
 # 1. Check Vite Process
 echo "1️⃣ Checking Vite Process..."
-if ps aux | grep -E "vite|npm.*dev" | grep -v grep > /dev/null; then
+if pgrep -f "vite|npm.*dev" > /dev/null; then
     echo "   ✅ Vite is RUNNING"
-    ps aux | grep vite | grep -v grep | awk '{print "   PID: " $2 ", MEM: " $4 "%"}'
+    pgrep -af "vite" | awk '{print "   PID: " $1}'
 else
     echo "   ❌ Vite is NOT running"
     echo "   → Run: cd src/dashboard-ui && npm run dev"

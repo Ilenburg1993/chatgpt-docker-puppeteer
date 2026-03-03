@@ -1,6 +1,7 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da camada HTTP, realtime e supervisão do produto.  
-**Quando consultar**: ao alterar rotas, dashboard API, socket hub, bridge NERV do servidor ou serviços de controle expostos externamente.  
+**Quando consultar**: ao alterar rotas, dashboard API, socket hub, bridge NERV do servidor ou
+serviços de controle expostos externamente.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # SERVER
@@ -236,8 +237,7 @@ Aprofundamento específico: [SERVER_HANDLERS.md](./SERVER_HANDLERS.md).
 
 ### Server x Agent/Kernel
 
-- O server observa e controla o runtime, mas não substitui o loop principal nem o motor de
-  execução.
+- O server observa e controla o runtime, mas não substitui o loop principal nem o motor de execução.
 
 ## Restrições e guardrails
 

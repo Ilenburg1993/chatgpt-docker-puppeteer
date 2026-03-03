@@ -1,11 +1,13 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/server/handlers/`.  
-**Quando consultar**: ao alterar superfícies MCP, compatibilidade OpenAI, transformação de payloads de inferência ou endpoints protocolados montados pelo servidor.  
+**Quando consultar**: ao alterar superfícies MCP, compatibilidade OpenAI, transformação de payloads
+de inferência ou endpoints protocolados montados pelo servidor.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # SERVER HANDLERS
 
-**Propósito**: documentar `src/server/handlers/` como a camada de protocolos especiais expostos pelo servidor.  
+**Propósito**: documentar `src/server/handlers/` como a camada de protocolos especiais expostos pelo
+servidor.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, integração, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.

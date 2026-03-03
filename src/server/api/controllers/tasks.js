@@ -154,7 +154,7 @@ async function _runTaskControlCommand(req, res, command, payload = {}) {
                     payload.idempotency_key ||
                     `${req.id}:${command}:${payload.task_id || (Array.isArray(payload.ids) ? payload.ids.join(',') : 'n/a')}`,
             },
-            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] },
+            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'anonymous', permissions: [] },
         });
 
         return result;
@@ -182,8 +182,8 @@ async function _runTaskControlCommand(req, res, command, payload = {}) {
 router.get('/', async (req, res) => {
     try {
         // Parse pagination parameters
-        const page = Math.max(1, parseInt(String(req.query.page)) || 1);
-        const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit)) || 100));
+        const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+        const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit), 10) || 100));
         const offset = (page - 1) * limit;
 
         // Get optional filters

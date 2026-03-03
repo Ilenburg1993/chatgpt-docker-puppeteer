@@ -114,9 +114,9 @@ echo "🌐 Verificando Chrome/Chromium..."
 CHROME_FOUND=false
 
 # Check if Chrome (or proxy) is running on PROXY_PORT (container-facing)
-if curl -s http://localhost:${PROXY_PORT}/json/version &> /dev/null; then
+if curl -s "http://localhost:${PROXY_PORT}/json/version" &> /dev/null; then
   echo -e "${GREEN}✅ Chrome/Proxy com remote debugging detectado na porta ${PROXY_PORT}${NC}"
-  CHROME_INFO=$(curl -s http://localhost:${PROXY_PORT}/json/version)
+  CHROME_INFO=$(curl -s "http://localhost:${PROXY_PORT}/json/version")
   CHROME_VERSION=$(echo "$CHROME_INFO" | sed -n 's/.*"Browser"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p')
     echo "   Versão: $CHROME_VERSION"
     CHROME_FOUND=true

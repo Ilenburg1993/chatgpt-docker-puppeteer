@@ -245,8 +245,10 @@ export function classifyError(error, context = {}) {
 export function getSmallerModel(currentModel) {
     if (!currentModel) return null;
 
-    // strip any wrapper that some toolkits add (e.g. `Custom/` prefix)
-    const normalized = String(currentModel).replace(/^custom\//i, '');
+    // strip any wrapper that some toolkits add (e.g. `Custom/` prefix) and normalize case
+    const normalized = String(currentModel)
+        .replace(/^custom\//i, '')
+        .toLowerCase();
 
     // Fallback chain: cloud → local 7b → local 3b → local 1.5b → null
     const fallbackChain = {

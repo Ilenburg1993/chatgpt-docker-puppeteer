@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Audit and Fix"
+  short_description: "Audita e corrige bugs diretamente no código-fonte."
+  default_prompt: "Use $code-audit-and-fix para varrer um módulo, identificar bugs e aplicar correções cirúrgicas com validação automática via testes."

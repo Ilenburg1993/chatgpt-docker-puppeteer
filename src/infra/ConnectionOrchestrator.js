@@ -63,8 +63,8 @@ const DEFAULTS = {
     // Retry & Timing
     retryDelayMs: 3000,
     maxRetryDelayMs: 15000,
-    maxConnectionAttempts: parseInt(process.env.MAX_CONNECTION_ATTEMPTS || '5'),
-    connectionTimeout: parseInt(process.env.CONNECTION_TIMEOUT || '30000'),
+    maxConnectionAttempts: parseInt(process.env.MAX_CONNECTION_ATTEMPTS || '5', 10),
+    connectionTimeout: parseInt(process.env.CONNECTION_TIMEOUT || '30000', 10),
 
     // Page Selection
     pageScanIntervalMs: 4000,

@@ -17,8 +17,6 @@ cd "$SCRIPT_DIR"
 SERVER_PORT=3008
 HEALTH_URL="http://localhost:${SERVER_PORT}/api/health"
 CHROME_CONFIG="chrome-config.json"
-BACKUP_DIR="backups/launcher-$(date +%Y%m%d-%H%M%S)"
-LOG_FILE="logs/launcher.log"
 
 # ============================================================================
 #  CORES E FORMATACAO
@@ -79,7 +77,7 @@ main_menu() {
         echo -e "${COLOR_CYAN}============================================================${COLOR_RESET}"
         echo ""
 
-        read -p "Escolha uma opção: " choice
+        read -r -p "Escolha uma opção: " choice
 
         case "$choice" in
             1) start_system ;;
@@ -115,7 +113,7 @@ start_system() {
         echo ""
     else
         echo "        Instale em: https://nodejs.org/"
-        read -p "Pressione ENTER para continuar..."
+        read -r -p "Pressione ENTER para continuar..."
         return
     fi
 
@@ -127,7 +125,7 @@ start_system() {
     else
         echo -e "        ${COLOR_RED}✗${COLOR_RESET} PM2 não encontrado!"
         echo "        Execute: npm install -g pm2"
-        read -p "Pressione ENTER para continuar..."
+        read -r -p "Pressione ENTER para continuar..."
         return
     fi
 
@@ -203,7 +201,7 @@ start_system() {
     echo "  PM2 Status: npm run queue:status"
     echo "  Logs: Option [5] no menu"
     echo ""
-    read -p "Pressione ENTER para continuar..."
+    read -r -p "Pressione ENTER para continuar..."
 }
 
 # ============================================================================
@@ -219,7 +217,7 @@ stop_system() {
     echo ""
     echo -e "${COLOR_GREEN}✓ Sistema parado com sucesso!${COLOR_RESET}"
     echo ""
-    read -p "Pressione ENTER para continuar..."
+    read -r -p "Pressione ENTER para continuar..."
 }
 
 # ============================================================================
@@ -235,7 +233,7 @@ restart_system() {
     echo ""
     echo -e "${COLOR_GREEN}✓ Sistema reiniciado!${COLOR_RESET}"
     echo ""
-    read -p "Pressione ENTER para continuar..."
+    read -r -p "Pressione ENTER para continuar..."
 }
 
 # ============================================================================
@@ -321,7 +319,7 @@ status_check() {
     echo ""
 
     echo -e "${COLOR_CYAN}============================================================${COLOR_RESET}"
-    read -p "Pressione ENTER para continuar..."
+    read -r -p "Pressione ENTER para continuar..."
 }
 
 # ============================================================================
@@ -338,7 +336,7 @@ view_logs() {
     echo " [3] Application Logs"
     echo " [4] Todos os logs"
     echo ""
-    read -p "Opcao: " log_choice
+    read -r -p "Opcao: " log_choice
 
     case "$log_choice" in
         1) npx pm2 logs ;;
@@ -366,7 +364,7 @@ open_pm2_gui() {
     else
         echo -e "${COLOR_YELLOW}pm2-gui não está instalado.${COLOR_RESET}"
         echo ""
-        read -p "Deseja instalar agora? (s/N): " install_gui
+        read -r -p "Deseja instalar agora? (s/N): " install_gui
         if [[ "$install_gui" =~ ^[Ss]$ ]]; then
             echo ""
             echo "Instalando pm2-gui..."
@@ -379,7 +377,7 @@ open_pm2_gui() {
     fi
 
     echo ""
-    read -p "Pressione ENTER para continuar..."
+    read -r -p "Pressione ENTER para continuar..."
 }
 
 # ============================================================================
@@ -407,11 +405,11 @@ clean_system() {
     echo "  - Cache PM2"
     echo "  - Crash reports processados"
     echo ""
-    read -p "Confirma limpeza? (s/N): " confirm
+    read -r -p "Confirma limpeza? (s/N): " confirm
 
     if [[ ! "$confirm" =~ ^[Ss]$ ]]; then
         echo "Operação cancelada."
-        read -p "Pressione ENTER para continuar..."
+        read -r -p "Pressione ENTER para continuar..."
         return
     fi
 
@@ -422,7 +420,7 @@ clean_system() {
     echo ""
     echo -e "${COLOR_GREEN}✓ Limpeza concluída!${COLOR_RESET}"
     echo ""
-    read -p "Pressione ENTER para continuar..."
+    read -r -p "Pressione ENTER para continuar..."
 }
 
 # ============================================================================
@@ -436,7 +434,7 @@ diagnose_crashes() {
     if [ ! -d "logs/crash_reports" ] || [ -z "$(ls -A logs/crash_reports 2>/dev/null)" ]; then
         echo -e "${COLOR_GREEN}✓ Nenhum crash detectado!${COLOR_RESET}"
         echo ""
-        read -p "Pressione ENTER para continuar..."
+        read -r -p "Pressione ENTER para continuar..."
         return
     fi
 
@@ -456,7 +454,7 @@ diagnose_crashes() {
     npm run diagnose
 
     echo ""
-    read -p "Pressione ENTER para continuar..."
+    read -r -p "Pressione ENTER para continuar..."
 }
 
 # ============================================================================
@@ -502,7 +500,7 @@ backup_config() {
     echo "  Local: $BACKUP_PATH"
     echo "  Arquivos: config, controle, dynamic_rules, ecosystem, chrome-config, fila"
     echo ""
-    read -p "Pressione ENTER para continuar..."
+    read -r -p "Pressione ENTER para continuar..."
 }
 
 # ============================================================================

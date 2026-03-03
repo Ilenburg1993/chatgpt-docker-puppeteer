@@ -157,8 +157,8 @@ Logo, o dashboard não depende apenas da proteção HTTP tradicional.
 
 ## HTTPS
 
-O engine em
-[server.js](/workspaces/chatgpt-docker-puppeteer/src/server/engine/server.js) suporta HTTPS.
+O engine em [server.js](/workspaces/chatgpt-docker-puppeteer/src/server/engine/server.js) suporta
+HTTPS.
 
 Comportamento observado:
 

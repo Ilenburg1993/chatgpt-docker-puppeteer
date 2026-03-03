@@ -1,0 +1,238 @@
+name: Semantic Analysis
+
+# Análise semântica profunda: detecta bugs complexos além de sintaxe e tipagem.
+# Executa auditorias especializadas de segurança, performance e arquitetura,
+# identificando padrões problemáticos em lógica, acoplamento e contratos.
+# Totalmente não-bloqueante: resultados são informativos e não bloqueiam o merge.
+#
+# Modos:
+#   standard — security + architecture + contracts (padrão)
+#   full     — standard + performance + qualidade semântica profunda
+#
+# Detecta (além de sintaxe/tipagem):
+#   • Padrões de vazamento de memória (addEventListener sem removeEventListener)
+#   • Queries N+1 em extractors e loops
+#   • Acoplamento severo e importações cross-domain ilegais
+#   • Violações de contratos de domínio
+#   • Vulnerabilidades de segurança por padrão de código
+#   • Drift de arquitetura em relação ao ARCHITECTURE.md
+
+on:
+  schedule:
+    # Segunda-feira 04:13 UTC — análise semanal profunda
+    - cron: "13 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Modo de análise"
+        required: false
+        default: standard
+        type: choice
+        options:
+          - standard
+          - full
+
+concurrency:
+  group: semantic-analysis-${{ github.workflow }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+jobs:
+  semantic-bug-hunt:
+    name: Semantic bug hunt (security + architecture + performance)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/semantic-analysis/{security,performance,architecture,contracts}
+
+      - name: Select analysis mode
+        id: select_mode
+        run: |
+          MODE="standard"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.mode }}" = "full" ]; then
+            MODE="full"
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      # ── Security audit: padrões de injeção, segredos hardcoded, surfaces HTTP ──
+      - name: Security pattern audit
+        id: audit_security
+        continue-on-error: true
+        run: |
+          npm run audit:preflight || echo "::warning::audit:preflight retornou erro; continuando análise sem contexto semântico pré-carregado."
+          rc=0
+          timeout --signal=INT --kill-after=30s 10m \
+            npm run audit:security -- \
+              --json \
+              --publish-master false \
+              --publish-snapshot false \
+              --output-dir artifacts/semantic-analysis/security \
+              --progress false \
+              --eta false \
+              --shadow-gate false \
+              --cloud-fallback off || rc=$?
+          if [ "$rc" -eq 124 ]; then
+            echo "Security audit hit enforced timeout." >&2
+          fi
+          exit $rc
+
+      # ── Architecture audit: acoplamento, drift, dependências cross-domain ──────
+      - name: Architecture drift audit
+        id: audit_architecture
+        continue-on-error: true
+        run: |
+          rc=0
+          timeout --signal=INT --kill-after=30s 10m \
+            npm run audit:architecture -- \
+              --json \
+              --publish-master false \
+              --publish-snapshot false \
+              --output-dir artifacts/semantic-analysis/architecture \
+              --progress false \
+              --eta false \
+              --shadow-gate false \
+              --cloud-fallback off || rc=$?
+          if [ "$rc" -eq 124 ]; then
+            echo "Architecture audit hit enforced timeout." >&2
+          fi
+          exit $rc
+
+      # ── Contract coverage: violações de contratos de domínio ─────────────────
+      - name: Contract coverage audit
+        id: audit_contracts
+        continue-on-error: true
+        run: |
+          rc=0
+          timeout --signal=INT --kill-after=30s 12m \
+            npm run audit:contracts -- \
+              --json \
+              --publish-master false \
+              --publish-snapshot false \
+              --output-dir artifacts/semantic-analysis/contracts \
+              --progress false \
+              --eta false \
+              --shadow-gate false \
+              --cloud-fallback off || rc=$?
+          if [ "$rc" -eq 124 ]; then
+            echo "Contracts audit hit enforced timeout." >&2
+          fi
+          exit $rc
+
+      # ── Performance audit (apenas no modo full) ───────────────────────────────
+      - name: Performance pattern audit (full mode only)
+        id: audit_performance
+        if: steps.select_mode.outputs.mode == 'full'
+        continue-on-error: true
+        run: |
+          rc=0
+          timeout --signal=INT --kill-after=30s 10m \
+            npm run audit:performance -- \
+              --json \
+              --publish-master false \
+              --publish-snapshot false \
+              --output-dir artifacts/semantic-analysis/performance \
+              --progress false \
+              --eta false \
+              --shadow-gate false \
+              --cloud-fallback off || rc=$?
+          if [ "$rc" -eq 124 ]; then
+            echo "Performance audit hit enforced timeout." >&2
+          fi
+          exit $rc
+
+      # ── Build summary ─────────────────────────────────────────────────────────
+      - name: Build semantic analysis summary
+        if: always()
+        run: |
+          # shellcheck disable=SC2016
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import path from "node:path";
+
+            function findingsFromDir(dir) {
+              if (!fs.existsSync(dir)) return null;
+              const files = fs.readdirSync(dir).filter(f => f.endsWith(".json"));
+              if (files.length === 0) return null;
+              files.sort();
+              try {
+                const payload = JSON.parse(fs.readFileSync(path.join(dir, files[files.length - 1]), "utf8"));
+                const report = payload?.report || payload;
+                return report?.summary?.total_findings ?? null;
+              } catch { return null; }
+            }
+
+            const mode = process.env.AUDIT_MODE || "standard";
+            const secFindings = findingsFromDir("artifacts/semantic-analysis/security");
+            const archFindings = findingsFromDir("artifacts/semantic-analysis/architecture");
+            const contractFindings = findingsFromDir("artifacts/semantic-analysis/contracts");
+            const perfFindings = mode === "full" ? findingsFromDir("artifacts/semantic-analysis/performance") : null;
+
+            const lines = [
+              "## Semantic Analysis — Bug Hunt (non-blocking)",
+              "",
+              `- mode: ${mode}`,
+              `- security_findings: ${secFindings ?? "n/a"}`,
+              `- architecture_findings: ${archFindings ?? "n/a"}`,
+              `- contract_findings: ${contractFindings ?? "n/a"}`,
+              perfFindings !== null
+                ? `- performance_findings: ${perfFindings ?? "n/a"}`
+                : "- performance_findings: skipped (standard mode)",
+              "",
+              "> Resultados acima são informativos e não bloqueiam o merge.",
+              "> Consulte os artefatos para detalhes completos dos findings.",
+            ];
+            fs.writeFileSync("artifacts/semantic-analysis/summary.md", lines.join("\n") + "\n");
+          '
+          cat artifacts/semantic-analysis/summary.md >> "$GITHUB_STEP_SUMMARY"
+        env:
+          AUDIT_MODE: ${{ steps.select_mode.outputs.mode }}
+
+      - name: Upload semantic analysis artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: semantic-analysis-${{ steps.select_mode.outputs.mode }}-${{ github.run_id }}
+          path: artifacts/semantic-analysis
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,4 +1,5 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
 import { getDb } from './sqlite.js';
 
@@ -129,7 +130,11 @@ function _rowToTask(row) {
     if (row.blocked_details_json) {
         try {
             task.state.blocked_details = JSON.parse(row.blocked_details_json);
-        } catch (_) {
+        } catch (err) {
+            log.warn(
+                { taskId: task.id, field: 'blocked_details_json', error: err?.message },
+                '[task_repo] Fallback to raw string for malformed JSON'
+            );
             task.state.blocked_details = row.blocked_details_json;
         }
     }
@@ -138,7 +143,11 @@ function _rowToTask(row) {
     if (row.result_json) {
         try {
             task.result_db = JSON.parse(row.result_json);
-        } catch (_) {
+        } catch (err) {
+            log.warn(
+                { taskId: task.id, field: 'result_json', error: err?.message },
+                '[task_repo] Fallback to raw string for malformed JSON'
+            );
             task.result_db = row.result_json;
         }
     }
@@ -219,6 +228,24 @@ function countTasks({ status = null, stage = null, missionId = null } = {}) {
     const sql = `SELECT COUNT(*) as n FROM tasks ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`;
     const row = db.prepare(sql).get(params);
     return /** @type {{ n: number }} */ (row)?.n || 0;
+}
+
+/**
+ * Conta tarefas agrupadas por status numa única query SQL (GROUP BY).
+ * Mais eficiente que chamar countTasks() 8 vezes em paralelo.
+ *
+ * @returns {Record<string, number>} Mapa de status → contagem
+ */
+function countTasksByStatus() {
+    const db = getDb();
+    const rows = db.prepare('SELECT status, COUNT(*) as n FROM tasks GROUP BY status').all();
+    /** @type {Record<string, number>} */
+    const result = {};
+    for (const row of rows) {
+        const r = /** @type {{ status: string, n: number }} */ (row);
+        result[r.status] = r.n;
+    }
+    return result;
 }
 
 /** Função exportada: getTaskDependencies. */
@@ -916,6 +943,7 @@ export {
     claimNextEligibleTask,
     clearQueuePreserveRunning,
     countTasks,
+    countTasksByStatus,
     extendTaskLock,
     getTaskById,
     getTaskDependencies,

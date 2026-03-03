@@ -30,7 +30,7 @@ echo "  3️⃣  Iniciar AMBOS com debug (9229 + 9230)"
 echo "  4️⃣  Verificar status de debug"
 echo "  5️⃣  Parar todos os processos"
 echo ""
-read -p "Escolha uma opção (1-5): " OPTION
+read -r -p "Escolha uma opção (1-5): " OPTION
 
 case $OPTION in
   1)

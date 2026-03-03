@@ -1,11 +1,13 @@
 **Status**: Canônico de apoio.  
 **Escopo**: aprofundamento da subtrilha `src/infra/browser_pool/`.  
-**Quando consultar**: ao alterar alocação de páginas, health monitoring CDP, circuit breaker de browser, validação de página ou enforcement arquitetural do Chrome externo.  
+**Quando consultar**: ao alterar alocação de páginas, health monitoring CDP, circuit breaker de
+browser, validação de página ou enforcement arquitetural do Chrome externo.  
 **Documento-mestre relacionado**: [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 # BROWSER POOL
 
-**Propósito**: documentar `src/infra/browser_pool/` como a camada soberana de pool e saúde do ambiente browser.  
+**Propósito**: documentar `src/infra/browser_pool/` como a camada soberana de pool e saúde do
+ambiente browser.  
 **Status documental**: Canônico de apoio.  
 **Público**: engenharia, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -44,8 +46,8 @@ Responsabilidades observáveis:
 Responsabilidades:
 
 - registrar falhas por instância;
-- distinguir causas como `USER_CLOSED`, `TECHNICAL_CRASH`, `PROXY_FAILURE`,
-  `OUT_OF_MEMORY`, `NETWORK_ISSUE`;
+- distinguir causas como `USER_CLOSED`, `TECHNICAL_CRASH`, `PROXY_FAILURE`, `OUT_OF_MEMORY`,
+  `NETWORK_ISSUE`;
 - projetar estado do circuito (`OPERATIONAL`, `DEGRADED`, `CIRCUIT_OPEN`);
 - decidir políticas de pausa, polling e retry por causa.
 

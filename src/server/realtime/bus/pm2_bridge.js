@@ -5,9 +5,23 @@ import { log } from '#core/logger';
 import CONFIG from '#core/config';
 
 /**
- * Processos gerenciados (ecosystem.config.js)
+ * Processos sempre gerenciados (núcleo do ecosystem.config.cjs).
  */
-const MANAGED_PROCESSES = ['agente-gpt', 'dashboard-web', 'chrome-proxy'];
+const CORE_PROCESSES = ['agente-gpt', 'dashboard-web', 'chrome-proxy'];
+
+/**
+ * Processos opcionais — ativos quando ENABLE_AUDIT_AGENT_PM2_PROCESSES=true.
+ */
+const OPTIONAL_PROCESSES = ['inference-gateway', 'ollama-host-supervisor', 'audit-agent'];
+
+/**
+ * Conjunto completo de processos gerenciados (dinâmico).
+ * Inclui opcionais quando a variável de ambiente correspondente está ativa.
+ */
+const MANAGED_PROCESSES = [
+    ...CORE_PROCESSES,
+    ...(String(process.env.ENABLE_AUDIT_AGENT_PM2_PROCESSES || '').toLowerCase() === 'true' ? OPTIONAL_PROCESSES : []),
+];
 
 /**
  * Estado operacional da ponte.
@@ -214,6 +228,14 @@ function stop() {
 
     lastProcessStates.clear();
     isBusActive = false;
+    try {
+        pm2Raw.disconnect();
+    } catch (disconnectErr) {
+        log(
+            'DEBUG',
+            `[PM2_BRIDGE] Disconnect error during stop: ${disconnectErr && disconnectErr.message ? disconnectErr.message : String(disconnectErr)}`
+        );
+    }
     log('INFO', '[PM2_BRIDGE] Ponte de eventos encerrada.');
 }
 
@@ -263,4 +285,4 @@ async function refreshSnapshot() {
     });
 }
 
-export { init, stop, getProcessStates, refreshSnapshot, MANAGED_PROCESSES };
+export { init, stop, getProcessStates, refreshSnapshot, MANAGED_PROCESSES, CORE_PROCESSES, OPTIONAL_PROCESSES };

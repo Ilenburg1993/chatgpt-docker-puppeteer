@@ -17,7 +17,8 @@ function _asInt(raw, fallback) {
 function _parseJson(raw, fallback = null) {
     try {
         return raw ? JSON.parse(String(raw)) : fallback;
-    } catch (_) {
+    } catch (err) {
+        log.debug({ error: err?.message }, '[dashboard_tasks] _parseJson fallback to default');
         return fallback;
     }
 }

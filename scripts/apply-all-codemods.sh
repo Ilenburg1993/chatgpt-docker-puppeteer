@@ -12,7 +12,9 @@ echo "=========================================================="
 echo ""
 
 # Arquivos a transformar (excluindo constants/ para evitar loops)
+# shellcheck disable=SC2034
 TARGET_PATTERN="src/**/*.js"
+# shellcheck disable=SC2034
 EXCLUDE_PATTERN="src/core/constants"
 
 echo "📁 Listando arquivos alvo..."

@@ -182,6 +182,7 @@ async function gracefulShutdown(signal) {
         }
     } finally {
         clearTimeout(forceExitTimeout);
+        cleanupSignalListeners();
         if (!allowProcessExit) {
             isShuttingDown = false;
         }

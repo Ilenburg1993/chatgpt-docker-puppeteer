@@ -29,6 +29,9 @@ const ALLOWED_TARGETS = new Set(['auto', 'chatgpt', 'gemini', 'claude', 'ollama'
 const AUTONOMY_VALUES = Object.values(AUTONOMY_MODES);
 const AUTONOMY_SCHEMA = z.enum(/** @type {[string, ...string[]]} */ (AUTONOMY_VALUES));
 
+// Terminal mission statuses: proposals cannot be accepted for missions in these states.
+const TERMINAL_MISSION_STATUSES = new Set([MISSION_STATUS.DONE, MISSION_STATUS.FAILED, MISSION_STATUS.CANCELLED]);
+
 const createMissionSchema = z.object({
     title: z.string().min(1).max(500),
     description: z.string().max(5000).optional(),
@@ -170,7 +173,7 @@ async function _runMissionControlCommand(req, res, command, payload = {}) {
                 idempotency_key:
                     payload.idempotency_key || `${req.id}:${command}:${payload.mission_id || req.params.id}`,
             },
-            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] },
+            actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'anonymous', permissions: [] },
         });
 
         return result;
@@ -406,9 +409,49 @@ router.get('/:id/progress', async (req, res) => {
             });
         }
 
+        const db = getDb();
+
+        // Live task counts from DB: more accurate than mission.context.progress which may be stale
+        // when tasks progress autonomously via the orchestration workers.
+        const countRows = db
+            .prepare(
+                `
+                SELECT stage, status, COUNT(*) AS c
+                FROM tasks
+                WHERE mission_id = ?
+                GROUP BY stage, status
+            `
+            )
+            .all(missionId);
+
+        /** @type {Record<string, number>} */
+        const byStatus = {};
+        /** @type {Record<string, number>} */
+        const byStage = {};
+        let totalTasks = 0;
+        for (const r of countRows) {
+            const c = Number(r.c) || 0;
+            totalTasks += c;
+            byStatus[String(r.status)] = (byStatus[String(r.status)] || 0) + c;
+            byStage[String(r.stage)] = (byStage[String(r.stage)] || 0) + c;
+        }
+
+        const liveCounts = {
+            total: totalTasks,
+            by_status: byStatus,
+            by_stage: byStage,
+            pending: byStatus['PENDING'] || 0,
+            running: byStatus['RUNNING'] || 0,
+            done: byStatus['DONE'] || 0,
+            failed: byStatus['FAILED'] || 0,
+            blocked: byStatus['BLOCKED'] || 0,
+            cancelled: byStatus['CANCELLED'] || 0,
+        };
+
         res.json({
             success: true,
             progress: _computeProgressView(mission),
+            live_counts: liveCounts,
             request_id: req.id,
         });
     } catch (err) {
@@ -603,6 +646,14 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
             request_id: req.id,
         });
     } catch (err) {
+        if (err?.code === 'CONFLICT') {
+            return res.status(409).json({
+                success: false,
+                error: 'Conflito de concorrência ao salvar feedback',
+                details: err?.message || String(err),
+                request_id: req.id,
+            });
+        }
         log('ERROR', `[MISSIONS_API] Erro ao adicionar feedback: ${err?.message || String(err)}`, req.id);
         res.status(500).json({
             success: false,
@@ -803,6 +854,19 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
+        }
+
+        // Guard: reject proposals for missions in terminal state.
+        // Tasks created for DONE/FAILED/CANCELLED missions would be queued and executed unexpectedly.
+        if (TERMINAL_MISSION_STATUSES.has(mission.status)) {
+            return res.status(409).json({
+                success: false,
+                error: 'Missão em estado terminal',
+                message: `Não é possível aceitar proposals para missões em estado ${mission.status}. Apenas missões ativas (READY, RUNNING, PAUSED) aceitam proposals.`,
+                mission_id: missionId,
+                mission_status: mission.status,
+                request_id: req.id,
+            });
         }
 
         const proposals = Array.isArray(req.body?.proposals) ? req.body.proposals : null;

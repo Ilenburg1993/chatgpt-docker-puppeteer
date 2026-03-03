@@ -1,6 +1,7 @@
 # OPERACOES
 
-**Propósito**: concentrar a documentação de deploy, ambiente, PM2, devcontainer, rede e operação do runtime em execução.  
+**Propósito**: concentrar a documentação de deploy, ambiente, PM2, devcontainer, rede e operação do
+runtime em execução.  
 **Status documental**: Canônico.  
 **Público**: engenharia, operação, manutenção e agentes de IA.  
 **Última atualização**: 1 de março de 2026.
@@ -59,13 +60,13 @@
   [../RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md](../RELATORIOS/AUDITORIA_QUALITATIVA_CATEGORIAS_VIVAS.md).
 - A reclassificação dos relatórios de implementação já foi aplicada.
 - `NETWORKING.md`, `SECURITY.md` e `LAUNCHER.md` já foram reescritos com base no código atual.
-- `CHROME_PROXY_SETUP.md`, `CHROME_PROXY_INTEGRATION_GUIDE.md` e
-  `DASHBOARD_PORT_FORWARDING.md` também já foram reescritos com base nos scripts e configs atuais.
+- `CHROME_PROXY_SETUP.md`, `CHROME_PROXY_INTEGRATION_GUIDE.md` e `DASHBOARD_PORT_FORWARDING.md`
+  também já foram reescritos com base nos scripts e configs atuais.
 - `DEVCONTAINER.md` e `PM2_QUICK_REFERENCE.md` também já foram reescritos com base no estado atual
   observado e com exposição explícita dos drifts remanescentes.
 - Os drifts principais do `Makefile` e dos scripts PM2 já foram corrigidos nesta trilha.
-- A próxima fase recomendada aqui é uma passada de link hygiene e, depois, revisar helpers
-  legados restantes (`launcher`, `quick-ops`, scripts históricos de deploy).
+- A próxima fase recomendada aqui é uma passada de link hygiene e, depois, revisar helpers legados
+  restantes (`launcher`, `quick-ops`, scripts históricos de deploy).
 
 ## Regras de manutenção
 

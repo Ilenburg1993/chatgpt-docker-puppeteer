@@ -48,8 +48,8 @@ operacional, execução controlada, leitura de artefatos e troubleshooting de `p
 2. Coletar baseline de `pm2`, `mcp` e `rag`.
 3. Executar o script correto para o objetivo (`audit:observability`, `audit:quick`, `audit:deep`,
    `audit:nightly`).
-4. Ler o report com foco em `audit_mode`, `collector_plan`, `semantic_preflight`, `quality_execution`
-   e `shadow_gate`.
+4. Ler o report com foco em `audit_mode`, `collector_plan`, `semantic_preflight`,
+   `quality_execution` e `shadow_gate`.
 5. Recoletar baseline final e registrar delta, risco residual e anomalias.
 
 ## Guardrails

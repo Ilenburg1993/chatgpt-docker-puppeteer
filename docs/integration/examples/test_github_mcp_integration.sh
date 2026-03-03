@@ -133,7 +133,7 @@ fi
 section "[6/7] Testing GitHub Token Configuration"
 if [ -n "$GITHUB_PERSONAL_ACCESS_TOKEN" ]; then
     TOKEN_LEN=${#GITHUB_PERSONAL_ACCESS_TOKEN}
-    if [ $TOKEN_LEN -gt 20 ]; then
+    if [ "$TOKEN_LEN" -gt 20 ]; then
         echo -e "${GREEN}✓ PASS${NC}: GITHUB_PERSONAL_ACCESS_TOKEN is set (length: $TOKEN_LEN)"
         ((PASSED++))
     else

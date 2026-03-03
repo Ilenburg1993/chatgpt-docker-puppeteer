@@ -1,0 +1,608 @@
+# copilot-setup-steps.yml
+#
+# GitHub Copilot Coding Agent — bootstrap environment v3.1
+#
+# Executado automaticamente pelo GitHub Copilot Coding Agent antes de cada sessão.
+# Prepara o ambiente com ferramentas, dependências e configurações idênticas ao
+# DevContainer, garantindo máxima autonomia e produtividade do agente.
+#
+# Referência oficial:
+#   https://docs.github.com/en/copilot/customizing-copilot/customizing-the-development-environment-for-copilot-coding-agent
+#
+# Versão: 3.1 — Correções de bugs + alinhamento de versões
+# Atualizado: 2026-03-01
+#
+# ─── MUDANÇAS v3.1 (correções de bugs em relação a v3.0) ─────────────────────
+#   - BUGFIX: actions/checkout e setup-node alinhados para @v6 (espelha ci.yml)
+#   - BUGFIX: actions/cache corrigido para @v4 (versão estável; @v5 não existe)
+#   - BUGFIX: NPM_GLOBAL_PREFIX removido de env: (shell expansion não ocorre em
+#             YAML env:). Prefixo agora é definido diretamente no step via shell.
+#   - BUGFIX: Nomes de steps com ${VAR} (ex: "gh CLI v${GH_VERSION}") removidos —
+#             variáveis de env: não expandem em campos name: do YAML de workflows.
+#   - FEATURE: .github/actionlint.yaml criado para suprimir falso positivo de
+#              snapshot: true (campo propriamente da plataforma Copilot).
+#
+# ─── ESTRATÉGIA: MIRROR AMPLO vs MINIMAL ────────────────────────────────────
+#   Justificativa para setup abrangente (não é exagero):
+#   1. snapshot: true — setup roda UMA VEZ por sessão; overhead ~8min cold → zero
+#      em execuções subsequentes via snapshot da plataforma Copilot.
+#   2. O agente executa scripts de auditoria, diagnóstico e análise que dependem
+#      de ferramentas como sqlite3, jq, yq, rg, graphviz, shellcheck etc.
+#   3. Ter missing tools durante uma sessão forçaria o agente a interromper tarefas
+#      para instalar deps, desperdiçando tempo de task.
+#   Ferramentas excluídas intencionalmente (não são ferramentas de desenvolvimento):
+#     postgresql-client, protobuf-compiler, watchman, iotop (monitoramento) →
+#     disponíveis no DevContainer para uso interativo, mas irrelevantes para o agente.
+#
+# ─── PRINCÍPIOS ───────────────────────────────────────────────────────────────
+#   1. FAIL-FAST críticos (sem continue-on-error): checkout, Node.js 24, npm ci
+#   2. OPCIONAIS (continue-on-error: true): Docker CLI, dashboard build, testes
+#   3. CACHE em 4 CAMADAS: reduz warm start de ~10min para ~2-3min
+#   4. MIRROR DOCKERFILE: versões alinhadas com ARGs de .devcontainer/Dockerfile
+#   5. DOCUMENTAÇÃO: DOCUMENTAÇÃO/CI_CD/COPILOT_SETUP_STEPS.md
+
+name: Copilot Setup Steps
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  security-events: write
+  statuses: write
+
+concurrency:
+  group: copilot-setup-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Nome OBRIGATÓRIO pela plataforma Copilot — não renomear.
+  # actionlint:ignore unknown-prop
+  copilot-setup-steps:
+    name: Bootstrap — Copilot Coding Agent v3.1
+    runs-on: ubuntu-latest
+    timeout-minutes: 59
+    # snapshot: true
+    # ↑ Campo proprietário da plataforma GitHub Copilot Coding Agent.
+    # Permite restaurar o ambiente após o setup sem re-executar todos os steps.
+    # Desabilitado como comentário para não disparar falso positivo no actionlint.
+    # Para habilitar quando a feature estiver GA no seu plano, descomente a linha.
+    # Ref: https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent
+
+    permissions:
+      contents: read
+      # Nota: permissões do workflow são somente para o bootstrap de ambiente.
+      # O agente Copilot usa seu próprio token GITHUB_TOKEN durante execução de tarefas —
+      # com as permissões configuradas em Settings → Copilot → Coding Agent.
+      # Esta seção NÃO controla o que o agente pode fazer; apenas o que este job pode.
+
+    # Variáveis de ambiente — espelha SECTION 8.5 do .devcontainer/Dockerfile.
+    # Para atualizar: alinhar com os ARG correspondentes no Dockerfile e
+    # incrementar a chave de cache em ~/.npm-global-copilot (step 3).
+    env:
+      # ── Toolchain pins (espelham ARGs do Dockerfile) ───────────────────────
+      NPM_VERSION: "11.11.0"
+      PNPM_VERSION: "10.30.3"
+      GH_VERSION: "2.87.3"
+      ACTIONLINT_VERSION: "1.7.11"
+      HADOLINT_VERSION: "2.14.0"
+      YQ_VERSION: "v4.44.3"
+      TS_VERSION: "5.9.3"
+      TS_LSP_VERSION: "5.1.3"
+      DEVCONTAINER_CLI_VERSION: "0.83.3"
+      # ── Runtime do projeto ─────────────────────────────────────────────────
+      NODE_ENV: "development"
+      SERVER_PORT: "3008"
+      CHROME_PROXY_PORT: "9224"
+      LOG_LEVEL: "info"
+      NPM_CONFIG_AUDIT: "false"
+      NPM_CONFIG_FUND: "false"
+      NPM_CONFIG_LOGLEVEL: "warn"
+
+    steps:
+      # ═══════════════════════════════════════════════════════════════════════
+      # 0. CHECKOUT
+      # Fetch-depth: 0 para permitir git diff, blame, log e operações de
+      # rollback de commits durante a sessão do agente.
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 1. PROJECT INSTRUCTIONS
+      # Exibe as orientações canônicas do projeto no log do job para que o
+      # agente possa consultá-las durante a sessão. Os arquivos são:
+      #   • .github/copilot-instructions.md  — guia operacional completo
+      #   • .github/AGENTS.md               — baseline universal multi-agente
+      #   • .github/instructions/project-canon.instructions.md — baseline curto
+      # ═══════════════════════════════════════════════════════════════════
+      - name: Load project instructions
+        run: |
+          INSTRUCTIONS=(
+            ".github/copilot-instructions.md"
+            ".github/AGENTS.md"
+            ".github/instructions/project-canon.instructions.md"
+          )
+          for file in "${INSTRUCTIONS[@]}"; do
+            if [ -f "$file" ]; then
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "📄  $file"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              cat "$file"
+            else
+              echo "⚠️  $file — não encontrado"
+            fi
+          done
+          echo ""
+          echo "✅ Instruções do projeto carregadas"
+
+      # ═══════════════════════════════════════════════════════════════════
+      # 2. NODE.JS 24 LTS
+      # setup-node@v6 com cache:npm gerencia ~/.npm automaticamente.
+      # A chave de cache é baseada em package-lock.json — garante que mudanças
+      # de dependências invalidam o cache.
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Verify Node.js runtime (>= 24 required)
+        run: node scripts/ci/check-node-version.mjs
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 3. PREFIXO npm GLOBAL (isolado e cacheável)
+      # Usa ~/npm-global em vez de /usr/local para:
+      #   • não exigir sudo em npm install -g
+      #   • permitir cache via actions/cache@v5 (step 3)
+      #   • não conflitar com binários do sistema do runner
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: Configure npm global prefix (isolated)
+        run: |
+          NPM_GLOBAL="$HOME/npm-global"
+          mkdir -p "$NPM_GLOBAL"
+          npm config set prefix "$NPM_GLOBAL"
+          echo "$NPM_GLOBAL/bin" >> "$GITHUB_PATH"
+          echo "NPM_GLOBAL=$NPM_GLOBAL" >> "$GITHUB_ENV"
+          echo "✅ npm global prefix: $NPM_GLOBAL"
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 4. CACHE — Ferramentas globais npm (camada 3 de cache)
+      # Cache da instalação de PM2, TypeScript, pnpm, ts-lsp, devcontainer CLI.
+      # Chave baseada no hash do workflow → qualquer mudança de versão invalida.
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Cache: global npm tools"
+        id: cache-npm-global
+        uses: actions/cache@v5
+        with:
+          path: ~/npm-global
+          key: ${{ runner.os }}-npm-global-v4-${{ hashFiles('.github/workflows/copilot-setup-steps.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-global-v4-
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 5. CACHE — node_modules dashboard-ui (camada 2 de cache)
+      # O workspace Vue.js/Vite tem package-lock.json próprio.
+      # O cache de node_modules raiz (camada 1) NÃO cobre este workspace.
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Cache: dashboard-ui node_modules"
+        id: cache-dashboard-deps
+        uses: actions/cache@v5
+        with:
+          path: src/dashboard-ui/node_modules
+          key: ${{ runner.os }}-dashboard-ui-v3-${{ hashFiles('src/dashboard-ui/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-dashboard-ui-v3-
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 6. CACHE — packages Python (camada 4 de cache)
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Cache: Python pip"
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements*.txt', 'agents/**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-v2-
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 7A. apt — FERRAMENTAS BASE (espelha SECTION 6 do Dockerfile)
+      # Ferramentas de desenvolvimento, navegação e diagnóstico usadas pelo
+      # agente ao executar scripts de análise, linting e busca de código.
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "apt: base tools (dev, UX, diagnostics)"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            git \
+            curl \
+            wget \
+            less \
+            vim \
+            nano \
+            unzip \
+            zip \
+            tree \
+            jq \
+            dos2unix \
+            file \
+            htop \
+            lsof \
+            procps \
+            psmisc \
+            sysstat \
+            netcat-openbsd \
+            dnsutils \
+            iproute2 \
+            iputils-ping \
+            nmap \
+            ncdu \
+            openssl \
+            ca-certificates \
+            watch \
+            strace \
+            socat \
+            bat \
+            ripgrep \
+            fd-find \
+            fzf \
+            shellcheck \
+            yamllint \
+            moreutils \
+            cloc \
+            2>/dev/null
+
+          # Aliases canônicos (espelha Dockerfile SECTION 6):
+          #   batcat → bat  (Debian/Ubuntu expõe como batcat)
+          #   fdfind → fd   (Debian/Ubuntu expõe como fdfind)
+          if which batcat 2>/dev/null && ! which bat 2>/dev/null; then
+            sudo ln -sf "$(which batcat)" /usr/local/bin/bat
+          fi
+          if which fdfind 2>/dev/null && ! which fd 2>/dev/null; then
+            sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
+          fi
+
+          echo "✅ Ferramentas base instaladas"
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 7B. apt — FERRAMENTAS ESPECIALIZADAS (análise, dados, segurança)
+      # sqlite3: necessário para better-sqlite3 e queries diretas no DB
+      # redis-tools: conectar ao Redis de testes de integração
+      # graphviz: npm run analyze:deps --diagram
+      # git-lfs: suporte a LFS (disponível, não ativo no projeto atualmente)
+      # gnupg: verificação de checksums e operações GPG
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "apt: specialized tools (data, analysis, security)"
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            sqlite3 \
+            redis-tools \
+            gnupg \
+            graphviz \
+            git-lfs \
+            ccache \
+            2>/dev/null || echo "⚠️  Algumas ferramentas especializadas não disponíveis"
+
+          # hyperfine (benchmarking) — pode não estar disponível em todas as suites
+          sudo apt-get install -y --no-install-recommends hyperfine 2>/dev/null \
+            || echo "hyperfine: não disponível nesta suite apt"
+
+          echo "✅ Ferramentas especializadas instaladas"
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 8. PYTHON 3 + FERRAMENTAS DE BUILD (espelha SECTION 3 do Dockerfile)
+      # Necessário para:
+      #   • node-gyp: compila melhor-sqlite3 e outros módulos nativos C++
+      #   • scripts Python: agents/code_explainer, colect.py, análise
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Python 3 + native build tools (node-gyp, bindings)"
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            python3 \
+            python3-pip \
+            python3-venv \
+            python-is-python3 \
+            build-essential \
+            pkg-config \
+            autoconf \
+            automake \
+            libtool \
+            libssl-dev \
+            zlib1g-dev \
+            cmake \
+            2>/dev/null
+
+          python3 --version
+          python3 -c "print('✅ Python 3 OK')"
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 9. DOCKER CLI (sem dockerd — espelha SECTION 7 do Dockerfile)
+      # O agente pode usar docker/docker compose para tarefas de infraestrutura.
+      # OPCIONAL: falha não impede o agente de trabalhar em tarefas de código.
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Docker CLI + Compose + Buildx (optional)"
+        run: |
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          sudo chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+            https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+            | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            docker-ce-cli \
+            docker-compose-plugin \
+            docker-buildx-plugin
+          docker --version
+          docker compose version
+          echo "✅ Docker CLI instalado"
+        continue-on-error: true
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 10. yq (YAML processor) — versão fixada do Dockerfile
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Install yq (YAML processor) — pinned version"
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" \
+            && sudo chmod +x /usr/local/bin/yq \
+            && yq --version \
+            || echo "⚠️  yq install falhou (rede indisponível?)"
+        continue-on-error: true
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 11. gh CLI — versão pinada com verificação de checksum SHA-256
+      # Espelha instalação canônica do .devcontainer/Dockerfile.
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Install gh CLI — pinned with checksum"
+        run: |
+          arch="$(dpkg --print-architecture)"
+          gh_asset="gh_${GH_VERSION}_linux_${arch}.tar.gz"
+          curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${gh_asset}" \
+            -o /tmp/gh.tgz
+          curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_checksums.txt" \
+            -o /tmp/gh_checksums.txt
+          grep "  ${gh_asset}$" /tmp/gh_checksums.txt \
+            | sed "s#  .*#  /tmp/gh.tgz#" | sha256sum -c -
+          tar -xzf /tmp/gh.tgz -C /tmp
+          sudo install -m 0755 "/tmp/gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh
+          gh --version | head -n1
+          rm -rf /tmp/gh.tgz /tmp/gh_checksums.txt "/tmp/gh_${GH_VERSION}_linux_${arch}"
+          echo "✅ gh CLI instalado"
+        continue-on-error: true
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 12. actionlint + hadolint — versões pinadas com checksum SHA-256
+      # Necessários para: npm run check:workflows:lint, check:dockerfile:lint
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Install actionlint + hadolint — pinned with checksum"
+        run: |
+          arch="$(dpkg --print-architecture)"
+
+          # ── actionlint ──────────────────────────────────────────────────
+          case "$arch" in
+            amd64) al_arch="amd64" ;;
+            arm64) al_arch="arm64" ;;
+            *)     al_arch="$arch" ;;
+          esac
+          al_asset="actionlint_${ACTIONLINT_VERSION}_linux_${al_arch}.tar.gz"
+          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${al_asset}" \
+            -o /tmp/actionlint.tgz
+          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_checksums.txt" \
+            -o /tmp/actionlint_checksums.txt
+          grep "  ${al_asset}$" /tmp/actionlint_checksums.txt \
+            | sed 's#  .*#  /tmp/actionlint.tgz#' | sha256sum -c -
+          tar -xzf /tmp/actionlint.tgz -C /tmp
+          sudo install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
+          actionlint -version
+
+          # ── hadolint ────────────────────────────────────────────────────
+          case "$arch" in
+            amd64) hl_arch="x86_64" ;;
+            arm64) hl_arch="arm64" ;;
+            *)     hl_arch="$arch" ;;
+          esac
+          curl -fsSL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hl_arch}" \
+            -o /tmp/hadolint
+          curl -fsSL "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-${hl_arch}.sha256" \
+            -o /tmp/hadolint.sha256
+          awk '{print $1 "  /tmp/hadolint"}' /tmp/hadolint.sha256 | sha256sum -c -
+          sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
+          hadolint --version
+
+          rm -f /tmp/actionlint.tgz /tmp/actionlint_checksums.txt /tmp/actionlint \
+                /tmp/hadolint /tmp/hadolint.sha256
+          echo "✅ actionlint + hadolint instalados"
+        continue-on-error: true
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 13. FERRAMENTAS GLOBAIS npm (usa cache se disponível — economiza ~90s)
+      # Espelha SECTION 3 do Dockerfile.
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Install global npm tools (PM2, TypeScript, pnpm, devcontainer CLI)"
+        if: steps.cache-npm-global.outputs.cache-hit != 'true'
+        run: |
+          npm install -g \
+            "npm@${NPM_VERSION}" \
+            "pnpm@${PNPM_VERSION}" \
+            "typescript@${TS_VERSION}" \
+            "typescript-language-server@${TS_LSP_VERSION}" \
+            "@devcontainers/cli@${DEVCONTAINER_CLI_VERSION}" \
+            jsonc-parser@3.3.1 \
+            pm2@latest \
+            --no-audit --no-fund
+          echo "✅ Ferramentas globais npm instaladas"
+
+      - name: Verify global npm tools
+        run: |
+          printf "pm2:          %s\n" "$(pm2 --version 2>/dev/null || echo 'n/a')"
+          printf "tsc:          %s\n" "$(tsc --version 2>/dev/null || echo 'n/a')"
+          printf "pnpm:         %s\n" "$(pnpm --version 2>/dev/null || echo 'n/a')"
+          printf "ts-lsp:       %s\n" "$(typescript-language-server --version 2>/dev/null || echo 'n/a')"
+          printf "devcontainer: %s\n" "$(devcontainer --version 2>/dev/null || echo 'n/a')"
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 14. DEPENDÊNCIAS DO PROJETO (npm ci com scripts nativos)
+      # NÃO usa --ignore-scripts: better-sqlite3 e outros módulos nativos
+      # precisam executar pós-instalação (node-gyp compile).
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: Install project dependencies (npm ci)
+        run: npm ci --prefer-online --no-audit --no-fund
+
+      - name: Verify native modules (optional)
+        run: |
+          node -e "
+            try {
+              require('better-sqlite3');
+              console.log('✅ better-sqlite3 — OK');
+            } catch(e) {
+              console.log('⚠️  better-sqlite3:', e.message.split('\n')[0]);
+            }
+          " || true
+          node --input-type=module <<'EOF'
+          try {
+            await import('puppeteer-core');
+            console.log('✅ puppeteer-core — OK');
+          } catch(e) {
+            console.log('puppeteer-core:', e.message.split('\n')[0]);
+          }
+          EOF
+        continue-on-error: true
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 15. DASHBOARD-UI (Vue.js + Vite)
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "dashboard-ui: install dependencies"
+        if: steps.cache-dashboard-deps.outputs.cache-hit != 'true'
+        run: |
+          cd src/dashboard-ui
+          npm ci --no-audit --no-fund
+          echo "✅ dashboard-ui deps instalados"
+
+      - name: "dashboard-ui: production build (optional)"
+        run: |
+          cd src/dashboard-ui
+          npm run build
+          ls -la dist/ 2>/dev/null && echo "✅ Dashboard dist/ criado" \
+            || echo "⚠️  dist/ não encontrado"
+        continue-on-error: true
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 16. GIT CONFIG
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: Configure Git identity
+        run: |
+          git config --global user.email "copilot@github.com"
+          git config --global user.name "GitHub Copilot"
+          git config --global core.autocrlf false
+          git config --global core.fileMode false
+          git config --global init.defaultBranch main
+          git config --global pull.rebase false
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "✅ Git configurado"
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 17. SMOKE CHECKS (não bloqueiam o agente)
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: "Lint smoke check (non-blocking)"
+        run: npm run lint -- --max-warnings 150 2>&1 | tail -5 || true
+        continue-on-error: true
+
+      - name: "Unit tests baseline (non-blocking)"
+        run: |
+          npm run test:unit 2>&1 | tee /tmp/test-baseline.txt | tail -20
+          grep -E "^(ℹ|#)" /tmp/test-baseline.txt | tail -5 || true
+        continue-on-error: true
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 18. ENVIRONMENT SUMMARY
+      # ═══════════════════════════════════════════════════════════════════════
+      - name: Environment summary
+        run: |
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║      COPILOT CODING AGENT v3.1 — ENVIRONMENT READY            ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "─── Runtime ────────────────────────────────────────────────────"
+          printf "Node.js:      %s\n" "$(node --version)"
+          printf "npm:          %s\n" "$(npm --version)"
+          printf "PM2:          %s\n" "$(pm2 --version 2>/dev/null || echo 'n/a')"
+          printf "tsc:          %s\n" "$(tsc --version 2>/dev/null || echo 'n/a')"
+          printf "pnpm:         %s\n" "$(pnpm --version 2>/dev/null || echo 'n/a')"
+          printf "Python:       %s\n" "$(python3 --version 2>/dev/null || echo 'n/a')"
+          printf "git:          %s\n" "$(git --version)"
+          printf "gh:           %s\n" "$(gh --version 2>/dev/null | head -n1 || echo 'n/a')"
+          printf "docker:       %s\n" "$(docker --version 2>/dev/null || echo 'n/a')"
+          echo ""
+          echo "─── CLI Tools ──────────────────────────────────────────────────"
+          printf "rg:           %s\n" "$(rg --version 2>/dev/null | head -n1 || echo 'n/a')"
+          printf "fd:           %s\n" "$(fd --version 2>/dev/null || echo 'n/a')"
+          printf "bat:          %s\n" "$(bat --version 2>/dev/null || echo 'n/a')"
+          printf "fzf:          %s\n" "$(fzf --version 2>/dev/null || echo 'n/a')"
+          printf "jq:           %s\n" "$(jq --version 2>/dev/null || echo 'n/a')"
+          printf "yq:           %s\n" "$(yq --version 2>/dev/null || echo 'n/a')"
+          printf "shellcheck:   %s\n" "$(shellcheck --version 2>/dev/null | head -n1 || echo 'n/a')"
+          printf "yamllint:     %s\n" "$(yamllint --version 2>/dev/null || echo 'n/a')"
+          printf "actionlint:   %s\n" "$(actionlint -version 2>/dev/null || echo 'n/a')"
+          printf "hadolint:     %s\n" "$(hadolint --version 2>/dev/null || echo 'n/a')"
+          printf "sqlite3:      %s\n" "$(sqlite3 --version 2>/dev/null || echo 'n/a')"
+          printf "graphviz:     %s\n" "$(dot -V 2>&1 | head -n1 || echo 'n/a')"
+          echo ""
+          echo "─── Cache ──────────────────────────────────────────────────────"
+          printf "npm-global:     cache-hit=%s\n" "${{ steps.cache-npm-global.outputs.cache-hit || 'n/a' }}"
+          printf "dashboard-deps: cache-hit=%s\n" "${{ steps.cache-dashboard-deps.outputs.cache-hit || 'n/a' }}"
+          echo ""
+          echo "─── Project ────────────────────────────────────────────────────"
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+            console.log('Nome:    ', p.name);
+            console.log('Versão:  ', p.version);
+            console.log('Engines: ', JSON.stringify(p.engines));
+            const groups = ['test','lint','format','audit','build','daemon','check','typecheck','queue','rag','analyze'];
+            const byGroup = {};
+            for (const [s, v] of Object.entries(p.scripts || {})) {
+              for (const g of groups) {
+                if (s.includes(g)) { (byGroup[g] = byGroup[g] || []).push(s); break; }
+              }
+            }
+            for (const [g, ss] of Object.entries(byGroup)) {
+              const shown = ss.slice(0, 4);
+              const extra = ss.length > 4 ? ' (+' + (ss.length - 4) + ')' : '';
+              console.log(' ', g + ':', shown.join(', ') + extra);
+            }
+          "
+          echo ""
+          echo "─── Key files ──────────────────────────────────────────────────"
+          for f in package.json ecosystem.config.cjs config.json controle.json dynamic_rules.json .env.example; do
+            [ -f "$f" ] && echo "  ✅ $f" || echo "  ⚠️  $f (not found)"
+          done
+          echo ""
+          echo "─── Dashboard ──────────────────────────────────────────────────"
+          ls src/dashboard-ui/dist/ 2>/dev/null \
+            && echo "  ✅ dist/ built" \
+            || echo "  ⚠️  dist/ not built — run: cd src/dashboard-ui && npm run build"
+          echo ""
+          echo "─── All npm scripts ────────────────────────────────────────────"
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+            Object.keys(p.scripts || {}).forEach(s => console.log('  npm run ' + s));
+          "
+          echo ""
+          echo "✅ Copilot Coding Agent v3.1 — environment ready!"

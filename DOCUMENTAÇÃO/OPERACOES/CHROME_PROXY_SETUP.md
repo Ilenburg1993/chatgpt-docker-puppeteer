@@ -1,6 +1,7 @@
 # Setup do Chrome Proxy
 
-**Propósito**: documentar o setup operacional real do Chrome Proxy no estado atual do projeto, sem assumir launchers completos ou IPs fixos que já não representam o código canônico.  
+**Propósito**: documentar o setup operacional real do Chrome Proxy no estado atual do projeto, sem
+assumir launchers completos ou IPs fixos que já não representam o código canônico.  
 **Status documental**: Canônico.  
 **Público**: operação local, devcontainer, manutenção e agentes de IA.  
 **Última atualização**: 28 de fevereiro de 2026.
@@ -61,8 +62,8 @@ Para diagnóstico pontual:
 CHROME_PROXY_PORT=9224 CHROME_PORT=9225 node scripts/chrome-proxy-service.js
 ```
 
-O script lê a configuração prioritariamente por variáveis de ambiente. Ele não depende de um IP
-fixo em linha de comando para o fluxo canônico.
+O script lê a configuração prioritariamente por variáveis de ambiente. Ele não depende de um IP fixo
+em linha de comando para o fluxo canônico.
 
 ## Variáveis relevantes
 
@@ -152,8 +153,8 @@ O script já faz detecção progressiva. Se ainda falhar:
 - não assuma `192.168.0.2` como IP canônico;
 - não assuma que `start-chrome-with-proxy.bat` já inicia automaticamente todo o stack;
 - não documente `9224` como porta do Chrome real;
-- não trate scripts auxiliares antigos como contrato principal se divergirem de `ecosystem.config.cjs`
-  e das variáveis atuais.
+- não trate scripts auxiliares antigos como contrato principal se divergirem de
+  `ecosystem.config.cjs` e das variáveis atuais.
 
 ## Leituras relacionadas
 

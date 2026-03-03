@@ -117,16 +117,16 @@ CHROME_PORT="${CHROME_PROXY_PORT:-${CHROME_PORT:-9224}}"
 echo "   Usando porta do Chrome (proxy): $CHROME_PORT"
 check "Porta $CHROME_PORT acessível" "curl -s http://localhost:$CHROME_PORT/json/version"
 
-if curl -s http://localhost:$CHROME_PORT/json/version &> /dev/null; then
-    CHROME_INFO=$(curl -s http://localhost:$CHROME_PORT/json/version)
-    BROWSER=$(echo $CHROME_INFO | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).Browser || 'Unknown')")
-    WS_URL=$(echo $CHROME_INFO | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).webSocketDebuggerUrl || 'N/A')")
+if curl -s "http://localhost:$CHROME_PORT/json/version" &> /dev/null; then
+    CHROME_INFO=$(curl -s "http://localhost:$CHROME_PORT/json/version")
+    BROWSER=$(printf '%s' "$CHROME_INFO" | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).Browser || 'Unknown')")
+    WS_URL=$(printf '%s' "$CHROME_INFO" | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).webSocketDebuggerUrl || 'N/A')")
 
     echo "   Browser: $BROWSER"
     echo "   WebSocket: ${WS_URL:0:50}..."
 
     # Check if pages are available
-    PAGES=$(curl -s http://localhost:$CHROME_PORT/json/list | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).length || 0)")
+    PAGES=$(curl -s "http://localhost:$CHROME_PORT/json/list" | node -e "const d=require('fs').readFileSync(0);console.log(JSON.parse(d).length || 0)")
     echo "   Páginas abertas: $PAGES"
 else
     echo -e "${RED}   Chrome/Proxy não está acessível no endpoint configurado (porta ${CHROME_PORT})${NC}"
@@ -154,7 +154,7 @@ fi
 
 # Check for running node processes
 NODE_PROCS=$(pgrep -f "node.*index.js" | wc -l)
-if [ $NODE_PROCS -gt 0 ]; then
+if [ "$NODE_PROCS" -gt 0 ]; then
     echo "   Processos Node (index.js): $NODE_PROCS"
 else
     echo "   Nenhum processo do agente rodando"
@@ -174,18 +174,18 @@ if [ -d "fila" ]; then
     echo "   Travadas: $LOCKED"
     echo "   Corrompidas: $CORRUPTED"
 
-    if [ $LOCKED -gt 0 ]; then
+    if [ "$LOCKED" -gt 0 ]; then
         echo ""
         echo "   Tarefas travadas:"
-        find fila -maxdepth 1 -name "*.tmp.*" -exec basename {} \; | while read lock; do
+        while IFS= read -r lock; do
             PID=$(echo "$lock" | sed -n 's/.*tmp\.\([0-9][0-9]*\).*/\1/p')
-            if ps -p $PID > /dev/null 2>&1; then
+            if ps -p "$PID" > /dev/null 2>&1; then
                 echo "      - $lock (PID $PID ativo)"
             else
                 echo -e "      - $lock ${RED}(PID $PID morto - orphan!)${NC}"
                 ((WARNINGS++))
             fi
-        done
+        done < <(find fila -maxdepth 1 -name "*.tmp.*" -exec basename {} \;)
     fi
 fi
 echo ""
@@ -199,7 +199,7 @@ DISK_AVAIL=$(df -h . 2>/dev/null | awk 'END {print $4}')
 
 echo "   Uso: $DISK_USAGE% | Disponível: $DISK_AVAIL"
 
-if [ $DISK_USAGE -gt 90 ]; then
+if [ "$DISK_USAGE" -gt 90 ]; then
     echo -e "   ${RED}⚠️  Espaço em disco crítico!${NC}"
     ((WARNINGS++))
 fi
@@ -226,11 +226,11 @@ if [ -d "logs/crash_reports" ]; then
     CRASH_COUNT=$(find logs/crash_reports -name "*.json" -mtime -7 | wc -l)
     echo "   Crashes (últimos 7 dias): $CRASH_COUNT"
 
-    if [ $CRASH_COUNT -gt 0 ]; then
+    if [ "$CRASH_COUNT" -gt 0 ]; then
         echo "   Crashes mais recentes:"
-        find logs/crash_reports -name "*.json" -mtime -1 -exec basename {} \; | head -3 | while read crash; do
+        while IFS= read -r crash; do
             echo "      - $crash"
-        done
+        done < <(find logs/crash_reports -name "*.json" -mtime -1 -exec basename {} \; | head -3)
     fi
 fi
 

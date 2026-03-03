@@ -106,5 +106,6 @@ npm run test:coverage
 ## Documentos relacionados
 
 - Guia local rápido: [../../tests/README.md](../../tests/README.md)
-- Plano de consolidação: [../PLANOS/TESTS_CONSOLIDATION_PLAN.md](../PLANOS/TESTS_CONSOLIDATION_PLAN.md)
+- Plano de consolidação:
+  [../PLANOS/TESTS_CONSOLIDATION_PLAN.md](../PLANOS/TESTS_CONSOLIDATION_PLAN.md)
 - Estratégia histórica: [../AUDITORIAS/TESTS_STRATEGY.md](../AUDITORIAS/TESTS_STRATEGY.md)

@@ -842,7 +842,8 @@ watch -n 1 'curl -s http://localhost:9224/health | jq'
 
 - `DOCUMENTAÇÃO/CHROME_PROXY_SETUP.md` - Configuração do proxy
 - `DOCUMENTAÇÃO/CHROME_PROXY_INTEGRATION_GUIDE.md` - Guia de integração
-- `DOCUMENTAÇÃO/ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md` - Histórico arquivado de análises de arquitetura
+- `DOCUMENTAÇÃO/ARQUIVO_MORTO/ARQUITETURA_HISTORICA/README.md` - Histórico arquivado de análises de
+  arquitetura
 - `DOCUMENTAÇÃO/ARQUITETURA/ARCHITECTURE.md` - Arquitetura oficial atual
 
 ### Scripts Relacionados

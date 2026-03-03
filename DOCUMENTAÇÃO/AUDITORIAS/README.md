@@ -1,6 +1,7 @@
 # AUDITORIAS
 
-**Propósito**: concentrar auditorias formais, trilhas de bug audit, matrizes de correção e material de rastreabilidade viva do projeto.  
+**Propósito**: concentrar auditorias formais, trilhas de bug audit, matrizes de correção e material
+de rastreabilidade viva do projeto.  
 **Status documental**: Canônico.  
 **Público**: engenharia, auditoria, manutenção e agentes de IA.  
 **Última atualização**: 1 de março de 2026.
@@ -37,8 +38,8 @@
 ## Subárvores locais
 
 - [BUGS/](./BUGS/): trilha principal de auditoria e acompanhamento de bugs.
-- [BUGS/rodadas/README.md](./BUGS/rodadas/README.md): reservado para rodadas específicas e
-  snapshots quando necessário.
+- [BUGS/rodadas/README.md](./BUGS/rodadas/README.md): reservado para rodadas específicas e snapshots
+  quando necessário.
 
 ## Regras de manutenção
 
@@ -51,6 +52,7 @@
 ## Links relacionados
 
 - Hub principal: [../README.md](../README.md)
-- Referência de ambiente: [../REFERENCIA/ENV_VARIABLES_GUIDE.md](../REFERENCIA/ENV_VARIABLES_GUIDE.md)
+- Referência de ambiente:
+  [../REFERENCIA/ENV_VARIABLES_GUIDE.md](../REFERENCIA/ENV_VARIABLES_GUIDE.md)
 - Relatórios: [../RELATORIOS/README.md](../RELATORIOS/README.md)
 - Arquivo histórico: [../ARQUIVO_MORTO/README.md](../ARQUIVO_MORTO/README.md)

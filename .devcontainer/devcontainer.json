@@ -101,15 +101,15 @@
     // Canonical NSS artifact directory.
     // Used by profile.d + nss-gatekeeper; safe as plain metadata in containerEnv.
     "DEVCONTAINER_NSS_DIR": "/tmp/devcontainer-nss",
-    // Safe to globalize: libnss_wrapper alone is inert until NSS_WRAPPER_* is set.
-    // This helps base container processes (including VS Code server bootstrap)
-    // inherit the preload without risking missing-file failures at startup.
+    // Safe to globalize as long as NSS_WRAPPER_* points at files that always exist.
+    // This keeps base container processes (including VS Code bootstrap paths)
+    // on a safe, always-readable NSS baseline before profile hooks refine it.
     "LD_PRELOAD": "libnss_wrapper.so",
-    // Safe once nss-gatekeeper seeds fallback artifacts during container boot.
-    // This closes the remaining gap for base processes that do not read profile.d
-    // and are not fully governed by remoteEnv.
-    "NSS_WRAPPER_PASSWD": "/tmp/devcontainer-nss/passwd",
-    "NSS_WRAPPER_GROUP": "/tmp/devcontainer-nss/group",
+    // Bootstrap fallback must point to stable files. /tmp artifacts are runtime
+    // only and may not exist yet when VS Code issues early exec/user commands.
+    // The gatekeeper/profile path can still override these to /tmp later.
+    "NSS_WRAPPER_PASSWD": "/etc/passwd",
+    "NSS_WRAPPER_GROUP": "/etc/group",
     // Canonical tooling metadata exported by the image for wrappers/checkers.
     "JSONC_PARSER_MODULE_PATH": "/usr/local/share/npm-global/lib/node_modules/jsonc-parser",
     // =========================================================
@@ -501,14 +501,12 @@
     }
   },
   // ============================================================
-  // FEATURES - Auto-install tools and utilities
+  // FEATURES
   // ============================================================
-  // NOTA v5.2: Features removidas para evitar duplicações.
-  // Pacotes instalados manualmente no Dockerfile para maior controle.
-  // Antes: common-utils:2 (git, curl, wget, zip, unzip, tree, jq)
-  // Antes: github-cli:1 (gh)
-  // Agora: Todos instalados em Dockerfile SECTION 6
-  "features": {},
+  // Deliberadamente omitidas. O bloco vazio `"features": {}` faz o Dev Containers
+  // gerar um Dockerfile intermediário desnecessário e pode disparar warnings do
+  // builder sobre `ARG BASE_IMAGE` sem default. O tooling é instalado manualmente
+  // no Dockerfile para manter controle e evitar duplicações.
   // ===========================================================
   // PORT FORWARDING — CONTRATO FINAL (DENY BY DEFAULT)
   // ===========================================================
@@ -937,10 +935,13 @@
     "CHROME_HOST": "${localEnv:CHROME_HOST:host.docker.internal}",
     "CHROME_PORT": "${localEnv:CHROME_PORT:9225}",
     "CHROME_PROXY_BIND": "${localEnv:CHROME_PROXY_BIND:0.0.0.0}",
-    // NSS wrapper for VS Code remote server + subprocesses.
+    // NSS wrapper baseline for VS Code remote server + subprocesses.
     // Official Dev Container guidance: remoteEnv reaches VS Code and related
     // subprocesses, which is exactly the gap not covered by profile-only hooks.
+    // Keep this on stable system files; shell/profile hooks may override to the
+    // dynamic /tmp artifacts after they are materialized.
     "DEVCONTAINER_NSS_DIR": "${containerEnv:DEVCONTAINER_NSS_DIR}",
+    "LD_PRELOAD": "${containerEnv:LD_PRELOAD}",
     "NSS_WRAPPER_PASSWD": "${containerEnv:NSS_WRAPPER_PASSWD}",
     "NSS_WRAPPER_GROUP": "${containerEnv:NSS_WRAPPER_GROUP}",
     // Keep Codex state consistent across terminal + extension processes in-container.

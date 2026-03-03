@@ -291,8 +291,10 @@ class ContextManager {
         // Summary básico: concatena outputs
         const summaryText = oldSteps.map(s => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`).join('\n');
 
-        // Atualiza context
-        context.summary = (context.summary || '') + '\n' + summaryText;
+        // Atualiza context — cap summary to prevent unbounded growth
+        const maxSummaryChars = this.config.maxTokens * 2; // ~50% do token budget em chars
+        const combined = (context.summary || '') + '\n' + summaryText;
+        context.summary = combined.length > maxSummaryChars ? combined.slice(-maxSummaryChars) : combined;
         context.steps = context.steps.slice(-this.config.windowSize); // Mantém apenas recentes
         context.token_count =
             this._estimateTokens(context.summary) + context.steps.reduce((sum, s) => sum + s.tokens, 0);
@@ -304,11 +306,15 @@ class ContextManager {
     }
 
     /**
-     * Estima tokens aproximadamente (1 token ~= 4 chars)
+     * Estima tokens aproximadamente.
+     * Usa heurística combinada: max(chars/4, words*1.3) para precisão em ambos
+     * texto natural (word-heavy) e strings técnicas (char-heavy, sem espaços).
      */
     _estimateTokens(text) {
         if (!text) return 0;
-        return Math.ceil(text.length / 4);
+        const charEstimate = Math.ceil(text.length / 4);
+        const wordEstimate = Math.ceil(text.split(/\s+/).length * 1.3);
+        return Math.max(charEstimate, wordEstimate);
     }
 
     /**

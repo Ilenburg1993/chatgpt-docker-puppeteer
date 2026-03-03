@@ -33,7 +33,7 @@ echo ""
 echo -e "${COLOR_CYAN}============================================================${COLOR_RESET}"
 echo ""
 
-read -p "Deseja ver as instruções de setup? (s/n): " proceed
+read -r -p "Deseja ver as instruções de setup? (s/n): " proceed
 
 if [[ ! "$proceed" =~ ^[Ss]$ ]]; then
     echo ""
@@ -68,7 +68,7 @@ echo ""
 echo -e "${COLOR_CYAN}============================================================${COLOR_RESET}"
 echo ""
 
-read -p "Deseja abrir o site do PM2 Plus? (s/n): " open_browser
+read -r -p "Deseja abrir o site do PM2 Plus? (s/n): " open_browser
 
 if [[ "$open_browser" =~ ^[Ss]$ ]]; then
     echo ""

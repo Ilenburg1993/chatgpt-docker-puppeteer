@@ -28,10 +28,9 @@ the same project-scoped home:
 - `.devcontainer/devcontainer.json` → `remoteEnv.CODEX_HOME`
 - `.vscode/settings.json` → `terminal.integrated.env.linux.CODEX_HOME`
 
-Do not point the in-container workspace back to `~/.codex`.
-Do not reintroduce the removed `remote_models` feature flag in `.codex/config.toml`.
-Keep `.github/skills` and `.github/instructions` as the canonical shared sources for Copilot and
-other agents.
+Do not point the in-container workspace back to `~/.codex`. Do not reintroduce the removed
+`remote_models` feature flag in `.codex/config.toml`. Keep `.github/skills` and
+`.github/instructions` as the canonical shared sources for Copilot and other agents.
 
 ## VS Code integrated terminal
 

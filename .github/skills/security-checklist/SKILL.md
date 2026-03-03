@@ -2,8 +2,8 @@
 name: security-checklist
 user-invokable: true
 description:
-  'Skill canônico para auditoria de segurança: segredos hardcoded, superfícies HTTP, auth,
-  headers, contratos do domínio security e revisão orientada por risco.'
+  'Skill canônico para auditoria de segurança: segredos hardcoded, superfícies HTTP, auth, headers,
+  contratos do domínio security e revisão orientada por risco.'
 ---
 
 # security-checklist
@@ -50,7 +50,8 @@ domínio `security` e sinais estáticos de risco.
 ## Guardrails
 
 - Heurística não substitui revisão manual de auth.
-- Não assumir que ausência de sinal textual prova vulnerabilidade; tratar como finding investigativo.
+- Não assumir que ausência de sinal textual prova vulnerabilidade; tratar como finding
+  investigativo.
 - Vincular toda conclusão a evidência de arquivo, linha ou contrato.
 
 ## Validation / Done Criteria

@@ -29,7 +29,7 @@ async function applyRoutes(app) {
 
     // FIXED (P1-14): Global request timeout middleware (30s default)
     // Previne requests órfãos que bloqueiam workers indefinidamente
-    const REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT || '30000');
+    const REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT || '30000', 10);
     app.use((req, res, next) => {
         // Set timeout on the request
         req.setTimeout(REQUEST_TIMEOUT_MS, () => {
@@ -90,6 +90,7 @@ async function applyRoutes(app) {
 
     // Metrics endpoint (delegado a `controllers/metrics.js`)
     app.get('/api/metrics', metricsController.getMetrics);
+    app.get('/api/metrics/tasks', metricsController.getTaskMetrics);
 
     /* --------------------------------------------------------------------------
        1. MAPEAMENTO DE DOMÍNIOS SOBERANOS

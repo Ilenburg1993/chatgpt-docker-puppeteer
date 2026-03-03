@@ -1,6 +1,8 @@
 ---
 name: documentation-governance
-description: Use esta skill quando o trabalho envolver auditoria, reorganização, atualização de status, taxonomia, índices canônicos ou governança contínua da documentação do projeto.
+description:
+  Use esta skill quando o trabalho envolver auditoria, reorganização, atualização de status,
+  taxonomia, índices canônicos ou governança contínua da documentação do projeto.
 license: MIT
 ---
 

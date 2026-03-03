@@ -10,8 +10,8 @@ description:
 
 ## Overview
 
-Skill canônico para contratos v3: criação, migração, paridade híbrida, cobertura, drift e rollout
-de enforcement.
+Skill canônico para contratos v3: criação, migração, paridade híbrida, cobertura, drift e rollout de
+enforcement.
 
 ## Recommended Tuple
 
