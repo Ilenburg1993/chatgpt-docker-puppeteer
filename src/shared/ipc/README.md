@@ -1,6 +1,7 @@
 # src/shared/ipc
 
-**Propósito**: Contratos compartilhados de IPC — envelopes, schemas, constantes e utilitários usados por múltiplos módulos.  
+**Propósito**: Contratos compartilhados de IPC — envelopes, schemas, constantes e utilitários usados
+por múltiplos módulos.  
 **Status**: Canônico de apoio.  
 **Público**: Módulos que se comunicam via IPC (infra, server, shared).  
 **Última atualização**: 2 de março de 2026.
@@ -20,13 +21,13 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `envelope.js` | Formato canônico de envelope de mensagem IPC |
-| `schemas.js` | Schemas Zod para validação de mensagens IPC |
-| `constants.js` | Constantes compartilhadas de IPC |
-| `envelope_reader.js` | Leitor e validador de envelopes IPC |
-| `utils.js` | Utilitários de serialização IPC |
+| Arquivo              | Descrição                                    |
+| -------------------- | -------------------------------------------- |
+| `envelope.js`        | Formato canônico de envelope de mensagem IPC |
+| `schemas.js`         | Schemas Zod para validação de mensagens IPC  |
+| `constants.js`       | Constantes compartilhadas de IPC             |
+| `envelope_reader.js` | Leitor e validador de envelopes IPC          |
+| `utils.js`           | Utilitários de serialização IPC              |
 
 ## Regras de manutenção
 

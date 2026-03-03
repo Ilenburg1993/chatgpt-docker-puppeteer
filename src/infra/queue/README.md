@@ -1,6 +1,7 @@
 # src/infra/queue
 
-**Propósito**: Fila de tarefas com scheduler, cache, motor de consultas e carregador — coordena o fluxo de trabalho do agente.  
+**Propósito**: Fila de tarefas com scheduler, cache, motor de consultas e carregador — coordena o
+fluxo de trabalho do agente.  
 **Status**: Canônico.  
 **Público**: Kernel e workers que consomem e produzem tarefas.  
 **Última atualização**: 2 de março de 2026.
@@ -19,12 +20,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `scheduler.js` | Agendamento e priorização de tarefas |
-| `task_loader.js` | Carrega tarefas de `fila/*.json` |
-| `query_engine.js` | Consultas sobre o estado da fila |
-| `cache.js` | Cache em memória da fila |
+| Arquivo           | Descrição                            |
+| ----------------- | ------------------------------------ |
+| `scheduler.js`    | Agendamento e priorização de tarefas |
+| `task_loader.js`  | Carrega tarefas de `fila/*.json`     |
+| `query_engine.js` | Consultas sobre o estado da fila     |
+| `cache.js`        | Cache em memória da fila             |
 
 ## Regras de manutenção
 

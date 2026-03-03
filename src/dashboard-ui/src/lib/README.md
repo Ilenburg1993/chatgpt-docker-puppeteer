@@ -1,6 +1,7 @@
 # src/dashboard-ui/src/lib
 
-**Propósito**: Utilitários de biblioteca do dashboard — cliente HTTP, guard de comandos e funções auxiliares.  
+**Propósito**: Utilitários de biblioteca do dashboard — cliente HTTP, guard de comandos e funções
+auxiliares.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores frontend.  
 **Última atualização**: 2 de março de 2026.
@@ -18,11 +19,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `http.js` | Cliente HTTP para a API backend |
+| Arquivo            | Descrição                            |
+| ------------------ | ------------------------------------ |
+| `http.js`          | Cliente HTTP para a API backend      |
 | `command_guard.js` | Validação de comandos antes de envio |
-| `utils.js` | Utilitários gerais do frontend |
+| `utils.js`         | Utilitários gerais do frontend       |
 
 ## Regras de manutenção
 

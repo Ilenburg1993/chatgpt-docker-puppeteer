@@ -1,6 +1,7 @@
 # src/orchestrator
 
-**Propósito**: Orquestrador de missões — implementa estratégias de execução (`SINGLE_SHOT`, `ITERATIVE`, `MULTI_STEP`) e gerencia contexto e memória de missões.  
+**Propósito**: Orquestrador de missões — implementa estratégias de execução (`SINGLE_SHOT`,
+`ITERATIVE`, `MULTI_STEP`) e gerencia contexto e memória de missões.  
 **Status**: Canônico.  
 **Público**: Mantenedores do pipeline de missões.  
 **Última atualização**: 2 de março de 2026.
@@ -22,14 +23,14 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `orchestrator_engine.js` | Motor principal de orquestração de missões |
-| `context_manager.js` | Gerencia o contexto acumulado de uma missão |
-| `checkpoint_manager.js` | Persistência de checkpoints de progresso |
-| `memory_store.js` | Store de memória de curto prazo da missão |
-| `validation/` | Validação de entradas do orquestrador |
-| `index.js` | Ponto de entrada público do módulo |
+| Arquivo/Pasta            | Descrição                                   |
+| ------------------------ | ------------------------------------------- |
+| `orchestrator_engine.js` | Motor principal de orquestração de missões  |
+| `context_manager.js`     | Gerencia o contexto acumulado de uma missão |
+| `checkpoint_manager.js`  | Persistência de checkpoints de progresso    |
+| `memory_store.js`        | Store de memória de curto prazo da missão   |
+| `validation/`            | Validação de entradas do orquestrador       |
+| `index.js`               | Ponto de entrada público do módulo          |
 
 ## Regras de manutenção
 

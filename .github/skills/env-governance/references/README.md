@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-Especificações de variáveis de ambiente, exemplos de templates `.env` e guias de boas práticas consultados durante a execução da skill.
+Especificações de variáveis de ambiente, exemplos de templates `.env` e guias de boas práticas
+consultados durante a execução da skill.
 
 ## Links relacionados
 

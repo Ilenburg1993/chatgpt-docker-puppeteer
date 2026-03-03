@@ -1,6 +1,7 @@
 # src/logic/validation/rules
 
-**Propósito**: Regras de validação organizadas por categoria — formato, restrições físicas e semântica.  
+**Propósito**: Regras de validação organizadas por categoria — formato, restrições físicas e
+semântica.  
 **Status**: Canônico.  
 **Público**: Mantenedores do motor de validação de lógica de negócio.  
 **Última atualização**: 2 de março de 2026.
@@ -18,11 +19,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `format_rules.js` | Regras de validação de formato |
+| Arquivo             | Descrição                                  |
+| ------------------- | ------------------------------------------ |
+| `format_rules.js`   | Regras de validação de formato             |
 | `physical_rules.js` | Regras de restrições físicas e estruturais |
-| `semantic_rules.js` | Regras de validação semântica |
+| `semantic_rules.js` | Regras de validação semântica              |
 
 ## Regras de manutenção
 

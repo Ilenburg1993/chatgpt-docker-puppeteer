@@ -16,10 +16,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `dark-theme.css` | Tema escuro do dashboard |
-| `tailwind.css` | Configuração Tailwind CSS global |
+| Arquivo          | Descrição                        |
+| ---------------- | -------------------------------- |
+| `dark-theme.css` | Tema escuro do dashboard         |
+| `tailwind.css`   | Configuração Tailwind CSS global |
 
 ## Regras de manutenção
 

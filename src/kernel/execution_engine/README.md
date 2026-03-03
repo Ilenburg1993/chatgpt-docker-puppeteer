@@ -1,6 +1,7 @@
 # src/kernel/execution_engine
 
-**Propósito**: Motor de execução de tarefas do kernel — processa e executa tarefas individualmente.  
+**Propósito**: Motor de execução de tarefas do kernel — processa e executa tarefas
+individualmente.  
 **Status**: Canônico.  
 **Público**: Mantenedores do kernel.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo               | Descrição                                  |
+| --------------------- | ------------------------------------------ |
 | `execution_engine.js` | Processa e executa tarefas individualmente |
 
 ## Regras de manutenção

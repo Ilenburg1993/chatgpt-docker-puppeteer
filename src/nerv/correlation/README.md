@@ -1,6 +1,7 @@
 # src/nerv/correlation
 
-**Propósito**: Correlação e rastreamento de eventos do NERV — permite rastrear fluxos de eventos relacionados através de IDs de correlação.  
+**Propósito**: Correlação e rastreamento de eventos do NERV — permite rastrear fluxos de eventos
+relacionados através de IDs de correlação.  
 **Status**: Canônico.  
 **Público**: Mantenedores de observabilidade e do NERV.  
 **Última atualização**: 2 de março de 2026.
@@ -17,10 +18,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                  | Descrição                                          |
+| ------------------------ | -------------------------------------------------- |
 | `correlation_context.js` | Contexto de correlação para rastreamento de fluxos |
-| `correlation_store.js` | Store de correlações ativas |
+| `correlation_store.js`   | Store de correlações ativas                        |
 
 ## Regras de manutenção
 

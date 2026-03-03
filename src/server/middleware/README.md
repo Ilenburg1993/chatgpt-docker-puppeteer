@@ -1,6 +1,7 @@
 # src/server/middleware
 
-**Propósito**: Middlewares Express do servidor — autenticação, autorização RBAC, validação de schema, tratamento de erros e request ID.  
+**Propósito**: Middlewares Express do servidor — autenticação, autorização RBAC, validação de
+schema, tratamento de erros e request ID.  
 **Status**: Canônico.  
 **Público**: Mantenedores da API e da segurança do servidor.  
 **Última atualização**: 2 de março de 2026.
@@ -21,13 +22,13 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `auth.js` | Autenticação JWT |
-| `authorize.js` | Autorização RBAC por rota |
-| `schema_guard.js` | Validação de schema de entrada (Zod) |
-| `error_handler.js` | Handler centralizado de erros |
-| `request_id.js` | Geração de request ID único por requisição |
+| Arquivo            | Descrição                                  |
+| ------------------ | ------------------------------------------ |
+| `auth.js`          | Autenticação JWT                           |
+| `authorize.js`     | Autorização RBAC por rota                  |
+| `schema_guard.js`  | Validação de schema de entrada (Zod)       |
+| `error_handler.js` | Handler centralizado de erros              |
+| `request_id.js`    | Geração de request ID único por requisição |
 
 ## Regras de manutenção
 

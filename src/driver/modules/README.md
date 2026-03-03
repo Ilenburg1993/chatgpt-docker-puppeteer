@@ -1,6 +1,7 @@
 # src/driver/modules
 
-**Propósito**: Módulos funcionais compartilhados entre drivers — biomecânica de input, navegação de frames, submissão e recuperação de erros.  
+**Propósito**: Módulos funcionais compartilhados entre drivers — biomecânica de input, navegação de
+frames, submissão e recuperação de erros.  
 **Status**: Canônico.  
 **Público**: Mantenedores de drivers de alvo.  
 **Última atualização**: 2 de março de 2026.
@@ -22,13 +23,13 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `biomechanics_engine.js` | Simula comportamento humano (delays, movimentos) |
-| `frame_navigator.js` | Navega entre frames da página |
-| `submission_controller.js` | Controla submissão de prompts ao LLM |
-| `recovery_system.js` | Trata erros e recupera estados inválidos |
-| `triage.js` | Classifica o estado atual da página |
+| Arquivo                    | Descrição                                        |
+| -------------------------- | ------------------------------------------------ |
+| `biomechanics_engine.js`   | Simula comportamento humano (delays, movimentos) |
+| `frame_navigator.js`       | Navega entre frames da página                    |
+| `submission_controller.js` | Controla submissão de prompts ao LLM             |
+| `recovery_system.js`       | Trata erros e recupera estados inválidos         |
+| `triage.js`                | Classifica o estado atual da página              |
 
 ## Regras de manutenção
 

@@ -17,10 +17,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `BaseDriver.js` | Classe base com ciclo de vida e comportamentos comuns |
-| `TargetDriver.js` | Abstração para drivers de alvos LLM específicos |
+| Arquivo           | Descrição                                             |
+| ----------------- | ----------------------------------------------------- |
+| `BaseDriver.js`   | Classe base com ciclo de vida e comportamentos comuns |
+| `TargetDriver.js` | Abstração para drivers de alvos LLM específicos       |
 
 ## Regras de manutenção
 

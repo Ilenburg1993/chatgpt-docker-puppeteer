@@ -1,6 +1,7 @@
 # src/core
 
-**Propósito**: Núcleo da aplicação — configuração, logger, identidade, schemas, validadores, constantes e políticas de inicialização.  
+**Propósito**: Núcleo da aplicação — configuração, logger, identidade, schemas, validadores,
+constantes e políticas de inicialização.  
 **Status**: Canônico.  
 **Público**: Todos os módulos do runtime; mantenedores da fundação do sistema.  
 **Última atualização**: 2 de março de 2026.
@@ -25,23 +26,23 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `config.js` | Carregamento e acesso à configuração global |
-| `logger.js` | Logger centralizado do sistema |
-| `identity_manager.js` | Gerenciamento de identidade e robot_id |
-| `constants/` | Constantes centralizadas por domínio |
-| `schemas/` | Schemas Zod para tarefas, DNA e bootstrap |
-| `validators/` | Validadores de pré-condições |
-| `context/` | Motor de gerenciamento de janela de contexto LLM |
-| `authority.js` | Controle de autoridade e permissões |
-| `doctor.js` | Diagnóstico de saúde do ambiente |
-| `env_bootstrap.js` | Inicialização e validação de variáveis de ambiente |
-| `forensics.js` | Análise forense de falhas |
-| `retry_policy.js` | Política de retry para operações resilientes |
-| `boot_resilience_manager.js` | Gerenciamento de resiliência no boot |
-| `hardware.js` | Informações de hardware do sistema |
-| `memory.js` | Utilitários de gerenciamento de memória |
+| Arquivo/Pasta                | Descrição                                          |
+| ---------------------------- | -------------------------------------------------- |
+| `config.js`                  | Carregamento e acesso à configuração global        |
+| `logger.js`                  | Logger centralizado do sistema                     |
+| `identity_manager.js`        | Gerenciamento de identidade e robot_id             |
+| `constants/`                 | Constantes centralizadas por domínio               |
+| `schemas/`                   | Schemas Zod para tarefas, DNA e bootstrap          |
+| `validators/`                | Validadores de pré-condições                       |
+| `context/`                   | Motor de gerenciamento de janela de contexto LLM   |
+| `authority.js`               | Controle de autoridade e permissões                |
+| `doctor.js`                  | Diagnóstico de saúde do ambiente                   |
+| `env_bootstrap.js`           | Inicialização e validação de variáveis de ambiente |
+| `forensics.js`               | Análise forense de falhas                          |
+| `retry_policy.js`            | Política de retry para operações resilientes       |
+| `boot_resilience_manager.js` | Gerenciamento de resiliência no boot               |
+| `hardware.js`                | Informações de hardware do sistema                 |
+| `memory.js`                  | Utilitários de gerenciamento de memória            |
 
 ## Regras de manutenção
 

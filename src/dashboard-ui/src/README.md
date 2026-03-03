@@ -1,6 +1,7 @@
 # src/dashboard-ui/src
 
-**Propósito**: Código-fonte do frontend Vue/Vite do dashboard — componentes, views, stores, router, composables e assets.  
+**Propósito**: Código-fonte do frontend Vue/Vite do dashboard — componentes, views, stores, router,
+composables e assets.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores frontend e mantenedores do dashboard.  
 **Última atualização**: 2 de março de 2026.
@@ -23,17 +24,17 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `main.js` | Entrada da aplicação Vue |
-| `App.vue` | Componente raiz |
-| `components/` | Componentes reutilizáveis por categoria |
-| `views/` | Views de página (roteadas) |
-| `stores/` | Estado global via Pinia |
-| `router/` | Configuração de rotas Vue Router |
+| Arquivo/Pasta  | Descrição                               |
+| -------------- | --------------------------------------- |
+| `main.js`      | Entrada da aplicação Vue                |
+| `App.vue`      | Componente raiz                         |
+| `components/`  | Componentes reutilizáveis por categoria |
+| `views/`       | Views de página (roteadas)              |
+| `stores/`      | Estado global via Pinia                 |
+| `router/`      | Configuração de rotas Vue Router        |
 | `composables/` | Lógica reutilizável com Composition API |
-| `assets/` | Assets estáticos e estilos |
-| `lib/` | Utilitários e cliente HTTP |
+| `assets/`      | Assets estáticos e estilos              |
+| `lib/`         | Utilitários e cliente HTTP              |
 
 ## Regras de manutenção
 

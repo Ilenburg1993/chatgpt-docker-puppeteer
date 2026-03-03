@@ -1,6 +1,7 @@
 # src/dashboard-ui/src/stores
 
-**Propósito**: Stores Pinia de estado global do dashboard — tarefas, missões, eventos, sistema e telemetria.  
+**Propósito**: Stores Pinia de estado global do dashboard — tarefas, missões, eventos, sistema e
+telemetria.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores frontend.  
 **Última atualização**: 2 de março de 2026.
@@ -21,13 +22,13 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `tasks_vnext.js` | Store canônico de tarefas (versão atual) |
-| `missions_vnext.js` | Store de missões |
-| `events_vnext.js` | Store de eventos do sistema |
-| `system.js` | Store de estado geral do sistema |
-| `telemetry.js` | Store de telemetria e métricas |
+| Arquivo             | Descrição                                |
+| ------------------- | ---------------------------------------- |
+| `tasks_vnext.js`    | Store canônico de tarefas (versão atual) |
+| `missions_vnext.js` | Store de missões                         |
+| `events_vnext.js`   | Store de eventos do sistema              |
+| `system.js`         | Store de estado geral do sistema         |
+| `telemetry.js`      | Store de telemetria e métricas           |
 
 ## Regras de manutenção
 

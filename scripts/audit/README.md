@@ -1,6 +1,7 @@
 # scripts/audit
 
-**Propósito**: Pipeline completo de auditoria automatizada — coletores, contratos, triage LLM, reporters e publicação de artefatos.  
+**Propósito**: Pipeline completo de auditoria automatizada — coletores, contratos, triage LLM,
+reporters e publicação de artefatos.  
 **Status**: Canônico.  
 **Público**: Mantenedores e o Audit Agent LLM.  
 **Última atualização**: 2 de março de 2026.
@@ -12,19 +13,19 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `runner.mjs` | Entry point do pipeline de auditoria |
-| `preflight_semantic.mjs` | Preflight semântico (RAG + LSP) |
-| `make-skill.js` | Gerador de skills de auditoria |
-| `collectors/` | Coletores por categoria (quality, security, runtime, etc.) |
-| `contracts/` | Avaliadores de contratos arquiteturais |
-| `lib/` | Utilitários internos (logger, exec, schema, git, etc.) |
-| `normalize/` | Normalização de findings |
-| `reporters/` | Reporters (console, JSON, contratos) |
-| `triage/` | Triage e propostas de correção via LLM |
-| `publish_json.mjs` / `publish_md.mjs` | Publicação de artefatos |
-| `triage_llm.mjs` | Triage via LLM |
+| Arquivo/Pasta                         | Descrição                                                  |
+| ------------------------------------- | ---------------------------------------------------------- |
+| `runner.mjs`                          | Entry point do pipeline de auditoria                       |
+| `preflight_semantic.mjs`              | Preflight semântico (RAG + LSP)                            |
+| `make-skill.js`                       | Gerador de skills de auditoria                             |
+| `collectors/`                         | Coletores por categoria (quality, security, runtime, etc.) |
+| `contracts/`                          | Avaliadores de contratos arquiteturais                     |
+| `lib/`                                | Utilitários internos (logger, exec, schema, git, etc.)     |
+| `normalize/`                          | Normalização de findings                                   |
+| `reporters/`                          | Reporters (console, JSON, contratos)                       |
+| `triage/`                             | Triage e propostas de correção via LLM                     |
+| `publish_json.mjs` / `publish_md.mjs` | Publicação de artefatos                                    |
+| `triage_llm.mjs`                      | Triage via LLM                                             |
 
 ## Regras de manutenção
 

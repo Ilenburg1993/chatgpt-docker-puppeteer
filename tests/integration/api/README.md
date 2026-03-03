@@ -7,8 +7,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                        | Descrição                                                |
+| ------------------------------ | -------------------------------------------------------- |
 | `test_health_endpoint.spec.js` | Valida o endpoint `/health` e seus contratos de resposta |
 
 ## Regras de manutenção

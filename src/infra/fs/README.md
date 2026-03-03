@@ -1,6 +1,7 @@
 # src/infra/fs
 
-**Propósito**: Utilitários de sistema de arquivos — leitura segura, escrita atômica, caminhos canônicos e store de controle.  
+**Propósito**: Utilitários de sistema de arquivos — leitura segura, escrita atômica, caminhos
+canônicos e store de controle.  
 **Status**: Canônico.  
 **Público**: Módulos que precisam de I/O de arquivo resiliente.  
 **Última atualização**: 2 de março de 2026.
@@ -21,12 +22,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `atomic_write.js` | Escrita atômica de arquivos |
-| `control_store.js` | Acesso ao `controle.json` da aplicação |
-| `paths.js` | Caminhos canônicos centralizados |
-| `safe_read.js` | Leitura resiliente com tratamento de erros |
+| Arquivo            | Descrição                                  |
+| ------------------ | ------------------------------------------ |
+| `atomic_write.js`  | Escrita atômica de arquivos                |
+| `control_store.js` | Acesso ao `controle.json` da aplicação     |
+| `paths.js`         | Caminhos canônicos centralizados           |
+| `safe_read.js`     | Leitura resiliente com tratamento de erros |
 
 ## Regras de manutenção
 

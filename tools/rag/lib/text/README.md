@@ -7,8 +7,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                | Descrição                                                                                                             |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `query_normalizer.mjs` | Normaliza queries (lowercase, colapso de espaços, remoção de caracteres especiais) e expande com sinônimos semânticos |
 
 ## Links relacionados

@@ -1,6 +1,7 @@
 # src/server/realtime/bus
 
-**Propósito**: Bridge PM2 para comunicação inter-processos em tempo real via barramento de mensagens.  
+**Propósito**: Bridge PM2 para comunicação inter-processos em tempo real via barramento de
+mensagens.  
 **Status**: Canônico.  
 **Público**: Mantenedores do servidor e operadores PM2.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo         | Descrição                                                |
+| --------------- | -------------------------------------------------------- |
 | `pm2_bridge.js` | Bridge de mensagens PM2 para comunicação inter-processos |
 
 ## Regras de manutenção

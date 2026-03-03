@@ -1,6 +1,7 @@
 # agents — env-governance
 
-**Propósito**: Definições de agentes auxiliares invocados pela skill `env-governance` durante governança de variáveis de ambiente.  
+**Propósito**: Definições de agentes auxiliares invocados pela skill `env-governance` durante
+governança de variáveis de ambiente.  
 **Status**: Especializado.  
 **Público**: Agentes de IA que executam a skill pai.  
 **Última atualização**: 2 de março de 2026.

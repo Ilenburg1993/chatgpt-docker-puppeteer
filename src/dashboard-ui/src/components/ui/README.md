@@ -1,6 +1,7 @@
 # src/dashboard-ui/src/components/ui
 
-**Propósito**: Componentes de UI genéricos e reutilizáveis — primitivos do design system do dashboard.  
+**Propósito**: Componentes de UI genéricos e reutilizáveis — primitivos do design system do
+dashboard.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores frontend.  
 **Última atualização**: 2 de março de 2026.
@@ -21,12 +22,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `Button.vue` | Componente de botão |
-| `Card.vue` | Componente de card/painel |
-| `Modal.vue` | Modal reutilizável |
-| `Badge.vue` | Badge de status |
+| Arquivo                     | Descrição                       |
+| --------------------------- | ------------------------------- |
+| `Button.vue`                | Componente de botão             |
+| `Card.vue`                  | Componente de card/painel       |
+| `Modal.vue`                 | Modal reutilizável              |
+| `Badge.vue`                 | Badge de status                 |
 | `NotificationContainer.vue` | Container de notificações toast |
 
 ## Regras de manutenção

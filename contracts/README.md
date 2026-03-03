@@ -1,6 +1,7 @@
 # contracts
 
-**Propósito**: Registro e domínios de contratos arquiteturais — definem invariantes, allowlists e regras de conformidade do sistema.  
+**Propósito**: Registro e domínios de contratos arquiteturais — definem invariantes, allowlists e
+regras de conformidade do sistema.  
 **Status**: Canônico.  
 **Público**: Mantenedores, Audit Agent e pipeline de auditoria.  
 **Última atualização**: 2 de março de 2026.
@@ -12,11 +13,11 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `registry.json` | Registro central de todos os contratos do projeto |
-| `domains/` | Contratos por domínio (api, security, runtime, etc.) |
-| `allowlists/` | Exceções permitidas para regras de contrato |
+| Arquivo/Pasta   | Descrição                                            |
+| --------------- | ---------------------------------------------------- |
+| `registry.json` | Registro central de todos os contratos do projeto    |
+| `domains/`      | Contratos por domínio (api, security, runtime, etc.) |
+| `allowlists/`   | Exceções permitidas para regras de contrato          |
 
 ## Regras de manutenção
 

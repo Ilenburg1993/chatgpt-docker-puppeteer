@@ -17,10 +17,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo           | Descrição                                       |
+| ----------------- | ----------------------------------------------- |
 | `api_envelope.js` | Formato padronizado de envelope de resposta API |
-| `task_views.js` | Serialização de tarefas para respostas da API |
+| `task_views.js`   | Serialização de tarefas para respostas da API   |
 
 ## Regras de manutenção
 

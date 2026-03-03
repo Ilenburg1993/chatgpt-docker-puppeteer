@@ -1,6 +1,7 @@
 # tests/regression
 
-**Propósito**: Testes de regressão organizados por wave — garantem que correções de bugs não regridam após refatorações.  
+**Propósito**: Testes de regressão organizados por wave — garantem que correções de bugs não
+regridam após refatorações.  
 **Status**: Canônico.  
 **Público**: Todos os desenvolvedores — executado em cada PR.  
 **Última atualização**: 2 de março de 2026.
@@ -17,11 +18,11 @@
 
 ## Entradas principais (amostra)
 
-| Arquivo | Descrição |
-|---|---|
-| `test_p1_fixes.spec.js` – `test_p4_p5_fixes.spec.js` | Correções das fases P1–P5 |
-| `test_wave1_runtime_fixes.spec.js` | Correções de runtime da wave 1 |
-| `test_wave20b_*.spec.js` | Contratos de wave 20b (import, signal, server) |
+| Arquivo                                              | Descrição                                      |
+| ---------------------------------------------------- | ---------------------------------------------- |
+| `test_p1_fixes.spec.js` – `test_p4_p5_fixes.spec.js` | Correções das fases P1–P5                      |
+| `test_wave1_runtime_fixes.spec.js`                   | Correções de runtime da wave 1                 |
+| `test_wave20b_*.spec.js`                             | Contratos de wave 20b (import, signal, server) |
 
 ## Regras de manutenção
 

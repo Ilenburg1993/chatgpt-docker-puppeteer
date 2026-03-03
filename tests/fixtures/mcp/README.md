@@ -1,6 +1,7 @@
 # tests/fixtures/mcp
 
-**Propósito**: Fixtures e servidores de exemplo para testes do protocolo MCP (Model Context Protocol).  
+**Propósito**: Fixtures e servidores de exemplo para testes do protocolo MCP (Model Context
+Protocol).  
 **Status**: Canônico.  
 **Público**: Desenvolvedores de testes de integração MCP.  
 **Última atualização**: 2 de março de 2026.
@@ -11,8 +12,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo            | Descrição                                        |
+| ------------------ | ------------------------------------------------ |
 | `stdio-server.mjs` | Servidor MCP via stdio para testes de transporte |
 
 ## Regras de manutenção

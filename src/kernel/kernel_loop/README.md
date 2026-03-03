@@ -1,6 +1,7 @@
 # src/kernel/kernel_loop
 
-**Propósito**: Loop de controle do kernel — executa a 20Hz (50ms), coordena o ciclo de observação, decisão e ação.  
+**Propósito**: Loop de controle do kernel — executa a 20Hz (50ms), coordena o ciclo de observação,
+decisão e ação.  
 **Status**: Canônico.  
 **Público**: Mantenedores do kernel; componente crítico de performance.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo          | Descrição                         |
+| ---------------- | --------------------------------- |
 | `kernel_loop.js` | Loop de controle a 20Hz do kernel |
 
 ## Regras de manutenção

@@ -1,6 +1,7 @@
 # src/nerv/buffers
 
-**Propósito**: Buffers, backpressure e filas de eventos do barramento NERV — gerencia o fluxo de eventos em condições de alta carga.  
+**Propósito**: Buffers, backpressure e filas de eventos do barramento NERV — gerencia o fluxo de
+eventos em condições de alta carga.  
 **Status**: Canônico.  
 **Público**: Mantenedores do NERV.  
 **Última atualização**: 2 de março de 2026.
@@ -19,12 +20,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `buffers.js` | Ring buffers para eventos do NERV |
-| `backpressure.js` | Controle de backpressure |
-| `inbound_queue.js` | Fila de entrada de eventos |
-| `outbound_queue.js` | Fila de saída de eventos |
+| Arquivo             | Descrição                         |
+| ------------------- | --------------------------------- |
+| `buffers.js`        | Ring buffers para eventos do NERV |
+| `backpressure.js`   | Controle de backpressure          |
+| `inbound_queue.js`  | Fila de entrada de eventos        |
+| `outbound_queue.js` | Fila de saída de eventos          |
 
 ## Regras de manutenção
 

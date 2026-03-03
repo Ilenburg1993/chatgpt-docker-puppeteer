@@ -1,6 +1,7 @@
 # tools/outputs
 
-**Propósito**: Saídas geradas por ferramentas de análise do projeto — estrutura de arquivos e mapeamentos.  
+**Propósito**: Saídas geradas por ferramentas de análise do projeto — estrutura de arquivos e
+mapeamentos.  
 **Status**: Canônico de apoio.  
 **Público**: Desenvolvedores consultando snapshots de estrutura do projeto.  
 **Última atualização**: 2 de março de 2026.
@@ -11,8 +12,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                 | Descrição                                      |
+| ----------------------- | ---------------------------------------------- |
 | `estrutura_projeto.txt` | Snapshot da estrutura de diretórios do projeto |
 
 ## Regras de manutenção

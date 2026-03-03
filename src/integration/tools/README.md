@@ -1,6 +1,7 @@
 # src/integration/tools
 
-**Propósito**: Ferramentas de integração de alto nível — LSP, MCP upstream, Ollama e RAG, disponíveis para o runtime e agentes.  
+**Propósito**: Ferramentas de integração de alto nível — LSP, MCP upstream, Ollama e RAG,
+disponíveis para o runtime e agentes.  
 **Status**: Especializado.  
 **Público**: Agentes e módulos que consomem ferramentas de IA e desenvolvimento.  
 **Última atualização**: 2 de março de 2026.
@@ -19,12 +20,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `lsp-tools.mjs` | Ferramentas de análise estática via LSP/tsserver |
-| `mcp-upstream-tools.mjs` | Ferramentas expostas por servidores MCP |
-| `ollama-tools.mjs` | Ferramentas de inferência local Ollama |
-| `rag-tools.mjs` | Ferramentas de busca semântica RAG |
+| Arquivo                  | Descrição                                        |
+| ------------------------ | ------------------------------------------------ |
+| `lsp-tools.mjs`          | Ferramentas de análise estática via LSP/tsserver |
+| `mcp-upstream-tools.mjs` | Ferramentas expostas por servidores MCP          |
+| `ollama-tools.mjs`       | Ferramentas de inferência local Ollama           |
+| `rag-tools.mjs`          | Ferramentas de busca semântica RAG               |
 
 ## Regras de manutenção
 

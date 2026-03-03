@@ -7,9 +7,9 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `reranker.mjs` | Re-ranking de resultados por relevância semântica |
+| Arquivo         | Descrição                                                   |
+| --------------- | ----------------------------------------------------------- |
+| `reranker.mjs`  | Re-ranking de resultados por relevância semântica           |
 | `diversity.mjs` | Diversificação de resultados (evitar duplicatas semânticas) |
 
 ## Links relacionados

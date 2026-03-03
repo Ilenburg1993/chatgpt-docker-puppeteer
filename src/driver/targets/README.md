@@ -16,8 +16,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo            | Descrição                                 |
+| ------------------ | ----------------------------------------- |
 | `ChatGPTDriver.js` | Driver concreto para automação do ChatGPT |
 
 ## Regras de manutenção

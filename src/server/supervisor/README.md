@@ -1,6 +1,7 @@
 # src/server/supervisor
 
-**Propósito**: Supervisor de processos do servidor — reconciliação de estado e remediação automática de falhas.  
+**Propósito**: Supervisor de processos do servidor — reconciliação de estado e remediação automática
+de falhas.  
 **Status**: Canônico.  
 **Público**: Mantenedores de confiabilidade operacional (SRE).  
 **Última atualização**: 2 de março de 2026.
@@ -17,9 +18,9 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `reconcilier.js` | Reconcilia estado desejado vs estado real |
+| Arquivo          | Descrição                                        |
+| ---------------- | ------------------------------------------------ |
+| `reconcilier.js` | Reconcilia estado desejado vs estado real        |
 | `remediation.js` | Aplica correções automáticas a desvios de estado |
 
 ## Regras de manutenção

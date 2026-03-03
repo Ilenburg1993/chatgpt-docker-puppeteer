@@ -7,10 +7,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `test_io.spec.js` | Operações de I/O de arquivo (fila, respostas) |
-| `test_lock_manager.spec.js` | Gerenciador de locks de arquivo |
+| Arquivo                     | Descrição                                     |
+| --------------------------- | --------------------------------------------- |
+| `test_io.spec.js`           | Operações de I/O de arquivo (fila, respostas) |
+| `test_lock_manager.spec.js` | Gerenciador de locks de arquivo               |
 
 ## Links relacionados
 

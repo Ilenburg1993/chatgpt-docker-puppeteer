@@ -16,8 +16,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo       | Descrição                            |
+| ------------- | ------------------------------------ |
 | `log_tail.js` | Stream de tail de logs em tempo real |
 
 ## Regras de manutenção

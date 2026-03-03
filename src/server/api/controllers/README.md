@@ -13,7 +13,8 @@ Controllers organizados por domínio:
 - `missions.js` / `dna.js` — missões e DNA do agente.
 - `health.js` / `metrics.js` / `system.js` — saúde e métricas.
 - `artifacts.js` / `rag.js` — artefatos e RAG.
-- `dashboard.js` / `dashboard_*.js` — endpoints do dashboard (audit, events, inference, missions, tasks).
+- `dashboard.js` / `dashboard_*.js` — endpoints do dashboard (audit, events, inference, missions,
+  tasks).
 
 ## O que não deve ficar aqui
 
@@ -22,12 +23,12 @@ Controllers organizados por domínio:
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `tasks.js` | Controller de tarefas |
-| `missions.js` | Controller de missões |
-| `health.js` | Controller de health check |
-| `dashboard.js` | Controller principal do dashboard |
+| Arquivo              | Descrição                            |
+| -------------------- | ------------------------------------ |
+| `tasks.js`           | Controller de tarefas                |
+| `missions.js`        | Controller de missões                |
+| `health.js`          | Controller de health check           |
+| `dashboard.js`       | Controller principal do dashboard    |
 | `dashboard_audit.js` | Controller de auditoria do dashboard |
 
 ## Regras de manutenção

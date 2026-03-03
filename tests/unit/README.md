@@ -1,6 +1,7 @@
 # tests/unit
 
-**Propósito**: Testes unitários organizados por módulo do runtime — cobertura isolada de cada componente sem dependências externas reais.  
+**Propósito**: Testes unitários organizados por módulo do runtime — cobertura isolada de cada
+componente sem dependências externas reais.  
 **Status**: Canônico.  
 **Público**: Todos os desenvolvedores.  
 **Última atualização**: 2 de março de 2026.
@@ -12,27 +13,27 @@
 
 ## Entradas principais
 
-| Pasta | Módulo correspondente |
-|---|---|
-| `agent/` | `src/agent/` — workers de fila e orquestração |
-| `audit/` | `scripts/audit/` — pipeline de auditoria |
-| `audit_agent/` | `src/audit_agent/` — agente de auditoria LLM |
-| `audit_skills/` | Skills de auditoria |
-| `core/` | `src/core/` — config, logger, schemas |
-| `devcontainer/` | `.devcontainer/scripts/` — scripts de lifecycle |
-| `driver/` | `src/driver/` — adapters de browser |
-| `inference/` | `src/inference_gateway/` — gateway de inferência |
-| `infra/` | `src/infra/` — I/O, locks, pool |
-| `integration/` | Utilitários de integração compartilhados |
-| `kernel/` | `src/kernel/` — engine de execução |
-| `lsp/` | LSP / tsserver daemon |
-| `mcp/` | Protocolo MCP |
-| `missions/` | `src/missions/` — processamento de missões |
-| `nerv/` | `src/nerv/` — barramento de eventos |
+| Pasta           | Módulo correspondente                             |
+| --------------- | ------------------------------------------------- |
+| `agent/`        | `src/agent/` — workers de fila e orquestração     |
+| `audit/`        | `scripts/audit/` — pipeline de auditoria          |
+| `audit_agent/`  | `src/audit_agent/` — agente de auditoria LLM      |
+| `audit_skills/` | Skills de auditoria                               |
+| `core/`         | `src/core/` — config, logger, schemas             |
+| `devcontainer/` | `.devcontainer/scripts/` — scripts de lifecycle   |
+| `driver/`       | `src/driver/` — adapters de browser               |
+| `inference/`    | `src/inference_gateway/` — gateway de inferência  |
+| `infra/`        | `src/infra/` — I/O, locks, pool                   |
+| `integration/`  | Utilitários de integração compartilhados          |
+| `kernel/`       | `src/kernel/` — engine de execução                |
+| `lsp/`          | LSP / tsserver daemon                             |
+| `mcp/`          | Protocolo MCP                                     |
+| `missions/`     | `src/missions/` — processamento de missões        |
+| `nerv/`         | `src/nerv/` — barramento de eventos               |
 | `orchestrator/` | `src/orchestrator/` — estratégias de orquestração |
-| `rag/` | `tools/rag/` — sistema RAG |
-| `server/` | `src/server/` — API e realtime |
-| `shared/` | `src/shared/` — utilitários compartilhados |
+| `rag/`          | `tools/rag/` — sistema RAG                        |
+| `server/`       | `src/server/` — API e realtime                    |
+| `shared/`       | `src/shared/` — utilitários compartilhados        |
 
 ## Regras de manutenção
 

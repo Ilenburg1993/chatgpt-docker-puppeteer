@@ -1,6 +1,7 @@
 # agents
 
-**Propósito**: Agentes auxiliares Python — implementações de agentes especializados (code_explainer, cooking_ai) com servidor FastAPI.  
+**Propósito**: Agentes auxiliares Python — implementações de agentes especializados (code_explainer,
+cooking_ai) com servidor FastAPI.  
 **Status**: Canônico de apoio.  
 **Público**: Desenvolvedores Python e mantenedores de agentes auxiliares.  
 **Última atualização**: 2 de março de 2026.
@@ -14,13 +15,13 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `server.py` | Servidor FastAPI principal dos agentes |
-| `__init__.py` | Módulo Python do pacote agents |
-| `code_explainer/` | Agente explicador de código |
-| `cooking_ai/` | Agente de culinária (demonstração) |
-| `teste.js` | Script de teste de integração JS↔Python |
+| Arquivo/Pasta     | Descrição                               |
+| ----------------- | --------------------------------------- |
+| `server.py`       | Servidor FastAPI principal dos agentes  |
+| `__init__.py`     | Módulo Python do pacote agents          |
+| `code_explainer/` | Agente explicador de código             |
+| `cooking_ai/`     | Agente de culinária (demonstração)      |
+| `teste.js`        | Script de teste de integração JS↔Python |
 
 ## Regras de manutenção
 

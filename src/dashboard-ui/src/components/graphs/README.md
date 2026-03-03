@@ -11,8 +11,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo        | Descrição                        |
+| -------------- | -------------------------------- |
 | `VisGraph.vue` | Visualização de grafo interativo |
 
 ## Links relacionados

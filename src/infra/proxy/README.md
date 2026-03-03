@@ -1,6 +1,7 @@
 # src/infra/proxy
 
-**Propósito**: Serviço de proxy do Chrome — redireciona conexões ao browser via proxy configurável.  
+**Propósito**: Serviço de proxy do Chrome — redireciona conexões ao browser via proxy
+configurável.  
 **Status**: Especializado.  
 **Público**: Mantenedores de infraestrutura de browser e operadores de ambiente.  
 **Última atualização**: 2 de março de 2026.
@@ -17,10 +18,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `chromeProxyService.js` | Serviço de proxy para conexões ao Chrome |
-| `chromeProxyService.d.ts` | Tipos TypeScript do serviço de proxy |
+| Arquivo                   | Descrição                                |
+| ------------------------- | ---------------------------------------- |
+| `chromeProxyService.js`   | Serviço de proxy para conexões ao Chrome |
+| `chromeProxyService.d.ts` | Tipos TypeScript do serviço de proxy     |
 
 ## Regras de manutenção
 

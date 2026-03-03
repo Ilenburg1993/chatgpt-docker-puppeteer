@@ -1,6 +1,7 @@
 # assistant
 
-**Propósito**: Instruções e documentação de escopo para o assistente de IA — contexto operacional para sessões de codificação assistida.  
+**Propósito**: Instruções e documentação de escopo para o assistente de IA — contexto operacional
+para sessões de codificação assistida.  
 **Status**: Especializado.  
 **Público**: Assistentes de IA (Copilot, Claude, etc.) e mantenedores de prompts.  
 **Última atualização**: 2 de março de 2026.
@@ -12,12 +13,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                     | Descrição                                    |
+| --------------------------- | -------------------------------------------- |
 | `ASSISTANT_INSTRUCTIONS.md` | Instruções canônicas para o assistente de IA |
-| `docs-scope.md` | Escopo de documentação para o assistente |
-| `inventory-src.md` | Inventário dos módulos de `src/` |
-| `perf-notes.toml.example` | Exemplo de notas de performance |
+| `docs-scope.md`             | Escopo de documentação para o assistente     |
+| `inventory-src.md`          | Inventário dos módulos de `src/`             |
+| `perf-notes.toml.example`   | Exemplo de notas de performance              |
 
 ## O que não deve ficar aqui
 

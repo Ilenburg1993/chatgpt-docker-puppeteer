@@ -1,18 +1,19 @@
 # scripts/ci
 
-**Propósito**: Scripts de CI — verificação de versão Node.js, execução de suítes e validação de workflows GitHub.  
+**Propósito**: Scripts de CI — verificação de versão Node.js, execução de suítes e validação de
+workflows GitHub.  
 **Status**: Canônico.  
 **Público**: Engenheiros de CI/CD e mantenedores.  
 **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `check-node-version.mjs` | Garante que Node.js >= 24 está em uso |
-| `run-ci-suite.mjs` | Executa a suíte completa de CI localmente |
-| `validate-workflows.mjs` | Valida estrutura dos workflows GitHub Actions |
-| `verify-github-workflows.mjs` | Verifica integridade e sintaxe dos workflows |
+| Arquivo                       | Descrição                                     |
+| ----------------------------- | --------------------------------------------- |
+| `check-node-version.mjs`      | Garante que Node.js >= 24 está em uso         |
+| `run-ci-suite.mjs`            | Executa a suíte completa de CI localmente     |
+| `validate-workflows.mjs`      | Valida estrutura dos workflows GitHub Actions |
+| `verify-github-workflows.mjs` | Verifica integridade e sintaxe dos workflows  |
 
 ## Regras de manutenção
 

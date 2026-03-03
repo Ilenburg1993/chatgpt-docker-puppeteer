@@ -17,10 +17,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo         | Descrição                                       |
+| --------------- | ----------------------------------------------- |
 | `code_logic.js` | Extrai blocos de código de conteúdo de contexto |
-| `json_logic.js` | Extrai e valida JSON de conteúdo de contexto |
+| `json_logic.js` | Extrai e valida JSON de conteúdo de contexto    |
 
 ## Regras de manutenção
 

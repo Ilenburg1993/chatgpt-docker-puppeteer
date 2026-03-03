@@ -1,6 +1,7 @@
 # src/nerv
 
-**Propósito**: Barramento de eventos central (NERV) — conecta todos os módulos do sistema via eventos desacoplados, com suporte a transporte híbrido, correlação e telemetria.  
+**Propósito**: Barramento de eventos central (NERV) — conecta todos os módulos do sistema via
+eventos desacoplados, com suporte a transporte híbrido, correlação e telemetria.  
 **Status**: Canônico.  
 **Público**: Todos os módulos do runtime; é a espinha dorsal do sistema.  
 **Última atualização**: 2 de março de 2026.
@@ -22,21 +23,22 @@
 
 - Lógica de domínio de qualquer módulo
 - Persistência de dados → `src/infra/`
-- Bridges específicas de módulos → `src/driver/nerv_adapter/`, `src/server/nerv_adapter/`, `src/kernel/nerv_bridge/`
+- Bridges específicas de módulos → `src/driver/nerv_adapter/`, `src/server/nerv_adapter/`,
+  `src/kernel/nerv_bridge/`
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `nerv.js` | Factory principal do barramento NERV |
-| `core.js` | Núcleo de composição do NERV |
-| `emission/` | Publicação de eventos (emit, ack, command) |
-| `reception/` | Subscrição e recepção de eventos |
-| `transport/` | Transporte híbrido com reconexão |
-| `buffers/` | Buffers, backpressure e filas |
-| `correlation/` | Correlação e rastreamento de eventos |
-| `telemetry/` | Métricas IPC do barramento |
-| `health/` | Saúde do barramento |
+| Arquivo/Pasta  | Descrição                                  |
+| -------------- | ------------------------------------------ |
+| `nerv.js`      | Factory principal do barramento NERV       |
+| `core.js`      | Núcleo de composição do NERV               |
+| `emission/`    | Publicação de eventos (emit, ack, command) |
+| `reception/`   | Subscrição e recepção de eventos           |
+| `transport/`   | Transporte híbrido com reconexão           |
+| `buffers/`     | Buffers, backpressure e filas              |
+| `correlation/` | Correlação e rastreamento de eventos       |
+| `telemetry/`   | Métricas IPC do barramento                 |
+| `health/`      | Saúde do barramento                        |
 
 ## Regras de manutenção
 

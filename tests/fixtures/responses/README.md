@@ -11,10 +11,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `resposta-valida.fixture.txt` | Resposta bem formada de um LLM |
-| `resposta-ia.fixture.txt` | Resposta alternativa para cenários de parsing |
+| Arquivo                       | Descrição                                     |
+| ----------------------------- | --------------------------------------------- |
+| `resposta-valida.fixture.txt` | Resposta bem formada de um LLM                |
+| `resposta-ia.fixture.txt`     | Resposta alternativa para cenários de parsing |
 
 ## Regras de manutenção
 

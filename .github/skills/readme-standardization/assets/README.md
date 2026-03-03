@@ -1,6 +1,7 @@
 # assets — readme-standardization
 
-**Propósito**: Imagens, diagramas e outros ativos visuais referenciados pela skill `readme-standardization` e pelos READMEs gerados por ela.  
+**Propósito**: Imagens, diagramas e outros ativos visuais referenciados pela skill
+`readme-standardization` e pelos READMEs gerados por ela.  
 **Status**: Especializado.  
 **Público**: Agentes de IA que executam a skill pai e mantenedores de documentação.  
 **Última atualização**: 2 de março de 2026.

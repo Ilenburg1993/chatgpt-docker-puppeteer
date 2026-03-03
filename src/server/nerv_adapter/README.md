@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-- `server_nerv_adapter.js`: conecta o servidor ao NERV, emitindo eventos de API e recebendo comandos do barramento.
+- `server_nerv_adapter.js`: conecta o servidor ao NERV, emitindo eventos de API e recebendo comandos
+  do barramento.
 
 ## O que não deve ficar aqui
 
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                  | Descrição                           |
+| ------------------------ | ----------------------------------- |
 | `server_nerv_adapter.js` | Bridge bidirecional servidor ↔ NERV |
 
 ## Regras de manutenção

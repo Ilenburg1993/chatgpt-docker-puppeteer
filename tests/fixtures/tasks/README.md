@@ -1,6 +1,7 @@
 # tests/fixtures/tasks
 
-**Propósito**: Fixtures de tarefas (missões) válidas e inválidas para testes de validação de schema e processamento da fila.  
+**Propósito**: Fixtures de tarefas (missões) válidas e inválidas para testes de validação de schema
+e processamento da fila.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores de testes de kernel, agent e infra.  
 **Última atualização**: 2 de março de 2026.
@@ -11,11 +12,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `tarefa-valida-chatgpt.fixture.json` | Tarefa válida para o driver ChatGPT |
-| `tarefa-valida-gemini.fixture.json` | Tarefa válida para o driver Gemini |
-| `tarefa-invalida.fixture.json` | Tarefa com campos ausentes para testes de validação |
+| Arquivo                              | Descrição                                           |
+| ------------------------------------ | --------------------------------------------------- |
+| `tarefa-valida-chatgpt.fixture.json` | Tarefa válida para o driver ChatGPT                 |
+| `tarefa-valida-gemini.fixture.json`  | Tarefa válida para o driver Gemini                  |
+| `tarefa-invalida.fixture.json`       | Tarefa com campos ausentes para testes de validação |
 
 ## Regras de manutenção
 

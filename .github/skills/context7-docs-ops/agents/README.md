@@ -1,6 +1,7 @@
 # agents — context7-docs-ops
 
-**Propósito**: Definições de agentes auxiliares invocados pela skill `context7-docs-ops` para consulta de documentação externa via Context7 MCP.  
+**Propósito**: Definições de agentes auxiliares invocados pela skill `context7-docs-ops` para
+consulta de documentação externa via Context7 MCP.  
 **Status**: Especializado.  
 **Público**: Agentes de IA que executam a skill pai.  
 **Última atualização**: 2 de março de 2026.

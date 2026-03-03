@@ -1,6 +1,7 @@
 # src/server/realtime/telemetry
 
-**Propósito**: Telemetria de hardware em tempo real para o dashboard — CPU, memória e métricas do sistema.  
+**Propósito**: Telemetria de hardware em tempo real para o dashboard — CPU, memória e métricas do
+sistema.  
 **Status**: Canônico.  
 **Público**: Mantenedores do dashboard e operadores de SRE.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo       | Descrição                                          |
+| ------------- | -------------------------------------------------- |
 | `hardware.js` | Streaming de métricas de hardware para o dashboard |
 
 ## Regras de manutenção

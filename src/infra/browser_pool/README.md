@@ -1,6 +1,7 @@
 # src/infra/browser_pool
 
-**Propósito**: Gerenciamento do pool de instâncias Chrome — monitoramento de saúde, circuit breaker e validação de páginas.  
+**Propósito**: Gerenciamento do pool de instâncias Chrome — monitoramento de saúde, circuit breaker
+e validação de páginas.  
 **Status**: Canônico.  
 **Público**: Mantenedores da infraestrutura de browser e do driver.  
 **Última atualização**: 2 de março de 2026.
@@ -21,14 +22,14 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `pool_manager.js` | Gerencia o pool de instâncias Chrome disponíveis |
-| `circuit_breaker.js` | Protege contra falhas em cascata no pool |
-| `PageLifecycleMonitor.js` | Monitora o ciclo de vida de páginas abertas |
-| `PageValidator.js` | Valida saúde e disponibilidade de páginas |
-| `PeriodicHealthMonitor.js` | Realiza verificações periódicas de saúde |
-| `puppeteer_guard.js` | Proteção de operações Puppeteer |
+| Arquivo                    | Descrição                                        |
+| -------------------------- | ------------------------------------------------ |
+| `pool_manager.js`          | Gerencia o pool de instâncias Chrome disponíveis |
+| `circuit_breaker.js`       | Protege contra falhas em cascata no pool         |
+| `PageLifecycleMonitor.js`  | Monitora o ciclo de vida de páginas abertas      |
+| `PageValidator.js`         | Valida saúde e disponibilidade de páginas        |
+| `PeriodicHealthMonitor.js` | Realiza verificações periódicas de saúde         |
+| `puppeteer_guard.js`       | Proteção de operações Puppeteer                  |
 
 ## Regras de manutenção
 

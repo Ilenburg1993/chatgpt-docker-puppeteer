@@ -1,6 +1,7 @@
 # analysis/rotation-scripts/
 
-**Propósito**: Scripts e logs de rotação de credenciais — AWS IAM keys, GitHub Actions secrets e deploy keys, executados durante operações de resposta a incidentes de segurança.  
+**Propósito**: Scripts e logs de rotação de credenciais — AWS IAM keys, GitHub Actions secrets e
+deploy keys, executados durante operações de resposta a incidentes de segurança.  
 **Status**: Histórico.  
 **Público**: Mantenedores responsáveis por segurança e rotação de credenciais.  
 **Última atualização**: 2 de março de 2026.

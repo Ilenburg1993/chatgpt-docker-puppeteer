@@ -1,6 +1,7 @@
 # tests/e2e
 
-**Propósito**: Testes de ponta a ponta (E2E) que validam fluxos completos do sistema — boot, sequência de inicialização e integração total do agente.  
+**Propósito**: Testes de ponta a ponta (E2E) que validam fluxos completos do sistema — boot,
+sequência de inicialização e integração total do agente.  
 **Status**: Canônico.  
 **Público**: QA, mantenedores do runtime e desenvolvedores de novas funcionalidades.  
 **Última atualização**: 2 de março de 2026.
@@ -19,11 +20,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `test_ariadne_thread.spec.js` | Valida rastreabilidade de contexto ponta a ponta |
-| `test_boot_sequence.spec.js` | Verifica as 6 fases do boot do sistema |
-| `test_integration_complete.spec.js` | Cobertura completa de integração E2E |
+| Arquivo                             | Descrição                                        |
+| ----------------------------------- | ------------------------------------------------ |
+| `test_ariadne_thread.spec.js`       | Valida rastreabilidade de contexto ponta a ponta |
+| `test_boot_sequence.spec.js`        | Verifica as 6 fases do boot do sistema           |
+| `test_integration_complete.spec.js` | Cobertura completa de integração E2E             |
 
 ## Regras de manutenção
 

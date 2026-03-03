@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-- `high_level_adapter.js`: adaptador de alto nível que abstrai detalhes de transporte para consumidores do NERV.
+- `high_level_adapter.js`: adaptador de alto nível que abstrai detalhes de transporte para
+  consumidores do NERV.
 
 ## O que não deve ficar aqui
 
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                 | Descrição                                |
+| ----------------------- | ---------------------------------------- |
 | `high_level_adapter.js` | Abstração de alto nível para uso do NERV |
 
 ## Regras de manutenção

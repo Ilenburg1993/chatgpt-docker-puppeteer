@@ -1,6 +1,7 @@
 # src/dashboard-ui/src/components/tasks
 
-**Propósito**: Componentes de gestão de tarefas do dashboard — listagem, detalhes, formulário e filtros.  
+**Propósito**: Componentes de gestão de tarefas do dashboard — listagem, detalhes, formulário e
+filtros.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores frontend.  
 **Última atualização**: 2 de março de 2026.
@@ -20,13 +21,13 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `TaskList.vue` | Lista de tarefas |
-| `TaskCard.vue` | Card de tarefa individual |
-| `TaskDetail.vue` | Detalhes completos de tarefa |
-| `TaskForm.vue` | Formulário de criação/edição |
-| `TaskFilters.vue` | Filtros e busca de tarefas |
+| Arquivo           | Descrição                    |
+| ----------------- | ---------------------------- |
+| `TaskList.vue`    | Lista de tarefas             |
+| `TaskCard.vue`    | Card de tarefa individual    |
+| `TaskDetail.vue`  | Detalhes completos de tarefa |
+| `TaskForm.vue`    | Formulário de criação/edição |
+| `TaskFilters.vue` | Filtros e busca de tarefas   |
 
 ## Links relacionados
 

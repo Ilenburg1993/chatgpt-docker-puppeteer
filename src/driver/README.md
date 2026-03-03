@@ -1,6 +1,7 @@
 # src/driver
 
-**Propósito**: Camada de automação de browser — conecta o runtime ao Chrome externo via DevTools Protocol e executa ações em alvos (ChatGPT, etc.).  
+**Propósito**: Camada de automação de browser — conecta o runtime ao Chrome externo via DevTools
+Protocol e executa ações em alvos (ChatGPT, etc.).  
 **Status**: Canônico.  
 **Público**: Mantenedores da camada de automação e integradores de novos alvos LLM.  
 **Última atualização**: 2 de março de 2026.
@@ -25,17 +26,17 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `factory.js` | Factory pattern para criação de drivers por alvo |
+| Arquivo/Pasta               | Descrição                                        |
+| --------------------------- | ------------------------------------------------ |
+| `factory.js`                | Factory pattern para criação de drivers por alvo |
 | `DriverLifecycleManager.js` | Gerencia o ciclo de vida de instâncias de driver |
-| `core/` | Classes base `BaseDriver` e `TargetDriver` |
-| `targets/ChatGPTDriver.js` | Driver específico para ChatGPT |
-| `modules/` | Módulos funcionais compartilhados entre drivers |
-| `nerv_adapter/` | Bridge entre o driver e o barramento NERV |
-| `guards/` | Verificação de prontidão do driver |
-| `extractors/` | Extratores de conteúdo estruturado da página |
-| `trackers/` | Rastreamento de sessão de página |
+| `core/`                     | Classes base `BaseDriver` e `TargetDriver`       |
+| `targets/ChatGPTDriver.js`  | Driver específico para ChatGPT                   |
+| `modules/`                  | Módulos funcionais compartilhados entre drivers  |
+| `nerv_adapter/`             | Bridge entre o driver e o barramento NERV        |
+| `guards/`                   | Verificação de prontidão do driver               |
+| `extractors/`               | Extratores de conteúdo estruturado da página     |
+| `trackers/`                 | Rastreamento de sessão de página                 |
 
 ## Regras de manutenção
 

@@ -1,16 +1,17 @@
 # tests/legacy/manual-notes
 
-**Propósito**: Anotações textuais de sessões de testes manuais históricas — multi-tab e simulação de stall.  
+**Propósito**: Anotações textuais de sessões de testes manuais históricas — multi-tab e simulação de
+stall.  
 **Status**: Histórico.  
 **Público**: Referência para mantenedores.  
 **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `test_multi_tab_manual.txt` | Notas de teste manual de múltiplas abas de browser |
-| `test_stall_simulation_manual.txt` | Notas de simulação manual de stall do agente |
+| Arquivo                            | Descrição                                          |
+| ---------------------------------- | -------------------------------------------------- |
+| `test_multi_tab_manual.txt`        | Notas de teste manual de múltiplas abas de browser |
+| `test_stall_simulation_manual.txt` | Notas de simulação manual de stall do agente       |
 
 ## Regras de manutenção
 

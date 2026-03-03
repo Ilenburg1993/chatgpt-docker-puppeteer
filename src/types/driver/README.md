@@ -1,6 +1,7 @@
 # src/types/driver
 
-**Propósito**: Tipos TypeScript para o módulo `src/driver/` — contratos e declarações do driver de browser.  
+**Propósito**: Tipos TypeScript para o módulo `src/driver/` — contratos e declarações do driver de
+browser.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores que trabalham com o driver de automação.  
 **Última atualização**: 2 de março de 2026.
@@ -11,10 +12,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo          | Descrição                                      |
+| ---------------- | ---------------------------------------------- |
 | `contracts.d.ts` | Declarações TypeScript dos contratos do driver |
-| `contracts.js` | Contratos do driver em JavaScript |
+| `contracts.js`   | Contratos do driver em JavaScript              |
 
 ## Links relacionados
 

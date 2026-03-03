@@ -19,11 +19,11 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `validation/` | Motor de validação com regras de formato, físicas e semânticas |
-| `validator.js` | Validador principal de lógica de negócio |
-| `adaptive.js` | Regras adaptativas baseadas em histórico e contexto |
+| Arquivo/Pasta  | Descrição                                                      |
+| -------------- | -------------------------------------------------------------- |
+| `validation/`  | Motor de validação com regras de formato, físicas e semânticas |
+| `validator.js` | Validador principal de lógica de negócio                       |
+| `adaptive.js`  | Regras adaptativas baseadas em histórico e contexto            |
 
 ## Regras de manutenção
 

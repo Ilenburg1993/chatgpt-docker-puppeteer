@@ -1,6 +1,7 @@
 # src/server/domain
 
-**Propósito**: Serviços de domínio do servidor — implementam lógica de negócio acessada pelos controllers da API.  
+**Propósito**: Serviços de domínio do servidor — implementam lógica de negócio acessada pelos
+controllers da API.  
 **Status**: Canônico.  
 **Público**: Mantenedores dos controllers e da lógica de servidor.  
 **Última atualização**: 2 de março de 2026.
@@ -20,12 +21,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `task_control_service.js` | Lógica de negócio para controle de tarefas |
+| Arquivo                      | Descrição                                  |
+| ---------------------------- | ------------------------------------------ |
+| `task_control_service.js`    | Lógica de negócio para controle de tarefas |
 | `mission_control_service.js` | Lógica de negócio para controle de missões |
 | `control_command_service.js` | Serviço de comandos de controle do sistema |
-| `rbac_policy.js` | Políticas de RBAC para autorização |
+| `rbac_policy.js`             | Políticas de RBAC para autorização         |
 
 ## Regras de manutenção
 

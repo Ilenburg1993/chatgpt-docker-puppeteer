@@ -1,6 +1,7 @@
 # src/core/validators
 
-**Propósito**: Validadores de pré-condições do sistema — verificam invariantes antes de operações críticas.  
+**Propósito**: Validadores de pré-condições do sistema — verificam invariantes antes de operações
+críticas.  
 **Status**: Canônico.  
 **Público**: Módulos que precisam verificar pré-condições antes de executar operações.  
 **Última atualização**: 2 de março de 2026.
@@ -17,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                     | Descrição                                                   |
+| --------------------------- | ----------------------------------------------------------- |
 | `prerequisite_validator.js` | Valida pré-condições do sistema antes de operações críticas |
 
 ## Regras de manutenção

@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-Arquivos de definição de agentes (personas, capacidades e instruções) usados durante a execução da skill.
+Arquivos de definição de agentes (personas, capacidades e instruções) usados durante a execução da
+skill.
 
 ## Links relacionados
 

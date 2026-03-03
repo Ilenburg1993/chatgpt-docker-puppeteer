@@ -1,6 +1,7 @@
 # src/kernel/policies
 
-**Propósito**: Definições de políticas de execução do kernel — regras de priorização, limites e comportamento.  
+**Propósito**: Definições de políticas de execução do kernel — regras de priorização, limites e
+comportamento.  
 **Status**: Canônico.  
 **Público**: Mantenedores do kernel e operadores do sistema.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo            | Descrição                        |
+| ------------------ | -------------------------------- |
 | `policy_engine.js` | Avaliação de políticas do kernel |
 
 ## Regras de manutenção

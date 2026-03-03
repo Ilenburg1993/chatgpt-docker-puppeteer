@@ -1,6 +1,7 @@
 # src/server/watchers
 
-**Propósito**: Watchers de sistema de arquivos e logs — monitoram mudanças em tempo real para atualização do servidor.  
+**Propósito**: Watchers de sistema de arquivos e logs — monitoram mudanças em tempo real para
+atualização do servidor.  
 **Status**: Canônico.  
 **Público**: Mantenedores do servidor e do dashboard.  
 **Última atualização**: 2 de março de 2026.
@@ -17,10 +18,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `fs_watcher.js` | Monitora mudanças em arquivos do sistema |
-| `log_watcher.js` | Observa novos logs para streaming |
+| Arquivo          | Descrição                                |
+| ---------------- | ---------------------------------------- |
+| `fs_watcher.js`  | Monitora mudanças em arquivos do sistema |
+| `log_watcher.js` | Observa novos logs para streaming        |
 
 ## Regras de manutenção
 

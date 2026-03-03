@@ -1,6 +1,7 @@
 # .opencode/
 
-**Propósito**: Configuração do assistente OpenCode neste repositório — comandos customizados e integração com o ambiente de desenvolvimento.  
+**Propósito**: Configuração do assistente OpenCode neste repositório — comandos customizados e
+integração com o ambiente de desenvolvimento.  
 **Status**: Canônico de apoio.  
 **Público**: Assistente OpenCode e desenvolvedores que configuram a integração.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Pasta | Descrição |
-|---|---|
+| Pasta       | Descrição                                     |
+| ----------- | --------------------------------------------- |
 | `commands/` | Comandos customizados disponíveis no OpenCode |
 
 ## Links relacionados

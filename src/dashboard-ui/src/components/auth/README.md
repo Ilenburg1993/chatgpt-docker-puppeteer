@@ -11,8 +11,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo          | Descrição                   |
+| ---------------- | --------------------------- |
 | `LoginModal.vue` | Modal de login do dashboard |
 
 ## Links relacionados

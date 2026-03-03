@@ -1,6 +1,7 @@
 # tests/fixtures/dna
 
-**Propósito**: Fixtures de identidade do agente (DNA/identidade), usados em testes de inicialização e ciclo de vida.  
+**Propósito**: Fixtures de identidade do agente (DNA/identidade), usados em testes de inicialização
+e ciclo de vida.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores de testes de identidade e kernel.  
 **Última atualização**: 2 de março de 2026.
@@ -11,8 +12,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                          | Descrição                                          |
+| -------------------------------- | -------------------------------------------------- |
 | `identidade-valida.fixture.json` | Identidade completa e válida para testes positivos |
 
 ## Regras de manutenção

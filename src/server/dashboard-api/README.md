@@ -1,6 +1,7 @@
 # src/server/dashboard-api
 
-**Propósito**: API específica do dashboard — sincronização de tarefas e agregação de telemetria para o frontend.  
+**Propósito**: API específica do dashboard — sincronização de tarefas e agregação de telemetria para
+o frontend.  
 **Status**: Canônico.  
 **Público**: Mantenedores do dashboard e do frontend Vue.  
 **Última atualização**: 2 de março de 2026.
@@ -17,10 +18,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `task_sync_bridge.js` | Sincroniza estado de tarefas com o dashboard |
-| `telemetry_aggregator.js` | Agrega telemetria para o frontend |
+| Arquivo                   | Descrição                                    |
+| ------------------------- | -------------------------------------------- |
+| `task_sync_bridge.js`     | Sincroniza estado de tarefas com o dashboard |
+| `telemetry_aggregator.js` | Agrega telemetria para o frontend            |
 
 ## Regras de manutenção
 

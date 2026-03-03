@@ -1,6 +1,7 @@
 # tests/legacy/node
 
-**Propósito**: Testes JavaScript de fases anteriores do projeto, não compatíveis com o runner nativo Node.js atual.  
+**Propósito**: Testes JavaScript de fases anteriores do projeto, não compatíveis com o runner nativo
+Node.js atual.  
 **Status**: Histórico.  
 **Público**: Mantenedores para referência e migração.  
 **Última atualização**: 2 de março de 2026.
@@ -11,11 +12,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `test_dna_system.js` | Testes do sistema de identidade DNA |
-| `test_schema_v5.js` | Testes do schema versão 5 |
-| `test_task_end_to_end.js` | Testes E2E de tarefas (legado) |
+| Arquivo                            | Descrição                           |
+| ---------------------------------- | ----------------------------------- |
+| `test_dna_system.js`               | Testes do sistema de identidade DNA |
+| `test_schema_v5.js`                | Testes do schema versão 5           |
+| `test_task_end_to_end.js`          | Testes E2E de tarefas (legado)      |
 | `test_chrome_proxy_integration.js` | Integração de proxy Chrome (legado) |
 
 ## Regras de manutenção

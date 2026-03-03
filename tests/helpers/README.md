@@ -11,8 +11,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo           | Descrição                                                      |
+| ----------------- | -------------------------------------------------------------- |
 | `test_helpers.js` | Coleção de helpers genéricos para setup e assertions de testes |
 
 ## O que não deve ficar aqui

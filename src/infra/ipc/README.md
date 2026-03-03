@@ -1,6 +1,7 @@
 # src/infra/ipc
 
-**Propósito**: Buffer e cliente de comunicação inter-processos (IPC) — troca de mensagens com processos PM2 e subprocessos.  
+**Propósito**: Buffer e cliente de comunicação inter-processos (IPC) — troca de mensagens com
+processos PM2 e subprocessos.  
 **Status**: Canônico.  
 **Público**: Módulos que precisam comunicar-se via IPC com outros processos.  
 **Última atualização**: 2 de março de 2026.
@@ -17,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo     | Descrição                               |
+| ----------- | --------------------------------------- |
 | `buffer.js` | Buffer de mensagens IPC entre processos |
 
 ## Regras de manutenção

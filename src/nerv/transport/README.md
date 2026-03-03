@@ -1,6 +1,7 @@
 # src/nerv/transport
 
-**Propósito**: Transporte de baixo nível do NERV — conexão, framing, transporte híbrido e reconexão automática.  
+**Propósito**: Transporte de baixo nível do NERV — conexão, framing, transporte híbrido e reconexão
+automática.  
 **Status**: Canônico.  
 **Público**: Mantenedores do NERV.  
 **Última atualização**: 2 de março de 2026.
@@ -20,12 +21,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `hybrid_transport.js` | Transporte híbrido local + Socket.io |
-| `connection.js` | Gerenciamento de conexões de transporte |
-| `reconnect.js` | Reconexão automática com backoff |
-| `framing.js` | Framing de mensagens |
+| Arquivo               | Descrição                               |
+| --------------------- | --------------------------------------- |
+| `hybrid_transport.js` | Transporte híbrido local + Socket.io    |
+| `connection.js`       | Gerenciamento de conexões de transporte |
+| `reconnect.js`        | Reconexão automática com backoff        |
+| `framing.js`          | Framing de mensagens                    |
 
 ## Regras de manutenção
 

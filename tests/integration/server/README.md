@@ -1,6 +1,7 @@
 # tests/integration/server
 
-**Propósito**: Testes de integração do servidor web — dashboard realtime, socket, autenticação e TLS.  
+**Propósito**: Testes de integração do servidor web — dashboard realtime, socket, autenticação e
+TLS.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores do módulo `src/server/`.  
 **Última atualização**: 2 de março de 2026.
@@ -13,14 +14,14 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `test_dashboard_realtime_contract.spec.js` | Contrato de eventos realtime do dashboard |
-| `test_server_engine_tls.spec.js` | Configuração TLS do servidor |
-| `test_socket_split_handshake.spec.js` | Handshake do socket splitado |
-| `test_socket_split_reconnect.spec.js` | Reconexão de socket |
-| `test_wave16r_dashboard_socket_auth_required.spec.js` | Auth obrigatória no socket |
-| `test_wave18_dashboard_realtime_control_command_status.spec.js` | Status de comandos de controle |
+| Arquivo                                                         | Descrição                                 |
+| --------------------------------------------------------------- | ----------------------------------------- |
+| `test_dashboard_realtime_contract.spec.js`                      | Contrato de eventos realtime do dashboard |
+| `test_server_engine_tls.spec.js`                                | Configuração TLS do servidor              |
+| `test_socket_split_handshake.spec.js`                           | Handshake do socket splitado              |
+| `test_socket_split_reconnect.spec.js`                           | Reconexão de socket                       |
+| `test_wave16r_dashboard_socket_auth_required.spec.js`           | Auth obrigatória no socket                |
+| `test_wave18_dashboard_realtime_control_command_status.spec.js` | Status de comandos de controle            |
 
 ## Regras de manutenção
 

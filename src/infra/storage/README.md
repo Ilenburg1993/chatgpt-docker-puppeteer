@@ -1,6 +1,7 @@
 # src/infra/storage
 
-**Propósito**: Armazenamento persistente de artefatos, respostas, DNA e identidade do robô em sistema de arquivos.  
+**Propósito**: Armazenamento persistente de artefatos, respostas, DNA e identidade do robô em
+sistema de arquivos.  
 **Status**: Canônico.  
 **Público**: Módulos que produzem ou consomem artefatos de execução.  
 **Última atualização**: 2 de março de 2026.
@@ -21,13 +22,13 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `artifact_store.js` | Armazena artefatos de execução de missões |
+| Arquivo                | Descrição                                      |
+| ---------------------- | ---------------------------------------------- |
+| `artifact_store.js`    | Armazena artefatos de execução de missões      |
 | `response_store_v2.js` | Store canônico de respostas LLM (versão atual) |
-| `dna_store.js` | Persiste o DNA evolutivo do agente |
-| `task_store.js` | Store de estado de tarefas em arquivo |
-| `robot_identity.json` | Identidade persistida do robô |
+| `dna_store.js`         | Persiste o DNA evolutivo do agente             |
+| `task_store.js`        | Store de estado de tarefas em arquivo          |
+| `robot_identity.json`  | Identidade persistida do robô                  |
 
 ## Regras de manutenção
 

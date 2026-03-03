@@ -1,6 +1,7 @@
 # src/logic/validation
 
-**Propósito**: Motor de validação de lógica de negócio — verifica formato, regras físicas e semântica de dados e respostas.  
+**Propósito**: Motor de validação de lógica de negócio — verifica formato, regras físicas e
+semântica de dados e respostas.  
 **Status**: Canônico.  
 **Público**: Módulos que precisam validar respostas de LLM e dados de negócio.  
 **Última atualização**: 2 de março de 2026.
@@ -19,11 +20,11 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `validation_core.js` | Núcleo do motor de validação |
-| `scan_engine.js` | Motor de varredura e aplicação de regras |
-| `rules/` | Regras de validação por categoria |
+| Arquivo/Pasta        | Descrição                                |
+| -------------------- | ---------------------------------------- |
+| `validation_core.js` | Núcleo do motor de validação             |
+| `scan_engine.js`     | Motor de varredura e aplicação de regras |
+| `rules/`             | Regras de validação por categoria        |
 
 ## Regras de manutenção
 

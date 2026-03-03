@@ -1,6 +1,7 @@
 # src/kernel/telemetry
 
-**Propósito**: Telemetria do kernel — coleta e expõe métricas de desempenho e saúde do loop de controle.  
+**Propósito**: Telemetria do kernel — coleta e expõe métricas de desempenho e saúde do loop de
+controle.  
 **Status**: Canônico.  
 **Público**: Mantenedores de observabilidade e SRE.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo               | Descrição                                           |
+| --------------------- | --------------------------------------------------- |
 | `kernel_telemetry.js` | Métricas e telemetria do loop de controle do kernel |
 
 ## Regras de manutenção

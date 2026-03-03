@@ -17,10 +17,10 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `styles/` | Estilos globais da aplicação |
-| `vue.svg` | Ícone Vue |
+| Arquivo/Pasta | Descrição                    |
+| ------------- | ---------------------------- |
+| `styles/`     | Estilos globais da aplicação |
+| `vue.svg`     | Ícone Vue                    |
 
 ## Links relacionados
 

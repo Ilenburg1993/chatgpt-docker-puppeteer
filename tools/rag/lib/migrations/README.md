@@ -7,8 +7,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo         | Descrição                                 |
+| --------------- | ----------------------------------------- |
 | `schema_v2.mjs` | Migração para schema v2 do banco vetorial |
 
 ## Regras de manutenção

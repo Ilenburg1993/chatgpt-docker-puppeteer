@@ -7,15 +7,15 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `test_audit_agent_contracts.spec.js` | Contratos do audit agent |
-| `test_audit_agent_runtime.spec.js` | Runtime do audit agent |
-| `test_audit_agent_server.spec.js` | Servidor do audit agent |
+| Arquivo                                    | Descrição                         |
+| ------------------------------------------ | --------------------------------- |
+| `test_audit_agent_contracts.spec.js`       | Contratos do audit agent          |
+| `test_audit_agent_runtime.spec.js`         | Runtime do audit agent            |
+| `test_audit_agent_server.spec.js`          | Servidor do audit agent           |
 | `test_audit_job_repo_and_db_store.spec.js` | Repositório de jobs e store de DB |
-| `test_context_builder.spec.js` | Construtor de contexto para LLM |
-| `test_patch_author_llm.spec.js` | Autoria de patches via LLM |
-| `test_triage_llm.spec.js` | Triage de findings via LLM |
+| `test_context_builder.spec.js`             | Construtor de contexto para LLM   |
+| `test_patch_author_llm.spec.js`            | Autoria de patches via LLM        |
+| `test_triage_llm.spec.js`                  | Triage de findings via LLM        |
 
 ## Links relacionados
 

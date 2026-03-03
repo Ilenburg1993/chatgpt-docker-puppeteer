@@ -22,14 +22,14 @@
 
 ## Entradas principais
 
-| Pasta | Descrição |
-|---|---|
-| `layout/` | Componentes estruturais da aplicação |
-| `tasks/` | Componentes de gestão de tarefas |
-| `charts/` | Componentes de gráficos e métricas |
-| `ui/` | Componentes de UI genéricos reutilizáveis |
-| `auth/` | Componentes de autenticação |
-| `graphs/` | Visualizações de grafo |
+| Pasta     | Descrição                                 |
+| --------- | ----------------------------------------- |
+| `layout/` | Componentes estruturais da aplicação      |
+| `tasks/`  | Componentes de gestão de tarefas          |
+| `charts/` | Componentes de gráficos e métricas        |
+| `ui/`     | Componentes de UI genéricos reutilizáveis |
+| `auth/`   | Componentes de autenticação               |
+| `graphs/` | Visualizações de grafo                    |
 
 ## Regras de manutenção
 

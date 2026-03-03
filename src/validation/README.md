@@ -1,6 +1,7 @@
 # src/validation
 
-**Propósito**: Julgamento LLM para validação de qualidade — avalia respostas geradas com base em critérios semânticos.  
+**Propósito**: Julgamento LLM para validação de qualidade — avalia respostas geradas com base em
+critérios semânticos.  
 **Status**: Especializado.  
 **Público**: Módulos que precisam de validação por LLM de saídas geradas.  
 **Última atualização**: 2 de março de 2026.
@@ -17,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo        | Descrição                                      |
+| -------------- | ---------------------------------------------- |
 | `llm_judge.js` | Juiz LLM para avaliação de qualidade de saídas |
 
 ## Regras de manutenção

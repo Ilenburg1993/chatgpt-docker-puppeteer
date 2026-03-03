@@ -1,6 +1,7 @@
 # tests/mocks
 
-**Propósito**: Mocks de módulos do sistema para uso em testes unitários e de integração — browser, logger e NERV.  
+**Propósito**: Mocks de módulos do sistema para uso em testes unitários e de integração — browser,
+logger e NERV.  
 **Status**: Canônico.  
 **Público**: Todos os desenvolvedores de testes.  
 **Última atualização**: 2 de março de 2026.
@@ -11,11 +12,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo           | Descrição                                        |
+| ----------------- | ------------------------------------------------ |
 | `mock_browser.js` | Mock do browser Puppeteer (page, evaluate, etc.) |
-| `mock_logger.js` | Mock do logger com spy em métodos de log |
-| `mock_nerv.js` | Mock do barramento NERV (emit, on, off) |
+| `mock_logger.js`  | Mock do logger com spy em métodos de log         |
+| `mock_nerv.js`    | Mock do barramento NERV (emit, on, off)          |
 
 ## O que não deve ficar aqui
 

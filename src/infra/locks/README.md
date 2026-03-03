@@ -1,6 +1,7 @@
 # src/infra/locks
 
-**Propósito**: Gerenciamento de locks de arquivo para operações críticas que exigem exclusão mútua.  
+**Propósito**: Gerenciamento de locks de arquivo para operações críticas que exigem exclusão
+mútua.  
 **Status**: Canônico.  
 **Público**: Módulos que fazem operações de I/O concorrentes.  
 **Última atualização**: 2 de março de 2026.
@@ -18,11 +19,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `lock_manager.js` | Gerencia aquisição e liberação de locks |
-| `resilient_lock.js` | Lock com retry automático e timeout |
-| `process_guard.js` | Proteção contra execução concorrente de processo |
+| Arquivo             | Descrição                                        |
+| ------------------- | ------------------------------------------------ |
+| `lock_manager.js`   | Gerencia aquisição e liberação de locks          |
+| `resilient_lock.js` | Lock com retry automático e timeout              |
+| `process_guard.js`  | Proteção contra execução concorrente de processo |
 
 ## Regras de manutenção
 

@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-Guias de configuração do tsserver, exemplos de padrões de tipagem Node.js 24 + ESM e referências de erros comuns.
+Guias de configuração do tsserver, exemplos de padrões de tipagem Node.js 24 + ESM e referências de
+erros comuns.
 
 ## Links relacionados
 

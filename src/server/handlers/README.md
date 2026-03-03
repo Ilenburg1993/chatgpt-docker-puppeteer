@@ -1,6 +1,7 @@
 # src/server/handlers
 
-**Propósito**: Handlers de protocolos externos — MCP (Model Context Protocol) e compatibilidade OpenAI.  
+**Propósito**: Handlers de protocolos externos — MCP (Model Context Protocol) e compatibilidade
+OpenAI.  
 **Status**: Especializado.  
 **Público**: Mantenedores de integrações com ferramentas externas e clientes OpenAI-compatíveis.  
 **Última atualização**: 2 de março de 2026.
@@ -18,10 +19,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `mcp-handler.js` | Handler de protocolo MCP no servidor |
-| `openai-handler.js` | Handler de compatibilidade com API OpenAI |
+| Arquivo                 | Descrição                                 |
+| ----------------------- | ----------------------------------------- |
+| `mcp-handler.js`        | Handler de protocolo MCP no servidor      |
+| `openai-handler.js`     | Handler de compatibilidade com API OpenAI |
 | `openai-transformer.js` | Transformação de formato OpenAI ↔ sistema |
 
 ## Regras de manutenção

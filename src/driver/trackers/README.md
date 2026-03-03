@@ -1,6 +1,7 @@
 # src/driver/trackers
 
-**Propósito**: Rastreamento de sessões de página de browser para correlação de eventos e diagnóstico.  
+**Propósito**: Rastreamento de sessões de página de browser para correlação de eventos e
+diagnóstico.  
 **Status**: Canônico.  
 **Público**: Mantenedores do driver e da camada de observabilidade.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                 | Descrição                                                |
+| ----------------------- | -------------------------------------------------------- |
 | `PageSessionTracker.js` | Rastreia sessões de página para correlação e diagnóstico |
 
 ## Regras de manutenção

@@ -1,6 +1,7 @@
 # src/server/engine
 
-**Propósito**: Componentes core do servidor Express + Socket.io — app, lifecycle e configuração do socket.  
+**Propósito**: Componentes core do servidor Express + Socket.io — app, lifecycle e configuração do
+socket.  
 **Status**: Canônico.  
 **Público**: Mantenedores do servidor.  
 **Última atualização**: 2 de março de 2026.
@@ -20,11 +21,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `app.js` | Configuração da aplicação Express |
-| `server.js` | Inicialização do servidor HTTP |
-| `socket.js` | Configuração do Socket.io |
+| Arquivo        | Descrição                              |
+| -------------- | -------------------------------------- |
+| `app.js`       | Configuração da aplicação Express      |
+| `server.js`    | Inicialização do servidor HTTP         |
+| `socket.js`    | Configuração do Socket.io              |
 | `lifecycle.js` | Ciclo de vida do servidor (start/stop) |
 
 ## Regras de manutenção

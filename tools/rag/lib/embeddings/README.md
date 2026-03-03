@@ -7,17 +7,20 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `ollama.mjs` | Provider de embeddings via API Ollama |
+| Arquivo           | Descrição                                       |
+| ----------------- | ----------------------------------------------- |
+| `ollama.mjs`      | Provider de embeddings via API Ollama           |
 | `embed_cache.mjs` | Cache de embeddings para evitar reprocessamento |
 
 ## Regras de manutenção
 
-- Model de embeddings configurável via `options.model` ao chamar o provider, ou via defaults em `tools/rag/lib/contract.mjs` (`DEFAULT_EMBEDDING_MODEL`).
-- Base URL do Ollama configurável via variável de ambiente `OLLAMA_LOCAL_BASE_URL` ou `options.baseUrl`.
+- Model de embeddings configurável via `options.model` ao chamar o provider, ou via defaults em
+  `tools/rag/lib/contract.mjs` (`DEFAULT_EMBEDDING_MODEL`).
+- Base URL do Ollama configurável via variável de ambiente `OLLAMA_LOCAL_BASE_URL` ou
+  `options.baseUrl`.
 - Tamanho máximo de texto configurável via `OLLAMA_EMBED_MAX_CHARS`.
-- Cache em disco — limpar manualmente a pasta de cache se corrompido (usar `npm run rag:health` apenas para verificar saúde, não para resetar).
+- Cache em disco — limpar manualmente a pasta de cache se corrompido (usar `npm run rag:health`
+  apenas para verificar saúde, não para resetar).
 
 ## Links relacionados
 

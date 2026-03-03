@@ -16,8 +16,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                 | Descrição                                |
+| ----------------------- | ---------------------------------------- |
 | `validation_service.js` | Valida entradas e estado do orquestrador |
 
 ## Regras de manutenção

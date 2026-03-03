@@ -1,6 +1,7 @@
 # src/driver/guards
 
-**Propósito**: Guards de prontidão do driver — verificam se o browser e o alvo estão prontos para interação.  
+**Propósito**: Guards de prontidão do driver — verificam se o browser e o alvo estão prontos para
+interação.  
 **Status**: Canônico.  
 **Público**: Mantenedores do pipeline de execução de driver.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                   | Descrição                                            |
+| ------------------------- | ---------------------------------------------------- |
 | `DriverReadinessGuard.js` | Verifica se o driver está pronto para executar ações |
 
 ## Regras de manutenção

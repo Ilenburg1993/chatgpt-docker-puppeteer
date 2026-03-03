@@ -1,14 +1,15 @@
 # .github/prompts
 
-**Propósito**: Prompts reutilizáveis para assistentes de IA — referência sob demanda para tarefas recorrentes.  
+**Propósito**: Prompts reutilizáveis para assistentes de IA — referência sob demanda para tarefas
+recorrentes.  
 **Status**: Canônico de apoio.  
 **Público**: Desenvolvedores usando assistentes de IA com suporte a prompts.  
 **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo      | Descrição                                                        |
+| ------------ | ---------------------------------------------------------------- |
 | `prompts.js` | Coleção de prompts reutilizáveis para tarefas de desenvolvimento |
 
 ## Regras de manutenção

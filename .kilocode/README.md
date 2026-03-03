@@ -1,6 +1,7 @@
 # .kilocode/
 
-**Propósito**: Configuração do assistente Kilo Code neste repositório — regras de workspace e configuração de MCP (Model Context Protocol).  
+**Propósito**: Configuração do assistente Kilo Code neste repositório — regras de workspace e
+configuração de MCP (Model Context Protocol).  
 **Status**: Canônico de apoio.  
 **Público**: Assistente Kilo Code e desenvolvedores que configuram a integração.  
 **Última atualização**: 2 de março de 2026.
@@ -17,10 +18,10 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `mcp.json` | Configuração do Model Context Protocol |
-| `rules/` | Regras de workspace para o Kilo Code |
+| Arquivo/Pasta | Descrição                              |
+| ------------- | -------------------------------------- |
+| `mcp.json`    | Configuração do Model Context Protocol |
+| `rules/`      | Regras de workspace para o Kilo Code   |
 
 ## Links relacionados
 

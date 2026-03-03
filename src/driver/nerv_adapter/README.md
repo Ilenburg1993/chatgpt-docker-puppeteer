@@ -1,13 +1,15 @@
 # src/driver/nerv_adapter
 
-**Propósito**: Bridge entre o driver de browser e o barramento de eventos NERV — publica e consome eventos de automação.  
+**Propósito**: Bridge entre o driver de browser e o barramento de eventos NERV — publica e consome
+eventos de automação.  
 **Status**: Canônico.  
 **Público**: Mantenedores do driver e da integração com NERV.  
 **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 
-- `driver_nerv_adapter.js`: adaptador que conecta o driver ao NERV, emitindo eventos de ciclo de vida e recebendo comandos.
+- `driver_nerv_adapter.js`: adaptador que conecta o driver ao NERV, emitindo eventos de ciclo de
+  vida e recebendo comandos.
 
 ## O que não deve ficar aqui
 
@@ -16,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                  | Descrição                                    |
+| ------------------------ | -------------------------------------------- |
 | `driver_nerv_adapter.js` | Bridge driver ↔ NERV para eventos e comandos |
 
 ## Regras de manutenção

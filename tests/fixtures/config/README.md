@@ -1,6 +1,7 @@
 # tests/fixtures/config
 
-**Propósito**: Fixtures de configuração (`config.json`) para testes de validação de schema e comportamento de carregamento.  
+**Propósito**: Fixtures de configuração (`config.json`) para testes de validação de schema e
+comportamento de carregamento.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores de testes do módulo `src/core/`.  
 **Última atualização**: 2 de março de 2026.
@@ -11,9 +12,9 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `config-valido.fixture.json` | Configuração completa e válida para testes positivos |
+| Arquivo                        | Descrição                                                       |
+| ------------------------------ | --------------------------------------------------------------- |
+| `config-valido.fixture.json`   | Configuração completa e válida para testes positivos            |
 | `config-invalido.fixture.json` | Configuração com campos ausentes/incorretos para testes de erro |
 
 ## Regras de manutenção

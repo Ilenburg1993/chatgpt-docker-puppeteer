@@ -7,10 +7,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `test_driver_nerv.spec.js` | Integração entre driver e NERV (emissão/recepção de eventos) |
-| `test_wave13_hot_pool_reuse_integrity.spec.js` | Integridade de reuso do pool de browser |
+| Arquivo                                        | Descrição                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `test_driver_nerv.spec.js`                     | Integração entre driver e NERV (emissão/recepção de eventos) |
+| `test_wave13_hot_pool_reuse_integrity.spec.js` | Integridade de reuso do pool de browser                      |
 
 ## Regras de manutenção
 

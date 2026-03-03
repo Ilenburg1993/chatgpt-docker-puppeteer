@@ -1,6 +1,7 @@
 # src/server
 
-**Propósito**: Servidor web do sistema — API REST, WebSocket em tempo real, dashboard, middleware e supervisor de processos.  
+**Propósito**: Servidor web do sistema — API REST, WebSocket em tempo real, dashboard, middleware e
+supervisor de processos.  
 **Status**: Canônico.  
 **Público**: Mantenedores da API e do dashboard; integradores externos.  
 **Última atualização**: 2 de março de 2026.
@@ -27,17 +28,17 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `main.js` | Bootstrap do servidor Express + Socket.io |
-| `api/` | API REST: rotas e controllers |
-| `engine/` | Componentes core do servidor (app, socket, lifecycle) |
-| `middleware/` | Auth, autorização, validação e error handler |
-| `realtime/` | Bus PM2, streams SSE e telemetria em tempo real |
-| `nerv_adapter/` | Bridge servidor ↔ NERV |
-| `supervisor/` | Reconciliador e remediação de processos |
-| `domain/` | Serviços de domínio do servidor |
-| `handlers/` | Handlers MCP e compatibilidade OpenAI |
+| Arquivo/Pasta   | Descrição                                             |
+| --------------- | ----------------------------------------------------- |
+| `main.js`       | Bootstrap do servidor Express + Socket.io             |
+| `api/`          | API REST: rotas e controllers                         |
+| `engine/`       | Componentes core do servidor (app, socket, lifecycle) |
+| `middleware/`   | Auth, autorização, validação e error handler          |
+| `realtime/`     | Bus PM2, streams SSE e telemetria em tempo real       |
+| `nerv_adapter/` | Bridge servidor ↔ NERV                                |
+| `supervisor/`   | Reconciliador e remediação de processos               |
+| `domain/`       | Serviços de domínio do servidor                       |
+| `handlers/`     | Handlers MCP e compatibilidade OpenAI                 |
 
 ## Regras de manutenção
 

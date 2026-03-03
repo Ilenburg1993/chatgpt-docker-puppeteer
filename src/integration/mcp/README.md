@@ -19,12 +19,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `upstream-manager.mjs` | Gerencia múltiplos upstreams MCP |
-| `upstream-http.mjs` | Adaptador HTTP para servidores MCP |
-| `upstream-stdio.mjs` | Adaptador stdio para servidores MCP locais |
-| `upstream-stdio-sdk.mjs` | Adaptador stdio com SDK oficial MCP |
+| Arquivo                  | Descrição                                  |
+| ------------------------ | ------------------------------------------ |
+| `upstream-manager.mjs`   | Gerencia múltiplos upstreams MCP           |
+| `upstream-http.mjs`      | Adaptador HTTP para servidores MCP         |
+| `upstream-stdio.mjs`     | Adaptador stdio para servidores MCP locais |
+| `upstream-stdio-sdk.mjs` | Adaptador stdio com SDK oficial MCP        |
 
 ## Regras de manutenção
 

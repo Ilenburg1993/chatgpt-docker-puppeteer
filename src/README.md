@@ -1,6 +1,7 @@
 # src
 
-**Propósito**: Código-fonte oficial do runtime do sistema. Contém todos os módulos de produção organizados por domínio.  
+**Propósito**: Código-fonte oficial do runtime do sistema. Contém todos os módulos de produção
+organizados por domínio.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores e mantenedores do projeto.  
 **Última atualização**: 2 de março de 2026.
@@ -19,27 +20,27 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `main.js` | Bootstrap canônico da aplicação |
-| `core/` | Configuração, logger, schemas, validadores e constantes centrais |
-| `nerv/` | Barramento de eventos central (NERV) |
-| `kernel/` | Loop de execução, políticas e telemetria |
-| `orchestrator/` | Estratégias de orquestração de missões |
-| `agent/` | Workers internos: fila, watchdog, controle, missão |
-| `driver/` | Automação de browser via Chrome DevTools |
-| `infra/` | Pool de browsers, DB, fila, locks, storage |
-| `server/` | API REST, Socket.io e dashboard |
-| `missions/` | Domínio de missões e templates |
-| `integration/` | Integrações com LSP, MCP e ferramentas externas |
-| `inference_gateway/` | Gateway para modelos de inferência (LLMs) |
-| `audit_agent/` | Agente de auditoria autônomo |
-| `shared/` | Módulos compartilhados entre domínios |
-| `types/` | Definições de tipos TypeScript/JSDoc |
-| `validation/` | Lógica de validação global |
-| `logic/` | Lógica de negócio e regras de validação |
-| `state/` | Gerenciamento de estado global |
-| `dashboard-ui/` | Frontend Vue/Vite do dashboard |
+| Arquivo/Pasta        | Descrição                                                        |
+| -------------------- | ---------------------------------------------------------------- |
+| `main.js`            | Bootstrap canônico da aplicação                                  |
+| `core/`              | Configuração, logger, schemas, validadores e constantes centrais |
+| `nerv/`              | Barramento de eventos central (NERV)                             |
+| `kernel/`            | Loop de execução, políticas e telemetria                         |
+| `orchestrator/`      | Estratégias de orquestração de missões                           |
+| `agent/`             | Workers internos: fila, watchdog, controle, missão               |
+| `driver/`            | Automação de browser via Chrome DevTools                         |
+| `infra/`             | Pool de browsers, DB, fila, locks, storage                       |
+| `server/`            | API REST, Socket.io e dashboard                                  |
+| `missions/`          | Domínio de missões e templates                                   |
+| `integration/`       | Integrações com LSP, MCP e ferramentas externas                  |
+| `inference_gateway/` | Gateway para modelos de inferência (LLMs)                        |
+| `audit_agent/`       | Agente de auditoria autônomo                                     |
+| `shared/`            | Módulos compartilhados entre domínios                            |
+| `types/`             | Definições de tipos TypeScript/JSDoc                             |
+| `validation/`        | Lógica de validação global                                       |
+| `logic/`             | Lógica de negócio e regras de validação                          |
+| `state/`             | Gerenciamento de estado global                                   |
+| `dashboard-ui/`      | Frontend Vue/Vite do dashboard                                   |
 
 ## Regras de manutenção
 

@@ -7,8 +7,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo    | Descrição                                                 |
+| ---------- | --------------------------------------------------------- |
 | `gitleaks` | Binário gitleaks para detecção de secrets em repositórios |
 
 ## Regras de manutenção

@@ -1,6 +1,8 @@
 # Skill: typescript-typing
 
-**Propósito**: Adição de tipagem TypeScript robusta (interfaces, types, generics) em JS via JSDoc ou migração progressiva para TS. Use quando o pedido envolver "tipar", "TypeScript", "interface", "type", "migração TS", "definir tipos" ou "fortalecer sistema de tipos" no projeto.  
+**Propósito**: Adição de tipagem TypeScript robusta (interfaces, types, generics) em JS via JSDoc ou
+migração progressiva para TS. Use quando o pedido envolver "tipar", "TypeScript", "interface",
+"type", "migração TS", "definir tipos" ou "fortalecer sistema de tipos" no projeto.  
 **Status**: Especializado.  
 **Público**: Agentes de IA e desenvolvedores que trabalham com tipagem TypeScript/JSDoc.  
 **Última atualização**: 2 de março de 2026.

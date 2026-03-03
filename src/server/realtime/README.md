@@ -1,6 +1,7 @@
 # src/server/realtime
 
-**Propósito**: Funcionalidades em tempo real do servidor — bus PM2, streams SSE/Socket.io, telemetria de hardware e feed de eventos SSOT.  
+**Propósito**: Funcionalidades em tempo real do servidor — bus PM2, streams SSE/Socket.io,
+telemetria de hardware e feed de eventos SSOT.  
 **Status**: Canônico.  
 **Público**: Mantenedores do dashboard e da observabilidade em tempo real.  
 **Última atualização**: 2 de março de 2026.
@@ -19,12 +20,12 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `ssot_event_feed.js` | Feed de eventos SSOT para o dashboard |
-| `bus/` | Bridge PM2 para comunicação inter-processos |
-| `streams/` | Streams de logs em tempo real (log tail) |
-| `telemetry/` | Telemetria de hardware em tempo real |
+| Arquivo/Pasta        | Descrição                                   |
+| -------------------- | ------------------------------------------- |
+| `ssot_event_feed.js` | Feed de eventos SSOT para o dashboard       |
+| `bus/`               | Bridge PM2 para comunicação inter-processos |
+| `streams/`           | Streams de logs em tempo real (log tail)    |
+| `telemetry/`         | Telemetria de hardware em tempo real        |
 
 ## Regras de manutenção
 

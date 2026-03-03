@@ -1,6 +1,7 @@
 # src/integration/lsp
 
-**Propósito**: Daemon do servidor LSP (tsserver) para integração de inteligência de código no runtime.  
+**Propósito**: Daemon do servidor LSP (tsserver) para integração de inteligência de código no
+runtime.  
 **Status**: Especializado.  
 **Público**: Mantenedores de integrações de tooling de desenvolvimento e auditoria de código.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo               | Descrição                                    |
+| --------------------- | -------------------------------------------- |
 | `tsserver-daemon.mjs` | Gerencia o processo tsserver como daemon LSP |
 
 ## Regras de manutenção

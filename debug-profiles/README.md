@@ -1,6 +1,7 @@
 # debug-profiles/
 
-**Propósito**: Perfis de debug gerados durante sessões de depuração — capturam estado do sistema em momentos específicos para análise post-mortem.  
+**Propósito**: Perfis de debug gerados durante sessões de depuração — capturam estado do sistema em
+momentos específicos para análise post-mortem.  
 **Status**: Artefato de runtime.  
 **Público**: Desenvolvedores que investigam problemas de performance ou comportamento.  
 **Última atualização**: 2 de março de 2026.

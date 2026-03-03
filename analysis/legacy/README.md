@@ -1,6 +1,7 @@
 # analysis/legacy/
 
-**Propósito**: Scripts e artefatos legados de operações de manutenção anteriores, mantidos por referência histórica.  
+**Propósito**: Scripts e artefatos legados de operações de manutenção anteriores, mantidos por
+referência histórica.  
 **Status**: Histórico.  
 **Público**: Mantenedores que precisam referenciar operações anteriores.  
 **Última atualização**: 2 de março de 2026.

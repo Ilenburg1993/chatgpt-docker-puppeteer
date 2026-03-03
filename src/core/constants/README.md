@@ -1,6 +1,7 @@
 # src/core/constants
 
-**Propósito**: Constantes centralizadas do sistema, organizadas por domínio (browser, logging, tarefas e compartilhadas).  
+**Propósito**: Constantes centralizadas do sistema, organizadas por domínio (browser, logging,
+tarefas e compartilhadas).  
 **Status**: Canônico.  
 **Público**: Todos os módulos do runtime.  
 **Última atualização**: 2 de março de 2026.
@@ -21,13 +22,13 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `index.js` | Exporta todas as constantes centralizadas |
-| `browser.js` | Constantes de browser e automação |
-| `logging.js` | Níveis e categorias de log |
-| `tasks.js` | Estados, tipos e limites de tarefas |
-| `shared.js` | Constantes compartilhadas por múltiplos domínios |
+| Arquivo      | Descrição                                        |
+| ------------ | ------------------------------------------------ |
+| `index.js`   | Exporta todas as constantes centralizadas        |
+| `browser.js` | Constantes de browser e automação                |
+| `logging.js` | Níveis e categorias de log                       |
+| `tasks.js`   | Estados, tipos e limites de tarefas              |
+| `shared.js`  | Constantes compartilhadas por múltiplos domínios |
 
 ## Regras de manutenção
 

@@ -1,13 +1,15 @@
 # agents — audit-runbook-observability
 
-**Propósito**: Definições de agentes auxiliares invocados pela skill `audit-runbook-observability`.  
+**Propósito**: Definições de agentes auxiliares invocados pela skill
+`audit-runbook-observability`.  
 **Status**: Especializado.  
 **Público**: Agentes de IA que executam a skill pai.  
 **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 
-Arquivos de definição de agentes (personas, capacidades e instruções) usados durante a execução da skill.
+Arquivos de definição de agentes (personas, capacidades e instruções) usados durante a execução da
+skill.
 
 ## Links relacionados
 

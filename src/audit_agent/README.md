@@ -1,6 +1,7 @@
 # src/audit_agent
 
-**Propósito**: Agente de auditoria autônomo — inspeciona o sistema, classifica achados, aplica patches via LLM e mantém histórico em banco de dados.  
+**Propósito**: Agente de auditoria autônomo — inspeciona o sistema, classifica achados, aplica
+patches via LLM e mantém histórico em banco de dados.  
 **Status**: Especializado.  
 **Público**: Equipe de qualidade e mantenedores de confiabilidade do sistema.  
 **Última atualização**: 2 de março de 2026.
@@ -19,16 +20,16 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `main.js` | Bootstrap do agente de auditoria |
-| `runtime.js` | Loop de execução do agente de auditoria |
-| `server.js` | Servidor HTTP do agente de auditoria |
-| `context_builder.js` | Constrói contexto para análise de LLM |
-| `triage_llm.js` | Triagem de achados via LLM |
-| `patch_author_llm.js` | Geração de patches via LLM |
-| `db_store.js` | Persistência de achados e jobs de auditoria |
-| `contracts.js` | Contratos e schemas do módulo |
+| Arquivo               | Descrição                                   |
+| --------------------- | ------------------------------------------- |
+| `main.js`             | Bootstrap do agente de auditoria            |
+| `runtime.js`          | Loop de execução do agente de auditoria     |
+| `server.js`           | Servidor HTTP do agente de auditoria        |
+| `context_builder.js`  | Constrói contexto para análise de LLM       |
+| `triage_llm.js`       | Triagem de achados via LLM                  |
+| `patch_author_llm.js` | Geração de patches via LLM                  |
+| `db_store.js`         | Persistência de achados e jobs de auditoria |
+| `contracts.js`        | Contratos e schemas do módulo               |
 
 ## Regras de manutenção
 

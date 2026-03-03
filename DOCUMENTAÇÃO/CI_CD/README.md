@@ -1,6 +1,7 @@
 # CI/CD
 
-**Propósito**: Documentação dos pipelines de integração e entrega contínua do projeto — workflows do GitHub Actions, configuração do Copilot e guias operacionais de CI/CD.  
+**Propósito**: Documentação dos pipelines de integração e entrega contínua do projeto — workflows do
+GitHub Actions, configuração do Copilot e guias operacionais de CI/CD.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores, mantenedores e agentes de IA que trabalham com automação de CI/CD.  
 **Última atualização**: 2 de março de 2026.
@@ -19,8 +20,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                  | Descrição                                           |
+| ------------------------ | --------------------------------------------------- |
 | `COPILOT_SETUP_STEPS.md` | Passos de configuração do GitHub Copilot no projeto |
 
 ## Regras de manutenção

@@ -1,13 +1,15 @@
 # tests/python
 
-**Propósito**: Testes Python para os agentes auxiliares do sistema — destinado a novos testes Python ativos.  
+**Propósito**: Testes Python para os agentes auxiliares do sistema — destinado a novos testes Python
+ativos.  
 **Status**: Canônico de apoio.  
 **Público**: Desenvolvedores dos agentes Python (`agents/`).  
 **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 
-- Testes Python para agentes auxiliares (atualmente vazia — testes legados em `tests/legacy/python/`).
+- Testes Python para agentes auxiliares (atualmente vazia — testes legados em
+  `tests/legacy/python/`).
 
 ## O que não deve ficar aqui
 

@@ -1,6 +1,7 @@
 # src/kernel/nerv_bridge
 
-**Propósito**: Bridge entre o kernel e o barramento de eventos NERV — traduz eventos NERV em ações do kernel e vice-versa.  
+**Propósito**: Bridge entre o kernel e o barramento de eventos NERV — traduz eventos NERV em ações
+do kernel e vice-versa.  
 **Status**: Canônico.  
 **Público**: Mantenedores do kernel e da integração com NERV.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                 | Descrição                         |
+| ----------------------- | --------------------------------- |
 | `kernel_nerv_bridge.js` | Bridge bidirecional kernel ↔ NERV |
 
 ## Regras de manutenção

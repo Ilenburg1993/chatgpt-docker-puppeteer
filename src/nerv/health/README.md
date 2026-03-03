@@ -1,6 +1,7 @@
 # src/nerv/health
 
-**Propósito**: Verificação de saúde do barramento NERV — monitora disponibilidade e integridade do sistema de eventos.  
+**Propósito**: Verificação de saúde do barramento NERV — monitora disponibilidade e integridade do
+sistema de eventos.  
 **Status**: Canônico.  
 **Público**: Mantenedores do NERV e operadores de SRE.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo     | Descrição                               |
+| ----------- | --------------------------------------- |
 | `health.js` | Verificação de saúde do barramento NERV |
 
 ## Regras de manutenção

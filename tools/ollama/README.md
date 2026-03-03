@@ -1,14 +1,15 @@
 # tools/ollama
 
-**Propósito**: Cliente Ollama auxiliar para uso em scripts de tooling — não é o cliente de runtime (que fica em `src/`).  
+**Propósito**: Cliente Ollama auxiliar para uso em scripts de tooling — não é o cliente de runtime
+(que fica em `src/`).  
 **Status**: Canônico de apoio.  
 **Público**: Desenvolvedores de ferramentas RAG e auditoria.  
 **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo      | Descrição                                                 |
+| ------------ | --------------------------------------------------------- |
 | `client.mjs` | Cliente HTTP para API Ollama (generate, embeddings, tags) |
 
 ## Regras de manutenção

@@ -1,6 +1,7 @@
 # docs
 
-**Propósito**: Documentação de integração com serviços externos — exemplos de configuração para Claude Desktop, VS Code, MCP e GitHub.  
+**Propósito**: Documentação de integração com serviços externos — exemplos de configuração para
+Claude Desktop, VS Code, MCP e GitHub.  
 **Status**: Canônico de apoio.  
 **Público**: Desenvolvedores configurando integrações externas.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Pasta | Descrição |
-|---|---|
+| Pasta          | Descrição                                               |
+| -------------- | ------------------------------------------------------- |
 | `integration/` | Guias e exemplos de integração com ferramentas externas |
 
 ## Links relacionados

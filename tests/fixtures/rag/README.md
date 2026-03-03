@@ -1,21 +1,23 @@
 # tests/fixtures/rag
 
-**Propósito**: Amostras de documentos e dados para testes do sistema RAG (Retrieval-Augmented Generation).  
+**Propósito**: Amostras de documentos e dados para testes do sistema RAG (Retrieval-Augmented
+Generation).  
 **Status**: Canônico.  
 **Público**: Desenvolvedores de testes RAG.  
 **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 
-- Documentos de exemplo em múltiplos formatos (JS, JSON, Markdown) para testes de indexação e recuperação.
+- Documentos de exemplo em múltiplos formatos (JS, JSON, Markdown) para testes de indexação e
+  recuperação.
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `sample.js` | Documento JavaScript de exemplo para chunking e indexação |
-| `sample.json` | Documento JSON de exemplo |
-| `sample.md` | Documento Markdown de exemplo |
+| Arquivo       | Descrição                                                 |
+| ------------- | --------------------------------------------------------- |
+| `sample.js`   | Documento JavaScript de exemplo para chunking e indexação |
+| `sample.json` | Documento JSON de exemplo                                 |
+| `sample.md`   | Documento Markdown de exemplo                             |
 
 ## Regras de manutenção
 

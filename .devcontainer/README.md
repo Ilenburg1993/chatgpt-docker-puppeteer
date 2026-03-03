@@ -1,6 +1,7 @@
 # .devcontainer
 
-**Propósito**: Configuração do ambiente de desenvolvimento em container — Dockerfile, scripts de lifecycle, configurações e análises de ambiente.  
+**Propósito**: Configuração do ambiente de desenvolvimento em container — Dockerfile, scripts de
+lifecycle, configurações e análises de ambiente.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores usando VS Code Remote Containers ou GitHub Codespaces.  
 **Última atualização**: 2 de março de 2026.
@@ -18,16 +19,16 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `devcontainer.json` | Configuração principal do DevContainer |
-| `Dockerfile` | Imagem de desenvolvimento |
-| `scripts/` | Scripts de lifecycle do container |
-| `config/` | Configurações adicionais do container |
-| `nss-gatekeeper.sh` | Script NSS para resolução de usuário em container |
-| `ENV_VARIABLE_REFERENCE.md` | Referência de variáveis de ambiente do container |
-| `PORTS_TOPOLOGY.md` | Topologia de portas do ambiente |
-| `TROUBLESHOOTING_SSH.md` | Guia de troubleshooting SSH |
+| Arquivo/Pasta               | Descrição                                         |
+| --------------------------- | ------------------------------------------------- |
+| `devcontainer.json`         | Configuração principal do DevContainer            |
+| `Dockerfile`                | Imagem de desenvolvimento                         |
+| `scripts/`                  | Scripts de lifecycle do container                 |
+| `config/`                   | Configurações adicionais do container             |
+| `nss-gatekeeper.sh`         | Script NSS para resolução de usuário em container |
+| `ENV_VARIABLE_REFERENCE.md` | Referência de variáveis de ambiente do container  |
+| `PORTS_TOPOLOGY.md`         | Topologia de portas do ambiente                   |
+| `TROUBLESHOOTING_SSH.md`    | Guia de troubleshooting SSH                       |
 
 ## Regras de manutenção
 

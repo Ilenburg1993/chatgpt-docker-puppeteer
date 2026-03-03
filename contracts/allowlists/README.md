@@ -1,14 +1,15 @@
 # contracts/allowlists
 
-**Propósito**: Allowlists de exceções para regras de contratos arquiteturais — casos explicitamente permitidos fora do padrão.  
+**Propósito**: Allowlists de exceções para regras de contratos arquiteturais — casos explicitamente
+permitidos fora do padrão.  
 **Status**: Canônico.  
 **Público**: Mantenedores e Audit Agent.  
 **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                 | Descrição                                                                |
+| ----------------------- | ------------------------------------------------------------------------ |
 | `static_allowlist.json` | Exceções permitidas para análise estática (magic strings, imports, etc.) |
 
 ## Regras de manutenção

@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-- `execution_context_filler.js`: preenche o contexto de execução com dados necessários para a tarefa em andamento.
+- `execution_context_filler.js`: preenche o contexto de execução com dados necessários para a tarefa
+  em andamento.
 
 ## O que não deve ficar aqui
 
@@ -17,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                       | Descrição                                         |
+| ----------------------------- | ------------------------------------------------- |
 | `execution_context_filler.js` | Preenche contexto de execução com dados da tarefa |
 
 ## Regras de manutenção

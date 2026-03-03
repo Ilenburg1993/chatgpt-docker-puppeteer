@@ -1,15 +1,16 @@
 # diagnostics/
 
-**Propósito**: Relatórios e artefatos de diagnóstico do sistema — análise de bindings, reports de saúde e outputs de ferramentas de diagnóstico do runtime.  
+**Propósito**: Relatórios e artefatos de diagnóstico do sistema — análise de bindings, reports de
+saúde e outputs de ferramentas de diagnóstico do runtime.  
 **Status**: Artefato de runtime.  
 **Público**: Desenvolvedores e agentes de IA que investigam problemas operacionais.  
 **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 
-| Arquivo | Descrição |
-|---|---|
-| `bindings_report.txt` | Relatório de análise de bindings do sistema |
+| Arquivo                    | Descrição                                             |
+| -------------------------- | ----------------------------------------------------- |
+| `bindings_report.txt`      | Relatório de análise de bindings do sistema           |
 | `fix-bindings-report.json` | Report estruturado de correções de bindings aplicadas |
 
 ## O que não deve ficar aqui

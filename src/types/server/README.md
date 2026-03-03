@@ -1,6 +1,7 @@
 # src/types/server
 
-**Propósito**: Augmentações de tipos TypeScript para o módulo `src/server/` — inclui extensões de tipos Socket.io.  
+**Propósito**: Augmentações de tipos TypeScript para o módulo `src/server/` — inclui extensões de
+tipos Socket.io.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores que trabalham com o servidor e WebSocket.  
 **Última atualização**: 2 de março de 2026.
@@ -12,10 +13,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `augmentations.d.ts` | Augmentações TypeScript do servidor |
-| `socket_io_extensions.d.ts` | Extensões de tipos Socket.io |
+| Arquivo                     | Descrição                           |
+| --------------------------- | ----------------------------------- |
+| `augmentations.d.ts`        | Augmentações TypeScript do servidor |
+| `socket_io_extensions.d.ts` | Extensões de tipos Socket.io        |
 
 ## Links relacionados
 

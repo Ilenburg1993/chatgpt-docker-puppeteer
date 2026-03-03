@@ -17,10 +17,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo             | Descrição                                            |
+| ------------------- | ---------------------------------------------------- |
 | `budget_manager.js` | Gerencia o orçamento de tokens da janela de contexto |
-| `guardrails.js` | Aplica limites e proteções à janela de contexto |
+| `guardrails.js`     | Aplica limites e proteções à janela de contexto      |
 
 ## Regras de manutenção
 

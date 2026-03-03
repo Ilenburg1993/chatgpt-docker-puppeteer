@@ -1,6 +1,7 @@
 # src/driver/extractors
 
-**Propósito**: Extratores de conteúdo estruturado da página web — recupera dados parseados após interações de browser.  
+**Propósito**: Extratores de conteúdo estruturado da página web — recupera dados parseados após
+interações de browser.  
 **Status**: Canônico.  
 **Público**: Mantenedores de drivers e processadores de resposta de LLM.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                   | Descrição                                                 |
+| ------------------------- | --------------------------------------------------------- |
 | `structured_extractor.js` | Extrai conteúdo estruturado do DOM após interação com LLM |
 
 ## Regras de manutenção

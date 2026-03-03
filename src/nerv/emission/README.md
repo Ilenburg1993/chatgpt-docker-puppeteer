@@ -19,12 +19,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `emission.js` | Lógica central de emissão de eventos |
-| `emit_event.js` | Emissão de eventos de domínio |
-| `emit_command.js` | Emissão de comandos direcionados |
-| `emit_ack.js` | Emissão com confirmação de recebimento |
+| Arquivo           | Descrição                              |
+| ----------------- | -------------------------------------- |
+| `emission.js`     | Lógica central de emissão de eventos   |
+| `emit_event.js`   | Emissão de eventos de domínio          |
+| `emit_command.js` | Emissão de comandos direcionados       |
+| `emit_ack.js`     | Emissão com confirmação de recebimento |
 
 ## Regras de manutenção
 

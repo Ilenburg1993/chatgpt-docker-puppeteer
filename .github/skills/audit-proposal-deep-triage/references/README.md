@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-Materiais de referência consultados durante a execução da skill: especificações, exemplos e guias técnicos.
+Materiais de referência consultados durante a execução da skill: especificações, exemplos e guias
+técnicos.
 
 ## Links relacionados
 

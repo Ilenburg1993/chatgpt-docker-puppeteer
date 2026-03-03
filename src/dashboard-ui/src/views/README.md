@@ -12,7 +12,8 @@ Views organizadas por domínio:
 - **Dashboard**: `Dashboard.vue`, `DashboardView.vue`
 - **Tarefas**: `TasksView.vue`, `TaskDetail.vue`, `TaskQueue.vue`
 - **Missões**: `Missions.vue`, `MissionDetail.vue`
-- **Auditoria**: `AuditView.vue`, `AuditJobs.vue`, `AuditJobDetail.vue`, `AuditInference.vue`, `AuditPatchDetail.vue`
+- **Auditoria**: `AuditView.vue`, `AuditJobs.vue`, `AuditJobDetail.vue`, `AuditInference.vue`,
+  `AuditPatchDetail.vue`
 - **Artefatos**: `ArtifactView.vue`
 - **Monitoramento**: `SystemHealth.vue`, `PerformanceMetrics.vue`, `EventCorrelation.vue`
 - **Workflows**: `WorkflowEditor.vue`, `WorkflowView.vue`
@@ -26,14 +27,14 @@ Views organizadas por domínio:
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `Dashboard.vue` | View principal do dashboard |
-| `TasksView.vue` | View de lista de tarefas |
-| `AuditView.vue` | View de auditoria |
-| `SystemHealth.vue` | View de saúde do sistema |
-| `Missions.vue` | View de missões |
-| `WorkflowEditor.vue` | Editor de workflows |
+| Arquivo              | Descrição                   |
+| -------------------- | --------------------------- |
+| `Dashboard.vue`      | View principal do dashboard |
+| `TasksView.vue`      | View de lista de tarefas    |
+| `AuditView.vue`      | View de auditoria           |
+| `SystemHealth.vue`   | View de saúde do sistema    |
+| `Missions.vue`       | View de missões             |
+| `WorkflowEditor.vue` | Editor de workflows         |
 
 ## Regras de manutenção
 

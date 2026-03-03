@@ -1,8 +1,11 @@
 # Skill: skill-creator-pt-br
 
-**Propósito**: Orientações detalhadas em português brasileiro para construir ou atualizar skills — amplia as capacidades do agente com conhecimento especializado, fluxos de trabalho e integrações de ferramentas.  
+**Propósito**: Orientações detalhadas em português brasileiro para construir ou atualizar skills —
+amplia as capacidades do agente com conhecimento especializado, fluxos de trabalho e integrações de
+ferramentas.  
 **Status**: Especializado.  
-**Público**: Desenvolvedores e agentes de IA que precisam criar ou evoluir skills, com preferência por instruções em pt-BR.  
+**Público**: Desenvolvedores e agentes de IA que precisam criar ou evoluir skills, com preferência
+por instruções em pt-BR.  
 **Última atualização**: 2 de março de 2026.
 
 ## Documentação principal

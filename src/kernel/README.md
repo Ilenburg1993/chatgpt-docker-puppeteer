@@ -1,6 +1,7 @@
 # src/kernel
 
-**Propósito**: Motor de decisão e orquestração central — executa o loop de controle a 20Hz, aplica políticas, mantém observações e gerencia o ciclo de vida de tarefas.  
+**Propósito**: Motor de decisão e orquestração central — executa o loop de controle a 20Hz, aplica
+políticas, mantém observações e gerencia o ciclo de vida de tarefas.  
 **Status**: Canônico.  
 **Público**: Mantenedores do runtime; é o coração do sistema.  
 **Última atualização**: 2 de março de 2026.
@@ -26,17 +27,17 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `kernel.js` | Orquestrador principal do kernel |
-| `kernel_loop/` | Loop de controle a 20Hz (50ms) |
-| `execution_engine/` | Motor de execução de tarefas |
-| `policy_engine/` | Avaliação e aplicação de políticas |
-| `observation_store/` | Registro de fatos e observações do sistema |
-| `task_runtime/` | Gerenciamento do runtime de tarefas |
-| `nerv_bridge/` | Bridge kernel ↔ NERV |
-| `telemetry/` | Métricas e telemetria do kernel |
-| `task_execution_orchestrator.js` | Orquestra a execução de tarefas |
+| Arquivo/Pasta                    | Descrição                                  |
+| -------------------------------- | ------------------------------------------ |
+| `kernel.js`                      | Orquestrador principal do kernel           |
+| `kernel_loop/`                   | Loop de controle a 20Hz (50ms)             |
+| `execution_engine/`              | Motor de execução de tarefas               |
+| `policy_engine/`                 | Avaliação e aplicação de políticas         |
+| `observation_store/`             | Registro de fatos e observações do sistema |
+| `task_runtime/`                  | Gerenciamento do runtime de tarefas        |
+| `nerv_bridge/`                   | Bridge kernel ↔ NERV                       |
+| `telemetry/`                     | Métricas e telemetria do kernel            |
+| `task_execution_orchestrator.js` | Orquestra a execução de tarefas            |
 
 ## Regras de manutenção
 

@@ -1,14 +1,15 @@
 # tests/scripts
 
-**Propósito**: Scripts auxiliares de suporte à manutenção dos testes — correção de imports e automações de refatoração.  
+**Propósito**: Scripts auxiliares de suporte à manutenção dos testes — correção de imports e
+automações de refatoração.  
 **Status**: Canônico de apoio.  
 **Público**: Mantenedores de testes.  
 **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo               | Descrição                                            |
+| --------------------- | ---------------------------------------------------- |
 | `corrigir_imports.js` | Corrige automaticamente caminhos de import nos specs |
 
 ## Regras de manutenção

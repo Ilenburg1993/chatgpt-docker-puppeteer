@@ -1,6 +1,7 @@
 # src/infra/transport
 
-**Propósito**: Adaptador de transporte Socket.io para comunicação em tempo real entre o servidor e clientes.  
+**Propósito**: Adaptador de transporte Socket.io para comunicação em tempo real entre o servidor e
+clientes.  
 **Status**: Canônico.  
 **Público**: Módulos de servidor e NERV que precisam de transporte em tempo real.  
 **Última atualização**: 2 de março de 2026.
@@ -17,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                | Descrição                                         |
+| ---------------------- | ------------------------------------------------- |
 | `socket_io_adapter.js` | Adaptador Socket.io para transporte em tempo real |
 
 ## Regras de manutenção

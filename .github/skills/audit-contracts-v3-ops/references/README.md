@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-Especificações DSL, exemplos de contratos e guias de migração consultados durante a execução da skill.
+Especificações DSL, exemplos de contratos e guias de migração consultados durante a execução da
+skill.
 
 ## Links relacionados
 

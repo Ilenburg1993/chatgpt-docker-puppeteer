@@ -1,6 +1,7 @@
 # src/kernel/policy_engine
 
-**Propósito**: Motor de políticas do kernel — avalia regras e toma decisões sobre execução de tarefas.  
+**Propósito**: Motor de políticas do kernel — avalia regras e toma decisões sobre execução de
+tarefas.  
 **Status**: Canônico.  
 **Público**: Mantenedores do kernel.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo            | Descrição                                   |
+| ------------------ | ------------------------------------------- |
 | `policy_engine.js` | Motor de avaliação e aplicação de políticas |
 
 ## Regras de manutenção

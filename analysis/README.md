@@ -1,6 +1,8 @@
 # analysis/
 
-**Propósito**: Artefatos de análise, investigação de segurança, auditoria de dependências e relatórios de qualidade do projeto — gerados durante operações de triagem, purga de histórico e diagnóstico.  
+**Propósito**: Artefatos de análise, investigação de segurança, auditoria de dependências e
+relatórios de qualidade do projeto — gerados durante operações de triagem, purga de histórico e
+diagnóstico.  
 **Status**: Artefato de runtime / Histórico.  
 **Público**: Mantenedores e agentes de IA que realizam auditorias e diagnósticos.  
 **Última atualização**: 2 de março de 2026.
@@ -20,16 +22,16 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `actions-check/` | Resultados de verificação de GitHub Actions |
-| `backups/` | Backups do repositório (bundles git) |
-| `ci-local/` | Resultados de execução local de CI/detecção de secrets |
-| `legacy/` | Scripts e artefatos legados de manutenção |
-| `notifications/` | Scripts de criação de notificações/issues |
-| `rotation-scripts/` | Scripts de rotação de credenciais e secrets |
-| `verification_commands/` | Outputs de comandos de verificação pós-operação |
-| `exploratory-bug-hunt-*.md` | Relatórios de caça proativa de bugs |
+| Arquivo/Pasta               | Descrição                                              |
+| --------------------------- | ------------------------------------------------------ |
+| `actions-check/`            | Resultados de verificação de GitHub Actions            |
+| `backups/`                  | Backups do repositório (bundles git)                   |
+| `ci-local/`                 | Resultados de execução local de CI/detecção de secrets |
+| `legacy/`                   | Scripts e artefatos legados de manutenção              |
+| `notifications/`            | Scripts de criação de notificações/issues              |
+| `rotation-scripts/`         | Scripts de rotação de credenciais e secrets            |
+| `verification_commands/`    | Outputs de comandos de verificação pós-operação        |
+| `exploratory-bug-hunt-*.md` | Relatórios de caça proativa de bugs                    |
 
 ## Regras de manutenção
 

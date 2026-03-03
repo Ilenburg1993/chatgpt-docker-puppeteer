@@ -1,6 +1,7 @@
 # src/dashboard-ui/src/composables
 
-**Propósito**: Composables Vue com Composition API — lógica reutilizável de autenticação, realtime, socket, auditoria e preferências de UI.  
+**Propósito**: Composables Vue com Composition API — lógica reutilizável de autenticação, realtime,
+socket, auditoria e preferências de UI.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores frontend.  
 **Última atualização**: 2 de março de 2026.
@@ -22,13 +23,13 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `useAuth.js` | Autenticação e sessão |
-| `useRealtime.js` | Dados em tempo real via Socket.io |
-| `useSocket.js` | Conexão Socket.io |
-| `useSsotRealtime.js` | Feed de eventos SSOT |
-| `useNotifications.js` | Notificações toast |
+| Arquivo               | Descrição                         |
+| --------------------- | --------------------------------- |
+| `useAuth.js`          | Autenticação e sessão             |
+| `useRealtime.js`      | Dados em tempo real via Socket.io |
+| `useSocket.js`        | Conexão Socket.io                 |
+| `useSsotRealtime.js`  | Feed de eventos SSOT              |
+| `useNotifications.js` | Notificações toast                |
 
 ## Regras de manutenção
 

@@ -7,7 +7,8 @@
 
 ## O que esta pasta contém
 
-Checklists de inspeção, catálogos de padrões de bugs e guias de triagem consultados durante a execução da skill.
+Checklists de inspeção, catálogos de padrões de bugs e guias de triagem consultados durante a
+execução da skill.
 
 ## Links relacionados
 

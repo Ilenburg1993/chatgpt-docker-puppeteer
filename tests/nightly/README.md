@@ -1,6 +1,7 @@
 # tests/nightly
 
-**Propósito**: Testes de execução noturna — cenários de chaos, stress e auditoria profunda que não cabem no CI rápido.  
+**Propósito**: Testes de execução noturna — cenários de chaos, stress e auditoria profunda que não
+cabem no CI rápido.  
 **Status**: Canônico.  
 **Público**: Mantenedores e operações.  
 **Última atualização**: 2 de março de 2026.
@@ -11,8 +12,8 @@
 
 ## Entradas principais
 
-| Pasta | Descrição |
-|---|---|
+| Pasta    | Descrição                                |
+| -------- | ---------------------------------------- |
 | `audit/` | Testes de chaos do pipeline de auditoria |
 
 ## Regras de manutenção

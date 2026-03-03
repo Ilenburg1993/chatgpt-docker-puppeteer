@@ -17,10 +17,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo            | Descrição                           |
+| ------------------ | ----------------------------------- |
 | `ipc_telemetry.js` | Métricas de comunicação IPC do NERV |
-| `metrics.js` | Agregação de métricas do barramento |
+| `metrics.js`       | Agregação de métricas do barramento |
 
 ## Regras de manutenção
 

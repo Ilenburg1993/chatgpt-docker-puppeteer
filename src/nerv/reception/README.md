@@ -1,6 +1,7 @@
 # src/nerv/reception
 
-**Propósito**: Recepção e subscrição de eventos do barramento NERV — handlers de entrada de eventos.  
+**Propósito**: Recepção e subscrição de eventos do barramento NERV — handlers de entrada de
+eventos.  
 **Status**: Canônico.  
 **Público**: Mantenedores do NERV.  
 **Última atualização**: 2 de março de 2026.
@@ -17,10 +18,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `reception.js` | Lógica central de recepção e roteamento |
-| `receive.js` | Recepção e despacho de eventos individuais |
+| Arquivo        | Descrição                                  |
+| -------------- | ------------------------------------------ |
+| `reception.js` | Lógica central de recepção e roteamento    |
+| `receive.js`   | Recepção e despacho de eventos individuais |
 
 ## Regras de manutenção
 

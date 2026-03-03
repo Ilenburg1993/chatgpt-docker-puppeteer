@@ -1,6 +1,7 @@
 # src/kernel/observation_store
 
-**Propósito**: Store de observações e fatos do sistema — registra eventos e estados observados para suportar decisões do policy engine.  
+**Propósito**: Store de observações e fatos do sistema — registra eventos e estados observados para
+suportar decisões do policy engine.  
 **Status**: Canônico.  
 **Público**: Mantenedores do kernel e do motor de políticas.  
 **Última atualização**: 2 de março de 2026.
@@ -16,8 +17,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo                | Descrição                                            |
+| ---------------------- | ---------------------------------------------------- |
 | `observation_store.js` | Registro de fatos e observações para o policy engine |
 
 ## Regras de manutenção

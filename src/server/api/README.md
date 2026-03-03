@@ -19,11 +19,11 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `router.js` | Roteador principal da API REST |
+| Arquivo/Pasta  | Descrição                                               |
+| -------------- | ------------------------------------------------------- |
+| `router.js`    | Roteador principal da API REST                          |
 | `controllers/` | Controllers por domínio (tarefas, missões, audit, etc.) |
-| `utils/` | Utilitários de envelope de resposta e views |
+| `utils/`       | Utilitários de envelope de resposta e views             |
 
 ## Regras de manutenção
 

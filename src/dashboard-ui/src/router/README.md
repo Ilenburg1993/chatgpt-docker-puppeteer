@@ -16,8 +16,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo    | Descrição                                     |
+| ---------- | --------------------------------------------- |
 | `index.js` | Configuração do Vue Router com rotas e guards |
 
 ## Regras de manutenção

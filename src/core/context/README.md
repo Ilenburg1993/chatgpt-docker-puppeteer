@@ -1,6 +1,7 @@
 # src/core/context
 
-**Propósito**: Motor de gerenciamento da janela de contexto para LLMs — extração, parsing, transformação e controle de limites de tokens.  
+**Propósito**: Motor de gerenciamento da janela de contexto para LLMs — extração, parsing,
+transformação e controle de limites de tokens.  
 **Status**: Canônico.  
 **Público**: Módulos que constroem prompts e gerenciam contexto para chamadas a LLMs.  
 **Última atualização**: 2 de março de 2026.
@@ -22,14 +23,14 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `context_core.js` | Núcleo do sistema de gerenciamento de contexto |
-| `engine/` | Motor de processamento do contexto |
-| `extractors/` | Extratores de código e JSON do contexto |
-| `limits/` | Gerenciamento de orçamento e guardrails de tokens |
-| `parsing/` | Parsing de referências e estruturas de contexto |
-| `transformers/` | Transformadores de identidade, metadados e resumo |
+| Arquivo/Pasta     | Descrição                                         |
+| ----------------- | ------------------------------------------------- |
+| `context_core.js` | Núcleo do sistema de gerenciamento de contexto    |
+| `engine/`         | Motor de processamento do contexto                |
+| `extractors/`     | Extratores de código e JSON do contexto           |
+| `limits/`         | Gerenciamento de orçamento e guardrails de tokens |
+| `parsing/`        | Parsing de referências e estruturas de contexto   |
+| `transformers/`   | Transformadores de identidade, metadados e resumo |
 
 ## Regras de manutenção
 

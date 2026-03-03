@@ -16,8 +16,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo         | Descrição                                                   |
+| --------------- | ----------------------------------------------------------- |
 | `ref_parser.js` | Faz parsing de referências de contexto (arquivos, símbolos) |
 
 ## Regras de manutenção

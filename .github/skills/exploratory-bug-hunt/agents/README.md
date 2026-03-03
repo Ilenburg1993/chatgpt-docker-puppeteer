@@ -1,6 +1,7 @@
 # agents — exploratory-bug-hunt
 
-**Propósito**: Definições de agentes auxiliares invocados pela skill `exploratory-bug-hunt` durante caça proativa de bugs.  
+**Propósito**: Definições de agentes auxiliares invocados pela skill `exploratory-bug-hunt` durante
+caça proativa de bugs.  
 **Status**: Especializado.  
 **Público**: Agentes de IA que executam a skill pai.  
 **Última atualização**: 2 de março de 2026.

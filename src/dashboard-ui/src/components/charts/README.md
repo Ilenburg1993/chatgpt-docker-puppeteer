@@ -14,12 +14,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `BarChart.vue` | Gráfico de barras |
-| `GaugeChart.vue` | Gráfico de medidor circular |
-| `LineChart.vue` | Gráfico de linha para séries temporais |
-| `index.js` | Exportação centralizada |
+| Arquivo          | Descrição                              |
+| ---------------- | -------------------------------------- |
+| `BarChart.vue`   | Gráfico de barras                      |
+| `GaugeChart.vue` | Gráfico de medidor circular            |
+| `LineChart.vue`  | Gráfico de linha para séries temporais |
+| `index.js`       | Exportação centralizada                |
 
 ## Regras de manutenção
 

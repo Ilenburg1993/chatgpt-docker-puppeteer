@@ -1,6 +1,7 @@
 # src/shared/telemetry
 
-**Propósito**: Telemetria compartilhada entre módulos — snapshot de estado e coleta de métricas transversais.  
+**Propósito**: Telemetria compartilhada entre módulos — snapshot de estado e coleta de métricas
+transversais.  
 **Status**: Canônico de apoio.  
 **Público**: Módulos que produzem ou consomem dados de telemetria.  
 **Última atualização**: 2 de março de 2026.
@@ -17,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo       | Descrição                                   |
+| ------------- | ------------------------------------------- |
 | `snapshot.js` | Captura snapshots de estado para telemetria |
 
 ## Regras de manutenção

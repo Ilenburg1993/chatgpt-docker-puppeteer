@@ -1,6 +1,7 @@
 # src/core/schemas
 
-**Propósito**: Schemas Zod para validação de dados centrais — tarefas, DNA, bootstrap e tipos compartilhados.  
+**Propósito**: Schemas Zod para validação de dados centrais — tarefas, DNA, bootstrap e tipos
+compartilhados.  
 **Status**: Canônico.  
 **Público**: Todos os módulos que produzem ou consomem dados de tarefa, missão e configuração.  
 **Última atualização**: 2 de março de 2026.
@@ -23,16 +24,16 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `task_schema.js` | Schema canônico de tarefas |
-| `task_schema_v5.js` | Schema de tarefas versão 5 |
-| `dna_schema.js` | Schema do DNA do agente |
-| `bootstrap_state_schema.js` | Schema de estado de bootstrap |
-| `schema_core.js` | Primitivos e utilitários de schema |
-| `shared_types.js` | Tipos Zod compartilhados |
-| `migrator_v4_to_v5.js` | Migração de tarefas v4 → v5 |
-| `task_healer.js` | Correção de tarefas com dados inválidos |
+| Arquivo                     | Descrição                               |
+| --------------------------- | --------------------------------------- |
+| `task_schema.js`            | Schema canônico de tarefas              |
+| `task_schema_v5.js`         | Schema de tarefas versão 5              |
+| `dna_schema.js`             | Schema do DNA do agente                 |
+| `bootstrap_state_schema.js` | Schema de estado de bootstrap           |
+| `schema_core.js`            | Primitivos e utilitários de schema      |
+| `shared_types.js`           | Tipos Zod compartilhados                |
+| `migrator_v4_to_v5.js`      | Migração de tarefas v4 → v5             |
+| `task_healer.js`            | Correção de tarefas com dados inválidos |
 
 ## Regras de manutenção
 

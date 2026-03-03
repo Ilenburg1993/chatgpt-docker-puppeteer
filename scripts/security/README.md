@@ -1,14 +1,15 @@
 # scripts/security
 
-**Propósito**: Scripts de segurança — gate de auditoria npm para bloquear dependências vulneráveis em CI.  
+**Propósito**: Scripts de segurança — gate de auditoria npm para bloquear dependências vulneráveis
+em CI.  
 **Status**: Canônico.  
 **Público**: Engenheiros de CI/CD e segurança.  
 **Última atualização**: 2 de março de 2026.
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo              | Descrição                                                                 |
+| -------------------- | ------------------------------------------------------------------------- |
 | `npm-audit-gate.mjs` | Executa `npm audit` e falha se houver vulnerabilidades acima do threshold |
 
 ## Regras de manutenção

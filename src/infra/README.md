@@ -1,8 +1,10 @@
 # src/infra
 
-**Propósito**: Camada de infraestrutura — gerencia recursos compartilhados como pool de browsers, banco de dados, fila, locks, storage, proxy e transporte.  
+**Propósito**: Camada de infraestrutura — gerencia recursos compartilhados como pool de browsers,
+banco de dados, fila, locks, storage, proxy e transporte.  
 **Status**: Canônico.  
-**Público**: Módulos do runtime que precisam de recursos de infraestrutura; mantenedores de operações.  
+**Público**: Módulos do runtime que precisam de recursos de infraestrutura; mantenedores de
+operações.  
 **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
@@ -26,19 +28,19 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `browser_pool/` | Pool e monitoramento de instâncias Chrome |
-| `db/` | SQLite e repositórios de dados |
-| `queue/` | Fila de tarefas, scheduler e cache |
-| `storage/` | Artefatos, DNA, respostas e identidade |
-| `locks/` | Locks de arquivo para operações críticas |
-| `fs/` | Leitura/escrita atômica no sistema de arquivos |
-| `proxy/` | Serviço de proxy do Chrome |
-| `ipc/` | Buffer e cliente IPC |
-| `transport/` | Adaptador Socket.io |
-| `ConnectionOrchestrator.js` | Orquestrador de conexões de browser |
-| `http_client_utils.js` | Utilitários de cliente HTTP |
+| Arquivo/Pasta               | Descrição                                      |
+| --------------------------- | ---------------------------------------------- |
+| `browser_pool/`             | Pool e monitoramento de instâncias Chrome      |
+| `db/`                       | SQLite e repositórios de dados                 |
+| `queue/`                    | Fila de tarefas, scheduler e cache             |
+| `storage/`                  | Artefatos, DNA, respostas e identidade         |
+| `locks/`                    | Locks de arquivo para operações críticas       |
+| `fs/`                       | Leitura/escrita atômica no sistema de arquivos |
+| `proxy/`                    | Serviço de proxy do Chrome                     |
+| `ipc/`                      | Buffer e cliente IPC                           |
+| `transport/`                | Adaptador Socket.io                            |
+| `ConnectionOrchestrator.js` | Orquestrador de conexões de browser            |
+| `http_client_utils.js`      | Utilitários de cliente HTTP                    |
 
 ## Regras de manutenção
 

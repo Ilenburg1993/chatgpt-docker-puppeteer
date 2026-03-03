@@ -11,8 +11,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo              | Descrição                                 |
+| -------------------- | ----------------------------------------- |
 | `augmentations.d.ts` | Augmentações TypeScript de infraestrutura |
 
 ## Links relacionados

@@ -1,6 +1,7 @@
 # src/inference_gateway
 
-**Propósito**: Gateway centralizado para acesso a modelos de inferência LLM — gerencia políticas, backends, supervisão de hosts Ollama e persistência de configurações.  
+**Propósito**: Gateway centralizado para acesso a modelos de inferência LLM — gerencia políticas,
+backends, supervisão de hosts Ollama e persistência de configurações.  
 **Status**: Especializado.  
 **Público**: Módulos que precisam invocar LLMs; mantenedores de integrações de inferência.  
 **Última atualização**: 2 de março de 2026.
@@ -23,15 +24,15 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `gateway.js` | Roteamento e execução de chamadas a LLMs |
-| `main.js` | Bootstrap do gateway de inferência |
-| `server.js` | Servidor HTTP do gateway |
-| `policy_config.js` | Políticas de roteamento e seleção de backend |
+| Arquivo                     | Descrição                                     |
+| --------------------------- | --------------------------------------------- |
+| `gateway.js`                | Roteamento e execução de chamadas a LLMs      |
+| `main.js`                   | Bootstrap do gateway de inferência            |
+| `server.js`                 | Servidor HTTP do gateway                      |
+| `policy_config.js`          | Políticas de roteamento e seleção de backend  |
 | `ollama_host_supervisor.js` | Supervisão de disponibilidade de hosts Ollama |
-| `persistence.js` | Persistência de configurações e histórico |
-| `client_tags.js` | Tags para roteamento de clientes |
+| `persistence.js`            | Persistência de configurações e histórico     |
+| `client_tags.js`            | Tags para roteamento de clientes              |
 
 ## Regras de manutenção
 

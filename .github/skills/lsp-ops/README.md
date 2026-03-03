@@ -1,6 +1,8 @@
 # Skill: lsp-ops
 
-**Propósito**: Operações LSP internas via tsserver daemon — navegação semântica, diagnósticos e edição de código via MCP/LSP. Use quando a tarefa envolver navegação por definições, referências ou diagnósticos de TypeScript.  
+**Propósito**: Operações LSP internas via tsserver daemon — navegação semântica, diagnósticos e
+edição de código via MCP/LSP. Use quando a tarefa envolver navegação por definições, referências ou
+diagnósticos de TypeScript.  
 **Status**: Especializado.  
 **Público**: Agentes de IA que realizam navegação e análise semântica de código.  
 **Última atualização**: 2 de março de 2026.

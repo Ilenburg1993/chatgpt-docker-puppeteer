@@ -1,6 +1,7 @@
 # src/dashboard-ui/src/components/layout
 
-**Propósito**: Componentes estruturais do layout da aplicação — header, sidebar, footer e estrutura principal.  
+**Propósito**: Componentes estruturais do layout da aplicação — header, sidebar, footer e estrutura
+principal.  
 **Status**: Canônico.  
 **Público**: Desenvolvedores frontend.  
 **Última atualização**: 2 de março de 2026.
@@ -19,12 +20,12 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo         | Descrição                                    |
+| --------------- | -------------------------------------------- |
 | `AppLayout.vue` | Layout principal (wrapper de todas as views) |
-| `Header.vue` | Cabeçalho com navegação global |
-| `Sidebar.vue` | Barra lateral de navegação |
-| `Footer.vue` | Rodapé da aplicação |
+| `Header.vue`    | Cabeçalho com navegação global               |
+| `Sidebar.vue`   | Barra lateral de navegação                   |
+| `Footer.vue`    | Rodapé da aplicação                          |
 
 ## Links relacionados
 

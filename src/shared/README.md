@@ -1,6 +1,7 @@
 # src/shared
 
-**Propósito**: Módulos compartilhados entre domínios — utilitários, IPC, telemetria e componentes reutilizáveis de browser e NERV.  
+**Propósito**: Módulos compartilhados entre domínios — utilitários, IPC, telemetria e componentes
+reutilizáveis de browser e NERV.  
 **Status**: Canônico de apoio.  
 **Público**: Todos os módulos do runtime que precisam de utilitários transversais.  
 **Última atualização**: 2 de março de 2026.
@@ -26,17 +27,17 @@
 
 ## Entradas principais
 
-| Arquivo/Pasta | Descrição |
-|---|---|
-| `utils/` | Utilitários gerais de execução |
-| `ipc/` | Envelopes, schemas e constantes IPC compartilhados |
-| `telemetry/` | Telemetria compartilhada entre módulos |
-| `biomechanics/` | Simulação de comportamento humano no browser |
-| `nerv/` | Componentes NERV compartilhados |
-| `page_stability/` | Estabilizador de página de browser |
-| `sadi/` | Analisador SADI |
-| `health-check.js` | Health check do inference gateway |
-| `inference-gateway-client.js` | Cliente para o gateway de inferência |
+| Arquivo/Pasta                 | Descrição                                          |
+| ----------------------------- | -------------------------------------------------- |
+| `utils/`                      | Utilitários gerais de execução                     |
+| `ipc/`                        | Envelopes, schemas e constantes IPC compartilhados |
+| `telemetry/`                  | Telemetria compartilhada entre módulos             |
+| `biomechanics/`               | Simulação de comportamento humano no browser       |
+| `nerv/`                       | Componentes NERV compartilhados                    |
+| `page_stability/`             | Estabilizador de página de browser                 |
+| `sadi/`                       | Analisador SADI                                    |
+| `health-check.js`             | Health check do inference gateway                  |
+| `inference-gateway-client.js` | Cliente para o gateway de inferência               |
 
 ## Regras de manutenção
 

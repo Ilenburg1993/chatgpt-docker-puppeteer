@@ -1,6 +1,7 @@
 # src/core/context/engine
 
-**Propósito**: Motor de processamento do contexto — orquestra a montagem e compressão da janela de contexto para LLMs.  
+**Propósito**: Motor de processamento do contexto — orquestra a montagem e compressão da janela de
+contexto para LLMs.  
 **Status**: Canônico.  
 **Público**: Mantenedores do sistema de contexto LLM.  
 **Última atualização**: 2 de março de 2026.
@@ -17,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo             | Descrição                                         |
+| ------------------- | ------------------------------------------------- |
 | `context_engine.js` | Motor de montagem da janela de contexto para LLMs |
 
 ## Regras de manutenção

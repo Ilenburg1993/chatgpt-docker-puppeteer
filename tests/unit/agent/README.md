@@ -7,11 +7,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `test_artifacts_attempts.spec.js` | Gerenciamento de artifacts e tentativas do agente |
-| `test_ssot_consolidation.spec.js` | Consolidação de fonte única de verdade (SSOT) |
-| `test_ssot_orchestration_worker.spec.js` | Worker de orquestração SSOT |
+| Arquivo                                  | Descrição                                         |
+| ---------------------------------------- | ------------------------------------------------- |
+| `test_artifacts_attempts.spec.js`        | Gerenciamento de artifacts e tentativas do agente |
+| `test_ssot_consolidation.spec.js`        | Consolidação de fonte única de verdade (SSOT)     |
+| `test_ssot_orchestration_worker.spec.js` | Worker de orquestração SSOT                       |
 
 ## Links relacionados
 

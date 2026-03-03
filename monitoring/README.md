@@ -1,14 +1,15 @@
 # monitoring/
 
-**Propósito**: Configuração de monitoramento e observabilidade do sistema — configuração do Prometheus para coleta de métricas de runtime.  
+**Propósito**: Configuração de monitoramento e observabilidade do sistema — configuração do
+Prometheus para coleta de métricas de runtime.  
 **Status**: Canônico de apoio.  
 **Público**: Operadores e desenvolvedores que configuram monitoramento de produção.  
 **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo          | Descrição                                            |
+| ---------------- | ---------------------------------------------------- |
 | `prometheus.yml` | Configuração do Prometheus para scraping de métricas |
 
 ## O que não deve ficar aqui

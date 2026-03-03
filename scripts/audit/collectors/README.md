@@ -7,15 +7,15 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
-| `architecture.mjs` | Coleta evidências de conformidade arquitetural |
-| `performance.mjs` | Coleta métricas de performance |
-| `quality.mjs` | Coleta dados de qualidade (lint, format, JSDoc) |
-| `runtime.mjs` | Coleta evidências de comportamento de runtime |
-| `security.mjs` | Coleta evidências de segurança |
-| `static.mjs` | Análise estática (dependências, circular, magic strings) |
-| `tests.mjs` | Coleta resultados de testes |
+| Arquivo            | Descrição                                                |
+| ------------------ | -------------------------------------------------------- |
+| `architecture.mjs` | Coleta evidências de conformidade arquitetural           |
+| `performance.mjs`  | Coleta métricas de performance                           |
+| `quality.mjs`      | Coleta dados de qualidade (lint, format, JSDoc)          |
+| `runtime.mjs`      | Coleta evidências de comportamento de runtime            |
+| `security.mjs`     | Coleta evidências de segurança                           |
+| `static.mjs`       | Análise estática (dependências, circular, magic strings) |
+| `tests.mjs`        | Coleta resultados de testes                              |
 
 ## Links relacionados
 

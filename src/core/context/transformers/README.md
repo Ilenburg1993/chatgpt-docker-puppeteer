@@ -18,11 +18,11 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo       | Descrição                                                |
+| ------------- | -------------------------------------------------------- |
 | `identity.js` | Adiciona informações de identidade do agente ao contexto |
-| `metadata.js` | Enriquece o contexto com metadados de tarefa e sessão |
-| `summary.js` | Gera resumos comprimidos do histórico de contexto |
+| `metadata.js` | Enriquece o contexto com metadados de tarefa e sessão    |
+| `summary.js`  | Gera resumos comprimidos do histórico de contexto        |
 
 ## Regras de manutenção
 

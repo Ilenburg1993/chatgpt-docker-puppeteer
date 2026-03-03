@@ -1,13 +1,15 @@
 # src/kernel/task_runtime
 
-**Propósito**: Runtime de tarefas do kernel — gerencia o ciclo de vida completo de uma tarefa em execução.  
+**Propósito**: Runtime de tarefas do kernel — gerencia o ciclo de vida completo de uma tarefa em
+execução.  
 **Status**: Canônico.  
 **Público**: Mantenedores do kernel.  
 **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 
-- `task_runtime.js`: gerenciamento do ciclo de vida de tarefas em execução (tentativas, timeout, estado).
+- `task_runtime.js`: gerenciamento do ciclo de vida de tarefas em execução (tentativas, timeout,
+  estado).
 
 ## O que não deve ficar aqui
 
@@ -16,8 +18,8 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo           | Descrição                                     |
+| ----------------- | --------------------------------------------- |
 | `task_runtime.js` | Ciclo de vida completo de tarefas em execução |
 
 ## Regras de manutenção
