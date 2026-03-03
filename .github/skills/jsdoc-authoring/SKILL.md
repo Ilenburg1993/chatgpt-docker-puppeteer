@@ -1,12 +1,10 @@
 ---
 name: jsdoc-authoring
-description:
-  Phase 2 JSDoc authoring for this repository. Use for robust JS-first contracts in Node 24 + ESM,
-  with @ts-check, explicit @param/@returns, options typedefs, and no weak public tags.
+description: JSDoc authoring skill for this repository. Use for robust JS-first contracts in Node 24 + ESM, with @ts-check, explicit @param/@returns, options typedefs, and no weak public tags.
 license: MIT
 ---
 
-# Skill — JSDoc Authoring (Phase 2)
+# Skill — JSDoc Authoring
 
 ## Overview
 
@@ -62,11 +60,23 @@ This phase assumes:
 
 ## Validation / Done Criteria
 
-- Export presence remains 100% documented.
-- Exported functions have `@returns`.
-- Public parameters are fully tagged.
-- Options objects use a named typedef when applicable.
-- Public JSDoc avoids weak generic tags unless the dynamic contract is intentional.
+Metas numéricas do programa full-strict (todas devem ser `= 0` simultaneamente):
+
+| Métrica                       | Alvo |
+| ----------------------------- | ---- |
+| `functions_missing_param_tags` | 0    |
+| `functions_missing_returns`    | 0    |
+| `unsafe_generic_tags_total`    | 0    |
+| `public_any_tags_total`        | 0    |
+| `options_objects_without_typedef` | 0 |
+
+Critérios qualitativos (aplica em toda PR):
+
+- Cada exportação pública tem `@returns` documentado.
+- Parâmetros públicos estão totalmente tagueados com `@param {type}`.
+- Objetos de opções usam `@typedef {object}` nomeado, nunca `Object` genérico.
+- JSDoc público evita tags genéricas fracas (`any`, `object`, `Function`) salvo contrato
+  dinâmico intencional e documentado.
 
 ## Related Skills
 

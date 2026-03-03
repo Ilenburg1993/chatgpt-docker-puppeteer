@@ -1,5 +1,19 @@
 # Roadmap — JSDoc Completo + Full Strict em 100% do Repositório
 
+> **Convenção de evolução deste plano**: Este documento vive no branch
+> `feat/typing-fullstrict-roadmap` e é atualizado **continuamente** à medida que
+> cada tarefa é implementada. A regra é:
+>
+> - Todo artefato produzido (skill, script, tsconfig, npm script, target Makefile, update de
+>   workflow) é commitado no mesmo PR, junto com o tick **✅** na checklist correspondente
+>   deste documento.
+> - Nenhum artefato é considerado "feito" até que o item correspondente esteja marcado
+>   **e commitado**.
+> - Revisão deste documento é obrigatória antes do merge: o estado final do documento deve
+>   refletir exatamente o estado final do código.
+> - O PR só é mergeado quando as três condições de encerramento do programa estão
+>   simultaneamente verdes na CI.
+
 ## Contexto e baseline
 
 ### Estado real medido na auditoria (3 mar 2026)
@@ -80,6 +94,67 @@
         `node scripts/analysis/jsdoc_coverage_cli.mjs --scope full --format     console --gaps`
 - [ ] Classificar os 14 arquivos de `tests/legacy/` como gap explícito na auditoria (não ignorados,
       não fora de escopo)
+
+### Tarefas — Skills de tipagem e JSDoc
+
+Para cada skill abaixo, carregar o `SKILL.md`, atualizar referências ao roadmap, commands, critérios
+de done e seções de related skills:
+
+- [ ] **`typing-node24-esm-tsserver`** — atualizar:
+  - [x] Description frontmatter: "Phase 2 → Full-Strict Roadmap orchestration skill"
+  - [x] Workflow: adicionar `typecheck:dashboard`, `jsdoc:coverage:gaps`, `check:ts-expect-error`,
+        `check:base-strict` como steps canônicos
+  - [x] Validation / Done Criteria: substituir critérios de "Phase 2" pelos do programa full-strict
+  - [x] Related Skills: adicionar `strict-lane-governance` e `vue-tsc-dashboard`
+- [ ] **`jsdoc-authoring`** — atualizar:
+  - [x] Description frontmatter: remover "Phase 2"; tornar atemporal
+  - [x] Validation / Done Criteria: substituir critérios qualitativos pelos numéricos
+        (`= 0` para cada indicador de gap)
+- [ ] **`typescript-typing`** — atualizar:
+  - [x] Workflow: adicionar Step 7 — tipagem Vue/SFC via `vue-tsc` para `src/dashboard-ui`
+  - [x] Related Skills: adicionar `vue-tsc-dashboard` e `strict-lane-governance`
+
+### Tarefas — Novas skills
+
+- [x] **`strict-lane-governance`** _(nova)_ — governa criação, nomeação, manutenção e remoção de
+      `tsconfig.strict.*.json`
+  - Path: `.github/skills/strict-lane-governance/SKILL.md`
+- [x] **`vue-tsc-dashboard`** _(nova)_ — governa tipagem Vue + `vue-tsc` para `src/dashboard-ui`
+  - Path: `.github/skills/vue-tsc-dashboard/SKILL.md`
+
+### Tarefas — Scripts de análise e CI
+
+- [x] **`scripts/analysis/strict_lane_audit.mjs`** _(novo)_ — audita cobertura de lanes strict;
+      emite `strict_uncovered_files_total` + lista de arquivos
+- [x] **`scripts/ci/check-ts-expect-error.mjs`** _(novo)_ — gate de CI: conta `@ts-expect-error`
+      fora da allowlist; falha com exit 1 se count > threshold (default: 0)
+- [x] **`scripts/ci/check-base-strict.mjs`** _(novo)_ — gate de CI: verifica
+      `tsconfig.base.json` com `strict: true`
+- [ ] Atualizar **`scripts/analysis/typing_hardening_audit.mjs`**:
+  - [ ] Importar `strict_lane_audit.mjs` para popular `strict_uncovered_files[]`
+  - [ ] Adicionar `js_files_missing_ts_check[]` com lista completa
+  - [ ] Atualizar `AREA_THRESHOLDS.overall` de `90` → `100`
+- [ ] Atualizar **`scripts/analysis/jsdoc_coverage_engine.mjs`**:
+  - [ ] Adicionar `public_any_tags_total` e `public_unknown_tags_total` no shape do relatório
+- [ ] Atualizar **`scripts/analysis/jsdoc_coverage_cli.mjs`**:
+  - [ ] Implementar flag `--gaps` (lista símbolos bloqueadores por lote)
+  - [ ] Implementar flag `--fail-on-any-gap` (exit 1 se qualquer métrica > 0)
+  - [ ] Bump de schema para `3.1.0`
+- [ ] Atualizar **`scripts/ci/verify-skills-governance.mjs`**:
+  - [ ] Verificar que `strict-lane-governance` e `vue-tsc-dashboard` existem e têm `SKILL.md`
+
+### Tarefas — package.json e Makefile
+
+- [x] **package.json** — scripts adicionados/atualizados:
+  - [x] `typecheck:dashboard` — `vue-tsc --noEmit` no workspace `src/dashboard-ui`
+  - [x] `typecheck:repo` — atualizado para incluir `&& npm run typecheck:dashboard`
+  - [x] `analyze:typing:gaps` — `typing_hardening_audit.mjs --format console --show-gaps`
+  - [x] `jsdoc:coverage:gaps` — `jsdoc_coverage_cli.mjs --scope full --format console --gaps`
+  - [x] `check:ts-expect-error` — `node scripts/ci/check-ts-expect-error.mjs`
+  - [x] `check:base-strict` — `node scripts/ci/check-base-strict.mjs`
+- [x] **Makefile** — targets adicionados:
+  - [x] `typecheck-dashboard`, `typecheck-repo`, `analyze-typing-gaps`, `jsdoc-gaps`,
+        `check-ts-expect-error`, `check-base-strict`, `typing-fullstrict-check`
 
 ### Critério de saída da Fase 0
 

@@ -1,8 +1,6 @@
 ---
 name: typescript-typing
-description:
-  Incremental TypeScript typing for a JS-first repository. Use for JSDoc, shared typedefs, .d.ts
-  promotion, declaration validation, and safer narrowing without broad TS migration.
+description: Incremental TypeScript typing for a JS-first repository. Use for JSDoc, shared typedefs, .d.ts promotion, declaration validation, and safer narrowing without broad TS migration.
 license: MIT
 ---
 
@@ -50,6 +48,8 @@ The default path is:
 4. Keep file-local types local when they serve one module.
 5. Use declaration emit (`typecheck:declarations`) to validate public JS APIs.
 6. Align JSON payload artifacts with JSON Schema, not with ad-hoc object comments alone.
+7. Para `src/dashboard-ui`: rodar `npm run typecheck:dashboard` (vue-tsc --noEmit); consultar
+   a skill `vue-tsc-dashboard` para tipagem de SFCs, props, emits e stores Pinia.
 
 ## Guardrails
 
@@ -69,5 +69,7 @@ The default path is:
 
 - [`../jsdoc-authoring/SKILL.md`](../jsdoc-authoring/SKILL.md)
 - [`../typing-node24-esm-tsserver/SKILL.md`](../typing-node24-esm-tsserver/SKILL.md)
+- [`../strict-lane-governance/SKILL.md`](../strict-lane-governance/SKILL.md)
+- [`../vue-tsc-dashboard/SKILL.md`](../vue-tsc-dashboard/SKILL.md)
 - [`../schema-contract-governance/SKILL.md`](../schema-contract-governance/SKILL.md)
 - [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md)

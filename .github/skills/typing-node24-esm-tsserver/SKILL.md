@@ -1,12 +1,10 @@
 ---
 name: typing-node24-esm-tsserver
-description:
-  Phase 2 orchestration skill for typing hardening in this repository: strict multi-lane configs,
-  declaration emit, JSDoc coverage, tsserver wrapper contracts, and CI validation.
+description: Full-Strict Roadmap orchestration skill for typing hardening in this repository. Covers strict multi-lane configs, declaration emit, JSDoc coverage, tsserver wrapper contracts, dashboard vue-tsc, and CI gates.
 license: MIT
 ---
 
-# Skill — Typing Node24 ESM TS Server (Phase 2 Orchestrator)
+# Skill — Typing Node24 ESM TS Server (Full-Strict Roadmap Orchestrator)
 
 ## Overview
 
@@ -48,13 +46,17 @@ It covers:
 
 ## Workflow
 
-1. Run `npm run typecheck:repo`.
+1. Run `npm run typecheck:repo` (inclui `typecheck:dashboard` a partir da Fase 2 do roadmap).
 2. Run `npm run typecheck:strict:all`.
 3. Run `npm run typecheck:declarations`.
 4. Run `npm run jsdoc:coverage:json -- --validate-schema`.
-5. Run `npm run analyze:typing`.
+5. Run `npm run analyze:typing` + `npm run analyze:typing:gaps` para ver arquivos sem cobertura.
 6. Run `npm run analyze:tsserver-contract`.
 7. Run `npm run check:skills:strict`.
+8. Run `npm run typecheck:dashboard` para validar SFCs Vue em `src/dashboard-ui`.
+9. Run `npm run jsdoc:coverage:gaps` para listar símbolos bloqueadores por lote.
+10. Run `npm run check:ts-expect-error` para garantir allowlist zerada.
+11. Run `npm run check:base-strict` (passe com `continue-on-error: true` até a Fase 5).
 
 ## Guardrails
 
@@ -65,16 +67,29 @@ It covers:
 
 ## Validation / Done Criteria
 
-- Every strict lane is green.
-- Declaration emit is green.
-- JSDoc report validates against schema.
-- `analyze:typing` meets phase 2 thresholds.
-- Daemon, schema, and `lsp-ops` remain in sync.
+As três condições de encerramento do programa full-strict (todas devem ser `true` simultaneamente):
+
+- [ ] **100 % de cobertura** — `js_files_missing_ts_check_total = 0` (incluindo legacy).
+- [ ] **Zero backlog JSDoc** — `functions_missing_param_tags = 0`, `unsafe_generic_tags_total = 0`,
+      `public_any_tags_total = 0`.
+- [ ] **Base strict** — `tsconfig.base.json` tem `strict: true`; `check:base-strict` verde.
+
+Critérios contínuos (devem ser verdes em toda PR):
+
+- [ ] Todas as lanes strict são verdes (`typecheck:strict:all`).
+- [ ] Declaration emit verde (`typecheck:declarations`).
+- [ ] Relatório JSDoc valida contra schema (`jsdoc:coverage:json -- --validate-schema`).
+- [ ] `typecheck:dashboard` verde (vue-tsc --noEmit em `src/dashboard-ui`).
+- [ ] `check:ts-expect-error` verde (sem ocorrências não-allowlistadas).
+- [ ] Daemon, schema e `lsp-ops` sincronizados.
 
 ## Related Skills
 
 - [`../jsdoc-authoring/SKILL.md`](../jsdoc-authoring/SKILL.md)
 - [`../typescript-typing/SKILL.md`](../typescript-typing/SKILL.md)
+- [`../strict-lane-governance/SKILL.md`](../strict-lane-governance/SKILL.md)
+- [`../vue-tsc-dashboard/SKILL.md`](../vue-tsc-dashboard/SKILL.md)
 - [`../lsp-ops/SKILL.md`](../lsp-ops/SKILL.md)
 - [`../schema-contract-governance/SKILL.md`](../schema-contract-governance/SKILL.md)
+- [TYPING_FULLSTRICT_ROADMAP.md](../../../DOCUMENTAÇÃO/PLANOS/TYPING_FULLSTRICT_ROADMAP.md)
 - [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_AUTOMATION_INDEX.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_AUTOMATION_INDEX.md)
