@@ -201,6 +201,26 @@ dashboard, testes e attaches (PM2/Docker/Vite).
 3. Para perfis de subsistema (NERV, Kernel, etc.) basta copiar o perfil do agente e alterar a
    variável de ambiente `DEBUG` para o filtro desejado.
 
+##### Depuração com DevTools via MCP
+
+Para inspecionar a sessão de navegador headless/conectado via DevTools, o projeto agora inclui uma
+dependência de desenvolvimento opcional
+[`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp). Ele expõe um
+servidor MCP compatível com Puppeteer, permitindo o uso do painel do Chrome DevTools no modo remoto.
+
+- A biblioteca é instalada automaticamente com `npm install` em `devDependencies`.
+- Há um script disponível:
+
+```bash
+npm run mcp:start    # dispara o servidor MCP na porta 9222 (pode ajustar com --port)
+```
+
+Após iniciá‑lo, abra `chrome://inspect` no Chrome e adicione `localhost:9222` como destino. Você
+poderá conectar o DevTools a qualquer instância de navegador criada pelo agente.
+
+Se preferir instalar globalmente para testes fora do projeto, use
+`npm install -g chrome-devtools-mcp`.
+
 > ⚠️ Requer **VS Code 1.80+** para suporte aos tipos `pwa-node`/`pwa-chrome`.
 
 #### Iniciando PM2 com inspeção

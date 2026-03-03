@@ -1,7 +1,7 @@
 # Copilot Instructions — chatgpt-docker-puppeteer
 
-**Propósito**: contexto operacional e arquitetural para agentes de IA neste repositório.  
-**Status**: Canônico. **Última atualização**: 1 de março de 2026.
+**Propósito**: contexto operacional e arquitetural para agentes de IA neste repositório. **Status**:
+Canônico. **Última atualização**: 1 de março de 2026.
 
 > Responda sempre em **português brasileiro (pt-BR)** ao interagir com humanos ou escrever
 > documentação.

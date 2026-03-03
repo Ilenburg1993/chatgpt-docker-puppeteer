@@ -1,16 +1,16 @@
 {
-  "servers": {
-    "chatgpt-docker-puppeteer": {
-      "type": "http",
-      "url": "http://localhost:3008/api/mcp"
-    },
-    "context7": {
-      "args": [
-        "-y",
-        "@upstash/context7-mcp"
-      ],
-      "command": "npx",
-      "type": "stdio"
-    }
-  }
+	"inputs": [
+		{
+			"id": "token",
+			"type": "promptString",
+			"description": "",
+			"password": true
+		}
+	],
+	"servers": {
+		"chatgpt-docker-puppeteer": {
+			"type": "http",
+			"url": "http://localhost:3008/api/mcp"
+		}
+	}
 }
