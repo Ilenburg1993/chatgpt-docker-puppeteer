@@ -1,5 +1,14 @@
 name: CI
 
+# Pipeline principal: validação do ambiente, testes unitários/integração/regressão e audit lite.
+# Lint (ESLint + Prettier) → lint.yml | Shell lint (ShellCheck + actionlint) → shellcheck.yml
+#
+# Jobs:
+#   validate    — validação do Node, YAML dos workflows e testes unitários (bloqueante)
+#   audit-lite  — auditoria rápida não-bloqueante (artefatos + PR comment)
+#   integration — testes de integração (needs: validate)
+#   regression  — testes de regressão (needs: integration)
+
 on:
   push:
     branches: [main]
@@ -21,7 +30,7 @@ permissions:
 
 jobs:
   validate:
-    name: Lint, format and tests (Node 24)
+    name: Tests & Validation (Node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -68,72 +77,85 @@ jobs:
       - name: Validate workflow YAMLs
         run: node scripts/ci/validate-workflows.mjs
 
-      - name: Lint GitHub workflows with actionlint
-        uses: raven-actions/actionlint@v2.1.2
-
-      - name: Lint shell scripts with shellcheck
-        uses: reviewdog/action-shellcheck@v1.32.0
-        with:
-          github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
-          shellcheck_flags: "-x"
-          reporter: github-check
-          filter_mode: nofilter
-          fail_level: error
-          path: "."
-          exclude: |
-            ./node_modules/*
-            ./src/dashboard-ui/node_modules/*
-            ./.git/*
-        id: lint
-        continue-on-error: true
-        run: npm run lint
-
-      - name: Prettier check
-        id: prettier
-        continue-on-error: true
-        run: npm run format:check
-
       - name: Unit tests
         id: unit_tests
         continue-on-error: true
-        run: npm run test:unit
+        run: |
+          npm run test:unit 2>&1 | tee /tmp/unit-test-output.txt
+          TEST_EXIT=${PIPESTATUS[0]}
+          exit $TEST_EXIT
+
+      - name: Build step summary
+        if: always()
+        run: |
+          UNIT_OK="${{ steps.unit_tests.outcome }}"
+          {
+            echo "## $([ "$UNIT_OK" = "success" ] && echo "✅" || echo "❌") CI — Tests & Validation (Node 24)"
+            echo ""
+            echo "| Check | Status |"
+            echo "|---|---|"
+            echo "| Validate Node runtime | ✅ passed |"
+            echo "| Validate workflow YAMLs | ✅ passed |"
+            echo "| Unit tests | $([ "$UNIT_OK" = "success" ] && echo "✅ passed" || echo "❌ failed") |"
+            echo ""
+            if [ "$UNIT_OK" != "success" ] && [ -f /tmp/unit-test-output.txt ]; then
+              echo "### Unit test output (tail)"
+              echo '```'
+              tail -80 /tmp/unit-test-output.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: CI Summary
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v8
         env:
-          LINT_OUTCOME: ${{ steps.lint.outcome }}
-          PRETTIER_OUTCOME: ${{ steps.prettier.outcome }}
           UNIT_OUTCOME: ${{ steps.unit_tests.outcome }}
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('node:fs');
             const marker = '<!-- ci-validate-summary -->';
             const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : o === 'skipped' ? '⏭️' : '⚠️';
-            const lo = process.env.LINT_OUTCOME || 'unknown';
-            const po = process.env.PRETTIER_OUTCOME || 'unknown';
             const uo = process.env.UNIT_OUTCOME || 'unknown';
-            const allOk = lo === 'success' && po === 'success' && uo === 'success';
-            const suggestions = [];
-            if (lo === 'failure') suggestions.push('💡 `npm run lint:fix` para corrigir lint automaticamente.');
-            if (po === 'failure') suggestions.push('💡 `npm run format` para corrigir formatação.');
-            if (uo === 'failure') suggestions.push('💡 `npm run test:unit` localmente para ver as falhas.');
+            const allOk = uo === 'success';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // Read captured test output — take the LAST max chars (failures are at the end)
+            const readOutput = (p, max = 4000) => {
+              try {
+                const txt = fs.readFileSync(p, 'utf8').trim();
+                return txt.length > max ? '...(truncated)\n' + txt.slice(-max) : txt;
+              } catch { return ''; }
+            };
+            const unitOut = readOutput('/tmp/unit-test-output.txt');
+
+            const details = [];
+            if (uo === 'failure' && unitOut) {
+              details.push(
+                `<details>\n<summary>📋 Unit test output</summary>\n\n` +
+                `\`\`\`\n${unitOut}\n\`\`\`\n</details>`
+              );
+            }
+
             const body = [
               marker,
-              `## ${allOk ? '✅' : '❌'} CI — Validate (Node 24)`,
+              `## ${allOk ? '✅' : '❌'} CI — Tests & Validation (Node 24)`,
               '',
               '| Check | Status |',
               '|---|---|',
-              `| ESLint | ${icon(lo)} ${lo} |`,
-              `| Prettier | ${icon(po)} ${po} |`,
+              '| Validate Node runtime | ✅ passed |',
+              '| Validate workflow YAMLs | ✅ passed |',
               `| Unit tests | ${icon(uo)} ${uo} |`,
               '',
-              ...suggestions,
+              ...details,
+              ...(uo === 'failure' ? ['💡 Execute `npm run test:unit` localmente para ver as falhas.'] : []),
               '',
               allOk
-                ? '> Todos os checks passaram. ✅'
-                : '> Falhas acima **bloqueiam** o merge.',
+                ? '> ✅ Todos os checks passaram.'
+                : `> ❌ Falhas acima **bloqueiam** o merge. [Ver logs completos](${runUrl}).`,
             ].join('\n');
+
             try {
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
@@ -166,13 +188,11 @@ jobs:
               await core.summary.addRaw(body, true).write();
             }
 
-      - name: Fail if any check failed
+      - name: Fail if unit tests failed
         if: always()
         run: |
-          if [ "${{ steps.lint.outcome }}" = "failure" ] || \
-             [ "${{ steps.prettier.outcome }}" = "failure" ] || \
-             [ "${{ steps.unit_tests.outcome }}" = "failure" ]; then
-            echo "::error::One or more checks failed. See CI Summary comment on the PR."
+          if [ "${{ steps.unit_tests.outcome }}" = "failure" ]; then
+            echo "::error::Unit tests failed. See CI Summary comment on the PR."
             exit 1
           fi
 

@@ -26,10 +26,12 @@ const workflowsRequiringConcurrency = new Set([
     'docker-rebuild.yml',
     'docker-security-scan.yml',
     'jsdoc-typing.yml',
+    'lint.yml',
     'release.yml',
     'scorecard.yml',
     'security.yml',
     'semantic-analysis.yml',
+    'shellcheck.yml',
     'stale.yml',
 ]);
 const uploadArtifactPattern = /^actions\/upload-artifact@/;

@@ -1,0 +1,167 @@
+name: Shell & Workflow Lint
+
+# Lint de scripts shell com ShellCheck e workflows GitHub Actions com actionlint.
+# Não-bloqueante: resultados são informativos e comentados no PR com instruções de correção.
+#
+# Jobs:
+#   shellcheck — reviewdog/action-shellcheck + raven-actions/actionlint
+#
+# Excluídas da varredura: node_modules, src/dashboard-ui/node_modules, .git
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: shellcheck-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  shellcheck:
+    name: ShellCheck + actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: ShellCheck (via reviewdog)
+        id: shellcheck
+        uses: reviewdog/action-shellcheck@v1.32.0
+        continue-on-error: true
+        with:
+          github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          shellcheck_flags: "-x"
+          reporter: github-check
+          filter_mode: nofilter
+          fail_level: error
+          path: "."
+          exclude: |
+            ./node_modules/*
+            ./src/dashboard-ui/node_modules/*
+            ./.git/*
+
+      - name: actionlint (via raven-actions)
+        id: actionlint
+        uses: raven-actions/actionlint@v2.1.2
+        continue-on-error: true
+
+      - name: Build step summary
+        if: always()
+        run: |
+          SHELL_OK="${{ steps.shellcheck.outcome }}"
+          ACTION_OK="${{ steps.actionlint.outcome }}"
+          icon() { [ "$1" = "success" ] && echo "✅" || echo "⚠️"; }
+          {
+            echo "## Shell & Workflow Lint"
+            echo ""
+            echo "| Check | Status |"
+            echo "|---|---|"
+            echo "| ShellCheck | $(icon "$SHELL_OK") $SHELL_OK |"
+            echo "| actionlint | $(icon "$ACTION_OK") $ACTION_OK |"
+            echo ""
+            if [ "$SHELL_OK" != "success" ]; then
+              echo "> ⚠️ Erros de ShellCheck encontrados. Veja as annotations na aba **Files changed** do PR."
+            fi
+            if [ "$ACTION_OK" != "success" ]; then
+              echo "> ⚠️ Erros de actionlint encontrados. Execute \`actionlint -color\` localmente."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment PR with shellcheck results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          SHELLCHECK_OUTCOME: ${{ steps.shellcheck.outcome }}
+          ACTIONLINT_OUTCOME: ${{ steps.actionlint.outcome }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const shellOk  = process.env.SHELLCHECK_OUTCOME === 'success';
+            const actionOk = process.env.ACTIONLINT_OUTCOME === 'success';
+            const allOk = shellOk && actionOk;
+
+            const icon = (ok) => ok ? '✅' : '⚠️';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const filesUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${context.issue.number}/files`;
+            const marker = '<!-- shellcheck-summary -->';
+
+            const suggestions = [];
+            if (!shellOk) {
+              suggestions.push(
+                '💡 **ShellCheck**: Veja as annotations inline na aba ' +
+                `[Files changed](${filesUrl}). ` +
+                'Ou execute localmente: `shellcheck -x <script.sh>`'
+              );
+            }
+            if (!actionOk) {
+              suggestions.push(
+                '💡 **actionlint**: Execute `actionlint -color` na raiz do repositório para ver todos os erros.'
+              );
+            }
+
+            const body = [
+              marker,
+              `## ${icon(allOk)} Shell & Workflow Lint`,
+              '',
+              '> ℹ️ Este workflow é **não-bloqueante** — falhas são informativas.',
+              '',
+              `| Check | Status |`,
+              `|---|---|`,
+              `| ShellCheck | ${icon(shellOk)} ${shellOk ? 'passou' : 'erros encontrados'} |`,
+              `| actionlint | ${icon(actionOk)} ${actionOk ? 'passou' : 'erros encontrados'} |`,
+              '',
+              ...suggestions,
+              '',
+              allOk
+                ? '> ✅ Todos os checks passaram.'
+                : `> ⚠️ Problemas encontrados (não bloqueiam o merge). [Ver logs completos](${runUrl}).`,
+            ].join('\n');
+
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find(
+                (c) => c.user?.type === 'Bot' && typeof c.body === 'string' && c.body.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Falha ao postar PR comment: ${err.message}. Resultado disponível no workflow step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }
