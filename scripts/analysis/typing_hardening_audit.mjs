@@ -9,6 +9,7 @@ import { analyzeJSDocCoverage, collectJsSourceFiles } from './jsdoc_coverage_eng
 const { values } = parseArgs({
     options: {
         format: { type: 'string', default: 'console' },
+        scope: { type: 'string', default: 'full' },
     },
 });
 
@@ -19,7 +20,10 @@ const AREA_THRESHOLDS = {
     overall: 90,
 };
 
+const PUBLIC_ROOTS = ['src/shared', 'src/inference_gateway', 'src/audit_agent', 'src/server/api', 'src/integration/lsp'];
+
 const STRICT_CONFIGS = [
+    'tsconfig.strict.public.json',
     'tsconfig.strict.core.json',
     'tsconfig.strict.server.json',
     'tsconfig.strict.infra.json',
@@ -93,11 +97,15 @@ const sourceFiles = collectJsSourceFiles(['src']).filter(file => !isLegacyExclud
 const scriptFiles = collectJsSourceFiles(['scripts']).filter(file => !isLegacyExcluded(file));
 const testFiles = collectJsSourceFiles(['tests']).filter(file => !isLegacyExcluded(file));
 const combinedFiles = [...new Set([...sourceFiles, ...scriptFiles, ...testFiles])];
+const requestedScope = String(values.scope || 'full').trim().toLowerCase() === 'public' ? 'public' : 'full';
+const publicScopeFiles = collectJsSourceFiles(PUBLIC_ROOTS).filter(file => !isLegacyExcluded(file));
 const jsdocReport = analyzeJSDocCoverage({ files: combinedFiles, scope: 'full' });
+const publicJSDocReport = analyzeJSDocCoverage({ files: publicScopeFiles, scope: 'full' });
 const srcCoverage = summarizeTsCheck(sourceFiles);
 const scriptsCoverage = summarizeTsCheck(scriptFiles);
 const testsCoverage = summarizeTsCheck(testFiles);
 const overallCoverage = summarizeTsCheck(combinedFiles);
+const publicCoverage = summarizeTsCheck(publicScopeFiles);
 const tsExpectErrorCount = countDirective(combinedFiles);
 
 /** @type {Record<string, { files: number, fileNames: string[] }>} */
@@ -120,20 +128,57 @@ const publicUnknownTagsTotal = jsdocReport.files.reduce(
     0
 );
 
-const passes =
+const publicScopePublicAnyTagsTotal = publicJSDocReport.files.reduce(
+    (total, fileReport) =>
+        total +
+        fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
+    0
+);
+
+const publicScopePublicUnknownTagsTotal = publicJSDocReport.files.reduce(
+    (total, fileReport) =>
+        total +
+        fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_unknown_tags_count, 0),
+    0
+);
+
+const fullScopePasses =
     srcCoverage.coveragePct >= AREA_THRESHOLDS.src &&
     scriptsCoverage.coveragePct >= AREA_THRESHOLDS.scripts &&
     testsCoverage.coveragePct >= AREA_THRESHOLDS.tests &&
     overallCoverage.coveragePct >= AREA_THRESHOLDS.overall &&
     tsExpectErrorCount === 0;
 
+const publicScopePasses =
+    publicCoverage.coveragePct >= 100 &&
+    publicJSDocReport.functions_missing_param_tags === 0 &&
+    publicJSDocReport.functions_missing_options_typedef === 0 &&
+    publicJSDocReport.unsafe_generic_tags_total === 0 &&
+    publicScopePublicAnyTagsTotal === 0 &&
+    tsExpectErrorCount === 0;
+
+const passes = requestedScope === 'public' ? publicScopePasses : fullScopePasses;
+
 const report = {
+    scope: requestedScope,
     thresholds: AREA_THRESHOLDS,
     ts_check: {
         src: srcCoverage,
         scripts: scriptsCoverage,
         tests: testsCoverage,
         overall: overallCoverage,
+    },
+    public_scope: {
+        files: publicCoverage.total,
+        with_ts_check: publicCoverage.withTsCheck,
+        coverage_pct: publicCoverage.coveragePct,
+        exports_total: publicJSDocReport.exports_total,
+        functions_total: publicJSDocReport.functions_total,
+        functions_missing_param_tags: publicJSDocReport.functions_missing_param_tags,
+        functions_missing_options_typedef: publicJSDocReport.functions_missing_options_typedef,
+        unsafe_generic_tags_total: publicJSDocReport.unsafe_generic_tags_total,
+        public_any_tags_total: publicScopePublicAnyTagsTotal,
+        public_unknown_tags_total: publicScopePublicUnknownTagsTotal,
     },
     public_api: {
         public_any_tags_total: publicAnyTagsTotal,
@@ -154,20 +199,37 @@ if (String(values.format || 'console').toLowerCase() === 'json') {
     console.log('='.repeat(80));
     console.log('TYPING HARDENING AUDIT');
     console.log('='.repeat(80));
-    console.log(`@ts-check src: ${srcCoverage.withTsCheck}/${srcCoverage.total} (${srcCoverage.coveragePct}%)`);
-    console.log(
-        `@ts-check scripts: ${scriptsCoverage.withTsCheck}/${scriptsCoverage.total} (${scriptsCoverage.coveragePct}%)`
-    );
-    console.log(`@ts-check tests: ${testsCoverage.withTsCheck}/${testsCoverage.total} (${testsCoverage.coveragePct}%)`);
-    console.log(
-        `@ts-check overall: ${overallCoverage.withTsCheck}/${overallCoverage.total} (${overallCoverage.coveragePct}%)`
-    );
-    console.log(`public_any_tags_total: ${publicAnyTagsTotal}`);
-    console.log(`public_unknown_tags_total: ${publicUnknownTagsTotal}`);
-    console.log(`unsafe_generic_tags_total: ${jsdocReport.unsafe_generic_tags_total}`);
-    console.log(`functions_missing_options_typedef: ${jsdocReport.functions_missing_options_typedef}`);
-    console.log(`@ts-expect-error total: ${tsExpectErrorCount}`);
-    console.log('');
+    if (requestedScope === 'public') {
+        console.log(
+            `@ts-check public scope: ${publicCoverage.withTsCheck}/${publicCoverage.total} (${publicCoverage.coveragePct}%)`
+        );
+        console.log(`public_scope_files: ${publicCoverage.total}`);
+        console.log(`public_scope_exports_total: ${publicJSDocReport.exports_total}`);
+        console.log(`public_scope_functions_missing_param_tags: ${publicJSDocReport.functions_missing_param_tags}`);
+        console.log(
+            `public_scope_functions_missing_options_typedef: ${publicJSDocReport.functions_missing_options_typedef}`
+        );
+        console.log(`public_scope_unsafe_generic_tags_total: ${publicJSDocReport.unsafe_generic_tags_total}`);
+        console.log(`public_scope_public_any_tags_total: ${publicScopePublicAnyTagsTotal}`);
+        console.log(`public_scope_public_unknown_tags_total: ${publicScopePublicUnknownTagsTotal}`);
+        console.log(`@ts-expect-error total: ${tsExpectErrorCount}`);
+        console.log('');
+    } else {
+        console.log(`@ts-check src: ${srcCoverage.withTsCheck}/${srcCoverage.total} (${srcCoverage.coveragePct}%)`);
+        console.log(
+            `@ts-check scripts: ${scriptsCoverage.withTsCheck}/${scriptsCoverage.total} (${scriptsCoverage.coveragePct}%)`
+        );
+        console.log(`@ts-check tests: ${testsCoverage.withTsCheck}/${testsCoverage.total} (${testsCoverage.coveragePct}%)`);
+        console.log(
+            `@ts-check overall: ${overallCoverage.withTsCheck}/${overallCoverage.total} (${overallCoverage.coveragePct}%)`
+        );
+        console.log(`public_any_tags_total: ${publicAnyTagsTotal}`);
+        console.log(`public_unknown_tags_total: ${publicUnknownTagsTotal}`);
+        console.log(`unsafe_generic_tags_total: ${jsdocReport.unsafe_generic_tags_total}`);
+        console.log(`functions_missing_options_typedef: ${jsdocReport.functions_missing_options_typedef}`);
+        console.log(`@ts-expect-error total: ${tsExpectErrorCount}`);
+        console.log('');
+    }
     for (const [config, lane] of Object.entries(strictLanes)) {
         console.log(`- ${config}: ${lane.files} file(s)`);
     }

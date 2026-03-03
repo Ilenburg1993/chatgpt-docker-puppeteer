@@ -18,6 +18,17 @@
 import { log } from '#core/logger';
 
 /**
+ * @typedef {object} NERVLike
+ * @property {(event: string, handler: (payload: unknown) => void) => void} onEvent
+ * @property {(actor: string, action: string, payload?: Record<string, unknown>) => unknown|Promise<unknown>} sendEvent
+ * @property {object} [state]
+ */
+
+/**
+ * @typedef {object} NERVEventPayload
+ */
+
+/**
  * Valida se uma instância NERV é válida e segura para uso
  * @param {object} [nerv] - Instância do NERV a validar
  * @returns {boolean} true se o NERV é válido, false caso contrário
@@ -55,10 +66,11 @@ export function isValidNERV(nerv) {
 
 /**
  * Executa uma operação NERV com validação prévia
- * @param {object} nerv - Instância do NERV
+ * @template T
+ * @param {NERVLike} nerv - Instância do NERV
  * @param {string} operation - Nome da operação para logging
- * @param {Function} operationFn - Função que executa a operação
- * @returns {Promise<any>} Resultado da operação ou throws se NERV inválido
+ * @param {() => T|Promise<T>} operationFn - Função que executa a operação
+ * @returns {Promise<T>} Resultado da operação ou throws se NERV inválido
  */
 export async function safeNERVOperation(nerv, operation, operationFn) {
     if (!isValidNERV(nerv)) {
@@ -78,9 +90,9 @@ export async function safeNERVOperation(nerv, operation, operationFn) {
 
 /**
  * Wrapper para nerv.onEvent com validação
- * @param {object} nerv - Instância do NERV
+ * @param {NERVLike} nerv - Instância do NERV
  * @param {string} event - Nome do evento
- * @param {Function} handler - Handler do evento
+ * @param {(payload: unknown) => void} handler - Handler do evento
  * @returns {Promise<boolean>} true se registrado com sucesso
  */
 export async function safeOnEvent(nerv, event, handler) {
@@ -92,11 +104,11 @@ export async function safeOnEvent(nerv, event, handler) {
 
 /**
  * Wrapper para nerv.sendEvent com validação
- * @param {object} nerv - Instância do NERV
+ * @param {NERVLike} nerv - Instância do NERV
  * @param {string} actor - Ator que envia o evento
  * @param {string} action - Ação do evento
- * @param {object} [payload] - Payload do evento
- * @returns {Promise<any>} Resultado do sendEvent
+ * @param {NERVEventPayload} [payload={}] - Payload do evento
+ * @returns {Promise<unknown>} Resultado do sendEvent
  */
 export async function safeSendEvent(nerv, actor, action, payload = {}) {
     return safeNERVOperation(nerv, `sendEvent(${actor}, ${action})`, () => {

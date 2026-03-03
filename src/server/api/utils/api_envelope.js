@@ -12,28 +12,24 @@ import { Buffer } from 'node:buffer';
  * }} ApiResponseLike
  */
 
-/**
- * @typedef {Record<string, unknown> & {
- *   code?: string,
- *   error?: string,
- *   details?: unknown
- * }} FailureOptions
- */
+/** @typedef {object} ApiEnvelopeMetaOptions */
+/** @typedef {object} FailureOptions */
 
 /**
  * Sends a successful JSON envelope with the request identifier.
  * @param {ApiResponseLike} res
  * @param {ApiRequestLike} req
  * @param {unknown} data
- * @param {Record<string, unknown>} [meta={}]
+ * @param {ApiEnvelopeMetaOptions} [meta={}]
  * @returns {void}
  */
 function ok(res, req, data, meta = {}) {
+    const metaRecord = meta && typeof meta === 'object' ? /** @type {Record<string, unknown>} */ (meta) : {};
     res.json({
         success: true,
         request_id: req.id,
         data,
-        meta,
+        meta: metaRecord,
     });
 }
 
@@ -46,7 +42,11 @@ function ok(res, req, data, meta = {}) {
  * @returns {void}
  */
 function fail(res, req, httpStatus, options = {}) {
-    const { code, error, details } = options;
+    const optionRecord =
+        options && typeof options === 'object' ? /** @type {Record<string, unknown>} */ (options) : {};
+    const code = typeof optionRecord.code === 'string' ? optionRecord.code : undefined;
+    const error = typeof optionRecord.error === 'string' ? optionRecord.error : undefined;
+    const details = optionRecord.details;
     res.status(httpStatus).json({
         success: false,
         request_id: req.id,

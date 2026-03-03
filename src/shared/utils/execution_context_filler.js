@@ -4,16 +4,20 @@ import * as logger from '#core/logger';
 import fs from 'node:fs';
 
 /**
+ * @typedef {object} FillExecutionContextOptions
+ * @property {object} [driver] - Driver instance (BaseDriver, ChatGPTDriver, etc)
+ * @property {object} [browserPool] - BrowserPool manager instance
+ * @property {number} [tacticalAttempts=0] - Tentativas de retry tático (Driver)
+ * @property {number} [strategicAttempts=0] - Tentativas de retry estratégico (Kernel)
+ * @property {string[]} [errorsRecovered=[]] - Erros recuperados via retry
+ * @property {number} [totalBackoffMs=0] - Tempo total aguardado entre retries
+ */
+
+/**
  * Preenche execution context de uma task V5.
  *
  * @param {object} task - Task V5 object (mutável)
- * @param {object} options - Opções de preenchimento
- * @param {object} [options.driver] - Driver instance (BaseDriver, ChatGPTDriver, etc)
- * @param {object} [options.browserPool] - BrowserPool manager instance
- * @param {number} [options.tacticalAttempts=0] - Tentativas de retry tático (Driver)
- * @param {number} [options.strategicAttempts=0] - Tentativas de retry estratégico (Kernel)
- * @param {string[]} [options.errorsRecovered=[]] - Erros recuperados via retry
- * @param {number} [options.totalBackoffMs=0] - Tempo total aguardado entre retries
+ * @param {FillExecutionContextOptions} options - Opções de preenchimento
  * @returns {object} Task com execution context preenchido
  */
 function fillExecutionContext(task, options) {

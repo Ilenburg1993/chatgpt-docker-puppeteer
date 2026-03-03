@@ -59,17 +59,47 @@ export const ENDPOINTS = Object.freeze([
     '/v1/policies/reload',
 ]);
 
+/**
+ * @typedef {object} GatewayBaseUrlOverrides
+ * @property {string} [host]
+ * @property {number} [port]
+ * @property {string} [baseUrl]
+ */
+/** @typedef {{ ok: boolean, status: number, text: string, json: any }} GatewayJsonResponse */
+/**
+ * @typedef {object} CreateGatewayClientOptions
+ * @property {string} [clientTag]
+ * @property {string} [baseUrl]
+ * @property {string} [host]
+ * @property {number} [port]
+ * @property {string} [model]
+ * @property {number} [timeout]
+ * @property {boolean} [enabled]
+ */
+/**
+ * @typedef {object} ValidateGenerateOptions
+ * @property {string} [clientTag]
+ * @property {string} [profileName]
+ * @property {string} [model]
+ * @property {string} [runtime]
+ */
+/** @typedef {object} GatewayClient */
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function getErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
 /**
  * Obtém a URL base do Inference Gateway
- * @param {{
- *   host?: string,
- *   port?: number,
- *   baseUrl?: string
- * }} overrides
+ * @param {GatewayBaseUrlOverrides} [overrides={}]
  * @returns {string}
  */
 export function getGatewayBaseUrl(overrides = {}) {
@@ -139,7 +169,7 @@ function _parseJsonMaybe(text) {
  * @param {string} url
  * @param {object} body
  * @param {number} timeoutMs
- * @returns {Promise<{ok: boolean, status: number, text: string, json: object|null}>}
+ * @returns {Promise<GatewayJsonResponse>}
  */
 async function _postJson(url, body, timeoutMs) {
     const res = await fetch(url, {
@@ -157,7 +187,7 @@ async function _postJson(url, body, timeoutMs) {
  * Faz um GET para o Gateway
  * @param {string} url
  * @param {number} timeoutMs
- * @returns {Promise<{ok: boolean, status: number, text: string, json: object|null}>}
+ * @returns {Promise<GatewayJsonResponse>}
  */
 async function _getJson(url, timeoutMs) {
     const res = await fetch(url, {
@@ -176,16 +206,8 @@ async function _getJson(url, timeoutMs) {
 
 /**
  * Cria um cliente do Inference Gateway com configuração padronizada
- * @param {{
- *   clientTag?: string,
- *   baseUrl?: string,
- *   host?: string,
- *   port?: number,
- *   model?: string,
- *   timeout?: number,
- *   enabled?: boolean
- * }} options
- * @returns {object}
+ * @param {CreateGatewayClientOptions} [options={}]
+ * @returns {GatewayClient}
  */
 export function createGatewayClient(options = {}) {
     const { clientTag = 'fallback_generic', baseUrl, host, port, model, timeout, enabled = true } = options;
@@ -216,7 +238,7 @@ export function createGatewayClient(options = {}) {
                 }
                 return { ok: true, health: result.json };
             } catch (err) {
-                return { ok: false, error: err.message };
+                return { ok: false, error: getErrorMessage(err) };
             }
         },
 
@@ -232,18 +254,13 @@ export function createGatewayClient(options = {}) {
                 }
                 return { ok: true, models: result.json?.models || [] };
             } catch (err) {
-                return { ok: false, error: err.message };
+                return { ok: false, error: getErrorMessage(err) };
             }
         },
 
         /**
          * Valida se uma geração é permitida (preflight)
-         * @param {{
-         *   clientTag?: string,
-         *   profileName?: string,
-         *   model?: string,
-         *   runtime?: string
-         * }} options
+         * @param {ValidateGenerateOptions} [options={}]
          * @returns {Promise<{ok: boolean, validated?: boolean, error?: string, status?: number, details?: object}>}
          */
         async validateGenerate(options = {}) {
@@ -268,7 +285,7 @@ export function createGatewayClient(options = {}) {
                 }
                 return { ok: true, validated: true, details: result.json };
             } catch (err) {
-                return { ok: false, validated: false, error: err.message };
+                return { ok: false, validated: false, error: getErrorMessage(err) };
             }
         },
 
@@ -382,7 +399,7 @@ export function createGatewayClient(options = {}) {
                 return {
                     ok: false,
                     skipped: false,
-                    error: err.message,
+                    error: getErrorMessage(err),
                     clientTag: tag,
                     model: mod,
                 };
@@ -452,7 +469,7 @@ export function createGatewayClient(options = {}) {
             } catch (err) {
                 return {
                     ok: false,
-                    error: err.message,
+                    error: getErrorMessage(err),
                 };
             }
         },
@@ -483,7 +500,7 @@ export function createGatewayClient(options = {}) {
                 }
                 return { ok: true, validated: true };
             } catch (err) {
-                return { ok: false, validated: false, error: err.message };
+                return { ok: false, validated: false, error: getErrorMessage(err) };
             }
         },
     };
@@ -495,7 +512,7 @@ export function createGatewayClient(options = {}) {
 
 /**
  * Cria cliente para Audit Agent Triage
- * @returns {object}
+ * @returns {GatewayClient}
  */
 export function createAuditTriageClient() {
     return createGatewayClient({
@@ -506,7 +523,7 @@ export function createAuditTriageClient() {
 
 /**
  * Cria cliente para Audit Agent Patch
- * @returns {object}
+ * @returns {GatewayClient}
  */
 export function createAuditPatchClient() {
     return createGatewayClient({
@@ -517,7 +534,7 @@ export function createAuditPatchClient() {
 
 /**
  * Cria cliente para Diagnostic Code Analyzer
- * @returns {object}
+ * @returns {GatewayClient}
  */
 export function createDiagnosticCodeAnalyzerClient() {
     return createGatewayClient({
@@ -527,7 +544,7 @@ export function createDiagnosticCodeAnalyzerClient() {
 
 /**
  * Cria cliente para Diagnostic System Analyzer
- * @returns {object}
+ * @returns {GatewayClient}
  */
 export function createDiagnosticSystemAnalyzerClient() {
     return createGatewayClient({
@@ -537,7 +554,7 @@ export function createDiagnosticSystemAnalyzerClient() {
 
 /**
  * Cria cliente para Diagnostic Report Generator
- * @returns {object}
+ * @returns {GatewayClient}
  */
 export function createDiagnosticReportClient() {
     return createGatewayClient({

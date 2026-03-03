@@ -19,3 +19,8 @@ como referência comparativa.
 ## Links relacionados
 
 - Índice do arquivo morto: [../README.md](../README.md)
+- Canon de tipagem/JSDoc vigente: [../../REFERENCIA/TYPING_JSDOC_CANON.md](../../REFERENCIA/TYPING_JSDOC_CANON.md)
+
+## Regra de uso
+
+Se um checklist historico divergir do canon atual, o canon atual sempre vence.

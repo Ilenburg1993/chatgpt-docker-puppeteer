@@ -1,5 +1,62 @@
 // @ts-check
 import { log } from '#core/logger';
+
+/**
+ * @typedef {object} TaskViewRow
+ * @property {string} [id]
+ * @property {string} [mission_id]
+ * @property {string} [mission_title]
+ * @property {string} [mission_status]
+ * @property {string} [mission_autonomy_mode]
+ * @property {string} [workflow_id]
+ * @property {string} [parent_id]
+ * @property {string} [status]
+ * @property {string} [stage]
+ * @property {number} [attempts]
+ * @property {number} [priority]
+ * @property {string} [target]
+ * @property {string} [model]
+ * @property {number} [execute_after_ms]
+ * @property {string} [locked_by]
+ * @property {number} [lock_expires_at_ms]
+ * @property {string} [blocked_reason]
+ * @property {number} [blocked_at_ms]
+ * @property {string} [latest_attempt_id]
+ * @property {string} [spec_user_message]
+ * @property {string} [spec_system_message]
+ * @property {number} [created_at_ms]
+ * @property {number} [updated_at_ms]
+ * @property {number} [started_at_ms]
+ * @property {number} [completed_at_ms]
+ * @property {number} [failed_at_ms]
+ * @property {number} [paused_at_ms]
+ * @property {number} [cancelled_at_ms]
+ * @property {string} [task_json]
+ * @property {string} [prompt_template_artifact_id]
+ * @property {string} [last_error]
+ * @property {string} [blocked_details_json]
+ */
+
+/**
+ * @typedef {object} TaskCommandCaps
+ * @property {boolean} can_pause
+ * @property {boolean} can_resume
+ * @property {boolean} can_unblock
+ * @property {boolean} can_retry
+ * @property {boolean} can_cancel
+ * @property {boolean} can_patch
+ * @property {boolean} can_set_dependencies
+ * @property {boolean} can_reassign_mission
+ */
+
+/**
+ * @typedef {Record<string, unknown> & {
+ *   meta?: Record<string, unknown>,
+ *   state?: Record<string, unknown>,
+ *   spec?: Record<string, unknown>
+ * }} TaskJsonShape
+ */
+
 function _preview(text, maxChars) {
     const s = typeof text === 'string' ? text : String(text ?? '');
     if (s.length <= maxChars) return s;
@@ -7,8 +64,9 @@ function _preview(text, maxChars) {
 }
 
 /**
- * Função exportada: parseTaskJson.
- * @returns {any}
+ * Faz parse seguro do `task_json` persistido em banco.
+ * @param {unknown} raw
+ * @returns {TaskJsonShape|null}
  */
 function parseTaskJson(raw) {
     try {
@@ -42,8 +100,9 @@ function _isEditable(row) {
 }
 
 /**
- * Função exportada: buildTaskCommandCaps.
- * @returns {any}
+ * Constrói as capacidades de mutação disponíveis para uma task.
+ * @param {TaskViewRow} row
+ * @returns {TaskCommandCaps}
  */
 function buildTaskCommandCaps(row) {
     const status = String(row?.status || '').toUpperCase();
@@ -71,8 +130,9 @@ function buildMissionRef(row) {
 }
 
 /**
- * Função exportada: taskRowToListItem.
- * @returns {any}
+ * Projeta uma task persistida para o formato de listagem.
+ * @param {TaskViewRow} row
+ * @returns {TaskJsonShape}
  */
 function taskRowToListItem(row) {
     const taskJson = parseTaskJson(row.task_json);
@@ -115,8 +175,9 @@ function taskRowToListItem(row) {
 }
 
 /**
- * Função exportada: taskRowToDetailTask.
- * @returns {any}
+ * Projeta uma task persistida para o formato detalhado consumido pela UI.
+ * @param {TaskViewRow} row
+ * @returns {TaskJsonShape}
  */
 function taskRowToDetailTask(row) {
     const task = parseTaskJson(row.task_json) || {};
@@ -125,12 +186,16 @@ function taskRowToDetailTask(row) {
     task.latest_attempt_id = row.latest_attempt_id ?? null;
     task.prompt_template_artifact_id = row.prompt_template_artifact_id ?? null;
 
-    task.meta = task.meta || {};
-    if (row.parent_id) task.meta.parent_id = row.parent_id;
-    if (row.workflow_id) task.meta.workflow_id = row.workflow_id;
+    task.meta =
+        task.meta && typeof task.meta === 'object' ? /** @type {Record<string, unknown>} */ (task.meta) : {};
+    const taskMeta = /** @type {Record<string, unknown>} */ (task.meta);
+    if (row.parent_id) taskMeta.parent_id = row.parent_id;
+    if (row.workflow_id) taskMeta.workflow_id = row.workflow_id;
 
-    task.state = task.state || {};
-    task.state.status = row.status;
+    task.state =
+        task.state && typeof task.state === 'object' ? /** @type {Record<string, unknown>} */ (task.state) : {};
+    const taskState = /** @type {Record<string, unknown>} */ (task.state);
+    taskState.status = row.status;
 
     // Expose DB columns that are not stored inside task_json so the UI
     // can show actionable information for BLOCKED/FAILED tasks.
@@ -140,7 +205,7 @@ function taskRowToDetailTask(row) {
     task.blocked_at_ms = row.blocked_at_ms ?? null;
     /** @type {string|null} Last error text from most recent failed attempt. */
     task.last_error = row.last_error ?? null;
-    /** @type {Record<string,any>|string|null} Parsed blocked_details_json, or raw string if invalid JSON. */
+    /** @type {Record<string, unknown>|string|null} Parsed blocked_details_json, or raw string if invalid JSON. */
     task.blocked_details = null;
     if (row.blocked_details_json) {
         try {

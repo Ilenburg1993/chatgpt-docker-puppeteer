@@ -4,6 +4,10 @@ Canonic orchestration skill for phase 2 typing hardening.
 
 Load [SKILL.md](./SKILL.md) before using this skill.
 
+Normative canon:
+
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md)
+
 Key references:
 
 - [`references/tsserver-contract.md`](./references/tsserver-contract.md)

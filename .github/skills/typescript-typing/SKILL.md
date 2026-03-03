@@ -12,6 +12,10 @@ license: MIT
 
 This skill governs incremental typing in a JS-first codebase.
 
+The normative repository canon lives in:
+
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md)
+
 The default path is:
 
 - JSDoc in source files
@@ -66,3 +70,4 @@ The default path is:
 - [`../jsdoc-authoring/SKILL.md`](../jsdoc-authoring/SKILL.md)
 - [`../typing-node24-esm-tsserver/SKILL.md`](../typing-node24-esm-tsserver/SKILL.md)
 - [`../schema-contract-governance/SKILL.md`](../schema-contract-governance/SKILL.md)
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md)

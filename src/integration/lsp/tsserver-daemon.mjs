@@ -119,7 +119,7 @@ class TsserverDaemon {
         this.timeoutMs = Number(options.timeoutMs || DEFAULT_TIMEOUT_MS);
         this.started = false;
         this.requestSeq = 0;
-        /** @type {Promise<any>} */
+        /** @type {Promise<unknown>} */
         this.queue = Promise.resolve(undefined);
         /** @type {Map<string, AbortController>} */
         this.activeRequests = new Map();
@@ -251,15 +251,15 @@ class TsserverDaemon {
                     if (!sourceFile) return null;
                     const start = offsetToLineChar(sourceFile, ref.textSpan.start);
                     const end = offsetToLineChar(sourceFile, ref.textSpan.start + ref.textSpan.length);
-                    const refAny = /** @type {any} */ (ref);
+                    const refEntry = /** @type {ts.ReferenceEntry & { isDefinition?: boolean }} */ (ref);
                     return {
                         filePath: ref.fileName,
                         line: start.line,
                         character: start.character,
                         endLine: end.line,
                         endCharacter: end.character,
-                        isDefinition: Boolean(refAny.isDefinition),
-                        isWriteAccess: Boolean(refAny.isWriteAccess),
+                        isDefinition: Boolean(refEntry.isDefinition),
+                        isWriteAccess: Boolean(refEntry.isWriteAccess),
                     };
                 })
                 .filter(Boolean);
@@ -525,6 +525,12 @@ class TsserverDaemon {
 let singleton = null;
 
 /**
+ * @typedef {object} TsserverDaemonStartOptions
+ * @property {string} [rootDir]
+ * @property {number} [timeoutMs]
+ */
+
+/**
  * Returns the singleton wrapper around the local tsserver-backed language service.
  * @returns {import('./tsserver-contract.d.ts').TsserverDaemonFacade}
  */
@@ -540,7 +546,7 @@ export function getTsserverDaemon() {
 
 /**
  * Starts the singleton daemon and applies the optional timeout override.
- * @param {import('./tsserver-contract.d.ts').TsserverDaemonOptions} [options={}]
+ * @param {TsserverDaemonStartOptions} [options={}]
  * @returns {Promise<import('./tsserver-contract.d.ts').TsserverStartResult>}
  */
 export async function startTsserverDaemon(options = {}) {
@@ -552,7 +558,7 @@ export async function startTsserverDaemon(options = {}) {
 }
 
 /**
- * Stops the singleton daemon and aborts any queued in-flight request.
+ * Stops the singleton daemon and aborts the queued in-flight request, when present.
  * @returns {Promise<import('./tsserver-contract.d.ts').TsserverStopResult>}
  */
 export async function stopTsserverDaemon() {

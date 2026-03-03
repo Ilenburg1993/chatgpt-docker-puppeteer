@@ -30,9 +30,16 @@ consulta estável do projeto.
 - [MODULE_ALIASES.md](./MODULE_ALIASES.md)
 - [SCRIPTS.md](./SCRIPTS.md)
 - [GLOSSARY.md](./GLOSSARY.md)
+- [TYPING_INDEX.md](./TYPING_INDEX.md)
 
 ## Referências especializadas desta pasta
 
+- Tipagem e contratos:
+  - [TYPING_INDEX.md](./TYPING_INDEX.md)
+  - [TYPING_JSDOC_CANON.md](./TYPING_JSDOC_CANON.md)
+  - [TYPING_CONTRACT_MATRIX.md](./TYPING_CONTRACT_MATRIX.md)
+  - [TYPING_AUTOMATION_INDEX.md](./TYPING_AUTOMATION_INDEX.md)
+  - [TYPING_SCHEMA_TSSERVER_CANON.md](./TYPING_SCHEMA_TSSERVER_CANON.md)
 - Saúde e readiness:
   - [HEALTH_ENDPOINT.md](./HEALTH_ENDPOINT.md)
   - [REBUILD_READY_CHECKLIST.md](./REBUILD_READY_CHECKLIST.md)
@@ -73,6 +80,8 @@ consulta estável do projeto.
 
 - Se o documento responder “qual é o contrato”, “qual é a configuração” ou “qual é a referência
   estável”, ele tende a pertencer aqui.
+- Se o documento responder "qual e o canon de tipagem/JSDoc", a entrada primaria deve ser
+  `TYPING_INDEX.md`, com regras normativas em `TYPING_JSDOC_CANON.md`.
 - Relatórios com cara de análise podem permanecer aqui apenas quando funcionarem como referência
   técnica recorrente; se forem puramente históricos, devem migrar para `RELATORIOS/` ou
   `ARQUIVO_MORTO/`.

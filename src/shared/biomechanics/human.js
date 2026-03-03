@@ -787,13 +787,16 @@ function _computeFlightTime(profileConfig, char, page) {
     return Math.max(0, Math.min(BIOMECHANICS_CONFIG.MAX_FLIGHT_TIME, scaled));
 }
 
+/** @typedef {{ page: unknown, _emitVital: (event: string, payload?: Record<string, unknown>) => void }} HumanDriverLike */
+/** @typedef {{ signal?: AbortSignal|null, profile?: string }} HumanActionOptions */
+
 // ============================================
 // PUBLIC API (Driver-first) + Legacy Compatibility
 // ============================================
 
 /**
  * Executa clique humano realista em elemento usando biometria comportamental
- * @param {...any} args - Driver-first `(driver, selector, options?)` ou legacy `(page, ctx, selector, ...)`
+ * @param {...unknown} args - Driver-first `(driver, selector, options?)` ou legacy `(page, ctx, selector, ...)`
  * @returns {Promise<boolean>} true se clique foi executado com sucesso
  * @throws {TypeError} Se parâmetros obrigatórios estiverem ausentes ou inválidos
  * @sideEffects Move mouse, executa clique, emite eventos vitais - operação I/O
@@ -810,9 +813,9 @@ async function humanClick(...args) {
         return true;
     }
 
-    const driver = args[0];
+    const driver = /** @type {HumanDriverLike} */ (args[0]);
     const selector = args[1];
-    const options = args[2] || {};
+    const options = /** @type {HumanActionOptions} */ (args[2] || {});
 
     if (!driver || typeof driver !== 'object') {
         throw new TypeError('humanClick: driver is required');
@@ -824,7 +827,7 @@ async function humanClick(...args) {
         throw new TypeError('humanClick: selector is required');
     }
 
-    const page = driver.page;
+    const page = /** @type {any} */ (driver.page);
     const signal = options.signal || null;
 
     if (signal?.aborted) {
@@ -886,8 +889,9 @@ async function humanClick(...args) {
 }
 
 /**
- * Função exportada: humanType.
- * @returns {Promise<any>}
+ * Executa digitação humana realista com suporte ao contrato driver-first e ao wrapper legado.
+ * @param {...unknown} args - Driver-first `(driver, selector, text, options?)` ou legacy `(page, ctx, selector, text, ...)`
+ * @returns {Promise<boolean>}
  */
 async function humanType(...args) {
     if (_isLegacyHumanTypeArgs(args)) {
@@ -901,10 +905,10 @@ async function humanType(...args) {
         return true;
     }
 
-    const driver = args[0];
+    const driver = /** @type {HumanDriverLike} */ (args[0]);
     const selector = args[1];
     const text = args[2];
-    const options = args[3] || {};
+    const options = /** @type {HumanActionOptions} */ (args[3] || {});
 
     if (!driver || typeof driver !== 'object') {
         throw new TypeError('humanType: driver is required');
@@ -929,7 +933,7 @@ async function humanType(...args) {
         return true;
     }
 
-    const page = driver.page;
+    const page = /** @type {any} */ (driver.page);
     const signal = options.signal || null;
     const profile = options.profile || 'balanced';
     const profileConfig = _resolveTypingProfile(profile);

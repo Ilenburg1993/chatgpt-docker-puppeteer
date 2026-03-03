@@ -3,6 +3,25 @@
 import { listInferenceProfiles } from '../infra/db/inference_profile_repo.js';
 import { listInferenceClientPolicies } from '../infra/db/inference_client_policy_repo.js';
 
+/**
+ * @typedef {object} InferencePolicyLayer
+ * @property {number|null} [timeout_ms]
+ * @property {number|null} [max_parallel]
+ * @property {number|null} [max_tokens]
+ * @property {string[]|null} [allowed_models]
+ * @property {string[]|null} [allowed_backends]
+ * @property {string|null} [degraded_behavior]
+ * @property {string} [profile_id]
+ * @property {string|null} [profile_name]
+ */
+
+/**
+ * @typedef {object} InferencePolicyPersistenceSnapshot
+ * @property {Record<string, InferencePolicyLayer>} profilePolicies
+ * @property {Record<string, InferencePolicyLayer>} clientPolicies
+ * @property {{ profileCount:number, clientPolicyCount:number }} meta
+ */
+
 function asPlainObject(value, fallback = {}) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : fallback;
 }
@@ -43,14 +62,14 @@ function clientPolicyToLayer(policy) {
 
 /**
  * Carrega profiles/policies persistidos do SQLite.
- * @returns {{ profilePolicies: Record<string, any>, clientPolicies: Record<string, any>, meta: { profileCount:number, clientPolicyCount:number } }}
+ * @returns {InferencePolicyPersistenceSnapshot}
  */
 export function loadInferencePoliciesFromDb() {
     const profiles = listInferenceProfiles({ enabledOnly: true, limit: 500 });
     const clientPolicies = listInferenceClientPolicies({ enabledOnly: true, limit: 500 });
     const profileIdToName = new Map();
 
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, InferencePolicyLayer>} */
     const profileMap = Object.create(null);
     for (const profile of profiles) {
         if (!profile?.name) continue;
@@ -58,7 +77,7 @@ export function loadInferencePoliciesFromDb() {
         profileMap[String(profile.name)] = profileToPolicyLayer(profile);
     }
 
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, InferencePolicyLayer>} */
     const clientMap = Object.create(null);
     for (const policy of clientPolicies) {
         if (!policy?.client_tag) continue;

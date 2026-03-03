@@ -16,6 +16,8 @@ This skill documents the local wrapper around TypeScript language services imple
 The canonical contract lives in:
 
 - [`../../../schemas/typing/tsserver-tool-contract.schema.json`](../../../schemas/typing/tsserver-tool-contract.schema.json)
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md)
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_SCHEMA_TSSERVER_CANON.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_SCHEMA_TSSERVER_CANON.md)
 
 ## When To Use
 
@@ -69,3 +71,4 @@ The canonical contract lives in:
 
 - [`../typing-node24-esm-tsserver/SKILL.md`](../typing-node24-esm-tsserver/SKILL.md)
 - [`../schema-contract-governance/SKILL.md`](../schema-contract-governance/SKILL.md)
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md)

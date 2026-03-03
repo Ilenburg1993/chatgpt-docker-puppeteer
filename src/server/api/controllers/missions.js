@@ -1148,6 +1148,7 @@ export default router;
 
 /**
  * Função exportada: setMissionManager.
+ * @param {unknown} _ - Parâmetro ignorado (interface legado)
  * @returns {void}
  */
 function setMissionManager(_) {

@@ -55,11 +55,14 @@ jobs:
           }
 
           run_check typecheck-repo npm run typecheck:repo
+          run_check typecheck-strict-public npm run typecheck:strict:public
           run_check typecheck-strict-all npm run typecheck:strict:all
           run_check typecheck-declarations npm run typecheck:declarations
           run_check jsdoc-coverage npm run jsdoc:coverage:json -- --validate-schema --output-json artifacts/typing/jsdoc-report.json
+          run_check jsdoc-coverage-public npm run jsdoc:coverage:public
           run_check check-schemas npm run check:schemas:typing
           run_check analyze-typing bash -lc "npm run analyze:typing:json > artifacts/typing/typing-audit.json"
+          run_check analyze-typing-public bash -lc "npm run analyze:typing:json -- --scope public > artifacts/typing/typing-audit-public.json"
           run_check check-skills npm run check:skills:strict
 
       - name: Build summary and enforce gate
@@ -72,11 +75,14 @@ jobs:
 
           const requiredSteps = [
             ['typecheck-repo', 'typecheck:repo'],
+            ['typecheck-strict-public', 'typecheck:strict:public'],
             ['typecheck-strict-all', 'typecheck:strict:all'],
             ['typecheck-declarations', 'typecheck:declarations'],
             ['jsdoc-coverage', 'jsdoc:coverage:json'],
+            ['jsdoc-coverage-public', 'jsdoc:coverage:public'],
             ['check-schemas', 'check:schemas:typing'],
             ['analyze-typing', 'analyze:typing'],
+            ['analyze-typing-public', 'analyze:typing:public'],
             ['check-skills', 'check:skills:strict'],
           ];
 
@@ -91,6 +97,9 @@ jobs:
             : null;
           const typing = fs.existsSync('artifacts/typing/typing-audit.json')
             ? JSON.parse(fs.readFileSync('artifacts/typing/typing-audit.json', 'utf8'))
+            : null;
+          const typingPublic = fs.existsSync('artifacts/typing/typing-audit-public.json')
+            ? JSON.parse(fs.readFileSync('artifacts/typing/typing-audit-public.json', 'utf8'))
             : null;
 
           const lines = ['## JSDoc & Typing Gate', ''];
@@ -128,6 +137,19 @@ jobs:
 
           lines.push(`- skill governance status: ${exitCodeFor('check-skills') === 0 ? 'ok' : 'failed'}`);
           lines.push(`- tsserver/schema drift status: ${exitCodeFor('check-schemas') === 0 ? 'ok' : 'failed'}`);
+          lines.push('');
+          lines.push('### Public Contracts');
+          if (typingPublic?.public_scope) {
+            lines.push(`- files: ${typingPublic.public_scope.files}`);
+            lines.push(`- exports: ${typingPublic.public_scope.exports_total}`);
+            lines.push(`- functions_missing_param_tags: ${typingPublic.public_scope.functions_missing_param_tags}`);
+            lines.push(`- functions_missing_options_typedef: ${typingPublic.public_scope.functions_missing_options_typedef}`);
+            lines.push(`- unsafe_generic_tags_total: ${typingPublic.public_scope.unsafe_generic_tags_total}`);
+            lines.push(`- public_any_tags_total: ${typingPublic.public_scope.public_any_tags_total}`);
+          } else {
+            hasFailure = true;
+            lines.push('- public contracts audit: missing');
+          }
 
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
 

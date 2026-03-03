@@ -13,6 +13,14 @@ const requiredCanonicalSkills = [
     '.github/skills/schema-contract-governance',
 ];
 
+const requiredCanonicalDocs = [
+    'DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md',
+    'DOCUMENTAÇÃO/REFERENCIA/TYPING_CONTRACT_MATRIX.md',
+    'DOCUMENTAÇÃO/REFERENCIA/TYPING_AUTOMATION_INDEX.md',
+    'DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md',
+    'DOCUMENTAÇÃO/PLANOS/TYPING_CANON_LIFECYCLE.md',
+];
+
 const requiredReferenceSkills = new Set([
     '.github/skills/typing-node24-esm-tsserver',
     '.github/skills/schema-contract-governance',
@@ -24,6 +32,8 @@ const requiredCodexStubs = [
     '.codex/skills/typescript-strict-hardening/SKILL.md',
     '.codex/skills/schema-contract-governance/SKILL.md',
 ];
+
+const requiredCanonAnchor = 'TYPING_JSDOC_CANON.md';
 
 /**
  * @param {string} filePath
@@ -67,8 +77,29 @@ for (const skillDir of requiredCanonicalSkills) {
     if (requiredReferenceSkills.has(skillDir) && !fs.existsSync(path.resolve(skillDir, 'references'))) {
         issues.push(`Missing references directory for canonical skill: ${skillDir}`);
     }
+    if (fs.existsSync(readmePath)) {
+        const readmeText = fs.readFileSync(readmePath, 'utf8');
+        if (!readmeText.includes(requiredCanonAnchor)) {
+            issues.push(`Canonical skill README must link to the typing canon: ${readmePath}`);
+        }
+    }
+    if (fs.existsSync(skillPath)) {
+        const skillText = fs.readFileSync(skillPath, 'utf8');
+        if (!skillText.includes(requiredCanonAnchor)) {
+            issues.push(`Canonical skill SKILL.md must link to the typing canon: ${skillPath}`);
+        }
+    }
     if (fs.existsSync(readmePath)) validateLocalLinks(readmePath, issues);
     if (fs.existsSync(skillPath)) validateLocalLinks(skillPath, issues);
+}
+
+for (const docPath of requiredCanonicalDocs) {
+    const absolutePath = path.resolve(docPath);
+    if (!fs.existsSync(absolutePath)) {
+        issues.push(`Missing canonical typing document: ${absolutePath}`);
+        continue;
+    }
+    validateLocalLinks(absolutePath, issues);
 }
 
 for (const stubPath of requiredCodexStubs) {

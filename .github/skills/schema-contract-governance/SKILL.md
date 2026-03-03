@@ -12,6 +12,10 @@ license: MIT
 
 This skill governs contract layering in the repository.
 
+The normative repository canon lives in:
+
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md)
+
 It answers:
 
 - when JSDoc is enough
@@ -61,3 +65,4 @@ It answers:
 - [`../jsdoc-authoring/SKILL.md`](../jsdoc-authoring/SKILL.md)
 - [`../typescript-typing/SKILL.md`](../typescript-typing/SKILL.md)
 - [`../typing-node24-esm-tsserver/SKILL.md`](../typing-node24-esm-tsserver/SKILL.md)
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_CONTRACT_MATRIX.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_CONTRACT_MATRIX.md)

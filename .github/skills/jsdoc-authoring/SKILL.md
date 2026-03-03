@@ -13,6 +13,10 @@ license: MIT
 Use this skill when the task is to author or harden JSDoc in `.js/.mjs/.cjs` without migrating the
 runtime wholesale to `.ts`.
 
+The normative repository canon lives in:
+
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md)
+
 This phase assumes:
 
 - Node.js 24
@@ -69,3 +73,4 @@ This phase assumes:
 - [`../typescript-typing/SKILL.md`](../typescript-typing/SKILL.md)
 - [`../typing-node24-esm-tsserver/SKILL.md`](../typing-node24-esm-tsserver/SKILL.md)
 - [`../schema-contract-governance/SKILL.md`](../schema-contract-governance/SKILL.md)
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_INDEX.md)

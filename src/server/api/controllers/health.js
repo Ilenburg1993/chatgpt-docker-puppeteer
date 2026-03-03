@@ -5,15 +5,22 @@ import { _resolveArtifactsRoot } from '#infra/storage/artifact_store';
 import fs from 'node:fs/promises';
 
 /**
+ * @typedef {{ app?: { locals?: { kernel?: { getStatus?: () => unknown } } } }} HealthRequestLike
+ * @typedef {{ json: (payload: unknown) => unknown, status: (code: number) => HealthResponseLike }} HealthResponseLike
+ * @typedef {{ bsize: number, blocks: number, bfree: number, bavail: number, free_bytes: number, total_bytes: number }} DiskStatfsSummary
+ * @typedef {{ path: string, exists: boolean, statfs: DiskStatfsSummary|null }} DiskHealthEntry
+ */
+
+/**
  * GET /api/health - Health check geral do sistema.
  *
  * **Side-effects:** Coleta métricas de sistema (uptime, memória, PID).
  * **Semântica:** Verificação básica de saúde do processo Node.js.
  * **Unidades:** uptime em segundos, memory em bytes, timestamp em milissegundos.
  *
- * @param {object} req - Requisição HTTP
- * @param {object} res - Resposta HTTP
-  * @returns {Promise<void>}
+ * @param {HealthRequestLike} req - Requisição HTTP
+ * @param {HealthResponseLike} res - Resposta HTTP
+ * @returns {Promise<void>}
  */
 async function getHealth(req, res) {
     try {
@@ -37,9 +44,9 @@ async function getHealth(req, res) {
  * **Semântica:** Verifica se Chrome está acessível e respondendo.
  * **Unidades:** Timeout de 3000ms para verificação.
  *
- * @param {object} req - Requisição HTTP
- * @param {object} res - Resposta HTTP
-  * @returns {Promise<void>}
+ * @param {HealthRequestLike} req - Requisição HTTP
+ * @param {HealthResponseLike} res - Resposta HTTP
+ * @returns {Promise<void>}
  */
 async function getChromeHealth(req, res) {
     try {
@@ -75,7 +82,9 @@ async function getChromeHealth(req, res) {
 
 /**
  * GET /api/health/pm2 - Health check dos processos PM2
-  * @returns {Promise<void>}
+ * @param {HealthRequestLike} req
+ * @param {HealthResponseLike} res
+ * @returns {Promise<void>}
  */
 async function getPm2Health(req, res) {
     try {
@@ -95,7 +104,9 @@ async function getPm2Health(req, res) {
 
 /**
  * GET /api/health/kernel - Health check do Kernel
-  * @returns {Promise<any>}
+ * @param {HealthRequestLike} req
+ * @param {HealthResponseLike} res
+ * @returns {Promise<void>}
  */
 async function getKernelHealth(req, res) {
     try {
@@ -103,19 +114,21 @@ async function getKernelHealth(req, res) {
         const hasKernel = Boolean(kernel);
 
         if (!hasKernel) {
-            return res.json({
+            res.json({
                 status: 'not_applicable',
                 message: 'Kernel not injected in server process',
                 timestamp: Date.now(),
             });
+            return;
         }
 
         if (typeof kernel.getStatus === 'function') {
-            return res.json({
+            res.json({
                 status: 'ok',
                 kernel: kernel.getStatus(),
                 timestamp: Date.now(),
             });
+            return;
         }
 
         res.json({
@@ -131,7 +144,9 @@ async function getKernelHealth(req, res) {
 
 /**
  * GET /api/health/disk - Health check do disco
-  * @returns {Promise<void>}
+ * @param {HealthRequestLike} req
+ * @param {HealthResponseLike} res
+ * @returns {Promise<void>}
  */
 async function getDiskHealth(req, res) {
     try {
@@ -143,7 +158,7 @@ async function getDiskHealth(req, res) {
             { name: 'artifacts', path: artifactsDir },
         ];
 
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, DiskHealthEntry>} */
         const out = {};
         let okCount = 0;
 

@@ -32,3 +32,10 @@ documentação canônica em `DOCUMENTAÇÃO/`.
 
 Use este diretório apenas para consulta histórica, auditoria e rastreabilidade. O ponto de entrada
 canônico continua em `../README.md`.
+
+Para tipagem e JSDoc, o ponto de entrada normativo e:
+
+- [../REFERENCIA/TYPING_INDEX.md](../REFERENCIA/TYPING_INDEX.md)
+
+Material daqui nao deve ser usado como fonte de regra ativa para tipagem, JSDoc, schemas, skills
+ou CI.

@@ -21,6 +21,8 @@ mágicas e cobertura JSDoc.
 | `jsdoc_coverage_cli.mjs`                     | CLI de cobertura JSDoc                    |
 | `jsdoc_coverage_engine.mjs`                  | Engine de análise de cobertura JSDoc      |
 | `jsdoc_backfill_missing_exports.mjs`         | Identifica exports sem JSDoc              |
+| `typing_hardening_audit.mjs`                 | Auditoria agregada de tipagem e contratos |
+| `tsserver_contract_audit.mjs`                | Verifica drift do wrapper local LSP       |
 | `scan_magic_strings.js`                      | Detecta strings mágicas no código         |
 | `scan_literals.js` / `scan_literals_deep.js` | Scanner de literais                       |
 
@@ -28,8 +30,11 @@ mágicas e cobertura JSDoc.
 
 - Scripts devem ser somente leitura — não modificar source.
 - Usar `npm run jsdoc:coverage` para executar análise de JSDoc.
+- Para a superficie canônica de automação de tipagem/JSDoc, consultar
+  `DOCUMENTAÇÃO/REFERENCIA/TYPING_AUTOMATION_INDEX.md`.
 
 ## Links relacionados
 
 - Scripts pai: `scripts/README.md`
 - Análise circular: `npm run analyze:deps`
+- Canon de tipagem/JSDoc: `DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`

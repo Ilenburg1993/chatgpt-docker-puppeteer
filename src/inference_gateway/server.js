@@ -3,6 +3,13 @@
 import http from 'node:http';
 import { inferenceGateway } from './gateway.js';
 
+/**
+ * @typedef {object} InferenceGatewayServerOptions
+ * @property {typeof inferenceGateway} [gateway]
+ * @property {(() => Promise<unknown>|unknown)|null} [reloadPolicies]
+ */
+/** @typedef {Error & { statusCode?: number, code?: string }} InferenceGatewayServerError */
+
 function readJsonBody(req) {
     return new Promise((resolve, reject) => {
         let raw = '';
@@ -34,10 +41,11 @@ function writeJson(res, statusCode, body) {
 /**
  * Cria o servidor HTTP do Inference Gateway.
  * Expõe health, metrics, reload de policies e endpoints de inferência.
- * @param {{ gateway?: typeof inferenceGateway, reloadPolicies?: (() => Promise<unknown>|unknown)|null }} [options={}]
+ * @param {InferenceGatewayServerOptions} [options={}]
  * @returns {http.Server}
  */
-export function createInferenceGatewayServer({ gateway = inferenceGateway, reloadPolicies = null } = {}) {
+export function createInferenceGatewayServer(options = {}) {
+    const { gateway = inferenceGateway, reloadPolicies = null } = options;
     return http.createServer(async (req, res) => {
         try {
             const url = new URL(req.url || '/', 'http://localhost');
@@ -62,12 +70,13 @@ export function createInferenceGatewayServer({ gateway = inferenceGateway, reloa
                 return writeJson(res, 200, { ok: true, reloaded: out || null });
             }
             if (req.method === 'POST' && url.pathname === '/v1/generate') {
-                const body = /** @type {any} */ (await readJsonBody(req));
+                const body = /** @type {Parameters<typeof gateway.generate>[0]} */ (await readJsonBody(req));
                 const out = await gateway.generate(body);
                 return writeJson(res, 200, out);
             }
             if (req.method === 'POST' && url.pathname === '/v1/validate/generate') {
-                const body = /** @type {any} */ (await readJsonBody(req));
+                const body =
+                    /** @type {Parameters<NonNullable<typeof gateway.validateGenerate>>[0]} */ (await readJsonBody(req));
                 const out =
                     typeof gateway.validateGenerate === 'function'
                         ? gateway.validateGenerate(body)
@@ -75,21 +84,22 @@ export function createInferenceGatewayServer({ gateway = inferenceGateway, reloa
                 return writeJson(res, out?.ok ? 200 : 400, out);
             }
             if (req.method === 'POST' && url.pathname === '/v1/embed') {
-                const body = /** @type {any} */ (await readJsonBody(req));
+                const body = /** @type {Parameters<typeof gateway.embed>[0]} */ (await readJsonBody(req));
                 const out = await gateway.embed(body);
                 return writeJson(res, 200, out);
             }
             if (req.method === 'POST' && url.pathname === '/v1/models') {
-                const body = /** @type {any} */ (await readJsonBody(req));
+                const body = /** @type {Parameters<typeof gateway.listModels>[0]} */ (await readJsonBody(req));
                 const out = await gateway.listModels(body);
                 return writeJson(res, 200, out);
             }
 
             return writeJson(res, 404, { ok: false, error: 'not_found' });
         } catch (error) {
-            return writeJson(res, /** @type {any} */ (error).statusCode || 500, {
+            const typedError = /** @type {InferenceGatewayServerError} */ (error);
+            return writeJson(res, typedError.statusCode || 500, {
                 ok: false,
-                error: /** @type {any} */ (error).code || 'INFERENCE_GATEWAY_ERROR',
+                error: typedError.code || 'INFERENCE_GATEWAY_ERROR',
                 message: error?.message || String(error),
             });
         }

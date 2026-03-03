@@ -3,6 +3,23 @@
 import { retryWithBackoff } from '#core/retry_policy';
 
 /** @typedef {'ready'|'degraded'|'not-ready'|'stopped'} OllamaHostState */
+/**
+ * @typedef {object} OllamaHostSupervisorOptions
+ * @property {string} [baseUrl]
+ * @property {typeof fetch} [fetch]
+ * @property {number} [pollMs]
+ * @property {number} [requestTimeoutMs]
+ * @property {boolean} [circuitEnabled]
+ * @property {number} [circuitThreshold]
+ * @property {number} [circuitTimeoutMs]
+ * @property {boolean} [retryEnabled]
+ * @property {() => number} [now]
+ * @property {typeof setInterval} [setIntervalFn]
+ * @property {typeof clearInterval} [clearIntervalFn]
+ * @property {(level: string, message: string, data?: unknown) => void | null} [logger]
+ * @property {(state: ReturnType<OllamaHostSupervisor['getState']>) => void | null} [onStateChange]
+ * @property {{ upsert?: (payload: unknown) => unknown, setState?: (id: string, state: unknown, details?: unknown) => unknown } | null} [resourceHooks]
+ */
 
 function parseBool(value, fallback) {
     if (value === undefined || value === null || value === '') return fallback;
@@ -30,22 +47,7 @@ function buildVersionUrl(baseUrl) {
  */
 export class OllamaHostSupervisor {
     /**
-     * @param {{
-     *   baseUrl?: string,
-     *   fetch?: typeof fetch,
-     *   pollMs?: number,
-     *   requestTimeoutMs?: number,
-     *   circuitEnabled?: boolean,
-     *   circuitThreshold?: number,
-     *   circuitTimeoutMs?: number,
-     *   retryEnabled?: boolean,
-     *   now?: () => number,
-     *   setIntervalFn?: typeof setInterval,
-     *   clearIntervalFn?: typeof clearInterval,
-     *   logger?: ((level:string, message:string, data?:unknown)=>void)|null,
-     *   onStateChange?: ((state: ReturnType<OllamaHostSupervisor['getState']>) => void)|null,
-     *   resourceHooks?: { upsert?: (payload: any) => unknown, setState?: (id:string, state: any, details?: any) => unknown }|null,
-     * }} [options]
+     * @param {OllamaHostSupervisorOptions} [options]
      */
     constructor(options = {}) {
         this.baseUrl =
@@ -261,7 +263,7 @@ export class OllamaHostSupervisor {
 
 /**
  * Cria uma instância do supervisor de host Ollama.
- * @param {ConstructorParameters<typeof OllamaHostSupervisor>[0]} [options]
+ * @param {OllamaHostSupervisorOptions} [options]
  * @returns {OllamaHostSupervisor}
  */
 export function createOllamaHostSupervisor(options = {}) {

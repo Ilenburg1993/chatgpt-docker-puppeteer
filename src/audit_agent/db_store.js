@@ -5,14 +5,25 @@ import { upsertAuditFinding } from '#infra/db/audit_finding_repo';
 import { createAuditPatchProposal } from '#infra/db/audit_patch_repo';
 
 /**
+ * @typedef {object} AuditAgentDbStore
+ * @property {(job: Record<string, unknown>) => unknown} saveJob
+ * @property {(job: Record<string, unknown>) => unknown} onRunStart
+ * @property {(job: Record<string, unknown>) => unknown} onRunFinish
+ * @property {(jobId: string, findings?: Record<string, unknown>[]) => unknown[]} saveFindings
+ * @property {(jobId: string, patches?: Record<string, unknown>[]) => unknown[]} savePatchProposals
+ * @property {typeof listAuditJobs} listJobs
+ * @property {typeof getAuditJobById} getJobById
+ */
+
+/**
  * Store persistente (SQLite) para snapshots de jobs e runs do Audit Agent.
  * É um sink incremental: o runtime em memória continua sendo fonte de execução na V0.
-  * @returns {any}
+ * @returns {AuditAgentDbStore}
  */
 export function createAuditAgentDbStore() {
     return {
         /**
-         * @param {any} job
+         * @param {Record<string, unknown>} job
          */
         saveJob(job) {
             const existing = getAuditJobById(job?.id);
@@ -22,7 +33,7 @@ export function createAuditAgentDbStore() {
             return upsertAuditJobSnapshot(job);
         },
         /**
-         * @param {any} job
+         * @param {Record<string, unknown>} job
          */
         onRunStart(job) {
             if (!job?.current_run_id) return null;
@@ -41,7 +52,7 @@ export function createAuditAgentDbStore() {
             }
         },
         /**
-         * @param {any} job
+         * @param {Record<string, unknown>} job
          */
         onRunFinish(job) {
             if (!job?.current_run_id) return null;
@@ -61,7 +72,7 @@ export function createAuditAgentDbStore() {
         },
         /**
          * @param {string} jobId
-         * @param {Array<any>} findings
+         * @param {Record<string, unknown>[]} [findings=[]]
          */
         saveFindings(jobId, findings = []) {
             const rows = [];
@@ -88,7 +99,7 @@ export function createAuditAgentDbStore() {
         },
         /**
          * @param {string} jobId
-         * @param {Array<any>} patches
+         * @param {Record<string, unknown>[]} [patches=[]]
          */
         savePatchProposals(jobId, patches = []) {
             const rows = [];

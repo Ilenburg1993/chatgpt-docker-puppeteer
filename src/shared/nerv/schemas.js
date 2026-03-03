@@ -1,6 +1,16 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { ActionCode, ActorRole, MessageType, PROTOCOL_VERSION } from './constants.js';
 
+/**
+ * @typedef {object} NERVRobotIdentity
+ * @property {string} robot_id
+ * @property {string} instance_id
+ * @property {import('./constants.js').ActorRole} role
+ * @property {string} version
+ * @property {string[]} capabilities
+ * @property {{ platform: string, node_version: string, started_at: string }} metadata
+ */
+
 /* --------------------------------------------------------------------------
  * INTERNAL GUARDS
  * ------------------------------------------------------------------------ */
@@ -41,14 +51,7 @@ function isUUID(value) {
 
 /**
  * Valida a estrutura básica de um envelope NERV canônico
- * @param {object} envelope - Envelope a ser validado
- * @param {object} envelope.protocol - Bloco de protocolo
- * @param {string} envelope.protocol.version - Versão do protocolo
- * @param {number} envelope.protocol.timestamp - Timestamp numérico
- * @param {object} envelope.identity - Bloco de identidade
- * @param {object} envelope.causality - Bloco de causalidade
- * @param {object} envelope.type - Bloco de tipo
- * @param {object} envelope.payload - Payload da mensagem
+ * @param {any} envelope - Envelope a ser validado
  * @throws {Error} Se a estrutura violar o esquema
  * @sideEffects Pode lançar erro - função de validação
  */
@@ -94,11 +97,7 @@ function validateStructure(envelope) {
 
 /**
  * Valida a ontologia e semântica de um envelope NERV
- * @param {object} envelope - Envelope a ser validado
- * @param {object} envelope.identity - Bloco de identidade com actor e target
- * @param {object} envelope.causality - Bloco de causalidade com IDs UUID
- * @param {object} envelope.type - Bloco de tipo com message_type e action_code
- * @param {object} envelope.payload - Payload da mensagem
+ * @param {any} envelope - Envelope a ser validado
  * @throws {Error} Se a ontologia violar as regras do protocolo
  * @sideEffects Pode lançar erro - função de validação
  */
@@ -159,7 +158,7 @@ const FORBIDDEN_FIELDS = ['status', 'result', 'success', 'error', 'response', 'r
 
 /**
  * Valida proibições semânticas em envelope NERV (campos proibidos)
- * @param {object} envelope - Envelope a ser verificado
+ * @param {any} envelope - Envelope a ser verificado
  * @throws {Error} Se encontrar campos semânticos proibidos
  * @sideEffects Pode lançar erro - função de validação negativa
  */
@@ -199,13 +198,8 @@ function validateEnvelope(envelope) {
 
 /**
  * Valida a identidade de um robô/agente no sistema NERV
- * @param {object} identity - Objeto de identidade a ser validado
- * @param {string} identity.robot_id - ID único do robô
- * @param {string} identity.instance_id - ID da instância específica
- * @param {import('./constants.js').ActorRole} identity.role - Papel do ator no sistema
- * @param {string} identity.version - Versão do software do robô
- * @param {string[]} identity.capabilities - Array de capacidades do robô
- * @returns {object} A identidade validada (retornada para chaining)
+ * @param {NERVRobotIdentity} identity - Objeto de identidade a ser validado
+ * @returns {NERVRobotIdentity} A identidade validada (retornada para chaining)
  * @throws {Error} Se a identidade não atender aos requisitos
  * @sideEffects Pode lançar erro - função de validação
  */

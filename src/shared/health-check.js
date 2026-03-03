@@ -43,6 +43,22 @@ export const DEPTH_LEVEL = Object.freeze({
     DEEP: 'deep',
 });
 
+/** @typedef {string} HealthCheckDepth */
+/** @typedef {{ name: string, size: number, modified_at: string }} OllamaModelInfo */
+/** @typedef {{ connected: boolean, host: string, responseTimeMs: number|null, models: OllamaModelInfo[], version: string|null, error: string|null }} OllamaHealthResult */
+/** @typedef {{ connected: boolean, url: string, responseTimeMs: number|null, policiesLoaded: boolean, modelsAvailable: number, error: string|null }} GatewayHealthResult */
+/** @typedef {{ totalMb: number, usedMb: number, freeMb: number, usagePercent: number }} SystemMemoryHealth */
+/** @typedef {{ count: number, loadAverage: number[] }} SystemCpuHealth */
+/** @typedef {{ status: string, memory: SystemMemoryHealth, cpu: SystemCpuHealth, uptime: number, platform?: string, arch?: string, hostname?: string, nodeVersion?: string }} SystemHealthResult */
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function getErrorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -85,21 +101,14 @@ export function getHealthCheckTimeout(defaultTimeout = 30000) {
 
 /**
  * Verifica saúde do Ollama
- * @param {string} depth - Profundidade da verificação (quick, deep)
- * @returns {Promise<{
- *   connected: boolean,
- *   host: string,
- *   responseTimeMs: number|null,
- *   models: Array<{name: string, size: number, modified_at: string}>,
- *   version: string|null,
- *   error: string|null
- * }>}
+ * @param {HealthCheckDepth} [depth='quick'] - Profundidade da verificação
+ * @returns {Promise<OllamaHealthResult>}
  */
 export async function checkOllamaHealth(depth = 'quick') {
     const start = Date.now();
     const ollamaHost = getOllamaHost();
 
-    /** @type {Object} */
+    /** @type {OllamaHealthResult} */
     const result = {
         connected: false,
         host: ollamaHost,
@@ -125,7 +134,7 @@ export async function checkOllamaHealth(depth = 'quick') {
         if (response.ok) {
             result.connected = true;
             const data = await response.json();
-            result.models = (data.models || []).map(m => ({
+            result.models = (Array.isArray(data.models) ? data.models : []).map(/** @param {Record<string, unknown>} m */ m => ({
                 name: m.name,
                 size: m.size,
                 modified_at: m.modified_at,
@@ -138,7 +147,7 @@ export async function checkOllamaHealth(depth = 'quick') {
             result.error = `HTTP ${response.status}: ${response.statusText}`;
         }
     } catch (error) {
-        result.error = error.message;
+        result.error = getErrorMessage(error);
         result.responseTimeMs = Date.now() - start;
     }
 
@@ -168,21 +177,14 @@ async function getOllamaVersion(ollamaHost) {
 
 /**
  * Verifica saúde do Inference Gateway
- * @param {string} depth - Profundidade da verificação (quick, deep)
- * @returns {Promise<{
- *   connected: boolean,
- *   url: string,
- *   responseTimeMs: number|null,
- *   policiesLoaded: boolean,
- *   modelsAvailable: number,
- *   error: string|null
- * }>}
+ * @param {HealthCheckDepth} [depth='quick'] - Profundidade da verificação
+ * @returns {Promise<GatewayHealthResult>}
  */
 export async function checkGatewayHealth(depth = 'quick') {
     const start = Date.now();
     const gatewayUrl = getGatewayUrl();
 
-    /** @type {Object} */
+    /** @type {GatewayHealthResult} */
     const result = {
         connected: false,
         url: gatewayUrl,
@@ -227,7 +229,7 @@ export async function checkGatewayHealth(depth = 'quick') {
             result.error = `HTTP ${response.status}: ${response.statusText}`;
         }
     } catch (error) {
-        result.error = error.message;
+        result.error = getErrorMessage(error);
         result.responseTimeMs = Date.now() - start;
     }
 
@@ -236,17 +238,8 @@ export async function checkGatewayHealth(depth = 'quick') {
 
 /**
  * Verifica saúde do sistema (recursos)
- * @param {string} depth - Profundidade da verificação (quick, deep)
- * @returns {Promise<{
- *   status: string,
- *   memory: {totalMb: number, usedMb: number, freeMb: number, usagePercent: number},
- *   cpu: {count: number, loadAverage: number[]},
- *   uptime: number,
- *   platform?: string,
- *   arch?: string,
- *   hostname?: string,
- *   nodeVersion?: string
- * }>}
+ * @param {HealthCheckDepth} [depth='quick'] - Profundidade da verificação
+ * @returns {Promise<SystemHealthResult>}
  */
 export async function checkSystemHealth(depth = 'quick') {
     // Dynamic import para evitar problemas de inicialização
@@ -257,7 +250,7 @@ export async function checkSystemHealth(depth = 'quick') {
     const usedMem = totalMem - freeMem;
     const memUsagePercent = (usedMem / totalMem) * 100;
 
-    /** @type {Object} */
+    /** @type {SystemHealthResult} */
     const result = {
         status: HEALTH_STATUS.HEALTHY,
         memory: {
@@ -292,18 +285,24 @@ export async function checkSystemHealth(depth = 'quick') {
 
 /**
  * Calcula status geral baseado nos resultados individuais
- * @param {Object} ollama - Resultado do Ollama
- * @param {Object} gateway - Resultado do Gateway
- * @param {Object} system - Resultado do sistema
+ * @param {unknown} ollama - Resultado do Ollama
+ * @param {unknown} gateway - Resultado do Gateway
+ * @param {unknown} system - Resultado do sistema
  * @returns {string}
  */
 export function calculateOverallStatus(ollama, gateway, system) {
+    const ollamaState = ollama && typeof ollama === 'object' ? /** @type {Record<string, unknown>} */ (ollama) : {};
+    const gatewayState = gateway && typeof gateway === 'object' ? /** @type {Record<string, unknown>} */ (gateway) : {};
+    const systemState = system && typeof system === 'object' ? /** @type {Record<string, unknown>} */ (system) : {};
     /** @type {string[]} */
-    const statuses = [ollama.connected ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.UNHEALTHY, system.status];
+    const statuses = [
+        Boolean(ollamaState.connected) ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.UNHEALTHY,
+        typeof systemState.status === 'string' ? systemState.status : HEALTH_STATUS.UNKNOWN,
+    ];
 
     // Gateway é opcional, então só considera se estiver conectado
-    if (gateway.connected !== undefined) {
-        statuses.push(gateway.connected ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED);
+    if (gatewayState.connected !== undefined) {
+        statuses.push(Boolean(gatewayState.connected) ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED);
     }
 
     if (statuses.includes(HEALTH_STATUS.UNHEALTHY)) {
@@ -321,7 +320,7 @@ export function calculateOverallStatus(ollama, gateway, system) {
 
 /**
  * Opções para verificação de saúde completa
- * @typedef {Object} HealthCheckOptions
+ * @typedef {object} HealthCheckOptions
  * @property {string} [depth='quick'] - Profundidade (quick, deep)
  * @property {boolean} [includeOllama=true] - Incluir verificação do Ollama
  * @property {boolean} [includeGateway=true] - Incluir verificação do Gateway
@@ -330,11 +329,11 @@ export function calculateOverallStatus(ollama, gateway, system) {
 
 /**
  * Resultado da verificação de saúde
- * @typedef {Object} HealthCheckResult
+ * @typedef {object} HealthCheckResult
  * @property {string} status - Status geral
- * @property {Object} ollama - Resultado do Ollama
- * @property {Object} gateway - Resultado do Gateway
- * @property {Object} system - Resultado do sistema
+ * @property {Record<string, unknown>} ollama - Resultado do Ollama
+ * @property {Record<string, unknown>} gateway - Resultado do Gateway
+ * @property {Record<string, unknown>} system - Resultado do sistema
  * @property {string} timestamp - Timestamp da verificação
  * @property {number} durationMs - Duração em ms
  */
@@ -362,15 +361,16 @@ export async function checkHealth(options = {}) {
         checks.push(checkSystemHealth(depth));
     }
 
-    /** @type {Object[]} */
     const results = await Promise.all(checks);
 
-    /** @type {Object} */
-    const ollama = includeOllama ? results.shift() : { connected: false, error: 'disabled' };
-    /** @type {Object} */
-    const gateway = includeGateway ? results.shift() : { connected: false, error: 'disabled' };
-    /** @type {Object} */
-    const system = includeSystem ? results.shift() : { status: HEALTH_STATUS.UNKNOWN };
+    const ollama =
+        includeOllama && results.length > 0 ? results.shift() || { connected: false, error: 'disabled' } : { connected: false, error: 'disabled' };
+    const gateway =
+        includeGateway && results.length > 0
+            ? results.shift() || { connected: false, error: 'disabled' }
+            : { connected: false, error: 'disabled' };
+    const system =
+        includeSystem && results.length > 0 ? results.shift() || { status: HEALTH_STATUS.UNKNOWN } : { status: HEALTH_STATUS.UNKNOWN };
 
     const status = calculateOverallStatus(ollama, gateway, system);
 
@@ -394,8 +394,7 @@ export async function checkHealth(options = {}) {
  */
 export class SharedHealthChecker {
     /**
-     * @param {Object} [options]
-     * @param {string} [options.depth]
+     * @param {HealthCheckOptions} [options={}]
      */
     constructor(options = {}) {
         this.options = options;
@@ -419,8 +418,7 @@ export class SharedHealthChecker {
 
     /**
      * Executa verificação de saúde em todos os serviços
-     * @param {Object} [opts] - Opções de verificação
-     * @param {string} [opts.depth] - Profundidade da verificação
+     * @param {HealthCheckOptions} [opts={}] - Opções de verificação
      * @returns {Promise<HealthCheckResult>}
      */
     async checkAll(opts = {}) {
@@ -435,7 +433,7 @@ export class SharedHealthChecker {
 
     /**
      * Alias para checkAll para compatibilidade
-     * @param {Object} [opts]
+     * @param {HealthCheckOptions} [opts={}]
      * @returns {Promise<HealthCheckResult>}
      */
     async check(opts = {}) {
@@ -444,9 +442,9 @@ export class SharedHealthChecker {
 
     /**
      * Calcula status geral
-     * @param {Object} ollama
-     * @param {Object} gateway
-     * @param {Object} system
+     * @param {OllamaHealthResult} ollama
+     * @param {GatewayHealthResult} gateway
+     * @param {SystemHealthResult} system
      * @returns {string}
      */
     calculateOverallStatus(ollama, gateway, system) {

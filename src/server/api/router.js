@@ -17,13 +17,17 @@ import systemController from './controllers/system.js';
 import tasksController from './controllers/tasks.js';
 
 /**
+ * @typedef {{ use: (...args: unknown[]) => unknown, get: (...args: unknown[]) => unknown, post: (...args: unknown[]) => unknown, locals: Record<string, unknown> }} ExpressAppLike
+ */
+
+/**
  * Aplica a malha de rotas à instância do Express.
  * Define a topologia lógica da API e injeta os escudos de integridade.
  *
- * @param {object} app - Instância do Express vinda de engine/app.js
+ * @param {ExpressAppLike} app - Instância do Express vinda de engine/app.js
  * @throws {Error} - Se algum controller falhar ao inicializar
  * @sideEffects - Registra rotas HTTP, middlewares, handlers de erro
-  * @returns {Promise<any>}
+ * @returns {Promise<void>}
  */
 async function applyRoutes(app) {
     log('INFO', '[GATEWAY] Selando malha de rotas V700 (Consolidação Total)...');

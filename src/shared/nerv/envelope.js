@@ -8,12 +8,22 @@ import { ActionCode, ActorRole, MessageType, PROTOCOL_VERSION } from './constant
  * --------------------------------------------------------------------------
  */
 
+/**
+ * @param {unknown} condition
+ * @param {string} message
+ * @returns {void}
+ */
 function assert(condition, message) {
     if (!condition) {
         throw new Error(`[IPC ENVELOPE VIOLATION] ${message}`);
     }
 }
 
+/**
+ * @param {string} value
+ * @param {string} field
+ * @returns {void}
+ */
 function assertUUID(value, field) {
     assert(typeof value === 'string', `${field} must be a string`);
     assert(
@@ -23,20 +33,34 @@ function assertUUID(value, field) {
 }
 
 /**
+ * @typedef {object} NERVEnvelopeParams
+ * @property {import('./constants.js').ActorRole} actor - Papel do ator emissor
+ * @property {import('./constants.js').MessageType} messageType - Tipo ontológico da mensagem
+ * @property {import('./constants.js').ActionCode} actionCode - Código semântico da ação
+ * @property {Record<string, unknown>} [payload={}] - Payload semântico da mensagem
+ * @property {string|null} [correlationId=null] - ID de correlação
+ * @property {import('./constants.js').ActorRole|null} [target=null] - Papel do ator alvo
+ */
+
+/**
+ * @typedef {object} NERVEnvelope
+ * @property {{ version: string, timestamp: number }} protocol
+ * @property {{ actor: import('./constants.js').ActorRole, target: import('./constants.js').ActorRole|null }} identity
+ * @property {{ msg_id: string, correlation_id: string }} causality
+ * @property {{ message_type: import('./constants.js').MessageType, action_code: import('./constants.js').ActionCode }} type
+ * @property {Record<string, unknown>} payload
+ */
+
+/**
  * Cria envelope IPC imutável seguindo protocolo NERV.
  * Sem defaults que ocultem intenção. Nenhum campo é inferido.
  *
- * @param {object} params - Parâmetros para criação do envelope
- * @param {import('./constants.js').ActorRole} params.actor - Papel do ator emissor
- * @param {import('./constants.js').MessageType} params.messageType - Tipo ontológico da mensagem
- * @param {import('./constants.js').ActionCode} params.actionCode - Código semântico da ação
- * @param {object} [params.payload={}] - Payload semântico da mensagem
- * @param {string|null} [params.correlationId=null] - ID de correlação (opcional)
- * @param {import('./constants.js').ActorRole|null} [params.target=null] - Papel do ator alvo (opcional)
- * @returns {object} Envelope NERV válido e imutável
+ * @param {NERVEnvelopeParams} params - Parâmetros para criação do envelope
+ * @returns {NERVEnvelope} Envelope NERV válido e imutável
  * @throws {Error} Se parâmetros violarem invariantes do protocolo
  */
-function createEnvelope({ actor, messageType, actionCode, payload = {}, correlationId = null, target = null }) {
+function createEnvelope(params) {
+    const { actor, messageType, actionCode, payload = {}, correlationId = null, target = null } = params;
     /* ------------------------------------------------------------------------
      * LAYER 1 — PROTOCOL
      * ---------------------------------------------------------------------- */
@@ -123,6 +147,11 @@ function createEnvelope({ actor, messageType, actionCode, payload = {}, correlat
  * --------------------------------------------------------------------------
  * Ensures total immutability of the envelope.
  */
+/**
+ * @template T
+ * @param {T} obj
+ * @returns {T}
+ */
 function deepFreeze(obj) {
     Object.freeze(obj);
     for (const key of Object.keys(obj)) {
@@ -157,11 +186,12 @@ function normalize(envelope) {
     if (envelope.header && envelope.ids && (envelope.kind || envelope.type)) {
         const headerSource = envelope.header.source || envelope.header?.source;
         const actorKey = headerSource ? String(headerSource).toUpperCase() : null;
-        const actor = actorKey && ActorRole[actorKey] ? ActorRole[actorKey] : null;
+        const actorRoleMap = /** @type {Record<string, string>} */ (ActorRole);
+        const actor = actorKey && actorRoleMap[actorKey] ? actorRoleMap[actorKey] : null;
 
         const headerTarget = envelope.header.target || null;
         const targetKey = headerTarget ? String(headerTarget).toUpperCase() : null;
-        const target = targetKey && ActorRole[targetKey] ? ActorRole[targetKey] : null;
+        const target = targetKey && actorRoleMap[targetKey] ? actorRoleMap[targetKey] : null;
 
         const messageType = envelope.kind || (envelope.type && envelope.type.message_type);
         const actionCode =

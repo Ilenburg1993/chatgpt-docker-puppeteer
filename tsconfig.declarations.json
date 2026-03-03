@@ -38,5 +38,6 @@
     "**/*.bundle.js",
     "**/*.d.ts.map",
     "**/*.js.map"
-  ]
+  ],
+  "display": "public declaration emit validation"
 }

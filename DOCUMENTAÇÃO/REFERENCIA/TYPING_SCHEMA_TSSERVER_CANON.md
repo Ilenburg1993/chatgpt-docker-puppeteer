@@ -1,5 +1,13 @@
 # Typing, Schema and tsserver Canon
 
+This document is a focused reference for schema layering and the local `tsserver` wrapper.
+
+The normative source of truth for typing and JSDoc governance is:
+
+- [`TYPING_JSDOC_CANON.md`](./TYPING_JSDOC_CANON.md)
+
+Use this file as a subsystem reference, not as a competing canon.
+
 ## Camadas de Contrato
 
 - JSDoc: contrato estático direto em arquivos JS
@@ -37,3 +45,8 @@
 - Contratos JS públicos: JSDoc + `.d.ts` auxiliar quando necessário
 - Artefatos JSON: JSON Schema local e versionado
 - Wrapper LSP local: schema local, sempre mapeado ao `ts.server.protocol`
+
+## Related Documents
+
+- [`TYPING_INDEX.md`](./TYPING_INDEX.md)
+- [`TYPING_CONTRACT_MATRIX.md`](./TYPING_CONTRACT_MATRIX.md)

@@ -1,5 +1,8 @@
 # Typing Phase 2 Hardening Plan
 
+> Status de governanca: este plano permanece como registro de execucao da fase 2. As regras
+> normativas atuais vivem em `DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`.
+
 ## Objetivo
 
 Consolidar a fase 2 de hardening com foco em:

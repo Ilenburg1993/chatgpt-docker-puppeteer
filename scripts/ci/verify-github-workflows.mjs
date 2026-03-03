@@ -9,11 +9,14 @@ const strict = process.argv.includes('--strict');
 const allowedDynamicWorkflows = new Set(['Dependabot Updates', 'Claude']);
 const requiredTypingCommands = [
     'npm run typecheck:repo',
+    'npm run typecheck:strict:public',
     'npm run typecheck:strict:all',
     'npm run typecheck:declarations',
     'npm run jsdoc:coverage:json',
+    'npm run jsdoc:coverage:public',
     'npm run check:schemas:typing',
     'npm run analyze:typing',
+    'npm run analyze:typing:public',
     'npm run check:skills:strict',
 ];
 
@@ -96,6 +99,18 @@ function validateTypingWorkflowContract() {
         if (!raw.includes(command)) {
             issues.push(`Typing workflow must include command: ${command}`);
         }
+    }
+    let previousIndex = -1;
+    for (const command of requiredTypingCommands) {
+        const currentIndex = raw.indexOf(command);
+        if (currentIndex === -1) {
+            continue;
+        }
+        if (currentIndex < previousIndex) {
+            issues.push(`Typing workflow must keep canonical command order: ${command}`);
+            break;
+        }
+        previousIndex = currentIndex;
     }
     if (raw.includes('continue-on-error: true')) {
         issues.push('Typing workflow must remain blocking and cannot use continue-on-error: true.');

@@ -288,11 +288,19 @@ const sadiLogic = (terms, svgSigs) => {
 ========================================================================== */
 
 /**
+ * @typedef {{ url: () => string, name: () => string }} SadiFrameLike
+ * @typedef {{ frames: () => Promise<SadiFrameLike[]>, mainFrame: () => SadiFrameLike, evaluate: (...args: unknown[]) => Promise<unknown>, url: () => string }} SadiPageLike
+ * @typedef {{ selector: string, isShadow?: boolean, isShadowRoot?: boolean, context?: string, framePath?: string, timestamp?: number }} SadiElementProtocol
+ * @typedef {{ protocol: SadiElementProtocol, confidence: number, candidates_count?: number, detection_time_ms: number, has_svg?: boolean, is_disabled?: boolean }} SadiDetectionResult
+ * @typedef {{ protocol: SadiElementProtocol, isBusy: boolean, growth_delta: number, detection_time_ms: number, content_length: number }} SadiResponseDetectionResult
+ */
+
+/**
  * v4.0: Localiza frame por path com validação e fallback
  *
- * @param {Object} page - Puppeteer Page instance
+ * @param {SadiPageLike} page - Puppeteer Page instance
  * @param {string} framePath - Frame path identifier
- * @returns {Promise<Frame|Page>} Frame encontrado ou main frame
+ * @returns {Promise<SadiFrameLike|SadiPageLike>} Frame encontrado ou main frame
  * @throws {Error} Se page for inválido
  */
 async function findFrameByPath(page, framePath) {
@@ -339,12 +347,12 @@ async function findFrameByPath(page, framePath) {
 /**
  * v4.0: Localiza o campo de input com validação, cache e telemetria
  *
- * @param {Object} page - Puppeteer Page instance
+ * @param {SadiPageLike} page - Puppeteer Page instance
  * @param {string} [langCode='en'] - Language code for i18n keywords (en, pt, es, etc.)
- * @returns {Promise<Object|null>} Detection result with protocol and confidence
+ * @returns {Promise<SadiDetectionResult|null>} Detection result with protocol and confidence
  *
- * @typedef {Object} DetectionResult
- * @property {Object} protocol - Element protocol (selector, framePath, etc.)
+ * @typedef {object} DetectionResult
+ * @property {SadiElementProtocol} protocol - Element protocol (selector, framePath, etc.)
  * @property {number} confidence - Confidence score (0-500+)
  * @property {number} candidates_count - Total candidates evaluated
  * @property {number} detection_time_ms - Time taken for detection
@@ -378,7 +386,7 @@ async function findChatInputSelector(page, langCode = 'en') {
         const keywords = await i18n.getTerms('input_placeholders', langCode);
         debug('findChatInputSelector: starting detection with %d keywords', keywords.length);
 
-        const result = await page.evaluate(
+        const result = /** @type {SadiDetectionResult|null} */ (await page.evaluate(
             (terms, svgSigs, sadiLogicFn, config, startTs) => {
                 // FIXED: Sem async (não tem await dentro)
                 const SADI = sadiLogicFn(terms, svgSigs);
@@ -457,7 +465,7 @@ async function findChatInputSelector(page, langCode = 'en') {
             sadiLogic,
             SADI_CONFIG,
             startTime
-        );
+        ));
 
         const detectionTime = Date.now() - startTime;
         debug(
@@ -511,9 +519,9 @@ async function findChatInputSelector(page, langCode = 'en') {
 /**
  * v4.0: Localiza o botão de envio com validação geométrica e vetorial
  *
- * @param {Object} page - Puppeteer Page instance
- * @param {Object} inputProtocol - Input protocol from findChatInputSelector
- * @returns {Promise<Object|null>} Detection result with protocol and confidence
+ * @param {SadiPageLike} page - Puppeteer Page instance
+ * @param {SadiElementProtocol} inputProtocol - Input protocol from findChatInputSelector
+ * @returns {Promise<SadiDetectionResult|null>} Detection result with protocol and confidence
  * @throws {Error} If page or inputProtocol is invalid
  */
 async function findSendButtonSelector(page, inputProtocol) {
@@ -529,7 +537,7 @@ async function findSendButtonSelector(page, inputProtocol) {
         const startTime = Date.now();
         debug('findSendButtonSelector: starting detection for input=%s', inputProtocol.selector);
 
-        const result = await page.evaluate(
+        const result = /** @type {SadiDetectionResult|null} */ (await page.evaluate(
             (proto, svgSigs, sadiLogicFn, config, startTs) => {
                 // FIXED: Sem async (não tem await dentro)
                 const SADI = sadiLogicFn([], svgSigs);
@@ -603,7 +611,7 @@ async function findSendButtonSelector(page, inputProtocol) {
             sadiLogic,
             SADI_CONFIG,
             startTime
-        );
+        ));
 
         const detectionTime = Date.now() - startTime;
         debug(
@@ -622,8 +630,8 @@ async function findSendButtonSelector(page, inputProtocol) {
 /**
  * v4.0: Monitora a área de resposta para detectar atividade da IA
  *
- * @param {Object} page - Puppeteer Page instance
- * @returns {Promise<Object|null>} Detection result with protocol and busy status
+ * @param {SadiPageLike} page - Puppeteer Page instance
+ * @returns {Promise<SadiResponseDetectionResult|null>} Detection result with protocol and busy status
  * @throws {Error} If page is invalid
  */
 async function findResponseArea(page) {
@@ -636,7 +644,7 @@ async function findResponseArea(page) {
         debug('findResponseArea: starting growth detection');
         const startTime = Date.now();
 
-        const result = await page.evaluate(
+        const result = /** @type {SadiResponseDetectionResult|null} */ (await page.evaluate(
             (sadiLogicFn, config, startTs) => {
                 // FIXED: Sem async (Promise simples em vez de await)
                 const SADI = sadiLogicFn([], []);
@@ -682,7 +690,7 @@ async function findResponseArea(page) {
             sadiLogic,
             SADI_CONFIG,
             startTime
-        );
+        ));
 
         const detectionTime = Date.now() - startTime;
         debug('findResponseArea: detection completed in %dms, growth=%d', detectionTime, result?.growth_delta || 0);
@@ -697,8 +705,8 @@ async function findResponseArea(page) {
 /**
  * v4.0: Valida interatividade de candidato com tratamento de erro robusto
  *
- * @param {Object} page - Puppeteer Page instance
- * @param {Object} protocol - Element protocol from detection
+ * @param {SadiPageLike} page - Puppeteer Page instance
+ * @param {SadiElementProtocol} protocol - Element protocol from detection
  * @returns {Promise<boolean>} True if element is interactive
  */
 async function validateCandidateInteractivity(page, protocol) {
@@ -715,7 +723,7 @@ async function validateCandidateInteractivity(page, protocol) {
     try {
         debug('validateCandidateInteractivity: testing selector=%s', protocol.selector);
 
-        const isInteractive = await page.evaluate(
+        const isInteractive = /** @type {boolean} */ (await page.evaluate(
             (proto, sadiLogicFn) => {
                 // FIXED: Usando função serializada diretamente (sem new Function)
                 const SADI = sadiLogicFn([], []);
@@ -739,7 +747,7 @@ async function validateCandidateInteractivity(page, protocol) {
             },
             protocol,
             sadiLogic
-        );
+        ));
 
         debug('validateCandidateInteractivity: result=%s', isInteractive);
         return isInteractive;

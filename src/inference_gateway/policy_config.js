@@ -3,26 +3,40 @@
 import { normalizeInferenceClientTag } from './client_tags.js';
 
 /**
- * @typedef {{
- *   timeoutMs?: number,
- *   maxParallel?: number,
- *   allowedModels?: string[]|null,
- *   allowedBackends?: string[]|null,
- *   maxTokens?: number|null,
- *   degradedBehavior?: 'degraded_continue'|'fail_closed'|null
- * }} InferencePolicyConfig
+ * @typedef {object} InferencePolicyConfig
+ * @property {number} [timeoutMs]
+ * @property {number} [maxParallel]
+ * @property {string[]|null} [allowedModels]
+ * @property {string[]|null} [allowedBackends]
+ * @property {number|null} [maxTokens]
+ * @property {'degraded_continue'|'fail_closed'|null} [degradedBehavior]
+ */
+
+/**
+ * @typedef {object} ResolveInferencePolicyInput
+ * @property {unknown} [clientTag]
+ * @property {Partial<InferencePolicyConfig>|null} [overrides]
+ * @property {Partial<InferencePolicyConfig>|null} [clientPolicy]
+ * @property {Partial<InferencePolicyConfig>|null} [profilePolicy]
+ * @property {Partial<InferencePolicyConfig>|null} [globalPolicy]
+ * @property {Partial<InferencePolicyConfig>|null} [envPolicy]
+ * @property {Partial<InferencePolicyConfig>|null} [defaults]
+ */
+
+/**
+ * @typedef {Required<Pick<InferencePolicyConfig,'timeoutMs'|'maxParallel'|'degradedBehavior'>> & {
+ *   maxTokens: number|null,
+ *   allowedModels: string[]|null,
+ *   allowedBackends: string[]|null
+ * }} EffectiveInferencePolicy
  */
 
 /**
  * @typedef {{
- *   clientTag?: unknown,
- *   overrides?: Partial<InferencePolicyConfig>|null,
- *   clientPolicy?: Partial<InferencePolicyConfig>|null,
- *   profilePolicy?: Partial<InferencePolicyConfig>|null,
- *   globalPolicy?: Partial<InferencePolicyConfig>|null,
- *   envPolicy?: Partial<InferencePolicyConfig>|null,
- *   defaults?: Partial<InferencePolicyConfig>|null,
- * }} ResolveInferencePolicyInput
+ *   clientTag: import('./client_tags.js').InferenceClientTag,
+ *   effective: EffectiveInferencePolicy,
+ *   sourcesApplied: string[]
+ * }} ResolvedInferencePolicy
  */
 
 function asPlainObject(value) {
@@ -101,7 +115,7 @@ function mergeLayer(target, layer) {
  * Ordem (menor -> maior): defaults, env, global, profile, client, overrides.
  *
  * @param {ResolveInferencePolicyInput} input
- * @returns {{ clientTag: import('./client_tags.js').InferenceClientTag, effective: Required<Pick<InferencePolicyConfig,'timeoutMs'|'maxParallel'|'degradedBehavior'>> & { maxTokens: number|null, allowedModels: string[]|null, allowedBackends: string[]|null }, sourcesApplied: string[] }}
+ * @returns {ResolvedInferencePolicy}
  */
 export function resolveInferencePolicy(input = {}) {
     const sourcesApplied = [];

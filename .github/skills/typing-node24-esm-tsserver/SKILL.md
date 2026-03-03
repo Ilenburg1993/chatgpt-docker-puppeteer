@@ -12,6 +12,10 @@ license: MIT
 
 This is the orchestration skill for repository-wide typing hardening.
 
+The normative repository canon lives in:
+
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md)
+
 It covers:
 
 - `typecheck:repo`
@@ -73,3 +77,4 @@ It covers:
 - [`../typescript-typing/SKILL.md`](../typescript-typing/SKILL.md)
 - [`../lsp-ops/SKILL.md`](../lsp-ops/SKILL.md)
 - [`../schema-contract-governance/SKILL.md`](../schema-contract-governance/SKILL.md)
+- [`../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_AUTOMATION_INDEX.md`](../../../DOCUMENTAÇÃO/REFERENCIA/TYPING_AUTOMATION_INDEX.md)

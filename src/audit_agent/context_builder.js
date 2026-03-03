@@ -15,7 +15,13 @@ const execFile = promisify(execFileCb);
  */
 
 /**
- * @typedef {(name: string, args: Record<string, unknown>, options?: { timeoutMs?: number, id?: number }) => Promise<McpToolCallResult>} CallMcpToolOverride
+ * @typedef {object} McpToolCallOptions
+ * @property {number} [timeoutMs]
+ * @property {number} [id]
+ */
+
+/**
+ * @typedef {(name: string, args: Record<string, unknown>, options?: McpToolCallOptions) => Promise<McpToolCallResult>} CallMcpToolOverride
  */
 
 /**
@@ -61,6 +67,20 @@ const execFile = promisify(execFileCb);
  */
 
 /**
+ * @typedef {{ context: Record<string, unknown>, findings: Array<Record<string, unknown>>, patches: unknown[] }} AuditAgentQuickContextResult
+ */
+
+/**
+ * @typedef {{ tools: Record<string, unknown>, raw: Record<string, unknown> }} AuditAgentSemanticContextResult
+ */
+
+/**
+ * @typedef {object} AuditAgentContextBuilderFacade
+ * @property {(job?: AuditAgentContextJob|null) => Promise<AuditAgentQuickContextResult>} collectQuickContext
+ * @property {(job?: AuditAgentContextJob|null) => Promise<AuditAgentSemanticContextResult>} collectMcpSemanticContext
+ */
+
+/**
  * @param {unknown} value
  * @returns {Record<string, unknown> | null}
  */
@@ -102,7 +122,7 @@ function getStructuredContentData(json) {
 /**
  * @param {unknown} text
  * @param {unknown} [fallback=null]
- * @returns {any}
+ * @returns {unknown}
  */
 function parseJsonSafe(text, fallback = null) {
     try {
@@ -224,10 +244,11 @@ function _getMcpLspCacheSize() {
 /**
  * @param {string} name
  * @param {Record<string, unknown>} args
- * @param {{ timeoutMs?: number, id?: number }} [options]
+ * @param {McpToolCallOptions} [options]
  * @returns {Promise<McpToolCallResult>}
  */
-async function callMcpTool(name, args, { timeoutMs = 5000, id = 1 } = {}) {
+async function callMcpTool(name, args, options = {}) {
+    const { timeoutMs = 5000, id = 1 } = options;
     const baseUrl = getServerBaseUrl();
     try {
         const res = await fetch(`${baseUrl}/api/mcp`, {
@@ -565,12 +586,10 @@ function buildProbeState(probe, parsedJson) {
 
 /**
  * @param {AuditAgentContextBuilderOptions} [options={}]
- * @returns {{
- *   collectQuickContext: (job?: AuditAgentContextJob|null) => Promise<{ context: Record<string, unknown>, findings: Array<Record<string, unknown>>, patches: unknown[] }>,
- *   collectMcpSemanticContext: (job?: AuditAgentContextJob|null) => Promise<{ tools: Record<string, unknown>, raw: Record<string, unknown> }>
- * }}
+ * @returns {AuditAgentContextBuilderFacade}
  */
-export function createAuditAgentContextBuilder({ callMcpTool: callOverride } = {}) {
+export function createAuditAgentContextBuilder(options = {}) {
+    const { callMcpTool: callOverride } = options;
     return {
         async collectQuickContext(job = null) {
             const [mcpProbe, ragProbe, lspProbe, infProbe] = await Promise.all([

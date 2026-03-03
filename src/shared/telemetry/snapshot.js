@@ -41,6 +41,13 @@ import { log } from '#core/logger';
  * @property {number} browser.pages - Páginas abertas
  */
 
+/**
+ * @typedef {object} TelemetryCollectorContext
+ * @property {object} [nerv] - Instância do NERV
+ * @property {object} [kernel] - Instância do Kernel
+ * @property {object} [browserPool] - Instância do Browser Pool
+ */
+
 /** @type {TelemetrySnapshot|null} */
 let currentSnapshot = null;
 
@@ -158,10 +165,7 @@ async function collectBrowserMetrics(browserPool) {
 
 /**
  * Coleta snapshot completo de telemetria
- * @param {object} [context] - Contexto com instâncias dos subsistemas
- * @param {object} [context.nerv] - Instância do NERV
- * @param {object} [context.kernel] - Instância do Kernel
- * @param {object} [context.browserPool] - Instância do Browser Pool
+ * @param {TelemetryCollectorContext} [context={}] - Contexto com instâncias dos subsistemas
  * @returns {Promise<TelemetrySnapshot>}
  */
 async function collectSnapshot(context = {}) {
@@ -191,7 +195,7 @@ async function collectSnapshot(context = {}) {
 /**
  * Inicia o coletor de snapshots em background
  * @param {number} intervalMs - Intervalo entre coletas (ms)
- * @param {object} [context] - Contexto com instâncias dos subsistemas
+ * @param {TelemetryCollectorContext} [context={}] - Contexto com instâncias dos subsistemas
  * @returns {Promise<void>}
  */
 export async function start(intervalMs = 60000, context = {}) {

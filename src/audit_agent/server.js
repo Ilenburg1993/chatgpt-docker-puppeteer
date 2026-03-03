@@ -2,6 +2,12 @@
 
 import http from 'node:http';
 
+/**
+ * @typedef {object} AuditAgentServerDependencies
+ * @property {import('./runtime.js').AuditAgentRuntime} runtime
+ */
+/** @typedef {Error & { statusCode?: number, code?: string }} AuditAgentServerError */
+
 function writeJson(res, statusCode, body) {
     res.statusCode = statusCode;
     res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -31,10 +37,11 @@ function readJsonBody(req) {
 }
 
 /**
- * @param {{ runtime: import('./runtime.js').AuditAgentRuntime }} deps
-  * @returns {any}
+ * @param {AuditAgentServerDependencies} deps
+ * @returns {http.Server}
  */
-export function createAuditAgentServer({ runtime }) {
+export function createAuditAgentServer(deps) {
+    const { runtime } = deps;
     return http.createServer(async (req, res) => {
         try {
             const url = new URL(req.url || '/', 'http://localhost');
@@ -58,7 +65,7 @@ export function createAuditAgentServer({ runtime }) {
                 return writeJson(res, 200, { ok: true, job });
             }
             if (req.method === 'POST' && url.pathname === '/jobs') {
-                const body = /** @type {any} */ (await readJsonBody(req));
+                const body = /** @type {Record<string, unknown>} */ (await readJsonBody(req));
                 const job = runtime.createJob(body);
                 return writeJson(res, 201, { ok: true, job });
             }
@@ -70,15 +77,17 @@ export function createAuditAgentServer({ runtime }) {
             }
             if (req.method === 'POST' && url.pathname.match(/^\/jobs\/[^/]+\/cancel$/)) {
                 const id = decodeURIComponent(url.pathname.split('/')[2]);
-                const body = /** @type {any} */ (await readJsonBody(req));
-                const job = runtime.cancelJob(id, body.reason || 'manual_cancel');
+                const body = /** @type {Record<string, unknown>} */ (await readJsonBody(req));
+                const reason = typeof body.reason === 'string' ? body.reason : 'manual_cancel';
+                const job = runtime.cancelJob(id, reason);
                 return writeJson(res, 200, { ok: true, job });
             }
             return writeJson(res, 404, { ok: false, error: 'not_found' });
         } catch (error) {
-            return writeJson(res, /** @type {any} */ (error).statusCode || 500, {
+            const typedError = /** @type {AuditAgentServerError} */ (error);
+            return writeJson(res, typedError.statusCode || 500, {
                 ok: false,
-                error: /** @type {any} */ (error).code || 'AUDIT_AGENT_SERVER_ERROR',
+                error: typedError.code || 'AUDIT_AGENT_SERVER_ERROR',
                 message: error?.message || String(error),
             });
         }

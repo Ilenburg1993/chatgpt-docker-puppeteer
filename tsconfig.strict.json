@@ -3,6 +3,9 @@
   "files": [],
   "references": [
     {
+      "path": "./tsconfig.strict.public.json"
+    },
+    {
       "path": "./tsconfig.strict.core.json"
     },
     {

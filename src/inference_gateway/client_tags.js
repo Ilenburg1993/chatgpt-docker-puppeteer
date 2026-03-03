@@ -1,6 +1,12 @@
 // @ts-check
 
 /** @typedef {typeof INFERENCE_CLIENT_TAGS[keyof typeof INFERENCE_CLIENT_TAGS]} InferenceClientTag */
+/**
+ * @typedef {object} NormalizeInferenceClientTagOptions
+ * @property {InferenceClientTag|null} [fallback]
+ * @property {boolean} [allowFallbackGeneric]
+ */
+/** @typedef {Error & { code?: string, statusCode?: number }} InferenceClientTagError */
 
 /**
  * Tags canônicas de consumidores de inferência.
@@ -32,10 +38,11 @@ export function isInferenceClientTag(value) {
  * Normaliza e valida uma tag de cliente de inferência.
  *
  * @param {unknown} value
- * @param {{ fallback?: InferenceClientTag|null, allowFallbackGeneric?: boolean }} [options]
+ * @param {NormalizeInferenceClientTagOptions} [options]
  * @returns {InferenceClientTag}
  */
-export function normalizeInferenceClientTag(value, { fallback = null, allowFallbackGeneric = true } = {}) {
+export function normalizeInferenceClientTag(value, options = {}) {
+    const { fallback = null, allowFallbackGeneric = true } = options;
     const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
     if (isInferenceClientTag(normalized)) {
         return normalized;
@@ -50,8 +57,9 @@ export function normalizeInferenceClientTag(value, { fallback = null, allowFallb
     }
 
     const err = new Error('inference clientTag inválido');
-    /** @type {any} */ (err).code = 'INFERENCE_CLIENT_TAG_INVALID';
-    /** @type {any} */ (err).statusCode = 422;
+    const typedErr = /** @type {InferenceClientTagError} */ (err);
+    typedErr.code = 'INFERENCE_CLIENT_TAG_INVALID';
+    typedErr.statusCode = 422;
     throw err;
 }
 
