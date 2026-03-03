@@ -19,6 +19,7 @@ function step(step) {
 
 /**
  * @param {{ profile: Profile, changedFiles?: string[], qualityMode?: QualityMode, qualityJsdoc?: boolean, qualityPrettier?: boolean }} options
+  * @returns {any}
  */
 export function buildQualityExecutionPlan(options) {
     const profile = options.profile;

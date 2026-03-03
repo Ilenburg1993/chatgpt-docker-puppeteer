@@ -76,6 +76,7 @@ async function loadTask(id) {
 /**
  * Deleta uma tarefa específica do disco.
  * @param {string} id - ID da tarefa.
+  * @returns {Promise<void>}
  */
 async function deleteTask(id) {
     const filepath = path.join(PATHS.QUEUE, `${id}.json`);

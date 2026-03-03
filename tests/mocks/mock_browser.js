@@ -2,6 +2,7 @@ import sinon from 'sinon';
 
 /**
  * Cria uma página mockada do Puppeteer
+  * @returns {any}
  */
 function criarPaginaMock() {
     return {
@@ -36,6 +37,7 @@ function criarPaginaMock() {
 
 /**
  * Cria um browser mockado do Puppeteer
+  * @returns {any}
  */
 function criarBrowserMock() {
     const pagina = criarPaginaMock();
@@ -63,6 +65,7 @@ function criarBrowserMock() {
 
 /**
  * Cria um BrowserPoolManager mockado
+  * @returns {any}
  */
 function criarBrowserPoolMock() {
     const browser = criarBrowserMock();
@@ -92,6 +95,7 @@ function criarBrowserPoolMock() {
 
 /**
  * Cria um ConnectionOrchestrator mockado
+  * @returns {any}
  */
 function criarConnectionOrchestratorMock() {
     return {

@@ -87,22 +87,30 @@ function _derivePatchDraftFromContext(job, contextPack) {
 
 function assertKind(kind) {
     if (!isAuditJobKind(kind)) {
-        const err = new Error(`audit job kind inválido: ${String(kind)}`);
-        /** @type {any} */ (err).statusCode = 422;
-        /** @type {any} */ (err).code = 'AUDIT_JOB_KIND_INVALID';
+        const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+            new Error(`audit job kind inválido: ${String(kind)}`)
+        );
+        err.statusCode = 422;
+        err.code = 'AUDIT_JOB_KIND_INVALID';
         throw err;
     }
 }
 
 function assertTriggerType(triggerType) {
     if (!isAuditJobTriggerType(triggerType)) {
-        const err = new Error(`audit job trigger_type inválido: ${String(triggerType)}`);
-        /** @type {any} */ (err).statusCode = 422;
-        /** @type {any} */ (err).code = 'AUDIT_JOB_TRIGGER_INVALID';
+        const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+            new Error(`audit job trigger_type inválido: ${String(triggerType)}`)
+        );
+        err.statusCode = 422;
+        err.code = 'AUDIT_JOB_TRIGGER_INVALID';
         throw err;
     }
 }
 
+/**
+ * Runtime de orquestração do Audit Agent.
+ * Coordena fila de jobs, coleta de contexto, triagem e propostas de patch.
+ */
 export class AuditAgentRuntime {
     /**
      * @param {{
@@ -280,15 +288,19 @@ export class AuditAgentRuntime {
     queueJob(id) {
         const job = this.jobs.get(String(id));
         if (!job) {
-            const err = new Error('audit job não encontrado');
-            /** @type {any} */ (err).statusCode = 404;
-            /** @type {any} */ (err).code = 'AUDIT_JOB_NOT_FOUND';
+            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+                new Error('audit job não encontrado')
+            );
+            err.statusCode = 404;
+            err.code = 'AUDIT_JOB_NOT_FOUND';
             throw err;
         }
         if ([AUDIT_JOB_STATUS.COMPLETED, AUDIT_JOB_STATUS.CANCELLED].includes(job.status)) {
-            const err = new Error(`audit job em estado terminal: ${job.status}`);
-            /** @type {any} */ (err).statusCode = 409;
-            /** @type {any} */ (err).code = 'AUDIT_JOB_TERMINAL';
+            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+                new Error(`audit job em estado terminal: ${job.status}`)
+            );
+            err.statusCode = 409;
+            err.code = 'AUDIT_JOB_TERMINAL';
             throw err;
         }
         const ts = this.now();
@@ -302,9 +314,11 @@ export class AuditAgentRuntime {
     cancelJob(id, reason = 'manual_cancel') {
         const job = this.jobs.get(String(id));
         if (!job) {
-            const err = new Error('audit job não encontrado');
-            /** @type {any} */ (err).statusCode = 404;
-            /** @type {any} */ (err).code = 'AUDIT_JOB_NOT_FOUND';
+            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+                new Error('audit job não encontrado')
+            );
+            err.statusCode = 404;
+            err.code = 'AUDIT_JOB_NOT_FOUND';
             throw err;
         }
         const ts = this.now();

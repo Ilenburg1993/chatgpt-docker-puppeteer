@@ -17,7 +17,10 @@ const PATTERNS = {
     DEBUG: /debug|test|fix/i,
 };
 
-/** Função exportada: classifyScript. */
+/**
+ * Função exportada: classifyScript.
+ * @returns {any}
+ */
 function classifyScript(filename, content) {
     // System files - ignore
     if (PATTERNS.SYSTEM.test(filename)) {
@@ -88,7 +91,10 @@ function classifyScript(filename, content) {
     };
 }
 
-/** Função exportada: auditTmpScripts. */
+/**
+ * Função exportada: auditTmpScripts.
+ * @returns {any}
+ */
 function auditTmpScripts() {
     console.log('🔍 AUDITING /tmp/ JAVASCRIPT FILES\n');
     console.log('='.repeat(80));

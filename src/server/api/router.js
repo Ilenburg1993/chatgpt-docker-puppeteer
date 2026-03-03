@@ -23,6 +23,7 @@ import tasksController from './controllers/tasks.js';
  * @param {object} app - Instância do Express vinda de engine/app.js
  * @throws {Error} - Se algum controller falhar ao inicializar
  * @sideEffects - Registra rotas HTTP, middlewares, handlers de erro
+  * @returns {Promise<any>}
  */
 async function applyRoutes(app) {
     log('INFO', '[GATEWAY] Selando malha de rotas V700 (Consolidação Total)...');

@@ -21,7 +21,10 @@ const sleep = ms =>
         setTimeout(r, ms);
     });
 
-/** Função exportada: ensureDirs. */
+/**
+ * Função exportada: ensureDirs.
+ * @returns {void}
+ */
 function ensureDirs() {
     [QUEUE_DIR, LOG_DIR, TMP_DIR].forEach(d => {
         if (!fs.existsSync(d)) {
@@ -31,7 +34,10 @@ function ensureDirs() {
 }
 
 // GERA TAREFA NO FORMATO SCHEMA V3
-/** Função exportada: writeTask. */
+/**
+ * Função exportada: writeTask.
+ * @returns {any}
+ */
 function writeTask(options) {
     ensureDirs();
     const id = options.id || `TEST-${Date.now()}`;
@@ -71,7 +77,10 @@ function writeTask(options) {
     return fp;
 }
 
-/** Função exportada: readTask. */
+/**
+ * Função exportada: readTask.
+ * @returns {any}
+ */
 function readTask(id) {
     try {
         const fp = path.join(QUEUE_DIR, `${id}.json`);
@@ -84,7 +93,10 @@ function readTask(id) {
     }
 }
 
-/** Função exportada: removeRunLock. */
+/**
+ * Função exportada: removeRunLock.
+ * @returns {void}
+ */
 function removeRunLock() {
     try {
         if (fs.existsSync(RUN_LOCK)) {
@@ -95,7 +107,10 @@ function removeRunLock() {
     }
 }
 
-/** Função exportada: cleanTmp. */
+/**
+ * Função exportada: cleanTmp.
+ * @returns {void}
+ */
 function cleanTmp() {
     try {
         if (fs.existsSync(TMP_DIR)) {
@@ -106,7 +121,10 @@ function cleanTmp() {
     }
 }
 
-/** Função exportada: readLatestGlobalLogTail. */
+/**
+ * Função exportada: readLatestGlobalLogTail.
+ * @returns {any}
+ */
 function readLatestGlobalLogTail(lines = 50) {
     try {
         if (!fs.existsSync(LOG_FILE_CURRENT)) {
@@ -119,7 +137,10 @@ function readLatestGlobalLogTail(lines = 50) {
     }
 }
 
-/** Função exportada: startAgent. */
+/**
+ * Função exportada: startAgent.
+ * @returns {any}
+ */
 function startAgent(timeoutMs = 15000) {
     ensureDirs();
     const outPath = path.join(TMP_DIR, `stdout-${Date.now()}.log`);
@@ -166,7 +187,10 @@ function startAgent(timeoutMs = 15000) {
     return { proc, ready };
 }
 
-/** Função exportada: stopAgent. */
+/**
+ * Função exportada: stopAgent.
+ * @returns {void}
+ */
 function stopAgent(proc) {
     if (!proc || proc.killed) {
         return;
@@ -185,7 +209,10 @@ function stopAgent(proc) {
     }
 }
 
-/** Função exportada: waitForCondition. */
+/**
+ * Função exportada: waitForCondition.
+ * @returns {Promise<any>}
+ */
 async function waitForCondition(fn, timeout = 10000, interval = 500) {
     const end = Date.now() + timeout;
     while (Date.now() < end) {

@@ -66,6 +66,7 @@ async function loadResponse(taskId, signal = null) {
 /**
  * Deleta um arquivo de resposta de forma assíncrona.
  * @param {string} taskId - ID da tarefa cujo resultado deve ser removido.
+  * @returns {Promise<void>}
  */
 async function deleteResponse(taskId) {
     const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;

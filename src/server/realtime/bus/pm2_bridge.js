@@ -34,6 +34,7 @@ let lastProcessStates = new Map(); // Cache de estados
 /**
  * Inicializa a escuta do barramento de eventos do PM2.
  * Implementa lógica de auto-recuperação e reconexão resiliente.
+  * @returns {void}
  */
 function init() {
     if (isBusActive) {
@@ -214,6 +215,7 @@ function _startHealthCheck() {
 /**
  * Encerramento limpo do barramento.
  * Chamado pelo orquestrador de ciclo de vida (lifecycle.js) no shutdown.
+  * @returns {void}
  */
 function stop() {
     if (healthCheckInterval) {

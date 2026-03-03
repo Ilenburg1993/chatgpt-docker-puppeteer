@@ -47,7 +47,10 @@ function _rowToAuditJob(row) {
     };
 }
 
-/** Função exportada: createAuditJob. */
+/**
+ * Função exportada: createAuditJob.
+ * @returns {any}
+ */
 function createAuditJob(input = {}) {
     const db = getDb();
     const now = _now();
@@ -91,14 +94,20 @@ function createAuditJob(input = {}) {
     return getAuditJobById(String(input.id));
 }
 
-/** Função exportada: getAuditJobById. */
+/**
+ * Função exportada: getAuditJobById.
+ * @returns {any}
+ */
 function getAuditJobById(id) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM audit_jobs WHERE id = ?').get(String(id || '').trim());
     return _rowToAuditJob(row);
 }
 
-/** Função exportada: listAuditJobs. */
+/**
+ * Função exportada: listAuditJobs.
+ * @returns {any}
+ */
 function listAuditJobs({ status = null, limit = 100 } = {}) {
     const db = getDb();
     const rows = db
@@ -118,7 +127,10 @@ function listAuditJobs({ status = null, limit = 100 } = {}) {
     return rows.map(_rowToAuditJob).filter(Boolean);
 }
 
-/** Função exportada: updateAuditJob. */
+/**
+ * Função exportada: updateAuditJob.
+ * @returns {any}
+ */
 function updateAuditJob(id, updates = {}) {
     const existing = getAuditJobById(id);
     if (!existing) return null;
@@ -209,7 +221,10 @@ function updateAuditJob(id, updates = {}) {
     return getAuditJobById(existing.id);
 }
 
-/** Função exportada: upsertAuditJobSnapshot. */
+/**
+ * Função exportada: upsertAuditJobSnapshot.
+ * @returns {any}
+ */
 function upsertAuditJobSnapshot(job) {
     const existing = getAuditJobById(job?.id);
     if (!existing) return createAuditJob(job);

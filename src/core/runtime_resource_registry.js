@@ -106,6 +106,7 @@ function upsertRuntimeResource(resource) {
  * @param {string} id
  * @param {RuntimeResourceState} state
  * @param {Partial<RuntimeResource>} [details]
+  * @returns {any}
  */
 function setRuntimeResourceState(id, state, details = {}) {
     return upsertRuntimeResource({

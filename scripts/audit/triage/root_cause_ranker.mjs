@@ -1,5 +1,6 @@
 /**
  * @param {ReturnType<import('./context_pack.mjs').buildContextPack>} contextPack
+  * @returns {any}
  */
 export function rankRootCauses(contextPack) {
     /** @type {Array<{ cause: string, score: number }>} */

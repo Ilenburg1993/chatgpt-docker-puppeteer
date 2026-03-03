@@ -21,6 +21,7 @@ let retryTimeout = null;
 /**
  * Inicializa o motor de streaming de logs.
  * Implementa vigilância de Inode para suportar a troca física de arquivos (Rotação).
+  * @returns {void}
  */
 function init() {
     // 1. Limpeza de estado anterior (Idempotência de Boot)
@@ -133,6 +134,7 @@ function _clearInternalResources() {
 /**
  * Encerramento atômico do streamer.
  * Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
+  * @returns {void}
  */
 function stop() {
     _clearInternalResources();

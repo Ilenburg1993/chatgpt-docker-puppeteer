@@ -206,6 +206,7 @@ async function ollamaModelsHandler() {
  * Register Ollama tools in the Tool Registry
  *
  * @param {ToolRegistry} registry
+  * @returns {Promise<void>}
  */
 export async function registerOllamaTools(registry) {
     console.error('[Ollama Tools] Registering tools...');

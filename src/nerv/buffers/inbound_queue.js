@@ -45,6 +45,7 @@ function createQueue() {
  *
  * @param {number|null} deps.maxSize
  * Limite máximo técnico da fila (opcional).
+  * @returns {any}
  */
 function createInboundQueue({ telemetry, maxSize = null }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {

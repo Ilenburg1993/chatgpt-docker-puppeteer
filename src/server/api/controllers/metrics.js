@@ -4,6 +4,7 @@ import { countTasksByStatus } from '#infra/db/task_repo';
 
 /**
  * GET /api/metrics - Métricas gerais do sistema
+  * @returns {Promise<void>}
  */
 async function getMetrics(req, res) {
     try {
@@ -29,6 +30,7 @@ async function getMetrics(req, res) {
  *
  * Usa uma única query SQL com GROUP BY status para contar todas as tarefas
  * por status de forma eficiente (evita N+1 queries).
+  * @returns {Promise<void>}
  */
 async function getTaskMetrics(req, res) {
     try {

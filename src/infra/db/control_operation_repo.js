@@ -53,7 +53,10 @@ function _rowToOperation(row) {
     };
 }
 
-/** Função exportada: createControlOperation. */
+/**
+ * Função exportada: createControlOperation.
+ * @returns {any}
+ */
 function createControlOperation({
     command,
     entityType,
@@ -104,14 +107,20 @@ function createControlOperation({
     return getControlOperationById(id);
 }
 
-/** Função exportada: getControlOperationById. */
+/**
+ * Função exportada: getControlOperationById.
+ * @returns {any}
+ */
 function getControlOperationById(id) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM control_operations WHERE id = ?').get(String(id || '').trim());
     return _rowToOperation(row);
 }
 
-/** Função exportada: getControlOperationByIdempotencyKey. */
+/**
+ * Função exportada: getControlOperationByIdempotencyKey.
+ * @returns {any}
+ */
 function getControlOperationByIdempotencyKey(idempotencyKey) {
     const db = getDb();
     const row = db
@@ -120,7 +129,10 @@ function getControlOperationByIdempotencyKey(idempotencyKey) {
     return _rowToOperation(row);
 }
 
-/** Função exportada: updateControlOperation. */
+/**
+ * Função exportada: updateControlOperation.
+ * @returns {any}
+ */
 function updateControlOperation(id, updates = {}) {
     const db = getDb();
     const existing = getControlOperationById(id);
@@ -155,7 +167,10 @@ function updateControlOperation(id, updates = {}) {
     return getControlOperationById(existing.id);
 }
 
-/** Função exportada: listControlOperations. */
+/**
+ * Função exportada: listControlOperations.
+ * @returns {any}
+ */
 function listControlOperations({ limit = 100, entityType = null, entityId = null } = {}) {
     const db = getDb();
     const where = [];

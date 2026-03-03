@@ -7,6 +7,7 @@ import { createAuditPatchProposal } from '#infra/db/audit_patch_repo';
 /**
  * Store persistente (SQLite) para snapshots de jobs e runs do Audit Agent.
  * É um sink incremental: o runtime em memória continua sendo fonte de execução na V0.
+  * @returns {any}
  */
 export function createAuditAgentDbStore() {
     return {

@@ -23,6 +23,7 @@ let debounceTimer = null;
 /**
  * Inicializa o sensor de filesystem da fila.
  * Monitora a pasta física definida na Fachada de IO.
+  * @returns {void}
  */
 function init() {
     if (fsWatcher) {
@@ -97,6 +98,7 @@ function _signalChange() {
 /**
  * Encerramento limpo do sensor.
  * Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
+  * @returns {void}
  */
 function stop() {
     // B006: cancela debounce pendente para evitar _signalChange() após shutdown

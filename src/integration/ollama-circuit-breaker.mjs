@@ -311,6 +311,7 @@ export function getAllStatuses() {
 
 /**
  * Reset all circuit breakers (for testing)
+  * @returns {void}
  */
 export function resetAll() {
     for (const breaker of circuitBreakers.values()) {

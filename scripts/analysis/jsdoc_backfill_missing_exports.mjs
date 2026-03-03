@@ -128,8 +128,8 @@ function patchFile(filePath, missingExports) {
 const reportPath = path.resolve(String(values.report || 'jsdoc-coverage-report.json'));
 const applyMode = Boolean(values.apply);
 const limit = Math.max(0, Number.parseInt(String(values.limit || '0'), 10) || 0);
-const includePrefixes = splitCsv(values.include);
-const excludePrefixes = splitCsv(values.exclude);
+const includePrefixes = splitCsv(String(values.include || ''));
+const excludePrefixes = splitCsv(String(values.exclude || ''));
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 /** @type {Array<{file:string, exported_symbols:MissingExport[]}>} */

@@ -24,6 +24,10 @@ function buildVersionUrl(baseUrl) {
     return `${String(baseUrl || '').replace(/\/$/, '')}/api/version`;
 }
 
+/**
+ * Supervisor de saúde do host Ollama local.
+ * Monitora disponibilidade, estado do circuit breaker e publica mudanças de estado.
+ */
 export class OllamaHostSupervisor {
     /**
      * @param {{
@@ -255,6 +259,11 @@ export class OllamaHostSupervisor {
     }
 }
 
+/**
+ * Cria uma instância do supervisor de host Ollama.
+ * @param {ConstructorParameters<typeof OllamaHostSupervisor>[0]} [options]
+ * @returns {OllamaHostSupervisor}
+ */
 export function createOllamaHostSupervisor(options = {}) {
     return new OllamaHostSupervisor(options);
 }

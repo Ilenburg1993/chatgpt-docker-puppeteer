@@ -89,7 +89,10 @@ function _updatePatch(id, fields = {}) {
     return getAuditPatchProposalById(existing.id);
 }
 
-/** Função exportada: createAuditPatchProposal. */
+/**
+ * Função exportada: createAuditPatchProposal.
+ * @returns {any}
+ */
 function createAuditPatchProposal(input = {}) {
     const db = getDb();
     const id = String(input.id || `apch-${uuidv4()}`);
@@ -127,13 +130,19 @@ function createAuditPatchProposal(input = {}) {
     return getAuditPatchProposalById(id);
 }
 
-/** Função exportada: getAuditPatchProposalById. */
+/**
+ * Função exportada: getAuditPatchProposalById.
+ * @returns {any}
+ */
 function getAuditPatchProposalById(id) {
     const db = getDb();
     return _rowToPatch(db.prepare('SELECT * FROM audit_patch_proposals WHERE id = ?').get(String(id || '').trim()));
 }
 
-/** Função exportada: listAuditPatchProposalsByJobId. */
+/**
+ * Função exportada: listAuditPatchProposalsByJobId.
+ * @returns {any}
+ */
 function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
     const db = getDb();
     const rows = db
@@ -149,7 +158,10 @@ function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
     return rows.map(_rowToPatch).filter(Boolean);
 }
 
-/** Função exportada: updateAuditPatchProposal. */
+/**
+ * Função exportada: updateAuditPatchProposal.
+ * @returns {any}
+ */
 function updateAuditPatchProposal(id, fields = {}) {
     return _updatePatch(id, fields);
 }

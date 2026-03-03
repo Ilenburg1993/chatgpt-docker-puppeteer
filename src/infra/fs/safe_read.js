@@ -7,6 +7,7 @@ import { CORRUPT, MAX_JSON_SIZE, sleep } from './fs_utils.js';
 /**
  * Lê um JSON do disco com proteção contra corrupção e travamentos de arquivo.
  * Utiliza loop iterativo em vez de recursão para prevenir Stack Overflow.
+  * @returns {Promise<any>}
  */
 async function safeReadJSON(filepath) {
     if (!fss.existsSync(filepath)) {

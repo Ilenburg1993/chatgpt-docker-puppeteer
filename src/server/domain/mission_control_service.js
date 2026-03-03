@@ -308,7 +308,10 @@ function _recordMissionEvents({
     }
 }
 
-/** Função exportada: createMissionCommand. */
+/**
+ * Função exportada: createMissionCommand.
+ * @returns {any}
+ */
 function createMissionCommand({ actor = {}, reason, payload = {} }) {
     const actorView = asRecord(actor);
     const payloadView = asRecord(payload);
@@ -363,7 +366,10 @@ function createMissionCommand({ actor = {}, reason, payload = {} }) {
     };
 }
 
-/** Função exportada: executeMissionCommand. */
+/**
+ * Função exportada: executeMissionCommand.
+ * @returns {any}
+ */
 function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' }) {
     const actorView = asRecord(actor);
     const db = getDb();
@@ -398,7 +404,10 @@ function executeMissionCommand({ missionId, actor = {}, reason, ifVersion = null
     return result;
 }
 
-/** Função exportada: pauseMissionCommand. */
+/**
+ * Função exportada: pauseMissionCommand.
+ * @returns {any}
+ */
 function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
     const db = getDb();
@@ -437,7 +446,10 @@ function pauseMissionCommand({ missionId, actor = {}, reason, ifVersion = null }
     return result;
 }
 
-/** Função exportada: resumeMissionCommand. */
+/**
+ * Função exportada: resumeMissionCommand.
+ * @returns {any}
+ */
 function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
     const db = getDb();
@@ -476,7 +488,10 @@ function resumeMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
     return result;
 }
 
-/** Função exportada: cancelMissionCommand. */
+/**
+ * Função exportada: cancelMissionCommand.
+ * @returns {any}
+ */
 function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
 
@@ -541,7 +556,10 @@ function cancelMissionCommand({ missionId, actor = {}, reason, ifVersion = null 
     return result;
 }
 
-/** Função exportada: patchMissionCommand. */
+/**
+ * Função exportada: patchMissionCommand.
+ * @returns {any}
+ */
 function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const actorView = asRecord(actor);
     const patchView = asRecord(patch);
@@ -579,7 +597,10 @@ function patchMissionCommand({ missionId, actor = {}, reason, ifVersion = null, 
     return result;
 }
 
-/** Função exportada: setMissionPolicyCommand. */
+/**
+ * Função exportada: setMissionPolicyCommand.
+ * @returns {any}
+ */
 function setMissionPolicyCommand({
     missionId,
     actor = {},
@@ -630,7 +651,10 @@ function setMissionPolicyCommand({
     return result;
 }
 
-/** Função exportada: reorderMissionStepsCommand. */
+/**
+ * Função exportada: reorderMissionStepsCommand.
+ * @returns {any}
+ */
 function reorderMissionStepsCommand({ missionId, actor = {}, reason, ifVersion = null, stepOrder = [] }) {
     const actorView = asRecord(actor);
     const db = getDb();

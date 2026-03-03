@@ -7,7 +7,10 @@ process.env.CHROME_PROXY_ENABLED = 'true';
 process.env.CHROME_PROXY_PORT = '9224';
 process.env.CHROME_PORT = '9225';
 
-/** Função exportada: testChromeProxyIntegration. */
+/**
+ * Função exportada: testChromeProxyIntegration.
+ * @returns {Promise<void>}
+ */
 async function testChromeProxyIntegration() {
     log('INFO', '========================================');
     log('INFO', 'TESTE: Integração Chrome Proxy + Pool');

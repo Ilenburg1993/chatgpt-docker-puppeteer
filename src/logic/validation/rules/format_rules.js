@@ -64,6 +64,7 @@ function validateJSON(content, signal = null) {
  * @param {string} content - Conteúdo a ser testado.
  * @param {string} patternStr - String da expressão regular.
  * @param {AbortSignal} [signal] - Sinal de cancelamento.
+  * @returns {any}
  */
 function validateRegex(content, patternStr, signal = null) {
     if (!patternStr) {
@@ -91,6 +92,7 @@ function validateRegex(content, patternStr, signal = null) {
 
 /**
  * Valida se o conteúdo respeita o formato Markdown (presença de blocos de código).
+  * @returns {any}
  */
 function validateMarkdownCode(content) {
     if (!content || !content.includes('```')) {

@@ -58,6 +58,7 @@ function readMasterHistoryHints(masterPath, contractId) {
 /**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
  * @param {{ rag?: any, lsp?: any, history?: any, masterPath?: string }} sources
+  * @returns {any}
  */
 export function buildContextPack(finding, sources = {}) {
     const codeContext = readLocalCodeContext(finding.file, finding.line, 8);

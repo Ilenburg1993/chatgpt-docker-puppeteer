@@ -1,5 +1,6 @@
 /**
  * @param {{ stepsTotal: number, startedAt?: number }} options
+  * @returns {any}
  */
 export function createProgressTracker(options) {
     let stepsTotal = Math.max(1, Number(options.stepsTotal || 1));

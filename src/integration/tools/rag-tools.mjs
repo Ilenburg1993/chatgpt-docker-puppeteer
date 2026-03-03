@@ -389,6 +389,7 @@ async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'l
  * Register RAG tools in the Tool Registry
  *
  * @param {any} registry - Tool registry instance
+  * @returns {Promise<void>}
  */
 export async function registerRagTools(registry) {
     console.error('[RAG Tools] Registering tools...');

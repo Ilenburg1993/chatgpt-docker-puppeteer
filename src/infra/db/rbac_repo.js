@@ -80,7 +80,10 @@ function _normalizeUsername(username) {
         .toLowerCase();
 }
 
-/** Função exportada: ensureBaseRbacData. */
+/**
+ * Função exportada: ensureBaseRbacData.
+ * @returns {void}
+ */
 function ensureBaseRbacData() {
     const db = getDb();
     const tx = db.transaction(() => {
@@ -131,6 +134,7 @@ function ensureBaseRbacData() {
 
 /**
  * @param {{username:string, password:string, role?: string, active?: boolean}} params
+  * @returns {any}
  */
 function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active = true }) {
     const db = getDb();
@@ -217,7 +221,10 @@ function getRbacUserByUsername(username) {
     };
 }
 
-/** Função exportada: verifyRbacCredentials. */
+/**
+ * Função exportada: verifyRbacCredentials.
+ * @returns {any}
+ */
 function verifyRbacCredentials(username, password) {
     const db = getDb();
     const name = _normalizeUsername(username);
@@ -237,7 +244,10 @@ function verifyRbacCredentials(username, password) {
     return getRbacUserByUsername(name);
 }
 
-/** Função exportada: bootstrapRbacFromEnv. */
+/**
+ * Função exportada: bootstrapRbacFromEnv.
+ * @returns {void}
+ */
 function bootstrapRbacFromEnv() {
     ensureBaseRbacData();
 

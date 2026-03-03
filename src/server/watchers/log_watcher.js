@@ -18,6 +18,7 @@ let reconnectTimeout = null;
 /**
  * Inicializa o monitoramento de integridade do log.
  * Focado em resiliência de sistema de arquivos e persistência de handle.
+  * @returns {Promise<void>}
  */
 async function init() {
     // 1. Prevenção de Duplicidade: Limpa recursos antes de iniciar
@@ -88,6 +89,7 @@ function _scheduleReconnect(ms) {
 /**
  * Encerramento gracioso do observador e limpeza de timers.
  * Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
+  * @returns {void}
  */
 function stop() {
     if (watcher) {

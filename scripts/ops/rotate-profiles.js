@@ -11,6 +11,7 @@ const MAX_BACKUPS_DAYS = 30; // Mantém backups por 30 dias
 
 /**
  * Rotaciona o profile persistente atual para backup
+  * @returns {Promise<any>}
  */
 async function rotateProfile() {
     try {
@@ -63,6 +64,7 @@ async function rotateProfile() {
 
 /**
  * Remove backups antigos (>30 dias)
+  * @returns {Promise<any>}
  */
 async function cleanOldBackups() {
     try {
@@ -120,6 +122,7 @@ async function cleanOldBackups() {
 
 /**
  * Calcula tamanho total de um diretório (recursivo)
+  * @returns {Promise<any>}
  */
 async function getDirectorySize(dirPath) {
     let totalSize = 0;
@@ -146,6 +149,7 @@ async function getDirectorySize(dirPath) {
 
 /**
  * Retorna estatísticas dos backups atuais
+  * @returns {Promise<any>}
  */
 async function getBackupStats() {
     try {

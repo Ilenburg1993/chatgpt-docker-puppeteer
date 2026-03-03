@@ -18,6 +18,7 @@ import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
  * @property {Object} [telemetry] - Opções de telemetria.
  * @property {Object} [pump] - Opções do pump.
  * @property {number} [pump.baseIntervalMs] - Intervalo base em ms.
+ * @property {number} [pump.drainBatchSize] - Quantidade máxima drenada por tick.
  * @property {Object} [browserPool] - Pool de browsers.
  * @property {Object} [scheduler] - Scheduler de tarefas.
  * @property {Function} [onActivateTask] - Callback para ativação de tarefa.

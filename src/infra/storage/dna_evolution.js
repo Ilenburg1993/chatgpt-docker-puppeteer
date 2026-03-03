@@ -188,6 +188,7 @@ async function evolveWithFullProtocol(fullProtocol, domain, intent) {
 
 /**
  * Reseta contadores de evolução (chamado no boot).
+  * @returns {void}
  */
 function resetEvolutionCounters() {
     evolutionCounter.clear();

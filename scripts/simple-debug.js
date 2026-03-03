@@ -112,7 +112,10 @@ async function runSimpleScenario(scenario) {
     });
 }
 
-/** Função exportada: runSimpleDebug. */
+/**
+ * Função exportada: runSimpleDebug.
+ * @returns {Promise<void>}
+ */
 async function main() {
     console.log('🧪 RUNTIME DEBUG - Versão Simplificada');
     console.log('=====================================\n');

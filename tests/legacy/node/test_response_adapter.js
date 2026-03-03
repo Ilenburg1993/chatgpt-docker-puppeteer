@@ -22,7 +22,10 @@ const createMockTask = taskId => ({
 });
 
 // Testes
-/** Função exportada: runTests. */
+/**
+ * Função exportada: runTests.
+ * @returns {Promise<any>}
+ */
 async function runTests() {
     let passed = 0;
     let failed = 0;

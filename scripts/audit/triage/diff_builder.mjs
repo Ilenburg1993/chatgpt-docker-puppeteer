@@ -62,6 +62,7 @@ function buildContractAwareReplacement(finding, oldLine, fallback) {
 /**
  * @param {any} finding
  * @param {{ title?: string, cause?: string, replacementHint?: string }} [context]
+  * @returns {any}
  */
 export function buildSuggestedDiff(finding, context = {}) {
     if (!finding?.file) {

@@ -56,6 +56,7 @@ function safeCall(handler, payload) {
  *  - send(frame)
  *  - onReceive(handler)
  *  - onError(handler) [opcional]
+  * @returns {any}
  */
 function createConnection({ telemetry, adapter }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {

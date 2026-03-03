@@ -114,6 +114,7 @@ let minLevel = LOG_LEVELS[configuredLevel] ?? LOG_LEVELS.INFO;
  * @param {string|Error|Record<string, unknown>} msg - Mensagem ou objeto a logar.
  * @param {string} [taskId='-'] - ID da tarefa associada.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe.
+  * @returns {void}
  */
 function log(level, msg, taskId = '-') {
     // Filter: Only log if level >= configured threshold
@@ -173,6 +174,7 @@ log.setLevel = newLevel => {
  * @param {string} action - Ação auditada.
  * @param {Record<string, unknown>} details - Detalhes da ação.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe com fallback para console.
+  * @returns {void}
  */
 function audit(action, details) {
     rotateFile(AUDIT_FILE, 'audit_', MAX_AUDIT_SIZE);
@@ -194,6 +196,7 @@ function audit(action, details) {
  * @param {string} name - Nome da métrica.
  * @param {Record<string, unknown>} [payload] - Payload da métrica.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe.
+  * @returns {void}
  */
 function metric(name, payload) {
     rotateFile(METRICS_FILE, 'metrics_', MAX_LOG_SIZE);

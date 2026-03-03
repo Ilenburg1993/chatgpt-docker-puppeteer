@@ -176,6 +176,14 @@ function _normalizePatchProposal(job, contextPack, llmOut) {
     };
 }
 
+/**
+ * Cria o cliente de geração de propostas de patch do Audit Agent.
+ * O cliente opera em modo proposal-only e depende do Inference Gateway.
+ * @returns {{
+ *   isEnabled: () => boolean,
+ *   runPatchAuthor: (job: unknown, contextPack: unknown, llmTriage: unknown) => Promise<Record<string, unknown>>
+ * }}
+ */
 export function createAuditAgentPatchAuthorLlmClient() {
     return {
         isEnabled: _isEnabled,
@@ -251,7 +259,7 @@ export function createAuditAgentPatchAuthorLlmClient() {
                 profile_name: profileName || null,
                 model: model || null,
                 parsed: parsedInfo.parsed,
-                triage_anchor: _asRecord(llmTriage?.parsed),
+                triage_anchor: _asRecord(_asRecord(llmTriage).parsed),
             });
             normalizedProposal.patch_summary.validation = {
                 ..._asRecord(normalizedProposal.patch_summary.validation),

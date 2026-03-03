@@ -40,7 +40,10 @@ function _rowToRun(row) {
     };
 }
 
-/** Função exportada: createAuditJobRun. */
+/**
+ * Função exportada: createAuditJobRun.
+ * @returns {any}
+ */
 function createAuditJobRun(input = {}) {
     const db = getDb();
     db.prepare(
@@ -74,14 +77,20 @@ function createAuditJobRun(input = {}) {
     return getAuditJobRunById(String(input.id));
 }
 
-/** Função exportada: getAuditJobRunById. */
+/**
+ * Função exportada: getAuditJobRunById.
+ * @returns {any}
+ */
 function getAuditJobRunById(id) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM audit_job_runs WHERE id = ?').get(String(id || '').trim());
     return _rowToRun(row);
 }
 
-/** Função exportada: updateAuditJobRun. */
+/**
+ * Função exportada: updateAuditJobRun.
+ * @returns {any}
+ */
 function updateAuditJobRun(id, updates = {}) {
     const existing = getAuditJobRunById(id);
     if (!existing) return null;
@@ -141,7 +150,10 @@ function updateAuditJobRun(id, updates = {}) {
     return getAuditJobRunById(existing.id);
 }
 
-/** Função exportada: listAuditJobRunsByJobId. */
+/**
+ * Função exportada: listAuditJobRunsByJobId.
+ * @returns {any}
+ */
 function listAuditJobRunsByJobId(jobId, { limit = 50 } = {}) {
     const db = getDb();
     const rows = db

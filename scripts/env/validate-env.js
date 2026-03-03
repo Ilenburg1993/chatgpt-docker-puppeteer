@@ -26,7 +26,10 @@ const colors = {
 // ============================================================================
 // Parser de .env
 // ============================================================================
-/** Função exportada: parseEnvFile. */
+/**
+ * Função exportada: parseEnvFile.
+ * @returns {any}
+ */
 function parseEnvFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
     const env = {};

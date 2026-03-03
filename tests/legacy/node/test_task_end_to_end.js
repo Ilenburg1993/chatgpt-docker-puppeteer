@@ -586,7 +586,10 @@ async function testFullE2EFlow() {
 // TEST RUNNER
 // ============================================================================
 
-/** Função exportada: runAllTests. */
+/**
+ * Função exportada: runAllTests.
+ * @returns {Promise<any>}
+ */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));
     console.log('  Task Processing End-to-End Tests');

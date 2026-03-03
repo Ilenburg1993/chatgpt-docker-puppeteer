@@ -7,7 +7,10 @@ import { HandleManager } from '#driver/modules/handle_manager';
 // TEST 1: Shutdown - Isolamento de Erros Por Fase
 // ============================================================================
 
-/** Função exportada: testShutdownPhaseIsolation. */
+/**
+ * Função exportada: testShutdownPhaseIsolation.
+ * @returns {Promise<any>}
+ */
 async function testShutdownPhaseIsolation() {
     console.log('\n=== TEST 1: Shutdown - Isolamento de Erros ===');
 
@@ -130,7 +133,10 @@ async function testShutdownPhaseIsolation() {
 // TEST 2: HandleManager - AbortController Funcionamento
 // ============================================================================
 
-/** Função exportada: testHandleManagerAbort. */
+/**
+ * Função exportada: testHandleManagerAbort.
+ * @returns {Promise<any>}
+ */
 async function testHandleManagerAbort() {
     console.log('\n=== TEST 2: HandleManager - AbortController ===');
 
@@ -201,7 +207,10 @@ async function testHandleManagerAbort() {
 // TEST 3: HandleManager - Cleanup Completo (sem timeout)
 // ============================================================================
 
-/** Função exportada: testHandleManagerComplete. */
+/**
+ * Função exportada: testHandleManagerComplete.
+ * @returns {Promise<any>}
+ */
 async function testHandleManagerComplete() {
     console.log('\n=== TEST 3: HandleManager - Cleanup Completo ===');
 
@@ -260,7 +269,10 @@ async function testHandleManagerComplete() {
 // TEST 4: HandleManager - Handles com Erro Individual
 // ============================================================================
 
-/** Função exportada: testHandleManagerWithErrors. */
+/**
+ * Função exportada: testHandleManagerWithErrors.
+ * @returns {Promise<any>}
+ */
 async function testHandleManagerWithErrors() {
     console.log('\n=== TEST 4: HandleManager - Handles com Erros Individuais ===');
 
@@ -325,7 +337,10 @@ async function testHandleManagerWithErrors() {
 // TEST 5: Validação de Código Modificado
 // ============================================================================
 
-/** Função exportada: testCodeValidation. */
+/**
+ * Função exportada: testCodeValidation.
+ * @returns {Promise<any>}
+ */
 async function testCodeValidation() {
     console.log('\n=== TEST 5: Validação de Código Modificado ===');
 
@@ -390,7 +405,10 @@ async function testCodeValidation() {
 // EXECUTOR PRINCIPAL
 // ============================================================================
 
-/** Função exportada: runAllTests. */
+/**
+ * Função exportada: runAllTests.
+ * @returns {Promise<void>}
+ */
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
     console.log('║  Suite de Testes - Correções P2 (Critical Cases Analysis)   ║');

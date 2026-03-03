@@ -177,6 +177,7 @@ function criarNERVMock() {
 /**
  * Cria um NERV simplificado (sem EventEmitter)
  * Útil para testes que só precisam verificar chamadas
+  * @returns {any}
  */
 function criarNERVSimples() {
     return {

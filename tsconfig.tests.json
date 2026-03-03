@@ -2,22 +2,20 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.tools.tsbuildinfo",
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.tests.tsbuildinfo",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2024", "ES2022.Error", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
   "include": [
-    "scripts/build/**/*.mjs",
-    "scripts/env/**/*.mjs",
-    "scripts/health/**/*.mjs",
-    "scripts/setup/**/*.mjs",
-    "scripts/analysis/jsdoc_coverage_cli.mjs",
-    "scripts/analysis/jsdoc_coverage_engine.mjs",
-    "scripts/analysis/jsdoc_backfill_missing_exports.mjs",
-    "eslint.config.mjs",
-    ".puppeteerrc.cjs"
+    "tests/unit/audit/test_impact_classifier_scope_matrix.spec.js",
+    "tests/unit/audit/test_jsdoc_coverage_engine_exports_detection.spec.js",
+    "tests/unit/audit/test_jsdoc_coverage_engine_tag_validation.spec.js",
+    "tests/unit/audit/test_quality_collector_smart_plan_resolution.spec.js",
+    "tests/unit/audit/test_quality_collector_fallback_rules.spec.js",
+    "tests/unit/audit/test_quality_parsers_eslint_json.spec.js",
+    "tests/unit/audit/test_quality_parsers_prettier_check.spec.js"
   ],
   "exclude": [
     "node_modules",
@@ -36,15 +34,12 @@
     "analysis",
     "local-login",
     "DOCUMENTAÇÃO",
-    "src/dashboard-ui/**",
     ".git",
     "**/node_modules/**",
     "**/*.min.js",
     "**/*.map",
-    "**/bundle.js",
     "**/*.bundle.js",
     "**/*.d.ts.map",
-    "**/*.js.map",
-    "scripts/legacy/**"
+    "**/*.js.map"
   ]
 }

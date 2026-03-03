@@ -45,6 +45,10 @@ export function getInferenceEnvBootstrapPolicy() {
     };
 }
 
+/**
+ * Gateway de inferência para geração, embedding e listagem de modelos.
+ * Aplica políticas por cliente/perfil e controla concorrência por clientTag.
+ */
 export class InferenceGateway {
     /**
      * @param {{
@@ -304,4 +308,8 @@ export class InferenceGateway {
     }
 }
 
+/**
+ * Instância singleton do gateway de inferência usada pelo servidor HTTP do módulo.
+ * @type {InferenceGateway}
+ */
 export const inferenceGateway = new InferenceGateway();

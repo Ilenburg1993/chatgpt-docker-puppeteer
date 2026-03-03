@@ -327,7 +327,10 @@ function updateMissionProgressState(params) {
     return { ok: true, mission: updated };
 }
 
-/** Função exportada: executeMissionTransition. */
+/**
+ * Função exportada: executeMissionTransition.
+ * @returns {any}
+ */
 function executeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     const mission = getMissionById(missionId);
     const now = Date.now();
@@ -344,7 +347,10 @@ function executeMissionTransition({ missionId, actorType = 'user', actorId = nul
     });
 }
 
-/** Função exportada: pauseMissionTransition. */
+/**
+ * Função exportada: pauseMissionTransition.
+ * @returns {any}
+ */
 function pauseMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     return transitionMission({
         missionId,
@@ -371,7 +377,10 @@ function pauseMissionTransition({ missionId, actorType = 'user', actorId = null,
     });
 }
 
-/** Função exportada: resumeMissionTransition. */
+/**
+ * Função exportada: resumeMissionTransition.
+ * @returns {any}
+ */
 function resumeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     const mission = getMissionById(missionId);
     const now = Date.now();
@@ -401,7 +410,10 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
     });
 }
 
-/** Função exportada: cancelMissionTransition. */
+/**
+ * Função exportada: cancelMissionTransition.
+ * @returns {any}
+ */
 function cancelMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
     return transitionMission({
         missionId,
@@ -429,7 +441,10 @@ function cancelMissionTransition({ missionId, actorType = 'user', actorId = null
     });
 }
 
-/** Função exportada: failMissionTransition. */
+/**
+ * Função exportada: failMissionTransition.
+ * @returns {any}
+ */
 function failMissionTransition({
     missionId,
     failureReason,
@@ -456,7 +471,10 @@ function failMissionTransition({
     });
 }
 
-/** Função exportada: completeMissionTransition. */
+/**
+ * Função exportada: completeMissionTransition.
+ * @returns {any}
+ */
 function completeMissionTransition({
     missionId,
     contextPatch = null,

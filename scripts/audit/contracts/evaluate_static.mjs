@@ -288,6 +288,7 @@ function resolveAllowlistedFiles(contract, allowlists) {
  *   contracts: ContractDefinitionV1[],
  *   allowlists?: Record<string, Record<string, string[]>>,
  * }} options
+  * @returns {any}
  */
 export function evaluateStaticContracts(options) {
     const rootDir = path.resolve(options.rootDir);

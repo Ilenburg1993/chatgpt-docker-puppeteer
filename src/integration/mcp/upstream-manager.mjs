@@ -170,7 +170,10 @@ function setOneStatus(next) {
     _status.upstreams.push(next);
 }
 
-/** Função exportada: getUpstreamStatus. */
+/**
+ * Função exportada: getUpstreamStatus.
+ * @returns {any}
+ */
 export function getUpstreamStatus() {
     // Return a shallow clone to avoid accidental mutation
     return { upstreams: _status.upstreams.map(u => ({ ...u })) };
@@ -575,7 +578,10 @@ export async function registerUpstreams(registry, options = {}) {
     return getUpstreamStatus();
 }
 
-/** Função exportada: shutdownUpstreams. */
+/**
+ * Função exportada: shutdownUpstreams.
+ * @returns {Promise<void>}
+ */
 export async function shutdownUpstreams() {
     for (const entry of _retryState.values()) {
         if (entry.timer) clearTimeout(entry.timer);

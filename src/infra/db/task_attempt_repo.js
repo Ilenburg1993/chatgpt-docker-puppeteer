@@ -31,6 +31,7 @@ function _now() {
  *   diagnostic_artifacts_json?: string|null,
  *   diagnosis_json?: string|null,
  * }} AttemptUpsert
+  * @returns {void}
  */
 
 function upsertAttempt(input) {
@@ -108,7 +109,10 @@ function upsertAttempt(input) {
     });
 }
 
-/** Função exportada: updateAttempt. */
+/**
+ * Função exportada: updateAttempt.
+ * @returns {any}
+ */
 function updateAttempt(attemptId, updates = {}) {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId);
@@ -119,13 +123,19 @@ function updateAttempt(attemptId, updates = {}) {
     return db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null;
 }
 
-/** Função exportada: getAttemptById. */
+/**
+ * Função exportada: getAttemptById.
+ * @returns {any}
+ */
 function getAttemptById(attemptId) {
     const db = getDb();
     return db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null;
 }
 
-/** Função exportada: listAttemptsByTask. */
+/**
+ * Função exportada: listAttemptsByTask.
+ * @returns {any}
+ */
 function listAttemptsByTask(taskId, { limit = 200 } = {}) {
     const db = getDb();
     const lim = Math.max(1, Math.min(Number(limit) || 200, 2000));

@@ -3,6 +3,7 @@ import path from 'node:path';
 
 /**
  * @param {{ runDir: string }} options
+  * @returns {any}
  */
 export function createRunStateStore(options) {
     const runDir = options.runDir;

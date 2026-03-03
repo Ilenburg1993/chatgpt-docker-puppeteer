@@ -21,6 +21,7 @@ function _makeArtifactId() {
  *   created_at_ms?: number,
  *   created_by?: string|null,
  * }} ArtifactInsert
+  * @returns {any}
  */
 
 function insertArtifact(input) {
@@ -50,7 +51,10 @@ function insertArtifact(input) {
     return id;
 }
 
-/** Função exportada: getArtifactById. */
+/**
+ * Função exportada: getArtifactById.
+ * @returns {any}
+ */
 function getArtifactById(artifactId) {
     const db = getDb();
     return db.prepare('SELECT * FROM artifacts WHERE id = ?').get(artifactId) || null;

@@ -102,7 +102,7 @@ function getStructuredContentData(json) {
 /**
  * @param {unknown} text
  * @param {unknown} [fallback=null]
- * @returns {unknown}
+ * @returns {any}
  */
 function parseJsonSafe(text, fallback = null) {
     try {
@@ -205,10 +205,18 @@ function _ensureCacheSpace() {
     }
 }
 
+/**
+ * Limpa o cache interno de resultados MCP/LSP mantido pelo context builder.
+ * @returns {void}
+ */
 function _clearMcpLspCache() {
     _mcpLspCache.clear();
 }
 
+/**
+ * Retorna o tamanho atual do cache interno MCP/LSP.
+ * @returns {number}
+ */
 function _getMcpLspCacheSize() {
     return _mcpLspCache.size;
 }
@@ -557,6 +565,10 @@ function buildProbeState(probe, parsedJson) {
 
 /**
  * @param {AuditAgentContextBuilderOptions} [options={}]
+ * @returns {{
+ *   collectQuickContext: (job?: AuditAgentContextJob|null) => Promise<{ context: Record<string, unknown>, findings: Array<Record<string, unknown>>, patches: unknown[] }>,
+ *   collectMcpSemanticContext: (job?: AuditAgentContextJob|null) => Promise<{ tools: Record<string, unknown>, raw: Record<string, unknown> }>
+ * }}
  */
 export function createAuditAgentContextBuilder({ callMcpTool: callOverride } = {}) {
     return {

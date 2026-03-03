@@ -124,6 +124,7 @@ async function getDna() {
  *
  * @param {object} dna - Novo objeto de DNA.
  * @param {string} author - Identificador da entidade que evoluiu o DNA (ex: 'SADI_V19').
+  * @returns {Promise<any>}
  */
 async function saveDna(dna, author = 'system') {
     try {
@@ -189,6 +190,7 @@ async function getTargetRules(domain) {
 /**
  * Invalida o cache em RAM.
  * Chamado pela fachada de IO quando sinais externos (Watchers) detectam mudanças manuais no disco.
+  * @returns {void}
  */
 function invalidateCache() {
     cachedDna = null;

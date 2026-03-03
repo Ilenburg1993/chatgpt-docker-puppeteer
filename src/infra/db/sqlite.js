@@ -9,7 +9,10 @@ import { MIGRATIONS } from './migrations.js';
 /** @type {import('better-sqlite3').Database|null} */
 let singletonDb = null;
 
-/** Função exportada: resolveDbPath. */
+/**
+ * Função exportada: resolveDbPath.
+ * @returns {any}
+ */
 function resolveDbPath() {
     const fromEnv = process.env.MAESTRO_DB_PATH || process.env.DB_PATH || null;
     const fromConfig = typeof CONFIG?.all?.DB_PATH === 'string' ? CONFIG.all.DB_PATH : null;
@@ -79,7 +82,10 @@ function migrate(db) {
     }
 }
 
-/** Função exportada: getDb. */
+/**
+ * Função exportada: getDb.
+ * @returns {any}
+ */
 function getDb() {
     if (singletonDb) {
         return singletonDb;
@@ -105,7 +111,10 @@ function getDb() {
     return singletonDb;
 }
 
-/** Função exportada: closeDb. */
+/**
+ * Função exportada: closeDb.
+ * @returns {void}
+ */
 function closeDb() {
     if (!singletonDb) {
         return;

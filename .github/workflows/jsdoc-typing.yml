@@ -236,11 +236,14 @@ jobs:
               "## JSDoc Coverage (non-blocking)",
               "",
               covered
-                ? `- total_exports: ${covered.total ?? "n/a"} | documented: ${covered.documented ?? "n/a"} | coverage: ${covered.percent ?? "n/a"}%`
+                ? `- total_exports: ${covered.exports_total ?? "n/a"} | documented: ${covered.exports_with_jsdoc ?? "n/a"} | coverage: ${covered.coverage_pct ?? "n/a"}%`
                 : "- (JSON report not available — see coverage.txt artifact)",
+              covered
+                ? `- function_returns: ${covered.functions_with_returns_tag ?? "n/a"}/${covered.functions_total ?? "n/a"} | missing_returns: ${covered.functions_missing_returns_tag ?? "n/a"} | coverage: ${covered.function_returns_coverage_pct ?? "n/a"}%`
+                : null,
               "",
               "> Falhas acima são informativas e não bloqueiam o merge.",
-            ];
+            ].filter(Boolean);
             fs.writeFileSync("artifacts/jsdoc/summary.md", lines.join("\n") + "\n");
           '
           cat artifacts/jsdoc/summary.md >> "$GITHUB_STEP_SUMMARY"

@@ -1146,7 +1146,10 @@ router.delete('/:id/purge', async (req, res) => {
  */
 export default router;
 
-/** Função exportada: setMissionManager. */
+/**
+ * Função exportada: setMissionManager.
+ * @returns {void}
+ */
 function setMissionManager(_) {
     log('WARN', '[MISSIONS_API] setMissionManager() ignored (SSOT missions controller)');
 }

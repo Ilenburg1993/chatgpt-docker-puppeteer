@@ -155,7 +155,10 @@ function _rowToTask(row) {
     return task;
 }
 
-/** Função exportada: getTaskById. */
+/**
+ * Função exportada: getTaskById.
+ * @returns {any}
+ */
 function getTaskById(taskId) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
@@ -168,6 +171,7 @@ function getTaskById(taskId) {
  * o máximo retornável a 500 por chamada (vs 20.000 anterior).
  *
  * @param {{ status?: string|null, stage?: string|null, missionId?: string|null, limit?: number, offset?: number }} [opts]
+  * @returns {any}
  */
 function listTasks({ status = null, stage = null, missionId = null, limit = 100, offset = 0 } = {}) {
     const db = getDb();
@@ -248,7 +252,10 @@ function countTasksByStatus() {
     return result;
 }
 
-/** Função exportada: getTaskDependencies. */
+/**
+ * Função exportada: getTaskDependencies.
+ * @returns {any}
+ */
 function getTaskDependencies(taskId) {
     const db = getDb();
     const rows = db
@@ -274,6 +281,7 @@ function getTaskDependencies(taskId) {
  * @param {string} [options.actor='system'] - The actor performing the action
  * @param {boolean} [options.ifNotExists=false] - Whether to insert only if not exists
  * @param {string|null} [options.promptTemplateArtifactId=null] - Prompt template artifact ID
+  * @returns {any}
  */
 function insertTask(
     rawTask,
@@ -715,12 +723,18 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
     return getTaskById(taskId);
 }
 
-/** Função exportada: setTaskStage. */
+/**
+ * Função exportada: setTaskStage.
+ * @returns {any}
+ */
 function setTaskStage(taskId, stage) {
     return updateTask(taskId, { stage });
 }
 
-/** Função exportada: setTaskStatus. */
+/**
+ * Função exportada: setTaskStatus.
+ * @returns {any}
+ */
 function setTaskStatus(taskId, status, extra = {}) {
     return updateTask(taskId, { status, ...extra });
 }
@@ -819,6 +833,7 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
  * @param {string} params.taskId - The task ID
  * @param {string} [params.workerId] - The worker ID (optional, for safety)
  * @param {string} [params.expectedAttemptId] - Expected latest attempt/correlation for lock-causality guard
+  * @returns {any}
  */
 function releaseTaskLock(
     /** @type {{ taskId: string, workerId?: string, expectedAttemptId?: string }} */ {
@@ -857,6 +872,7 @@ function releaseTaskLock(
  * @param {string} params.workerId - The worker ID
  * @param {number} [params.nowMs] - Current timestamp in ms
  * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
+  * @returns {any}
  */
 function extendTaskLock(
     /** @type {{ taskId: string, workerId: string, nowMs?: number, lockTtlMs?: number }} */ {
@@ -887,7 +903,10 @@ function extendTaskLock(
     return res.changes || 0;
 }
 
-/** Função exportada: retryFailedTasks. */
+/**
+ * Função exportada: retryFailedTasks.
+ * @returns {any}
+ */
 function retryFailedTasks() {
     const db = getDb();
     const now = _now();
@@ -906,7 +925,10 @@ function retryFailedTasks() {
     return res.changes || 0;
 }
 
-/** Função exportada: incrementTaskAttempts. */
+/**
+ * Função exportada: incrementTaskAttempts.
+ * @returns {any}
+ */
 function incrementTaskAttempts(taskId, delta = 1) {
     const db = getDb();
     const now = _now();
@@ -924,7 +946,10 @@ function incrementTaskAttempts(taskId, delta = 1) {
     return res.changes || 0;
 }
 
-/** Função exportada: clearQueuePreserveRunning. */
+/**
+ * Função exportada: clearQueuePreserveRunning.
+ * @returns {any}
+ */
 function clearQueuePreserveRunning() {
     const db = getDb();
     const running = db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status = 'RUNNING'").get()?.c || 0;
@@ -932,7 +957,10 @@ function clearQueuePreserveRunning() {
     return { deleted: res.changes || 0, preserved: running };
 }
 
-/** Função exportada: purgeTask. */
+/**
+ * Função exportada: purgeTask.
+ * @returns {any}
+ */
 function purgeTask(taskId) {
     const db = getDb();
     const res = db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);

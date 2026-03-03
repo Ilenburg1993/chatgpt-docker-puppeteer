@@ -38,7 +38,10 @@ function _rowToFinding(row) {
     };
 }
 
-/** Função exportada: upsertAuditFinding. */
+/**
+ * Função exportada: upsertAuditFinding.
+ * @returns {any}
+ */
 function upsertAuditFinding(input = {}) {
     const db = getDb();
     const now = _now();
@@ -99,13 +102,19 @@ function upsertAuditFinding(input = {}) {
     return getAuditFindingById(id);
 }
 
-/** Função exportada: getAuditFindingById. */
+/**
+ * Função exportada: getAuditFindingById.
+ * @returns {any}
+ */
 function getAuditFindingById(id) {
     const db = getDb();
     return _rowToFinding(db.prepare('SELECT * FROM audit_job_findings WHERE id = ?').get(String(id || '').trim()));
 }
 
-/** Função exportada: listAuditFindingsByJobId. */
+/**
+ * Função exportada: listAuditFindingsByJobId.
+ * @returns {any}
+ */
 function listAuditFindingsByJobId(jobId, { limit = 200 } = {}) {
     const db = getDb();
     const rows = db

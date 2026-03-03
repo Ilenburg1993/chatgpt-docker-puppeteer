@@ -11,6 +11,7 @@ function sanitizePathToken(value) {
 
 /**
  * @param {{ runId: string, runDir: string, logLevel?: 'info'|'debug', logFormat?: 'jsonl'|'console', enableConsole?: boolean }} options
+  * @returns {any}
  */
 export function createAuditLogger(options) {
     const runDir = options.runDir;

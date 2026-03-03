@@ -33,7 +33,10 @@ const signalHandlers = {
     unhandledRejection: null,
 };
 
-/** Função exportada: setAllowProcessExit. */
+/**
+ * Função exportada: setAllowProcessExit.
+ * @returns {void}
+ */
 function setAllowProcessExit(flag) {
     allowProcessExit = !!flag;
 }
@@ -64,6 +67,7 @@ function removeSignalListenerSafely(signal, key) {
  * Estratégia: Desativação em cascata reversa (Periferia -> Núcleo).
  *
  * @param {string} signal - O sinal de interrupção (ex: SIGINT, SIGTERM).
+  * @returns {Promise<void>}
  */
 async function gracefulShutdown(signal) {
     if (isShuttingDown) {
@@ -192,6 +196,7 @@ async function gracefulShutdown(signal) {
 /**
  * Ativa a escuta de sinais vitais do SO e monitora exceções críticas.
  * Deve ser invocado no início do bootstrap em main.js.
+  * @returns {void}
  */
 function listenToSignals() {
     if (signalsListening) {
@@ -257,7 +262,10 @@ function listenToSignals() {
     signalsListening = true;
 }
 
-/** Função exportada: cleanupSignalListeners. */
+/**
+ * Função exportada: cleanupSignalListeners.
+ * @returns {void}
+ */
 function cleanupSignalListeners() {
     if (!signalsListening) {
         return;

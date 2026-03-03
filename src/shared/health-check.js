@@ -478,6 +478,24 @@ export function createAuditHealthChecker() {
 // DEFAULT EXPORT
 // ============================================================================
 
+/**
+ * Barrel compatível com consumidores legados do módulo de health-check compartilhado.
+ * @type {{
+ *   HEALTH_STATUS: typeof HEALTH_STATUS,
+ *   DEPTH_LEVEL: typeof DEPTH_LEVEL,
+ *   getOllamaHost: typeof getOllamaHost,
+ *   getGatewayUrl: typeof getGatewayUrl,
+ *   getHealthCheckTimeout: typeof getHealthCheckTimeout,
+ *   checkOllamaHealth: typeof checkOllamaHealth,
+ *   checkGatewayHealth: typeof checkGatewayHealth,
+ *   checkSystemHealth: typeof checkSystemHealth,
+ *   calculateOverallStatus: typeof calculateOverallStatus,
+ *   checkHealth: typeof checkHealth,
+ *   SharedHealthChecker: typeof SharedHealthChecker,
+ *   createDiagnosticHealthChecker: typeof createDiagnosticHealthChecker,
+ *   createAuditHealthChecker: typeof createAuditHealthChecker
+ * }}
+ */
 export default {
     HEALTH_STATUS,
     DEPTH_LEVEL,

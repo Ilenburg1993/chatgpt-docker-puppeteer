@@ -54,7 +54,10 @@ function _setModelEnabled(id, enabled) {
     return getInferenceModelById(targetId);
 }
 
-/** Função exportada: upsertInferenceModel. */
+/**
+ * Função exportada: upsertInferenceModel.
+ * @returns {any}
+ */
 function upsertInferenceModel(input = {}) {
     const db = getDb();
     const now = _now();
@@ -105,13 +108,19 @@ function upsertInferenceModel(input = {}) {
     return getInferenceModelById(id);
 }
 
-/** Função exportada: getInferenceModelById. */
+/**
+ * Função exportada: getInferenceModelById.
+ * @returns {any}
+ */
 function getInferenceModelById(id) {
     const db = getDb();
     return _rowToModel(db.prepare('SELECT * FROM inference_models WHERE id = ?').get(String(id || '').trim()));
 }
 
-/** Função exportada: listInferenceModels. */
+/**
+ * Função exportada: listInferenceModels.
+ * @returns {any}
+ */
 function listInferenceModels({ backendId = null, enabledOnly = false, limit = 200 } = {}) {
     const db = getDb();
     const rows = db
@@ -132,7 +141,10 @@ function listInferenceModels({ backendId = null, enabledOnly = false, limit = 20
     return rows.map(_rowToModel).filter(Boolean);
 }
 
-/** Função exportada: setInferenceModelEnabled. */
+/**
+ * Função exportada: setInferenceModelEnabled.
+ * @returns {any}
+ */
 function setInferenceModelEnabled(id, enabled) {
     return _setModelEnabled(id, Boolean(enabled));
 }

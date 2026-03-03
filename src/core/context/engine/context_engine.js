@@ -56,6 +56,7 @@ async function applyTransform(content, transform, targetTask) {
  * @param {AbortSignal} signal - Sinal para cancelamento imediato.
  * @param {number} depth - Nível atual de recursão.
  * @param {BudgetManager} budget - Gestor de volume de injeção.
+  * @returns {Promise<any>}
  */
 
 async function resolveContext(text, currentTask = null, signal = null, depth = 0, budget = null) {

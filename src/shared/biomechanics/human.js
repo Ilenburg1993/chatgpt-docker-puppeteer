@@ -885,7 +885,10 @@ async function humanClick(...args) {
     return true;
 }
 
-/** Função exportada: humanType. */
+/**
+ * Função exportada: humanType.
+ * @returns {Promise<any>}
+ */
 async function humanType(...args) {
     if (_isLegacyHumanTypeArgs(args)) {
         // Legacy API used by biomechanics_engine.

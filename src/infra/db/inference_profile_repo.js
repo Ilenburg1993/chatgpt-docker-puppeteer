@@ -41,7 +41,10 @@ function _rowToProfile(row) {
     };
 }
 
-/** Função exportada: upsertInferenceProfile. */
+/**
+ * Função exportada: upsertInferenceProfile.
+ * @returns {any}
+ */
 function upsertInferenceProfile(input = {}) {
     const db = getDb();
     const now = _now();
@@ -93,13 +96,19 @@ function upsertInferenceProfile(input = {}) {
     return getInferenceProfileById(id);
 }
 
-/** Função exportada: getInferenceProfileById. */
+/**
+ * Função exportada: getInferenceProfileById.
+ * @returns {any}
+ */
 function getInferenceProfileById(id) {
     const db = getDb();
     return _rowToProfile(db.prepare('SELECT * FROM inference_profiles WHERE id = ?').get(String(id || '').trim()));
 }
 
-/** Função exportada: listInferenceProfiles. */
+/**
+ * Função exportada: listInferenceProfiles.
+ * @returns {any}
+ */
 function listInferenceProfiles({ enabledOnly = false, limit = 100 } = {}) {
     const db = getDb();
     const rows = db

@@ -33,6 +33,7 @@ const GLOBAL_TEST_CONFIG = {
 
 /**
  * Setup principal
+  * @returns {Promise<void>}
  */
 async function setup() {
     console.log('[TEST SETUP] Iniciando setup global...');

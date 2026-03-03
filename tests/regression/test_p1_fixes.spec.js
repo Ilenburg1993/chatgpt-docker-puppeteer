@@ -9,7 +9,10 @@ const LOCK_DIR = ROOT;
 // TEST 1: Lock Manager - Two-Phase Commit
 // ============================================================================
 
-/** Função exportada: testLockTwoPhaseCommit. */
+/**
+ * Função exportada: testLockTwoPhaseCommit.
+ * @returns {Promise<any>}
+ */
 async function testLockTwoPhaseCommit() {
     console.log('\n=== TEST 1: Lock Manager - Two-Phase Commit ===');
 
@@ -69,7 +72,10 @@ async function testLockTwoPhaseCommit() {
 // TEST 2: Lock Manager - Concorrência Extrema
 // ============================================================================
 
-/** Função exportada: testLockConcurrency. */
+/**
+ * Função exportada: testLockConcurrency.
+ * @returns {Promise<any>}
+ */
 async function testLockConcurrency() {
     console.log('\n=== TEST 2: Lock Manager - Concorrência (10 tentativas simultâneas) ===');
 
@@ -126,7 +132,10 @@ async function testLockConcurrency() {
 // TEST 3: Lock Manager - Validação de Temp Files
 // ============================================================================
 
-/** Função exportada: testLockNoTempOrphans. */
+/**
+ * Função exportada: testLockNoTempOrphans.
+ * @returns {Promise<any>}
+ */
 async function testLockNoTempOrphans() {
     console.log('\n=== TEST 3: Lock Manager - Sem arquivos .tmp órfãos ===');
 
@@ -167,7 +176,10 @@ async function testLockNoTempOrphans() {
 // TEST 4: BrowserPool - Promise Memoization (Mock)
 // ============================================================================
 
-/** Função exportada: testBrowserPoolMemoization. */
+/**
+ * Função exportada: testBrowserPoolMemoization.
+ * @returns {Promise<any>}
+ */
 async function testBrowserPoolMemoization() {
     console.log('\n=== TEST 4: BrowserPool - Promise Memoization ===');
 
@@ -249,7 +261,10 @@ async function testBrowserPoolMemoization() {
 // TEST 5: Validação de Integração
 // ============================================================================
 
-/** Função exportada: testIntegrationValidation. */
+/**
+ * Função exportada: testIntegrationValidation.
+ * @returns {Promise<any>}
+ */
 async function testIntegrationValidation() {
     console.log('\n=== TEST 5: Validação de Integração ===');
 
@@ -323,7 +338,10 @@ async function testIntegrationValidation() {
 // EXECUTOR PRINCIPAL
 // ============================================================================
 
-/** Função exportada: runAllTests. */
+/**
+ * Função exportada: runAllTests.
+ * @returns {Promise<void>}
+ */
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
     console.log('║  Suite de Testes - Correções P1 (Critical Cases Analysis)   ║');

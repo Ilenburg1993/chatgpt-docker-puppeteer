@@ -523,7 +523,10 @@ class TsserverDaemon {
 
 let singleton = null;
 
-/** Função exportada: getTsserverDaemon. */
+/**
+ * Função exportada: getTsserverDaemon.
+ * @returns {any}
+ */
 export function getTsserverDaemon() {
     if (!singleton) {
         singleton = new TsserverDaemon({
@@ -534,7 +537,10 @@ export function getTsserverDaemon() {
     return singleton;
 }
 
-/** Função exportada: startTsserverDaemon. */
+/**
+ * Função exportada: startTsserverDaemon.
+ * @returns {Promise<any>}
+ */
 export async function startTsserverDaemon(options = {}) {
     const daemon = getTsserverDaemon();
     if (options.timeoutMs) {
@@ -543,7 +549,10 @@ export async function startTsserverDaemon(options = {}) {
     return daemon.start();
 }
 
-/** Função exportada: stopTsserverDaemon. */
+/**
+ * Função exportada: stopTsserverDaemon.
+ * @returns {Promise<any>}
+ */
 export async function stopTsserverDaemon() {
     if (!singleton) return { stopped: true };
     return singleton.stop();

@@ -8,6 +8,7 @@ const TMP_DIRS = [path.join(import.meta.dirname, 'tmp')];
 
 /**
  * Cleanup principal
+  * @returns {Promise<void>}
  */
 async function teardown() {
     console.log('\n[TEST TEARDOWN] Iniciando cleanup global...');

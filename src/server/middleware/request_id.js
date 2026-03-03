@@ -13,6 +13,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * @param {object} req - Request Express.
  * @param {object} res - Response Express.
  * @param {function} next - Próximo middleware.
+  * @returns {void}
  */
 function requestId(req, res, next) {
     // 1. Tenta recuperar ID pré-existente (vido de Proxy, Load Balancer ou Dashboard)

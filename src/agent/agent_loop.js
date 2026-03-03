@@ -11,6 +11,7 @@ import { log } from '#core/logger';
  * @property {number} [plannerMs=1500] - Intervalo para missionPlannerProcessor.tick() em ms.
  * @property {number} [watchdogMs=1500] - Intervalo para attemptWatchdog.tick() em ms.
  * @property {number} [orchestrationMs=1250] - Intervalo para taskOrchestrationWorker.tick() em ms.
+ * @property {number} [stepTimeoutMs=30000] - Timeout máximo de um step completo em ms.
  */
 
 /**

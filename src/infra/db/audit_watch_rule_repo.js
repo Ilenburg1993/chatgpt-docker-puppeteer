@@ -37,13 +37,19 @@ function _rowToRule(row) {
     };
 }
 
-/** Função exportada: getAuditWatchRuleById. */
+/**
+ * Função exportada: getAuditWatchRuleById.
+ * @returns {any}
+ */
 function getAuditWatchRuleById(id) {
     const db = getDb();
     return _rowToRule(db.prepare('SELECT * FROM audit_watch_rules WHERE id = ?').get(String(id || '').trim()));
 }
 
-/** Função exportada: listAuditWatchRules. */
+/**
+ * Função exportada: listAuditWatchRules.
+ * @returns {any}
+ */
 function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
     const db = getDb();
     const rows = db
@@ -59,7 +65,10 @@ function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
     return rows.map(_rowToRule).filter(Boolean);
 }
 
-/** Função exportada: upsertAuditWatchRule. */
+/**
+ * Função exportada: upsertAuditWatchRule.
+ * @returns {any}
+ */
 function upsertAuditWatchRule(input = {}) {
     const db = getDb();
     const now = _now();

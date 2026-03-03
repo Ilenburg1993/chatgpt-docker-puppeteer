@@ -549,6 +549,23 @@ export function createDiagnosticReportClient() {
 // DEFAULT EXPORT
 // ============================================================================
 
+/**
+ * Barrel compatível com consumidores legados dos clientes do Inference Gateway.
+ * @type {{
+ *   CLIENT_TAGS: typeof CLIENT_TAGS,
+ *   ENDPOINTS: typeof ENDPOINTS,
+ *   getGatewayBaseUrl: typeof getGatewayBaseUrl,
+ *   isGatewayEnabled: typeof isGatewayEnabled,
+ *   getTimeout: typeof getTimeout,
+ *   getDefaultModel: typeof getDefaultModel,
+ *   createGatewayClient: typeof createGatewayClient,
+ *   createAuditTriageClient: typeof createAuditTriageClient,
+ *   createAuditPatchClient: typeof createAuditPatchClient,
+ *   createDiagnosticCodeAnalyzerClient: typeof createDiagnosticCodeAnalyzerClient,
+ *   createDiagnosticSystemAnalyzerClient: typeof createDiagnosticSystemAnalyzerClient,
+ *   createDiagnosticReportClient: typeof createDiagnosticReportClient
+ * }}
+ */
 export default {
     CLIENT_TAGS,
     ENDPOINTS,

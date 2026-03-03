@@ -24,6 +24,7 @@ function buildSignalMap(contracts) {
  *   contracts: ContractDefinitionV1[],
  *   signals: Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>,
  * }} options
+  * @returns {any}
  */
 export function evaluateRuntimeSignals(options) {
     const signalMap = buildSignalMap(options.contracts || []);

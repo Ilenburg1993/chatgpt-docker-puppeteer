@@ -53,7 +53,10 @@ function _setBackendEnabled(id, enabled) {
     return getInferenceBackendById(targetId);
 }
 
-/** Função exportada: upsertInferenceBackend. */
+/**
+ * Função exportada: upsertInferenceBackend.
+ * @returns {any}
+ */
 function upsertInferenceBackend(input = {}) {
     const db = getDb();
     const now = _now();
@@ -100,13 +103,19 @@ function upsertInferenceBackend(input = {}) {
     return getInferenceBackendById(id);
 }
 
-/** Função exportada: getInferenceBackendById. */
+/**
+ * Função exportada: getInferenceBackendById.
+ * @returns {any}
+ */
 function getInferenceBackendById(id) {
     const db = getDb();
     return _rowToBackend(db.prepare('SELECT * FROM inference_backends WHERE id = ?').get(String(id || '').trim()));
 }
 
-/** Função exportada: listInferenceBackends. */
+/**
+ * Função exportada: listInferenceBackends.
+ * @returns {any}
+ */
 function listInferenceBackends({ enabledOnly = false, limit = 100 } = {}) {
     const db = getDb();
     const rows = db
@@ -122,7 +131,10 @@ function listInferenceBackends({ enabledOnly = false, limit = 100 } = {}) {
     return rows.map(_rowToBackend).filter(Boolean);
 }
 
-/** Função exportada: setInferenceBackendEnabled. */
+/**
+ * Função exportada: setInferenceBackendEnabled.
+ * @returns {any}
+ */
 function setInferenceBackendEnabled(id, enabled) {
     return _setBackendEnabled(id, Boolean(enabled));
 }

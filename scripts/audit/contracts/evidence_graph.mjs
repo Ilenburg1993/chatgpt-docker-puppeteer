@@ -18,6 +18,7 @@ function groupKey(finding) {
 
 /**
  * @param {Array<any>} findings
+  * @returns {any}
  */
 export function buildEvidenceGraph(findings) {
     /** @type {Map<string, any[]>} */

@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 /**
  * Logs a message with timestamp
  * @param {string} message
+  * @returns {void}
  */
 export function log(message) {
     console.log(`[${new Date().toISOString()}] ${message}`);
@@ -16,6 +17,7 @@ export function log(message) {
 /**
  * Logs an error message
  * @param {string} message
+  * @returns {void}
  */
 export function error(message) {
     console.error(`[${new Date().toISOString()}] ERROR: ${message}`);
@@ -49,6 +51,7 @@ export async function readJson(filePath) {
  * Writes a JSON file
  * @param {string} filePath
  * @param {any} data
+  * @returns {Promise<void>}
  */
 export async function writeJson(filePath, data) {
     await fs.writeFile(filePath, JSON.stringify(data, null, 2));
@@ -69,6 +72,7 @@ export async function runCommand(command, args = []) {
  * Validates that required environment variables are set
  * @param {string[]} vars
  * @throws {Error} if any var is missing
+  * @returns {void}
  */
 export function validateEnv(vars) {
     const missing = vars.filter(v => !process.env[v]);

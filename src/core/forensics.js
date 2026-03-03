@@ -40,6 +40,7 @@ const CAPTURE_TIMEOUT_MS = 5000;
  * Side-effects: Modifica estado global nervInstance.
  * Deve ser chamado no boot antes de usar forensics.
  * @param {Object} nerv - Instância do NERV para notificações.
+  * @returns {void}
  */
 function setNERV(nerv) {
     nervInstance = nerv;

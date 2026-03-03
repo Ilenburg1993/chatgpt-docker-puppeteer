@@ -45,17 +45,26 @@ function _isAllowed(value, allowed) {
     return typeof value === 'string' && allowed.includes(value);
 }
 
-/** @param {unknown} value */
+/**
+ * @param {unknown} value
+ * @returns {any}
+ */
 export function isAuditJobStatus(value) {
     return _isAllowed(value, Object.values(AUDIT_JOB_STATUS));
 }
 
-/** @param {unknown} value */
+/**
+ * @param {unknown} value
+ * @returns {any}
+ */
 export function isAuditJobTriggerType(value) {
     return _isAllowed(value, Object.values(AUDIT_JOB_TRIGGER_TYPE));
 }
 
-/** @param {unknown} value */
+/**
+ * @param {unknown} value
+ * @returns {any}
+ */
 export function isAuditJobKind(value) {
     return _isAllowed(value, Object.values(AUDIT_JOB_KIND));
 }

@@ -108,6 +108,7 @@ function openObservationWindow() {
  * API PÚBLICA: Retorna o snapshot atual da fila.
  * Implementa o Heartbeat de segurança para garantir consistência eventual.
  * P9.6: Adiciona tracking de cache hits/misses
+  * @returns {Promise<any>}
  */
 async function getQueue() {
     const now = Date.now();
@@ -134,6 +135,7 @@ async function getQueue() {
 /**
  * Sinalização Externa: Marca o cache como inconsistente.
  * Chamado exclusivamente por sensores (fs_watcher) ou comandos IPC.
+  * @returns {void}
  */
 function markDirty() {
     isCacheDirty = true;

@@ -61,7 +61,10 @@ async function runTest(name, testFn) {
     }
 }
 
-/** Função exportada: runAllTests. */
+/**
+ * Função exportada: runAllTests.
+ * @returns {Promise<any>}
+ */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));
     console.log('  Task E2E Tests (Simplified - Focus on Integration)');

@@ -102,7 +102,6 @@ module.exports = {
             // Limites e resiliência
             max_memory_restart: '3G',
             exp_backoff_restart_delay: 100,
-            min_uptime: '10s',
             autorestart: true,
 
             // Shutdown determinístico
@@ -168,7 +167,6 @@ module.exports = {
             // Limites e resiliência
             max_memory_restart: '3G',
             exp_backoff_restart_delay: 100,
-            min_uptime: '10s',
             autorestart: true,
 
             // Shutdown previsível
@@ -232,7 +230,6 @@ module.exports = {
             watch: false,
             max_memory_restart: '500M',
             exp_backoff_restart_delay: 100,
-            min_uptime: '10s',
 
             // Node arguments (aligned with other processes)
             node_args: [

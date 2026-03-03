@@ -36,6 +36,7 @@ async function getProjectContext(projectId) {
 /**
  * Localiza uma tarefa específica pelo seu Identificador Único (UUID).
  * @param {string} taskId - ID da tarefa.
+  * @returns {Promise<any>}
  */
 async function findById(taskId) {
     if (!taskId) {
@@ -49,6 +50,7 @@ async function findById(taskId) {
 
 /**
  * Localiza a última tarefa concluída com sucesso em um projeto.
+  * @returns {Promise<any>}
  */
 async function findLast(projectId) {
     const context = await getProjectContext(projectId);
@@ -57,6 +59,7 @@ async function findLast(projectId) {
 
 /**
  * Localiza a última tarefa concluída que possui uma tag específica.
+  * @returns {Promise<any>}
  */
 async function findLastByTag(projectId, tag) {
     if (!tag) {
@@ -70,6 +73,7 @@ async function findLastByTag(projectId, tag) {
 
 /**
  * Localiza a primeira tarefa (mais antiga) concluída com uma tag específica.
+  * @returns {Promise<any>}
  */
 async function findFirstByTag(projectId, tag) {
     if (!tag) {

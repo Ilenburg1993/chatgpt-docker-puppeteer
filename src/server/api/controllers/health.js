@@ -13,6 +13,7 @@ import fs from 'node:fs/promises';
  *
  * @param {object} req - Requisição HTTP
  * @param {object} res - Resposta HTTP
+  * @returns {Promise<void>}
  */
 async function getHealth(req, res) {
     try {
@@ -38,6 +39,7 @@ async function getHealth(req, res) {
  *
  * @param {object} req - Requisição HTTP
  * @param {object} res - Resposta HTTP
+  * @returns {Promise<void>}
  */
 async function getChromeHealth(req, res) {
     try {
@@ -73,6 +75,7 @@ async function getChromeHealth(req, res) {
 
 /**
  * GET /api/health/pm2 - Health check dos processos PM2
+  * @returns {Promise<void>}
  */
 async function getPm2Health(req, res) {
     try {
@@ -92,6 +95,7 @@ async function getPm2Health(req, res) {
 
 /**
  * GET /api/health/kernel - Health check do Kernel
+  * @returns {Promise<any>}
  */
 async function getKernelHealth(req, res) {
     try {
@@ -127,6 +131,7 @@ async function getKernelHealth(req, res) {
 
 /**
  * GET /api/health/disk - Health check do disco
+  * @returns {Promise<void>}
  */
 async function getDiskHealth(req, res) {
     try {

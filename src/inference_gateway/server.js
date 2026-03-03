@@ -31,6 +31,12 @@ function writeJson(res, statusCode, body) {
     res.end(JSON.stringify(body));
 }
 
+/**
+ * Cria o servidor HTTP do Inference Gateway.
+ * Expõe health, metrics, reload de policies e endpoints de inferência.
+ * @param {{ gateway?: typeof inferenceGateway, reloadPolicies?: (() => Promise<unknown>|unknown)|null }} [options={}]
+ * @returns {http.Server}
+ */
 export function createInferenceGatewayServer({ gateway = inferenceGateway, reloadPolicies = null } = {}) {
     return http.createServer(async (req, res) => {
         try {

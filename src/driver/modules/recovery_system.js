@@ -543,13 +543,15 @@ class RecoverySystem extends EventEmitter {
      */
     _timeout(ms, operation) {
         let handle;
-        const promise = new Promise((_, reject) => {
-            handle = setTimeout(() => {
-                const error = new Error(`Timeout in ${operation} after ${ms}ms`);
-                error.name = 'TimeoutError';
-                reject(error);
-            }, ms);
-        });
+        const promise = /** @type {Promise<never>} */ (
+            new Promise((_, reject) => {
+                handle = setTimeout(() => {
+                    const error = new Error(`Timeout in ${operation} after ${ms}ms`);
+                    error.name = 'TimeoutError';
+                    reject(error);
+                }, ms);
+            })
+        );
         return { promise, cancel: () => clearTimeout(handle) };
     }
 

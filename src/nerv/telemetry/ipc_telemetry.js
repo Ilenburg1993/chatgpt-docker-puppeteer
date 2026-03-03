@@ -54,6 +54,7 @@ function safeCall(handler, payload) {
  * @param {Object} config
  * Configuração estritamente técnica (opcional):
  * - enabled: boolean
+  * @returns {any}
  */
 function createIPCTelemetry(config = {}) {
     const enabled = config.enabled !== false;

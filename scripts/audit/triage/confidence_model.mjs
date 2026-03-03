@@ -1,6 +1,7 @@
 /**
  * @param {any} finding
  * @param {{ sourceConvergence?: number, hasContract?: boolean, hasRuntimeEvidence?: boolean }} [signals]
+  * @returns {any}
  */
 export function scoreConfidence(finding, signals = {}) {
     let score = 0.45;

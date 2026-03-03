@@ -37,7 +37,10 @@ http.interceptors.response.use(
     }
 );
 
-/** Função exportada: formatHttpError. */
+/**
+ * Função exportada: formatHttpError.
+ * @returns {any}
+ */
 export function formatHttpError(error) {
     const requestId = error?.request_id || error?.response?.data?.request_id || null;
     const apiMessage = error?.response?.data?.error || error?.response?.data?.message || null;

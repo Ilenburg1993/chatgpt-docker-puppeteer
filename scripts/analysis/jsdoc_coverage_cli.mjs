@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import fs from 'node:fs';
 import { parseArgs } from 'node:util';
 import { analyzeJSDocCoverage, collectJsSourceFiles } from './jsdoc_coverage_engine.mjs';
@@ -45,12 +46,23 @@ if (format === 'json') {
     console.log(`exports_total: ${report.exports_total}`);
     console.log(`exports_with_jsdoc: ${report.exports_with_jsdoc}`);
     console.log(`coverage_pct: ${report.coverage_pct}%`);
+    console.log(`functions_total: ${report.functions_total}`);
+    console.log(`functions_with_returns_tag: ${report.functions_with_returns_tag}`);
+    console.log(`functions_missing_returns_tag: ${report.functions_missing_returns_tag}`);
+    console.log(`function_returns_coverage_pct: ${report.function_returns_coverage_pct}%`);
     console.log('');
     const worstFiles = [...report.files]
-        .sort((a, b) => a.coverage_pct - b.coverage_pct || a.file.localeCompare(b.file))
+        .sort(
+            (a, b) =>
+                b.functions_missing_returns_tag - a.functions_missing_returns_tag ||
+                a.coverage_pct - b.coverage_pct ||
+                a.file.localeCompare(b.file)
+        )
         .slice(0, 25);
     for (const item of worstFiles) {
-        if (item.coverage_pct >= 100) continue;
-        console.log(`- ${item.file}: ${item.coverage_pct}% (${item.exports_with_jsdoc}/${item.exports_total})`);
+        if (item.coverage_pct >= 100 && item.functions_missing_returns_tag === 0) continue;
+        console.log(
+            `- ${item.file}: exports ${item.coverage_pct}% (${item.exports_with_jsdoc}/${item.exports_total}), returns ${item.function_returns_coverage_pct}% (${item.functions_with_returns_tag}/${item.functions_total})`
+        );
     }
 }

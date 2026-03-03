@@ -47,6 +47,7 @@ function _normalizePolicy(policy) {
  *   policy?: Record<string, unknown>,
  *   context?: Record<string, unknown>
  * }} [input={}]
+  * @returns {any}
  */
 function createMission({
     title,
@@ -88,7 +89,10 @@ function createMission({
     return getMissionById(id);
 }
 
-/** Função exportada: listMissions. */
+/**
+ * Função exportada: listMissions.
+ * @returns {any}
+ */
 function listMissions({ status = null, limit = 500 } = {}) {
     const db = getDb();
     const sql = `
@@ -105,7 +109,10 @@ function listMissions({ status = null, limit = 500 } = {}) {
     return rows.map(_rowToMission);
 }
 
-/** Função exportada: getMissionById. */
+/**
+ * Função exportada: getMissionById.
+ * @returns {any}
+ */
 function getMissionById(missionId) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId);
@@ -152,7 +159,10 @@ function _rowToMission(row) {
     };
 }
 
-/** Função exportada: updateMission. */
+/**
+ * Função exportada: updateMission.
+ * @returns {any}
+ */
 function updateMission(missionId, updates = {}) {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId);
@@ -212,7 +222,9 @@ function updateMission(missionId, updates = {}) {
 
     if (result.changes === 0) {
         // Concurrent modification detected — throw conflict error for caller to handle
-        const error = new Error('Concurrent modification detected — mission was updated by another process');
+        const error = /** @type {Error & { code?: string, status?: number, missionId?: string }} */ (
+            new Error('Concurrent modification detected — mission was updated by another process')
+        );
         error.code = 'CONFLICT';
         error.status = 409;
         error.missionId = missionId;
@@ -222,7 +234,10 @@ function updateMission(missionId, updates = {}) {
     return getMissionById(missionId);
 }
 
-/** Função exportada: deleteMission. */
+/**
+ * Função exportada: deleteMission.
+ * @returns {any}
+ */
 function deleteMission(missionId) {
     const db = getDb();
     const res = db.prepare('DELETE FROM missions WHERE id = ?').run(missionId);

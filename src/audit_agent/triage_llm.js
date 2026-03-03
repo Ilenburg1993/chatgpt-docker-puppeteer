@@ -73,6 +73,14 @@ async function _postJson(url, body, timeoutMs) {
     return { ok: res.ok, status: res.status, text, json };
 }
 
+/**
+ * Cria o cliente de triagem LLM do Audit Agent.
+ * O cliente consulta o Inference Gateway e retorna resumo/risco em modo read-only.
+ * @returns {{
+ *   isEnabled: () => boolean,
+ *   runTriage: (job: unknown, contextPack: unknown) => Promise<Record<string, unknown>>
+ * }}
+ */
 export function createAuditAgentTriageLlmClient() {
     return {
         isEnabled: _isEnabled,

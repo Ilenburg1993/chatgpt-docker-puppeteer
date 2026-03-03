@@ -5,6 +5,7 @@ import { ref, computed } from 'vue';
 /**
  * Composable para interação com APIs do Audit Agent
  * @param {UseAuditOptions} options
+  * @returns {any}
  */
 export function useAudit(options = {}) {
     const baseUrl = options.baseUrl || '/api/dashboard';

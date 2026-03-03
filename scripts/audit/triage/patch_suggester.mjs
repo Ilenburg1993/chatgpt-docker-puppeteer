@@ -2,6 +2,7 @@
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
  * @param {ReturnType<import('./root_cause_ranker.mjs').rankRootCauses>} rankedCauses
  * @param {{ proposeDiffs: boolean }} options
+  * @returns {any}
  */
 export function suggestPatch(finding, rankedCauses, options) {
     const file = finding.file || 'arquivo_indefinido.js';

@@ -370,7 +370,10 @@ function generateHtmlReport(analysis) {
 // EXECUÇÃO PRINCIPAL
 // ============================================================================
 
-/** Função exportada: runRuntimeDebugSuite. */
+/**
+ * Função exportada: runRuntimeDebugSuite.
+ * @returns {Promise<void>}
+ */
 async function main() {
     console.log('🚀 RUNTIME DEBUG SUITE - Node.js Inspect Coverage');
     console.log('================================================\n');

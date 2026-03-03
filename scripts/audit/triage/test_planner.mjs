@@ -1,5 +1,6 @@
 /**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
+  * @returns {any}
  */
 export function buildTestPlan(finding) {
     const plan = [];

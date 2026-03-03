@@ -129,6 +129,7 @@ async function loadVocab() {
 
 /**
  * Retorna termos de uma categoria com fallback hierárquico para o Inglês.
+  * @returns {Promise<any>}
  */
 async function getTerms(category, langCode = 'en') {
     const v = await loadVocab();
@@ -152,6 +153,7 @@ async function getTerms(category, langCode = 'en') {
 
 /**
  * Aprende e persiste um novo termo após validação semântica.
+  * @returns {Promise<void>}
  */
 async function learnTerm(langCode, category, term) {
     if (!term || typeof term !== 'string' || term.length < 3) {

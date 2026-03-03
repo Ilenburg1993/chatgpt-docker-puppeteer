@@ -47,6 +47,7 @@ function getSocketInstance(url = '', options = {}) {
 
 /**
  * Composable para gerenciar conexão Socket.io
+  * @returns {any}
  */
 export function useSocket(options = {}) {
     const socket = getSocketInstance(options.url || '', options);

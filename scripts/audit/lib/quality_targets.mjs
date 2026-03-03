@@ -17,7 +17,10 @@ export const ENTRYPOINT_SMOKE_IMPACT_PATHS = Object.freeze([
     'src/driver/factory.js',
 ]);
 
-/** @param {string|null|undefined} file */
+/**
+ * @param {string|null|undefined} file
+ * @returns {any}
+ */
 export function normalizeRepoPath(file) {
     return String(file || '')
         .replace(/\\/g, '/')
@@ -25,13 +28,19 @@ export function normalizeRepoPath(file) {
         .trim();
 }
 
-/** @param {unknown} value */
+/**
+ * @param {unknown} value
+ * @returns {any}
+ */
 export function normalizeChangedFiles(value) {
     if (!Array.isArray(value)) return [];
     return [...new Set(value.map(normalizeRepoPath).filter(Boolean))];
 }
 
-/** @param {string} file */
+/**
+ * @param {string} file
+ * @returns {any}
+ */
 export function isDocOnlyFile(file) {
     const f = normalizeRepoPath(file);
     if (!f) return false;
@@ -39,28 +48,43 @@ export function isDocOnlyFile(file) {
     return /\.(md|txt|rst)$/i.test(f);
 }
 
-/** @param {string} file */
+/**
+ * @param {string} file
+ * @returns {any}
+ */
 export function isCodeFile(file) {
     return CODE_EXT_RE.test(normalizeRepoPath(file));
 }
 
-/** @param {string} file */
+/**
+ * @param {string} file
+ * @returns {any}
+ */
 export function isJsSourceFile(file) {
     return JS_SOURCE_RE.test(normalizeRepoPath(file));
 }
 
-/** @param {string} file */
+/**
+ * @param {string} file
+ * @returns {any}
+ */
 export function isPrettierEligibleFile(file) {
     return PRETTIER_EXT_RE.test(normalizeRepoPath(file));
 }
 
-/** @param {string} file */
+/**
+ * @param {string} file
+ * @returns {any}
+ */
 export function isDashboardFile(file) {
     const f = normalizeRepoPath(file);
     return f.startsWith('src/dashboard-ui/');
 }
 
-/** @param {string} file */
+/**
+ * @param {string} file
+ * @returns {any}
+ */
 export function isBrowserTypeImpactFile(file) {
     const f = normalizeRepoPath(file);
     return (
@@ -73,7 +97,10 @@ export function isBrowserTypeImpactFile(file) {
     );
 }
 
-/** @param {string} file */
+/**
+ * @param {string} file
+ * @returns {any}
+ */
 export function isNodeTypeImpactFile(file) {
     const f = normalizeRepoPath(file);
     return (
@@ -87,7 +114,10 @@ export function isNodeTypeImpactFile(file) {
     );
 }
 
-/** @param {string} file */
+/**
+ * @param {string} file
+ * @returns {any}
+ */
 export function isHighRiskQualityConfigFile(file) {
     const f = normalizeRepoPath(file);
     return (
@@ -107,7 +137,10 @@ export function isHighRiskQualityConfigFile(file) {
     );
 }
 
-/** @param {string[]} files */
+/**
+ * @param {string[]} files
+ * @returns {any}
+ */
 export function filterExistingFiles(files) {
     return files.filter(file => {
         try {
@@ -118,17 +151,26 @@ export function filterExistingFiles(files) {
     });
 }
 
-/** @param {string[]} changed */
+/**
+ * @param {string[]} changed
+ * @returns {any}
+ */
 export function pickJsCheckFiles(changed) {
     return filterExistingFiles(changed.filter(isJsSourceFile));
 }
 
-/** @param {string[]} changed */
+/**
+ * @param {string[]} changed
+ * @returns {any}
+ */
 export function pickPrettierFiles(changed) {
     return filterExistingFiles(changed.filter(isPrettierEligibleFile));
 }
 
-/** @param {string[]} changed */
+/**
+ * @param {string[]} changed
+ * @returns {any}
+ */
 export function pickJSDocDeltaFiles(changed) {
     return filterExistingFiles(
         changed.filter(
@@ -137,7 +179,10 @@ export function pickJSDocDeltaFiles(changed) {
     );
 }
 
-/** @param {string[]} changed */
+/**
+ * @param {string[]} changed
+ * @returns {any}
+ */
 export function summarizeChangeImpact(changed) {
     const normalized = normalizeChangedFiles(changed);
     return {
@@ -153,7 +198,10 @@ export function summarizeChangeImpact(changed) {
     };
 }
 
-/** @param {string[]} changed */
+/**
+ * @param {string[]} changed
+ * @returns {any}
+ */
 export function resolveEntrypointSmokeTargets(changed) {
     const impacted = new Set();
     const normalized = normalizeChangedFiles(changed);

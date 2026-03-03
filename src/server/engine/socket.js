@@ -449,6 +449,7 @@ function sendCommand(command, payload, robotId = null) {
  * Encerramento atômico do Hub.
  * Garante desconexão forçada de todos os agentes e limpeza total de memória.
  * Essencial para o ciclo de vida NASA Standard.
+  * @returns {Promise<void>}
  */
 async function stop() {
     if (taskUpdateTimer) {
@@ -481,6 +482,7 @@ async function stop() {
 
 /**
  * Notify: Broadcast global informativo para todos os conectados.
+  * @returns {any}
  */
 function notify(event, data) {
     if (!ioInstance) {
@@ -493,6 +495,7 @@ function notify(event, data) {
 /**
  * Notify agents (system room) with a lightweight signal event.
  * Used for wake-ups (e.g. cache invalidation) without a full IPC envelope.
+  * @returns {any}
  */
 function notifyAgent(event, data = {}) {
     if (!ioInstance) {
@@ -508,6 +511,7 @@ function notifyAgent(event, data = {}) {
  *
  * @param {string|Object} taskId - ID da task ou objeto {taskId, state}
  * @param {Object} [data] - Dados do update (opcional se taskId for objeto)
+  * @returns {void}
  */
 function broadcastTaskUpdate(taskId, data) {
     if (!ioInstance) {
@@ -736,6 +740,7 @@ export const connectExternal = async (port = 3008) => {
 /**
  * Notifica todos os clientes conectados sobre shutdown iminente do servidor.
  * @param {number} timeoutMs - Tempo em ms até o shutdown forçado
+  * @returns {void}
  */
 function notifyShutdown(timeoutMs) {
     if (!ioInstance) {

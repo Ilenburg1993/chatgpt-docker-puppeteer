@@ -1,6 +1,7 @@
 /**
  * @param {Record<string, { total: number, violated: number, covered: number, covered_by_run?: number, covered_by_tests?: number }>} coverage
  * @param {Record<string, any>} [drift]
+  * @returns {any}
  */
 export function renderContractCoverage(coverage, drift = {}) {
     const lines = ['## Contract Coverage'];

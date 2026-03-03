@@ -166,7 +166,10 @@ function finding(
     };
 }
 
-/** @param {string} output */
+/**
+ * @param {string} output
+ * @returns {any}
+ */
 export function parseTypecheckOutput(output) {
     /** @type {RawFinding[]} */
     const findings = [];
@@ -193,7 +196,10 @@ export function parseTypecheckOutput(output) {
     return findings;
 }
 
-/** @param {string} output */
+/**
+ * @param {string} output
+ * @returns {any}
+ */
 export function parsePrettierCheckOutput(output) {
     /** @type {RawFinding[]} */
     const findings = [];
@@ -222,7 +228,10 @@ export function parsePrettierCheckOutput(output) {
     return findings;
 }
 
-/** @param {string} output */
+/**
+ * @param {string} output
+ * @returns {any}
+ */
 export function parseEslintJsonOutput(output) {
     const parsed = parseJsonFromMixedOutput(String(output || ''));
     const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.results) ? parsed.results : [];
@@ -273,6 +282,7 @@ function parseNodeCheckFailure(file, stderr) {
 
 /**
  * @param {string} stdout
+  * @returns {any}
  */
 export function parseJSDocCoverageReport(stdout) {
     return parseJsonFromMixedOutput(String(stdout || ''));
@@ -360,6 +370,7 @@ export function parseTsIgnoreFindings(stdout, scopeFiles) {
  *  qualityParallelism?: 'auto'|'serial',
  *  exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
  * }} options
+  * @returns {Promise<any>}
  */
 export async function collectQualityFindings(options) {
     /** @type {RawFinding[]} */

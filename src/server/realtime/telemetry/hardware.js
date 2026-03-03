@@ -18,6 +18,7 @@ const PULSE_RATE_MS = 5000;
 /**
  * Inicializa o ciclo de emissão de telemetria de hardware.
  * Garante que apenas um loop de pulso esteja ativo por processo.
+  * @returns {void}
  */
 function init() {
     if (pulseInterval) {
@@ -84,6 +85,7 @@ function _pushMetrics() {
 /**
  * Interrompe o ciclo de monitoramento e limpa recursos de memória.
  * Chamado pelo orquestrador de ciclo de vida (lifecycle.js) no shutdown.
+  * @returns {void}
  */
 function stop() {
     if (pulseInterval) {

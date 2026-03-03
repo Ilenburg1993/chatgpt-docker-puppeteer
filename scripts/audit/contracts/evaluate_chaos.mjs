@@ -10,6 +10,7 @@ import { evaluateRuntimeSignals } from './evaluate_runtime.mjs';
  *   runDir: string,
  *   exec?: (stepId: string, command: string, args: string[], options?: any) => Promise<any>,
  * }} options
+  * @returns {Promise<any>}
  */
 export async function evaluateChaosContracts(options) {
     /** @type {Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>} */

@@ -148,6 +148,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
  *
  * @param {string} target - Nome do alvo.
  * @param {string|null} taskId - ID da tarefa (null para liberação administrativa).
+  * @returns {Promise<void>}
  */
 async function releaseLock(target = 'global', taskId = null) {
     const lockFile = getLockPath(target);

@@ -32,6 +32,7 @@ function readJsonBody(req) {
 
 /**
  * @param {{ runtime: import('./runtime.js').AuditAgentRuntime }} deps
+  * @returns {any}
  */
 export function createAuditAgentServer({ runtime }) {
     return http.createServer(async (req, res) => {

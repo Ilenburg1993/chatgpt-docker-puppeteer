@@ -1483,7 +1483,10 @@ function _dispatch(command, payload, actor) {
     }
 }
 
-/** Função exportada: validateCommand. */
+/**
+ * Função exportada: validateCommand.
+ * @returns {any}
+ */
 function validateCommand({ command, payload = {}, actor = null }) {
     const normalized = _normalizeCommand(command);
 
@@ -1529,7 +1532,10 @@ function validateCommand({ command, payload = {}, actor = null }) {
     }
 }
 
-/** Função exportada: executeCommand. */
+/**
+ * Função exportada: executeCommand.
+ * @returns {Promise<any>}
+ */
 async function executeCommand({ command, payload = {}, actor = null, dryRun = false }) {
     const normalized = _normalizeCommand(command);
 

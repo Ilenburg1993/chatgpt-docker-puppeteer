@@ -33,7 +33,10 @@ function _rowToStep(row) {
     };
 }
 
-/** Função exportada: listMissionSteps. */
+/**
+ * Função exportada: listMissionSteps.
+ * @returns {any}
+ */
 function listMissionSteps(missionId) {
     const db = getDb();
     const rows = db
@@ -50,7 +53,10 @@ function listMissionSteps(missionId) {
     return rows.map(_rowToStep).filter(Boolean);
 }
 
-/** Função exportada: getMissionStep. */
+/**
+ * Função exportada: getMissionStep.
+ * @returns {any}
+ */
 function getMissionStep(missionId, stepId, attemptSeq = null) {
     const db = getDb();
     const mission = String(missionId || '').trim();
@@ -84,7 +90,10 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
     return _rowToStep(row);
 }
 
-/** Função exportada: syncMissionStepsFromWorkflow. */
+/**
+ * Função exportada: syncMissionStepsFromWorkflow.
+ * @returns {any}
+ */
 function syncMissionStepsFromWorkflow(missionId, workflow) {
     const db = getDb();
     const mission = String(missionId || '').trim();
@@ -157,7 +166,10 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
     return listMissionSteps(mission);
 }
 
-/** Função exportada: markMissionStepStatus. */
+/**
+ * Função exportada: markMissionStepStatus.
+ * @returns {any}
+ */
 function markMissionStepStatus({
     missionId,
     stepId,
@@ -197,7 +209,10 @@ function markMissionStepStatus({
     return getMissionStep(mission, step, existing.attempt_seq);
 }
 
-/** Função exportada: createNextStepAttempt. */
+/**
+ * Função exportada: createNextStepAttempt.
+ * @returns {any}
+ */
 function createNextStepAttempt({ missionId, stepId, title = '', stepIndex = 0 }) {
     const db = getDb();
     const mission = String(missionId || '').trim();

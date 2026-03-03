@@ -836,13 +836,15 @@ class BiomechanicsEngine extends EventEmitter {
      */
     _timeout(ms, operation) {
         let timerId;
-        const p = new Promise((_, reject) => {
-            timerId = setTimeout(() => {
-                const error = new Error(`Timeout in ${operation} after ${ms}ms`);
-                error.name = 'TimeoutError';
-                reject(error);
-            }, ms);
-        });
+        const p = /** @type {CancelableTimeoutPromise} */ (
+            new Promise((_, reject) => {
+                timerId = setTimeout(() => {
+                    const error = new Error(`Timeout in ${operation} after ${ms}ms`);
+                    error.name = 'TimeoutError';
+                    reject(error);
+                }, ms);
+            })
+        );
         p.cancel = () => clearTimeout(timerId);
         return p;
     }

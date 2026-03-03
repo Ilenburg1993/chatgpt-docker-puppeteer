@@ -9,7 +9,10 @@ console.log('\n========================================');
 console.log('  DNA System V2.0 Tests');
 console.log('========================================\n');
 
-/** Função exportada: runTests. */
+/**
+ * Função exportada: runTests.
+ * @returns {Promise<any>}
+ */
 async function runTests() {
     // Test 1: Capabilities atualizadas no IdentityManager
     {

@@ -44,7 +44,10 @@ function _rowToPolicy(row) {
     };
 }
 
-/** Função exportada: upsertInferenceClientPolicy. */
+/**
+ * Função exportada: upsertInferenceClientPolicy.
+ * @returns {any}
+ */
 function upsertInferenceClientPolicy(input = {}) {
     const db = getDb();
     const now = _now();
@@ -104,7 +107,10 @@ function upsertInferenceClientPolicy(input = {}) {
     return getInferenceClientPolicyByTag(clientTag);
 }
 
-/** Função exportada: getInferenceClientPolicyByTag. */
+/**
+ * Função exportada: getInferenceClientPolicyByTag.
+ * @returns {any}
+ */
 function getInferenceClientPolicyByTag(clientTag) {
     const db = getDb();
     return _rowToPolicy(
@@ -112,7 +118,10 @@ function getInferenceClientPolicyByTag(clientTag) {
     );
 }
 
-/** Função exportada: listInferenceClientPolicies. */
+/**
+ * Função exportada: listInferenceClientPolicies.
+ * @returns {any}
+ */
 function listInferenceClientPolicies({ enabledOnly = false, limit = 100 } = {}) {
     const db = getDb();
     const rows = db

@@ -149,6 +149,7 @@ async function _getChromeVersion(browserPool) {
  * @param {object} task - Task V5 object
  * @param {string} [errorRecovered] - Erro recuperado (opcional)
  * @param {number} [backoffMs=0] - Tempo aguardado neste backoff
+  * @returns {void}
  */
 function incrementTacticalAttempts(task, errorRecovered, backoffMs) {
     errorRecovered = errorRecovered || null;
@@ -186,6 +187,7 @@ function incrementTacticalAttempts(task, errorRecovered, backoffMs) {
  * @param {object} task - Task V5 object
  * @param {string} [errorRecovered] - Erro recuperado (opcional)
  * @param {number} [backoffMs=0] - Tempo aguardado neste backoff
+  * @returns {void}
  */
 function incrementStrategicAttempts(task, errorRecovered, backoffMs) {
     errorRecovered = errorRecovered || null;

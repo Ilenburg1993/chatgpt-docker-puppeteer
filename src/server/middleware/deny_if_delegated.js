@@ -4,6 +4,7 @@ import { log } from '#core/logger';
 /**
  * Middleware que bloqueia operações de escrita/configuração
  * quando o servidor está rodando no modo 'delegated'.
+  * @returns {any}
  */
 function denyIfDelegated(req, res, next) {
     try {

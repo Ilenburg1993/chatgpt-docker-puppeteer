@@ -117,6 +117,7 @@ export function getLegacyStaticContracts() {
 
 /**
  * @param {{ id: string }[]} contracts
+  * @returns {any}
  */
 export function indexByContractId(contracts) {
     /** @type {Map<string, any>} */

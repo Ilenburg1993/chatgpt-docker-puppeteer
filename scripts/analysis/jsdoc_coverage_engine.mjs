@@ -1,3 +1,4 @@
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
@@ -24,6 +25,10 @@ import ts from 'typescript';
  *   exports_total: number,
  *   exports_with_jsdoc: number,
  *   coverage_pct: number,
+ *   functions_total: number,
+ *   functions_with_returns_tag: number,
+ *   functions_missing_returns_tag: number,
+ *   function_returns_coverage_pct: number,
  * }} FileJSDocReport
  */
 
@@ -35,7 +40,20 @@ import ts from 'typescript';
  *   exports_total: number,
  *   exports_with_jsdoc: number,
  *   coverage_pct: number,
- *   by_path_prefix: Record<string, { files: number, exports_total: number, exports_with_jsdoc: number, coverage_pct: number }>,
+ *   functions_total: number,
+ *   functions_with_returns_tag: number,
+ *   functions_missing_returns_tag: number,
+ *   function_returns_coverage_pct: number,
+ *   by_path_prefix: Record<string, {
+ *     files: number,
+ *     exports_total: number,
+ *     exports_with_jsdoc: number,
+ *     coverage_pct: number,
+ *     functions_total: number,
+ *     functions_with_returns_tag: number,
+ *     functions_missing_returns_tag: number,
+ *     function_returns_coverage_pct: number
+ *   }>,
  *   files: FileJSDocReport[],
  * }} JSDocCoverageReport
  */
@@ -99,10 +117,7 @@ function assessQuality(kind, tags) {
         // class description-only can be minimal; no mandatory tags here.
     }
 
-    let quality = 'none';
-    if (tags.length > 0) {
-        quality = missing.length === 0 ? 'complete' : 'minimal';
-    }
+    const quality = tags.length > 0 ? (missing.length === 0 ? 'complete' : 'minimal') : 'none';
     return { missing, quality: /** @type {JSDocQualityLevel} */ (quality) };
 }
 
@@ -117,13 +132,22 @@ function buildAssessment(node, sf, exportName, kind) {
     const tags = getJSDocTags(node);
     const jsdoc = hasJsDoc(node);
     const assessed = assessQuality(kind, tags);
+    /** @type {JSDocQualityLevel} */
+    let quality = 'none';
+    if (jsdoc) {
+        if (kind === 'function') {
+            quality = assessed.missing.length === 0 ? 'complete' : 'minimal';
+        } else {
+            quality = tags.length > 0 ? assessed.quality : 'complete';
+        }
+    }
     return {
         export_name: exportName,
         kind,
         has_jsdoc: jsdoc,
         tags_present: tags,
         missing_tags: jsdoc ? assessed.missing : kind === 'function' ? ['returns'] : [],
-        quality_level: jsdoc ? assessed.quality : 'none',
+        quality_level: quality,
         line: getLine(node, sf),
     };
 }
@@ -269,12 +293,22 @@ function parseFile(file) {
     const exportsTotal = exported.length;
     const exportsWithJsdoc = exported.filter(e => e.has_jsdoc).length;
     const coveragePct = exportsTotal > 0 ? Number(((exportsWithJsdoc / exportsTotal) * 100).toFixed(1)) : 100;
+    const functionExports = exported.filter(e => e.kind === 'function');
+    const functionsTotal = functionExports.length;
+    const functionsMissingReturnsTag = functionExports.filter(e => e.missing_tags.includes('returns')).length;
+    const functionsWithReturnsTag = functionsTotal - functionsMissingReturnsTag;
+    const functionReturnsCoveragePct =
+        functionsTotal > 0 ? Number(((functionsWithReturnsTag / functionsTotal) * 100).toFixed(1)) : 100;
     return /** @type {FileJSDocReport} */ ({
         file: norm(path.relative(process.cwd(), abs)),
         exported_symbols: exported,
         exports_total: exportsTotal,
         exports_with_jsdoc: exportsWithJsdoc,
         coverage_pct: coveragePct,
+        functions_total: functionsTotal,
+        functions_with_returns_tag: functionsWithReturnsTag,
+        functions_missing_returns_tag: functionsMissingReturnsTag,
+        function_returns_coverage_pct: functionReturnsCoveragePct,
     });
 }
 
@@ -302,21 +336,42 @@ export function analyzeJSDocCoverage(options) {
     const exportsTotal = fileReports.reduce((n, f) => n + f.exports_total, 0);
     const exportsWithJsdoc = fileReports.reduce((n, f) => n + f.exports_with_jsdoc, 0);
     const coveragePct = exportsTotal > 0 ? Number(((exportsWithJsdoc / exportsTotal) * 100).toFixed(1)) : 100;
+    const functionsTotal = fileReports.reduce((n, f) => n + f.functions_total, 0);
+    const functionsWithReturnsTag = fileReports.reduce((n, f) => n + f.functions_with_returns_tag, 0);
+    const functionsMissingReturnsTag = fileReports.reduce((n, f) => n + f.functions_missing_returns_tag, 0);
+    const functionReturnsCoveragePct =
+        functionsTotal > 0 ? Number(((functionsWithReturnsTag / functionsTotal) * 100).toFixed(1)) : 100;
 
-    /** @type {Record<string, { files: number, exports_total: number, exports_with_jsdoc: number, coverage_pct: number }>} */
+    /** @type {JSDocCoverageReport['by_path_prefix']} */
     const byPathPrefix = {};
     for (const fr of fileReports) {
         const prefix = inferPrefix(fr.file);
         if (!byPathPrefix[prefix]) {
-            byPathPrefix[prefix] = { files: 0, exports_total: 0, exports_with_jsdoc: 0, coverage_pct: 100 };
+            byPathPrefix[prefix] = {
+                files: 0,
+                exports_total: 0,
+                exports_with_jsdoc: 0,
+                coverage_pct: 100,
+                functions_total: 0,
+                functions_with_returns_tag: 0,
+                functions_missing_returns_tag: 0,
+                function_returns_coverage_pct: 100,
+            };
         }
         byPathPrefix[prefix].files += 1;
         byPathPrefix[prefix].exports_total += fr.exports_total;
         byPathPrefix[prefix].exports_with_jsdoc += fr.exports_with_jsdoc;
+        byPathPrefix[prefix].functions_total += fr.functions_total;
+        byPathPrefix[prefix].functions_with_returns_tag += fr.functions_with_returns_tag;
+        byPathPrefix[prefix].functions_missing_returns_tag += fr.functions_missing_returns_tag;
     }
     for (const item of Object.values(byPathPrefix)) {
         item.coverage_pct =
             item.exports_total > 0 ? Number(((item.exports_with_jsdoc / item.exports_total) * 100).toFixed(1)) : 100;
+        item.function_returns_coverage_pct =
+            item.functions_total > 0
+                ? Number(((item.functions_with_returns_tag / item.functions_total) * 100).toFixed(1))
+                : 100;
     }
 
     return {
@@ -326,6 +381,10 @@ export function analyzeJSDocCoverage(options) {
         exports_total: exportsTotal,
         exports_with_jsdoc: exportsWithJsdoc,
         coverage_pct: coveragePct,
+        functions_total: functionsTotal,
+        functions_with_returns_tag: functionsWithReturnsTag,
+        functions_missing_returns_tag: functionsMissingReturnsTag,
+        function_returns_coverage_pct: functionReturnsCoveragePct,
         by_path_prefix: byPathPrefix,
         files: fileReports,
     };

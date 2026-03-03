@@ -38,6 +38,7 @@ function criarLoggerMock() {
 /**
  * Cria um logger silencioso (noop)
  * Útil quando você não quer poluir a saída dos testes
+  * @returns {any}
  */
 function criarLoggerSilencioso() {
     return {

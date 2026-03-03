@@ -4,6 +4,7 @@ import { log, audit } from '#core/logger';
 /**
  * Middleware para tratamento de rotas não localizadas (404).
  * Atua como o último recurso antes do processador de erros global.
+  * @returns {void}
  */
 function notFound(req, res, next) {
     const error = new Error(`Recurso não localizado: ${req.method} ${req.originalUrl}`);
@@ -19,6 +20,7 @@ function notFound(req, res, next) {
  * @param {object} req - Request Express.
  * @param {object} res - Response Express.
  * @param {function} next - Próximo middleware.
+  * @returns {void}
  */
 function errorHandler(err, req, res, next) {
     // 1. Determinação do Status Code

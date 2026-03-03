@@ -1,4 +1,7 @@
-/** Função exportada: requireReason. */
+/**
+ * Função exportada: requireReason.
+ * @returns {any}
+ */
 export function requireReason(reason, fallbackMessage = 'Motivo operacional é obrigatório para este comando.') {
     const normalized = String(reason || '').trim();
     if (!normalized) {
@@ -7,7 +10,10 @@ export function requireReason(reason, fallbackMessage = 'Motivo operacional é o
     return normalized;
 }
 
-/** Função exportada: confirmTwoStepAction. */
+/**
+ * Função exportada: confirmTwoStepAction.
+ * @returns {any}
+ */
 export function confirmTwoStepAction({ actionLabel, reason, firstMessage = null, secondMessage = null }) {
     const normalizedReason = requireReason(reason);
     if (typeof window === 'undefined' || typeof window.confirm !== 'function') {

@@ -36,7 +36,10 @@ function sanitizeToolMetadata(tool) {
     return { description, inputSchema };
 }
 
-/** Função exportada: registerUpstreamMcpTools. */
+/**
+ * Função exportada: registerUpstreamMcpTools.
+ * @returns {Promise<any>}
+ */
 export async function registerUpstreamMcpTools(registry, options = {}) {
     const enabled = options.enabled ?? process.env.MCP_UPSTREAM_ENABLED === 'true';
     if (!enabled) {
