@@ -12,7 +12,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { resolve, relative } from 'node:path';
+import { resolve, relative, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 
 const ROOT = resolve('.');
@@ -49,13 +49,13 @@ function listEligibleFiles() {
 }
 
 /**
- * Lista todos os arquivos `tsconfig.strict.*.json` na raiz do projeto.
+ * Lista todos os arquivos `tsconfig.strict.*.json` em `config/typing/strict`.
  *
  * @returns {string[]} Caminhos absolutos das lanes strict.
  */
 function listStrictLanes() {
     try {
-        const raw = execSync('fd -e json "^tsconfig\\.strict\\." . --max-depth 1', {
+        const raw = execSync('fd -e json "^tsconfig\\.strict\\." config/typing/strict --max-depth 1', {
             encoding: 'utf8',
         });
         return raw.trim().split('\n').filter(Boolean);
@@ -75,19 +75,21 @@ function getCoveredFiles(laneFile) {
     /** @type {Set<string>} */
     const covered = new Set();
     try {
+        const laneDir = dirname(resolve(laneFile));
         /** @type {Record<string, unknown>} */
         const config = JSON.parse(readFileSync(laneFile, 'utf8'));
         const files = /** @type {string[]} */ (config.files ?? []);
         const includes = /** @type {string[]} */ (config.include ?? []);
 
         for (const f of files) {
-            covered.add(relative(ROOT, resolve(f)));
+            covered.add(relative(ROOT, resolve(laneDir, f)));
         }
         // Para `include` com globs, registra o prefixo do padrão como cobertura parcial
         for (const pattern of includes) {
             // Ex.: "src/kernel/**/*" → "src/kernel"
             const prefix = pattern.replace(/\/\*\*.*$/, '').replace(/\/\*.*$/, '');
-            covered.add(prefix + '/');
+            const resolvedPrefix = relative(ROOT, resolve(laneDir, prefix));
+            covered.add(resolvedPrefix.endsWith('/') ? resolvedPrefix : resolvedPrefix + '/');
         }
     } catch {
         /* skip configs ilegíveis */

@@ -3,28 +3,127 @@
   "files": [],
   "references": [
     {
-      "path": "./tsconfig.strict.public.json"
+      "path": "./config/typing/strict/tsconfig.strict.public.json"
     },
     {
-      "path": "./tsconfig.strict.core.json"
+      "path": "./config/typing/strict/tsconfig.strict.configs.json"
     },
     {
-      "path": "./tsconfig.strict.server.json"
+      "path": "./config/typing/strict/tsconfig.strict.agents.json"
     },
     {
-      "path": "./tsconfig.strict.infra.json"
+      "path": "./config/typing/strict/tsconfig.strict.tools.workspace.json"
     },
     {
-      "path": "./tsconfig.strict.integration.json"
+      "path": "./config/typing/strict/tsconfig.strict.src.agent.json"
     },
     {
-      "path": "./tsconfig.strict.audit.json"
+      "path": "./config/typing/strict/tsconfig.strict.src.audit_agent.json"
     },
     {
-      "path": "./tsconfig.strict.tools.json"
+      "path": "./config/typing/strict/tsconfig.strict.src.core.json"
     },
     {
-      "path": "./tsconfig.strict.tests.json"
+      "path": "./config/typing/strict/tsconfig.strict.src.driver.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.inference_gateway.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.infra.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.integration.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.kernel.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.logic.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.missions.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.nerv.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.orchestrator.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.server.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.shared.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.types.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.validation.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.root.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.src.dashboard-ui.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.analysis.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.audit.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.ci.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.build.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.env.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.health.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.ops.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.setup.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.legacy.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.root.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.unit.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.integration.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.regression.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.e2e.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.helpers.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.fixtures.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.mocks.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.manual.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.tests.legacy.json"
     }
   ],
   "display": "strict workspace solution"

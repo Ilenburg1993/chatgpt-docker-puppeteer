@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import ts from 'typescript';
-import { analyzeJSDocCoverage, collectJsSourceFiles } from './jsdoc_coverage_engine.mjs';
+import { analyzeJSDocCoverage, collectJsSourceFiles } from '../jsdoc_coverage_engine.mjs';
 import { runStrictLaneAudit } from './strict_lane_audit.mjs';
 
 const { values } = parseArgs({
@@ -30,10 +30,13 @@ const PUBLIC_ROOTS = [
     'src/integration/lsp',
 ];
 
-/** Descobre dinamicamente todas as lanes strict presentes na raiz do projeto. */
+const STRICT_LANES_DIR = path.join('config', 'typing', 'strict');
+
+/** Descobre dinamicamente todas as lanes strict presentes na pasta dedicada. */
 const STRICT_CONFIGS = fs
-    .readdirSync('.')
+    .readdirSync(STRICT_LANES_DIR)
     .filter(f => f.startsWith('tsconfig.strict.') && f.endsWith('.json'))
+    .map(f => path.join(STRICT_LANES_DIR, f))
     .sort();
 
 /**
