@@ -25,12 +25,17 @@ const workflowsRequiringConcurrency = new Set([
     'dependency-review.yml',
     'docker-rebuild.yml',
     'docker-security-scan.yml',
+    'integration-tests.yml',
     'jsdoc-typing.yml',
+    'lint.yml',
+    'regression-tests.yml',
     'release.yml',
     'scorecard.yml',
     'security.yml',
     'semantic-analysis.yml',
+    'shellcheck.yml',
     'stale.yml',
+    'unit-tests.yml',
 ]);
 const uploadArtifactPattern = /^actions\/upload-artifact@/;
 const requiredPinnedActionRefs = new Map([

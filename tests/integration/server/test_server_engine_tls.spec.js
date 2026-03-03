@@ -48,8 +48,11 @@ test('server engine falls back to HTTP in dev when FORCE_HTTPS=true and certs ar
         async () => serverEngine.start(port)
     );
 
-    assert.equal(result.protocol, 'HTTP');
-    await serverEngine.stop(2000);
+    try {
+        assert.equal(result.protocol, 'HTTP');
+    } finally {
+        await serverEngine.stop(2000);
+    }
 });
 
 test('server engine starts in HTTPS when FORCE_HTTPS=true and cert files exist', async () => {
@@ -64,6 +67,9 @@ test('server engine starts in HTTPS when FORCE_HTTPS=true and cert files exist',
         async () => serverEngine.start(port)
     );
 
-    assert.equal(result.protocol, 'HTTPS');
-    await serverEngine.stop(2000);
+    try {
+        assert.equal(result.protocol, 'HTTPS');
+    } finally {
+        await serverEngine.stop(2000);
+    }
 });

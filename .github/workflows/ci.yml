@@ -1,5 +1,13 @@
 name: CI
 
+# Pipeline principal: validação do ambiente e audit lite.
+# Testes → unit-tests.yml | integration-tests.yml | regression-tests.yml
+# Lint (ESLint + Prettier) → lint.yml | Shell lint (ShellCheck + actionlint) → shellcheck.yml
+#
+# Jobs:
+#   validate   — validação do Node runtime e YAMLs dos workflows (bloqueante)
+#   audit-lite — auditoria rápida não-bloqueante (artefatos + PR comment)
+
 on:
   push:
     branches: [main]
@@ -21,7 +29,7 @@ permissions:
 
 jobs:
   validate:
-    name: Lint, format and tests (Node 24)
+    name: Validation (Node 24)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -63,76 +71,61 @@ jobs:
           exit 1
 
       - name: Validate Node runtime
+        id: node_check
         run: node scripts/ci/check-node-version.mjs
 
       - name: Validate workflow YAMLs
+        id: yaml_check
         run: node scripts/ci/validate-workflows.mjs
 
-      - name: Lint GitHub workflows with actionlint
-        uses: raven-actions/actionlint@v2.1.2
-
-      - name: Lint shell scripts with shellcheck
-        uses: reviewdog/action-shellcheck@v1.32.0
-        with:
-          github_token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
-          shellcheck_flags: "-x"
-          reporter: github-check
-          filter_mode: nofilter
-          fail_level: error
-          path: "."
-          exclude: |
-            ./node_modules/*
-            ./src/dashboard-ui/node_modules/*
-            ./.git/*
-        id: lint
-        continue-on-error: true
-        run: npm run lint
-
-      - name: Prettier check
-        id: prettier
-        continue-on-error: true
-        run: npm run format:check
-
-      - name: Unit tests
-        id: unit_tests
-        continue-on-error: true
-        run: npm run test:unit
+      - name: Build step summary
+        if: always()
+        env:
+          NODE_OUTCOME: ${{ steps.node_check.outcome }}
+          YAML_OUTCOME: ${{ steps.yaml_check.outcome }}
+        run: |
+          icon() { if [ "$1" = "success" ]; then echo "✅"; else echo "❌"; fi; }
+          if [ "$NODE_OUTCOME" != "success" ] || [ "$YAML_OUTCOME" != "success" ]; then
+            ALL_OK="failure"
+          else
+            ALL_OK="success"
+          fi
+          {
+            echo "## $(icon "$ALL_OK") CI — Validation (Node 24)"
+            echo ""
+            echo "| Check | Status |"
+            echo "|---|---|"
+            echo "| Validate Node runtime | $(icon "$NODE_OUTCOME") $NODE_OUTCOME |"
+            echo "| Validate workflow YAMLs | $(icon "$YAML_OUTCOME") $YAML_OUTCOME |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: CI Summary
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v8
         env:
-          LINT_OUTCOME: ${{ steps.lint.outcome }}
-          PRETTIER_OUTCOME: ${{ steps.prettier.outcome }}
-          UNIT_OUTCOME: ${{ steps.unit_tests.outcome }}
+          NODE_OUTCOME: ${{ steps.node_check.outcome }}
+          YAML_OUTCOME: ${{ steps.yaml_check.outcome }}
         with:
           github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           script: |
+            const nodeOk = process.env.NODE_OUTCOME === 'success';
+            const yamlOk = process.env.YAML_OUTCOME === 'success';
+            const allOk = nodeOk && yamlOk;
+            const icon = (ok) => ok ? '✅' : '❌';
             const marker = '<!-- ci-validate-summary -->';
-            const icon = (o) => o === 'success' ? '✅' : o === 'failure' ? '❌' : o === 'skipped' ? '⏭️' : '⚠️';
-            const lo = process.env.LINT_OUTCOME || 'unknown';
-            const po = process.env.PRETTIER_OUTCOME || 'unknown';
-            const uo = process.env.UNIT_OUTCOME || 'unknown';
-            const allOk = lo === 'success' && po === 'success' && uo === 'success';
-            const suggestions = [];
-            if (lo === 'failure') suggestions.push('💡 `npm run lint:fix` para corrigir lint automaticamente.');
-            if (po === 'failure') suggestions.push('💡 `npm run format` para corrigir formatação.');
-            if (uo === 'failure') suggestions.push('💡 `npm run test:unit` localmente para ver as falhas.');
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = [
               marker,
-              `## ${allOk ? '✅' : '❌'} CI — Validate (Node 24)`,
+              `## ${icon(allOk)} CI — Validation (Node 24)`,
               '',
               '| Check | Status |',
               '|---|---|',
-              `| ESLint | ${icon(lo)} ${lo} |`,
-              `| Prettier | ${icon(po)} ${po} |`,
-              `| Unit tests | ${icon(uo)} ${uo} |`,
-              '',
-              ...suggestions,
+              `| Validate Node runtime | ${icon(nodeOk)} ${nodeOk ? 'passed' : 'failed'} |`,
+              `| Validate workflow YAMLs | ${icon(yamlOk)} ${yamlOk ? 'passed' : 'failed'} |`,
               '',
               allOk
-                ? '> Todos os checks passaram. ✅'
-                : '> Falhas acima **bloqueiam** o merge.',
+                ? `> ✅ Validação do ambiente passou. [Ver logs](${runUrl}).`
+                : `> ❌ Falhas na validação. [Ver logs completos](${runUrl}).`,
             ].join('\n');
             try {
               const comments = await github.paginate(github.rest.issues.listComments, {
@@ -165,16 +158,6 @@ jobs:
               core.warning(`Failed to post PR comment: ${err.message}. Results available in the workflow step summary.`);
               await core.summary.addRaw(body, true).write();
             }
-
-      - name: Fail if any check failed
-        if: always()
-        run: |
-          if [ "${{ steps.lint.outcome }}" = "failure" ] || \
-             [ "${{ steps.prettier.outcome }}" = "failure" ] || \
-             [ "${{ steps.unit_tests.outcome }}" = "failure" ]; then
-            echo "::error::One or more checks failed. See CI Summary comment on the PR."
-            exit 1
-          fi
 
   audit-lite:
     name: Audit lite (non-blocking)
@@ -321,85 +304,3 @@ jobs:
           path: artifacts/audit
           if-no-files-found: warn
           retention-days: 7
-
-  integration:
-    name: Integration tests (Node 24)
-    runs-on: ubuntu-latest
-    needs: validate
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          cache: "npm"
-
-      - name: Prepare npm environment
-        run: |
-          mkdir -p "$HOME/.npm"
-          npm cache verify || npm cache clean --force
-
-      - name: Install dependencies (with retry)
-        run: |
-          for attempt in 1 2; do
-            echo "npm ci attempt $attempt"
-            if npm ci --prefer-online --no-audit --no-fund; then
-              exit 0
-            fi
-
-            if [ "$attempt" -lt 2 ]; then
-              echo "Retrying npm ci after cache cleanup..."
-              rm -rf node_modules
-              npm cache clean --force
-            fi
-          done
-          exit 1
-
-      - name: Integration tests
-        run: npm run test:integration
-
-  regression:
-    name: Regression tests (Node 24)
-    runs-on: ubuntu-latest
-    needs: integration
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          cache: "npm"
-
-      - name: Prepare npm environment
-        run: |
-          mkdir -p "$HOME/.npm"
-          npm cache verify || npm cache clean --force
-
-      - name: Install dependencies (with retry)
-        run: |
-          for attempt in 1 2; do
-            echo "npm ci attempt $attempt"
-            if npm ci --prefer-online --no-audit --no-fund; then
-              exit 0
-            fi
-
-            if [ "$attempt" -lt 2 ]; then
-              echo "Retrying npm ci after cache cleanup..."
-              rm -rf node_modules
-              npm cache clean --force
-            fi
-          done
-          exit 1
-
-      - name: Regression tests
-        run: npm run test:regression

@@ -1,0 +1,217 @@
+name: Lint & Format
+
+# Verifica qualidade de código com ESLint e formatação com Prettier.
+# Bloqueante: falhas impedem o merge e são comentadas no PR com detalhes dos erros.
+#
+# Jobs:
+#   lint-and-format — ESLint + Prettier com captura de output e PR comment detalhado
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  lint-and-format:
+    name: ESLint + Prettier (Node 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Prepare npm environment
+        run: |
+          mkdir -p "$HOME/.npm"
+          npm cache verify || npm cache clean --force
+
+      - name: Install dependencies (with retry)
+        run: |
+          for attempt in 1 2; do
+            echo "npm ci attempt $attempt"
+            if npm ci --prefer-online --no-audit --no-fund; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 2 ]; then
+              echo "Retrying npm ci after cache cleanup..."
+              rm -rf node_modules
+              npm cache clean --force
+            fi
+          done
+          exit 1
+
+      - name: ESLint
+        id: eslint
+        continue-on-error: true
+        run: |
+          npm run lint 2>&1 | tee /tmp/eslint-output.txt
+          exit "${PIPESTATUS[0]}"
+
+      - name: Prettier check
+        id: prettier
+        continue-on-error: true
+        run: |
+          npm run format:check 2>&1 | tee /tmp/prettier-output.txt
+          exit "${PIPESTATUS[0]}"
+
+      - name: Build step summary
+        if: always()
+        run: |
+          ESLINT_OK="${{ steps.eslint.outcome }}"
+          PRETTIER_OK="${{ steps.prettier.outcome }}"
+          icon() { [ "$1" = "success" ] && echo "✅" || echo "❌"; }
+          {
+            echo "## $([ "$ESLINT_OK" = "success" ] && [ "$PRETTIER_OK" = "success" ] && echo "✅" || echo "❌") Lint & Format"
+            echo ""
+            echo "| Check | Status |"
+            echo "|---|---|"
+            echo "| ESLint | $(icon "$ESLINT_OK") $ESLINT_OK |"
+            echo "| Prettier | $(icon "$PRETTIER_OK") $PRETTIER_OK |"
+            echo ""
+            if [ "$ESLINT_OK" != "success" ] && [ -f /tmp/eslint-output.txt ]; then
+              echo "### ESLint errors"
+              echo '```'
+              head -100 /tmp/eslint-output.txt
+              echo '```'
+            fi
+            if [ "$PRETTIER_OK" != "success" ] && [ -f /tmp/prettier-output.txt ]; then
+              echo "### Prettier errors"
+              echo '```'
+              head -50 /tmp/prettier-output.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment PR with lint results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          ESLINT_OUTCOME: ${{ steps.eslint.outcome }}
+          PRETTIER_OUTCOME: ${{ steps.prettier.outcome }}
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('node:fs');
+
+            const eslintOk  = process.env.ESLINT_OUTCOME  === 'success';
+            const prettierOk = process.env.PRETTIER_OUTCOME === 'success';
+            const allOk = eslintOk && prettierOk;
+
+            const icon = (ok) => ok ? '✅' : '❌';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const marker = '<!-- lint-format-summary -->';
+
+            // Read captured outputs (cap at 3 000 chars each to stay under comment limit)
+            const readOutput = (p, max = 3000) => {
+              try {
+                const txt = fs.readFileSync(p, 'utf8').trim();
+                return txt.length > max ? txt.slice(0, max) + '\n...(truncated, see full log)' : txt;
+              } catch {
+                return '';
+              }
+            };
+
+            const eslintOut   = readOutput('/tmp/eslint-output.txt');
+            const prettierOut = readOutput('/tmp/prettier-output.txt', 2000);
+
+            const details = [];
+            if (!eslintOk && eslintOut) {
+              details.push(
+                `<details>\n<summary>📋 ESLint — primeiros erros</summary>\n\n` +
+                `\`\`\`\n${eslintOut}\n\`\`\`\n</details>`
+              );
+            }
+            if (!prettierOk && prettierOut) {
+              details.push(
+                `<details>\n<summary>📋 Prettier — arquivos fora do padrão</summary>\n\n` +
+                `\`\`\`\n${prettierOut}\n\`\`\`\n</details>`
+              );
+            }
+
+            const suggestions = [];
+            if (!eslintOk)   suggestions.push('💡 **ESLint**: `npm run lint:fix` corrige a maioria dos erros automaticamente.');
+            if (!prettierOk) suggestions.push('💡 **Prettier**: `npm run format` aplica a formatação correta.');
+
+            const body = [
+              marker,
+              `## ${icon(allOk)} Lint & Format`,
+              '',
+              `| Check | Status |`,
+              `|---|---|`,
+              `| ESLint | ${icon(eslintOk)} ${eslintOk ? 'passou' : 'falhou'} |`,
+              `| Prettier | ${icon(prettierOk)} ${prettierOk ? 'passou' : 'falhou'} |`,
+              '',
+              ...details,
+              ...suggestions,
+              '',
+              allOk
+                ? '> ✅ Todos os checks passaram.'
+                : `> ❌ Falhas acima **bloqueiam** o merge. [Ver logs completos](${runUrl}).`,
+            ].join('\n');
+
+            try {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              });
+              const existing = comments.find(
+                (c) => c.user?.type === 'Bot' && typeof c.body === 'string' && c.body.includes(marker)
+              );
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              core.warning(`Falha ao postar PR comment: ${err.message}. Resultado disponível no workflow step summary.`);
+              await core.summary.addRaw(body, true).write();
+            }
+
+      - name: Fail if any check failed
+        if: always()
+        run: |
+          if [ "${{ steps.eslint.outcome }}" = "failure" ] || \
+             [ "${{ steps.prettier.outcome }}" = "failure" ]; then
+            echo "::error::Lint ou formatação falharam. Veja o comentário no PR para detalhes."
+            exit 1
+          fi
