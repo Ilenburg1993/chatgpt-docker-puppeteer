@@ -5,6 +5,11 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string}
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -13,6 +18,11 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {unknown} raw
+ * @param {unknown} [fallback]
+ * @returns {any}
+ */
 function _parseJson(raw, fallback = null) {
     if (raw === null || raw === undefined) return fallback;
     try {
@@ -22,6 +32,26 @@ function _parseJson(raw, fallback = null) {
     }
 }
 
+/**
+ * @typedef {object} AuditJobRun
+ * @property {string} id
+ * @property {string} job_id
+ * @property {number} attempt_seq
+ * @property {string} status
+ * @property {string} executor
+ * @property {string|null} llm_model
+ * @property {string|null} llm_provider
+ * @property {Record<string, any>|null} token_usage_json
+ * @property {Record<string, any>|null} metrics_json
+ * @property {any} error_json
+ * @property {number} started_at_ms
+ * @property {number|null} completed_at_ms
+ */
+
+/**
+ * @param {Record<string, any>|null|undefined} row
+ * @returns {AuditJobRun|null}
+ */
 function _rowToRun(row) {
     if (!row) return null;
     return {
@@ -42,14 +72,25 @@ function _rowToRun(row) {
 
 /**
  * @typedef {object} CreateAuditJobRunInput
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {string} id
+ * @property {string} job_id
+ * @property {number} [attempt_seq]
+ * @property {string} [status]
+ * @property {string} [executor]
+ * @property {string} [llm_model]
+ * @property {string} [llm_provider]
+ * @property {Record<string, any>} [token_usage_json]
+ * @property {Record<string, any>} [metrics_json]
+ * @property {any} [error_json]
+ * @property {number} [started_at_ms]
+ * @property {number|null} [completed_at_ms]
  */
 /**
  * Função exportada: createAuditJobRun.
  * @param {CreateAuditJobRunInput} input Input data for the AuditJobRun record.
  * @returns {AuditJobRun|null}
  */
-function createAuditJobRun(input = {}) {
+function createAuditJobRun(input = /** @type {CreateAuditJobRunInput} */ ({})) {
     const db = getDb();
     db.prepare(
         `
@@ -89,13 +130,21 @@ function createAuditJobRun(input = {}) {
  */
 function getAuditJobRunById(id) {
     const db = getDb();
-    const row = db.prepare('SELECT * FROM audit_job_runs WHERE id = ?').get(String(id || '').trim());
+    const row = /** @type {Record<string, any>|null} */ (
+        db.prepare('SELECT * FROM audit_job_runs WHERE id = ?').get(String(id || '').trim())
+    );
     return _rowToRun(row);
 }
 
 /**
  * @typedef {object} UpdateAuditJobRunUpdates
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {string} [status]
+ * @property {string|null} [llm_model]
+ * @property {string|null} [llm_provider]
+ * @property {Record<string, any>|null} [token_usage_json]
+ * @property {Record<string, any>|null} [metrics_json]
+ * @property {any} [error_json]
+ * @property {number|null} [completed_at_ms]
  */
 /**
  * Função exportada: updateAuditJobRun.
@@ -164,11 +213,11 @@ function updateAuditJobRun(id, updates = {}) {
 
 /**
  * @typedef {object} ListAuditJobRunsByJobIdOptions
- * @property {*} [limit]
+ * @property {number} [limit]
  */
 /**
  * Função exportada: listAuditJobRunsByJobId.
- * @param {*} jobId
+ * @param {string} jobId
  * @param {ListAuditJobRunsByJobIdOptions} [options]
  * @returns {AuditJobRun[]}
  */
@@ -184,7 +233,7 @@ function listAuditJobRunsByJobId(jobId, { limit = 50 } = {}) {
         `
         )
         .all(String(jobId || '').trim(), Math.max(1, Math.min(Number(limit) || 50, 500)));
-    return rows.map(_rowToRun).filter(Boolean);
+    return /** @type {AuditJobRun[]} */ (/** @type {Record<string, any>[]} */ (rows).map(_rowToRun).filter(Boolean));
 }
 
 export { createAuditJobRun, getAuditJobRunById, listAuditJobRunsByJobId, updateAuditJobRun };

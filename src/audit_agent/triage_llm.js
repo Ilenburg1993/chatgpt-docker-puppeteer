@@ -1,27 +1,43 @@
 // @ts-check
 
+/**
+ * @param {unknown} value
+ * @returns {Record<string, any>}
+ */
 function _asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (/** @type {unknown} */ (value)) : {};
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string}
+ */
 function _safeString(value, fallback = '') {
     if (value === null || value === undefined) return fallback;
     return String(value);
 }
 
+/**
+ * @param {unknown} job
+ * @param {unknown} contextPack
+ * @returns {string}
+ */
 function _buildTriagePrompt(job, contextPack) {
-    const scope = _asRecord(job?.scope_json);
-    const context = _asRecord(contextPack?.context);
-    const mcpTools = _asRecord(context?.mcp_tools);
-    const runtime = _asRecord(context?.runtime);
-    const rag = _asRecord(runtime?.rag);
-    const lsp = _asRecord(runtime?.lsp);
-    const findings = Array.isArray(contextPack?.findings) ? contextPack.findings : [];
+    const j = _asRecord(job);
+    const cp = _asRecord(contextPack);
+    const scope = _asRecord(j.scope_json);
+    const context = _asRecord(cp.context);
+    const mcpTools = _asRecord(context.mcp_tools);
+    const runtime = _asRecord(context.runtime);
+    const rag = _asRecord(runtime.rag);
+    const lsp = _asRecord(runtime.lsp);
+    const findings = Array.isArray(cp.findings) ? cp.findings : [];
 
     const lines = [
         'Você é um triage de engenharia para um repositório JS/Node.',
         'Objetivo: resumir riscos e sugerir próximos passos read-only (sem patch).',
-        `job_kind=${_safeString(job?.kind, 'unknown')}`,
+        `job_kind=${_safeString(j.kind, 'unknown')}`,
         `target_file=${_safeString(scope.filePath || scope.file_path, 'n/a')}`,
         `query=${_safeString(scope.query || scope.rag_query, 'n/a')}`,
         `lsp_ok=${_safeString(lsp.ok, 'unknown')}`,
@@ -34,7 +50,7 @@ function _buildTriagePrompt(job, contextPack) {
         `lsp_document_symbols=${JSON.stringify(mcpTools.lsp_document_symbols || null)}`,
         `rag_search=${JSON.stringify(mcpTools.rag_search || null)}`,
         `rag_expand=${JSON.stringify(mcpTools.rag_expand || null)}`,
-        `existing_findings=${JSON.stringify(findings.slice(0, 8).map(f => ({ title: f?.title, severity: f?.severity, category: f?.category })))}`.slice(
+        `existing_findings=${JSON.stringify(findings.slice(0, 8).map(/** @param {Record<string, any>} f */ f => ({ title: f?.title, severity: f?.severity, category: f?.category })))}`.slice(
             0,
             4000
         ),
@@ -53,6 +69,10 @@ function _isEnabled() {
     return String(process.env.AUDIT_AGENT_TRIAGE_LLM_ENABLED || 'false').toLowerCase() === 'true';
 }
 
+/**
+ * @param {unknown} text
+ * @returns {unknown}
+ */
 function _parseJsonMaybe(text) {
     try {
         return JSON.parse(String(text || ''));
@@ -61,6 +81,12 @@ function _parseJsonMaybe(text) {
     }
 }
 
+/**
+ * @param {string} url
+ * @param {unknown} body
+ * @param {number} timeoutMs
+ * @returns {Promise<{ok: boolean, status: number, text: string, json: unknown}>}
+ */
 async function _postJson(url, body, timeoutMs) {
     const res = await fetch(url, {
         method: 'POST',
@@ -106,7 +132,7 @@ export function createAuditAgentTriageLlmClient() {
                 basePayload,
                 Math.min(timeoutMs, 10_000)
             );
-            if (!preflight.ok || !preflight.json?.ok) {
+            if (!preflight.ok || !_asRecord(preflight.json).ok) {
                 return {
                     ok: false,
                     skipped: true,
@@ -124,8 +150,8 @@ export function createAuditAgentTriageLlmClient() {
                 },
                 timeoutMs
             );
-            const json = out.json;
-            if (!out.ok || !json?.ok) {
+            const json = _asRecord(out.json);
+            if (!out.ok || !json.ok) {
                 return {
                     ok: false,
                     skipped: false,
@@ -136,7 +162,7 @@ export function createAuditAgentTriageLlmClient() {
                 };
             }
 
-            const responseText = _safeString(json?.result?.response, '').trim();
+            const responseText = _safeString(_asRecord(json.result).response, '').trim();
             const parsed = _parseJsonMaybe(responseText);
             return {
                 ok: true,
@@ -148,9 +174,9 @@ export function createAuditAgentTriageLlmClient() {
                 prompt_chars: prompt.length,
                 raw_response: responseText,
                 parsed: parsed || null,
-                policy: json?.policy || null,
+                policy: json.policy || null,
                 preflight: preflight.json || null,
-                ts: json?.ts || Date.now(),
+                ts: json.ts || Date.now(),
             };
         },
     };

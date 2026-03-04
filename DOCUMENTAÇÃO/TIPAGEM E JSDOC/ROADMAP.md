@@ -11,20 +11,21 @@
 
 ---
 
-## Estado geral — 4 de março de 2026 (atualizado)
+## Estado geral — 4 de março de 2026 (Fase A concluída)
 
-| Indicador                     | Antes     | Agora          |
-| ----------------------------- | --------- | -------------- |
-| Arquivos com `// @ts-check`   | **670**   | **670**        |
-| `@ts-nocheck` em código real  | **0** ✅   | **0** ✅        |
-| Erros `typecheck:node` (base) | ~2.170    | **2.120**      |
-| Erros `typecheck:strict:all`  | ~7.414    | **6.866**      |
-| Lanes com 0 erros             | 11 de 30+ | **12 de 30+**  |
+| Indicador                     | Antes     | Agora         |
+| ----------------------------- | --------- | ------------- |
+| Arquivos com `// @ts-check`   | **670**   | **670**       |
+| `@ts-nocheck` em código real  | **0** ✅   | **0** ✅       |
+| Erros `typecheck:node` (base) | ~2.170    | **2.120**     |
+| Erros `typecheck:strict:all`  | ~7.414    | **6.866**     |
+| Lanes com 0 erros             | 11 de 30+ | **13 de 30+** |
 
 **Fase 0 concluída**: 214 erros JSDoc estruturais (TS8032=177, TS8024=37) eliminados. **Fase A
-parcial (3/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gateway` ✅.
+concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gateway` ✅,
+`src.audit_agent` ✅, `src.dashboard-ui` ✅, `tests.manual` ✅.
 
-**Próximo passo**: `src.audit_agent` (358 erros) — Fase A, prioridade 6.
+**Próximo passo**: Fase B — `src.nerv` (439 erros).
 
 **Dependência nova instalada**: `@types/better-sqlite3` (devDependencies) — resolve TS7016 em
 `src/infra/db/sqlite.js`.
@@ -69,9 +70,9 @@ parcial (3/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gateway
 | `src.logic`             |     0 | ✅ verde | Manter |
 | `scripts.analysis`      |     0 | ✅ verde | Manter |
 | `src.inference_gateway` |     0 | ✅ verde | Manter |
-| `src.dashboard-ui`      |   285 | Fase A  | —      |
-| `tests.manual`          |   300 | Fase A  | —      |
-| `src.audit_agent`       |   358 | Fase A  | —      |
+| `src.dashboard-ui`      |     0 | ✅ verde | Manter |
+| `tests.manual`          |     0 | ✅ verde | Manter |
+| `src.audit_agent`       |     0 | ✅ verde | Manter |
 | `src.nerv`              |   439 | Fase B  | —      |
 | `scripts.health`        |   441 | Fase B  | —      |
 | `src.missions`          |   608 | Fase B  | —      |
@@ -112,19 +113,19 @@ Objectivo: zerar 6 lanes com correções JSDoc reais.
 | ----------------------- | ----: | :--------: | -------------------------------------------------------- | ------ |
 | `src.logic`             |     2 |     1      | Corrigir 2 erros diretos                                 | ✅ 0    |
 | `scripts.analysis`      |   181 |     2      | Typedefs para nós de AST, variáveis de análise           | ✅ 0    |
-| `src.inference_gateway` |   191 |     3      | OllamaResponse, PolicyConfig, ProfileRecord, \*\_repo.js | —      |
-| `src.dashboard-ui`      |   285 |     4      | State de stores Pinia, ref()/computed() composables      | —      |
-| `tests.manual`          |   300 |     5      | `/** @type {any} */` em asserções onde tipo irrelevante  | —      |
-| `src.audit_agent`       |   358 |     6      | AuditJob, AuditFinding, AuditPatch, JobRun typedefs      | —      |
+| `src.inference_gateway` |   191 |     3      | OllamaResponse, PolicyConfig, ProfileRecord, \*\_repo.js | ✅ 0    |
+| `src.dashboard-ui`      |   285 |     4      | State de stores Pinia, ref()/computed() composables      | ✅ 0    |
+| `tests.manual`          |   300 |     5      | `/** @type {any} */` em asserções onde tipo irrelevante  | ✅ 0    |
+| `src.audit_agent`       |   358 |     6      | AuditJob, AuditFinding, AuditPatch, JobRun typedefs      | ✅ 0    |
 
 **Gate por lane**: `npm run typecheck:strict:<LANE>` → 0 erros
 
 - [x] `src.logic`: 2 → 0 ✅
 - [x] `scripts.analysis`: 181 → 0 ✅
 - [x] `src.inference_gateway`: 191 → 0 ✅ (+ `@types/better-sqlite3` instalado)
-- [ ] `src.dashboard-ui`: 285 → 0
-- [ ] `tests.manual`: 300 → 0
-- [ ] `src.audit_agent`: 358 → 0
+- [x] `src.dashboard-ui`: 285 → 0 ✅
+- [x] `tests.manual`: 300 → 0 ✅
+- [x] `src.audit_agent`: 358 → 0 ✅
 
 ---
 

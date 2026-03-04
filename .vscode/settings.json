@@ -719,11 +719,8 @@
   "chat.experimental.useSkillAdherencePrompt": true,
   "chat.includeApplyingInstructions": true,
   "chat.includeReferencedInstructions": true,
-  "chat.instructionsFilesLocations": [
-    ".github/instructions"
-  ],
   "chat.math.enabled": true,
-  "chat.mcp.access": true,
+  "chat.mcp.access": "all",
   "chat.mcp.assisted.nuget.enabled": true,
   "chat.mcp.discovery.enabled": {
     "claude-desktop": true,

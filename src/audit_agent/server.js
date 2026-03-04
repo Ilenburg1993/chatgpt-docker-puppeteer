@@ -8,16 +8,25 @@ import http from 'node:http';
  */
 /** @typedef {Error & { statusCode?: number, code?: string }} AuditAgentServerError */
 
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {number} statusCode
+ * @param {unknown} body
+ */
 function writeJson(res, statusCode, body) {
     res.statusCode = statusCode;
     res.setHeader('content-type', 'application/json; charset=utf-8');
     res.end(JSON.stringify(body));
 }
 
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {Promise<unknown>}
+ */
 function readJsonBody(req) {
     return new Promise((resolve, reject) => {
         let raw = '';
-        req.on('data', chunk => {
+        req.on('data', (/** @type {unknown} */ chunk) => {
             raw += String(chunk);
             if (raw.length > 1_000_000) {
                 reject(Object.assign(new Error('payload too large'), { statusCode: 413 }));
@@ -52,7 +61,8 @@ export function createAuditAgentServer(deps) {
                 return writeJson(res, 200, { ok: true, metrics: runtime.getMetrics() });
             }
             if (req.method === 'GET' && url.pathname === '/jobs') {
-                const status = url.searchParams.get('status');
+                const statusParam = url.searchParams.get('status');
+                const status = statusParam != null ? statusParam : null;
                 const limit = Number(url.searchParams.get('limit') || 100);
                 return writeJson(res, 200, { ok: true, items: runtime.listJobs({ status, limit }) });
             }
@@ -88,7 +98,7 @@ export function createAuditAgentServer(deps) {
             return writeJson(res, typedError.statusCode || 500, {
                 ok: false,
                 error: typedError.code || 'AUDIT_AGENT_SERVER_ERROR',
-                message: error?.message || String(error),
+                message: error instanceof Error ? error.message : String(error),
             });
         }
     });

@@ -15,16 +15,30 @@ function nowMs() {
     return Date.now();
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} [fallback]
+ * @returns {number}
+ */
 function normPriority(value, fallback = 50) {
     const n = Number(value);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.min(100, Math.trunc(n)));
 }
 
+/**
+ * @param {unknown} value
+ * @returns {unknown[]}
+ */
 function _asArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
+/**
+ * @param {Record<string, any>|null|undefined} job
+ * @param {Record<string, any>|null|undefined} contextPack
+ * @returns {object}
+ */
 function _derivePatchDraftFromContext(job, contextPack) {
     const context = contextPack?.context || {};
     const mcpTools = context.mcp_tools || {};
@@ -56,9 +70,12 @@ function _derivePatchDraftFromContext(job, contextPack) {
         context_budget: mcpTools?.budget || null,
         rag_anchor: ragFirst
             ? {
-                  chunk_id: ragFirst.chunk_id || null,
-                  score: ragFirst.score ?? null,
-                  path: ragFirst.path || ragFirst.file_path || null,
+                  chunk_id: /** @type {Record<string, any>} */ (ragFirst).chunk_id || null,
+                  score: /** @type {Record<string, any>} */ (ragFirst).score ?? null,
+                  path:
+                      /** @type {Record<string, any>} */ (ragFirst).path ||
+                      /** @type {Record<string, any>} */ (ragFirst).file_path ||
+                      null,
               }
             : null,
         recommended_next_actions: [
@@ -85,6 +102,10 @@ function _derivePatchDraftFromContext(job, contextPack) {
     };
 }
 
+/**
+ * @param {unknown} kind
+ * @returns {void}
+ */
 function assertKind(kind) {
     if (!isAuditJobKind(kind)) {
         const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
@@ -96,6 +117,10 @@ function assertKind(kind) {
     }
 }
 
+/**
+ * @param {unknown} triggerType
+ * @returns {void}
+ */
 function assertTriggerType(triggerType) {
     if (!isAuditJobTriggerType(triggerType)) {
         const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
@@ -126,8 +151,8 @@ export class AuditAgentRuntime {
      *     listJobs?: (opts?:any)=>unknown[],
      *   }|null
      *   contextBuilder?: { collectQuickContext?: (job?:any)=>Promise<{context?:any, findings?:unknown[], patches?:unknown[]}> }|null
-     *   triageClient?: { runTriage?: (job:any, contextPack:any)=>Promise<void>, isEnabled?: ()=>boolean }|null
-     *   patchAuthorClient?: { runPatchAuthor?: (job:any, contextPack:any, llmTriage:any)=>Promise<void>, isEnabled?: ()=>boolean }|null
+     *   triageClient?: { runTriage?: (job:any, contextPack:any)=>Promise<Record<string, any>>, isEnabled?: ()=>boolean }|null
+     *   patchAuthorClient?: { runPatchAuthor?: (job:any, contextPack:any, llmTriage:any)=>Promise<Record<string, any>>, isEnabled?: ()=>boolean }|null
      *   diagnosticClient?: { runDiagnostic?: (jobKind:string, params?:any)=>Promise<{success:boolean, data?:any, error?:string, durationMs?:number}>, isEnabled?: ()=>boolean }|null
      * }} [options]
      */
@@ -151,19 +176,36 @@ export class AuditAgentRuntime {
         this._failed = 0;
     }
 
+    /**
+     * @param {string} level
+     * @param {string} message
+     * @param {unknown} [data]
+     * @returns {void}
+     */
     _log(level, message, data) {
         if (this.logger) this.logger(level, message, data);
     }
 
+    /**
+     * @param {Record<string, any>|null|undefined} job
+     * @returns {void}
+     */
     _persistJob(job) {
         if (!this.store || typeof this.store.saveJob !== 'function' || !job) return;
         try {
             this.store.saveJob(job);
         } catch (error) {
-            this._log('WARN', '[audit-agent] saveJob failed', { id: job?.id, error: error?.message || String(error) });
+            this._log('WARN', '[audit-agent] saveJob failed', {
+                id: job?.id,
+                error: error instanceof Error ? error.message : String(error),
+            });
         }
     }
 
+    /**
+     * @param {Record<string, any>|null|undefined} job
+     * @returns {void}
+     */
     _persistRunStart(job) {
         if (!this.store || typeof this.store.onRunStart !== 'function' || !job) return;
         try {
@@ -171,11 +213,15 @@ export class AuditAgentRuntime {
         } catch (error) {
             this._log('WARN', '[audit-agent] onRunStart failed', {
                 id: job?.id,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
         }
     }
 
+    /**
+     * @param {Record<string, any>|null|undefined} job
+     * @returns {void}
+     */
     _persistRunFinish(job) {
         if (!this.store || typeof this.store.onRunFinish !== 'function' || !job) return;
         try {
@@ -183,11 +229,16 @@ export class AuditAgentRuntime {
         } catch (error) {
             this._log('WARN', '[audit-agent] onRunFinish failed', {
                 id: job?.id,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
         }
     }
 
+    /**
+     * @param {string} jobId
+     * @param {unknown[]} findings
+     * @returns {void}
+     */
     _persistFindings(jobId, findings) {
         if (!this.store || typeof this.store.saveFindings !== 'function') return;
         try {
@@ -195,11 +246,16 @@ export class AuditAgentRuntime {
         } catch (error) {
             this._log('WARN', '[audit-agent] saveFindings failed', {
                 id: jobId,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
         }
     }
 
+    /**
+     * @param {string} jobId
+     * @param {unknown[]} patches
+     * @returns {void}
+     */
     _persistPatchProposals(jobId, patches) {
         if (!this.store || typeof this.store.savePatchProposals !== 'function') return;
         try {
@@ -207,7 +263,7 @@ export class AuditAgentRuntime {
         } catch (error) {
             this._log('WARN', '[audit-agent] savePatchProposals failed', {
                 id: jobId,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
         }
     }
@@ -219,7 +275,7 @@ export class AuditAgentRuntime {
         let hydrated = 0;
         let skipped = 0;
         const rows = Array.isArray(this.store.listJobs({ limit })) ? this.store.listJobs({ limit }) : [];
-        for (const row of rows) {
+        for (const row of /** @type {Record<string, any>[]} */ (rows)) {
             if (!row?.id) {
                 skipped += 1;
                 continue;
@@ -228,11 +284,11 @@ export class AuditAgentRuntime {
                 skipped += 1;
                 continue;
             }
-            const job = {
+            const job = /** @type {Record<string, any>} */ ({
                 ...row,
                 history: Array.isArray(row.history) ? row.history : [],
                 current_run_id: null,
-            };
+            });
             this.jobs.set(job.id, job);
             hydrated += 1;
         }
@@ -265,7 +321,7 @@ export class AuditAgentRuntime {
             attempt_seq: 0,
             result_json: null,
             error_json: null,
-            history: [],
+            history: /** @type {any[]} */ ([]),
         };
         job.history.push({ ts, event: 'created', status: job.status });
         this.jobs.set(id, job);
@@ -273,6 +329,10 @@ export class AuditAgentRuntime {
         return { ...job };
     }
 
+    /**
+     * @param {{ status?: string|null, limit?: number }} [opts]
+     * @returns {Record<string, any>[]}
+     */
     listJobs({ status = null, limit = 100 } = {}) {
         const rows = [...this.jobs.values()]
             .filter(job => !status || job.status === status)
@@ -280,11 +340,19 @@ export class AuditAgentRuntime {
         return rows.slice(0, Math.max(1, Math.min(Number(limit) || 100, 500))).map(job => ({ ...job }));
     }
 
+    /**
+     * @param {string} id
+     * @returns {Record<string, any>|null}
+     */
     getJob(id) {
         const job = this.jobs.get(String(id));
         return job ? { ...job } : null;
     }
 
+    /**
+     * @param {string} id
+     * @returns {Record<string, any>}
+     */
     queueJob(id) {
         const job = this.jobs.get(String(id));
         if (!job) {
@@ -311,6 +379,11 @@ export class AuditAgentRuntime {
         return { ...job };
     }
 
+    /**
+     * @param {string} id
+     * @param {string} [reason]
+     * @returns {Record<string, any>}
+     */
     cancelJob(id, reason = 'manual_cancel') {
         const job = this.jobs.get(String(id));
         if (!job) {
@@ -345,6 +418,10 @@ export class AuditAgentRuntime {
             .sort((a, b) => b.priority - a.priority || a.created_at_ms - b.created_at_ms);
     }
 
+    /**
+     * @param {Record<string, any>} job
+     * @returns {Promise<void>}
+     */
     async _processJob(job) {
         const startTs = this.now();
         job.status = AUDIT_JOB_STATUS.RUNNING;
@@ -380,7 +457,10 @@ export class AuditAgentRuntime {
                 contextPack = await this.contextBuilder.collectQuickContext(job);
             } catch (error) {
                 contextPack = {
-                    context: { mode: 'read_only_probe_v0', error: error?.message || String(error) },
+                    context: {
+                        mode: 'read_only_probe_v0',
+                        error: error instanceof Error ? error.message : String(error),
+                    },
                     findings: [
                         {
                             severity: 'warning',
@@ -388,7 +468,7 @@ export class AuditAgentRuntime {
                             title: 'Falha ao coletar contexto do audit-agent',
                             source: 'audit-agent',
                             dedup_key: 'ctx:collect:error',
-                            evidence: { error: error?.message || String(error) },
+                            evidence: { error: error instanceof Error ? error.message : String(error) },
                         },
                     ],
                     patches: [],
@@ -397,6 +477,7 @@ export class AuditAgentRuntime {
         }
 
         const patchLike = job.kind === AUDIT_JOB_KIND.PATCH_SUGGEST || job.kind === AUDIT_JOB_KIND.BUG_HUNT;
+        /** @type {Record<string, any>|null} */
         let llmTriage = null;
         if (this.triageClient && typeof this.triageClient.runTriage === 'function') {
             const tsTriage = this.now();
@@ -404,15 +485,16 @@ export class AuditAgentRuntime {
             job.history.push({ ts: tsTriage, event: 'step', step: job.current_step });
             this._persistJob(job);
             try {
-                llmTriage = await this.triageClient.runTriage(job, contextPack);
+                llmTriage = /** @type {Record<string, any>} */ (await this.triageClient.runTriage(job, contextPack));
             } catch (error) {
                 llmTriage = {
                     ok: false,
                     skipped: false,
-                    error: error?.message || String(error),
+                    error: error instanceof Error ? error.message : String(error),
                 };
             }
         }
+        /** @type {Record<string, any>|null} */
         let llmPatchAuthor = null;
         if (patchLike && this.patchAuthorClient && typeof this.patchAuthorClient.runPatchAuthor === 'function') {
             const tsPatch = this.now();
@@ -420,12 +502,14 @@ export class AuditAgentRuntime {
             job.history.push({ ts: tsPatch, event: 'step', step: job.current_step });
             this._persistJob(job);
             try {
-                llmPatchAuthor = await this.patchAuthorClient.runPatchAuthor(job, contextPack, llmTriage);
+                llmPatchAuthor = /** @type {Record<string, any>} */ (
+                    await this.patchAuthorClient.runPatchAuthor(job, contextPack, llmTriage)
+                );
             } catch (error) {
                 llmPatchAuthor = {
                     ok: false,
                     skipped: false,
-                    error: error?.message || String(error),
+                    error: error instanceof Error ? error.message : String(error),
                 };
             }
         }
@@ -438,6 +522,7 @@ export class AuditAgentRuntime {
             job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_VERIFY ||
             job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_REPORT;
 
+        /** @type {Record<string, any>|null} */
         let diagnosticResult = null;
         if (isDiagnosticJob && this.diagnosticClient && typeof this.diagnosticClient.runDiagnostic === 'function') {
             const tsDiag = this.now();
@@ -449,7 +534,7 @@ export class AuditAgentRuntime {
             } catch (error) {
                 diagnosticResult = {
                     success: false,
-                    error: error?.message || String(error),
+                    error: error instanceof Error ? error.message : String(error),
                 };
             }
         }
@@ -569,7 +654,7 @@ export class AuditAgentRuntime {
                     job.status = AUDIT_JOB_STATUS.FAILED;
                     job.updated_at_ms = ts;
                     job.completed_at_ms = ts;
-                    job.error_json = { message: error?.message || String(error) };
+                    job.error_json = { message: error instanceof Error ? error.message : String(error) };
                     job.history.push({ ts, event: 'failed', status: job.status, error: job.error_json.message });
                     this._persistJob(job);
                     this._persistRunFinish(job);
@@ -583,7 +668,7 @@ export class AuditAgentRuntime {
     }
 
     getMetrics() {
-        const byStatus = {};
+        const byStatus = /** @type {Record<string, number>} */ ({});
         for (const job of this.jobs.values()) {
             byStatus[job.status] = (byStatus[job.status] || 0) + 1;
         }

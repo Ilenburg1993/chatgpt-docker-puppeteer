@@ -5,6 +5,11 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string}
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -13,6 +18,11 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {unknown} raw
+ * @param {unknown} [fallback]
+ * @returns {any}
+ */
 function _parseJson(raw, fallback = null) {
     if (raw === null || raw === undefined) return fallback;
     try {
@@ -22,6 +32,33 @@ function _parseJson(raw, fallback = null) {
     }
 }
 
+/**
+ * @typedef {object} AuditJob
+ * @property {string} id
+ * @property {string} status
+ * @property {string} kind
+ * @property {number} priority
+ * @property {string} trigger_type
+ * @property {string|null} trigger_ref
+ * @property {Record<string, any>} scope_json
+ * @property {Record<string, any>} policy_json
+ * @property {string|null} mission_id
+ * @property {string|null} current_step
+ * @property {string|null} created_by
+ * @property {string|null} assigned_to
+ * @property {number} attempt_seq
+ * @property {any} result_json
+ * @property {any} error_json
+ * @property {number} created_at_ms
+ * @property {number} updated_at_ms
+ * @property {number|null} started_at_ms
+ * @property {number|null} completed_at_ms
+ */
+
+/**
+ * @param {Record<string, any>|null|undefined} row
+ * @returns {AuditJob|null}
+ */
 function _rowToAuditJob(row) {
     if (!row) return null;
     return {
@@ -49,14 +86,34 @@ function _rowToAuditJob(row) {
 
 /**
  * @typedef {object} CreateAuditJobInput
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {string} [id]
+ * @property {string} [status]
+ * @property {string} [kind]
+ * @property {number} [priority]
+ * @property {string} [trigger_type]
+ * @property {string} [trigger_ref]
+ * @property {Record<string, any>} [scope_json]
+ * @property {Record<string, any>} [scope]
+ * @property {Record<string, any>} [policy_json]
+ * @property {Record<string, any>} [policy]
+ * @property {string} [mission_id]
+ * @property {string} [current_step]
+ * @property {string} [created_by]
+ * @property {string} [assigned_to]
+ * @property {number} [attempt_seq]
+ * @property {any} [result_json]
+ * @property {any} [error_json]
+ * @property {number} [created_at_ms]
+ * @property {number} [updated_at_ms]
+ * @property {number|null} [started_at_ms]
+ * @property {number|null} [completed_at_ms]
  */
 /**
  * Função exportada: createAuditJob.
- * @param {CreateAuditJobInput} input Input data for the AuditJob record.
+ * @param {CreateAuditJobInput} [input]
  * @returns {AuditJob|null}
  */
-function createAuditJob(input = {}) {
+function createAuditJob(input = /** @type {CreateAuditJobInput} */ ({})) {
     const db = getDb();
     const now = _now();
     db.prepare(
@@ -106,7 +163,9 @@ function createAuditJob(input = {}) {
  */
 function getAuditJobById(id) {
     const db = getDb();
-    const row = db.prepare('SELECT * FROM audit_jobs WHERE id = ?').get(String(id || '').trim());
+    const row = /** @type {Record<string, any>|null} */ (
+        db.prepare('SELECT * FROM audit_jobs WHERE id = ?').get(String(id || '').trim())
+    );
     return _rowToAuditJob(row);
 }
 
@@ -136,12 +195,26 @@ function listAuditJobs({ status = null, limit = 100 } = {}) {
             status: status ? String(status) : null,
             limit: Math.max(1, Math.min(Number(limit) || 100, 500)),
         });
-    return rows.map(_rowToAuditJob).filter(Boolean);
+    return /** @type {AuditJob[]} */ (/** @type {Record<string, any>[]} */ (rows).map(_rowToAuditJob).filter(Boolean));
 }
 
 /**
  * @typedef {object} UpdateAuditJobUpdates
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {string} [status]
+ * @property {number} [priority]
+ * @property {string} [trigger_ref]
+ * @property {Record<string, any>} [scope_json]
+ * @property {Record<string, any>} [scope]
+ * @property {Record<string, any>} [policy_json]
+ * @property {Record<string, any>} [policy]
+ * @property {string} [mission_id]
+ * @property {string} [current_step]
+ * @property {string} [assigned_to]
+ * @property {number} [attempt_seq]
+ * @property {any} [result_json]
+ * @property {any} [error_json]
+ * @property {number|null} [started_at_ms]
+ * @property {number|null} [completed_at_ms]
  */
 /**
  * Função exportada: updateAuditJob.

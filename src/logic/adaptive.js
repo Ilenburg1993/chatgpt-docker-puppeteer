@@ -643,7 +643,7 @@ export const values = {
         return Math.round(state.infra.avg * 5);
     },
     get ECHO_TIMEOUT() {
-        return Math.round(((/** @type {Record<string, any>} */ (state.targets))['chatgpt']?.echo.avg || SEED_ECHO) * 3);
+        return Math.round(/** @type {Record<string, any>} */ ((state.targets))['chatgpt']?.echo.avg || SEED_ECHO) * 3;
     },
     get PROGRESS_TIMEOUT() {
         return 60000;
