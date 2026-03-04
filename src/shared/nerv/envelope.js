@@ -154,9 +154,10 @@ function createEnvelope(params) {
  */
 function deepFreeze(obj) {
     Object.freeze(obj);
-    for (const key of Object.keys(obj)) {
-        if (typeof obj[key] === 'object' && obj[key] !== null && !Object.isFrozen(obj[key])) {
-            deepFreeze(obj[key]);
+    const o = /** @type {Record<string, any>} */ (obj);
+    for (const key of Object.keys(o)) {
+        if (typeof o[key] === 'object' && o[key] !== null && !Object.isFrozen(o[key])) {
+            deepFreeze(o[key]);
         }
     }
     return obj;
@@ -166,12 +167,8 @@ function deepFreeze(obj) {
 // envelope ({ actor, messageType, actionCode, payload, correlationId, target })
 // and returns a canonical, validated envelope.
 /**
- * @typedef {object} NormalizeEnvelope
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Normaliza envelopes NERV de diferentes formatos para o formato canônico
- * @param {NormalizeEnvelope} envelope - Envelope a ser normalizado (canônico ou legado)
+ * @param {Record<string, any>} envelope - Envelope a ser normalizado (canônico ou legado)
  * @returns {object} Envelope NERV canônico e validado
  * @throws {Error} Se o envelope não puder ser normalizado
  * @sideEffects Nenhum - função pura
@@ -224,12 +221,8 @@ function normalize(envelope) {
 }
 
 /**
- * @typedef {object} AssertValidEnvelope
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Valida envelope NERV (canônico ou achatado) lançando erro se inválido
- * @param {AssertValidEnvelope} envelope - Envelope a ser validado
+ * @param {Record<string, any>} envelope - Envelope a ser validado
  * @returns {boolean} true se válido
  * @throws {Error} Se o envelope for inválido
  * @sideEffects Pode lançar erro - função de validação

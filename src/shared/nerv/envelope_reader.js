@@ -1,12 +1,8 @@
 // @ts-check
 
 /**
- * @typedef {object} GetMessageTypeEnvelope
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Extrai o tipo de mensagem de envelope NERV (suporta formatos canônico e legado)
- * @param {GetMessageTypeEnvelope} envelope - Envelope NERV a ser analisado
+ * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
  * @returns {import('./constants.js').MessageType|null} Tipo da mensagem ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
@@ -17,12 +13,8 @@ function getMessageType(envelope) {
 }
 
 /**
- * @typedef {object} GetActionCodeEnvelope
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Extrai o código de ação de envelope NERV (suporta formatos canônico e legado)
- * @param {GetActionCodeEnvelope} envelope - Envelope NERV a ser analisado
+ * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
  * @returns {string|null} Código da ação ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
@@ -37,12 +29,8 @@ function getActionCode(envelope) {
 }
 
 /**
- * @typedef {object} GetCorrelationIdEnvelope
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Extrai o ID de correlação de envelope NERV (suporta formatos canônico e legado)
- * @param {GetCorrelationIdEnvelope} envelope - Envelope NERV a ser analisado
+ * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
  * @returns {string|null} ID de correlação ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
@@ -57,12 +45,8 @@ function getCorrelationId(envelope) {
 }
 
 /**
- * @typedef {object} GetMsgIdEnvelope
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Extrai o ID da mensagem de envelope NERV (suporta formatos canônico e legado)
- * @param {GetMsgIdEnvelope} envelope - Envelope NERV a ser analisado
+ * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
  * @returns {string|null} ID da mensagem ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
@@ -71,12 +55,8 @@ function getMsgId(envelope) {
 }
 
 /**
- * @typedef {object} GetPayloadEnvelope
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Extrai o payload de envelope NERV
- * @param {GetPayloadEnvelope} envelope - Envelope NERV a ser analisado
+ * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
  * @returns {object} Payload da mensagem (objeto vazio se não encontrado)
  * @sideEffects Nenhum - função pura
  */
@@ -85,12 +65,8 @@ function getPayload(envelope) {
 }
 
 /**
- * @typedef {object} GetTaskIdFromPayloadPayload
- * @property {*} _ Propriedades definidas via runtime.
- */
-/**
  * Extrai o ID da tarefa do payload de envelope NERV
- * @param {GetTaskIdFromPayloadPayload} payload - Payload da mensagem a ser analisado
+ * @param {Record<string, any>} payload - Payload da mensagem a ser analisado
  * @returns {string|null} ID da tarefa ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */

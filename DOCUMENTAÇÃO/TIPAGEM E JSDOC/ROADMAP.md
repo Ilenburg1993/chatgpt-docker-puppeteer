@@ -25,7 +25,7 @@
 concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gateway` ✅,
 `src.audit_agent` ✅, `src.dashboard-ui` ✅, `tests.manual` ✅.
 
-**Próximo passo**: Fase B — `src.nerv` (439 erros).
+**Próximo passo**: Fase B — `scripts.health` (441 erros).
 
 **Dependência nova instalada**: `@types/better-sqlite3` (devDependencies) — resolve TS7016 em
 `src/infra/db/sqlite.js`.
@@ -73,7 +73,7 @@ concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gate
 | `src.dashboard-ui`      |     0 | ✅ verde | Manter |
 | `tests.manual`          |     0 | ✅ verde | Manter |
 | `src.audit_agent`       |     0 | ✅ verde | Manter |
-| `src.nerv`              |   439 | Fase B  | —      |
+| `src.nerv`              |     0 | ✅ verde | Manter |
 | `scripts.health`        |   441 | Fase B  | —      |
 | `src.missions`          |   608 | Fase B  | —      |
 | `src.shared`            |   746 | Fase B  | —      |
@@ -147,7 +147,7 @@ Objectivo: zerar 11 lanes. Após Fase A, cascatas de TS2339 já terão reduzido.
 | `src.core`         | 1.053 |     10     | ConfigShape, RuntimeContext, BootState               |
 | `src.agent`        | 1.190 |     11     | TaskAttempt, MissionState, AgentContext, WorkerState |
 
-- [ ] `src.nerv`: 439 → 0
+- [x] `src.nerv`: 439 → 0
 - [ ] `scripts.health`: 441 → 0
 - [ ] `src.missions`: 608 → 0
 - [ ] `src.shared`: 746 → 0

@@ -45,8 +45,8 @@ function safeCall(handler, payload) {
 
 /**
  * @typedef {object} CreateConnectionDeps
- * @property {object} telemetry
- * @property {object} adapter
+ * @property {any} telemetry
+ * @property {any} adapter
  */
 /**
  * @typedef {object} CreateConnectionOptions
@@ -85,7 +85,7 @@ function createConnection({ telemetry, adapter }) {
   =========================== */
 
     if (typeof adapter.onReceive === 'function') {
-        adapter.onReceive(frame => {
+        adapter.onReceive((/** @type {any} */ frame) => {
             telemetry.emit('nerv:transport:receive', {
                 size: frame ? frame.length || null : null,
             });
@@ -97,7 +97,7 @@ function createConnection({ telemetry, adapter }) {
     }
 
     if (typeof adapter.onError === 'function') {
-        adapter.onError(error => {
+        adapter.onError((/** @type {any} */ error) => {
             telemetry.emit('nerv:transport:error', {
                 message: error ? error.message : 'erro físico',
             });
@@ -147,7 +147,7 @@ function createConnection({ telemetry, adapter }) {
     /**
      * Envia frame opaco pelo meio físico.
      *
-     * @param {object} frame
+     * @param {any} frame
      */
     function send(frame) {
         telemetry.emit('nerv:transport:send', {

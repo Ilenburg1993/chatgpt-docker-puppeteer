@@ -8,10 +8,10 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
 
 /**
  * @typedef {object} CreateEmitEventDeps
- * @property {object} envelopes
- * @property {object} buffers
- * @property {object} correlation
- * @property {object} telemetry
+ * @property {any} envelopes
+ * @property {any} buffers
+ * @property {any} correlation
+ * @property {any} telemetry
  */
 /**
  * @typedef {object} CreateEmitEventOptions
@@ -60,10 +60,11 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
             // 2. Validação estrutural
             envelopes.assertValid(normalized);
         } catch (error) {
+            const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:emission:rejected', {
                 kind: MessageType.EVENT,
                 reason: 'estrutura',
-                message: error.message,
+                message: _e.message,
             });
             return;
         }

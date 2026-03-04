@@ -9,10 +9,10 @@ import createEmitEvent from './emit_event.js';
 
 /**
  * @typedef {object} CreateEmissionDeps
- * @property {object} envelopes
- * @property {object} buffers
- * @property {object} correlation
- * @property {object} telemetry
+ * @property {any} envelopes
+ * @property {any} buffers
+ * @property {any} correlation
+ * @property {any} telemetry
  */
 /**
  * @typedef {object} CreateEmissionOptions
@@ -41,26 +41,26 @@ function createEmission({ envelopes, buffers, correlation, telemetry }) {
      Composição dos emissores
   ========================================================= */
 
-    const commandEmitter = createEmitCommand({
+    const commandEmitter = /** @type {any} */ (createEmitCommand({
         envelopes,
         buffers,
         correlation,
         telemetry,
-    });
+    }));
 
-    const eventEmitter = createEmitEvent({
+    const eventEmitter = /** @type {any} */ (createEmitEvent({
         envelopes,
         buffers,
         correlation,
         telemetry,
-    });
+    }));
 
-    const ackEmitter = createEmitAck({
+    const ackEmitter = /** @type {any} */ (createEmitAck({
         envelopes,
         buffers,
         correlation,
         telemetry,
-    });
+    }));
 
     /* =========================================================
      Interface pública do módulo

@@ -9,8 +9,9 @@ import createReconnect from './reconnect.js';
 
 /**
  * @typedef {object} CreateTransportDeps
- * @property {object} telemetry
- * @property {object} adapter
+ * @property {any} telemetry
+ * @property {any} adapter
+ * @property {*} [reconnect]
  */
 /**
  * @typedef {object} CreateTransportOptions
@@ -42,37 +43,38 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
      1. Framing (empacotamento físico)
   ========================================================= */
 
-    const unpacker = framing.createUnpacker();
+    const unpacker = /** @type {any} */ (framing.createUnpacker());
 
     /* =========================================================
      2. Conexão física
   ========================================================= */
 
-    const connection = createConnection({
+    const connection = /** @type {any} */ (createConnection({
         telemetry,
         adapter: {
             ...adapter,
 
             // Recebe chunks brutos do meio físico
+            /** @param {any} handler */
             onReceive(handler) {
-                adapter.onReceive(chunk => {
+                adapter.onReceive((/** @type {any} */ chunk) => {
                     unpacker.push(chunk, handler);
                 });
             },
         },
-    });
+    }));
 
     /* =========================================================
      3. Reconexão técnica (opcional)
   ========================================================= */
 
     const reconnect = reconnectPolicy
-        ? createReconnect({
+        ? /** @type {any} */ (createReconnect({
               telemetry,
               start: connection.start,
               stop: connection.stop,
               policy: reconnectPolicy,
-          })
+          }))
         : null;
 
     /* =========================================================

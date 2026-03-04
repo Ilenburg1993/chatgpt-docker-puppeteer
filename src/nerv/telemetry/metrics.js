@@ -57,14 +57,25 @@ function createMetrics() {
      Operações internas
   =========================== */
 
+    /**
+     * @param {string} name
+     * @param {number} [value]
+     */
     function incCounter(name, value = 1) {
         counters[name] = (counters[name] || 0) + value;
     }
 
+    /**
+     * @param {string} name
+     * @param {any} value
+     */
     function setGauge(name, value) {
         gauges[name] = value;
     }
 
+    /**
+     * @param {string} name
+     */
     function mark(name) {
         timestamps[name] = now();
     }

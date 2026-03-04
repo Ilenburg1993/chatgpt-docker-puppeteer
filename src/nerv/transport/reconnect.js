@@ -49,9 +49,10 @@ function now() {
 
 /**
  * @typedef {object} CreateReconnectDeps
- * @property {object} telemetry
+ * @property {any} telemetry
  * @property {function(): void} start
  * @property {function(): void} stop
+ * @property {*} [policy]
  */
 /**
  * @typedef {object} CreateReconnectOptions
@@ -89,6 +90,7 @@ function createReconnect({ telemetry, start, stop, policy = {} }) {
 
     let attempts = 0;
     let active = false;
+    /** @type {ReturnType<typeof setTimeout> | null} */
     let timer = null;
 
     /* ===========================

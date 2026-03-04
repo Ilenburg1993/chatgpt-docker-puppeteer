@@ -5,7 +5,9 @@
  * @returns {Record<string, any>}
  */
 function _asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (/** @type {unknown} */ (value)) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, any>} */ (/** @type {unknown} */ (value))
+        : {};
 }
 
 /**
@@ -106,7 +108,13 @@ function _buildPatchPrompt(job, contextPack, llmTriage) {
         `rag_search=${JSON.stringify(mcpTools.rag_search || null)}`,
         `rag_expand=${JSON.stringify(mcpTools.rag_expand || null)}`,
         `findings=${JSON.stringify(
-            findings.slice(0, 10).map(/** @param {Record<string, any>} f */ f => ({ title: f?.title, severity: f?.severity, category: f?.category }))
+            findings.slice(0, 10).map(
+                /** @param {Record<string, any>} f */ f => ({
+                    title: f?.title,
+                    severity: f?.severity,
+                    category: f?.category,
+                })
+            )
         ).slice(0, 5000)}`,
     ].join('\n');
 }
@@ -128,8 +136,7 @@ function _coercePatchAuthorParsed(rawParsed) {
               .slice(0, 10)
         : null;
     const proposedChanges = Array.isArray(parsed.proposed_changes)
-        ? parsed.proposed_changes
-              .map(/** @param {unknown} v */ v => String(v || '').trim())
+        ? parsed.proposed_changes.map(/** @param {unknown} v */ v => String(v || '').trim())
         : null;
 
     return {

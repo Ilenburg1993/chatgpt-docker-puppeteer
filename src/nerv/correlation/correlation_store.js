@@ -47,7 +47,8 @@ function emptyMap() {
 
 /**
  * @typedef {object} CreateCorrelationStoreDeps
- * @property {object} telemetry
+ * @property {any} telemetry
+ * @property {*} [limits]
  */
 /**
  * @typedef {object} CreateCorrelationStoreOptions
@@ -87,6 +88,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
 
     /**
      * Cria uma nova correlação, se ainda não existir.
+     * @param {string} correlationId
      */
     function ensureCorrelation(correlationId) {
         if (!store[correlationId]) {
@@ -149,6 +151,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      * Cria um registro técnico mínimo a partir de um envelope.
      * Payload permanece opaco (não armazenado integralmente).
      * P9.5: Adiciona memoization de JSON serialization
+     * @param {any} envelope
      */
     function createRecord(envelope) {
         const messageType = getMessageType(envelope);

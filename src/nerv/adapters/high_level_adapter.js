@@ -9,10 +9,11 @@ import { MessageType } from '#shared/nerv/constants';
  * @property {*} [messageType]
  * @property {*} [actionCode]
  * @property {*} [payload]
+ * @property {string|null} [correlationId]
  */
 /**
  * Função exportada: makeEnvelope.
- * @param {MakeEnvelopeOptions} [options]
+ * @param {MakeEnvelopeOptions} options
  * @returns {object}
  */
 function makeEnvelope({ actor, target = null, messageType, actionCode, payload = {}, correlationId = null }) {
@@ -20,20 +21,12 @@ function makeEnvelope({ actor, target = null, messageType, actionCode, payload =
 }
 
 /**
- * @typedef {object} SendEventNerv
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
- * @typedef {object} SendEventInput
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Send NERV event (async).
  * ✅ P1-4: Now properly awaits emission and propagates errors.
- * @param {SendEventNerv} nerv - NERV instance
+ * @param {any} nerv - NERV instance
  * @param {string} actor - Actor role
  * @param {string} actionCode - Action code
- * @param {SendEventInput} [payload={}] - Event payload
+ * @param {Record<string, any>} [payload={}] - Event payload
  * @param {string|null} [correlationId=null] - Correlation ID
  * @param {string|null} [target=null] - Target actor
  * @returns {Promise<object>} Resolved envelope
@@ -56,20 +49,12 @@ async function sendEvent(nerv, actor, actionCode, payload = {}, correlationId = 
 }
 
 /**
- * @typedef {object} SendCommandNerv
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
- * @typedef {object} SendCommandInput
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Send NERV command (async).
  * ✅ P1-4: Now properly awaits emission and propagates errors.
- * @param {SendCommandNerv} nerv - NERV instance
+ * @param {any} nerv - NERV instance
  * @param {string} actor - Actor role
  * @param {string} actionCode - Action code
- * @param {SendCommandInput} [payload={}] - Command payload
+ * @param {Record<string, any>} [payload={}] - Command payload
  * @param {string|null} [correlationId=null] - Correlation ID
  * @param {string|null} [target=null] - Target actor
  * @returns {Promise<object>} Resolved envelope
@@ -92,13 +77,9 @@ async function sendCommand(nerv, actor, actionCode, payload = {}, correlationId 
 }
 
 /**
- * @typedef {object} SendAckNerv
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Send NERV acknowledgment (async).
  * ✅ P1-4: Now properly awaits emission and propagates errors.
- * @param {SendAckNerv} nerv - NERV instance
+ * @param {any} nerv - NERV instance
  * @param {string} actor - Actor role
  * @param {string} actionCode - Action code
  * @param {string|null} [correlationId=null] - Correlation ID

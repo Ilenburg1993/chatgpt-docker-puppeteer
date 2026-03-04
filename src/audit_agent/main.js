@@ -28,7 +28,9 @@ if (cfg.persistDb) {
         const { createAuditAgentDbStore } = await import('./db_store.js');
         store = createAuditAgentDbStore();
     } catch (error) {
-            console.warn(`[audit-agent] db store unavailable (fallback in-memory): ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+            `[audit-agent] db store unavailable (fallback in-memory): ${error instanceof Error ? error.message : String(error)}`
+        );
     }
 }
 let contextBuilder = null;

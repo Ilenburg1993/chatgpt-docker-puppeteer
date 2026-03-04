@@ -9,7 +9,8 @@ import createBackpressure from './backpressure.js';
 
 /**
  * @typedef {object} CreateBuffersDeps
- * @property {object} telemetry
+ * @property {any} telemetry
+ * @property {*} [limits]
  */
 /**
  * @typedef {object} CreateBuffersOptions
@@ -35,17 +36,17 @@ function createBuffers({ telemetry, limits = {} }) {
 
     const blockOnPressure = limits.blockOnPressure === true;
 
-    const backpressure = createBackpressure({ telemetry });
+    const backpressure = /** @type {any} */ (createBackpressure({ telemetry }));
 
-    const outbound = createOutboundQueue({
+    const outbound = /** @type {any} */ (createOutboundQueue({
         telemetry,
         maxSize: limits.outbound ?? null,
-    });
+    }));
 
-    const inbound = createInboundQueue({
+    const inbound = /** @type {any} */ (createInboundQueue({
         telemetry,
         maxSize: limits.inbound ?? null,
-    });
+    }));
 
     /* ===========================
      API pública do módulo
@@ -54,6 +55,9 @@ function createBuffers({ telemetry, limits = {} }) {
     return Object.freeze({
         /* Outbound */
 
+        /**
+         * @param {any} item
+         */
         async enqueueOutbound(item) {
             // P9.3: Hard limit de 10000 items para prevenir buffer overflow
             if (outbound.size() > 10000) {
@@ -91,6 +95,9 @@ function createBuffers({ telemetry, limits = {} }) {
 
         /* Inbound */
 
+        /**
+         * @param {any} item
+         */
         async enqueueInbound(item) {
             const ok = inbound.enqueue(item);
             if (!ok) {

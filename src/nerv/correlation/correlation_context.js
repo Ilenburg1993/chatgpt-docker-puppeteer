@@ -47,8 +47,8 @@ function cloneRecords(records) {
 
 /**
  * @typedef {object} CreateCorrelationContextDeps
- * @property {object} store
- * @property {object} telemetry
+ * @property {any} store
+ * @property {any} telemetry
  */
 /**
  * @typedef {object} CreateCorrelationContextOptions

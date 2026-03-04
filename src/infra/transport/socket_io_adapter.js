@@ -6,6 +6,7 @@ import EventEmitter from 'node:events';
 /**
  * @typedef {object} CreateSocketAdapterConfig
  * @property {string} url
+ * @property {*} [options]
  */
 /**
  * Cria uma instância do adaptador de transporte para Socket.io.
@@ -32,9 +33,11 @@ function createSocketAdapter(config) {
     });
 
     // Instância nativa do socket (inicializada em start)
+    /** @type {any} */
     let socket = null;
 
     // Handler injetado pelo NERV para receber dados
+    /** @type {any} */
     let inboundHandler = null;
 
     /**
@@ -72,13 +75,13 @@ function createSocketAdapter(config) {
         });
 
         // 2. Desconexão
-        socket.on('disconnect', reason => {
+        socket.on('disconnect', (/** @type {any} */ reason) => {
             events.emit('disconnect');
             events.emit('log', { level: 'WARN', msg: `[TRANSPORT] Desconectado: ${reason}` });
         });
 
         // 3. Erros de Conexão (silenciado durante shutdown)
-        socket.on('connect_error', err => {
+        socket.on('connect_error', (/** @type {any} */ err) => {
             // Ignora erros de conexão se já estamos desligando
             if (_shuttingDown) {
                 return;
@@ -92,14 +95,15 @@ function createSocketAdapter(config) {
 
         // 4. Recebimento de Dados (Payload do NERV)
         // O servidor envia eventos no canal 'message'
-        socket.on('message', rawFrame => {
+        socket.on('message', (/** @type {any} */ rawFrame) => {
             if (inboundHandler) {
                 try {
                     inboundHandler(rawFrame);
                 } catch (err) {
+                    const _e = /** @type {any} */ (err);
                     events.emit('error', {
                         code: 'INBOUND_HANDLER_FAIL',
-                        msg: `Erro ao processar pacote de entrada: ${err.message}`,
+                        msg: `Erro ao processar pacote de entrada: ${_e.message}`,
                     });
                 }
             }

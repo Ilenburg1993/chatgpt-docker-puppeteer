@@ -52,7 +52,9 @@ function safeCall(handler, payload) {
 
 /**
  * @typedef {object} CreateIPCTelemetryConfig
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {string} [namespace]
+ * @property {boolean} [enabled]
+ * @property {number} [maxListeners]
  */
 /**
  * Cria o sistema de telemetria do NERV.
@@ -84,6 +86,8 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Incrementa contador técnico.
+     * @param {string} name
+     * @param {number} [value]
      */
     function incCounter(name, value = 1) {
         metrics.counters[name] = (metrics.counters[name] || 0) + value;
@@ -91,6 +95,8 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Atualiza gauge técnico.
+     * @param {string} name
+     * @param {any} value
      */
     function setGauge(name, value) {
         metrics.gauges[name] = value;
@@ -98,6 +104,7 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Registra timestamp técnico.
+     * @param {string} name
      */
     function mark(name) {
         metrics.timestamps[name] = now();
@@ -113,10 +120,10 @@ function createIPCTelemetry(config = {}) {
      * @param {string} type
      * Nome do evento técnico (ex.: nerv:envelope:sent)
      *
-     * @param {object} [meta]
+     * @param {any} [meta]
      * Metadados técnicos opcionais (nunca semânticos)
      */
-    function emit(type, meta = null) {
+    function emit(type, meta = undefined) {
         if (!enabled) {
             return;
         }

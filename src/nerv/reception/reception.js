@@ -7,9 +7,9 @@ import createReceive from './receive.js';
 
 /**
  * @typedef {object} CreateReceptionDeps
- * @property {object} envelopes
- * @property {object} correlation
- * @property {object} telemetry
+ * @property {any} envelopes
+ * @property {any} correlation
+ * @property {any} telemetry
  */
 /**
  * @typedef {object} CreateReceptionOptions
@@ -37,11 +37,11 @@ function createReception({ envelopes, correlation, telemetry }) {
      Composição do receptor factual
   ========================================================= */
 
-    const receiver = createReceive({
+    const receiver = /** @type {any} */ (createReceive({
         envelopes,
         correlation,
         telemetry,
-    });
+    }));
 
     /* =========================================================
      Interface pública do módulo

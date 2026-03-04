@@ -5,7 +5,9 @@
  * @returns {Record<string, any>}
  */
 function _asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (/** @type {unknown} */ (value)) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, any>} */ (/** @type {unknown} */ (value))
+        : {};
 }
 
 /**

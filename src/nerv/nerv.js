@@ -17,7 +17,7 @@ import createTransport from './transport/transport.js';
  * @property {'LOCAL'|'HYBRID'} [mode='LOCAL'] - Modo de conexão NERV
  * @property {string} [socketUrl] - URL para Socket.io (modo HYBRID)
  * @property {object} [socketOptions] - Opções para Socket.io
- * @property {object} [buffers] - Configurações de buffers inbound/outbound
+ * @property {any} [buffers] - Configurações de buffers inbound/outbound
  * @property {object} [health] - Configurações de health monitoring
  */
 
@@ -38,7 +38,7 @@ async function bootstrapSocketAdapter(config) {
     });
 
     // Log de eventos de conexão (antes de criar telemetria)
-    socketAdapter.events.on('log', ({ level, msg }) => {
+    /** @type {any} */ (socketAdapter).events.on('log', (/** @type {{level: string, msg: string}} */ { level, msg }) => {
         log.info(`[NERV/${level}] ${msg}`);
     });
 
@@ -53,15 +53,15 @@ async function bootstrapSocketAdapter(config) {
  */
 /**
  * Bootstrap: Hybrid transport (local + Socket.io)
- * @param {BootstrapHybridTransportOptions} [options]
+ * @param {BootstrapHybridTransportOptions} options
  */
 function bootstrapHybridTransport({ mode, socketAdapter, telemetry }) {
     if (mode === CONNECTION_MODES.LOCAL || mode === CONNECTION_MODES.HYBRID) {
-        const hybridTransport = createHybridTransport({
+        const hybridTransport = /** @type {any} */ (createHybridTransport({
             mode,
             socketAdapter,
             telemetry,
-        });
+        }));
 
         hybridTransport.start();
         return hybridTransport;
@@ -77,7 +77,7 @@ function bootstrapHybridTransport({ mode, socketAdapter, telemetry }) {
  */
 /**
  * Bootstrap: Transport físico (híbrido ou customizado)
- * @param {BootstrapTransportOptions} [options]
+ * @param {BootstrapTransportOptions} options
  */
 function bootstrapTransport({ hybridTransport, config, telemetry }) {
     // ONDA 2.6: Usa hybridTransport se local/hybrid, ou transport customizado
@@ -106,7 +106,7 @@ function bootstrapTransport({ hybridTransport, config, telemetry }) {
  */
 /**
  * Constrói a interface pública do NERV
- * @param {BuildPublicAPIOptions} [options]
+ * @param {BuildPublicAPIOptions} options
  */
 function buildPublicAPI({
     hybridTransport,
@@ -122,14 +122,14 @@ function buildPublicAPI({
 
     return {
         /* Emissão */
-        emit: envelope => {
+        emit: (/** @type {any} */ envelope) => {
             // ONDA 2.6: Emite via hybrid transport diretamente
             if (hybridTransport) {
                 return hybridTransport.send(envelope);
             }
             return emission.emitEvent(envelope);
         },
-        send: envelope => {
+        send: (/** @type {any} */ envelope) => {
             // Alias para emit - usado pelos testes
             if (hybridTransport) {
                 return hybridTransport.send(envelope);
@@ -143,13 +143,13 @@ function buildPublicAPI({
         /* Recepção */
         receive: reception.receive,
         onReceive: baseOnReceive,
-        onEvent: (actionCodeOrHandler, maybeHandler) => {
+        onEvent: (/** @type {any} */ actionCodeOrHandler, /** @type {any} */ maybeHandler) => {
             // overload:
             // - onEvent(handler) => all EVENT envelopes
             // - onEvent(actionCode, handler) => EVENT envelopes with action_code == actionCode
             if (typeof actionCodeOrHandler === 'function') {
                 const handler = actionCodeOrHandler;
-                return baseOnReceive(envelope => {
+                return baseOnReceive((/** @type {any} */ envelope) => {
                     if (getMessageType(envelope) === 'EVENT') handler(envelope);
                 });
             }
@@ -157,7 +157,7 @@ function buildPublicAPI({
             if (typeof actionCodeOrHandler === 'string' && typeof maybeHandler === 'function') {
                 const actionCode = actionCodeOrHandler;
                 const handler = maybeHandler;
-                return baseOnReceive(envelope => {
+                return baseOnReceive((/** @type {any} */ envelope) => {
                     if (getMessageType(envelope) !== 'EVENT') return;
                     if (getActionCode(envelope) !== actionCode) return;
                     handler(envelope);
@@ -167,14 +167,14 @@ function buildPublicAPI({
             throw new Error('onEvent requer (handler) ou (actionCode, handler)');
         },
         onCommand: reception.onCommand || reception.onReceive,
-        onActor: (actor, handler) => {
+        onActor: (/** @type {any} */ actor, /** @type {any} */ handler) => {
             if (typeof actor !== 'string' || !actor.trim()) {
                 throw new Error('onActor requer actor string');
             }
             if (typeof handler !== 'function') {
                 throw new Error('onActor requer função');
             }
-            return baseOnReceive(envelope => {
+            return baseOnReceive((/** @type {any} */ envelope) => {
                 const a = envelope?.identity?.actor || envelope?.actor || envelope?.header?.source || null;
                 if (a === actor) handler(envelope);
             });
@@ -293,7 +293,7 @@ async function createNERV(config = {}) {
     /* 9. Health */
     const health = createHealth({
         telemetry,
-        thresholds: config.health?.thresholds || {},
+        thresholds: (/** @type {any} */ (config.health))?.thresholds || {},
     });
 
     /* 10. Interface pública */

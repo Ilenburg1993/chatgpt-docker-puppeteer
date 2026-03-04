@@ -26,7 +26,7 @@
 
 /**
  * @typedef {object} CreateBackpressureDeps
- * @property {object} telemetry
+ * @property {any} telemetry
  */
 /**
  * @typedef {object} CreateBackpressureOptions
@@ -47,15 +47,7 @@ function createBackpressure({ telemetry }) {
     /**
      * Emite sinal técnico de pressão.
      *
-     * @param {object} info
-     * @param {string} info.buffer
-     * Nome do buffer (ex.: inbound, outbound)
-     *
-     * @param {number} info.size
-     * Tamanho atual da fila
-     *
-     * @param {number|null} info.limit
-     * Limite técnico configurado
+     * @param {{buffer: string, size: number, limit: number|null}} info
      */
     function signal({ buffer, size, limit }) {
         telemetry.emit('nerv:buffer:pressure', {
@@ -67,6 +59,7 @@ function createBackpressure({ telemetry }) {
 
     /**
      * Emite sinal técnico de normalização (pressão aliviada).
+     * @param {{buffer: string, size: number}} info
      */
     function relief({ buffer, size }) {
         telemetry.emit('nerv:buffer:relief', {

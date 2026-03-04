@@ -38,7 +38,7 @@ function createQueue() {
 
 /**
  * @typedef {object} CreateInboundQueueDeps
- * @property {object} telemetry
+ * @property {any} telemetry
  * @property {number|null} maxSize
  */
 /**
@@ -60,7 +60,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
         throw new Error('inbound_queue requer telemetry válida');
     }
 
-    const queue = createQueue();
+    const queue = /** @type {any[]} */ (createQueue());
 
     /* ===========================
      Operações internas
@@ -105,7 +105,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
     /**
      * Remove e retorna o próximo item da fila.
      *
-     * @returns {object} item ou null se vazio
+     * @returns {object | null} item ou null se vazio
      */
     function dequeue() {
         if (queue.length === 0) {

@@ -45,7 +45,8 @@ function clone(obj) {
 
 /**
  * @typedef {object} CreateHealthDeps
- * @property {object} telemetry
+ * @property {any} telemetry
+ * @property {*} [thresholds]
  */
 /**
  * @typedef {object} CreateHealthOptions
@@ -104,6 +105,9 @@ function createHealth({ telemetry, thresholds = {} }) {
      Operações internas
   ========================================================= */
 
+    /**
+     * @param {any} partial
+     */
     function update(partial) {
         Object.assign(state, partial);
         state.timestamp = now();
@@ -151,7 +155,7 @@ function createHealth({ telemetry, thresholds = {} }) {
      * Não interpreta, apenas atualiza estado.
      *
      * @param {string} type
-     * @param {object} data
+     * @param {any} [data]
      */
     function report(type, data = {}) {
         switch (type) {
@@ -227,6 +231,9 @@ function createHealth({ telemetry, thresholds = {} }) {
 
     /**
      * Registra handler observacional de mudanças.
+     */
+    /**
+     * @param {Function} handler
      */
     function onChange(handler) {
         if (typeof handler !== 'function') {

@@ -39,8 +39,9 @@ function safeCall(handler, envelope, telemetry) {
     try {
         handler(envelope);
     } catch (error) {
+        const _e = /** @type {any} */ (error);
         telemetry.emit('nerv:reception:handler_error', {
-            message: error.message,
+            message: _e.message,
         });
     }
 }
@@ -51,9 +52,9 @@ function safeCall(handler, envelope, telemetry) {
 
 /**
  * @typedef {object} CreateReceptionDeps
- * @property {object} envelopes
- * @property {object} correlation
- * @property {object} telemetry
+ * @property {any} envelopes
+ * @property {any} correlation
+ * @property {any} telemetry
  */
 /**
  * @typedef {object} CreateReceptionOptions
@@ -98,8 +99,9 @@ function createReception({ envelopes, correlation, telemetry }) {
             // 1. Desserialização técnica (se necessário)
             envelope = typeof raw === 'string' ? JSON.parse(raw) : raw;
         } catch (error) {
+            const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:reception:deserialization_failed', {
-                message: error.message,
+                message: _e.message,
             });
             return;
         }
@@ -113,8 +115,9 @@ function createReception({ envelopes, correlation, telemetry }) {
             // 3. Validação estrutural
             envelopes.assertValid(normalized);
         } catch (error) {
+            const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:reception:invalid_envelope', {
-                message: error.message,
+                message: _e.message,
             });
             return;
         }
