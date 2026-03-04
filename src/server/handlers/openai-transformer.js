@@ -61,11 +61,6 @@ export function validateOpenAIRequest(body) {
  * Translates OpenAI Chat Completions request to Ollama /api/generate format
  *
  * @param {TranslateRequestToOllamaOpenaiReq} openaiReq - OpenAI request body
- * @param {Array<{role: string, content: string}>} openaiReq.messages - Messages array
- * @param {string} [openaiReq.model] - Model name
- * @param {number} [openaiReq.temperature] - Temperature (0-1)
- * @param {number} [openaiReq.max_tokens] - Max tokens to generate
- * @param {number} [openaiReq.top_p] - Top-p sampling (0-1)
  * @returns {object} Ollama request body
  *
  * @example
@@ -123,10 +118,7 @@ export function translateRequestToOllama(openaiReq) {
  * Translates Ollama /api/generate response to OpenAI Chat Completions format
  *
  * @param {TranslateResponseToOpenAIOllamaResp} ollamaResp - Ollama response body
- * @param {string} ollamaResp.response - Generated text
- * @param {string} ollamaResp.model - Model used
  * @param {TranslateResponseToOpenAIOriginalReq} originalReq - Original OpenAI request (for token estimation)
- * @param {unknown[]} originalReq.messages - Messages array
  * @returns {object} OpenAI Chat Completions response
  *
  * @example

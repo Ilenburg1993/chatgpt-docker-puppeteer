@@ -30,7 +30,7 @@
 
 <script setup>
 // @ts-check
-import { useNotifications } from '../../composables/useNotifications.js';
+import { useNotifications } from '@/composables/useNotifications.js';
 
 /**
  * Componente de notificações para o dashboard

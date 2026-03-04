@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/health/health.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -60,11 +60,10 @@ function clone(obj) {
  * **Unidades:** Thresholds como inteiros (tamanhos de buffer), timestamp em ms.
  *
  * @param {CreateHealthDeps} deps - Dependências do módulo
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @param {object} [deps.thresholds={}] - Limiares técnicos opcionais
+ * @param {object} deps
+ * @param {object} deps.thresholds
  * @param {number} [deps.thresholds.maxOutboundBuffer] - Limite outbound buffer
  * @param {number} [deps.thresholds.maxInboundBuffer] - Limite inbound buffer
- * @param {CreateHealthOptions} [options]
  * @returns {object} Módulo health com métodos updateTransport, updateBuffers, getSnapshot
  * @throws {Error} Se telemetry não for fornecida
  */

@@ -148,7 +148,6 @@ function ensureBaseRbacData() {
  */
 /**
  * @param {UpsertRbacUserParams} params
- * @param {UpsertRbacUserOptions} [options]
   * @returns {object}
  */
 function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active = true }) {

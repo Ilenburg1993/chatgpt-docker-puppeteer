@@ -21,6 +21,7 @@ const CONFIG = {
 };
 
 // Armazenamento de dados coletados
+/** @type {any} */
 const analysisData = {
     files: [],
     globalPublic: [],
@@ -44,11 +45,19 @@ const analysisData = {
 // CLASSE: FileScanner
 // ============================================
 class FileScanner {
+    /**
+     * @param {any} config
+     */
     constructor(config) {
         this.config = config;
+        /** @type {string[]} */
         this.files = [];
     }
 
+    /**
+     * @param {string} filePath
+     * @returns {boolean}
+     */
     shouldInclude(filePath) {
         const ext = path.extname(filePath);
         const relativePath = path.relative(PROJECT_ROOT, filePath);
@@ -69,6 +78,9 @@ class FileScanner {
         return true;
     }
 
+    /**
+     * @param {string} dirPath
+     */
     scanDir(dirPath) {
         let entries;
         try {
@@ -104,12 +116,19 @@ class FileScanner {
 // CLASSE: VariableParser
 // ============================================
 class VariableParser {
+    /**
+     * @param {string} content
+     * @param {string} filePath
+     */
     constructor(content, filePath) {
         this.content = content;
         this.filePath = filePath;
         this.lines = content.split('\n');
+        /** @type {any[]} */
         this.variables = [];
+        /** @type {any[]} */
         this.functions = [];
+        /** @type {any[]} */
         this.classes = [];
         this.exports = new Set();
         this.imports = new Map();
@@ -149,8 +168,8 @@ class VariableParser {
 
             match = line.match(exportNamedRegex);
             if (match) {
-                const names = match[1].split(',').map(n => n.trim().split(' as ')[0]);
-                names.forEach(n => this.exports.add(n));
+                const names = match[1].split(',').map(/** @param {string} n */ n => n.trim().split(' as ')[0]);
+                names.forEach(/** @param {string} n */ n => this.exports.add(n));
             }
         }
     }
@@ -168,8 +187,8 @@ class VariableParser {
             if (match) {
                 if (match[1]) {
                     // named imports
-                    const names = match[1].split(',').map(n => n.trim().split(' as ')[0]);
-                    names.forEach(n => this.imports.set(n, { line: i + 1, source: match[5] }));
+                    const names = match[1].split(',').map(/** @param {string} n */ n => n.trim().split(' as ')[0]);
+                    names.forEach(/** @param {string} n */ n => this.imports.set(n, { line: i + 1, source: match[5] }));
                 } else if (match[2]) {
                     // default import
                     this.imports.set(match[2], { line: i + 1, source: match[5] });
@@ -233,22 +252,28 @@ class VariableParser {
                         this.variables.push(varInfo);
                     } else if (pattern.type === 'destructuring-object') {
                         const [, keyword, props] = match;
-                        const propList = props.split(',').map(p => p.trim().split(':')[0].trim());
-                        propList.forEach(prop => {
-                            if (prop && !prop.includes('...')) {
-                                const varInfo = this.analyzeVariable(prop, 'undefined', keyword, lineNum, line);
-                                this.variables.push(varInfo);
+                        const propList = props
+                            .split(',')
+                            .map(/** @param {string} p */ p => p.trim().split(':')[0].trim());
+                        propList.forEach(
+                            /** @param {string} prop */ prop => {
+                                if (prop && !prop.includes('...')) {
+                                    const varInfo = this.analyzeVariable(prop, 'undefined', keyword, lineNum, line);
+                                    this.variables.push(varInfo);
+                                }
                             }
-                        });
+                        );
                     } else if (pattern.type === 'destructuring-array') {
                         const [, keyword, props] = match;
-                        const propList = props.split(',').map(p => p.trim());
-                        propList.forEach(prop => {
-                            if (prop && !prop.includes('...')) {
-                                const varInfo = this.analyzeVariable(prop, 'undefined', keyword, lineNum, line);
-                                this.variables.push(varInfo);
+                        const propList = props.split(',').map(/** @param {string} p */ p => p.trim());
+                        propList.forEach(
+                            /** @param {string} prop */ prop => {
+                                if (prop && !prop.includes('...')) {
+                                    const varInfo = this.analyzeVariable(prop, 'undefined', keyword, lineNum, line);
+                                    this.variables.push(varInfo);
+                                }
                             }
-                        });
+                        );
                     } else if (pattern.type === 'class-property') {
                         const [, name, value] = match;
                         const varInfo = this.analyzeVariable(name, value.trim(), 'this', lineNum, line);
@@ -259,6 +284,14 @@ class VariableParser {
         }
     }
 
+    /**
+     * @param {string} name
+     * @param {string} value
+     * @param {string} keyword
+     * @param {number} lineNum
+     * @param {string} fullLine
+     * @returns {any}
+     */
     analyzeVariable(name, value, keyword, lineNum, fullLine) {
         const isConst = keyword === 'const';
         const isLet = keyword === 'let';
@@ -308,6 +341,10 @@ class VariableParser {
         };
     }
 
+    /**
+     * @param {number} lineNum
+     * @returns {boolean}
+     */
     isTopLevel(lineNum) {
         // Verificar se está no topo do arquivo (antes de qualquer função/classe)
         for (let i = 0; i < lineNum - 1; i++) {
@@ -331,6 +368,10 @@ class VariableParser {
         return true;
     }
 
+    /**
+     * @param {string} value
+     * @returns {string}
+     */
     inferType(value) {
         if (!value || value === 'undefined') return 'undefined';
         if (value === 'null') return 'null';
@@ -345,6 +386,10 @@ class VariableParser {
         return 'unknown';
     }
 
+    /**
+     * @param {string} value
+     * @returns {boolean}
+     */
     isConstantValue(value) {
         // Verificar se o valor parece ser uma constante
         if (!value) return false;
@@ -361,6 +406,10 @@ class VariableParser {
         return false;
     }
 
+    /**
+     * @param {string} value
+     * @returns {boolean}
+     */
     isMagicValue(value) {
         // Detectar magic numbers e strings
         if (/^-?\d+$/.test(value)) return true; // Números inteiros
@@ -431,6 +480,11 @@ class _DependencyMapper {
         this.dependencies = new Map();
     }
 
+    /**
+     * @param {any[]} variables
+     * @param {string} filePath
+     * @returns {any[]}
+     */
     analyze(variables, filePath) {
         const fileDeps = [];
 
@@ -452,7 +506,13 @@ class _DependencyMapper {
         return fileDeps;
     }
 
+    /**
+     * @param {string} value
+     * @param {any[]} allVariables
+     * @returns {string[]}
+     */
     findDependencies(value, allVariables) {
+        /** @type {string[]} */
         const deps = [];
         if (!value) return deps;
 
@@ -467,6 +527,10 @@ class _DependencyMapper {
         return [...new Set(deps)];
     }
 
+    /**
+     * @param {string} value
+     * @returns {string | null}
+     */
     getVariableName(value) {
         // Extrair nome da variável do valor (simplificado)
         const match = value.match(/^(\w+)/);
@@ -479,6 +543,7 @@ class _DependencyMapper {
 // ============================================
 class IssueDetector {
     constructor() {
+        /** @type {{ unused: any[], duplicates: any[], magicValues: any[], redundantLet: any[], enumCandidates: any[], typeCandidates: any[] }} */
         this.issues = {
             unused: [],
             duplicates: [],
@@ -489,6 +554,10 @@ class IssueDetector {
         };
     }
 
+    /**
+     * @param {any[]} allVariables
+     * @returns {any}
+     */
     detect(allVariables) {
         // 1. Detectar variáveis não utilizadas (simplificado)
         // (Um análise real precisaria de AST completo)
@@ -505,7 +574,9 @@ class IssueDetector {
                 this.issues.duplicates.push({
                     name,
                     count,
-                    files: allVariables.filter(v => v.name === name).map(v => v.file),
+                    files: allVariables
+                        .filter(/** @param {any} v */ v => v.name === name)
+                        .map(/** @param {any} v */ v => v.file),
                 });
             }
         }
@@ -533,6 +604,10 @@ class IssueDetector {
         return this.issues;
     }
 
+    /**
+     * @param {string} name
+     * @returns {boolean}
+     */
     isCommonName(name) {
         const commonNames = [
             'i',
@@ -570,6 +645,9 @@ class IssueDetector {
         return commonNames.includes(name);
     }
 
+    /**
+     * @param {any[]} variables
+     */
     detectEnumCandidates(variables) {
         // Agrupar por valor para encontrar valores comuns
         const valueGroups = new Map();
@@ -590,12 +668,15 @@ class IssueDetector {
                 this.issues.enumCandidates.push({
                     value,
                     usages: vars.length,
-                    variables: vars.map(v => ({ name: v.name, file: v.file, line: v.line })),
+                    variables: vars.map(/** @param {any} v */ v => ({ name: v.name, file: v.file, line: v.line })),
                 });
             }
         }
     }
 
+    /**
+     * @param {any[]} variables
+     */
     detectTypeCandidates(variables) {
         // Objetos com estrutura similar são candidatas a interface
         const objectVars = variables.filter(v => v.type === 'object' && v.value !== '{}');
@@ -617,7 +698,7 @@ class IssueDetector {
                 this.issues.typeCandidates.push({
                     type: 'object',
                     propertyCount: props,
-                    files: vars.map(v => ({ name: v.name, file: v.file })),
+                    files: vars.map(/** @param {any} v */ v => ({ name: v.name, file: v.file })),
                 });
             }
         }
@@ -628,6 +709,9 @@ class IssueDetector {
 // CLASSE: ReportGenerator
 // ============================================
 class ReportGenerator {
+    /**
+     * @param {any} data
+     */
     constructor(data) {
         this.data = data;
     }
@@ -680,6 +764,7 @@ ${this.generateTypeDistribution()}
     }
 
     generateTypeDistribution() {
+        /** @type {Record<string, number>} */
         const types = {};
         const allVars = [...this.data.globalPublic, ...this.data.globalPrivate, ...this.data.local];
 
@@ -719,6 +804,7 @@ ${this.generateTypeDistribution()}
         if (this.data.globalPrivate.length === 0) return '';
 
         // Agrupar por arquivo
+        /** @type {Record<string, any[]>} */
         const byFile = {};
         for (const v of this.data.globalPrivate) {
             const file = path.basename(v.file);
@@ -773,7 +859,12 @@ ${this.generateTypeDistribution()}
         return md;
     }
 
+    /**
+     * @param {any[]} constants
+     * @returns {Record<string, any[]>}
+     */
     categorizeConstants(constants) {
+        /** @type {Record<string, any[]>} */
         const categories = {
             'URLs e Endpoints': [],
             'Timeouts e Números': [],
@@ -846,7 +937,9 @@ Nomes usados em múltiplos lugares:
 |------|-------------|----------|\n`;
 
             for (const d of this.data.issues.duplicates.slice(0, 15)) {
-                const files = [...new Set(d.files.map(f => path.basename(f)))].slice(0, 3).join(', ');
+                const files = [...new Set(d.files.map(/** @param {any} f */ f => path.basename(f)))]
+                    .slice(0, 3)
+                    .join(', ');
                 md += `| \`${d.name}\` | ${d.count} | ${files} |\n`;
             }
             md += '\n';
@@ -941,8 +1034,14 @@ Os seguintes padrões foram identificados:
         return md;
     }
 
+    /**
+     * @param {string} str
+     * @returns {string}
+     */
     toPascalCase(str) {
-        return str.replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => chr.toUpperCase()).replace(/^./, chr => chr.toUpperCase());
+        return str
+            .replace(/[^a-zA-Z0-9]+(.)/g, /** @param {string} _ @param {string} chr */ (_, chr) => chr.toUpperCase())
+            .replace(/^./, /** @param {string} chr */ chr => chr.toUpperCase());
     }
 }
 
@@ -960,8 +1059,11 @@ async function main() {
 
     // 2. Parsear cada arquivo
     console.log('\n📝 Parseando arquivos e identificando variáveis...');
+    /** @type {any[]} */
     const allVariables = [];
+    /** @type {any[]} */
     const allFunctions = [];
+    /** @type {any[]} */
     const allClasses = [];
 
     for (const file of files) {
@@ -976,7 +1078,8 @@ async function main() {
 
             analysisData.files.push(file);
         } catch (err) {
-            console.warn(`   ⚠️  Erro ao processar ${file}: ${err.message}`);
+            const _e = /** @type {any} */ (err);
+            console.warn(`   ⚠️  Erro ao processar ${file}: ${_e.message}`);
         }
     }
 

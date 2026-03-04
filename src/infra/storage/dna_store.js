@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { log } from '#core/logger';
 import { DnaSchema } from '#core/schemas';
 import { atomicWrite, safeReadJSON } from '../fs/fs_core.js';

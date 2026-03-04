@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/correlation/correlation_store.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -62,12 +62,11 @@ function emptyMap() {
  * **Unidades:** TTL em milissegundos (padrão 3600000), maxEntries como inteiro.
  *
  * @param {CreateCorrelationStoreDeps} deps - Dependências do módulo
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @param {object} [deps.limits={}] - Limites técnicos opcionais
+ * @param {object} deps
+ * @param {object} deps.limits
  * @param {number} [deps.limits.maxEntries] - Máximo de entradas por correlação
  * @param {number} [deps.limits.maxCorrelations=10000] - Máximo de correlações armazenadas em memória
  * @param {number} [deps.limits.ttl=3600000] - TTL em milissegundos (1 hora padrão)
- * @param {CreateCorrelationStoreOptions} [options]
  * @returns {object} Store de correlação com métodos addEntry, getCorrelation, listCorrelations
  * @throws {Error} Se telemetry não for fornecida ou inválida
  */

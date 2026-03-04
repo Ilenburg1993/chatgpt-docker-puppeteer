@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { z } from 'zod';
 import { CONNECTION_MODES } from '../constants/browser.js';
 

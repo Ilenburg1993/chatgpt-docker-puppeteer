@@ -237,8 +237,6 @@ function validateBrowserConnection(browser) {
  * Verifica: Browser Pool, Circuit Breaker, Página, Interface LLM.
  *
  * @param {ValidateDriverExecutionOptions} options
- * @param {BrowserPoolManager} options.browserPool
- * @param {PuppeteerPage} options.page
  * @returns {Promise<object>} ValidationResult
  */
 async function validateDriverExecution({ browserPool, page }) {
@@ -273,9 +271,6 @@ async function validateDriverExecution({ browserPool, page }) {
  * Valida pré-requisitos para execução do Kernel Loop.
  *
  * @param {ValidateKernelExecutionOptions} options
- * @param {object} options.executionEngine
- * @param {object} options.nervBridge
- * @param {object} options.telemetry
  * @returns {object} ValidationResult
  */
 function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {

@@ -12,8 +12,8 @@ license: MIT
 ## Overview
 
 Este skill governa o ciclo de vida das **lanes strict** do repositório. Cada
-`config/typing/strict/tsconfig.strict.<familia>.<modulo>.json` deve cobrir um **subtree inteiro**, não um arquivo-âncora
-simbólico de um único arquivo.
+`config/typing/strict/tsconfig.strict.<familia>.<modulo>.json` deve cobrir um **subtree inteiro**,
+não um arquivo-âncora simbólico de um único arquivo.
 
 O registro canônico do progresso por fase vive em:
 
@@ -67,13 +67,13 @@ O registro canônico do progresso por fase vive em:
    {
      "references": [
        // ... lanes existentes ...
-      { "path": "./config/typing/strict/tsconfig.strict.src.<modulo>.json" },
+       { "path": "./config/typing/strict/tsconfig.strict.src.<modulo>.json" },
      ],
    }
    ```
 5. Adicionar script no `package.json` (dentro do bloco `typecheck:strict:*`):
    ```jsonc
-  "typecheck:strict:src.<modulo>": "tsc -p config/typing/strict/tsconfig.strict.src.<modulo>.json"
+   "typecheck:strict:src.<modulo>": "tsc -p config/typing/strict/tsconfig.strict.src.<modulo>.json"
    ```
 6. Atualizar `typecheck:strict:all` para incluir o novo script.
 7. Adicionar target no Makefile:

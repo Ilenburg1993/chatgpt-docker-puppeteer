@@ -8,12 +8,20 @@
 ========================================================================== */
 
 /**
+ * @typedef {object} CheckPhysicalIntegrityValidation
+ * @property {number} [min_length] - Tamanho mínimo em bytes exigido para o arquivo.
+ */
+/**
+ * @typedef {object} CheckPhysicalIntegritySpec
+ * @property {CheckPhysicalIntegrityValidation} [validation] - Regras de validação física.
+ */
+/**
  * @typedef {object} CheckPhysicalIntegrityTask
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {CheckPhysicalIntegritySpec} [spec] - Especificações da tarefa.
  */
 /**
  * @typedef {object} CheckPhysicalIntegrityStats
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {number} size - Tamanho do arquivo em bytes (fs.Stats.size).
  */
 /**
  * Verifica se o arquivo atende aos requisitos físicos mínimos.

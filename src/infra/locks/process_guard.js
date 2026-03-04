@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/infra/locks/process_guard.js
    Audit Level: 700 — Sovereign Process Guard (Singularity Edition)

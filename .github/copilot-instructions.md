@@ -138,8 +138,9 @@ trabalho. Todas ficam em `.github/skills/`:
 | `exploratory-bug-hunt`           | Caça proativa de bugs sem pista prévia                             |
 | `reactive-bug-audit`             | Auditoria focada em bug operacional específico                     |
 | `audit-system-analysis-planning` | Análise arquitetural e planejamento                                |
-| `typing-node24-esm-tsserver`     | Tipagem TypeScript/JSDoc para Node 24 + ESM                        |
-| `jsdoc-authoring`                | Criação e revisão de JSDoc completo                                |
+| `typing-node24-esm-tsserver`     | Tipagem TypeScript/JSDoc para Node 24 + ESM (arquitetura de lanes) |
+| `jsdoc-authoring`                | Cookbook completo de JSDoc: padrões por TS code, cascata, batch    |
+| `typing-fix-protocol`            | Protocolo operacional de scan+triagem+fix por lane ou arquivo      |
 | `lsp-ops`                        | Operações LSP (definições, referências, diagnósticos via tsserver) |
 | `context7-docs-ops`              | Documentação de libs externas via Context7 MCP                     |
 | `documentation-governance`       | Auditoria e governança de documentação                             |

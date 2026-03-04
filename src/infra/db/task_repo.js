@@ -180,7 +180,6 @@ function getTaskById(taskId) {
  * o máximo retornável a 500 por chamada (vs 20.000 anterior).
  *
  * @param {ListTasksOptions} [opts]
- * @param {ListTasksOptions} [options]
   * @returns {TaskRow[]}
  */
 function listTasks({ status = null, stage = null, missionId = null, limit = 100, offset = 0 } = {}) {
@@ -224,7 +223,6 @@ function listTasks({ status = null, stage = null, missionId = null, limit = 100,
 /**
  * Conta o total de tasks com filtros (para paginação).
  * @param {CountTasksOptions} [opts]
- * @param {CountTasksOptions} [options]
  * @returns {number}
  */
 function countTasks({ status = null, stage = null, missionId = null } = {}) {
@@ -302,11 +300,6 @@ function getTaskDependencies(taskId) {
  * Inserts a task into the database.
  * @param {InsertTaskRawTask} rawTask - The raw task object
  * @param {InsertTaskOptions} [options={}] - Options
- * @param {string} [options.stage='READY'] - The task stage
- * @param {string} [options.status='PENDING'] - The task status
- * @param {string} [options.actor='system'] - The actor performing the action
- * @param {boolean} [options.ifNotExists=false] - Whether to insert only if not exists
- * @param {string|null} [options.promptTemplateArtifactId=null] - Prompt template artifact ID
   * @returns {TaskRow|null}
  */
 function insertTask(
@@ -789,10 +782,6 @@ function setTaskStatus(taskId, status, extra = {}) {
 /**
  * Atomically claims next eligible task (READY + PENDING).
  * @param {ClaimNextEligibleTaskParams} params - Parameters
- * @param {string} params.workerId - The worker ID
- * @param {number} [params.nowMs] - Current timestamp in ms
- * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
- * @param {ClaimNextEligibleTaskOptions} [options]
  * @returns {object|null} { task, row } or null
  */
 function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) {
@@ -882,9 +871,6 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
 /**
  * Releases the lock on a task.
  * @param {ReleaseTaskLockParams} params - Parameters
- * @param {string} params.taskId - The task ID
- * @param {string} [params.workerId] - The worker ID (optional, for safety)
- * @param {string} [params.expectedAttemptId] - Expected latest attempt/correlation for lock-causality guard
  * @returns {TaskRow|null}
  */
 function releaseTaskLock(
@@ -925,10 +911,6 @@ function releaseTaskLock(
 /**
  * Extends the lock on a task.
  * @param {ExtendTaskLockParams} params - Parameters
- * @param {string} params.taskId - The task ID
- * @param {string} params.workerId - The worker ID
- * @param {number} [params.nowMs] - Current timestamp in ms
- * @param {number} [params.lockTtlMs=60000] - Lock TTL in ms
  * @returns {TaskRow|null}
  */
 function extendTaskLock(

@@ -1,5 +1,4 @@
 // @ts-check
-// @ts-nocheck
 // NOTE: This is an E2E test and requires external dependencies (Chrome proxy).
 // It is not part of the default CI/unit/integration/regression test run.
 

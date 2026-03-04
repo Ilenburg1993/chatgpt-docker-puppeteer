@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { STATUS_VALUES } from '#core/constants/tasks';
 import * as logger from '#core/logger';
 import { parseTask } from '#core/schemas';

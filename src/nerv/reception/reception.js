@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import createReceive from './receive.js';
 
 /* ===========================
@@ -25,10 +25,6 @@ import createReceive from './receive.js';
  * **Unidades:** Dependências seguem contratos NERV (envelopes, correlation, telemetry).
  *
  * @param {CreateReceptionDeps} deps - Dependências do módulo
- * @param {object} deps.envelopes - Sistema de envelopes (normalização + validação)
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @param {CreateReceptionOptions} [options]
  * @returns {object} Módulo de recepção com método onMessage
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

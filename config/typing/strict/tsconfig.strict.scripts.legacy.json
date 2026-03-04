@@ -7,7 +7,6 @@
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "useUnknownInCatchVariables": true,
-    "composite": true,
     "noEmit": true
   },
   "files": [],

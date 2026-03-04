@@ -19,11 +19,13 @@ let config;
 try {
     config = JSON.parse(readFileSync(TSCONFIG_BASE, 'utf8'));
 } catch (/** @type {unknown} */ e) {
-    console.error(`❌ check-base-strict: não foi possível ler ${TSCONFIG_BASE}: ${e.message}`);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`❌ check-base-strict: não foi possível ler ${TSCONFIG_BASE}: ${msg}`);
     process.exit(1);
 }
 
-const strict = config?.compilerOptions?.strict;
+const compilerOptions = /** @type {Record<string, unknown>} */ (config?.compilerOptions ?? {});
+const strict = compilerOptions?.strict;
 
 if (strict !== true) {
     console.error('\n❌ check-base-strict: tsconfig.base.json NÃO tem strict: true');

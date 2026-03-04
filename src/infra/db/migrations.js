@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 
 /**
  * SQLite schema migrations (SSOT).
@@ -165,7 +165,7 @@ const MIGRATIONS = [
                 db
                     .prepare("PRAGMA table_info('tasks')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ r => String(r.name))
             );
 
             if (!cols.has('prompt_template_artifact_id')) {
@@ -195,7 +195,7 @@ const MIGRATIONS = [
                 db
                     .prepare("PRAGMA table_info('tasks')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ r => String(r.name))
             );
             if (!taskCols.has('blocked_reason')) {
                 db.exec('ALTER TABLE tasks ADD COLUMN blocked_reason TEXT NULL;');
@@ -212,7 +212,7 @@ const MIGRATIONS = [
                 db
                     .prepare("PRAGMA table_info('task_attempts')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ r => String(r.name))
             );
             if (!attemptCols.has('reason_class')) {
                 db.exec('ALTER TABLE task_attempts ADD COLUMN reason_class TEXT NULL;');
@@ -239,7 +239,7 @@ const MIGRATIONS = [
                 db
                     .prepare("PRAGMA table_info('task_attempts')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ r => String(r.name))
             );
             if (!attemptCols.has('reason_code')) {
                 db.exec('ALTER TABLE task_attempts ADD COLUMN reason_code TEXT NULL;');
@@ -268,7 +268,7 @@ const MIGRATIONS = [
                 db
                     .prepare("PRAGMA table_info('tasks')")
                     .all()
-                    .map(r => String(r.name))
+                    .map(/** @param {any} r */ r => String(r.name))
             );
 
             if (!taskCols.has('parent_id')) {
@@ -285,7 +285,7 @@ const MIGRATIONS = [
 
             // Best-effort backfill from task_json (requires SQLite JSON1).
             try {
-                const probe = db.prepare("SELECT json_extract('{\"a\":1}', '$.a') AS a").get();
+                const probe = /** @type {any} */ (db.prepare("SELECT json_extract('{\"a\":1}', '$.a') AS a").get());
                 const jsonOk = probe && Number(probe.a) === 1;
                 if (jsonOk) {
                     db.exec(`

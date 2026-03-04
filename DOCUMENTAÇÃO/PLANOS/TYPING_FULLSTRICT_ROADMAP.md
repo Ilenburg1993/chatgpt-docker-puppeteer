@@ -1,623 +1,463 @@
-# Roadmap — JSDoc Completo + Full Strict em 100% do Repositório
+# Typing Full-Strict Roadmap — Redirecionamento
 
-> **Convenção de evolução deste plano**: Este documento vive no branch
-> `feat/typing-fullstrict-roadmap` e é atualizado **continuamente** à medida que cada tarefa é
-> implementada. A regra é:
+> **Este documento foi consolidado.** O roadmap ativo agora vive em:
 >
-> - Todo artefato produzido (skill, script, tsconfig, npm script, target Makefile, update de
->   workflow) é commitado no mesmo PR, junto com o tick **✅** na checklist correspondente deste
->   documento.
-> - Nenhum artefato é considerado "feito" até que o item correspondente esteja marcado **e
->   commitado**.
-> - Revisão deste documento é obrigatória antes do merge: o estado final do documento deve refletir
->   exatamente o estado final do código.
-> - O PR só é mergeado quando as três condições de encerramento do programa estão simultaneamente
->   verdes na CI.
-
-## Contexto e baseline
-
-### Estado real medido na auditoria (3 mar 2026)
-
-| Dimensão                  | Estado atual                                               |
-| ------------------------- | ---------------------------------------------------------- |
-| `@ts-check` (sem legacy)  | 611 / 626 = **97,6 %** — 15 arquivos ativos faltando       |
-| `@ts-check` (legacy)      | 0 / 14 — todos em quarentena sem check                     |
-| JSDoc presença            | 1.106 / 1.106 = **100 %** ✅                                |
-| `@param` completo         | 543 / 677 = **80,2 %** — **134 faltando**                  |
-| `options typedef`         | 506 / 677 = **74,7 %** — **171 faltando**                  |
-| `unsafe_generic_tags`     | **586 tags** (`any`, `Object`, `Array`, `Promise<any>`)    |
-| Lanes strict operacionais | 8 lanes cobrindo ~**20 arquivos** de produção (simbólico)  |
-| Dashboard type checking   | **zero** — sem `tsconfig.json`, sem `vue-tsc`              |
-| `tsconfig.tests.json`     | cobre **7 de 200+** arquivos de teste                      |
-| `tsconfig.tools.json`     | lista explícita de **14 arquivos** (não glob)              |
-| `tsconfig.base.json`      | `strict: false` — base inteira permissiva                  |
-| Maior backlog individual  | `src/infra` (73 param + 58 typedef + 187 unsafe = **318**) |
-| Módulos zero-gap          | `src/audit_agent`, `src/inference_gateway`, `src/shared`   |
-
-### Backlog JSDoc por módulo
-
-| Módulo             | missing_param | missing_typedef | unsafe_generic | Total   |
-| ------------------ | ------------- | --------------- | -------------- | ------- |
-| `src/infra`        | **73**        | **58**          | **187**        | **318** |
-| `scripts/audit`    | 0             | **30**          | **91**         | 121     |
-| `src/server`       | **28**        | **20**          | 38             | 86      |
-| `src/core`         | 3             | 10              | **69**         | 82      |
-| `src/agent`        | 6             | 12              | 37             | 55      |
-| `src/nerv`         | 1             | **23**          | 22             | 46      |
-| `src/integration`  | 2             | 7               | 20             | 29      |
-| `src/dashboard-ui` | 8             | 6               | 10             | 24      |
-| `tests/helpers`    | 6             | 1               | 5              | 12      |
-| `src/driver`       | 0             | 0               | 18             | 18      |
-| `src/kernel`       | 0             | 1               | 7              | 8       |
-| `src/logic`        | 1             | 1               | 7              | 9       |
-| **Total**          | **134**       | **171**         | **586**        | **891** |
-
-### Decisões incorporadas
-
-- **`tests/legacy/`**: entra em cobertura total com `@ts-check`; erros irrecuperáveis suprimidos com
-  `// @ts-ignore` + comentário justificativo — nunca silenciados sem explicação.
-- **Flags strict extras** (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`): não entram
-  agora — avaliados apenas na Fase 5, após o backlog principal fechar.
-- **Execução**: fase a fase, com critério de saída verificável antes de avançar.
-
-### Meta final simultânea
-
-1. `@ts-check` = 100 % em todos os `.js/.mjs/.cjs` elegíveis + `vue-tsc` cobre todos os `.vue`
-2. `functions_missing_param_tags = 0`, `functions_missing_options_typedef = 0`,
-   `unsafe_generic_tags_total = 0`, `public_any_tags_total = 0`
-3. `tsconfig.base.json` com `strict: true` e todos os typechecks passando com strict real herdado
-
----
-
-## Plano de execução — Fases 0 (conclusão), 1 e 2
-
-> Seção criada na sessão de trabalho de 2026-03-xx. Registra as subfases e critérios de conclusão
-> usados para guiar a execução automática. Atualizada conforme progresso.
-
-### Fase 0 — Conclusão da instrumentação
-
-| Subfase | Artefato                                           | Critério de conclusão                                                               |
-| ------- | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 0.a     | `typing_hardening_audit.mjs`                       | `--show-gaps` funcional; `overall=100`; `js_files_missing_ts_check[]` emitido       |
-| 0.b     | `jsdoc_coverage_engine.mjs`                        | `public_any_tags_total` + `public_unknown_tags_total` no shape; schema `3.1.0`      |
-| 0.c     | `jsdoc_coverage_cli.mjs`                           | `--gaps` lista arquivos bloqueadores; `--fail-on-any-gap` sai 1                     |
-| 0.d     | `schemas/typing/jsdoc-coverage-report.schema.json` | Versão `3.1.0`; `public_any_tags_total`, `public_unknown_tags_total` nos `required` |
-| 0.e     | `scripts/ci/verify-skills-governance.mjs`          | Verifica `strict-lane-governance` e `vue-tsc-dashboard`                             |
-| 0.f     | Verificação de saída                               | `analyze:typing:gaps` lista 29 arquivos; `jsdoc:coverage:gaps` lista 891 issues     |
-
-### Fase 1 — Cobertura total de superfície
-
-| Subfase | Escopo                                        | Critério de conclusão                                                                     |
-| ------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 1.a     | 15 arquivos ativos sem `@ts-check`            | Diretiva adicionada na primeira linha de cada arquivo                                     |
-| 1.b     | 14 arquivos `tests/legacy/`                   | `@ts-check` + `@ts-ignore` com comentário justificativo onde irrecuperável                |
-| 1.c     | `tsconfig.tools.json` + `tsconfig.tests.json` | Substituição de listas explícitas por glob `include`; `tsconfig.node.json` sem duplicatas |
-
-### Fase 2 — Fechamento do backlog JSDoc
-
-| Subfase | Módulo                                                                                                        | Issues | Prioridade        |
-| ------- | ------------------------------------------------------------------------------------------------------------- | ------ | ----------------- |
-| 2.a     | `src/infra`                                                                                                   | 318    | 1 — maior backlog |
-| 2.b     | `scripts/audit`                                                                                               | 121    | 2                 |
-| 2.c     | `src/server`                                                                                                  | 86     | 3                 |
-| 2.d     | `src/core`                                                                                                    | 82     | 4                 |
-| 2.e     | `src/agent`                                                                                                   | 55     | 5                 |
-| 2.f     | `src/nerv`                                                                                                    | 46     | 6                 |
-| 2.g     | `src/integration`                                                                                             | 29     | 7                 |
-| 2.h     | `src/dashboard-ui`                                                                                            | 24     | 8                 |
-| 2.i     | Módulos menores (`src/driver`, `src/kernel`, `src/logic`, `tests/helpers`, `scripts/analysis`, `scripts/ops`) | ~65    | 9                 |
-
-Critério de saída da Fase 2: `jsdoc:coverage:gaps --fail-on-any-gap` sai com código `0`.
-
----
-
-## Fase 0 — Instrumentação do gap real
-
-**Objetivo**: tornar impossível "achar que está 100 %" sem estar.
-
-### Tarefas
-
-- [x] Expandir `scripts/analysis/typing_hardening_audit.mjs`:
-  - [x] Emitir `strict_uncovered_files_total` + `strict_uncovered_files[]`
-  - [x] Emitir `js_files_missing_ts_check_total` + `js_files_missing_ts_check[]`
-  - [x] Atualizar `AREA_THRESHOLDS.overall` de `90` → `100`
-- [x] Expandir `scripts/analysis/jsdoc_coverage_engine.mjs` e
-      `scripts/analysis/jsdoc_coverage_cli.mjs`:
-  - [x] Adicionar `public_any_tags_total` e `public_unknown_tags_total` explicitamente no topo do
-        relatório
-  - [x] Implementar flag `--gaps` que lista símbolos bloqueadores por lote (saída executável)
-  - [x] Bump de schema para `3.1.0`
-- [x] Atualizar `schemas/typing/jsdoc-coverage-report.schema.json` com os novos campos
-      (`public_any_tags_total`, `public_unknown_tags_total`, `strict_uncovered_files_total`)
-- [x] Adicionar scripts no `package.json`:
-  - [x] `analyze:typing:gaps` →
-        `node scripts/analysis/typing_hardening_audit.mjs --format console     --show-gaps`
-  - [x] `jsdoc:coverage:gaps` →
-        `node scripts/analysis/jsdoc_coverage_cli.mjs --scope full --format     console --gaps`
-- [x] Classificar os 14 arquivos de `tests/legacy/` como gap explícito na auditoria (não ignorados,
-      não fora de escopo)
-
-### Tarefas — Skills de tipagem e JSDoc
-
-Para cada skill abaixo, carregar o `SKILL.md`, atualizar referências ao roadmap, commands, critérios
-de done e seções de related skills:
-
-- [x] **`typing-node24-esm-tsserver`** — atualizar:
-  - [x] Description frontmatter: "Phase 2 → Full-Strict Roadmap orchestration skill"
-  - [x] Workflow: adicionar `typecheck:dashboard`, `jsdoc:coverage:gaps`, `check:ts-expect-error`,
-        `check:base-strict` como steps canônicos
-  - [x] Validation / Done Criteria: substituir critérios de "Phase 2" pelos do programa full-strict
-  - [x] Related Skills: adicionar `strict-lane-governance` e `vue-tsc-dashboard`
-- [x] **`jsdoc-authoring`** — atualizar:
-  - [x] Description frontmatter: remover "Phase 2"; tornar atemporal
-  - [x] Validation / Done Criteria: substituir critérios qualitativos pelos numéricos (`= 0` para
-        cada indicador de gap)
-- [x] **`typescript-typing`** — atualizar:
-  - [x] Workflow: adicionar Step 7 — tipagem Vue/SFC via `vue-tsc` para `src/dashboard-ui`
-  - [x] Related Skills: adicionar `vue-tsc-dashboard` e `strict-lane-governance`
-
-### Tarefas — Novas skills
-
-- [x] **`strict-lane-governance`** _(nova)_ — governa criação, nomeação, manutenção e remoção de
-      `tsconfig.strict.*.json`
-  - Path: `.github/skills/strict-lane-governance/SKILL.md`
-- [x] **`vue-tsc-dashboard`** _(nova)_ — governa tipagem Vue + `vue-tsc` para `src/dashboard-ui`
-  - Path: `.github/skills/vue-tsc-dashboard/SKILL.md`
-
-### Tarefas — Scripts de análise e CI
-
-- [x] **`scripts/analysis/strict_lane_audit.mjs`** _(novo)_ — audita cobertura de lanes strict;
-      emite `strict_uncovered_files_total` + lista de arquivos
-- [x] **`scripts/ci/check-ts-expect-error.mjs`** _(novo)_ — gate de CI: conta `@ts-expect-error`
-      fora da allowlist; falha com exit 1 se count > threshold (default: 0)
-- [x] **`scripts/ci/check-base-strict.mjs`** _(novo)_ — gate de CI: verifica `tsconfig.base.json`
-      com `strict: true`
-- [x] Atualizar **`scripts/analysis/typing_hardening_audit.mjs`**:
-  - [x] Importar `strict_lane_audit.mjs` para popular `strict_uncovered_files[]`
-  - [x] Adicionar `js_files_missing_ts_check[]` com lista completa
-  - [x] Atualizar `AREA_THRESHOLDS.overall` de `90` → `100`
-- [x] Atualizar **`scripts/analysis/jsdoc_coverage_engine.mjs`**:
-  - [x] Adicionar `public_any_tags_total` e `public_unknown_tags_total` no shape do relatório
-- [x] Atualizar **`scripts/analysis/jsdoc_coverage_cli.mjs`**:
-  - [x] Implementar flag `--gaps` (lista símbolos bloqueadores por lote)
-  - [x] Implementar flag `--fail-on-any-gap` (exit 1 se qualquer métrica > 0)
-  - [x] Bump de schema para `3.1.0`
-- [x] Atualizar **`scripts/ci/verify-skills-governance.mjs`**:
-  - [x] Verificar que `strict-lane-governance` e `vue-tsc-dashboard` existem e têm `SKILL.md`
-
-### Tarefas — package.json e Makefile
-
-- [x] **package.json** — scripts adicionados/atualizados:
-  - [x] `typecheck:dashboard` — `vue-tsc --noEmit` no workspace `src/dashboard-ui`
-  - [x] `typecheck:repo` — atualizado para incluir `&& npm run typecheck:dashboard`
-  - [x] `analyze:typing:gaps` — `typing_hardening_audit.mjs --format console --show-gaps`
-  - [x] `jsdoc:coverage:gaps` — `jsdoc_coverage_cli.mjs --scope full --format console --gaps`
-  - [x] `check:ts-expect-error` — `node scripts/ci/check-ts-expect-error.mjs`
-  - [x] `check:base-strict` — `node scripts/ci/check-base-strict.mjs`
-- [x] **Makefile** — targets adicionados:
-  - [x] `typecheck-dashboard`, `typecheck-repo`, `analyze-typing-gaps`, `jsdoc-gaps`,
-        `check-ts-expect-error`, `check-base-strict`, `typing-fullstrict-check`
-
-### Critério de saída da Fase 0
-
-- [x] `analyze:typing:gaps` lista exatamente os 29 arquivos sem check (15 ativos + 14 legacy)
-- [x] `jsdoc:coverage:gaps` lista todos os 891 issues abertos
-- [x] Schema validado na versão `3.1.0`
-
----
-
-## Fase 1 — Cobertura total de superfície
-
-**Objetivo**: todo arquivo elegível entra em algum verificador; nenhum código rastreado fica fora do
-radar.
-
-### Tarefas — `@ts-check`
-
-- [x] Adicionar `// @ts-check` nos **15 arquivos ativos** sem cobertura:
-  - [x] `scripts/analysis/analyze-code-graph.js`
-  - [x] `scripts/analysis/audit-tmp-scripts.js`
-  - [x] `scripts/health/test-health-logic.js`
-  - [x] `scripts/ops/rotate-profiles.js`
-  - [x] `scripts/validate_config.js`
-  - [x] `tests/e2e/test_ariadne_thread.spec.js`
-  - [x] `tests/e2e/test_boot_sequence.spec.js`
-  - [x] `tests/e2e/test_integration_complete.spec.js`
-  - [x] `tests/integration/rag/test_multi_llm_integration.spec.js`
-  - [x] `tests/manual/test_chrome_proxy_integration.js`
-  - [x] `tests/unit/agent/test_artifacts_attempts.spec.js`
-  - [x] `tests/unit/agent/test_ssot_consolidation.spec.js`
-  - [x] `tests/unit/agent/test_ssot_orchestration_worker.spec.js`
-  - [x] `tests/unit/nerv/test_envelope.spec.js`
-  - [x] `tests/unit/server/test_api_workflow_results_breaking.spec.js`
-- [x] Adicionar `// @ts-check` nos **14 arquivos de `tests/legacy/`**; suprimir erros irrecuperáveis
-      com `// @ts-ignore` + comentário justificando (proibido suprimir sem contexto)
-
-### Tarefas — tsconfigs
-
-- [x] **`tsconfig.tools.json`**: substituir lista de 14 arquivos explícitos por
-      `include: ["scripts/**/*"]` com `exclude` padronizado para `dist/`, `coverage/`, `tmp/`,
-      `node_modules/`
-- [x] **`tsconfig.tests.json`**: substituir lista de 7 arquivos por `include: ["tests/**/*"]` com
-      exclude adequado
-- [x] **`tsconfig.node.json`**: remover os 7 arquivos de scripts que sobrepõem com
-      `tsconfig.tools.json` — cobrir apenas `src/**/*` + `*.config.*` + `.puppeteerrc.cjs`
-
-### Tarefas — Dashboard Vue
-
-- [x] Instalar no workspace `src/dashboard-ui`:
-  ```
-  npm install -D vue-tsc @vue/tsconfig --workspace src/dashboard-ui
-  ```
-- [x] Criar `src/dashboard-ui/tsconfig.json`:
-  - `extends: "@vue/tsconfig/tsconfig.dom.json"`
-  - `compilerOptions.strict: true`, `verbatimModuleSyntax: true`, `allowImportingTsExtensions: true`
-  - `include: ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue", "src/**/*.js"]`
-- [x] Adicionar `typecheck:dashboard` no `package.json` raiz:
-  ```
-  npm --workspace src/dashboard-ui exec -- vue-tsc --noEmit -p src/dashboard-ui/tsconfig.json
-  ```
-- [x] Expandir `typecheck:repo` para incluir `typecheck:dashboard`
-- [x] Tipar configs do dashboard:
-  - [x] `src/dashboard-ui/vite.config.js`: `@ts-check` + `import { defineConfig } from 'vite'`
-  - [x] `src/dashboard-ui/tailwind.config.js`: `/** @type {import('tailwindcss').Config} */`
-  - [x] `src/dashboard-ui/postcss.config.js`: `/** @type {Record<string, object>} */`
-
-### Critério de saída da Fase 1
-
-- [x] `@ts-check` = 100 % em todos os `.js/.mjs/.cjs` elegíveis
-- [x] `typecheck:dashboard` executa `vue-tsc --noEmit` sem pânico de config ausente
-- [x] `typecheck:repo` (expandido) passa por todas as superfícies
-- [x] `strict_uncovered_files_total = 0` (todo arquivo ativo em algum config)
-
----
-
-## Fase 2 — Fechamento do backlog JSDoc por pasta
-
-> **Status** (atualizado): **Subfase 2.a concluída** — `unsafe_generic_tags_total: 586 → 0` ✅.
-> Engine atualizada: `UNSAFE_GENERIC_IN_TYPE_RE` agora analisa apenas posições de tipo (`{...}`),
-> evitando falsos positivos de descrições. **Pendente** para próximas sessões:
+> **[`../TIPAGEM E JSDOC/ROADMAP.md`](../TIPAGEM%20E%20JSDOC/ROADMAP.md)**
 >
-> - `functions_missing_param_tags: 118` (Subfase 2.c)
-> - `functions_missing_options_typedef: 171` (Subfase 2.b)
+> Todos os dados de baseline, checklist de fases e estimativas estão lá. O hub completo está em
+> `DOCUMENTAÇÃO/TIPAGEM E JSDOC/`.
 
-**Objetivo**: zerar os três indicadores de qualidade em cada pasta antes de avançar para a próxima.
-
-### Regras de execução (skill `jsdoc-authoring`)
-
-- Nenhum `Object`, `Array`, `Function`, `Promise<any>` em tag pública quando o shape é conhecível
-- Typedef local para options object com 1 uso; promoção para `src/types/**` somente quando
-  compartilhado em 2+ módulos distintos
-- Usar `@import` quando o tipo já existe em outro arquivo
-- `@template` apenas quando a API é genuinamente genérica
-- `@satisfies` para object literals que devem satisfazer um tipo compartilhado sem widening
-- Nunca alterar comportamento de runtime para simplificar a documentação
-
-### Ordem obrigatória (maior backlog primeiro)
-
-#### 1. `src/infra` — 318 issues
-
-- [ ] Missing `@param` (73 funções): documentar todos os parâmetros com tipo explícito
-- [ ] Missing `options typedef` (58 funções): criar `@typedef {object} NomeDaOpcaoOptions` local ou
-      importar de `src/types/infra/augmentations.d.ts`
-- [ ] `unsafe_generic` (187 tags): substituir `Object`/`Array` por `Record<string, unknown>`, unions
-      ou interfaces locais
-- [ ] Critério de saída: `missing_param = 0 && missing_typedef = 0 && unsafe_generic = 0` em
-      `src/infra`
-
-#### 2. `scripts/audit` — 121 issues
-
-- [ ] Missing `options typedef` (30 funções): payloads de auditoria que usam `Object` genérico no
-      `runner.mjs` e ferramentas de publish
-- [ ] `unsafe_generic` (91 tags): typedefs para payloads do audit agent
-- [ ] Critério de saída: `missing_typedef = 0 && unsafe_generic = 0` em `scripts/audit`
-
-#### 3. `src/server` — 86 issues
-
-- [ ] Missing `@param` (28 funções): rotas e middlewares Express com params não tipados
-- [ ] Missing `options typedef` (20 funções): options de Socket.io e configurações de servidor
-- [ ] `unsafe_generic` (38 tags)
-- [ ] Critério de saída: três indicadores em zero em `src/server`
-
-#### 4. `src/nerv` — 46 issues
-
-- [ ] Missing `options typedef` (23 funções): payloads de eventos NERV usando `Object` genérico →
-      criar typedefs de evento em `src/types/nerv/augmentations.d.ts`
-- [ ] `unsafe_generic` (22 tags)
-- [ ] Critério de saída: três indicadores em zero em `src/nerv`
-
-#### 5. `src/agent` — 55 issues
-
-- [ ] Missing `@param` (6 funções)
-- [ ] Missing `options typedef` (12 funções): workers com callbacks e payloads genéricos
-- [ ] `unsafe_generic` (37 tags)
-- [ ] Critério de saída: três indicadores em zero em `src/agent`
-
-#### 6. `src/core` — 82 issues
-
-- [ ] Missing `@param` (3 funções)
-- [ ] Missing `options typedef` (10 funções)
-- [ ] `unsafe_generic` (69 tags): atenção — 158 exports, maioria constantes; verificar se
-      `unsafe_generic` vêm de enums/constantes com tipo fraco
-- [ ] Critério de saída: três indicadores em zero em `src/core`
-
-#### 7. `src/integration` — 29 issues
-
-- [ ] Missing `@param` (2 funções)
-- [ ] Missing `options typedef` (7 funções)
-- [ ] `unsafe_generic` (20 tags)
-- [ ] Critério de saída: três indicadores em zero em `src/integration`
-
-#### 8. `src/dashboard-ui` — 24 issues
-
-- [ ] Missing `@param` (8 funções): componentes Vue com props não tipadas
-- [ ] Missing `options typedef` (6 funções): stores Pinia com estado genérico
-- [ ] `unsafe_generic` (10 tags)
-- [ ] Critério de saída: três indicadores em zero em `src/dashboard-ui`
-
-#### 9. Backlog menor
-
-- [ ] `tests/helpers` (6 param + 1 typedef + 5 unsafe)
-- [ ] `scripts/analysis` — scripts de auditoria com tags genéricas
-- [ ] `scripts/env`, `scripts/ops`
-- [ ] Restos pontuais: `src/driver` (18 unsafe), `src/kernel` (8), `src/logic` (9)
-
-### Critério de saída da Fase 2 (via `jsdoc:coverage:json`)
-
-- [ ] `functions_missing_param_tags = 0`
-- [ ] `functions_missing_options_typedef = 0`
-- [ ] `unsafe_generic_tags_total = 0`
+> **Status de governança**: Este documento é atualizado a cada sessão de trabalho. Todo tick ✅
+> exige que o código correspondente esteja commitado. Nenhuma métrica é marcada verde sem evidência
+> verificável.
 
 ---
 
-## Fase 3 — Substituição das lanes simbólicas por lanes reais
+## O que foi feito até aqui
 
-**Objetivo**: trocar os 8 arquivos-âncora simbólicos por lanes cobrindo subtrees completos.
+Sessões anteriores aplicaram `// @ts-nocheck` em ~127 arquivos para produzir "verde falso" nas lanes
+strict. Isso foi **revertido** nesta sessão: todos os arquivos agora têm `// @ts-check` ativo e
+nenhum tem `// @ts-nocheck` (exceto `scripts/dist/` gerado e `.backup`).
 
-### Estrutura das novas lanes
+O baseline real medido após a restauração está a seguir.
 
-Todas as lanes herdam da config de família correspondente com:
+---
 
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
-    "useUnknownInCatchVariables": true,
-    "composite": true
-  }
+## Baseline real — 4 de março de 2026
+
+### Estado geral
+
+| Indicador                           | Valor         | Nota                                           |
+| ----------------------------------- | ------------- | ---------------------------------------------- |
+| Arquivos JS/MJS com `@ts-check`     | **640 / 640** | 100 % ✅ restaurado nesta sessão                |
+| `functions_missing_param_tags`      | **0**         | ✅ formal — qualidade dos tipos é problema real |
+| `functions_missing_options_typedef` | **0**         | ✅ formal                                       |
+| `unsafe_generic_tags_total`         | **0**         | ✅ formal                                       |
+| `typecheck:node` (sem strict)       | **2.170**     | Erros mesmo sem flags strict                   |
+| `typecheck:strict:all`              | **7.414**     | Com flags strict nas lanes                     |
+
+### Baseline por lane strict
+
+| Lane                    | Erros | Fase    |
+| ----------------------- | ----: | ------- |
+| `src.types`             |     0 | ✅ verde |
+| `agents`                |     0 | ✅ verde |
+| `scripts.ci`            |     0 | ✅ verde |
+| `scripts.setup`         |     0 | ✅ verde |
+| `tests.helpers`         |     0 | ✅ verde |
+| `scripts.build`         |     0 | ✅ verde |
+| `scripts.env`           |     0 | ✅ verde |
+| `src.validation`        |     0 | ✅ verde |
+| `tests.mocks`           |     0 | ✅ verde |
+| `src.logic`             |     2 | Fase A  |
+| `scripts.analysis`      |   181 | Fase A  |
+| `src.inference_gateway` |   191 | Fase A  |
+| `src.dashboard-ui`      |   285 | Fase A  |
+| `tests.manual`          |   300 | Fase A  |
+| `src.audit_agent`       |   358 | Fase A  |
+| `src.nerv`              |   439 | Fase B  |
+| `scripts.health`        |   441 | Fase B  |
+| `src.missions`          |   608 | Fase B  |
+| `src.shared`            |   746 | Fase B  |
+| `src.orchestrator`      |   773 | Fase B  |
+| `src.integration`       |   924 | Fase B  |
+| `scripts.audit`         |   928 | Fase B  |
+| `scripts.root`          |   935 | Fase B  |
+| `tools.workspace`       | 1.013 | Fase B  |
+| `src.core`              | 1.053 | Fase B  |
+| `src.agent`             | 1.190 | Fase B  |
+| `tests.legacy`          | 1.403 | Fase C  |
+| `src.kernel`            | 1.530 | Fase C  |
+| `src.driver`            | 1.558 | Fase C  |
+| `src.infra`             | 2.232 | Fase C  |
+
+---
+
+## Análise dos erros — distribuição e causas
+
+### Distribuição global (strict:all = 7.414 erros)
+
+| Código TS   |   Qtd | O que significa                         | Flag / causa                 |
+| ----------- | ----: | --------------------------------------- | ---------------------------- |
+| **TS2339**  | 3.448 | Propriedade não existe no tipo          | Nenhuma — presente sempre    |
+| **TS7006**  | 1.353 | Parâmetro sem tipo (implicitly `any`)   | `noImplicitAny`              |
+| **TS18046** |   602 | `catch(e)` — e é `unknown`              | `useUnknownInCatchVariables` |
+| **TS7005**  |   147 | Variável sem tipo inferível             | `noImplicitAny`              |
+| **TS7031**  |   101 | Binding element sem tipo                | `noImplicitAny`              |
+| **TS7034**  |    74 | Elemento de array sem tipo              | `noImplicitAny`              |
+| **TS2345**  |   308 | Argumento de tipo incompatível          | Cascata de TS2339            |
+| **TS2322**  |   257 | Atribuição de tipo incompatível         | Cascata de TS2339            |
+| **TS18047** |   220 | Valor possivelmente `null`              | `strictNullChecks`           |
+| **TS18048** |    25 | Valor possivelmente `undefined`         | `strictNullChecks`           |
+| **TS8032**  |   177 | JSDoc malformado (param destrutturado)  | Estrutural — não flag        |
+| **TS8024**  |    37 | JSDoc @param fora de ordem              | Estrutural — não flag        |
+| **outros**  |  ~665 | TS2304, TS2353, TS7053, TS2741, TS2571… | Variados                     |
+
+### Insight central: TS2339 é o problema raiz (46% dos erros)
+
+**3.448 dos 7.414 erros** são TS2339. Este erro dispara em **qualquer modo** — inclusive sem
+`strict`. Significa que objetos não têm shape tipado e acessamos propriedades não declaradas neles.
+Causas:
+
+1. **Payloads NERV** — emitidos como `{}`, recebidos sem typedef
+2. **JSON.parse()** sem anotação de tipo
+3. **Parâmetros `{Object}`, `{any}`, `{*}`** — tipos vagos que o formal `param=0` não detecta
+4. **Resultados de DB** sem typedef de retorno
+5. **Config objects** sem shape declarado
+
+Fixar TS2339 via typedefs é a maior alavanca: resolve ~3.448 erros sem depender de nenhuma flag
+strict adicional.
+
+---
+
+## Análise de viabilidade das flags TypeScript
+
+Esta é a análise de quais flags são aplicáveis ao **projeto inteiro** (JS-first, Node.js 24+, ESM).
+
+### Flags viáveis — do mais simples ao mais complexo
+
+| Flag                         | Erros diretos | Padrão de correção                                  | Dificuldade |
+| ---------------------------- | ------------: | --------------------------------------------------- | ----------- |
+| `useUnknownInCatchVariables` |           602 | `const e = /** @type {any} */ (err);` — sistemático | **Baixa**   |
+| `noImplicitReturns`          |           ~30 | Adicionar `return` explícito onde falta             | **Baixa**   |
+| `strictFunctionTypes`        |           ~50 | Corrigir assinaturas de callbacks incompatíveis     | **Baixa**   |
+| `noImplicitAny`              |         1.675 | @param em callbacks e variáveis — sistemático       | **Média**   |
+| `strictNullChecks`           |           245 | `?.`, `?? default`, guards `if (x === null)`        | **Média**   |
+
+Após corrigir TS2339 (via typedefs — trabalho de qualidade JSDoc), as contagens acima diminuem
+porque muitos TS2345/TS2322 actualmente contados como "cascata" desaparecem.
+
+### Sequência recomendada de ativação de flags na base
+
+```
+1. [base atual]              → strict: false, checkJs: true  (baseline)
+2. useUnknownInCatchVariables → 602 erros → pattern fix sistemático
+3. noImplicitAny              → ~1.675 erros → @param sistemático
+4. strictNullChecks           → ~245 erros → null guards
+5. strict: true               → todos os anteriores + strictFunctionTypes etc.
+```
+
+### Flags NÃO recomendadas para este projeto agora
+
+| Flag                         | Motivo                                                           |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `noUncheckedIndexedAccess`   | Inflaria erros em todo array/object access — refatoração massiva |
+| `exactOptionalPropertyTypes` | Incompatível com padrões de options-object atuais                |
+
+---
+
+## Plano de execução — 4 fases progressivas + preparação
+
+### Fase 0 — Preparação: JSDoc estrutural (214 erros sem flag)
+
+**Objetivo**: corrigir TS8032 e TS8024 que são erros de estrutura JSDoc, não de flags.
+
+#### Padrão TS8032 — parâmetro desestruturado sem @param pai
+
+```js
+// ANTES (gera TS8032):
+/**
+ * @param {string} params.taskId    ← erro: sem @param {object} params primeiro
+ * @param {string} params.status
+ */
+function foo(params) { ... }
+
+// DEPOIS (correto):
+/**
+ * @param {object} params
+ * @param {string} params.taskId
+ * @param {string} params.status
+ */
+function foo(params) { ... }
+```
+
+**Tarefas**:
+
+- [ ] Listar todos: `npm run typecheck:node 2>&1 | grep "TS8032"` → 177 ocorrências
+- [ ] Corrigir adicionando `@param {object} params` antes dos sub-params em cada arquivo
+- [ ] Corrigir TS8024 (37 ocorrências) — reordenar @param errado
+
+**Gate**: `typecheck:node | grep -c "TS8032"` → 0
+
+---
+
+### Fase A — Lanes pequenas (≤ 400 erros cada)
+
+**Objetivo**: zerar 6 lanes com correções JSDoc reais.
+
+| Lane                    | Erros | Prioridade |
+| ----------------------- | ----: | :--------: |
+| `src.logic`             |     2 |     1      |
+| `scripts.analysis`      |   181 |     2      |
+| `src.inference_gateway` |   191 |     3      |
+| `src.dashboard-ui`      |   285 |     4      |
+| `tests.manual`          |   300 |     5      |
+| `src.audit_agent`       |   358 |     6      |
+
+#### Estratégia técnica por tipo de erro
+
+**TS2339** — propriedade não existe:
+
+```js
+// Fix 1: typedef local para shape conhecido
+/**
+ * @typedef {object} TaskPayload
+ * @property {string} id
+ * @property {'pending'|'running'|'done'|'error'} status
+ */
+/** @returns {Promise<TaskPayload|null>} */
+async function getTask(id) { ... }
+
+// Fix 2: cast para acesso dinâmico legítimo
+const val = (/** @type {Record<string, unknown>} */ (obj))[key];
+```
+
+**TS18046** — catch unknown:
+
+```js
+try { ... } catch (err) {
+    const e = /** @type {any} */ (err);
+    log.error(e.message);
 }
 ```
 
-#### Lanes `src/**` — herdam de `tsconfig.node.json`
+**TS7006** — parâmetro sem tipo:
 
-- [ ] `tsconfig.strict.src.agent.json` → `include: ["src/agent/**/*"]`
-- [ ] `tsconfig.strict.src.audit_agent.json` → `include: ["src/audit_agent/**/*"]`
-- [ ] `tsconfig.strict.src.core.json` → `include: ["src/core/**/*"]` _(substitui âncora)_
-- [ ] `tsconfig.strict.src.driver.json` → `include: ["src/driver/**/*"]`
-- [ ] `tsconfig.strict.src.inference_gateway.json` → `include: ["src/inference_gateway/**/*"]`
-- [ ] `tsconfig.strict.src.infra.json` → `include: ["src/infra/**/*"]` _(substitui âncora)_
-- [ ] `tsconfig.strict.src.integration.json` → `include: ["src/integration/**/*"]` _(substitui
-      âncora)_
-- [ ] `tsconfig.strict.src.kernel.json` → `include: ["src/kernel/**/*"]`
-- [ ] `tsconfig.strict.src.logic.json` → `include: ["src/logic/**/*"]`
-- [ ] `tsconfig.strict.src.missions.json` → `include: ["src/missions/**/*"]`
-- [ ] `tsconfig.strict.src.nerv.json` → `include: ["src/nerv/**/*"]`
-- [ ] `tsconfig.strict.src.orchestrator.json` → `include: ["src/orchestrator/**/*"]`
-- [ ] `tsconfig.strict.src.server.json` → `include: ["src/server/**/*"]` _(substitui âncora)_
-- [ ] `tsconfig.strict.src.shared.json` → `include: ["src/shared/**/*"]`
-- [ ] `tsconfig.strict.src.types.json` → `include: ["src/types/**/*"]`
-- [ ] `tsconfig.strict.src.validation.json` → `include: ["src/validation/**/*"]`
-- [ ] `tsconfig.strict.src.root.json` → `files: ["src/main.js", ...]` para arquivos avulsos em
-      `src/`
+```js
+// Em callbacks:
+items.forEach(/** @param {TaskRecord} item */ item => item.name);
+```
 
-#### Lanes `scripts/**` — herdam de `tsconfig.tools.json`
+#### Checklist Fase A
 
-- [ ] `tsconfig.strict.scripts.analysis.json`
-- [ ] `tsconfig.strict.scripts.audit.json`
-- [ ] `tsconfig.strict.scripts.ci.json`
-- [ ] `tsconfig.strict.scripts.build.json`
-- [ ] `tsconfig.strict.scripts.env.json`
-- [ ] `tsconfig.strict.scripts.health.json`
-- [ ] `tsconfig.strict.scripts.ops.json`
-- [ ] `tsconfig.strict.scripts.setup.json`
-- [ ] `tsconfig.strict.scripts.legacy.json`
-- [ ] `tsconfig.strict.scripts.root.json`
-
-#### Lanes `tests/**` — herdam de `tsconfig.tests.json`
-
-- [ ] `tsconfig.strict.tests.unit.json`
-- [ ] `tsconfig.strict.tests.integration.json`
-- [ ] `tsconfig.strict.tests.regression.json`
-- [ ] `tsconfig.strict.tests.e2e.json`
-- [ ] `tsconfig.strict.tests.helpers.json`
-- [ ] `tsconfig.strict.tests.fixtures.json`
-- [ ] `tsconfig.strict.tests.mocks.json`
-- [ ] `tsconfig.strict.tests.manual.json`
-- [ ] `tsconfig.strict.tests.legacy.json`
-
-#### Configs de raiz
-
-- [ ] `tsconfig.strict.configs.json` → configs de raiz (`*.config.*`, `.puppeteerrc.cjs`) + configs
-      do dashboard
-
-#### Solution file e scripts
-
-- [ ] Atualizar `tsconfig.strict.json` para referenciar todas as novas lanes
-- [ ] Remover âncoras antigas assim que a lane real da mesma família estiver verde
-- [ ] Atualizar scripts `typecheck:strict:*` no `package.json` — um por lane nova
-- [ ] Atualizar `typecheck:strict:all` como cadeia completa de todas as lanes
-
-### Critério de saída da Fase 3
-
-- [ ] `tsconfig.strict.json` referencia somente lanes com subtree real
-- [ ] `strict_uncovered_files_total = 0` (todo arquivo ativo em alguma lane)
-- [ ] Nenhuma lane com um único arquivo-âncora simbólico
+- [ ] `src.logic`: 2 → 0 (gate: `npm run typecheck:strict:src.logic`)
+- [ ] `scripts.analysis`: 181 → 0
+- [ ] `src.inference_gateway`: 191 → 0
+  - Typedefs: OllamaResponse, PolicyConfig, ProfileRecord, InferenceRequest
+  - Tipos de retorno em todos os `*_repo.js`
+- [ ] `src.dashboard-ui`: 285 → 0
+  - Tipar state de stores Pinia explicitamente
+  - Tipar `ref()` e `computed()` em composables
+- [ ] `tests.manual`: 300 → 0
+  - `/** @type {any} */` em asserções onde tipo exato não importa
+- [ ] `src.audit_agent`: 358 → 0
+  - Typedefs: AuditJob, AuditFinding, AuditPatch, JobRun
 
 ---
 
-## Fase 4 — Remediação strict por domínio
+### Fase B — Lanes médias (500–1.300 erros cada)
 
-**Objetivo**: corrigir erros de `tsc -p tsconfig.strict.src.<dominio>.json` em cada lane até zero.
+**Objetivo**: zerar 11 lanes. Após Fase A, cascatas de TS2339 já terão reduzido.
 
-### Estratégia técnica (skill `typing-node24-esm-tsserver`)
+| Lane               | Erros | Prioridade |
+| ------------------ | ----: | :--------: |
+| `src.nerv`         |   439 |     1      |
+| `scripts.health`   |   441 |     2      |
+| `src.missions`     |   608 |     3      |
+| `src.shared`       |   746 |     4      |
+| `src.orchestrator` |   773 |     5      |
+| `src.integration`  |   924 |     6      |
+| `scripts.audit`    |   928 |     7      |
+| `scripts.root`     |   935 |     8      |
+| `tools.workspace`  | 1.013 |     9      |
+| `src.core`         | 1.053 |     10     |
+| `src.agent`        | 1.190 |     11     |
 
-- Substituir `any` por: unions, `Record<string, unknown>`, typedefs locais, tipos importados, guards
-  explícitos
-- Manter `unknown` apenas em bordas inseguras com narrowing no mesmo módulo
-- Promover para `src/types/**` somente quando o tipo for compartilhado em 2+ módulos distintos
-- Usar `@import` quando o tipo já existe em outro arquivo
-- SFCs Vue: migrar para `<script setup lang="ts">` onde `vue-tsc` exigir
-- **Proibido**: enfraquecer lanes strict para esconder erros; usar `@ts-ignore` sem comentário
+#### Foco especial
 
-### Ordem de execução (mesma da Fase 2)
+**src.nerv** — payloads de eventos são o problema central:
 
-- [ ] `src/infra`
-- [ ] `src/server`
-- [ ] `src/agent` + `src/core`
-- [ ] `src/nerv`
-- [ ] `src/integration`
-- [ ] `scripts/audit`
-- [ ] `scripts` restantes
-- [ ] `tests`
-- [ ] `dashboard-ui`
-- [ ] `legacy`
+- Criar `src/types/nerv/events.d.ts` com todos os payloads de evento
+- Usar `/** @typedef {import('#types/nerv/events').NervPayload} NervPayload */` nos emissores
 
-### Critério de saída da Fase 4
+**src.core** — objetos de configuração:
 
-- [ ] Cada lane strict passa isoladamente: `tsc -p tsconfig.strict.src.<dominio>.json` sem erros
-- [ ] `typecheck:strict:all` passa como agregador completo
+- Typedef para o shape completo de `ConfigShape`, `RuntimeContext`
 
----
+**src.agent** — workers com callbacks:
 
-## Fase 5 — Convergência da base para strict verdadeiro
+- Maior concentração de TS7006 (callbacks de fila, watchdogs)
+- Typedef: TaskAttempt, MissionState, AgentContext
 
-**Objetivo**: eliminar a dualidade "base permissiva + strict paralelo".
+#### Checklist Fase B
 
-### Tarefas
-
-- [ ] Adicionar ao `tsconfig.base.json`:
-  ```json
-  {
-    "compilerOptions": {
-      "strict": true,
-      "noImplicitAny": true,
-      "noImplicitReturns": true,
-      "useUnknownInCatchVariables": true
-    }
-  }
-  ```
-- [ ] Remover overrides redundantes nos configs derivados (as lanes que já explicitavam essas flags
-      podem simplificar)
-- [ ] Verificar (e corrigir) que `typecheck:node`, `typecheck:tools`, `typecheck:tests`,
-      `typecheck:browser` passam com strict herdado da base
-- [ ] **Avaliar agora** adicionar `noUncheckedIndexedAccess` e `exactOptionalPropertyTypes` — com o
-      backlog zerado, o risco de regressão é mínimo
-- [ ] Atualizar `DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md` refletindo que a base agora é
-      estrita
-
-### Critério de saída da Fase 5
-
-- [ ] `tsconfig.base.json` com `strict: true`
-- [ ] `typecheck:node`, `typecheck:tools`, `typecheck:tests`, `typecheck:browser` todos verdes com
-      strict por herança
-- [ ] Nenhum config de uso regular depende de `strict: false`
+- [ ] `src.nerv`: 439 → 0
+- [ ] `scripts.health`: 441 → 0
+- [ ] `src.missions`: 608 → 0
+- [ ] `src.shared`: 746 → 0
+- [ ] `src.orchestrator`: 773 → 0
+- [ ] `src.integration`: 924 → 0
+- [ ] `scripts.audit`: 928 → 0
+- [ ] `scripts.root`: 935 → 0
+- [ ] `tools.workspace`: 1.013 → 0
+- [ ] `src.core`: 1.053 → 0
+- [ ] `src.agent`: 1.190 → 0
 
 ---
 
-## Fase 6 — Declaration emit completo da superfície pública
+### Fase C — Lanes grandes (> 1.300 erros cada)
 
-**Objetivo**: a API pública de `src/**` emite declarações usáveis e precisas sem `any` evitável.
+**Objetivo**: zerar 4 lanes maiores. src.infra é a FUNDAÇÃO — seus tipos cascateiam para todo o
+projeto.
 
-### Tarefas
+| Lane           | Erros | Estratégia especial                                   |
+| -------------- | ----: | ----------------------------------------------------- |
+| `tests.legacy` | 1.403 | @ts-ignore linha por linha com justificativa (legado) |
+| `src.kernel`   | 1.530 | Loop de execução — typedefs de estado e contexto      |
+| `src.driver`   | 1.558 | Puppeteer — augmentar tipos de Page, Browser, Element |
+| `src.infra`    | 2.232 | **Corrigir primeiro** — fundação do projeto           |
 
-- [ ] Expandir `tsconfig.declarations.json` dos 2 arquivos atuais para toda a superfície pública
-      Node-side relevante:
-  - [ ] Adicionar `src/shared/**`
-  - [ ] Adicionar `src/inference_gateway/**`
-  - [ ] Adicionar `src/audit_agent/**`
-  - [ ] Adicionar `src/server/api/**`
-  - [ ] Adicionar `src/integration/lsp/**`
-  - [ ] Adicionar demais módulos com API consumível externamente
-  - [ ] Manter `exclude: ["src/dashboard-ui/**"]`
-- [ ] Corrigir tipos inferidos fracos nos `.d.ts` gerados em `tmp/types-public/`:
-  - [ ] `any` em retorno → tipo real via JSDoc
-  - [ ] Shapes vagos em parâmetros → typedef local ou promoção para `src/types/**`
+**Prioridade interna de src.infra** (do mais impactante ao menos):
 
-### Critério de saída da Fase 6
+1. `src/infra/db/*.js` — tipos de retorno de queries SQLite
+2. `src/infra/browser_pool/*.js` — tipos de Puppeteer
+3. `src/infra/queue/*.js` — TaskRecord, QueueEntry
+4. `src/infra/storage/*.js` — tipos de armazenamento
+5. `src/infra/locks/*.js`, `src/infra/fs/*.js` — mais simples
 
-- [ ] `typecheck:declarations` verde
-- [ ] `.d.ts` emitido em `tmp/types-public/` sem `any` evitável em APIs públicas
+**Para tests.legacy** — regra de qualidade:
 
----
+```js
+// PERMITIDO: @ts-ignore com justificativa
+// @ts-ignore // legacy: API removida na v2, código não migrado
+const result = oldApi.call();
 
-## Fase 7 — CI final bloqueante de 100 %
+// PROIBIDO: @ts-nocheck em qualquer arquivo (sem exceção)
+```
 
-**Objetivo**: congelar o estado final como contrato permanente de merge.
+#### Checklist Fase C
 
-### Expansão do workflow `jsdoc-typing.yml` — de 10 para 12 checks
-
-| #   | Check                       | Comando                                                    |
-| --- | --------------------------- | ---------------------------------------------------------- |
-| 1   | `typecheck-repo`            | `npm run typecheck:repo` (já inclui dashboard)             |
-| 2   | `typecheck-strict-all`      | `npm run typecheck:strict:all` (lanes reais)               |
-| 3   | `typecheck-declarations`    | `npm run typecheck:declarations`                           |
-| 4   | `typecheck-dashboard`       | `npm run typecheck:dashboard`                              |
-| 5   | `jsdoc-coverage`            | `jsdoc:coverage:json -- --validate-schema`                 |
-| 6   | `jsdoc-coverage-gaps`       | `jsdoc:coverage:json -- --gaps --fail-on-any-gap`          |
-| 7   | `check-schemas`             | `npm run check:schemas:typing`                             |
-| 8   | `analyze-typing`            | `npm run analyze:typing:json`                              |
-| 9   | `analyze-tsserver-contract` | `npm run analyze:tsserver-contract`                        |
-| 10  | `check-skills`              | `npm run check:skills:strict`                              |
-| 11  | `check-ts-expect-error`     | script que conta `@ts-expect-error` e falha se > allowlist |
-| 12  | `check-base-strict`         | script que verifica `strict: true` em `tsconfig.base.json` |
-
-### Tarefas
-
-- [ ] Atualizar `.github/workflows/jsdoc-typing.yml` com os 2 checks novos (11 e 12)
-- [ ] Criar `scripts/ci/check-ts-expect-error.mjs` — conta instâncias de `@ts-expect-error` fora de
-      allowlist formal; falha se `count > 0` (ou > threshold da allowlist)
-- [ ] Criar `scripts/ci/check-base-strict.mjs` — verifica que `tsconfig.base.json` tem
-      `strict:     true`; falha se ausente ou `false`
-- [ ] Adicionar `issues: write` + `pull-requests: write` ao job se PR comments forem adicionados
-      (padrão já estabelecido nos outros workflows)
-- [ ] Atualizar `DOCUMENTAÇÃO/REFERENCIA/TYPING_AUTOMATION_INDEX.md` com os novos gates e scripts
-
-### Critério de saída da Fase 7
-
-- [ ] Todo PR que degradar qualquer das 12 métricas falha na CI
-- [ ] `@ts-expect-error = 0` em estado limpo do repositório
-- [ ] Gates permanentes e automatizados sem intervenção manual
+- [ ] `src.infra`: 2.232 → 0 (**fazer primeiro**)
+- [ ] `src.kernel`: 1.530 → 0
+- [ ] `src.driver`: 1.558 → 0
+- [ ] `tests.legacy`: 1.403 → 0
 
 ---
 
-## Verificação de encerramento do programa
+### Fase D — Convergência da base e ativação progressiva de flags
 
-O programa está encerrado quando as **três condições** forem simultaneamente verdadeiras e todos os
-gates de CI estiverem verdes:
+**Objetivo**: após Fases A–C, medir superfícies regulares e ativar flags na base.
 
-- [ ] **Condição 1 — Cobertura**: `@ts-check` = 100 % em todos os `.js/.mjs/.cjs` elegíveis _e_
-      `vue-tsc` cobre todos os `.vue` do dashboard sem erros
-- [ ] **Condição 2 — Qualidade JSDoc**: `functions_missing_param_tags = 0`,
-      `functions_missing_options_typedef = 0`, `unsafe_generic_tags_total = 0`,
-      `public_any_tags_total = 0`
-- [ ] **Condição 3 — Strict real**: `tsconfig.base.json` com `strict: true` _e_ todos os typechecks
-      (`typecheck:node`, `typecheck:tools`, `typecheck:tests`, `typecheck:browser`,
-      `typecheck:dashboard`, `typecheck:strict:all`, `typecheck:declarations`) passando com strict
-      por herança da base
+#### D.1 — Re-medição após Fases A–C
+
+```bash
+npm run typecheck:node    # deve estar próximo de 0
+npm run typecheck:tools   # deve estar próximo de 0
+npm run typecheck:tests   # deve estar próximo de 0
+```
+
+#### D.2 — Ativação progressiva de flags em tsconfig.base.json
+
+**Etapa 1**: `useUnknownInCatchVariables: true`
+
+- 602 erros → padrão sistemático: `const e = /** @type {any} */ (err);`
+- Gate: `typecheck:strict:all` sem regressão
+
+**Etapa 2**: `noImplicitAny: true`
+
+- ~1.675 erros → @param em todos os callbacks
+- Gate: `typecheck:strict:all` sem regressão
+
+**Etapa 3**: `strictNullChecks: true`
+
+- ~245 erros diretos → null guards, optional chaining
+- Gate: `typecheck:strict:all` sem regressão
+
+**Etapa 4**: `strict: true` completo
+
+- Congela todos os flags acima + strictFunctionTypes + noImplicitReturns
+- Gate: `typecheck:strict:all` → 0 | `typecheck:node` → 0 | `check:base-strict` → OK
 
 ---
 
-## Referências técnicas
+## Regras de qualidade — o que é proibido e permitido
 
-- TypeScript `strict`: <https://www.typescriptlang.org/tsconfig/strict.html>
-- TypeScript `allowJs`: <https://www.typescriptlang.org/tsconfig/allowJs.html>
-- TypeScript `checkJs`: <https://www.typescriptlang.org/tsconfig/checkJs.html>
-- TypeScript `composite`: <https://www.typescriptlang.org/tsconfig/composite.html>
-- TSConfig Reference: <https://www.typescriptlang.org/tsconfig/>
-- Vue + TypeScript: <https://vuejs.org/guide/typescript/overview.html>
-- Vite config typing: <https://vite.dev/config/>
-- Documentação canônica local: `DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`
+| Proibido                                       | Permitido                                                |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| `// @ts-nocheck` em qualquer arquivo           | `/** @type {any} */ (expr)` — cast explícito justificado |
+| `// @ts-ignore` sem comentário na mesma linha  | `/** @type {Record<string, unknown>} */` — dinâmico real |
+| `{any}`, `{Object}`, `{*}` em tipos conhecidos | `// @ts-ignore // legacy: justificativa clara`           |
+| Marcar lane verde sem realmente corrigir       | `@template T` para APIs genuinamente genéricas           |
+| Silenciar em vez de corrigir                   | `/** @import { Tipo } from '#types/...' */` para reusar  |
+
+---
+
+## Checklist de progresso consolidado
+
+### Fase 0 — JSDoc estrutural (sem flag)
+
+- [ ] TS8032: 177 → 0
+- [ ] TS8024: 37 → 0
+
+### 9 lanes já verdes — manter ✅
+
+- [x] `src.types`, `agents`, `scripts.ci`, `scripts.setup`, `tests.helpers`
+- [x] `scripts.build`, `scripts.env`, `src.validation`, `tests.mocks`
+
+### Fase A — Lanes pequenas (6 lanes)
+
+- [ ] `src.logic`: 2 → 0
+- [ ] `scripts.analysis`: 181 → 0
+- [ ] `src.inference_gateway`: 191 → 0
+- [ ] `src.dashboard-ui`: 285 → 0
+- [ ] `tests.manual`: 300 → 0
+- [ ] `src.audit_agent`: 358 → 0
+
+### Fase B — Lanes médias (11 lanes)
+
+- [ ] `src.nerv`: 439 → 0
+- [ ] `scripts.health`: 441 → 0
+- [ ] `src.missions`: 608 → 0
+- [ ] `src.shared`: 746 → 0
+- [ ] `src.orchestrator`: 773 → 0
+- [ ] `src.integration`: 924 → 0
+- [ ] `scripts.audit`: 928 → 0
+- [ ] `scripts.root`: 935 → 0
+- [ ] `tools.workspace`: 1.013 → 0
+- [ ] `src.core`: 1.053 → 0
+- [ ] `src.agent`: 1.190 → 0
+
+### Fase C — Lanes grandes (4 lanes)
+
+- [ ] `src.infra`: 2.232 → 0
+- [ ] `tests.legacy`: 1.403 → 0
+- [ ] `src.kernel`: 1.530 → 0
+- [ ] `src.driver`: 1.558 → 0
+
+### Fase D — Base strict + superfícies regulares
+
+- [ ] `typecheck:node` → 0
+- [ ] `typecheck:tools` → 0
+- [ ] `typecheck:tests` → 0
+- [ ] `useUnknownInCatchVariables: true` em tsconfig.base.json — sem regressão
+- [ ] `noImplicitAny: true` em tsconfig.base.json — sem regressão
+- [ ] `strictNullChecks: true` em tsconfig.base.json — sem regressão
+- [ ] `strict: true` em tsconfig.base.json — sem regressão
+- [ ] `typecheck:strict:all` → 0
+
+---
+
+## Estimativa de esforço
+
+| Fase   | Erros diretos | Padrão dominante          | Sessões estimadas |
+| ------ | ------------: | ------------------------- | :---------------: |
+| Fase 0 |           214 | JSDoc estrutural          |         1         |
+| Fase A |         1.317 | TS2339 + TS18046          |        2–3        |
+| Fase B |         7.331 | TS2339 + TS7006 + TS18046 |        6–8        |
+| Fase C |         6.723 | TS2339 massiço            |        5–6        |
+| Fase D |          res. | Flags progressivas        |        2–3        |
+
+> **Nota importante sobre cascata**: corrigir um typedef numa camada base (ex:
+> `src/infra/db/task_repo.js`) pode eliminar dezenas de TS2339 em `src/agent/*.js` e
+> `src/missions/*.js`. O número real de **linhas modificadas** é muito menor que o número de erros
+> reportados.
+
+---
+
+## Referências
+
+- TypeScript `strict` mode: <https://www.typescriptlang.org/tsconfig/strict.html>
+- JSDoc com TypeScript: <https://www.typescriptlang.org/docs/handbook/jsdoc-supported-types.html>
+- `@param` para objetos desestruturados: <https://jsdoc.app/tags-param#parameters-with-properties>
 - Skill JSDoc: `.github/skills/jsdoc-authoring/SKILL.md`
 - Skill Typing: `.github/skills/typing-node24-esm-tsserver/SKILL.md`
-- Plano anterior (Fase 2): `DOCUMENTAÇÃO/PLANOS/TYPING_PHASE2_HARDENING_PLAN.md`

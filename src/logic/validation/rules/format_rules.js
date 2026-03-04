@@ -16,7 +16,7 @@
  * @param {AbortSignal} [signal] - Sinal de cancelamento opcional.
  * @returns {object} { ok: boolean, reason: string|null }
  */
-function validateJSON(content, signal = null) {
+function validateJSON(content, signal = undefined) {
     if (!content || typeof content !== 'string') {
         return { ok: false, reason: 'INVALID_INPUT: Conteúdo nulo ou inválido.' };
     }
@@ -45,7 +45,10 @@ function validateJSON(content, signal = null) {
                     found = true;
                     break;
                 } catch (e) {
-                    return { ok: false, reason: `JSON_CORRUPTED: Estrutura inválida. ${e.message}` };
+                    return {
+                        ok: false,
+                        reason: `JSON_CORRUPTED: Estrutura inválida. ${e instanceof Error ? e.message : String(e)}`,
+                    };
                 }
             }
         }
@@ -64,9 +67,9 @@ function validateJSON(content, signal = null) {
  * @param {string} content - Conteúdo a ser testado.
  * @param {string} patternStr - String da expressão regular.
  * @param {AbortSignal} [signal] - Sinal de cancelamento.
-  * @returns {boolean}
+ * @returns {{ ok: boolean, reason: string|null }}
  */
-function validateRegex(content, patternStr, signal = null) {
+function validateRegex(content, patternStr, signal = undefined) {
     if (!patternStr) {
         return { ok: true, reason: null };
     }
@@ -92,8 +95,8 @@ function validateRegex(content, patternStr, signal = null) {
 
 /**
  * Valida se o conteúdo respeita o formato Markdown (presença de blocos de código).
- * @param {*} content
-  * @returns {boolean}
+ * @param {string} content
+ * @returns {{ ok: boolean, reason: string|null }}
  */
 function validateMarkdownCode(content) {
     if (!content || !content.includes('```')) {

@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import createConnection from './connection.js';
 import * as framing from './framing.js';
 import createReconnect from './reconnect.js';
@@ -26,10 +26,6 @@ import createReconnect from './reconnect.js';
  * **Unidades:** Políticas de reconexão seguem typedef de createReconnect.
  *
  * @param {CreateTransportDeps} deps - Dependências do transporte
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @param {object} deps.adapter - Adaptador físico (IPC, socket, pipe)
- * @param {object} [deps.reconnect] - Política de reconexão opcional
- * @param {CreateTransportOptions} [options]
  * @returns {object} Transporte com métodos send, start, stop, onReceive
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

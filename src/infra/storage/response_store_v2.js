@@ -30,10 +30,6 @@ function _responseDir() {
  *
  * @param {string} taskId - Task ID
  * @param {SaveResponseV2ResponseData} responseData - Response V2 data
- * @param {object} responseData.content - { text, markdown, html, json }
- * @param {object} responseData.generation - Generation metadata
- * @param {object} responseData.validation - Validation (nullable)
- * @param {object} responseData.preview - Preview estruturado
  * @param {{ attemptId?: string|null, writeLegacyLatest?: boolean }=} opts
  * @param {SaveResponseV2Options} [opts]
  * @returns {Promise<object>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile, htmlFile} }

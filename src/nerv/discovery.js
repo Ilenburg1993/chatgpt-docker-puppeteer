@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { log } from '#core/logger';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 import { ActionCode, ActorRole } from '#shared/nerv/constants';
@@ -68,7 +68,6 @@ function unpublishServerReady() {
  *
  * @param {WaitForServerReadyNerv} nerv - Instância NERV com método onEvent
  * @param {WaitForServerReadyOptions} [options={}] - Opções de configuração
- * @param {number} [options.timeoutMs=10000] - Timeout em milissegundos
  * @returns {Promise<object>} Payload do envelope SERVER_READY
  * @throws {Error} Se NERV não tem onEvent ou timeout expirar
  */

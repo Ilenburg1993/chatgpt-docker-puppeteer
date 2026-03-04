@@ -15,6 +15,10 @@ import { requireInferenceClientTag } from './client_tags.js';
  * }} InferenceGatewayMetrics
  */
 
+/**
+ * @param {string} name
+ * @param {number} fallback
+ */
 function parsePositiveIntEnv(name, fallback) {
     const n = Number(process.env[name]);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
@@ -105,6 +109,10 @@ export class InferenceGateway {
         };
     }
 
+    /**
+     * @param {string} clientTag
+     * @param {string} operation
+     */
     _bumpMetric(clientTag, operation) {
         this.metrics.byClientTag[clientTag] = (this.metrics.byClientTag[clientTag] || 0) + 1;
         this.metrics.byOperation[operation] = (this.metrics.byOperation[operation] || 0) + 1;
@@ -113,17 +121,22 @@ export class InferenceGateway {
         if (operation === 'listModels') this.metrics.listModels = (this.metrics.listModels || 0) + 1;
     }
 
+    /**
+     * @param {string} clientTag
+     * @param {number} maxParallel
+     */
     _acquire(clientTag, maxParallel) {
         const current = this._inFlightByClient.get(clientTag) || 0;
         if (current >= maxParallel) {
             const err = new Error(`limite de concorrência excedido para ${clientTag}`);
-            /** @type {unknown} */ (err).code = 'INFERENCE_CONCURRENCY_LIMIT';
-            /** @type {unknown} */ (err).statusCode = 429;
+            /** @type {any} */ (err).code = 'INFERENCE_CONCURRENCY_LIMIT';
+            /** @type {any} */ (err).statusCode = 429;
             throw err;
         }
         this._inFlightByClient.set(clientTag, current + 1);
     }
 
+    /** @param {string} clientTag */
     _release(clientTag) {
         const current = this._inFlightByClient.get(clientTag) || 0;
         if (current <= 1) {
@@ -141,8 +154,8 @@ export class InferenceGateway {
         const clientPolicy = this.clientPolicies[clientTag] || null;
         const profileName = String(
             options?.profileName ||
-                /** @type {unknown} */ (clientPolicy)?.profile_name ||
-                /** @type {unknown} */ (clientPolicy)?.profileName ||
+                /** @type {any} */ (clientPolicy)?.profile_name ||
+                /** @type {any} */ (clientPolicy)?.profileName ||
                 ''
         ).trim();
         return resolveInferencePolicy({
@@ -199,8 +212,8 @@ export class InferenceGateway {
         });
         if (!routeCheck.ok) {
             const err = new Error(routeCheck.reason || 'rota inválida');
-            /** @type {unknown} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
-            /** @type {unknown} */ (err).statusCode = 403;
+            /** @type {any} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
+            /** @type {any} */ (err).statusCode = 403;
             throw err;
         }
 
@@ -209,7 +222,7 @@ export class InferenceGateway {
         this._bumpMetric(clientTag, 'generate');
         try {
             const maxTokens = request.maxTokens ?? policy.effective.maxTokens ?? undefined;
-            const result = await this.ollamaClient.generate(request.prompt, request.model, {
+            const result = await /** @type {any} */ (this.ollamaClient).generate(request.prompt, request.model, {
                 max_tokens: maxTokens,
                 runtime: request.runtime,
             });
@@ -244,15 +257,15 @@ export class InferenceGateway {
         });
         if (!routeCheck.ok) {
             const err = new Error(routeCheck.reason || 'rota inválida');
-            /** @type {unknown} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
-            /** @type {unknown} */ (err).statusCode = 403;
+            /** @type {any} */ (err).code = 'INFERENCE_ROUTE_NOT_ALLOWED';
+            /** @type {any} */ (err).statusCode = 403;
             throw err;
         }
 
         this._acquire(clientTag, Math.max(1, Number(policy.effective.maxParallel || 1)));
         this._bumpMetric(clientTag, 'embed');
         try {
-            const result = await this.ollamaClient.embed(request.text, request.model, {
+            const result = await /** @type {any} */ (this.ollamaClient).embed(request.text, request.model, {
                 runtime: request.runtime,
             });
             return {
@@ -284,7 +297,7 @@ export class InferenceGateway {
         this._acquire(clientTag, Math.max(1, Number(policy.effective.maxParallel || 1)));
         this._bumpMetric(clientTag, 'listModels');
         try {
-            const models = await this.ollamaClient.listModels();
+            const models = await /** @type {any} */ (this.ollamaClient).listModels();
             return {
                 ok: true,
                 clientTag,

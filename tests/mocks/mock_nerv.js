@@ -4,7 +4,9 @@ import EventEmitter from 'node:events';
 
 /**
  * @typedef {object} ExtrairNomeEventoEnvelope
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {{ action_code?: string }} [type] - Formato novo (NERV 2.x)
+ * @property {string} [actionCode] - Formato alternativo
+ * @property {string} [kind] - Formato legado
  */
 /**
  * Helper para extrair nome do evento de um envelope NERV.
@@ -95,9 +97,15 @@ function criarNERVMock() {
         }),
 
         // Métodos de inscrição (compatibilidade com EventEmitter)
-        on: sinon.spy((...args) => emitter.on(...args)),
-        once: sinon.spy((...args) => emitter.once(...args)),
-        off: sinon.spy((...args) => emitter.off(...args)),
+        on: sinon.spy((/** @type {string|symbol} */ event, /** @type {(...a: any[]) => void} */ listener) =>
+            emitter.on(event, listener)
+        ),
+        once: sinon.spy((/** @type {string|symbol} */ event, /** @type {(...a: any[]) => void} */ listener) =>
+            emitter.once(event, listener)
+        ),
+        off: sinon.spy((/** @type {string|symbol} */ event, /** @type {(...a: any[]) => void} */ listener) =>
+            emitter.off(event, listener)
+        ),
 
         // Estado interno
         _eventos: {},
@@ -127,21 +135,22 @@ function criarNERVMock() {
                 .map(call => call.args[0]);
         },
 
-        obterInscricoes: function (nomeEvento) {
+        obterInscricoes: function (/** @type {string|symbol} */ nomeEvento) {
             return this._emitter.listenerCount(nomeEvento);
         },
 
         limpar: function () {
-            this.emit.resetHistory();
-            this.emitCommand.resetHistory();
-            this.emitEvent.resetHistory();
-            this.emitAck.resetHistory();
-            this.on.resetHistory();
-            this.once.resetHistory();
-            this.off.resetHistory();
-            this._emitter.removeAllListeners();
-            this._eventos = {};
-            this._inscricoes = {};
+            const self = /** @type {Record<string, any>} */ (this);
+            self.emit.resetHistory();
+            self.emitCommand.resetHistory();
+            self.emitEvent.resetHistory();
+            self.emitAck.resetHistory();
+            self.on.resetHistory();
+            self.once.resetHistory();
+            self.off.resetHistory();
+            self._emitter.removeAllListeners();
+            self._eventos = {};
+            self._inscricoes = {};
         },
 
         /**
@@ -182,7 +191,7 @@ function criarNERVMock() {
 /**
  * Cria um NERV simplificado (sem EventEmitter)
  * Útil para testes que só precisam verificar chamadas
-  * @returns {object}
+ * @returns {object}
  */
 function criarNERVSimples() {
     return {
@@ -195,13 +204,14 @@ function criarNERVSimples() {
         off: sinon.stub(),
 
         limpar: function () {
-            this.emit.resetHistory();
-            this.emitCommand.resetHistory();
-            this.emitEvent.resetHistory();
-            this.emitAck.resetHistory();
-            this.on.resetHistory();
-            this.once.resetHistory();
-            this.off.resetHistory();
+            const self = /** @type {Record<string, any>} */ (this);
+            self.emit.resetHistory();
+            self.emitCommand.resetHistory();
+            self.emitEvent.resetHistory();
+            self.emitAck.resetHistory();
+            self.on.resetHistory();
+            self.once.resetHistory();
+            self.off.resetHistory();
         },
     };
 }

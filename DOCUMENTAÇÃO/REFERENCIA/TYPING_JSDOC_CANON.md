@@ -12,8 +12,8 @@ Use this file when the question is:
 - which scripts and gates are part of the supported interface
 - what "done" means for typing and JSDoc
 
-This file is normative. Supporting documents may explain, index, or operationalize it, but they
-must not compete with it.
+This file is normative. Supporting documents may explain, index, or operationalize it, but they must
+not compete with it.
 
 ## Scope
 
@@ -162,8 +162,8 @@ The following commands are part of the supported repository contract and may not
 - `check:schemas:typing`
 - `check:skills:strict`
 
-Changing any of these commands requires a governance update in this canon, the automation index,
-and the relevant skill documentation.
+Changing any of these commands requires a governance update in this canon, the automation index, and
+the relevant skill documentation.
 
 ## Canonical CI Gate
 

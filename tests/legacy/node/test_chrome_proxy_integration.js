@@ -1,5 +1,4 @@
 // @ts-check
-// @ts-nocheck
 import { log } from '#core/logger';
 
 // Configuração de teste

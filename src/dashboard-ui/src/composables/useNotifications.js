@@ -17,10 +17,22 @@ const notifications = ref([]);
 const notifTimers = new Map();
 
 /**
+ * @typedef {object} UseNotificationsReturn
+ * @property {import('vue').Ref<Notification[]>} notifications
+ * @property {(message: string, type?: 'success'|'error'|'warning'|'info', duration?: number) => string} addNotification
+ * @property {(id: string) => void} removeNotification
+ * @property {(message: string, duration?: number) => string} showSuccess
+ * @property {(message: string, duration?: number) => string} showError
+ * @property {(message: string, duration?: number) => string} showWarning
+ * @property {(message: string, duration?: number) => string} showInfo
+ * @property {() => void} clearAll
+ */
+
+/**
  * Composable para gerenciamento de notificações no dashboard
  * Fornece funções para mostrar notificações de sucesso, erro, warning e info
  *
- * @returns {object} Funções e estado das notificações
+ * @returns {UseNotificationsReturn} Funções e estado das notificações
  * @sideEffects - Gerencia estado global de notificações, remove notificações automaticamente após duration
  */
 export function useNotifications() {

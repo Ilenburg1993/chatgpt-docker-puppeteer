@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/transport/reconnect.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -68,13 +68,10 @@ function now() {
  * **Unidades:** interval em ms (padrão 1000), maxAttempts como inteiro ou null.
  *
  * @param {CreateReconnectDeps} deps - Dependências do controlador
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @param {function(): void} deps.start - Função para iniciar transporte
- * @param {function(): void} deps.stop - Função para parar transporte
- * @param {object} [deps.policy={}] - Política de reconexão
+ * @param {object} deps
+ * @param {object} deps.policy
  * @param {number} [deps.policy.interval=1000] - Intervalo entre tentativas (ms)
  * @param {number|null} [deps.policy.maxAttempts=null] - Máximo de tentativas (null=infinito)
- * @param {CreateReconnectOptions} [options]
  * @returns {object} Controlador com métodos start, stop, onConnectionUp, onConnectionDown
  * @throws {Error} Se dependências obrigatórias estiverem ausentes ou inválidas
  */

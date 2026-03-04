@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/transport/connection.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -57,10 +57,8 @@ function safeCall(handler, payload) {
  * Cria uma conexão física genérica.
  *
  * @param {CreateConnectionDeps} deps
- * @param {object} deps.telemetry
  * Interface de telemetria do NERV.
  *
- * @param {object} deps.adapter
  * Adaptador físico concreto (ex.: IPC, socket, pipe).
  * Deve expor:
  *  - start()
@@ -68,7 +66,6 @@ function safeCall(handler, payload) {
  *  - send(frame)
  *  - onReceive(handler)
  *  - onError(handler) [opcional]
- * @param {CreateConnectionOptions} [options]
   * @returns {object}
  */
 function createConnection({ telemetry, adapter }) {

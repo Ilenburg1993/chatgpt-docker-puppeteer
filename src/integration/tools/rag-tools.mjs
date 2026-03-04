@@ -51,18 +51,6 @@ import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../.
  * - MMR diversity (avoids redundant results)
  *
  * @param {RagSearchHandlerParams} params - Search parameters
- * @param {string} params.query - Search query (natural language or exact terms)
- * @param {number} params.topK - Number of results (default: 5, max: 20)
- * @param {string} params.pathPrefix - Optional: Filter by path (e.g., "src/kernel")
- * @param {string} params.ext - Optional: Filter by extension (e.g., ".js", ".mjs")
- * @param {'core'|'dev'|'full'} params.profile - RAG scan profile context
- * @param {'hybrid'|'lexical-only'|'auto'} params.mode - Search mode
- * @param {'code-first'|'docs-first'|'all'} params.intent_scope - Result intent policy
- * @param {boolean} params.auto_expand - Expand top results automatically
- * @param {'lines'|'symbol'} params.expand_mode - Expansion mode
- * @param {number} params.expand_top_n - Number of top chunks to auto-expand
- * @param {boolean} params.includeDiagnostics - Include diagnostic details in text output
- * @param {RagSearchHandlerOptions} [options]
  * @returns {Promise<{text:string,json?:any,flags:any}>} Structured tool result
  */
 async function ragSearchHandler({

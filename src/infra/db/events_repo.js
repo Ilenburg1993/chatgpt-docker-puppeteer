@@ -81,8 +81,6 @@ function recordEvent(params) {
  * Keeps events table bounded to prevent unbounded disk growth.
  *
  * @param {PruneEventsOptions} [options={}]
- * @param {number} [options.retentionMs=604800000] - Retention period in ms (default: 7 days)
- * @param {number} [options.maxRows=100000] - Max rows to keep regardless of age
  * @returns {{ deleted: number }} Number of rows deleted
  */
 function pruneEvents(options = {}) {

@@ -47,13 +47,13 @@ const BASE_VOCAB = {
     ],
 };
 
-let vocabCache = null;
+let vocabCache = /** @type {Record<string, any> | null} */ (null);
 
 /* ==========================================================================
    UTILITÁRIOS INTERNOS
 ========================================================================== */
 
-const sleep = ms =>
+const sleep = (/** @type {number} */ ms) =>
     new Promise(r => {
         setTimeout(r, ms);
     });
@@ -134,10 +134,11 @@ async function loadVocab() {
  * Retorna termos de uma categoria com fallback hierárquico para o Inglês.
  * @param {*} category
  * @param {*} [langCode]
-  * @returns {Promise<void>}
+ * @returns {Promise<string[]>}
  */
 async function getTerms(category, langCode = 'en') {
     const v = await loadVocab();
+    if (!v) return [];
     const lang = normalizeLang(langCode);
 
     // Usamos um Set para garantir unicidade
@@ -145,12 +146,12 @@ async function getTerms(category, langCode = 'en') {
 
     // 1. Prioridade: Idioma Detectado
     if (v[lang] && v[lang][category]) {
-        v[lang][category].forEach(t => terms.add(t.toLowerCase()));
+        v[lang][category].forEach((/** @type {string} */ t) => terms.add(t.toLowerCase()));
     }
 
     // 2. Fallback: Inglês (Sempre incluído como segurança universal)
     if (lang !== 'en' && v['en'] && v['en'][category]) {
-        v['en'][category].forEach(t => terms.add(t.toLowerCase()));
+        v['en'][category].forEach((/** @type {string} */ t) => terms.add(t.toLowerCase()));
     }
 
     return Array.from(terms);
@@ -161,7 +162,7 @@ async function getTerms(category, langCode = 'en') {
  * @param {*} langCode
  * @param {*} category
  * @param {*} term
-  * @returns {Promise<void>}
+ * @returns {Promise<void>}
  */
 async function learnTerm(langCode, category, term) {
     if (!term || typeof term !== 'string' || term.length < 3) {
@@ -169,6 +170,7 @@ async function learnTerm(langCode, category, term) {
     }
 
     const v = await loadVocab();
+    if (!v) return;
     const lang = normalizeLang(langCode);
     const cleanTerm = term
         .toLowerCase()
@@ -176,7 +178,7 @@ async function learnTerm(langCode, category, term) {
         .replace(/[.!?]$/, '');
 
     // 1. Proteção contra Envenenamento (Blocklist)
-    if (v.blocked.some(bad => cleanTerm.includes(bad))) {
+    if (v.blocked.some((/** @type {string} */ bad) => cleanTerm.includes(bad))) {
         return;
     }
 
@@ -196,7 +198,7 @@ async function learnTerm(langCode, category, term) {
             vocabCache = v; // Atualiza cache em memória
             log('INFO', `[i18n] Aprendizado consolidado (${lang}): "${cleanTerm}"`);
         } catch (e) {
-            log('ERROR', `[i18n] Falha ao persistir aprendizado: ${e.message}`);
+            log('ERROR', `[i18n] Falha ao persistir aprendizado: ${/** @type {any} */ (e).message}`);
         }
     }
 }

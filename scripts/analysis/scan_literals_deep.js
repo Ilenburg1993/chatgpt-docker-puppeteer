@@ -14,8 +14,11 @@ console.log(`Src: ${SRC}\n`);
 // ANÁLISE COMPLETA DE ARQUIVOS
 // ============================================
 
+/** @param {string} dir */
 function getAllJsFiles(dir) {
+    /** @type {string[]} */
     const files = [];
+    /** @param {string} d */
     function walk(d) {
         const entries = fs.readdirSync(d, { withFileTypes: true });
         entries.forEach(entry => {
@@ -135,7 +138,7 @@ files.forEach(file => {
     try {
         content = fs.readFileSync(file, 'utf8');
     } catch (_error) {
-        console.error(`Erro ao processar ${file}:`, _error.message);
+        console.error(`Erro ao processar ${file}:`, /** @type {any} */ (_error).message);
         return;
     }
     const _lines = content.split('\n');
@@ -271,6 +274,7 @@ files.forEach(file => {
 console.log('📊 RELATÓRIO DETALHADO\n');
 console.log('='.repeat(100));
 
+/** @param {any} title @param {any} data */
 function printCategory(title, data, minOccurrences = 1) {
     const entries = Array.from(data.values.entries())
         .filter(([_, locs]) => locs.length >= minOccurrences)
@@ -285,9 +289,11 @@ function printCategory(title, data, minOccurrences = 1) {
     entries.forEach(([value, locations]) => {
         console.log(`   ${value.padEnd(30)} → ${locations.length} uso(s)`);
         if (locations.length <= 3) {
-            locations.forEach(loc => {
-                console.log(`      ${loc.file}:${loc.line}`);
-            });
+            locations.forEach(
+                /** @param {any} loc */ loc => {
+                    console.log(`      ${loc.file}:${loc.line}`);
+                }
+            );
         } else {
             console.log(`      ${locations[0].file}:${locations[0].line}`);
             console.log(`      ... e mais ${locations.length - 1} arquivo(s)`);

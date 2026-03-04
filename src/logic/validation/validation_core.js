@@ -4,8 +4,21 @@ import { runSinglePassValidation } from './scan_engine.js';
 import { log } from '#core/logger';
 
 /**
+ * @typedef {object} ValidateTaskResultTaskPayload
+ * @property {string} [language] - Idioma da tarefa.
+ */
+/**
+ * @typedef {object} ValidateTaskResultTaskSpec
+ * @property {ValidateTaskResultTaskPayload} [payload] - Payload da tarefa.
+ */
+/**
+ * @typedef {object} ValidateTaskResultTaskMeta
+ * @property {string} [id] - ID da tarefa.
+ */
+/**
  * @typedef {object} ValidateTaskResultTask
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {ValidateTaskResultTaskMeta} [meta] - Metadados da tarefa.
+ * @property {ValidateTaskResultTaskSpec} [spec] - Especificações da tarefa.
  */
 /**
  * Realiza a auditoria completa de qualidade de um resultado em disco.
@@ -15,7 +28,7 @@ import { log } from '#core/logger';
  * @param {AbortSignal} [signal] - Sinal soberano para interrupção imediata.
  * @returns {Promise<object>} { ok: boolean, reason: string|null }
  */
-async function validateTaskResult(task, filePath, signal = null) {
+async function validateTaskResult(task, filePath, signal = undefined) {
     const taskId = task?.meta?.id || 'unknown';
 
     try {
@@ -37,7 +50,9 @@ async function validateTaskResult(task, filePath, signal = null) {
 
         // 4. EXECUÇÃO DO MOTOR DE VARREDURA (SINGLE-PASS)
         // Delega a leitura eficiente e aplicação de regras ao scan_engine.
-        const result = await runSinglePassValidation(task, filePath, systemErrorTerms, signal);
+        const result = /** @type {{ok: boolean, reason: string|null}} */ (
+            await runSinglePassValidation(task, filePath, systemErrorTerms, signal)
+        );
 
         // 5. TELEMETRIA DE RESULTADO
         if (result.ok) {
@@ -50,16 +65,17 @@ async function validateTaskResult(task, filePath, signal = null) {
 
         return result;
     } catch (valErr) {
+        const caught = /** @type {any} */ (valErr);
         // 6. TRATAMENTO DE INTERRUPÇÃO SILENCIOSA
-        if (valErr.message === 'VALIDATION_ABORTED' || valErr.name === 'AbortError') {
+        if (caught.message === 'VALIDATION_ABORTED' || caught.name === 'AbortError') {
             return { ok: false, reason: 'VALIDATION_CANCELLED: Operação interrompida pelo sinal de aborto.' };
         }
 
         // 7. TRATAMENTO DE FALHA CATASTRÓFICA
-        log('ERROR', `[VALIDATOR] Colapso na orquestração: ${valErr.message}`, taskId);
+        log('ERROR', `[VALIDATOR] Colapso na orquestração: ${caught.message}`, taskId);
         return {
             ok: false,
-            reason: `VALIDATOR_INTERNAL_ERROR: ${valErr.message}`,
+            reason: `VALIDATOR_INTERNAL_ERROR: ${caught.message}`,
         };
     }
 }

@@ -25,17 +25,6 @@ function _ensureArray(value) {
  * Cria task filha determinística para o próximo step de workflow.
  *
  * @param {BuildWorkflowNextStepTaskParams} params
- * @param {Record<string, unknown>} params.parentTask
- * @param {string} params.parentTaskId
- * @param {string|null} [params.attemptId]
- * @param {Record<string, unknown>} [params.nextStep]
- * @param {number} [params.nextStepIndex=0]
- * @param {Record<string, unknown>|null} [params.workflowConfig]
- * @param {string[]} [params.completedStepIds]
- * @param {Record<string, unknown>} [params.accumulatedContext]
- * @param {number} [params.nowMs]
- * @param {string} [params.source='self_generated']
- * @param {BuildWorkflowNextStepTaskOptions} [options]
  * @returns {{
  *   childTask: Record<string, unknown>,
  *   childId: string,

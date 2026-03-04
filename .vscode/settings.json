@@ -113,6 +113,7 @@
   "editor.acceptSuggestionOnEnter": "off",
   "editor.codeActions.triggerOnFocusChange": true,
   "editor.codeActionsOnSave": {
+
     "source.fixAll": "always",
     "source.fixAll.eslint": "always",
     "source.fixAll.prettier": "always",
@@ -920,5 +921,6 @@
   "git-graph.repository.sign.tags": false,
   "git-graph.repository.useMailmap": false,
   "git-graph.date.format": "Date & Time",
-  "git-graph.dialog.addTag.pushToRemote": true
+  "git-graph.dialog.addTag.pushToRemote": true,
+  "python.analysis.typeCheckingMode": "standard"
 }

@@ -29,7 +29,7 @@ function reloadPolicies() {
     } catch (error) {
         return {
             ok: false,
-            error: error?.message || String(error),
+            error: /** @type {any} */ (error)?.message || String(error),
         };
     }
 }
@@ -52,6 +52,7 @@ server.listen(port, host, () => {
 });
 
 let shuttingDown = false;
+/** @param {string} signal */
 function shutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;

@@ -159,11 +159,6 @@ export function getDiagnosticJobById(id) {
 /**
  * Lista jobs de diagnóstico com filtros opcionais
  * @param {ListDiagnosticJobsFilters} [filters]
- * @param {string} [filters.status]
- * @param {string} [filters.kind]
- * @param {string} [filters.triggerType]
- * @param {number} [filters.limit]
- * @param {number} [filters.offset]
  * @returns {object[]}
  */
 export function listDiagnosticJobs(filters = {}) {

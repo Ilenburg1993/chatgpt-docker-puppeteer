@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/reception/receive.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -69,10 +69,6 @@ function safeCall(handler, envelope, telemetry) {
  * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
  * @param {CreateReceptionDeps} deps - Dependências do receptor
- * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @param {CreateReceptionOptions} [options]
  * @returns {object} Receptor com métodos onMessage, receive
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

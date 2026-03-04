@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import CONFIG from '#core/config';
 import { log } from '#core/logger';
 import os from 'node:os';

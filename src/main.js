@@ -33,7 +33,6 @@
  * a partir deste processo constitui uma violação arquitetural.
  */
 
-// @ts-nocheck - Suprime warnings TypeScript para propriedades dinâmicas e tipos implícitos
 
 // =========================================================================
 // ENVIRONMENT VARIABLES (load .env.local before imports)
@@ -1305,25 +1304,7 @@ async function boot() {
  *
  * @async
  * @param {ShutdownContext} context - Contexto de runtime retornado por boot()
- * @param {object} context.serverAdapter - Adaptador do servidor NERV
- * @param {object} context.driverAdapter - Adaptador do driver NERV
- * @param {object} context.kernel - Instância do KERNEL
- * @param {object} context.browserPool - Pool de browsers
- * @param {object} context.nerv - Sistema de comunicação NERV
- * @param {object} context.httpServer - Servidor HTTP (se integrado)
- * @param {boolean} context.httpAuthority - Se este processo é dono do bind HTTP
- * @param {object} context.serverLifecycle - Módulo de lifecycle do server (opcional)
- * @param {boolean} context.serverLifecycleManaged - Se lifecycle do server deve coordenar teardown de infraestrutura
- * @param {object} context.queueWorker - Worker da fila SSOT
- * @param {object} context.taskProjector - Projetor de estado de tarefas
- * @param {object} context.taskControlWatcher - Watcher de controle de tarefas
- * @param {object} context.missionRunner - Executor de missões
- * @param {object} context.missionPlannerProcessor - Processador de planejamento de missões
- * @param {object} context.attemptWatchdog - Watchdog de tentativas
- * @param {object} context.heartbeatWatchdog - Watchdog de heartbeat
- * @param {object} context.agentLoop - Loop principal do agente
  * @param {ShutdownOptions} [options] - Opções de shutdown
- * @param {boolean} [options.exitOnComplete=false] - Se verdadeiro, encerra processo ao concluir
  * @returns {Promise<{ok: boolean, failedPhases: number, totalPhases: number, duration: number}>}
  *
  * @throws {Error} Se alguma fase crítica do shutdown falhar

@@ -30,11 +30,11 @@ const colors = {
 /**
  * Função exportada: parseEnvFile.
  * @param {*} filePath
- * @returns {object}
+ * @returns {Record<string, string>}
  */
 function parseEnvFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
-    const env = {};
+    const env = /** @type {Record<string, string>} */ ({});
 
     content.split('\n').forEach((line, _) => {
         // Ignorar comentários e linhas vazias
@@ -55,13 +55,24 @@ function parseEnvFile(filePath) {
 // ============================================================================
 /** Classe exportada: EnvValidator. */
 class EnvValidator {
+    /**
+     * @param {string} schemaPath - Caminho para o schema JSON
+     */
     constructor(schemaPath) {
         this.schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+        /** @type {string[]} */
         this.errors = [];
+        /** @type {string[]} */
         this.warnings = [];
+        /** @type {string[]} */
         this.info = [];
     }
 
+    /**
+     * @param {Record<string, string>} envData
+     * @param {string} [envName]
+     * @returns {boolean}
+     */
     validate(envData, envName = 'unknown') {
         this.errors = [];
         this.warnings = [];
@@ -106,6 +117,11 @@ class EnvValidator {
         return this.errors.length === 0;
     }
 
+    /**
+     * @param {string} categoryName
+     * @param {Record<string, string>} envData
+     * @returns {void}
+     */
     validateCategory(categoryName, envData) {
         const category = this.schema.categories[categoryName];
         if (!category) return;
@@ -143,6 +159,13 @@ class EnvValidator {
         });
     }
 
+    /**
+     * @param {string} varName
+     * @param {string} value
+     * @param {Record<string, unknown>} spec
+     * @param {string} categoryName
+     * @returns {void}
+     */
     validateType(varName, value, spec, categoryName) {
         if (spec.type === 'integer') {
             const num = parseInt(value, 10);
@@ -151,17 +174,17 @@ class EnvValidator {
                 return;
             }
 
-            if (spec.minimum !== undefined && num < spec.minimum) {
+            if (spec.minimum !== undefined && num < /** @type {number} */ (spec.minimum)) {
                 this.errors.push(`${categoryName}: ${varName} < ${spec.minimum} (recebido: ${num})`);
             }
 
-            if (spec.maximum !== undefined && num > spec.maximum) {
+            if (spec.maximum !== undefined && num > /** @type {number} */ (spec.maximum)) {
                 this.errors.push(`${categoryName}: ${varName} > ${spec.maximum} (recebido: ${num})`);
             }
 
-            if (spec.enum && !spec.enum.includes(num)) {
+            if (spec.enum && !(/** @type {number[]} */ (spec.enum).includes(num))) {
                 this.errors.push(
-                    `${categoryName}: ${varName} deve ser um de [${spec.enum.join(', ')}] (recebido: ${num})`
+                    `${categoryName}: ${varName} deve ser um de [${/** @type {number[]} */ (spec.enum).join(', ')}] (recebido: ${num})`
                 );
             }
         }
@@ -173,24 +196,24 @@ class EnvValidator {
                 return;
             }
 
-            if (spec.minimum !== undefined && num < spec.minimum) {
+            if (spec.minimum !== undefined && num < /** @type {number} */ (spec.minimum)) {
                 this.errors.push(`${categoryName}: ${varName} < ${spec.minimum} (recebido: ${num})`);
             }
 
-            if (spec.maximum !== undefined && num > spec.maximum) {
+            if (spec.maximum !== undefined && num > /** @type {number} */ (spec.maximum)) {
                 this.errors.push(`${categoryName}: ${varName} > ${spec.maximum} (recebido: ${num})`);
             }
         }
 
         if (spec.type === 'string') {
-            if (spec.enum && !spec.enum.includes(value)) {
+            if (spec.enum && !(/** @type {string[]} */ (spec.enum).includes(value))) {
                 this.errors.push(
-                    `${categoryName}: ${varName} deve ser um de [${spec.enum.join(', ')}] (recebido: ${value})`
+                    `${categoryName}: ${varName} deve ser um de [${/** @type {string[]} */ (spec.enum).join(', ')}] (recebido: ${value})`
                 );
             }
 
             if (spec.pattern) {
-                const regex = new RegExp(spec.pattern);
+                const regex = new RegExp(/** @type {string} */ (spec.pattern));
                 if (!regex.test(value)) {
                     this.errors.push(
                         `${categoryName}: ${varName} não corresponde ao padrão ${spec.pattern} (recebido: ${value})`
@@ -207,6 +230,10 @@ class EnvValidator {
         }
     }
 
+    /**
+     * @param {Record<string, string>} envData
+     * @returns {void}
+     */
     validateConstraints(envData) {
         console.log(`\n${colors.gray}[CONSTRAINTS]${colors.reset}`);
 
@@ -353,7 +380,9 @@ function main() {
                 totalErrors++;
             }
         } catch (error) {
-            console.error(`${colors.red}ERRO ao processar ${envFile}: ${error.message}${colors.reset}\n`);
+            console.error(
+                `${colors.red}ERRO ao processar ${envFile}: ${error instanceof Error ? error.message : String(error)}${colors.reset}\n`
+            );
             totalErrors++;
         }
     });

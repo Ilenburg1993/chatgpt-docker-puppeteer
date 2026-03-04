@@ -177,7 +177,7 @@
 /**
  * Paginated response
  * @typedef {object} PaginatedResponse
- * @property {Array} items - Array of items
+ * @property {Array<unknown>} items - Array of items
  * @property {number} total - Total count
  * @property {number} page - Current page
  * @property {number} limit - Items per page

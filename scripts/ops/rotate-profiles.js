@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
 import { promises as fs } from 'node:fs';
-// @ts-nocheck
 import path from 'node:path';
 import { log } from '#core/logger';
 

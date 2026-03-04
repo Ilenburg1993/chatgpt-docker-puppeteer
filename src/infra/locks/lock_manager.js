@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import * as PATHS from '../fs/paths.js';

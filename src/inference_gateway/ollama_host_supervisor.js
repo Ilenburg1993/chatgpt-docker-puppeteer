@@ -21,6 +21,10 @@ import { retryWithBackoff } from '#core/retry_policy';
  * @property {{ upsert?: (payload: unknown) => unknown, setState?: (id: string, state: unknown, details?: unknown) => unknown } | null} [resourceHooks]
  */
 
+/**
+ * @param {any} value
+ * @param {boolean} fallback
+ */
 function parseBool(value, fallback) {
     if (value === undefined || value === null || value === '') return fallback;
     const v = String(value).trim().toLowerCase();
@@ -29,6 +33,10 @@ function parseBool(value, fallback) {
     return fallback;
 }
 
+/**
+ * @param {any} value
+ * @param {number} fallback
+ */
 function parseIntPos(value, fallback) {
     const n = Number(value);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
@@ -81,6 +89,7 @@ export class OllamaHostSupervisor {
         this._consecutiveFailures = 0;
         this._circuitOpenUntil = 0;
         this._state = /** @type {OllamaHostState} */ ('stopped');
+        /** @type {{ ok: boolean, version: string|null, statusCode: number|null, checkedAt: number, error: string|null, circuitOpen: boolean }} */
         this._last = {
             ok: false,
             version: null,
@@ -91,6 +100,11 @@ export class OllamaHostSupervisor {
         };
     }
 
+    /**
+     * @param {string} level
+     * @param {string} message
+     * @param {any} [data]
+     */
     _log(level, message, data) {
         if (this.logger) this.logger(level, message, data);
     }
@@ -217,9 +231,9 @@ export class OllamaHostSupervisor {
             this._last = {
                 ok: false,
                 version: null,
-                statusCode: /** @type {unknown} */ (error)?.statusCode ?? null,
+                statusCode: /** @type {any} */ (error)?.statusCode ?? null,
                 checkedAt: this.now(),
-                error: error?.message || String(error),
+                error: /** @type {any} */ (error)?.message || String(error),
                 circuitOpen: this.circuitEnabled && this.now() < this._circuitOpenUntil,
             };
             this._emitState();

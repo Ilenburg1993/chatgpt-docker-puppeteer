@@ -308,18 +308,16 @@ function createSsotGatewayKernel(config = {}) {
  * Cria e compõe o Kernel de forma explícita e determinística.
  *
  * @param {CreateLegacyKernelConfig} [config] - Configurações estruturais do Kernel
- * @param {object} [config.nerv] - Instância do NERV já configurada e conectada (obrigatório)
- * @param {object} [config.contextManager] - Context manager opcional (injeção externa)
- * @param {object} [config.telemetry] - Opções da telemetria do Kernel
+ * @param {object} config
+ * @param {object} config.telemetry
  * @param {string} [config.telemetry.source='kernel'] - Identificador da fonte de telemetria
  * @param {number} [config.telemetry.retention=1000] - Número de eventos a reter em memória
- * @param {object} [config.policy] - Limites e políticas normativas
+ * @param {object} config.policy
  * @param {number} [config.policy.maxConcurrentTasks] - Número máximo de tarefas concorrentes
  * @param {number} [config.policy.taskTimeout] - Timeout padrão para tarefas em ms
- * @param {object} [config.loop] - Opções do kernel_loop (intervalo, scheduler)
+ * @param {object} config.loop
  * @param {number} [config.loop.interval] - Intervalo do loop em ms
  *
- * @param {CreateLegacyKernelOptions} [options]
  * @returns {object} Interface pública do Kernel
  *
  * @throws {Error} Se NERV não for fornecido

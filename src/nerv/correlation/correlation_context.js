@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/correlation/correlation_context.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -63,9 +63,6 @@ function cloneRecords(records) {
  * **Unidades:** correlationId como string não vazia, histórico como array de registros.
  *
  * @param {CreateCorrelationContextDeps} deps - Dependências do contexto
- * @param {object} deps.store - Instância de correlation_store
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @param {CreateCorrelationContextOptions} [options]
  * @returns {object} Contexto com métodos getHistory, getLatest, getStats
  * @throws {Error} Se store ou telemetry forem inválidos
  */

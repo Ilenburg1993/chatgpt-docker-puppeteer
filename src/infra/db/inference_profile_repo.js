@@ -6,6 +6,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {string} [fallback]
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -14,6 +18,10 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} fallback
+ */
 function _parseJson(raw, fallback) {
     if (raw == null) return fallback;
     try {
@@ -23,27 +31,60 @@ function _parseJson(raw, fallback) {
     }
 }
 
+/**
+ * @param {any} row
+ * @returns {InferenceProfile|null}
+ */
 function _rowToProfile(row) {
     if (!row) return null;
+    const _row = /** @type {any} */ (row);
     return {
-        id: String(row.id),
-        name: String(row.name),
-        purpose: String(row.purpose || ''),
-        enabled: Number(row.enabled) === 1,
-        preferred_backend_id: row.preferred_backend_id ? String(row.preferred_backend_id) : null,
-        preferred_model_id: row.preferred_model_id ? String(row.preferred_model_id) : null,
-        fallback_chain_json: _parseJson(row.fallback_chain_json, []),
-        generation_params_json: _parseJson(row.generation_params_json, {}),
-        budget_policy_json: _parseJson(row.budget_policy_json, {}),
-        validation_policy_json: _parseJson(row.validation_policy_json, {}),
-        created_at_ms: Number(row.created_at_ms) || 0,
-        updated_at_ms: Number(row.updated_at_ms) || 0,
+        id: String(_row.id),
+        name: String(_row.name),
+        purpose: String(_row.purpose || ''),
+        enabled: Number(_row.enabled) === 1,
+        preferred_backend_id: _row.preferred_backend_id ? String(_row.preferred_backend_id) : null,
+        preferred_model_id: _row.preferred_model_id ? String(_row.preferred_model_id) : null,
+        fallback_chain_json: _parseJson(_row.fallback_chain_json, []),
+        generation_params_json: _parseJson(_row.generation_params_json, {}),
+        budget_policy_json: _parseJson(_row.budget_policy_json, {}),
+        validation_policy_json: _parseJson(_row.validation_policy_json, {}),
+        created_at_ms: Number(_row.created_at_ms) || 0,
+        updated_at_ms: Number(_row.updated_at_ms) || 0,
     };
 }
 
 /**
+ * @typedef {object} InferenceProfile
+ * @property {string} id
+ * @property {string} name
+ * @property {string} purpose
+ * @property {boolean} enabled
+ * @property {string|null} preferred_backend_id
+ * @property {string|null} preferred_model_id
+ * @property {any[]} fallback_chain_json
+ * @property {object} generation_params_json
+ * @property {object} budget_policy_json
+ * @property {object} validation_policy_json
+ * @property {number} created_at_ms
+ * @property {number} updated_at_ms
+ */
+/**
  * @typedef {object} UpsertInferenceProfileInput
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {string} [id]
+ * @property {string} [name]
+ * @property {string} [purpose]
+ * @property {boolean} [enabled]
+ * @property {string|null} [preferred_backend_id]
+ * @property {string|null} [preferred_model_id]
+ * @property {any} [fallback_chain_json]
+ * @property {any} [fallback_chain]
+ * @property {any} [generation_params_json]
+ * @property {any} [generation_params]
+ * @property {any} [budget_policy_json]
+ * @property {any} [budget_policy]
+ * @property {any} [validation_policy_json]
+ * @property {any} [validation_policy]
  */
 /**
  * Função exportada: upsertInferenceProfile.
@@ -53,11 +94,13 @@ function _rowToProfile(row) {
 function upsertInferenceProfile(input = {}) {
     const db = getDb();
     const now = _now();
-    const existing = input.id
-        ? db.prepare('SELECT * FROM inference_profiles WHERE id = ?').get(String(input.id))
-        : input.name
-          ? db.prepare('SELECT * FROM inference_profiles WHERE name = ?').get(String(input.name))
-          : null;
+    const existing = /** @type {any} */ (
+        input.id
+            ? db.prepare('SELECT * FROM inference_profiles WHERE id = ?').get(String(input.id))
+            : input.name
+              ? db.prepare('SELECT * FROM inference_profiles WHERE name = ?').get(String(input.name))
+              : null
+    );
     const id = existing?.id || `infprof-${uuidv4()}`;
     const name = String(input.name || existing?.name || '').trim();
     if (!name) throw new Error('inference profile name obrigatório');
@@ -133,7 +176,9 @@ function listInferenceProfiles({ enabledOnly = false, limit = 100 } = {}) {
         `
         )
         .all({ limit: Math.max(1, Math.min(Number(limit) || 100, 500)) });
-    return rows.map(_rowToProfile).filter(Boolean);
+    return rows
+        .map(_rowToProfile)
+        .filter(/** @param {InferenceProfile|null} x @returns {x is InferenceProfile} */ x => x != null);
 }
 
 export { getInferenceProfileById, listInferenceProfiles, upsertInferenceProfile };

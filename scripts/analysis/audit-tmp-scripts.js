@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
 import fs from 'node:fs';
-// @ts-nocheck
 import path from 'node:path';
 import { execSync as _execSync } from 'node:child_process';
 
@@ -20,9 +19,9 @@ const PATTERNS = {
 
 /**
  * Função exportada: classifyScript.
- * @param {*} filename
- * @param {*} content
- * @returns {object}
+ * @param {any} filename
+ * @param {any} content
+ * @returns {any}
  */
 function classifyScript(filename, content) {
     // System files - ignore
@@ -96,7 +95,7 @@ function classifyScript(filename, content) {
 
 /**
  * Função exportada: auditTmpScripts.
- * @returns {object}
+ * @returns {any}
  */
 function auditTmpScripts() {
     console.log('🔍 AUDITING /tmp/ JAVASCRIPT FILES\n');
@@ -104,6 +103,7 @@ function auditTmpScripts() {
 
     const files = fs.readdirSync(TMP_DIR).filter(f => f.endsWith('.js'));
 
+    /** @type {Record<string, any[]>} */
     const results = {
         SYSTEM: [],
         IMMEDIATE: [],
@@ -129,7 +129,8 @@ function auditTmpScripts() {
 
             content = fs.readFileSync(filepath, 'utf8');
         } catch (err) {
-            console.error(`⚠️  Cannot read ${filename}: ${err.message}`);
+            const _e1 = /** @type {any} */ (err);
+            console.error(`⚠️  Cannot read ${filename}: ${_e1.message}`);
             return;
         }
 
@@ -191,6 +192,10 @@ function auditTmpScripts() {
     return { results, toMove, toDelete, toReview };
 }
 
+/**
+ * @param {any[]} toMove
+ * @param {any[]} toDelete
+ */
 function executeRecommendations(toMove, toDelete) {
     console.log('='.repeat(80));
 
@@ -206,7 +211,8 @@ function executeRecommendations(toMove, toDelete) {
                 fs.unlinkSync(source);
                 console.log(`  ✅ ${filename} → ${classification.target}`);
             } catch (err) {
-                console.error(`  ❌ Failed to move ${filename}: ${err.message}`);
+                const _e2 = /** @type {any} */ (err);
+                console.error(`  ❌ Failed to move ${filename}: ${_e2.message}`);
             }
         });
     }
@@ -220,7 +226,8 @@ function executeRecommendations(toMove, toDelete) {
                 fs.unlinkSync(filepath);
                 console.log(`  ✅ Deleted ${filename}`);
             } catch (err) {
-                console.error(`  ❌ Failed to delete ${filename}: ${err.message}`);
+                const _e3 = /** @type {any} */ (err);
+                console.error(`  ❌ Failed to delete ${filename}: ${_e3.message}`);
             }
         });
     }

@@ -151,7 +151,6 @@ function _computeBackoffMs({ iteration = 1, minMs = 2000, maxMs = 120000 } = {})
  * Sources checked: response_v2_json artifact, response_text artifact, legacy result_json storage file.
  * @private
  * @param {ReadAttemptOutputTextOptions} [opts]
- * @param {ReadAttemptOutputTextOptions} [options]
  * @returns {Promise<string>} Returns empty string when no output is available.
  */
 async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetries = 3, retryDelayMs = 50 } = {}) {
@@ -258,7 +257,6 @@ function _ensureArray(value) {
  * Add or replace an input object into an inputs array by matching `type` or `label`.
  * @private
  * @param {SetOrReplaceInputOptions} [opts]
- * @param {SetOrReplaceInputOptions} [options]
  * @returns {Array<object>}
  */
 function _setOrReplaceInput({ inputs, next } = {}) {

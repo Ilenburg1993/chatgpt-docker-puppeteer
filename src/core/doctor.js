@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
 import { exec } from 'node:child_process';
 import fs, { promises as fsp } from 'node:fs';

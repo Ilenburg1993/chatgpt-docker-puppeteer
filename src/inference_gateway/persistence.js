@@ -22,6 +22,10 @@ import { listInferenceClientPolicies } from '../infra/db/inference_client_policy
  * @property {{ profileCount:number, clientPolicyCount:number }} meta
  */
 
+/**
+ * @param {any} value
+ * @param {any} [fallback]
+ */
 function asPlainObject(value, fallback = {}) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : fallback;
 }
@@ -32,7 +36,7 @@ function asPlainObject(value, fallback = {}) {
  */
 /**
  * Converte profile persistido para layer compatível com `resolveInferencePolicy`.
- * @param {ProfileToPolicyLayerProfile} profile
+ * @param {any} profile
  */
 function profileToPolicyLayer(profile) {
     const generation = asPlainObject(profile?.generation_params_json, {});
@@ -55,7 +59,8 @@ function profileToPolicyLayer(profile) {
  */
 /**
  * Converte policy de cliente persistida para layer compatível com `resolveInferencePolicy`.
- * @param {ClientPolicyToLayerPolicy} policy
+ * @param {any} policy
+ * @returns {InferencePolicyLayer}
  */
 function clientPolicyToLayer(policy) {
     const degraded = asPlainObject(policy?.degraded_behavior_json, {});

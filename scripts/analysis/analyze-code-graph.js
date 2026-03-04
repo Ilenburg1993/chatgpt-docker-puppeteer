@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 // @ts-check
-// @ts-nocheck
 import ts from 'typescript';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,19 +38,22 @@ const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options);
 const _typeChecker = program.getTypeChecker();
 
 // Data structures for analysis
-const dependencyGraph = new Map(); // file -> [dependencies]
-const reverseGraph = new Map(); // file -> [dependents]
-const nervEvents = { emitters: {}, listeners: {} };
+const dependencyGraph = /** @type {Map<string, string[]>} */ (new Map()); // file -> [dependencies]
+const reverseGraph = /** @type {Map<string, string[]>} */ (new Map()); // file -> [dependents]
+const nervEvents = /** @type {{ emitters: Record<string, string[]>, listeners: Record<string, string[]> }} */ ({
+    emitters: {},
+    listeners: {},
+});
 const moduleStats = {
     total: 0,
-    byDirectory: {},
+    byDirectory: /** @type {Record<string, number>} */ ({}),
     topImporters: [],
     topImported: [],
 };
 
 /**
  * Normalize file path relative to root
- * @param {*} filePath
+ * @param {string} filePath
  */
 function normalizePath(filePath) {
     return path.relative(ROOT, filePath).replace(/\\/g, '/');
@@ -59,7 +61,7 @@ function normalizePath(filePath) {
 
 /**
  * Get module category (nerv, kernel, driver, etc.)
- * @param {*} filePath
+ * @param {string} filePath
  */
 function getModuleCategory(filePath) {
     const normalized = normalizePath(filePath);
@@ -92,18 +94,20 @@ function getModuleCategory(filePath) {
 
 /**
  * Extract dependencies from a source file
- * @param {*} sourceFile
+ * @param {any} sourceFile
  */
 function extractDependencies(sourceFile) {
     const _filePath = normalizePath(sourceFile.fileName);
+    /** @type {string[]} */
     const deps = [];
 
+    /** @param {any} node */
     function visit(node) {
         // require() calls
         if (
             ts.isCallExpression(node) &&
             node.expression.kind === ts.SyntaxKind.Identifier &&
-            node.expression.text === 'require' &&
+            /** @type {any} */ (node.expression).text === 'require' &&
             node.arguments.length > 0
         ) {
             const arg = node.arguments[0];
@@ -126,12 +130,14 @@ function extractDependencies(sourceFile) {
 
 /**
  * Extract NERV event emissions and listeners
- * @param {*} sourceFile
+ * @param {any} sourceFile
  */
 function extractNervEvents(sourceFile) {
     const _filePath = normalizePath(sourceFile.fileName);
+    /** @type {{ emits: string[], listens: string[] }} */
     const events = { emits: [], listens: [] };
 
+    /** @param {any} node */
     function visit(node) {
         // nerv.emit('EVENT_NAME', ...)
         if (ts.isCallExpression(node)) {
@@ -186,7 +192,7 @@ function buildDependencyGraph() {
             if (!reverseGraph.has(dep)) {
                 reverseGraph.set(dep, []);
             }
-            reverseGraph.get(dep).push(filePath);
+            reverseGraph.get(dep)?.push(filePath);
         });
 
         // Extract NERV events
@@ -214,8 +220,10 @@ function buildDependencyGraph() {
 function findCircularDependencies() {
     const visited = new Set();
     const stack = new Set();
+    /** @type {string[][]} */
     const cycles = [];
 
+    /** @param {string} node @param {string[]} path */
     function dfs(node, path = []) {
         if (stack.has(node)) {
             const cycleStart = path.indexOf(node);
@@ -249,8 +257,8 @@ function findCircularDependencies() {
 
 /**
  * Resolve import path
- * @param {*} fromFile
- * @param {*} importPath
+ * @param {string} fromFile
+ * @param {string} importPath
  */
 function resolveImport(fromFile, importPath) {
     if (importPath.startsWith('.')) {
@@ -266,6 +274,7 @@ function resolveImport(fromFile, importPath) {
  * Find orphaned modules
  */
 function findOrphans() {
+    /** @type {string[]} */
     const orphans = [];
     dependencyGraph.forEach((deps, file) => {
         const dependents = reverseGraph.get(file) || [];
@@ -379,8 +388,8 @@ if (options.exportJson) {
     const output = {
         timestamp: new Date().toISOString(),
         stats: moduleStats,
-        dependencies: object.fromEntries(dependencyGraph),
-        reverseDependencies: object.fromEntries(reverseGraph),
+        dependencies: Object.fromEntries(dependencyGraph),
+        reverseDependencies: Object.fromEntries(reverseGraph),
         nervEvents,
         circular: options.findCircular ? findCircularDependencies() : [],
         orphans: options.findOrphans ? findOrphans() : [],

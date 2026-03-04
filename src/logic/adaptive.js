@@ -85,7 +85,7 @@ const AdaptiveStateSchema = z.object({
 -------------------------------------------------------------------------- */
 const STATE_FILE = path.join(LOG_DIR, 'adaptive_state.json');
 
-const createEmptyStats = avg => ({
+const createEmptyStats = (/** @type {number} */ avg) => ({
     avg,
     var: Math.pow(avg / 2, 2),
     count: 0,
@@ -101,6 +101,7 @@ let state = defaultState;
 let isReady = false;
 let persistLock = false;
 let pendingPersist = false;
+/** @type {ReturnType<typeof setTimeout> | null} */
 let persistTimeout = null;
 
 /* --------------------------------------------------------------------------
@@ -125,7 +126,7 @@ async function init() {
             }
         }
     } catch (e) {
-        log('WARN', `[ADAPTIVE] Falha no boot: ${e.message}`);
+        log('WARN', `[ADAPTIVE] Falha no boot: ${e instanceof Error ? e.message : String(e)}`);
         state = defaultState;
     } finally {
         isReady = true;
@@ -175,7 +176,7 @@ async function persist() {
         await fs.writeFile(tmp, JSON.stringify(state, null, 2));
         await fs.rename(tmp, STATE_FILE);
     } catch (e) {
-        log('ERROR', `[ADAPTIVE] Falha de escrita: ${e.message}`);
+        log('ERROR', `[ADAPTIVE] Falha de escrita: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
         persistLock = false;
         if (pendingPersist) {
@@ -188,7 +189,11 @@ async function persist() {
 /* --------------------------------------------------------------------------
    MOTOR ESTATÍSTICO
 -------------------------------------------------------------------------- */
-function updateStats(stats, value, label) {
+function updateStats(
+    /** @type {{ avg: number, var: number, count: number }} */ stats,
+    /** @type {number} */ value,
+    /** @type {string} */ label
+) {
     if (!Number.isFinite(value) || value < 0) {
         return;
     }
@@ -217,11 +222,11 @@ function updateStats(stats, value, label) {
 /* --------------------------------------------------------------------------
    FUNÇÕES AUXILIARES (CIRCUIT BREAKER, DECAY, GC)
 -------------------------------------------------------------------------- */
-function shouldCircuitBreak(stats) {
+function shouldCircuitBreak(/** @type {{ avg: number, count: number }} */ stats) {
     return stats.count >= 5 && stats.avg > CIRCUIT_BREAKER_THRESHOLD_MS;
 }
 
-function decayIfNeeded(profile, now) {
+function decayIfNeeded(/** @type {Record<string, any>} */ profile, /** @type {number} */ now) {
     const age = now - profile.last_update;
     if (age > TARGET_INACTIVE_THRESHOLD_MS) {
         // Decay exponencial: mais velho = menos confiança
@@ -239,7 +244,7 @@ function garbageCollectTargets() {
         const sorted = targets.sort((a, b) => a[1].last_update - b[1].last_update);
         const toRemove = sorted.slice(0, sorted.length - MAX_TARGETS);
         toRemove.forEach(([key]) => {
-            delete state.targets[key];
+            delete (/** @type {Record<string, any>} */ (state.targets)[key]);
             log('INFO', `[ADAPTIVE] GC: removido target inativo: ${key}`);
         });
     }
@@ -282,9 +287,10 @@ async function recordMetric(type, ms, target = 'generic') {
 
     const key = target.toLowerCase();
     const now = Date.now();
+    const tgts = /** @type {Record<string, any>} */ (state.targets);
 
-    if (!state.targets[key]) {
-        state.targets[key] = {
+    if (!tgts[key]) {
+        tgts[key] = {
             ttft: createEmptyStats(SEED_TTFT),
             stream: createEmptyStats(SEED_STREAM),
             echo: createEmptyStats(SEED_ECHO),
@@ -294,24 +300,24 @@ async function recordMetric(type, ms, target = 'generic') {
     }
 
     // Update timestamp
-    state.targets[key].last_update = now;
+    tgts[key].last_update = now;
 
     switch (type) {
         case 'ttft':
-            updateStats(state.targets[key].ttft, ms, 'TTFT');
+            updateStats(tgts[key].ttft, ms, 'TTFT');
             break;
         case 'gap':
-            updateStats(state.targets[key].stream, ms, 'STREAM');
+            updateStats(tgts[key].stream, ms, 'STREAM');
             break;
         case 'echo':
-            updateStats(state.targets[key].echo, ms, 'ECHO');
+            updateStats(tgts[key].echo, ms, 'ECHO');
             break;
         case 'tool_execution': // NEW: For MCP tools (RAG, Ollama, etc.)
             // Ensure tool_execution stats exist (for backward compatibility with old state files)
-            if (!state.targets[key].tool_execution) {
-                state.targets[key].tool_execution = createEmptyStats(SEED_TOOL_EXECUTION);
+            if (!tgts[key].tool_execution) {
+                tgts[key].tool_execution = createEmptyStats(SEED_TOOL_EXECUTION);
             }
-            updateStats(state.targets[key].tool_execution, ms, 'TOOL_EXECUTION');
+            updateStats(tgts[key].tool_execution, ms, 'TOOL_EXECUTION');
             break;
         case 'heartbeat':
             updateStats(state.infra, ms, 'INFRA');
@@ -347,7 +353,7 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
     }
 
     const now = Date.now();
-    const profile = state.targets[target.toLowerCase()];
+    const profile = /** @type {Record<string, any>} */ (state.targets)[target.toLowerCase()];
 
     // [V46] Decay de targets inativos
     if (profile) {
@@ -410,7 +416,7 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
 
 /**
  * @typedef {object} GetToolTimeoutOptions
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {number} [contextSize] - Tamanho do contexto em bytes.
  */
 /**
  * Calcula timeout adaptativo para execução de MCP tools baseado em histórico.
@@ -420,8 +426,7 @@ async function getAdjustedTimeout(target = 'generic', messageCount = 0, phase = 
  * **Unidades:** Retorna timeout em ms, min 10s, max 300s (5min).
  *
  * @param {string} toolName - Nome do tool (e.g., 'ollama_generate', 'rag_search')
- * @param {GetToolTimeoutOptions} [options={}] - Opções de contexto
- * @param {number} [options.contextSize=0] - Tamanho do contexto em bytes
+ * @param {GetToolTimeoutOptions} [options={}] - Opções de contexto (contextSize: tamanho em bytes)
  * @returns {Promise<AdaptiveTimeoutResult>} Objeto com timeout calculado e metadados
  */
 async function getToolTimeout(toolName, options = {}) {
@@ -431,7 +436,7 @@ async function getToolTimeout(toolName, options = {}) {
 
     const target = `tool:${toolName}`;
     const now = Date.now();
-    const profile = state.targets[target];
+    const profile = /** @type {Record<string, any>} */ (state.targets)[target];
 
     // [V46] Decay de targets inativos
     if (profile) {
@@ -520,7 +525,7 @@ async function getStabilityMetrics(target = 'generic') {
         await readyPromise;
     }
 
-    const profile = state.targets[target.toLowerCase()];
+    const profile = /** @type {Record<string, any>} */ (state.targets)[target.toLowerCase()];
     if (!profile || profile.stream.count === 0) {
         return { score: 100, status: 'STABLE', samples: 0 };
     }
@@ -572,7 +577,9 @@ async function getHealthStatus() {
 
 /**
  * @typedef {object} GetPercentileTimeoutStats
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {number} avg - Média do tempo de resposta em ms.
+ * @property {number} var - Variância (não desvio padrão) do tempo de resposta.
+ * @property {number} count - Quantidade de amostras coletadas.
  */
 /**
  * Calcula timeout baseado em percentil estatístico assumindo distribuição normal.
@@ -594,7 +601,7 @@ function getPercentileTimeout(stats, percentile = 95) {
 
     const avg = Math.max(1, stats.avg);
     const std = Math.sqrt(Math.max(0, stats.var));
-    const z = z_scores[percentile] || 1.645;
+    const z = /** @type {Record<number, number>} */ (z_scores)[percentile] || 1.645;
 
     return Math.round(avg + z * std);
 }
@@ -636,7 +643,7 @@ export const values = {
         return Math.round(state.infra.avg * 5);
     },
     get ECHO_TIMEOUT() {
-        return Math.round((state.targets.chatgpt?.echo.avg || SEED_ECHO) * 3);
+        return Math.round(((/** @type {Record<string, any>} */ (state.targets))['chatgpt']?.echo.avg || SEED_ECHO) * 3);
     },
     get PROGRESS_TIMEOUT() {
         return 60000;

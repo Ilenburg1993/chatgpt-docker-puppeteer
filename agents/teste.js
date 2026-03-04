@@ -16,7 +16,7 @@
  * ============================================================================
  */
 
-const OpenAI = require('openai');
+import OpenAI from 'openai';
 
 /* ---------------------------------------------------------------------------
  * Client configuration — GitHub Models (OpenAI-compatible API)
@@ -39,7 +39,7 @@ const tools = {
         return new Date().toISOString();
     },
 
-    echo: ({ text }) => {
+    echo: (/** @type {{text: string}} */ { text }) => {
         return `Echo: ${text}`;
     },
 };
@@ -48,6 +48,7 @@ const tools = {
  * Initial conversation state
  * ---------------------------------------------------------------------------
  */
+/** @type {any[]} */
 const messages = [
     {
         role: 'system',
@@ -121,26 +122,34 @@ async function runAgent() {
         if (message.tool_calls && message.tool_calls.length > 0) {
             messages.push(message);
 
-            for (const call of message.tool_calls) {
+            for (const _call of message.tool_calls) {
+                const call = /** @type {{id: string, function: {name: string, arguments: string}}} */ (
+                    /** @type {any} */ (_call)
+                );
                 const toolName = call.function.name;
                 const args = JSON.parse(call.function.arguments || '{}');
 
-                if (!tools[toolName]) {
+                const toolRegistry = /** @type {Record<string, (a: any) => unknown>} */ (
+                    /** @type {unknown} */ (tools)
+                );
+                if (!toolRegistry[toolName]) {
                     throw new Error(`Unknown tool requested: ${toolName}`);
                 }
 
-                const result = await tools[toolName](args);
+                const result = await toolRegistry[toolName](args);
 
-                messages.push({
-                    role: 'tool',
-                    tool_call_id: call.id,
-                    content: [
-                        {
-                            type: 'text',
-                            text: String(result),
-                        },
-                    ],
-                });
+                messages.push(
+                    /** @type {any} */ ({
+                        role: 'tool',
+                        tool_call_id: call.id,
+                        content: [
+                            {
+                                type: 'text',
+                                text: String(result),
+                            },
+                        ],
+                    })
+                );
             }
 
             continue;
@@ -152,7 +161,11 @@ async function runAgent() {
          */
         if (message.content) {
             console.log('\n[MODEL OUTPUT]\n');
-            console.log(message.content.map(c => c.text).join('\n'));
+            console.log(
+                /** @type {any[]} */ (/** @type {unknown} */ (message.content))
+                    .map((/** @type {{text?: string}} */ c) => c.text)
+                    .join('\n')
+            );
             break;
         }
 

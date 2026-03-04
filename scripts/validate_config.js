@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
 import fs from 'node:fs';
-// @ts-nocheck
 import path from 'node:path';
 
 const CONFIG_FILES = {

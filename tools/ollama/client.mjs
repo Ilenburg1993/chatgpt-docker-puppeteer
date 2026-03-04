@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Ollama HTTP Client (Dual-URL Architecture v5.1)
  *
@@ -83,6 +84,10 @@ export class OllamaClient {
         }
     }
 
+    /**
+     * @param {any} value
+     * @param {boolean} [defaultValue]
+     */
     _parseBoolean(value, defaultValue = false) {
         if (value === undefined || value === null || value === '') {
             return defaultValue;
@@ -90,6 +95,7 @@ export class OllamaClient {
         return String(value).toLowerCase() === 'true';
     }
 
+    /** @param {any} value */
     _normalizeRuntimePreference(value) {
         const raw = String(value || 'auto')
             .trim()
@@ -100,6 +106,7 @@ export class OllamaClient {
         return 'auto';
     }
 
+    /** @param {any} value */
     _buildLocalAllowedModels(value) {
         if (Array.isArray(value)) {
             return new Set(value.map(v => String(v || '').trim()).filter(Boolean));
@@ -116,6 +123,7 @@ export class OllamaClient {
         );
     }
 
+    /** @param {any} model */
     _assertLocalModelAllowed(model) {
         if (!model) return;
 
@@ -140,13 +148,14 @@ export class OllamaClient {
     }
 
     _getCloudHeaders() {
-        const headers = { 'Content-Type': 'application/json' };
+        const headers = /** @type {Record<string, string>} */ ({ 'Content-Type': 'application/json' });
         if (this.cloudApiKey) {
-            headers.Authorization = `Bearer ${this.cloudApiKey}`;
+            headers['Authorization'] = `Bearer ${this.cloudApiKey}`;
         }
         return headers;
     }
 
+    /** @param {any} error */
     _isAbortError(error) {
         return error?.name === 'AbortError' || String(error?.message || '').includes('cancelled by user');
     }
@@ -228,6 +237,11 @@ export class OllamaClient {
         );
     }
 
+    /**
+     * @param {any} runtime
+     * @param {any} requestBody
+     * @param {any} [signal]
+     */
     async _requestGenerateAtRuntime(runtime, requestBody, signal) {
         const baseUrl = runtime === 'cloud' ? this.cloudBaseUrl : this.localBaseUrl;
         const headers = runtime === 'cloud' ? this._getCloudHeaders() : { 'Content-Type': 'application/json' };
@@ -281,6 +295,7 @@ export class OllamaClient {
         const defaultModel = process.env.OLLAMA_DEFAULT_MODEL || 'qwen3-coder-next';
         const defaultMaxTokens = Number(process.env.OLLAMA_MAX_TOKENS || 1000);
 
+        const _opts = /** @type {Record<string, any>} */ (options);
         const {
             temperature = 0.7,
             num_predict = defaultMaxTokens,
@@ -289,7 +304,7 @@ export class OllamaClient {
             runtime,
             signal,
             ...otherOptions
-        } = options;
+        } = _opts;
 
         const selectedModel = model || defaultModel;
 
@@ -336,7 +351,7 @@ export class OllamaClient {
                 if (fallbackDisabledCase) {
                     throw new Error(
                         'Cloud-first generation failed and local fallback is disabled. ' +
-                            `cloud_error=\"${primaryError.message}\"`
+                            `cloud_error="${/** @type {any} */ (primaryError).message}"`
                     );
                 }
 
@@ -346,7 +361,7 @@ export class OllamaClient {
                     }
                     throw new Error(`Ollama generate timeout (>${this.generateTimeout}ms)`);
                 }
-                throw new Error(`Ollama generate error: ${primaryError.message}`);
+                throw new Error(`Ollama generate error: ${/** @type {any} */ (primaryError).message}`);
             }
 
             attempts.push('local');
@@ -365,7 +380,7 @@ export class OllamaClient {
             } catch (fallbackError) {
                 throw new Error(
                     'Cloud-first generation failed and local fallback also failed. ' +
-                        `cloud_error="${primaryError.message}"; local_error="${fallbackError.message}"`
+                        `cloud_error="${/** @type {any} */ (primaryError).message}"; local_error="${/** @type {any} */ (fallbackError).message}"`
                 );
             }
         }
@@ -397,7 +412,7 @@ export class OllamaClient {
             throw new Error('Text must be a non-empty string');
         }
 
-        const { signal } = options;
+        const { signal } = /** @type {Record<string, any>} */ (options);
         const baseUrl = this.localBaseUrl;
         console.error(`[OllamaClient] embed() using local: ${baseUrl}`);
 
@@ -433,16 +448,17 @@ export class OllamaClient {
 
             return data.embedding;
         } catch (error) {
-            if (error?.name === 'AbortError') {
+            if (/** @type {any} */ (error)?.name === 'AbortError') {
                 if (signal?.aborted) {
                     throw new Error('Ollama embed cancelled by user');
                 }
                 throw new Error(`Ollama embed timeout (>${this.embedTimeout}ms)`);
             }
-            throw new Error(`Ollama embed error: ${error.message}`);
+            throw new Error(`Ollama embed error: ${/** @type {any} */ (error).message}`);
         }
     }
 
+    /** @param {any} runtime */
     async _listModelsAtRuntime(runtime) {
         const baseUrl = runtime === 'cloud' ? this.cloudBaseUrl : this.localBaseUrl;
         const headers = runtime === 'cloud' ? this._getCloudHeaders() : {};
@@ -478,23 +494,23 @@ export class OllamaClient {
             fallback_local_enabled: this.nonEmbeddingLocalFallback,
             non_embedding_runtime: this.nonEmbeddingRuntime,
             local_model_profile: this.localModelProfile,
-            cloud_models: [],
-            local_models: [],
-            errors: {},
+            cloud_models: /** @type {any[]} */ ([]),
+            local_models: /** @type {any[]} */ ([]),
+            errors: /** @type {Record<string, string>} */ ({}),
         };
 
         if (this.cloudEnabled) {
             try {
                 details.cloud_models = await this._listModelsAtRuntime('cloud');
             } catch (error) {
-                details.errors.cloud = error.message;
+                details.errors.cloud = /** @type {any} */ (error).message;
             }
         }
 
         try {
             details.local_models = await this._listModelsAtRuntime('local');
         } catch (error) {
-            details.errors.local = error.message;
+            details.errors.local = /** @type {any} */ (error).message;
         }
 
         return details;
@@ -572,7 +588,7 @@ export class OllamaClient {
             runtimePreference: options.runtime,
         });
 
-        const tryRuntime = async runtime => {
+        const tryRuntime = async (/** @type {string} */ runtime) => {
             const baseUrl = runtime === 'cloud' ? this.cloudBaseUrl : this.localBaseUrl;
             const headers = runtime === 'cloud' ? this._getCloudHeaders() : { 'Content-Type': 'application/json' };
 
@@ -604,10 +620,10 @@ export class OllamaClient {
                 !this._isAbortError(primaryError);
 
             if (!canFallback) {
-                if (primaryError?.name === 'AbortError') {
+                if (/** @type {any} */ (primaryError)?.name === 'AbortError') {
                     throw new Error(`Ollama model info timeout (>${this.listTimeout}ms)`);
                 }
-                throw new Error(`Ollama model info error: ${primaryError.message}`);
+                throw new Error(`Ollama model info error: ${/** @type {any} */ (primaryError).message}`);
             }
 
             try {
@@ -615,7 +631,7 @@ export class OllamaClient {
             } catch (fallbackError) {
                 throw new Error(
                     'Ollama model info failed in cloud and local fallback. ' +
-                        `cloud_error="${primaryError.message}"; local_error="${fallbackError.message}"`
+                        `cloud_error="${/** @type {any} */ (primaryError).message}"; local_error="${/** @type {any} */ (fallbackError).message}"`
                 );
             }
         }

@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import EventEmitter from 'node:events';
 import { log } from '#core/logger';
 

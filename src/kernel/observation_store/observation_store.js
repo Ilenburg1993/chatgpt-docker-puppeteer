@@ -23,7 +23,6 @@ import EventEmitter from 'node:events';
  * P9.5: Adiciona memoization de JSON serialization
  *
  * @param {CreateObservationRecordParams} params
- * @param {CreateObservationRecordOptions} [options]
  * @returns {object}
  */
 function createObservationRecord({ msgId, correlationId, source, payload, originalTimestamp }) {

@@ -56,7 +56,6 @@ function _normalizePolicy(policy) {
  */
 /**
  * @param {CreateMissionInput} input={}]
- * @param {CreateMissionOptions} [options]
   * @returns {Mission|null}
  */
 function createMission({

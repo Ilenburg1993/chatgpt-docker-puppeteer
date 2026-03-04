@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
 import { ConnectionOrchestrator } from '../ConnectionOrchestrator.js';

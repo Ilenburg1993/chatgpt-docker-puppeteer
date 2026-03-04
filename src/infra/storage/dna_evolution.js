@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/infra/storage/dna_evolution.js
    Audit Level: 750 — Automatic DNA Evolution Engine

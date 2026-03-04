@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import createEmitAck from './emit_ack.js';
 import createEmitCommand from './emit_command.js';
 import createEmitEvent from './emit_event.js';
@@ -29,11 +29,6 @@ import createEmitEvent from './emit_event.js';
  * **Unidades:** Dependências seguem contratos NERV (envelopes, buffers, correlation, telemetry).
  *
  * @param {CreateEmissionDeps} deps - Dependências do módulo
- * @param {object} deps.envelopes - Sistema de envelopes (normalização + validação)
- * @param {object} deps.buffers - Subsistema de buffers (fila outbound)
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria do NERV
- * @param {CreateEmissionOptions} [options]
  * @returns {object} Módulo de emissão com métodos sendCommand, sendEvent, sendAck
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

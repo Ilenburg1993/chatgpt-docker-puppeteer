@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { promises as fs } from 'node:fs';
 import fss from 'node:fs';
 import crypto from 'node:crypto';

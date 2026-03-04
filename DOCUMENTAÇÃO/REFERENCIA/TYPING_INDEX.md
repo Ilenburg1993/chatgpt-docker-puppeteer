@@ -1,40 +1,46 @@
 # Typing Documentation Index
 
-This is the single human entry point for typing, JSDoc, schema, and contract governance.
+> **Última revisão**: 4 de março de 2026
 
-## Core Canon
+## Hub operacional (ponto de entrada para agentes e desenvolvedores)
 
-- [`TYPING_JSDOC_CANON.md`](./TYPING_JSDOC_CANON.md): normative source of truth
-- [`TYPING_CONTRACT_MATRIX.md`](./TYPING_CONTRACT_MATRIX.md): operational ownership and validator map
-- [`TYPING_AUTOMATION_INDEX.md`](./TYPING_AUTOMATION_INDEX.md): supported automation surface
+O hub `DOCUMENTAÇÃO/TIPAGEM E JSDOC/` é o ponto de entrada para todo trabalho de tipagem:
 
-## Focused References
+- [`../TIPAGEM E JSDOC/README.md`](../TIPAGEM%20E%20JSDOC/README.md): entrada, estado atual, regras
+  absolutas
+- [`../TIPAGEM E JSDOC/PADROES.md`](../TIPAGEM%20E%20JSDOC/PADROES.md): como escrever JSDoc e
+  resolver cada tipo de erro
+- [`../TIPAGEM E JSDOC/ROADMAP.md`](../TIPAGEM%20E%20JSDOC/ROADMAP.md): roadmap de execução ativo
+  com checklist
+- [`../TIPAGEM E JSDOC/SCRIPTS-E-AUTOMACAO.md`](../TIPAGEM%20E%20JSDOC/SCRIPTS-E-AUTOMACAO.md):
+  comandos npm, scripts de análise
+- [`../TIPAGEM E JSDOC/CONFIGURACOES-TSCONFIG.md`](../TIPAGEM%20E%20JSDOC/CONFIGURACOES-TSCONFIG.md):
+  lanes strict, flags, tsconfig
 
-- [`TYPING_SCHEMA_TSSERVER_CANON.md`](./TYPING_SCHEMA_TSSERVER_CANON.md): focused explanation of
-  schema layering and the local tsserver wrapper
-- [`STRICT_MIGRATION_CHECKLIST.md`](./STRICT_MIGRATION_CHECKLIST.md): tactical reference for strict
-  migration work
-- [`SCRIPTS.md`](./SCRIPTS.md): broader script reference outside typing-only automation
+## Referência de governança (normativa)
 
-## Active Plan and Lifecycle
+- [`TYPING_JSDOC_CANON.md`](./TYPING_JSDOC_CANON.md): canon normativo — regras de governança, change
+  control
+- [`TYPING_CONTRACT_MATRIX.md`](./TYPING_CONTRACT_MATRIX.md): mapa de propriedade e validators por
+  contrato
+- [`TYPING_AUTOMATION_INDEX.md`](./TYPING_AUTOMATION_INDEX.md): superfície canônica de automação
+- [`TYPING_SCHEMA_TSSERVER_CANON.md`](./TYPING_SCHEMA_TSSERVER_CANON.md): camada de schemas e
+  wrapper LSP
 
-- [`../PLANOS/TYPING_CANON_LIFECYCLE.md`](../PLANOS/TYPING_CANON_LIFECYCLE.md): document lifecycle
-  and archival policy
-- [`../PLANOS/TYPING_PHASE2_HARDENING_PLAN.md`](../PLANOS/TYPING_PHASE2_HARDENING_PLAN.md): phase 2
-  historical execution plan, preserved as context rather than normative rule
-- [`../PLANOS/PLANO_HARDENING_TIPAGEM.md`](../PLANOS/PLANO_HARDENING_TIPAGEM.md): broader typing
-  hardening plan, non-normative once superseded by the canon
+## Skills de apoio
 
-## Historical Material
+- `.github/skills/jsdoc-authoring/SKILL.md`
+- `.github/skills/typing-node24-esm-tsserver/SKILL.md`
 
-- [`../ARQUIVO_MORTO/README.md`](../ARQUIVO_MORTO/README.md): historical archive only
-- [`../ARQUIVO_MORTO/CHECKLISTS_HISTORICOS/README.md`](../ARQUIVO_MORTO/CHECKLISTS_HISTORICOS/README.md):
-  preserved historical checklists
+## Histórico (não-normativo)
 
-## Reading Order
+- [`../ARQUIVO_MORTO/SUPERSEDED/PLANO_HARDENING_TIPAGEM.md`](../ARQUIVO_MORTO/SUPERSEDED/PLANO_HARDENING_TIPAGEM.md)
+- [`../ARQUIVO_MORTO/SUPERSEDED/TYPING_PHASE2_HARDENING_PLAN.md`](../ARQUIVO_MORTO/SUPERSEDED/TYPING_PHASE2_HARDENING_PLAN.md)
+- [`../ARQUIVO_MORTO/SUPERSEDED/STRICT_MIGRATION_CHECKLIST.md`](../ARQUIVO_MORTO/SUPERSEDED/STRICT_MIGRATION_CHECKLIST.md)
 
-1. Read the canon.
-2. Read the contract matrix.
-3. Read the automation index.
-4. Read focused references only for the specific subsystem.
-5. Consult historical material only when you need traceability.
+## Ordem de leitura
+
+1. Leia `TIPAGEM E JSDOC/README.md` para o estado atual e regras.
+2. Leia `TIPAGEM E JSDOC/PADROES.md` antes de qualquer edição.
+3. Leia `TIPAGEM E JSDOC/ROADMAP.md` para saber o que fazer em seguida.
+4. Consulte o canon normativo apenas para change control e governança.

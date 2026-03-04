@@ -274,7 +274,8 @@ class ConfigurationManager extends EventEmitter {
 
             return this.currentConfig;
         } catch (err) {
-            log('WARN', `[CONFIG] Erro crítico no reload: ${err.message}. Mantendo estado anterior.`, correlationId);
+            const caught = /** @type {any} */ (err);
+            log('WARN', `[CONFIG] Erro crítico no reload: ${caught.message}. Mantendo estado anterior.`, correlationId);
             return this.currentConfig;
         }
     }
@@ -584,8 +585,8 @@ class ConfigurationManager extends EventEmitter {
      * Also falls back to process.env when the requested key exists there.
      *
      * @param {string} key - The key or dot-path to retrieve from the current configuration.
-     * @param {object} [fallback] - Value to return when the key is not present.
-     * @returns {object} The value from configuration, environment, or the provided fallback.
+     * @param {unknown} [fallback] - Value to return when the key is not present.
+     * @returns {unknown} The value from configuration, environment, or the provided fallback.
      */
     get(key, fallback) {
         try {
@@ -593,13 +594,13 @@ class ConfigurationManager extends EventEmitter {
 
             // Fast-path: top-level direct property
             if (Object.prototype.hasOwnProperty.call(this.currentConfig, key)) {
-                const v = this.currentConfig[key];
+                const v = /** @type {any} */ (this.currentConfig)[key];
                 return v === undefined ? fallback : v;
             }
 
             // Dot-path traversal (e.g. 'a.b.c')
             const parts = key.split('.');
-            let val = this.currentConfig;
+            let val = /** @type {any} */ (this.currentConfig);
             for (const p of parts) {
                 if (val && Object.prototype.hasOwnProperty.call(val, p)) {
                     val = val[p];

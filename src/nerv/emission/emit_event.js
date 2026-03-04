@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { MessageType } from '#shared/nerv/constants';
 import { getCorrelationId } from '#shared/nerv/envelope_reader';
 
@@ -28,11 +28,6 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
  * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
  * @param {CreateEmitEventDeps} deps - Dependências do emissor
- * @param {object} deps.envelopes - Sistema de envelopes (normalize, assertValid)
- * @param {object} deps.buffers - Subsistema de buffers outbound
- * @param {object} deps.correlation - Sistema de correlação histórica
- * @param {object} deps.telemetry - Interface de telemetria NERV
- * @param {CreateEmitEventOptions} [options]
  * @returns {object} Emissor com método emitEvent
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */

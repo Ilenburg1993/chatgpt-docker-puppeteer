@@ -1,5 +1,4 @@
 // @ts-check
-// @ts-nocheck
 import path from 'node:path';
 
 const ROOT = path.join(import.meta.dirname, '..');

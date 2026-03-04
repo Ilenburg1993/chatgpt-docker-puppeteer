@@ -99,7 +99,6 @@ function _buildMissionContext(db, missionId) {
  */
 /**
  * @param {BuildTasksWhereFilters} filters={}]
- * @param {BuildTasksWhereOptions} [options]
  */
 function _buildTasksWhere({ status, stage, missionId, target, blocked, search, priorityGte } = {}) {
     const where = [];

@@ -3,6 +3,31 @@ import { ref, computed, onMounted } from 'vue';
 import { useNotifications } from './useNotifications.js';
 import { http } from '@/lib/http';
 
+/**
+ * @typedef {object} AuthUser
+ * @property {string} [id]
+ * @property {string} [username]
+ * @property {string} [role]
+ * @property {string[]} [permissions]
+ */
+
+/**
+ * @typedef {object} UseAuthReturn
+ * @property {import('vue').Ref<AuthUser|null>} user
+ * @property {import('vue').Ref<boolean>} loading
+ * @property {import('vue').ComputedRef<boolean>} isAuthenticated
+ * @property {import('vue').ComputedRef<boolean>} isAdmin
+ * @property {import('vue').ComputedRef<boolean>} isOwner
+ * @property {import('vue').ComputedRef<boolean>} isOperator
+ * @property {import('vue').ComputedRef<string[]>} permissions
+ * @property {(permission: string) => boolean} can
+ * @property {(username: string, password: string) => Promise<boolean>} login
+ * @property {() => Promise<void>} logout
+ * @property {() => Promise<boolean>} verifyToken
+ * @property {(url: string, options?: RequestInit) => Promise<Response>} authenticatedFetch
+ * @property {() => string|null} getToken
+ */
+
 const authUser = ref(null);
 const authLoading = ref(false);
 let verifyInFlight = null;
@@ -16,7 +41,7 @@ const clearTokenInStorage = () => localStorage.removeItem('auth_token');
  * Composable para gerenciamento de autenticação JWT
  * Gerencia login, logout, e verificação de token automaticamente
  *
- * @returns {object} Estado e funções de autenticação
+ * @returns {UseAuthReturn} Estado e funções de autenticação
  * @sideEffects - Gerencia token JWT no localStorage, faz verificações automáticas
  */
 export function useAuth() {

@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { BootstrapStateSchema } from './bootstrap_state_schema.js';
 import { DnaSchema, SelectorProtocolSchema } from './dna_schema.js';
 import * as migrator from './migrator_v4_to_v5.js';

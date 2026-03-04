@@ -57,7 +57,6 @@ function _safeId(raw) {
  * @param {string} taskId - Task ID
  * @param {SafeUpdateTaskUpdates} updates - Updates
  * @param {SafeUpdateTaskOptions} [options] - Options
- * @param {boolean} [options.throwOnConflict=false] - If true, re-throws
  * @returns {object|null} Updated task or null on conflict
  */
 function _safeUpdateTask(taskId, updates, { throwOnConflict = false } = {}) {

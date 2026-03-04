@@ -4,19 +4,19 @@ This index defines the canonical automation surface for typing, JSDoc, schema, a
 
 ## Supported Commands
 
-| Command | Class | Primary Entry Point | Input | Output | Schema | Contract Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| `typecheck:repo` | gate | `package.json` -> `tsc` configs | Repository source tree | Exit code only | n/a | Canonical |
-| `typecheck:strict:public` | gate | `config/typing/strict/tsconfig.strict.public.json` | Public-contract lane files | Exit code only | n/a | Canonical |
-| `typecheck:strict:all` | gate | `package.json` strict chain | Strict lane set | Exit code only | n/a | Canonical |
-| `typecheck:declarations` | gate | `tsconfig.declarations.json` | Public JS-first surfaces | Emitted `.d.ts` in `tmp/types-public` plus exit code | n/a | Canonical |
-| `jsdoc:coverage:json` | report | `scripts/analysis/jsdoc_coverage_cli.mjs` | JS source files | JSON report | `schemas/typing/jsdoc-coverage-report.schema.json` | Canonical |
-| `jsdoc:coverage:public` | report | `scripts/analysis/jsdoc_coverage_cli.mjs --roots ...` | Public-scope JS source files | Console report | Derived from JSDoc report schema | Canonical |
-| `analyze:typing` | audit | `scripts/analysis/typing/typing_hardening_audit.mjs` | Source tree plus strict configs | Console audit | Internal structured JSON in `--format json` mode | Canonical |
-| `analyze:typing:public` | audit | `scripts/analysis/typing/typing_hardening_audit.mjs --scope public` | Public-scope files | Console audit | Internal structured JSON in `--format json` mode | Canonical |
-| `analyze:tsserver-contract` | drift-check | `scripts/analysis/typing/tsserver_contract_audit.mjs` | Daemon, schema, skill docs | Console audit plus exit code | `schemas/typing/tsserver-tool-contract.schema.json` | Canonical |
-| `check:schemas:typing` | governance check | `package.json` schema validation chain | Schema files and report outputs | Exit code plus validation logs | `schemas/typing/**` | Canonical |
-| `check:skills:strict` | governance check | `scripts/ci/verify-skills-governance.mjs --strict` | Canonical skills plus `.codex` stubs | Exit code plus validation logs | n/a | Canonical |
+| Command                     | Class            | Primary Entry Point                                                 | Input                                | Output                                               | Schema                                              | Contract Status |
+| --------------------------- | ---------------- | ------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- | --------------------------------------------------- | --------------- |
+| `typecheck:repo`            | gate             | `package.json` -> `tsc` configs                                     | Repository source tree               | Exit code only                                       | n/a                                                 | Canonical       |
+| `typecheck:strict:public`   | gate             | `config/typing/strict/tsconfig.strict.public.json`                  | Public-contract lane files           | Exit code only                                       | n/a                                                 | Canonical       |
+| `typecheck:strict:all`      | gate             | `package.json` strict chain                                         | Strict lane set                      | Exit code only                                       | n/a                                                 | Canonical       |
+| `typecheck:declarations`    | gate             | `tsconfig.declarations.json`                                        | Public JS-first surfaces             | Emitted `.d.ts` in `tmp/types-public` plus exit code | n/a                                                 | Canonical       |
+| `jsdoc:coverage:json`       | report           | `scripts/analysis/jsdoc_coverage_cli.mjs`                           | JS source files                      | JSON report                                          | `schemas/typing/jsdoc-coverage-report.schema.json`  | Canonical       |
+| `jsdoc:coverage:public`     | report           | `scripts/analysis/jsdoc_coverage_cli.mjs --roots ...`               | Public-scope JS source files         | Console report                                       | Derived from JSDoc report schema                    | Canonical       |
+| `analyze:typing`            | audit            | `scripts/analysis/typing/typing_hardening_audit.mjs`                | Source tree plus strict configs      | Console audit                                        | Internal structured JSON in `--format json` mode    | Canonical       |
+| `analyze:typing:public`     | audit            | `scripts/analysis/typing/typing_hardening_audit.mjs --scope public` | Public-scope files                   | Console audit                                        | Internal structured JSON in `--format json` mode    | Canonical       |
+| `analyze:tsserver-contract` | drift-check      | `scripts/analysis/typing/tsserver_contract_audit.mjs`               | Daemon, schema, skill docs           | Console audit plus exit code                         | `schemas/typing/tsserver-tool-contract.schema.json` | Canonical       |
+| `check:schemas:typing`      | governance check | `package.json` schema validation chain                              | Schema files and report outputs      | Exit code plus validation logs                       | `schemas/typing/**`                                 | Canonical       |
+| `check:skills:strict`       | governance check | `scripts/ci/verify-skills-governance.mjs --strict`                  | Canonical skills plus `.codex` stubs | Exit code plus validation logs                       | n/a                                                 | Canonical       |
 
 ## Classification Rules
 

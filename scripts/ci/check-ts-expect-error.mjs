@@ -37,7 +37,7 @@ try {
     );
 } catch (/** @type {unknown} */ e) {
     // rg retorna exit 1 se não encontrou matches — isso é o resultado esperado (zero ocorrências).
-    rawOutput = e.stdout ?? '';
+    rawOutput = /** @type {any} */ (e)?.stdout ?? '';
 }
 
 /** @typedef {{ file: string, line: number, text: string }} Match */

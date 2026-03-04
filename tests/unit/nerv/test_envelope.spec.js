@@ -1,5 +1,4 @@
 // @ts-check
-// @ts-nocheck
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { createEnvelope } from '#shared/nerv/envelope';

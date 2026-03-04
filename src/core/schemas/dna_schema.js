@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { z } from 'zod';
 import { TIMESTAMP_SCHEMA } from './shared_types.js';
 

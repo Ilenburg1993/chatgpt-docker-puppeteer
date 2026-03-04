@@ -1,10 +1,8 @@
 # scripts/analysis
 
 **Propósito**: Scripts de análise estática do código — grafo de dependências, variáveis, strings
-mágicas e cobertura JSDoc.  
-**Status**: Canônico de apoio.  
-**Público**: Mantenedores e ferramentas de CI de qualidade.  
-**Última atualização**: 2 de março de 2026.
+mágicas e cobertura JSDoc. **Status**: Canônico de apoio. **Público**: Mantenedores e ferramentas de
+CI de qualidade. **Última atualização**: 2 de março de 2026.
 
 ## O que esta pasta contém
 

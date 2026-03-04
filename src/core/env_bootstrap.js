@@ -16,7 +16,7 @@ const BOOTSTRAP_FLAG = '__MAESTRO_ENV_BOOTSTRAPPED__';
  * @returns {boolean} `true` quando bootstrap ocorre nesta chamada; `false` quando já estava aplicado.
  */
 function ensureEnvBootstrap() {
-    if (globalThis[BOOTSTRAP_FLAG]) {
+    if (/** @type {Record<string, unknown>} */ (globalThis)[BOOTSTRAP_FLAG]) {
         return false;
     }
 
@@ -45,7 +45,7 @@ function ensureEnvBootstrap() {
         delete process.env.NO_COLOR;
     }
 
-    globalThis[BOOTSTRAP_FLAG] = true;
+    /** @type {Record<string, unknown>} */ (globalThis)[BOOTSTRAP_FLAG] = true;
     return true;
 }
 

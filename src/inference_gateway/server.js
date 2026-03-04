@@ -10,16 +10,20 @@ import { inferenceGateway } from './gateway.js';
  */
 /** @typedef {Error & { statusCode?: number, code?: string }} InferenceGatewayServerError */
 
+/** @param {any} req */
 function readJsonBody(req) {
     return new Promise((resolve, reject) => {
         let raw = '';
-        req.on('data', chunk => {
-            raw += String(chunk);
-            if (raw.length > 2_000_000) {
-                reject(Object.assign(new Error('payload too large'), { statusCode: 413 }));
-                req.destroy();
+        req.on(
+            'data',
+            /** @param {any} chunk */ chunk => {
+                raw += String(chunk);
+                if (raw.length > 2_000_000) {
+                    reject(Object.assign(new Error('payload too large'), { statusCode: 413 }));
+                    req.destroy();
+                }
             }
-        });
+        );
         req.on('end', () => {
             if (!raw.trim()) return resolve({});
             try {
@@ -32,6 +36,11 @@ function readJsonBody(req) {
     });
 }
 
+/**
+ * @param {any} res
+ * @param {any} statusCode
+ * @param {any} body
+ */
 function writeJson(res, statusCode, body) {
     res.statusCode = statusCode;
     res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -75,8 +84,9 @@ export function createInferenceGatewayServer(options = {}) {
                 return writeJson(res, 200, out);
             }
             if (req.method === 'POST' && url.pathname === '/v1/validate/generate') {
-                const body =
-                    /** @type {Parameters<NonNullable<typeof gateway.validateGenerate>>[0]} */ (await readJsonBody(req));
+                const body = /** @type {Parameters<NonNullable<typeof gateway.validateGenerate>>[0]} */ (
+                    await readJsonBody(req)
+                );
                 const out =
                     typeof gateway.validateGenerate === 'function'
                         ? gateway.validateGenerate(body)
@@ -100,7 +110,7 @@ export function createInferenceGatewayServer(options = {}) {
             return writeJson(res, typedError.statusCode || 500, {
                 ok: false,
                 error: typedError.code || 'INFERENCE_GATEWAY_ERROR',
-                message: error?.message || String(error),
+                message: /** @type {any} */ (error)?.message || String(error),
             });
         }
     });

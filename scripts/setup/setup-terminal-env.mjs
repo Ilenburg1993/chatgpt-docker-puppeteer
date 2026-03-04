@@ -17,8 +17,16 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 
 /**
+ * @typedef {object} EnvironmentInfo
+ * @property {boolean} isProduction - Indica se está em ambiente de produção
+ * @property {boolean} hasDistBuild - Indica se o build dist existe
+ * @property {string} cwd - Diretório de trabalho atual
+ * @property {boolean} isInDist - Indica se está no diretório dist
+ */
+
+/**
  * Detecta o ambiente atual
- * @returns {object} Informações do ambiente
+ * @returns {EnvironmentInfo} Informações do ambiente
  */
 function detectEnvironment() {
     const hasDistBuild = existsSync(join(projectRoot, 'dist/main.js'));
@@ -35,7 +43,10 @@ function detectEnvironment() {
 
 /**
  * @typedef {object} GeneratePromptConfigEnv
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {boolean} isProduction - Indica se está em produção
+ * @property {boolean} isInDist - Indica se está no diretório dist
+ * @property {boolean} [hasDistBuild] - Se o build dist existe
+ * @property {string} [cwd] - Diretório de trabalho atual
  */
 /**
  * Gera configuração do prompt do terminal
@@ -64,7 +75,10 @@ export PROMPT_COMMAND='echo -e "\\e[1;32m💻 Ambiente de Desenvolvimento\\e[0m"
 
 /**
  * @typedef {object} GenerateAliasesEnv
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {boolean} isProduction - Indica se está em produção
+ * @property {boolean} isInDist - Indica se está no diretório dist
+ * @property {boolean} [hasDistBuild] - Se o build dist existe
+ * @property {string} [cwd] - Diretório de trabalho atual
  */
 /**
  * Gera aliases úteis baseados no ambiente

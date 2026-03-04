@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
@@ -11,7 +11,7 @@ let singletonDb = null;
 
 /**
  * Função exportada: resolveDbPath.
- * @returns {object|null}
+ * @returns {string}
  */
 function resolveDbPath() {
     const fromEnv = process.env.MAESTRO_DB_PATH || process.env.DB_PATH || null;
@@ -53,7 +53,7 @@ function migrate(db) {
         db
             .prepare('SELECT version FROM schema_migrations ORDER BY version ASC')
             .all()
-            .map(r => Number(r.version))
+            .map(/** @param {any} r */ r => Number(r.version))
     );
 
     for (const migration of MIGRATIONS) {
@@ -84,7 +84,7 @@ function migrate(db) {
 
 /**
  * Função exportada: getDb.
- * @returns {object|null}
+ * @returns {import('better-sqlite3').Database}
  */
 function getDb() {
     if (singletonDb) {
@@ -96,7 +96,10 @@ function getDb() {
     try {
         fs.mkdirSync(dir, { recursive: true });
     } catch (err) {
-        log('ERROR', `[DB] Failed to create DB directory: ${dir} - ${err?.message || String(err)}`);
+        log(
+            'ERROR',
+            `[DB] Failed to create DB directory: ${dir} - ${/** @type {any} */ (err)?.message || String(err)}`
+        );
         throw err;
     }
 
@@ -122,7 +125,7 @@ function closeDb() {
     try {
         singletonDb.close();
     } catch (err) {
-        log('WARN', `[DB] Failed to close SQLite DB: ${err?.message || String(err)}`);
+        log('WARN', `[DB] Failed to close SQLite DB: ${/** @type {any} */ (err)?.message || String(err)}`);
     } finally {
         singletonDb = null;
     }

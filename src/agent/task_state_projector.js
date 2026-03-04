@@ -74,7 +74,6 @@ function _statSizeBytes(filePath) {
  */
 /**
  * @param {RegisterResponseArtifactsArg0} [arg0]
- * @param {RegisterResponseArtifactsOptions} [options]
  */
 function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
     /** @type {Record<string, string|null>} */
@@ -127,7 +126,6 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
  */
 /**
  * @param {RegisterDiagnosticArtifactsArg0} [arg0]
- * @param {RegisterDiagnosticArtifactsOptions} [options]
  */
 function _registerResponseArtifacts({ storage, actor = 'system' } = {}) {
     /** @type {Record<string, string|null>} */

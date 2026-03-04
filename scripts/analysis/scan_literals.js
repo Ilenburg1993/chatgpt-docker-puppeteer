@@ -39,6 +39,7 @@ const GREP_PATTERNS = [
 
 function grepScan() {
     console.log('🔍 FASE 1: Grep Pattern Scan\n');
+    /** @type {Record<string, any>} */
     const results = {};
 
     GREP_PATTERNS.forEach(({ pattern, category }) => {
@@ -81,7 +82,9 @@ function astScan() {
     console.log('\n🔬 FASE 2: AST Deep Analysis\n');
 
     // Buscar todos arquivos .js em src/
+    /** @type {string[]} */
     const files = [];
+    /** @param {string} dir */
     function walk(dir) {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
         entries.forEach(entry => {
@@ -152,7 +155,7 @@ function astScan() {
                 literalsByContext.logCalls.get(level).push(relativePath);
             }
         } catch (error) {
-            console.error(`Erro ao processar ${file}:`, error.message);
+            console.error(`Erro ao processar ${file}:`, /** @type {any} */ (error).message);
         }
     });
 
@@ -163,6 +166,10 @@ function astScan() {
 // MERGE & REPORT
 // ============================================
 
+/**
+ * @param {any} grepResults
+ * @param {any} astResults
+ */
 function generateReport(grepResults, astResults) {
     console.log('\n📊 RELATÓRIO CONSOLIDADO\n');
     console.log('='.repeat(80));
@@ -172,7 +179,7 @@ function generateReport(grepResults, astResults) {
     Object.entries(grepResults).forEach(([category, values]) => {
         if (values.length > 0) {
             console.log(`\n📦 ${category} (${values.length} valores):`);
-            values.forEach(v => console.log(`   - ${v}`));
+            values.forEach(/** @param {any} v */ v => console.log(`   - ${v}`));
         }
     });
 

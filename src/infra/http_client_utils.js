@@ -23,10 +23,6 @@ import https from 'node:https';
  *
  * @param {string|URL} url - The URL to request
  * @param {SafeHttpRequestOptions} [options={}] - Request options
- * @param {number} [options.timeout=5000] - Timeout in milliseconds
- * @param {string} [options.method='GET'] - HTTP method
- * @param {object} [options.headers] - Request headers
- * @param {object} [options.body] - Request body (for POST/PUT)
  * @returns {Promise<{statusCode: number, headers: object, body: string}>}
  * @throws {Error} If request fails or times out
  *
@@ -215,9 +211,6 @@ export async function fetchJson(url, options = {}) {
  *
  * @param {string|URL} url - URL to request
  * @param {RetryHttpRequestOptions} [options={}] - Request options
- * @param {number} [options.maxRetries=3] - Maximum retry attempts
- * @param {number} [options.backoffMs=100] - Base backoff delay in ms
- * @param {function} [options.shouldRetry] - Function to determine if error is retryable
  * @returns {Promise<object>} Response object
  *
  * @example
@@ -273,9 +266,6 @@ export async function retryHttpRequest(url, options = {}) {
  *
  * @param {string|URL} url - URL to poll
  * @param {PollUntilHealthyOptions} [options={}] - Polling options
- * @param {number} [options.maxWaitMs=30000] - Maximum time to wait
- * @param {number} [options.intervalMs=500] - Polling interval
- * @param {number} [options.requestTimeout=2000] - Timeout per request
  * @returns {Promise<boolean>} True if URL became healthy
  *
  * @example

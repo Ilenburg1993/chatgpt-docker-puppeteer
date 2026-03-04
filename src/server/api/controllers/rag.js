@@ -40,7 +40,8 @@ import { asRecord } from '#types/guards';
  * **Semântica:** Formata resultados como documento Markdown coeso para LLMs.
  *
  * @param {HandleRagAskReq} req - Request Express
- * @param {object} req.body - Body com parâmetros de busca
+ * @param {object} req
+ * @param {object} req.body
  * @param {string} req.body.query - Query de busca obrigatória
  * @param {number} [req.body.topK=8] - Número máximo de chunks
  * @param {string} [req.body.pathPrefix] - Filtro por prefixo de caminho
@@ -105,7 +106,8 @@ export async function handleRagAsk(req, res) {
  * **Semântica:** Retorna chunks estruturados sem formatação Markdown.
  *
  * @param {HandleRagQueryReq} req - Request Express
- * @param {object} req.body - Body com parâmetros de busca
+ * @param {object} req
+ * @param {object} req.body
  * @param {string} req.body.query - Query de busca obrigatória
  * @param {number} [req.body.topK=8] - Número máximo de resultados
  * @param {object} [req.body.filters] - Filtros adicionais de busca
@@ -218,7 +220,8 @@ export async function handleRagHealth(req, res) {
  * **Semântica:** Reindexa workspace completo para atualizar cache RAG.
  *
  * @param {HandleRagIndexReq} req - Request Express
- * @param {object} [req.body] - Body opcional
+ * @param {object} req
+ * @param {object} req.body
  * @param {string} [req.body.root] - Diretório raiz para indexação
  * @param {HandleRagIndexRes} res - Response Express
  * @returns {Promise<void>}
@@ -295,7 +298,8 @@ export async function handleRagIndex(req, res) {
  * **Semântica:** Combina múltiplas estratégias de busca para máxima relevância.
  *
  * @param {HandleRagHybridSearchReq} req - Request Express
- * @param {object} req.body - Body com parâmetros de busca híbrida
+ * @param {object} req
+ * @param {object} req.body
  * @param {string} req.body.query - Query de busca obrigatória
  * @param {number} [req.body.topK] - Número máximo de resultados
  * @param {string} [req.body.pathPrefix] - Filtro por prefixo de caminho

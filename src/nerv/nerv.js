@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { CONNECTION_MODES } from '#core/constants/browser';
 import { log } from '#core/logger';
 import * as envelopesModule from '#shared/nerv/envelope';

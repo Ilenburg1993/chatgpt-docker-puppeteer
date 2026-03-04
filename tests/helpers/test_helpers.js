@@ -17,7 +17,7 @@ if (!fs.existsSync(TMP_DIR)) {
 }
 
 /** Constante/valor exportado: sleep. */
-const sleep = ms =>
+const sleep = (/** @type {number} */ ms) =>
     new Promise(r => {
         setTimeout(r, ms);
     });
@@ -42,11 +42,14 @@ function ensureDirs() {
  * @property {string} [target] - Target URL
  * @property {*} [prompt] - Prompt da tarefa
  * @property {*} [context] - Contexto adicional
+ * @property {number} [priority] - Prioridade (default: 5)
+ * @property {string} [status] - Status inicial (default: PENDING)
+ * @property {string|null} [startedEm] - Data de início (para testes de recovery)
  */
 /**
  * Função exportada: writeTask.
  * @param {WriteTaskOptions} options
- * @returns {object}
+ * @returns {string}
  */
 function writeTask(options) {
     ensureDirs();
@@ -90,7 +93,7 @@ function writeTask(options) {
 /**
  * Função exportada: readTask.
  * @param {string} id
- * @returns {object}
+ * @returns {object|null}
  */
 function readTask(id) {
     try {
@@ -135,7 +138,7 @@ function cleanTmp() {
 /**
  * Função exportada: readLatestGlobalLogTail.
  * @param {*} [lines]
- * @returns {object}
+ * @returns {string}
  */
 function readLatestGlobalLogTail(lines = 50) {
     try {
@@ -145,7 +148,7 @@ function readLatestGlobalLogTail(lines = 50) {
         const content = fs.readFileSync(LOG_FILE_CURRENT, 'utf-8').trim().split('\n');
         return content.slice(-lines).join('\n');
     } catch (e) {
-        return `<error reading log: ${e.message}>`;
+        return `<error reading log: ${e instanceof Error ? e.message : String(e)}>`;
     }
 }
 
@@ -158,7 +161,7 @@ function startAgent(timeoutMs = 15000) {
     ensureDirs();
     const outPath = path.join(TMP_DIR, `stdout-${Date.now()}.log`);
     const outStream = fs.createWriteStream(outPath);
-    const childEnv = { ...process.env, FORCE_COLOR: '1' };
+    const childEnv = /** @type {Record<string, string | undefined>} */ ({ ...process.env, FORCE_COLOR: '1' });
     delete childEnv.NO_COLOR;
 
     const proc = child_process.spawn('node', ['index.js'], {
@@ -176,7 +179,7 @@ function startAgent(timeoutMs = 15000) {
             reject(new Error(`Timeout (${timeoutMs}ms) aguardando agente.`));
         }, timeoutMs);
 
-        const checkOutput = data => {
+        const checkOutput = (/** @type {Buffer} */ data) => {
             const text = data.toString();
             // Accept multiple engine startup variants (e.g. Engine V32.0 Iniciada)
             if (/Engine V\d+\.\d+\s+Iniciad/i.test(text) || text.includes('Agente Iniciado')) {

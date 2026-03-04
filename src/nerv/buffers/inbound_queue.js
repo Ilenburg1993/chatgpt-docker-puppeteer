@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/buffers/inbound_queue.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -50,12 +50,9 @@ function createQueue() {
  * Cria a fila técnica de entrada.
  *
  * @param {CreateInboundQueueDeps} deps
- * @param {object} deps.telemetry
  * Interface de telemetria do NERV (observação técnica).
  *
- * @param {number|null} deps.maxSize
  * Limite máximo técnico da fila (opcional).
- * @param {CreateInboundQueueOptions} [options]
   * @returns {object}
  */
 function createInboundQueue({ telemetry, maxSize = null }) {

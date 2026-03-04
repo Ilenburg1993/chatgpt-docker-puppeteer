@@ -50,9 +50,6 @@ export const RetryStrategy = Object.freeze({
  *
  * @param {Error} error - Error object from tool execution
  * @param {ClassifyErrorContext} context - Execution context
- * @param {string} [context.tool] - Tool name (e.g., 'ollama_generate')
- * @param {string} [context.model] - Model being used (for fallback suggestion)
- * @param {number} [context.attempt] - Current attempt number
  * @returns {object} Classification result with strategy
  *
  * @example

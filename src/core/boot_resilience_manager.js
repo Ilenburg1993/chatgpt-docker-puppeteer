@@ -237,9 +237,6 @@ function getChromeInstructions(errorMessage) {
  *
  * @param {Error} error - Erro original do Browser Pool
  * @param {HandleBrowserPoolFailureOptions} options - Opções de configuração
- * @param {boolean} [options.allowDegradedMode=true] - Permite boot sem browser
- * @param {boolean} [options.autoRetry=true] - Tenta iniciar Chrome automaticamente
- * @param {number} [options.maxAutoRetries=2] - Máximo de tentativas automáticas
  *
  * @returns {Promise<BrowserPoolDecision>}
  * ⚠️ Esta função NUNCA é void.
@@ -415,7 +412,6 @@ async function handleBrowserPoolFailure(error, options = {}) {
  *
  * @param {InitializeBrowserPoolResilientConfig} config - Configuração do Browser Pool
  * @param {InitializeBrowserPoolResilientOptions} [options] - Opções de resiliência
- * @param {object} [options.nerv] - NERV bus para Circuit Breaker (opcional)
  * @returns {Promise<object>} - Resultado da inicialização
  */
 async function initializeBrowserPoolResilient(config, options = {}) {

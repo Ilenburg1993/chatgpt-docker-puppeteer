@@ -9,16 +9,16 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
-function fail(msg) {
+function fail(/** @type {string} */ msg) {
     console.error(`[check-env-local] FAIL: ${msg}`);
     process.exit(2);
 }
 
-function ok(msg) {
+function ok(/** @type {string} */ msg) {
     console.log(`[check-env-local] OK: ${msg}`);
 }
 
-function fileExists(p) {
+function fileExists(/** @type {string} */ p) {
     try {
         fs.accessSync(p, fs.constants.F_OK);
         return true;
@@ -27,7 +27,7 @@ function fileExists(p) {
     }
 }
 
-async function isTracked(relPath) {
+async function isTracked(/** @type {string} */ relPath) {
     try {
         await execa('git', ['ls-files', '--error-unmatch', relPath], { cwd: ROOT, stdio: 'ignore' });
         return true;

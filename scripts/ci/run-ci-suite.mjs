@@ -2,6 +2,7 @@
 // @ts-check
 import { spawnSync } from 'node:child_process';
 
+/** @type {[string, string[]][]} */
 const commands = [
     ['node', ['scripts/ci/check-node-version.mjs']],
     ['npm', ['run', 'lint']],

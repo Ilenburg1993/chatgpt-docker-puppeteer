@@ -1,4 +1,5 @@
 // @ts-check
+// @ts-ignore - config.json resolvido em runtime; sem declarações de tipo
 import config from '../config.json' with { type: 'json' };
 
 console.log('🔍 VERIFICAÇÃO DE CONFIGURAÇÃO');

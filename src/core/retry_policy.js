@@ -34,11 +34,8 @@ function computeExponentialBackoffDelay(attempt, baseDelayMs, maxDelayMs, jitter
  * @property {number} maxAttempts
  * @property {number} baseDelayMs
  * @property {number} maxDelayMs
- * @property {number} jitterRatio
- * @property {(ctx: { attempt: number} onRetry
- * @property {number} maxAttempts
- * @property {unknown} error
- * @property {number} delayMs
+ * @property {number} [jitterRatio]
+ * @property {((ctx: { attempt: number, maxAttempts: number, error: unknown, delayMs: number }) => void) | undefined} [onRetry]
  */
 /**
  * @template T

@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 /* ==========================================================================
    src/nerv/buffers/backpressure.js
    Subsistema: NERV — Neural Event Relay Vector
@@ -36,9 +36,7 @@
  * Cria um observador técnico de backpressure.
  *
  * @param {CreateBackpressureDeps} deps
- * @param {object} deps.telemetry
  * Interface de telemetria do NERV.
- * @param {CreateBackpressureOptions} [options]
   * @returns {object}
  */
 function createBackpressure({ telemetry }) {

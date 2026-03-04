@@ -195,10 +195,6 @@ export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 
  *
  * @param {function} operation - Function that returns a Promise
  * @param {WithRetryOptions} options - Configuration options
- * @param {number} [options.maxRetries] - Maximum number of retry attempts (default: 3)
- * @param {number} [options.timeoutMs] - Timeout per attempt in milliseconds (default: 5000)
- * @param {number} [options.backoffMs] - Base backoff delay in milliseconds (default: 100)
- * @param {function} [options.shouldRetry] - Function to determine if error is retryable (default: all errors retry)
  * @returns {Promise<unknown>} Result of the operation
  * @throws {Error} If all retries fail
  *

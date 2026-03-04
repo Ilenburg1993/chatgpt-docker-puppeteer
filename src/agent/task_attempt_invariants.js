@@ -30,7 +30,6 @@ function getCurrentAttemptIdForTask(taskId) {
  */
 /**
  * @param {EvaluateAttemptInvariantsParams} params
- * @param {EvaluateAttemptInvariantsOptions} [options]
  * @returns {{ apply: boolean, currentAttemptId: string|null, reason: string }}
  */
 function evaluateAttemptInvariants({ taskId, attemptId = null }) {
@@ -72,7 +71,6 @@ function evaluateAttemptInvariants({ taskId, attemptId = null }) {
  */
 /**
  * @param {EmitStaleAttemptIgnoredEventParams} params
- * @param {EmitStaleAttemptIgnoredEventOptions} [options]
   * @returns {object}
  */
 function emitStaleAttemptIgnoredEvent({
@@ -126,7 +124,6 @@ function emitStaleAttemptIgnoredEvent({
  */
 /**
  * @param {ReleaseTaskLockForAttemptParams} params
- * @param {ReleaseTaskLockForAttemptOptions} [options]
  * @returns {number}
  */
 function releaseTaskLockForAttempt({

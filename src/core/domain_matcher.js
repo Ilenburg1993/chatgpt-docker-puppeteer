@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 
 function normalizeDomain(value) {
     return String(value || '')

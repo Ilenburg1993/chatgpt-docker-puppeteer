@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-check
 import { CONNECTION_MODES } from '#core/constants/browser';
 import { getActionCode, getCorrelationId, getMessageType, getMsgId } from '#shared/nerv/envelope_reader';
 import EventEmitter from 'node:events';
@@ -30,10 +30,6 @@ const CIRCUIT_STATES = {
  * **Unidades:** mode segue CONNECTION_MODES, handlerId como contador incremental.
  *
  * @param {CreateHybridTransportConfig} config - Configuração do transporte híbrido
- * @param {string} [config.mode='LOCAL'] - Modo de conexão ('LOCAL'|'HYBRID')
- * @param {object} [config.socketAdapter=null] - Adapter Socket.io para modo híbrido
- * @param {object} config.telemetry - Interface de telemetria NERV
- * @param {CreateHybridTransportOptions} [options]
  * @returns {object} Transporte híbrido com métodos send, onReceive, start, stop
  * @throws {Error} Se telemetry não for fornecida
  */

@@ -18,7 +18,7 @@ const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 /**
  * Garante a existência da infraestrutura física de pastas no boot.
  * Utiliza a autoridade de caminhos do paths.js.
-  * @returns {void}
+ * @returns {void}
  */
 function ensureInfrastructure() {
     const criticalDirs = [PATHS.QUEUE, PATHS.RESPONSE, PATHS.LOGS, PATHS.CORRUPT, PATHS.REPORTS];
@@ -29,7 +29,9 @@ function ensureInfrastructure() {
                 fs.mkdirSync(dir, { recursive: true });
             } catch (err) {
                 // Falha na criação de pastas é um erro fatal de boot
-                console.error(`[FS_UTILS] Falha crítica ao criar diretório ${dir}: ${err.message}`);
+                console.error(
+                    `[FS_UTILS] Falha crítica ao criar diretório ${dir}: ${/** @type {any} */ (err).message}`
+                );
                 throw err;
             }
         }

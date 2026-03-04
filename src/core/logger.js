@@ -56,7 +56,9 @@ function cleanOldFiles(prefix) {
             });
         }
     } catch (e) {
-        console.error(`[LOGGER] Erro na limpeza de arquivos (${prefix}): ${e.message}`);
+        console.error(
+            `[LOGGER] Erro na limpeza de arquivos (${prefix}): ${e instanceof Error ? e.message : String(e)}`
+        );
     }
 }
 
@@ -85,7 +87,7 @@ function rotateFile(filePath, prefix, maxSize) {
             cleanOldFiles(prefix);
         }
     } catch (e) {
-        console.error(`[LOGGER] Erro ao rotacionar ${prefix}: ${e.message}`);
+        console.error(`[LOGGER] Erro ao rotacionar ${prefix}: ${e instanceof Error ? e.message : String(e)}`);
     }
 }
 
@@ -104,7 +106,7 @@ const LOG_LEVELS = {
 
 // Read LOG_LEVEL from environment (default: INFO)
 const configuredLevel = process.env.LOG_LEVEL?.toUpperCase() || 'INFO';
-let minLevel = LOG_LEVELS[configuredLevel] ?? LOG_LEVELS.INFO;
+let minLevel = /** @type {Record<string, number>} */ (LOG_LEVELS)[configuredLevel] ?? LOG_LEVELS.INFO;
 
 /**
  * Log Operacional: Registra eventos do fluxo de trabalho com filtragem por nível.
@@ -114,11 +116,11 @@ let minLevel = LOG_LEVELS[configuredLevel] ?? LOG_LEVELS.INFO;
  * @param {string|Error|Record<string, unknown>} msg - Mensagem ou objeto a logar.
  * @param {string} [taskId='-'] - ID da tarefa associada.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe.
-  * @returns {void}
+ * @returns {void}
  */
 function log(level, msg, taskId = '-') {
     // Filter: Only log if level >= configured threshold
-    const levelValue = LOG_LEVELS[level.toUpperCase()] ?? LOG_LEVELS.INFO;
+    const levelValue = /** @type {Record<string, number>} */ (LOG_LEVELS)[level.toUpperCase()] ?? LOG_LEVELS.INFO;
     if (levelValue < minLevel) {
         return; // Skip this log
     }
@@ -160,8 +162,8 @@ log.getLevel = () => configuredLevel;
  */
 log.setLevel = newLevel => {
     const upperLevel = newLevel.toUpperCase();
-    if (LOG_LEVELS[upperLevel] !== undefined) {
-        minLevel = LOG_LEVELS[upperLevel];
+    if (/** @type {Record<string, number>} */ (LOG_LEVELS)[upperLevel] !== undefined) {
+        minLevel = /** @type {Record<string, number>} */ (LOG_LEVELS)[upperLevel];
         log('INFO', `Log level changed to: ${upperLevel}`);
     } else {
         log('WARN', `Invalid log level: ${newLevel}. Valid levels: DEBUG, INFO, WARN, ERROR, FATAL`);
@@ -174,7 +176,7 @@ log.setLevel = newLevel => {
  * @param {string} action - Ação auditada.
  * @param {Record<string, unknown>} details - Detalhes da ação.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe com fallback para console.
-  * @returns {void}
+ * @returns {void}
  */
 function audit(action, details) {
     rotateFile(AUDIT_FILE, 'audit_', MAX_AUDIT_SIZE);
@@ -196,7 +198,7 @@ function audit(action, details) {
  * @param {string} name - Nome da métrica.
  * @param {Record<string, unknown>} [payload] - Payload da métrica.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe.
-  * @returns {void}
+ * @returns {void}
  */
 function metric(name, payload) {
     rotateFile(METRICS_FILE, 'metrics_', MAX_LOG_SIZE);
@@ -230,11 +232,16 @@ function metric(name, payload) {
  *   log.error('Mensagem', taskId)
  *   log.fatal('Mensagem', taskId)
  */
-log.debug = (msg, taskId) => log('DEBUG', msg, taskId);
-log.info = (msg, taskId) => log('INFO', msg, taskId);
-log.warn = (msg, taskId) => log('WARN', msg, taskId);
-log.error = (msg, taskId) => log('ERROR', msg, taskId);
-log.fatal = (msg, taskId) => log('FATAL', msg, taskId);
+log.debug = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @type {string} */ taskId = '-') =>
+    log('DEBUG', msg, taskId);
+log.info = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @type {string} */ taskId = '-') =>
+    log('INFO', msg, taskId);
+log.warn = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @type {string} */ taskId = '-') =>
+    log('WARN', msg, taskId);
+log.error = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @type {string} */ taskId = '-') =>
+    log('ERROR', msg, taskId);
+log.fatal = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @type {string} */ taskId = '-') =>
+    log('FATAL', msg, taskId);
 
 // --- INICIALIZAÇÃO (HYGIENE CHECK) ---
 cleanOldFiles('agente_');

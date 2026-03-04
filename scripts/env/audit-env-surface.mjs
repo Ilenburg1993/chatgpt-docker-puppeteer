@@ -37,7 +37,7 @@ const RUNTIME_ONLY = new Set([
     'ROBOT_ID',
 ]);
 
-function walk(dirPath, files = []) {
+function walk(/** @type {string} */ dirPath, /** @type {string[]} */ files = []) {
     let entries = [];
     try {
         entries = fs.readdirSync(dirPath, { withFileTypes: true });
