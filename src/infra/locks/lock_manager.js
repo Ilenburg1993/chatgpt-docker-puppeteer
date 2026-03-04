@@ -62,11 +62,12 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
             await fs.unlink(tempLockFile).catch(() => {});
             return true;
         } catch (linkErr) {
+            const _ce = /** @type {any} */ (linkErr);
             // Link falhou: lock já existe (outro processo venceu)
             await fs.unlink(tempLockFile).catch(() => {});
 
             // Se erro não for EEXIST, algo grave no I/O
-            if (linkErr.code !== 'EEXIST' && linkErr.code !== 'EPERM') {
+            if ((/** @type {any} */ (linkErr)).code !== 'EEXIST' && (/** @type {any} */ (linkErr)).code !== 'EPERM') {
                 return false;
             }
 
@@ -74,7 +75,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
         }
 
         // Análise de ocupação: Quem detém o lock?
-        const currentLock = await safeReadJSON(lockFile);
+        const currentLock = /** @type {any} */ (await safeReadJSON(lockFile));
 
         // Caso A: Lock inexistente ou ilegível (Race na deleção)
         if (!currentLock) {
@@ -116,7 +117,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
 
                 // [FASE 4] Somos únicos - prossegue com recovery
                 // [ANTI-RACE] Revalida PID antes de deletar
-                const recheck = await safeReadJSON(lockFile);
+                const recheck = /** @type {any} */ (await safeReadJSON(lockFile));
                 if (recheck && recheck.pid === currentLock.pid) {
                     await fs.unlink(lockFile).catch(() => {});
                 }
@@ -127,6 +128,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
                 // Tenta adquirir novamente após limpeza
                 return acquireLock(taskId, target, attempt + 1);
             } catch (_) {
+                const _ce = /** @type {any} */ (_);
                 return false;
             }
         }
@@ -134,6 +136,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
         // Caso C: Lock válido (processo ativo)
         return false;
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         // Falha na fase 1: cleanup e abort
         await fs.unlink(tempLockFile).catch(() => {});
         return false;
@@ -154,7 +157,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
 async function releaseLock(target = 'global', taskId = null) {
     const lockFile = getLockPath(target);
 
-    const currentLock = await safeReadJSON(lockFile);
+    const currentLock = /** @type {any} */ (await safeReadJSON(lockFile));
     if (!currentLock) {
         return;
     }
@@ -165,6 +168,7 @@ async function releaseLock(target = 'global', taskId = null) {
             await fs.unlink(lockFile).catch(() => {});
         }
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         // Falha na deleção de lock inexistente é ignorada (Best-effort)
     }
 }

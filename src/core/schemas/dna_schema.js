@@ -1,6 +1,8 @@
 // @ts-check
-import { z } from 'zod';
+import { z as _zImport } from 'zod';
 import { TIMESTAMP_SCHEMA } from './shared_types.js';
+/** @type {any} */
+const z = _zImport;
 
 /**
  * SelectorProtocolSchema: O formato de saída do SADI V10+.

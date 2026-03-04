@@ -9,6 +9,7 @@
 ========================================================================== */
 
 // Lazy load para evitar circular dependency
+/** @type {any} */
 let dnaStore = null;
 const getDnaStore = async () => {
     if (!dnaStore) {
@@ -35,10 +36,6 @@ const MAX_EVOLUTIONS_PER_DOMAIN = 5;
 const evolutionCounter = new Map();
 
 /**
- * @typedef {object} EvolveWithSadiProtocolProtocol
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Evolui o DNA automaticamente quando SADI descobre novo selector.
  *
  * Critérios de Aceitação:
@@ -46,7 +43,7 @@ const evolutionCounter = new Map();
  * - Selector não existe no DNA atual
  * - Não exceder MAX_EVOLUTIONS_PER_DOMAIN por sessão
  *
- * @param {EvolveWithSadiProtocolProtocol} protocol - Protocolo SADI com selector descoberto
+ * @param {any} protocol - Protocolo SADI com selector descoberto
  * @param {string} domain - Domínio (ex: 'chatgpt.com')
  * @param {string} intent - Intenção (ex: 'input_box', 'send_button')
  * @returns {Promise<{accepted: boolean, reason?: string, stats?: object, error?: string}>}
@@ -141,20 +138,17 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
             },
         };
     } catch (error) {
-        log('ERROR', `[DNA_EVOLUTION] Falha ao evoluir DNA: ${error.message}`);
-        return { accepted: false, reason: 'ERROR', error: error.message };
+        const _ce = /** @type {any} */ (error);
+        log('ERROR', `[DNA_EVOLUTION] Falha ao evoluir DNA: ${_ce.message}`);
+        return { accepted: false, reason: 'ERROR', error: _ce.message };
     }
 }
 
 /**
- * @typedef {object} EvolveWithFullProtocolFullProtocol
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Evolui DNA com protocolo SADI completo (incluindo metadata).
  * Substitui array de strings por protocolo estruturado.
  *
- * @param {EvolveWithFullProtocolFullProtocol} fullProtocol - Protocolo completo com context, isShadow, etc
+ * @param {any} fullProtocol - Protocolo completo com context, isShadow, etc
  * @param {string} domain - Domínio
  * @param {string} intent - Intenção
  * @returns {Promise<boolean>} - true se evoluiu
@@ -189,7 +183,8 @@ async function evolveWithFullProtocol(fullProtocol, domain, intent) {
         log('INFO', `[DNA_EVOLUTION] Protocolo estruturado salvo: ${domain}/${intent}`);
         return true;
     } catch (error) {
-        log('ERROR', `[DNA_EVOLUTION] Falha ao salvar protocolo: ${error.message}`);
+        const _ce = /** @type {any} */ (error);
+        log('ERROR', `[DNA_EVOLUTION] Falha ao salvar protocolo: ${_ce.message}`);
         return false;
     }
 }
@@ -209,7 +204,7 @@ function resetEvolutionCounters() {
  * @returns {object} - {domain: count}
  */
 function getEvolutionStats() {
-    const stats = {};
+    const stats = /** @type {any} */ ({});
     evolutionCounter.forEach((count, domain) => {
         stats[domain] = count;
     });

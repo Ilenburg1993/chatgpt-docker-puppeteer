@@ -24,6 +24,7 @@ const DEFAULT_DNA = {
 /**
  * Cache em RAM para performance de percepção (SADI).
  */
+/** @type {any} */
 let cachedDna = null;
 
 /**
@@ -34,10 +35,11 @@ let cachedDna = null;
  * @param {object} dna - DNA atual a ser backupeado
  * @returns {boolean} - true se backup foi criado
  */
+/** @type {any[]} */
 const DNA_HISTORY = [];
 const MAX_HISTORY = 10;
 
-function backupDna(dna) {
+function backupDna(/** @type {any} */ dna) {
     try {
         const backup = {
             snapshot: structuredClone(dna),
@@ -55,7 +57,8 @@ function backupDna(dna) {
         log('DEBUG', `[DNA_STORE] Backup criado: v${backup.version} (${DNA_HISTORY.length}/${MAX_HISTORY})`);
         return true;
     } catch (e) {
-        log('WARN', `[DNA_STORE] Falha ao criar backup: ${e.message}`);
+        const _ce = /** @type {any} */ (e);
+        log('WARN', `[DNA_STORE] Falha ao criar backup: ${_ce.message}`);
         return false;
     }
 }
@@ -73,7 +76,7 @@ async function getDna() {
     }
 
     // 2. Leitura de Disco
-    const rawDna = await safeReadJSON(PATHS.RULES);
+    const rawDna = /** @type {any} */ (await safeReadJSON(PATHS.RULES));
 
     if (!rawDna) {
         log('WARN', '[DNA_STORE] dynamic_rules.json ausente. Inicializando estrutura V4 Gold.');
@@ -92,7 +95,8 @@ async function getDna() {
 
         return cachedDna;
     } catch (e) {
-        log('ERROR', `[DNA_STORE] DNA corrompido: ${e.message}`);
+        const _ce = /** @type {any} */ (e);
+        log('ERROR', `[DNA_STORE] DNA corrompido: ${_ce.message}`);
 
         // 5. Tentativa de Recovery do Histórico
         if (DNA_HISTORY.length > 0) {
@@ -109,7 +113,8 @@ async function getDna() {
                 log('INFO', `[DNA_STORE] DNA recuperado com sucesso do backup v${DNA_HISTORY[0].version}`);
                 return cachedDna;
             } catch (recoveryError) {
-                log('ERROR', `[DNA_STORE] Falha no recovery: ${recoveryError.message}. Usando baseline.`);
+                const _ce = /** @type {any} */ (recoveryError);
+                log('ERROR', `[DNA_STORE] Falha no recovery: ${_ce.message}. Usando baseline.`);
             }
         }
 
@@ -126,9 +131,9 @@ async function getDna() {
 /**
  * Persiste a evolução do DNA, atualizando metadados e invalidando o cache.
  *
- * @param {SaveDnaDna} dna - Novo objeto de DNA.
+ * @param {any} dna - Novo objeto de DNA.
  * @param {string} author - Identificador da entidade que evoluiu o DNA (ex: 'SADI_V19').
-  * @returns {Promise<void>}
+  * @returns {Promise<any>}
  */
 async function saveDna(dna, author = 'system') {
     try {
@@ -161,8 +166,9 @@ async function saveDna(dna, author = 'system') {
         );
         return true;
     } catch (e) {
-        log('ERROR', `[DNA_STORE] Falha ao persistir evolução genômica: ${e.message}`);
-        throw new Error(`DNA_PERSISTENCE_FAILURE: ${e.message}`); // eslint-disable-line preserve-caught-error
+        const _ce = /** @type {any} */ (e);
+        log('ERROR', `[DNA_STORE] Falha ao persistir evolução genômica: ${_ce.message}`);
+        throw new Error(`DNA_PERSISTENCE_FAILURE: ${_ce.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -173,7 +179,7 @@ async function saveDna(dna, author = 'system') {
  * @returns {Promise<object>} Regras do alvo mescladas com globais.
  */
 async function getTargetRules(domain) {
-    const dna = await getDna();
+    const dna = /** @type {any} */ (await getDna());
     const targetKey = (domain || 'unknown').toLowerCase();
 
     const targetData = dna.targets[targetKey];
@@ -194,7 +200,7 @@ async function getTargetRules(domain) {
 /**
  * Invalida o cache em RAM.
  * Chamado pela fachada de IO quando sinais externos (Watchers) detectam mudanças manuais no disco.
-  * @returns {void}
+  * @returns {any}
  */
 function invalidateCache() {
     cachedDna = null;

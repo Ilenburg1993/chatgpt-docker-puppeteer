@@ -128,8 +128,8 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                         try {
                             handler(envelope);
                         } catch (err) {
-                        const _e = /** @type {any} */ (err);
-                        telemetry.emit('hybrid_transport_handler_error', {
+                            const _e = /** @type {any} */ (err);
+                            telemetry.emit('hybrid_transport_handler_error', {
                                 error: _e.message,
                                 correlationId: envelope.causality?.correlation_id,
                                 msgId: envelope.causality?.msg_id,
@@ -291,7 +291,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
         };
 
         if (mode === CONNECTION_MODES.HYBRID && socketAdapter) {
-            (/** @type {any} */ (status)).remote = socketAdapter.events ? 'active' : 'inactive';
+            /** @type {any} */ (status).remote = socketAdapter.events ? 'active' : 'inactive';
         }
 
         return status;

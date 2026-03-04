@@ -345,7 +345,7 @@
   "typescript.preferences.preferTypeOnlyAutoImports": true,
   "typescript.referencesCodeLens.enabled": true,
   "typescript.referencesCodeLens.showOnAllFunctions": true,
-  "typescript.reportStyleChecksAsWarnings": false,
+  "typescript.reportStyleChecksAsWarnings": true,
   "typescript.suggest.autoImports": true,
   "typescript.suggest.completeFunctionCalls": true,
   "typescript.tsdk": "node_modules/typescript/lib",
@@ -843,7 +843,6 @@
   "github.copilot.chat.newWorkspaceCreation.enabled": true,
   "github.copilot.chat.responsesApiReasoningEffort": "high",
   "github.copilot.chat.reviewSelection.enabled": true,
-  "github.copilot.chat.reviewSelection.instructions": {"pt-br": "Selecione o código que deseja revisar e pressione Ctrl+Enter para enviar ao Copilot Chat."},
   "github.copilot.chat.summarizeAgentConversationHistory.enabled": true,
   "github.copilot.chat.switchAgent.enabled": true,
   "github.copilot.chat.tools.memory.enabled": true,
@@ -919,5 +918,27 @@
   "git-graph.repository.useMailmap": false,
   "git-graph.date.format": "Date & Time",
   "git-graph.dialog.addTag.pushToRemote": true,
-  "python.analysis.typeCheckingMode": "standard"
+  "python.analysis.typeCheckingMode": "standard",
+  "github.copilot.chat.reviewSelection.instructions": [
+    {
+      "file": ".copilot-review-instructions.md"
+    }
+  ],
+  "github.copilot.chat.additionalReadAccessPaths": [
+    "C:\\"
+  ],
+  "js/ts.tsserver.experimental.enableProjectDiagnostics": true,
+  "js/ts.tsserver.useSyntaxServer": "always",
+  "js/ts.tsserver.maxMemory": 6144,
+  "js/ts.preferences.preferTypeOnlyAutoImports": true,
+  "js/ts.preferences.importModuleSpecifierEnding": "js",
+  "js/ts.preferences.includePackageJsonAutoImports": "on",
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  "js/ts.preferGoToSourceDefinition": true,
+  "js/ts.suggest.completeFunctionCalls": true,
+  "js/ts.implementationsCodeLens.enabled": true,
+  "js/ts.implementationsCodeLens.showOnAllClassMethods": true,
+  "js/ts.implementationsCodeLens.showOnInterfaceMethods": true,
+  "js/ts.referencesCodeLens.enabled": true,
+  "js/ts.referencesCodeLens.showOnAllFunctions": true
 }

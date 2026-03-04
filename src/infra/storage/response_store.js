@@ -10,7 +10,7 @@ import { sleep, cleanText } from '../fs/fs_utils.js';
  * Utiliza loop iterativo para garantir estabilidade da pilha em retries.
  *
  * @param {string} taskId - ID da tarefa alvo.
- * @param {AbortSignal} signal - Sinal para interromper leitura longa.
+ * @param {any} signal - Sinal para interromper leitura longa.
  * @returns {Promise<string|null>} Conteúdo limpo ou null se não localizado.
  */
 async function loadResponse(taskId, signal = null) {
@@ -44,13 +44,14 @@ async function loadResponse(taskId, signal = null) {
             // 4. Sanitização Universal (Remoção de caracteres de controle)
             return cleanText(content);
         } catch (err) {
+            const _ce = /** @type {any} */ (err);
             // Tratamento de interrupção externa
-            if (err.name === 'AbortError' || err.message === 'OPERATION_ABORTED') {
+            if (_ce.name === 'AbortError' || _ce.message === 'OPERATION_ABORTED') {
                 throw new Error('READ_ABORTED'); // eslint-disable-line preserve-caught-error
             }
 
             // Tratamento de Concorrência (Arquivo travado pelo SO ou Logger)
-            if (err.code === 'EBUSY' || err.code === 'EPERM') {
+            if (_ce.code === 'EBUSY' || _ce.code === 'EPERM') {
                 attempts++;
                 await sleep(200 * attempts); // Backoff progressivo (200ms, 400ms...)
                 continue;
@@ -77,6 +78,7 @@ async function deleteResponse(taskId) {
             await fs.unlink(filepath);
         }
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         // Falha no delete não deve interromper o fluxo principal (Best-effort)
     }
 }

@@ -37,11 +37,13 @@ function createReception({ envelopes, correlation, telemetry }) {
      Composição do receptor factual
   ========================================================= */
 
-    const receiver = /** @type {any} */ (createReceive({
-        envelopes,
-        correlation,
-        telemetry,
-    }));
+    const receiver = /** @type {any} */ (
+        createReceive({
+            envelopes,
+            correlation,
+            telemetry,
+        })
+    );
 
     /* =========================================================
      Interface pública do módulo

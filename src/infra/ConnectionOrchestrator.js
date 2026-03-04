@@ -8,7 +8,7 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { createMockBrowser } from './mock_chrome.js';
 
 // Aplica stealth plugin para anti-detection
-puppeteerExtra.use(StealthPlugin());
+/** @type {any} */ (puppeteerExtra).use(StealthPlugin());
 
 /* ========================================================================
    ESTADOS GLOBAIS
@@ -182,11 +182,15 @@ class ConnectionOrchestrator {
         this.config = { ...DEFAULTS, ...options };
         this.state = STATES.INIT;
         this.env = null;
+        /** @type {any} */
         this.browser = null;
+        /** @type {any} */
         this.page = null;
         this.retryCount = 0;
         this.lastIssue = null;
+        /** @type {any[]} */
         this.stateHistory = [];
+        /** @type {any[]} */
         this.attemptedModes = []; // Rastreia modos já tentados
 
         // Handlers referenciados para remoção limpa
@@ -194,7 +198,7 @@ class ConnectionOrchestrator {
         this._onTargetDestroyed = this._handleTargetDestroyed.bind(this);
     }
 
-    setState(next, meta = {}) {
+    setState(/** @type {any} */ next, /** @type {any} */ meta = {}) {
         if (this.state === next) {
             return;
         } // Evita spam de estado igual
@@ -207,14 +211,14 @@ class ConnectionOrchestrator {
         log('INFO', { event: 'ORCH_STATE', state: next, meta }, correlationId);
     }
 
-    _pushStateHistory(state, meta) {
+    _pushStateHistory(/** @type {any} */ state, /** @type {any} */ meta) {
         this.stateHistory.push({ state, meta, ts: new Date().toISOString() });
         if (this.stateHistory.length > this.config.stateHistorySize) {
             this.stateHistory.shift();
         }
     }
 
-    classifyIssue(kind, type, message) {
+    classifyIssue(/** @type {any} */ kind, /** @type {any} */ type, /** @type {any} */ message) {
         this.lastIssue = { kind, type, message, ts: new Date().toISOString() };
         return this.lastIssue;
     }
@@ -234,7 +238,7 @@ class ConnectionOrchestrator {
         this.setState(STATES.BROWSER_LOST);
     }
 
-    _handleTargetDestroyed(target) {
+    _handleTargetDestroyed(/** @type {any} */ target) {
         if (this.page && target.type() === 'page' && target.url() === this.page.url()) {
             // Verificação extra: a página realmente fechou ou navegou?
             if (this.page.isClosed()) {
@@ -283,7 +287,8 @@ class ConnectionOrchestrator {
                     protocolTimeout: 5000,
                 });
             } catch (e) {
-                const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
+                const _ce = /** @type {any} */ (e);
+                const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${_ce.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
                 errors.push(error);
                 if (!this.config.autoFallback) {
@@ -311,7 +316,8 @@ class ConnectionOrchestrator {
                         protocolTimeout: 5000,
                     });
                 } catch (e) {
-                    errors.push(`${host}:${port} - ${e.message}`);
+                    const _ce = /** @type {any} */ (e);
+                    errors.push(`${host}:${port} - ${_ce.message}`);
                 }
             }
         }
@@ -346,7 +352,8 @@ class ConnectionOrchestrator {
                     protocolTimeout: 10000,
                 });
             } catch (e) {
-                const error = `browserEndpoint.wsEndpoint (${this.config.browserEndpoint.wsEndpoint}): ${e.message}`;
+                const _ce = /** @type {any} */ (e);
+                const error = `browserEndpoint.wsEndpoint (${this.config.browserEndpoint.wsEndpoint}): ${_ce.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
                 errors.push(error);
                 if (!this.config.autoFallback) {
@@ -390,7 +397,8 @@ class ConnectionOrchestrator {
                     }
                 }
             } catch (e) {
-                const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${e.message}`;
+                const _ce = /** @type {any} */ (e);
+                const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${_ce.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
                 errors.push(error);
                 if (!this.config.autoFallback) {
@@ -450,7 +458,8 @@ class ConnectionOrchestrator {
                     }
                     errors.push(`${host}:${port} - No WS URL in response`);
                 } catch (e) {
-                    errors.push(`${host}:${port} - ${e.message}`);
+                    const _ce = /** @type {any} */ (e);
+                    errors.push(`${host}:${port} - ${_ce.message}`);
                 }
             }
         }
@@ -560,7 +569,7 @@ class ConnectionOrchestrator {
                 } catch (error) {
                     lastError = error;
                     this.attemptedModes.push(currentMode);
-                    log('WARN', `[ORCH] Falha em modo ${currentMode}: ${error.message}`);
+                    log('WARN', `[ORCH] Falha em modo ${currentMode}: ${/** @type {any} */ (error).message}`);
 
                     // Se não é auto e não tem fallback, rejeita imediatamente
                     if (!autoFallback && mode !== 'auto') {
@@ -577,7 +586,7 @@ class ConnectionOrchestrator {
             this.classifyIssue(
                 ISSUE_KIND.EVENT,
                 ISSUE_TYPES.BROWSER_NOT_STARTED,
-                lastError?.message || 'Todos os modos falharam'
+                /** @type {any} */ (lastError)?.message || 'Todos os modos falharam'
             );
             this.setState(STATES.RETRY_BROWSER, { retry: this.retryCount, attemptedModes: this.attemptedModes });
 
@@ -599,13 +608,13 @@ class ConnectionOrchestrator {
 
         // Esgotou todas as tentativas
         throw new Error(
-            `Falha ao conectar após ${this.retryCount} tentativas: ${lastError?.message || 'Unknown error'}`
+            `Falha ao conectar após ${this.retryCount} tentativas: ${/** @type {any} */ (lastError)?.message || 'Unknown error'}`
         );
     }
 
     async scanForTargetPage() {
         const pages = await this.browser.pages();
-        const candidates = pages.filter(p => {
+        const candidates = pages.filter((/** @type {any} */ p) => {
             const url = p.url();
             // [P8.2] SECURITY: Use URL parsing instead of .includes() to prevent bypass
             if (!url || url === 'about:blank') {
@@ -613,10 +622,12 @@ class ConnectionOrchestrator {
             }
             try {
                 const parsed = new URL(url);
-                return this.config.allowedDomains.some(d => {
-                    // Match exact hostname or subdomain
-                    return parsed.hostname === d || parsed.hostname.endsWith(`.${d}`);
-                });
+                return this.config.allowedDomains.some(
+                    /** @type {any} */ d => {
+                        // Match exact hostname or subdomain
+                        return parsed.hostname === d || parsed.hostname.endsWith(`.${d}`);
+                    }
+                );
             } catch {
                 return false; // Invalid URL
             }
@@ -627,7 +638,7 @@ class ConnectionOrchestrator {
         return this.config.pageSelectionPolicy === 'MOST_RECENT' ? candidates[candidates.length - 1] : candidates[0];
     }
 
-    async ensurePage(maxRetries = 60, maxWaitMs = 120000) {
+    async ensurePage(/** @type {number} */ maxRetries = 60, /** @type {number} */ maxWaitMs = 120000) {
         this.setState(STATES.WAITING_FOR_PAGE);
 
         // Se já temos página válida, retorna
@@ -663,14 +674,15 @@ class ConnectionOrchestrator {
                     setTimeout(r, this.config.pageScanIntervalMs);
                 });
             } catch (e) {
-                if (e.message.includes('Browser lost')) {
+                const _ce = /** @type {any} */ (e);
+                if (_ce.message.includes('Browser lost')) {
                     // Joga erro para cima para reiniciar o ciclo do browser
                     throw e;
                 }
 
                 attempt++;
                 if (attempt >= maxRetries) {
-                    throw new Error(`Failed to ensure page after ${maxRetries} attempts: ${e.message}`, { cause: e });
+                    throw new Error(`Failed to ensure page after ${maxRetries} attempts: ${_ce.message}`, { cause: e });
                 }
 
                 await new Promise(r => {
@@ -682,7 +694,7 @@ class ConnectionOrchestrator {
         throw new Error(`Failed to ensure page after ${maxRetries} attempts`);
     }
 
-    async validatePage(page) {
+    async validatePage(/** @type {any} */ page) {
         this.setState(STATES.VALIDATING_PAGE);
         try {
             if (!page || page.isClosed()) {
@@ -732,11 +744,12 @@ class ConnectionOrchestrator {
                     return { browser: this.browser, page: this.page };
                 }
             } catch (e) {
+                const _ce = /** @type {any} */ (e);
                 attempt++;
-                log('WARN', `[ORCH] Ciclo de recuperação (attempt ${attempt}/${maxRetries}): ${e.message}`);
+                log('WARN', `[ORCH] Ciclo de recuperação (attempt ${attempt}/${maxRetries}): ${_ce.message}`);
 
                 if (attempt >= maxRetries) {
-                    throw new Error(`Failed to acquire context after ${maxRetries} attempts: ${e.message}`); // eslint-disable-line preserve-caught-error
+                    throw new Error(`Failed to acquire context after ${maxRetries} attempts: ${_ce.message}`); // eslint-disable-line preserve-caught-error
                 }
 
                 await new Promise(r => {
@@ -765,12 +778,12 @@ class ConnectionOrchestrator {
      * Retorna um relatório com tentativas em hosts/ports configurados.
      * Útil para scripts de bootstrap/diagnóstico.
      */
-    static async synchronize(options = {}) {
-        const report = {
+    static async synchronize(/** @type {any} */ options = {}) {
+        const report = /** @type {any} */ ({
             checked: [],
             reachable: [],
             unreachable: [],
-        };
+        });
 
         const hosts = options.hosts && options.hosts.length ? options.hosts : DEFAULTS.hosts;
         const ports = options.ports && options.ports.length ? options.ports : DEFAULTS.ports;
@@ -780,7 +793,7 @@ class ConnectionOrchestrator {
         for (const port of ports) {
             for (const host of hosts) {
                 const url = `http://${host}:${port}/json/version`;
-                const entry = { host, port, url, ok: false, status: null, ws: null, error: null };
+                const entry = /** @type {any} */ ({ host, port, url, ok: false, status: null, ws: null, error: null });
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -803,7 +816,8 @@ class ConnectionOrchestrator {
                     report.reachable.push(entry);
                     report.checked.push(entry);
                 } catch (err) {
-                    entry.error = err && err.message ? err.message : String(err);
+                    entry.error =
+                        err && /** @type {any} */ (err).message ? /** @type {any} */ (err).message : String(err);
                     report.unreachable.push(entry);
                     report.checked.push(entry);
                 }

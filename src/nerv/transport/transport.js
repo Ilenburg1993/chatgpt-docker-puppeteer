@@ -49,32 +49,36 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
      2. Conexão física
   ========================================================= */
 
-    const connection = /** @type {any} */ (createConnection({
-        telemetry,
-        adapter: {
-            ...adapter,
+    const connection = /** @type {any} */ (
+        createConnection({
+            telemetry,
+            adapter: {
+                ...adapter,
 
-            // Recebe chunks brutos do meio físico
-            /** @param {any} handler */
-            onReceive(handler) {
-                adapter.onReceive((/** @type {any} */ chunk) => {
-                    unpacker.push(chunk, handler);
-                });
+                // Recebe chunks brutos do meio físico
+                /** @param {any} handler */
+                onReceive(handler) {
+                    adapter.onReceive((/** @type {any} */ chunk) => {
+                        unpacker.push(chunk, handler);
+                    });
+                },
             },
-        },
-    }));
+        })
+    );
 
     /* =========================================================
      3. Reconexão técnica (opcional)
   ========================================================= */
 
     const reconnect = reconnectPolicy
-        ? /** @type {any} */ (createReconnect({
-              telemetry,
-              start: connection.start,
-              stop: connection.stop,
-              policy: reconnectPolicy,
-          }))
+        ? /** @type {any} */ (
+              createReconnect({
+                  telemetry,
+                  start: connection.start,
+                  stop: connection.stop,
+                  policy: reconnectPolicy,
+              })
+          )
         : null;
 
     /* =========================================================

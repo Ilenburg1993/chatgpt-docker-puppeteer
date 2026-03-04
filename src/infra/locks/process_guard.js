@@ -29,6 +29,7 @@ function isProcessAlive(pid) {
         process.kill(pid, 0);
         return true;
     } catch (e) {
+        const _ce = /** @type {any} */ (e);
         /**
          * EPERM: O processo existe, mas o usuário atual não tem permissão
          * para sinalizá-lo (comum em processos de sistema ou outros usuários).
@@ -37,7 +38,7 @@ function isProcessAlive(pid) {
          * ESRCH: O processo não foi encontrado (morreu ou nunca existiu).
          * Consideramos como MORTO.
          */
-        return e.code === 'EPERM';
+        return _ce.code === 'EPERM';
     }
 }
 

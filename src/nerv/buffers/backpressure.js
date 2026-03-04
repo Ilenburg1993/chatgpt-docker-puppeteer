@@ -37,7 +37,7 @@
  *
  * @param {CreateBackpressureDeps} deps
  * Interface de telemetria do NERV.
-  * @returns {object}
+ * @returns {object}
  */
 function createBackpressure({ telemetry }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {

@@ -4,11 +4,11 @@ import { STATUS_VALUES } from '#core/constants/tasks';
 
 /**
  * Função exportada: checkControlPause.
- * @returns {Promise<void>}
+ * @returns {Promise<any>}
  */
 async function checkControlPause() {
     try {
-        const control = await safeReadJSON(CONTROL);
+        const control = /** @type {any} */ (await safeReadJSON(CONTROL));
         return control && control.estado === STATUS_VALUES.PAUSED;
     } catch (e) {
         return false; // Em caso de erro, assume execução normal

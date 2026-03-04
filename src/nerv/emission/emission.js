@@ -41,26 +41,32 @@ function createEmission({ envelopes, buffers, correlation, telemetry }) {
      Composição dos emissores
   ========================================================= */
 
-    const commandEmitter = /** @type {any} */ (createEmitCommand({
-        envelopes,
-        buffers,
-        correlation,
-        telemetry,
-    }));
+    const commandEmitter = /** @type {any} */ (
+        createEmitCommand({
+            envelopes,
+            buffers,
+            correlation,
+            telemetry,
+        })
+    );
 
-    const eventEmitter = /** @type {any} */ (createEmitEvent({
-        envelopes,
-        buffers,
-        correlation,
-        telemetry,
-    }));
+    const eventEmitter = /** @type {any} */ (
+        createEmitEvent({
+            envelopes,
+            buffers,
+            correlation,
+            telemetry,
+        })
+    );
 
-    const ackEmitter = /** @type {any} */ (createEmitAck({
-        envelopes,
-        buffers,
-        correlation,
-        telemetry,
-    }));
+    const ackEmitter = /** @type {any} */ (
+        createEmitAck({
+            envelopes,
+            buffers,
+            correlation,
+            telemetry,
+        })
+    );
 
     /* =========================================================
      Interface pública do módulo

@@ -174,10 +174,11 @@ async function probeChromeConnection() {
             });
         });
     } catch (err) {
+        const _ce = /** @type {any} */ (err);
         return {
             connected: false,
             endpoint: httpEndpoint,
-            error: err.message,
+            error: _ce.message,
             latency_ms: 0,
         };
     }
@@ -201,7 +202,7 @@ async function getTrends() {
     }
 }
 
-async function saveTrends(trends) {
+async function saveTrends(/** @type {any} */ trends) {
     try {
         const limit = 50;
         const simplified = {
@@ -212,6 +213,7 @@ async function saveTrends(trends) {
         };
         await fsp.writeFile(TREND_FILE, JSON.stringify(simplified, null, 2));
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         /* Fail-safe */
     }
 }
@@ -258,7 +260,7 @@ async function probeConnectivity(url) {
         const t0 = Date.now();
         const client = url.startsWith('https') ? https : http;
         const req = client.request(url, { method: 'HEAD', timeout: 5000 }, res => {
-            resolve({ ok: res.statusCode < 400, status: res.statusCode, ms: Date.now() - t0 });
+            resolve({ ok: (/** @type {any} */ (res)).statusCode < 400, status: (/** @type {any} */ (res)).statusCode, ms: Date.now() - t0 });
         });
         req.on('error', () => resolve({ ok: false, status: 'OFFLINE', ms: Date.now() - t0 }));
         req.on('timeout', () => {
@@ -287,6 +289,7 @@ async function checkStorageSLA() {
         ioLatency = Date.now() - t0;
         writeOk = true;
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         writeOk = false;
     }
 
@@ -334,7 +337,7 @@ async function validateDNASanity() {
 async function runFullCheck() {
     const t0 = Date.now();
     const trends = await getTrends();
-    const io = await import('#infra/io').then(m => m.default ?? m); // Carrega dinamicamente para evitar ciclos
+    const io = await import('#infra/io').then(m => (/** @type {any} */ (m)).default ?? m); // Carrega dinamicamente para evitar ciclos
 
     const targets = ['https://www.google.com', ...(CONFIG.allowedDomains || []).map(d => `https://${d}`)];
     const [networkResults, storage, dna, lag, chrome] = await Promise.all([
@@ -353,13 +356,14 @@ async function runFullCheck() {
     try {
         proxyReport = await ConnectionOrchestrator.synchronize();
     } catch (err) {
-        proxyReport = { error: err && err.message ? err.message : String(err) };
+        const _ce = /** @type {any} */ (err);
+        proxyReport = { error: err && _ce.message ? _ce.message : String(err) };
     }
 
     // Estatísticas da fila
     let queueStats = { pending: 0, running: 0, total: 0 };
     try {
-        const tasks = /** @type {unknown[]} */ (await io.loadAllTasks());
+        const tasks = /** @type {any[]} */ (await io.loadAllTasks());
         queueStats = {
             pending: tasks.filter(t => t.status === STATUS_VALUES.PENDING).length,
             running: tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length,

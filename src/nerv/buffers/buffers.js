@@ -27,7 +27,7 @@ import createBackpressure from './backpressure.js';
  * - outbound: Limite de fila outbound
  * - inbound: Limite de fila inbound
  * - blockOnPressure: Se true, bloqueia quando buffer cheio (default: false)
-  * @returns {object}
+ * @returns {object}
  */
 function createBuffers({ telemetry, limits = {} }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {
@@ -38,15 +38,19 @@ function createBuffers({ telemetry, limits = {} }) {
 
     const backpressure = /** @type {any} */ (createBackpressure({ telemetry }));
 
-    const outbound = /** @type {any} */ (createOutboundQueue({
-        telemetry,
-        maxSize: limits.outbound ?? null,
-    }));
+    const outbound = /** @type {any} */ (
+        createOutboundQueue({
+            telemetry,
+            maxSize: limits.outbound ?? null,
+        })
+    );
 
-    const inbound = /** @type {any} */ (createInboundQueue({
-        telemetry,
-        maxSize: limits.inbound ?? null,
-    }));
+    const inbound = /** @type {any} */ (
+        createInboundQueue({
+            telemetry,
+            maxSize: limits.inbound ?? null,
+        })
+    );
 
     /* ===========================
      API pública do módulo

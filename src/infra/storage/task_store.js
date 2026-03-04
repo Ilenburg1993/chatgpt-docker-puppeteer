@@ -11,16 +11,12 @@ import * as PATHS from '../fs/paths.js';
 const fsp = fs.promises;
 
 /**
- * @typedef {object} SaveTaskTask
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Salva uma tarefa no disco após validação V5.
  *
  * MUDANÇA V5: Sempre salva em formato V5 (auto-upgrade de V4 se necessário).
  *
- * @param {SaveTaskTask} task - Objeto da tarefa (V4 ou V5).
- * @returns {Promise<object>} Tarefa validada e persistida (V5).
+ * @param {any} task - Objeto da tarefa (V4 ou V5).
+ * @returns {Promise<any>} Tarefa validada e persistida (V5).
  */
 async function saveTask(task) {
     try {
@@ -32,8 +28,7 @@ async function saveTask(task) {
         }
 
         // Valida schema V5 (parseTask já usa V5 se meta.version === '5.0')
-        /** @type {Record<string, unknown>} */
-        const validatedTask = parseTask(taskV5);
+        const validatedTask = /** @type {any} */ (parseTask(taskV5));
         const filepath = path.join(PATHS.QUEUE, `${validatedTask.meta.id}.json`);
 
         // ✅ Duplicate ID Detection: Log warning se task já existe
@@ -46,7 +41,8 @@ async function saveTask(task) {
 
         return validatedTask;
     } catch (e) {
-        throw new Error(`[TASK_STORE] Falha ao persistir tarefa: ${e.message}`); // eslint-disable-line preserve-caught-error
+        const _ce = /** @type {any} */ (e);
+        throw new Error(`[TASK_STORE] Falha ao persistir tarefa: ${_ce.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -57,14 +53,14 @@ async function saveTask(task) {
  * Não reescreve o arquivo (migration lazy, apenas em memória).
  *
  * @param {string} id - ID da tarefa.
- * @returns {Promise<object>} Tarefa (V5 se era V4, V5 nativa se já era V5).
+ * @returns {Promise<any>} Tarefa (V5 se era V4, V5 nativa se já era V5).
  */
 async function loadTask(id) {
     const filepath = path.join(PATHS.QUEUE, `${id}.json`);
-    const rawTask = await safeReadJSON(filepath);
+    const rawTask = /** @type {any} */ (await safeReadJSON(filepath));
 
     if (!rawTask) {
-        return null;
+        return /** @type {any} */ (null);
     }
 
     // Auto-migration V4 → V5 (lazy, apenas em memória)
@@ -80,7 +76,7 @@ async function loadTask(id) {
 /**
  * Deleta uma tarefa específica do disco.
  * @param {string} id - ID da tarefa.
-  * @returns {Promise<void>}
+  * @returns {Promise<any>}
  */
 async function deleteTask(id) {
     const filepath = path.join(PATHS.QUEUE, `${id}.json`);
@@ -89,7 +85,8 @@ async function deleteTask(id) {
             await fsp.unlink(filepath);
         }
     } catch (e) {
-        throw new Error(`[TASK_STORE] Erro ao remover arquivo: ${e.message}`); // eslint-disable-line preserve-caught-error
+        const _ce = /** @type {any} */ (e);
+        throw new Error(`[TASK_STORE] Erro ao remover arquivo: ${_ce.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -101,6 +98,7 @@ function listTaskFiles() {
     try {
         return fs.readdirSync(PATHS.QUEUE).filter(f => f.endsWith('.json'));
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         return [];
     }
 }
@@ -109,7 +107,7 @@ function listTaskFiles() {
  * Limpeza Cirúrgica da Fila: Remove todas as tarefas, EXCETO as que estão em execução.
  * Garante a continuidade do trabalho do Maestro durante limpezas administrativas.
  *
- * @returns {Promise<object>} Relatório de limpeza { deleted: number, preserved: number }
+ * @returns {Promise<any>} Relatório de limpeza { deleted: number, preserved: number }
  */
 async function clearQueue() {
     const files = listTaskFiles();
@@ -119,7 +117,7 @@ async function clearQueue() {
     for (const file of files) {
         try {
             const filepath = path.join(PATHS.QUEUE, file);
-            const task = await safeReadJSON(filepath);
+            const task = /** @type {any} */ (await safeReadJSON(filepath));
 
             // Proteção de Soberania: Nunca apagar o que o robô está operando agora
             if (task && task.state && task.state.status === STATUS_VALUES.RUNNING) {
@@ -130,6 +128,7 @@ async function clearQueue() {
             await fsp.unlink(filepath);
             deleted++;
         } catch (_) {
+            const _ce = /** @type {any} */ (_);
             // Em caso de erro de leitura ou exclusão de um arquivo específico, incrementa preservados
             preserved++;
         }

@@ -7,7 +7,8 @@ import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
         console.log(JSON.stringify(report, null, 2));
         process.exit(0);
     } catch (err) {
-        console.error('Error during proxy synchronization:', err && err.message ? err.message : err);
+        const _ce = /** @type {any} */ (err);
+        console.error('Error during proxy synchronization:', err && _ce.message ? _ce.message : err);
         process.exit(2);
     }
 })();

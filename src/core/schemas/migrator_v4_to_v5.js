@@ -3,12 +3,8 @@ import * as logger from '../logger.js';
 import { TaskSchemaV5 } from './task_schema_v5.js';
 
 /**
- * @typedef {object} IsV4TaskTask
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Detecta se task é V4 baseado na versão.
- * @param {IsV4TaskTask} task - Task object
+ * @param {any} task - Task object
  * @returns {boolean} - true se V4, false caso contrário
  */
 function isV4Task(task) {
@@ -16,22 +12,14 @@ function isV4Task(task) {
 }
 
 /**
- * @typedef {object} IsV5TaskTask
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Detecta se task é V5 baseado na versão.
- * @param {IsV5TaskTask} task - Task object
+ * @param {any} task - Task object
  * @returns {boolean} - true se V5, false caso contrário
  */
 function isV5Task(task) {
     return task?.meta?.version === '5.0';
 }
 
-/**
- * @typedef {object} MigrateTaskV4toV5TaskV4
- * @property {*} _ Propriedades definidas em runtime.
- */
 /**
  * Migra task individual de V4 para V5.
  *
@@ -51,7 +39,7 @@ function isV5Task(task) {
  * - result.subtask_results: []
  * - result.validation_results: []
  *
- * @param {MigrateTaskV4toV5TaskV4} taskV4 - Task V4 object
+ * @param {any} taskV4 - Task V4 object
  * @returns {object} - Task V5 object
  * @throws {Error} - Se migração falhar
  */
@@ -230,27 +218,25 @@ function migrateTaskV4toV5(taskV4) {
         logger.info(`Task ${taskV4.meta.id} migrada com sucesso para V5`);
         return validatedTask;
     } catch (error) {
-        logger.error(`Falha ao migrar task ${taskV4?.meta?.id || 'unknown'} para V5: ${error.message}`, {
-            error,
-            taskV4,
-        });
-        throw new Error(`Schema migration failed for task ${taskV4?.meta?.id}: ${error.message}`, { cause: error });
+        const _e = /** @type {any} */ (error);
+        logger.error(`Falha ao migrar task ${taskV4?.meta?.id || 'unknown'} para V5: ${_e.message}`);
+        throw new Error(`Schema migration failed for task ${taskV4?.meta?.id}: ${_e.message}`, { cause: error });
     }
 }
 
 /**
  * Migra batch de tasks V4 para V5.
- * @param {object[]} tasksV4 - Array de tasks V4
- * @returns {object[]} - Array de tasks V5
+ * @param {any[]} tasksV4 - Array de tasks V4
+ * @returns {any[]} - Array de tasks V5
  * @throws {Error} - Se alguma migração falhar
  */
 function migrateBatchV4toV5(tasksV4) {
     logger.info(`Iniciando migração batch de ${tasksV4.length} tasks V4 → V5...`);
 
     const results = {
-        migrated: [],
-        alreadyV5: [],
-        failed: [],
+        migrated: /** @type {any[]} */ ([]),
+        alreadyV5: /** @type {any[]} */ ([]),
+        failed: /** @type {any[]} */ ([]),
     };
 
     for (const taskV4 of tasksV4) {
@@ -262,22 +248,18 @@ function migrateBatchV4toV5(tasksV4) {
                 results.migrated.push(taskV5);
             }
         } catch (error) {
+            const _e = /** @type {any} */ (error);
             results.failed.push({
                 task_id: taskV4?.meta?.id || 'unknown',
-                error: error.message,
+                error: _e.message,
             });
         }
     }
 
-    logger.info(`Migração batch concluída:`, {
-        total: tasksV4.length,
-        migrated: results.migrated.length,
-        alreadyV5: results.alreadyV5.length,
-        failed: results.failed.length,
-    });
+    logger.info(`Migração batch concluída:`);
 
     if (results.failed.length > 0) {
-        logger.error(`${results.failed.length} tasks falharam na migração:`, results.failed);
+        logger.error(`${results.failed.length} tasks falharam na migração:`);
         throw new Error(`Batch migration failed for ${results.failed.length} tasks. See logs for details.`);
     }
 
@@ -285,12 +267,8 @@ function migrateBatchV4toV5(tasksV4) {
 }
 
 /**
- * @typedef {object} ValidateV5TaskTask
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Valida se task está em formato V5 válido.
- * @param {ValidateV5TaskTask} task - Task object
+ * @param {any} task - Task object
  * @returns {boolean} - true se válido, false caso contrário
  */
 function validateV5Task(task) {
@@ -298,20 +276,17 @@ function validateV5Task(task) {
         TaskSchemaV5.parse(task);
         return true;
     } catch (error) {
-        logger.error(`Task ${task?.meta?.id} não é V5 válida: ${error.message}`);
+        const _e = /** @type {any} */ (error);
+        logger.error(`Task ${task?.meta?.id} não é V5 válida: ${_e.message}`);
         return false;
     }
 }
 
 /**
- * @typedef {object} DowngradeV5toV4TaskV5
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Converte task V5 de volta para V4 (downgrade).
  * ATENÇÃO: Perde informações de missões/workflows/execution context/result V2!
  *
- * @param {DowngradeV5toV4TaskV5} taskV5 - Task V5 object
+ * @param {any} taskV5 - Task V5 object
  * @returns {object} - Task V4 object
  */
 function downgradeV5toV4(taskV5) {
@@ -379,12 +354,8 @@ function downgradeV5toV4(taskV5) {
 }
 
 /**
- * @typedef {object} AutoMigrateTaskTask
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Migra automaticamente task, detectando versão.
- * @param {AutoMigrateTaskTask} task - Task de qualquer versão
+ * @param {any} task - Task de qualquer versão
  * @returns {object} - Task V5
  */
 function autoMigrateTask(task) {

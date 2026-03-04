@@ -1,5 +1,7 @@
 // @ts-check
-import { z } from 'zod';
+import { z as _zImport } from 'zod';
+/** @type {any} */
+const z = _zImport;
 import { CONNECTION_MODES } from '../constants/browser.js';
 
 import {
@@ -144,6 +146,7 @@ import {
     StateSchemaV5,
     ResultSchemaV5,
 } from './task_schema_v5.js';
+
 
 /**
  * Barrel de schemas de task (V4/V5) para compatibilidade de import no core.

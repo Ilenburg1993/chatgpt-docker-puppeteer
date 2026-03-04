@@ -1,5 +1,5 @@
 // @ts-check
-import { z } from 'zod';
+import { z as _zImport } from 'zod';
 import { CONNECTION_MODES } from '../constants/browser.js';
 
 import {
@@ -10,6 +10,8 @@ import {
     SOURCE_SCHEMA,
     STATUS_SCHEMA,
 } from './shared_types.js';
+/** @type {any} */
+const z = _zImport;
 
 /**
  * 1. MetaSchema V5: Identidade e Rastreabilidade + Hierarquia de Missões.

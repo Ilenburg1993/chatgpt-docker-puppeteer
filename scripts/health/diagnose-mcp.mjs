@@ -62,14 +62,10 @@ function printResult(label, result) {
 }
 
 /**
- * @typedef {object} CallToolParams
- * @property {*} _ Propriedades definidas via runtime.
- */
-/**
  * @param {string} base
  * @param {number} id
  * @param {string} name
- * @param {CallToolParams} args
+ * @param {any} args
  */
 async function callTool(base, id, name, args) {
     return fetchJson(`${base}/api/mcp`, {
@@ -132,14 +128,14 @@ async function main() {
     printResult('POST /api/mcp tools/list', toolsList);
 
     const toolNames = Array.isArray(toolsList.json?.result?.tools)
-        ? toolsList.json.result.tools.map(item => item?.name).filter(Boolean)
+        ? toolsList.json.result.tools.map((/** @type {any} */ item) => item?.name).filter(Boolean)
         : [];
     if (toolNames.length > 0) {
         console.log(`[MCP DIAG] tools/list count: ${toolNames.length}`);
     }
 
-    const missingCoreTools = REQUIRED_CORE_TOOLS.filter(name => !toolNames.includes(name));
-    const missingLspTools = LSP_ENABLED ? REQUIRED_LSP_TOOLS.filter(name => !toolNames.includes(name)) : [];
+    const missingCoreTools = REQUIRED_CORE_TOOLS.filter((/** @type {any} */ name) => !toolNames.includes(name));
+    const missingLspTools = LSP_ENABLED ? REQUIRED_LSP_TOOLS.filter((/** @type {any} */ name) => !toolNames.includes(name)) : [];
     const lspToolsPresent = !LSP_ENABLED || missingLspTools.length === 0;
 
     const ragProbe = await callTool(base, 3, 'rag_search', {
@@ -172,7 +168,8 @@ async function main() {
     printResult('POST /api/mcp tools/call rag_expand', ragExpandProbe);
 
     let lspFunctionalOk = false;
-    let lspFunctionalIssues = [];
+    /** @type {any[]} */
+let lspFunctionalIssues = [];
     if (LSP_ENABLED && lspToolsPresent) {
         const lspDiagnostics = await callTool(base, 5, 'lsp_diagnostics', { filePath, maxResults: 20 });
         const lspDefinition = await callTool(base, 6, 'lsp_definition', { filePath, line, character, maxResults: 20 });
@@ -200,7 +197,7 @@ async function main() {
     let githubToolsOk = true;
     if (githubProxyEnabled && toolNames.length > 0) {
         const prefix = String(process.env.MCP_GITHUB_TOOL_PREFIX || 'mcp_github__');
-        const count = toolNames.filter(name => String(name).startsWith(prefix)).length;
+        const count = toolNames.filter((/** @type {any} */ name) => String(name).startsWith(prefix)).length;
         githubToolsOk = count > 0;
     }
 

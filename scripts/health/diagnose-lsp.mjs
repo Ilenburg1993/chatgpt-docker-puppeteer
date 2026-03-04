@@ -17,13 +17,9 @@ const REQUIRED_LSP_TOOLS = [
 ];
 
 /**
- * @typedef {object} CallMcpParams
- * @property {*} _ Propriedades definidas via runtime.
- */
-/**
  * @param {string} base
  * @param {string} method
- * @param {CallMcpParams} params
+ * @param {any} params
  * @param {number} id
  * @returns {Promise<{ ok: boolean, status: number, json: unknown, text: string }>}
  */
@@ -53,11 +49,7 @@ async function fetchHealth(base) {
 }
 
 /**
- * @typedef {object} ToolNamesFromListPayload
- * @property {*} _ Propriedades definidas via runtime.
- */
-/**
- * @param {ToolNamesFromListPayload} payload
+ * @param {any} payload
  * @returns {string[]}
  */
 function toolNamesFromList(payload) {
@@ -69,11 +61,7 @@ function toolNamesFromList(payload) {
 }
 
 /**
- * @typedef {object} EvaluateFunctionalResponseResponse
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
- * @param {EvaluateFunctionalResponseResponse} response
+ * @param {any} response
  * @param {string} op
  */
 function evaluateFunctionalResponse(response, op) {
@@ -167,7 +155,7 @@ async function main() {
         base,
         target_file: targetFile,
         health_ok: health.ok,
-        mcp_tools_list_ok: toolsList.ok && !toolsList.json?.error,
+        mcp_tools_list_ok: toolsList.ok && !(/** @type {any} */ (toolsList.json))?.error,
         lsp_tools_present: missingTools.length === 0,
         lsp_tools_missing: missingTools,
         lsp_functional_ok: diagnosticsEval.ok && definitionEval.ok,

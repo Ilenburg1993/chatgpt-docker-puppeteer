@@ -13,13 +13,13 @@ async function getProjectContext(projectId) {
     const safeProjectId = projectId || 'default';
 
     return allTasks
-        .filter(task => {
+        .filter((/** @type {any} */ task) => {
             // [V700] Blindagem contra tarefas malformadas ou parciais
             const isMatch = task?.meta?.project_id === safeProjectId;
             const isDone = task?.state?.status === STATUS_VALUES.DONE;
             return isMatch && isDone;
         })
-        .sort((a, b) => {
+        .sort((/** @type {any} */ a, /** @type {any} */ b) => {
             // Ordenação cronológica reversa baseada no término da tarefa
             const dateA = a?.state?.completed_at || '';
             const dateB = b?.state?.completed_at || '';
@@ -40,12 +40,12 @@ async function getProjectContext(projectId) {
  */
 async function findById(taskId) {
     if (!taskId) {
-        return null;
+        return /** @type {any} */ (null);
     }
 
     const allTasks = await cache.getQueue();
     // Busca linear O(N) sobre o snapshot de RAM
-    return allTasks.find(task => task?.meta?.id === taskId) || null;
+    return allTasks.find((/** @type {any} */ task) => task?.meta?.id === taskId) || null;
 }
 
 /**
@@ -55,39 +55,39 @@ async function findById(taskId) {
  */
 async function findLast(projectId) {
     const context = await getProjectContext(projectId);
-    return context[0] || null;
+    return /** @type {any} */ (context[0] || null);
 }
 
 /**
  * Localiza a última tarefa concluída que possui uma tag específica.
  * @param {*} projectId
  * @param {*} tag
-  * @returns {Promise<object[]>}
+  * @returns {Promise<any>}
  */
 async function findLastByTag(projectId, tag) {
     if (!tag) {
-        return null;
+        return /** @type {any} */ (null);
     }
     const context = await getProjectContext(projectId);
 
     // Assegura que a busca respeite a coleção de tags da tarefa
-    return context.find(task => Array.isArray(task?.meta?.tags) && task.meta.tags.includes(tag)) || null;
+    return context.find((/** @type {any} */ task) => Array.isArray(task?.meta?.tags) && task.meta.tags.includes(tag)) || null;
 }
 
 /**
  * Localiza a primeira tarefa (mais antiga) concluída com uma tag específica.
  * @param {*} projectId
  * @param {*} tag
-  * @returns {Promise<object[]>}
+  * @returns {Promise<any>}
  */
 async function findFirstByTag(projectId, tag) {
     if (!tag) {
-        return null;
+        return /** @type {any} */ (null);
     }
     const context = await getProjectContext(projectId);
 
     // Inverte a cronologia do contexto para encontrar a semente do projeto
-    return [...context].reverse().find(task => Array.isArray(task?.meta?.tags) && task.meta.tags.includes(tag)) || null;
+    return [...context].reverse().find((/** @type {any} */ task) => Array.isArray(task?.meta?.tags) && task.meta.tags.includes(tag)) || null;
 }
 
 export { findById, findLast, findLastByTag, findFirstByTag };

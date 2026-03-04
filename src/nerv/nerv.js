@@ -38,9 +38,12 @@ async function bootstrapSocketAdapter(config) {
     });
 
     // Log de eventos de conexão (antes de criar telemetria)
-    /** @type {any} */ (socketAdapter).events.on('log', (/** @type {{level: string, msg: string}} */ { level, msg }) => {
-        log.info(`[NERV/${level}] ${msg}`);
-    });
+    /** @type {any} */ (socketAdapter).events.on(
+        'log',
+        (/** @type {{level: string, msg: string}} */ { level, msg }) => {
+            log.info(`[NERV/${level}] ${msg}`);
+        }
+    );
 
     return socketAdapter;
 }
@@ -57,11 +60,13 @@ async function bootstrapSocketAdapter(config) {
  */
 function bootstrapHybridTransport({ mode, socketAdapter, telemetry }) {
     if (mode === CONNECTION_MODES.LOCAL || mode === CONNECTION_MODES.HYBRID) {
-        const hybridTransport = /** @type {any} */ (createHybridTransport({
-            mode,
-            socketAdapter,
-            telemetry,
-        }));
+        const hybridTransport = /** @type {any} */ (
+            createHybridTransport({
+                mode,
+                socketAdapter,
+                telemetry,
+            })
+        );
 
         hybridTransport.start();
         return hybridTransport;
@@ -293,7 +298,7 @@ async function createNERV(config = {}) {
     /* 9. Health */
     const health = createHealth({
         telemetry,
-        thresholds: (/** @type {any} */ (config.health))?.thresholds || {},
+        thresholds: /** @type {any} */ (config.health)?.thresholds || {},
     });
 
     /* 10. Interface pública */

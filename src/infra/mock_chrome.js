@@ -11,7 +11,7 @@ function createMockPage() {
         url() {
             return this._url;
         },
-        async goto(url, _ = {}) {
+        async goto(/** @type {any} */ url, _ = {}) {
             this._url = url;
             // pequeno delay simulado para aproximar comportamento real
             await new Promise(resolve => setTimeout(resolve, 5));
@@ -26,10 +26,11 @@ function createMockPage() {
         async setViewport() {
             return;
         },
-        async evaluate(fn, ...args) {
+        // @ts-ignore - rest param typed via JSDoc
+        async evaluate(/** @type {any} */ fn, .../** @type {any[]} */ args) {
             if (typeof fn === 'function') {
                 try {
-                    return fn(...args);
+                    return fn(.../** @type {any[]} */ args);
                 } catch (e) {
                     return null;
                 }

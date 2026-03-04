@@ -53,7 +53,7 @@ function createQueue() {
  * Interface de telemetria do NERV (observação técnica).
  *
  * Limite máximo técnico da fila (opcional).
-  * @returns {object}
+ * @returns {object}
  */
 function createInboundQueue({ telemetry, maxSize = null }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {

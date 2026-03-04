@@ -10,11 +10,14 @@ const CACHE_HEARTBEAT_MS = 5000; // Varredura forçada a cada 5s
 const OBSERVATION_WINDOW_MS = 300; // Janela de estabilização para eventos de disco
 
 // --- ESTADO VOLÁTIL DO CACHE ---
+/** @type {any[]} */
 let globalQueueCache = [];
 let isCacheDirty = true;
 let lastFullScan = 0;
+/** @type {any} */
 let currentScanPromise = null;
 // const WATCHER_DEBOUNCE_MS = 100; // Debounce para file watcher (P1.2) - not used yet
+/** @type {any} */
 let windowTimer = null;
 // watcherDebounceTimer reserved for future use
 
@@ -33,7 +36,8 @@ function listTaskFiles() {
             .filter(file => file.endsWith('.json'))
             .map(file => path.join(PATHS.QUEUE, file));
     } catch (err) {
-        log('ERROR', `[CACHE] Falha ao listar diretório da fila: ${err.message}`);
+        const _ce = /** @type {any} */ (err);
+        log('ERROR', `[CACHE] Falha ao listar diretório da fila: ${_ce.message}`);
         return [];
     }
 }
@@ -47,6 +51,7 @@ async function loadTask(filePath) {
         const raw = await fs.promises.readFile(filePath, 'utf-8');
         return JSON.parse(raw);
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         // Falha silenciosa para arquivos em processo de escrita/deleção
         return null;
     }
@@ -108,7 +113,7 @@ function openObservationWindow() {
  * API PÚBLICA: Retorna o snapshot atual da fila.
  * Implementa o Heartbeat de segurança para garantir consistência eventual.
  * P9.6: Adiciona tracking de cache hits/misses
-  * @returns {Promise<void>}
+  * @returns {Promise<any>}
  */
 async function getQueue() {
     const now = Date.now();
@@ -135,7 +140,7 @@ async function getQueue() {
 /**
  * Sinalização Externa: Marca o cache como inconsistente.
  * Chamado exclusivamente por sensores (fs_watcher) ou comandos IPC.
-  * @returns {void}
+  * @returns {any}
  */
 function markDirty() {
     isCacheDirty = true;
@@ -144,7 +149,7 @@ function markDirty() {
 
 /**
  * P9.6: Retorna métricas de cache para observabilidade.
- * @returns {object} Cache metrics
+ * @returns {any} Cache metrics
  */
 function getCacheMetrics() {
     const total = cacheHits + cacheMisses;

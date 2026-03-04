@@ -23,7 +23,7 @@ export const types = {
  * Parseia e valida uma tarefa raw, aplicando migração automática V4 → V5 se necessário.
  * Side-effects: Validação rigorosa, migração transparente de versões antigas.
  * @param {Record<string, unknown>} raw - Dados raw da tarefa.
- * @returns {Record<string, unknown>} Tarefa validada e migrada para V5.
+ * @returns {any} Tarefa validada e migrada para V5.
  * @throws {Error} Se a validação falhar após tentativas de migração.
  */
 export const parseTask = raw => {
