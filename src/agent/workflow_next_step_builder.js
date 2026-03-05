@@ -1,18 +1,34 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import crypto from 'node:crypto';
 
+/**
+ * @param {any} input
+ * @returns {string}
+ */
 function _hashId(input) {
     return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
 }
 
+/**
+ * @param {any} value
+ * @returns {any[]}
+ */
 function _ensureArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
 /**
  * @typedef {object} BuildWorkflowNextStepTaskParams
- * @property {Record<string, unknown>} parentTask
+ * @property {any} parentTask
  * @property {string} parentTaskId
+ * @property {any} [attemptId]
+ * @property {any} [nextStep]
+ * @property {number} [nextStepIndex]
+ * @property {any} [workflowConfig]
+ * @property {any[]} [completedStepIds]
+ * @property {any} [accumulatedContext]
+ * @property {number} [nowMs]
+ * @property {string} [source]
  */
 /**
  * @typedef {object} BuildWorkflowNextStepTaskOptions

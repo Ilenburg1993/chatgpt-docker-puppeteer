@@ -74,7 +74,8 @@ function recordEvent(params) {
 
 /**
  * @typedef {object} PruneEventsOptions
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {number} [retentionMs] Período de retenção em ms.
+ * @property {number} [maxRows] Máximo de linhas a reter.
  */
 /**
  * Prune events older than the specified retention period.
