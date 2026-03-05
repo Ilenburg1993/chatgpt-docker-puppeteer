@@ -152,8 +152,8 @@ export class ToolRegistry {
 
         const normalizedMetadata = {
             ...metadata,
-            allowMutations: (/** @type {any} */ (metadata)).allowMutations === true,
-            requiresConfirmationToken: (/** @type {any} */ (metadata)).requiresConfirmationToken === true,
+            allowMutations: /** @type {any} */ (metadata).allowMutations === true,
+            requiresConfirmationToken: /** @type {any} */ (metadata).requiresConfirmationToken === true,
         };
 
         this.tools.set(name, { metadata: normalizedMetadata, handler });
@@ -292,17 +292,20 @@ export class ToolRegistry {
 
                 console.error(`[Tool Registry] Tool execution completed: ${name} (${duration}ms)`);
                 return result;
-            } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+            } catch (_raw_error) {
+                const error = /** @type {any} */ (_raw_error);
                 clearTimeout(timeoutId);
                 lastError = error;
 
                 // Classify error for retry decision
                 const { classifyError, calculateBackoff } = await import('./error-classifier.mjs');
-                const classification = /** @type {any} */ (classifyError(error, {
-                    tool: name,
-                    model: (/** @type {any} */ (params)).model,
-                    attempt,
-                }));
+                const classification = /** @type {any} */ (
+                    classifyError(error, {
+                        tool: name,
+                        model: /** @type {any} */ (params).model,
+                        attempt,
+                    })
+                );
 
                 console.error(
                     `[Tool Registry] Tool ${name} failed (attempt ${attempt}/${maxAttempts}): ` +

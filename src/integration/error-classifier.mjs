@@ -78,7 +78,7 @@ export function classifyError(/** @type {any} */ error, /** @type {any} */ conte
         return m ? m[1] : null;
     }
 
-    const detectedModel = (/** @type {any} */ context).model || extractModel(msg);
+    const detectedModel = /** @type {any} */ context.model || extractModel(msg);
 
     // 1. TRANSIENT: Network failures, temporary unavailability
     // These are infrastructure issues that often resolve quickly
@@ -124,7 +124,7 @@ export function classifyError(/** @type {any} */ error, /** @type {any} */ conte
     ) {
         // Special case: Ollama timeout → suggest model fallback
         const isOllamaTimeout =
-            ((/** @type {any} */ context).tool?.includes('ollama') || msg.includes('Ollama')) &&
+            /** @type {any} */ (context.tool?.includes('ollama') || msg.includes('Ollama')) &&
             (msg.includes('timeout') || msg.includes('timed out') || msg.includes('aborted'));
 
         const fallbackModel = isOllamaTimeout ? getSmallerModel(detectedModel) : null;
@@ -268,7 +268,7 @@ export function getSmallerModel(/** @type {any} */ currentModel) {
         'qwen2.5-coder:1.5b': null,
     };
 
-    return (/** @type {any} */ (fallbackChain))[normalized] || null;
+    return /** @type {any} */ (fallbackChain)[normalized] || null;
 }
 
 /**
@@ -288,7 +288,11 @@ export function getSmallerModel(/** @type {any} */ currentModel) {
  * calculateBackoff(3, 1000)  // → ~2000-4000ms  (1s * 2^2 * [0.5-1.0])
  * calculateBackoff(10, 1000) // → ~30000-60000ms (capped at maxDelayMs)
  */
-export function calculateBackoff(/** @type {any} */ attempt, /** @type {any} */ baseDelayMs, /** @type {any} */ maxDelayMs = 60000) {
+export function calculateBackoff(
+    /** @type {any} */ attempt,
+    /** @type {any} */ baseDelayMs,
+    /** @type {any} */ maxDelayMs = 60000
+) {
     // Exponential growth: 2^(attempt-1)
     const exponential = baseDelayMs * Math.pow(2, attempt - 1);
 

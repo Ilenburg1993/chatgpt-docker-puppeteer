@@ -11,21 +11,28 @@
 
 ---
 
-## Estado geral — 4 de março de 2026 (Fase A concluída)
+## Estado geral — 5 de março de 2026 (Fase B: 6/11 concluídas)
 
 | Indicador                     | Antes     | Agora         |
 | ----------------------------- | --------- | ------------- |
 | Arquivos com `// @ts-check`   | **670**   | **670**       |
 | `@ts-nocheck` em código real  | **0** ✅   | **0** ✅       |
 | Erros `typecheck:node` (base) | ~2.170    | **2.120**     |
-| Erros `typecheck:strict:all`  | ~7.414    | **6.866**     |
-| Lanes com 0 erros             | 11 de 30+ | **13 de 30+** |
+| Erros `typecheck:strict:all`  | ~7.414    | **~4.400** ↓  |
+| Lanes com 0 erros             | 11 de 30+ | **21 de 30+** |
 
 **Fase 0 concluída**: 214 erros JSDoc estruturais (TS8032=177, TS8024=37) eliminados. **Fase A
 concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gateway` ✅,
 `src.audit_agent` ✅, `src.dashboard-ui` ✅, `tests.manual` ✅.
 
-**Próximo passo**: Fase B — `scripts.health` (441 erros).
+**Fase B em andamento** (6/11 concluídas): `src.nerv` ✅, `scripts.health` ✅, `src.missions` ✅,
+`src.shared` ✅, `src.orchestrator` ✅, `src.integration` ✅.
+
+> **Cascata**: as correções das Fases A e B geraram reduções massivas nos lanes restantes:
+> `src.infra` 2.232→716 (−68%), `src.kernel` 1.530→359 (−77%), `src.agent` 1.190→447,
+> `tools.workspace` 1.013→**8** (wins imediatos!).
+
+**Próximo passo**: Fase B — `tools.workspace` (8 erros!) → `scripts.root` (357) → `src.kernel` (359).
 
 **Dependência nova instalada**: `@types/better-sqlite3` (devDependencies) — resolve TS7016 em
 `src/infra/db/sqlite.js`.
@@ -74,20 +81,20 @@ concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gate
 | `tests.manual`          |     0 | ✅ verde | Manter |
 | `src.audit_agent`       |     0 | ✅ verde | Manter |
 | `src.nerv`              |     0 | ✅ verde | Manter |
-| `scripts.health`        |   441 | Fase B  | —      |
-| `src.missions`          |   608 | Fase B  | —      |
-| `src.shared`            |   746 | Fase B  | —      |
-| `src.orchestrator`      |   773 | Fase B  | —      |
-| `src.integration`       |   924 | Fase B  | —      |
+| `scripts.health`        |     0 | ✅ verde | Manter |
+| `src.missions`          |     0 | ✅ verde | Manter |
+| `src.shared`            |     0 | ✅ verde | Manter |
+| `src.orchestrator`      |     0 | ✅ verde | Manter |
+| `src.integration`       |     0 | ✅ verde | Manter |
+| `tools.workspace`       |     8 | Fase B  | ↓ era 1.013 |
+| `scripts.root`          |   357 | Fase B  | ↓ era 935 |
+| `src.kernel`            |   359 | Fase B/C| ↓ era 1.530 |
+| `src.agent`             |   447 | Fase B  | ↓ era 1.190 |
+| `src.core`              |   464 | Fase B  | ↓ era 1.053 |
+| `tests.legacy`          |   481 | Fase C  | ↓ era 1.403 |
+| `src.infra`             |   716 | Fase C  | ↓ era 2.232 |
+| `src.driver`            |   810 | Fase C  | ↓ era 1.558 |
 | `scripts.audit`         |   928 | Fase B  | —      |
-| `scripts.root`          |   935 | Fase B  | —      |
-| `tools.workspace`       | 1.013 | Fase B  | —      |
-| `src.core`              | 1.053 | Fase B  | —      |
-| `src.agent`             | 1.190 | Fase B  | —      |
-| `tests.legacy`          | 1.403 | Fase C  | —      |
-| `src.kernel`            | 1.530 | Fase C  | —      |
-| `src.driver`            | 1.558 | Fase C  | —      |
-| `src.infra`             | 2.232 | Fase C  | —      |
 
 ---
 
@@ -147,17 +154,18 @@ Objectivo: zerar 11 lanes. Após Fase A, cascatas de TS2339 já terão reduzido.
 | `src.core`         | 1.053 |     10     | ConfigShape, RuntimeContext, BootState               |
 | `src.agent`        | 1.190 |     11     | TaskAttempt, MissionState, AgentContext, WorkerState |
 
-- [x] `src.nerv`: 439 → 0
-- [ ] `scripts.health`: 441 → 0
-- [ ] `src.missions`: 608 → 0
-- [ ] `src.shared`: 746 → 0
-- [ ] `src.orchestrator`: 773 → 0
-- [ ] `src.integration`: 924 → 0
+- [x] `src.nerv`: 439 → 0 ✅
+- [x] `scripts.health`: 441 → 0 ✅
+- [x] `src.missions`: 608 → 0 ✅
+- [x] `src.shared`: 746 → 0 ✅
+- [x] `src.orchestrator`: 773 → 0 ✅
+- [x] `src.integration`: 924 → 0 ✅
+- [ ] `tools.workspace`: **8** → 0  ← próximo (era 1.013!)
+- [ ] `scripts.root`: **357** → 0  ← (era 935)
+- [ ] `src.kernel`: **359** → 0    ← (era 1.530, promovido de Fase C)
+- [ ] `src.agent`: **447** → 0     ← (era 1.190)
+- [ ] `src.core`: **464** → 0      ← (era 1.053)
 - [ ] `scripts.audit`: 928 → 0
-- [ ] `scripts.root`: 935 → 0
-- [ ] `tools.workspace`: 1.013 → 0
-- [ ] `src.core`: 1.053 → 0
-- [ ] `src.agent`: 1.190 → 0
 
 ---
 
@@ -166,12 +174,13 @@ Objectivo: zerar 11 lanes. Após Fase A, cascatas de TS2339 já terão reduzido.
 **`src.infra` deve ser corrigido primeiro** — seus tipos cascateiam para src.agent, src.missions,
 src.kernel.
 
-| Lane           | Erros | Estratégia                                                   |
-| -------------- | ----: | ------------------------------------------------------------ |
-| `src.infra`    | 2.232 | **Fazer primeiro.** Typedefs SQLite, BrowserPool, QueueEntry |
-| `src.driver`   | 1.558 | Augmentar Page, Browser, ElementHandle do Puppeteer          |
-| `src.kernel`   | 1.530 | Typedefs de loop de execução, PolicyState, ObservationStore  |
-| `tests.legacy` | 1.403 | @ts-ignore pontual com justificativa (legado não-migrado)    |
+| Lane           | Erros atual | Erros original | Estratégia                                                   |
+| -------------- | ----------: | -------------: | ------------------------------------------------------------ |
+| `src.infra`    |         716 |          2.232 | Typedefs SQLite, BrowserPool, QueueEntry                     |
+| `src.driver`   |         810 |          1.558 | Augmentar Page, Browser, ElementHandle do Puppeteer          |
+| `tests.legacy` |         481 |          1.403 | @ts-ignore pontual com justificativa (legado não-migrado)    |
+
+> `src.kernel` foi promovido para Fase B (359 erros — abaixo dos limiares originais de Fase C).
 
 **Prioridade dentro de src.infra**:
 
@@ -180,10 +189,9 @@ src.kernel.
 3. `src/infra/queue/*.js` — TaskRecord, QueueEntry
 4. `src/infra/storage/*.js`, `locks/*.js`, `fs/*.js`
 
-- [ ] `src.infra`: 2.232 → 0 (**fazer primeiro**)
-- [ ] `src.driver`: 1.558 → 0
-- [ ] `src.kernel`: 1.530 → 0
-- [ ] `tests.legacy`: 1.403 → 0
+- [ ] `src.infra`: 716 → 0 (↓ era 2.232)
+- [ ] `src.driver`: 810 → 0 (↓ era 1.558)
+- [ ] `tests.legacy`: 481 → 0 (↓ era 1.403)
 
 ---
 

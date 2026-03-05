@@ -320,7 +320,12 @@ function clearRetry(/** @type {any} */ alias) {
  * @param {Record<string, unknown>} env
  * @param {ScheduleRetryOptions} options
  */
-function scheduleRetry(/** @type {any} */ cfg, /** @type {any} */ registry, /** @type {any} */ env, /** @type {any} */ options) {
+function scheduleRetry(
+    /** @type {any} */ cfg,
+    /** @type {any} */ registry,
+    /** @type {any} */ env,
+    /** @type {any} */ options
+) {
     const { restart } = options;
     if (!restart.enabled) return;
 
@@ -364,7 +369,12 @@ function scheduleRetry(/** @type {any} */ cfg, /** @type {any} */ registry, /** 
  * @param {RegisterOneUpstreamOptions} options
  * @returns {Promise<{ status: UpstreamStatus }>}
  */
-async function registerOneUpstream(/** @type {any} */ cfg, /** @type {any} */ registry, /** @type {any} */ env, /** @type {any} */ options) {
+async function registerOneUpstream(
+    /** @type {any} */ cfg,
+    /** @type {any} */ registry,
+    /** @type {any} */ env,
+    /** @type {any} */ options
+) {
     const { refresh, restart } = options;
 
     const already = _registeredAliases.has(cfg.alias);
@@ -445,9 +455,10 @@ async function registerOneUpstream(/** @type {any} */ cfg, /** @type {any} */ re
                             return await client.callTool({
                                 name: upstreamName,
                                 arguments: params,
-                                signal: (/** @type {any} */ (execOptions)).signal,
+                                signal: /** @type {any} */ (execOptions).signal,
                             });
-                        } catch (_raw_err) { const err = /** @type {any} */ (_raw_err);
+                        } catch (_raw_err) {
+                            const err = /** @type {any} */ (_raw_err);
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
                             throw err;
                         }
@@ -502,9 +513,10 @@ async function registerOneUpstream(/** @type {any} */ cfg, /** @type {any} */ re
                             return await client.callTool({
                                 name: upstreamName,
                                 arguments: params,
-                                signal: (/** @type {any} */ (execOptions)).signal,
+                                signal: /** @type {any} */ (execOptions).signal,
                             });
-                        } catch (_raw_err) { const err = /** @type {any} */ (_raw_err);
+                        } catch (_raw_err) {
+                            const err = /** @type {any} */ (_raw_err);
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
                             throw err;
                         }
@@ -518,7 +530,8 @@ async function registerOneUpstream(/** @type {any} */ cfg, /** @type {any} */ re
         st.state = 'ready';
         _registeredAliases.add(cfg.alias);
         clearRetry(cfg.alias);
-    } catch (_raw_err) { const err = /** @type {any} */ (_raw_err);
+    } catch (_raw_err) {
+        const err = /** @type {any} */ (_raw_err);
         st.ready = false;
         st.state = 'not-ready';
         st.lastError = err && err.message ? err.message : String(err);
@@ -530,7 +543,13 @@ async function registerOneUpstream(/** @type {any} */ cfg, /** @type {any} */ re
     return { status: st };
 }
 
-function markUpstreamCallFailure(/** @type {any} */ cfg, /** @type {any} */ err, /** @type {any} */ registry, /** @type {any} */ env, /** @type {any} */ restart) {
+function markUpstreamCallFailure(
+    /** @type {any} */ cfg,
+    /** @type {any} */ err,
+    /** @type {any} */ registry,
+    /** @type {any} */ env,
+    /** @type {any} */ restart
+) {
     const prev = _status.upstreams.find((/** @type {any} */ u) => u.alias === cfg.alias);
     const next = {
         alias: cfg.alias,

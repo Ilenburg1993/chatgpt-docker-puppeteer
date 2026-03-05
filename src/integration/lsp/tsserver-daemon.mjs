@@ -115,8 +115,8 @@ function createLanguageService(/** @type {any} */ rootDir, /** @type {any} */ ex
 /** Classe exportada: TsserverDaemon. */
 class TsserverDaemon {
     constructor(options = {}) {
-        this.rootDir = normalizePath((/** @type {any} */ (options)).rootDir || process.cwd());
-        this.timeoutMs = Number((/** @type {any} */ (options)).timeoutMs || DEFAULT_TIMEOUT_MS);
+        this.rootDir = normalizePath(/** @type {any} */ (options).rootDir || process.cwd());
+        this.timeoutMs = Number(/** @type {any} */ (options).timeoutMs || DEFAULT_TIMEOUT_MS);
         this.started = false;
         this.requestSeq = 0;
         /** @type {Promise<unknown>} */
@@ -150,9 +150,11 @@ class TsserverDaemon {
 
         const run = async () => {
             const requestId = `lsp-${++this.requestSeq}`;
-            const timeoutMs = Number((/** @type {any} */ (options)).timeoutMs || this.timeoutMs);
+            const timeoutMs = Number(/** @type {any} */ (options).timeoutMs || this.timeoutMs);
             const internal = new AbortController();
-            const combined = (/** @type {any} */ (options)).signal ? AbortSignal.any([(/** @type {any} */ (options)).signal, internal.signal]) : internal.signal;
+            const combined = /** @type {any} */ (options).signal
+                ? AbortSignal.any([/** @type {any} */ (options).signal, internal.signal])
+                : internal.signal;
             const timeoutId = setTimeout(() => internal.abort(), timeoutMs);
             this.activeRequests.set(requestId, internal);
             try {
@@ -456,7 +458,11 @@ class TsserverDaemon {
             throw new Error('LSP_CODE_ACTION_EMPTY_EDITS');
         }
 
-        const totalBytes = edits.reduce((/** @type {any} */ acc, /** @type {any} */ edit) => acc + Buffer.byteLength(String(edit.newText || ''), 'utf8'), 0);
+        const totalBytes = edits.reduce(
+            (/** @type {any} */ acc, /** @type {any} */ edit) =>
+                acc + Buffer.byteLength(String(edit.newText || ''), 'utf8'),
+            0
+        );
         if (totalBytes > MAX_PATCH_BYTES) {
             throw new Error(`LSP_PATCH_TOO_LARGE: ${totalBytes} > ${MAX_PATCH_BYTES}`);
         }
@@ -551,8 +557,8 @@ export function getTsserverDaemon() {
  */
 export async function startTsserverDaemon(/** @type {any} */ options = {}) {
     const daemon = getTsserverDaemon();
-    if ((/** @type {any} */ (options)).timeoutMs) {
-        daemon.timeoutMs = Number((/** @type {any} */ (options)).timeoutMs);
+    if (/** @type {any} */ (options).timeoutMs) {
+        daemon.timeoutMs = Number(/** @type {any} */ (options).timeoutMs);
     }
     return daemon.start();
 }

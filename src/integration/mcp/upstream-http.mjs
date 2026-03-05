@@ -81,7 +81,8 @@ export function createMcpHttpClient(/** @type {any} */ config = {}) {
                 body: JSON.stringify(body),
                 signal,
             });
-        } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+        } catch (_raw_error) {
+            const error = /** @type {any} */ (_raw_error);
             if (error?.name === 'AbortError') {
                 throw error;
             }
