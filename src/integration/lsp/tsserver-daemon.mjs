@@ -8,17 +8,17 @@ const DEFAULT_TIMEOUT_MS = Number(process.env.LSP_TOOL_TIMEOUT_MS || 15000);
 const DEFAULT_MAX_RESULTS = Number(process.env.LSP_MAX_RESULTS || 200);
 const MAX_PATCH_BYTES = 200 * 1024;
 
-function normalizePath(p) {
+function normalizePath(/** @type {any} */ p) {
     return path.resolve(String(p || '')).replace(/\\/g, '/');
 }
 
-function isInsideWorkspace(rootDir, filePath) {
+function isInsideWorkspace(/** @type {any} */ rootDir, /** @type {any} */ filePath) {
     const root = normalizePath(rootDir);
     const full = normalizePath(filePath);
     return full === root || full.startsWith(`${root}/`);
 }
 
-function ensureWorkspacePath(rootDir, filePath) {
+function ensureWorkspacePath(/** @type {any} */ rootDir, /** @type {any} */ filePath) {
     const fullPath = path.resolve(rootDir, String(filePath || ''));
     if (!isInsideWorkspace(rootDir, fullPath)) {
         throw new Error(`LSP_PATH_OUTSIDE_WORKSPACE: ${filePath}`);
@@ -26,13 +26,13 @@ function ensureWorkspacePath(rootDir, filePath) {
     return fullPath;
 }
 
-function lineCharToOffset(sourceFile, line, character) {
+function lineCharToOffset(/** @type {any} */ sourceFile, /** @type {any} */ line, /** @type {any} */ character) {
     const safeLine = Math.max(0, Number(line || 1) - 1);
     const safeCharacter = Math.max(0, Number(character || 1) - 1);
     return ts.getPositionOfLineAndCharacter(sourceFile, safeLine, safeCharacter);
 }
 
-function offsetToLineChar(sourceFile, offset) {
+function offsetToLineChar(/** @type {any} */ sourceFile, /** @type {any} */ offset) {
     const lc = ts.getLineAndCharacterOfPosition(sourceFile, Math.max(0, offset || 0));
     return {
         line: lc.line + 1,
@@ -40,12 +40,12 @@ function offsetToLineChar(sourceFile, offset) {
     };
 }
 
-function formatDiagnosticMessage(diag) {
+function formatDiagnosticMessage(/** @type {any} */ diag) {
     if (typeof diag.messageText === 'string') return diag.messageText;
     return ts.flattenDiagnosticMessageText(diag.messageText, '\n');
 }
 
-function applyTextChanges(originalText, textChanges) {
+function applyTextChanges(/** @type {any} */ originalText, /** @type {any} */ textChanges) {
     const sorted = [...textChanges].sort((a, b) => b.start - a.start);
     let next = originalText;
     for (const change of sorted) {
@@ -54,7 +54,7 @@ function applyTextChanges(originalText, textChanges) {
     return next;
 }
 
-function createLanguageService(rootDir, extraFile) {
+function createLanguageService(/** @type {any} */ rootDir, /** @type {any} */ extraFile) {
     const configPath =
         ts.findConfigFile(rootDir, ts.sys.fileExists, 'tsconfig.json') ||
         ts.findConfigFile(rootDir, ts.sys.fileExists, 'jsconfig.json');
@@ -66,7 +66,7 @@ function createLanguageService(rootDir, extraFile) {
         moduleResolution: ts.ModuleResolutionKind.NodeNext,
         target: ts.ScriptTarget.ES2022,
     };
-    let fileNames = [];
+    /** @type {any[]} */ let fileNames = [];
 
     if (configPath) {
         const readConfig = ts.readConfigFile(configPath, ts.sys.readFile);
@@ -83,13 +83,13 @@ function createLanguageService(rootDir, extraFile) {
         fileNames.push(fullExtra);
     }
 
-    const scriptVersions = new Map(fileNames.map(f => [normalizePath(f), '1']));
+    const scriptVersions = new Map(fileNames.map((/** @type {any} */ f) => [normalizePath(f), '1']));
     const normalizedFileNames = [...new Set(fileNames.map(normalizePath))];
 
     const host = {
         getScriptFileNames: () => normalizedFileNames,
-        getScriptVersion: fileName => scriptVersions.get(normalizePath(fileName)) || '1',
-        getScriptSnapshot: fileName => {
+        getScriptVersion: (/** @type {any} */ fileName) => scriptVersions.get(normalizePath(fileName)) || '1',
+        getScriptSnapshot: (/** @type {any} */ fileName) => {
             const full = normalizePath(fileName);
             if (!fs.existsSync(full)) return undefined;
             const content = fs.readFileSync(full, 'utf8');
@@ -97,7 +97,7 @@ function createLanguageService(rootDir, extraFile) {
         },
         getCurrentDirectory: () => rootDir,
         getCompilationSettings: () => compilerOptions,
-        getDefaultLibFileName: options => ts.getDefaultLibFilePath(options),
+        getDefaultLibFileName: (/** @type {any} */ options) => ts.getDefaultLibFilePath(options),
         fileExists: ts.sys.fileExists,
         readFile: ts.sys.readFile,
         readDirectory: ts.sys.readDirectory,
@@ -115,8 +115,8 @@ function createLanguageService(rootDir, extraFile) {
 /** Classe exportada: TsserverDaemon. */
 class TsserverDaemon {
     constructor(options = {}) {
-        this.rootDir = normalizePath(options.rootDir || process.cwd());
-        this.timeoutMs = Number(options.timeoutMs || DEFAULT_TIMEOUT_MS);
+        this.rootDir = normalizePath((/** @type {any} */ (options)).rootDir || process.cwd());
+        this.timeoutMs = Number((/** @type {any} */ (options)).timeoutMs || DEFAULT_TIMEOUT_MS);
         this.started = false;
         this.requestSeq = 0;
         /** @type {Promise<unknown>} */
@@ -143,16 +143,16 @@ class TsserverDaemon {
         return { stopped: true };
     }
 
-    async execute(operation, params = {}, options = {}) {
+    async execute(/** @type {any} */ operation, /** @type {any} */ params = {}, /** @type {any} */ options = {}) {
         if (!this.started) {
             await this.start();
         }
 
         const run = async () => {
             const requestId = `lsp-${++this.requestSeq}`;
-            const timeoutMs = Number(options.timeoutMs || this.timeoutMs);
+            const timeoutMs = Number((/** @type {any} */ (options)).timeoutMs || this.timeoutMs);
             const internal = new AbortController();
-            const combined = options.signal ? AbortSignal.any([options.signal, internal.signal]) : internal.signal;
+            const combined = (/** @type {any} */ (options)).signal ? AbortSignal.any([(/** @type {any} */ (options)).signal, internal.signal]) : internal.signal;
             const timeoutId = setTimeout(() => internal.abort(), timeoutMs);
             this.activeRequests.set(requestId, internal);
             try {
@@ -171,7 +171,7 @@ class TsserverDaemon {
         return queued;
     }
 
-    async _dispatch(operation, params, signal) {
+    async _dispatch(/** @type {any} */ operation, /** @type {any} */ params, /** @type {any} */ signal) {
         switch (operation) {
             case 'definition':
                 return this._definition(params, signal);
@@ -198,13 +198,13 @@ class TsserverDaemon {
         }
     }
 
-    _assertNotAborted(signal) {
+    _assertNotAborted(/** @type {any} */ signal) {
         if (signal?.aborted) {
             throw new Error('LSP_CANCELLED');
         }
     }
 
-    async _definition(params, signal) {
+    async _definition(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         const { languageService, dispose } = createLanguageService(this.rootDir, filePath);
@@ -214,7 +214,7 @@ class TsserverDaemon {
             const offset = lineCharToOffset(source, params.line, params.character);
             const defs = languageService.getDefinitionAtPosition(filePath, offset) || [];
             return defs
-                .map(d => {
+                .map((/** @type {any} */ d) => {
                     const sourceFile = languageService.getProgram()?.getSourceFile(d.fileName);
                     if (!sourceFile) return null;
                     const start = offsetToLineChar(sourceFile, d.textSpan.start);
@@ -235,7 +235,7 @@ class TsserverDaemon {
         }
     }
 
-    async _references(params, signal) {
+    async _references(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         const { languageService, dispose } = createLanguageService(this.rootDir, filePath);
@@ -246,7 +246,7 @@ class TsserverDaemon {
             const refs = languageService.getReferencesAtPosition(filePath, offset) || [];
             return refs
                 .slice(0, DEFAULT_MAX_RESULTS)
-                .map(ref => {
+                .map((/** @type {any} */ ref) => {
                     const sourceFile = languageService.getProgram()?.getSourceFile(ref.fileName);
                     if (!sourceFile) return null;
                     const start = offsetToLineChar(sourceFile, ref.textSpan.start);
@@ -268,7 +268,7 @@ class TsserverDaemon {
         }
     }
 
-    async _hover(params, signal) {
+    async _hover(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         const { languageService, dispose } = createLanguageService(this.rootDir, filePath);
@@ -289,15 +289,15 @@ class TsserverDaemon {
         }
     }
 
-    async _documentSymbols(params, signal) {
+    async _documentSymbols(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         const { languageService, dispose } = createLanguageService(this.rootDir, filePath);
         try {
             const tree = languageService.getNavigationTree(filePath);
             if (!tree) return [];
-            const out = [];
-            const walk = (node, parent = null) => {
+            const out = /** @type {any[]} */ ([]);
+            const walk = (/** @type {any} */ node, parent = null) => {
                 for (const span of node.spans || []) {
                     out.push({
                         name: node.text,
@@ -318,14 +318,14 @@ class TsserverDaemon {
         }
     }
 
-    async _workspaceSymbols(params, signal) {
+    async _workspaceSymbols(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const query = String(params.query || '');
-        const { languageService, dispose } = createLanguageService(this.rootDir);
+        const { languageService, dispose } = createLanguageService(this.rootDir, undefined);
         try {
             const maxResultCount = Number(params.maxResults || DEFAULT_MAX_RESULTS);
             const items = languageService.getNavigateToItems(query, undefined, undefined) || [];
-            return items.slice(0, maxResultCount).map(item => ({
+            return items.slice(0, maxResultCount).map((/** @type {any} */ item) => ({
                 name: item.name,
                 kind: item.kind,
                 filePath: item.fileName,
@@ -337,7 +337,7 @@ class TsserverDaemon {
         }
     }
 
-    async _diagnostics(params, signal) {
+    async _diagnostics(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         const { languageService, dispose } = createLanguageService(this.rootDir, filePath);
@@ -349,7 +349,7 @@ class TsserverDaemon {
                 ...languageService.getSemanticDiagnostics(filePath),
                 ...languageService.getSuggestionDiagnostics(filePath),
             ];
-            return diagnostics.slice(0, DEFAULT_MAX_RESULTS).map(diag => {
+            return diagnostics.slice(0, DEFAULT_MAX_RESULTS).map((/** @type {any} */ diag) => {
                 const start = offsetToLineChar(source, diag.start || 0);
                 const end = offsetToLineChar(source, (diag.start || 0) + (diag.length || 0));
                 return {
@@ -367,7 +367,7 @@ class TsserverDaemon {
         }
     }
 
-    async _completion(params, signal) {
+    async _completion(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         const { languageService, dispose } = createLanguageService(this.rootDir, filePath);
@@ -377,7 +377,7 @@ class TsserverDaemon {
             const offset = lineCharToOffset(source, params.line, params.character);
             const list = languageService.getCompletionsAtPosition(filePath, offset, {});
             if (!list) return [];
-            return list.entries.slice(0, DEFAULT_MAX_RESULTS).map(entry => ({
+            return list.entries.slice(0, DEFAULT_MAX_RESULTS).map((/** @type {any} */ entry) => ({
                 name: entry.name,
                 kind: entry.kind,
                 kindModifiers: entry.kindModifiers,
@@ -388,14 +388,14 @@ class TsserverDaemon {
         }
     }
 
-    async _updateFile(params, signal) {
+    async _updateFile(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         await fsp.writeFile(filePath, String(params.content || ''), 'utf8');
         return { updated: true };
     }
 
-    async _codeActions(params, signal) {
+    async _codeActions(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         const { languageService, dispose } = createLanguageService(this.rootDir, filePath);
@@ -414,12 +414,12 @@ class TsserverDaemon {
                 ...languageService.getSemanticDiagnostics(filePath),
             ];
             const rangeCodes = diagnostics
-                .filter(diag => {
+                .filter((/** @type {any} */ diag) => {
                     const dStart = diag.start || 0;
                     const dEnd = dStart + (diag.length || 0);
                     return dStart <= end && dEnd >= start;
                 })
-                .map(diag => diag.code);
+                .map((/** @type {any} */ diag) => diag.code);
 
             if (rangeCodes.length === 0) return [];
 
@@ -433,8 +433,8 @@ class TsserverDaemon {
                 kind: 'quickfix',
                 source: 'typescript',
                 fixName: fix.fixName,
-                edits: (fix.changes || []).flatMap(change =>
-                    (change.textChanges || []).map(textChange => ({
+                edits: (fix.changes || []).flatMap((/** @type {any} */ change) =>
+                    (change.textChanges || []).map((/** @type {any} */ textChange) => ({
                         filePath: change.fileName,
                         start: textChange.span.start,
                         length: textChange.span.length,
@@ -447,7 +447,7 @@ class TsserverDaemon {
         }
     }
 
-    async _applyCodeAction(params, signal) {
+    async _applyCodeAction(/** @type {any} */ params, /** @type {any} */ signal) {
         this._assertNotAborted(signal);
         const mode = String(params.mode || 'preview');
         const action = params.action || {};
@@ -456,7 +456,7 @@ class TsserverDaemon {
             throw new Error('LSP_CODE_ACTION_EMPTY_EDITS');
         }
 
-        const totalBytes = edits.reduce((acc, edit) => acc + Buffer.byteLength(String(edit.newText || ''), 'utf8'), 0);
+        const totalBytes = edits.reduce((/** @type {any} */ acc, /** @type {any} */ edit) => acc + Buffer.byteLength(String(edit.newText || ''), 'utf8'), 0);
         if (totalBytes > MAX_PATCH_BYTES) {
             throw new Error(`LSP_PATCH_TOO_LARGE: ${totalBytes} > ${MAX_PATCH_BYTES}`);
         }
@@ -522,7 +522,7 @@ class TsserverDaemon {
     }
 }
 
-let singleton = null;
+/** @type {any} */ let singleton = null;
 
 /**
  * @typedef {object} TsserverDaemonStartOptions
@@ -549,10 +549,10 @@ export function getTsserverDaemon() {
  * @param {TsserverDaemonStartOptions} [options={}]
  * @returns {Promise<import('./tsserver-contract.d.ts').TsserverStartResult>}
  */
-export async function startTsserverDaemon(options = {}) {
+export async function startTsserverDaemon(/** @type {any} */ options = {}) {
     const daemon = getTsserverDaemon();
-    if (options.timeoutMs) {
-        daemon.timeoutMs = Number(options.timeoutMs);
+    if ((/** @type {any} */ (options)).timeoutMs) {
+        daemon.timeoutMs = Number((/** @type {any} */ (options)).timeoutMs);
     }
     return daemon.start();
 }

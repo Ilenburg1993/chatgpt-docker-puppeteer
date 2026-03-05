@@ -76,7 +76,7 @@ export class OllamaCircuitBreaker {
         this.nextAttemptTime = 0;
 
         // Sliding window for failure rate calculation
-        this.callHistory = []; // Array of {timestamp, success: boolean}
+        /** @type {any[]} */ this.callHistory = []; // Array of {timestamp, success: boolean}
         this.windowSize = windowSize;
     }
 
@@ -172,7 +172,7 @@ export class OllamaCircuitBreaker {
      * Record call in sliding window
      * @private
      */
-    _recordCall(success) {
+    _recordCall(/** @type {any} */ success) {
         this.callHistory.push({ timestamp: Date.now(), success });
 
         // Keep only windowSize recent calls
@@ -221,7 +221,7 @@ export class OllamaCircuitBreaker {
         this.state = CircuitState.CLOSED;
         this.failureCount = 0;
         this.successCount = 0;
-        this.callHistory = [];
+        /** @type {any[]} */ this.callHistory = [];
         this.lastFailureTime = 0;
         this.nextAttemptTime = 0;
         log('INFO', '[OllamaCircuitBreaker] Circuit manually RESET to CLOSED');
@@ -279,7 +279,7 @@ const circuitBreakers = new Map();
  * // Get breaker for local Ollama
  * const localBreaker = getCircuitBreaker('local');
  */
-export function getCircuitBreaker(endpoint, options = {}) {
+export function getCircuitBreaker(/** @type {any} */ endpoint, /** @type {any} */ options = {}) {
     if (!circuitBreakers.has(endpoint)) {
         // Apply env var overrides
         const config = {
@@ -294,7 +294,7 @@ export function getCircuitBreaker(endpoint, options = {}) {
         log('INFO', `[OllamaCircuitBreaker] Created circuit breaker for endpoint: ${endpoint}`);
     }
 
-    return circuitBreakers.get(endpoint);
+    return /** @type {any} */ (circuitBreakers.get(endpoint));
 }
 
 /**
@@ -309,7 +309,7 @@ export function getCircuitBreaker(endpoint, options = {}) {
 export function getAllStatuses() {
     const statuses = {};
     for (const [endpoint, breaker] of circuitBreakers.entries()) {
-        statuses[endpoint] = breaker.getStatus();
+        (/** @type {any} */ (statuses))[endpoint] = breaker.getStatus();
     }
     return statuses;
 }

@@ -67,18 +67,18 @@ export const RetryStrategy = Object.freeze({
  * //   suggestedDelayMs: 1000
  * // }
  */
-export function classifyError(error, context = {}) {
+export function classifyError(/** @type {any} */ error, /** @type {any} */ context = {}) {
     const msg = String(error?.message || '');
     const name = String(error?.name || '');
     const code = String(error?.code || '');
 
     // helper: try to pick a model name out of a free-form message
-    function extractModel(text) {
+    function extractModel(/** @type {any} */ text) {
         const m = text.match(/(qwen[\w.\-:]+)/i);
         return m ? m[1] : null;
     }
 
-    const detectedModel = context.model || extractModel(msg);
+    const detectedModel = (/** @type {any} */ context).model || extractModel(msg);
 
     // 1. TRANSIENT: Network failures, temporary unavailability
     // These are infrastructure issues that often resolve quickly
@@ -124,7 +124,7 @@ export function classifyError(error, context = {}) {
     ) {
         // Special case: Ollama timeout → suggest model fallback
         const isOllamaTimeout =
-            (context.tool?.includes('ollama') || msg.includes('Ollama')) &&
+            ((/** @type {any} */ context).tool?.includes('ollama') || msg.includes('Ollama')) &&
             (msg.includes('timeout') || msg.includes('timed out') || msg.includes('aborted'));
 
         const fallbackModel = isOllamaTimeout ? getSmallerModel(detectedModel) : null;
@@ -244,7 +244,7 @@ export function classifyError(error, context = {}) {
  * getSmallerModel('qwen3-coder-next')  // → 'qwen2.5-coder:7b'
  * getSmallerModel('qwen2.5-coder:3b')  // → 'qwen2.5-coder:1.5b' (new 1.5b tier)
  */
-export function getSmallerModel(currentModel) {
+export function getSmallerModel(/** @type {any} */ currentModel) {
     if (!currentModel) return null;
 
     // strip any wrapper that some toolkits add (e.g. `Custom/` prefix) and normalize case
@@ -268,7 +268,7 @@ export function getSmallerModel(currentModel) {
         'qwen2.5-coder:1.5b': null,
     };
 
-    return fallbackChain[normalized] || null;
+    return (/** @type {any} */ (fallbackChain))[normalized] || null;
 }
 
 /**
@@ -288,7 +288,7 @@ export function getSmallerModel(currentModel) {
  * calculateBackoff(3, 1000)  // → ~2000-4000ms  (1s * 2^2 * [0.5-1.0])
  * calculateBackoff(10, 1000) // → ~30000-60000ms (capped at maxDelayMs)
  */
-export function calculateBackoff(attempt, baseDelayMs, maxDelayMs = 60000) {
+export function calculateBackoff(/** @type {any} */ attempt, /** @type {any} */ baseDelayMs, /** @type {any} */ maxDelayMs = 60000) {
     // Exponential growth: 2^(attempt-1)
     const exponential = baseDelayMs * Math.pow(2, attempt - 1);
 
@@ -317,8 +317,8 @@ export function calculateBackoff(attempt, baseDelayMs, maxDelayMs = 60000) {
  * isRetryable(new Error('ECONNREFUSED'))  // → true
  * isRetryable(new Error('401 Unauthorized'))  // → false
  */
-export function isRetryable(error, context = {}) {
-    const classification = classifyError(error, context);
+export function isRetryable(/** @type {any} */ error, /** @type {any} */ context = {}) {
+    const classification = /** @type {any} */ (classifyError(error, context));
     return classification.retryable;
 }
 
@@ -337,7 +337,7 @@ export function isRetryable(error, context = {}) {
  * getErrorSummary(new Error('ECONNREFUSED'))
  * // → "Network connectivity issue (TRANSIENT) - will retry with backoff"
  */
-export function getErrorSummary(error, context = {}) {
-    const classification = classifyError(error, context);
+export function getErrorSummary(/** @type {any} */ error, /** @type {any} */ context = {}) {
+    const classification = /** @type {any} */ (classifyError(error, context));
     return `${classification.message} (${classification.errorClass})`;
 }

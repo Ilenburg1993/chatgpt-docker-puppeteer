@@ -77,7 +77,7 @@ async function ragSearchHandler({
 
     try {
         const result = await ragHybridSearch(
-            /** @type {unknown} */ ({
+            /** @type {any} */ ({
                 query,
                 topK: validTopK,
                 profile,
@@ -225,7 +225,7 @@ async function ragSearchHandler({
                 ...(result.reason_code ? { reason_code: result.reason_code } : {}),
                 ...(result.degraded_reason ? { degraded_reason: result.degraded_reason } : {}),
                 result_count: result.results.length,
-                results: result.results.map(r => ({
+                results: result.results.map((/** @type {any} */ r) => ({
                     chunk_id: r.chunk_id,
                     path: r.path,
                     content_class: r.content_class || null,
@@ -264,7 +264,7 @@ async function ragSearchHandler({
                 partial: Boolean(result.degraded),
             },
         };
-    } catch (error) {
+    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
         console.error('[RAG Tool] rag_search error:', error);
         throw new Error(`RAG search failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -284,7 +284,7 @@ async function ragHealthHandler() {
     console.error('[RAG Tool] rag_health check...');
 
     try {
-        const health = await ragHealth();
+        const health = /** @type {any} */ (await ragHealth());
         const cacheStats = getRagCacheStats();
 
         let status = '# RAG System Health\n\n';
@@ -337,16 +337,16 @@ async function ragHealthHandler() {
         }
 
         return status;
-    } catch (error) {
+    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
         console.error('[RAG Tool] rag_health error:', error);
         throw new Error(`RAG health check failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
-async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'lines' }) {
+async function ragExpandHandler(/** @type {any} */ { chunk_id, before_lines, after_lines, mode = 'lines' }) {
     console.error(`[RAG Tool] rag_expand: chunk_id=${chunk_id} mode=${mode}`);
 
-    const expanded = /** @type {unknown} */ (
+    const expanded = /** @type {any} */ (
         await ragExpand({
             chunkId: chunk_id,
             beforeLines: before_lines,
@@ -413,7 +413,7 @@ async function ragExpandHandler({ chunk_id, before_lines, after_lines, mode = 'l
  * @param {RegisterRagToolsRegistry} registry - Tool registry instance
   * @returns {Promise<void>}
  */
-export async function registerRagTools(registry) {
+export async function registerRagTools(/** @type {any} */ registry) {
     console.error('[RAG Tools] Registering tools...');
 
     // rag_search

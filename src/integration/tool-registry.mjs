@@ -49,14 +49,14 @@
  * Normalize unknown tool output to a structured shape used by MCP adapters.
  * Backward-compatible: plain strings/objects are still accepted.
  *
- * @param {NormalizeToolResultPayloadValue} value
+ * @param {any} value
  * @returns {{ text: string, json?: unknown, flags: { degraded: boolean, mutating: boolean, partial: boolean } }}
  */
 export function normalizeToolResultPayload(value) {
     if (value && typeof value === 'object' && Array.isArray(value.content)) {
         const textParts = value.content
-            .filter(part => part && part.type === 'text' && typeof part.text === 'string')
-            .map(part => part.text);
+            .filter((/** @type {any} */ part) => part && part.type === 'text' && typeof part.text === 'string')
+            .map((/** @type {any} */ part) => part.text);
         return {
             text: textParts.join('\n').trim() || JSON.stringify(value, null, 2),
             json: value.structuredContent,
@@ -116,7 +116,7 @@ export class ToolRegistry {
      * Register a tool in the registry
      *
      * @param {string} name - Tool name (e.g., 'rag_search', 'ollama_generate')
-     * @param {object} metadata - Tool metadata (description, inputSchema)
+     * @param {any} metadata - Tool metadata (description, inputSchema)
      * @param {function} handler - Async function to execute the tool
      *
      * @example
@@ -152,8 +152,8 @@ export class ToolRegistry {
 
         const normalizedMetadata = {
             ...metadata,
-            allowMutations: metadata.allowMutations === true,
-            requiresConfirmationToken: metadata.requiresConfirmationToken === true,
+            allowMutations: (/** @type {any} */ (metadata)).allowMutations === true,
+            requiresConfirmationToken: (/** @type {any} */ (metadata)).requiresConfirmationToken === true,
         };
 
         this.tools.set(name, { metadata: normalizedMetadata, handler });
@@ -164,8 +164,8 @@ export class ToolRegistry {
      * Execute a tool by name (with optional retry, adaptive timeout, circuit breaker)
      *
      * @param {string} name - Tool name
-     * @param {object} params - Tool parameters (validated against inputSchema)
-     * @param {object} options - Execution options (signal for cancellation, etc.)
+     * @param {any} params - Tool parameters (validated against inputSchema)
+     * @param {any} options - Execution options (signal for cancellation, etc.)
      * @returns {Promise<string|object>} Tool result
      *
      * @throws {Error} If tool not found or execution fails
@@ -229,7 +229,7 @@ export class ToolRegistry {
             const breaker = getCircuitBreaker(endpoint);
 
             if (!breaker.allowRequest()) {
-                const status = breaker.getStatus();
+                const status = /** @type {any} */ (breaker.getStatus());
                 throw new Error(
                     `Ollama ${endpoint} circuit breaker OPEN - service unavailable. ` +
                         `Retry in ${Math.round(status.nextAttemptIn / 1000)}s`
@@ -292,17 +292,17 @@ export class ToolRegistry {
 
                 console.error(`[Tool Registry] Tool execution completed: ${name} (${duration}ms)`);
                 return result;
-            } catch (error) {
+            } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
                 clearTimeout(timeoutId);
                 lastError = error;
 
                 // Classify error for retry decision
                 const { classifyError, calculateBackoff } = await import('./error-classifier.mjs');
-                const classification = classifyError(error, {
+                const classification = /** @type {any} */ (classifyError(error, {
                     tool: name,
-                    model: params.model,
+                    model: (/** @type {any} */ (params)).model,
                     attempt,
-                });
+                }));
 
                 console.error(
                     `[Tool Registry] Tool ${name} failed (attempt ${attempt}/${maxAttempts}): ` +
@@ -446,7 +446,7 @@ export const registry = new ToolRegistry();
  * Initialization state
  */
 let initialized = false;
-let initPromise = null;
+/** @type {Promise<void> | null} */ let initPromise = null;
 
 /**
  * Initialize registry with all available tools
@@ -506,7 +506,7 @@ export async function initialize() {
 
             initialized = true;
 
-            const stats = registry.getStats();
+            const stats = /** @type {any} */ (registry.getStats());
             console.error(`[Tool Registry] Initialization complete: ${stats.totalTools} tools registered`);
             console.error(`[Tool Registry] Available tools: ${stats.tools.join(', ')}`);
         } catch (error) {

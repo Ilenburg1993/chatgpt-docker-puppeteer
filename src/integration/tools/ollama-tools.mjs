@@ -38,7 +38,7 @@ const OllamaEmbedSchema = z.object({
         .optional(),
 });
 
-function formatModelBlock(models) {
+function formatModelBlock(/** @type {any} */ models) {
     if (!Array.isArray(models) || models.length === 0) {
         return '- (none)\n';
     }
@@ -54,16 +54,16 @@ function formatModelBlock(models) {
     return out;
 }
 
-async function ollamaGenerateHandler(params, options = {}) {
+async function ollamaGenerateHandler(/** @type {any} */ params, /** @type {any} */ options = {}) {
     let validated;
     try {
         validated = OllamaGenerateSchema.parse(params);
-    } catch (error) {
+    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
         if (error instanceof z.ZodError) {
-            const issues = error.issues ?? error.errors ?? [];
+            const issues = (/** @type {any} */ (error)).issues ?? [];
             const message =
                 Array.isArray(issues) && issues.length > 0
-                    ? issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
+                    ? issues.map((/** @type {any} */ e) => `${e.path.join('.')}: ${e.message}`).join('; ')
                     : 'validation failed';
             throw new Error(`Invalid input: ${message}`); // eslint-disable-line preserve-caught-error
         }
@@ -100,22 +100,22 @@ async function ollamaGenerateHandler(params, options = {}) {
         formatted += '\n';
 
         return formatted;
-    } catch (error) {
+    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_generate error:', error);
         throw new Error(`Ollama generate failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
-async function ollamaEmbedHandler(params, options = {}) {
+async function ollamaEmbedHandler(/** @type {any} */ params, /** @type {any} */ options = {}) {
     let validated;
     try {
         validated = OllamaEmbedSchema.parse(params);
-    } catch (error) {
+    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
         if (error instanceof z.ZodError) {
-            const issues = error.issues ?? error.errors ?? [];
+            const issues = (/** @type {any} */ (error)).issues ?? [];
             const message =
                 Array.isArray(issues) && issues.length > 0
-                    ? issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')
+                    ? issues.map((/** @type {any} */ e) => `${e.path.join('.')}: ${e.message}`).join('; ')
                     : 'validation failed';
             throw new Error(`Invalid input: ${message}`); // eslint-disable-line preserve-caught-error
         }
@@ -150,7 +150,7 @@ async function ollamaEmbedHandler(params, options = {}) {
         formatted += `- Mean: ${(embedding.reduce((a, b) => a + b, 0) / embedding.length).toFixed(6)}\n`;
 
         return formatted;
-    } catch (error) {
+    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_embed error:', error);
         throw new Error(`Ollama embed failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -194,7 +194,7 @@ async function ollamaModelsHandler() {
         formatted += '- Local non-embedding remains available for fallback/specific objectives\n';
 
         return formatted;
-    } catch (error) {
+    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_models error:', error);
         let formatted = '# Available Ollama Models\n\n';
         formatted += '**priority:** cloud-first-non-embedding\n\n';
@@ -206,10 +206,10 @@ async function ollamaModelsHandler() {
 /**
  * Register Ollama tools in the Tool Registry
  *
- * @param {ToolRegistry} registry
+ * @param {any} registry
   * @returns {Promise<void>}
  */
-export async function registerOllamaTools(registry) {
+export async function registerOllamaTools(/** @type {any} */ registry) {
     console.error('[Ollama Tools] Registering tools...');
 
     registry.register(

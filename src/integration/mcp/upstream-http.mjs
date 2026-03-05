@@ -7,7 +7,7 @@
  * - Supports AbortSignal for cancellation/timeouts
  */
 
-function safeJsonParse(maybeJson) {
+function safeJsonParse(/** @type {any} */ maybeJson) {
     try {
         return JSON.parse(maybeJson);
     } catch {
@@ -15,7 +15,7 @@ function safeJsonParse(maybeJson) {
     }
 }
 
-function normalizeHeaders(extraHeaders) {
+function normalizeHeaders(/** @type {any} */ extraHeaders) {
     if (!extraHeaders) return {};
     if (extraHeaders instanceof Headers) {
         return Object.fromEntries(extraHeaders.entries());
@@ -44,13 +44,13 @@ export class MCPUpstreamError extends Error {
 /**
  * @typedef {object} CreateMcpHttpClientConfig
  * @property {string} url
- * @property {Headers | Record<string} headers
+ * @property {any} headers
  */
 /**
  * @param {CreateMcpHttpClientConfig} [config]
-  * @returns {Promise<object>}
+ * @returns {object}
  */
-export function createMcpHttpClient(config = {}) {
+export function createMcpHttpClient(/** @type {any} */ config = {}) {
     const { url, headers } = /** @type {{ url?: string, headers?: Headers | Record<string, string> }} */ (config);
     if (!url || typeof url !== 'string') {
         throw new Error('createMcpHttpClient: url must be a non-empty string');
@@ -72,7 +72,7 @@ export function createMcpHttpClient(config = {}) {
 
         let response;
         try {
-            response = await fetch(url, {
+            response = await fetch(/** @type {string} */ (url), {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json',
@@ -81,7 +81,7 @@ export function createMcpHttpClient(config = {}) {
                 body: JSON.stringify(body),
                 signal,
             });
-        } catch (error) {
+        } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
             if (error?.name === 'AbortError') {
                 throw error;
             }

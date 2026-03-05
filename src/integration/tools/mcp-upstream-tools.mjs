@@ -13,7 +13,7 @@
 
 import { createMcpHttpClient } from '../mcp/upstream-http.mjs';
 
-function parseJsonObject(value) {
+function parseJsonObject(/** @type {any} */ value) {
     if (!value) return null;
     try {
         const parsed = JSON.parse(value);
@@ -23,7 +23,7 @@ function parseJsonObject(value) {
     }
 }
 
-function sanitizeToolMetadata(tool) {
+function sanitizeToolMetadata(/** @type {any} */ tool) {
     const description =
         typeof tool?.description === 'string' && tool.description.trim()
             ? tool.description
@@ -45,9 +45,9 @@ function sanitizeToolMetadata(tool) {
  * Função exportada: registerUpstreamMcpTools.
  * @param {*} registry
  * @param {RegisterUpstreamMcpToolsOptions} [options]
- * @returns {Promise<void>}
+ * @returns {Promise<any>}
  */
-export async function registerUpstreamMcpTools(registry, options = {}) {
+export async function registerUpstreamMcpTools(/** @type {any} */ registry, /** @type {any} */ options = {}) {
     const enabled = options.enabled ?? process.env.MCP_UPSTREAM_ENABLED === 'true';
     if (!enabled) {
         return { enabled: false, registered: 0 };
@@ -63,7 +63,7 @@ export async function registerUpstreamMcpTools(registry, options = {}) {
 
     const headers = options.headers ?? parseJsonObject(process.env.MCP_UPSTREAM_HEADERS_JSON) ?? undefined;
 
-    const client = createMcpHttpClient({ url, headers });
+    const client = /** @type {any} */ (createMcpHttpClient({ url, headers }));
 
     const toolList = await client.listTools();
     const tools = Array.isArray(toolList?.tools) ? toolList.tools : [];
@@ -89,7 +89,7 @@ export async function registerUpstreamMcpTools(registry, options = {}) {
                 const result = await client.callTool({
                     name: upstreamName,
                     arguments: params,
-                    signal: execOptions.signal,
+                    signal: (/** @type {any} */ (execOptions)).signal,
                 });
 
                 // Pass through MCP tool result shape when available.
