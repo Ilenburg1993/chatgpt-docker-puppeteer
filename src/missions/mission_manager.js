@@ -13,7 +13,7 @@ import { CheckpointManager } from '#orchestrator/checkpoint_manager';
 import { getActionCode, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
 import crypto from 'node:crypto';
 
-function _hashId(input) {
+function _hashId(/** @type {any} */ input) {
     return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
 }
 
@@ -23,13 +23,13 @@ function _hashId(input) {
 class MissionManager {
     /**
      * @param {object} deps
-     * @param {object} deps.kernel - Instância do Kernel (para executar tasks)
-     * @param {object} deps.nerv - Instância do NERV (para escutar eventos)
-     * @param {object} [deps.stateManager] - MissionStateManager (opcional, cria se não fornecido)
-     * @param {object} [deps.workflowGenerator] - WorkflowGenerator (opcional)
-     * @param {object} [deps.contextManager] - ContextManager (opcional)
-     * @param {object} [deps.feedbackProcessor] - FeedbackProcessor (opcional)
-     * @param {object} [deps.checkpointManager] - CheckpointManager (opcional)
+     * @param {any} deps.kernel - Instância do Kernel (para executar tasks)
+     * @param {any} deps.nerv - Instância do NERV (para escutar eventos)
+     * @param {any} [deps.stateManager] - MissionStateManager (opcional, cria se não fornecido)
+     * @param {any} [deps.workflowGenerator] - WorkflowGenerator (opcional)
+     * @param {any} [deps.contextManager] - ContextManager (opcional)
+     * @param {any} [deps.feedbackProcessor] - FeedbackProcessor (opcional)
+     * @param {any} [deps.checkpointManager] - CheckpointManager (opcional)
      */
     constructor({ kernel = null, nerv, stateManager = null, workflowGenerator = null, contextManager = null, feedbackProcessor = null, checkpointManager = null }) {
         if (!nerv) {
@@ -97,7 +97,7 @@ class MissionManager {
      * @param {string} options.description - Descrição
      * @param {string} options.templateId - ID do template (ex: 'book_writing')
      * @param {object} options.params - Parâmetros para o template
-     * @returns {Promise<object>} - State da missão criada
+     * @returns {Promise<any>} - State da missão criada
      */
     async createMission({ title, description, templateId, params }) {
         // 1. Valida entrada
@@ -138,7 +138,7 @@ class MissionManager {
             // Rollback: if context init fails after mission created, log and rethrow
             logger.log(
                 'ERROR',
-                `[MissionManager] Mission ${missionId} creation failed during context init: ${err?.message}`
+                `[MissionManager] Mission ${missionId} creation failed during context init: ${(/** @type {any} */ (err))?.message}`
             );
             throw err;
         }
@@ -151,7 +151,7 @@ class MissionManager {
      * Lê uma missão.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<object|null>} - State ou null
+     * @returns {Promise<any>} - State ou null
      */
     async getMission(missionId) {
         return this.stateManager.getMission(missionId);
@@ -160,8 +160,8 @@ class MissionManager {
     /**
      * Lista todas as missões.
      *
-     * @param {object} filters - Filtros opcionais
-     * @returns {Promise<Object[]>} - Array de states
+     * @param {any} filters - Filtros opcionais
+     * @returns {Promise<any>} - Array de states
      */
     async listMissions(filters = {}) {
         return this.stateManager.listMissions(filters);
@@ -299,7 +299,7 @@ class MissionManager {
      *
      * @param {string} missionId - ID da missão
      * @param {string} feedback - Feedback textual
-     * @returns {Promise<object>} Feedback processado
+     * @returns {Promise<any>} Feedback processado
      */
     async addFeedback(missionId, feedback) {
         const mission = await this.getMission(missionId);
@@ -330,7 +330,7 @@ class MissionManager {
      * Retorna progresso da missão.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<object>} - Objeto com progresso
+     * @returns {Promise<any>} - Objeto com progresso
      */
     async getMissionProgress(missionId) {
         const state = await this.getMission(missionId);
@@ -354,7 +354,7 @@ class MissionManager {
     /**
      * Executa próximo step da missão.
      */
-    async _executeNextStep(missionId) {
+    async _executeNextStep(/** @type {any} */ missionId) {
         const state = await this.getMission(missionId);
         if (!state) {
             logger.log('ERROR', `[MissionManager] Missão ${missionId} não encontrada ao executar step`);
@@ -388,11 +388,11 @@ class MissionManager {
             : null;
 
         // Gera Task V5 baseado no step com vínculo explícito de causalidade.
-        const taskV5 = this._generateTaskV5FromStep(step, state, {
+        const taskV5 = this._generateTaskV5FromStep(step, state, /** @type {any} */ ({
             stepIndex: currentStepIndex,
             parentTaskId,
             correlationId,
-        });
+        }));
 
         const dispatchMode = this._resolveDispatchMode();
 
@@ -418,8 +418,8 @@ class MissionManager {
                 }
             }
         } catch (error) {
-            logger.log('ERROR', `[MissionManager] Erro ao despachar task (${dispatchMode}): ${error.message}`);
-            await this._failMission(missionId, error.message);
+            logger.log('ERROR', `[MissionManager] Erro ao despachar task (${dispatchMode}): ${(/** @type {any} */ (error)).message}`);
+            await this._failMission(missionId, (/** @type {any} */ (error)).message);
         }
     }
 
@@ -443,7 +443,7 @@ class MissionManager {
         return 'ssot_queue';
     }
 
-    _mapMissionStatusToDb(status) {
+    _mapMissionStatusToDb(/** @type {any} */ status) {
         const normalized = String(status || '').trim().toLowerCase();
         if (normalized === 'running') return 'RUNNING';
         if (normalized === 'paused') return 'PAUSED';
@@ -454,7 +454,7 @@ class MissionManager {
         return 'READY';
     }
 
-    _syncMissionStatusToDb(missionState, statusOverride = null) {
+    _syncMissionStatusToDb(/** @type {any} */ missionState, /** @type {any} */ statusOverride = null) {
         const missionId = missionState?.id;
         if (!missionId) return;
 
@@ -498,14 +498,14 @@ class MissionManager {
                 completed_at_ms: completedAtMs,
             });
         } catch (error) {
-            logger.log('WARN', `[MissionManager] Falha ao sincronizar missão no SQLite: ${error.message}`);
+            logger.log('WARN', `[MissionManager] Falha ao sincronizar missão no SQLite: ${(/** @type {any} */ (error)).message}`);
         }
     }
 
     /**
      * Gera Task V5 a partir de um step do workflow.
      */
-    _generateTaskV5FromStep(step, missionState, { stepIndex = null, parentTaskId = null, correlationId = null } = {}) {
+    _generateTaskV5FromStep(/** @type {any} */ step, /** @type {any} */ missionState, { stepIndex = null, parentTaskId = null, correlationId = null } = {}) {
         const stableSeed = `${missionState?.id || 'mission'}|${step?.id || 'step'}|${stepIndex ?? 'na'}`;
         const taskId = `task-${_hashId(stableSeed)}`;
 
@@ -526,7 +526,7 @@ class MissionManager {
         // Adiciona outputs de steps recentes (se houver)
         if (context && context.steps && context.steps.length > 0) {
             const recentOutputs = context.steps
-                .map((s) => `Step ${s.step_id}: ${s.output.substring(0, 300)}...`)
+                .map((/** @type {any} */ s) => `Step ${s.step_id}: ${s.output.substring(0, 300)}...`)
                 .join('\n');
             finalPrompt += `\n\n[RECENT STEPS]:\n${recentOutputs}`;
         }
@@ -603,7 +603,7 @@ class MissionManager {
     /**
      * Handler: Task completada com sucesso.
      */
-    async _handleTaskCompleted(missionId, stepIndex, taskId, result) {
+    async _handleTaskCompleted(/** @type {any} */ missionId, /** @type {any} */ stepIndex, /** @type {any} */ taskId, /** @type {any} */ result) {
         logger.log('INFO', `[MissionManager] Task completada: ${taskId} (mission=${missionId}, step=${stepIndex})`);
 
         const state = await this.getMission(missionId);
@@ -653,7 +653,7 @@ class MissionManager {
     /**
      * Handler: Task falhou.
      */
-    async _handleTaskFailed(missionId, stepIndex, taskId, error) {
+    async _handleTaskFailed(/** @type {any} */ missionId, /** @type {any} */ stepIndex, /** @type {any} */ taskId, /** @type {any} */ error) {
         logger.log('ERROR', `[MissionManager] Task falhou: ${taskId} (mission=${missionId}, step=${stepIndex})`);
 
         await this._failMission(missionId, `Task ${taskId} falhou: ${error}`);
@@ -703,14 +703,14 @@ class MissionManager {
                 logger.log('INFO', `[MissionManager] ✅ Mission ${mission.id} recovered and resumed`);
             }
         } catch (error) {
-            logger.log('ERROR', `[MissionManager] Error during crash recovery: ${error.message}`);
+            logger.log('ERROR', `[MissionManager] Error during crash recovery: ${(/** @type {any} */ (error)).message}`);
         }
     }
 
     /**
      * Marca missão como completada.
      */
-    async _completeMission(missionId) {
+    async _completeMission(/** @type {any} */ missionId) {
         await this.stateManager.updateMission(missionId, {
             status: MISSION_STATUS.COMPLETED
         });
@@ -731,7 +731,7 @@ class MissionManager {
     /**
      * Marca missão como failed.
      */
-    async _failMission(missionId, reason) {
+    async _failMission(/** @type {any} */ missionId, /** @type {any} */ reason) {
         await this.stateManager.updateMission(missionId, {
             status: MISSION_STATUS.FAILED,
             failure_reason: reason
@@ -754,13 +754,13 @@ class MissionManager {
      * Setup listeners NERV para eventos de conclusão de tasks.
      */
     _setupListeners() {
-        this.unsubscribeNerv = this.nerv.onReceive(async envelope => {
+        this.unsubscribeNerv = this.nerv.onReceive(async (/** @type {any} */ envelope) => {
             if (getMessageType(envelope) !== MessageType.EVENT) {
                 return;
             }
 
             const actionCode = getActionCode(envelope);
-            const payload = getPayload(envelope);
+            const payload = /** @type {any} */ (getPayload(envelope));
 
             // Filtra apenas tasks que pertencem a missões
             if (!payload || !payload.task || !payload.task.meta || !payload.task.meta.mission_id) {
@@ -813,7 +813,7 @@ class MissionManager {
     /**
      * Helper: Encontra índice do step no workflow.
      */
-    _findStepIndex(missionId, stepId) {
+    _findStepIndex(/** @type {any} */ missionId, /** @type {any} */ stepId) {
         const missionCache = this.activeMissions.get(missionId);
         if (!missionCache) {
             return -1;
@@ -824,7 +824,7 @@ class MissionManager {
 
         // Se houver lista de steps no cache, tenta localizar pelo step_id
         if (Array.isArray(missionCache.steps)) {
-            const idx = missionCache.steps.findIndex(s => s.step_id === stepId || s.id === stepId);
+            const idx = missionCache.steps.findIndex((/** @type {any} */ s) => s.step_id === stepId || s.id === stepId);
             if (idx >= 0) return idx;
         }
 

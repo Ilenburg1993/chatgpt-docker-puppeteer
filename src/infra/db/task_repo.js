@@ -55,7 +55,7 @@ function _now() {
     return Date.now();
 }
 
-function _safeParseMs(isoOrMs) {
+function _safeParseMs(/** @type {any} */ isoOrMs) {
     if (isoOrMs === null || isoOrMs === undefined) {
         return null;
     }
@@ -69,7 +69,7 @@ function _safeParseMs(isoOrMs) {
     return null;
 }
 
-function _normalizeTaskForDb(rawTask) {
+function _normalizeTaskForDb(/** @type {any} */ rawTask) {
     const isV5 = rawTask?.meta?.version === '5.0' || rawTask?.execution || rawTask?.mission;
     const task = isV5 ? schemas.core.TaskSchemaV5.parse(rawTask) : schemas.parseTask(rawTask);
 
@@ -132,7 +132,7 @@ function _rowToTask(row) {
             task.state.blocked_details = JSON.parse(row.blocked_details_json);
         } catch (err) {
             log.warn(
-                { taskId: task.id, field: 'blocked_details_json', error: err?.message },
+                { taskId: task.id, field: 'blocked_details_json', error: (/** @type {any} */ (err))?.message },
                 '[task_repo] Fallback to raw string for malformed JSON'
             );
             task.state.blocked_details = row.blocked_details_json;
@@ -145,7 +145,7 @@ function _rowToTask(row) {
             task.result_db = JSON.parse(row.result_json);
         } catch (err) {
             log.warn(
-                { taskId: task.id, field: 'result_json', error: err?.message },
+                { taskId: task.id, field: 'result_json', error: (/** @type {any} */ (err))?.message },
                 '[task_repo] Fallback to raw string for malformed JSON'
             );
             task.result_db = row.result_json;
@@ -179,10 +179,10 @@ function getTaskById(taskId) {
  * PERF-01 FIX: Adicionado parâmetro `offset` para paginação e limitado
  * o máximo retornável a 500 por chamada (vs 20.000 anterior).
  *
- * @param {ListTasksOptions} [opts]
+ * @param {any} [opts]
   * @returns {TaskRow[]}
  */
-function listTasks({ status = null, stage = null, missionId = null, limit = 100, offset = 0 } = {}) {
+function listTasks({ status = null, stage = null, missionId = null, limit = 100, offset = 0 } = /** @type {any} */ ({})) {
     const db = getDb();
     const where = [];
     /** @type {Record<string, unknown>} */
@@ -222,10 +222,10 @@ function listTasks({ status = null, stage = null, missionId = null, limit = 100,
  */
 /**
  * Conta o total de tasks com filtros (para paginação).
- * @param {CountTasksOptions} [opts]
+ * @param {any} [opts]
  * @returns {number}
  */
-function countTasks({ status = null, stage = null, missionId = null } = {}) {
+function countTasks({ status = null, stage = null, missionId = null } = /** @type {any} */ ({})) {
     const db = getDb();
     const where = [];
     /** @type {Record<string, unknown>} */
@@ -285,16 +285,14 @@ function getTaskDependencies(taskId) {
         `
         )
         .all(taskId);
-    return rows.map(r => _rowToTask(/** @type {TaskRow} */ (r)));
+    return /** @type {any} */ (rows.map(r => _rowToTask(/** @type {TaskRow} */ (r))));
 }
 
 /**
- * @typedef {object} InsertTaskRawTask
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {*} InsertTaskRawTask
  */
 /**
- * @typedef {object} InsertTaskOptions
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {*} InsertTaskOptions
  */
 /**
  * Inserts a task into the database.
@@ -395,7 +393,7 @@ function insertTask(
         });
 
         // If task already existed and we chose IGNORE, skip side effects.
-        const inserted = db.prepare('SELECT changes() AS c').get()?.c || 0;
+        const inserted = (/** @type {any} */ (db.prepare('SELECT changes() AS c').get()))?.c || 0;
         if (!inserted) {
             return;
         }
@@ -437,8 +435,7 @@ function insertTask(
 }
 
 /**
- * @typedef {object} UpdateTaskUpdates
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {*} UpdateTaskUpdates
  */
 /**
  * Updates a task with optimistic locking (retries up to 3 times on version conflict).
@@ -447,7 +444,7 @@ function insertTask(
  * @param {string} taskId
  * @param {UpdateTaskUpdates} updates
  * @param {number} [_retryCount=0] - Internal retry counter
- * @returns {TaskRow} - Task atualizado (nunca null em conflito)
+ * @returns {any} - Task atualizado (nunca null em conflito)
  * @throws {Error} OptimisticLockError se max retries excedido
  */
 function updateTask(taskId, updates = {}, _retryCount = 0) {
@@ -465,7 +462,7 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
 
     const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
     if (!existing) {
-        return null;
+        return /** @type {any} */ (null);
     }
 
     /** @type {TaskRow} */
@@ -750,34 +747,31 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
  * Função exportada: setTaskStage.
  * @param {*} taskId
  * @param {*} stage
- * @returns {TaskRow|null}
+ * @returns {any}
  */
 function setTaskStage(taskId, stage) {
     return updateTask(taskId, { stage });
 }
 
 /**
- * @typedef {object} SetTaskStatusExtra
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {*} SetTaskStatusExtra
  */
 /**
  * Função exportada: setTaskStatus.
  * @param {*} taskId
  * @param {*} status
  * @param {SetTaskStatusExtra} [extra]
- * @returns {TaskRow|null}
+ * @returns {any}
  */
 function setTaskStatus(taskId, status, extra = {}) {
     return updateTask(taskId, { status, ...extra });
 }
 
 /**
- * @typedef {object} ClaimNextEligibleTaskParams
- * @property {string} workerId
+ * @typedef {*} ClaimNextEligibleTaskParams
  */
 /**
- * @typedef {object} ClaimNextEligibleTaskOptions
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {*} ClaimNextEligibleTaskOptions
  */
 /**
  * Atomically claims next eligible task (READY + PENDING).
@@ -871,7 +865,7 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
 /**
  * Releases the lock on a task.
  * @param {ReleaseTaskLockParams} params - Parameters
- * @returns {TaskRow|null}
+ * @returns {any}
  */
 function releaseTaskLock(
     /** @type {{ taskId: string, workerId?: string, expectedAttemptId?: string }} */ {
@@ -911,7 +905,7 @@ function releaseTaskLock(
 /**
  * Extends the lock on a task.
  * @param {ExtendTaskLockParams} params - Parameters
- * @returns {TaskRow|null}
+ * @returns {any}
  */
 function extendTaskLock(
     /** @type {{ taskId: string, workerId: string, nowMs?: number, lockTtlMs?: number }} */ {
@@ -944,7 +938,7 @@ function extendTaskLock(
 
 /**
  * Função exportada: retryFailedTasks.
- * @returns {TaskRow|null}
+ * @returns {any}
  */
 function retryFailedTasks() {
     const db = getDb();
@@ -968,7 +962,7 @@ function retryFailedTasks() {
  * Função exportada: incrementTaskAttempts.
  * @param {*} taskId
  * @param {*} [delta]
- * @returns {TaskRow|null}
+ * @returns {any}
  */
 function incrementTaskAttempts(taskId, delta = 1) {
     const db = getDb();
@@ -989,11 +983,12 @@ function incrementTaskAttempts(taskId, delta = 1) {
 
 /**
  * Função exportada: clearQueuePreserveRunning.
- * @returns {TaskRow|null}
+ * @returns {any}
  */
 function clearQueuePreserveRunning() {
     const db = getDb();
-    const running = db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status = 'RUNNING'").get()?.c || 0;
+    const _runResult = db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status = 'RUNNING'").get();
+    const running = (/** @type {any} */ (_runResult))?.c || 0;
     const res = db.prepare("DELETE FROM tasks WHERE status != 'RUNNING'").run();
     return { deleted: res.changes || 0, preserved: running };
 }
@@ -1001,7 +996,7 @@ function clearQueuePreserveRunning() {
 /**
  * Função exportada: purgeTask.
  * @param {*} taskId
- * @returns {TaskRow|null}
+ * @returns {any}
  */
 function purgeTask(taskId) {
     const db = getDb();

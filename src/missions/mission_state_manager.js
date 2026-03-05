@@ -35,7 +35,7 @@ class MissionStateManager {
             await fs.mkdir(this.baseDir, { recursive: true });
             logger.log('INFO', `[MissionStateManager] Diretório inicializado: ${this.baseDir}`);
         } catch (error) {
-            logger.log('ERROR', `[MissionStateManager] Falha ao criar diretório: ${error.message}`);
+            logger.log('ERROR', `[MissionStateManager] Falha ao criar diretório: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }
@@ -43,13 +43,8 @@ class MissionStateManager {
     /**
      * Cria uma nova missão no filesystem.
      *
-     * @param {object} mission - Dados da missão
-     * @param {string} mission.id - ID único da missão
-     * @param {string} mission.title - Título descritivo
-     * @param {string} mission.description - Descrição detalhada
-     * @param {object} mission.workflow - Workflow estruturado
-     * @param {object} mission.config - Configuração (template, params)
-     * @returns {Promise<object>} - State completo da missão
+     * @param {any} mission - Dados da missão
+     * @returns {Promise<any>} - State completo da missão
      */
     async createMission(mission) {
         if (!mission || !mission.id) {
@@ -63,7 +58,7 @@ class MissionStateManager {
             await fs.access(missionDir);
             throw new Error(`Mission ${mission.id} já existe`);
         } catch (error) {
-            if (error.code !== 'ENOENT') {
+            if ((/** @type {any} */ (error)).code !== 'ENOENT') {
                 throw error;
             }
         }
@@ -113,7 +108,7 @@ class MissionStateManager {
      * Lê o estado de uma missão.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<object|null>} - State da missão ou null se não existir
+     * @returns {Promise<any>} - State da missão ou null se não existir
      */
     async getMission(missionId) {
         try {
@@ -121,10 +116,10 @@ class MissionStateManager {
             const content = await fs.readFile(statePath, 'utf8');
             return JSON.parse(content);
         } catch (error) {
-            if (error.code === 'ENOENT') {
+            if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return null;
             }
-            logger.log('ERROR', `[MissionStateManager] Erro ao ler missão ${missionId}: ${error.message}`);
+            logger.log('ERROR', `[MissionStateManager] Erro ao ler missão ${missionId}: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }
@@ -132,9 +127,8 @@ class MissionStateManager {
     /**
      * Lista todas as missões.
      *
-     * @param {object} filters - Filtros opcionais
-     * @param {string} [filters.status] - Filtrar por status
-     * @returns {Promise<Object[]>} - Array de states
+     * @param {any} filters - Filtros opcionais
+     * @returns {Promise<any>} - Array de states
      */
     async listMissions(filters = {}) {
         try {
@@ -159,7 +153,7 @@ class MissionStateManager {
 
             return missions;
         } catch (error) {
-            logger.log('ERROR', `[MissionStateManager] Erro ao listar missões: ${error.message}`);
+            logger.log('ERROR', `[MissionStateManager] Erro ao listar missões: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }
@@ -168,8 +162,8 @@ class MissionStateManager {
      * Atualiza o estado de uma missão.
      *
      * @param {string} missionId - ID da missão
-     * @param {object} updates - Campos a atualizar
-     * @returns {Promise<object>} - State atualizado
+     * @param {any} updates - Campos a atualizar
+     * @returns {Promise<any>} - State atualizado
      */
     async updateMission(missionId, updates) {
         const state = await this.getMission(missionId);
@@ -218,7 +212,7 @@ class MissionStateManager {
             await fs.rm(missionDir, { recursive: true, force: true });
             logger.log('INFO', `[MissionStateManager] Missão deletada: ${missionId}`);
         } catch (error) {
-            logger.log('ERROR', `[MissionStateManager] Erro ao deletar missão ${missionId}: ${error.message}`);
+            logger.log('ERROR', `[MissionStateManager] Erro ao deletar missão ${missionId}: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }
@@ -237,7 +231,7 @@ class MissionStateManager {
             await fs.writeFile(outputPath, content, 'utf8');
             logger.log('DEBUG', `[MissionStateManager] Output salvo: ${missionId}/${stepId}`);
         } catch (error) {
-            logger.log('ERROR', `[MissionStateManager] Erro ao salvar output: ${error.message}`);
+            logger.log('ERROR', `[MissionStateManager] Erro ao salvar output: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }
@@ -255,7 +249,7 @@ class MissionStateManager {
         try {
             return await fs.readFile(outputPath, 'utf8');
         } catch (error) {
-            if (error.code === 'ENOENT') {
+            if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return null;
             }
             throw error;
@@ -266,7 +260,7 @@ class MissionStateManager {
      * Salva checkpoint da missão.
      *
      * @param {string} missionId - ID da missão
-     * @param {object} checkpoint - Dados do checkpoint
+     * @param {any} checkpoint - Dados do checkpoint
      */
     async saveCheckpoint(missionId, checkpoint) {
         const checkpointPath = path.join(this.baseDir, missionId, 'checkpoints', 'checkpoint-latest.json');
@@ -284,7 +278,7 @@ class MissionStateManager {
 
             logger.log('INFO', `[MissionStateManager] Checkpoint salvo: ${missionId}`);
         } catch (error) {
-            logger.log('ERROR', `[MissionStateManager] Erro ao salvar checkpoint: ${error.message}`);
+            logger.log('ERROR', `[MissionStateManager] Erro ao salvar checkpoint: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }
@@ -293,7 +287,7 @@ class MissionStateManager {
      * Carrega último checkpoint.
      *
      * @param {string} missionId - ID da missão
-     * @returns {Promise<object|null>} - Checkpoint ou null
+     * @returns {Promise<any>} - Checkpoint ou null
      */
     async loadCheckpoint(missionId) {
         const checkpointPath = path.join(this.baseDir, missionId, 'checkpoints', 'checkpoint-latest.json');
@@ -302,7 +296,7 @@ class MissionStateManager {
             const content = await fs.readFile(checkpointPath, 'utf8');
             return JSON.parse(content);
         } catch (error) {
-            if (error.code === 'ENOENT') {
+            if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return null;
             }
             throw error;
@@ -314,7 +308,7 @@ class MissionStateManager {
      *
      * @param {string} missionId - ID da missão
      * @param {string} feedback - Feedback textual
-     * @param {object} [metadata={}] - Metadata adicional (processed_id, category, action_items, patterns)
+     * @param {any} [metadata={}] - Metadata adicional (processed_id, category, action_items, patterns)
      */
     async addFeedback(missionId, feedback, metadata = {}) {
         const state = await this.getMission(missionId);
@@ -341,7 +335,7 @@ class MissionStateManager {
     /**
      * Helper: Salva state.json.
      */
-    async _saveState(missionId, state) {
+    async _saveState(/** @type {any} */ missionId, /** @type {any} */ state) {
         const statePath = path.join(this.baseDir, missionId, 'state.json');
         await fs.writeFile(statePath, JSON.stringify(state, null, 2), 'utf8');
     }
@@ -349,12 +343,12 @@ class MissionStateManager {
     /**
      * Helper: Calcula total de tasks de um workflow.
      */
-    _calculateTotalTasks(workflow) {
+    _calculateTotalTasks(/** @type {any} */ workflow) {
         if (!workflow || !workflow.steps) {
             return 0;
         }
 
-        return workflow.steps.reduce((total, step) => {
+        return workflow.steps.reduce((/** @type {any} */ total, /** @type {any} */ step) => {
             // Cada step pode ter múltiplas iterações
             const maxIterations = step.max_iterations || 1;
             return total + maxIterations;

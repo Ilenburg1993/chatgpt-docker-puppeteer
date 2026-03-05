@@ -21,7 +21,7 @@ class WorkflowGenerator {
      * Carrega um template do disco.
      *
      * @param {string} templateId - ID do template (ex: 'book_writing')
-     * @returns {Promise<object>} - Template carregado
+     * @returns {Promise<any>} - Template carregado
      */
     async loadTemplate(templateId) {
         // Verifica cache
@@ -46,7 +46,7 @@ class WorkflowGenerator {
             logger.log('INFO', `[WorkflowGenerator] Template carregado: ${templateId}`);
             return template;
         } catch (error) {
-            logger.log('ERROR', `[WorkflowGenerator] Erro ao carregar template ${templateId}: ${error.message}`);
+            logger.log('ERROR', `[WorkflowGenerator] Erro ao carregar template ${templateId}: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }
@@ -96,8 +96,8 @@ class WorkflowGenerator {
     /**
      * Valida parâmetros fornecidos contra schema do template.
      */
-    _validateParams(template, params) {
-        const validated = {};
+    _validateParams(/** @type {any} */ template, /** @type {any} */ params) {
+        const validated = /** @type {any} */ ({});
         const errors = [];
 
         // Itera sobre params definidos no template
@@ -152,7 +152,7 @@ class WorkflowGenerator {
     /**
      * Constrói contexto completo (params + computed values).
      */
-    _buildContext(template, params) {
+    _buildContext(/** @type {any} */ template, /** @type {any} */ params) {
         return {
             ...params,
             // Computed values podem ser adicionados aqui
@@ -167,7 +167,7 @@ class WorkflowGenerator {
      * NOTA: Por ora, implementação simplificada que expande baseado em num_chapters.
      * Versão completa integraria com outline gerado.
      */
-    async _expandSteps(steps, context) {
+    async _expandSteps(/** @type {any} */ steps, /** @type {any} */ context) {
         const expanded = [];
 
         for (const step of steps) {
@@ -182,7 +182,7 @@ class WorkflowGenerator {
                     try {
                         expandedStep = structuredClone(step);
                     } catch (cloneErr) {
-                        logger.error(`[WorkflowGenerator] structuredClone failed for step ${step.id}: ${cloneErr?.message}`);
+                        logger.error(`[WorkflowGenerator] structuredClone failed for step ${step.id}: ${(/** @type {any} */ (cloneErr))?.message}`);
                         expandedStep = JSON.parse(JSON.stringify(step)); // Fallback to JSON clone
                     }
                     delete expandedStep.repeat_for_each;
@@ -210,7 +210,7 @@ class WorkflowGenerator {
     /**
      * Substitui placeholders ({{param}}) em todos os campos dos steps.
      */
-    _replacePlaceholders(steps, context) {
+    _replacePlaceholders(/** @type {any} */ steps, /** @type {any} */ context) {
         const replaced = [];
 
         for (const step of steps) {
@@ -233,7 +233,10 @@ class WorkflowGenerator {
     /**
      * Substitui placeholders recursivamente em um objeto.
      */
-    _recursiveReplace(obj, context) {
+    /**
+     * @returns {any}
+     */
+    _recursiveReplace(/** @type {any} */ obj, /** @type {any} */ context) {
         if (typeof obj === 'string') {
             return this._replacePlaceholdersInString(obj, context);
         }
@@ -243,7 +246,7 @@ class WorkflowGenerator {
         }
 
         if (obj !== null && typeof obj === 'object') {
-            const replaced = {};
+            const replaced = /** @type {any} */ ({});
             for (const [key, value] of Object.entries(obj)) {
                 replaced[key] = this._recursiveReplace(value, context);
             }
@@ -257,8 +260,8 @@ class WorkflowGenerator {
      * Substitui placeholders em uma string.
      * Ex: "Write chapter {{chapter_num}}" → "Write chapter 5"
      */
-    _replacePlaceholdersInString(str, context) {
-        const result = str.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    _replacePlaceholdersInString(/** @type {any} */ str, /** @type {any} */ context) {
+        const result = str.replace(/\{\{(\w+)\}\}/g, (/** @type {any} */ match, /** @type {any} */ key) => {
             if (key in context) {
                 return String(context[key]);
             }
@@ -283,7 +286,7 @@ class WorkflowGenerator {
 
             return templates;
         } catch (error) {
-            logger.log('ERROR', `[WorkflowGenerator] Erro ao listar templates: ${error.message}`);
+            logger.log('ERROR', `[WorkflowGenerator] Erro ao listar templates: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }

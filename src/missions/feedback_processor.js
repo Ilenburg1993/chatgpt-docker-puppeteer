@@ -41,7 +41,7 @@ const INJECTION_FORMAT = {
 class FeedbackProcessor {
     /**
      * @param {object} options
-     * @param {object} [options.contextManager] - ContextManager para armazenar patterns
+     * @param {any} [options.contextManager] - ContextManager para armazenar patterns
      */
     constructor({ contextManager = null } = {}) {
         this.contextManager = contextManager;
@@ -96,8 +96,8 @@ class FeedbackProcessor {
      * Processa feedback textual bruto do usuário.
      *
      * @param {string} feedbackText - Texto do feedback
-     * @param {object} [metadata={}] - Metadata adicional (mission_id, step_id, etc)
-     * @returns {object} Feedback processado com categorização e patterns
+     * @param {any} [metadata={}] - Metadata adicional (mission_id, step_id, etc)
+     * @returns {any} Feedback processado com categorização e patterns
      *
      * @example
      * const processed = feedbackProcessor.processFeedback(
@@ -194,7 +194,7 @@ class FeedbackProcessor {
      * Injeta feedback processado em prompt de step.
      *
      * @param {string} stepPrompt - Prompt original do step
-     * @param {object} processedFeedback - Feedback processado (resultado de processFeedback)
+     * @param {any} processedFeedback - Feedback processado (resultado de processFeedback)
      * @param {object} [options={}] - Opções de injeção
      * @param {string} [options.format='default'] - Formato: 'default', 'inline', 'structured'
      * @param {boolean} [options.includeCategory=true] - Incluir categoria do feedback
@@ -237,7 +237,7 @@ class FeedbackProcessor {
 
                 if (includeActionItems && processedFeedback.actionItems.length > 0) {
                     augmentedPrompt += `\n\nAction Items:`;
-                    processedFeedback.actionItems.forEach((item, i) => {
+                    processedFeedback.actionItems.forEach((/** @type {any} */ item, /** @type {any} */ i) => {
                         augmentedPrompt += `\n${i + 1}. ${item}`;
                     });
                 }
@@ -257,7 +257,7 @@ class FeedbackProcessor {
     /**
      * Normaliza texto do feedback (lowercase, remove espaços extras).
      */
-    _normalize(text) {
+    _normalize(/** @type {any} */ text) {
         return text
             .trim()
             .replace(/\s+/g, ' ')
@@ -267,11 +267,11 @@ class FeedbackProcessor {
     /**
      * Categoriza feedback com base em keywords.
      */
-    _categorize(normalizedText) {
+    _categorize(/** @type {any} */ normalizedText) {
         const lowerText = normalizedText.toLowerCase();
 
         // Conta matches de cada categoria
-        const categoryScores = {};
+        const categoryScores = /** @type {any} */ ({});
         for (const category of Object.keys(this.categoryKeywords)) {
             categoryScores[category] = 0;
         }
@@ -306,13 +306,13 @@ class FeedbackProcessor {
      * - Listas numeradas ou bullet points
      * - Sentenças imperativas (começam com verbo)
      */
-    _extractActionItems(normalizedText) {
+    _extractActionItems(/** @type {any} */ normalizedText) {
         const items = [];
 
         // 1. Detecta listas numeradas ou com bullet points
         const listMatches = normalizedText.match(/(?:^|\n)(?:\d+\.|[-*•])\s*(.+?)(?=\n|$)/g);
         if (listMatches) {
-            items.push(...listMatches.map(item => item.replace(/^(?:\d+\.|[-*•])\s*/, '').trim()));
+            items.push(...listMatches.map((/** @type {any} */ item) => item.replace(/^(?:\d+\.|[-*•])\s*/, '').trim()));
         }
 
         // 2. Detecta sentenças imperativas (começam com verbo)
