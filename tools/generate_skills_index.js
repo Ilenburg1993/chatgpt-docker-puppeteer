@@ -9,6 +9,10 @@ const ROOT = path.resolve(__dirname, '..');
 const SKILLS_DIR = path.join(ROOT, 'skills');
 const INDEX_FILE = path.join(SKILLS_DIR, 'index.json');
 
+/**
+ * @param {string[]} bases
+ * @returns {Array<{dir: string, md: string, source: string}>}
+ */
 function findSkillDirs(bases) {
     const found = [];
     for (const base of bases) {
@@ -32,12 +36,13 @@ const candidates = findSkillDirs(['skills/personal', 'skills/project', '.github/
 const skills = candidates.map(c => {
     const contents = fs.readFileSync(c.md, 'utf8');
     const match = contents.match(/^---\n([\s\S]*?)\n---/);
-    let meta = {};
+    let meta = /** @type {any} */ ({});
     if (match) {
         try {
             meta = yaml.load(match[1]) || {};
         } catch (e) {
-            console.error('YAML parse error in', c.md, e.message || e);
+            const _e = /** @type {any} */ (e);
+            console.error('YAML parse error in', c.md, _e.message || e);
         }
     }
     return {

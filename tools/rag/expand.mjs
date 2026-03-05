@@ -1,5 +1,5 @@
-// @ts-check
 #!/usr/bin/env node
+// @ts-check
 import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragExpand } from './lib/facade.mjs';
@@ -23,13 +23,13 @@ if (!chunkId) {
     process.exit(2);
 }
 
-const result = await ragExpand({
+const result = /** @type {any} */ (await ragExpand({
     chunkId,
     mode: values.mode || 'lines',
     beforeLines: values['before-lines'] ? Number(values['before-lines']) : undefined,
     afterLines: values['after-lines'] ? Number(values['after-lines']) : undefined,
     root: values.root,
-});
+}));
 
 if (values.json) {
     console.log(JSON.stringify(result, null, 2));

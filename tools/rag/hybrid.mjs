@@ -1,5 +1,5 @@
-// @ts-check
 #!/usr/bin/env node
+// @ts-check
 import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragHybridSearch } from './lib/facade.mjs';

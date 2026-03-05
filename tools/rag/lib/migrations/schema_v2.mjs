@@ -41,7 +41,7 @@
  *
  * Must return: Updated manifest with new schema_version
  */
-export const MIGRATIONS = {
+export const MIGRATIONS = /** @type {Record<string, Function>} */ ({
     /**
      * Example migration from v1 to v2
      * (Not active - just demonstrates the pattern)
@@ -99,7 +99,7 @@ export const MIGRATIONS = {
     //   console.log('[RAG Migration] Migration to v3 complete');
     //   return manifest;
     // }
-};
+});
 
 /**
  * Apply migrations to bring manifest from current version to target version
@@ -108,11 +108,11 @@ export const MIGRATIONS = {
  * - Direct: v1->v2 via MIGRATIONS['1->2']
  * - Chained: v1->v3 via MIGRATIONS['1->2'] then MIGRATIONS['2->3']
  *
- * @param {Object} manifest - Current manifest object
+ * @param {any} manifest - Current manifest object
  * @param {number} targetVersion - Desired schema version
  * @param {Object} paths - RAG paths object
  * @param {Object|null} db - LanceDB connection (optional)
- * @returns {Promise<Object>} Updated manifest
+ * @returns {Promise<any>} Updated manifest
  * @throws {Error} If no migration path exists
  */
 export async function migrateManifest(manifest, targetVersion, paths, db = null) {

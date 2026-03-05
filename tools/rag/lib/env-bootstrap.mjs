@@ -11,12 +11,16 @@ function projectRootFromHere() {
     return path.resolve(here, '../../../');
 }
 
+/**
+ * @param {{ rootDir?: string, useGlobalFlag?: boolean, quiet?: boolean }} [options]
+ * @returns {{ root: string, loaded: string[] }}
+ */
 export function bootstrapRagEnv(options = {}) {
     const root = options.rootDir ? path.resolve(options.rootDir) : projectRootFromHere();
     const useGlobalFlag = options.useGlobalFlag !== false;
     const quiet = options.quiet !== false;
 
-    if (useGlobalFlag && globalThis[RAG_ENV_BOOTSTRAP_FLAG]) {
+    if (useGlobalFlag && /** @type {any} */ (globalThis)[RAG_ENV_BOOTSTRAP_FLAG]) {
         return { root, loaded: [] };
     }
 
@@ -35,7 +39,7 @@ export function bootstrapRagEnv(options = {}) {
     }
 
     if (useGlobalFlag) {
-        globalThis[RAG_ENV_BOOTSTRAP_FLAG] = true;
+        /** @type {any} */ (globalThis)[RAG_ENV_BOOTSTRAP_FLAG] = true;
     }
 
     return { root, loaded };

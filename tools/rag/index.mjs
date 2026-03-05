@@ -19,7 +19,7 @@ const { values } = parseArgs({
 
 const maxFileBytes = values['max-file-bytes'] ? Number(values['max-file-bytes']) : undefined;
 
-const report = await ragIndex({
+const report = /** @type {any} */ (await ragIndex({
     root: values.root,
     ollamaBaseUrl: values['ollama-base-url'],
     model: values.model,
@@ -28,7 +28,7 @@ const report = await ragIndex({
     excludeGlobs: values['exclude-glob'],
     docsMode: values['docs-mode'],
     maxFileBytes,
-});
+}));
 
 if (values.json) {
     console.log(JSON.stringify(report, null, 2));

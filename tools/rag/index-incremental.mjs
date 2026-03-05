@@ -1,5 +1,5 @@
-// @ts-check
 #!/usr/bin/env node
+// @ts-check
 import './lib/env-bootstrap.mjs';
 import { ragIndex } from './lib/facade.mjs';
 import { resolveRagScopeConfig } from './lib/scope_config.mjs';
@@ -29,14 +29,14 @@ async function indexIncremental() {
     if (scope.excludeGlobs.length > 0) console.log(`[RAG Incremental] Exclude globs: ${scope.excludeGlobs.join(', ')}`);
 
     try {
-        const report = await ragIndex({
+        const report = /** @type {any} */ (await ragIndex({
             root: '/workspaces/chatgpt-docker-puppeteer',
             maxFileBytes: scope.maxFileBytes,
             profile: scope.profile,
             includeGlobs: scope.includeGlobs,
             excludeGlobs: scope.excludeGlobs,
             docsMode: scope.docsMode,
-        });
+        }));
 
         console.log('\n[RAG Incremental] ✅ Complete!');
         console.log(`  Files scanned: ${report.scanned_files}`);
