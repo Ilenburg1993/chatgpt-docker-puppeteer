@@ -55,11 +55,11 @@ O baseline real medido após a restauração está a seguir.
 | `src.dashboard-ui`      |   285 | Fase A  |
 | `tests.manual`          |   300 | Fase A  |
 | `src.audit_agent`       |   358 | Fase A  |
-| `src.nerv`              |   439 | Fase B  |
-| `scripts.health`        |   441 | Fase B  |
-| `src.missions`          |   608 | Fase B  |
+| `src.nerv`              |   439 | Fase B  | ✅ verde |
+| `scripts.health`        |   441 | Fase B  | ✅ verde |
+| `src.missions`          |   608 | Fase B  | ✅ verde |
 | `src.shared`            |   746 | Fase B  |
-| `src.orchestrator`      |   773 | Fase B  |
+| `src.orchestrator`      |   773 | Fase B  | ✅ verde |
 | `src.integration`       |   924 | Fase B  |
 | `scripts.audit`         |   928 | Fase B  |
 | `scripts.root`          |   935 | Fase B  |
@@ -281,11 +281,11 @@ items.forEach(/** @param {TaskRecord} item */ item => item.name);
 
 #### Checklist Fase B
 
-- [ ] `src.nerv`: 439 → 0
-- [ ] `scripts.health`: 441 → 0
-- [ ] `src.missions`: 608 → 0
+- [x] `src.nerv`: 439 → 0
+- [x] `scripts.health`: 441 → 0
+- [x] `src.missions`: 608 → 0
 - [ ] `src.shared`: 746 → 0
-- [ ] `src.orchestrator`: 773 → 0
+- [x] `src.orchestrator`: 773 → 0
 - [ ] `src.integration`: 924 → 0
 - [ ] `scripts.audit`: 928 → 0
 - [ ] `scripts.root`: 935 → 0
@@ -405,11 +405,11 @@ npm run typecheck:tests   # deve estar próximo de 0
 
 ### Fase B — Lanes médias (11 lanes)
 
-- [ ] `src.nerv`: 439 → 0
-- [ ] `scripts.health`: 441 → 0
-- [ ] `src.missions`: 608 → 0
+- [x] `src.nerv`: 439 → 0
+- [x] `scripts.health`: 441 → 0
+- [x] `src.missions`: 608 → 0
 - [ ] `src.shared`: 746 → 0
-- [ ] `src.orchestrator`: 773 → 0
+- [x] `src.orchestrator`: 773 → 0
 - [ ] `src.integration`: 924 → 0
 - [ ] `scripts.audit`: 928 → 0
 - [ ] `scripts.root`: 935 → 0
