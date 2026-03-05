@@ -32,8 +32,8 @@ concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gate
 > `src.infra` 2.232→716 (−68%), `src.kernel` 1.530→359 (−77%), `src.agent` 1.190→447,
 > `tools.workspace` 1.013→**0** ✅.
 
-**Próximo passo**: Fase B — `scripts.root` (357) → `src.kernel` (359) → `src.agent` (447) →
-`src.core` (464).
+**Próximo passo**: Fase B — `src.kernel` (359) → `src.agent` (447) →
+`src.core` (464). `scripts.root` ✅ zerada.
 
 **Dependência nova instalada**: `@types/better-sqlite3` (devDependencies) — resolve TS7016 em
 `src/infra/db/sqlite.js`.
@@ -88,7 +88,7 @@ concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gate
 | `src.orchestrator`      |     0 | ✅ verde  | Manter      |
 | `src.integration`       |     0 | ✅ verde  | Manter      |
 | `tools.workspace`       |     0 | ✅ Done   | ↓ era 1.013 |
-| `scripts.root`          |   357 | Fase B   | ↓ era 935   |
+| `scripts.root`          |     0 | ✅ Done   | ↓ era 935, zerada Fase B |
 | `src.kernel`            |   359 | Fase B/C | ↓ era 1.530 |
 | `src.agent`             |   447 | Fase B   | ↓ era 1.190 |
 | `src.core`              |   464 | Fase B   | ↓ era 1.053 |
@@ -162,8 +162,8 @@ Objectivo: zerar 11 lanes. Após Fase A, cascatas de TS2339 já terão reduzido.
 - [x] `src.orchestrator`: 773 → 0 ✅
 - [x] `src.integration`: 924 → 0 ✅
 - [x] `tools.workspace`: **8** → 0 ✅ (era 1.013!)
-- [ ] `scripts.root`: **357** → 0 ← próximo (era 935)
-- [ ] `src.kernel`: **359** → 0 ← (era 1.530, promovido de Fase C)
+- [x] `scripts.root`: **357** → 0 ✅ (era 935! instalado @types/ws)
+- [ ] `src.kernel`: **359** → 0 ← próximo (era 1.530, promovido de Fase C)
 - [ ] `src.agent`: **447** → 0 ← (era 1.190)
 - [ ] `src.core`: **464** → 0 ← (era 1.053)
 - [ ] `scripts.audit`: 928 → 0
