@@ -1,10 +1,11 @@
+// @ts-check
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 const CANON_DB_DIR = '/home/node/.local/share/rag-db';
 const CANON_INDEX_DIR = '/home/node/.local/share/rag-index';
 
-export function getRagPaths(overrides = {}) {
+export function getRagPaths(/** @type {any} */ overrides = {}) {
     const dbDir = overrides.dbDir || CANON_DB_DIR;
     const indexDir = overrides.indexDir || CANON_INDEX_DIR;
     return {
@@ -15,12 +16,12 @@ export function getRagPaths(overrides = {}) {
     };
 }
 
-export async function ensureDirs(paths) {
+export async function ensureDirs(/** @type {any} */ paths) {
     await fs.mkdir(paths.dbDir, { recursive: true });
     await fs.mkdir(paths.indexDir, { recursive: true });
 }
 
-export async function atomicWriteJson(filePath, data) {
+export async function atomicWriteJson(/** @type {any} */ filePath,  /** @type {any} */ data) {
     const dir = path.dirname(filePath);
     const tmpPath = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`);
     const json = JSON.stringify(data, null, 2);
@@ -28,19 +29,20 @@ export async function atomicWriteJson(filePath, data) {
     await fs.rename(tmpPath, filePath);
 }
 
-function isProcessAlive(pid) {
+function isProcessAlive(/** @type {any} */ pid) {
     const parsed = Number.parseInt(String(pid ?? ''), 10);
     if (!Number.isFinite(parsed) || parsed <= 0) return null;
     try {
         process.kill(parsed, 0);
         return true;
     } catch (error) {
-        if (error?.code === 'ESRCH') return false;
+        const _ce = /** @type {any} */ (error);
+        if (_ce?.code === 'ESRCH') return false;
         return true;
     }
 }
 
-export async function acquireIndexLock(paths, { staleAfterMs = 6 * 60 * 60 * 1000 } = {}) {
+export async function acquireIndexLock(/** @type {any} */ paths, /** @type {any} */ { staleAfterMs = 6 * 60 * 60 * 1000 } = {}) {
     const now = Date.now();
     try {
         const handle = await fs.open(paths.lockPath, 'wx');
@@ -48,14 +50,15 @@ export async function acquireIndexLock(paths, { staleAfterMs = 6 * 60 * 60 * 100
         await handle.close();
         return { acquired: true, staleRecovered: false };
     } catch (err) {
-        if (err?.code !== 'EEXIST') {
+        const _ce = /** @type {any} */ (err);
+        if (_ce?.code !== 'EEXIST') {
             throw err;
         }
     }
 
     try {
         const stat = await fs.stat(paths.lockPath);
-        const lockRaw = await fs.readFile(paths.lockPath, 'utf8').catch(() => null);
+        const lockRaw = await fs.readFile(paths.lockPath, 'utf8').catch(/** @type {any} */ () => null);
         let lockJson = null;
         if (lockRaw) {
             try {
@@ -76,10 +79,11 @@ export async function acquireIndexLock(paths, { staleAfterMs = 6 * 60 * 60 * 100
         await fs.unlink(paths.lockPath);
         return acquireIndexLock(paths, { staleAfterMs });
     } catch (err) {
-        return { acquired: false, staleRecovered: false, reason: 'LOCK_UNKNOWN', error: String(err?.message || err) };
+        const _ce = /** @type {any} */ (err);
+        return { acquired: false, staleRecovered: false, reason: 'LOCK_UNKNOWN', error: String(_ce?.message || _ce) };
     }
 }
 
-export async function releaseIndexLock(paths) {
-    await fs.unlink(paths.lockPath).catch(() => {});
+export async function releaseIndexLock(/** @type {any} */ paths) {
+    await fs.unlink(paths.lockPath).catch(/** @type {any} */ () => {});
 }

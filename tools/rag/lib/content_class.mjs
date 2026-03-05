@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 
 const DOC_EXTENSIONS = new Set(['.md', '.mdx']);

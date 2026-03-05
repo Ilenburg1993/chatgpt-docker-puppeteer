@@ -39,13 +39,13 @@ class ResilientLockManager {
          * @private
          */
         this._cleanupHandlersRegistered = false;
-        this._cleanupHandlers = {
+        this._cleanupHandlers = /** @type {Record<string, any>} */ ({
             beforeExit: null,
             sigint: null,
             sigterm: null,
             uncaughtException: null,
             unhandledRejection: null,
-        };
+        });
         this._fatalHookRegistration = {
             uncaughtExceptionHadExternalListener: false,
             unhandledRejectionHadExternalListener: false,
@@ -78,11 +78,11 @@ class ResilientLockManager {
             return;
         }
 
-        const cleanup = async signal => {
+        const cleanup = async (/** @type {any} */ signal) => {
             const lockCount = this.activeLocks.size;
             if (lockCount > 0) {
                 console.log(`[ResilientLock] ${signal} received. Releasing ${lockCount} active locks...`);
-                await this.releaseAll().catch(err => console.error(`[ResilientLock] Cleanup error: ${err.message}`));
+                await this.releaseAll().catch((/** @type {any} */ err) => console.error(`[ResilientLock] Cleanup error: ${err.message}`));
             }
         };
 
@@ -99,7 +99,7 @@ class ResilientLockManager {
             process.listenerCount('uncaughtException') > 0;
         this._fatalHookRegistration.unhandledRejectionHadExternalListener =
             process.listenerCount('unhandledRejection') > 0;
-        this._cleanupHandlers.uncaughtException = err => {
+        this._cleanupHandlers.uncaughtException = (/** @type {any} */ err) => {
             void cleanup('uncaughtException').finally(() => {
                 if (!this._fatalHookRegistration.uncaughtExceptionHadExternalListener) {
                     // Preserve Node crash semantics when no app-level handler existed.
@@ -109,18 +109,18 @@ class ResilientLockManager {
                 }
             });
         };
-        this._cleanupHandlers.unhandledRejection = reason => {
+        this._cleanupHandlers.unhandledRejection = (/** @type {any} */ reason) => {
             void cleanup('unhandledRejection');
             // Deliberately no rethrow here to avoid changing Node's configured
             // unhandled rejection mode. App-level policy remains the owner.
             void reason;
         };
 
-        process.once('SIGINT', this._cleanupHandlers.sigint);
-        process.once('SIGTERM', this._cleanupHandlers.sigterm);
-        process.once('beforeExit', this._cleanupHandlers.beforeExit);
-        process.once('uncaughtException', this._cleanupHandlers.uncaughtException);
-        process.once('unhandledRejection', this._cleanupHandlers.unhandledRejection);
+        process.once('SIGINT', /** @type {any} */ (this._cleanupHandlers.sigint));
+        process.once('SIGTERM', /** @type {any} */ (this._cleanupHandlers.sigterm));
+        process.once('beforeExit', /** @type {any} */ (this._cleanupHandlers.beforeExit));
+        process.once('uncaughtException', /** @type {any} */ (this._cleanupHandlers.uncaughtException));
+        process.once('unhandledRejection', /** @type {any} */ (this._cleanupHandlers.unhandledRejection));
 
         this._cleanupHandlersRegistered = true;
         log('DEBUG', '[ResilientLock] Cleanup handlers registered');
@@ -179,7 +179,7 @@ class ResilientLockManager {
 
         // Check if lock is already held
         if (this.activeLocks.has(lockKey)) {
-            log('WARN', `[ResilientLock] Lock ${lockKey} already held`, metadata);
+            log('WARN', `[ResilientLock] Lock ${lockKey} already held`, /** @type {any} */ (metadata));
             return false;
         }
 
@@ -189,7 +189,7 @@ class ResilientLockManager {
 
             if (!acquired) {
                 this._stats.totalFailedAcquire++;
-                log('DEBUG', `[ResilientLock] Failed to acquire ${lockKey}`, metadata);
+                log('DEBUG', `[ResilientLock] Failed to acquire ${lockKey}`, /** @type {any} */ (metadata));
                 return false;
             }
 
@@ -209,11 +209,12 @@ class ResilientLockManager {
                 this._stats.peakConcurrentLocks = this.activeLocks.size;
             }
 
-            log('DEBUG', `[ResilientLock] Acquired ${lockKey} (${this.activeLocks.size} active)`, metadata);
+            log('DEBUG', `[ResilientLock] Acquired ${lockKey} (${this.activeLocks.size} active)`, /** @type {any} */ (metadata));
             return true;
         } catch (err) {
+            const _err = /** @type {any} */ (err);
             this._stats.totalFailedAcquire++;
-            log('ERROR', `[ResilientLock] Error acquiring ${lockKey}: ${err.message}`, metadata);
+            log('ERROR', `[ResilientLock] Error acquiring ${lockKey}: ${_err.message}`, /** @type {any} */ (metadata));
             return false;
         }
     }
@@ -244,11 +245,12 @@ class ResilientLockManager {
                 this._unregisterCleanupHandlers();
             }
 
-            log('DEBUG', `[ResilientLock] Released ${lockKey} (${this.activeLocks.size} active)`, lock.metadata);
+            log('DEBUG', `[ResilientLock] Released ${lockKey} (${this.activeLocks.size} active)`, /** @type {any} */ (lock.metadata));
             return true;
         } catch (err) {
+            const _err2 = /** @type {any} */ (err);
             this._stats.totalFailedRelease++;
-            log('WARN', `[ResilientLock] Failed to release ${lockKey}: ${err.message}`, lock.metadata);
+            log('WARN', `[ResilientLock] Failed to release ${lockKey}: ${_err2.message}`, /** @type {any} */ (lock.metadata));
 
             // Remove from map anyway to prevent memory leak
             this.activeLocks.delete(lockKey);
@@ -295,8 +297,9 @@ class ResilientLockManager {
                 if (success) released++;
                 else failed++;
             } catch (err) {
+                const _err3 = /** @type {any} */ (err);
                 failed++;
-                log('WARN', `[ResilientLock] Failed to release lock ${lockKey}: ${err.message}`);
+                log('WARN', `[ResilientLock] Failed to release lock ${lockKey}: ${_err3.message}`);
             }
         });
 
@@ -416,12 +419,13 @@ class ResilientLockManager {
             if (extended) {
                 // Update metadata to reflect extension
                 lock.metadata.lastExtendedAt = Date.now();
-                log('DEBUG', `[ResilientLock] Extended ${lockKey}`, lock.metadata);
+                log('DEBUG', `[ResilientLock] Extended ${lockKey}`, /** @type {any} */ (lock.metadata));
             }
 
             return extended;
         } catch (err) {
-            log('ERROR', `[ResilientLock] Failed to extend ${lockKey}: ${err.message}`, lock.metadata);
+            const _err4 = /** @type {any} */ (err);
+            log('ERROR', `[ResilientLock] Failed to extend ${lockKey}: ${_err4.message}`, /** @type {any} */ (lock.metadata));
             return false;
         }
     }

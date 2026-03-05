@@ -1,3 +1,4 @@
+// @ts-check
 import { MAX_CHUNK_CHARS_CODE } from '../contract.mjs';
 import { estimateCharsForLines } from '../text.mjs';
 import { chunkPlain } from './chunk_plain.mjs';
@@ -7,7 +8,7 @@ const ANCHOR_RE =
     /^(?:\s*export\s+|\s*class\s+\w|\s*(?:async\s+)?function\s+\w|\s*interface\s+\w|\s*type\s+\w|\s*const\s+\w+\s*=\s*\(|\s*describe\(|\s*it\()/;
 const BLOCK_COMMENT_START = /^\s*\/\*\*/;
 
-export function chunkCode({ lines, maxChunkChars = MAX_CHUNK_CHARS_CODE, minChunkChars = 200 }) {
+export function chunkCode(/** @type {any} */ { lines, maxChunkChars = MAX_CHUNK_CHARS_CODE, minChunkChars = 200 }) {
     if (!lines || lines.length === 0) return [];
 
     const candidates = new Set([0]);

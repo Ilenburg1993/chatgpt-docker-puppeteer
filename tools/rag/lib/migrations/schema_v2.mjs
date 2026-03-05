@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Schema Migration Framework for RAG System
  *

@@ -1,3 +1,4 @@
+// @ts-check
 #!/usr/bin/env node
 import './lib/env-bootstrap.mjs';
 import { ragIndex } from './lib/facade.mjs';
@@ -46,7 +47,8 @@ async function indexIncremental() {
 
         process.exit(0);
     } catch (error) {
-        console.error('\n[RAG Incremental] ❌ Error:', error.message);
+        const _ce = /** @type {any} */ (error);
+        console.error('\n[RAG Incremental] ❌ Error:', _ce.message);
         process.exit(1);
     }
 }

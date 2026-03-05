@@ -1,3 +1,4 @@
+// @ts-check
 import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragHealth } from './lib/facade.mjs';

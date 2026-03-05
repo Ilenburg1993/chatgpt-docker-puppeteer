@@ -1,3 +1,4 @@
+// @ts-check
 import { promises as fs } from 'node:fs';
 import { SCHEMA_VERSION, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_BASE_URL } from './contract.mjs';
 
@@ -16,7 +17,7 @@ export function createEmptyManifest() {
     };
 }
 
-export async function loadManifest(paths) {
+export async function loadManifest(/** @type {any} */ paths) {
     try {
         const raw = await fs.readFile(paths.manifestPath, 'utf8');
         const parsed = JSON.parse(raw);
@@ -55,7 +56,8 @@ export async function loadManifest(paths) {
         }
         return parsed;
     } catch (err) {
-        if (err?.code === 'ENOENT') {
+        const _ce = /** @type {any} */ (err);
+        if (_ce?.code === 'ENOENT') {
             return null;
         }
         throw err;

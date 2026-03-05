@@ -1,3 +1,4 @@
+// @ts-check
 import { sha256HexForString } from '../contract.mjs';
 
 /**

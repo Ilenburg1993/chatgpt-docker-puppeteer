@@ -1,3 +1,4 @@
+// @ts-check
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import ignore from 'ignore';
@@ -51,7 +52,7 @@ export const RAG_SCAN_PROFILES = {
     full: [],
 };
 
-function isAllowedByExt(relPath) {
+function isAllowedByExt(/** @type {any} */ relPath) {
     const base = path.posix.basename(relPath);
     if (ALWAYS_ALLOW_BASENAMES.has(base)) return true;
     if (base.toLowerCase().endsWith('.dockerfile')) return true;
@@ -60,7 +61,7 @@ function isAllowedByExt(relPath) {
     return ALLOW_EXT.has(ext);
 }
 
-function resolveDocsMode(rawMode) {
+function resolveDocsMode(/** @type {any} */ rawMode) {
     const normalized = String(rawMode || '')
         .trim()
         .toLowerCase();
@@ -68,12 +69,12 @@ function resolveDocsMode(rawMode) {
     return 'include';
 }
 
-function isDocLikePath(relPath) {
+function isDocLikePath(/** @type {any} */ relPath) {
     const ext = path.posix.extname(String(relPath || '')).toLowerCase();
     return DOC_EXTENSIONS.has(ext);
 }
 
-function isDenied(relPath) {
+function isDenied(/** @type {any} */ relPath) {
     const p = relPath.endsWith('/') ? relPath : `${relPath}`;
     const base = path.posix.basename(relPath);
     if (ALWAYS_DENY_BASENAMES.has(base)) return true;
@@ -93,7 +94,7 @@ function isDenied(relPath) {
     return false;
 }
 
-export async function findProjectRoot(startDir = process.cwd()) {
+export async function findProjectRoot(/** @type {any} */ startDir = process.cwd()) {
     let current = path.resolve(startDir);
     while (true) {
         const candidate = path.join(current, 'package.json');
@@ -101,6 +102,7 @@ export async function findProjectRoot(startDir = process.cwd()) {
             await fs.access(candidate);
             return current;
         } catch (_) {
+            const _ce = /** @type {any} */ (_);
             const parent = path.dirname(current);
             if (parent === current) return startDir;
             current = parent;
@@ -108,7 +110,7 @@ export async function findProjectRoot(startDir = process.cwd()) {
     }
 }
 
-function globToRegExp(pattern) {
+function globToRegExp(/** @type {any} */ pattern) {
     const escaped = pattern
         .replace(/[.+^${}()|[\]\\]/g, '\\$&')
         .replace(/\*\*/g, '::DOUBLE_STAR::')
@@ -118,28 +120,28 @@ function globToRegExp(pattern) {
     return new RegExp(`^${escaped}$`);
 }
 
-function compileGlobs(globs = []) {
+function compileGlobs(/** @type {any} */ globs = []) {
     return globs
-        .map(g => String(g || '').trim())
+        .map((/** @type {any} */ g) => String(g || '').trim())
         .filter(Boolean)
-        .map(g => ({ raw: g, re: globToRegExp(g) }));
+        .map((/** @type {any} */ g) => (/** @type {any} */ { raw: g, re: globToRegExp(g) }));
 }
 
-function matchesAny(relPath, compiledGlobs) {
+function matchesAny(/** @type {any} */ relPath, /** @type {any} */ compiledGlobs) {
     if (!compiledGlobs || compiledGlobs.length === 0) return false;
-    return compiledGlobs.some(({ re }) => re.test(relPath));
+    return compiledGlobs.some((/** @type {any} */ { re }) => re.test(relPath));
 }
 
-function normalizeRelPathInput(relPath) {
+function normalizeRelPathInput(/** @type {any} */ relPath) {
     return String(relPath || '')
         .trim()
         .replace(/\\/g, '/')
         .replace(/^\.?\//, '');
 }
 
-function buildCompiledGlobs({ profile = 'full', includeGlobs = [], excludeGlobs = [] } = {}) {
+function buildCompiledGlobs(/** @type {any} */ { profile = 'full', includeGlobs = [], excludeGlobs = [] } = {}) {
     const profileName = String(profile || 'full');
-    const profileGlobs = RAG_SCAN_PROFILES[profileName] ?? RAG_SCAN_PROFILES.full;
+    const profileGlobs = (/** @type {any} */ (RAG_SCAN_PROFILES))[profileName] ?? RAG_SCAN_PROFILES.full;
     const compiledInclude = compileGlobs([...profileGlobs, ...(includeGlobs || [])]);
     const compiledExclude = compileGlobs(excludeGlobs || []);
     return {
@@ -149,7 +151,7 @@ function buildCompiledGlobs({ profile = 'full', includeGlobs = [], excludeGlobs 
     };
 }
 
-export function isRagIndexableRelPath(relPath, options = {}) {
+export function isRagIndexableRelPath(/** @type {any} */ relPath, /** @type {any} */ options = {}) {
     const normalized = normalizeRelPathInput(relPath);
     if (!normalized) return false;
     if (isDenied(normalized)) return false;
@@ -165,7 +167,7 @@ export function isRagIndexableRelPath(relPath, options = {}) {
     return true;
 }
 
-export async function loadWorkspaceFile(rootDir, relPath, options = {}) {
+export async function loadWorkspaceFile(/** @type {any} */ rootDir, /** @type {any} */ relPath, /** @type {any} */ options = {}) {
     const normalized = normalizeRelPathInput(relPath);
     if (!normalized) return null;
     if (!isRagIndexableRelPath(normalized, options)) return null;
@@ -198,22 +200,20 @@ export async function loadWorkspaceFile(rootDir, relPath, options = {}) {
     }
 }
 
-export async function scanWorkspace(
-    rootDir,
-    {
+export async function scanWorkspace(/** @type {any} */ rootDir, /** @type {any} */ {
         profile = 'full',
         includeGlobs = [],
         excludeGlobs = [],
         maxFileBytes = 2_000_000,
         docsMode = process.env.RAG_DOCS_MODE || 'include',
-    } = {}
-) {
+    } = {}) {
     const root = path.resolve(rootDir);
     const ig = ignore();
     try {
         const raw = await fs.readFile(path.join(root, '.gitignore'), 'utf8');
         ig.add(raw);
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         // no .gitignore
     }
 
@@ -224,17 +224,18 @@ export async function scanWorkspace(
     });
     const resolvedDocsMode = resolveDocsMode(docsMode);
 
-    const results = [];
+    /** @type {any[]} */ const results = [];
 
-    async function walk(relDir) {
+    async function walk(/** @type {any} */ relDir) {
         const fullDir = path.join(root, relDir);
         let entries;
         try {
             entries = await fs.readdir(fullDir, { withFileTypes: true });
         } catch (_) {
+            const _ce = /** @type {any} */ (_);
             return;
         }
-        entries.sort((a, b) => a.name.localeCompare(b.name));
+        entries.sort(/** @type {any} */ (a, b) => a.name.localeCompare(b.name));
 
         for (const ent of entries) {
             const relPath = relDir ? path.posix.join(relDir, ent.name) : ent.name;
@@ -261,6 +262,7 @@ export async function scanWorkspace(
             try {
                 stat = await fs.stat(fullPath);
             } catch (_) {
+                const _ce = /** @type {any} */ (_);
                 continue;
             }
             if (stat.size > maxFileBytes) continue;
@@ -276,12 +278,13 @@ export async function scanWorkspace(
                     buffer: buf,
                 });
             } catch (_) {
+                const _ce = /** @type {any} */ (_);
                 continue;
             }
         }
     }
 
     await walk('');
-    results.sort((a, b) => a.relPath.localeCompare(b.relPath));
+    results.sort(/** @type {any} */ (a, b) => a.relPath.localeCompare(b.relPath));
     return results;
 }

@@ -1,13 +1,14 @@
+// @ts-check
 import { DEFAULT_OLLAMA_BASE_URL, DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_EMBED_MAX_CHARS } from '../contract.mjs';
 
-function normalizeEmbeddingBaseUrl(rawBaseUrl) {
+function normalizeEmbeddingBaseUrl(/** @type {any} */ rawBaseUrl) {
     const raw = String(rawBaseUrl || '').trim();
     if (!raw) return '';
     const trimmed = raw.replace(/\/+$/, '');
     return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`;
 }
 
-function resolveEmbeddingBaseUrl(optionsBaseUrl) {
+function resolveEmbeddingBaseUrl(/** @type {any} */ optionsBaseUrl) {
     const fromOptions = normalizeEmbeddingBaseUrl(optionsBaseUrl);
     if (fromOptions) return fromOptions;
 
@@ -17,12 +18,12 @@ function resolveEmbeddingBaseUrl(optionsBaseUrl) {
     return normalizeEmbeddingBaseUrl(DEFAULT_OLLAMA_BASE_URL);
 }
 
-function parsePositiveInt(rawValue, fallback) {
+function parsePositiveInt(/** @type {any} */ rawValue, /** @type {any} */ fallback) {
     const parsed = Number.parseInt(String(rawValue ?? ''), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function parseBoolean(rawValue, fallback = true) {
+function parseBoolean(/** @type {any} */ rawValue, /** @type {any} */ fallback = true) {
     const normalized = String(rawValue ?? '')
         .trim()
         .toLowerCase();
@@ -32,12 +33,12 @@ function parseBoolean(rawValue, fallback = true) {
     return fallback;
 }
 
-function isContextLengthError(error) {
+function isContextLengthError(/** @type {any} */ error) {
     const message = String(error?.message || '').toLowerCase();
     return message.includes('context length') || message.includes('input length exceeds');
 }
 
-function parseHttpStatus(error) {
+function parseHttpStatus(/** @type {any} */ error) {
     const message = String(error?.message || '');
     const match = message.match(/HTTP_(\d{3}):/);
     if (!match) return null;
@@ -45,7 +46,7 @@ function parseHttpStatus(error) {
     return Number.isFinite(status) ? status : null;
 }
 
-function isTransientError(error) {
+function isTransientError(/** @type {any} */ error) {
     if (isContextLengthError(error)) return false;
     const status = parseHttpStatus(error);
     if (status !== null) {
@@ -62,7 +63,7 @@ function isTransientError(error) {
     );
 }
 
-function sleep(ms) {
+function sleep(/** @type {any} */ ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -118,9 +119,9 @@ export class OllamaEmbeddingsProvider {
 
     async health() {
         const versionUrl = this.baseURL.replace(/\/v1\/?$/, '') + '/api/version';
-        const version = await fetchJson(versionUrl, { timeoutMs: 1500 }).catch(() => null);
-        const models = await fetchJson(`${this.baseURL}/models`, { timeoutMs: 2000 }).catch(() => null);
-        const modelIds = Array.isArray(models?.data) ? models.data.map(m => m.id).filter(Boolean) : [];
+        const version = await fetchJson(versionUrl, { timeoutMs: 1500 }).catch(/** @type {any} */ () => null);
+        const models = await fetchJson(`${this.baseURL}/models`, { timeoutMs: 2000 }).catch(/** @type {any} */ () => null);
+        const modelIds = Array.isArray(models?.data) ? models.data.map((/** @type {any} */ m) => m.id).filter(Boolean) : [];
         const hasModel = modelIds.includes(this.model);
         return {
             ok: Boolean(version) && Array.isArray(models?.data),
@@ -130,7 +131,7 @@ export class OllamaEmbeddingsProvider {
         };
     }
 
-    async embed(text) {
+    async embed(/** @type {any} */ text) {
         this.embedCalls++;
         const originalText = String(text ?? '');
         const effectiveCap = this.runtimeSafeChars ? Math.min(this.maxChars, this.runtimeSafeChars) : this.maxChars;
@@ -164,6 +165,7 @@ export class OllamaEmbeddingsProvider {
                 }
                 return vector;
             } catch (error) {
+                const _ce = /** @type {any} */ (error);
                 if (!isContextLengthError(error)) throw error;
                 hadContextOverflow = true;
                 contextOverflowsThisCall++;
@@ -182,7 +184,7 @@ export class OllamaEmbeddingsProvider {
         throw new Error('OLLAMA_EMBEDDINGS_CONTEXT_RETRY_EXHAUSTED');
     }
 
-    async embedWithTransientRetries(input) {
+    async embedWithTransientRetries(/** @type {any} */ input) {
         const maxRetries = 3;
         const initialDelay = 1000;
         const maxDelay = 10000;
@@ -191,10 +193,11 @@ export class OllamaEmbeddingsProvider {
             try {
                 return await this.embedOnce(input);
             } catch (error) {
+                const _ce = /** @type {any} */ (error);
                 if (isContextLengthError(error)) throw error;
                 if (!isTransientError(error) || attempt === maxRetries) throw error;
                 const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), maxDelay);
-                console.warn(`[RAG] Embed retry ${attempt}/${maxRetries} after ${delay}ms: ${error.message}`);
+                console.warn(`[RAG] Embed retry ${attempt}/${maxRetries} after ${delay}ms: ${_ce.message}`);
                 await sleep(delay);
             }
         }
@@ -202,7 +205,7 @@ export class OllamaEmbeddingsProvider {
         throw new Error('OLLAMA_EMBEDDINGS_TRANSIENT_RETRY_EXHAUSTED');
     }
 
-    async embedOnce(input) {
+    async embedOnce(/** @type {any} */ input) {
         const body = { model: this.model, input };
         console.log(`[RAG]     • Sending to Ollama: ${input.length} chars, model=${this.model}`);
 
@@ -220,7 +223,7 @@ export class OllamaEmbeddingsProvider {
             throw new Error('OLLAMA_EMBEDDINGS_BAD_RESPONSE');
         }
         console.log(`[RAG]     ✓ Ollama response: ${vector.length}D vector in ${elapsed}ms`);
-        return vector.map(n => Number(n));
+        return vector.map((/** @type {any} */ n) => Number(n));
     }
 
     logContextStats() {
@@ -232,9 +235,9 @@ export class OllamaEmbeddingsProvider {
     }
 }
 
-async function fetchJson(url, options = {}) {
+async function fetchJson(/** @type {any} */ url, /** @type {any} */ options = {}) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 5000);
+    const timeout = setTimeout(/** @type {any} */ () => controller.abort(), options.timeoutMs ?? 5000);
     try {
         const res = await fetch(url, {
             method: options.method || 'GET',
@@ -243,7 +246,7 @@ async function fetchJson(url, options = {}) {
             signal: controller.signal,
         });
         if (!res.ok) {
-            const text = await res.text().catch(() => '');
+            const text = await res.text().catch(/** @type {any} */ () => '');
             throw new Error(`HTTP_${res.status}:${text.slice(0, 200)}`);
         }
         return await res.json();

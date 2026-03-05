@@ -1,3 +1,4 @@
+// @ts-check
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { getRagPaths, ensureDirs, atomicWriteJson, acquireIndexLock, releaseIndexLock } from './paths.mjs';
@@ -62,17 +63,17 @@ const RAG_INDEX_MODE = Object.freeze({
     INCREMENTAL: 'incremental',
 });
 
-function resolveDefaultProfile(requestedProfile) {
+function resolveDefaultProfile(/** @type {any} */ requestedProfile) {
     const raw = String(requestedProfile || process.env.RAG_PROFILE_DEFAULT || 'core').trim();
     return Object.prototype.hasOwnProperty.call(RAG_SCAN_PROFILES, raw) ? raw : 'core';
 }
 
-function isDegradedEnabled(explicitValue) {
+function isDegradedEnabled(/** @type {any} */ explicitValue) {
     if (typeof explicitValue === 'boolean') return explicitValue;
     return String(process.env.RAG_DEGRADED_MODE_ENABLED || 'true') !== 'false';
 }
 
-function classifyRagReasonCode(error) {
+function classifyRagReasonCode(/** @type {any} */ error) {
     const message = String(error?.message || '').toUpperCase();
     if (message.includes('RAG_INDEX_LOCKED')) return RAG_REASON_CODES.INDEX_LOCKED;
     if (message.includes('RAG_QUERY_TIMEOUT') || message.includes('RAG_HYBRID_SEARCH_TIMEOUT')) {
@@ -82,12 +83,12 @@ function classifyRagReasonCode(error) {
     return RAG_REASON_CODES.OLLAMA_UNAVAILABLE;
 }
 
-function shouldDegrade(error) {
+function shouldDegrade(/** @type {any} */ error) {
     const reasonCode = classifyRagReasonCode(error);
     return reasonCode === RAG_REASON_CODES.OLLAMA_UNAVAILABLE || reasonCode === RAG_REASON_CODES.EMBEDDING_TIMEOUT;
 }
 
-function normalizeTimestampMs(value) {
+function normalizeTimestampMs(/** @type {any} */ value) {
     if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
     if (typeof value === 'bigint') return Number(value);
     if (typeof value === 'string' && value.trim()) {
@@ -97,18 +98,18 @@ function normalizeTimestampMs(value) {
     return null;
 }
 
-function toIsoSecond(epochMs) {
+function toIsoSecond(/** @type {any} */ epochMs) {
     const iso = new Date(epochMs).toISOString();
     return iso.replace(/\.\d{3}Z$/, 'Z');
 }
 
-function toLocalSecond(epochMs) {
+function toLocalSecond(/** @type {any} */ epochMs) {
     const d = new Date(epochMs);
-    const pad = n => String(n).padStart(2, '0');
+    const pad = (/** @type {any} */ n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-function buildTimeFields(epochMs) {
+function buildTimeFields(/** @type {any} */ epochMs) {
     const normalized = normalizeTimestampMs(epochMs);
     if (!normalized) {
         return {
@@ -124,7 +125,7 @@ function buildTimeFields(epochMs) {
     };
 }
 
-function buildIndexStatus(manifest, nowMs = Date.now()) {
+function buildIndexStatus(/** @type {any} */ manifest, nowMs = Date.now()) {
     const updatedAtMs = normalizeTimestampMs(manifest?.updated_at);
     const mode =
         manifest?.last_index_mode === RAG_INDEX_MODE.INCREMENTAL ? RAG_INDEX_MODE.INCREMENTAL : RAG_INDEX_MODE.FULL;
@@ -137,11 +138,11 @@ function buildIndexStatus(manifest, nowMs = Date.now()) {
     };
 }
 
-function hasManifestIndexTimestamp(manifest) {
+function hasManifestIndexTimestamp(/** @type {any} */ manifest) {
     return normalizeTimestampMs(manifest?.updated_at) !== null;
 }
 
-function hasAvailableIndex({ manifest, tableNames }) {
+function hasAvailableIndex(/** @type {any} */ { manifest, tableNames }) {
     const hasManifest = Boolean(manifest) && !manifest?.error && hasManifestIndexTimestamp(manifest);
     const hasTable = Array.isArray(tableNames) && tableNames.includes(TABLE_NAME);
     return hasManifest && hasTable;
@@ -155,12 +156,12 @@ function buildQueryStatus(nowMs = Date.now()) {
     };
 }
 
-function clampPercent(value) {
+function clampPercent(/** @type {any} */ value) {
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.min(100, value));
 }
 
-function formatDurationMs(durationMs) {
+function formatDurationMs(/** @type {any} */ durationMs) {
     if (!Number.isFinite(durationMs) || durationMs < 0) return 'n/a';
     const totalSeconds = Math.ceil(durationMs / 1000);
     const hours = Math.floor(totalSeconds / 3600);
@@ -171,7 +172,7 @@ function formatDurationMs(durationMs) {
     return `${seconds}s`;
 }
 
-function buildProgressSnapshot({ startedAtMs, processedFiles, totalFiles, embeddedChunks, estimatedTotalChunks }) {
+function buildProgressSnapshot(/** @type {any} */ { startedAtMs, processedFiles, totalFiles, embeddedChunks, estimatedTotalChunks }) {
     const elapsedMs = Math.max(1, Date.now() - startedAtMs);
     const filesPct = totalFiles > 0 ? clampPercent((processedFiles / totalFiles) * 100) : 100;
     const filesRemainingPct = clampPercent(100 - filesPct);
@@ -198,7 +199,7 @@ function buildProgressSnapshot({ startedAtMs, processedFiles, totalFiles, embedd
     };
 }
 
-function buildScopeOptionsFromResolved(resolvedScope) {
+function buildScopeOptionsFromResolved(/** @type {any} */ resolvedScope) {
     return {
         profile: resolvedScope.profile,
         docsMode: resolvedScope.docsMode,
@@ -208,7 +209,7 @@ function buildScopeOptionsFromResolved(resolvedScope) {
     };
 }
 
-function copyScope(scope) {
+function copyScope(/** @type {any} */ scope) {
     if (!scope || typeof scope !== 'object') return null;
     return {
         profile: scope.profile,
@@ -220,40 +221,40 @@ function copyScope(scope) {
     };
 }
 
-function applyScopeToManifest(manifest, resolvedScope) {
+function applyScopeToManifest(/** @type {any} */ manifest, /** @type {any} */ resolvedScope) {
     manifest.last_scope = copyScope(resolvedScope.scope);
     manifest.last_scope_hash = resolvedScope.scopeHash;
 }
 
-function isSameScope(manifest, resolvedScope) {
+function isSameScope(/** @type {any} */ manifest, /** @type {any} */ resolvedScope) {
     return String(manifest?.last_scope_hash || '') === String(resolvedScope.scopeHash || '');
 }
 
-function normalizeTopK(rawTopK, fallback = 8) {
+function normalizeTopK(/** @type {any} */ rawTopK, fallback = 8) {
     const parsed = Number(rawTopK);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.max(1, Math.min(Math.trunc(parsed), 20));
 }
 
-function normalizeExpandTopN(rawExpandTopN, topK) {
+function normalizeExpandTopN(/** @type {any} */ rawExpandTopN, /** @type {any} */ topK) {
     const parsed = Number(rawExpandTopN);
     if (!Number.isFinite(parsed)) return 0;
     return Math.max(0, Math.min(Math.trunc(parsed), topK));
 }
 
-function toIsoSecondOrNull(epochMs) {
+function toIsoSecondOrNull(/** @type {any} */ epochMs) {
     const normalized = normalizeTimestampMs(epochMs);
     return normalized ? toIsoSecond(normalized) : null;
 }
 
-function normalizeFileMtimeMs(entry) {
+function normalizeFileMtimeMs(/** @type {any} */ entry) {
     if (!entry || typeof entry !== 'object') return null;
     return normalizeTimestampMs(entry.mtime_ms);
 }
 
-function decorateResultsWithSourceMetadata(results, manifest) {
+function decorateResultsWithSourceMetadata(/** @type {any} */ results, /** @type {any} */ manifest) {
     const manifestFiles = manifest?.files && typeof manifest.files === 'object' ? manifest.files : {};
-    return results.map(result => {
+    return results.map((/** @type {any} */ result) => {
         const contentClass = normalizeContentClass(result.content_class, result.path, result.ext);
         const pathRootRel = normalizeRelPath(result.path || '');
         const manifestEntry = manifestFiles[pathRootRel] || null;
@@ -268,7 +269,7 @@ function decorateResultsWithSourceMetadata(results, manifest) {
     });
 }
 
-function applyIntentScopePolicy(results, intentScope, topK) {
+function applyIntentScopePolicy(/** @type {any} */ results, /** @type {any} */ intentScope, /** @type {any} */ topK) {
     const normalizedScope = normalizeIntentScope(intentScope);
     if (normalizedScope === 'all') {
         return {
@@ -293,7 +294,7 @@ function applyIntentScopePolicy(results, intentScope, topK) {
 
     const merged = [...preferred, ...secondary];
     const sliced = merged.slice(0, topK);
-    const docsInOutput = sliced.filter(result => result.content_class === 'docs').length;
+    const docsInOutput = sliced.filter((/** @type {any} */ result) => result.content_class === 'docs').length;
     const docsFiltered = normalizedScope === 'code-first' && docsInPool > docsInOutput;
 
     return {
@@ -305,7 +306,7 @@ function applyIntentScopePolicy(results, intentScope, topK) {
     };
 }
 
-async function maybeAutoExpandResults(baseResults, options = {}) {
+async function maybeAutoExpandResults(/** @type {any} */ baseResults, /** @type {any} */ options = {}) {
     const autoExpand = Boolean(options.autoExpand);
     if (!autoExpand || baseResults.length === 0) {
         return {
@@ -386,7 +387,8 @@ async function maybeAutoExpandResults(baseResults, options = {}) {
             expandedCount += 1;
             out.push(result);
         } catch (error) {
-            result.expanded_context_error = String(error?.message || error);
+            const _ce = /** @type {any} */ (error);
+            result.expanded_context_error = String(_ce?.message || _ce);
             out.push(result);
         }
     }
@@ -401,7 +403,7 @@ async function maybeAutoExpandResults(baseResults, options = {}) {
     };
 }
 
-async function reconcileScopeChanges({ manifest, resolvedScope, table, report }) {
+async function reconcileScopeChanges(/** @type {any} */ { manifest, resolvedScope, table, report }) {
     if (isSameScope(manifest, resolvedScope)) return;
 
     const scopeOptions = buildScopeOptionsFromResolved(resolvedScope);
@@ -424,21 +426,21 @@ async function reconcileScopeChanges({ manifest, resolvedScope, table, report })
     }
 }
 
-function buildIndexLockError(lock) {
+function buildIndexLockError(/** @type {any} */ lock) {
     const lockInfo = lock?.existingLock || {};
-    const err = new Error(
+    const err = /** @type {any} */ (new Error(
         `RAG_INDEX_LOCKED: Another indexing process is running.\n` +
             `Lock held by PID ${lockInfo.pid || 'unknown'} since ${lockInfo.started_at ? new Date(lockInfo.started_at).toISOString() : 'unknown'}\n\n` +
             `If no indexing is running, the lock may be stale.\n` +
             `It will auto-clear after 6 hours, or you can manually remove:\n` +
             `  rm /home/node/.local/share/rag-index/index.lock\n`
-    );
+    ));
     err.details = lock;
     err.reason_code = RAG_REASON_CODES.INDEX_LOCKED;
     return err;
 }
 
-function buildHeaderTextForRange(range, { relPath, language, tags }) {
+function buildHeaderTextForRange(/** @type {any} */ range, /** @type {any} */ { relPath, language, tags }) {
     if (typeof range?.headerText === 'string' && range.headerText.trim()) {
         return range.headerText;
     }
@@ -452,12 +454,12 @@ function buildHeaderTextForRange(range, { relPath, language, tags }) {
     return lines.join('\n');
 }
 
-function buildEmbedText(headerText, text) {
+function buildEmbedText(/** @type {any} */ headerText, /** @type {any} */ text) {
     if (!headerText) return text;
     return `${headerText}\n\n${text}`;
 }
 
-function toChunkDescriptor(range, { relPath, lineStarts, fileBuffer, manifestChunkerVersion, language, tags }) {
+function toChunkDescriptor(/** @type {any} */ range, /** @type {any} */ { relPath, lineStarts, fileBuffer, manifestChunkerVersion, language, tags }) {
     const { startByte, endByte, text } = sliceByLines(fileBuffer, lineStarts, range.startLine, range.endLine);
     const content_sha256 = sha256HexForString(text);
     const chunk_id = buildChunkId({
@@ -486,15 +488,15 @@ function toChunkDescriptor(range, { relPath, lineStarts, fileBuffer, manifestChu
     };
 }
 
-function withNeighborIds(descriptors) {
-    return descriptors.map((d, idx) => ({
+function withNeighborIds(/** @type {any} */ descriptors) {
+    return descriptors.map((/** @type {any} */ d, /** @type {any} */ idx) => (/** @type {any} */ {
         ...d,
         chunk_prev_id: idx > 0 ? descriptors[idx - 1].chunk_id : null,
         chunk_next_id: idx + 1 < descriptors.length ? descriptors[idx + 1].chunk_id : null,
     }));
 }
 
-function parsePositiveIntWithDefault(value, fallback) {
+function parsePositiveIntWithDefault(/** @type {any} */ value, /** @type {any} */ fallback) {
     const parsed = Number.parseInt(String(value ?? ''), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
@@ -510,12 +512,12 @@ function getExpandConfig() {
     return { defaultLines, maxLines };
 }
 
-function clampExpandLines(raw, fallback, maxLines) {
+function clampExpandLines(/** @type {any} */ raw, /** @type {any} */ fallback, /** @type {any} */ maxLines) {
     const parsed = parsePositiveIntWithDefault(raw, fallback);
     return Math.min(parsed, maxLines);
 }
 
-function buildStructuredExpandError(reasonCode, message, details = {}) {
+function buildStructuredExpandError(/** @type {any} */ reasonCode, /** @type {any} */ message, details = {}) {
     return {
         ok: false,
         reason_code: reasonCode,
@@ -529,10 +531,10 @@ function buildStructuredExpandError(reasonCode, message, details = {}) {
  * Applies exponential backoff to any embedding provider
  *
  * @param {Function} fn - Async function to retry
- * @param {Object} options - Retry options
+ * @param {any} options - Retry options
  * @returns {Promise<any>} Result from fn
  */
-async function retryWithBackoff(fn, options = {}) {
+async function retryWithBackoff(/** @type {any} */ fn, /** @type {any} */ options = {}) {
     const { maxRetries = 3, initialDelay = 1000, maxDelay = 10000, onRetry } = options;
     let lastError;
 
@@ -540,6 +542,7 @@ async function retryWithBackoff(fn, options = {}) {
         try {
             return await fn();
         } catch (error) {
+            const _ce = /** @type {any} */ (error);
             lastError = error;
             if (attempt < maxRetries - 1) {
                 const delay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
@@ -556,14 +559,14 @@ async function retryWithBackoff(fn, options = {}) {
 /**
  * ✅ P1-1: Wrapped with timeout (30s) to prevent hanging on slow operations
  */
-export async function ragHealth(options = {}) {
+export async function ragHealth(/** @type {any} */ options = {}) {
     return await withTimeout(
         async () => {
             const paths = getRagPaths(options.paths);
             await ensureDirs(paths);
 
             const writable = (await canWrite(paths.indexDir)) && (await canWrite(paths.dbDir));
-            const manifest = await loadManifest(paths).catch(err => ({ error: String(err?.message || err) }));
+            const manifest = await loadManifest(paths).catch((/** @type {any} */ err) => (/** @type {any} */ { error: String(err?.message || err) }));
 
             const embeddings =
                 options.embeddingsProvider ||
@@ -573,15 +576,16 @@ export async function ragHealth(options = {}) {
                 });
             const embHealth = await embeddings
                 .health()
-                .catch(err => ({ ok: false, error: String(err?.message || err) }));
+                .catch((/** @type {any} */ err) => (/** @type {any} */ { ok: false, error: String(err?.message || err) }));
 
-            const db = await openDb(paths.dbDir).catch(err => ({ error: String(err?.message || err) }));
+            const db = await openDb(paths.dbDir).catch((/** @type {any} */ err) => (/** @type {any} */ { error: String(err?.message || err) }));
             let tableNames = null;
             if (!('error' in db)) {
                 tableNames = await db.tableNames().catch(() => null);
                 try {
                     await db.close();
                 } catch (_) {
+                    const _ce = /** @type {any} */ (_);
                     // ignore
                 }
             }
@@ -619,7 +623,7 @@ export async function ragHealth(options = {}) {
 /**
  * ✅ P1-1: Wrapped with timeout (30 minutes) to prevent infinite indexing
  */
-export async function ragIndex(options = {}) {
+export async function ragIndex(/** @type {any} */ options = {}) {
     return await withTimeout(
         async () => {
             const root = options.root ? path.resolve(options.root) : await findProjectRoot(process.cwd());
@@ -683,7 +687,7 @@ export async function ragIndex(options = {}) {
                 }
 
                 const db = await openDb(paths.dbDir);
-                const tableNames = await db.tableNames().catch(() => []);
+                const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => []));
                 let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
 
                 const throttler = createRagAdaptiveThrottler({ mode: 'full' });
@@ -789,7 +793,7 @@ export async function ragIndex(options = {}) {
                     const indexedAtMs = Date.now();
 
                     const descriptors = withNeighborIds(
-                        ranges.map(r =>
+                        ranges.map((/** @type {any} */ r) =>
                             toChunkDescriptor(r, {
                                 relPath,
                                 lineStarts,
@@ -814,7 +818,7 @@ export async function ragIndex(options = {}) {
                             maxRetries: 3,
                             initialDelay: 1000,
                             maxDelay: 10000,
-                            onRetry: (err, attempt, max, delay) => {
+                            onRetry: (/** @type {any} */ err, /** @type {any} */ attempt, /** @type {any} */ max, /** @type {any} */ delay) => {
                                 console.warn(`[RAG] Embed retry ${attempt}/${max} after ${delay}ms: ${err.message}`);
                             },
                         });
@@ -833,7 +837,7 @@ export async function ragIndex(options = {}) {
                         }
 
                         if (!table) {
-                            table = await ensureTable(db, manifest.embedding.dim);
+                            table = /** @type {any} */ (await ensureTable(db, manifest.embedding.dim));
                         }
 
                         chunkRows.push({
@@ -866,7 +870,7 @@ export async function ragIndex(options = {}) {
                     if (table) {
                         await deleteByPath(table, relPath);
                         report.deleted_chunks += 1; // logical delete op (not row count)
-                        report.inserted_chunks += await addChunks(table, chunkRows);
+                        report.inserted_chunks += /** @type {any} */ (await addChunks(table, chunkRows));
                     }
 
                     manifest.files[relPath] = {
@@ -886,7 +890,8 @@ export async function ragIndex(options = {}) {
                     try {
                         await createFTSIndex(table);
                     } catch (ftsError) {
-                        console.warn(`[RAG] FTS index not available yet: ${ftsError?.message || ftsError}`);
+                        const _ce = /** @type {any} */ (ftsError);
+                        console.warn(`[RAG] FTS index not available yet: ${_ce?.message || _ce}`);
                     }
                 }
 
@@ -915,6 +920,7 @@ export async function ragIndex(options = {}) {
                 try {
                     await db.close();
                 } catch (_) {
+                    const _ce = /** @type {any} */ (_);
                     // ignore
                 }
 
@@ -932,7 +938,7 @@ export async function ragIndex(options = {}) {
  * Selective incremental indexing for changed/deleted paths.
  * Indexes only the provided file paths and preserves manifest/storage contracts.
  */
-export async function ragIndexChanged(options = {}) {
+export async function ragIndexChanged(/** @type {any} */ options = {}) {
     return await withTimeout(
         async () => {
             const root = options.root ? path.resolve(options.root) : await findProjectRoot(process.cwd());
@@ -990,7 +996,7 @@ export async function ragIndexChanged(options = {}) {
                               ? options.paths
                               : []
                         )
-                            .map(p => normalizeRelPath(String(p || '').replace(/\\/g, '/')))
+                            .map((/** @type {any} */ p) => normalizeRelPath(String(p || '').replace(/\\/g, '/')))
                             .filter(Boolean)
                     ),
                 ];
@@ -1013,7 +1019,7 @@ export async function ragIndexChanged(options = {}) {
                 };
 
                 const db = await openDb(paths.dbDir);
-                const tableNames = await db.tableNames().catch(() => []);
+                const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => []));
                 let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
                 let dimValidated = manifest.embedding.dim === null;
                 await reconcileScopeChanges({ manifest, resolvedScope, table, report });
@@ -1029,6 +1035,7 @@ export async function ragIndexChanged(options = {}) {
                     try {
                         await db.close();
                     } catch (_) {
+                        const _ce = /** @type {any} */ (_);
                         // ignore
                     }
                     return report;
@@ -1135,7 +1142,7 @@ export async function ragIndexChanged(options = {}) {
                     const indexedAtMs = Date.now();
 
                     const descriptors = withNeighborIds(
-                        ranges.map(r =>
+                        ranges.map((/** @type {any} */ r) =>
                             toChunkDescriptor(r, {
                                 relPath,
                                 lineStarts,
@@ -1172,7 +1179,7 @@ export async function ragIndexChanged(options = {}) {
                         }
 
                         if (!table) {
-                            table = await ensureTable(db, manifest.embedding.dim);
+                            table = /** @type {any} */ (await ensureTable(db, manifest.embedding.dim));
                         }
 
                         chunkRows.push({
@@ -1205,7 +1212,7 @@ export async function ragIndexChanged(options = {}) {
                     if (table) {
                         await deleteByPath(table, relPath);
                         report.deleted_chunks += 1;
-                        report.inserted_chunks += await addChunks(table, chunkRows);
+                        report.inserted_chunks += /** @type {any} */ (await addChunks(table, chunkRows));
                     }
 
                     manifest.files[relPath] = {
@@ -1224,7 +1231,8 @@ export async function ragIndexChanged(options = {}) {
                     try {
                         await createFTSIndex(table);
                     } catch (ftsError) {
-                        console.warn(`[RAG] FTS index not available yet: ${ftsError?.message || ftsError}`);
+                        const _ce = /** @type {any} */ (ftsError);
+                        console.warn(`[RAG] FTS index not available yet: ${_ce?.message || _ce}`);
                     }
                 }
 
@@ -1237,6 +1245,7 @@ export async function ragIndexChanged(options = {}) {
                 try {
                     await db.close();
                 } catch (_) {
+                    const _ce = /** @type {any} */ (_);
                     // ignore
                 }
 
@@ -1253,7 +1262,7 @@ export async function ragIndexChanged(options = {}) {
 /**
  * ✅ P1-1: Wrapped with timeout (60s) to prevent hanging on slow queries
  */
-export async function ragQuery(options = {}) {
+export async function ragQuery(/** @type {any} */ options = {}) {
     return await withTimeout(
         async () => {
             const paths = getRagPaths(options.paths);
@@ -1279,7 +1288,7 @@ export async function ragQuery(options = {}) {
                     })
             );
 
-            /** @param {object} base */
+            /** @param {any} base */
             const finalizeResult = async base => {
                 const decorated = decorateResultsWithSourceMetadata(base.results || [], manifest);
                 const scoped = applyIntentScopePolicy(decorated, intentScope, requestedTopK);
@@ -1324,7 +1333,7 @@ export async function ragQuery(options = {}) {
             try {
                 const tableNames = await db.tableNames();
 
-                const lexicalOnly = async (reasonCode, degradedReason) => {
+                const lexicalOnly = async (/** @type {any} */ reasonCode, /** @type {any} */ degradedReason) => {
                     if (!tableNames.includes(TABLE_NAME)) {
                         return finalizeResult({
                             query,
@@ -1347,9 +1356,10 @@ export async function ragQuery(options = {}) {
                     let results = [];
                     try {
                         const table = await db.openTable(TABLE_NAME);
-                        results = await lexicalSearch(table, query, { topK: fetchTopK, filters });
+                        results = /** @type {any[]} */ (await lexicalSearch(table, query, { topK: fetchTopK, filters }));
                     } catch (lexicalError) {
-                        console.warn(`[RAG] Lexical fallback failed: ${lexicalError?.message || lexicalError}`);
+                        const _ce = /** @type {any} */ (lexicalError);
+                        console.warn(`[RAG] Lexical fallback failed: ${_ce?.message || _ce}`);
                     }
                     return finalizeResult({
                         query,
@@ -1423,12 +1433,13 @@ export async function ragQuery(options = {}) {
                         results,
                     });
                 } catch (error) {
-                    const reasonCode = classifyRagReasonCode(error);
-                    if (mode === 'auto' && degradedModeEnabled && shouldDegrade(error)) {
-                        return lexicalOnly(reasonCode, String(error?.message || 'Embedding backend unavailable'));
+                    const _ce = /** @type {any} */ (error);
+                    const reasonCode = classifyRagReasonCode(_ce);
+                    if (mode === 'auto' && degradedModeEnabled && shouldDegrade(_ce)) {
+                        return lexicalOnly(reasonCode, String(_ce?.message || 'Embedding backend unavailable'));
                     }
-                    error.reason_code = reasonCode;
-                    throw error;
+                    _ce.reason_code = reasonCode;
+                    throw _ce;
                 }
             } finally {
                 // Always close database connection, even on error (prevents resource leak)
@@ -1437,6 +1448,7 @@ export async function ragQuery(options = {}) {
                         await db.close();
                         dbClosed = true;
                     } catch (_) {
+                        const _ce = /** @type {any} */ (_);
                         // ignore close errors
                     }
                 }
@@ -1460,8 +1472,8 @@ export async function ragQuery(options = {}) {
  * @param {string} [options.pathPrefix] - Filter by path prefix
  * @param {string} [options.ext] - Filter by file extension
  * @param {string[]} [options.tags] - Filter by tags
- * @param {object|array} [options.distanceRange] - Min/max distance range
- * @param {object} [options.paths] - Caminhos customizados de índice
+ * @param {any} [options.distanceRange] - Min/max distance range
+ * @param {any} [options.paths] - Caminhos customizados de índice
  * @param {string} [options.profile] - Perfil de busca
  * @param {string} [options.mode] - Modo de busca (`auto|lexical-only`)
  * @param {boolean} [options.degradedModeEnabled] - Permite fallback degradado
@@ -1484,10 +1496,10 @@ export async function ragQuery(options = {}) {
  * @param {number} [options.after_lines] - Alias snake_case de afterLines
  * @param {string} [options.root] - Root path explícito para auto expansão
  * @param {boolean} [options.rerank] - Enable reranking (default: true)
- * @param {object} [options.rerankWeights] - Custom rerank weights
+ * @param {any} [options.rerankWeights] - Custom rerank weights
  * @param {boolean} [options.mmr] - Enable MMR diversity (default: true)
  * @param {number} [options.mmrLambda] - MMR lambda (default: 0.7)
- * @returns {Promise<object>} - Search results + metadata
+ * @returns {Promise<any>} - Search results + metadata
  */
 export async function ragHybridSearch(options = {}) {
     return await withTimeout(
@@ -1530,7 +1542,7 @@ export async function ragHybridSearch(options = {}) {
             const requestedTopK = normalizeTopK(topK, 8);
             const fetchTopK = intentScope === 'all' ? requestedTopK : Math.min(requestedTopK * 4, 80);
 
-            /** @param {object} base */
+            /** @param {any} base */
             const finalizeResult = async base => {
                 const decorated = decorateResultsWithSourceMetadata(base.results || [], manifest);
                 const scoped = applyIntentScopePolicy(decorated, intentScope, requestedTopK);
@@ -1576,7 +1588,7 @@ export async function ragHybridSearch(options = {}) {
                 const filters = { pathPrefix, ext, tags };
                 const tableNames = await db.tableNames();
 
-                const runLexical = async (reasonCode, degradedReason) => {
+                const runLexical = async (/** @type {any} */ reasonCode, /** @type {any} */ degradedReason) => {
                     if (!tableNames.includes(TABLE_NAME)) {
                         return finalizeResult({
                             results: [],
@@ -1602,9 +1614,10 @@ export async function ragHybridSearch(options = {}) {
                     let results = [];
                     try {
                         const table = await db.openTable(TABLE_NAME);
-                        results = await lexicalSearch(table, queryText, { topK: fetchTopK, filters });
+                        results = /** @type {any[]} */ (await lexicalSearch(table, queryText, { topK: fetchTopK, filters }));
                     } catch (lexicalError) {
-                        console.warn(`[RAG] Lexical fallback failed: ${lexicalError?.message || lexicalError}`);
+                        const _ce = /** @type {any} */ (lexicalError);
+                        console.warn(`[RAG] Lexical fallback failed: ${_ce?.message || _ce}`);
                     }
                     return finalizeResult({
                         results,
@@ -1692,12 +1705,13 @@ export async function ragHybridSearch(options = {}) {
                         mmrLambda,
                     });
                 } catch (error) {
-                    const reasonCode = classifyRagReasonCode(error);
-                    if (mode === 'auto' && degradedModeEnabled && shouldDegrade(error)) {
-                        return runLexical(reasonCode, String(error?.message || 'Embedding backend unavailable'));
+                    const _ce = /** @type {any} */ (error);
+                    const reasonCode = classifyRagReasonCode(_ce);
+                    if (mode === 'auto' && degradedModeEnabled && shouldDegrade(_ce)) {
+                        return runLexical(reasonCode, String(_ce?.message || 'Embedding backend unavailable'));
                     }
-                    error.reason_code = reasonCode;
-                    throw error;
+                    _ce.reason_code = reasonCode;
+                    throw _ce;
                 }
             } finally {
                 // Always close database connection, even on error (prevents resource leak)
@@ -1706,6 +1720,7 @@ export async function ragHybridSearch(options = {}) {
                         await db.close();
                         dbClosed = true;
                     } catch (_) {
+                        const _ce = /** @type {any} */ (_);
                         // ignore close errors
                     }
                 }
@@ -1716,13 +1731,13 @@ export async function ragHybridSearch(options = {}) {
     );
 }
 
-export async function ragAsk(options = {}) {
+export async function ragAsk(/** @type {any} */ options = {}) {
     const result = await ragQuery(options);
     const markdown = formatMarkdownResults(result);
     return { markdown, result };
 }
 
-export async function ragReset(options = {}) {
+export async function ragReset(/** @type {any} */ options = {}) {
     const paths = getRagPaths(options.paths);
     if (!options.yes) {
         throw new Error(
@@ -1738,7 +1753,7 @@ export async function ragReset(options = {}) {
 /**
  * Get query embedding cache statistics
  * Useful for monitoring cache performance and hit rates
- * @returns {object} - Cache stats { size, maxSize, hits, misses, hitRate }
+ * @returns {any} - Cache stats { size, maxSize, hits, misses, hitRate }
  *
  * @example
  * const stats = getRagCacheStats();
@@ -1749,7 +1764,7 @@ export function getRagCacheStats() {
     return queryEmbedCache.getStats();
 }
 
-export async function ragExpand(options = {}) {
+export async function ragExpand(/** @type {any} */ options = {}) {
     const paths = getRagPaths(options.paths);
     await ensureDirs(paths);
 
@@ -1774,7 +1789,7 @@ export async function ragExpand(options = {}) {
     const db = await openDb(paths.dbDir);
     let dbClosed = false;
     try {
-        const tableNames = await db.tableNames().catch(() => []);
+        const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => []));
         if (!tableNames.includes(TABLE_NAME)) {
             return buildStructuredExpandError(
                 'INDEX_NOT_FOUND',
@@ -1787,7 +1802,7 @@ export async function ragExpand(options = {}) {
         }
 
         const table = await db.openTable(TABLE_NAME);
-        const chunk = await getChunkById(table, chunkId);
+        const chunk = /** @type {any} */ (await getChunkById(table, chunkId));
         if (!chunk) {
             return buildStructuredExpandError('CHUNK_NOT_FOUND', 'chunk_id not found in index', {
                 chunk_id: chunkId,
@@ -1807,7 +1822,7 @@ export async function ragExpand(options = {}) {
         if (mode === 'symbol' && chunk.symbol) {
             const safePath = String(chunk.path).replace(/'/g, "''");
             const rows = await table.query().where(`path = '${safePath}'`).limit(10000).toArray();
-            const sameSymbol = rows.filter(row => String(row.symbol || '') === String(chunk.symbol));
+            const sameSymbol = rows.filter((/** @type {any} */ row) => String(row.symbol || '') === String(chunk.symbol));
             if (sameSymbol.length > 0) {
                 baseStartLine = sameSymbol.reduce(
                     (min, row) => Math.min(min, Number(row.start_line || min)),
@@ -1859,7 +1874,8 @@ export async function ragExpand(options = {}) {
             text: expandedSlice.text,
         };
     } catch (error) {
-        return buildStructuredExpandError('RAG_EXPAND_FAILED', String(error?.message || error), {
+        const _ce = /** @type {any} */ (error);
+        return buildStructuredExpandError('RAG_EXPAND_FAILED', String(_ce?.message || _ce), {
             chunk_id: chunkId,
             mode,
         });
@@ -1875,7 +1891,7 @@ export async function ragExpand(options = {}) {
     }
 }
 
-export async function getRagStorageStats(options = {}) {
+export async function getRagStorageStats(/** @type {any} */ options = {}) {
     const paths = getRagPaths(options.paths);
     await ensureDirs(paths);
     const manifest = (await loadManifest(paths)) || createEmptyManifest();
@@ -1883,7 +1899,7 @@ export async function getRagStorageStats(options = {}) {
     let dbClosed = false;
 
     try {
-        const tableNames = await db.tableNames().catch(() => []);
+        const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => []));
         if (!tableNames.includes(TABLE_NAME)) {
             return {
                 table_name: TABLE_NAME,
@@ -1896,7 +1912,7 @@ export async function getRagStorageStats(options = {}) {
         }
 
         const table = await db.openTable(TABLE_NAME);
-        const chunkStats = await getChunkStats(table);
+        const chunkStats = /** @type {any} */ (await getChunkStats(table));
         return {
             table_name: TABLE_NAME,
             table_exists: true,
@@ -1918,25 +1934,26 @@ export async function getRagStorageStats(options = {}) {
     }
 }
 
-export async function getRagIndexStatus(options = {}) {
+export async function getRagIndexStatus(/** @type {any} */ options = {}) {
     const paths = getRagPaths(options.paths);
     await ensureDirs(paths);
     const manifest = (await loadManifest(paths)) || createEmptyManifest();
     return buildIndexStatus(manifest);
 }
 
-async function canWrite(dirPath) {
+async function canWrite(/** @type {any} */ dirPath) {
     try {
         const testFile = path.join(dirPath, `.write_test_${process.pid}_${Date.now()}`);
         await fs.writeFile(testFile, 'ok', 'utf8');
         await fs.unlink(testFile);
         return true;
     } catch (_) {
+        const _ce = /** @type {any} */ (_);
         return false;
     }
 }
 
-function computeExt(relPath) {
+function computeExt(/** @type {any} */ relPath) {
     const base = path.posix.basename(relPath);
     if (base === 'Dockerfile' || base.toLowerCase().endsWith('.dockerfile')) return '.dockerfile';
     if (base === 'Makefile') return 'Makefile';
@@ -1945,7 +1962,7 @@ function computeExt(relPath) {
     return ext || base;
 }
 
-async function rmContents(dirPath) {
+async function rmContents(/** @type {any} */ dirPath) {
     const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => []);
     for (const ent of entries) {
         const full = path.join(dirPath, ent.name);

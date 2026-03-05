@@ -1,3 +1,4 @@
+// @ts-check
 #!/usr/bin/env node
 import './lib/env-bootstrap.mjs';
 import path from 'node:path';
@@ -98,6 +99,7 @@ async function watchTree(rootAbs, onFsEvent, watchers, relDir = '') {
         });
         watchers.set(absDir, watcher);
     } catch (error) {
+        const _ce = /** @type {any} */ (error);
         console.warn(`[RAG Watch] failed to watch ${absDir}: ${error?.message || error}`);
     }
 
@@ -176,7 +178,7 @@ async function main() {
         },
     });
 
-    const onFsEvent = ({ eventType, relPath, relDir }) => {
+    const onFsEvent = (/** @type {any} */ { eventType, relPath, relDir }) => {
         if (!relPath) {
             return;
         }

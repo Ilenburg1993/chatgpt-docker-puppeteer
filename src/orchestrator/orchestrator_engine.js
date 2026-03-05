@@ -9,8 +9,8 @@ import { ValidationService } from './validation/validation_service.js';
 /**
  * Opções do construtor do OrchestratorEngine.
  * @typedef {object} OrchestratorEngineOptions
- * @property {object} nerv - Instância do sistema NERV.
- * @property {ContextManager} [contextManager] - Gerenciador de contexto opcional.
+ * @property {any} nerv - Instância do sistema NERV.
+ * @property {ContextManager|null} [contextManager] - Gerenciador de contexto opcional.
  */
 
 /**
@@ -72,7 +72,7 @@ class OrchestratorEngine {
 
     /**
      * Verifica se task precisa de orquestração especial baseada na estratégia de execução.
-     * @param {object} task - Task V5 com spec.execution.strategy.
+     * @param {any} task - Task V5 com spec.execution.strategy.
      * @returns {boolean} True se a estratégia for ITERATIVE ou MULTI_STEP.
      */
     shouldOrchestrate(task) {
@@ -88,8 +88,8 @@ class OrchestratorEngine {
      * Para estratégias MULTI_STEP: inicializa workflow state com steps e progresso.
      * Emite evento NERV 'ORCHESTRATION_STARTED' para observabilidade.
      *
-     * @param {object} task - Task V5 com spec.execution.strategy
-     * @returns {Promise<object>} - Task modificada com estado inicializado (immutable se frozen)
+     * @param {any} task - Task V5 com spec.execution.strategy
+     * @returns {Promise<any>} - Task modificada com estado inicializado (immutable se frozen)
      * @throws {Error} - Se task.spec.execution.strategy for inválido
      * @sideEffects - Emite evento NERV 'ORCHESTRATION_STARTED'
      */
@@ -130,9 +130,9 @@ class OrchestratorEngine {
      * Retorna uma nova task com `state` atualizado, sem mutar o objeto original.
      * (algumas tasks chegam como snapshots congelados)
      *
-     * @param {object} task
-     * @param {object} statePatch
-     * @returns {object}
+     * @param {any} task
+     * @param {any} statePatch
+     * @returns {any}
      */
 
     _withState(task, statePatch) {
@@ -171,9 +171,9 @@ class OrchestratorEngine {
      * Para MULTI_STEP: executa próximo step do workflow.
      * Estratégias não implementadas caem para SINGLE_SHOT com warning.
      *
-     * @param {object} task - Task V5 com estado atualizado
-     * @param {object} executionResult - Resultado da execução do Driver (com sucesso/erro)
-     * @returns {Promise<object>} - Decision com { action: 'DONE'|'RETRY'|'NEXT_STEP', task, feedback }
+     * @param {any} task - Task V5 com estado atualizado
+     * @param {any} executionResult - Resultado da execução do Driver (com sucesso/erro)
+     * @returns {Promise<any>} - Decision com { action: 'DONE'|'RETRY'|'NEXT_STEP', task, feedback }
      * @throws {Error} - Se estratégia for inválida ou handlers falharem
      * @sideEffects - Emite eventos NERV 'ORCHESTRATION_COMPLETED' ou warnings no log
      */
@@ -222,8 +222,8 @@ class OrchestratorEngine {
      * Registra iteração ativa no mapa interno para tracking.
      *
      * @private
-     * @param {object} task - Task V5 com spec.execution.iterative_config
-     * @returns {object} - Task com iteration_state inicializado (immutable)
+     * @param {any} task - Task V5 com spec.execution.iterative_config
+     * @returns {any} - Task com iteration_state inicializado (immutable)
      * @sideEffects - Adiciona entrada no activeIterations Map
      */
     _initializeIterationState(task) {
@@ -256,8 +256,8 @@ class OrchestratorEngine {
      * Atualiza task.state apenas se não existir workflow_state.
      *
      * @private
-     * @param {object} task - Task V5 com spec.execution.workflow_config
-     * @returns {Promise<object>} - Task com workflow_state inicializado (immutable)
+     * @param {any} task - Task V5 com spec.execution.workflow_config
+     * @returns {Promise<any>} - Task com workflow_state inicializado (immutable)
      * @sideEffects - Adiciona entrada no activeWorkflows Map e inicializa contexto no ContextManager
      */
     async _initializeWorkflowState(task) {
@@ -327,9 +327,9 @@ class OrchestratorEngine {
      * Emite eventos NERV para observabilidade e limpa estado quando finaliza.
      *
      * @private
-     * @param {object} task - Task V5 com estado de iteração
-     * @param {object} executionResult - Resultado da execução com output para validação
-     * @returns {Promise<object>} - Decision { action: 'DONE'|'RETRY', task, feedback }
+     * @param {any} task - Task V5 com estado de iteração
+     * @param {any} executionResult - Resultado da execução com output para validação
+     * @returns {Promise<any>} - Decision { action: 'DONE'|'RETRY', task, feedback }
      * @throws {Error} - Se iteration state não for encontrado
      * @sideEffects - Emite eventos NERV, atualiza activeIterations Map, chama ValidationService
      */
@@ -458,9 +458,9 @@ class OrchestratorEngine {
      * Usa ContextManager para contexto avançado e emite eventos NERV.
      *
      * @private
-     * @param {object} task - Task V5 com estado de workflow
-     * @param {object} executionResult - Resultado da execução do step atual
-     * @returns {Promise<object>} - Decision { action: 'DONE'|'NEXT_STEP', task, feedback, nextStep? }
+     * @param {any} task - Task V5 com estado de workflow
+     * @param {any} executionResult - Resultado da execução do step atual
+     * @returns {Promise<any>} - Decision { action: 'DONE'|'NEXT_STEP', task, feedback, nextStep? }
      * @throws {Error} - Se workflow state não for encontrado
      * @sideEffects - Atualiza activeWorkflows Map, chama ContextManager, emite eventos NERV
      */
@@ -583,8 +583,8 @@ class OrchestratorEngine {
      * para guiar a próxima tentativa do modelo.
      *
      * @private
-     * @param {object} iterationState - Estado da iteração atual
-     * @param {object} validationResult - Resultado da validação com score e issues
+     * @param {any} iterationState - Estado da iteração atual
+     * @param {any} validationResult - Resultado da validação com score e issues
      * @returns {string} - Prompt de feedback formatado para injeção
      */
     _buildIterationFeedback(iterationState, validationResult) {
@@ -599,7 +599,7 @@ class OrchestratorEngine {
         for (const result of validationResult.validation_results) {
             if (result.suggestions && result.suggestions.length > 0) {
                 feedbackParts.push(`Suggestions from ${result.validator_type}:`);
-                feedbackParts.push(...result.suggestions.map(s => `  - ${s}`));
+                feedbackParts.push(...result.suggestions.map((/** @type {any} */ s) => `  - ${s}`));
             }
         }
 
@@ -616,8 +616,8 @@ class OrchestratorEngine {
      * Usa hybrid search com reranking e MMR para contexto relevante.
      *
      * @private
-     * @param {object} step - Step configuration com prompt e config
-     * @param {object} accumulated_context - Map de step_id -> output acumulado
+     * @param {any} step - Step configuration com prompt e config
+     * @param {any} accumulated_context - Map de step_id -> output acumulado
      * @param {string|null} workflow_id - ID do workflow para contexto avançado
      * @returns {Promise<string>} - Prompt enriquecido com contexto
      * @throws {Error} - Se RAG falhar (graceful degradation)
@@ -644,7 +644,7 @@ class OrchestratorEngine {
             // Adiciona outputs recentes (se houver e diferentes do accumulated_context)
             if (context && context.steps && context.steps.length > 0) {
                 const recentOutputs = context.steps
-                    .map(s => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`)
+                    .map((/** @type {any} */ s) => `Step ${s.step_id}: ${s.output.substring(0, 200)}...`)
                     .join('\n');
                 prompt += `\n\n[RECENT STEPS]:\n${recentOutputs}`;
             }
@@ -660,18 +660,18 @@ class OrchestratorEngine {
                 logger.debug(`[OrchestratorEngine] Auto-injecting RAG context for query: "${ragQuery}"`);
 
                 // Buscar contexto (hybrid search com reranking + MMR)
-                const ragResult = await ragHybridSearch({
+                const ragResult = /** @type {any} */ (await ragHybridSearch({
                     query: ragQuery,
                     topK: 3, // Limit to 3 chunks to avoid token bloat
                     rerank: true,
                     mmr: true,
                     mmrLambda: 0.7,
-                });
+                }));
 
                 if (ragResult.results && ragResult.results.length > 0) {
                     // Formatar contexto como markdown
                     const contextMd = ragResult.results
-                        .map((r, i) => {
+                        .map((/** @type {any} */ r, /** @type {any} */ i) => {
                             const preview = r.text.length > 400 ? r.text.substring(0, 400) + '...' : r.text;
                             return `### [${i + 1}] ${r.path}:${r.start_line}-${r.end_line}\n\`\`\`${r.language || 'text'}\n${preview}\n\`\`\``;
                         })
@@ -683,7 +683,8 @@ class OrchestratorEngine {
                     logger.info(`[OrchestratorEngine] ✓ RAG context injected (${ragResult.results.length} chunks)`);
                 }
             } catch (err) {
-                logger.warn(`[OrchestratorEngine] RAG auto-injection failed: ${err.message}`);
+                const _err = /** @type {any} */ (err);
+                logger.warn(`[OrchestratorEngine] RAG auto-injection failed: ${_err.message}`);
                 // Continuar sem RAG se falhar (graceful degradation)
             }
         }
@@ -785,7 +786,7 @@ class OrchestratorEngine {
      *
      * @private
      * @param {string} actionCode - Código da ação (ex: 'ORCHESTRATION_STARTED')
-     * @param {object} payload - Dados do evento
+     * @param {any} payload - Dados do evento
      * @returns {Promise<void>}
      * @sideEffects - Emite evento via NERV system
      */
@@ -805,12 +806,13 @@ class OrchestratorEngine {
         // Production adapters: emit canonical envelopes.
         if (typeof this.nerv.emitEvent === 'function') {
             try {
-                const code = ActionCode[actionCode] || actionCode;
+                const code = /** @type {any} */ (ActionCode)[actionCode] || actionCode;
                 await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, code, payload); // ✅ P1-4: Added await
             } catch (e) {
-                logger.error('[OrchestratorEngine] Falha ao emitir evento NERV:', e.message);
+                const _e = /** @type {any} */ (e);
+                logger.error('[OrchestratorEngine] Falha ao emitir evento NERV:', _e.message);
                 // ✅ P1-4: Re-throw para que caller saiba da falha
-                throw e;
+                throw _e;
             }
         }
     }

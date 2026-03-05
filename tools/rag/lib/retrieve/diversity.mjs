@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * MMR (Maximal Marginal Relevance) for result diversification
  * Promotes results from different files/locations
@@ -13,7 +14,7 @@
  * @param {number} [options.topK] - Number of results to return (default: 8)
  * @returns {object[]} - Diversified results
  */
-export function maximalMarginalRelevance(results, options = {}) {
+export function maximalMarginalRelevance(/** @type {any} */ results, /** @type {any} */ options = {}) {
     const {
         lambda = 0.7, // 1.0 = only relevance, 0.0 = only diversity
         topK = 8,
@@ -65,11 +66,11 @@ export function maximalMarginalRelevance(results, options = {}) {
 /**
  * Calculate similarity between two results
  * Higher similarity = more redundant (same file, close line numbers)
- * @param {object} a - First result
- * @param {object} b - Second result
+ * @param {any} a - First result
+ * @param {any} b - Second result
  * @returns {number} - Similarity score [0, 1] (1 = identical, 0 = completely different)
  */
-function calculateSimilarity(a, b) {
+function calculateSimilarity(/** @type {any} */ a, /** @type {any} */ b) {
     // Path similarity
     const pathSim = a.path === b.path ? 1.0 : 0.0;
 

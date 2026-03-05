@@ -1,3 +1,4 @@
+// @ts-check
 import { normalizeContentClass, normalizeIntentScope } from '../content_class.mjs';
 
 /**
@@ -12,10 +13,10 @@ import { normalizeContentClass, normalizeIntentScope } from '../content_class.mj
  * @param {string} query - Original query text
  * @param {object} options - Reranking options
  * @param {'code-first'|'docs-first'|'all'} [options.intentScope] - Ranking bias by content class
- * @param {object} [options.weights] - Weight for each signal (default: semantic=0.5, lexical=0.2, recency=0.1, fileType=0.1, length=0.05, position=0.05)
+ * @param {any} [options.weights] - Weight for each signal (default: semantic=0.5, lexical=0.2, recency=0.1, fileType=0.1, length=0.05, position=0.05)
  * @returns {object[]} - Reranked results with rerank_score and rerank_signals
  */
-export function rerank(results, query, options = {}) {
+export function rerank(/** @type {any} */ results, /** @type {any} */ query, /** @type {any} */ options = {}) {
     const {
         intentScope: rawIntentScope = 'all',
         weights = {
@@ -36,14 +37,14 @@ export function rerank(results, query, options = {}) {
 
     // Find max indexed_at for recency calculation (convert BigInt to Number)
     const maxIndexedAt = Math.max(
-        ...results.map(r => {
+        ...results.map((/** @type {any} */ r) => {
             const ts = r.indexed_at;
             return ts ? Number(ts) : 0;
         })
     );
 
     // Calculate rerank score for each result
-    const scored = results.map(r => {
+    const scored = results.map((/** @type {any} */ r) => {
         let score = 0;
         const signals = {};
 
@@ -54,7 +55,7 @@ export function rerank(results, query, options = {}) {
 
         // 2. Lexical score (exact token matches)
         const text = r.text.toLowerCase();
-        const exactMatches = queryTokens.filter(t => text.includes(t)).length;
+        const exactMatches = queryTokens.filter((/** @type {any} */ t) => text.includes(t)).length;
         const lexicalScore = queryTokens.length > 0 ? exactMatches / queryTokens.length : 0;
         score += weights.lexical * lexicalScore;
         signals.lexical = lexicalScore.toFixed(3);
@@ -111,7 +112,7 @@ export function rerank(results, query, options = {}) {
     });
 
     // Sort by rerank_score (descending)
-    scored.sort((a, b) => b.rerank_score - a.rerank_score);
+    scored.sort((/** @type {any} */ a, /** @type {any} */ b) => b.rerank_score - a.rerank_score);
 
     return scored;
 }
@@ -122,9 +123,9 @@ export function rerank(results, query, options = {}) {
  * @param {string} text - Text to tokenize
  * @returns {string[]} - Tokens
  */
-function tokenize(text) {
+function tokenize(/** @type {any} */ text) {
     return text
         .split(/\s+/)
-        .filter(t => t.length > 2) // Ignore very short tokens
-        .map(t => t.replace(/[^\w]/g, '')); // Strip punctuation
+        .filter((/** @type {any} */ t) => t.length > 2) // Ignore very short tokens
+        .map((/** @type {any} */ t) => t.replace(/[^\w]/g, '')); // Strip punctuation
 }

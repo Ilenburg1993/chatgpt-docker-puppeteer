@@ -29,28 +29,29 @@
  */
 export async function withTimeout(operation, timeoutMs, timeoutMessage = 'Operation timed out') {
     const controller = new AbortController();
+    /** @type {ReturnType<typeof setTimeout> | null} */
     let timeoutId = null;
 
     try {
         const timeoutPromise = new Promise((_, reject) => {
             timeoutId = setTimeout(() => {
                 controller.abort(timeoutMessage);
-                const error = new Error(timeoutMessage);
+                const error = /** @type {any} */ (new Error(timeoutMessage));
                 error.code = 'TIMEOUT';
                 error.timeoutMs = timeoutMs;
                 reject(error);
             }, timeoutMs);
         });
 
-        const result = await Promise.race([operation(), timeoutPromise]);
+        const result = await /** @type {Promise<any>} */ (Promise.race([operation(), timeoutPromise]));
 
         // Clear timeout on success
-        clearTimeout(timeoutId);
+        if (timeoutId !== null) clearTimeout(timeoutId);
 
         return result;
     } catch (err) {
         // Ensure timeout is cleared even on error
-        clearTimeout(timeoutId);
+        if (timeoutId !== null) clearTimeout(timeoutId);
         controller.abort('operation_failed');
         throw err;
     } finally {
@@ -81,6 +82,7 @@ export async function withTimeout(operation, timeoutMs, timeoutMessage = 'Operat
  */
 export async function withAbort(operation, timeoutMs, timeoutMessage = 'Operation aborted') {
     const controller = new AbortController();
+    /** @type {ReturnType<typeof setTimeout> | null} */
     let timeoutId = null;
 
     try {
@@ -88,15 +90,15 @@ export async function withAbort(operation, timeoutMs, timeoutMessage = 'Operatio
             controller.abort(timeoutMessage);
         }, timeoutMs);
 
-        const result = await operation(controller.signal);
+        const result = await /** @type {Promise<any>} */ (operation(controller.signal));
 
         // Clear timeout on success
-        clearTimeout(timeoutId);
+        if (timeoutId !== null) clearTimeout(timeoutId);
 
         return result;
     } catch (err) {
         // Ensure timeout is cleared even on error
-        clearTimeout(timeoutId);
+        if (timeoutId !== null) clearTimeout(timeoutId);
         controller.abort('operation_failed');
         throw err;
     } finally {
@@ -125,6 +127,7 @@ export async function withAbort(operation, timeoutMs, timeoutMessage = 'Operatio
  */
 export function createSharedTimeout(timeoutMs, timeoutMessage = 'Operation timed out') {
     const controller = new AbortController();
+    /** @type {ReturnType<typeof setTimeout> | null} */
     let timeoutId = null;
     let promiseResolved = false;
 
@@ -132,7 +135,7 @@ export function createSharedTimeout(timeoutMs, timeoutMessage = 'Operation timed
         timeoutId = setTimeout(() => {
             promiseResolved = true;
             controller.abort(timeoutMessage);
-            const error = new Error(timeoutMessage);
+            const error = /** @type {any} */ (new Error(timeoutMessage));
             error.code = 'TIMEOUT';
             error.timeoutMs = timeoutMs;
             reject(error);
@@ -176,7 +179,7 @@ export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 
 
     try {
         for (const operation of operations) {
-            const result = await Promise.race([operation(), timeoutPromise]);
+            const result = await /** @type {Promise<any>} */ (Promise.race([operation(), timeoutPromise]));
             results.push(result);
         }
         return results;
@@ -187,7 +190,10 @@ export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 
 
 /**
  * @typedef {object} WithRetryOptions
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {number} [maxRetries] - Max retry attempts
+ * @property {number} [timeoutMs] - Timeout per attempt
+ * @property {number} [backoffMs] - Backoff delay
+ * @property {function} [shouldRetry] - Predicate to decide retry
  */
 /**
  * Executes an operation with retries and timeout per attempt.
@@ -210,7 +216,8 @@ export async function withSharedTimeout(operations, timeoutMs, timeoutMessage = 
  * );
  */
 export async function withRetry(operation, options = {}) {
-    const { maxRetries = 3, timeoutMs = 5000, backoffMs = 100, shouldRetry = () => true } = options;
+    const _opts = /** @type {any} */ (options);
+    const { maxRetries = 3, timeoutMs = 5000, backoffMs = 100, shouldRetry = () => true } = _opts;
 
     let lastError = null;
 
@@ -232,7 +239,7 @@ export async function withRetry(operation, options = {}) {
     }
 
     // All retries failed
-    const error = new Error(`Operation failed after ${maxRetries + 1} attempts`);
+    const error = /** @type {any} */ (new Error(`Operation failed after ${maxRetries + 1} attempts`));
     error.code = 'MAX_RETRIES_EXCEEDED';
     error.lastError = lastError;
     error.attempts = maxRetries + 1;
@@ -256,12 +263,13 @@ export async function withRetry(operation, options = {}) {
  * }
  */
 export function isAbortError(error) {
-    return (
-        error &&
-        (error.name === 'AbortError' ||
-            error.code === 'ABORT_ERR' ||
-            error.code === 'TIMEOUT' ||
-            (error.message && error.message.includes('abort')))
+    const _e = /** @type {any} */ (error);
+    return !!(
+        _e &&
+        (_e.name === 'AbortError' ||
+            _e.code === 'ABORT_ERR' ||
+            _e.code === 'TIMEOUT' ||
+            (_e.message && _e.message.includes('abort')))
     );
 }
 

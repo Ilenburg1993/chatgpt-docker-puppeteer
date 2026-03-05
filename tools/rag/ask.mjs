@@ -1,3 +1,4 @@
+// @ts-check
 import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
 import { ragAsk } from './lib/facade.mjs';

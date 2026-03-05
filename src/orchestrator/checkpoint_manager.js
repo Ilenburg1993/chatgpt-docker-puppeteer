@@ -125,12 +125,12 @@ class CheckpointManager {
 
             return checkpoint;
         } catch (error) {
-            if (error.code === 'ENOENT') {
+            if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 logger.warn(`[CheckpointManager] No checkpoint found for mission: ${missionId}`);
                 return null;
             }
 
-            logger.error(`[CheckpointManager] Error loading checkpoint for ${missionId}: ${error.message}`);
+            logger.error(`[CheckpointManager] Error loading checkpoint for ${missionId}: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
     }
@@ -149,7 +149,7 @@ class CheckpointManager {
             const data = await fs.readFile(checkpointPath, 'utf-8');
             return JSON.parse(data);
         } catch (error) {
-            if (error.code === 'ENOENT') {
+            if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return null;
             }
             throw error;
@@ -199,7 +199,7 @@ class CheckpointManager {
 
             return checkpoints;
         } catch (error) {
-            if (error.code === 'ENOENT') {
+            if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return [];
             }
             throw error;
@@ -219,9 +219,9 @@ class CheckpointManager {
             await fs.unlink(checkpointPath);
             logger.info(`[CheckpointManager] Checkpoint deleted: ${missionId}/${checkpointId}`);
         } catch (error) {
-            if (error.code !== 'ENOENT') {
+            if ((/** @type {any} */ (error)).code !== 'ENOENT') {
                 logger.error(
-                    `[CheckpointManager] Error deleting checkpoint ${missionId}/${checkpointId}: ${error.message}`
+                    `[CheckpointManager] Error deleting checkpoint ${missionId}/${checkpointId}: ${(/** @type {any} */ (error)).message}`
                 );
             }
         }
@@ -239,7 +239,7 @@ class CheckpointManager {
             await fs.rm(checkpointsDir, { recursive: true, force: true });
             logger.info(`[CheckpointManager] All checkpoints deleted: ${missionId}`);
         } catch (error) {
-            logger.error(`[CheckpointManager] Error deleting checkpoints for ${missionId}: ${error.message}`);
+            logger.error(`[CheckpointManager] Error deleting checkpoints for ${missionId}: ${(/** @type {any} */ (error)).message}`);
         }
     }
 
@@ -277,7 +277,7 @@ class CheckpointManager {
         const toDelete = checkpoints.slice(keepLast);
 
         for (const checkpoint of toDelete) {
-            await this.deleteCheckpoint(missionId, checkpoint.checkpoint_id);
+            await this.deleteCheckpoint(missionId, (/** @type {any} */ (checkpoint)).checkpoint_id);
         }
 
         logger.info(`[CheckpointManager] Cleaned up ${toDelete.length} old checkpoints for ${missionId}`);
@@ -289,7 +289,7 @@ class CheckpointManager {
      * @param {string} [missionId] - ID da missão (opcional, se omitido retorna stats globais)
      * @returns {Promise<object>} - Estatísticas
      */
-    async getStats(missionId = null) {
+    async getStats(/** @type {any} */ missionId = undefined) {
         if (missionId) {
             const checkpoints = await this.listCheckpoints(missionId);
             const hasLatest = await this.hasCheckpoint(missionId);

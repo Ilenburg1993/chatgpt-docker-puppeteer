@@ -1,4 +1,5 @@
-export function formatMarkdownResults(queryResult) {
+// @ts-check
+export function formatMarkdownResults(/** @type {any} */ queryResult) {
     const lines = [];
     lines.push(`# RAG Context`);
     lines.push('');

@@ -1,3 +1,4 @@
+// @ts-check
 import { connect, Index } from '@lancedb/lancedb';
 import { Schema, Field, Utf8, Int32, Int64, Float32, FixedSizeList, List, Bool } from 'apache-arrow';
 import { rerank } from '../retrieve/reranker.mjs';
@@ -7,11 +8,11 @@ import { withTimeout } from '../../../../src/infra/abort_controller_utils.js';
 
 export const TABLE_NAME = 'chunks_v2';
 
-export async function openDb(dbDir) {
+export async function openDb(/** @type {any} */ dbDir) {
     return connect(dbDir);
 }
 
-export function buildSchema(embeddingDim) {
+export function buildSchema(/** @type {any} */ embeddingDim) {
     return new Schema([
         new Field('chunk_id', new Utf8(), false),
         new Field('file_id', new Utf8(), false),
@@ -39,9 +40,8 @@ export function buildSchema(embeddingDim) {
     ]);
 }
 
-export async function ensureTable(db, embeddingDim) {
-    return await withTimeout(
-        async () => {
+export async function ensureTable(/** @type {any} */ db,  /** @type {any} */ embeddingDim) {
+    return await withTimeout(/** @type {any} */ async () => {
             const tables = await db.tableNames();
             if (tables.includes(TABLE_NAME)) {
                 return db.openTable(TABLE_NAME);
@@ -55,24 +55,24 @@ export async function ensureTable(db, embeddingDim) {
     );
 }
 
-export async function createFTSIndex(table) {
+export async function createFTSIndex(/** @type {any} */ table) {
     console.log('[RAG] Creating FTS index on "embed_text" column...');
     try {
         await table.createIndex('embed_text', { config: Index.fts() });
         console.log('[RAG] ✓ FTS index created successfully');
     } catch (err) {
-        if (err?.message && (err.message.includes('already exists') || err.message.includes('Index already exists'))) {
+        const _ce = /** @type {any} */ (err);
+        if (_ce?.message && (_ce.message.includes('already exists') || _ce.message.includes('Index already exists'))) {
             console.log('[RAG] FTS index already exists, skipping');
         } else {
-            console.error('[RAG] Failed to create FTS index:', err?.message || err);
+            console.error('[RAG] Failed to create FTS index:', _ce?.message || err);
             throw err;
         }
     }
 }
 
-export async function deleteByPath(table, relPath) {
-    return await withTimeout(
-        async () => {
+export async function deleteByPath(/** @type {any} */ table,  /** @type {any} */ relPath) {
+    return await withTimeout(/** @type {any} */ async () => {
             const safe = relPath.replace(/'/g, "''");
             await table.delete(`path = '${safe}'`);
         },
@@ -81,9 +81,8 @@ export async function deleteByPath(table, relPath) {
     );
 }
 
-export async function addChunks(table, rows, { batchSize = 32 } = {}) {
-    return await withTimeout(
-        async () => {
+export async function addChunks(/** @type {any} */ table, /** @type {any} */ rows, /** @type {any} */ { batchSize = 32 } = {}) {
+    return await withTimeout(/** @type {any} */ async () => {
             let total = 0;
             let retriedWithoutContentClass = false;
             for (let i = 0; i < rows.length; i += batchSize) {
@@ -92,12 +91,13 @@ export async function addChunks(table, rows, { batchSize = 32 } = {}) {
                 try {
                     await table.add(batch);
                 } catch (error) {
-                    const message = String(error?.message || '');
+                    const _ce = /** @type {any} */ (error);
+                    const message = String(_ce?.message || '');
                     const schemaCompatIssue = message.includes('content_class') || message.includes('Unknown column');
                     if (!schemaCompatIssue) {
                         throw error;
                     }
-                    const fallbackBatch = batch.map(({ content_class: _contentClass, ...rest }) => rest);
+                    const fallbackBatch = batch.map((/** @type {any} */ row) => { const { content_class: _contentClass, ...rest } = row; return rest; });
                     await table.add(fallbackBatch);
                     if (!retriedWithoutContentClass) {
                         retriedWithoutContentClass = true;
@@ -115,9 +115,8 @@ export async function addChunks(table, rows, { batchSize = 32 } = {}) {
     );
 }
 
-export async function getChunkById(table, chunkId) {
-    return await withTimeout(
-        async () => {
+export async function getChunkById(/** @type {any} */ table,  /** @type {any} */ chunkId) {
+    return await withTimeout(/** @type {any} */ async () => {
             const safe = String(chunkId || '').replace(/'/g, "''");
             const rows = await table.query().where(`chunk_id = '${safe}'`).limit(1).toArray();
             if (!rows.length) return null;
@@ -128,9 +127,8 @@ export async function getChunkById(table, chunkId) {
     );
 }
 
-export async function getChunkStats(table) {
-    return await withTimeout(
-        async () => {
+export async function getChunkStats(/** @type {any} */ table) {
+    return await withTimeout(/** @type {any} */ async () => {
             let chunkCount = null;
             const counters = ['countRows', 'count_rows', 'count'];
             for (const fn of counters) {
@@ -153,7 +151,7 @@ export async function getChunkStats(table) {
                 chunk_count: chunkCount,
                 has_rows: Boolean(sampleRow),
                 sample_has_v2_fields: sampleRow
-                    ? ['kind', 'symbol', 'header_text', 'embed_text', 'chunk_prev_id', 'chunk_next_id'].every(k =>
+                    ? ['kind', 'symbol', 'header_text', 'embed_text', 'chunk_prev_id', 'chunk_next_id'].every((/** @type {any} */ k) =>
                           Object.prototype.hasOwnProperty.call(sampleRow, k)
                       )
                     : null,
@@ -170,7 +168,7 @@ export async function getChunkStats(table) {
 /**
  * @param {{ pathPrefix?: string, ext?: string, tags?: string[] }} [filters]
  */
-function buildWhere({ pathPrefix, ext, tags } = {}) {
+function buildWhere(/** @type {any} */ { pathPrefix, ext, tags } = {}) {
     const parts = [];
     if (pathPrefix) {
         const safe = pathPrefix.replace(/'/g, "''");
@@ -191,9 +189,8 @@ function buildWhere({ pathPrefix, ext, tags } = {}) {
  * @param {number[]} vector
  * @param {{ topK?: number, filters?: { pathPrefix?: string, ext?: string, tags?: string[] }, distanceRange?: [number, number] | { min?: number, max?: number } }} [options]
  */
-export async function search(table, vector, { topK = 8, filters = {}, distanceRange } = {}) {
-    return await withTimeout(
-        async () => {
+export async function search(/** @type {any} */ table, /** @type {any} */ vector, /** @type {any} */ { topK = 8, filters = {}, distanceRange } = {}) {
+    return await withTimeout(/** @type {any} */ async () => {
             const where = buildWhere(filters);
             let q = table.search(vector);
 
@@ -211,10 +208,10 @@ export async function search(table, vector, { topK = 8, filters = {}, distanceRa
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter(r => Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t)));
+                filtered = rows.filter((/** @type {any} */ r) => Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)));
             }
 
-            filtered.sort((a, b) => {
+            filtered.sort((/** @type {any} */ a, /** @type {any} */ b) => {
                 const da = typeof a._distance === 'number' ? a._distance : 0;
                 const db = typeof b._distance === 'number' ? b._distance : 0;
                 if (da !== db) return da - db;
@@ -236,9 +233,8 @@ export async function search(table, vector, { topK = 8, filters = {}, distanceRa
  * @param {string} textQuery
  * @param {{ topK?: number, filters?: { pathPrefix?: string, ext?: string, tags?: string[] }, distanceRange?: [number, number] | { min?: number, max?: number }, rerank?: boolean, rerankWeights?: object, intentScope?: 'code-first'|'docs-first'|'all', mmr?: boolean, mmrLambda?: number }} [options]
  */
-export async function hybridSearch(table, vector, textQuery, options = {}) {
-    return await withTimeout(
-        async () => {
+export async function hybridSearch(/** @type {any} */ table, /** @type {any} */ vector, /** @type {any} */ textQuery, /** @type {any} */ options = {}) {
+    return await withTimeout(/** @type {any} */ async () => {
             const {
                 topK = 8,
                 filters = {},
@@ -270,10 +266,10 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter(r => Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t)));
+                filtered = rows.filter((/** @type {any} */ r) => Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)));
             }
 
-            filtered.sort((a, b) => {
+            filtered.sort((/** @type {any} */ a, /** @type {any} */ b) => {
                 const da = typeof a._distance === 'number' ? a._distance : 0;
                 const db = typeof b._distance === 'number' ? b._distance : 0;
                 if (da !== db) return da - db;
@@ -306,9 +302,8 @@ export async function hybridSearch(table, vector, textQuery, options = {}) {
     );
 }
 
-export async function lexicalSearch(table, textQuery, options = {}) {
-    return await withTimeout(
-        async () => {
+export async function lexicalSearch(/** @type {any} */ table,  /** @type {any} */ textQuery,  /** @type {any} */ options = {}) {
+    return await withTimeout(/** @type {any} */ async () => {
             const { topK = 8, filters = {} } = options;
 
             let q = table
@@ -324,10 +319,10 @@ export async function lexicalSearch(table, textQuery, options = {}) {
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter(r => Array.isArray(r.tags) && [...required].every(t => r.tags.includes(t)));
+                filtered = rows.filter((/** @type {any} */ r) => Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)));
             }
 
-            filtered.sort((a, b) => {
+            filtered.sort((/** @type {any} */ a, /** @type {any} */ b) => {
                 const sa = typeof a._score === 'number' ? a._score : 0;
                 const sb = typeof b._score === 'number' ? b._score : 0;
                 if (sa !== sb) return sb - sa;
@@ -336,7 +331,7 @@ export async function lexicalSearch(table, textQuery, options = {}) {
                 return String(a.chunk_id).localeCompare(String(b.chunk_id));
             });
 
-            return filtered.slice(0, topK).map(row => ({
+            return filtered.slice(0, topK).map((/** @type {any} */ row) => (/** @type {any} */ {
                 ...formatResult(row),
                 score: typeof row._score === 'number' ? row._score : 0,
             }));
@@ -346,7 +341,7 @@ export async function lexicalSearch(table, textQuery, options = {}) {
     );
 }
 
-function formatResult(row) {
+function formatResult(/** @type {any} */ row) {
     const indexedAtMs = normalizeIndexedAtMs(row.indexed_at);
     return {
         score: typeof row._distance === 'number' ? -row._distance : 0,
@@ -378,7 +373,7 @@ function formatResult(row) {
     };
 }
 
-function normalizeIndexedAtMs(value) {
+function normalizeIndexedAtMs(/** @type {any} */ value) {
     if (typeof value === 'bigint') return Number(value);
     if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
     if (typeof value === 'string' && value.trim()) {
@@ -388,13 +383,13 @@ function normalizeIndexedAtMs(value) {
     return null;
 }
 
-function toIsoSecond(epochMs) {
+function toIsoSecond(/** @type {any} */ epochMs) {
     const iso = new Date(epochMs).toISOString();
     return iso.replace(/\.\d{3}Z$/, 'Z');
 }
 
-function toLocalSecond(epochMs) {
+function toLocalSecond(/** @type {any} */ epochMs) {
     const d = new Date(epochMs);
-    const pad = n => String(n).padStart(2, '0');
+    const pad = (/** @type {any} */ n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }

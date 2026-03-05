@@ -22,7 +22,7 @@ const PATTERN_TYPE = {
  * @class
  */
 class MemoryStore {
-    constructor(options = {}) {
+    constructor(options = /** @type {any} */ ({})) {
         this.config = {
             maxSize: options.maxSize || 1000, // Max patterns armazenados
             persistToDisk: options.persistToDisk || false, // Persistir em disk (TODO)
@@ -37,6 +37,7 @@ class MemoryStore {
         }
 
         // Array de patterns
+        /** @type {any[]} */
         this.patterns = [];
 
         // Índice por tipo (para busca rápida)
@@ -56,7 +57,7 @@ class MemoryStore {
     /**
      * Adiciona pattern ao store
      */
-    addPattern(pattern) {
+    addPattern(/** @type {any} */ pattern) {
         // Valida pattern
         if (!pattern || !pattern.type || !pattern.content) {
             log('WARN', '[MemoryStore] Pattern inválido, ignorando');
@@ -95,7 +96,7 @@ class MemoryStore {
     /**
      * Busca patterns relevantes
      */
-    searchPatterns(query, limit = 5) {
+    searchPatterns(/** @type {any} */ query, limit = 5) {
         this.stats.total_searches++;
 
         // Se query é vazia, retorna patterns mais recentes
@@ -140,13 +141,13 @@ class MemoryStore {
     /**
      * Busca patterns por tipo
      */
-    getPatternsByType(type, limit = 10) {
+    getPatternsByType(/** @type {any} */ type, limit = 10) {
         const patternIds = this.indexByType.get(type) || [];
 
         const results = patternIds
             .slice(0, limit)
-            .map(id => this.patterns.find(p => p.id === id))
-            .filter(p => p !== undefined);
+            .map((/** @type {any} */ id) => this.patterns.find((/** @type {any} */ p) => p.id === id))
+            .filter((/** @type {any} */ p) => p !== undefined);
 
         return results;
     }
@@ -154,7 +155,7 @@ class MemoryStore {
     /**
      * Calcula relevância de um pattern para uma query
      */
-    _calculateRelevanceScore(pattern, keywords) {
+    _calculateRelevanceScore(/** @type {any} */ pattern, /** @type {any} */ keywords) {
         let score = 0;
 
         const contentLower = pattern.content.toLowerCase();
@@ -183,7 +184,7 @@ class MemoryStore {
     /**
      * Retorna patterns mais recentes
      */
-    _getMostRecent(limit) {
+    _getMostRecent(/** @type {any} */ limit) {
         // Stable ordering: insertion order is the source of truth for most-recent.
         // Using created_at can be non-deterministic when multiple patterns share the same ms timestamp.
         return this.patterns.slice(-limit).reverse();
@@ -249,6 +250,7 @@ class MemoryStore {
      * Limpa todos os patterns
      */
     clear() {
+        /** @type {any[]} */
         this.patterns = [];
         this.indexByType.clear();
         log('INFO', '[MemoryStore] Todos os patterns removidos');

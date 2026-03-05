@@ -1,3 +1,4 @@
+// @ts-check
 #!/usr/bin/env node
 import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';

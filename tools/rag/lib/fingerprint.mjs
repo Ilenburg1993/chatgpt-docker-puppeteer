@@ -1,7 +1,8 @@
+// @ts-check
 import crypto from 'node:crypto';
 import xxhashFactory from 'xxhash-wasm';
 
-let xxhashPromise = null;
+/** @type {any} */ let xxhashPromise = null;
 async function getXXHash() {
     if (!xxhashPromise) {
         xxhashPromise = xxhashFactory();
@@ -9,7 +10,7 @@ async function getXXHash() {
     return xxhashPromise;
 }
 
-export async function fingerprintBuffer(buf) {
+export async function fingerprintBuffer(/** @type {any} */ buf) {
     const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
     const { h64Raw } = await getXXHash();
     const raw = h64Raw(buf);

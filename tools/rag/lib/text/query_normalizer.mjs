@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Query normalization and expansion for better cache hits and semantic matching
  * Improves cache hit rate by normalizing similar queries to the same form
@@ -18,7 +19,7 @@
  * normalizeQuery("  CHROME_PROXY_PORT  ") === "chrome_proxy_port"
  * normalizeQuery("kernel  loop   20Hz") === "kernel loop 20hz"
  */
-export function normalizeQuery(query) {
+export function normalizeQuery(/** @type {any} */ query) {
     return query
         .toLowerCase() // Case-insensitive
         .trim() // Remove leading/trailing whitespace
@@ -36,7 +37,7 @@ export function normalizeQuery(query) {
  * @example
  * expandQuery("function timeout") => "function func fn method timeout delay wait"
  */
-export function expandQuery(query) {
+export function expandQuery(/** @type {any} */ query) {
     // Code-specific synonyms mapping
     const CODE_SYNONYMS = {
         function: ['func', 'fn', 'method'],
@@ -59,8 +60,8 @@ export function expandQuery(query) {
 
     // Add synonyms for each token
     for (const token of tokens) {
-        if (CODE_SYNONYMS[token]) {
-            CODE_SYNONYMS[token].forEach(syn => expanded.add(syn));
+        if ((/** @type {any} */ (CODE_SYNONYMS))[token]) {
+            (/** @type {any} */ (CODE_SYNONYMS))[token].forEach((/** @type {any} */ syn) => expanded.add(syn));
         }
     }
 
@@ -80,7 +81,7 @@ export function expandQuery(query) {
  * processQuery("  Function TIMEOUT  ", { expand: true })
  * // => "function func fn method timeout delay wait timer"
  */
-export function processQuery(query, options = {}) {
+export function processQuery(/** @type {any} */ query, /** @type {any} */ options = {}) {
     const { expand = false } = options;
 
     let processed = normalizeQuery(query);

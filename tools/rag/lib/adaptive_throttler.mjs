@@ -1,26 +1,27 @@
+// @ts-check
 import os from 'node:os';
 
-function clamp(value, min, max) {
+function clamp(/** @type {any} */ value,  /** @type {any} */ min,  /** @type {any} */ max) {
     return Math.min(max, Math.max(min, value));
 }
 
-function parseNumber(value, fallback) {
+function parseNumber(/** @type {any} */ value,  /** @type {any} */ fallback) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function parseIntSafe(value, fallback) {
+function parseIntSafe(/** @type {any} */ value, /** @type {any} */ fallback) {
     const parsed = Number.parseInt(String(value ?? ''), 10);
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function parseBoolean(value, fallback = true) {
+function parseBoolean(/** @type {any} */ value, /** @type {any} */ fallback = true) {
     if (typeof value === 'boolean') return value;
     if (value === undefined || value === null || value === '') return fallback;
     return String(value).trim().toLowerCase() !== 'false';
 }
 
-function resolveMetricMode(value, fallback = 'auto') {
+function resolveMetricMode(/** @type {any} */ value, /** @type {any} */ fallback = 'auto') {
     const normalized = String(value || fallback)
         .trim()
         .toLowerCase();
@@ -28,7 +29,7 @@ function resolveMetricMode(value, fallback = 'auto') {
     return 'auto';
 }
 
-function sumCpuTimes(cpus) {
+function sumCpuTimes(/** @type {any} */ cpus) {
     if (!Array.isArray(cpus) || cpus.length === 0) return null;
     let idle = 0;
     let total = 0;
@@ -50,7 +51,7 @@ function sumCpuTimes(cpus) {
  * Focuses on machine-wide stability while preserving throughput.
  */
 export class AdaptiveThrottler {
-    constructor(options = {}) {
+    constructor(/** @type {any} */ options = {}) {
         this.enabled = parseBoolean(options.enabled, true);
         this.metric = resolveMetricMode(options.metric, 'auto');
         this.targetCPU = clamp(parseNumber(options.targetCPU, 70), 20, 95);
@@ -65,12 +66,12 @@ export class AdaptiveThrottler {
         this.speedupFactor = clamp(parseNumber(options.speedupFactor, 0.92), 0.2, 0.99);
         this.logCooldownMs = clamp(parseIntSafe(options.logCooldownMs, 4000), 500, 120_000);
 
-        this.samples = [];
+        this.samples = /** @type {any[]} */ ([]);
         this.consecutiveHighCPU = 0;
         this.lastSampleAtMs = 0;
         this.lastLoggedAtMs = 0;
         this.lastCpuSource = 'none';
-        this.lastMeasuredCPU = null;
+        /** @type {any} */ (this).lastMeasuredCPU = null;
 
         this.prevProcessUsage = process.cpuUsage();
         this.prevProcessTimeNs = process.hrtime.bigint();
@@ -142,14 +143,14 @@ export class AdaptiveThrottler {
         }
 
         const { cpu, source } = this.measureCpuNow();
-        const resolved = Number.isFinite(cpu) ? cpu : (this.lastMeasuredCPU ?? 0);
+        const resolved = /** @type {any} */ (Number.isFinite(cpu) ? cpu : (this.lastMeasuredCPU ?? 0));
         this.lastMeasuredCPU = clamp(resolved, 0, 100);
         this.lastCpuSource = source || this.lastCpuSource;
         this.lastSampleAtMs = now;
         return this.lastMeasuredCPU;
     }
 
-    maybeLogAdjustment(action, avgCPU, oldDelay) {
+    maybeLogAdjustment(/** @type {any} */ action, /** @type {any} */ avgCPU, /** @type {any} */ oldDelay) {
         const now = Date.now();
         if (action === 'stable') return;
         if (now - this.lastLoggedAtMs < this.logCooldownMs) return;
@@ -174,7 +175,7 @@ export class AdaptiveThrottler {
         this.samples.push(cpu);
         if (this.samples.length > this.sampleSize) this.samples.shift();
 
-        const avgCPU = this.samples.reduce((a, b) => a + b, 0) / this.samples.length;
+        const avgCPU = this.samples.reduce(/** @type {any} */ (a, b) => a + b, 0) / this.samples.length;
         const highThreshold = this.targetCPU + this.highWatermark;
         const lowThreshold = Math.max(0, this.targetCPU - this.lowWatermark);
         const oldDelay = this.currentDelay;
@@ -211,7 +212,7 @@ export class AdaptiveThrottler {
      * Get current stats for reporting.
      */
     getStats() {
-        const avgCPU = this.samples.length > 0 ? this.samples.reduce((a, b) => a + b, 0) / this.samples.length : 0;
+        const avgCPU = this.samples.length > 0 ? this.samples.reduce(/** @type {any} */ (a, b) => a + b, 0) / this.samples.length : 0;
 
         return {
             enabled: this.enabled,
@@ -229,7 +230,7 @@ export class AdaptiveThrottler {
     }
 }
 
-export function createRagAdaptiveThrottler(options = {}) {
+export function createRagAdaptiveThrottler(/** @type {any} */ options = {}) {
     const mode = String(options.mode || 'full') === 'incremental' ? 'incremental' : 'full';
     const defaults =
         mode === 'incremental'
