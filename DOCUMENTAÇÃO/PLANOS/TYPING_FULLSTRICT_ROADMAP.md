@@ -67,7 +67,7 @@ O baseline real medido após a restauração está a seguir.
 | `src.core`              | 1.053 | Fase B  |
 | `src.agent`             | 1.190 | Fase B  |
 | `tests.legacy`          | 1.403 | Fase C  |
-| `src.kernel`            | 1.530 | Fase C  |
+| `src.kernel`            |     0 | ✅ Done |
 | `src.driver`            | 1.558 | Fase C  |
 | `src.infra`             | 2.232 | Fase C  |
 
@@ -328,7 +328,7 @@ const result = oldApi.call();
 #### Checklist Fase C
 
 - [ ] `src.infra`: 2.232 → 0 (**fazer primeiro**)
-- [ ] `src.kernel`: 1.530 → 0
+- [x] `src.kernel`: ~~1.530~~ → **0** ✅
 - [ ] `src.driver`: 1.558 → 0
 - [ ] `tests.legacy`: 1.403 → 0
 
@@ -421,7 +421,7 @@ npm run typecheck:tests   # deve estar próximo de 0
 
 - [ ] `src.infra`: 2.232 → 0
 - [ ] `tests.legacy`: 1.403 → 0
-- [ ] `src.kernel`: 1.530 → 0
+- [x] `src.kernel`: ~~1.530~~ → **0** ✅
 - [ ] `src.driver`: 1.558 → 0
 
 ### Fase D — Base strict + superfícies regulares
