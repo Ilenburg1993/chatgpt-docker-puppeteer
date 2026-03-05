@@ -33,7 +33,6 @@
  * a partir deste processo constitui uma violação arquitetural.
  */
 
-
 // =========================================================================
 // ENVIRONMENT VARIABLES (load .env.local before imports)
 // =========================================================================

@@ -22,7 +22,7 @@ const SADI_CONFIG = {
  * Debug logging (ativado via env var SADI_DEBUG=true)
  */
 const DEBUG = process.env.SADI_DEBUG === 'true';
-function debug(msg, ...args) {
+function debug(/** @type {any} */ msg, /** @type {any} */ ...args) {
     if (DEBUG) log.debug(`[SADI:DEBUG] ${msg}`, ...args);
 }
 
@@ -55,7 +55,7 @@ const SVG_SIGNATURES = [
     // Plus (new chat)
     'M12 5v14m-7-7h14',
     'M12 6v12m-6-6h12',
-].map(sig => sig.replace(/[\s,]/g, '').slice(0, 20));
+].map((/** @type {any} */ sig) => sig.replace(/[\s,]/g, '').slice(0, 20));
 
 /**
  * Detection cache (v4.0)
@@ -68,22 +68,23 @@ const detectionCache = new Map();
  * Este código roda via page.evaluate(), então tem acesso a APIs do browser.
  */
 // eslint-disable-next-line no-unused-vars
-const sadiLogic = (terms, svgSigs) => {
+const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
     const SADI = {
         /**
          * Busca recursiva atravessando barreiras de Shadow DOM e IFrames.
          */
-        query: (selector, root = document, onlyFrames = false, accumulator = []) => {
+        query: (/** @type {any} */ selector, /** @type {any} */ root = document, /** @type {any} */ onlyFrames = false, /** @type {any} */ accumulator = []) => {
             try {
                 const nodes = root.querySelectorAll(selector);
                 for (let i = 0; i < nodes.length; i++) {
                     accumulator.push(nodes[i]);
                 }
             } catch (_) {
+                const _ce = /** @type {any} */ (_);
                 return accumulator;
             }
 
-            const hosts = Array.from(root.querySelectorAll('*')).filter(el => el.shadowRoot);
+            const hosts = Array.from(root.querySelectorAll('*')).filter((/** @type {any} */ el) => el.shadowRoot);
             for (const h of hosts) {
                 SADI.query(selector, h.shadowRoot, onlyFrames, accumulator);
             }
@@ -95,13 +96,14 @@ const sadiLogic = (terms, svgSigs) => {
                         SADI.query(selector, f.contentDocument, onlyFrames, accumulator);
                     }
                 } catch (_) {
+                    const _ce = /** @type {any} */ (_);
                     // Ignore cross-origin frame access errors
                 }
             }
             return accumulator;
         },
 
-        getActiveElement: (root = document) => {
+        getActiveElement: (/** @type {any} */ root = document) => {
             let el = root.activeElement;
             while (el && el.shadowRoot && el.shadowRoot.activeElement) {
                 el = el.shadowRoot.activeElement;
@@ -112,7 +114,7 @@ const sadiLogic = (terms, svgSigs) => {
         /**
          * Gera a identidade única de um frame para rastreabilidade de linhagem.
          */
-        getFrameIdentity: el => {
+        getFrameIdentity: (/** @type {any} */ el) => {
             if (!el) {
                 return 'root';
             }
@@ -129,6 +131,7 @@ const sadiLogic = (terms, svgSigs) => {
                         srcPath = `[src*="${CSS.escape(url.pathname)}"]`;
                     }
                 } catch (_) {
+                    const _ce = /** @type {any} */ (_);
                     // Ignore URL parse errors
                 }
             }
@@ -151,7 +154,7 @@ const sadiLogic = (terms, svgSigs) => {
         /**
          * v4.0: Adiciona z-index check e position check
          */
-        isOccluded: el => {
+        isOccluded: (/** @type {any} */ el) => {
             const style = window.getComputedStyle(el);
             if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity || '1') < 0.1) {
                 return true;
@@ -199,6 +202,7 @@ const sadiLogic = (terms, svgSigs) => {
                         }
                     }
                 } catch (_) {
+                    const _ce = /** @type {any} */ (_);
                     // Ignore DOM access errors
                 }
             }
@@ -219,7 +223,7 @@ const sadiLogic = (terms, svgSigs) => {
             ];
 
             // Streaming dots detection
-            const streamingDots = SADI.query('[class*="dot"], [class*="ellipsis"]').filter(el => {
+            const streamingDots = SADI.query('[class*="dot"], [class*="ellipsis"]').filter((/** @type {any} */ el) => {
                 const style = window.getComputedStyle(el);
                 return style.animation || style.animationName;
             });
@@ -230,9 +234,9 @@ const sadiLogic = (terms, svgSigs) => {
         /**
          * Gera um protocolo estruturado para interatividade remota.
          */
-        generateProtocol: el => {
+        generateProtocol: (/** @type {any} */ el) => {
             const win = el.ownerDocument.defaultView;
-            const getBase = target => {
+            const getBase = (/** @type {any} */ target) => {
                 if (!target) {
                     return null;
                 }
@@ -256,7 +260,7 @@ const sadiLogic = (terms, svgSigs) => {
                 return target.tagName.toLowerCase();
             };
 
-            const path = [];
+            /** @type {any[]} */ const path = [];
             let current = win;
             try {
                 while (current && current !== window.top && current.parent !== current) {
@@ -268,6 +272,7 @@ const sadiLogic = (terms, svgSigs) => {
                     }
                 }
             } catch (_) {
+                const _ce = /** @type {any} */ (_);
                 path.push('barrier');
             }
 
@@ -303,7 +308,7 @@ const sadiLogic = (terms, svgSigs) => {
  * @returns {Promise<SadiFrameLike|SadiPageLike>} Frame encontrado ou main frame
  * @throws {Error} Se page for inválido
  */
-async function findFrameByPath(page, framePath) {
+async function findFrameByPath(/** @type {any} */ page, /** @type {any} */ framePath) {
     // v4.0: Validação de parâmetros
     if (!page || typeof page.frames !== 'function') {
         throw new Error('[SADI] Invalid Puppeteer page object');
@@ -317,7 +322,7 @@ async function findFrameByPath(page, framePath) {
     const frames = await page.frames();
     debug('findFrameByPath: searching in %d frames', frames.length);
 
-    const found = frames.find(f => {
+    const found = frames.find((/** @type {any} */ f) => {
         try {
             const fUrl = f.url();
             if (!fUrl || fUrl === 'about:blank') {
@@ -330,6 +335,7 @@ async function findFrameByPath(page, framePath) {
             }
             return framePath.includes(f.name());
         } catch (_) {
+            const _ce = /** @type {any} */ (_);
             return false;
         }
     });
@@ -359,7 +365,7 @@ async function findFrameByPath(page, framePath) {
  *
  * @throws {Error} If page is invalid or langCode is invalid
  */
-async function findChatInputSelector(page, langCode = 'en') {
+async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */ langCode = 'en') {
     // v4.0: Validação de parâmetros
     if (!page || typeof page.evaluate !== 'function') {
         throw new Error('[SADI] Invalid Puppeteer page object');
@@ -386,86 +392,94 @@ async function findChatInputSelector(page, langCode = 'en') {
         const keywords = await i18n.getTerms('input_placeholders', langCode);
         debug('findChatInputSelector: starting detection with %d keywords', keywords.length);
 
-        const result = /** @type {SadiDetectionResult|null} */ (await page.evaluate(
-            (terms, svgSigs, sadiLogicFn, config, startTs) => {
-                // FIXED: Sem async (não tem await dentro)
-                const SADI = sadiLogicFn(terms, svgSigs);
-                const candidates = [...new Set(SADI.query('textarea, div[contenteditable="true"], [role="textbox"]'))]
-                    .filter(el => !SADI.isOccluded(el))
-                    .slice(0, config.MAX_CANDIDATES); // v4.0: Limite de candidatos
+        const result = /** @type {SadiDetectionResult|null} */ (
+            await page.evaluate(
+                (/** @type {any} */ terms, /** @type {any} */ svgSigs, /** @type {any} */ sadiLogicFn, /** @type {any} */ config, /** @type {any} */ startTs) => {
+                    // FIXED: Sem async (não tem await dentro)
+                    const SADI = sadiLogicFn(terms, svgSigs);
+                    const candidates = [
+                        ...new Set(SADI.query('textarea, div[contenteditable="true"], [role="textbox"]')),
+                    ]
+                        .filter((/** @type {any} */ el) => !SADI.isOccluded(el))
+                        .slice(0, config.MAX_CANDIDATES); // v4.0: Limite de candidatos
 
-                // v4.0: Scoring aprimorado
-                const scoreCandidate = el => {
-                    let score = 0;
-                    const rect = el.getBoundingClientRect();
+                    // v4.0: Scoring aprimorado
+                    const scoreCandidate = (/** @type {any} */ el) => {
+                        let score = 0;
+                        const rect = el.getBoundingClientRect();
 
-                    // Posição vertical (inputs no bottom são +confiáveis)
-                    if (rect.top > window.innerHeight * 0.6)
-                        score += 150; // Bottom third
-                    else if (rect.top > window.innerHeight * 0.4) score += 100; // Middle
+                        // Posição vertical (inputs no bottom são +confiáveis)
+                        if (rect.top > window.innerHeight * 0.6)
+                            score += 150; // Bottom third
+                        else if (rect.top > window.innerHeight * 0.4) score += 100; // Middle
 
-                    // Keyword matching (placeholder, aria-label)
-                    const text = (el.getAttribute('placeholder') || el.getAttribute('aria-label') || '').toLowerCase();
-                    if (terms.some(k => text.includes(k))) score += 200; // v4.0: 150→200
+                        // Keyword matching (placeholder, aria-label)
+                        const text = (
+                            el.getAttribute('placeholder') ||
+                            el.getAttribute('aria-label') ||
+                            ''
+                        ).toLowerCase();
+                        if (terms.some((/** @type {any} */ k) => text.includes(k))) score += 200; // v4.0: 150→200
 
-                    // Stable ID (data-testid, id)
-                    if (el.getAttribute('data-testid')?.includes('message')) score += 100;
-                    if (el.id && isNaN(el.id.charAt(0)) && el.id.length > 2) score += 50;
+                        // Stable ID (data-testid, id)
+                        if (el.getAttribute('data-testid')?.includes('message')) score += 100;
+                        if (el.id && isNaN(el.id.charAt(0)) && el.id.length > 2) score += 50;
 
-                    // Tamanho (inputs maiores = mais provável)
-                    if (rect.width > window.innerWidth * 0.5) score += 80;
-                    if (rect.height > 40) score += 30;
+                        // Tamanho (inputs maiores = mais provável)
+                        if (rect.width > window.innerWidth * 0.5) score += 80;
+                        if (rect.height > 40) score += 30;
 
-                    // Visibilidade (center of screen = mais provável)
-                    const cx = rect.left + rect.width / 2;
-                    if (cx > window.innerWidth * 0.25 && cx < window.innerWidth * 0.75) {
-                        score += 60;
+                        // Visibilidade (center of screen = mais provável)
+                        const cx = rect.left + rect.width / 2;
+                        if (cx > window.innerWidth * 0.25 && cx < window.innerWidth * 0.75) {
+                            score += 60;
+                        }
+
+                        // Penalidades
+                        if (el.disabled || el.readOnly) score -= 200;
+                        if (el.style.display === 'none') score -= 500;
+
+                        return Math.max(0, score); // Never negative
+                    };
+
+                    const best = candidates.sort((/** @type {any} */ a, /** @type {any} */ b) => scoreCandidate(b) - scoreCandidate(a))[0];
+                    const score = best ? scoreCandidate(best) : 0;
+
+                    // v4.0: Confidence threshold
+                    if (score < config.MIN_CONFIDENCE_SCORE) {
+                        return null;
                     }
 
-                    // Penalidades
-                    if (el.disabled || el.readOnly) score -= 200;
-                    if (el.style.display === 'none') score -= 500;
-
-                    return Math.max(0, score); // Never negative
-                };
-
-                const best = candidates.sort((a, b) => scoreCandidate(b) - scoreCandidate(a))[0];
-                const score = best ? scoreCandidate(best) : 0;
-
-                // v4.0: Confidence threshold
-                if (score < config.MIN_CONFIDENCE_SCORE) {
-                    return null;
-                }
-
-                // v4.0: Telemetria expandida
-                return best
-                    ? {
-                          protocol: SADI.generateProtocol(best),
-                          confidence: score,
-                          candidates_count: candidates.length,
-                          detection_time_ms: Date.now() - startTs,
-                          page_url: window.location.href,
-                          viewport: { width: window.innerWidth, height: window.innerHeight },
-                          best_candidate: {
-                              tagName: best.tagName,
-                              hasId: !!best.id,
-                              hasPlaceholder: !!best.getAttribute('placeholder'),
-                              rect: {
-                                  top: best.getBoundingClientRect().top,
-                                  left: best.getBoundingClientRect().left,
-                                  width: best.getBoundingClientRect().width,
-                                  height: best.getBoundingClientRect().height,
+                    // v4.0: Telemetria expandida
+                    return best
+                        ? {
+                              protocol: SADI.generateProtocol(best),
+                              confidence: score,
+                              candidates_count: candidates.length,
+                              detection_time_ms: Date.now() - startTs,
+                              page_url: window.location.href,
+                              viewport: { width: window.innerWidth, height: window.innerHeight },
+                              best_candidate: {
+                                  tagName: best.tagName,
+                                  hasId: !!best.id,
+                                  hasPlaceholder: !!best.getAttribute('placeholder'),
+                                  rect: {
+                                      top: best.getBoundingClientRect().top,
+                                      left: best.getBoundingClientRect().left,
+                                      width: best.getBoundingClientRect().width,
+                                      height: best.getBoundingClientRect().height,
+                                  },
                               },
-                          },
-                      }
-                    : null;
-            },
-            keywords,
-            SVG_SIGNATURES,
-            sadiLogic,
-            SADI_CONFIG,
-            startTime
-        ));
+                          }
+                        : null;
+                },
+                keywords,
+                SVG_SIGNATURES,
+                sadiLogic,
+                SADI_CONFIG,
+                startTime
+            )
+        );
 
         const detectionTime = Date.now() - startTime;
         debug(
@@ -503,15 +517,17 @@ async function findChatInputSelector(page, langCode = 'en') {
                         debug('findChatInputSelector: DNA evolution rejected - %s', evolutionResult.reason);
                     }
                 } catch (evolutionError) {
+                    const _ce = /** @type {any} */ (evolutionError);
                     // Graceful degradation - don't fail if evolution fails
-                    log.warn('[SADI] DNA evolution failed:', evolutionError.message);
+                    log.warn('[SADI] DNA evolution failed:', _ce.message);
                 }
             }
         }
 
         return result;
     } catch (error) {
-        log.error('[SADI] findChatInputSelector error:', error.message);
+        const _ce = /** @type {any} */ (error);
+        log.error('[SADI] findChatInputSelector error:', _ce.message);
         return null; // Graceful fallback
     }
 }
@@ -524,7 +540,7 @@ async function findChatInputSelector(page, langCode = 'en') {
  * @returns {Promise<SadiDetectionResult|null>} Detection result with protocol and confidence
  * @throws {Error} If page or inputProtocol is invalid
  */
-async function findSendButtonSelector(page, inputProtocol) {
+async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} */ inputProtocol) {
     // v4.0: Validação de parâmetros
     if (!page || typeof page.evaluate !== 'function') {
         throw new Error('[SADI] Invalid Puppeteer page object');
@@ -537,81 +553,83 @@ async function findSendButtonSelector(page, inputProtocol) {
         const startTime = Date.now();
         debug('findSendButtonSelector: starting detection for input=%s', inputProtocol.selector);
 
-        const result = /** @type {SadiDetectionResult|null} */ (await page.evaluate(
-            (proto, svgSigs, sadiLogicFn, config, startTs) => {
-                // FIXED: Sem async (não tem await dentro)
-                const SADI = sadiLogicFn([], svgSigs);
-                const input = SADI.query(proto.selector)[0];
-                if (!input) {
-                    return null;
-                }
-
-                const root = input.getRootNode ? input.getRootNode() : document;
-                const buttons = Array.from(root.querySelectorAll('button, [role="button"], svg'));
-
-                const iRect = input.getBoundingClientRect();
-                const scoreButton = btn => {
-                    let score = 0;
-                    const bRect = btn.getBoundingClientRect();
-
-                    // Proximidade horizontal e vertical ao input
-                    if (bRect.left >= iRect.left && Math.abs(bRect.top - iRect.top) < 120) {
-                        score += 80;
+        const result = /** @type {SadiDetectionResult|null} */ (
+            await page.evaluate(
+                (/** @type {any} */ proto, /** @type {any} */ svgSigs, /** @type {any} */ sadiLogicFn, /** @type {any} */ config, /** @type {any} */ startTs) => {
+                    // FIXED: Sem async (não tem await dentro)
+                    const SADI = sadiLogicFn([], svgSigs);
+                    const input = SADI.query(proto.selector)[0];
+                    if (!input) {
+                        return null;
                     }
 
-                    // Verificação de DNA vetorial (SVG)
-                    const paths = Array.from(btn.querySelectorAll('path'));
-                    for (const p of paths) {
-                        const d = (p.getAttribute('d') || '').replace(/[\s,]/g, '');
-                        if (svgSigs.some(sig => d.startsWith(sig))) {
-                            score += 200;
-                            break;
+                    const root = input.getRootNode ? input.getRootNode() : document;
+                    const buttons = Array.from(root.querySelectorAll('button, [role="button"], svg'));
+
+                    const iRect = input.getBoundingClientRect();
+                    const scoreButton = (/** @type {any} */ btn) => {
+                        let score = 0;
+                        const bRect = btn.getBoundingClientRect();
+
+                        // Proximidade horizontal e vertical ao input
+                        if (bRect.left >= iRect.left && Math.abs(bRect.top - iRect.top) < 120) {
+                            score += 80;
                         }
+
+                        // Verificação de DNA vetorial (SVG)
+                        const paths = Array.from(btn.querySelectorAll('path'));
+                        for (const p of paths) {
+                            const d = (p.getAttribute('d') || '').replace(/[\s,]/g, '');
+                            if (svgSigs.some((/** @type {any} */ sig) => d.startsWith(sig))) {
+                                score += 200;
+                                break;
+                            }
+                        }
+
+                        // Atributos de intenção
+                        if (btn.getAttribute('data-testid')?.includes('send')) {
+                            score += 150;
+                        }
+
+                        // v4.0: Aria-label check
+                        const ariaLabel = btn.getAttribute('aria-label') || '';
+                        if (ariaLabel.toLowerCase().includes('send') || ariaLabel.toLowerCase().includes('submit')) {
+                            score += 100;
+                        }
+
+                        // v4.0: Disabled check (botão desabilitado ainda é o botão certo)
+                        if (btn.disabled) {
+                            score += 50; // Bonus, não penalidade
+                        }
+
+                        return score;
+                    };
+
+                    const best = buttons.sort((/** @type {any} */ a, /** @type {any} */ b) => scoreButton(b) - scoreButton(a))[0];
+                    const score = best ? scoreButton(best) : 0;
+
+                    // v4.0: Confidence threshold
+                    if (score < config.MIN_CONFIDENCE_SCORE) {
+                        return null;
                     }
 
-                    // Atributos de intenção
-                    if (btn.getAttribute('data-testid')?.includes('send')) {
-                        score += 150;
-                    }
-
-                    // v4.0: Aria-label check
-                    const ariaLabel = btn.getAttribute('aria-label') || '';
-                    if (ariaLabel.toLowerCase().includes('send') || ariaLabel.toLowerCase().includes('submit')) {
-                        score += 100;
-                    }
-
-                    // v4.0: Disabled check (botão desabilitado ainda é o botão certo)
-                    if (btn.disabled) {
-                        score += 50; // Bonus, não penalidade
-                    }
-
-                    return score;
-                };
-
-                const best = buttons.sort((a, b) => scoreButton(b) - scoreButton(a))[0];
-                const score = best ? scoreButton(best) : 0;
-
-                // v4.0: Confidence threshold
-                if (score < config.MIN_CONFIDENCE_SCORE) {
-                    return null;
-                }
-
-                return best
-                    ? {
-                          protocol: SADI.generateProtocol(best),
-                          confidence: score,
-                          detection_time_ms: Date.now() - startTs,
-                          has_svg: best.querySelector('path') !== null,
-                          is_disabled: best.disabled || false,
-                      }
-                    : null;
-            },
-            inputProtocol,
-            SVG_SIGNATURES,
-            sadiLogic,
-            SADI_CONFIG,
-            startTime
-        ));
+                    return best
+                        ? {
+                              protocol: SADI.generateProtocol(best),
+                              confidence: score,
+                              detection_time_ms: Date.now() - startTs,
+                              has_svg: best.querySelector('path') !== null,
+                              is_disabled: best.disabled || false,
+                          }
+                        : null;
+                },
+                inputProtocol,
+                SVG_SIGNATURES,
+                sadiLogic,
+                SADI_CONFIG,
+                startTime
+            )
+        );
 
         const detectionTime = Date.now() - startTime;
         debug(
@@ -622,7 +640,8 @@ async function findSendButtonSelector(page, inputProtocol) {
 
         return result;
     } catch (error) {
-        log.error('[SADI] findSendButtonSelector error:', error.message);
+        const _ce = /** @type {any} */ (error);
+        log.error('[SADI] findSendButtonSelector error:', _ce.message);
         return null; // Graceful fallback
     }
 }
@@ -634,7 +653,7 @@ async function findSendButtonSelector(page, inputProtocol) {
  * @returns {Promise<SadiResponseDetectionResult|null>} Detection result with protocol and busy status
  * @throws {Error} If page is invalid
  */
-async function findResponseArea(page) {
+async function findResponseArea(/** @type {any} */ page) {
     // v4.0: Validação de parâmetros
     if (!page || typeof page.evaluate !== 'function') {
         throw new Error('[SADI] Invalid Puppeteer page object');
@@ -644,60 +663,63 @@ async function findResponseArea(page) {
         debug('findResponseArea: starting growth detection');
         const startTime = Date.now();
 
-        const result = /** @type {SadiResponseDetectionResult|null} */ (await page.evaluate(
-            (sadiLogicFn, config, startTs) => {
-                // FIXED: Sem async (Promise simples em vez de await)
-                const SADI = sadiLogicFn([], []);
-                const containers = SADI.query('div, article, section, pre').filter(c => c.innerText.length > 5);
-                const snapshot = containers.map(c => ({ el: c, len: c.innerText.length }));
+        const result = /** @type {SadiResponseDetectionResult|null} */ (
+            await page.evaluate(
+                (/** @type {any} */ sadiLogicFn, /** @type {any} */ config, /** @type {any} */ startTs) => {
+                    // FIXED: Sem async (Promise simples em vez de await)
+                    const SADI = sadiLogicFn([], []);
+                    const containers = SADI.query('div, article, section, pre').filter((/** @type {any} */ c) => c.innerText.length > 5);
+                    const snapshot = containers.map((/** @type {any} */ c) => ({ el: c, len: c.innerText.length }));
 
-                // v4.0: Usar config para delay
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        let best = null,
-                            maxDelta = 0;
-                        snapshot.forEach(snap => {
-                            if (!snap.el.isConnected) {
-                                return;
-                            }
-                            const currentLen = snap.el.innerText.length;
-                            const delta = currentLen - snap.len;
-                            if (delta > maxDelta) {
-                                maxDelta = delta;
-                                best = snap.el;
-                            }
-                        });
+                    // v4.0: Usar config para delay
+                    return new Promise((/** @type {any} */ resolve) => {
+                        setTimeout(() => {
+                            let best = null,
+                                maxDelta = 0;
+                            snapshot.forEach((/** @type {any} */ snap) => {
+                                if (!snap.el.isConnected) {
+                                    return;
+                                }
+                                const currentLen = snap.el.innerText.length;
+                                const delta = currentLen - snap.len;
+                                if (delta > maxDelta) {
+                                    maxDelta = delta;
+                                    best = snap.el;
+                                }
+                            });
 
-                        const final =
-                            best ||
-                            containers
-                                .filter(c => c.isConnected)
-                                .sort((a, b) => b.innerText.length - a.innerText.length)[0];
-                        resolve(
-                            final
-                                ? {
-                                      protocol: SADI.generateProtocol(final),
-                                      isBusy: SADI.checkSystemStatus(),
-                                      growth_delta: maxDelta,
-                                      detection_time_ms: Date.now() - startTs,
-                                      content_length: final.innerText.length,
-                                  }
-                                : null
-                        );
-                    }, config.RESPONSE_GROWTH_DELAY);
-                });
-            },
-            sadiLogic,
-            SADI_CONFIG,
-            startTime
-        ));
+                            const final =
+                                best ||
+                                containers
+                                    .filter((/** @type {any} */ c) => c.isConnected)
+                                    .sort((/** @type {any} */ a, /** @type {any} */ b) => b.innerText.length - a.innerText.length)[0];
+                            resolve(
+                                final
+                                    ? {
+                                          protocol: SADI.generateProtocol(final),
+                                          isBusy: SADI.checkSystemStatus(),
+                                          growth_delta: maxDelta,
+                                          detection_time_ms: Date.now() - startTs,
+                                          content_length: final.innerText.length,
+                                      }
+                                    : null
+                            );
+                        }, config.RESPONSE_GROWTH_DELAY);
+                    });
+                },
+                sadiLogic,
+                SADI_CONFIG,
+                startTime
+            )
+        );
 
         const detectionTime = Date.now() - startTime;
         debug('findResponseArea: detection completed in %dms, growth=%d', detectionTime, result?.growth_delta || 0);
 
         return result;
     } catch (error) {
-        log.error('[SADI] findResponseArea error:', error.message);
+        const _ce = /** @type {any} */ (error);
+        log.error('[SADI] findResponseArea error:', _ce.message);
         return null; // Graceful fallback
     }
 }
@@ -709,7 +731,7 @@ async function findResponseArea(page) {
  * @param {SadiElementProtocol} protocol - Element protocol from detection
  * @returns {Promise<boolean>} True if element is interactive
  */
-async function validateCandidateInteractivity(page, protocol) {
+async function validateCandidateInteractivity(/** @type {any} */ page, /** @type {any} */ protocol) {
     // v4.0: Validação de parâmetros
     if (!page || typeof page.evaluate !== 'function') {
         log.error('[SADI] validateCandidateInteractivity: invalid page object');
@@ -723,36 +745,40 @@ async function validateCandidateInteractivity(page, protocol) {
     try {
         debug('validateCandidateInteractivity: testing selector=%s', protocol.selector);
 
-        const isInteractive = /** @type {boolean} */ (await page.evaluate(
-            (proto, sadiLogicFn) => {
-                // FIXED: Usando função serializada diretamente (sem new Function)
-                const SADI = sadiLogicFn([], []);
-                const el = SADI.query(proto.selector)[0];
-                if (!el) {
-                    return false;
-                }
+        const isInteractive = /** @type {boolean} */ (
+            await page.evaluate(
+                (/** @type {any} */ proto, /** @type {any} */ sadiLogicFn) => {
+                    // FIXED: Usando função serializada diretamente (sem new Function)
+                    const SADI = sadiLogicFn([], []);
+                    const el = SADI.query(proto.selector)[0];
+                    if (!el) {
+                        return false;
+                    }
 
-                // v4.0: Check disabled/readonly ANTES de focar
-                if (el.disabled || el.readOnly) {
-                    return false;
-                }
+                    // v4.0: Check disabled/readonly ANTES de focar
+                    if (el.disabled || el.readOnly) {
+                        return false;
+                    }
 
-                try {
-                    el.focus();
-                } catch (_) {
-                    return false;
-                }
-                const active = SADI.getActiveElement();
-                return active === el || el.contains(active);
-            },
-            protocol,
-            sadiLogic
-        ));
+                    try {
+                        el.focus();
+                    } catch (_) {
+                        const _ce = /** @type {any} */ (_);
+                        return false;
+                    }
+                    const active = SADI.getActiveElement();
+                    return active === el || el.contains(active);
+                },
+                protocol,
+                sadiLogic
+            )
+        );
 
         debug('validateCandidateInteractivity: result=%s', isInteractive);
         return isInteractive;
     } catch (e) {
-        log.error('[SADI] validateCandidateInteractivity error:', e.message);
+        const _ce = /** @type {any} */ (e);
+        log.error('[SADI] validateCandidateInteractivity error:', _ce.message);
         return false;
     }
 }

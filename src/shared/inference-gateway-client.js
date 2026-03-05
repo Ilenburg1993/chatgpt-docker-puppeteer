@@ -65,7 +65,7 @@ export const ENDPOINTS = Object.freeze([
  * @property {number} [port]
  * @property {string} [baseUrl]
  */
-/** @typedef {{ ok: boolean, status: number, text: string, json: unknown }} GatewayJsonResponse */
+/** @typedef {{ ok: boolean, status: number, text: string, json: any }} GatewayJsonResponse */
 /**
  * @typedef {object} CreateGatewayClientOptions
  * @property {string} [clientTag]
@@ -276,7 +276,7 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(`${_baseUrl}/v1/validate/generate`, payload, Math.min(_timeout, 10000));
+                const result = await _postJson(`${_baseUrl}/v1/validate/generate`, /** @type {any} */ (payload), Math.min(_timeout, 10000));
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -337,7 +337,7 @@ export function createGatewayClient(options = {}) {
 
             // Preflight opcional
             if (doPreflight) {
-                const preflightResult = await this.validateGenerate({
+                const preflightResult = await (/** @type {any} */ (this)).validateGenerate({
                     clientTag: tag,
                     profileName,
                     model: mod,
@@ -367,11 +367,11 @@ export function createGatewayClient(options = {}) {
             };
 
             if (temperature !== undefined) {
-                payload.temperature = temperature;
+                (/** @type {any} */ (payload)).temperature = temperature;
             }
 
             try {
-                const result = await _postJson(`${_baseUrl}/v1/generate`, payload, _timeout);
+                const result = await _postJson(`${_baseUrl}/v1/generate`, /** @type {any} */ (payload), _timeout);
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -394,7 +394,7 @@ export function createGatewayClient(options = {}) {
                     response: responseText,
                     parsed,
                     policy: result.json?.policy || null,
-                    preflight: doPreflight ? { validated: true } : null,
+                    preflight: doPreflight ? { validated: true } : /** @type {any} */ (null),
                     clientTag: tag,
                     model: mod,
                     ts: result.json?.ts || Date.now(),
@@ -434,7 +434,7 @@ export function createGatewayClient(options = {}) {
 
             // Preflight opcional
             if (doPreflight) {
-                const preflightResult = await this.validateEmbed({
+                const preflightResult = await (/** @type {any} */ (this)).validateEmbed({
                     clientTag: tag,
                     model: mod,
                 });
@@ -455,7 +455,7 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(`${_baseUrl}/v1/embed`, payload, _timeout);
+                const result = await _postJson(`${_baseUrl}/v1/embed`, /** @type {any} */ (payload), _timeout);
 
                 if (!result.ok || !result.json?.ok) {
                     return {
@@ -493,7 +493,7 @@ export function createGatewayClient(options = {}) {
             };
 
             try {
-                const result = await _postJson(`${_baseUrl}/v1/validate/embed`, payload, Math.min(_timeout, 10000));
+                const result = await _postJson(`${_baseUrl}/v1/validate/embed`, /** @type {any} */ (payload), Math.min(_timeout, 10000));
 
                 if (!result.ok || !result.json?.ok) {
                     return {

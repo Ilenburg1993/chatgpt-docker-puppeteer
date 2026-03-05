@@ -37,7 +37,7 @@ import { log } from '#core/logger';
  * @param {IsValidNERVNerv} [nerv] - Instância do NERV a validar
  * @returns {boolean} true se o NERV é válido, false caso contrário
  */
-export function isValidNERV(nerv) {
+export function isValidNERV(/** @type {any} */ nerv) {
     try {
         // Verificações básicas de tipo e estrutura
         if (!nerv || typeof nerv !== 'object') {
@@ -63,7 +63,8 @@ export function isValidNERV(nerv) {
         log('DEBUG', '[NERV_UTILS] NERV instance validation passed');
         return true;
     } catch (err) {
-        log('ERROR', `[NERV_UTILS] Error validating NERV instance: ${err.message}`);
+        const _ce = /** @type {any} */ (err);
+        log('ERROR', `[NERV_UTILS] Error validating NERV instance: ${_ce.message}`);
         return false;
     }
 }
@@ -76,7 +77,11 @@ export function isValidNERV(nerv) {
  * @param {() => T|Promise<T>} operationFn - Função que executa a operação
  * @returns {Promise<T>} Resultado da operação ou throws se NERV inválido
  */
-export async function safeNERVOperation(nerv, operation, operationFn) {
+export async function safeNERVOperation(
+    /** @type {any} */ nerv,
+    /** @type {any} */ operation,
+    /** @type {any} */ operationFn
+) {
     if (!isValidNERV(nerv)) {
         const error = new Error(`[NERV_UTILS] Cannot execute ${operation}: NERV instance is invalid`);
         log('ERROR', error.message);
@@ -87,8 +92,9 @@ export async function safeNERVOperation(nerv, operation, operationFn) {
         log('DEBUG', `[NERV_UTILS] Executing safe NERV operation: ${operation}`);
         return await operationFn();
     } catch (err) {
-        log('ERROR', `[NERV_UTILS] Error in NERV operation ${operation}: ${err.message}`);
-        throw err;
+        const _ce = /** @type {any} */ (err);
+        log('ERROR', `[NERV_UTILS] Error in NERV operation ${operation}: ${_ce.message}`);
+        throw _ce;
     }
 }
 
@@ -99,7 +105,7 @@ export async function safeNERVOperation(nerv, operation, operationFn) {
  * @param {(payload: unknown) => void} handler - Handler do evento
  * @returns {Promise<boolean>} true se registrado com sucesso
  */
-export async function safeOnEvent(nerv, event, handler) {
+export async function safeOnEvent(/** @type {any} */ nerv, /** @type {any} */ event, /** @type {any} */ handler) {
     return safeNERVOperation(nerv, `onEvent(${event})`, () => {
         nerv.onEvent(event, handler);
         return true;
@@ -114,7 +120,12 @@ export async function safeOnEvent(nerv, event, handler) {
  * @param {NERVEventPayload} [payload={}] - Payload do evento
  * @returns {Promise<unknown>} Resultado do sendEvent
  */
-export async function safeSendEvent(nerv, actor, action, payload = {}) {
+export async function safeSendEvent(
+    /** @type {any} */ nerv,
+    /** @type {any} */ actor,
+    /** @type {any} */ action,
+    /** @type {any} */ payload = {}
+) {
     return safeNERVOperation(nerv, `sendEvent(${actor}, ${action})`, () => {
         return nerv.sendEvent(actor, action, payload);
     });

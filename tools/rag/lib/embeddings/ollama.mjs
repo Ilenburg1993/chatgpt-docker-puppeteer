@@ -120,8 +120,12 @@ export class OllamaEmbeddingsProvider {
     async health() {
         const versionUrl = this.baseURL.replace(/\/v1\/?$/, '') + '/api/version';
         const version = await fetchJson(versionUrl, { timeoutMs: 1500 }).catch(/** @type {any} */ () => null);
-        const models = await fetchJson(`${this.baseURL}/models`, { timeoutMs: 2000 }).catch(/** @type {any} */ () => null);
-        const modelIds = Array.isArray(models?.data) ? models.data.map((/** @type {any} */ m) => m.id).filter(Boolean) : [];
+        const models = await fetchJson(`${this.baseURL}/models`, { timeoutMs: 2000 }).catch(
+            /** @type {any} */ () => null
+        );
+        const modelIds = Array.isArray(models?.data)
+            ? models.data.map((/** @type {any} */ m) => m.id).filter(Boolean)
+            : [];
         const hasModel = modelIds.includes(this.model);
         return {
             ok: Boolean(version) && Array.isArray(models?.data),

@@ -82,7 +82,9 @@ class ResilientLockManager {
             const lockCount = this.activeLocks.size;
             if (lockCount > 0) {
                 console.log(`[ResilientLock] ${signal} received. Releasing ${lockCount} active locks...`);
-                await this.releaseAll().catch((/** @type {any} */ err) => console.error(`[ResilientLock] Cleanup error: ${err.message}`));
+                await this.releaseAll().catch((/** @type {any} */ err) =>
+                    console.error(`[ResilientLock] Cleanup error: ${err.message}`)
+                );
             }
         };
 
@@ -209,7 +211,11 @@ class ResilientLockManager {
                 this._stats.peakConcurrentLocks = this.activeLocks.size;
             }
 
-            log('DEBUG', `[ResilientLock] Acquired ${lockKey} (${this.activeLocks.size} active)`, /** @type {any} */ (metadata));
+            log(
+                'DEBUG',
+                `[ResilientLock] Acquired ${lockKey} (${this.activeLocks.size} active)`,
+                /** @type {any} */ (metadata)
+            );
             return true;
         } catch (err) {
             const _err = /** @type {any} */ (err);
@@ -245,12 +251,20 @@ class ResilientLockManager {
                 this._unregisterCleanupHandlers();
             }
 
-            log('DEBUG', `[ResilientLock] Released ${lockKey} (${this.activeLocks.size} active)`, /** @type {any} */ (lock.metadata));
+            log(
+                'DEBUG',
+                `[ResilientLock] Released ${lockKey} (${this.activeLocks.size} active)`,
+                /** @type {any} */ (lock.metadata)
+            );
             return true;
         } catch (err) {
             const _err2 = /** @type {any} */ (err);
             this._stats.totalFailedRelease++;
-            log('WARN', `[ResilientLock] Failed to release ${lockKey}: ${_err2.message}`, /** @type {any} */ (lock.metadata));
+            log(
+                'WARN',
+                `[ResilientLock] Failed to release ${lockKey}: ${_err2.message}`,
+                /** @type {any} */ (lock.metadata)
+            );
 
             // Remove from map anyway to prevent memory leak
             this.activeLocks.delete(lockKey);
@@ -425,7 +439,11 @@ class ResilientLockManager {
             return extended;
         } catch (err) {
             const _err4 = /** @type {any} */ (err);
-            log('ERROR', `[ResilientLock] Failed to extend ${lockKey}: ${_err4.message}`, /** @type {any} */ (lock.metadata));
+            log(
+                'ERROR',
+                `[ResilientLock] Failed to extend ${lockKey}: ${_err4.message}`,
+                /** @type {any} */ (lock.metadata)
+            );
             return false;
         }
     }

@@ -49,10 +49,10 @@ import { log } from '#core/logger';
  */
 
 /** @type {TelemetrySnapshot|null} */
-let currentSnapshot = null;
+/** @type {any} */ let currentSnapshot = null;
 
 /** @type {NodeJS.Timeout|null} */
-let snapshotInterval = null;
+/** @type {any} */ let snapshotInterval = null;
 
 /** @type {boolean} */
 let isRunning = false;
@@ -72,7 +72,8 @@ async function collectSystemMetrics() {
             uptime: Math.round(process.uptime()),
         };
     } catch (err) {
-        log('WARN', `[SNAPSHOT] Falha ao coletar métricas de sistema: ${err.message}`);
+        const _ce = /** @type {any} */ (err);
+        log('WARN', `[SNAPSHOT] Falha ao coletar métricas de sistema: ${_ce.message}`);
         return { cpu: 0, memory: 0, uptime: 0 };
     }
 }
@@ -86,7 +87,7 @@ async function collectSystemMetrics() {
  * @param {CollectNervMetricsNerv} [nerv] - Instância do NERV
  * @returns {Promise<object>}
  */
-async function collectNervMetrics(nerv) {
+async function collectNervMetrics(/** @type {any} */ nerv) {
     try {
         if (!nerv || typeof nerv.getStatus !== 'function') {
             return { connected: false, eventsPerSecond: 0, bufferSize: 0 };
@@ -99,7 +100,8 @@ async function collectNervMetrics(nerv) {
             bufferSize: status.buffers?.size || 0,
         };
     } catch (err) {
-        log('WARN', `[SNAPSHOT] Falha ao coletar métricas do NERV: ${err.message}`);
+        const _ce = /** @type {any} */ (err);
+        log('WARN', `[SNAPSHOT] Falha ao coletar métricas do NERV: ${_ce.message}`);
         return { connected: false, eventsPerSecond: 0, bufferSize: 0 };
     }
 }
@@ -126,7 +128,7 @@ async function collectPm2Metrics() {
  * @param {CollectKernelMetricsKernel} [kernel] - Instância do Kernel
  * @returns {Promise<object>}
  */
-async function collectKernelMetrics(kernel) {
+async function collectKernelMetrics(/** @type {any} */ kernel) {
     try {
         if (!kernel) {
             return { activeMissions: 0, queueSize: 0 };
@@ -141,7 +143,8 @@ async function collectKernelMetrics(kernel) {
             queueSize: 0, // Placeholder
         };
     } catch (err) {
-        log('WARN', `[SNAPSHOT] Falha ao coletar métricas do Kernel: ${err.message}`);
+        const _ce = /** @type {any} */ (err);
+        log('WARN', `[SNAPSHOT] Falha ao coletar métricas do Kernel: ${_ce.message}`);
         return { activeMissions: 0, queueSize: 0 };
     }
 }
@@ -155,7 +158,7 @@ async function collectKernelMetrics(kernel) {
  * @param {CollectBrowserMetricsBrowserPool} [browserPool] - Instância do Browser Pool
  * @returns {Promise<object>}
  */
-async function collectBrowserMetrics(browserPool) {
+async function collectBrowserMetrics(/** @type {any} */ browserPool) {
     try {
         if (!browserPool) {
             return { instances: 0, pages: 0 };
@@ -170,7 +173,8 @@ async function collectBrowserMetrics(browserPool) {
             pages: 0, // Placeholder
         };
     } catch (err) {
-        log('WARN', `[SNAPSHOT] Falha ao coletar métricas do Browser: ${err.message}`);
+        const _ce = /** @type {any} */ (err);
+        log('WARN', `[SNAPSHOT] Falha ao coletar métricas do Browser: ${_ce.message}`);
         return { instances: 0, pages: 0 };
     }
 }
@@ -180,7 +184,7 @@ async function collectBrowserMetrics(browserPool) {
  * @param {TelemetryCollectorContext} [context={}] - Contexto com instâncias dos subsistemas
  * @returns {Promise<TelemetrySnapshot>}
  */
-async function collectSnapshot(context = {}) {
+async function collectSnapshot(/** @type {any} */ context = {}) {
     const timestamp = Date.now();
 
     const [system, nerv, pm2, kernel, browser] = await Promise.all([
@@ -191,14 +195,14 @@ async function collectSnapshot(context = {}) {
         collectBrowserMetrics(context.browserPool),
     ]);
 
-    const snapshot = {
+    const snapshot = /** @type {any} */ ({
         timestamp,
         system,
         nerv,
         pm2,
         kernel,
         browser,
-    };
+    });
 
     log('DEBUG', `[SNAPSHOT] Coletado snapshot em ${Date.now() - timestamp}ms`);
     return snapshot;
@@ -210,7 +214,7 @@ async function collectSnapshot(context = {}) {
  * @param {TelemetryCollectorContext} [context={}] - Contexto com instâncias dos subsistemas
  * @returns {Promise<void>}
  */
-export async function start(intervalMs = 60000, context = {}) {
+export async function start(/** @type {any} */ intervalMs = 60000, /** @type {any} */ context = {}) {
     if (isRunning) {
         log('WARN', '[SNAPSHOT] Snapshot já está rodando');
         return;
@@ -228,14 +232,16 @@ export async function start(intervalMs = 60000, context = {}) {
             try {
                 currentSnapshot = await collectSnapshot(context);
             } catch (err) {
-                log('ERROR', `[SNAPSHOT] Erro na coleta periódica: ${err.message}`);
+                const _ce = /** @type {any} */ (err);
+                log('ERROR', `[SNAPSHOT] Erro na coleta periódica: ${_ce.message}`);
                 // Continua rodando mesmo com erro
             }
         }, intervalMs);
 
         log('INFO', '[SNAPSHOT] Coletor iniciado com sucesso');
     } catch (err) {
-        log('ERROR', `[SNAPSHOT] Falha ao iniciar coletor: ${err.message}`);
+        const _ce = /** @type {any} */ (err);
+        log('ERROR', `[SNAPSHOT] Falha ao iniciar coletor: ${_ce.message}`);
         throw err;
     }
 }

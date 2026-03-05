@@ -660,13 +660,15 @@ class OrchestratorEngine {
                 logger.debug(`[OrchestratorEngine] Auto-injecting RAG context for query: "${ragQuery}"`);
 
                 // Buscar contexto (hybrid search com reranking + MMR)
-                const ragResult = /** @type {any} */ (await ragHybridSearch({
-                    query: ragQuery,
-                    topK: 3, // Limit to 3 chunks to avoid token bloat
-                    rerank: true,
-                    mmr: true,
-                    mmrLambda: 0.7,
-                }));
+                const ragResult = /** @type {any} */ (
+                    await ragHybridSearch({
+                        query: ragQuery,
+                        topK: 3, // Limit to 3 chunks to avoid token bloat
+                        rerank: true,
+                        mmr: true,
+                        mmrLambda: 0.7,
+                    })
+                );
 
                 if (ragResult.results && ragResult.results.length > 0) {
                     // Formatar contexto como markdown

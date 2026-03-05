@@ -64,7 +64,7 @@ const STABILIZER_CONFIG = {
 // ============================================
 
 class StabilizerAbortError extends Error {
-    constructor(message, phase = null) {
+    constructor(/** @type {any} */ message, phase = null) {
         super(message);
         this.name = 'StabilizerAbortError';
         this.phase = phase;
@@ -82,13 +82,13 @@ class StabilizerAbortError extends Error {
  * @param {number} retries - Max retry attempts (default: 3)
  * @returns {Promise<number>} Event loop lag in ms
  */
-async function measureEventLoopLag(page, retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT) {
+async function measureEventLoopLag(/** @type {any} */ page, /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT) {
     for (let i = 0; i < retries; i++) {
         try {
             return await page.evaluate(() => {
                 // NOTE: the identifier name `eventLoopLag` is intentional; unit tests stub by fn.toString().
                 const eventLoopLag = () =>
-                    new Promise(resolve => {
+                    new Promise((/** @type {any} */ resolve) => {
                         const channel = new MessageChannel();
                         const t0 = performance.now();
                         channel.port1.onmessage = () => {
@@ -102,11 +102,12 @@ async function measureEventLoopLag(page, retries = STABILIZER_CONFIG.HELPER_RETR
                 return eventLoopLag();
             });
         } catch (err) {
+            const _ce = /** @type {any} */ (err);
             if (i === retries - 1) {
-                log('DEBUG', `[STABILIZER] Event loop lag measurement failed after ${retries} retries: ${err.message}`);
+                log('DEBUG', `[STABILIZER] Event loop lag measurement failed after ${retries} retries: ${_ce.message}`);
                 return STABILIZER_CONFIG.DEFAULT_LAG_FALLBACK;
             }
-            await new Promise(r => setTimeout(r, STABILIZER_CONFIG.HELPER_RETRY_DELAY * (i + 1)));
+            await new Promise((/** @type {any} */ r) => setTimeout(r, STABILIZER_CONFIG.HELPER_RETRY_DELAY * (i + 1)));
         }
     }
     return STABILIZER_CONFIG.DEFAULT_LAG_FALLBACK;
@@ -123,10 +124,10 @@ async function measureEventLoopLag(page, retries = STABILIZER_CONFIG.HELPER_RETR
  * @param {number} retries - Max retry attempts (default: 3)
  * @returns {Promise<boolean>} `true` quando ainda há atividade de carregamento
  */
-async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT) {
+async function getPageLoadStatus(/** @type {any} */ page, /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT) {
     for (let i = 0; i < retries; i++) {
         try {
-            const busy = await page.evaluate(config => {
+            const busy = await page.evaluate((/** @type {any} */ config) => {
                 // Returns true when the page still appears "busy" (spinner OR recent network).
                 /** @param {Document | ShadowRoot} [root=document] */
                 const checkSpinnersDeep = (root = document) => {
@@ -141,14 +142,14 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                             if (node.matches(selector)) {
                                 // False positive filter: must be visible and have non-zero rects.
                                 const rects = node.getClientRects();
-                                if (rects.length > 0 && node.offsetParent !== null) {
+                                if (rects.length > 0 && (/** @type {any} */ (node)).offsetParent !== null) {
                                     const st = window.getComputedStyle(node);
                                     if (
                                         st.display !== 'none' &&
                                         st.visibility !== 'hidden' &&
                                         parseFloat(st.opacity || '1') > 0.1
                                     ) {
-                                        const hasSize = Array.from(rects).some(r => r.width > 0 && r.height > 0);
+                                        const hasSize = Array.from(rects).some((/** @type {any} */ r) => r.width > 0 && r.height > 0);
                                         if (hasSize) return true;
                                     }
                                 }
@@ -164,6 +165,7 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
                                     )
                                         return true;
                                 } catch (_err) {
+                                    const _ce = /** @type {any} */ (_err);
                                     // Ignore cross-origin iframe access errors
                                 }
                             }
@@ -193,11 +195,12 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
 
             return busy === true;
         } catch (err) {
+            const _ce = /** @type {any} */ (err);
             if (i === retries - 1) {
-                log('DEBUG', `[STABILIZER] Page load status check failed after ${retries} retries: ${err.message}`);
+                log('DEBUG', `[STABILIZER] Page load status check failed after ${retries} retries: ${_ce.message}`);
                 return false;
             }
-            await new Promise(r => setTimeout(r, STABILIZER_CONFIG.HELPER_RETRY_DELAY * (i + 1)));
+            await new Promise((/** @type {any} */ r) => setTimeout(r, STABILIZER_CONFIG.HELPER_RETRY_DELAY * (i + 1)));
         }
     }
     return false;
@@ -220,7 +223,7 @@ async function getPageLoadStatus(page, retries = STABILIZER_CONFIG.HELPER_RETRY_
  * @returns {Promise<object>} Result object with success, duration, phases, etc.
  * @throws {TypeError} If required parameters are invalid
  */
-async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TIMEOUT, signal = null) {
+async function waitForStability(/** @type {any} */ driver, /** @type {any} */ timeoutMs = STABILIZER_CONFIG.DEFAULT_TIMEOUT, /** @type {any} */ signal = null) {
     // [v2.0] Parameter validation (Bug #1 fix)
     if (!driver || typeof driver !== 'object') {
         throw new TypeError('waitForStability: driver is required and must be a Driver object');
@@ -238,7 +241,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
     const correlationId = driver.correlationId;
 
     // Result object (v2.0 - Improvement #12)
-    const result = {
+    const result = /** @type {any} */ ({
         success: false,
         duration: 0,
         phasesCompleted: [],
@@ -248,7 +251,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
         domain: 'unknown',
         timeout: false,
         lagMeasurements: [],
-    };
+    });
 
     // Make result coercible to boolean for backward compatibility
     result.valueOf = () => result.success;
@@ -263,9 +266,9 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
         }
     };
 
-    const throwIfAborted = (phase = null) => {
+    const throwIfAborted = (/** @type {string | null} */ phase = null) => {
         if (signal?.aborted) {
-            throw new StabilizerAbortError('stabilization aborted', phase);
+            throw new StabilizerAbortError('stabilization aborted', /** @type {any} */ (phase));
         }
     };
 
@@ -284,7 +287,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             result.domain = new URL(url).hostname.replace('www.', '');
         }
     } catch (err) {
-        log('DEBUG', `[STABILIZER] Failed to extract domain: ${err.message}`, correlationId);
+        const _ce = /** @type {any} */ (err);
+        log('DEBUG', `[STABILIZER] Failed to extract domain: ${_ce.message}`, correlationId);
     }
 
     // [v2.0] Telemetry: Stability start
@@ -320,13 +324,14 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 driver._emitVital('PHASE_SUCCESS', { phase: 'NETWORK_IDLE', duration: phase1Duration });
                 result.phasesCompleted.push('NETWORK_IDLE');
             } catch (err) {
+                const _ce = /** @type {any} */ (err);
                 if (isPageClosed()) {
                     throw new Error('page is closed'); // eslint-disable-line preserve-caught-error
                 }
-                log('DEBUG', `[STABILIZER] Network idle failed: ${err.message}`, correlationId);
+                log('DEBUG', `[STABILIZER] Network idle failed: ${_ce.message}`, correlationId);
                 driver._emitVital('PHASE_FAILURE', {
                     phase: 'NETWORK_IDLE',
-                    error: err.message,
+                    error: _ce.message,
                     recoverable: true,
                 });
                 result.phasesFailed.push('NETWORK_IDLE');
@@ -364,7 +369,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                     break;
                 }
 
-                await new Promise(r => setTimeout(r, STABILIZER_CONFIG.SPINNER_CHECK_INTERVAL));
+                await new Promise((/** @type {any} */ r) => setTimeout(r, STABILIZER_CONFIG.SPINNER_CHECK_INTERVAL));
                 iterations++;
             }
 
@@ -396,7 +401,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             let silenceWindow = STABILIZER_CONFIG.DOM_SILENCE_WINDOW_DEFAULT;
             try {
                 const metrics = await adaptive.getSnapshot();
-                const targetStats = metrics.targets[result.domain];
+                const targetStats = (/** @type {any} */ (metrics)).targets[result.domain];
 
                 if (targetStats) {
                     const avgStreamTime = targetStats.stream.avg;
@@ -410,25 +415,26 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                     }
                 }
             } catch (err) {
-                log('DEBUG', `[STABILIZER] Adaptive snapshot failed: ${err.message}`, correlationId);
+                const _ce = /** @type {any} */ (err);
+                log('DEBUG', `[STABILIZER] Adaptive snapshot failed: ${_ce.message}`, correlationId);
             }
 
             try {
                 await page.evaluate(
-                    async (windowMs, taskDomain, maxWaitMs, config) => {
-                        const observers = [];
-                        if (!window.__STABILIZER_OBSERVERS) {
-                            window.__STABILIZER_OBSERVERS = [];
+                    async (/** @type {any} */ windowMs, /** @type {any} */ taskDomain, /** @type {any} */ maxWaitMs, /** @type {any} */ config) => {
+                        /** @type {any[]} */ const observers = [];
+                        if (!(/** @type {any} */ (window)).__STABILIZER_OBSERVERS) {
+                            (/** @type {any} */ (window)).__STABILIZER_OBSERVERS = [];
                         }
 
                         try {
-                            return new Promise(resolve => {
+                            return /** @type {Promise<void>} */ (new Promise((/** @type {any} */ resolve) => {
                                 let lastActivity = Date.now();
                                 const startTime = Date.now();
 
-                                const onMutation = mutations => {
+                                const onMutation = (/** @type {any} */ mutations) => {
                                     const isRelevant = mutations.some(
-                                        m =>
+                                        (/** @type {any} */ m) =>
                                             m.type === 'childList' ||
                                             m.type === 'characterData' ||
                                             (m.type === 'attributes' &&
@@ -467,6 +473,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                                         queue.push(nodeWithContent.contentDocument);
                                                     }
                                                 } catch (_err) {
+                                                    const _ce = /** @type {any} */ (_err);
                                                     // Ignore cross-origin iframe access errors
                                                 }
                                             }
@@ -475,7 +482,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                     }
                                 }
 
-                                roots.forEach(r => {
+                                roots.forEach((/** @type {any} */ r) => {
                                     const obs = new MutationObserver(onMutation);
                                     const target = r instanceof ShadowRoot ? r : r.documentElement || r;
                                     try {
@@ -489,18 +496,19 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                             attributeOldValue: false,
                                         });
                                         observers.push(obs);
-                                        window.__STABILIZER_OBSERVERS.push(obs);
+                                        (/** @type {any} */ (window)).__STABILIZER_OBSERVERS.push(obs);
                                     } catch (_err) {
+                                        const _ce = /** @type {any} */ (_err);
                                         // Ignore observer errors
                                     }
                                 });
 
                                 const check = setInterval(() => {
                                     const now = Date.now();
-                                    if (!window.__SADI_PULSE) {
-                                        window.__SADI_PULSE = {};
+                                    if (!(/** @type {any} */ (window)).__SADI_PULSE) {
+                                        (/** @type {any} */ (window)).__SADI_PULSE = {};
                                     }
-                                    const lastPulse = window.__SADI_PULSE[taskDomain] || 0;
+                                    const lastPulse = (/** @type {any} */ (window)).__SADI_PULSE[taskDomain] || 0;
                                     const isPulsing = now - lastPulse < config.SADI_PULSE_THRESHOLD;
 
                                     if ((!isPulsing && now - lastActivity > windowMs) || now - startTime > maxWaitMs) {
@@ -508,9 +516,9 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                         resolve();
                                     }
                                 }, config.ENTROPY_CHECK_INTERVAL);
-                            });
+                            }));
                         } finally {
-                            observers.forEach(o => o.disconnect());
+                            observers.forEach((/** @type {any} */ o) => o.disconnect());
                         }
                     },
                     silenceWindow,
@@ -526,13 +534,14 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 driver._emitVital('PHASE_SUCCESS', { phase: 'DOM_ENTROPY', duration: phase3Duration });
                 result.phasesCompleted.push('DOM_ENTROPY');
             } catch (evaluateErr) {
+                const _ce = /** @type {any} */ (evaluateErr);
                 if (isPageClosed()) {
                     throw new Error('page is closed'); // eslint-disable-line preserve-caught-error
                 }
-                log('WARN', `[STABILIZER] DOM entropy failed: ${evaluateErr.message}`, correlationId);
+                log('WARN', `[STABILIZER] DOM entropy failed: ${_ce.message}`, correlationId);
                 driver._emitVital('PHASE_FAILURE', {
                     phase: 'DOM_ENTROPY',
-                    error: evaluateErr.message,
+                    error: _ce.message,
                     recoverable: true,
                 });
                 result.phasesFailed.push('DOM_ENTROPY');
@@ -540,15 +549,16 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 // [v2.0] Force cleanup (Bug #6 fix)
                 await page
                     .evaluate(() => {
-                        if (window.__STABILIZER_OBSERVERS) {
-                            window.__STABILIZER_OBSERVERS.forEach(obs => {
+                        if ((/** @type {any} */ (window)).__STABILIZER_OBSERVERS) {
+                            (/** @type {any} */ (window)).__STABILIZER_OBSERVERS.forEach((/** @type {any} */ obs) => {
                                 try {
                                     obs.disconnect();
                                 } catch (_err) {
+                                    const _ce = /** @type {any} */ (_err);
                                     // Ignore observer cleanup errors
                                 }
                             });
-                            window.__STABILIZER_OBSERVERS = [];
+                            (/** @type {any} */ (window)).__STABILIZER_OBSERVERS = [];
                         }
                     })
                     .catch(() => {});
@@ -569,8 +579,8 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
             driver._emitVital('PHASE_START', { phase: 'HYDRATION' });
 
             try {
-                await page.evaluate(config => {
-                    return new Promise(resolve => {
+                await page.evaluate((/** @type {any} */ config) => {
+                    return new Promise((/** @type {any} */ resolve) => {
                         const controller = new AbortController();
                         let done = false;
 
@@ -583,11 +593,13 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                             try {
                                 document.removeEventListener('mousemove', onMouseMove);
                             } catch (_err) {
+                                const _ce = /** @type {any} */ (_err);
                                 // Ignore remove listener errors
                             }
                             try {
                                 controller.abort();
                             } catch (_err) {
+                                const _ce = /** @type {any} */ (_err);
                                 // Ignore abort errors
                             }
                             resolve();
@@ -596,7 +608,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                         const onMouseMove = () => {
                             finish();
                         };
-                        const addMouseMoveListener = options => {
+                        const addMouseMoveListener = (/** @type {any} */ options) => {
                             document.addEventListener('mousemove', onMouseMove, options);
                         };
 
@@ -610,6 +622,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                                 signal: controller.signal,
                             });
                         } catch (_err) {
+                            const _ce = /** @type {any} */ (_err);
                             // Fallback for contexts that do not support AbortSignal in addEventListener options
                             addMouseMoveListener({ once: true });
                         }
@@ -626,8 +639,9 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 driver._emitVital('PHASE_SUCCESS', { phase: 'HYDRATION', duration: phase4Duration });
                 result.phasesCompleted.push('HYDRATION');
             } catch (err) {
-                log('DEBUG', `[STABILIZER] Hydration guard failed: ${err.message}`, correlationId);
-                driver._emitVital('PHASE_FAILURE', { phase: 'HYDRATION', error: err.message, recoverable: true });
+                const _ce = /** @type {any} */ (err);
+                log('DEBUG', `[STABILIZER] Hydration guard failed: ${_ce.message}`, correlationId);
+                driver._emitVital('PHASE_FAILURE', { phase: 'HYDRATION', error: _ce.message, recoverable: true });
                 result.phasesFailed.push('HYDRATION');
             }
         }
@@ -649,11 +663,11 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 await Promise.race([
                     page.evaluate(
                         () =>
-                            new Promise(r => {
+                            new Promise((/** @type {any} */ r) => {
                                 requestAnimationFrame(() => requestAnimationFrame(r));
                             })
                     ),
-                    new Promise(r => setTimeout(r, STABILIZER_CONFIG.FRAME_SYNC_TIMEOUT)),
+                    new Promise((/** @type {any} */ r) => setTimeout(r, STABILIZER_CONFIG.FRAME_SYNC_TIMEOUT)),
                 ]);
 
                 throwIfAborted('FRAME_SYNC');
@@ -663,8 +677,9 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                 driver._emitVital('PHASE_SUCCESS', { phase: 'FRAME_SYNC', duration: phase5Duration });
                 result.phasesCompleted.push('FRAME_SYNC');
             } catch (err) {
-                log('DEBUG', `[STABILIZER] Frame sync failed: ${err.message}`, correlationId);
-                driver._emitVital('PHASE_FAILURE', { phase: 'FRAME_SYNC', error: err.message, recoverable: true });
+                const _ce = /** @type {any} */ (err);
+                log('DEBUG', `[STABILIZER] Frame sync failed: ${_ce.message}`, correlationId);
+                driver._emitVital('PHASE_FAILURE', { phase: 'FRAME_SYNC', error: _ce.message, recoverable: true });
                 result.phasesFailed.push('FRAME_SYNC');
             }
         }
@@ -695,7 +710,7 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
                         lag,
                         measurements: result.lagMeasurements.length,
                     });
-                    await new Promise(r => setTimeout(r, STABILIZER_CONFIG.CPU_LAG_RETRY_DELAY));
+                    await new Promise((/** @type {any} */ r) => setTimeout(r, STABILIZER_CONFIG.CPU_LAG_RETRY_DELAY));
                 }
             }
 
@@ -734,14 +749,15 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
 
         return result;
     } catch (e) {
+        const _ce = /** @type {any} */ (e);
         // [v2.0] Consistent error propagation (Improvement #14)
         result.duration = Date.now() - start;
 
         // Abort is not an error: return a failure result and emit STABILITY_ABORTED.
-        if (e?.name === 'StabilizerAbortError') {
+        if (_ce?.name === 'StabilizerAbortError') {
             result.success = false;
 
-            const phase = e.phase || null;
+            const phase = _ce.phase || null;
             if (phase && !result.phasesCompleted.includes(phase) && !result.phasesFailed.includes(phase)) {
                 result.phasesFailed.push(phase);
             }
@@ -757,20 +773,20 @@ async function waitForStability(driver, timeoutMs = STABILIZER_CONFIG.DEFAULT_TI
         // Critical: page closed. Must propagate and emit STABILITY_ERROR.
         if (isPageClosed()) {
             const message = 'page is closed';
-            log('ERROR', `[STABILIZER] Page closed during stabilization: ${e?.message || message}`, correlationId);
+            log('ERROR', `[STABILIZER] Page closed during stabilization: ${_ce?.message || message}`, correlationId);
             driver._emitVital('STABILITY_ERROR', {
                 error: message,
                 critical: true,
                 duration: result.duration,
             });
 
-            if (e?.message && /page is closed/i.test(e.message)) {
-                throw e;
+            if (_ce?.message && /page is closed/i.test(_ce.message)) {
+                throw _ce;
             }
             throw new Error(message); // eslint-disable-line preserve-caught-error
         }
 
-        const msg = e?.message || String(e);
+        const msg = _ce?.message || String(_ce);
 
         if (Date.now() >= deadline) {
             log('WARN', `[STABILIZER] Stabilization timeout (${result.duration}ms): ${msg}`, correlationId);

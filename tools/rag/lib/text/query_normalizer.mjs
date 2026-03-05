@@ -60,8 +60,8 @@ export function expandQuery(/** @type {any} */ query) {
 
     // Add synonyms for each token
     for (const token of tokens) {
-        if ((/** @type {any} */ (CODE_SYNONYMS))[token]) {
-            (/** @type {any} */ (CODE_SYNONYMS))[token].forEach((/** @type {any} */ syn) => expanded.add(syn));
+        if (/** @type {any} */ (CODE_SYNONYMS)[token]) {
+            /** @type {any} */ (CODE_SYNONYMS)[token].forEach((/** @type {any} */ syn) => expanded.add(syn));
         }
     }
 
