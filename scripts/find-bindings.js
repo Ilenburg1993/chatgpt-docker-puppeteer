@@ -6,8 +6,12 @@ import path from 'node:path';
 
 const ROOT = process.argv[2] || path.join(process.cwd(), 'src');
 const EXT = new Set(['.js', '.ts', '.cjs', '.mjs', '.jsx', '.tsx']);
-let issues = [];
+let issues = /** @type {any[]} */ ([]);
 
+/**
+ * @param {string} dir
+ * @returns {void}
+ */
 function walk(dir) {
     let entries;
     try {

@@ -27,7 +27,7 @@ function isJSFile(filepath) {
 /**
  * Extrai funções e métodos de um arquivo JavaScript.
  * @param {string} content - Conteúdo do arquivo.
- * @returns {Array<{name: string, type: string, startLine: number, endLine: number}>} Lista de funções/métodos encontrados.
+ * @returns {Array<{name: string, type: string, startLine: number, endLine?: number}>} Lista de funções/métodos encontrados.
  */
 function extractFunctions(content) {
     const functions = [];
@@ -172,7 +172,7 @@ function processFile(filepath) {
 /**
  * Processa todos os arquivos JS/TS em um diretório recursivamente.
  * @param {string} dir - Diretório para processar.
- * @returns {object} Estatísticas de processamento.
+ * @returns {{totalAdded: number, totalProcessed: number}} Estatísticas de processamento.
  */
 function processDirectory(dir) {
     let totalAdded = 0;
@@ -196,7 +196,8 @@ function processDirectory(dir) {
                 }
                 totalProcessed++;
             } catch (error) {
-                console.error(`❌ Erro ao processar ${fullPath}:`, error.message);
+                const _ce = /** @type {any} */ (error);
+                console.error(`❌ Erro ao processar ${fullPath}:`, _ce.message);
             }
         }
     }

@@ -1033,7 +1033,7 @@
     "--shm-size=4g",
     // STABILITY: Evita erro de "Too many open files" no VS Code/Node
     "--ulimit",
-    "nofile=65536:65536",
+    "nofile=262144:262144",
     // ============================================================================
     // IDENTITY & SECURITY: Docker CLI Access
     // ============================================================================

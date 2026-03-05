@@ -27,6 +27,10 @@ const supervisor = createOllamaHostSupervisor({
 });
 
 let shuttingDown = false;
+/**
+ * @param {string} signal
+ * @returns {Promise<void>}
+ */
 async function shutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;

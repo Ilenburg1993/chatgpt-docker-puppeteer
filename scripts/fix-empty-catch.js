@@ -3,6 +3,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+/**
+ * @param {string} filePath
+ * @returns {number}
+ */
 function fixFile(filePath) {
     let content = fs.readFileSync(filePath, 'utf-8');
     let totalFixed = 0;
@@ -30,6 +34,10 @@ function fixFile(filePath) {
     return totalFixed;
 }
 
+/**
+ * @param {string} dir
+ * @returns {number}
+ */
 function walkDir(dir) {
     let totalFixed = 0;
     const files = fs.readdirSync(dir);

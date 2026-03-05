@@ -138,6 +138,12 @@ function createDebugDirectory() {
     return debugDir;
 }
 
+/**
+ * @param {any} entryPoint
+ * @param {any} config
+ * @param {any} scenario
+ * @returns {string}
+ */
 function generateScenarioId(entryPoint, config, scenario) {
     return `${entryPoint.name}_${config.name}_${scenario.name}`
         .toLowerCase()
@@ -145,6 +151,11 @@ function generateScenarioId(entryPoint, config, scenario) {
         .replace(/_+/g, '_');
 }
 
+/**
+ * @param {any} baseEnv
+ * @param {any} additionalEnv
+ * @returns {any}
+ */
 function mergeEnv(baseEnv, additionalEnv) {
     return { ...baseEnv, ...additionalEnv };
 }
@@ -153,6 +164,12 @@ function mergeEnv(baseEnv, additionalEnv) {
 // EXECUTOR DE CENÁRIOS
 // ============================================================================
 
+/**
+ * @param {any} entryPoint
+ * @param {any} config
+ * @param {any} scenario
+ * @returns {Promise<any>}
+ */
 async function executeScenario(entryPoint, config, scenario) {
     const scenarioId = generateScenarioId(entryPoint, config, scenario);
     // const debugDir = createDebugDirectory(); // Diretório criado implicitamente
@@ -198,7 +215,7 @@ async function executeScenario(entryPoint, config, scenario) {
         timeoutId = setTimeout(() => {
             console.log(`   ⏰ Timeout atingido, encerrando processo...`);
             try {
-                process.kill(child.pid, 'SIGTERM');
+                process.kill(/** @type {number} */ (child.pid), 'SIGTERM');
             } catch (_e) {
                 // Processo já pode ter terminado
             }
@@ -242,6 +259,10 @@ async function executeScenario(entryPoint, config, scenario) {
 // ANALISADOR DE RESULTADOS
 // ============================================================================
 
+/**
+ * @param {any[]} results
+ * @returns {any}
+ */
 function analyzeResults(results) {
     console.log('\n📊 ANÁLISE DE RESULTADOS\n');
 
@@ -257,17 +278,17 @@ function analyzeResults(results) {
         console.log('\n🔍 ERROS DETECTADOS:');
         errors.forEach(error => {
             console.log(
-                `   • ${error.scenarioId}: ${error.stderr.split('\n').find(line => line.includes('Error')) || 'Erro genérico'}`
+                `   • ${error.scenarioId}: ${error.stderr.split('\n').find((/** @type {string} */ line) => line.includes('Error')) || 'Erro genérico'}`
             );
         });
     }
 
     // Analisar padrões de falha
-    const errorPatterns = {};
+    const errorPatterns = /** @type {Record<string, number>} */ ({});
     results.forEach(result => {
         if (result.stderr) {
             const lines = result.stderr.split('\n');
-            lines.forEach(line => {
+            lines.forEach((/** @type {string} */ line) => {
                 if (line.includes('Error') || line.includes('Exception') || line.includes('uncaught')) {
                     const pattern = line.split(':')[0];
                     errorPatterns[pattern] = (errorPatterns[pattern] || 0) + 1;
@@ -302,6 +323,9 @@ function analyzeResults(results) {
 // PERSISTÊNCIA DE RESULTADOS
 // ============================================================================
 
+/**
+ * @param {any} analysis
+ */
 function saveResults(analysis) {
     const debugDir = createDebugDirectory();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -317,6 +341,10 @@ function saveResults(analysis) {
     console.log(`📄 Relatório HTML salvo em: ${htmlPath}`);
 }
 
+/**
+ * @param {any} analysis
+ * @returns {string}
+ */
 function generateHtmlReport(analysis) {
     return `
 <!DOCTYPE html>
@@ -353,7 +381,7 @@ function generateHtmlReport(analysis) {
     <h2>Detailed Results</h2>
     ${analysis.detailed
         .map(
-            result => `
+            (/** @type {any} */ result) => `
         <div class="scenario ${result.exitCode === 0 ? 'passed' : 'failed'}">
             <h3>${result.scenarioId}</h3>
             <p>Exit Code: ${result.exitCode}</p>
@@ -400,10 +428,11 @@ async function main() {
                     // Pequena pausa entre cenários para evitar interferência
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 } catch (error) {
-                    console.error(`❌ Erro crítico no cenário: ${error.message}`);
+                    const _ce = /** @type {any} */ (error);
+                    console.error(`❌ Erro crítico no cenário: ${_ce.message}`);
                     results.push({
                         scenarioId: generateScenarioId(entryPoint, config, scenario),
-                        error: error.message,
+                        error: _ce.message,
                         timestamp: new Date().toISOString(),
                     });
                 }

@@ -33,7 +33,7 @@ const VALID_ENFORCE_LEVELS = new Set(['off', 'warn', 'p1', 'p0']);
 
 /**
  * @param {string} filePath
- * @returns {object}
+ * @returns {any}
  */
 function readJson(filePath) {
     const raw = fs.readFileSync(filePath, 'utf8');
@@ -80,8 +80,8 @@ function validateContract(contract, index, sourcePath) {
 
 /**
  * @typedef {object} LoadContractRegistryOptions
- * @property {string} registryPath
- * @property {string[]} domainsFilter
+ * @property {string} [registryPath]
+ * @property {string[]} [domainsFilter]
  */
 /**
  * @param {LoadContractRegistryOptions} [options]
@@ -163,7 +163,7 @@ export function loadContractRegistry(options = {}) {
             continue;
         }
         const domainContracts = Array.isArray(payload?.contracts) ? payload.contracts : [];
-        domainContracts.forEach((item, index) => {
+        domainContracts.forEach((/** @type {any} */ item, /** @type {any} */ index) => {
             const contract = /** @type {ContractDefinitionV1} */ ({
                 ...item,
                 source_path: String(relPath),

@@ -40,6 +40,10 @@ const SIMPLE_SCENARIOS = [
     },
 ];
 
+/**
+ * @param {any} scenario
+ * @returns {Promise<any>}
+ */
 async function runSimpleScenario(scenario) {
     console.log(`\n🧪 Executando: ${scenario.name}`);
     console.log(`   📝 ${scenario.description}`);
@@ -136,10 +140,11 @@ async function main() {
             // Pequena pausa entre cenários
             await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error) {
-            console.error(`❌ Erro crítico no cenário ${scenario.name}: ${error.message}`);
+            const _ce = /** @type {any} */ (error);
+            console.error(`❌ Erro crítico no cenário ${scenario.name}: ${_ce.message}`);
             results.push({
                 scenario: scenario.name,
-                error: error.message,
+                error: _ce.message,
                 success: false,
             });
         }

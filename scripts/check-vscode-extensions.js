@@ -6,7 +6,7 @@ import { execSync } from 'node:child_process';
 /**
  * Remove comentários do formato JSONC para converter para JSON válido.
  * @param {string} content - Conteúdo JSONC como string.
- * @returns {object} Objeto JSON resultante após remoção dos comentários.
+ * @returns {any} Objeto JSON resultante após remoção dos comentários.
  */
 function parseJSONC(content) {
     const lines = content.split('\n').filter(line => {
@@ -29,7 +29,7 @@ function main() {
         const config = parseJSONC(extensionsFile);
 
         // Obter extensões instaladas
-        let installed = [];
+        let installed = /** @type {string[]} */ ([]);
         try {
             const output = execSync('code --list-extensions', { encoding: 'utf-8' });
             installed = output
@@ -45,7 +45,7 @@ function main() {
         const unwanted = config.unwantedRecommendations || [];
 
         // Calcular estatísticas
-        const installedCount = recommended.filter(ext => installed.includes(ext.toLowerCase())).length;
+        const installedCount = recommended.filter((/** @type {string} */ ext) => installed.includes(ext.toLowerCase())).length;
 
         const missingCount = recommended.length - installedCount;
         const percentage = Math.round((installedCount / recommended.length) * 100);
@@ -69,7 +69,8 @@ function main() {
             process.exit(0);
         }
     } catch (error) {
-        console.error('❌ Erro ao verificar extensões:', error.message);
+        const _ce = /** @type {any} */ (error);
+        console.error('❌ Erro ao verificar extensões:', _ce.message);
         process.exit(1);
     }
 }

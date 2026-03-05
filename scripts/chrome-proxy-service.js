@@ -97,8 +97,8 @@ function parseIntSafe(value, defaultValue, varName, range = {}) {
     if (value == null || value === '') return defaultValue;
 
     const parsed = parseInt(String(value), 10);
-    const min = Number.isFinite(range.min) ? range.min : 1;
-    const max = Number.isFinite(range.max) ? range.max : 65535;
+    const min = Number.isFinite(range.min) ? /** @type {number} */ (range.min) : 1;
+    const max = Number.isFinite(range.max) ? /** @type {number} */ (range.max) : 65535;
 
     if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
         console.warn(`[WARN] Invalid ${varName}="${value}", using default: ${defaultValue}`);
@@ -381,7 +381,8 @@ function shutdownOnceFactory(svc, timeoutMs, reason, exitCode) {
 
             await Promise.race([stopPromise, new Promise(resolve => setTimeout(resolve, timeoutMs))]);
         } catch (err) {
-            console.error(`[ERROR][pm2:${tag}] Error during shutdown:`, err && err.stack ? err.stack : err);
+            const _ce = /** @type {any} */ (err);
+            console.error(`[ERROR][pm2:${tag}] Error during shutdown:`, _ce && _ce.stack ? _ce.stack : _ce);
         } finally {
             process.exit(exitCode);
         }
@@ -472,7 +473,7 @@ async function main() {
     const shutdownFatal = shutdownOnceFactory(svc, PM2_KILL_TIMEOUT_MS, 'fatal', 1);
 
     const processHandlers = {
-        message: msg => {
+        message: (/** @type {any} */ msg) => {
             // PM2: shutdown_with_message
             if (msg === 'shutdown') shutdownGracefully();
         },
@@ -484,11 +485,11 @@ async function main() {
         sigterm: shutdownGracefully,
         sigquit: shutdownGracefully,
         sigusr2: shutdownGracefully,
-        uncaughtException: err => {
+        uncaughtException: (/** @type {any} */ err) => {
             console.error(`[ERROR][pm2:${tag}] uncaughtException:`, err && err.stack ? err.stack : err);
             shutdownFatal();
         },
-        unhandledRejection: reason => {
+        unhandledRejection: (/** @type {any} */ reason) => {
             console.error(`[ERROR][pm2:${tag}] unhandledRejection:`, reason);
             shutdownFatal();
         },
@@ -518,8 +519,9 @@ async function main() {
         await svc.start();
         console.log(`[INFO][pm2:${tag}] ChromeProxyService started successfully`);
     } catch (err) {
+        const _ce = /** @type {any} */ (err);
         console.error(`\n❌ Failed to start ChromeProxyService [pm2:${tag}]:`);
-        console.error(err && err.stack ? err.stack : err);
+        console.error(_ce && _ce.stack ? _ce.stack : _ce);
 
         unregisterProcessHandlers();
 

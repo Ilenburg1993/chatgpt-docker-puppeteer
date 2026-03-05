@@ -11,10 +11,12 @@ const { values } = parseArgs({
     },
 });
 
-const report = /** @type {any} */ (await ragHealth({
-    ollamaBaseUrl: values['ollama-base-url'],
-    model: values.model,
-}));
+const report = /** @type {any} */ (
+    await ragHealth({
+        ollamaBaseUrl: values['ollama-base-url'],
+        model: values.model,
+    })
+);
 
 if (values.json) {
     console.log(JSON.stringify(report, null, 2));

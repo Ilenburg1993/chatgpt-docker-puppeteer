@@ -23,7 +23,7 @@ if (unusedVars.length === 0) {
 
 console.log(`\n🔧 Processing ${unusedVars.length} unused variable(s)...\n`);
 
-const changes = {};
+const changes = /** @type {any} */ ({});
 
 // Parse ESLint output
 unusedVars.forEach(line => {
@@ -55,7 +55,7 @@ Object.entries(changes).forEach(([file, vars]) => {
     const lines = content.split('\n');
     let modified = false;
 
-    vars.forEach(({ line, varName }) => {
+    vars.forEach((/** @type {any} */ { line, varName }) => {
         const lineIdx = line - 1;
         if (lineIdx >= lines.length) {
             return;

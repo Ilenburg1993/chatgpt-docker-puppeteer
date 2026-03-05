@@ -10,7 +10,7 @@ const args = process.argv.slice(2);
 const WATCH_MODE = args.includes('--watch');
 const ONLY_FAILED = args.includes('--failed');
 const TAG_FILTER = args.find(a => a.startsWith('--tag='))?.split('=')[1];
-const LIMIT = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1], 10) || 15;
+const LIMIT = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1] ?? '15', 10) || 15;
 
 // Cores ANSI
 const C = {
@@ -36,17 +36,22 @@ const STATUS_COLORS = {
 };
 
 // --- HELPERS DE DADOS (V2/V3 ADAPTER) ---
-const getStatus = t => t.state?.status || t.status || 'UNKNOWN';
-const getPrio = t => t.meta?.priority ?? t.prioridade ?? 5;
-const getId = t => t.meta?.id || t.id || '???';
-const getPrompt = t => t.spec?.payload?.user_message || t.prompt || '';
-const getCreated = t => t.meta?.created_at || t.criadoEm;
-const getStarted = t => t.state?.started_at || t.startedEm;
-const getCompleted = t => t.state?.completed_at;
-const getError = t => t.state?.history?.find(h => h.event === 'ERROR')?.msg || t.erro || '';
-const getSchedule = t => t.policy?.execute_after;
-const getTags = t => t.meta?.tags || [];
+const getStatus = (/** @type {any} */ t) => t.state?.status || t.status || 'UNKNOWN';
+const getPrio = (/** @type {any} */ t) => t.meta?.priority ?? t.prioridade ?? 5;
+const getId = (/** @type {any} */ t) => t.meta?.id || t.id || '???';
+const getPrompt = (/** @type {any} */ t) => t.spec?.payload?.user_message || t.prompt || '';
+const getCreated = (/** @type {any} */ t) => t.meta?.created_at || t.criadoEm;
+const getStarted = (/** @type {any} */ t) => t.state?.started_at || t.startedEm;
+const getCompleted = (/** @type {any} */ t) => t.state?.completed_at;
+const getError = (/** @type {any} */ t) =>
+    t.state?.history?.find((/** @type {any} */ h) => h.event === 'ERROR')?.msg || t.erro || '';
+const getSchedule = (/** @type {any} */ t) => t.policy?.execute_after;
+const getTags = (/** @type {any} */ t) => t.meta?.tags || [];
 
+/**
+ * @param {string|undefined} isoDate
+ * @returns {string}
+ */
 function timeAgo(isoDate) {
     if (!isoDate) {
         return '-';
@@ -71,9 +76,9 @@ function render() {
 
     const files = fs.readdirSync(QUEUE_DIR).filter(f => f.endsWith('.json'));
     const stats = { TOTAL: 0, PENDING: 0, RUNNING: 0, DONE: 0, FAILED: 0, PAUSED: 0, SCHEDULED: 0, SKIPPED: 0 };
-    const activeTasks = [];
-    const recentFailures = [];
-    const completedDurations = []; // Para cálculo de ETA
+    const activeTasks = /** @type {any[]} */ ([]);
+    const recentFailures = /** @type {any[]} */ ([]);
+    const completedDurations = /** @type {any[]} */ ([]); // Para cálculo de ETA
 
     files.forEach(f => {
         try {
@@ -93,8 +98,8 @@ function render() {
             }
 
             stats.TOTAL++;
-            if (stats[status] !== undefined) {
-                stats[status]++;
+            if (/** @type {any} */ (stats)[status] !== undefined) {
+                /** @type {any} */ (stats)[status]++;
             }
 
             // Telemetria de Tempo (últimas 20 tarefas concluídas para média móvel)
@@ -102,7 +107,7 @@ function render() {
                 const start = getStarted(t);
                 const end = getCompleted(t);
                 if (start && end) {
-                    completedDurations.push(new Date(end) - new Date(start));
+                    completedDurations.push(Number(new Date(end)) - Number(new Date(start)));
                 }
             }
 
@@ -167,7 +172,7 @@ function render() {
     }
 
     // Listagem de Ativas
-    console.log(`\n${C.DIM}TAREFAS ATIVAS (Limit: ${LIMIT}):${C.RST}`);
+    console.log(`\n${C.DIM}TAREFAS ATIVAS (Limit: ${LIMIT}):${C.RESET}`);
     console.log(`${C.DIM}ID                       STATUS      PRIO   TEMPO   PROMPT${C.RESET}`);
     console.log(C.DIM + '-'.repeat(80) + C.RESET);
 
@@ -175,7 +180,7 @@ function render() {
         .sort((a, b) => (a.status === 'RUNNING' ? -1 : 1) || b.prio - a.prio)
         .slice(0, LIMIT)
         .forEach(t => {
-            const color = STATUS_COLORS[t.status] || C.WHITE;
+            const color = /** @type {any} */ (STATUS_COLORS)[t.status] || C.WHITE;
             let timeLabel = t.status === 'RUNNING' ? timeAgo(t.started) : timeAgo(t.created);
             if (t.status === 'SCHEDULED') {
                 const d = new Date(t.schedule);
@@ -190,7 +195,7 @@ function render() {
     if (recentFailures.length > 0) {
         console.log(`\n${C.RED}FALHAS RECENTES:${C.RESET}`);
         recentFailures
-            .sort((a, b) => new Date(b.created) - new Date(a.created))
+            .sort((a, b) => Number(new Date(b.created)) - Number(new Date(a.created)))
             .slice(0, 3)
             .forEach(f => {
                 console.log(`  ${C.RED}✖${C.RESET} ${f.id.padEnd(20)} | ${f.error.slice(0, 60)}...`);

@@ -91,7 +91,8 @@ class ConfigValidator {
             const content = fs.readFileSync(filepath, 'utf8');
             return JSON.parse(content);
         } catch (error) {
-            this.errors.push(`Invalid JSON in ${filepath}: ${error.message}`);
+            const _ce = /** @type {any} */ (error);
+            this.errors.push(`Invalid JSON in ${filepath}: ${_ce.message}`);
             return null;
         }
     }
@@ -179,7 +180,7 @@ class ConfigValidator {
      */
     validateEnvironment() {
         const env = process.env.NODE_ENV || 'development';
-        const required = REQUIRED_ENV_VARS[env] || [];
+        const required = (/** @type {any} */ (REQUIRED_ENV_VARS))[env] || [];
 
         this.log('INFO', `Validating environment variables for: ${env}`);
 
@@ -227,7 +228,8 @@ class ConfigValidator {
                     fs.unlinkSync(testFile);
                     this.log('INFO', `✓ ${dir}/ is writable`);
                 } catch (error) {
-                    this.errors.push(`Directory "${dir}" is not writable: ${error.message}`);
+                    const _ce = /** @type {any} */ (error);
+                    this.errors.push(`Directory "${dir}" is not writable: ${_ce.message}`);
                 }
             }
         }
@@ -253,7 +255,8 @@ class ConfigValidator {
             }
             this.log('INFO', `✓ ${entryPoint} exists and looks valid`);
         } catch (error) {
-            this.errors.push(`Cannot read ${entryPoint}: ${error.message}`);
+            const _ce = /** @type {any} */ (error);
+            this.errors.push(`Cannot read ${entryPoint}: ${_ce.message}`);
         }
     }
 

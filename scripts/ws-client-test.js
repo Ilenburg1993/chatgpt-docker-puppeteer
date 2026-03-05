@@ -15,7 +15,7 @@ ws.on('open', () => {
     ws.send(JSON.stringify({ id: 1, method: 'Target.getTargets' }));
 });
 
-ws.on('message', data => {
+ws.on('message', (/** @type {any} */ data) => {
     console.log('[ws-client] message', data.toString());
     ws.close();
 });
@@ -25,7 +25,7 @@ ws.on('close', () => {
     process.exit(0);
 });
 
-ws.on('error', err => {
+ws.on('error', (/** @type {any} */ err) => {
     console.error('[ws-client] error', err && err.message ? err.message : String(err));
     process.exit(1);
 });

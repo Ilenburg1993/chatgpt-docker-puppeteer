@@ -9,6 +9,10 @@ const SOURCE_FILE = process.argv[2] || path.join(ROOT, 'prompts.txt');
 
 // --- HELPERS DE ROBUSTEZ ---
 
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 function sanitizePrompt(text) {
     if (!text || typeof text !== 'string') {
         return '';
@@ -18,6 +22,11 @@ function sanitizePrompt(text) {
     return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
 }
 
+/**
+ * @param {string} filepath
+ * @param {string} content
+ * @returns {void}
+ */
 function atomicWrite(filepath, content) {
     const tmp = `${filepath}.tmp.${Date.now()}`;
     fs.writeFileSync(tmp, content, 'utf-8');

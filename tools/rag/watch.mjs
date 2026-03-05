@@ -184,15 +184,17 @@ async function main() {
         batchMax,
         onBatch: async (/** @type {string[]} */ batch) => {
             const started = Date.now();
-            const report = /** @type {any} */ (await ragIndexChanged({
-                root,
-                profile,
-                includeGlobs,
-                excludeGlobs,
-                docsMode,
-                maxFileBytes,
-                changedPaths: batch,
-            }));
+            const report = /** @type {any} */ (
+                await ragIndexChanged({
+                    root,
+                    profile,
+                    includeGlobs,
+                    excludeGlobs,
+                    docsMode,
+                    maxFileBytes,
+                    changedPaths: batch,
+                })
+            );
             const tookMs = Date.now() - started;
             console.log(
                 `[RAG Watch] batch=${batch.length} changed=${report.changed_files} ` +

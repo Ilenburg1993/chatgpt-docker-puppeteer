@@ -47,7 +47,7 @@ const _VALID_MODELS = ['gpt-5', 'gpt-4o', 'o1-preview', 'gemini-1.5-pro', 'claud
 /**
  * Parseia argumentos da linha de comando para opções de criação de tarefa.
  * @param {string[]} args - Array de argumentos da linha de comando.
- * @returns {object} Opções parseadas com valores padrão.
+ * @returns {any} Opções parseadas com valores padrão.
  * @property {number} prio - Prioridade da tarefa (0-100).
  * @property {string} model - Modelo de IA a ser utilizado.
  * @property {string} target - Plataforma alvo (chatgpt, gemini, etc).
@@ -59,7 +59,7 @@ const _VALID_MODELS = ['gpt-5', 'gpt-4o', 'o1-preview', 'gemini-1.5-pro', 'claud
  * @property {boolean} interactive - Modo interativo ativado.
  */
 function parseArgs(args) {
-    const options = {
+    const options = /** @type {any} */ ({
         prio: 5,
         model: 'gpt-5',
         target: 'chatgpt',
@@ -69,7 +69,7 @@ function parseArgs(args) {
         template: null,
         after: null,
         interactive: args.length === 0,
-    };
+    });
 
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
@@ -132,12 +132,6 @@ function parseSchedule(input) {
  * Cria uma nova tarefa e a salva no diretório de fila.
  * Side-effects: Cria arquivo JSON no diretório de fila, imprime informações no console.
  * @param {CreateTaskOptions} opts - Opções da tarefa.
- * @param {number} opts.prio - Prioridade da tarefa (0-100).
- * @param {string} opts.model - Modelo de IA a ser utilizado.
- * @param {string} opts.target - Plataforma alvo (chatgpt, gemini, etc).
- * @param {string} opts.system - Mensagem do sistema/persona.
- * @param {string} opts.after - Data/agendamento para execução.
- * @param {string[]} opts.tags - Tags para categorização.
  * @param {string} promptText - Texto do prompt do usuário.
  */
 function createTask(opts, promptText) {
@@ -183,7 +177,8 @@ function createTask(opts, promptText) {
         }
         console.log(`   📝 Prompt:  "${promptText.slice(0, 50)}..."`);
     } catch (e) {
-        console.error(`\n❌ ERRO AO CRIAR TAREFA: ${e.message}`);
+        const _ce = /** @type {any} */ (e);
+        console.error(`\n❌ ERRO AO CRIAR TAREFA: ${_ce.message}`);
     }
 }
 
@@ -195,7 +190,7 @@ function createTask(opts, promptText) {
  */
 async function runInteractive() {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const ask = q =>
+    const ask = (/** @type {string} */ q) =>
         new Promise(r => {
             rl.question(q, r);
         });

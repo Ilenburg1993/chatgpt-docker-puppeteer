@@ -882,7 +882,7 @@
   "window.restoreWindows": "none",
   "window.titleBarStyle": "custom",
   "workbench.colorTheme": "GitHub Dark Default",
-  "workbench.editor.alwaysShowEditorActions": false,
+  "workbench.editor.alwaysShowEditorActions": true,
   "workbench.editor.closeEmptyGroups": true,
   "workbench.editor.closeOnFileDelete": true,
   "workbench.editor.enablePreview": true,
@@ -900,7 +900,7 @@
   "telemetry.telemetryLevel": "off",
   "windowsaistudio.enableRemoteFine-tuningAndInference": false,
   "windowsaistudio.externalOpenAIProviders": [],
-  "windowsaistudio.openAIInferencePort": 0,
+  "windowsaistudio.openAIInferencePort": 11435,
   "windowsaistudio.remoteInfereneEndpoints": [],
 
   // ===========================================================================

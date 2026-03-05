@@ -11,8 +11,11 @@ const REPORT_PATH = path.join(REPORT_DIR, 'fix-bindings-report.json');
 const EXT = new Set(['.js', '.ts', '.cjs', '.mjs', '.jsx', '.tsx']);
 const IGNORES = new Set(['node_modules', '.git', 'dist', 'build', 'coverage']);
 
-let edits = [];
+let edits = /** @type {any[]} */ ([]);
 
+/**
+ * @param {string} dir
+ */
 function walk(dir) {
     let entries;
     try {
@@ -32,6 +35,9 @@ function walk(dir) {
     }
 }
 
+/**
+ * @param {string} file
+ */
 function processFile(file) {
     let content;
     try {
@@ -41,7 +47,7 @@ function processFile(file) {
     }
     const _original = content;
     let changed = false;
-    const changesHere = [];
+    const changesHere = /** @type {any[]} */ ([]);
 
     // 1) Replace host literals used directly as listen args: server.listen(PORT, '127.0.0.1', ...)
     const listenArgRegex = /(\.listen\s*\(\s*[^\)]*?)(['\"])(127\.0\.0\.1|localhost)\2([^\)]*?\))/gs;
@@ -62,11 +68,14 @@ function processFile(file) {
     // 3) Replace hosts arrays: hosts: ['127.0.0.1', 'localhost']
     const hostsArrayRegex = /(\bhosts\s*:\s*\[)([\s\S]*?)(\])/g;
     content = content.replace(hostsArrayRegex, (m, start, inner, end) => {
-        const replaced = inner.replace(/(['\"])(127\.0\.0\.1|localhost)\1/g, (mm, q, h) => {
-            changesHere.push({ type: 'hosts-array', host: h, snippet: mm });
-            changed = true;
-            return `${q}0.0.0.0${q}`;
-        });
+        const replaced = inner.replace(
+            /(['"])(127\.0\.0\.1|localhost)\1/g,
+            (/** @type {any} */ mm, /** @type {any} */ q, /** @type {any} */ h) => {
+                changesHere.push({ type: 'hosts-array', host: h, snippet: mm });
+                changed = true;
+                return `${q}0.0.0.0${q}`;
+            }
+        );
         return `${start}${replaced}${end}`;
     });
 
@@ -86,7 +95,8 @@ function processFile(file) {
                 fs.copyFileSync(file, file + '.bak');
                 fs.writeFileSync(file, content, 'utf8');
             } catch (e) {
-                console.error(`[ERROR] Failed to write file ${file}:`, e.message);
+                const _ce = /** @type {any} */ (e);
+                console.error(`[ERROR] Failed to write file ${file}:`, _ce.message);
             }
         }
     }
@@ -125,7 +135,8 @@ try {
     fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2), 'utf8');
     console.log('[INFO] Report written to', REPORT_PATH);
 } catch (e) {
-    console.error('[WARN] Could not write report:', e.message);
+    const _ce = /** @type {any} */ (e);
+    console.error('[WARN] Could not write report:', _ce.message);
 }
 
 console.log('[INFO] Detected binding occurrences:');

@@ -112,6 +112,12 @@ const controlRegexFixes = [
 // ============================================================================
 // Helper Functions
 // ============================================================================
+/**
+ * @param {string} filePath
+ * @param {string|RegExp} pattern
+ * @param {string} replacement
+ * @returns {boolean}
+ */
 function applyFix(filePath, pattern, replacement) {
     try {
         const fullPath = path.join(process.cwd(), filePath);
@@ -135,11 +141,18 @@ function applyFix(filePath, pattern, replacement) {
         console.log(`✅ Fixed: ${filePath}`);
         return true;
     } catch (e) {
-        console.log(`❌ Error fixing ${filePath}: ${e.message}`);
+        const _ce = /** @type {any} */ (e);
+        console.log(`❌ Error fixing ${filePath}: ${_ce.message}`);
         return false;
     }
 }
 
+/**
+ * @param {string} filePath
+ * @param {number} lineNumber
+ * @param {string} comment
+ * @returns {boolean}
+ */
 function addCommentBeforeLine(filePath, lineNumber, comment) {
     try {
         const fullPath = path.join(process.cwd(), filePath);
@@ -152,7 +165,7 @@ function addCommentBeforeLine(filePath, lineNumber, comment) {
         }
 
         const targetLine = lines[lineNumber - 1];
-        const indent = targetLine.match(/^(\s*)/)[1];
+        const indent = targetLine.match(/^(\s*)/)?.[1] ?? '';
 
         // Check if comment already exists
         if (lines[lineNumber - 2] && lines[lineNumber - 2].includes('eslint-disable')) {
@@ -166,7 +179,8 @@ function addCommentBeforeLine(filePath, lineNumber, comment) {
         console.log(`✅ Added comment: ${filePath}:${lineNumber}`);
         return true;
     } catch (e) {
-        console.log(`❌ Error adding comment to ${filePath}: ${e.message}`);
+        const _ce = /** @type {any} */ (e);
+        console.log(`❌ Error adding comment to ${filePath}: ${_ce.message}`);
         return false;
     }
 }

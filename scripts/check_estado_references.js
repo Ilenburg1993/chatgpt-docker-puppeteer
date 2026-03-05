@@ -16,6 +16,10 @@ const ALLOWED_PATTERNS = [
     'scripts/',
 ];
 
+/**
+ * @param {string} dir
+ * @returns {string[]}
+ */
 function walk(dir) {
     const results = [];
     for (const name of fs.readdirSync(dir)) {

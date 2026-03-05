@@ -133,19 +133,24 @@ server.setRequestHandler(/** @type {any} */ ('tools/call'), async request => {
 });
 
 if (typeof server.setNotificationHandler === 'function') {
-    server.setNotificationHandler(/** @type {any} */ ('notifications/cancelled'), /** @type {any} */ (async (/** @type {any} */ notification) => {
-        const targetId =
-            notification?.params?.requestId ?? notification?.params?.id ?? notification?.params?.request_id;
-        const key = targetId !== undefined && targetId !== null ? String(targetId) : null;
-        if (!key) return {};
-        const controller = activeRequests.get(key);
-        if (controller) {
-            controller.abort();
-            activeRequests.delete(key);
-            console.error(`[MCP] Cancelled active request ${key}`);
-        }
-        return {};
-    }));
+    server.setNotificationHandler(
+        /** @type {any} */ ('notifications/cancelled'),
+        /** @type {any} */ (
+            async (/** @type {any} */ notification) => {
+                const targetId =
+                    notification?.params?.requestId ?? notification?.params?.id ?? notification?.params?.request_id;
+                const key = targetId !== undefined && targetId !== null ? String(targetId) : null;
+                if (!key) return {};
+                const controller = activeRequests.get(key);
+                if (controller) {
+                    controller.abort();
+                    activeRequests.delete(key);
+                    console.error(`[MCP] Cancelled active request ${key}`);
+                }
+                return {};
+            }
+        )
+    );
 }
 
 /**

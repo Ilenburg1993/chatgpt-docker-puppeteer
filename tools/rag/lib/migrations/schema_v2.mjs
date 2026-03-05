@@ -41,65 +41,67 @@
  *
  * Must return: Updated manifest with new schema_version
  */
-export const MIGRATIONS = /** @type {Record<string, Function>} */ ({
-    /**
-     * Example migration from v1 to v2
-     * (Not active - just demonstrates the pattern)
-     *
-     * Hypothetical changes:
-     * - Add 'tags_indexed' boolean to track if tags are in use
-     * - Add 'last_query_at' timestamp
-     * - Rename 'embedding.base_url_default' to 'embedding.default_base_url'
-     */
-    // '1->2': async (manifest, paths, db) => {
-    //   console.log('[RAG Migration] Migrating schema from v1 to v2...');
-    //
-    //   // Add new fields
-    //   manifest.tags_indexed = false;
-    //   manifest.last_query_at = null;
-    //
-    //   // Rename field (preserve value)
-    //   if (manifest.embedding.base_url_default) {
-    //     manifest.embedding.default_base_url = manifest.embedding.base_url_default;
-    //     delete manifest.embedding.base_url_default;
-    //   }
-    //
-    //   // Update version
-    //   manifest.schema_version = 2;
-    //
-    //   console.log('[RAG Migration] Migration to v2 complete');
-    //   return manifest;
-    // },
-    /**
-     * Example migration from v2 to v3
-     * (Not active - demonstrates chaining)
-     *
-     * Hypothetical changes:
-     * - Split 'files' map into separate metadata file
-     * - Add compression flag
-     */
-    // '2->3': async (manifest, paths, db) => {
-    //   console.log('[RAG Migration] Migrating schema from v2 to v3...');
-    //
-    //   // Extract files to separate JSON
-    //   const filesMetadata = manifest.files;
-    //   const metadataPath = path.join(paths.indexDir, 'files_metadata.v3.json');
-    //   await fs.writeFile(metadataPath, JSON.stringify(filesMetadata, null, 2), 'utf8');
-    //
-    //   // Replace with reference
-    //   manifest.files_ref = 'files_metadata.v3.json';
-    //   delete manifest.files;
-    //
-    //   // Add new field
-    //   manifest.compression_enabled = false;
-    //
-    //   // Update version
-    //   manifest.schema_version = 3;
-    //
-    //   console.log('[RAG Migration] Migration to v3 complete');
-    //   return manifest;
-    // }
-});
+export const MIGRATIONS = /** @type {Record<string, Function>} */ (
+    {
+        /**
+         * Example migration from v1 to v2
+         * (Not active - just demonstrates the pattern)
+         *
+         * Hypothetical changes:
+         * - Add 'tags_indexed' boolean to track if tags are in use
+         * - Add 'last_query_at' timestamp
+         * - Rename 'embedding.base_url_default' to 'embedding.default_base_url'
+         */
+        // '1->2': async (manifest, paths, db) => {
+        //   console.log('[RAG Migration] Migrating schema from v1 to v2...');
+        //
+        //   // Add new fields
+        //   manifest.tags_indexed = false;
+        //   manifest.last_query_at = null;
+        //
+        //   // Rename field (preserve value)
+        //   if (manifest.embedding.base_url_default) {
+        //     manifest.embedding.default_base_url = manifest.embedding.base_url_default;
+        //     delete manifest.embedding.base_url_default;
+        //   }
+        //
+        //   // Update version
+        //   manifest.schema_version = 2;
+        //
+        //   console.log('[RAG Migration] Migration to v2 complete');
+        //   return manifest;
+        // },
+        /**
+         * Example migration from v2 to v3
+         * (Not active - demonstrates chaining)
+         *
+         * Hypothetical changes:
+         * - Split 'files' map into separate metadata file
+         * - Add compression flag
+         */
+        // '2->3': async (manifest, paths, db) => {
+        //   console.log('[RAG Migration] Migrating schema from v2 to v3...');
+        //
+        //   // Extract files to separate JSON
+        //   const filesMetadata = manifest.files;
+        //   const metadataPath = path.join(paths.indexDir, 'files_metadata.v3.json');
+        //   await fs.writeFile(metadataPath, JSON.stringify(filesMetadata, null, 2), 'utf8');
+        //
+        //   // Replace with reference
+        //   manifest.files_ref = 'files_metadata.v3.json';
+        //   delete manifest.files;
+        //
+        //   // Add new field
+        //   manifest.compression_enabled = false;
+        //
+        //   // Update version
+        //   manifest.schema_version = 3;
+        //
+        //   console.log('[RAG Migration] Migration to v3 complete');
+        //   return manifest;
+        // }
+    }
+);
 
 /**
  * Apply migrations to bring manifest from current version to target version

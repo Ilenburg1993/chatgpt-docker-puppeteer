@@ -110,12 +110,12 @@ const CRITICAL_SCENARIOS = [
 
 class RuntimeMonitor {
     constructor() {
-        this.metrics = {
+        this.metrics = /** @type {any} */ ({
             memory: [],
             cpu: [],
             handles: [],
             requests: [],
-        };
+        });
         this.interval = null;
     }
 
@@ -143,12 +143,14 @@ class RuntimeMonitor {
         if (this.metrics.memory.length === 0) return null;
 
         const memoryTrend = this.analyzeMemoryTrend();
-        const peakMemory = Math.max(...this.metrics.memory.map(m => m.heapUsed));
+        const peakMemory = Math.max(...this.metrics.memory.map((/** @type {any} */ m) => m.heapUsed));
 
         return {
             memoryTrend,
             peakMemory,
-            averageMemory: this.metrics.memory.reduce((sum, m) => sum + m.heapUsed, 0) / this.metrics.memory.length,
+            averageMemory:
+                this.metrics.memory.reduce((/** @type {any} */ sum, /** @type {any} */ m) => sum + m.heapUsed, 0) /
+                this.metrics.memory.length,
             memorySamples: this.metrics.memory.length,
         };
     }
@@ -161,8 +163,10 @@ class RuntimeMonitor {
 
         if (!older.length) return 'stable';
 
-        const recentAvg = recent.reduce((sum, m) => sum + m.heapUsed, 0) / recent.length;
-        const olderAvg = older.reduce((sum, m) => sum + m.heapUsed, 0) / older.length;
+        const recentAvg =
+            recent.reduce((/** @type {any} */ sum, /** @type {any} */ m) => sum + m.heapUsed, 0) / recent.length;
+        const olderAvg =
+            older.reduce((/** @type {any} */ sum, /** @type {any} */ m) => sum + m.heapUsed, 0) / older.length;
 
         const growthRate = (recentAvg - olderAvg) / olderAvg;
 
@@ -176,6 +180,10 @@ class RuntimeMonitor {
 // EXECUTOR ESPECIALIZADO
 // ============================================================================
 
+/**
+ * @param {any} scenario
+ * @returns {Promise<any>}
+ */
 async function executeCriticalScenario(scenario) {
     console.log(`\n🎯 Executando cenário crítico: ${scenario.name}`);
     console.log(`   📝 ${scenario.description}`);
@@ -264,19 +272,23 @@ async function executeCriticalScenario(scenario) {
 // ANALISADOR DE BUGS DE RUNTIME
 // ============================================================================
 
+/**
+ * @param {any[]} results
+ * @returns {any}
+ */
 function analyzeRuntimeBugs(results) {
     console.log('\n🐛 ANÁLISE DE BUGS DE RUNTIME\n');
 
-    const bugs = {
+    const bugs = /** @type {any} */ ({
         memoryLeaks: [],
         raceConditions: [],
         unhandledRejections: [],
         blockingOperations: [],
         resourceLeaks: [],
         errorPropagation: [],
-    };
+    });
 
-    results.forEach(result => {
+    results.forEach((/** @type {any} */ result) => {
         if (!result.success) {
             console.log(`❌ Cenário falhou: ${result.scenario}`);
             if (result.stderr) {
@@ -341,7 +353,7 @@ function analyzeRuntimeBugs(results) {
     Object.entries(bugs).forEach(([type, issues]) => {
         if (issues.length > 0) {
             console.log(`🚨 ${type.toUpperCase()}: ${issues.length} ocorrências`);
-            issues.forEach((issue, idx) => {
+            issues.forEach((/** @type {any} */ issue, /** @type {any} */ idx) => {
                 console.log(`   ${idx + 1}. ${issue.scenario}`);
                 console.log(`      ${issue.evidence.slice(0, 100)}...`);
             });
@@ -381,11 +393,12 @@ async function main() {
             // Pausa entre cenários para limpeza
             await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (error) {
-            console.error(`❌ Erro crítico no cenário ${scenario.name}: ${error.message}`);
+            const _ce = /** @type {any} */ (error);
+            console.error(`❌ Erro crítico no cenário ${scenario.name}: ${_ce.message}`);
             results.push({
                 scenario: scenario.name,
                 focus: scenario.focus,
-                error: error.message,
+                error: _ce.message,
                 success: false,
             });
         }

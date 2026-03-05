@@ -1,4 +1,5 @@
 // @ts-check
+// @ts-ignore - helpers stubs not yet exported
 import { startAgent, stopAgent, waitForCondition, removeRunLock, cleanTmp } from './helpers.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,6 +9,11 @@ const QUEUE_DIR = path.join(ROOT, 'fila');
 const CORRUPT_DIR = path.join(QUEUE_DIR, 'corrupted');
 
 // Helper para injetar arquivos brutos ignorando o gerador oficial
+/**
+ * @param {string} filename
+ * @param {any} content
+ * @returns {void}
+ */
 function injectRaw(filename, content) {
     fs.writeFileSync(
         path.join(QUEUE_DIR, filename),

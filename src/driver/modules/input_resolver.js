@@ -19,7 +19,7 @@ import { log } from '#core/logger';
 const RESOLVER_CONFIG = {
     /** Cache TTL para protocolos (ms) - Default: 60s */
     CACHE_TTL_MS: parseInt(
-        process.env.RESOLVER_CACHE_TTL || String(/** @type {unknown} */ (CONFIG)?.all?.INPUT_CACHE_TTL || '60000'),
+        process.env.RESOLVER_CACHE_TTL || String(/** @type {any} */ (CONFIG)?.all?.INPUT_CACHE_TTL || '60000'),
         10
     ),
 
@@ -219,19 +219,20 @@ class InputResolver extends EventEmitter {
 
             return result;
         } catch (err) {
+            const _ce = /** @type {any} */ (err);
             this.stats.failedResolutions++;
 
             // EventEmitter local
             this.emit(RESOLVER_EVENTS.RESOLUTION_FAILED, {
                 domain: this.driver.currentDomain,
-                error: err.message,
+                error: _ce.message,
                 timestamp: Date.now(),
             });
 
-            throw err;
+            throw _ce;
         } finally {
             // Higiene de handles: evita vazamento de referências Puppeteer
-            await this.driver.handles.clearAll();
+            await /** @type {any} */ (this.driver.handles)?.clearAll();
         }
     }
 
@@ -263,7 +264,8 @@ class InputResolver extends EventEmitter {
                     cacheTimeoutP,
                 ]);
             } catch (validationErr) {
-                log('WARN', `[INPUT_RESOLVER] Cache validation timeout/error: ${validationErr.message}`, correlationId);
+                const _ce = /** @type {any} */ (validationErr);
+                log('WARN', `[INPUT_RESOLVER] Cache validation timeout/error: ${_ce.message}`, correlationId);
             } finally {
                 cacheTimeoutP.cancel();
             }
@@ -336,10 +338,11 @@ class InputResolver extends EventEmitter {
                     );
                 }
             } catch (heuristicErr) {
+                const _ce = /** @type {any} */ (heuristicErr);
                 if (retry < maxRetries - 1) {
                     log(
                         'WARN',
-                        `[INPUT_RESOLVER] Heurística failed (retry ${retry + 1}/${maxRetries}): ${heuristicErr.message}`,
+                        `[INPUT_RESOLVER] Heurística failed (retry ${retry + 1}/${maxRetries}): ${_ce.message}`,
                         correlationId
                     );
                     await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
@@ -353,7 +356,7 @@ class InputResolver extends EventEmitter {
         this.driver._emitVital('TRIAGE_ALERT', {
             type: 'INPUT_NOT_FOUND',
             severity: 'HIGH',
-            evidence: { domain, url: this.driver.page.url() },
+            evidence: { domain, url: /** @type {any} */ (this.driver.page).url() },
         });
 
         throw new Error(`INPUT_NOT_FOUND: Falha ao localizar interface em ${domain}`);
@@ -406,7 +409,7 @@ class InputResolver extends EventEmitter {
      * Consolida a descoberta, resolve o botão de envio e atualiza o cache.
      *
      * @private
-     * @param {object} protocol - Protocolo resolvido
+     * @param {any} protocol - Protocolo resolvido
      * @param {string} source - Fonte da resolução ('DNA_MATCH' ou 'HEURISTIC_MATCH')
      * @param {object} dnaRules - Regras DNA do domínio
      * @param {number} [confidence=1.0] - Nível de confiança (0-1)
@@ -438,7 +441,7 @@ class InputResolver extends EventEmitter {
         const shouldCache = confidence >= RESOLVER_CONFIG.MIN_CONFIDENCE_THRESHOLD;
 
         if (shouldCache) {
-            this._updateCache(domain, finalProtocol, confidence);
+            this._updateCache(domain ?? '', finalProtocol, confidence);
         } else {
             log('WARN', `[INPUT_RESOLVER] Low confidence (${confidence}), não cacheando`, correlationId);
         }
@@ -497,7 +500,7 @@ class InputResolver extends EventEmitter {
     _updateCache(domain, protocol, confidence) {
         // ✅ LRU eviction se cache > MAX_CACHE_SIZE (BUG #7 fix)
         if (this.protocolCache.size >= RESOLVER_CONFIG.MAX_CACHE_SIZE) {
-            const oldestKey = this.protocolCache.keys().next().value;
+            const oldestKey = /** @type {string} */ (this.protocolCache.keys().next().value);
             this.protocolCache.delete(oldestKey);
 
             log('DEBUG', `[INPUT_RESOLVER] LRU eviction: ${oldestKey}`, this.driver.correlationId);
@@ -601,7 +604,7 @@ class InputResolver extends EventEmitter {
      * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        let timerId;
+        let timerId = /** @type {ReturnType<typeof setTimeout>|undefined} */ (undefined);
         const p = /** @type {CancelableTimeoutPromise} */ (
             new Promise((_, reject) => {
                 timerId = setTimeout(() => {
@@ -623,7 +626,7 @@ class InputResolver extends EventEmitter {
 /**
  * Factory function para criar instância de InputResolver.
  *
- * @param {CreateDriver} driver - Instância do driver
+ * @param {any} driver - Instância do driver
  * @returns {InputResolver} Nova instância
  *
  * @example

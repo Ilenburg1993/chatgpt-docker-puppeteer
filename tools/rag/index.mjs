@@ -19,16 +19,18 @@ const { values } = parseArgs({
 
 const maxFileBytes = values['max-file-bytes'] ? Number(values['max-file-bytes']) : undefined;
 
-const report = /** @type {any} */ (await ragIndex({
-    root: values.root,
-    ollamaBaseUrl: values['ollama-base-url'],
-    model: values.model,
-    profile: values.profile || process.env.RAG_PROFILE_DEFAULT || 'core',
-    includeGlobs: values['include-glob'],
-    excludeGlobs: values['exclude-glob'],
-    docsMode: values['docs-mode'],
-    maxFileBytes,
-}));
+const report = /** @type {any} */ (
+    await ragIndex({
+        root: values.root,
+        ollamaBaseUrl: values['ollama-base-url'],
+        model: values.model,
+        profile: values.profile || process.env.RAG_PROFILE_DEFAULT || 'core',
+        includeGlobs: values['include-glob'],
+        excludeGlobs: values['exclude-glob'],
+        docsMode: values['docs-mode'],
+        maxFileBytes,
+    })
+);
 
 if (values.json) {
     console.log(JSON.stringify(report, null, 2));

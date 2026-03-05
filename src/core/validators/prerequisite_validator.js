@@ -11,7 +11,7 @@ const ValidationResult = {
     ok: () => ({ valid: true }),
 
     // Cria resultado de falha com mensagem
-    fail: (reason, details = {}) => ({
+    fail: (/** @type {string} */ reason, details = {}) => ({
         valid: false,
         reason,
         details,
@@ -22,7 +22,7 @@ const ValidationResult = {
  * Valida se a página está em URL utilizável para um provedor LLM suportado.
  *
  * @param {PuppeteerPage} page - Puppeteer Page
- * @returns {Promise<object>} ValidationResult
+ * @returns {Promise<any>} ValidationResult
  */
 async function validateLLMPage(page) {
     if (!page) {
@@ -41,9 +41,10 @@ async function validateLLMPage(page) {
     try {
         url = page.url();
     } catch (err) {
+        const _ce = /** @type {any} */ (err);
         return ValidationResult.fail('PAGE_ERROR', {
             message: 'Erro ao obter URL da página',
-            error: err.message,
+            error: _ce.message,
         });
     }
 
@@ -79,7 +80,7 @@ async function validateLLMPage(page) {
  * Usa SADI (Sensory Analysis Deep Intelligence) via analyzer.js.
  *
  * @param {PuppeteerPage} page - Puppeteer Page
- * @returns {Promise<object>} ValidationResult
+ * @returns {Promise<any>} ValidationResult
  */
 async function validateLLMInterface(page) {
     const pageValidation = await validateLLMPage(page);
@@ -88,7 +89,7 @@ async function validateLLMInterface(page) {
     }
 
     // Usa analyzer.js (SADI) em vez de seletores hardcoded
-    const analyzer = await import('#shared/sadi/analyzer').then(m => m.default ?? m);
+    const analyzer = await import('#shared/sadi/analyzer').then((/** @type {any} */ m) => m.default ?? m);
     const url = page.url();
 
     try {
@@ -132,15 +133,17 @@ async function validateLLMInterface(page) {
                 log('WARN', `[PrerequisiteValidator] Área de resposta não detectada (não-crítico)`);
             }
         } catch (err) {
-            log('WARN', `[PrerequisiteValidator] Erro ao detectar área de resposta: ${err.message}`);
+            const _ce = /** @type {any} */ (err);
+            log('WARN', `[PrerequisiteValidator] Erro ao detectar área de resposta: ${_ce.message}`);
         }
 
         return ValidationResult.ok();
     } catch (err) {
+        const _ce = /** @type {any} */ (err);
         return ValidationResult.fail('INTERFACE_CHECK_ERROR', {
             message: 'Erro ao verificar interface LLM usando SADI',
-            error: err.message,
-            stack: err.stack,
+            error: _ce.message,
+            stack: _ce.stack,
         });
     }
 }
@@ -148,8 +151,8 @@ async function validateLLMInterface(page) {
 /**
  * Valida se Browser Pool está disponível e funcional.
  *
- * @param {BrowserPoolManager} browserPool
- * @returns {object} ValidationResult
+ * @param {any} browserPool
+ * @returns {any} ValidationResult
  */
 function validateBrowserPool(browserPool) {
     if (!browserPool) {
@@ -208,7 +211,7 @@ function validateBrowserPool(browserPool) {
  * Valida se browser instance está conectada e utilizável.
  *
  * @param {ValidateBrowserConnectionBrowser} browser - Puppeteer Browser
- * @returns {object} ValidationResult
+ * @returns {any} ValidationResult
  */
 function validateBrowserConnection(browser) {
     if (!browser) {
@@ -217,7 +220,7 @@ function validateBrowserConnection(browser) {
         });
     }
 
-    if (!(/** @type {unknown} */ (browser).isConnected())) {
+    if (!(/** @type {any} */ (browser).isConnected())) {
         return ValidationResult.fail('BROWSER_DISCONNECTED', {
             message: 'Browser não está conectado',
             suggestion: 'Verifique se Chrome está rodando e acessível',
@@ -229,7 +232,7 @@ function validateBrowserConnection(browser) {
 
 /**
  * @typedef {object} ValidateDriverExecutionOptions
- * @property {BrowserPoolManager} browserPool
+ * @property {any} browserPool
  * @property {PuppeteerPage} page
  */
 /**
@@ -237,7 +240,7 @@ function validateBrowserConnection(browser) {
  * Verifica: Browser Pool, Circuit Breaker, Página, Interface LLM.
  *
  * @param {ValidateDriverExecutionOptions} options
- * @returns {Promise<object>} ValidationResult
+ * @returns {Promise<any>} ValidationResult
  */
 async function validateDriverExecution({ browserPool, page }) {
     // 1. Valida Browser Pool
@@ -263,15 +266,15 @@ async function validateDriverExecution({ browserPool, page }) {
 
 /**
  * @typedef {object} ValidateKernelExecutionOptions
- * @property {object} executionEngine
- * @property {object} nervBridge
- * @property {object} telemetry
+ * @property {any} executionEngine
+ * @property {any} nervBridge
+ * @property {any} telemetry
  */
 /**
  * Valida pré-requisitos para execução do Kernel Loop.
  *
  * @param {ValidateKernelExecutionOptions} options
- * @returns {object} ValidationResult
+ * @returns {any} ValidationResult
  */
 function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {
     if (!executionEngine) {

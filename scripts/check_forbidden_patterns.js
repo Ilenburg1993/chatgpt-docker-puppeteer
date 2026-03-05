@@ -40,7 +40,7 @@ function mapOutputFindings(findings) {
  * @param {any[]} legacyFindings
  * @param {Set<string>} [comparableContractIds]
  */
-function parityReport(dslFindings, legacyFindings, comparableContractIds = null) {
+function parityReport(dslFindings, legacyFindings, comparableContractIds = undefined) {
     /** @type {Map<string, number>} */
     const dslMap = new Map();
     /** @type {Map<string, number>} */
@@ -99,33 +99,39 @@ function main() {
         primaryContracts = activeDslContracts;
     }
 
-    const primaryEval = evaluateStaticContracts({
-        rootDir: ROOT,
-        scanDir: SRC,
-        contracts: primaryContracts,
-        allowlists: registry.allowlists,
-    });
+    const primaryEval = /** @type {any} */ (
+        evaluateStaticContracts({
+            rootDir: ROOT,
+            scanDir: SRC,
+            contracts: primaryContracts,
+            allowlists: registry.allowlists,
+        })
+    );
 
-    let parity = {
+    let parity = /** @type {any} */ ({
         enabled: false,
         dsl_findings: 0,
         legacy_findings: 0,
         mismatches: [],
-    };
+    });
 
     if (mode === 'hybrid' && parityEnabled) {
-        const dslEval = evaluateStaticContracts({
-            rootDir: ROOT,
-            scanDir: SRC,
-            contracts: activeDslContracts,
-            allowlists: registry.allowlists,
-        });
-        const legacyEval = evaluateStaticContracts({
-            rootDir: ROOT,
-            scanDir: SRC,
-            contracts: legacyContracts,
-            allowlists: {},
-        });
+        const dslEval = /** @type {any} */ (
+            evaluateStaticContracts({
+                rootDir: ROOT,
+                scanDir: SRC,
+                contracts: activeDslContracts,
+                allowlists: registry.allowlists,
+            })
+        );
+        const legacyEval = /** @type {any} */ (
+            evaluateStaticContracts({
+                rootDir: ROOT,
+                scanDir: SRC,
+                contracts: legacyContracts,
+                allowlists: {},
+            })
+        );
         parity = parityReport(dslEval.findings, legacyEval.findings, legacyContractIds);
     }
 

@@ -287,7 +287,7 @@ function resolveAllowlistedFiles(contract, allowlists) {
  * @property {string} rootDir
  * @property {string} scanDir
  * @property {ContractDefinitionV1[]} contracts
- * @property {Record<string} allowlists
+ * @property {Record<string, any>} allowlists
  */
 /**
  * @param {EvaluateStaticContractsOptions} options

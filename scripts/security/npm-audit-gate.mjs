@@ -105,10 +105,11 @@ async function execJsonCapable(command, args) {
         });
         return { stdout: result.stdout, stderr: result.stderr, exitCode: 0 };
     } catch (error) {
+        const _ce = /** @type {any} */ (error);
         return {
-            stdout: typeof error.stdout === 'string' ? error.stdout : '',
-            stderr: typeof error.stderr === 'string' ? error.stderr : String(error.message || ''),
-            exitCode: typeof error.code === 'number' ? error.code : 1,
+            stdout: typeof _ce.stdout === 'string' ? _ce.stdout : '',
+            stderr: typeof _ce.stderr === 'string' ? _ce.stderr : String(_ce.message || ''),
+            exitCode: typeof _ce.code === 'number' ? _ce.code : 1,
         };
     }
 }
@@ -206,7 +207,7 @@ async function getPackageRegistryMetadata(packageName) {
     }
 
     const versions = Array.isArray(parsed.versions)
-        ? parsed.versions.filter(version => typeof version === 'string' && version.length > 0)
+        ? parsed.versions.filter((/** @type {string} */ version) => typeof version === 'string' && version.length > 0)
         : [];
     const time =
         parsed.time && typeof parsed.time === 'object' ? /** @type {Record<string, unknown>} */ (parsed.time) : {};
@@ -281,7 +282,7 @@ async function isPublishedVersion(spec) {
  * @typedef {object} ClassifyVulnerabilityVulnerability
  * @property {string} name
  * @property {string} severity
- * @property {boolean | { name?: string} [fixAvailable]
+ * @property {boolean | { name?: string; version?: string; isSemVerMajor?: boolean }} [fixAvailable]
  * @property {string} [version]
  * @property {boolean} [isSemVerMajor]
  * @property {unknown} [via]
@@ -397,10 +398,10 @@ try {
     process.exit(2);
 }
 
-const rawVulnerabilities = Object.values(payload.vulnerabilities || {});
+const rawVulnerabilities = /** @type {any[]} */ (Object.values(payload.vulnerabilities || {}));
 const filtered = rawVulnerabilities.filter(item => {
     const severity = String(item?.severity || 'info');
-    return (SEVERITY_RANK[severity] ?? 0) >= SEVERITY_RANK[options.minSeverity];
+    return ((/** @type {any} */ (SEVERITY_RANK))[severity] ?? 0) >= (/** @type {any} */ (SEVERITY_RANK))[options.minSeverity];
 });
 
 /** @type {Array<Record<string, unknown>>} */

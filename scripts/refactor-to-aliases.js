@@ -61,8 +61,12 @@ const ALIAS_MAP = {
 };
 
 // Arquivos para processar
-const filesToProcess = [];
+const filesToProcess = /** @type {string[]} */ ([]);
 
+/**
+ * @param {string} dir
+ * @returns {void}
+ */
 function findJSFiles(dir) {
     const files = fs.readdirSync(dir);
 
@@ -93,6 +97,10 @@ function findJSFiles(dir) {
     }
 }
 
+/**
+ * @param {string} filePath
+ * @returns {boolean}
+ */
 function refactorFile(filePath) {
     let content = fs.readFileSync(filePath, 'utf8');
     let hasChanges = false;
@@ -130,7 +138,8 @@ for (const file of filesToProcess) {
             changedCount++;
         }
     } catch (error) {
-        console.error(`❌ Erro em ${file}:`, error.message);
+        const _ce = /** @type {any} */ (error);
+        console.error(`❌ Erro em ${file}:`, _ce.message);
         errorCount++;
     }
 }

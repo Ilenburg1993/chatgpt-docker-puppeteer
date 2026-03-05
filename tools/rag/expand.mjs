@@ -23,13 +23,15 @@ if (!chunkId) {
     process.exit(2);
 }
 
-const result = /** @type {any} */ (await ragExpand({
-    chunkId,
-    mode: values.mode || 'lines',
-    beforeLines: values['before-lines'] ? Number(values['before-lines']) : undefined,
-    afterLines: values['after-lines'] ? Number(values['after-lines']) : undefined,
-    root: values.root,
-}));
+const result = /** @type {any} */ (
+    await ragExpand({
+        chunkId,
+        mode: values.mode || 'lines',
+        beforeLines: values['before-lines'] ? Number(values['before-lines']) : undefined,
+        afterLines: values['after-lines'] ? Number(values['after-lines']) : undefined,
+        root: values.root,
+    })
+);
 
 if (values.json) {
     console.log(JSON.stringify(result, null, 2));

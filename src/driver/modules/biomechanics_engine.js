@@ -192,7 +192,7 @@ class BiomechanicsEngine extends EventEmitter {
      * Cria uma instância do BiomechanicsEngine.
      *
      * @param {object} driver - Instância do BaseDriver
-     * @param {object} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
+     * @param {any} [driver.page] - Puppeteer Page instance (pode ser null até attachContext)
      * @param {function} driver._emitVital - Método IPC para telemetria vital
      * @param {function} driver._assertPageAlive - Validação de page alive
      * @param {string} driver.correlationId - ID de correlação para logs
@@ -270,9 +270,13 @@ class BiomechanicsEngine extends EventEmitter {
         this.driver._assertPageAlive();
 
         try {
-            const platform = await this.driver.page.evaluate(() => {
+            const _page = /** @type {any} */ (this.driver.page);
+            const platform = await _page.evaluate(() => {
                 const ua = navigator.userAgent || '';
-                if (navigator.userAgentData?.mobile || /Mobile(?!.*Chrome\/\d+)|Android|iPhone/i.test(ua)) {
+                if (
+                    /** @type {any} */ (navigator).userAgentData?.mobile ||
+                    /Mobile(?!.*Chrome\/\d+)|Android|iPhone/i.test(ua)
+                ) {
                     return 'mobile';
                 }
                 return (navigator.platform || '').toLowerCase();
@@ -314,21 +318,24 @@ class BiomechanicsEngine extends EventEmitter {
 
         const released = [];
 
+        const _page = /** @type {any} */ (this.driver.page);
         try {
-            if (this.driver.page && !this.driver.page.isClosed()) {
+            if (_page && !_page.isClosed()) {
                 const knownMods = MODIFIER_KEYS_ARRAY;
                 for (const mod of knownMods) {
                     try {
-                        await this.driver.page.keyboard.up(mod);
+                        await _page.keyboard.up(mod);
                         released.push(mod);
                     } catch (err) {
-                        log('WARN', `[BIOMECH] Failed to release ${mod}: ${err.message}`, this.driver.correlationId);
+                        const _ce = /** @type {any} */ (err);
+                        log('WARN', `[BIOMECH] Failed to release ${mod}: ${_ce.message}`, this.driver.correlationId);
                     }
                 }
             }
         } catch (err) {
-            log('ERROR', `[BIOMECH] releaseModifiers error: ${err.message}`, this.driver.correlationId);
-            throw err;
+            const _ce = /** @type {any} */ (err);
+            log('ERROR', `[BIOMECH] releaseModifiers error: ${_ce.message}`, this.driver.correlationId);
+            throw _ce;
         }
 
         this.emit(BIOMECH_EVENTS.MODIFIERS_RELEASE_COMPLETED, { released });
@@ -411,7 +418,7 @@ class BiomechanicsEngine extends EventEmitter {
      * Tolerância: STABLE_RECT_TOLERANCE_PX (default: 0.5px).
      *
      * @private
-     * @param {object} ctx - Context (page ou frame)
+     * @param {any} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do elemento
      * @returns {Promise<object|null>} Rect { x, y, w, h } ou null
      *
@@ -423,7 +430,7 @@ class BiomechanicsEngine extends EventEmitter {
 
         for (let i = 0; i < BIOMECH_CONFIG.STABLE_RECT_MAX_ATTEMPTS; i++) {
             try {
-                const rect = await ctx.evaluate(s => {
+                const rect = await ctx.evaluate((/** @type {string} */ s) => {
                     const el = document.querySelector(s);
                     if (!el) return null;
                     const r = el.getBoundingClientRect();
@@ -474,8 +481,8 @@ class BiomechanicsEngine extends EventEmitter {
      *
      * Scroll element into view em todos os níveis de frame hierarchy.
      *
-     * @param {object} ctx - Context (page ou frame)
-     * @param {unknown[]} frameStack - Stack de frames (nested)
+     * @param {any} ctx - Context (page ou frame)
+     * @param {any[]} frameStack - Stack de frames (nested)
      * @param {string} selector - Seletor CSS do elemento
      * @returns {Promise<void>}
      *
@@ -489,11 +496,12 @@ class BiomechanicsEngine extends EventEmitter {
         this.emit(BIOMECH_EVENTS.SCROLL_STARTED, { selector });
         this.stats.totalScrolls++;
 
-        const mainHeight = await this.driver.page.evaluate(() => window.innerHeight);
+        const _page = /** @type {any} */ (this.driver.page);
+        const mainHeight = await _page.evaluate(() => window.innerHeight);
         const baseOffset = mainHeight * BIOMECH_CONFIG.SCROLL_OFFSET_RATIO;
 
         await ctx.evaluate(
-            (sel, off, maxOffsetRatio) => {
+            (/** @type {string} */ sel, /** @type {number} */ off, /** @type {number} */ maxOffsetRatio) => {
                 const el = document.querySelector(sel);
                 if (!el) return;
                 el.scrollIntoView({ behavior: 'auto', block: 'center' });
@@ -508,12 +516,12 @@ class BiomechanicsEngine extends EventEmitter {
         // Scroll nested frames
         for (let i = frameStack.length - 1; i >= 0; i--) {
             try {
-                const parent = i === 0 ? this.driver.page : await frameStack[i - 1].contentFrame();
+                const parent = i === 0 ? _page : await frameStack[i - 1].contentFrame();
                 if (!parent) continue;
 
                 await frameStack[i].scrollIntoView({ behavior: 'auto', block: 'center' });
                 await parent.evaluate(
-                    (off, maxRatio) => {
+                    (/** @type {number} */ off, /** @type {number} */ maxRatio) => {
                         const safeOff = Math.min(off, window.innerHeight * maxRatio);
                         window.scrollBy(0, -safeOff);
                     },
@@ -533,8 +541,8 @@ class BiomechanicsEngine extends EventEmitter {
      * Prepara elemento para interação (scroll + click humanizado + focus).
      *
      * @param {object} execContext - Execution context
-     * @param {object} execContext.ctx - Context (page ou frame)
-     * @param {unknown[]} execContext.frameStack - Stack de frames
+     * @param {any} execContext.ctx - Context (page ou frame)
+     * @param {any[]} execContext.frameStack - Stack de frames
      * @param {number} execContext.offsetX - Offset X para click
      * @param {number} execContext.offsetY - Offset Y para click
      * @param {string} selector - Seletor CSS do elemento
@@ -570,8 +578,14 @@ class BiomechanicsEngine extends EventEmitter {
         }
 
         // Human click com telemetria
-        await human.humanClick(this.driver.page, ctx, selector, offsetX, offsetY, this.driver.signal, pulse =>
-            this.driver._emitVital('HUMAN_PULSE', pulse)
+        await human.humanClick(
+            this.driver.page,
+            ctx,
+            selector,
+            offsetX,
+            offsetY,
+            this.driver.signal,
+            (/** @type {any} */ pulse) => this.driver._emitVital('HUMAN_PULSE', pulse)
         );
 
         await ctx.focus(selector);
@@ -581,7 +595,7 @@ class BiomechanicsEngine extends EventEmitter {
     /**
      * Limpa input (cross-platform: keyboard select-all + evaluate clear).
      *
-     * @param {object} ctx - Context (page ou frame)
+     * @param {any} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do input
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
      * @returns {Promise<void>}
@@ -606,7 +620,7 @@ class BiomechanicsEngine extends EventEmitter {
         this.driver._emitVital('PROGRESS_UPDATE', { step: 'CLEARING_INPUT', selector });
 
         // ✅ BUG #7 fix: Valida se elemento existe
-        const exists = await ctx.evaluate(s => !!document.querySelector(s), selector);
+        const exists = await ctx.evaluate((/** @type {string} */ s) => !!document.querySelector(s), selector);
         if (!exists) {
             throw new Error(`ELEMENT_NOT_FOUND: ${selector}`);
         }
@@ -614,24 +628,26 @@ class BiomechanicsEngine extends EventEmitter {
         const mod = await this.getModifier();
 
         if (mod && mod !== 'mobile') {
-            await this.driver.page.keyboard.down(mod);
-            await this.driver.page.keyboard.press('a');
-            await this.driver.page.keyboard.up(mod);
-            await this.driver.page.keyboard.press('Backspace');
+            const _page = /** @type {any} */ (this.driver.page);
+            await _page.keyboard.down(mod);
+            await _page.keyboard.press('a');
+            await _page.keyboard.up(mod);
+            await _page.keyboard.press('Backspace');
         }
 
-        const cleared = await ctx.evaluate(sel => {
+        const cleared = await ctx.evaluate((/** @type {string} */ sel) => {
             const el = document.querySelector(sel);
             if (!el) return false;
+            const _el = /** @type {any} */ (el);
 
-            if (el.isContentEditable) {
-                el.innerHTML = '';
+            if (_el.isContentEditable) {
+                _el.innerHTML = '';
             } else {
-                el.value = '';
+                _el.value = '';
             }
 
             // Verifica se limpou
-            return (el.value || el.innerHTML || '').trim() === '';
+            return (_el.value || _el.innerHTML || '').trim() === '';
         }, selector);
 
         if (!cleared) {
@@ -645,7 +661,7 @@ class BiomechanicsEngine extends EventEmitter {
      * Executa digitação interna (zen mode ou human mode).
      *
      * @private
-     * @param {object} ctx - Context (page ou frame)
+     * @param {any} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do input
      * @param {string} text - Texto a digitar
      * @param {AbortSignal} signal - AbortSignal para cancelamento
@@ -661,25 +677,26 @@ class BiomechanicsEngine extends EventEmitter {
             this.driver._emitVital('PROGRESS_UPDATE', { step: 'ZEN_MODE_TYPING_START', length: text.length });
 
             const zenSuccess = await ctx.evaluate(
-                (sel, content) => {
+                (/** @type {string} */ sel, /** @type {string} */ content) => {
                     const el = document.querySelector(sel);
                     if (!el) return false;
+                    const _el = /** @type {any} */ (el);
 
-                    el.focus();
+                    _el.focus();
                     const ok = document.execCommand('insertText', false, content);
                     if (!ok) {
                         const setter =
                             Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set ||
                             Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerText')?.set;
                         if (setter) {
-                            setter.call(el, content);
+                            setter.call(_el, content);
                         }
                     }
-                    ['input', 'change'].forEach(ev => el.dispatchEvent(new Event(ev, { bubbles: true })));
-                    const finalVal = el.value || el.innerText || '';
+                    ['input', 'change'].forEach(ev => _el.dispatchEvent(new Event(ev, { bubbles: true })));
+                    const finalVal = _el.value || _el.innerText || '';
                     if (finalVal.trim().length > 0) {
-                        el.blur();
-                        el.focus();
+                        _el.blur();
+                        _el.focus();
                         return true;
                     }
                     return false;
@@ -700,14 +717,15 @@ class BiomechanicsEngine extends EventEmitter {
 
             const lag = await stabilizer.measureEventLoopLag(this.driver.page);
 
-            await human.humanType(this.driver.page, ctx, selector, text, lag, signal, pulse =>
+            await human.humanType(this.driver.page, ctx, selector, text, lag, signal, (/** @type {any} */ pulse) =>
                 this.driver._emitVital('HUMAN_PULSE', pulse)
             );
 
             // Verificação de Eco (Sanidade)
-            const eco = await ctx.evaluate(s => {
+            const eco = await ctx.evaluate((/** @type {string} */ s) => {
                 const el = document.querySelector(s);
-                const val = el?.value || el?.innerText || '';
+                const _el = /** @type {any} */ (el);
+                const val = _el?.value || _el?.innerText || '';
                 return Array.from(val.replace(/\s/g, '')).length;
             }, selector);
 
@@ -728,7 +746,7 @@ class BiomechanicsEngine extends EventEmitter {
      * - **Zen Mode**: textos > ZEN_MODE_THRESHOLD_CHARS (default: 2000)
      * - **Human Mode**: textos <= threshold (digitação biomimética com velocidade variável)
      *
-     * @param {object} ctx - Context (page ou frame)
+     * @param {any} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do input
      * @param {string} text - Texto a digitar
      * @param {AbortSignal} signal - AbortSignal para cancelamento
@@ -777,12 +795,13 @@ class BiomechanicsEngine extends EventEmitter {
 
             this.emit(BIOMECH_EVENTS.TYPING_COMPLETED, { selector, length: text.length, duration });
         } catch (err) {
+            const _ce = /** @type {any} */ (err);
             this.emit(BIOMECH_EVENTS.TYPING_COMPLETED, {
                 selector,
                 length: text.length,
-                error: err.message,
+                error: _ce.message,
             });
-            throw err;
+            throw _ce;
         }
     }
 
@@ -835,7 +854,7 @@ class BiomechanicsEngine extends EventEmitter {
      * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        let timerId;
+        let timerId = /** @type {ReturnType<typeof setTimeout>|undefined} */ (undefined);
         const p = /** @type {CancelableTimeoutPromise} */ (
             new Promise((_, reject) => {
                 timerId = setTimeout(() => {
@@ -857,7 +876,7 @@ class BiomechanicsEngine extends EventEmitter {
 /**
  * Factory function para criar instância de BiomechanicsEngine.
  *
- * @param {CreateDriver} driver - Instância do driver
+ * @param {any} driver - Instância do driver
  * @returns {BiomechanicsEngine} Nova instância
  *
  * @example
