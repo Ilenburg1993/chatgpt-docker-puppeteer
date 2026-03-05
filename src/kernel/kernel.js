@@ -14,17 +14,17 @@ import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
 /**
  * Opções para createSsotGatewayKernel.
  * @typedef {object} SsotGatewayKernelOptions
- * @property {object} [nerv] - Instância do sistema NERV.
- * @property {object} [telemetry] - Opções de telemetria.
- * @property {object} [pump] - Opções do pump.
+ * @property {any} [nerv] - Instância do sistema NERV.
+ * @property {any} [telemetry] - Opções de telemetria.
+ * @property {any} [pump] - Opções do pump.
  * @property {number} [pump.baseIntervalMs] - Intervalo base em ms.
  * @property {number} [pump.drainBatchSize] - Quantidade máxima drenada por tick.
- * @property {object} [browserPool] - Pool de browsers.
- * @property {object} [scheduler] - Scheduler de tarefas.
+ * @property {any} [browserPool] - Pool de browsers.
+ * @property {any} [scheduler] - Scheduler de tarefas.
  * @property {Function} [onActivateTask] - Callback para ativação de tarefa.
  * @property {Function} [onTerminateTask] - Callback para terminação de tarefa.
  * @property {Function} [onSuspendTask] - Callback para suspensão de tarefa.
- * @property {object} [loop] - Opções do loop.
+ * @property {any} [loop] - Opções do loop.
  * @property {string} [mode] - Modo do kernel.
  */
 
@@ -43,6 +43,10 @@ import { KernelTelemetry } from './telemetry/kernel_telemetry.js';
    Fábrica do Kernel
 =========================== */
 
+/**
+ * @param {any} err
+ * @returns {Error & {retryable?: boolean, delayMs?: number, reason?: string, nextAction?: string}}
+ */
 function _makeRetryableEmitError(err) {
     const message = err?.message || String(err);
     /** @type {Error & { retryable?: boolean, delayMs?: number, reason?: string, nextAction?: string }} */
@@ -78,9 +82,9 @@ function createSsotGatewayKernel(config = {}) {
     const drainBatchSize = Math.max(1, Number(pumpOptions.drainBatchSize ?? 100) || 100);
 
     let running = false;
-    let timer = null;
+    let timer = /** @type {any} */ (null);
     let tickCounter = 0;
-    let lastTickAt = null;
+    let lastTickAt = /** @type {number|null} */ (null);
 
     /**
      * Executa um passo do loop principal do kernel.
@@ -105,7 +109,8 @@ function createSsotGatewayKernel(config = {}) {
                 if (!raw) break;
                 try {
                     nerv.receive(raw);
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     telemetry.warning('kernel_ssot_gateway_inbound_receive_failed', {
                         error: err?.message || String(err),
                         at: Date.now(),
@@ -125,12 +130,14 @@ function createSsotGatewayKernel(config = {}) {
                 if (transport && typeof transport.send === 'function') {
                     try {
                         transport.send(envelope);
-                    } catch (err) {
+                    } catch (_rawErr) {
+                        const err = /** @type {any} */ (_rawErr);
                         try {
                             const serialized = JSON.stringify(envelope);
                             const buffer = Buffer.from(serialized, 'utf8');
                             transport.send(buffer);
-                        } catch (fallbackError) {
+                        } catch (_rawFallback) {
+                            const fallbackError = /** @type {any} */ (_rawFallback);
                             telemetry.critical('kernel_ssot_gateway_outbound_send_failed', {
                                 error: fallbackError?.message || err?.message || String(fallbackError || err),
                                 at: Date.now(),
@@ -141,7 +148,8 @@ function createSsotGatewayKernel(config = {}) {
                     // Local fallback: deliver directly to NERV reception in-process.
                     try {
                         nerv.receive(envelope);
-                    } catch (err) {
+                    } catch (_rawErr) {
+                        const err = /** @type {any} */ (_rawErr);
                         telemetry.warning('kernel_ssot_gateway_outbound_loopback_failed', {
                             error: err?.message || String(err),
                             at: Date.now(),
@@ -225,14 +233,16 @@ function createSsotGatewayKernel(config = {}) {
 
     /**
      * Executa uma tarefa através do driver.
-     * @param {object} task - Tarefa a ser executada.
-     * @param {string} [correlationId] - ID de correlação para rastreamento.
+     * @param {any} task - Tarefa a ser executada.
+     * @param {any} [correlationId] - ID de correlação para rastreamento.
      * @returns {Promise<void>}
      * @throws {Error} Se task.meta.id não for válido ou se ocorrer erro na emissão do comando.
      * Side-effects: Envia comando para o driver via NERV.
      */
     /**
      * ✅ P1-4: Agora aguarda emissão para garantir que comando foi enviado.
+     * @param {any} task
+     * @param {any} [correlationId]
      */
     async function executeTask(task, correlationId) {
         if (!task?.meta?.id) {
@@ -302,7 +312,11 @@ function createSsotGatewayKernel(config = {}) {
  */
 /**
  * @typedef {object} CreateLegacyKernelConfig
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} [nerv]
+ * @property {any} [contextManager]
+ * @property {any} [telemetry]
+ * @property {any} [policy]
+ * @property {any} [loop]
  */
 /**
  * Cria e compõe o Kernel de forma explícita e determinística.
@@ -408,7 +422,7 @@ function createLegacyKernel({
      8. TASK EXECUTION ORCHESTRATOR — Orquestração V5 (V2.0)
   ========================================================= */
 
-    /** @type {Map<string, {task: object, correlationId: string}>} */
+    /** @type {Map<string, {task: any, correlationId: any}>} */
     const pendingDispatch = new Map();
 
     /** @type {TaskExecutionOrchestrator|null} */
@@ -432,7 +446,7 @@ function createLegacyKernel({
      * @returns {Promise<void>}
      */
     const terminateRuntimeTask = async ({ taskId, reason }) => {
-        const runtime = taskRuntime.getTask(taskId);
+        const runtime = /** @type {any} */ (taskRuntime.getTask(taskId));
 
         if (!runtime || runtime.state === TaskState.TERMINATED) {
             cleanupTaskDispatchState(taskId);
@@ -467,7 +481,7 @@ function createLegacyKernel({
      * @returns {Promise<void>}
      */
     const suspendRuntimeTask = async ({ taskId, reason }) => {
-        const runtime = taskRuntime.getTask(taskId);
+        const runtime = /** @type {any} */ (taskRuntime.getTask(taskId));
         if (!runtime || runtime.state === TaskState.TERMINATED || runtime.state === TaskState.SUSPENDED) {
             return;
         }
@@ -489,7 +503,7 @@ function createLegacyKernel({
      * @throws {Error} Se o despacho da tarefa falhar.
      */
     const activateRuntimeTask = async ({ taskId, reason }) => {
-        const runtime = taskRuntime.getTask(taskId);
+        const runtime = /** @type {any} */ (taskRuntime.getTask(taskId));
         if (!runtime) {
             telemetry.warning('kernel_activate_missing_runtime_task', { taskId, at: Date.now() });
             return;
@@ -520,7 +534,8 @@ function createLegacyKernel({
         // A limpeza deve ocorrer em "terminate"/"completed".
         try {
             await taskExecutor.executeTask(queued.task, queued.correlationId);
-        } catch (error) {
+        } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
             telemetry.warning('kernel_activate_dispatch_failed', {
                 taskId,
                 error: error?.message || String(error),
@@ -559,7 +574,7 @@ function createLegacyKernel({
      9. KERNEL LOOP — Tempo soberano e ciclo executivo
   ========================================================= */
 
-    const kernelLoopOptions = /** @type {unknown} */ ({
+    const kernelLoopOptions = /** @type {any} */ ({
         executionEngine,
         nervBridge,
         telemetry,
@@ -678,8 +693,8 @@ function createLegacyKernel({
         /**
          * Executa uma tarefa no kernel.
          * Side-effects: Cria ou atualiza runtime da tarefa, adiciona à fila de despacho pendente.
-         * @param {object} task - Tarefa a ser executada.
-         * @param {string} [correlationId] - ID de correlação para rastreamento.
+         * @param {any} task - Tarefa a ser executada.
+         * @param {any} [correlationId] - ID de correlação para rastreamento.
          * @returns {Promise<void>}
          * @throws {Error} Se task.meta.id não for válido.
          */
@@ -690,7 +705,7 @@ function createLegacyKernel({
 
             const taskId = task.meta.id;
 
-            const existingRuntime = taskRuntime.getTask(taskId);
+            const existingRuntime = /** @type {any} */ (taskRuntime.getTask(taskId));
             if (existingRuntime && existingRuntime.state === TaskState.TERMINATED) {
                 // Allow SSOT to re-dispatch the same taskId after terminal by forgetting runtime state.
                 try {
@@ -758,7 +773,7 @@ function createLegacyKernel({
 function createKernel(config = {}) {
     const mode = config?.mode || 'ssot_gateway';
     if (mode === 'legacy') {
-        return createLegacyKernel(config);
+        return createLegacyKernel(/** @type {any} */ (config));
     }
     return createSsotGatewayKernel(config);
 }

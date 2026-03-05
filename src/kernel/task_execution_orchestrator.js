@@ -34,8 +34,8 @@ import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#sh
 class TaskExecutionOrchestrator {
     /**
      * @param {object} params
-     * @param {object} params.nerv - Instância do NERV
-     * @param {object} params.nervBridge - KernelNERVBridge
+     * @param {any} params.nerv - Instância do NERV
+     * @param {any} params.nervBridge - KernelNERVBridge
      * @param {TaskRetryRequestedCallback|null} [params.onTaskRetryRequested] - callback retry
      * @param {TaskPermanentFailureCallback|null} [params.onTaskPermanentFailure] - callback failure permanente
      * @param {TaskCompletedCallback|null} [params.onTaskCompleted] - callback conclusão
@@ -102,7 +102,8 @@ class TaskExecutionOrchestrator {
         try {
             // Hook: beforeExecution (orchestrator prepara task)
             preparedTask = await this.nervBridge.beforeTaskExecution(task);
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
                 'ERROR',
@@ -138,7 +139,8 @@ class TaskExecutionOrchestrator {
                     task: preparedTask,
                 },
             });
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log('ERROR', `[TaskExecutionOrchestrator] emitCommand falhou: ${taskId} - ${msg}`, correlationId);
 
@@ -165,7 +167,8 @@ class TaskExecutionOrchestrator {
         if (this.unsubscribeNerv) {
             try {
                 this.unsubscribeNerv();
-            } catch (unsubscribeError) {
+            } catch (_rawUnsubErr) {
+                const unsubscribeError = /** @type {any} */ (_rawUnsubErr);
                 logger.log(
                     'WARN',
                     `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`
@@ -174,7 +177,7 @@ class TaskExecutionOrchestrator {
             this.unsubscribeNerv = null;
         }
 
-        const maybeUnsub = this.nerv.onReceive(envelope => {
+        const maybeUnsub = this.nerv.onReceive((/** @type {any} */ envelope) => {
             if (getMessageType(envelope) !== MessageType.EVENT) {
                 return;
             }
@@ -185,7 +188,8 @@ class TaskExecutionOrchestrator {
             let correlationId = null;
             try {
                 correlationId = getCorrelationId(envelope) || null;
-            } catch (correlationReadError) {
+            } catch (_rawCorrErr) {
+                const correlationReadError = /** @type {any} */ (_rawCorrErr);
                 logger.log(
                     'DEBUG',
                     `[TaskExecutionOrchestrator] Falha ao ler correlationId do envelope: ${correlationReadError?.message || String(correlationReadError)}`
@@ -219,7 +223,7 @@ class TaskExecutionOrchestrator {
 
             if (actionCode === ActionCode.DRIVER_TASK_ABORTED) {
                 // Treat abort as a non-retryable terminal failure for kernel lifecycle purposes.
-                const safePayload = payload && typeof payload === 'object' ? payload : {};
+                const safePayload = /** @type {any} */ (payload && typeof payload === 'object' ? payload : {});
                 const taskId = safePayload.taskId;
                 this._handleTaskFailed(
                     /** @type {DriverTaskFailedPayload} */ ({
@@ -317,7 +321,8 @@ class TaskExecutionOrchestrator {
         try {
             // Hook: afterExecution (orchestrator decide próxima ação)
             decision = await this.nervBridge.afterTaskExecution(task, result);
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
                 'ERROR',
@@ -348,7 +353,8 @@ class TaskExecutionOrchestrator {
 
         try {
             await this.nervBridge.processOrchestrationDecision(decision, correlationId);
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
                 'ERROR',
@@ -498,7 +504,8 @@ class TaskExecutionOrchestrator {
                     retriesAttempted: safePayload.retriesAttempted ?? null,
                 },
             });
-        } catch (emitError) {
+        } catch (_rawEmitErr) {
+            const emitError = /** @type {any} */ (_rawEmitErr);
             logger.log(
                 'ERROR',
                 `[TaskExecutionOrchestrator] emitEvent TASK_FAILED falhou para ${taskId}: ${emitError?.message || String(emitError)}`,
@@ -507,6 +514,11 @@ class TaskExecutionOrchestrator {
         }
     }
 
+    /**
+     * Handler: Task enfileirada pelo driver.
+     * @param {any} payload
+     * @param {any} correlationId
+     */
     _handleTaskQueued(payload, correlationId) {
         const taskId = payload?.taskId;
         if (!taskId) {
@@ -525,7 +537,8 @@ class TaskExecutionOrchestrator {
         if (this.unsubscribeNerv) {
             try {
                 this.unsubscribeNerv();
-            } catch (unsubscribeError) {
+            } catch (_rawUnsubErr) {
+                const unsubscribeError = /** @type {any} */ (_rawUnsubErr);
                 logger.log(
                     'WARN',
                     `[TaskExecutionOrchestrator] Falha ao remover listener anterior: ${unsubscribeError?.message || String(unsubscribeError)}`

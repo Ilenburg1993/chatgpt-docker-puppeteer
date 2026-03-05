@@ -38,7 +38,7 @@ const ALLOWED_TRANSITIONS = Object.freeze({
 class TaskRuntime extends EventEmitter {
     /**
      * @param {object} params
-     * @param {object} params.telemetry
+     * @param {any} params.telemetry
      * Canal de telemetria do Kernel.
      */
     constructor({ telemetry }) {
@@ -233,7 +233,7 @@ class TaskRuntime extends EventEmitter {
      *
      * @param {object} params
      * @param {string} params.taskId
-     * @param {object} params.intent
+     * @param {any} params.intent
      * Descrição da intenção registrada.
      */
     recordIntentReference({ taskId, intent }) {
@@ -257,7 +257,7 @@ class TaskRuntime extends EventEmitter {
      *
      * @param {object} params
      * @param {string} params.taskId
-     * @param {object} params.observation
+     * @param {any} params.observation
      * Referência à observação.
      */
     recordObservationReference({ taskId, observation }) {
@@ -321,7 +321,7 @@ class TaskRuntime extends EventEmitter {
     /**
      * Lista todas as tarefas existentes.
      *
-     * @returns {Array<object>}
+     * @returns {any[]}
      */
     listTasks() {
         return Array.from(this.tasks.values()).map(t => this._snapshot(t));
@@ -343,7 +343,7 @@ class TaskRuntime extends EventEmitter {
      * @returns {object}
      */
     getStats() {
-        const byState = {};
+        const byState = /** @type {Record<string, number>} */ ({});
 
         for (const state of Object.values(TaskState)) {
             byState[state] = 0;
@@ -365,6 +365,8 @@ class TaskRuntime extends EventEmitter {
 
     /**
      * Recupera tarefa ou lança erro.
+     * @param {any} taskId
+     * @returns {any}
      */
     _getTaskOrThrow(taskId) {
         const task = this.tasks.get(taskId);
@@ -376,13 +378,18 @@ class TaskRuntime extends EventEmitter {
 
     /**
      * Verifica se transição é permitida.
+     * @param {any} from
+     * @param {any} to
+     * @returns {boolean}
      */
     _isTransitionAllowed(from, to) {
-        return ALLOWED_TRANSITIONS[from]?.includes(to) ?? false;
+        return (/** @type {any} */ (ALLOWED_TRANSITIONS))[from]?.includes(to) ?? false;
     }
 
     /**
      * Registra entrada no histórico interno.
+     * @param {any} task
+     * @param {any} entry
      */
     _recordHistory(task, entry) {
         task.history.push(Object.freeze(entry));
@@ -391,6 +398,8 @@ class TaskRuntime extends EventEmitter {
     /**
      * Produz snapshot imutável da tarefa.
      * Protege contra mutação externa.
+     * @param {any} task
+     * @returns {object}
      */
     _snapshot(task) {
         return Object.freeze({

@@ -62,10 +62,10 @@ const PolicyAlertType = Object.freeze({
 class PolicyEngine {
     /**
      * @param {object} params
-     * @param {object} params.telemetry
+     * @param {any} params.telemetry
      * Canal de telemetria do Kernel.
      *
-     * @param {object} [params.limits]
+     * @param {any} [params.limits]
      * Limites técnicos/configuracionais.
      */
     constructor({ telemetry, limits = {} }) {
@@ -96,10 +96,10 @@ class PolicyEngine {
      * Avalia normativamente uma tarefa no contexto atual.
      *
      * @param {object} params
-     * @param {object} params.task
+     * @param {any} params.task
      * Snapshot imutável da tarefa.
      *
-     * @param {unknown[]} params.observations
+     * @param {any[]} params.observations
      * Lista de observações correlacionadas.
      *
      * @param {number} params.at
@@ -109,7 +109,7 @@ class PolicyEngine {
      * Avaliação normativa consultiva.
      */
     assess({ task, observations, at }) {
-        const alerts = [];
+        const alerts = /** @type {any[]} */ ([]);
 
         // 1. Avaliação de volume de observações
         this._assessObservationVolume(task, observations, alerts);
@@ -155,6 +155,9 @@ class PolicyEngine {
 
     /**
      * Avalia pressão por volume de observações.
+     * @param {any} task
+     * @param {any[]} observations
+     * @param {any[]} alerts
      */
     _assessObservationVolume(task, observations, alerts) {
         if (observations.length > this.limits.maxObservationsPerTask) {
@@ -172,6 +175,9 @@ class PolicyEngine {
 
     /**
      * Avalia idade lógica da tarefa.
+     * @param {any} task
+     * @param {any} at
+     * @param {any[]} alerts
      */
     _assessTaskAge(task, at, alerts) {
         if (this.limits.maxTaskAgeMs !== null) {
@@ -193,6 +199,10 @@ class PolicyEngine {
 
     /**
      * Avalia gaps temporais entre observações.
+     * @param {any} task
+     * @param {any[]} observations
+     * @param {any} at
+     * @param {any[]} alerts
      */
     _assessObservationGaps(task, observations, at, alerts) {
         if (observations.length === 0) {
@@ -224,6 +234,8 @@ class PolicyEngine {
 
     /**
      * Avalia taxa de duplicação de observações.
+     * @param {any[]} observations
+     * @param {any[]} alerts
      */
     _assessDuplication(observations, alerts) {
         if (observations.length === 0) {
@@ -258,6 +270,10 @@ class PolicyEngine {
 
     /**
      * Avalia risco configuracional.
+     * @param {any} task
+     * @param {any[]} observations
+     * @param {any} at
+     * @param {any[]} alerts
      */
     _assessConfigurationRisk(task, observations, at, alerts) {
         // Tarefa suspensa com observações acumuladas
@@ -290,6 +306,10 @@ class PolicyEngine {
     /**
      * Avalia estagnação lógica.
      * [P2.1 CORREÇÃO] Adiciona contexto semântico para reduzir falsos positivos
+     * @param {any} task
+     * @param {any[]} observations
+     * @param {any} at
+     * @param {any[]} alerts
      */
     _assessStagnation(task, observations, at, alerts) {
         // Tarefa ativa sem progresso recente
@@ -339,7 +359,7 @@ class PolicyEngine {
     /**
      * Calcula nível normativo a partir dos alertas.
      *
-     * @param {Array<object>} alerts
+     * @param {any[]} alerts
      * @returns {string}
      */
     _computeLevel(alerts) {

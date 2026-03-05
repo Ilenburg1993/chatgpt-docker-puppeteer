@@ -38,11 +38,11 @@ import { DecisionKind } from '../execution_engine/execution_engine.js';
 
 /**
  * @typedef {object} KernelLoopOptions
- * @property {object} executionEngine - Motor semântico que avalia e produz decisões
- * @property {object} nervBridge - Ponte de integração com NERV
- * @property {object} telemetry - Sistema de telemetria
- * @property {object} [browserPool=null] - Pool de browsers
- * @property {object} [scheduler=global] - Scheduler para setInterval
+ * @property {any} executionEngine - Motor semântico que avalia e produz decisões
+ * @property {any} nervBridge - Ponte de integração com NERV
+ * @property {any} telemetry - Sistema de telemetria
+ * @property {any} [browserPool=null] - Pool de browsers
+ * @property {any} [scheduler=global] - Scheduler para setInterval
  * @property {number} [baseIntervalMs=50] - Intervalo base entre ciclos
  * @property {function|null} [onActivateTask=null] - Callback para ativação de tarefa
  * @property {function|null} [onTerminateTask=null] - Callback para terminação de tarefa
@@ -56,19 +56,19 @@ import { DecisionKind } from '../execution_engine/execution_engine.js';
 class KernelLoop {
     /**
      * @param {object} params
-     * @param {object} params.executionEngine
+     * @param {any} params.executionEngine
      * Motor semântico que avalia e produz decisões.
      *
-     * @param {object} params.nervBridge
+     * @param {any} params.nervBridge
      * Ponte de integração com NERV (para drenagem de buffers).
      *
-     * @param {object} params.telemetry
+     * @param {any} params.telemetry
      * Canal de telemetria do Kernel.
      *
-     * @param {object} [params.browserPool]
+     * @param {any} [params.browserPool]
      * Browser Pool Manager (para checar Circuit Breaker).
      *
-     * @param {object} [params.scheduler]
+     * @param {any} [params.scheduler]
      * Scheduler técnico (padrão: global).
      *
      * @param {number} [params.baseIntervalMs]
@@ -249,7 +249,8 @@ class KernelLoop {
 
             // 4. Drenagem de buffer outbound (COMMANDs/EVENTs a enviar)
             this._drainOutbound();
-        } catch (error) {
+        } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
             this.state = KernelLoopState.DEGRADED;
 
             this.telemetry.critical('kernel_loop_tick_error', {
@@ -364,13 +365,15 @@ class KernelLoop {
             try {
                 transport.send(envelope);
                 drained++;
-            } catch (error) {
+            } catch (_rawErr) {
+                const error = /** @type {any} */ (_rawErr);
                 try {
                     const serialized = JSON.stringify(envelope);
                     const buffer = Buffer.from(serialized, 'utf8');
                     transport.send(buffer);
                     drained++;
-                } catch (fallbackError) {
+                } catch (_rawFallback) {
+                    const fallbackError = /** @type {any} */ (_rawFallback);
                     this.telemetry.critical('kernel_loop_outbound_send_failed', {
                         error: fallbackError?.message || error?.message || String(fallbackError || error),
                         at: Date.now(),
@@ -396,10 +399,10 @@ class KernelLoop {
      * [P3.2 CORREÇÃO] Aplica propostas em paralelo quando possível
      * [P9.4 CORREÇÃO] Adiciona timeout de 5s para prevenir kernel loop blocking
      *
-     * @param {Array<object>} proposals
+     * @param {any[]} proposals
      * Lista de propostas de decisão.
      *
-     * @param {object} context
+     * @param {any} context
      * Contexto do ciclo atual.
      */
     async _applyDecisions(proposals, context) {
@@ -423,7 +426,8 @@ class KernelLoop {
             proposals.map(async proposal => {
                 try {
                     await this._applyDecision(proposal, context);
-                } catch (error) {
+                } catch (_rawError) {
+                    const error = /** @type {any} */ (_rawError);
                     this.telemetry.critical('kernel_loop_decision_application_failed', {
                         proposal,
                         error: error.message,
@@ -436,7 +440,8 @@ class KernelLoop {
         // Race entre decisions e timeout; sempre limpa o timer (A005)
         try {
             await Promise.race([decisionsPromise, timeoutPromise]);
-        } catch (error) {
+        } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
             if (error.message.includes('timeout')) {
                 this.telemetry.critical('kernel_loop_decision_timeout', {
                     count: proposals.length,
@@ -454,6 +459,8 @@ class KernelLoop {
 
     /**
      * Aplica uma única decisão.
+     * @param {any} proposal - Proposta de decisão do ExecutionEngine.
+     * @param {any} context - Contexto do ciclo atual.
      */
     async _applyDecision(proposal, context) {
         const { kind, taskId, reason } = proposal;

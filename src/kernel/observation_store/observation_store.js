@@ -8,7 +8,11 @@ import EventEmitter from 'node:events';
 
 /**
  * @typedef {object} CreateObservationRecordParams
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {any} msgId
+ * @property {any} correlationId
+ * @property {any} source
+ * @property {any} payload
+ * @property {any} [originalTimestamp]
  */
 /**
  * @typedef {object} CreateObservationRecordOptions
@@ -23,7 +27,7 @@ import EventEmitter from 'node:events';
  * P9.5: Adiciona memoization de JSON serialization
  *
  * @param {CreateObservationRecordParams} params
- * @returns {object}
+ * @returns {any}
  */
 function createObservationRecord({ msgId, correlationId, source, payload, originalTimestamp }) {
     let payloadSerialized;
@@ -54,10 +58,10 @@ function createObservationRecord({ msgId, correlationId, source, payload, origin
 class ObservationStore extends EventEmitter {
     /**
      * @param {object} params
-     * @param {object} params.telemetry
+     * @param {any} params.telemetry
      * Canal de telemetria do Kernel.
      *
-     * @param {number} [params.maxObservationsPerCorrelation]
+     * @param {number | null} [params.maxObservationsPerCorrelation]
      * Limite técnico opcional (default: sem limite).
      */
     constructor({ telemetry, maxObservationsPerCorrelation = null }) {
@@ -86,7 +90,7 @@ class ObservationStore extends EventEmitter {
          * Índice temporal:
          * Array de [timestamp, correlationId] para queries temporais
          */
-        this.temporalIndex = [];
+        this.temporalIndex = /** @type {any[]} */ ([]);
     }
 
     /* ===========================
@@ -96,7 +100,7 @@ class ObservationStore extends EventEmitter {
     /**
      * Ingere um EVENT como fato observado.
      *
-     * @param {object} eventEnvelope
+     * @param {any} eventEnvelope
      * Envelope IPC do tipo EVENT.
      *
      * Regras:
@@ -229,7 +233,7 @@ class ObservationStore extends EventEmitter {
         for (const [timestamp, correlationId] of this.temporalIndex) {
             if (timestamp >= startAt && timestamp <= endAt) {
                 const observations = this.getByCorrelation(correlationId);
-                results.push(...observations.filter(obs => obs.ingestedAt >= startAt && obs.ingestedAt <= endAt));
+                results.push(...observations.filter((/** @type {any} */ obs) => obs.ingestedAt >= startAt && obs.ingestedAt <= endAt));
             }
         }
 
@@ -350,7 +354,7 @@ class ObservationStore extends EventEmitter {
         let purgedCount = 0;
 
         for (const [correlationId, observations] of this.byCorrelation.entries()) {
-            const filtered = observations.filter(obs => obs.ingestedAt >= olderThan);
+            const filtered = observations.filter((/** @type {any} */ obs) => obs.ingestedAt >= olderThan);
 
             purgedCount += observations.length - filtered.length;
 

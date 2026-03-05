@@ -114,7 +114,7 @@ let minLevel = /** @type {Record<string, number>} */ (LOG_LEVELS)[configuredLeve
  * Side-effects: Escreve no console e arquivo de log, rotaciona arquivos se necessário.
  * @param {LogLevel} level - Nível do log.
  * @param {string|Error|Record<string, unknown>} msg - Mensagem ou objeto a logar.
- * @param {string} [taskId='-'] - ID da tarefa associada.
+ * @param {string | null} [taskId='-'] - ID da tarefa associada.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe.
  * @returns {void}
  */
