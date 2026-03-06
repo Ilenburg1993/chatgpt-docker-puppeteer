@@ -106,7 +106,7 @@ async function _postJson(url, body, timeoutMs) {
  * O cliente consulta o Inference Gateway e retorna resumo/risco em modo read-only.
  * @returns {{
  *   isEnabled: () => boolean,
- *   runTriage: (job: unknown, contextPack: unknown) => Promise<Record<string, unknown>>
+ *   runTriage: (job: unknown, contextPack: unknown) => Promise<any>
  * }}
  */
 export function createAuditAgentTriageLlmClient() {

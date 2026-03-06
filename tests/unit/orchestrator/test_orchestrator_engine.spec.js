@@ -184,7 +184,7 @@ describe('OrchestratorEngine', () => {
     beforeEach(() => {
         mockNerv = {
             events: [],
-            emit: function (event, payload) {
+            emit: function (/** @type {any} */ event, /** @type {any} */ payload) {
                 this.events.push({ event, payload });
             },
         };
@@ -251,7 +251,7 @@ describe('OrchestratorEngine', () => {
             assert.ok(orchestrator.activeIterations.has('task-iter'));
 
             // Verifica evento NERV
-            const startEvent = mockNerv.events.find(e => e.event === 'ORCHESTRATION_STARTED');
+            const startEvent = mockNerv.events.find((/** @type {any} */ e) => e.event === 'ORCHESTRATION_STARTED');
             assert.ok(startEvent, 'Deve emitir ORCHESTRATION_STARTED');
             assert.strictEqual(startEvent.payload.strategy, 'ITERATIVE');
         });
@@ -309,7 +309,7 @@ describe('OrchestratorEngine', () => {
             assert.strictEqual(decision.feedback, null);
 
             // Verifica evento NERV
-            const completeEvent = mockNerv.events.find(e => e.event === 'ORCHESTRATION_COMPLETED');
+            const completeEvent = mockNerv.events.find((/** @type {any} */ e) => e.event === 'ORCHESTRATION_COMPLETED');
             assert.ok(completeEvent, 'Deve emitir ORCHESTRATION_COMPLETED');
         });
     });

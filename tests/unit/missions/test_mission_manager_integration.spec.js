@@ -17,9 +17,9 @@ const TEST_TEMPLATES_DIR = path.join(import.meta.dirname, '../../../src/missions
 class MockNERV extends EventEmitter {
     constructor() {
         super();
-        this.receiveHandlers = [];
-        this.emittedCommands = [];
-        this.emittedEvents = [];
+        /** @type {any[]} */ this.receiveHandlers = [];
+        /** @type {any[]} */ this.emittedCommands = [];
+        /** @type {any[]} */ this.emittedEvents = [];
     }
 
     onReceive(/** @type {any} */ handler) {
@@ -46,7 +46,7 @@ class MockNERV extends EventEmitter {
 // Mock Kernel simples
 class MockKernel {
     constructor() {
-        this.executedTasks = [];
+        /** @type {any[]} */ this.executedTasks = [];
     }
 
     async executeTask(/** @type {any} */ task, /** @type {any} */ correlationId) {
@@ -55,6 +55,9 @@ class MockKernel {
 }
 
 // Helper: envelope do driver → mission manager (formato resiliente)
+/**
+ * @param {{ actionCode: any, missionId: any, taskId: any, stepId: any, result?: any, error?: any, correlationId?: any }} opts
+ */
 function buildTaskEnvelope({
     actionCode,
     missionId,
@@ -397,8 +400,8 @@ describe('MissionManager (end-to-end)', () => {
     /** @type {any} */ let missionManager;
     /** @type {any} */ let kernel;
     /** @type {any} */ let nerv;
-    let prevMissionDispatchMode;
-    let prevMissionLegacyDispatchEnabled;
+    /** @type {string|undefined} */ let prevMissionDispatchMode;
+    /** @type {string|undefined} */ let prevMissionLegacyDispatchEnabled;
 
     beforeEach(async () => {
         // Este suite valida integração histórica com mock de kernel (dispatch direto).

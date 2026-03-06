@@ -147,13 +147,13 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             ];
 
             const grouped = events.reduce((acc, evt) => {
-                acc[evt.taskId] = acc[evt.taskId] || [];
-                acc[evt.taskId].push(evt);
+                /** @type {any} */ (acc)[evt.taskId] = /** @type {any} */ (acc)[evt.taskId] || [];
+                /** @type {any} */ (acc)[evt.taskId].push(evt);
                 return acc;
-            }, {});
+            }, /** @type {Record<string,any[]>} */ ({}));
 
-            assert.strictEqual(grouped['task-001'].length, 2);
-            assert.strictEqual(grouped['task-002'].length, 1);
+            assert.strictEqual(/** @type {any} */ (grouped)['task-001'].length, 2);
+            assert.strictEqual(/** @type {any} */ (grouped)['task-002'].length, 1);
         });
     });
 
@@ -189,7 +189,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
         it('deve logar erro de NERV', () => {
             const errors = [];
 
-            mockNERV.on('ERROR', error => {
+            mockNERV.on('ERROR', (/** @type {any} */ error) => {
                 errors.push(error);
             });
 
@@ -225,10 +225,10 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 __proto__: { polluted: true },
             };
 
-            const sanitized = {
+            const sanitized = /** @type {any} */ ({
                 taskId: event.taskId,
                 status: event.status,
-            };
+            });
 
             assert.ok(!('_internal' in sanitized));
             // __proto__ existe em todos os objetos, mas não deve ter a propriedade polluted
@@ -252,7 +252,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
 
         it('deve debounce eventos de status', async () => {
             let emitCount = 0;
-            const debounced = () => {
+            /** @type {any} */ const debounced = () => {
                 clearTimeout(debounced.timer);
                 debounced.timer = setTimeout(() => emitCount++, 50);
             };
@@ -290,7 +290,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             let disconnected = false;
 
             const socket = {
-                on: (event, handler) => {
+                on: (/** @type {string} */ event, /** @type {any} */ handler) => {
                     if (event === 'disconnect') {
                         handler();
                     }

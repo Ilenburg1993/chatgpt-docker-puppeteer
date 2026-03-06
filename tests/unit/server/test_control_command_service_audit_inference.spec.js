@@ -16,10 +16,10 @@ function actor() {
     };
 }
 
-async function listen(server) {
-    await new Promise((resolve, reject) => {
-        server.listen(0, '127.0.0.1', err => (err ? reject(err) : resolve()));
-    });
+async function listen(/** @type {any} */ server) {
+    await /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
+        server.listen(0, '127.0.0.1', (/** @type {any} */ err) => (err ? reject(err) : resolve()));
+    }));
     const addr = /** @type {import('node:net').AddressInfo} */ (server.address());
     return { host: addr.address, port: addr.port };
 }
@@ -109,7 +109,7 @@ test('executeCommand proxies AUDIT_JOB_CREATE and AUDIT_JOB_RUN to local audit-a
         else process.env.AUDIT_AGENT_HOST = prevHost;
         if (prevPort === undefined) delete process.env.AUDIT_AGENT_PORT;
         else process.env.AUDIT_AGENT_PORT = prevPort;
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise(resolve => { server.close(() => resolve()); }));
     }
 });
 
@@ -158,6 +158,6 @@ test('executeCommand proxies patch_suggest job and returns WAITING_APPROVAL afte
         else process.env.AUDIT_AGENT_HOST = prevHost;
         if (prevPort === undefined) delete process.env.AUDIT_AGENT_PORT;
         else process.env.AUDIT_AGENT_PORT = prevPort;
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise(resolve => { server.close(() => resolve()); }));
     }
 });

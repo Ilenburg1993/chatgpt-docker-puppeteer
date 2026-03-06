@@ -50,7 +50,7 @@ export const RetryStrategy = Object.freeze({
  *
  * @param {Error} error - Error object from tool execution
  * @param {ClassifyErrorContext} context - Execution context
- * @returns {object} Classification result with strategy
+ * @returns {any} Classification result with strategy
  *
  * @example
  * const classification = classifyError(new Error('ECONNREFUSED'), {

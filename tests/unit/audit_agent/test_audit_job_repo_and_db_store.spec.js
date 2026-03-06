@@ -29,7 +29,7 @@ import {
     upsertInferenceClientPolicy,
 } from '../../../src/infra/db/inference_client_policy_repo.js';
 
-function withTempDb(fn) {
+function withTempDb(/** @type {(arg: any) => Promise<void>} */ fn) {
     return async () => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-agent-db-'));
         const dbPath = path.join(tmpDir, 'maestro.sqlite');
@@ -51,12 +51,12 @@ test(
     'audit agent db store persists jobs and runs snapshots from runtime',
     withTempDb(async () => {
         const store = createAuditAgentDbStore();
-        const rt = new AuditAgentRuntime({ store });
+        const rt = new AuditAgentRuntime({ store: /** @type {any} */ (store) });
         const job = rt.createJob({ kind: 'quick_audit', trigger_type: 'manual', created_by: 'unit-test' });
         rt.queueJob(job.id);
         await rt.tick();
 
-        const persisted = getAuditJobById(job.id);
+        const persisted = /** @type {any} */ (getAuditJobById(job.id));
         assert.ok(persisted);
         assert.equal(persisted.status, 'COMPLETED');
         assert.equal(persisted.kind, 'quick_audit');
@@ -74,7 +74,7 @@ test(
     'audit agent db store persists patch-like jobs waiting approval',
     withTempDb(async () => {
         const rt = new AuditAgentRuntime({
-            store: createAuditAgentDbStore(),
+            store: /** @type {any} */ (createAuditAgentDbStore()),
             contextBuilder: {
                 async collectQuickContext() {
                     return {
@@ -118,7 +118,7 @@ test(
         rt.queueJob(job.id);
         await rt.tick();
 
-        const persisted = getAuditJobById(job.id);
+        const persisted = /** @type {any} */ (getAuditJobById(job.id));
         assert.equal(persisted.status, 'WAITING_APPROVAL');
 
         const runs = listAuditJobRunsByJobId(job.id);
@@ -142,22 +142,22 @@ test(
 test(
     'inference profile and client policy repos support basic upsert/list/get',
     withTempDb(async () => {
-        const profile = upsertInferenceProfile({
+        const profile = /** @type {any} */ (upsertInferenceProfile({
             name: 'patch_safe',
             purpose: 'patch generation',
             generation_params: { temperature: 0.1, top_p: 0.9 },
             fallback_chain: [{ model: 'small' }],
-        });
+        }));
         assert.equal(profile.name, 'patch_safe');
 
-        const policy = upsertInferenceClientPolicy({
+        const policy = /** @type {any} */ (upsertInferenceClientPolicy({
             client_tag: 'audit_agent_patch',
             profile_id: profile.id,
             allowed_models: ['qwen2.5-coder'],
             allowed_backends: ['ollama_local'],
             max_parallel: 1,
             timeout_ms: 120000,
-        });
+        }));
         assert.equal(policy.client_tag, 'audit_agent_patch');
         assert.equal(policy.profile_id, profile.id);
 
@@ -166,7 +166,7 @@ test(
         const policies = listInferenceClientPolicies();
         assert.ok(policies.some(p => p.client_tag === 'audit_agent_patch'));
 
-        const loaded = getInferenceClientPolicyByTag('audit_agent_patch');
+        const loaded = /** @type {any} */ (getInferenceClientPolicyByTag('audit_agent_patch'));
         assert.equal(loaded.allowed_models_json[0], 'qwen2.5-coder');
         assert.equal(loaded.allowed_backends_json[0], 'ollama_local');
     })
@@ -209,12 +209,12 @@ test(
     'audit runtime hydrates snapshots from db store and watch rules repo persists rows',
     withTempDb(async () => {
         const store = createAuditAgentDbStore();
-        const rt1 = new AuditAgentRuntime({ store });
+        const rt1 = new AuditAgentRuntime({ store: /** @type {any} */ (store) });
         const j = rt1.createJob({ kind: 'quick_audit', trigger_type: 'manual' });
         rt1.queueJob(j.id);
         await rt1.tick();
 
-        const rt2 = new AuditAgentRuntime({ store });
+        const rt2 = new AuditAgentRuntime({ store: /** @type {any} */ (store) });
         const hydration = rt2.hydrateFromStore();
         assert.equal(hydration.hydrated >= 1, true);
         const loaded = rt2.getJob(j.id);

@@ -10,7 +10,7 @@ import {
 } from '../../../src/integration/error-classifier.mjs';
 
 // helper to build a fake error object
-function makeError(msg, name) {
+function makeError(/** @type {string} */ msg, /** @type {string|undefined} */ name = undefined) {
     const err = new Error(msg);
     if (name) err.name = name;
     return err;

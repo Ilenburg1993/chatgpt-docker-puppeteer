@@ -26,7 +26,7 @@ function actor() {
     };
 }
 
-function withTempDb(fn) {
+function withTempDb(/** @type {() => Promise<void>} */ fn) {
     return async () => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'control-audit-persist-'));
         const dbPath = path.join(tmpDir, 'maestro.sqlite');
@@ -44,7 +44,7 @@ function withTempDb(fn) {
     };
 }
 
-async function listenJsonStub(handler) {
+async function listenJsonStub(/** @type {(req: any) => any} */ handler) {
     const server = http.createServer((req, res) => {
         Promise.resolve(handler(req))
             .then(body => {
@@ -57,7 +57,7 @@ async function listenJsonStub(handler) {
                 res.end(JSON.stringify({ ok: false, error: err?.message || String(err) }));
             });
     });
-    await new Promise((resolve, reject) => server.listen(0, '127.0.0.1', err => (err ? reject(err) : resolve())));
+    await /** @type {Promise<void>} */ (new Promise(resolve => server.listen(0, '127.0.0.1', resolve)));
     const addr = /** @type {import('node:net').AddressInfo} */ (server.address());
     return { server, host: addr.address, port: addr.port };
 }
@@ -67,7 +67,7 @@ test(
     withTempDb(async () => {
         const prevGwHost = process.env.INFERENCE_GATEWAY_HOST;
         const prevGwPort = process.env.INFERENCE_GATEWAY_PORT;
-        const stub = await listenJsonStub(req => {
+        const stub = await listenJsonStub((/** @type {any} */ req) => {
             if ((req.url || '').startsWith('/v1/policies/reload')) {
                 return { ok: true, reloaded: { ok: true } };
             }
@@ -82,6 +82,7 @@ test(
                 kind: 'patch_suggest',
                 trigger_type: 'manual',
             });
+            /** @type {any} */
             const patch = createAuditPatchProposal({
                 job_id: 'ajb-test',
                 patch_unified_diff: 'diff --git a/x b/x',
@@ -374,7 +375,7 @@ test(
             else process.env.INFERENCE_GATEWAY_HOST = prevGwHost;
             if (prevGwPort === undefined) delete process.env.INFERENCE_GATEWAY_PORT;
             else process.env.INFERENCE_GATEWAY_PORT = prevGwPort;
-            await new Promise(resolve => stub.server.close(() => resolve()));
+            await /** @type {Promise<void>} */ (new Promise(resolve => { stub.server.close(() => resolve()); }));
         }
     })
 );

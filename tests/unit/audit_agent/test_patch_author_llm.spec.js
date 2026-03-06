@@ -4,16 +4,16 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { createAuditAgentPatchAuthorLlmClient } from '../../../src/audit_agent/patch_author_llm.js';
 
-async function listen(server) {
-    await new Promise((resolve, reject) => {
-        server.listen(0, '127.0.0.1', err => (err ? reject(err) : resolve()));
-    });
+async function listen(/** @type {any} */ server) {
+    await /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
+        server.listen(0, '127.0.0.1', (/** @type {any} */ err) => (err ? reject(err) : resolve()));
+    }));
     const addr = server.address();
     return { host: addr.address, port: addr.port };
 }
 
-function withEnv(pairs, fn) {
-    const prev = {};
+function withEnv(/** @type {Record<string,any>} */ pairs, /** @type {() => any} */ fn) {
+    const prev = /** @type {Record<string,string|undefined>} */ ({});
     for (const [k, v] of Object.entries(pairs)) {
         prev[k] = process.env[k];
         if (v === undefined || v === null) delete process.env[k];
@@ -87,7 +87,7 @@ test('patch_author_llm performs preflight and returns normalized proposal', asyn
             }
         );
     } finally {
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
     }
 });
 
@@ -131,7 +131,7 @@ test('patch_author_llm tolerates non-JSON model response and emits fallback vali
             }
         );
     } finally {
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
     }
 });
 
@@ -176,6 +176,6 @@ test('patch_author_llm fails when strict JSON mode is required and response shap
             }
         );
     } finally {
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
     }
 });

@@ -1496,11 +1496,12 @@ function _dispatch(command, payload, actor) {
  * @typedef {object} ValidateCommandOptions
  * @property {*} [command]
  * @property {*} [payload]
+ * @property {*} [actor]
  */
 /**
  * Função exportada: validateCommand.
  * @param {ValidateCommandOptions} [options]
- * @returns {Promise<object>|object|null}
+ * @returns {any}
  */
 function validateCommand({ command, payload = {}, actor = null }) {
     const normalized = _normalizeCommand(command);
@@ -1551,11 +1552,13 @@ function validateCommand({ command, payload = {}, actor = null }) {
  * @typedef {object} ExecuteCommandOptions
  * @property {*} [command]
  * @property {*} [payload]
+ * @property {*} [actor]
+ * @property {boolean} [dryRun]
  */
 /**
  * Função exportada: executeCommand.
  * @param {ExecuteCommandOptions} [options]
- * @returns {Promise<void>}
+ * @returns {Promise<any>}
  */
 async function executeCommand({ command, payload = {}, actor = null, dryRun = false }) {
     const normalized = _normalizeCommand(command);

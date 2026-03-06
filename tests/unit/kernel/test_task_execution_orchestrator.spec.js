@@ -11,7 +11,7 @@ class MockNERV extends EventEmitter {
         this.receiveHandlers = [];
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const idx = this.receiveHandlers.indexOf(handler);
@@ -19,7 +19,7 @@ class MockNERV extends EventEmitter {
         };
     }
 
-    receive(envelope) {
+    receive(/** @type {any} */ envelope) {
         this.receiveHandlers.forEach(h => h(envelope));
     }
 }
@@ -33,17 +33,17 @@ describe('TaskExecutionOrchestrator', () => {
         nerv = new MockNERV();
 
         nervBridge = {
-            beforeTaskExecution: async task => task,
+            beforeTaskExecution: async (/** @type {any} */ task) => task,
             emitCommandCalls: [],
             emitEventCalls: [],
             decisions: 0,
-            emitCommand(cmd) {
+            emitCommand(/** @type {any} */ cmd) {
                 this.emitCommandCalls.push(cmd);
             },
-            emitEvent(evt) {
+            emitEvent(/** @type {any} */ evt) {
                 this.emitEventCalls.push(evt);
             },
-            async afterTaskExecution(task) {
+            async afterTaskExecution(/** @type {any} */ task) {
                 this.decisions += 1;
                 return { action: 'DONE', task, feedback: null };
             },

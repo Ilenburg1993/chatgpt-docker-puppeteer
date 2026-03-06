@@ -37,7 +37,7 @@ function extrairNomeEvento(envelope) {
 
 /**
  * Cria um NERV mockado com EventEmitter real
- * @returns {object} NERV mockado
+ * @returns {any} NERV mockado
  */
 function criarNERVMock() {
     const emitter = new EventEmitter();
@@ -191,7 +191,7 @@ function criarNERVMock() {
 /**
  * Cria um NERV simplificado (sem EventEmitter)
  * Útil para testes que só precisam verificar chamadas
- * @returns {object}
+ * @returns {any}
  */
 function criarNERVSimples() {
     return {

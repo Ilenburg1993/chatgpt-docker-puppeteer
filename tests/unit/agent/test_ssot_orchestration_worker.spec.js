@@ -30,11 +30,11 @@ function makeArtifactsDir() {
     return dir;
 }
 
-function hashId(input) {
+function hashId(/** @type {any} */ input) {
     return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
 }
 
-async function makeResponseTextArtifact({ taskId, attemptId, text }) {
+async function makeResponseTextArtifact(/** @type {{ taskId: any, attemptId: any, text: any }} */ { taskId, attemptId, text }) {
     const now = Date.now();
     const stored = await putText({
         kind: 'response_text',
@@ -140,6 +140,7 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         const worker = new TaskOrchestrationWorker({ intervalMs: 999999, batchSize: 50, workerId: 'orch_test' });
         await worker.tick();
 
+        /** @type {any} */
         const row = db.prepare('SELECT stage, status, execute_after_ms, task_json FROM tasks WHERE id = ?').get(taskId);
         assert.strictEqual(row.stage, 'READY');
         assert.strictEqual(row.status, 'PENDING');
@@ -150,17 +151,18 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
 
         const task = JSON.parse(row.task_json);
         const inputs = task?.spec?.payload?.context?.inputs || [];
-        const fb = inputs.find(i => i && i.type === 'artifact_text' && i.label === 'orchestration_feedback');
+        const fb = inputs.find((/** @type {any} */ i) => i && i.type === 'artifact_text' && i.label === 'orchestration_feedback');
         assert.ok(fb && fb.artifact_id, 'deve injetar input artifact_text orchestration_feedback');
 
+        /** @type {any} */
         const art = db.prepare('SELECT * FROM artifacts WHERE id = ?').get(fb.artifact_id);
         assert.ok(art && art.storage_uri, 'feedback artifact deve existir no DB');
         const content = fs.readFileSync(art.storage_uri, 'utf8');
         assert.ok(content.includes('Orchestration Feedback'), 'feedback artifact deve conter header');
 
-        const applied = db
+        const applied = (/** @type {any} */ (db
             .prepare('SELECT COUNT(1) AS c FROM events WHERE dedup_key = ?')
-            .get(`task:${taskId}:orchestrated:${attemptId}`)?.c;
+            .get(`task:${taskId}:orchestrated:${attemptId}`)))?.c;
         assert.strictEqual(applied, 1, 'deve marcar orquestração aplicada por attempt');
     });
 
@@ -212,6 +214,7 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         const worker = new TaskOrchestrationWorker({ intervalMs: 999999, batchSize: 50, workerId: 'orch_test' });
         await worker.tick();
 
+        /** @type {any} */
         const row = db
             .prepare('SELECT status, blocked_reason, blocked_details_json FROM tasks WHERE id = ?')
             .get(taskId);
@@ -221,6 +224,7 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         const details = JSON.parse(row.blocked_details_json);
         assert.ok(details.feedback_artifact_id, 'blocked_details_json deve ter feedback_artifact_id');
 
+        /** @type {any} */
         const art = db.prepare('SELECT * FROM artifacts WHERE id = ?').get(details.feedback_artifact_id);
         assert.ok(art && art.storage_uri, 'feedback artifact deve existir');
     });
@@ -281,18 +285,19 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         await worker.tick(); // second tick should be a no-op (applied)
 
         const childId = `task-${hashId(`${taskId}|${attemptId}|s1`)}`;
+        /** @type {any} */
         const child = db.prepare('SELECT id, stage, status, task_json FROM tasks WHERE id = ?').get(childId);
         assert.ok(child, 'task filha deve existir');
         assert.strictEqual(child.stage, 'READY');
         assert.strictEqual(child.status, 'PENDING');
 
         const dep =
-            db
+            (/** @type {any} */ (db
                 .prepare('SELECT COUNT(1) AS c FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?')
-                .get(childId, taskId)?.c || 0;
+                .get(childId, taskId)))?.c || 0;
         assert.strictEqual(dep, 1, 'dependency parent->child deve existir');
 
-        const tasksCount = db.prepare('SELECT COUNT(1) AS c FROM tasks').get()?.c || 0;
+        const tasksCount = (/** @type {any} */ (db.prepare('SELECT COUNT(1) AS c FROM tasks').get()))?.c || 0;
         assert.strictEqual(tasksCount, 2, 'não deve duplicar task filha ao re-tick');
 
         const childTask = JSON.parse(child.task_json);

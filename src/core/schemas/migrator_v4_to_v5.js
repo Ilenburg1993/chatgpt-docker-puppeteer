@@ -40,7 +40,7 @@ function isV5Task(task) {
  * - result.validation_results: []
  *
  * @param {any} taskV4 - Task V4 object
- * @returns {object} - Task V5 object
+ * @returns {any} - Task V5 object
  * @throws {Error} - Se migração falhar
  */
 function migrateTaskV4toV5(taskV4) {
@@ -287,7 +287,7 @@ function validateV5Task(task) {
  * ATENÇÃO: Perde informações de missões/workflows/execution context/result V2!
  *
  * @param {any} taskV5 - Task V5 object
- * @returns {object} - Task V4 object
+ * @returns {any} - Task V4 object
  */
 function downgradeV5toV4(taskV5) {
     logger.warn(
@@ -356,7 +356,7 @@ function downgradeV5toV4(taskV5) {
 /**
  * Migra automaticamente task, detectando versão.
  * @param {any} task - Task de qualquer versão
- * @returns {object} - Task V5
+ * @returns {any} - Task V5
  */
 function autoMigrateTask(task) {
     if (!task) {

@@ -20,7 +20,7 @@ describe('Server Middleware - Request Processing', () => {
         });
 
         it('deve preservar código de status customizado', () => {
-            const error = new Error('Not found');
+            const error = /** @type {any} */ (new Error('Not found'));
             error.statusCode = 404;
 
             const response = {
@@ -34,7 +34,7 @@ describe('Server Middleware - Request Processing', () => {
         it('deve logar erro antes de responder', () => {
             /** @type {any[]} */ const logs = [];
 
-            const errorHandler = err => {
+            const errorHandler = (/** @type {any} */ err) => {
                 logs.push({
                     level: 'ERROR',
                     message: err.message,
@@ -63,7 +63,7 @@ describe('Server Middleware - Request Processing', () => {
         });
 
         it('deve ocultar stack trace em produção', () => {
-            const NODE_ENV = 'production';
+            /** @type {string} */ const NODE_ENV = 'production';
             const error = new Error('Test');
 
             const response = {
@@ -91,13 +91,13 @@ describe('Server Middleware - Request Processing', () => {
 
         it('deve adicionar Request ID ao header', () => {
             const req = {};
-            const res = {
-                setHeader: (name, value) => {
+            const res = /** @type {any} */ ({
+                setHeader: (/** @type {string} */ name, /** @type {string} */ value) => {
                     res.headers = res.headers || {};
                     res.headers[name] = value;
                 },
-                headers: {},
-            };
+                headers: /** @type {Record<string,string>} */ ({}),
+            });
 
             const requestId = 'req-12345';
             res.setHeader('X-Request-ID', requestId);
@@ -118,7 +118,7 @@ describe('Server Middleware - Request Processing', () => {
         });
 
         it('deve disponibilizar Request ID no req.id', () => {
-            const req = { id: undefined };
+            const req = { id: /** @type {string|undefined} */ (undefined) };
 
             req.id = 'req-12345';
 
@@ -194,14 +194,14 @@ describe('Server Middleware - Request Processing', () => {
         it('deve sanitizar campos não permitidos', () => {
             const allowedFields = ['prompt', 'target', 'priority'];
 
-            const body = {
+            const body = /** @type {any} */ ({
                 prompt: 'Teste',
                 target: 'gemini',
                 _internal: 'secret',
                 __proto__: { polluted: true },
-            };
+            });
 
-            const sanitized = {};
+            const sanitized = /** @type {any} */ ({});
             for (const field of allowedFields) {
                 if (field in body) {
                     sanitized[field] = body[field];
@@ -215,13 +215,13 @@ describe('Server Middleware - Request Processing', () => {
 
     describe('4. CORS Middleware', () => {
         it('deve adicionar headers CORS', () => {
-            const res = {
-                setHeader: (name, value) => {
+            const res = /** @type {any} */ ({
+                setHeader: (/** @type {string} */ name, /** @type {string} */ value) => {
                     res.headers = res.headers || {};
                     res.headers[name] = value;
                 },
-                headers: {},
-            };
+                headers: /** @type {Record<string,string>} */ ({}),
+            });
 
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
@@ -246,7 +246,7 @@ describe('Server Middleware - Request Processing', () => {
         it('deve logar requisição recebida', () => {
             /** @type {any[]} */ const logs = [];
 
-            const logger = req => {
+            const logger = (/** @type {any} */ req) => {
                 logs.push({
                     method: req.method,
                     path: req.path,
@@ -296,7 +296,7 @@ describe('Server Middleware - Request Processing', () => {
             const MAX_REQUESTS = 100;
             const requests = new Map([['192.168.1.1', 101]]);
 
-            const allowed = requests.get('192.168.1.1') < MAX_REQUESTS;
+            const allowed = (requests.get('192.168.1.1') ?? 0) < MAX_REQUESTS;
 
             assert.strictEqual(allowed, false);
         });

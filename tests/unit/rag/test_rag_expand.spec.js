@@ -18,7 +18,7 @@ class FakeEmbeddingsProvider {
         return { ok: true, hasModel: true, models: [this.model] };
     }
 
-    async embed(text) {
+    async embed(/** @type {any} */ text) {
         const hash = crypto.createHash('sha256').update(String(text), 'utf8').digest();
         const vector = [];
         for (let i = 0; i < this.dim; i++) vector.push(hash[i] / 255);
@@ -47,11 +47,11 @@ describe('ragExpand', () => {
                 profile: 'full',
             });
 
-            const result = await ragExpand({
+            const result = /** @type {any} */ (await ragExpand({
                 paths,
                 root: ws,
                 chunkId: 'non-existent',
-            });
+            }));
             assert.strictEqual(result.ok, false);
             assert.strictEqual(result.reason_code, 'CHUNK_NOT_FOUND');
         } finally {
@@ -93,23 +93,23 @@ describe('ragExpand', () => {
                 profile: 'full',
             });
 
-            const query = await ragQuery({
+            const query = /** @type {any} */ (await ragQuery({
                 query: 'hello(name)',
                 topK: 1,
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
-            });
+            }));
             const chunkId = query.results?.[0]?.chunk_id;
             assert.ok(chunkId, 'Expected at least one indexed chunk');
 
-            const expanded = await ragExpand({
+            const expanded = /** @type {any} */ (await ragExpand({
                 paths: ragPaths,
                 root: ws,
                 chunkId,
                 mode: 'lines',
                 beforeLines: 200,
                 afterLines: 200,
-            });
+            }));
 
             assert.strictEqual(expanded.ok, true);
             assert.strictEqual(expanded.mode, 'lines');
@@ -151,23 +151,23 @@ describe('ragExpand', () => {
                 profile: 'full',
             });
 
-            const query = await ragQuery({
+            const query = /** @type {any} */ (await ragQuery({
                 query: 'line_699',
                 topK: 1,
                 paths: ragPaths,
                 embeddingsProvider: embeddings,
-            });
+            }));
             const chunkId = query.results?.[0]?.chunk_id;
             assert.ok(chunkId, 'Expected indexed chunk for heavySymbol');
 
-            const expanded = await ragExpand({
+            const expanded = /** @type {any} */ (await ragExpand({
                 paths: ragPaths,
                 root: ws,
                 chunkId,
                 mode: 'symbol',
                 beforeLines: 0,
                 afterLines: 0,
-            });
+            }));
 
             assert.strictEqual(expanded.ok, true);
             assert.strictEqual(expanded.mode, 'symbol');

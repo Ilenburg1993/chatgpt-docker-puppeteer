@@ -232,7 +232,7 @@ function _normalizePatchProposal(job, contextPack, llmOut) {
  * O cliente opera em modo proposal-only e depende do Inference Gateway.
  * @returns {{
  *   isEnabled: () => boolean,
- *   runPatchAuthor: (job: unknown, contextPack: unknown, llmTriage: unknown) => Promise<Record<string, unknown>>
+ *   runPatchAuthor: (job: unknown, contextPack: unknown, llmTriage: unknown) => Promise<any>
  * }}
  */
 export function createAuditAgentPatchAuthorLlmClient() {
