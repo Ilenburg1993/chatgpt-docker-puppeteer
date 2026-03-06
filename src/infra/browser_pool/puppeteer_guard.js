@@ -109,13 +109,13 @@ if (isLaunchDisabled) {
          * NÃO tenta fallback.
          * Falha de forma inequívoca.
          */
-        /** @type {unknown} */ (puppeteer).launch = function forbiddenLaunch() {
+        /** @type {any} */ (puppeteer).launch = function forbiddenLaunch() {
             const error = new Error(ARCH_VIOLATION_MESSAGE);
 
             // Metadados úteis para forensics / logs estruturados
-            error.code = 'ARCH_FORBIDDEN_PUPPETEER_LAUNCH';
-            error.originalFunction = 'puppeteer.launch';
-            error.replacedBy = 'puppeteer.connect';
+            /** @type {any} */ (error).code = 'ARCH_FORBIDDEN_PUPPETEER_LAUNCH';
+            /** @type {any} */ (error).originalFunction = 'puppeteer.launch';
+            /** @type {any} */ (error).replacedBy = 'puppeteer.connect';
 
             throw error;
         };

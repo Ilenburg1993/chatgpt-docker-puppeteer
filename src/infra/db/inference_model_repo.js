@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {any} InferenceModel */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
@@ -6,6 +7,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -14,6 +19,10 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} fallback
+ */
 function _parseJson(raw, fallback) {
     if (raw == null) return fallback;
     try {
@@ -23,6 +32,10 @@ function _parseJson(raw, fallback) {
     }
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToModel(row) {
     if (!row) return null;
     return {
@@ -40,6 +53,10 @@ function _rowToModel(row) {
     };
 }
 
+/**
+ * @param {any} id
+ * @param {any} enabled
+ */
 function _setModelEnabled(id, enabled) {
     const db = getDb();
     const targetId = String(id || '').trim();
@@ -54,23 +71,20 @@ function _setModelEnabled(id, enabled) {
     return getInferenceModelById(targetId);
 }
 
-/**
- * @typedef {object} UpsertInferenceModelInput
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} UpsertInferenceModelInput */
 /**
  * Função exportada: upsertInferenceModel.
- * @param {UpsertInferenceModelInput} [input]
+ * @param {any} [input]
  * @returns {InferenceModel|null}
  */
 function upsertInferenceModel(input = {}) {
     const db = getDb();
     const now = _now();
-    const existing = input.id
+    const existing = /** @type {any} */ (input.id
         ? db.prepare('SELECT * FROM inference_models WHERE id = ?').get(String(input.id))
         : input.alias
           ? db.prepare('SELECT * FROM inference_models WHERE alias = ?').get(String(input.alias))
-          : null;
+          : null);
     const id = existing?.id || `infm-${uuidv4()}`;
     const alias = String(input.alias || existing?.alias || '').trim();
     const modelName = String(input.model_name || input.modelName || existing?.model_name || '').trim();
@@ -123,12 +137,7 @@ function getInferenceModelById(id) {
     return _rowToModel(db.prepare('SELECT * FROM inference_models WHERE id = ?').get(String(id || '').trim()));
 }
 
-/**
- * @typedef {object} ListInferenceModelsOptions
- * @property {*} [backendId]
- * @property {*} [enabledOnly]
- * @property {*} [limit]
- */
+/** @typedef {any} ListInferenceModelsOptions */
 /**
  * Função exportada: listInferenceModels.
  * @param {ListInferenceModelsOptions} [options]

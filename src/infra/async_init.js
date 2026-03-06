@@ -29,7 +29,7 @@
  * }
  */
 export function createAsyncInit(initFn) {
-    let initPromise = null;
+    let initPromise = /** @type {Promise<void>|null} */ (null);
     let initialized = false;
 
     const ready = new Proxy(Promise.resolve(), {
@@ -41,16 +41,16 @@ export function createAsyncInit(initFn) {
                         .then(() => {
                             initialized = true;
                         })
-                        .catch(err => {
+                        .catch(/** @param {any} err */ (err) => {
                             // Reset on error so next call retries
                             initPromise = null;
                             initialized = false;
                             throw err;
                         });
                 }
-                return initPromise.then.bind(initPromise);
+                return /** @type {NonNullable<typeof initPromise>} */ (initPromise).then.bind(initPromise);
             }
-            return target[prop];
+            return (/** @type {any} */ (target))[prop];
         },
     });
 
@@ -89,16 +89,13 @@ export function createTopLevelInit(initFn) {
             return await initFn();
         } catch (err) {
             // Log to stderr since logging system may not be ready
-            console.error('[INIT_ERROR]', err.message);
+            console.error('[INIT_ERROR]', /** @type {any} */ (err).message);
             throw err;
         }
     })();
 }
 
-/**
- * @typedef {object} InitDirectoryOptions
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} InitDirectoryOptions */
 /**
  * Creates a thread-safe directory initialization.
  * Handles EEXIST errors gracefully (common in multi-process scenarios).
@@ -121,7 +118,7 @@ export async function initDirectory(dirPath, options = { recursive: true }) {
         await fs.mkdir(dirPath, options);
     } catch (err) {
         // EEXIST is OK - directory already exists (another process created it)
-        if (err.code === 'EEXIST') {
+        if (/** @type {any} */ (err).code === 'EEXIST') {
             return;
         }
         throw err;
@@ -152,7 +149,7 @@ export async function ensureFile(filePath, defaultContent = '') {
         await fs.access(filePath);
     } catch (err) {
         // File doesn't exist, create it
-        if (err.code === 'ENOENT') {
+        if (/** @type {any} */ (err).code === 'ENOENT') {
             const fs = await import('node:fs/promises');
             await fs.writeFile(filePath, defaultContent, { flag: 'wx' }); // wx = exclusive write
         } else {
@@ -184,7 +181,7 @@ export async function ensureFile(filePath, defaultContent = '') {
  */
 export function createInitGuard() {
     let locked = false;
-    let waitQueue = [];
+    let waitQueue = /** @type {any[]} */ ([]);
 
     async function acquire() {
         // If not locked, acquire immediately
@@ -219,7 +216,7 @@ export function createInitGuard() {
  * Decorator pattern for making a function wait for initialization.
  * Useful for class methods that need resources to be ready.
  *
- * @param {Promise} initPromise - Initialization promise to wait for
+ * @param {Promise<any>} initPromise - Initialization promise to wait for
  * @param {function} fn - Function to wrap
  * @returns {function} Wrapped function
  *
@@ -233,17 +230,22 @@ export function createInitGuard() {
  * }
  */
 export function waitForInit(initPromise, fn) {
-    return async function (...args) {
+    /**
+     * @this {any}
+     * @param {...any} args
+     */
+    async function wrapper(...args) {
         await initPromise;
         return fn.apply(this, args);
-    };
+    }
+    return wrapper;
 }
 
 /**
  * Combines multiple initialization promises into one.
  * Useful when a module depends on multiple resources.
  *
- * @param {...Promise} initPromises - Promises to combine
+ * @param {...Promise<any>} initPromises - Promises to combine
  * @returns {Promise<void>}
  *
  * @example
@@ -284,7 +286,7 @@ export async function initWithTimeout(initFn, timeoutMs, name = 'Initialization'
     const timeoutPromise = new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
             const error = new Error(`${name} timed out after ${timeoutMs}ms`);
-            error.code = 'INIT_TIMEOUT';
+            /** @type {any} */ (error).code = 'INIT_TIMEOUT';
             reject(error);
         }, timeoutMs);
     });
@@ -323,7 +325,7 @@ export async function initWithTimeout(initFn, timeoutMs, name = 'Initialization'
  * );
  */
 export function initWithHealthCheck(initFn, healthCheckFn, intervalMs = 60000) {
-    let healthCheckInterval = null;
+    let healthCheckInterval = /** @type {any} */ (null);
     let isHealthy = false;
 
     const ready = (async () => {

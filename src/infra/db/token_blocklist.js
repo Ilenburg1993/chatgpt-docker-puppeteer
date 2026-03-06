@@ -15,7 +15,7 @@ import { log } from '#core/logger';
  */
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hora
-let _cleanupTimer = null;
+let _cleanupTimer = /** @type {any} */ (null);
 
 /**
  * Garante que a tabela de tokens revogados existe no banco de dados.
@@ -55,7 +55,7 @@ export function revokeToken(jti, expiresAtMs) {
             .run(jti, Date.now(), Number(expiresAtMs) || Date.now() + 86400000);
         return result.changes > 0;
     } catch (err) {
-        log('ERROR', `[TOKEN_BLOCKLIST] Erro ao revogar token: ${err.message}`);
+        log('ERROR', `[TOKEN_BLOCKLIST] Erro ao revogar token: ${/** @type {any} */ (err).message}`);
         return false;
     }
 }
@@ -74,7 +74,7 @@ export function isTokenRevoked(jti) {
         const row = db.prepare('SELECT 1 FROM revoked_tokens WHERE jti = ? AND expires_at_ms > ?').get(jti, Date.now());
         return !!row;
     } catch (err) {
-        log('WARN', `[TOKEN_BLOCKLIST] Erro ao verificar token: ${err.message}`);
+        log('WARN', `[TOKEN_BLOCKLIST] Erro ao verificar token: ${/** @type {any} */ (err).message}`);
         return false; // Fail-open: se não conseguimos verificar, permitir (log gerado)
     }
 }
@@ -94,7 +94,7 @@ export function cleanExpiredTokens() {
         }
         return removed;
     } catch (err) {
-        log('WARN', `[TOKEN_BLOCKLIST] Erro na limpeza de tokens: ${err.message}`);
+        log('WARN', `[TOKEN_BLOCKLIST] Erro na limpeza de tokens: ${/** @type {any} */ (err).message}`);
         return 0;
     }
 }

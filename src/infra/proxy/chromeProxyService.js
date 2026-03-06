@@ -58,10 +58,10 @@ import { v4 as uuidv4 } from 'uuid';
  */
 
 // NERV integration (optional) - lazy loaded
-let createNERV = null;
-let HighLevelNERV = null;
-let ActionCode = null;
-let ActorRole = null;
+/** @type {any} */ let createNERV = null;
+/** @type {any} */ let HighLevelNERV = null;
+/** @type {any} */ let ActionCode = null;
+/** @type {any} */ let ActorRole = null;
 
 import CONFIG from '#core/config';
 
@@ -255,7 +255,7 @@ class ChromeProxyService {
             // Default metrics are collected on scrape; no interval/timeout config needed.
             promClient.collectDefaultMetrics();
         } catch (err) {
-            this.log('warn', 'Failed to collect default metrics', { error: err.message });
+            this.log('warn', 'Failed to collect default metrics', { error: /** @type {any} */ (err).message });
         }
 
         this.metrics = {
@@ -360,25 +360,25 @@ class ChromeProxyService {
      */
     async _initProxy() {
         try {
-            const httpProxy = await import('http-proxy').then(m => m.default ?? m);
+            const httpProxy = /** @type {any} */ (await import('http-proxy').then(m => m.default ?? m));
             this.wsProxy = httpProxy.createProxyServer({
                 target: `http://${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`,
                 ws: true,
                 changeOrigin: true,
             });
-            this.wsProxy.on('error', (err, req, res) => {
+            this.wsProxy.on('error', /** @type {function(any, any, any): void} */ ((err, req, res) => {
                 this.stats.errors++;
                 this._incrementMetric(this.metrics.proxyErrors, { type: 'http_proxy' });
-                this.log('error', 'Proxy error', { error: err.message });
+                this.log('error', 'Proxy error', { error: /** @type {any} */ (err).message });
                 if (res && !res.finished) {
                     try {
                         res.writeHead(502, { 'Content-Type': 'text/plain' });
                         res.end('Proxy error');
                     } catch (writeErr) {
-                        this.log('debug', 'Failed to send error response', { error: writeErr.message });
+                        this.log('debug', 'Failed to send error response', { error: /** @type {any} */ (writeErr).message });
                     }
                 }
-            });
+            }));
         } catch (err) {
             this.wsProxy = null;
             this.log('warn', 'http-proxy unavailable, falling back to raw socket method');
@@ -390,7 +390,7 @@ class ChromeProxyService {
     ====================================================================== */
     _validateConfig() {
         const required = ['PROXY_PORT', 'CHROME_HOST', 'CHROME_PORT'];
-        const missing = required.filter(key => !this.config[key]);
+        const missing = required.filter(key => !(/** @type {any} */ (this.config))[key]);
 
         if (missing.length > 0) {
             throw new Error(`Missing required config: ${missing.join(', ')}`);
@@ -410,7 +410,7 @@ class ChromeProxyService {
         }
 
         // Validate ALLOWED_ORIGINS
-        if (!Array.isArray(this.config.ALLOWED_ORIGINS) || this.config.ALLOWED_ORIGINS.length === 0) {
+        if (!Array.isArray(this.config.ALLOWED_ORIGINS) || (this.config.ALLOWED_ORIGINS || []).length === 0) {
             throw new Error('ALLOWED_ORIGINS must be a non-empty array');
         }
     }
@@ -456,14 +456,14 @@ class ChromeProxyService {
 
         for (const name of preferredNames) {
             if (interfaces[name]) {
-                const ipv4 = interfaces[name].find(iface => iface.family === 'IPv4' && !iface.internal);
+                const ipv4 = interfaces[name]?.find(iface => iface.family === 'IPv4' && !iface.internal);
                 if (ipv4) return ipv4.address;
             }
         }
 
         // Fallback: unknown non-internal IPv4
         for (const name in interfaces) {
-            const ipv4 = interfaces[name].find(iface => iface.family === 'IPv4' && !iface.internal);
+            const ipv4 = interfaces[name]?.find(iface => iface.family === 'IPv4' && !iface.internal);
             if (ipv4) return ipv4.address;
         }
 
@@ -473,9 +473,19 @@ class ChromeProxyService {
     /* ======================================================================
        Logging with Correlation IDs
     ====================================================================== */
+    /**
+     * @param {any} level
+     * @param {any} message
+     * @param {any} [meta]
+     */
+    /**
+     * @param {any} level
+     * @param {any} message
+     * @param {any} [meta]
+     */
     log(level, message, meta = {}) {
         const store = this.asyncLocalStorage.getStore();
-        const correlationId = store?.correlationId || meta.correlationId || 'unknown';
+        const correlationId = (/** @type {any} */ (store))?.correlationId || meta.correlationId || 'unknown';
 
         const enrichedMeta = { ...meta, correlationId };
         const metaStr = ` [${correlationId.substring(0, 8)}]`;
@@ -493,6 +503,14 @@ class ChromeProxyService {
     /* ======================================================================
        Metrics Helper (replaces void err pattern)
     ====================================================================== */
+    /**
+     * @param {any} metric
+     * @param {any} [labels]
+     */
+    /**
+     * @param {any} metric
+     * @param {any} [labels]
+     */
     _incrementMetric(metric, labels = {}) {
         try {
             metric.inc(labels);
@@ -500,29 +518,47 @@ class ChromeProxyService {
             // Non-critical: log once, don't spam
             this.log('debug', 'Metric increment failed (non-critical)', {
                 metric: metric?.name || 'unknown',
-                error: err.message,
+                error: /** @type {any} */ (err).message,
             });
         }
     }
 
+    /**
+     * @param {any} metric
+     * @param {any} value
+     * @param {any} [labels]
+     */
+    /**
+     * @param {any} metric
+     * @param {any} value
+     * @param {any} [labels]
+     */
     _observeMetric(metric, value, labels = {}) {
         try {
             metric.observe(labels, value);
         } catch (err) {
             this.log('debug', 'Metric observe failed (non-critical)', {
                 metric: metric?.name || 'unknown',
-                error: err.message,
+                error: /** @type {any} */ (err).message,
             });
         }
     }
 
+    /**
+     * @param {any} metric
+     * @param {any} value
+     */
+    /**
+     * @param {any} metric
+     * @param {any} value
+     */
     _setMetric(metric, value) {
         try {
             metric.set(value);
         } catch (err) {
             this.log('debug', 'Metric set failed (non-critical)', {
                 metric: metric?.name || 'unknown',
-                error: err.message,
+                error: /** @type {any} */ (err).message,
             });
         }
     }
@@ -530,11 +566,27 @@ class ChromeProxyService {
     /* ======================================================================
        NERV Integration (Optional)
     ====================================================================== */
+    /**
+     * @param {any} nerv
+     */
+    /**
+     * @param {any} nerv
+     */
     setNERV(nerv) {
         this.nerv = nerv; // ✅ Use this.nerv (not this._nerv) - align with all NERV adapters
         this.log('info', 'NERV integration enabled');
     }
 
+    /**
+     * @param {any} actionCode
+     * @param {any} [payload]
+     * @param {any} [correlationId]
+     */
+    /**
+     * @param {any} actionCode
+     * @param {any} [payload]
+     * @param {any} [correlationId]
+     */
     async _emitNervEvent(actionCode, payload = {}, correlationId = null) {
         try {
             if (!this.nerv || !HighLevelNERV || typeof HighLevelNERV.sendEvent !== 'function') {
@@ -543,7 +595,7 @@ class ChromeProxyService {
             const actor = ActorRole.INFRA || 'INFRA';
             return await HighLevelNERV.sendEvent(this.nerv, actor, actionCode, payload, correlationId, null);
         } catch (err) {
-            this.log('debug', 'NERV publish failed (non-critical)', { error: err.message });
+            this.log('debug', 'NERV publish failed (non-critical)', { error: /** @type {any} */ (err).message });
             return null;
         }
     }
@@ -551,15 +603,23 @@ class ChromeProxyService {
     /* ======================================================================
        URL Rewriting (Chrome → Proxy)
     ====================================================================== */
+    /**
+     * @param {any} data
+     * @param {any} hostFallback
+     */
+    /**
+     * @param {any} data
+     * @param {any} hostFallback
+     */
     rewriteWebSocketURL(data, hostFallback) {
         try {
             const json = JSON.parse(data);
             const publicHost = this.config.PUBLIC_IP || (hostFallback ? String(hostFallback).split(':')[0] : null);
 
-            const rewriteIfPresent = val => {
+            const rewriteIfPresent = /** @type {(val: any) => any} */ (val => {
                 if (!val) return val;
                 return this._rewriteURL(val, publicHost);
-            };
+            });
 
             if (json.webSocketDebuggerUrl) {
                 const original = json.webSocketDebuggerUrl;
@@ -580,11 +640,19 @@ class ChromeProxyService {
 
             return JSON.stringify(json);
         } catch (err) {
-            this.log('error', 'JSON parse/rewrite failed', { error: err.message });
+            this.log('error', 'JSON parse/rewrite failed', { error: /** @type {any} */ (err).message });
             return data;
         }
     }
 
+    /**
+     * @param {any} url
+     * @param {any} publicHost
+     */
+    /**
+     * @param {any} url
+     * @param {any} publicHost
+     */
     _rewriteURL(url, publicHost) {
         const replacementHost = publicHost || this.config.PUBLIC_IP || this.config.CHROME_HOST;
 
@@ -608,7 +676,7 @@ class ChromeProxyService {
             return u.toString();
         } catch (err) {
             // Fallback: regex replacement
-            this.log('debug', 'URL parse failed, using regex fallback', { url, error: err.message });
+            this.log('debug', 'URL parse failed, using regex fallback', { url, error: /** @type {any} */ (err).message });
             return String(url).replace(
                 new RegExp(`(${this.config.CHROME_HOST}|localhost|127\\.0\\.0\\.1):${this.config.CHROME_PORT}`, 'g'),
                 `${replacementHost}:${this.config.PROXY_PORT}`
@@ -631,7 +699,7 @@ class ChromeProxyService {
                     this._setMetric(this.metrics.activeConnections, this.activeConnections.size);
                 }
             } catch (err) {
-                this.log('debug', 'Cleanup error (non-critical)', { error: err.message });
+                this.log('debug', 'Cleanup error (non-critical)', { error: /** @type {any} */ (err).message });
             }
         }
     }
@@ -639,6 +707,12 @@ class ChromeProxyService {
     /* ======================================================================
        IP Normalization (P1.6 - IPv6-mapped canonicalization)
     ====================================================================== */
+    /**
+     * @param {any} ip
+     */
+    /**
+     * @param {any} ip
+     */
     _normalizeIP(ip) {
         if (!ip) return '0.0.0.0';
         // Remove IPv6-mapped IPv4 prefix (::ffff:192.168.1.1 → 192.168.1.1)
@@ -658,11 +732,23 @@ class ChromeProxyService {
         }
     }
 
+    /**
+     * @param {any} ip
+     */
+    /**
+     * @param {any} ip
+     */
     _incrementIPConnection(ip) {
         const current = this.wsConnectionsPerIP.get(ip) || 0;
         this.wsConnectionsPerIP.set(ip, current + 1);
     }
 
+    /**
+     * @param {any} ip
+     */
+    /**
+     * @param {any} ip
+     */
     _decrementIPConnection(ip) {
         const current = this.wsConnectionsPerIP.get(ip) || 0;
         if (current > 0) {
@@ -696,7 +782,7 @@ class ChromeProxyService {
                 webSocketDebuggerUrl: json.webSocketDebuggerUrl,
             };
         } catch (err) {
-            return { healthy: false, error: err.message };
+            return { healthy: false, error: /** @type {any} */ (err).message };
         } finally {
             if (timeout) {
                 clearTimeout(timeout);
@@ -707,6 +793,16 @@ class ChromeProxyService {
     /* ======================================================================
        Retry with Exponential Backoff
     ====================================================================== */
+    /**
+     * @param {any} fn
+     * @param {number} [maxRetries]
+     * @param {number} [baseDelay]
+     */
+    /**
+     * @param {any} fn
+     * @param {number} [maxRetries]
+     * @param {number} [baseDelay]
+     */
     async _retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
@@ -716,7 +812,7 @@ class ChromeProxyService {
 
                 const delay = baseDelay * Math.pow(2, attempt);
                 this.log('warn', `Retry ${attempt + 1}/${maxRetries} after ${delay}ms`, {
-                    error: err.message,
+                    error: /** @type {any} */ (err).message,
                 });
 
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -889,11 +985,11 @@ class ChromeProxyService {
                     proxyRes.pipe(res);
 
                     // ✅ P2.7: Handle streaming errors (count failures in circuit breaker)
-                    proxyRes.on('error', streamErr => {
+                    proxyRes.on('error', /** @type {function(any): void} */ (streamErr => {
                         this.circuitBreaker.onFailure(); // Count failure in circuit breaker
                         this.stats.errors++;
                         this._incrementMetric(this.metrics.proxyErrors, { type: 'stream_error' });
-                        this.log('error', 'Proxy response stream error', { error: streamErr.message });
+                        this.log('error', 'Proxy response stream error', { error: /** @type {any} */ (streamErr).message });
 
                         if (!res.headersSent) {
                             res.writeHead(502, {
@@ -902,7 +998,7 @@ class ChromeProxyService {
                             });
                             res.end('Stream error');
                         }
-                    });
+                    }));
 
                     this.log('debug', 'HTTP response streaming', {
                         status: proxyRes.statusCode,
@@ -943,7 +1039,7 @@ class ChromeProxyService {
             })
             .catch(err => {
                 // ✅ P0.1 FIX: Detect circuit breaker rejection (let breaker manage state transition)
-                const isCircuitBreakerError = err.message && err.message.includes('Circuit breaker');
+                const isCircuitBreakerError = /** @type {any} */ (err).message && /** @type {any} */ (err).message.includes('Circuit breaker');
 
                 if (isCircuitBreakerError) {
                     // Circuit breaker is OPEN - return 503 with Retry-After
@@ -980,7 +1076,7 @@ class ChromeProxyService {
                     this._incrementMetric(this.metrics.proxyErrors, { type: 'http_request' });
                     this._incrementMetric(this.metrics.httpRequests, { method, path: url, status: '502' });
 
-                    this.log('error', 'Chrome unreachable', { error: err.message });
+                    this.log('error', 'Chrome unreachable', { error: /** @type {any} */ (err).message });
 
                     if (!res.headersSent) {
                         res.writeHead(502, {
@@ -991,7 +1087,7 @@ class ChromeProxyService {
                         res.end(
                             JSON.stringify({
                                 error: 'Chrome unreachable',
-                                message: err.message,
+                                message: /** @type {any} */ (err).message,
                                 hint: `Ensure Chrome is running with --remote-debugging-port=${this.config.CHROME_PORT}`,
                             })
                         );
@@ -1004,7 +1100,7 @@ class ChromeProxyService {
                     if (ActionCode) {
                         this._emitNervEvent(
                             ActionCode.DRIVER_ERROR,
-                            { event: 'proxy.http.error', error: err.message, path: url, method },
+                            { event: 'proxy.http.error', error: /** @type {any} */ (err).message, path: url, method },
                             correlationId
                         );
                     }
@@ -1015,6 +1111,14 @@ class ChromeProxyService {
     /* ======================================================================
        Health Check Handler
     ====================================================================== */
+    /**
+     * @param {any} req
+     * @param {any} res
+     */
+    /**
+     * @param {any} req
+     * @param {any} res
+     */
     async _handleHealthCheck(req, res) {
         const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
         const chromeHealth = await this._checkChromeHealth();
@@ -1049,6 +1153,12 @@ class ChromeProxyService {
     /* ======================================================================
        CORS Headers (Whitelist)
     ====================================================================== */
+    /**
+     * @param {any} req
+     */
+    /**
+     * @param {any} req
+     */
     _getCORSHeaders(req) {
         const origin = req.headers.origin;
 
@@ -1058,7 +1168,7 @@ class ChromeProxyService {
         }
 
         // Check whitelist
-        if (this.config.ALLOWED_ORIGINS.includes(origin)) {
+        if ((this.config.ALLOWED_ORIGINS || []).includes(origin)) {
             return {
                 'Access-Control-Allow-Origin': origin,
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -1114,7 +1224,7 @@ class ChromeProxyService {
 
         // ✅ P1.3: Origin Validation (CORS doesn't protect WebSocket)
         const origin = req.headers.origin;
-        if (origin && !this.config.ALLOWED_ORIGINS.includes(origin)) {
+        if (origin && !(this.config.ALLOWED_ORIGINS || []).includes(origin)) {
             this.log('warn', 'WebSocket upgrade rejected: Origin not in whitelist', {
                 origin,
                 url,
@@ -1222,7 +1332,7 @@ class ChromeProxyService {
             try {
                 s.__lastActivity = Date.now();
             } catch (err) {
-                this.log('debug', 'Mark active failed (non-critical)', { error: err.message });
+                this.log('debug', 'Mark active failed (non-critical)', { error: /** @type {any} */ (err).message });
             }
         };
 
@@ -1293,13 +1403,13 @@ class ChromeProxyService {
                 this._incrementMetric(this.metrics.proxyErrors, { type: 'ws_upgrade' });
                 this._incrementMetric(this.metrics.wsUpgrades, { success: 'false' });
 
-                this.log('error', 'WS proxy (http-proxy) failed', { error: err.message });
+                this.log('error', 'WS proxy (http-proxy) failed', { error: /** @type {any} */ (err).message });
 
                 const correlationId = req.headers?.['x-request-id'] || uuidv4();
                 if (ActionCode) {
                     this._emitNervEvent(
                         ActionCode.DRIVER_ERROR,
-                        { event: 'proxy.ws.proxy_error', error: err.message, url },
+                        { event: 'proxy.ws.proxy_error', error: /** @type {any} */ (err).message, url },
                         correlationId
                     );
                 }
@@ -1310,7 +1420,7 @@ class ChromeProxyService {
                 try {
                     socket.destroy();
                 } catch (destroyErr) {
-                    this.log('debug', 'Socket destroy failed', { error: destroyErr.message });
+                    this.log('debug', 'Socket destroy failed', { error: /** @type {any} */ (destroyErr).message });
                 }
                 return;
             }
@@ -1353,12 +1463,12 @@ class ChromeProxyService {
             this.stats.errors++;
             this._incrementMetric(this.metrics.proxyErrors, { type: 'proxy_socket' });
 
-            this.log('error', 'Proxy socket error', { error: err.message });
+            this.log('error', 'Proxy socket error', { error: /** @type {any} */ (err).message });
 
             if (ActionCode) {
                 this._emitNervEvent(
                     ActionCode.DRIVER_ERROR,
-                    { event: 'proxy.ws.proxy_socket_error', error: err.message, url },
+                    { event: 'proxy.ws.proxy_socket_error', error: /** @type {any} */ (err).message, url },
                     correlationId
                 );
             }
@@ -1372,12 +1482,12 @@ class ChromeProxyService {
             this.stats.errors++;
             this._incrementMetric(this.metrics.proxyErrors, { type: 'client_socket' });
 
-            this.log('error', 'Client socket error', { error: err.message });
+            this.log('error', 'Client socket error', { error: /** @type {any} */ (err).message });
 
             if (ActionCode) {
                 this._emitNervEvent(
                     ActionCode.DRIVER_ERROR,
-                    { event: 'proxy.ws.client_socket_error', error: err.message, url },
+                    { event: 'proxy.ws.client_socket_error', error: /** @type {any} */ (err).message, url },
                     correlationId
                 );
             }
@@ -1419,7 +1529,7 @@ class ChromeProxyService {
             this.log('info', 'http-proxy module ready');
         } catch (err) {
             this.log('warn', 'http-proxy initialization failed, using fallback', {
-                error: err.message,
+                error: /** @type {any} */ (err).message,
             });
             this.wsProxy = null;
         }
@@ -1428,10 +1538,10 @@ class ChromeProxyService {
         const nervEnabled = (process.env.NERV_INTEGRATION || 'true').toString().toLowerCase() !== 'false';
         if (nervEnabled) {
             try {
-                const nervModule = /** @type {unknown} */ (await import('#nerv/nerv'));
+                const nervModule = /** @type {any} */ (await import('#nerv/nerv'));
                 createNERV = nervModule?.createNERV || null;
-                HighLevelNERV = /** @type {unknown} */ (await import('#nerv/adapters/high_level_adapter'));
-                const nervConsts = /** @type {unknown} */ (await import('#shared/nerv/constants'));
+                HighLevelNERV = /** @type {any} */ (await import('#nerv/adapters/high_level_adapter'));
+                const nervConsts = /** @type {any} */ (await import('#shared/nerv/constants'));
                 ActionCode = nervConsts?.ActionCode || null;
                 ActorRole = nervConsts?.ActorRole || {};
 
@@ -1444,7 +1554,7 @@ class ChromeProxyService {
                 }
             } catch (err) {
                 this.log('warn', 'NERV initialization failed or not available, continuing without NERV', {
-                    error: err.message,
+                    error: /** @type {any} */ (err).message,
                 });
                 this.nerv = null;
                 createNERV = null;
@@ -1461,7 +1571,7 @@ class ChromeProxyService {
             try {
                 this.app.use(helmet());
             } catch (err) {
-                this.log('warn', 'Helmet middleware failed', { error: err.message });
+                this.log('warn', 'Helmet middleware failed', { error: /** @type {any} */ (err).message });
             }
 
             // Compression middleware
@@ -1476,7 +1586,7 @@ class ChromeProxyService {
                     })
                 );
             } catch (err) {
-                this.log('warn', 'Compression middleware failed', { error: err.message });
+                this.log('warn', 'Compression middleware failed', { error: /** @type {any} */ (err).message });
             }
 
             // Rate limiting (1000 req/min)
@@ -1491,14 +1601,14 @@ class ChromeProxyService {
                 });
                 this.app.use(limiter);
             } catch (err) {
-                this.log('warn', 'Rate limiting middleware failed', { error: err.message });
+                this.log('warn', 'Rate limiting middleware failed', { error: /** @type {any} */ (err).message });
             }
 
             // Correlation ID middleware
             this.app.use((req, res, next) => {
                 const correlationId = req.headers['x-correlation-id'] || req.headers['x-request-id'] || uuidv4();
 
-                req.correlationId = correlationId;
+                /** @type {any} */ (req).correlationId = correlationId;
                 res.setHeader('X-Correlation-ID', correlationId);
                 res.setHeader('X-Request-Id', correlationId);
 
@@ -1516,7 +1626,7 @@ class ChromeProxyService {
                     res.setHeader('Content-Type', promClient.register.contentType || 'text/plain; version=0.0.4');
                     res.end(await promClient.register.metrics());
                 } catch (err) {
-                    this.log('error', 'Metrics endpoint error', { error: err.message });
+                    this.log('error', 'Metrics endpoint error', { error: /** @type {any} */ (err).message });
                     res.statusCode = 500;
                     res.end('Metrics error');
                 }
@@ -1527,13 +1637,13 @@ class ChromeProxyService {
                 try {
                     await this._handleHealthCheck(req, res);
                 } catch (err) {
-                    this.log('error', 'Health check endpoint error', { error: err.message });
+                    this.log('error', 'Health check endpoint error', { error: /** @type {any} */ (err).message });
                     res.statusCode = 500;
                     res.setHeader('Content-Type', 'application/json');
                     res.end(
                         JSON.stringify({
                             status: 'error',
-                            error: err.message,
+                            error: /** @type {any} */ (err).message,
                             timestamp: Date.now(),
                         })
                     );
@@ -1561,7 +1671,7 @@ class ChromeProxyService {
                 this.log('info', `   Forwarding to: ${this.config.CHROME_HOST}:${this.config.CHROME_PORT}`);
                 this.log('info', `   Public URL: http://${this.config.PUBLIC_IP}:${this.config.PROXY_PORT}`);
                 this.log('info', `   Idle timeout: ${this._idleTimeoutMs}ms`);
-                this.log('info', `   CORS origins: ${this.config.ALLOWED_ORIGINS.length} allowed`);
+                this.log('info', `   CORS origins: ${(this.config.ALLOWED_ORIGINS || []).length} allowed`);
 
                 // Signal to PM2 that process is ready (prevents race condition)
                 if (process.send) {
@@ -1596,15 +1706,15 @@ class ChromeProxyService {
             return;
         }
 
-        this._signalHandlers.sigint = () => {
+        /** @type {any} */ (this._signalHandlers).sigint = () => {
             void this._handleShutdown('SIGINT');
         };
-        this._signalHandlers.sigterm = () => {
+        /** @type {any} */ (this._signalHandlers).sigterm = () => {
             void this._handleShutdown('SIGTERM');
         };
 
-        process.on('SIGINT', this._signalHandlers.sigint);
-        process.on('SIGTERM', this._signalHandlers.sigterm);
+        process.on('SIGINT', /** @type {any} */ (this._signalHandlers.sigint));
+        process.on('SIGTERM', /** @type {any} */ (this._signalHandlers.sigterm));
         this._signalHandlersInstalled = true;
     }
 
@@ -1644,7 +1754,7 @@ class ChromeProxyService {
         } catch (err) {
             this.log('error', 'Shutdown handler failed', {
                 signal,
-                error: err && err.message ? err.message : String(err),
+                error: err && /** @type {any} */ (err).message ? /** @type {any} */ (err).message : String(err),
             });
             process.exit(1);
         }
@@ -1697,7 +1807,7 @@ class ChromeProxyService {
 
             // Gracefully close active connections (10s timeout)
             const closePromises = Array.from(this.activeConnections).map(socket => {
-                return new Promise(resolve => {
+                return /** @type {Promise<void>} */ (new Promise(resolve => {
                     const forceSocketTimeout = setTimeout(() => {
                         if (!socket.destroyed) {
                             socket.destroy();
@@ -1710,14 +1820,14 @@ class ChromeProxyService {
                         resolve();
                     });
                     socket.end(); // Graceful close
-                });
+                }));
             });
 
             await Promise.all(closePromises);
             this.activeConnections.clear();
 
             // Close server
-            await new Promise(resolve => {
+            await /** @type {Promise<void>} */ (new Promise(resolve => {
                 if (this.server) {
                     const forceServerTimeout = setTimeout(() => {
                         this.log('warn', 'Forcing server shutdown after timeout');
@@ -1732,7 +1842,7 @@ class ChromeProxyService {
                 } else {
                     resolve();
                 }
-            });
+            }));
 
             this.server = null;
         })();

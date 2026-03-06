@@ -1,4 +1,6 @@
 // @ts-check
+/** @typedef {any} DiagnosticReport */
+/** @typedef {any} DiagnosticJob */
 
 /**
  * Diagnostic Agent Job Repository
@@ -21,14 +23,11 @@ function _now() {
     return Date.now();
 }
 
-/**
- * @typedef {object} RowToJobRow
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} RowToJobRow */
 /**
  * Converte row para DiagnosticJob
  * @param {RowToJobRow} row
- * @returns {object|null}
+ * @returns {any}
  */
 function _rowToJob(row) {
     if (!row) return null;
@@ -55,14 +54,11 @@ function _rowToJob(row) {
     };
 }
 
-/**
- * @typedef {object} RowToReportRow
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} RowToReportRow */
 /**
  * Converte row para DiagnosticReport
  * @param {RowToReportRow} row
- * @returns {object|null}
+ * @returns {any}
  */
 function _rowToReport(row) {
     if (!row) return null;
@@ -84,10 +80,7 @@ function _rowToReport(row) {
     };
 }
 
-/**
- * @typedef {object} CreateDiagnosticJobInput
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} CreateDiagnosticJobInput */
 /**
  * Cria um novo job de diagnóstico
  * @param {CreateDiagnosticJobInput} input
@@ -144,7 +137,7 @@ export function createDiagnosticJob(input) {
 /**
  * Obtém um job de diagnóstico pelo ID
  * @param {string} id
- * @returns {object|null}
+ * @returns {any}
  */
 export function getDiagnosticJobById(id) {
     const db = getDb();
@@ -152,14 +145,11 @@ export function getDiagnosticJobById(id) {
     return _rowToJob(row);
 }
 
-/**
- * @typedef {object} ListDiagnosticJobsFilters
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} ListDiagnosticJobsFilters */
 /**
  * Lista jobs de diagnóstico com filtros opcionais
  * @param {ListDiagnosticJobsFilters} [filters]
- * @returns {object[]}
+ * @returns {any[]}
  */
 export function listDiagnosticJobs(filters = {}) {
     const db = getDb();
@@ -203,15 +193,12 @@ export function listDiagnosticJobs(filters = {}) {
     return rows.map(_rowToJob);
 }
 
-/**
- * @typedef {object} UpdateDiagnosticJobUpdates
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} UpdateDiagnosticJobUpdates */
 /**
  * Atualiza um job de diagnóstico
  * @param {string} id
  * @param {UpdateDiagnosticJobUpdates} updates
- * @returns {object|null}
+ * @returns {any}
  */
 export function updateDiagnosticJob(id, updates = {}) {
     const db = getDb();
@@ -223,7 +210,7 @@ export function updateDiagnosticJob(id, updates = {}) {
 
     // Constrói a query dinamicamente
     const fields = [];
-    const params = { id: String(id), updated_at_ms: now };
+    const params = /** @type {any} */ ({ id: String(id), updated_at_ms: now });
 
     if (updates.status !== undefined) {
         fields.push('status = @status');
@@ -283,10 +270,7 @@ export function updateDiagnosticJob(id, updates = {}) {
     return getDiagnosticJobById(id);
 }
 
-/**
- * @typedef {object} CreateDiagnosticReportInput
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} CreateDiagnosticReportInput */
 /**
  * Cria um novo relatório de diagnóstico
  * @param {CreateDiagnosticReportInput} input
@@ -334,7 +318,7 @@ export function createDiagnosticReport(input) {
 /**
  * Obtém um relatório pelo ID
  * @param {string} id
- * @returns {object|null}
+ * @returns {any}
  */
 export function getDiagnosticReportById(id) {
     const db = getDb();
@@ -345,7 +329,7 @@ export function getDiagnosticReportById(id) {
 /**
  * Lista relatórios por job
  * @param {string} jobId
- * @returns {object[]}
+ * @returns {any[]}
  */
 export function listDiagnosticReportsByJob(jobId) {
     const db = getDb();

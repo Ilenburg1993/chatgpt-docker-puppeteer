@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {any} MissionStep */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
@@ -16,6 +17,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToStep(row) {
     if (!row) return null;
     return {
@@ -115,7 +120,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
             const stepId = String(step.id || `step-${index}`);
             const title = String(step.title || step.name || step.description || `Step ${index + 1}`);
 
-            const existing = db
+            const existing = /** @type {any} */ (db
                 .prepare(
                     `
                     SELECT *
@@ -125,7 +130,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
                     LIMIT 1
                 `
                 )
-                .get(mission, stepId);
+                .get(mission, stepId));
 
             if (!existing) {
                 db.prepare(
@@ -172,28 +177,15 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
     return listMissionSteps(mission);
 }
 
-/**
- * @typedef {object} MarkMissionStepStatusOptions
- * @property {*} [missionId]
- * @property {*} [stepId]
- * @property {*} [attemptSeq]
- * @property {*} [status]
- * @property {*} [currentTaskId]
- * @property {*} [lastTaskId]
- */
+/** @typedef {any} MarkMissionStepStatusOptions */
+
 /**
  * Função exportada: markMissionStepStatus.
- * @param {MarkMissionStepStatusOptions} [options]
+ * @param {any} [options]
  * @returns {MissionStep|null}
  */
-function markMissionStepStatus({
-    missionId,
-    stepId,
-    attemptSeq = null,
-    status,
-    currentTaskId = undefined,
-    lastTaskId = undefined,
-}) {
+function markMissionStepStatus(options = {}) {
+    const { missionId, stepId, attemptSeq = null, status, currentTaskId = undefined, lastTaskId = undefined } = /** @type {any} */ (options);
     const db = getDb();
     const mission = String(missionId || '').trim();
     const step = String(stepId || '').trim();
@@ -225,19 +217,14 @@ function markMissionStepStatus({
     return getMissionStep(mission, step, existing.attempt_seq);
 }
 
-/**
- * @typedef {object} CreateNextStepAttemptOptions
- * @property {*} [missionId]
- * @property {*} [stepId]
- * @property {*} [title]
- * @property {*} [stepIndex]
- */
+/** @typedef {any} CreateNextStepAttemptOptions */
 /**
  * Função exportada: createNextStepAttempt.
- * @param {CreateNextStepAttemptOptions} [options]
+ * @param {any} [options]
  * @returns {MissionStep|null}
  */
-function createNextStepAttempt({ missionId, stepId, title = '', stepIndex = 0 }) {
+function createNextStepAttempt(options = {}) {
+    const { missionId, stepId, title = '', stepIndex = 0 } = /** @type {any} */ (options);
     const db = getDb();
     const mission = String(missionId || '').trim();
     const step = String(stepId || '').trim();

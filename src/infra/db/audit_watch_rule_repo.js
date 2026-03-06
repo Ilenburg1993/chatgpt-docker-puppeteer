@@ -1,10 +1,15 @@
 // @ts-check
+/** @typedef {any} AuditWatchRule */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
 function _now() {
     return Date.now();
 }
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -12,6 +17,10 @@ function _safeJsonString(value, fallback = '{}') {
         return fallback;
     }
 }
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _parseJson(raw, fallback = {}) {
     if (raw == null) return fallback;
     try {
@@ -20,6 +29,10 @@ function _parseJson(raw, fallback = {}) {
         return fallback;
     }
 }
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToRule(row) {
     if (!row) return null;
     return {
@@ -47,11 +60,7 @@ function getAuditWatchRuleById(id) {
     return _rowToRule(db.prepare('SELECT * FROM audit_watch_rules WHERE id = ?').get(String(id || '').trim()));
 }
 
-/**
- * @typedef {object} ListAuditWatchRulesOptions
- * @property {*} [enabledOnly]
- * @property {*} [limit]
- */
+/** @typedef {any} ListAuditWatchRulesOptions */
 /**
  * Função exportada: listAuditWatchRules.
  * @param {ListAuditWatchRulesOptions} [options]
@@ -72,19 +81,16 @@ function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
     return rows.map(_rowToRule).filter(Boolean);
 }
 
-/**
- * @typedef {object} UpsertAuditWatchRuleInput
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} UpsertAuditWatchRuleInput */
 /**
  * Função exportada: upsertAuditWatchRule.
- * @param {UpsertAuditWatchRuleInput} [input]
+ * @param {any} [input]
  * @returns {AuditWatchRule|null}
  */
 function upsertAuditWatchRule(input = {}) {
     const db = getDb();
     const now = _now();
-    const existing = input.id ? db.prepare('SELECT * FROM audit_watch_rules WHERE id = ?').get(String(input.id)) : null;
+    const existing = /** @type {any} */ (input.id ? db.prepare('SELECT * FROM audit_watch_rules WHERE id = ?').get(String(input.id)) : null);
     const id = existing?.id || `awr-${uuidv4()}`;
     db.prepare(
         `

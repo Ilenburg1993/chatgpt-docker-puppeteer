@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {any} ControlOperation */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
@@ -15,6 +16,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -23,6 +28,10 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _parseJson(raw, fallback = {}) {
     if (!raw) return fallback;
     try {
@@ -32,6 +41,10 @@ function _parseJson(raw, fallback = {}) {
     }
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToOperation(row) {
     if (!row) return null;
     return {
@@ -45,7 +58,7 @@ function _rowToOperation(row) {
         idempotency_key: String(row.idempotency_key || ''),
         status: String(row.status || CONTROL_OPERATION_STATUS.PENDING),
         payload: _parseJson(row.payload_json, {}),
-        result: _parseJson(row.result_json, null),
+        result: _parseJson(/** @type {any} */ (row.result_json), /** @type {any} */ (null)),
         error_code: row.error_code ? String(row.error_code) : null,
         error_message: row.error_message ? String(row.error_message) : null,
         created_at_ms: Number(row.created_at_ms) || 0,
@@ -53,32 +66,14 @@ function _rowToOperation(row) {
     };
 }
 
-/**
- * @typedef {object} CreateControlOperationOptions
- * @property {*} [command]
- * @property {*} [entityType]
- * @property {*} [entityId]
- * @property {*} [actorId]
- * @property {*} [actorRole]
- * @property {*} [reason]
- * @property {*} [idempotencyKey]
- * @property {*} [payload]
- */
+/** @typedef {any} CreateControlOperationOptions */
 /**
  * Função exportada: createControlOperation.
- * @param {CreateControlOperationOptions} [options]
+ * @param {any} [opts]
  * @returns {ControlOperation|null}
  */
-function createControlOperation({
-    command,
-    entityType,
-    entityId,
-    actorId = null,
-    actorRole = null,
-    reason,
-    idempotencyKey,
-    payload = {},
-}) {
+function createControlOperation(opts = {}) {
+    const { command, entityType, entityId, actorId = null, actorRole = null, reason, idempotencyKey, payload = {} } = /** @type {any} */ (opts);
     const db = getDb();
     const now = _now();
     const id = `cop-${uuidv4()}`;
@@ -143,14 +138,11 @@ function getControlOperationByIdempotencyKey(idempotencyKey) {
     return _rowToOperation(row);
 }
 
-/**
- * @typedef {object} UpdateControlOperationUpdates
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} UpdateControlOperationUpdates */
 /**
  * Função exportada: updateControlOperation.
  * @param {string} id
- * @param {UpdateControlOperationUpdates} [updates]
+ * @param {any} [updates]
  * @returns {ControlOperation|null}
  */
 function updateControlOperation(id, updates = {}) {
@@ -187,12 +179,7 @@ function updateControlOperation(id, updates = {}) {
     return getControlOperationById(existing.id);
 }
 
-/**
- * @typedef {object} ListControlOperationsOptions
- * @property {*} [limit]
- * @property {*} [entityType]
- * @property {*} [entityId]
- */
+/** @typedef {any} ListControlOperationsOptions */
 /**
  * Função exportada: listControlOperations.
  * @param {ListControlOperationsOptions} [options]
@@ -201,7 +188,7 @@ function updateControlOperation(id, updates = {}) {
 function listControlOperations({ limit = 100, entityType = null, entityId = null } = {}) {
     const db = getDb();
     const where = [];
-    const params = { limit: Math.max(1, Math.min(Number(limit) || 100, 500)) };
+    const params = /** @type {any} */ ({ limit: Math.max(1, Math.min(Number(limit) || 100, 500)) });
 
     if (entityType) {
         where.push('entity_type = @entity_type');

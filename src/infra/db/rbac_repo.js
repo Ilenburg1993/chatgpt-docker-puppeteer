@@ -67,6 +67,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _hashPassword(raw) {
     return crypto
         .createHash('sha256')
@@ -74,6 +78,10 @@ function _hashPassword(raw) {
         .digest('hex');
 }
 
+/**
+ * @param {any} username
+ * @param {any} username
+ */
 function _normalizeUsername(username) {
     return String(username || '')
         .trim()
@@ -114,10 +122,10 @@ function ensureBaseRbacData() {
         }
 
         for (const [roleName, permissions] of Object.entries(ROLE_PERMISSION_MATRIX)) {
-            const role = db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName);
+            const role = /** @type {any} */ (db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName));
             if (!role) continue;
             for (const permission of permissions) {
-                const perm = db.prepare('SELECT id FROM rbac_permissions WHERE permission = ?').get(permission);
+                const perm = /** @type {any} */ (db.prepare('SELECT id FROM rbac_permissions WHERE permission = ?').get(permission));
                 if (!perm) continue;
                 db.prepare(
                     `
@@ -132,25 +140,14 @@ function ensureBaseRbacData() {
     tx();
 }
 
+/** @typedef {any} UpsertRbacUserParams */
+/** @typedef {any} UpsertRbacUserOptions */
 /**
- * @typedef {object} UpsertRbacUserParams
- * @property {string} username
- * @property {string} password
- * @property {string} role
- * @property {boolean} active
+ * @param {any} params
+  * @returns {any}
  */
-/**
- * @typedef {object} UpsertRbacUserOptions
- * @property {*} [username]
- * @property {*} [password]
- * @property {*} [role]
- * @property {*} [active]
- */
-/**
- * @param {UpsertRbacUserParams} params
-  * @returns {object}
- */
-function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active = true }) {
+function upsertRbacUser(params = {}) {
+    const { username, password, role = RBAC_ROLES.VIEWER, active = true } = /** @type {any} */ (params);
     const db = getDb();
     const name = _normalizeUsername(username);
     if (!name) throw new Error('username obrigatório');
@@ -162,7 +159,7 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
     const roleValues = /** @type {string[]} */ (Object.values(RBAC_ROLES));
     const roleName = roleValues.includes(String(role)) ? String(role) : RBAC_ROLES.VIEWER;
 
-    const existing = db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name);
+    const existing = /** @type {any} */ (db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name));
     const userId = existing?.id || `usr-${uuidv4()}`;
 
     db.prepare(
@@ -183,7 +180,7 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
         updated_at_ms: now,
     });
 
-    const roleRow = db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName);
+    const roleRow = /** @type {any} */ (db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName));
     if (roleRow) {
         db.prepare('DELETE FROM rbac_user_role WHERE user_id = ?').run(userId);
         db.prepare('INSERT OR IGNORE INTO rbac_user_role (user_id, role_id) VALUES (?, ?)').run(userId, roleRow.id);
@@ -194,14 +191,14 @@ function upsertRbacUser({ username, password, role = RBAC_ROLES.VIEWER, active =
 
 /**
  * @param {string} username
- * @returns {{id:string, username:string, active:boolean, roles:string[], role:string, permissions:string[], created_at_ms:number, updated_at_ms:number}|null}
+ * @returns {any}
  */
 function getRbacUserByUsername(username) {
     const db = getDb();
     const name = _normalizeUsername(username);
     if (!name) return null;
 
-    const row = db
+    const row = /** @type {any} */ (db
         .prepare(
             `
             SELECT u.*,
@@ -216,7 +213,7 @@ function getRbacUserByUsername(username) {
             GROUP BY u.id
         `
         )
-        .get(name);
+        .get(name));
 
     if (!row) return null;
 
@@ -239,14 +236,14 @@ function getRbacUserByUsername(username) {
  * Função exportada: verifyRbacCredentials.
  * @param {*} username
  * @param {*} password
- * @returns {object}
+ * @returns {any}
  */
 function verifyRbacCredentials(username, password) {
     const db = getDb();
     const name = _normalizeUsername(username);
     if (!name || !password) return null;
 
-    const row = db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name);
+    const row = /** @type {any} */ (db.prepare('SELECT * FROM rbac_users WHERE username = ?').get(name));
     if (!row || Number(row.active) !== 1) return null;
 
     const incomingHash = _hashPassword(password);

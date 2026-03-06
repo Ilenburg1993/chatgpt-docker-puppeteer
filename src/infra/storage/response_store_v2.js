@@ -14,16 +14,13 @@ function _responseDir() {
     return path.join(_resolveArtifactsRoot(), 'responses');
 }
 
-/**
- * @typedef {object} SaveResponseV2Options
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} SaveResponseV2Options */
 /**
  * @typedef {object} SaveResponseV2ResponseData
- * @property {object} content
- * @property {object} generation
- * @property {object} validation
- * @property {object} preview
+ * @property {any} content
+ * @property {any} generation
+ * @property {any} validation
+ * @property {any} preview
  */
 /**
  * Salva resposta em múltiplos formatos
@@ -61,12 +58,12 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
             atomicWrite(`${basePath}.html`, wrapHTML(responseData.content.html, taskId), 'utf-8'),
         ]);
 
-        logger.info(`[RESPONSE_STORE_V2] Resposta salva em 4 formatos para task ${taskId}`, {
+        logger.info(`[RESPONSE_STORE_V2] Resposta salva em 4 formatos para task ${taskId}`, /** @type {any} */ ({
             textSize: responseData.content.text.length,
             markdownSize: responseData.content.markdown.length,
             htmlSize: responseData.content.html.length,
             codeBlocks: responseData.content.json.codeBlocks?.length || 0,
-        });
+        }));
 
         /** @type {{ textFile: string, markdownFile: string, jsonFile: string, htmlFile: string, legacy?: { textFile: string, markdownFile: string, jsonFile: string, htmlFile: string } }} */
         const out = {
@@ -101,19 +98,16 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
 
         return out;
     } catch (error) {
-        logger.error('[RESPONSE_STORE_V2] Erro ao salvar resposta', {
+        logger.error('[RESPONSE_STORE_V2] Erro ao salvar resposta', /** @type {any} */ ({
             taskId,
-            error: error.message,
-            stack: error.stack,
-        });
-        throw new Error(`Falha ao salvar resposta V2: ${error.message}`); // eslint-disable-line preserve-caught-error
+            error: /** @type {any} */ (error).message,
+            stack: /** @type {any} */ (error).stack,
+        }));
+        throw new Error(`Falha ao salvar resposta V2: ${/** @type {any} */ (error).message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
-/**
- * @typedef {object} LoadResponseV2Options
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} LoadResponseV2Options */
 /**
  * Carrega resposta (backward compatible)
  *
@@ -136,7 +130,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
         html: `${basePath}.html`,
     };
 
-    const filePath = formatMap[format];
+    const filePath = (/** @type {any} */ (formatMap))[format];
 
     if (!filePath) {
         throw new Error(`Formato inválido: ${format}. Use 'text', 'markdown', 'json' ou 'html'.`);
@@ -153,20 +147,20 @@ async function loadResponseV2(taskId, format, opts = {}) {
     } catch (err) {
         // Fallback para .txt (compatibilidade V1)
         if (format !== 'text') {
-            logger.warn(`[RESPONSE_STORE_V2] Formato ${format} não encontrado, fallback para .txt`, {
+            logger.warn(`[RESPONSE_STORE_V2] Formato ${format} não encontrado, fallback para .txt`, /** @type {any} */ ({
                 taskId,
                 requestedFormat: format,
-            });
+            }));
             return await loadResponseV2(taskId, 'text', opts);
         }
 
         // Arquivo não existe
-        logger.error('[RESPONSE_STORE_V2] Resposta não encontrada', {
+        logger.error('[RESPONSE_STORE_V2] Resposta não encontrada', /** @type {any} */ ({
             taskId,
             format,
             filePath,
-        });
-        return null;
+        }));
+        return /** @type {any} */ (null);
     }
 }
 
@@ -234,9 +228,9 @@ async function deleteResponseV2(taskId) {
     }
 
     if (deletedCount > 0) {
-        logger.info(`[RESPONSE_STORE_V2] Resposta deletada para task ${taskId}`, {
+        logger.info(`[RESPONSE_STORE_V2] Resposta deletada para task ${taskId}`, /** @type {any} */ ({
             filesDeleted: deletedCount,
-        });
+        }));
     }
 
     return deletedCount;

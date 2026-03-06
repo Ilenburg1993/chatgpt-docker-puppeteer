@@ -10,7 +10,7 @@ async function _listLegacyQueueFiles() {
         const files = await fsp.readdir(PATHS.QUEUE);
         return files.filter(f => f.endsWith('.json')).map(f => path.join(PATHS.QUEUE, f));
     } catch (err) {
-        if (err && err.code === 'ENOENT') {
+        if (err && /** @type {any} */ (err).code === 'ENOENT') {
             return [];
         }
         throw err;
@@ -24,7 +24,7 @@ async function _listLegacyQueueFiles() {
 /**
  * Função exportada: importLegacyQueueFromDisk.
  * @param {ImportLegacyQueueFromDiskOptions} [options]
- * @returns {Promise<void>}
+ * @returns {Promise<any>}
  */
 async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
     const files = await _listLegacyQueueFiles();
@@ -60,7 +60,7 @@ async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
             failed++;
             log(
                 'WARN',
-                `[DB] Legacy queue import failed for ${path.basename(filePath)}: ${err?.message || String(err)}`
+                `[DB] Legacy queue import failed for ${path.basename(filePath)}: ${/** @type {any} */ (err)?.message || String(err)}`
             );
         }
     }

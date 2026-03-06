@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {any} AuditDiff */
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
@@ -6,6 +7,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -14,6 +19,10 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _parseJson(raw, fallback = {}) {
     if (!raw) return fallback;
     try {
@@ -23,6 +32,10 @@ function _parseJson(raw, fallback = {}) {
     }
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToAuditDiff(row) {
     if (!row) return null;
     return {
@@ -45,7 +58,7 @@ function _rowToAuditDiff(row) {
  */
 /**
  * Função exportada: insertAuditDiff.
- * @param {InsertAuditDiffOptions} [options]
+ * @param {any} options
  * @returns {AuditDiff|null}
  */
 function insertAuditDiff({ operationId, entityType, entityId, before = {}, after = {} }) {

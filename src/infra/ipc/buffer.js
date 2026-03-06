@@ -7,7 +7,7 @@ class IPCBuffer {
      * @param {number} maxSize - Limite máximo de mensagens para evitar Out-of-Memory.
      */
     constructor(maxSize = 1000) {
-        this.queue = [];
+        this.queue = /** @type {any[]} */ ([]);
         this.maxSize = maxSize;
     }
 

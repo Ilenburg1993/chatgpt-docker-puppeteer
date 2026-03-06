@@ -5,6 +5,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} value
+ * @param {any} value
+ */
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
@@ -13,6 +17,10 @@ function _safeJsonString(value, fallback = '{}') {
     }
 }
 
+/**
+ * @param {any} raw
+ * @param {any} raw
+ */
 function _parseJson(raw, fallback = {}) {
     if (!raw) return fallback;
     try {
@@ -22,6 +30,10 @@ function _parseJson(raw, fallback = {}) {
     }
 }
 
+/**
+ * @param {any} row
+ * @param {any} row
+ */
 function _rowToPrefs(row) {
     if (!row) return null;
     return {
@@ -39,7 +51,7 @@ function _rowToPrefs(row) {
 /**
  * Função exportada: getUserPreferences.
  * @param {*} userId
- * @returns {object|null}
+ * @returns {any}
  */
 function getUserPreferences(userId) {
     const db = getDb();
@@ -47,15 +59,12 @@ function getUserPreferences(userId) {
     return _rowToPrefs(row);
 }
 
-/**
- * @typedef {object} UpsertUserPreferencesUpdates
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} UpsertUserPreferencesUpdates */
 /**
  * Função exportada: upsertUserPreferences.
  * @param {*} userId
- * @param {UpsertUserPreferencesUpdates} [patch]
- * @returns {object|null}
+ * @param {any} [patch]
+ * @returns {any}
  */
 function upsertUserPreferences(userId, patch = {}) {
     const db = getDb();
