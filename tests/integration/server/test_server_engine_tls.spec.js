@@ -7,15 +7,15 @@ import * as serverEngine from '#server/engine/server';
 
 async function getFreePort() {
     const server = net.createServer();
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    await /** @type {Promise<void>} */ (new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve())));
     const address = server.address();
-    const port = address.port;
-    await new Promise(resolve => server.close(resolve));
+    const port = /** @type {any} */ (address).port;
+    await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
     return port;
 }
 
-async function withEnv(tempEnv, fn) {
-    const previous = {};
+async function withEnv(/** @type {any} */ tempEnv, /** @type {any} */ fn) {
+    const previous = /** @type {Record<string, string | undefined>} */ ({});
     for (const [key, value] of Object.entries(tempEnv)) {
         previous[key] = process.env[key];
         if (value === undefined || value === null) {

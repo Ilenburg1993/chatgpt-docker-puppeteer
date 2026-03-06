@@ -10,12 +10,12 @@ import path from 'node:path';
 import fs from 'fs/promises';
 
 describe('Phase 2 Integration Smoke Tests', () => {
-    let missionManager;
-    let testMissionsDir;
+    /** @type {any} */ let missionManager;
+    /** @type {any} */ let testMissionsDir;
 
     // Mocks
     const mockKernel = {
-        executeTask: async (task, correlationId) => {
+        executeTask: async (/** @type {any} */ task, /** @type {any} */ correlationId) => {
             return { status: 'queued', task_id: task.meta.id };
         },
     };
@@ -23,7 +23,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
     const nervEvents = [];
     const mockNERV = {
         onReceive: () => {},
-        emit: (eventName, data) => {
+        emit: (/** @type {any} */ eventName, /** @type {any} */ data) => {
             nervEvents.push({ event: eventName, data });
         },
         emitCommand: () => {},
@@ -126,7 +126,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
     });
 
     describe('3. End-to-End: Mission + Feedback + Checkpoint', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         it('should create mission successfully', async () => {
             const mission = await missionManager.createMission({
@@ -202,7 +202,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
     });
 
     describe('4. Crash Recovery Flow', () => {
-        let crashMissionId;
+        /** @type {any} */ let crashMissionId;
 
         it('should create mission and checkpoint', async () => {
             const mission = await missionManager.createMission({

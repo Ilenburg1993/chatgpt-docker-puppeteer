@@ -8,14 +8,14 @@ import path from 'node:path';
 import fs from 'fs/promises';
 
 describe('Feedback Flow Integration Tests', () => {
-    let missionManager;
-    let contextManager;
-    let feedbackProcessor;
-    let testMissionsDir;
+    /** @type {any} */ let missionManager;
+    /** @type {any} */ let contextManager;
+    /** @type {any} */ let feedbackProcessor;
+    /** @type {any} */ let testMissionsDir;
 
     // Mocks
     const mockKernel = {
-        executeTask: async (task, correlationId) => {
+        executeTask: async (/** @type {any} */ task, /** @type {any} */ correlationId) => {
             return { status: 'queued', task_id: task.meta.id };
         },
     };
@@ -51,7 +51,7 @@ describe('Feedback Flow Integration Tests', () => {
     });
 
     describe('1. Feedback Processing via MissionManager', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         beforeEach(async () => {
             const mission = await missionManager.createMission({
@@ -99,8 +99,8 @@ describe('Feedback Flow Integration Tests', () => {
             const processed = await missionManager.addFeedback(testMissionId, feedbackText);
 
             assert.ok(processed.patterns.length >= 2);
-            assert.ok(processed.patterns.some(p => p.includes('Add:')));
-            assert.ok(processed.patterns.some(p => p.includes('Avoid:')));
+            assert.ok(processed.patterns.some((/** @type {any} */ p) => p.includes('Add:')));
+            assert.ok(processed.patterns.some((/** @type {any} */ p) => p.includes('Avoid:')));
         });
 
         it('should store feedback in mission state', async () => {
@@ -129,7 +129,7 @@ describe('Feedback Flow Integration Tests', () => {
     });
 
     describe('2. Feedback Injection in Task Generation', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         beforeEach(async () => {
             const mission = await missionManager.createMission({
@@ -193,7 +193,7 @@ describe('Feedback Flow Integration Tests', () => {
     });
 
     describe('3. MemoryStore Integration', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         beforeEach(async () => {
             const mission = await missionManager.createMission({
@@ -226,7 +226,7 @@ describe('Feedback Flow Integration Tests', () => {
             const patterns = contextManager.getRelevantPatterns('code', 5);
 
             assert.ok(patterns.length > 0);
-            assert.ok(patterns.some(p => p.content.toLowerCase().includes('code')));
+            assert.ok(patterns.some((/** @type {any} */ p) => p.content.toLowerCase().includes('code')));
         });
 
         it('should store patterns with mission metadata', async () => {
@@ -267,7 +267,7 @@ describe('Feedback Flow Integration Tests', () => {
     });
 
     describe('5. Feedback Categories', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         beforeEach(async () => {
             const mission = await missionManager.createMission({

@@ -63,17 +63,17 @@ async function runIdentityTest() {
         console.log(`\n--------------------------------------------------`);
         console.log(`ESTADO: IDENTIDADE SOBERANA CONSOLIDADA`);
         console.log(`--------------------------------------------------\n`);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`\n❌ [FAIL] Colapso na Identidade: ${err.message}`);
         process.exitCode = 1;
     } finally {
         try {
             if (hadOriginal) {
-                fs.writeFileSync(IDENTITY_FILE, originalContent);
+                fs.writeFileSync(IDENTITY_FILE, /** @type {any} */ (originalContent));
             } else {
                 fs.rmSync(IDENTITY_FILE, { force: true });
             }
-        } catch (restoreErr) {
+        } catch (/** @type {any} */ restoreErr) {
             console.error(`\n❌ [FAIL] Não foi possível restaurar o arquivo de identidade: ${restoreErr.message}`);
             process.exitCode = 1;
         }

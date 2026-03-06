@@ -4,14 +4,14 @@ import assert from 'node:assert/strict';
 
 import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';
 
-function createAdapterLike(browserPool, hooks = {}) {
+function createAdapterLike(/** @type {any} */ browserPool, /** @type {any} */ hooks = {}) {
     return {
         browserPool,
         _detachDriverTelemetry: hooks.detachDriverTelemetry || (() => {}),
         _cleanupDriver: hooks.cleanupDriver || (() => {}),
         _timeout:
             hooks.timeout ||
-            ((ms, operation) =>
+            ((/** @type {any} */ ms, /** @type {any} */ operation) =>
                 new Promise((_, reject) => {
                     setTimeout(() => {
                         reject(new Error(`Timeout after ${ms}ms (${operation})`));

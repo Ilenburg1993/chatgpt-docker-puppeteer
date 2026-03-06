@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import * as socketEngine from '#server/engine/socket';
 
-function listenRandomPort(server) {
+function listenRandomPort(/** @type {any} */ server) {
     return new Promise((resolve, reject) => {
         server.once('error', reject);
         server.listen(0, '127.0.0.1', () => {
@@ -14,13 +14,13 @@ function listenRandomPort(server) {
     });
 }
 
-function closeServer(server) {
-    return new Promise(resolve => {
+function closeServer(/** @type {any} */ server) {
+    return /** @type {Promise<void>} */ (new Promise(resolve => {
         server.close(() => resolve());
-    });
+    }));
 }
 
-async function waitFor(predicate, timeoutMs = 10000, intervalMs = 100) {
+async function waitFor(/** @type {any} */ predicate, timeoutMs = 10000, intervalMs = 100) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         if (await predicate()) {
@@ -31,11 +31,11 @@ async function waitFor(predicate, timeoutMs = 10000, intervalMs = 100) {
     throw new Error(`Timeout waiting for condition (${timeoutMs}ms)`);
 }
 
-async function findAgentSocket(io, timeoutMs = 10000) {
+async function findAgentSocket(/** @type {any} */ io, timeoutMs = 10000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         const sockets = await io.fetchSockets();
-        const agentSocket = sockets.find(socket => Boolean(socket.robot_id));
+        const agentSocket = sockets.find((/** @type {any} */ socket) => Boolean(socket.robot_id));
         if (agentSocket) {
             return agentSocket;
         }
@@ -51,7 +51,7 @@ test('split mode survives reconnect storm (3 forced transport drops)', async t =
     });
 
     const port = await listenRandomPort(httpServer);
-    socketEngine.init(httpServer);
+    socketEngine.init(/** @type {any} */ (httpServer));
 
     const adapter = await socketEngine.connectExternal(port);
 

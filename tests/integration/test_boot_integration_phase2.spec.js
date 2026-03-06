@@ -10,23 +10,23 @@ import { createKernel } from '#kernel/kernel';
 import { createNERV } from '#nerv/nerv';
 
 describe('Boot Integration - Phase 2 Components', () => {
-    let nerv;
-    let contextManager;
-    let kernel;
-    let feedbackProcessor;
-    let checkpointManager;
-    let missionManager;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let contextManager;
+    /** @type {any} */ let kernel;
+    /** @type {any} */ let feedbackProcessor;
+    /** @type {any} */ let checkpointManager;
+    /** @type {any} */ let missionManager;
 
     before(async () => {
         // Simula boot sequence (sem browser pool)
 
         // Fase 2: NERV
-        nerv = await createNERV({
+        nerv = await createNERV(/** @type {any} */ ({
             mode: 'local',
             correlation: true,
             bufferSize: 1000,
             telemetry: false,
-        });
+        }));
 
         // Fase 3.5: ContextManager Compartilhado
         contextManager = new ContextManager({
@@ -131,7 +131,7 @@ describe('Boot Integration - Phase 2 Components', () => {
             // Verifica que pattern está acessível via MissionManager's contextManager
             const patterns = missionManager.contextManager.getRelevantPatterns('shared', 5);
             assert.ok(patterns.length > 0);
-            assert.ok(patterns.some(p => p.content.includes('shared')));
+            assert.ok(patterns.some((/** @type {any} */ p) => p.content.includes('shared')));
         });
     });
 

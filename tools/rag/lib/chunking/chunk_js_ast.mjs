@@ -1,5 +1,6 @@
 // @ts-check
 import { parse } from '@babel/parser';
+// @ts-ignore — @babel/traverse não tem typings publicados
 import traverseModule from '@babel/traverse';
 import { chunkPlain } from './chunk_plain.mjs';
 import { estimateCharsForLines } from '../text.mjs';

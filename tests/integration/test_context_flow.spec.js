@@ -8,13 +8,13 @@ import path from 'node:path';
 import fs from 'fs/promises';
 
 describe('Context Flow Integration Tests', () => {
-    let contextManager;
-    let missionManager;
-    let testMissionsDir;
+    /** @type {any} */ let contextManager;
+    /** @type {any} */ let missionManager;
+    /** @type {any} */ let testMissionsDir;
 
     // Mock dependencies
     const mockKernel = {
-        executeTask: async (task, correlationId) => {
+        executeTask: async (/** @type {any} */ task, /** @type {any} */ correlationId) => {
             // Mock: retorna sucesso
             return { status: 'queued', task_id: task.meta.id };
         },
@@ -77,7 +77,7 @@ describe('Context Flow Integration Tests', () => {
     });
 
     describe('2. Context Accumulation During Execution', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         before(async () => {
             const mission = await missionManager.createMission({
@@ -136,7 +136,7 @@ describe('Context Flow Integration Tests', () => {
     });
 
     describe('3. Context in Task Generation', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         before(async () => {
             const mission = await missionManager.createMission({
@@ -246,7 +246,7 @@ describe('Context Flow Integration Tests', () => {
 
             assert.ok(results.length > 0);
             // Deve priorizar patterns com "code" e "quality"
-            const hasRelevant = results.some(p => p.content.toLowerCase().includes('code'));
+            const hasRelevant = results.some((/** @type {any} */ p) => p.content.toLowerCase().includes('code'));
             assert.ok(hasRelevant);
         });
     });

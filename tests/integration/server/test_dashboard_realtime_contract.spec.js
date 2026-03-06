@@ -17,13 +17,13 @@ import { insertTask } from '#infra/db/task_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { closeDb } from '#infra/db/sqlite';
 
-function waitForEvent(socket, eventName, timeoutMs = 1500) {
+function waitForEvent(/** @type {any} */ socket, /** @type {any} */ eventName, timeoutMs = 1500) {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
             reject(new Error(`Timeout waiting for ${eventName}`));
         }, timeoutMs);
 
-        socket.once(eventName, data => {
+        socket.once(eventName, (/** @type {any} */ data) => {
             clearTimeout(timeout);
             resolve(data);
         });
@@ -56,16 +56,16 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         const app = express();
         httpServer = http.createServer(app);
 
-        await new Promise(resolve => {
-            httpServer.listen(0, '127.0.0.1', () => resolve());
-        });
+        await /** @type {Promise<void>} */ (new Promise(resolve => {
+            /** @type {any} */ (httpServer).listen(0, '127.0.0.1', () => resolve());
+        }));
 
         const address = httpServer.address();
         assert.ok(address && typeof address !== 'string', 'server should expose AddressInfo');
         port = address.port;
         assert.ok(port, 'server should bind an ephemeral port');
 
-        socketHub.init(httpServer);
+        socketHub.init(/** @type {any} */ (httpServer));
 
         const token = jwt.sign(
             {
@@ -140,7 +140,7 @@ describe('Dashboard realtime contract (Socket.io)', () => {
 
         try {
             if (httpServer) {
-                await new Promise(resolve => httpServer.close(() => resolve()));
+                await /** @type {Promise<void>} */ (new Promise(resolve => /** @type {any} */ (httpServer).close(() => resolve())));
                 httpServer = null;
             }
         } catch {}

@@ -9,7 +9,7 @@ console.log('> Validating health endpoint implementation...');
 
 try {
     // Check doctor.js exports
-    const doctor = await import('#core/doctor').then(m => m.default ?? m);
+    const doctor = await import('#core/doctor').then((/** @type {any} */ m) => m.default ?? m);
     if (!doctor.probeChromeConnection) {
         throw new Error('probeChromeConnection not exported from doctor.js');
     }
@@ -38,7 +38,7 @@ try {
 
     console.log('✓ PASS: Health endpoints properly implemented\n');
     process.exit(0);
-} catch (err) {
+} catch (/** @type {any} */ err) {
     console.error('✗ FAIL:', err.message);
     process.exit(1);
 }

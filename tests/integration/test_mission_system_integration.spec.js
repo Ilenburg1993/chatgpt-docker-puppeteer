@@ -18,9 +18,9 @@ import path from 'node:path';
  *   - REST API ↔ MissionManager
  */
 describe('Mission System Integration (E2E)', () => {
-    let nerv;
-    let kernel;
-    let missionManager;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let kernel;
+    /** @type {any} */ let missionManager;
     const testMissionsDir = path.join(import.meta.dirname, '../../missions-test');
 
     before(async () => {
@@ -32,7 +32,7 @@ describe('Mission System Integration (E2E)', () => {
         // Cleanup: Remove diretório de teste
         try {
             await fs.rm(testMissionsDir, { recursive: true, force: true });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             console.error(`Erro ao limpar diretório de teste: ${err.message}`);
         }
 
@@ -49,12 +49,12 @@ describe('Mission System Integration (E2E)', () => {
     describe('1. Boot Sequence Integration', () => {
         it('should initialize NERV → Kernel → MissionManager in correct order', async () => {
             // 1. Inicializa NERV
-            nerv = await createNERV({
+            nerv = await createNERV(/** @type {any} */ ({
                 mode: 'local',
                 correlation: true,
                 bufferSize: 100,
                 telemetry: false,
-            });
+            }));
 
             assert.ok(nerv, 'NERV deveria estar inicializado');
 
@@ -98,7 +98,7 @@ describe('Mission System Integration (E2E)', () => {
     });
 
     describe('2. Mission CRUD Integration', () => {
-        let createdMissionId;
+        /** @type {any} */ let createdMissionId;
 
         it('should create mission from template', async () => {
             const mission = await missionManager.createMission({
@@ -145,7 +145,7 @@ describe('Mission System Integration (E2E)', () => {
     });
 
     describe('3. Mission Execution Integration', () => {
-        let testMissionId;
+        /** @type {any} */ let testMissionId;
 
         before(async () => {
             // Cria mission para teste de execução
@@ -195,7 +195,7 @@ describe('Mission System Integration (E2E)', () => {
     });
 
     describe('4. Feedback Integration', () => {
-        let feedbackMissionId;
+        /** @type {any} */ let feedbackMissionId;
 
         before(async () => {
             const mission = await missionManager.createMission({
@@ -291,16 +291,16 @@ describe('Mission System Integration (E2E)', () => {
             assert.strictEqual(mission.workflow.steps.length, 17);
 
             // Verifica IDs dos steps expandidos
-            const chapterSteps = mission.workflow.steps.filter(s => s.id.startsWith('step-2-chapter-'));
+            const chapterSteps = mission.workflow.steps.filter((/** @type {any} */ s) => s.id.startsWith('step-2-chapter-'));
             assert.strictEqual(chapterSteps.length, 15, 'Deveria ter 15 chapter steps');
 
             // Verifica numeração correta
             assert.ok(
-                mission.workflow.steps.some(s => s.id === 'step-2-chapter-1'),
+                mission.workflow.steps.some((/** @type {any} */ s) => s.id === 'step-2-chapter-1'),
                 'Deveria ter chapter-1'
             );
             assert.ok(
-                mission.workflow.steps.some(s => s.id === 'step-2-chapter-15'),
+                mission.workflow.steps.some((/** @type {any} */ s) => s.id === 'step-2-chapter-15'),
                 'Deveria ter chapter-15'
             );
         });
@@ -329,7 +329,7 @@ describe('Mission System Integration (E2E)', () => {
     });
 
     describe('6. Progress Tracking Integration', () => {
-        let progressMissionId;
+        /** @type {any} */ let progressMissionId;
 
         before(async () => {
             const mission = await missionManager.createMission({

@@ -15,20 +15,20 @@ const colors = {
     cyan: '\x1b[36m',
 };
 
-function log(level, message) {
+function log(/** @type {any} */ level, /** @type {any} */ message) {
     const color =
-        {
+        /** @type {Record<string, string>} */ ({
             INFO: colors.cyan,
             SUCCESS: colors.green,
             ERROR: colors.red,
             WARN: colors.yellow,
             TEST: colors.blue,
-        }[level] || colors.reset;
+        })[level] || colors.reset;
 
     console.log(`${color}[${level}]${colors.reset} ${message}`);
 }
 
-function runCommand(cmd, options = {}) {
+function runCommand(/** @type {any} */ cmd, /** @type {any} */ options = {}) {
     try {
         const output = execSync(cmd, {
             cwd: ROOT,
@@ -37,7 +37,7 @@ function runCommand(cmd, options = {}) {
             ...options,
         });
         return { success: true, output };
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         return { success: false, error: error.message, output: error.stdout };
     }
 }
@@ -444,7 +444,7 @@ async function runAllTests() {
         results['Documentation'] = testDocumentation();
         results['Roadmap Updated'] = testRoadmapUpdated();
         results['IO Integration'] = testIOIntegration();
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         log('ERROR', `Test suite error: ${error.message}`);
         console.error(error);
     }

@@ -10,7 +10,7 @@ console.log(`
 
 let testsPassed = 0;
 let testsFailed = 0;
-const results = [];
+const results = /** @type {any[]} */ ([]);
 
 /**
  * Helper para executar testes
@@ -26,7 +26,7 @@ function runTest(name, testFn) {
         testsPassed++;
         results.push({ name, passed: true });
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.log(`❌ FALHOU: ${error.message}\n`);
         testsFailed++;
         results.push({ name, passed: false, error });

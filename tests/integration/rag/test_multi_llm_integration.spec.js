@@ -14,9 +14,9 @@ import { registry } from '../../../src/integration/tool-registry.mjs';
 import { setupMCPHandler } from '../../../src/server/handlers/mcp-handler.js';
 
 // Test server instance
-let app;
-let server;
-let baseUrl;
+/** @type {any} */ let app;
+/** @type {any} */ let server;
+/** @type {any} */ let baseUrl;
 
 // Setup test server
 before(async () => {
@@ -33,14 +33,14 @@ before(async () => {
     setupMCPHandler(app, registry);
 
     // Start server on random port
-    await new Promise(resolve => {
+    await /** @type {Promise<void>} */ (new Promise(resolve => {
         server = app.listen(0, () => {
             const { port } = server.address();
             baseUrl = `http://localhost:${port}`;
             console.log(`[Test] Server started on ${baseUrl}`);
             resolve();
         });
-    });
+    }));
 });
 
 // Cleanup
@@ -51,7 +51,7 @@ after(() => {
 });
 
 // Helper: Make MCP request
-async function mcpRequest(method, params = {}) {
+async function mcpRequest(/** @type {any} */ method, params = {}) {
     const response = await fetch(`${baseUrl}/api/mcp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,7 +148,7 @@ describe('MCP Protocol - tools/list', () => {
         assert.ok(Array.isArray(result.result.tools));
         assert.ok(result.result.tools.length >= 5);
 
-        const toolNames = result.result.tools.map(t => t.name);
+        const toolNames = result.result.tools.map((/** @type {any} */ t) => t.name);
         assert.ok(toolNames.includes('rag_search'));
         assert.ok(toolNames.includes('rag_health'));
         assert.ok(toolNames.includes('rag_expand'));
@@ -171,7 +171,7 @@ describe('MCP Protocol - tools/list', () => {
             assert.strictEqual(tool.inputSchema.type, 'object', `Tool ${tool.name} inputSchema not object`);
         }
 
-        const generateTool = tools.find(t => t.name === 'ollama_generate');
+        const generateTool = tools.find((/** @type {any} */ t) => t.name === 'ollama_generate');
         assert.ok(generateTool, 'ollama_generate metadata not found');
         assert.ok(generateTool.inputSchema.properties.runtime, 'ollama_generate.runtime schema missing');
         assert.deepEqual(generateTool.inputSchema.properties.runtime.enum, ['auto', 'cloud', 'local']);
@@ -515,7 +515,7 @@ describe('MCP Protocol - resources/list', () => {
         assert.ok(Array.isArray(result.result.resources));
         assert.ok(result.result.resources.length > 0);
 
-        const ragStats = result.result.resources.find(r => r.uri === 'rag://stats');
+        const ragStats = result.result.resources.find((/** @type {any} */ r) => r.uri === 'rag://stats');
         assert.ok(ragStats);
         assert.strictEqual(ragStats.mimeType, 'application/json');
     });
@@ -582,7 +582,7 @@ describe('Tool Registry - Direct Access', () => {
         const result = await registry.execute('ollama_models');
 
         assert.ok(result);
-        assert.ok(result.includes('Available Ollama Models'));
+        assert.ok(/** @type {any} */ (result).includes('Available Ollama Models'));
     });
 
     it('should throw on unknown tool', async () => {
@@ -590,7 +590,7 @@ describe('Tool Registry - Direct Access', () => {
     });
 
     it('should return correct stats', () => {
-        const stats = registry.getStats();
+        const stats = /** @type {any} */ (registry.getStats());
 
         assert.ok(stats.totalTools >= 5);
         assert.ok(Array.isArray(stats.tools));

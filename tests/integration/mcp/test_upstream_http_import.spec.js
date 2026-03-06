@@ -64,7 +64,7 @@ function startFakeMcpHttpServer() {
             res.statusCode = 200;
             res.setHeader('content-type', 'application/json');
             res.end(JSON.stringify({ jsonrpc: '2.0', id, result }));
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             res.statusCode = 500;
             res.setHeader('content-type', 'application/json');
             res.end(JSON.stringify({ error: err?.message || String(err) }));
@@ -100,7 +100,7 @@ test('imports tools from HTTP upstream and proxies calls', async () => {
 
         assert.equal(registry.has('mcp_core__hello'), true);
 
-        const out = await registry.execute('mcp_core__hello', { name: 'MCP' });
+        const out = /** @type {any} */ (await registry.execute('mcp_core__hello', { name: 'MCP' }));
         assert.equal(out?.content?.[0]?.text, 'Hello MCP');
     } finally {
         await shutdownUpstreams().catch(() => {});
