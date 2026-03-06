@@ -153,7 +153,7 @@ class DriverReadinessGuard {
                 } else {
                     checks[CHECK_TYPES.PAGE_STABLE] = true;
                 }
-            } catch (stabilityErr) {
+            } catch (/** @type {any} */ stabilityErr) {
                 issues.push({
                     check: CHECK_TYPES.PAGE_STABLE,
                     severity: SEVERITY.WARNING,
@@ -182,12 +182,12 @@ class DriverReadinessGuard {
                         );
 
                         // Check for FATAL patterns
-                        const hasFatal = triageResult.detected.some(d =>
+                        const hasFatal = triageResult.detected.some((/** @type {any} */ d) =>
                             FATAL_TRIAGE_PATTERNS.includes(d.type || d.pattern)
                         );
 
                         if (hasFatal) {
-                            const fatalIssues = triageResult.detected.filter(d =>
+                            const fatalIssues = triageResult.detected.filter((/** @type {any} */ d) =>
                                 FATAL_TRIAGE_PATTERNS.includes(d.type || d.pattern)
                             );
 
@@ -218,7 +218,7 @@ class DriverReadinessGuard {
                     } else {
                         checks[CHECK_TYPES.TRIAGE_CLEAN] = true;
                     }
-                } catch (triageErr) {
+                } catch (/** @type {any} */ triageErr) {
                     // Triage error itself is not blocking (unless FATAL pattern detected)
                     if (/** @type {any} */ (triageErr).message.startsWith('Triage FATAL:')) {
                         throw triageErr;
@@ -307,7 +307,7 @@ class DriverReadinessGuard {
                     }
 
                     checks[CHECK_TYPES.SESSION_HEALTHY] = true;
-                } catch (sessionErr) {
+                } catch (/** @type {any} */ sessionErr) {
                     issues.push({
                         check: CHECK_TYPES.SESSION_HEALTHY,
                         severity: SEVERITY.INFO,
@@ -341,7 +341,7 @@ class DriverReadinessGuard {
             );
 
             return result;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             // FATAL error during validation
             const result = {
                 ready: false,
@@ -378,7 +378,7 @@ class DriverReadinessGuard {
             });
 
             return (/** @type {any} */ (result)).ready;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             return false;
         }
     }

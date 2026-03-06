@@ -204,7 +204,7 @@ class SubmissionController extends EventEmitter {
         const timeoutP = this._timeout(SUBMISSION_CONFIG.SUBMIT_TIMEOUT_MS, 'submit');
         try {
             await Promise.race([this._executeSubmit(ctx, selector, taskId, correlationId), timeoutP]);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             this.stats.failedSubmissions++;
 
             // EventEmitter local
@@ -298,7 +298,7 @@ class SubmissionController extends EventEmitter {
         try {
             const timeoutData = await adaptive.getAdjustedTimeout(this.driver.currentDomain, 0, 'ECHO');
             debounceDelay = Math.min(Math.floor(timeoutData.timeout / 10), SUBMISSION_CONFIG.DEBOUNCE_MAX_MS);
-        } catch (_e) {
+        } catch (/** @type {any} */ _e) {
             // Fallback to default
         }
 
@@ -372,7 +372,7 @@ class SubmissionController extends EventEmitter {
      * @returns {Promise<boolean>} true se campo vazio, false caso contrário
      */
     async _verifyClearing(ctx, selector) {
-        return await /** @type {any} */ (ctx).evaluate(s => {
+        return await /** @type {any} */ (ctx).evaluate((/** @type {any} */ s) => {
             const el = document.querySelector(s);
             const content = el?.value || el?.innerText || '';
             return content.trim().length === 0;
@@ -396,7 +396,7 @@ class SubmissionController extends EventEmitter {
 
         for (let retry = 0; retry < maxRetries; retry++) {
             try {
-                await /** @type {any} */ (ctx).evaluate(sel => {
+                await /** @type {any} */ (ctx).evaluate((/** @type {any} */ sel) => {
                     const el = document.querySelector(sel);
                     if (!el) {
                         throw new Error(`Element not found: ${sel}`);
@@ -430,7 +430,7 @@ class SubmissionController extends EventEmitter {
                     log('DEBUG', `[SUBMISSION] Synthetic fallback succeeded (retry ${retry + 1})`, correlationId);
                     return; // Success
                 }
-            } catch (syntheticErr) {
+            } catch (/** @type {any} */ syntheticErr) {
                 if (retry < maxRetries - 1) {
                     log(
                         'WARN',

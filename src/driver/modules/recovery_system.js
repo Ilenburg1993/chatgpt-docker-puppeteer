@@ -66,7 +66,7 @@ class RecoverySystem extends EventEmitter {
      * Cria RecoverySystem instance v2.0
      *
      * @constructor
-     * @param {object} driver - Driver Puppeteer (BaseDriver instance)
+     * @param {any} driver - Driver Puppeteer (BaseDriver instance)
      * @throws {Error} Se driver inválido ou missing methods
      *
      * @example
@@ -91,7 +91,7 @@ class RecoverySystem extends EventEmitter {
 
         this.driver = driver;
 
-        // ✅ BUG #5 FIX: Metrics persistentes
+        /** @type {any} */
         this.stats = {
             tier0Applied: 0,
             tier1Applied: 0,
@@ -210,7 +210,7 @@ class RecoverySystem extends EventEmitter {
             });
 
             log('DEBUG', `[RECOVERY] Tier ${attempt} completed in ${duration}ms`, correlationId);
-        } catch (tierError) {
+        } catch (/** @type {any} */ tierError) {
             // ✅ Failure metrics
             this.stats.failedRecoveries++;
 
@@ -305,7 +305,7 @@ class RecoverySystem extends EventEmitter {
             } else {
                 log('WARN', `[RECOVERY] Página não disponível - pulando recovery de foco`, correlationId);
             }
-        } catch (focusErr) {
+        } catch (/** @type {any} */ focusErr) {
             log('DEBUG', `[RECOVERY] Tier 1: Focus recovery failed: ${focusErr.message}`, correlationId);
 
             // ✅ EventEmitter telemetry
@@ -385,7 +385,7 @@ class RecoverySystem extends EventEmitter {
 
                 // ✅ Success - sair do loop
                 return;
-            } catch (reloadErr) {
+            } catch (/** @type {any} */ reloadErr) {
                 if (retry < maxRetries - 1) {
                     log(
                         'WARN',
@@ -467,14 +467,14 @@ class RecoverySystem extends EventEmitter {
                 const killTimeout = this._timeout(KILL_TIMEOUT, 'browser_kill');
                 try {
                     await Promise.race([
-                        new Promise((resolve, reject) => {
+                        /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
                             try {
                                 proc.kill('SIGKILL');
                                 resolve();
-                            } catch (err) {
+                            } catch (/** @type {any} */ err) {
                                 reject(err);
                             }
-                        }),
+                        })),
                         killTimeout.promise,
                     ]);
                 } finally {
@@ -482,7 +482,7 @@ class RecoverySystem extends EventEmitter {
                 }
 
                 log('DEBUG', `[RECOVERY] Tier 3: Browser process kill issued`, correlationId);
-            } catch (killErr) {
+            } catch (/** @type {any} */ killErr) {
                 // Importante: kill pode falhar/timeoutar, mas o recovery precisa seguir para escalar.
                 log(
                     'WARN',
@@ -508,7 +508,7 @@ class RecoverySystem extends EventEmitter {
                 } else {
                     log('DEBUG', `[RECOVERY] Tier 3: Browser already disconnected`, correlationId);
                 }
-            } catch (disconnectErr) {
+            } catch (/** @type {any} */ disconnectErr) {
                 log('WARN', `[RECOVERY] Tier 3: Disconnect error: ${disconnectErr.message}`, correlationId);
             }
         }
@@ -542,6 +542,7 @@ class RecoverySystem extends EventEmitter {
      * @returns {{ promise: Promise<never>, cancel: () => void }}
      */
     _timeout(ms, operation) {
+        /** @type {any} */
         let handle;
         const promise = /** @type {Promise<never>} */ (
             new Promise((_, reject) => {
@@ -597,7 +598,7 @@ class RecoverySystem extends EventEmitter {
  * **Semântica:** Cria nova instância do RecoverySystem associada ao driver fornecido.
  * **Unidades:** N/A
  *
- * @param {object} driver - Instância do driver para sistema de recuperação
+ * @param {any} driver - Instância do driver para sistema de recuperação
  * @returns {RecoverySystem} Nova instância do RecoverySystem
  */
 export const create = driver => new RecoverySystem(driver);

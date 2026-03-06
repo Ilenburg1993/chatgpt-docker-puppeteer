@@ -119,7 +119,7 @@ class HandleManager extends EventEmitter {
 
         /**
          * Métricas de lifecycle.
-         * @type {object}
+         * @type {any}
          * @private
          */
         this.stats = {
@@ -156,7 +156,7 @@ class HandleManager extends EventEmitter {
      * - Handle deve ter método dispose() (Puppeteer JSHandle)
      * - Limite MAX_HANDLES não pode ser ultrapassado
      *
-     * @param {object} handle - Handle Puppeteer (JSHandle com método dispose)
+     * @param {any} handle - Handle Puppeteer (JSHandle com método dispose)
      * @returns {object} Handle registrado (para chaining)
      * @throws {Error} Se handle inválido ou limite atingido
      *
@@ -283,7 +283,7 @@ class HandleManager extends EventEmitter {
                     throw new Error('CLEANUP_ABORTED');
                 }
 
-                const h = this.activeHandles.pop();
+                const h = /** @type {any} */ (this.activeHandles.pop());
 
                 try {
                     // FIXED (P0-1.3): Usa withTimeout para garantir cleanup
@@ -298,7 +298,7 @@ class HandleManager extends EventEmitter {
                         remaining: this.activeHandles.length,
                         timestamp: Date.now(),
                     });
-                } catch (disposeErr) {
+                } catch (/** @type {any} */ disposeErr) {
                     errorsCount++;
                     this.stats.errorsOccurred++;
 
@@ -339,7 +339,7 @@ class HandleManager extends EventEmitter {
             });
 
             return { cleaned: cleanedCount, errors: errorsCount, timeout: false, duration };
-        } catch (_abortErr) {
+        } catch (/** @type {any} */ _abortErr) {
             // ✅ Timeout atingido: cleanup interrompido
             clearTimeout(timeoutId);
 
@@ -380,7 +380,7 @@ class HandleManager extends EventEmitter {
      * Útil quando handle específico não é mais necessário.
      *
      * @async
-     * @param {object} handle - Handle a limpar
+     * @param {any} handle - Handle a limpar
      * @returns {Promise<boolean>} True se limpo, false se não encontrado
      *
      * @emits HANDLE_EVENTS.HANDLE_CLEARED - Handle limpo com sucesso
@@ -422,7 +422,7 @@ class HandleManager extends EventEmitter {
             log('DEBUG', `[HandleManager] Handle cleared (${this.activeHandles.length} remaining)`);
 
             return true;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             this.stats.errorsOccurred++;
 
             log('WARN', `[HandleManager] Error clearing handle: ${err.message}`);
@@ -437,7 +437,7 @@ class HandleManager extends EventEmitter {
             // FIXED: Forçar dispose mesmo em timeout (best effort)
             try {
                 await handle.dispose().catch(() => {});
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // Ignore - já logamos o erro principal acima
             }
 
@@ -517,7 +517,7 @@ class HandleManager extends EventEmitter {
     _timeout(ms, operation) {
         return new Promise((_, reject) => {
             setTimeout(() => {
-                const error = new Error(`Timeout after ${ms}ms`);
+                const error = /** @type {any} */ (new Error(`Timeout after ${ms}ms`));
                 error.name = 'TimeoutError';
                 error.operation = operation;
                 reject(error);

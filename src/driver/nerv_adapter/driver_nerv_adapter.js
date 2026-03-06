@@ -112,6 +112,11 @@ const ADAPTER_EVENTS = {
 
 /** Classe exportada: DriverNERVAdapter. */
 class DriverNERVAdapter extends EventEmitter {
+    /**
+     * @param {any} nerv
+     * @param {any} browserPool
+     * @param {any} [config]
+     */
     constructor(nerv, browserPool, config) {
         super();
 
@@ -132,6 +137,7 @@ class DriverNERVAdapter extends EventEmitter {
         // Key: taskId
         // Value: { driver, page, listeners, abortController, externalAbortForwarder }
         this.activeDrivers = new Map();
+        /** @type {any[]} */
         this.telemetryBuffer = [];
         // Reentrancy guard for telemetry flush
         this._isFlushing = false;
@@ -144,6 +150,7 @@ class DriverNERVAdapter extends EventEmitter {
         this._shutdownPromise = null;
         this._shutdownResult = null;
 
+        /** @type {any} */
         this.performanceMetrics = {
             poolAcquireTimes: [],
             contextAttachTimes: [],
@@ -202,7 +209,7 @@ class DriverNERVAdapter extends EventEmitter {
     }
 
     _setupListeners() {
-        const unsubscribe = this.nerv.onReceive(envelope => {
+        const unsubscribe = this.nerv.onReceive((/** @type {any} */ envelope) => {
             const messageType = getMessageType(envelope);
             const actionCode = getActionCode(envelope);
             const correlationId = getCorrelationId(envelope);
@@ -210,7 +217,7 @@ class DriverNERVAdapter extends EventEmitter {
             if (messageType !== MessageType.COMMAND) return;
             if (!actionCode || !actionCode.startsWith('DRIVER_')) return;
 
-            this._handleDriverCommand(envelope).catch(err => {
+            this._handleDriverCommand(envelope).catch((/** @type {any} */ err) => {
                 log(
                     'ERROR',
                     `[DriverNERVAdapter] Erro ao processar comando: ${err?.message || String(err)}`,
@@ -220,7 +227,7 @@ class DriverNERVAdapter extends EventEmitter {
                 let taskId;
                 try {
                     taskId = getTaskIdFromPayload(getPayload(envelope));
-                } catch (taskIdError) {
+                } catch (/** @type {any} */ taskIdError) {
                     log(
                         'WARN',
                         `[DriverNERVAdapter] Falha ao extrair taskId do comando: ${taskIdError?.message || String(taskIdError)}`,
@@ -240,7 +247,7 @@ class DriverNERVAdapter extends EventEmitter {
                         reason: 'INFRASTRUCTURE_ERROR',
                     },
                     correlationId
-                ).catch(emitErr => {
+                ).catch((/** @type {any} */ emitErr) => {
                     log(
                         'ERROR',
                         `[DriverNERVAdapter] Falha ao emitir DRIVER_ERROR: ${emitErr?.message || String(emitErr)}`,
@@ -254,15 +261,18 @@ class DriverNERVAdapter extends EventEmitter {
         log('DEBUG', '[DriverNERVAdapter] Listeners configurados para DRIVER_* commands');
     }
 
+    /**
+     * @param {any} envelope
+     */
     async _handleDriverCommand(envelope) {
         const actionCode = getActionCode(envelope);
-        const payload = getPayload(envelope);
+        const payload = /** @type {any} */ (getPayload(envelope));
         const correlationId = getCorrelationId(envelope);
 
         let taskId;
         try {
             taskId = getTaskIdFromPayload(payload);
-        } catch (taskIdError) {
+        } catch (/** @type {any} */ taskIdError) {
             log(
                 'DEBUG',
                 `[DriverNERVAdapter] getTaskIdFromPayload falhou, aplicando fallback: ${taskIdError?.message || String(taskIdError)}`,
@@ -351,6 +361,11 @@ class DriverNERVAdapter extends EventEmitter {
         }
     }
 
+    /**
+     * @param {any} payload
+     * @param {any} [correlationId]
+     * @param {number} [retryCount]
+     */
     async _executeTask(payload, correlationId, retryCount = 0) {
         const { task, signal: externalSignal } = payload;
 
@@ -365,6 +380,7 @@ class DriverNERVAdapter extends EventEmitter {
         const taskId = task.meta.id;
         const startTime = Date.now();
 
+        /** @type {{ total: number, poolAcquire: number|null, contextAttach: number|null, execute: number|null, detach: number|null, release: number|null }} */
         const timings = {
             total: startTime,
             poolAcquire: null,
@@ -383,7 +399,7 @@ class DriverNERVAdapter extends EventEmitter {
             externalAbortForwarder = () => {
                 try {
                     abortController.abort(externalSignal.reason);
-                } catch (abortReasonError) {
+                } catch (/** @type {any} */ abortReasonError) {
                     log(
                         'DEBUG',
                         `[DriverNERVAdapter] Abort reason inválido para ${taskId}, usando abort sem reason: ${abortReasonError?.message || String(abortReasonError)}`,
@@ -522,12 +538,16 @@ class DriverNERVAdapter extends EventEmitter {
             return;
         }
 
+        /** @type {any} */
         let page = null;
+        /** @type {any} */
         let driver = null;
+        /** @type {any[]} */
         let listeners = [];
         let abortHandler = null;
 
         // Registra entry consistente (corrige mismatch com abort/shutdown)
+        /** @type {any} */
         const activeEntry = {
             driver: null,
             page: null,
@@ -551,7 +571,7 @@ class DriverNERVAdapter extends EventEmitter {
                         target,
                     },
                     correlationId
-                ).catch(err => {
+                ).catch((/** @type {any} */ err) => {
                     log(
                         'WARN', // ✅ P1-4: Upgraded from DEBUG - heartbeat failures are important
                         `[DriverNERVAdapter] Heartbeat emit failed for ${taskId}: ${err?.message || String(err)}`,
@@ -649,7 +669,7 @@ class DriverNERVAdapter extends EventEmitter {
             let pageUrl = null;
             try {
                 pageUrl = driver.page.url();
-            } catch (pageUrlError) {
+            } catch (/** @type {any} */ pageUrlError) {
                 log(
                     'DEBUG',
                     `[DriverNERVAdapter] Não foi possível obter URL da página para ${taskId}: ${pageUrlError?.message || String(pageUrlError)}`,
@@ -759,7 +779,7 @@ class DriverNERVAdapter extends EventEmitter {
                 if (persisted) {
                     log('INFO', `[DriverNERVAdapter] Response saved for task ${taskId}`, correlationId);
                 }
-            } catch (saveError) {
+            } catch (/** @type {any} */ saveError) {
                 log(
                     'ERROR',
                     `[DriverNERVAdapter] Failed to save response for ${taskId}: ${saveError?.message || String(saveError)}`,
@@ -787,7 +807,7 @@ class DriverNERVAdapter extends EventEmitter {
 
             this.stats.tasksExecuted++;
             this._recordSuccess(target);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const abortEntry = this.abortedTasks.get(taskId);
             const wasAborted = abortEntry?.aborting;
 
@@ -829,7 +849,7 @@ class DriverNERVAdapter extends EventEmitter {
                             diagnosis: failure.details || null,
                         });
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     diag = null;
                 }
 
@@ -871,7 +891,7 @@ class DriverNERVAdapter extends EventEmitter {
                     clearInterval(activeEntry.heartbeatTimer);
                     activeEntry.heartbeatTimer = null;
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore */
             }
 
@@ -880,7 +900,7 @@ class DriverNERVAdapter extends EventEmitter {
                 if (signal && abortHandler) {
                     signal.removeEventListener('abort', abortHandler);
                 }
-            } catch (removeAbortListenerError) {
+            } catch (/** @type {any} */ removeAbortListenerError) {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Falha ao remover listener de abort interno para ${taskId}: ${removeAbortListenerError?.message || String(removeAbortListenerError)}`,
@@ -893,7 +913,7 @@ class DriverNERVAdapter extends EventEmitter {
                 if (externalSignal && externalAbortForwarder) {
                     externalSignal.removeEventListener('abort', externalAbortForwarder);
                 }
-            } catch (removeExternalAbortError) {
+            } catch (/** @type {any} */ removeExternalAbortError) {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Falha ao remover listener de abort externo para ${taskId}: ${removeExternalAbortError?.message || String(removeExternalAbortError)}`,
@@ -907,6 +927,10 @@ class DriverNERVAdapter extends EventEmitter {
         }
     }
 
+    /**
+     * @param {any} payload
+     * @param {any} [correlationId]
+     */
     async _abortTask(payload, correlationId) {
         const taskId = payload?.taskId;
 
@@ -937,7 +961,7 @@ class DriverNERVAdapter extends EventEmitter {
 
         try {
             active.abortController?.abort(reason);
-        } catch (abortError) {
+        } catch (/** @type {any} */ abortError) {
             log(
                 'WARN',
                 `[DriverNERVAdapter] Abort com reason falhou para ${taskId}: ${abortError?.message || String(abortError)}`,
@@ -945,7 +969,7 @@ class DriverNERVAdapter extends EventEmitter {
             );
             try {
                 active.abortController?.abort();
-            } catch (fallbackAbortError) {
+            } catch (/** @type {any} */ fallbackAbortError) {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Abort fallback também falhou para ${taskId}: ${fallbackAbortError?.message || String(fallbackAbortError)}`,
@@ -967,6 +991,10 @@ class DriverNERVAdapter extends EventEmitter {
         this.stats.tasksAborted++;
     }
 
+    /**
+     * @param {any} payload
+     * @param {any} [correlationId]
+     */
     async _performHealthCheck(payload, correlationId) {
         let browserPoolHealth;
         let healthStatus = STATUS_VALUES.HEALTHY;
@@ -982,7 +1010,7 @@ class DriverNERVAdapter extends EventEmitter {
                 browserPoolHealth = { status: 'DEGRADED', reason: 'Pool not available' };
                 healthStatus = STATUS_VALUES.DEGRADED;
             }
-        } catch (poolError) {
+        } catch (/** @type {any} */ poolError) {
             log('ERROR', `[DriverNERVAdapter] Health check failed: ${poolError.message}`, correlationId);
 
             await this._emitError('health_check', poolError, null, correlationId, 'health_check');
@@ -1035,6 +1063,9 @@ class DriverNERVAdapter extends EventEmitter {
         return health;
     }
 
+    /**
+     * @param {any} timings
+     */
     _recordPerformanceMetrics(timings) {
         const { poolAcquire, contextAttach, execute, total } = timings;
 
@@ -1059,7 +1090,7 @@ class DriverNERVAdapter extends EventEmitter {
             if (this.performanceMetrics.totalTimes.length > 100) this.performanceMetrics.totalTimes.shift();
         }
 
-        const avg = arr => (arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+        const avg = (/** @type {number[]} */ arr) => (arr.length > 0 ? arr.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0) / arr.length : 0);
 
         this.performanceMetrics.avgPoolAcquire = Math.round(avg(this.performanceMetrics.poolAcquireTimes));
         this.performanceMetrics.avgContextAttach = Math.round(avg(this.performanceMetrics.contextAttachTimes));
@@ -1067,11 +1098,17 @@ class DriverNERVAdapter extends EventEmitter {
         this.performanceMetrics.avgTotal = Math.round(avg(this.performanceMetrics.totalTimes));
     }
 
+    /**
+     * @param {any} driver
+     * @param {any} taskId
+     * @param {any} [correlationId]
+     */
     _attachDriverTelemetry(driver, taskId, correlationId) {
+        /** @type {any[]} */
         const listeners = [];
 
         // ✅ P1-4: Removed 'void' and added error handler - state changes are critical for observability
-        const stateChangeListener = data => {
+        const stateChangeListener = (/** @type {any} */ data) => {
             this._emitBoth(
                 ADAPTER_EVENTS.TASK_STATE_OBSERVED,
                 ActionCode.DRIVER_STATE_OBSERVED,
@@ -1081,7 +1118,7 @@ class DriverNERVAdapter extends EventEmitter {
                     timestamp: new Date().toISOString(),
                 },
                 correlationId
-            ).catch(err => {
+            ).catch((/** @type {any} */ err) => {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Failed to emit state change for ${taskId}: ${err?.message}`,
@@ -1092,7 +1129,7 @@ class DriverNERVAdapter extends EventEmitter {
         driver.on('state_change', stateChangeListener);
         listeners.push({ event: 'state_change', listener: stateChangeListener });
 
-        const progressListener = data => {
+        const progressListener = (/** @type {any} */ data) => {
             try {
                 this._bufferTelemetry(
                     ActionCode.DRIVER_VITAL,
@@ -1106,7 +1143,7 @@ class DriverNERVAdapter extends EventEmitter {
                 );
 
                 this.stats.vitalsEmitted++;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log('WARN', `[DriverNERVAdapter] Progress telemetry buffer failed: ${err?.message || String(err)}`);
             }
         };
@@ -1114,7 +1151,7 @@ class DriverNERVAdapter extends EventEmitter {
         listeners.push({ event: 'progress', listener: progressListener });
 
         // ✅ P1-4: Removed 'void' and added error handler - anomalies are critical alerts
-        const anomalyListener = data => {
+        const anomalyListener = (/** @type {any} */ data) => {
             this._emitBoth(
                 ADAPTER_EVENTS.ERROR,
                 ActionCode.DRIVER_ANOMALY,
@@ -1125,7 +1162,7 @@ class DriverNERVAdapter extends EventEmitter {
                     details: data.message,
                 },
                 correlationId
-            ).catch(err => {
+            ).catch((/** @type {any} */ err) => {
                 log(
                     'ERROR',
                     `[DriverNERVAdapter] Failed to emit anomaly for ${taskId}: ${err?.message}`,
@@ -1149,13 +1186,17 @@ class DriverNERVAdapter extends EventEmitter {
         return listeners;
     }
 
+    /**
+     * @param {any} driver
+     * @param {any[]} listeners
+     */
     _detachDriverTelemetry(driver, listeners) {
         if (!listeners || listeners.length === 0) return;
 
         for (const { event, listener } of listeners) {
             try {
                 driver.off(event, listener);
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log('WARN', `[DriverNERVAdapter] Error removing listener ${event}: ${err.message}`);
             }
         }
@@ -1163,6 +1204,11 @@ class DriverNERVAdapter extends EventEmitter {
         log('DEBUG', `[DriverNERVAdapter] Detached ${listeners.length} telemetry listeners`);
     }
 
+    /**
+     * @param {any} actionCode
+     * @param {any} payload
+     * @param {any} [correlationId]
+     */
     async _emitEvent(actionCode, payload, correlationId) {
         const maxRetries = ADAPTER_CONFIG.EVENT_RETRY_MAX_ATTEMPTS;
 
@@ -1185,7 +1231,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log('DEBUG', `[DriverNERVAdapter] Evento NERV emitido: ${actionCode}`, correlationId);
                 this.stats.eventsEmitted++;
                 return;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 const lastError = err;
 
                 if (attempt < maxRetries - 1) {
@@ -1216,11 +1262,22 @@ class DriverNERVAdapter extends EventEmitter {
         }
     }
 
+    /**
+     * @param {any} localEvent
+     * @param {any} nervActionCode
+     * @param {any} payload
+     * @param {any} [correlationId]
+     */
     async _emitBoth(localEvent, nervActionCode, payload, correlationId) {
         this.emit(localEvent, { ...payload, correlationId });
         await this._emitEvent(nervActionCode, payload, correlationId);
     }
 
+    /**
+     * @param {any} actionCode
+     * @param {any} payload
+     * @param {any} [correlationId]
+     */
     _bufferTelemetry(actionCode, payload, correlationId) {
         this.telemetryBuffer.push({
             actionCode,
@@ -1257,6 +1314,7 @@ class DriverNERVAdapter extends EventEmitter {
                 )
             );
 
+            /** @type {any[]} */
             const failedItems = [];
             results.forEach((result, index) => {
                 if (result.status === 'rejected') {
@@ -1287,6 +1345,13 @@ class DriverNERVAdapter extends EventEmitter {
         }
     }
 
+    /**
+     * @param {any} operation
+     * @param {any} error
+     * @param {any} [taskId]
+     * @param {any} [correlationId]
+     * @param {any} [phase]
+     */
     async _emitError(operation, error, taskId, correlationId, phase) {
         log(
             'ERROR',
@@ -1324,10 +1389,10 @@ class DriverNERVAdapter extends EventEmitter {
      *   taskId?: string,
      *   correlationId?: string,
      *   target?: string,
-     *   driver?: unknown,
-     *   page?: unknown,
+     *   driver?: any,
+     *   page?: any,
      *   phase?: string,
-     *   diagnosis?: unknown
+     *   diagnosis?: any
      * }} [context={}]
      */
     async _captureDiagnostics({
@@ -1352,22 +1417,22 @@ class DriverNERVAdapter extends EventEmitter {
         let viewport = null;
         try {
             url = page.url();
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Keep null;
         }
         try {
             title = await page.title();
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Keep null;
         }
         try {
             ua = await page.browser().userAgent();
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Keep null;
         }
         try {
             viewport = page.viewport ? page.viewport() : null;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Keep null;
         }
 
@@ -1389,7 +1454,7 @@ class DriverNERVAdapter extends EventEmitter {
                 mime: 'image/png',
             });
             storage.screenshot_file = stored.storageUri;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             storage.screenshot_file = null;
         }
 
@@ -1406,7 +1471,7 @@ class DriverNERVAdapter extends EventEmitter {
                 mime: 'text/html',
             });
             storage.html_file = stored.storageUri;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             storage.html_file = null;
         }
 
@@ -1438,7 +1503,7 @@ class DriverNERVAdapter extends EventEmitter {
                 mime: 'application/json',
             });
             storage.meta_json_file = stored.storageUri;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             storage.meta_json_file = null;
         }
 
@@ -1457,15 +1522,16 @@ class DriverNERVAdapter extends EventEmitter {
      * Executa preflight mínimo antes do driver entrar no loop principal.
      *
      * @param {{
-     *   driver?: unknown,
-     *   page?: unknown,
-     *   task?: unknown,
+     *   driver?: any,
+     *   page?: any,
+     *   task?: any,
      *   taskId?: string,
      *   target?: string,
      *   signal?: AbortSignal | null
      * }} [context={}]
      */
     async _runPreflight({ driver, page, task, taskId, target, signal } = {}) {
+        /** @type {any} */
         const diagnosis = {
             stability: null,
             triage: null,
@@ -1499,7 +1565,7 @@ class DriverNERVAdapter extends EventEmitter {
                     },
                 };
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             return {
                 ok: false,
                 diagnosis,
@@ -1520,16 +1586,16 @@ class DriverNERVAdapter extends EventEmitter {
 
         // 2) Stabilizer (fast signal: if the page is still “busy”, prefer reschedule)
         try {
-            const stability = await (
+            const stability = /** @type {any} */ (await (
                 await import('#shared/page_stability/stabilizer')
-            ).waitForStability(driver, 10000, signal || null);
+            ).waitForStability(driver, 10000, signal || null));
             diagnosis.stability = {
                 success: Boolean(stability?.success),
                 timeout: Boolean(stability?.timeout),
                 phasesFailed: Array.isArray(stability?.phasesFailed) ? stability.phasesFailed.slice(0, 5) : [],
                 finalLag: stability?.finalLag ?? null,
             };
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             diagnosis.stability = { success: false, error: err?.message || String(err) };
         }
 
@@ -1556,7 +1622,7 @@ class DriverNERVAdapter extends EventEmitter {
         try {
             const { Triage } = await import('#driver/modules/triage');
             const triage = new Triage(page, String(langCode || 'en'));
-            const triageResult = await triage.diagnose(signal || null);
+            const triageResult = /** @type {any} */ (await triage.diagnose(signal ?? undefined));
             diagnosis.triage = { result: triageResult };
 
             const t = triageResult?.type || null;
@@ -1614,7 +1680,7 @@ class DriverNERVAdapter extends EventEmitter {
                     },
                 };
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             diagnosis.triage = { error: err?.message || String(err) };
             // Triage failure is not blocking by itself; continue.
         }
@@ -1662,7 +1728,7 @@ class DriverNERVAdapter extends EventEmitter {
                     },
                 };
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             diagnosis.interface = {
                 valid: false,
                 reason: 'INTERFACE_CHECK_ERROR',
@@ -1690,13 +1756,18 @@ class DriverNERVAdapter extends EventEmitter {
         return { ok: true, diagnosis, taskId, target, task: task || null };
     }
 
+    /**
+     * @param {any} promise
+     * @param {number} ms
+     * @param {string} [operation]
+     */
     _withTimeout(promise, ms, operation) {
         return new Promise((resolve, reject) => {
             let settled = false;
             const timer = setTimeout(() => {
                 if (settled) return;
                 settled = true;
-                const error = new Error(`Timeout after ${ms}ms`);
+                const error = /** @type {any} */ (new Error(`Timeout after ${ms}ms`));
                 error.name = 'TimeoutError';
                 error.operation = operation;
                 reject(error);
@@ -1719,19 +1790,25 @@ class DriverNERVAdapter extends EventEmitter {
         });
     }
 
+    /**
+     * @param {any} taskId
+     * @param {any} page
+     * @param {any} driver
+     * @param {any[]} listeners
+     */
     async _finallyCleanup(taskId, page, driver, listeners) {
         const hotPoolEnabled = String(process.env.DRIVER_HOT_POOL_ENABLED ?? 'true').toLowerCase() !== 'false';
         const isHotPath = Boolean(hotPoolEnabled && this.browserPool && driver && driver._isHot);
         const withTimeout =
             typeof this._withTimeout === 'function'
                 ? this._withTimeout.bind(this)
-                : (promise, ms, operation) =>
+                : (/** @type {any} */ promise, /** @type {number} */ ms, /** @type {string} */ operation) =>
                       new Promise((resolve, reject) => {
                           let settled = false;
                           const timer = setTimeout(() => {
                               if (settled) return;
                               settled = true;
-                              const error = new Error(`Timeout after ${ms}ms`);
+                              const error = /** @type {any} */ (new Error(`Timeout after ${ms}ms`));
                               error.name = 'TimeoutError';
                               error.operation = operation;
                               reject(error);
@@ -1756,7 +1833,7 @@ class DriverNERVAdapter extends EventEmitter {
         if (driver && listeners && listeners.length > 0) {
             try {
                 this._detachDriverTelemetry(driver, listeners);
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log('WARN', `[DriverNERVAdapter] Error detaching listeners: ${err.message}`);
             }
         }
@@ -1768,7 +1845,7 @@ class DriverNERVAdapter extends EventEmitter {
                 }
 
                 await withTimeout(driverFactory.releaseToPool(driver), 5000, 'driverFactory.releaseToPool (finally)');
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log('WARN', `[DriverNERVAdapter] Error releasing driver: ${err.message}`);
             }
         }
@@ -1780,12 +1857,15 @@ class DriverNERVAdapter extends EventEmitter {
         if (!isHotPath && page && this.browserPool) {
             try {
                 await withTimeout(this.browserPool.release(page), 5000, 'browserPool.release');
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log('WARN', `[DriverNERVAdapter] Error releasing page: ${err.message}`);
             }
         }
     }
 
+    /**
+     * @param {any} taskId
+     */
     _cleanupDriver(taskId) {
         const entry = this.activeDrivers.get(taskId);
         if (!entry) return;
@@ -1796,6 +1876,9 @@ class DriverNERVAdapter extends EventEmitter {
         log('DEBUG', `[DriverNERVAdapter] Task ${taskId} cleaned from activeDrivers Map (driver=${driverTarget})`);
     }
 
+    /**
+     * @param {any} target
+     */
     _canExecute(target) {
         if (!this.circuitBreakers.has(target)) {
             this.circuitBreakers.set(target, {
@@ -1834,6 +1917,9 @@ class DriverNERVAdapter extends EventEmitter {
         return true;
     }
 
+    /**
+     * @param {any} target
+     */
     _recordSuccess(target) {
         if (!this.circuitBreakers.has(target)) return;
 
@@ -1853,6 +1939,9 @@ class DriverNERVAdapter extends EventEmitter {
         breaker.failures = 0;
     }
 
+    /**
+     * @param {any} error
+     */
     _classifyFailure(error) {
         const message = String(error?.message || '');
         const name = String(error?.name || '');
@@ -2118,6 +2207,9 @@ class DriverNERVAdapter extends EventEmitter {
         };
     }
 
+    /**
+     * @param {any} target
+     */
     _recordFailure(target) {
         if (!this.circuitBreakers.has(target)) {
             this.circuitBreakers.set(target, {
@@ -2156,7 +2248,7 @@ class DriverNERVAdapter extends EventEmitter {
         this.healthCheckInterval = setInterval(async () => {
             try {
                 await this._performHealthCheck({}, 'PERIODIC_HEALTH_CHECK');
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log('ERROR', `[DriverNERVAdapter] Periodic health check failed: ${err.message}`);
             }
         }, ADAPTER_CONFIG.HEALTH_CHECK_INTERVAL_MS);
@@ -2198,6 +2290,9 @@ class DriverNERVAdapter extends EventEmitter {
         );
     }
 
+    /**
+     * @param {{ timeout?: number }} [options={}]
+     */
     async shutdown(options = {}) {
         if (this._shutdownResult) {
             return this._shutdownResult;
@@ -2232,7 +2327,7 @@ class DriverNERVAdapter extends EventEmitter {
             if (this._nervUnsubscribe) {
                 try {
                     this._nervUnsubscribe();
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
                     log('WARN', `[DriverNERVAdapter] Falha ao remover listener NERV: ${err.message}`);
                 } finally {
                     this._nervUnsubscribe = null;
@@ -2242,7 +2337,7 @@ class DriverNERVAdapter extends EventEmitter {
             if (this.telemetryBuffer.length > 0) {
                 try {
                     await this._withTimeout(this._flushTelemetry(), 5000, 'final_telemetry_flush');
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
                     log(
                         'WARN',
                         `[DriverNERVAdapter] Final telemetry flush failed during shutdown: ${err?.message || String(err)}`
@@ -2260,7 +2355,7 @@ class DriverNERVAdapter extends EventEmitter {
                             `shutdown_cleanup:${taskId}`
                         );
                         return { taskId, success: true };
-                    } catch (err) {
+                    } catch (/** @type {any} */ err) {
                         log('ERROR', `[DriverNERVAdapter] Erro ao liberar driver ${taskId}: ${err.message}`);
                         return { taskId, success: false, error: err.message };
                     }
@@ -2319,6 +2414,12 @@ class DriverNERVAdapter extends EventEmitter {
         };
     }
 
+    /**
+     * @param {any} taskId
+     * @param {any} result
+     * @param {any} task
+     * @param {any} [correlationId]
+     */
     async _persistResponse(taskId, result, task, correlationId) {
         const saver = this.config?.saveResponse;
         if (typeof saver !== 'function') return null;
