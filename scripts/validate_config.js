@@ -180,7 +180,7 @@ class ConfigValidator {
      */
     validateEnvironment() {
         const env = process.env.NODE_ENV || 'development';
-        const required = (/** @type {any} */ (REQUIRED_ENV_VARS))[env] || [];
+        const required = /** @type {any} */ (REQUIRED_ENV_VARS)[env] || [];
 
         this.log('INFO', `Validating environment variables for: ${env}`);
 

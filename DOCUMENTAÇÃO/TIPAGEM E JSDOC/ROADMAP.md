@@ -11,29 +11,29 @@
 
 ---
 
-## Estado geral — 5 de março de 2026 (Fase B: 6/11 concluídas)
+## Estado geral — 5 de março de 2026 (Fase B: 8/11 concluídas)
 
 | Indicador                     | Antes     | Agora         |
 | ----------------------------- | --------- | ------------- |
 | Arquivos com `// @ts-check`   | **670**   | **670**       |
 | `@ts-nocheck` em código real  | **0** ✅   | **0** ✅       |
 | Erros `typecheck:node` (base) | ~2.170    | **2.120**     |
-| Erros `typecheck:strict:all`  | ~7.414    | **~4.400** ↓  |
-| Lanes com 0 erros             | 11 de 30+ | **21 de 30+** |
+| Erros `typecheck:strict:all`  | ~7.414    | **~3.900** ↓  |
+| Lanes com 0 erros             | 11 de 30+ | **24 de 30+** |
 
 **Fase 0 concluída**: 214 erros JSDoc estruturais (TS8032=177, TS8024=37) eliminados. **Fase A
 concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gateway` ✅,
 `src.audit_agent` ✅, `src.dashboard-ui` ✅, `tests.manual` ✅.
 
-**Fase B em andamento** (7/11 concluídas): `src.nerv` ✅, `scripts.health` ✅, `src.missions` ✅,
-`src.shared` ✅, `src.orchestrator` ✅, `src.integration` ✅, `tools.workspace` ✅.
+**Fase B em andamento** (8/11 concluídas): `src.nerv` ✅, `scripts.health` ✅, `src.missions` ✅,
+`src.shared` ✅, `src.orchestrator` ✅, `src.integration` ✅, `tools.workspace` ✅, `src.kernel` ✅.
 
 > **Cascata**: as correções das Fases A e B geraram reduções massivas nos lanes restantes:
-> `src.infra` 2.232→716 (−68%), `src.kernel` 1.530→359 (−77%), `src.agent` 1.190→447,
+> `src.infra` 2.232→716 (−68%), `src.kernel` 1.530→**0** ✅ (−100%), `src.agent` 1.190→447,
 > `tools.workspace` 1.013→**0** ✅.
 
-**Próximo passo**: Fase B — `src.kernel` (359) → `src.agent` (447) →
-`src.core` (464). `scripts.root` ✅ zerada.
+**Próximo passo**: Fase B — `src.agent` (447) → `src.core` (464) → `scripts.audit` (928).
+`scripts.root` ✅ e `src.kernel` ✅ zeradas.
 
 **Dependência nova instalada**: `@types/better-sqlite3` (devDependencies) — resolve TS7016 em
 `src/infra/db/sqlite.js`.
@@ -64,38 +64,38 @@ concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gate
 
 ## Baseline por lane strict
 
-| Lane                    | Erros | Fase     | Status      |
-| ----------------------- | ----: | -------- | ----------- |
-| `src.types`             |     0 | ✅ verde  | Manter      |
-| `agents`                |     0 | ✅ verde  | Manter      |
-| `scripts.ci`            |     0 | ✅ verde  | Manter      |
-| `scripts.setup`         |     0 | ✅ verde  | Manter      |
-| `tests.helpers`         |     0 | ✅ verde  | Manter      |
-| `scripts.build`         |     0 | ✅ verde  | Manter      |
-| `scripts.env`           |     0 | ✅ verde  | Manter      |
-| `src.validation`        |     0 | ✅ verde  | Manter      |
-| `tests.mocks`           |     0 | ✅ verde  | Manter      |
-| `src.logic`             |     0 | ✅ verde  | Manter      |
-| `scripts.analysis`      |     0 | ✅ verde  | Manter      |
-| `src.inference_gateway` |     0 | ✅ verde  | Manter      |
-| `src.dashboard-ui`      |     0 | ✅ verde  | Manter      |
-| `tests.manual`          |     0 | ✅ verde  | Manter      |
-| `src.audit_agent`       |     0 | ✅ verde  | Manter      |
-| `src.nerv`              |     0 | ✅ verde  | Manter      |
-| `scripts.health`        |     0 | ✅ verde  | Manter      |
-| `src.missions`          |     0 | ✅ verde  | Manter      |
-| `src.shared`            |     0 | ✅ verde  | Manter      |
-| `src.orchestrator`      |     0 | ✅ verde  | Manter      |
-| `src.integration`       |     0 | ✅ verde  | Manter      |
-| `tools.workspace`       |     0 | ✅ Done   | ↓ era 1.013 |
+| Lane                    | Erros | Fase     | Status                   |
+| ----------------------- | ----: | -------- | ------------------------ |
+| `src.types`             |     0 | ✅ verde  | Manter                   |
+| `agents`                |     0 | ✅ verde  | Manter                   |
+| `scripts.ci`            |     0 | ✅ verde  | Manter                   |
+| `scripts.setup`         |     0 | ✅ verde  | Manter                   |
+| `tests.helpers`         |     0 | ✅ verde  | Manter                   |
+| `scripts.build`         |     0 | ✅ verde  | Manter                   |
+| `scripts.env`           |     0 | ✅ verde  | Manter                   |
+| `src.validation`        |     0 | ✅ verde  | Manter                   |
+| `tests.mocks`           |     0 | ✅ verde  | Manter                   |
+| `src.logic`             |     0 | ✅ verde  | Manter                   |
+| `scripts.analysis`      |     0 | ✅ verde  | Manter                   |
+| `src.inference_gateway` |     0 | ✅ verde  | Manter                   |
+| `src.dashboard-ui`      |     0 | ✅ verde  | Manter                   |
+| `tests.manual`          |     0 | ✅ verde  | Manter                   |
+| `src.audit_agent`       |     0 | ✅ verde  | Manter                   |
+| `src.nerv`              |     0 | ✅ verde  | Manter                   |
+| `scripts.health`        |     0 | ✅ verde  | Manter                   |
+| `src.missions`          |     0 | ✅ verde  | Manter                   |
+| `src.shared`            |     0 | ✅ verde  | Manter                   |
+| `src.orchestrator`      |     0 | ✅ verde  | Manter                   |
+| `src.integration`       |     0 | ✅ verde  | Manter                   |
+| `tools.workspace`       |     0 | ✅ Done   | ↓ era 1.013              |
 | `scripts.root`          |     0 | ✅ Done   | ↓ era 935, zerada Fase B |
-| `src.kernel`            |   359 | Fase B/C | ↓ era 1.530 |
-| `src.agent`             |   447 | Fase B   | ↓ era 1.190 |
-| `src.core`              |   464 | Fase B   | ↓ era 1.053 |
-| `tests.legacy`          |   481 | Fase C   | ↓ era 1.403 |
-| `src.infra`             |   716 | Fase C   | ↓ era 2.232 |
-| `src.driver`            |   810 | Fase C   | ↓ era 1.558 |
-| `scripts.audit`         |   928 | Fase B   | —           |
+| `src.kernel`            |     0 | ✅ Done   | ↓ era 1.530              |
+| `src.agent`             |   447 | Fase B   | ↓ era 1.190              |
+| `src.core`              |   464 | Fase B   | ↓ era 1.053              |
+| `tests.legacy`          |   481 | Fase C   | ↓ era 1.403              |
+| `src.infra`             |   716 | Fase C   | ↓ era 2.232              |
+| `src.driver`            |   810 | Fase C   | ↓ era 1.558              |
+| `scripts.audit`         |   928 | Fase B   | —                        |
 
 ---
 
@@ -163,8 +163,8 @@ Objectivo: zerar 11 lanes. Após Fase A, cascatas de TS2339 já terão reduzido.
 - [x] `src.integration`: 924 → 0 ✅
 - [x] `tools.workspace`: **8** → 0 ✅ (era 1.013!)
 - [x] `scripts.root`: **357** → 0 ✅ (era 935! instalado @types/ws)
-- [ ] `src.kernel`: **359** → 0 ← próximo (era 1.530, promovido de Fase C)
-- [ ] `src.agent`: **447** → 0 ← (era 1.190)
+- [x] `src.kernel`: **359** → 0 ✅ (era 1.530, promovido de Fase C)
+- [ ] `src.agent`: **447** → 0 ← próximo (era 1.190)
 - [ ] `src.core`: **464** → 0 ← (era 1.053)
 - [ ] `scripts.audit`: 928 → 0
 

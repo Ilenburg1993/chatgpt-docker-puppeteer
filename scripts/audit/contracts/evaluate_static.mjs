@@ -291,7 +291,7 @@ function resolveAllowlistedFiles(contract, allowlists) {
  */
 /**
  * @param {EvaluateStaticContractsOptions} options
-  * @returns {object}
+ * @returns {object}
  */
 export function evaluateStaticContracts(options) {
     const rootDir = path.resolve(options.rootDir);

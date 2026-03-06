@@ -383,7 +383,7 @@ class TaskRuntime extends EventEmitter {
      * @returns {boolean}
      */
     _isTransitionAllowed(from, to) {
-        return (/** @type {any} */ (ALLOWED_TRANSITIONS))[from]?.includes(to) ?? false;
+        return /** @type {any} */ (ALLOWED_TRANSITIONS)[from]?.includes(to) ?? false;
     }
 
     /**

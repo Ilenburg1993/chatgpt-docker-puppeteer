@@ -263,17 +263,19 @@ class KernelNERVBridge {
         }
         // Extract actionCode from payload if present
         const actionCode = (payload && payload.actionCode) || ActionCode.KERNEL_INTERNAL_ERROR;
-        const targetRole = target ? (/** @type {any} */ (ActorRole))[target.toUpperCase()] || null : null;
+        const targetRole = target ? /** @type {any} */ (ActorRole)[target.toUpperCase()] || null : null;
 
         try {
-            const envelope = /** @type {any} */ (await HighLevelNERV.sendCommand(
-                this.nerv,
-                ActorRole.KERNEL,
-                actionCode,
-                payload,
-                correlationId,
-                targetRole
-            )); // ✅ P1-4: Added await
+            const envelope = /** @type {any} */ (
+                await HighLevelNERV.sendCommand(
+                    this.nerv,
+                    ActorRole.KERNEL,
+                    actionCode,
+                    payload,
+                    correlationId,
+                    targetRole
+                )
+            ); // ✅ P1-4: Added await
             const msgId = envelope && envelope.causality && envelope.causality.msg_id;
 
             this.telemetry.info('nerv_bridge_command_emitted', {
@@ -310,17 +312,19 @@ class KernelNERVBridge {
 
         // Extrair actionCode do payload (ou usar genérico)
         const actionCode = payload.actionCode || ActionCode.KERNEL_TELEMETRY;
-        const targetRole = target ? (/** @type {any} */ (ActorRole))[target.toUpperCase()] || null : null;
+        const targetRole = target ? /** @type {any} */ (ActorRole)[target.toUpperCase()] || null : null;
 
         try {
-            const envelope = /** @type {any} */ (await HighLevelNERV.sendEvent(
-                this.nerv,
-                ActorRole.KERNEL,
-                actionCode,
-                payload,
-                correlationId,
-                targetRole
-            )); // ✅ P1-4: Added await
+            const envelope = /** @type {any} */ (
+                await HighLevelNERV.sendEvent(
+                    this.nerv,
+                    ActorRole.KERNEL,
+                    actionCode,
+                    payload,
+                    correlationId,
+                    targetRole
+                )
+            ); // ✅ P1-4: Added await
             const msgId = envelope && envelope.causality && envelope.causality.msg_id;
 
             this.telemetry.info('nerv_bridge_event_emitted', {

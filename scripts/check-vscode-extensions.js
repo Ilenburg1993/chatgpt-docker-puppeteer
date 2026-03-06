@@ -45,7 +45,9 @@ function main() {
         const unwanted = config.unwantedRecommendations || [];
 
         // Calcular estatísticas
-        const installedCount = recommended.filter((/** @type {string} */ ext) => installed.includes(ext.toLowerCase())).length;
+        const installedCount = recommended.filter((/** @type {string} */ ext) =>
+            installed.includes(ext.toLowerCase())
+        ).length;
 
         const missingCount = recommended.length - installedCount;
         const percentage = Math.round((installedCount / recommended.length) * 100);

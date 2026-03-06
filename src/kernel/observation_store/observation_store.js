@@ -233,7 +233,11 @@ class ObservationStore extends EventEmitter {
         for (const [timestamp, correlationId] of this.temporalIndex) {
             if (timestamp >= startAt && timestamp <= endAt) {
                 const observations = this.getByCorrelation(correlationId);
-                results.push(...observations.filter((/** @type {any} */ obs) => obs.ingestedAt >= startAt && obs.ingestedAt <= endAt));
+                results.push(
+                    ...observations.filter(
+                        (/** @type {any} */ obs) => obs.ingestedAt >= startAt && obs.ingestedAt <= endAt
+                    )
+                );
             }
         }
 
