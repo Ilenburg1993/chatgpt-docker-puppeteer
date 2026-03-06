@@ -1,6 +1,6 @@
 # Roadmap de Execução — Tipagem e JSDoc
 
-> **Última revisão**: 4 de março de 2026 **Branch ativa**: `feat/typing-fullstrict-roadmap` **PR
+> **Última revisão**: 6 de março de 2026 **Branch ativa**: `feat/typing-fullstrict-roadmap` **PR
 > ativa**: <https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/pull/99>
 >
 > Este é o documento operacional de execução. As regras normativas vivem em
@@ -11,29 +11,29 @@
 
 ---
 
-## Estado geral — 5 de março de 2026 (Fase B: 8/11 concluídas)
+## Estado geral — 6 de março de 2026 (Fase C em andamento)
 
 | Indicador                     | Antes     | Agora         |
 | ----------------------------- | --------- | ------------- |
 | Arquivos com `// @ts-check`   | **670**   | **670**       |
 | `@ts-nocheck` em código real  | **0** ✅   | **0** ✅       |
-| Erros `typecheck:node` (base) | ~2.170    | **2.120**     |
-| Erros `typecheck:strict:all`  | ~7.414    | **~3.900** ↓  |
-| Lanes com 0 erros             | 11 de 30+ | **24 de 30+** |
+| Erros `typecheck:node` (base) | ~2.170    | **~1.800**    |
+| Erros `typecheck:strict:all`  | ~7.414    | **~720** ↓    |
+| Lanes com 0 erros             | 11 de 30+ | **28 de 30+** |
 
 **Fase 0 concluída**: 214 erros JSDoc estruturais (TS8032=177, TS8024=37) eliminados. **Fase A
 concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gateway` ✅,
 `src.audit_agent` ✅, `src.dashboard-ui` ✅, `tests.manual` ✅.
 
-**Fase B em andamento** (8/11 concluídas): `src.nerv` ✅, `scripts.health` ✅, `src.missions` ✅,
-`src.shared` ✅, `src.orchestrator` ✅, `src.integration` ✅, `tools.workspace` ✅, `src.kernel` ✅.
+**Fase B concluída (11/11)**: `src.nerv` ✅, `scripts.health` ✅, `src.missions` ✅, `src.shared` ✅,
+`src.orchestrator` ✅, `src.integration` ✅, `tools.workspace` ✅, `scripts.root` ✅, `src.kernel` ✅,
+`src.agent` ✅, `src.core` ✅, `scripts.audit` ✅.
 
-> **Cascata**: as correções das Fases A e B geraram reduções massivas nos lanes restantes:
-> `src.infra` 2.232→716 (−68%), `src.kernel` 1.530→**0** ✅ (−100%), `src.agent` 1.190→447,
-> `tools.workspace` 1.013→**0** ✅.
+**Fase C em andamento**: `src.infra` ✅ **zerado** (484→0), restam `src.driver` (431) e
+`tests.legacy` (289).
 
-**Próximo passo**: Fase B — `src.agent` (447) → `src.core` (464) → `scripts.audit` (928).
-`scripts.root` ✅ e `src.kernel` ✅ zeradas.
+> **Cascata total**: Fases A+B+C zerou 28 lanes. Apenas `src.driver` e `tests.legacy` restam antes
+> da Fase D (flags noImplicitAny, strictNullChecks, strict:true).
 
 **Dependência nova instalada**: `@types/better-sqlite3` (devDependencies) — resolve TS7016 em
 `src/infra/db/sqlite.js`.
@@ -88,14 +88,14 @@ concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gate
 | `src.orchestrator`      |     0 | ✅ verde | Manter                   |
 | `src.integration`       |     0 | ✅ verde | Manter                   |
 | `tools.workspace`       |     0 | ✅ Done  | ↓ era 1.013              |
-| `scripts.root`          |     0 | ✅ Done  | ↓ era 935, zerada Fase B |
+| `scripts.root`          |     0 | ✅ Done  | ↓ era 935                |
 | `src.kernel`            |     0 | ✅ Done  | ↓ era 1.530              |
-| `src.agent`             |   447 | Fase B  | ↓ era 1.190              |
-| `src.core`              |   464 | Fase B  | ↓ era 1.053              |
-| `tests.legacy`          |   481 | Fase C  | ↓ era 1.403              |
-| `src.infra`             |   716 | Fase C  | ↓ era 2.232              |
-| `src.driver`            |   810 | Fase C  | ↓ era 1.558              |
-| `scripts.audit`         |   928 | Fase B  | —                        |
+| `src.agent`             |     0 | ✅ Done  | ↓ era 1.190              |
+| `src.core`              |     0 | ✅ Done  | ↓ era 1.053              |
+| `scripts.audit`         |     0 | ✅ Done  | ↓ era 928                |
+| `src.infra`             |     0 | ✅ Done  | ↓ era 2.232              |
+| `src.driver`            |   431 | Fase C  | ↓ era 1.558              |
+| `tests.legacy`          |   289 | Fase C  | ↓ era 1.403              |
 
 ---
 
@@ -164,9 +164,9 @@ Objectivo: zerar 11 lanes. Após Fase A, cascatas de TS2339 já terão reduzido.
 - [x] `tools.workspace`: **8** → 0 ✅ (era 1.013!)
 - [x] `scripts.root`: **357** → 0 ✅ (era 935! instalado @types/ws)
 - [x] `src.kernel`: **359** → 0 ✅ (era 1.530, promovido de Fase C)
-- [ ] `src.agent`: **447** → 0 ← próximo (era 1.190)
-- [ ] `src.core`: **464** → 0 ← (era 1.053)
-- [ ] `scripts.audit`: 928 → 0
+- [x] `src.agent`: **447** → 0 ✅
+- [x] `src.core`: **464** → 0 ✅
+- [x] `scripts.audit`: 928 → 0 ✅
 
 ---
 
@@ -190,9 +190,9 @@ src.kernel.
 3. `src/infra/queue/*.js` — TaskRecord, QueueEntry
 4. `src/infra/storage/*.js`, `locks/*.js`, `fs/*.js`
 
-- [ ] `src.infra`: 716 → 0 (↓ era 2.232)
-- [ ] `src.driver`: 810 → 0 (↓ era 1.558)
-- [ ] `tests.legacy`: 481 → 0 (↓ era 1.403)
+- [x] `src.infra`: 716 → 0 ✅ (↓ era 2.232)
+- [ ] `src.driver`: **431** → 0 ← próximo
+- [ ] `tests.legacy`: **289** → 0
 
 ---
 
