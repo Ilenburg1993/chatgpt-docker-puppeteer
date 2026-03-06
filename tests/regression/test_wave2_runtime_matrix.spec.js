@@ -46,7 +46,7 @@ test('wave2: shutdown does not call process.exit by default', async () => {
     };
 
     try {
-        const result = await shutdown({}, { exitOnComplete: false });
+        const result = await shutdown(/** @type {any} */ ({}), /** @type {any} */ ({ exitOnComplete: false }));
         assert.equal(result.ok, true);
         assert.equal(exitCalls, 0);
     } finally {

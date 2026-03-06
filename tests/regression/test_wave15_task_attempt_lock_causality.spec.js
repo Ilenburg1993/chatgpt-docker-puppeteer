@@ -66,7 +66,7 @@ test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando inf
         nowMs: now,
         lockTtlMs: 60000,
     });
-    assert.ok(claimed?.task, 'task deve ser claimada para testar lock release');
+    assert.ok(/** @type {any} */ (claimed)?.task, 'task deve ser claimada para testar lock release');
 
     updateTask(taskId, {
         latest_attempt_id: 'attempt-current',
@@ -80,7 +80,7 @@ test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando inf
     });
     assert.equal(skipped, 0, 'unlock com attempt stale deve ser ignorado');
 
-    const stillLocked = db.prepare('SELECT locked_by FROM tasks WHERE id = ?').get(taskId);
+    const stillLocked = /** @type {any} */ (db.prepare('SELECT locked_by FROM tasks WHERE id = ?').get(taskId));
     assert.equal(stillLocked?.locked_by, 'worker-wave15', 'lock deve permanecer ativo após unlock stale');
 
     const released = releaseTaskLock({
@@ -90,7 +90,9 @@ test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando inf
     });
     assert.equal(released, 1, 'unlock com attempt corrente deve liberar lock');
 
-    const unlockedRow = db.prepare('SELECT locked_by, lock_expires_at_ms FROM tasks WHERE id = ?').get(taskId);
+    const unlockedRow = /** @type {any} */ (
+        db.prepare('SELECT locked_by, lock_expires_at_ms FROM tasks WHERE id = ?').get(taskId)
+    );
     assert.equal(unlockedRow?.locked_by, null);
     assert.equal(unlockedRow?.lock_expires_at_ms, null);
 });

@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import * as lifecycle from '#server/engine/lifecycle';
 
-async function waitForOutput(getOutput, matcher, timeoutMs = 10000) {
+async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ matcher, timeoutMs = 10000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         const output = getOutput();

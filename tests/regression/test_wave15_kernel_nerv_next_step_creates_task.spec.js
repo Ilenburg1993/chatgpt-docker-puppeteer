@@ -121,9 +121,11 @@ test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplica√ß√
     await bridge._handleNextStepAction(parentTask, nextStep, null, correlationId);
     await bridge._handleNextStepAction(parentTask, nextStep, null, correlationId);
 
-    const row = db
-        .prepare('SELECT id, parent_id, mission_id, workflow_id, stage, status FROM tasks WHERE id = ?')
-        .get(expected.childId);
+    const row = /** @type {any} */ (
+        db
+            .prepare('SELECT id, parent_id, mission_id, workflow_id, stage, status FROM tasks WHERE id = ?')
+            .get(expected.childId)
+    );
     assert.ok(row, 'task filha deve existir');
     assert.equal(row.parent_id, parentTask.meta.id);
     assert.equal(row.mission_id, parentTask.meta.mission_id);
@@ -131,14 +133,17 @@ test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplica√ß√
     assert.equal(row.stage, 'READY');
     assert.equal(row.status, 'PENDING');
 
-    const countTasks = db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE id = ?').get(expected.childId)?.c || 0;
+    const countTasks =
+        /** @type {any} */ (db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE id = ?').get(expected.childId))?.c || 0;
     assert.equal(countTasks, 1, 'reprocessamento n√£o deve duplicar task filha');
 
     const eventCount =
-        db
-            .prepare(
-                "SELECT COUNT(1) AS c FROM events WHERE entity_id = ? AND event_type = 'TASK_ORCHESTRATION_NEXT_STEP_CREATED'"
-            )
-            .get(parentTask.meta.id)?.c || 0;
+        /** @type {any} */ (
+            db
+                .prepare(
+                    "SELECT COUNT(1) AS c FROM events WHERE entity_id = ? AND event_type = 'TASK_ORCHESTRATION_NEXT_STEP_CREATED'"
+                )
+                .get(parentTask.meta.id)
+        )?.c || 0;
     assert.equal(eventCount, 1, 'evento de next-step deve ser idempotente por dedupKey');
 });

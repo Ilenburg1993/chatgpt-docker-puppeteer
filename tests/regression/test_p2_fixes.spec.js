@@ -10,14 +10,14 @@ import { HandleManager } from '#driver/modules/handle_manager';
 
 /**
  * Função exportada: testShutdownPhaseIsolation.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testShutdownPhaseIsolation() {
     console.log('\n=== TEST 1: Shutdown - Isolamento de Erros ===');
 
     try {
         // Mock de shutdown function (baseado em src/main.js)
-        async function mockShutdown(context) {
+        async function mockShutdown(/** @type {any} */ context) {
             const phases = [];
             let failedPhases = 0;
 
@@ -70,7 +70,7 @@ async function testShutdownPhaseIsolation() {
                 try {
                     await phase.fn();
                     phases.push({ name: phase.name, status: 'SUCCESS' });
-                } catch (error) {
+                } catch (/** @type {any} */ error) {
                     failedPhases++;
                     phases.push({ name: phase.name, status: 'FAILED', error: error.message });
                 }
@@ -124,7 +124,7 @@ async function testShutdownPhaseIsolation() {
 
         console.log('✅ TEST 1 PASSOU: Isolamento de erros implementado corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 1 FALHOU:', error.message);
         return false;
     }
@@ -136,7 +136,7 @@ async function testShutdownPhaseIsolation() {
 
 /**
  * Função exportada: testHandleManagerAbort.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testHandleManagerAbort() {
     console.log('\n=== TEST 2: HandleManager - AbortController ===');
@@ -198,7 +198,7 @@ async function testHandleManagerAbort() {
 
         console.log('✅ TEST 2 PASSOU: AbortController funcionando corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 2 FALHOU:', error.message);
         return false;
     }
@@ -210,7 +210,7 @@ async function testHandleManagerAbort() {
 
 /**
  * Função exportada: testHandleManagerComplete.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testHandleManagerComplete() {
     console.log('\n=== TEST 3: HandleManager - Cleanup Completo ===');
@@ -260,7 +260,7 @@ async function testHandleManagerComplete() {
 
         console.log('✅ TEST 3 PASSOU: Cleanup completo sem abort\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 3 FALHOU:', error.message);
         return false;
     }
@@ -272,7 +272,7 @@ async function testHandleManagerComplete() {
 
 /**
  * Função exportada: testHandleManagerWithErrors.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testHandleManagerWithErrors() {
     console.log('\n=== TEST 4: HandleManager - Handles com Erros Individuais ===');
@@ -328,7 +328,7 @@ async function testHandleManagerWithErrors() {
 
         console.log('✅ TEST 4 PASSOU: Erros individuais não travam cleanup\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 4 FALHOU:', error.message);
         return false;
     }
@@ -340,7 +340,7 @@ async function testHandleManagerWithErrors() {
 
 /**
  * Função exportada: testCodeValidation.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testCodeValidation() {
     console.log('\n=== TEST 5: Validação de Código Modificado ===');
@@ -396,7 +396,7 @@ async function testCodeValidation() {
 
         console.log('✅ TEST 5 PASSOU: Código validado\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 5 FALHOU:', error.message);
         return false;
     }
@@ -408,7 +408,7 @@ async function testCodeValidation() {
 
 /**
  * Função exportada: runAllTests.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -429,7 +429,7 @@ async function runAllTests() {
         try {
             const passed = await test.fn();
             results.push({ name: test.name, passed });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error(`💥 Exceção em ${test.name}:`, error);
             results.push({ name: test.name, passed: false });
         }

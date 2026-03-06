@@ -12,11 +12,11 @@ const registryStub = {
     register() {},
 };
 
-function captureCounts(events) {
-    return Object.fromEntries(events.map(event => [event, process.listenerCount(event)]));
+function captureCounts(/** @type {any} */ events) {
+    return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
 }
 
-function assertCountsEqual(actual, expected, messagePrefix) {
+function assertCountsEqual(/** @type {any} */ actual, /** @type {any} */ expected, /** @type {any} */ messagePrefix) {
     for (const [event, expectedCount] of Object.entries(expected)) {
         assert.equal(actual[event], expectedCount, `${messagePrefix}: listener count mismatch for ${event}`);
     }

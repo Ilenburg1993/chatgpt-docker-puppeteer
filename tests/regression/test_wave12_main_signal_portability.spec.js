@@ -22,7 +22,7 @@ test('wave12: setupSignalHandlers tolerates unsupported SIGUSR2 and SIGHUP', () 
 
     try {
         assert.doesNotThrow(() => {
-            __mainTestHooks.setupSignalHandlers({});
+            __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
         }, 'setupSignalHandlers should not throw when optional signals are unsupported');
 
         const handlers = __mainTestHooks.getSignalHandlers();

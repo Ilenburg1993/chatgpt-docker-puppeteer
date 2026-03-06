@@ -9,7 +9,7 @@ import { shutdown as shutdownDriverFactory } from '#driver/factory';
 
 const ROOT = process.cwd();
 
-async function read(relPath) {
+async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(ROOT, relPath), 'utf8');
 }
 
@@ -78,14 +78,14 @@ test('wave11: shutdown delegates HTTP teardown to server lifecycle when managed'
         serverLifecycleManaged: true,
         httpAuthority: true,
         httpServer: {
-            close(cb) {
+            close(/** @type {any} */ cb) {
                 httpCloseCalls++;
                 cb();
             },
         },
     };
 
-    const result = await shutdown(context, { exitOnComplete: false });
+    const result = await shutdown(/** @type {any} */ (context), /** @type {any} */ ({ exitOnComplete: false }));
 
     assert.equal(result.ok, true, 'shutdown should finish successfully with managed lifecycle');
     assert.equal(serverAdapterShutdownCalls, 1, 'server adapter must shutdown once');

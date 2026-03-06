@@ -9,11 +9,11 @@ import {
     setAllowProcessExit,
 } from '#server/engine/lifecycle';
 
-function captureCounts(events) {
-    return Object.fromEntries(events.map(event => [event, process.listenerCount(event)]));
+function captureCounts(/** @type {any} */ events) {
+    return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
 }
 
-function assertCountsEqual(actual, expected, messagePrefix) {
+function assertCountsEqual(/** @type {any} */ actual, /** @type {any} */ expected, /** @type {any} */ messagePrefix) {
     for (const [event, expectedCount] of Object.entries(expected)) {
         assert.equal(actual[event], expectedCount, `${messagePrefix}: listener count mismatch for ${event}`);
     }
@@ -130,10 +130,10 @@ test('wave10: optional subprocess handlers do not arm shutdown state', () => {
     const handlers = __lifecycleTestHooks.getSignalHandlers();
 
     if (typeof handlers.sigpipe === 'function') {
-        handlers.sigpipe();
+        /** @type {any} */ (handlers).sigpipe();
     }
     if (typeof handlers.sigchld === 'function') {
-        handlers.sigchld();
+        /** @type {any} */ (handlers).sigchld();
     }
 
     assert.equal(

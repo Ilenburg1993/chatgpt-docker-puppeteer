@@ -12,16 +12,16 @@ const colors = {
     cyan: '\x1b[36m',
 };
 
-function log(type, message) {
+function log(/** @type {any} */ type, /** @type {any} */ message) {
     const prefix = type === 'SUCCESS' ? '✅' : type === 'FAIL' ? '❌' : '>';
     console.log(`${prefix} ${message}`);
 }
 
-function header(text) {
+function header(/** @type {any} */ text) {
     console.log(`\n${colors.cyan}=== ${text} ===${colors.reset}`);
 }
 
-function summary(text) {
+function summary(/** @type {any} */ text) {
     console.log(`\n${colors.blue}╔══════════════════════════════════════════════════════════════╗`);
     console.log(`║${text.padEnd(62)}║`);
     console.log(`╚══════════════════════════════════════════════════════════════╝${colors.reset}`);
@@ -284,7 +284,7 @@ async function test6_ConcurrentSignals() {
     let _shutdownInProgress = false;
     let shutdownCalls = 0;
 
-    const gracefulShutdown = async signal => {
+    const gracefulShutdown = async (/** @type {any} */ signal) => {
         if (_shutdownInProgress) {
             log('INFO', `${signal} ignorado (guard funcionou)`);
             return false;
@@ -320,7 +320,7 @@ async function test6_ConcurrentSignals() {
         { name: 'Apenas 1 shutdown executou', pass: shutdownCalls === 1 },
         { name: '1 chamada retornou true', pass: successCalls === 1 },
         { name: '4 chamadas bloqueadas', pass: blockedCalls === 4 },
-        { name: 'Flag ativada', pass: _shutdownInProgress === true },
+        { name: 'Flag ativada', pass: /** @type {boolean} */ (_shutdownInProgress) === true },
     ];
 
     const allPassed = checks.every(c => c.pass);
@@ -347,7 +347,7 @@ async function test7_OptimisticLock() {
         state: 'ACTIVE',
     };
 
-    const applyTransition = (expectedState, newState) => {
+    const applyTransition = (/** @type {any} */ expectedState, /** @type {any} */ newState) => {
         // Simula validação (delay)
         const actualState = task.state;
 
@@ -365,7 +365,7 @@ async function test7_OptimisticLock() {
     try {
         const result = applyTransition('ACTIVE', 'COMPLETED');
         log('SUCCESS', 'Transição bem-sucedida');
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         log('FAIL', `Erro inesperado: ${e.message}`);
         return false;
     }
@@ -382,7 +382,7 @@ async function test7_OptimisticLock() {
         applyTransition(expectedState, 'ACTIVE');
         log('FAIL', 'Race NÃO detectada (deveria falhar)');
         return false;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         if (e.message.includes('[RACE]')) {
             log('SUCCESS', `Race detectada corretamente: ${e.message}`);
         } else {

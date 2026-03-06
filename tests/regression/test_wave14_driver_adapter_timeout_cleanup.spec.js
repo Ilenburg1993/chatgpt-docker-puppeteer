@@ -37,8 +37,8 @@ test('wave14: _withTimeout returns TimeoutError metadata on timeout', async () =
     await assert.rejects(
         () => DriverNERVAdapter.prototype._withTimeout.call(adapterLike, new Promise(() => {}), 20, 'unit-timeout'),
         err => {
-            assert.equal(err?.name, 'TimeoutError');
-            assert.equal(err?.operation, 'unit-timeout');
+            assert.equal((/** @type {any} */ (err))?.name, 'TimeoutError');
+            assert.equal((/** @type {any} */ (err))?.operation, 'unit-timeout');
             return true;
         }
     );

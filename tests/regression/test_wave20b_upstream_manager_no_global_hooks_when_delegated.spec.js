@@ -11,8 +11,8 @@ const registryStub = {
     register() {},
 };
 
-function captureCounts(events) {
-    return Object.fromEntries(events.map(event => [event, process.listenerCount(event)]));
+function captureCounts(/** @type {any} */ events) {
+    return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
 }
 
 test('wave20b: registerUpstreams com installShutdownHook=false não instala listeners globais', async () => {

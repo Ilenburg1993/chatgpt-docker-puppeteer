@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 
-async function waitForOutput(getOutput, matcher, timeoutMs = 15000) {
+async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ matcher, timeoutMs = 15000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         const output = getOutput();

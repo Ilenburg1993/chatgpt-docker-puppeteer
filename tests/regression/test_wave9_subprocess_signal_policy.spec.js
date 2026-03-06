@@ -7,17 +7,17 @@ import { once } from 'node:events';
 import { __mainTestHooks } from '../../src/main.js';
 import { shutdown as shutdownDriverFactory } from '../../src/driver/factory.js';
 
-function captureCounts(events) {
-    return Object.fromEntries(events.map(event => [event, process.listenerCount(event)]));
+function captureCounts(/** @type {any} */ events) {
+    return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
 }
 
-function assertCountsEqual(actual, expected, messagePrefix) {
+function assertCountsEqual(/** @type {any} */ actual, /** @type {any} */ expected, /** @type {any} */ messagePrefix) {
     for (const [event, expectedCount] of Object.entries(expected)) {
         assert.equal(actual[event], expectedCount, `${messagePrefix}: listener count mismatch for ${event}`);
     }
 }
 
-async function waitForOutput(getOutput, matcher, timeoutMs = 15000) {
+async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ matcher, timeoutMs = 15000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         const output = getOutput();
@@ -29,7 +29,11 @@ async function waitForOutput(getOutput, matcher, timeoutMs = 15000) {
     throw new Error(`Timeout waiting for output: ${String(matcher)}`);
 }
 
-async function waitForExitWithTimeout(child, timeoutMs, timeoutMessage) {
+async function waitForExitWithTimeout(
+    /** @type {any} */ child,
+    /** @type {any} */ timeoutMs,
+    /** @type {any} */ timeoutMessage
+) {
     let timeoutId = null;
     try {
         return await Promise.race([
@@ -60,7 +64,7 @@ test('wave9: SIGPIPE/SIGCHLD optional policy is explicit, non-shutdown, and clea
     const before = captureCounts(events);
 
     try {
-        __mainTestHooks.setupSignalHandlers({});
+        __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
         const handlers = __mainTestHooks.getSignalHandlers();
         const afterSetup = captureCounts(events);
 
@@ -72,14 +76,14 @@ test('wave9: SIGPIPE/SIGCHLD optional policy is explicit, non-shutdown, and clea
         } else {
             if (typeof handlers.sigpipe === 'function') {
                 assert.equal(afterSetup.SIGPIPE, before.SIGPIPE + 1, 'SIGPIPE should be installed on POSIX');
-                handlers.sigpipe();
+                /** @type {any} */ (handlers).sigpipe();
             } else {
                 assert.equal(afterSetup.SIGPIPE, before.SIGPIPE, 'SIGPIPE count should stay stable when unsupported');
             }
 
             if (typeof handlers.sigchld === 'function') {
                 assert.equal(afterSetup.SIGCHLD, before.SIGCHLD + 1, 'SIGCHLD should be installed on POSIX');
-                handlers.sigchld();
+                /** @type {any} */ (handlers).sigchld();
             } else {
                 assert.equal(afterSetup.SIGCHLD, before.SIGCHLD, 'SIGCHLD count should stay stable when unsupported');
             }
@@ -129,7 +133,7 @@ test(
                     });
             };
 
-            __mainTestHooks.setupSignalHandlers({});
+            __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
             console.log('W9_READY');
 
             setTimeout(() => console.log('W9_STILL_ALIVE'), 300);

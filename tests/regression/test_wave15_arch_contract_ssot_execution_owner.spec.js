@@ -10,7 +10,7 @@ test('wave15: contrato de ownership SSOT de dispatch está registrado em archite
     const parsed = JSON.parse(content);
 
     const contract = Array.isArray(parsed?.contracts)
-        ? parsed.contracts.find(item => item?.id === 'CONTRACT-ARCH-SSOT-EXECUTION-OWNER')
+        ? parsed.contracts.find((/** @type {any} */ item) => item?.id === 'CONTRACT-ARCH-SSOT-EXECUTION-OWNER')
         : null;
 
     assert.ok(contract, 'contrato CONTRACT-ARCH-SSOT-EXECUTION-OWNER deve existir');

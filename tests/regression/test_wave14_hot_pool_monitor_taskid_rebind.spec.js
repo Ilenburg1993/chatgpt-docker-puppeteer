@@ -29,7 +29,7 @@ test('wave14: updatePageTaskId rebinds lifecycle monitor taskId on hot-reuse', (
     let reboundTo = null;
     const monitor = {
         cleanup: () => {},
-        rebindTaskId: nextTaskId => {
+        rebindTaskId: (/** @type {any} */ nextTaskId) => {
             reboundTo = nextTaskId;
         },
     };
@@ -72,10 +72,10 @@ test('wave14: removePageFromPool supports fallback by page reference when taskId
 
 test('wave14: lifecycle monitor uses rebound taskId on close/disconnect cleanup', () => {
     const page = new EventEmitter();
-    const removals = [];
+    const removals = /** @type {any[]} */ ([]);
     const poolManager = {
         stats: {},
-        removePageFromPool: (...args) => {
+        removePageFromPool: (/** @type {any[]} */ ...args) => {
             removals.push(args);
         },
     };

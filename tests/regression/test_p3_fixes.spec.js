@@ -13,17 +13,17 @@ const colors = {
     cyan: '\x1b[36m',
 };
 
-function log(type, message) {
+function log(/** @type {any} */ type, /** @type {any} */ message) {
     const timestamp = new Date().toISOString();
     const prefix = type === 'SUCCESS' ? '✅' : type === 'FAIL' ? '❌' : '>';
     console.log(`${prefix} ${message}`);
 }
 
-function header(text) {
+function header(/** @type {any} */ text) {
     console.log(`\n${colors.cyan}=== ${text} ===${colors.reset}`);
 }
 
-function summary(text) {
+function summary(/** @type {any} */ text) {
     console.log(`\n${colors.blue}╔══════════════════════════════════════════════════════════════╗`);
     console.log(`║${text.padEnd(62)}║`);
     console.log(`╚══════════════════════════════════════════════════════════════╝${colors.reset}`);
@@ -32,14 +32,16 @@ function summary(text) {
 // ============================================================================
 // Mock: system.js com killProcess simulando delay
 // ============================================================================
-function createMockSystem(delayMs) {
+function createMockSystem(/** @type {any} */ delayMs) {
     return {
-        killProcess: pid => {
-            return new Promise(resolve => {
-                setTimeout(() => {
-                    resolve();
-                }, delayMs);
-            });
+        killProcess: (/** @type {any} */ pid) => {
+            return /** @type {Promise<void>} */ (
+                new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve();
+                    }, delayMs);
+                })
+            );
         },
     };
 }
@@ -48,12 +50,12 @@ function createMockSystem(delayMs) {
 // Mock: RecoverySystem com system injetável
 // ============================================================================
 class MockRecoverySystem {
-    constructor(driver, systemModule) {
+    constructor(/** @type {any} */ driver, /** @type {any} */ systemModule) {
         this.driver = driver;
         this.system = systemModule;
     }
 
-    async applyTier3Kill(pid, correlationId) {
+    async applyTier3Kill(/** @type {any} */ pid, /** @type {any} */ correlationId) {
         // Simulação da lógica Tier 3 com timeout
         const KILL_TIMEOUT_MS = 5000;
 
@@ -65,7 +67,7 @@ class MockRecoverySystem {
                 }),
             ]);
             return { status: 'SUCCESS', timedOut: false };
-        } catch (killErr) {
+        } catch (/** @type {any} */ killErr) {
             if (killErr.message === 'KILL_TIMEOUT') {
                 return { status: 'TIMEOUT', timedOut: true };
             }

@@ -60,25 +60,27 @@ test('wave17: atualização stale (current_task_id divergente) é rejeitada sem 
         started_at_ms: now,
     });
 
-    const result = updateMissionProgressState({
-        missionId,
-        progress: {
-            current_task_id: null,
-            current_step_index: 2,
-        },
-        expectedProgress: {
-            currentTaskId: 'task-stale',
-            currentStepIndex: 1,
-        },
-        actorType: 'system',
-        dedupKey: `mission:${missionId}:stale-test`,
-    });
+    const result = updateMissionProgressState(
+        /** @type {any} */ ({
+            missionId,
+            progress: {
+                current_task_id: null,
+                current_step_index: 2,
+            },
+            expectedProgress: {
+                currentTaskId: 'task-stale',
+                currentStepIndex: 1,
+            },
+            actorType: 'system',
+            dedupKey: `mission:${missionId}:stale-test`,
+        })
+    );
 
     assert.equal(result.ok, false);
     assert.equal(result.statusCode, 423);
     assert.equal(result.code, 'MISSION_LOCKED');
 
-    const missionAfter = getMissionById(missionId);
+    const missionAfter = /** @type {any} */ (getMissionById(missionId));
     assert.equal(missionAfter.context?.progress?.current_task_id, 'task-live');
     assert.equal(Number(missionAfter.context?.progress?.current_step_index || 0), 1);
 

@@ -12,7 +12,7 @@ const LOCK_DIR = ROOT;
 
 /**
  * Função exportada: testLockTwoPhaseCommit.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testLockTwoPhaseCommit() {
     console.log('\n=== TEST 1: Lock Manager - Two-Phase Commit ===');
@@ -59,7 +59,7 @@ async function testLockTwoPhaseCommit() {
 
         console.log('✅ TEST 1 PASSOU: Two-Phase Commit funcionando corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 1 FALHOU:', error.message);
 
         // Cleanup em caso de erro
@@ -75,7 +75,7 @@ async function testLockTwoPhaseCommit() {
 
 /**
  * Função exportada: testLockConcurrency.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testLockConcurrency() {
     console.log('\n=== TEST 2: Lock Manager - Concorrência (10 tentativas simultâneas) ===');
@@ -112,14 +112,14 @@ async function testLockConcurrency() {
             return false;
         }
 
-        console.log(`✅ Apenas ${winner.taskId} adquiriu lock (atomicidade garantida)`);
+        console.log(`✅ Apenas ${winner?.taskId} adquiriu lock (atomicidade garantida)`);
 
         // Cleanup
         await releaseLock(target);
 
         console.log('✅ TEST 2 PASSOU: Concorrência tratada corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 2 FALHOU:', error.message);
 
         // Cleanup em caso de erro
@@ -135,7 +135,7 @@ async function testLockConcurrency() {
 
 /**
  * Função exportada: testLockNoTempOrphans.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testLockNoTempOrphans() {
     console.log('\n=== TEST 3: Lock Manager - Sem arquivos .tmp órfãos ===');
@@ -167,7 +167,7 @@ async function testLockNoTempOrphans() {
         console.log('✅ Nenhum arquivo .tmp órfão encontrado');
         console.log('✅ TEST 3 PASSOU: Cleanup de temp files funcionando\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 3 FALHOU:', error.message);
         return false;
     }
@@ -179,7 +179,7 @@ async function testLockNoTempOrphans() {
 
 /**
  * Função exportada: testBrowserPoolMemoization.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testBrowserPoolMemoization() {
     console.log('\n=== TEST 4: BrowserPool - Promise Memoization ===');
@@ -252,7 +252,7 @@ async function testBrowserPoolMemoization() {
         console.log('✅ Retornou imediatamente (já inicializado)');
         console.log('✅ TEST 4 PASSOU: Promise Memoization implementado corretamente\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 4 FALHOU:', error.message);
         return false;
     }
@@ -264,7 +264,7 @@ async function testBrowserPoolMemoization() {
 
 /**
  * Função exportada: testIntegrationValidation.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function testIntegrationValidation() {
     console.log('\n=== TEST 5: Validação de Integração ===');
@@ -329,7 +329,7 @@ async function testIntegrationValidation() {
 
         console.log('✅ TEST 5 PASSOU: Todos os arquivos validados\n');
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('❌ TEST 5 FALHOU:', error.message);
         return false;
     }
@@ -341,7 +341,7 @@ async function testIntegrationValidation() {
 
 /**
  * Função exportada: runAllTests.
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -362,7 +362,7 @@ async function runAllTests() {
         try {
             const passed = await test.fn();
             results.push({ name: test.name, passed });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error(`💥 Exceção em ${test.name}:`, error);
             results.push({ name: test.name, passed: false });
         }

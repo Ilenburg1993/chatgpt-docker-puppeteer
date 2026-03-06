@@ -12,7 +12,7 @@ test('wave17: mission transitions usam serviço único (sem updateMission(status
     const missionRunner = await fs.readFile(path.join(process.cwd(), 'src/agent/mission_runner.js'), 'utf8');
 
     const statusMutationPattern = /updateMission\s*\([^)]*$/gm;
-    const hasStatusMutation = content => {
+    const hasStatusMutation = (/** @type {any} */ content) => {
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i += 1) {
             if (!statusMutationPattern.test(lines[i])) {

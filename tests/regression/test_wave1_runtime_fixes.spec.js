@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 
-async function read(relPath) {
+async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(ROOT, relPath), 'utf8');
 }
 

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-async function read(relPath) {
+async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(process.cwd(), relPath), 'utf8');
 }
 

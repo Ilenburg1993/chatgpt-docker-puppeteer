@@ -7,17 +7,17 @@ import { once } from 'node:events';
 import { __mainTestHooks } from '../../src/main.js';
 import { shutdown as shutdownDriverFactory } from '../../src/driver/factory.js';
 
-function captureCounts(events) {
-    return Object.fromEntries(events.map(event => [event, process.listenerCount(event)]));
+function captureCounts(/** @type {any} */ events) {
+    return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
 }
 
-function assertCountsEqual(actual, expected, messagePrefix) {
+function assertCountsEqual(/** @type {any} */ actual, /** @type {any} */ expected, /** @type {any} */ messagePrefix) {
     for (const [event, expectedCount] of Object.entries(expected)) {
         assert.equal(actual[event], expectedCount, `${messagePrefix}: listener count mismatch for ${event}`);
     }
 }
 
-async function waitForOutput(getOutput, matcher, timeoutMs = 15000) {
+async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ matcher, timeoutMs = 15000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
         const output = getOutput();
@@ -29,7 +29,11 @@ async function waitForOutput(getOutput, matcher, timeoutMs = 15000) {
     throw new Error(`Timeout waiting for output: ${String(matcher)}`);
 }
 
-async function waitForExitWithTimeout(child, timeoutMs, timeoutMessage) {
+async function waitForExitWithTimeout(
+    /** @type {any} */ child,
+    /** @type {any} */ timeoutMs,
+    /** @type {any} */ timeoutMessage
+) {
     let timeoutId = null;
     try {
         return await Promise.race([
@@ -60,7 +64,7 @@ test('wave8: optional signal policy registers only platform-specific listener an
     const before = captureCounts(events);
 
     try {
-        __mainTestHooks.setupSignalHandlers({});
+        __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
         const afterSetup = captureCounts(events);
 
         assert.equal(afterSetup.SIGTERM, before.SIGTERM + 1, 'SIGTERM listener should be registered');
@@ -92,7 +96,7 @@ test('wave8: cleanupSignalHandlers remains idempotent with optional signals', ()
 
     const before = captureCounts(events);
 
-    __mainTestHooks.setupSignalHandlers({});
+    __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
     __mainTestHooks.cleanupSignalHandlers();
     __mainTestHooks.cleanupSignalHandlers();
     __mainTestHooks.resetShutdownState();
@@ -131,7 +135,7 @@ test(
                     });
             };
 
-            __mainTestHooks.setupSignalHandlers({});
+            __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
             console.log('W8_SIGQUIT_READY');
         `;
 

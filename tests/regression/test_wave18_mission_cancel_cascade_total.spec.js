@@ -19,7 +19,7 @@ function makeDbPath() {
     );
 }
 
-function makeTask(id, missionId, userMessage) {
+function makeTask(/** @type {any} */ id, /** @type {any} */ missionId, /** @type {any} */ userMessage) {
     return schemas.core.TaskSchemaV5.parse({
         meta: {
             id,
@@ -58,7 +58,7 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t 
         DELETE FROM missions;
     `);
 
-    const mission = createMission({ title: 'Wave18 Cascade', description: 'test' });
+    const mission = /** @type {any} */ (createMission({ title: 'Wave18 Cascade', description: 'test' }));
     updateMission(mission.id, { status: 'RUNNING' });
 
     insertTask(makeTask('task-wave18-cascade-1', mission.id, 'pending'), {
@@ -77,11 +77,15 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t 
         actor: 'test',
     });
 
-    const result = cancelMissionCommand({
-        missionId: mission.id,
-        reason: 'Teste de cancelamento em cascata',
-        actor: { id: 'tester', username: 'tester', role: 'owner' },
-    });
+    const result = /** @type {any} */ (
+        cancelMissionCommand(
+            /** @type {any} */ ({
+                missionId: mission.id,
+                reason: 'Teste de cancelamento em cascata',
+                actor: { id: 'tester', username: 'tester', role: 'owner' },
+            })
+        )
+    );
 
     const after = getMissionById(mission.id);
     const rows = db.prepare('SELECT id, status FROM tasks WHERE mission_id = ? ORDER BY id').all(mission.id);
@@ -89,7 +93,7 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t 
     assert.equal(result.after.status, 'CANCELLED');
     assert.equal(after?.status, 'CANCELLED');
 
-    const byId = new Map(rows.map(r => [String(r.id), String(r.status)]));
+    const byId = new Map(rows.map((/** @type {any} */ r) => [String(r.id), String(r.status)]));
     assert.equal(byId.get('task-wave18-cascade-1'), 'CANCELLED');
     assert.equal(byId.get('task-wave18-cascade-2'), 'CANCELLED');
     assert.equal(byId.get('task-wave18-cascade-3'), 'DONE');

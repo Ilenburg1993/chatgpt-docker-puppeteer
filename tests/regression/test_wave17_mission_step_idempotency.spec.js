@@ -74,10 +74,10 @@ test('wave17: MissionRunner cria task de step com id determinístico e sem dupli
 
     let tasks = db.prepare('SELECT id FROM tasks WHERE mission_id = ? ORDER BY id ASC').all(missionId);
     assert.equal(tasks.length, 1);
-    const firstTaskId = String(tasks[0].id);
+    const firstTaskId = String(/** @type {any} */ (tasks[0]).id);
 
     // Simula restart/reprocessamento: missão volta a current_task_id=null no mesmo step.
-    const mission = getMissionById(missionId);
+    const mission = /** @type {any} */ (getMissionById(missionId));
     const resetProgress = {
         ...(mission.context?.progress || {}),
         current_step_index: 0,
@@ -95,7 +95,7 @@ test('wave17: MissionRunner cria task de step com id determinístico e sem dupli
     await runner._processMission(missionId);
     tasks = db.prepare('SELECT id FROM tasks WHERE mission_id = ? ORDER BY id ASC').all(missionId);
     assert.equal(tasks.length, 1);
-    assert.equal(String(tasks[0].id), firstTaskId);
+    assert.equal(String(/** @type {any} */ (tasks[0]).id), firstTaskId);
 
     t.after(() => {
         try {

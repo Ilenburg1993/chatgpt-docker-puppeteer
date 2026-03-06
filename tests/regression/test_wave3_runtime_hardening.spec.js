@@ -8,7 +8,7 @@ import { shutdown as shutdownDriverFactory } from '#driver/factory';
 
 const ROOT = process.cwd();
 
-async function read(relPath) {
+async function read(/** @type {any} */ relPath) {
     return fs.readFile(path.join(ROOT, relPath), 'utf8');
 }
 
@@ -34,9 +34,9 @@ test('wave3: adaptive state schema accepts string record keys', async () => {
 
 test('wave3: concurrent signals reuse the same shutdown promise and exit once', async t => {
     const originalExit = process.exit;
-    const exitCodes = [];
+    const exitCodes = /** @type {any[]} */ ([]);
 
-    process.exit = (code = 0) => {
+    /** @type {any} */ (process).exit = (code = 0) => {
         exitCodes.push(Number(code));
     };
 
@@ -50,14 +50,14 @@ test('wave3: concurrent signals reuse the same shutdown promise and exit once', 
         await shutdownDriverFactory();
     });
 
-    __mainTestHooks.setupSignalHandlers({});
+    __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
 
     const handlers = __mainTestHooks.getSignalHandlers();
     assert.equal(typeof handlers.sigterm, 'function');
     assert.equal(typeof handlers.sigint, 'function');
 
-    const p1 = handlers.sigterm();
-    const p2 = handlers.sigint();
+    const p1 = /** @type {any} */ (handlers).sigterm();
+    const p2 = /** @type {any} */ (handlers).sigint();
 
     assert.strictEqual(p1, p2, 'SIGINT/SIGTERM concorrentes devem compartilhar a mesma Promise de shutdown');
 
