@@ -8,7 +8,7 @@ import { asRecord } from '#types/guards';
 /**
  * @typedef {{
  *  ok: boolean,
- *  mission?: object,
+ *  mission?: any,
  *  statusCode?: number,
  *  code?: string,
  *  error?: string,
@@ -16,10 +16,12 @@ import { asRecord } from '#types/guards';
  * }} MissionTransitionResult
  */
 
+/** @param {any} missionId @returns {string} */
 function _asMissionId(missionId) {
     return String(missionId || '').trim();
 }
 
+/** @param {any} missionId @returns {any} */
 function _ensureMission(missionId) {
     const id = _asMissionId(missionId);
     if (!id) {
@@ -32,6 +34,7 @@ function _ensureMission(missionId) {
     return { ok: true, mission, missionId: id };
 }
 
+/** @param {{ mission: any, toStatus: any, allowedFrom: any }} arg0 @returns {any} */
 function _transitionConflict({ mission, toStatus, allowedFrom }) {
     const from = String(mission?.status || '').toUpperCase();
     const to = String(toStatus || '').toUpperCase();
@@ -60,6 +63,7 @@ function _transitionConflict({ mission, toStatus, allowedFrom }) {
     return null;
 }
 
+/** @param {any} baseContext @param {any} patchContext @param {any} [opts] @returns {any} */
 function _mergeMissionContext(baseContext, patchContext, { failureReason = null } = {}) {
     const context = baseContext && typeof baseContext === 'object' ? baseContext : {};
     const patch = patchContext && typeof patchContext === 'object' ? patchContext : {};
@@ -70,6 +74,9 @@ function _mergeMissionContext(baseContext, patchContext, { failureReason = null 
     };
 }
 
+/**
+ * @param {{ missionId: any, eventType: any, actorType?: any, actorId?: any, payload?: any, dedupKey?: any }} arg0
+ */
 function _recordMissionEvent({
     missionId,
     eventType,
@@ -88,11 +95,13 @@ function _recordMissionEvent({
             payload,
             dedupKey,
         });
-    } catch (err) {
+    } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         log('WARN', `[MissionExecutionService] Falha ao registrar evento ${eventType}: ${err?.message || String(err)}`);
     }
 }
 
+/** @param {any} mission @param {any} [expected] @returns {any} */
 function _verifyProgressPreconditions(mission, expected = {}) {
     const progress = mission?.context?.progress || {};
     if (expected.currentTaskId !== undefined && progress.current_task_id !== expected.currentTaskId) {
@@ -125,6 +134,7 @@ function _verifyProgressPreconditions(mission, expected = {}) {
     return null;
 }
 
+/** @param {any} taskMutation @param {any} nowMs */
 function _applyTaskMutation(taskMutation, nowMs) {
     if (typeof taskMutation !== 'function') {
         return;
@@ -138,19 +148,18 @@ function _applyTaskMutation(taskMutation, nowMs) {
  * @property {string} missionId
  * @property {string} toStatus
  * @property {string[]} allowedFrom
- * @property {number|null} startedAtMs
- * @property {number|null} completedAtMs
- * @property {Record<string} contextPatch
- * @property {string|null} failureReason
- * @property {{ currentTaskId?: string|null} expectedProgress
- * @property {number} currentStepIndex
- * @property {string} actorType
- * @property {string|null} actorId
+ * @property {number|null} [startedAtMs]
+ * @property {number|null} [completedAtMs]
+ * @property {Record<string, any>} [contextPatch]
+ * @property {string|null} [failureReason]
+ * @property {{ currentTaskId?: string|null }} [expectedProgress]
+ * @property {number} [currentStepIndex]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
  * @property {string} eventType
- * @property {string|null} dedupKey
- * @property {Record<string} payload
- * @property {((db: object} taskMutation
- * @property {number) => void)|null} nowMs
+ * @property {string|null} [dedupKey]
+ * @property {Record<string, any>} [payload]
+ * @property {((db: any, nowMs: number) => void)|null} [taskMutation]
  */
 /**
  * @param {TransitionMissionParams} params
@@ -161,7 +170,7 @@ function transitionMission(params) {
     const missionRef = _ensureMission(params.missionId);
     if (!missionRef.ok) return missionRef;
 
-    const { mission, missionId } = missionRef;
+    const { mission, missionId } = /** @type {any} */ (missionRef);
     const conflict = _transitionConflict({
         mission,
         toStatus: params.toStatus,
@@ -198,7 +207,8 @@ function transitionMission(params) {
             ...(params.completedAtMs !== undefined ? { completed_at_ms: params.completedAtMs } : {}),
         });
         _applyTaskMutation(params.taskMutation, now);
-    } catch (err) {
+    } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         if (err?.code === 'CONFLICT') {
             return {
                 ok: false,
@@ -237,15 +247,15 @@ function transitionMission(params) {
 /**
  * @typedef {object} UpdateMissionProgressStateParams
  * @property {string} missionId
- * @property {Record<string} progress
- * @property {Record<string} contextPatch
- * @property {{ currentTaskId?: string|null} expectedProgress
- * @property {number} currentStepIndex
+ * @property {Record<string, any>} [progress]
+ * @property {Record<string, any>} [contextPatch]
+ * @property {{ currentTaskId?: string|null }} [expectedProgress]
+ * @property {number} [currentStepIndex]
  * @property {string} actorType
  * @property {string|null} actorId
  * @property {string} eventType
- * @property {string|null} dedupKey
- * @property {Record<string} payload
+ * @property {string|null} [dedupKey]
+ * @property {Record<string, any>} [payload]
  */
 /**
  * Atualiza progresso/contexto da missão em caminho único de domínio.
@@ -256,7 +266,7 @@ function transitionMission(params) {
 function updateMissionProgressState(params) {
     const missionRef = _ensureMission(params.missionId);
     if (!missionRef.ok) return missionRef;
-    const { mission, missionId } = missionRef;
+    const { mission, missionId } = /** @type {any} */ (missionRef);
 
     const missionStatus = String(mission.status || '').toUpperCase();
     if (
@@ -303,7 +313,8 @@ function updateMissionProgressState(params) {
     let updated;
     try {
         updated = updateMission(missionId, { context: nextContext });
-    } catch (err) {
+    } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         if (err?.code === 'CONFLICT') {
             return {
                 ok: false,
@@ -344,7 +355,7 @@ function updateMissionProgressState(params) {
  */
 /**
  * Função exportada: executeMissionTransition.
- * @param {ExecuteMissionTransitionOptions} [options]
+ * @param {ExecuteMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
 function executeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
@@ -373,7 +384,7 @@ function executeMissionTransition({ missionId, actorType = 'user', actorId = nul
  */
 /**
  * Função exportada: pauseMissionTransition.
- * @param {PauseMissionTransitionOptions} [options]
+ * @param {PauseMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
 function pauseMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
@@ -412,7 +423,7 @@ function pauseMissionTransition({ missionId, actorType = 'user', actorId = null,
  */
 /**
  * Função exportada: resumeMissionTransition.
- * @param {ResumeMissionTransitionOptions} [options]
+ * @param {ResumeMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
 function resumeMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
@@ -454,7 +465,7 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
  */
 /**
  * Função exportada: cancelMissionTransition.
- * @param {CancelMissionTransitionOptions} [options]
+ * @param {CancelMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
 function cancelMissionTransition({ missionId, actorType = 'user', actorId = null, dedupKey = null, payload = {} }) {
@@ -497,7 +508,7 @@ function cancelMissionTransition({ missionId, actorType = 'user', actorId = null
  */
 /**
  * Função exportada: failMissionTransition.
- * @param {FailMissionTransitionOptions} [options]
+ * @param {FailMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
 function failMissionTransition({
@@ -538,7 +549,7 @@ function failMissionTransition({
  */
 /**
  * Função exportada: completeMissionTransition.
- * @param {CompleteMissionTransitionOptions} [options]
+ * @param {CompleteMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
 function completeMissionTransition({

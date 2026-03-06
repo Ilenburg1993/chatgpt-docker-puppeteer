@@ -17,14 +17,14 @@ import { log } from '#core/logger';
 /**
  * Opções do construtor do AgentLoop.
  * @typedef {object} AgentLoopOptions
- * @property {object} kernel - Instância do kernel com método step() (obrigatório).
- * @property {object} [browserPool=null] - Pool de browsers com circuit breaker.
- * @property {object} [queueWorker=null] - Worker da fila com método tick().
- * @property {object} [taskControlWatcher=null] - Watcher de controle de tarefas.
- * @property {object} [missionRunner=null] - Runner de missões.
- * @property {object} [missionPlannerProcessor=null] - Processador de planejamento.
- * @property {object} [attemptWatchdog=null] - Watchdog de tentativas.
- * @property {object} [taskOrchestrationWorker=null] - Worker de orquestração.
+ * @property {any} kernel - Instância do kernel com método step() (obrigatório).
+ * @property {any} [browserPool=null] - Pool de browsers com circuit breaker.
+ * @property {any} [queueWorker=null] - Worker da fila com método tick().
+ * @property {any} [taskControlWatcher=null] - Watcher de controle de tarefas.
+ * @property {any} [missionRunner=null] - Runner de missões.
+ * @property {any} [missionPlannerProcessor=null] - Processador de planejamento.
+ * @property {any} [attemptWatchdog=null] - Watchdog de tentativas.
+ * @property {any} [taskOrchestrationWorker=null] - Worker de orquestração.
  * @property {AgentLoopIntervals} [intervals={}] - Configuração de intervalos.
  * @property {number} [baseTickMs=25] - Intervalo base do loop principal em ms.
  */
@@ -166,7 +166,8 @@ class AgentLoop {
                 this._next.kernelAt = now + this.intervals.kernelMs;
                 try {
                     await this.kernel.step();
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('ERROR', `[AgentLoop] kernel.step failed: ${err?.message || String(err)}`);
                 }
             }
@@ -180,7 +181,8 @@ class AgentLoop {
                 this._next.controlAt = now + this.intervals.controlMs;
                 try {
                     await this.taskControlWatcher.tick();
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] taskControlWatcher.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -190,7 +192,8 @@ class AgentLoop {
                 this._next.watchdogAt = now + this.intervals.watchdogMs;
                 try {
                     await this.attemptWatchdog.tick();
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] attemptWatchdog.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -200,7 +203,8 @@ class AgentLoop {
                 this._next.queueAt = now + this.intervals.queueMs;
                 try {
                     await this.queueWorker.tick();
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] queueWorker.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -210,7 +214,8 @@ class AgentLoop {
                 this._next.missionAt = now + this.intervals.missionMs;
                 try {
                     await this.missionRunner.tick();
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] missionRunner.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -219,7 +224,8 @@ class AgentLoop {
                 this._next.plannerAt = now + this.intervals.plannerMs;
                 try {
                     await this.missionPlannerProcessor.tick();
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] missionPlannerProcessor.tick failed: ${err?.message || String(err)}`);
                 }
             }
@@ -229,7 +235,8 @@ class AgentLoop {
                 this._next.orchestrationAt = now + this.intervals.orchestrationMs;
                 try {
                     await this.taskOrchestrationWorker.tick();
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] taskOrchestrationWorker.tick failed: ${err?.message || String(err)}`);
                 }
             }

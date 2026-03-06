@@ -43,10 +43,17 @@ import crypto from 'node:crypto';
  * @property {number} [max_tasks_total] - Máximo de tarefas totais.
  */
 
+/**
+ * @param {any} ms
+ */
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * @param {any} obj
+ * @param {any} fallback
+ */
 function _safeJson(obj, fallback) {
     try {
         return structuredClone(obj);
@@ -55,6 +62,9 @@ function _safeJson(obj, fallback) {
     }
 }
 
+/**
+ * @param {any} input
+ */
 function _hashId(input) {
     return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
 }
@@ -120,7 +130,8 @@ class MissionRunner {
             for (const mission of missions) {
                 try {
                     await this._processMission(mission.id);
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
                         `[MissionRunner] mission ${mission.id} processing failed: ${err?.message || String(err)}`
@@ -184,7 +195,7 @@ class MissionRunner {
         // If there is an active task, wait for terminal status.
         if (progress.current_task_id) {
             const db = getDb();
-            const row = db.prepare('SELECT status FROM tasks WHERE id = ?').get(progress.current_task_id);
+            const row = /** @type {any} */ (db.prepare('SELECT status FROM tasks WHERE id = ?').get(progress.current_task_id));
             const status = row?.status || null;
 
             // BUG-MISSION-NULL-TASK: task deleted/purged — do not loop forever treating null as "in progress"
@@ -247,7 +258,7 @@ class MissionRunner {
                     current_step_index: Number(progress.current_step_index || 0) + 1,
                 };
 
-                const progressResult = updateMissionProgressState({
+                const progressResult = updateMissionProgressState(/** @type {any} */ ({
                     missionId,
                     progress: nextProgress,
                     expectedProgress: { currentTaskId: progress.current_task_id },
@@ -257,7 +268,7 @@ class MissionRunner {
                         task_id: progress.current_task_id,
                         task_status: status,
                     },
-                });
+                }));
                 if (!progressResult.ok) {
                     log(
                         'WARN',
@@ -389,7 +400,7 @@ class MissionRunner {
         });
 
         const db = getDb();
-        const existingTask = db.prepare('SELECT id FROM tasks WHERE id = ?').get(taskId);
+        const existingTask = /** @type {any} */ (db.prepare('SELECT id FROM tasks WHERE id = ?').get(taskId));
         insertTask(taskV5, { stage: TASK_STAGES.READY, status: 'PENDING', actor: 'system', ifNotExists: true });
 
         recordEvent({
@@ -421,7 +432,7 @@ class MissionRunner {
             },
         };
 
-        const progressResult = updateMissionProgressState({
+        const progressResult = updateMissionProgressState(/** @type {any} */ ({
             missionId,
             progress: nextProgress,
             expectedProgress: { currentTaskId: progress.current_task_id, currentStepIndex },
@@ -432,7 +443,7 @@ class MissionRunner {
                 step_id: stepId,
                 step_index: currentStepIndex,
             },
-        });
+        }));
         if (!progressResult.ok) {
             log('WARN', `[MissionRunner] step progress rejected: ${progressResult.code || progressResult.error}`);
         }

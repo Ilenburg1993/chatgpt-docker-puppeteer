@@ -129,7 +129,7 @@ function _toFullPath(root, rel) {
 /**
  * Internal: supports either sync or async repo implementations.
  * @param {string} artifactId
- * @returns {Promise<unknown|null>}
+ * @returns {Promise<any>}
  */
 async function _getArtifactRow(artifactId) {
     return await Promise.resolve(getArtifactById(artifactId));
@@ -145,13 +145,9 @@ async function _getArtifactRow(artifactId) {
  * @property {*} [computeSha256]
  */
 /**
- * @typedef {object} PutTextParams
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Writes a text artifact file and returns storage pointers/metadata (no DB write).
  *
- * @param {PutTextParams} [params]
+ * @param {any} [params]
  * @returns {Promise<PutArtifactResult>}
  */
 async function putText({ kind, text, relPath, ext = 'txt', mime = 'text/plain', computeSha256 = false } = {}) {
@@ -199,13 +195,9 @@ async function putText({ kind, text, relPath, ext = 'txt', mime = 'text/plain', 
  * @property {*} [computeSha256]
  */
 /**
- * @typedef {object} PutBufferParams
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Writes a binary artifact file and returns storage pointers/metadata (no DB write).
  *
- * @param {PutBufferParams} [params]
+ * @param {any} [params]
  * @returns {Promise<PutArtifactResult>}
  */
 async function putBuffer({
@@ -271,13 +263,9 @@ async function putBuffer({
  * @property {*} [computeSha256]
  */
 /**
- * @typedef {object} PutJsonParams
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Stores JSON data as an artifact (pretty-printed).
  *
- * @param {PutJsonParams} [params]
+ * @param {any} [params]
  * @returns {Promise<PutArtifactResult>}
  */
 async function putJson({ kind, json, relPath, ext = 'json', mime = 'application/json', computeSha256 = false } = {}) {
@@ -330,7 +318,8 @@ async function readText(artifactId) {
     if (!uri) return null;
     try {
         return await fs.readFile(uri, 'utf8');
-    } catch (err) {
+    } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         if (err.code === 'ENOENT' || err.code === 'EACCES') return null;
         throw err;
     }
@@ -346,7 +335,8 @@ async function readBuffer(artifactId) {
     if (!uri) return null;
     try {
         return await fs.readFile(uri);
-    } catch (err) {
+    } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         if (err.code === 'ENOENT' || err.code === 'EACCES') return null;
         throw err;
     }
@@ -393,9 +383,10 @@ async function deleteArtifact(artifactId) {
     if (row.storage_uri && _isUnderRoot(root, row.storage_uri)) {
         try {
             await fs.unlink(row.storage_uri);
-        } catch (err) {
-            if (err.code !== 'ENOENT') throw err;
-        }
+        } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
+        if (err.code !== 'ENOENT') throw err;
+    }
     }
 
     deleteArtifactById(artifactId);

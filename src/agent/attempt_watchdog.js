@@ -7,6 +7,7 @@ import { releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 import { sendCommand } from '#nerv/adapters/high_level_adapter';
 import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
+/** @param {any} ms */
 function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -112,7 +113,7 @@ class AttemptWatchdog {
             const acceptedCutoff = now - this.acceptedStuckMs;
             const runningCutoff = now - this.runningHeartbeatStuckMs;
 
-            const dispatchedRows = db
+            const dispatchedRows = /** @type {any[]} */ (db
                 .prepare(
                     `
                     SELECT t.id AS task_id,
@@ -133,9 +134,9 @@ class AttemptWatchdog {
                     LIMIT @limit
                 `
                 )
-                .all({ now, cutoff, limit: this.maxBatch });
+                .all({ now, cutoff, limit: this.maxBatch }));
 
-            const acceptedRows = db
+            const acceptedRows = /** @type {any[]} */ (db
                 .prepare(
                     `
                     SELECT t.id AS task_id,
@@ -159,9 +160,9 @@ class AttemptWatchdog {
                     LIMIT @limit
                 `
                 )
-                .all({ now, acceptedCutoff, limit: this.maxBatch });
+                .all({ now, acceptedCutoff, limit: this.maxBatch }));
 
-            const runningRows = db
+            const runningRows = /** @type {any[]} */ (db
                 .prepare(
                     `
                     SELECT t.id AS task_id,
@@ -184,7 +185,7 @@ class AttemptWatchdog {
                     LIMIT @limit
                 `
                 )
-                .all({ now, runningCutoff, limit: this.maxBatch });
+                .all({ now, runningCutoff, limit: this.maxBatch }));
 
             for (const row of dispatchedRows) {
                 const taskId = row?.task_id;
@@ -311,7 +312,8 @@ class AttemptWatchdog {
                             ActorRole.DRIVER
                         );
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
                         `[AttemptWatchdog] Failed to emit DRIVER_ABORT for ${taskId}: ${err?.message || String(err)}`,
@@ -357,7 +359,7 @@ class AttemptWatchdog {
                 const envCutoff = now - this.envEscalationWindowMs;
                 const llmCutoff = now - this.llmTimeoutEscalationWindowMs;
 
-                const envLongRows = db
+                const envLongRows = /** @type {any[]} */ (db
                     .prepare(
                         `
                         SELECT t.id AS task_id,
@@ -403,9 +405,9 @@ class AttemptWatchdog {
                         cutoff: envCutoff,
                         threshold: this.envEscalationThreshold,
                         limit: this.maxBatch,
-                    });
+                    }));
 
-                const llmTimeoutRows = db
+                const llmTimeoutRows = /** @type {any[]} */ (db
                     .prepare(
                         `
                         SELECT t.id AS task_id,
@@ -441,7 +443,7 @@ class AttemptWatchdog {
                         cutoff: llmCutoff,
                         threshold: this.llmTimeoutEscalationThreshold,
                         limit: this.maxBatch,
-                    });
+                    }));
 
                 for (const row of envLongRows) {
                     const taskId = row?.task_id;

@@ -11,7 +11,7 @@ function getCurrentAttemptIdForTask(taskId) {
     if (!taskId) return null;
     try {
         const db = getDb();
-        const row = db.prepare('SELECT latest_attempt_id, last_correlation_id FROM tasks WHERE id = ?').get(taskId);
+        const row = /** @type {any} */ (db.prepare('SELECT latest_attempt_id, last_correlation_id FROM tasks WHERE id = ?').get(taskId));
         return row?.latest_attempt_id ?? row?.last_correlation_id ?? null;
     } catch (_) {
         return null;
@@ -71,7 +71,7 @@ function evaluateAttemptInvariants({ taskId, attemptId = null }) {
  */
 /**
  * @param {EmitStaleAttemptIgnoredEventParams} params
-  * @returns {object}
+ * @returns {any}
  */
 function emitStaleAttemptIgnoredEvent({
     taskId,
@@ -108,7 +108,7 @@ function emitStaleAttemptIgnoredEvent({
  * @typedef {object} ReleaseTaskLockForAttemptParams
  * @property {string} taskId
  * @property {string|null} attemptId
- * @property {string|null} workerId
+ * @property {string|null} [workerId]
  * @property {string|null} actionCode
  * @property {string|null} correlationId
  * @property {string} context

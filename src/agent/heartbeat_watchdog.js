@@ -99,7 +99,7 @@ class HeartbeatWatchdog {
             const staleThreshold = now - this.staleThresholdMs;
 
             const db = getDb();
-            const staleAttempts = db
+            const staleAttempts = /** @type {any[]} */ (db
                 .prepare(
                     `
                     SELECT
@@ -120,7 +120,7 @@ class HeartbeatWatchdog {
                     LIMIT 50
                     `
                 )
-                .all({ threshold: staleThreshold });
+                .all({ threshold: staleThreshold }));
 
             if (staleAttempts.length === 0) return;
 
@@ -179,7 +179,8 @@ class HeartbeatWatchdog {
                         reason_code: 'HEARTBEAT_TIMEOUT',
                         cause_layer: 'WATCHDOG',
                     });
-                } catch (attemptErr) {
+                } catch (_rawAttemptErr) {
+                    const attemptErr = /** @type {any} */ (_rawAttemptErr);
                     log(
                         'WARN',
                         `[HeartbeatWatchdog] updateAttempt failed for ${attemptId}: ${attemptErr?.message || String(attemptErr)}`
@@ -196,7 +197,8 @@ class HeartbeatWatchdog {
                             execute_after_ms: now + 5000,
                             last_error: errorMsg,
                         });
-                    } catch (taskErr) {
+                    } catch (_rawTaskErr) {
+                        const taskErr = /** @type {any} */ (_rawTaskErr);
                         log(
                             'WARN',
                             `[HeartbeatWatchdog] updateTask failed for ${taskId}: ${taskErr?.message || String(taskErr)}`
@@ -205,7 +207,8 @@ class HeartbeatWatchdog {
 
                     try {
                         releaseTaskLock({ taskId });
-                    } catch (lockErr) {
+                    } catch (_rawLockErr) {
+                        const lockErr = /** @type {any} */ (_rawLockErr);
                         log(
                             'DEBUG',
                             `[HeartbeatWatchdog] lock release skipped for ${taskId}: ${lockErr?.message || String(lockErr)}`
@@ -218,7 +221,8 @@ class HeartbeatWatchdog {
                     `[HeartbeatWatchdog] Task ${taskId} rescheduled after heartbeat timeout (attempt ${attemptId})`
                 );
             }
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[HeartbeatWatchdog] tick failed: ${err?.message || String(err)}`);
         }
     }

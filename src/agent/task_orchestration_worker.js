@@ -21,8 +21,8 @@ import fs from 'node:fs/promises';
 /**
  * Options for `TaskOrchestrationWorker` constructor.
  * @typedef {object} WorkerOptions
- * @property {unknown} [browserPool] - Browser pool instance used for circuit-breaker checks.
- * @property {string} [workerId] - Optional worker identifier.
+ * @property {any} [browserPool] - Browser pool instance used for circuit-breaker checks.
+ * @property {string|null} [workerId] - Optional worker identifier.
  * @property {number} [intervalMs] - Tick interval in milliseconds.
  * @property {number} [batchSize] - Maximum number of tasks to fetch per tick.
  * @property {number} [pausedRescheduleDelayMs] - Delay applied when dispatch is paused.
@@ -112,6 +112,7 @@ function _sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/** @param {any} value */
 function _safeJsonString(value) {
     try {
         return JSON.stringify(value ?? null);
@@ -124,6 +125,7 @@ function _now() {
     return Date.now();
 }
 
+/** @param {any} text @param {any} maxLen */
 function _truncate(text, maxLen) {
     const s = typeof text === 'string' ? text : String(text ?? '');
     if (!maxLen || maxLen <= 0) return '';
@@ -150,7 +152,7 @@ function _computeBackoffMs({ iteration = 1, minMs = 2000, maxMs = 120000 } = {})
  * ✅ P0-14: Retry logic para lidar com race entre putText() e read.
  * Sources checked: response_v2_json artifact, response_text artifact, legacy result_json storage file.
  * @private
- * @param {ReadAttemptOutputTextOptions} [opts]
+ * @param {any} [opts]
  * @returns {Promise<string>} Returns empty string when no output is available.
  */
 async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetries = 3, retryDelayMs = 50 } = {}) {
@@ -244,6 +246,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
     return '';
 }
 
+/** @param {any} value */
 function _ensureArray(value) {
     return Array.isArray(value) ? value : [];
 }
@@ -256,7 +259,7 @@ function _ensureArray(value) {
 /**
  * Add or replace an input object into an inputs array by matching `type` or `label`.
  * @private
- * @param {SetOrReplaceInputOptions} [opts]
+ * @param {any} [opts]
  * @returns {Array<object>}
  */
 function _setOrReplaceInput({ inputs, next } = {}) {
@@ -277,6 +280,7 @@ function _setOrReplaceInput({ inputs, next } = {}) {
     return filtered;
 }
 
+/** @param {any} task */
 function _workflowStateFromTask(task) {
     const ws = task?.state?.workflow_state;
     if (!ws || typeof ws !== 'object') {
@@ -394,7 +398,8 @@ class TaskOrchestrationWorker {
         try {
             updateTask(taskId, updates);
             return true;
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             if (err && err.name === 'OptimisticLockError') {
                 const msg = context
                     ? `[TaskOrchestrationWorker] ${context}: Task ${taskId} update conflict after retries`
@@ -417,20 +422,20 @@ class TaskOrchestrationWorker {
     /**
      * Check events table to see whether orchestration was already applied for a given task+attempt.
      * @private
-     * @param {{taskId?: unknown, attemptId?: unknown}} [opts]
+     * @param {{taskId?: any, attemptId?: unknown}} [opts]
      * @returns {boolean}
      */
     _hasAppliedOrchestration({ taskId, attemptId } = {}) {
         const db = getDb();
         const dedupKey = `task:${taskId}:orchestrated:${attemptId}`;
-        return Boolean(db.prepare('SELECT 1 AS ok FROM events WHERE dedup_key = ? LIMIT 1').get(dedupKey)?.ok);
+        return Boolean(/** @type {any} */ (db.prepare('SELECT 1 AS ok FROM events WHERE dedup_key = ? LIMIT 1').get(dedupKey))?.ok);
     }
 
     /**
      * Try to claim orchestration lock on a task row using ResilientLockManager.
      * ✅ P0-2.5: Usa ResilientLockManager para garantir cleanup automático em crash.
      * @private
-     * @param {{taskId?: unknown, nowMs?: number, lockTtlMs?: number}} [opts]
+     * @param {{taskId?: any, nowMs?: number, lockTtlMs?: number}} [opts]
      * @returns {Promise<boolean>} True when lock was acquired.
      */
     async _claimOrchestrationLock({ taskId, nowMs, lockTtlMs = 300000 } = {}) {
@@ -482,7 +487,7 @@ class TaskOrchestrationWorker {
         try {
             const db = getDb();
 
-            const rows = db
+            const rows = /** @type {any[]} */ (db
                 .prepare(
                     `
                     SELECT
@@ -498,7 +503,7 @@ class TaskOrchestrationWorker {
                     LIMIT ?
                 `
                 )
-                .all(this.batchSize);
+                .all(this.batchSize));
 
             for (const row of rows) {
                 const taskId = row?.id;
@@ -531,7 +536,8 @@ class TaskOrchestrationWorker {
                                 });
                                 return true;
                             });
-                        } catch (extErr) {
+                        } catch (_rawExtErr) {
+                            const extErr = /** @type {any} */ (_rawExtErr);
                             log(
                                 'WARN',
                                 `[TaskOrchestrationWorker] lock extension failed for ${taskId}: ${extErr?.message || String(extErr)}`
@@ -555,7 +561,8 @@ class TaskOrchestrationWorker {
                     } finally {
                         clearInterval(lockExtensionInterval);
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
                         `[TaskOrchestrationWorker] task ${taskId} orchestration failed: ${err?.message || String(err)}`
@@ -581,6 +588,7 @@ class TaskOrchestrationWorker {
         }
     }
 
+    /** @param {any} row */
     async _processTaskRow(row) {
         const taskId = row.id;
         const attemptId = row.latest_attempt_id;
@@ -642,7 +650,7 @@ class TaskOrchestrationWorker {
     /**
      * Handle missing output for an attempt. If threshold exceeded inside window, blocks the task.
      * @private
-     * @param {{taskId?: unknown, attemptId?: unknown}} [opts]
+     * @param {{taskId?: any, attemptId?: any}} [opts]
      * @returns {Promise<boolean>} True if task was blocked due to missing output.
      */
     async _handleMissingOutput({ taskId, attemptId } = {}) {
@@ -665,7 +673,7 @@ class TaskOrchestrationWorker {
         const windowMs = Math.max(60000, Number(this.outputMissingEscalation?.windowMs || 600000) || 600000);
         const threshold = Math.max(1, Number(this.outputMissingEscalation?.threshold || 3) || 3);
 
-        const recent =
+        const recent = /** @type {any} */ (
             db
                 .prepare(
                     `
@@ -677,7 +685,7 @@ class TaskOrchestrationWorker {
                   AND ts_ms >= ?
             `
                 )
-                .get(taskId, now - windowMs)?.c || 0;
+                .get(taskId, now - windowMs))?.c || 0;
 
         if (Number(recent || 0) < threshold) {
             // First occurrences: keep it as-is; next tick may succeed once artifacts are persisted.
@@ -712,7 +720,7 @@ class TaskOrchestrationWorker {
     /**
      * Handle ITERATIVE orchestration: validate output, persist iteration_state, schedule retry or block.
      * @private
-     * @param {{taskId?: unknown, attemptId?: unknown, task?: unknown, outputText?: unknown}} [opts]
+     * @param {{taskId?: any, attemptId?: any, task?: any, outputText?: any}} [opts]
      * @returns {Promise<void>}
      */
     async _handleIterative({ taskId, attemptId, task, outputText } = {}) {
@@ -956,8 +964,8 @@ class TaskOrchestrationWorker {
     /**
      * Persist a human-readable feedback artifact and register it in the artifacts repo.
      * @private
-     * @param {{taskId?: unknown, attemptId?: unknown, validationResult?: unknown, outputPreview?: unknown}} [opts]
-     * @returns {Promise<void>} Artifact id returned by insertArtifact().
+     * @param {{taskId?: any, attemptId?: any, validationResult?: any, outputPreview?: any}} [opts]
+     * @returns {Promise<any>} Artifact id returned by insertArtifact().
      */
     async _persistFeedbackArtifact({ taskId, attemptId, validationResult, outputPreview } = {}) {
         const now = _now();
@@ -1018,7 +1026,7 @@ class TaskOrchestrationWorker {
     /**
      * Handle MULTI_STEP orchestration: update workflow_state, persist completed step and create child task for next step.
      * @private
-     * @param {{taskId?: unknown, attemptId?: unknown, task?: unknown, outputText?: unknown}} [opts]
+     * @param {{taskId?: any, attemptId?: any, task?: any, outputText?: any}} [opts]
      * @returns {Promise<void>}
      */
     async _handleMultiStep({ taskId, attemptId, task, outputText } = {}) {

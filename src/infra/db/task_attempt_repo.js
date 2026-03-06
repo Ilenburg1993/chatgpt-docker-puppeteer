@@ -112,8 +112,10 @@ function upsertAttempt(input) {
 }
 
 /**
- * @typedef {object} UpdateAttemptUpdates
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {Record<string, any>} TaskAttempt
+ */
+/**
+ * @typedef {Record<string, any>} UpdateAttemptUpdates
  */
 /**
  * Função exportada: updateAttempt.
@@ -126,9 +128,9 @@ function updateAttempt(attemptId, updates = {}) {
     const existing = db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId);
     if (!existing) return null;
 
-    const next = { ...existing, ...updates };
+    const next = /** @type {any} */ ({ .../** @type {any} */ (existing), ...updates });
     upsertAttempt(next);
-    return db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null;
+    return /** @type {TaskAttempt|null} */ (db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null);
 }
 
 /**
@@ -138,7 +140,7 @@ function updateAttempt(attemptId, updates = {}) {
  */
 function getAttemptById(attemptId) {
     const db = getDb();
-    return db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null;
+    return /** @type {TaskAttempt|null} */ (db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null);
 }
 
 /**
@@ -154,7 +156,7 @@ function getAttemptById(attemptId) {
 function listAttemptsByTask(taskId, { limit = 200 } = {}) {
     const db = getDb();
     const lim = Math.max(1, Math.min(Number(limit) || 200, 2000));
-    return db
+    return /** @type {TaskAttempt[]} */ (db
         .prepare(
             `
             SELECT *
@@ -164,7 +166,7 @@ function listAttemptsByTask(taskId, { limit = 200 } = {}) {
             LIMIT ?
         `
         )
-        .all(taskId, lim);
+        .all(taskId, lim));
 }
 
 export { upsertAttempt, updateAttempt, getAttemptById, listAttemptsByTask };

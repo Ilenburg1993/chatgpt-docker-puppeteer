@@ -25,6 +25,7 @@ import { asRecord } from '#types/guards';
 import fs from 'node:fs';
 import path from 'node:path';
 
+/** @param {any} payload @returns {any} */
 function _safeDelayMs(payload) {
     const raw =
         payload?.suggestedDelayMs ?? payload?.retryDelayMs ?? payload?.retry_delay_ms ?? payload?.delayMs ?? null;
@@ -32,6 +33,7 @@ function _safeDelayMs(payload) {
     return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+/** @param {any} taskId @returns {any} */
 function _storagePointers(taskId) {
     const artifactsRoot = path.resolve(
         process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || PATHS.ARTIFACTS
@@ -45,6 +47,7 @@ function _storagePointers(taskId) {
     };
 }
 
+/** @param {any} filePath @returns {string} */
 function _guessMime(filePath) {
     const ext = String(path.extname(filePath) || '').toLowerCase();
     if (ext === '.json') return 'application/json';
@@ -53,6 +56,7 @@ function _guessMime(filePath) {
     return 'text/plain';
 }
 
+/** @param {any} filePath @returns {number} */
 function _statSizeBytes(filePath) {
     try {
         const st = fs.statSync(filePath);
@@ -69,7 +73,7 @@ function _statSizeBytes(filePath) {
  */
 /**
  * @typedef {object} RegisterResponseArtifactsArg0
- * @property {Record<string} [storage]
+ * @property {Record<string, any>} [storage]
  * @property {string} [actor]
  */
 /**
@@ -121,7 +125,7 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
  */
 /**
  * @typedef {object} RegisterDiagnosticArtifactsArg0
- * @property {Record<string} [storage]
+ * @property {Record<string, any>} [storage]
  * @property {string} [actor]
  */
 /**
@@ -176,10 +180,11 @@ function _registerResponseArtifacts({ storage, actor = 'system' } = {}) {
     return ids;
 }
 
+/** @param {any} taskId @returns {any} */
 function _getMissionIdForTask(taskId) {
     try {
         const db = getDb();
-        const row = db.prepare('SELECT mission_id FROM tasks WHERE id = ?').get(taskId);
+        const row = /** @type {any} */ (db.prepare('SELECT mission_id FROM tasks WHERE id = ?').get(taskId));
         return row?.mission_id ?? null;
     } catch (_) {
         return null;
@@ -189,7 +194,7 @@ function _getMissionIdForTask(taskId) {
 /**
  * Opções do construtor do TaskStateProjector.
  * @typedef {object} TaskStateProjectorOptions
- * @property {object} nerv - Instância do sistema nerv com método onReceive.
+ * @property {any} nerv - Instância do sistema nerv com método onReceive.
  * @property {string|null} [workerId] - ID opcional do worker.
  */
 
@@ -231,7 +236,8 @@ class TaskStateProjector {
         try {
             updateTask(taskId, updates);
             return true;
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             if (err && err.name === 'OptimisticLockError') {
                 const msg = context
                     ? `[TaskStateProjector] ${context}: Task ${taskId} update conflict after retries`
@@ -257,10 +263,11 @@ class TaskStateProjector {
      */
     start() {
         if (this._unsub) return;
-        const maybeUnsub = this.nerv.onReceive(envelope => {
+        const maybeUnsub = this.nerv.onReceive((/** @type {any} */ envelope) => {
             try {
                 this._handleEnvelope(envelope);
-            } catch (err) {
+            } catch (_rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 log('ERROR', `[TaskStateProjector] handler error: ${err?.message || String(err)}`);
             }
         });
@@ -288,7 +295,7 @@ class TaskStateProjector {
     /**
      * Processa um envelope NERV, projetando estado de tarefa no SQLite se for evento suportado.
      * @private
-     * @param {object} envelope - Envelope NERV contendo mensagem.
+     * @param {any} envelope - Envelope NERV contendo mensagem.
      * @returns {void}
      * @sideEffects Modifica estado do banco de dados baseado no evento.
      */
@@ -379,7 +386,8 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (err) {
+            } catch (_rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[PROJECTOR] heartbeat/accepted attempt failed: ${err?.message || String(err)}`);
             }
 
@@ -390,7 +398,7 @@ class TaskStateProjector {
 
             extendTaskLock({
                 taskId,
-                workerId: null,
+                workerId: /** @type {any} */ (null),
                 nowMs: now,
                 lockTtlMs,
             });
@@ -425,7 +433,8 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (err) {
+            } catch (_rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[PROJECTOR] RUNNING attempt transition failed: ${err?.message || String(err)}`);
             }
 
@@ -433,7 +442,7 @@ class TaskStateProjector {
             try {
                 recordEvent({
                     entityType: 'attempt',
-                    entityId: attemptId,
+                    entityId: /** @type {any} */ (attemptId),
                     tsMs: now,
                     actorType: 'system',
                     eventType: 'ATTEMPT_STARTED',
@@ -452,7 +461,7 @@ class TaskStateProjector {
             // Extend lock while running to prevent re-claim due to TTL expiry.
             extendTaskLock({
                 taskId,
-                workerId: null,
+                workerId: /** @type {any} */ (null),
                 nowMs: now,
                 lockTtlMs: this.runningLockTtlMs,
             });
@@ -516,7 +525,8 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (err) {
+            } catch (_rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
                     `[PROJECTOR] Failed to register attempt for DRIVER_TASK_FAILED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
@@ -581,7 +591,8 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (err) {
+            } catch (_rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
                     `[PROJECTOR] CRITICAL: Failed to link artifacts for completed task (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
@@ -612,7 +623,7 @@ class TaskStateProjector {
             try {
                 recordEvent({
                     entityType: 'attempt',
-                    entityId: attemptId,
+                    entityId: /** @type {any} */ (attemptId),
                     tsMs: now,
                     actorType: 'system',
                     eventType: 'ATTEMPT_COMPLETED',
@@ -660,11 +671,12 @@ class TaskStateProjector {
             } else {
                 try {
                     const db = getDb();
-                    const row = db.prepare('SELECT status FROM tasks WHERE id = ?').get(taskId);
+                    const row = /** @type {any} */ (db.prepare('SELECT status FROM tasks WHERE id = ?').get(taskId));
                     if (row?.status === 'PAUSED') {
                         nextStatus = 'PAUSED';
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[PROJECTOR] ABORTED attempt registration failed: ${err?.message || String(err)}`);
                 }
             }
@@ -689,7 +701,8 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (err) {
+            } catch (_rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
                     `[PROJECTOR] Failed to register attempt for DRIVER_TASK_ABORTED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
@@ -763,7 +776,8 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
                         `[PROJECTOR] Failed to register attempt for duplicate dispatch (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
@@ -797,8 +811,8 @@ class TaskStateProjector {
                     if (attemptId) {
                         const reasonCode = payload.reason_code || payload.reasonCode || payload.reason || null;
                         const causeLayer = payload.cause_layer || payload.causeLayer || null;
-                        const diagStorage =
-                            payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null;
+                        const diagStorage = /** @type {any} */ (
+                            payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null);
                         const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
                         const diagJson = JSON.stringify(diagIds);
                         const summary = payloadDetails.diagnosis_summary || payloadDetails.diagnosisSummary || null;
@@ -816,7 +830,8 @@ class TaskStateProjector {
                             diagnosis_json: summaryJson,
                         });
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
                         `[PROJECTOR] Failed to register diagnostic artifacts for stale attempt (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
@@ -859,7 +874,7 @@ class TaskStateProjector {
             }
             const causeLayer = payload.cause_layer || payload.causeLayer || null;
 
-            const diagStorage = payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null;
+            const diagStorage = /** @type {any} */ (payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null);
             const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
             const diagJson = JSON.stringify(diagIds);
             const summary = payloadDetails.diagnosis_summary || payloadDetails.diagnosisSummary || null;
@@ -914,7 +929,8 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
                         `[PROJECTOR] Failed to register diagnostic artifacts for USER_ACTION_REQUIRED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
@@ -992,7 +1008,8 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
                         `[PROJECTOR] Failed to register diagnostic artifacts for ENV_UNAVAILABLE (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
@@ -1029,7 +1046,7 @@ class TaskStateProjector {
                 let currentAttempts;
                 try {
                     const db = getDb();
-                    const row = db.prepare('SELECT attempts, task_json FROM tasks WHERE id = ?').get(taskId);
+                    const row = /** @type {any} */ (db.prepare('SELECT attempts, task_json FROM tasks WHERE id = ?').get(taskId));
                     currentAttempts = Number(row?.attempts ?? 0) || 0;
                     try {
                         const taskJson = row?.task_json ? JSON.parse(row.task_json) : null;
@@ -1079,7 +1096,8 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
                         `[PROJECTOR] Failed to register diagnostic artifacts for TASK_ERROR (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
@@ -1213,7 +1231,8 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (err) {
+                } catch (_rawErr) {
+                    const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[PROJECTOR] diagnostic artifact registration failed: ${err?.message || String(err)}`);
                 }
 
@@ -1261,7 +1280,8 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (err) {
+            } catch (_rawErr) {
+                const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[PROJECTOR] attempt state update failed: ${err?.message || String(err)}`);
             }
             releaseTaskLockForAttempt({ taskId, attemptId, actionCode, correlationId, context: 'projector' });

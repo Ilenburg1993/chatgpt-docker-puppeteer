@@ -42,10 +42,12 @@ class TaskControlWatcher {
         this.abortMaxRetries = Math.max(0, Number.parseInt(process.env.TASK_CONTROL_ABORT_MAX_RETRIES || '2', 10) || 2);
     }
 
+    /** @param {any} ms */
     _sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    /** @param {any} promise @param {any} timeoutMs @param {any} operation */
     _withTimeout(promise, timeoutMs, operation) {
         return new Promise((resolve, reject) => {
             let settled = false;
@@ -74,6 +76,7 @@ class TaskControlWatcher {
         });
     }
 
+    /** @param {any} taskId @param {any} reason @param {any} correlationId */
     async _emitAbortCommand(taskId, reason, correlationId) {
         const totalAttempts = this.abortMaxRetries + 1;
         let lastError = null;
@@ -94,7 +97,8 @@ class TaskControlWatcher {
                 );
 
                 return { ok: true, attempt };
-            } catch (error) {
+            } catch (_rawErr) {
+                const error = /** @type {any} */ (_rawErr);
                 lastError = error;
                 log(
                     'WARN',
@@ -177,7 +181,7 @@ class TaskControlWatcher {
                 TaskControlWatcher.MIN_RECENT_WINDOW_MS,
                 this.intervalMs * TaskControlWatcher.INTERVAL_MULTIPLIER
             );
-            const rows = db
+            const rows = /** @type {any[]} */ (db
                 .prepare(
                     `
                     SELECT id, status, last_correlation_id, updated_at_ms, paused_at_ms, cancelled_at_ms
@@ -191,7 +195,7 @@ class TaskControlWatcher {
                     LIMIT 50
                 `
                 )
-                .all({ recentMs: now - RECENT_WINDOW_MS });
+                .all({ recentMs: now - RECENT_WINDOW_MS }));
 
             for (const row of rows) {
                 const taskId = row?.id;
@@ -231,7 +235,8 @@ class TaskControlWatcher {
                 try {
                     releaseTaskLock({ taskId });
                     lockReleased = true;
-                } catch (_) {
+                } catch (_rawErr) {
+                    const _ = /** @type {any} */ (_rawErr);
                     lockReleaseError = _?.message || String(_);
                 }
 

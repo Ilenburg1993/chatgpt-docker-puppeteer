@@ -2,6 +2,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './sqlite.js';
 
+/** @typedef {Record<string, any>} Mission */
+/** @typedef {Record<string, any>} UpdateMissionUpdates */
+
 /** Constante/valor exportado: MISSION_STATUS. */
 const MISSION_STATUS = Object.freeze({
     DRAFT: 'DRAFT',
@@ -25,6 +28,10 @@ function _now() {
     return Date.now();
 }
 
+/**
+ * @param {any} policy
+ * @returns {any}
+ */
 function _normalizePolicy(policy) {
     const base = {
         max_cost_usd_total: 10,
@@ -51,12 +58,12 @@ function _normalizePolicy(policy) {
  * @property {string} [title]
  * @property {string} [description]
  * @property {string} [autonomy_mode]
- * @property {Record<string} [policy]
- * @property {Record<string} [context]
+ * @property {Record<string, any>} [policy]
+ * @property {Record<string, any>} [context]
  */
 /**
- * @param {CreateMissionInput} input={}]
-  * @returns {Mission|null}
+ * @param {CreateMissionInput} [input]
+ * @returns {Mission|null}
  */
 function createMission({
     title,
@@ -117,10 +124,10 @@ function listMissions({ status = null, limit = 500 } = {}) {
         ORDER BY created_at_ms DESC
         LIMIT @limit
     `;
-    const rows = db.prepare(sql).all({
+    const rows = /** @type {any[]} */ (db.prepare(sql).all({
         status,
         limit: Math.max(1, Math.min(Number(limit) || 500, 5000)),
-    });
+    }));
     return rows.map(_rowToMission);
 }
 
@@ -135,6 +142,10 @@ function getMissionById(missionId) {
     return row ? _rowToMission(row) : null;
 }
 
+/**
+ * @param {any} row
+ * @returns {any}
+ */
 function _rowToMission(row) {
     // ✅ P1-20: Protect JSON.parse() from corrupted policy_json
     let policy = {};
@@ -176,10 +187,6 @@ function _rowToMission(row) {
 }
 
 /**
- * @typedef {object} UpdateMissionUpdates
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
  * Função exportada: updateMission.
  * @param {*} missionId
  * @param {UpdateMissionUpdates} [updates]
@@ -187,7 +194,7 @@ function _rowToMission(row) {
  */
 function updateMission(missionId, updates = {}) {
     const db = getDb();
-    const existing = db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId);
+    const existing = /** @type {any} */ (db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId));
     if (!existing) return null;
 
     const now = _now();
@@ -259,7 +266,7 @@ function updateMission(missionId, updates = {}) {
 /**
  * Função exportada: deleteMission.
  * @param {*} missionId
- * @returns {boolean}
+ * @returns {number}
  */
 function deleteMission(missionId) {
     const db = getDb();

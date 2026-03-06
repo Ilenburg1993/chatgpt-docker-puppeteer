@@ -132,8 +132,9 @@ function _shouldAutoApprove({ mission, proposalTags = [] } = {}) {
         return false;
     }
 
-    const requireApprovalForTags = Array.isArray(mission.policy?.require_user_approval_for_tags)
-        ? mission.policy.require_user_approval_for_tags.map(String)
+    const missionPolicy = /** @type {any} */ (mission?.policy);
+    const requireApprovalForTags = Array.isArray(missionPolicy?.require_user_approval_for_tags)
+        ? missionPolicy.require_user_approval_for_tags.map(String)
         : [];
 
     if (requireApprovalForTags.length > 0) {
@@ -200,7 +201,7 @@ class MissionPlannerProcessor {
 
         try {
             const db = getDb();
-            const rows = db
+            const rows = /** @type {any[]} */ (db
                 .prepare(
                     `
                     SELECT id, mission_id, task_json, result_json, latest_attempt_id, updated_at_ms
@@ -212,7 +213,7 @@ class MissionPlannerProcessor {
                     LIMIT 50
                 `
                 )
-                .all();
+                .all());
 
             for (const row of rows) {
                 const taskId = row?.id;
@@ -261,8 +262,7 @@ class MissionPlannerProcessor {
      * @returns {Promise<void>}
      */
     async _processPlannerResult({ missionId, taskId }) {
-        /** @type {Mission} */
-        const mission = getMissionById(missionId);
+        const mission = /** @type {any} */ (getMissionById(missionId));
         if (!mission) {
             return;
         }
@@ -271,7 +271,7 @@ class MissionPlannerProcessor {
         let text;
         try {
             const db = getDb();
-            const row = db.prepare('SELECT result_json FROM tasks WHERE id = ?').get(taskId);
+            const row = /** @type {any} */ (db.prepare('SELECT result_json FROM tasks WHERE id = ?').get(taskId));
             const resultJson = row?.result_json ? String(row.result_json) : '';
             let parsed = null;
             try {
@@ -314,7 +314,7 @@ class MissionPlannerProcessor {
         // Wrap count + inserts in a transaction to prevent budget overrun race
         const insertInTransaction = db.transaction(() => {
             const existingCount =
-                db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(missionId)?.c || 0;
+                (/** @type {any} */ (db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(missionId)))?.c || 0;
             let remaining = Math.max(0, maxTotal - existingCount);
             if (remaining <= 0) {
                 return;
@@ -329,7 +329,7 @@ class MissionPlannerProcessor {
                 const userMessage = typeof proposal?.user_message === 'string' ? proposal.user_message.trim() : '';
                 if (!userMessage) continue;
 
-                const proposalTags = Array.isArray(proposal?.tags) ? proposal.tags.map(t => String(t)) : [];
+                const proposalTags = Array.isArray(proposal?.tags) ? proposal.tags.map(String) : [];
 
                 const autoApprove = _shouldAutoApprove({ mission, proposalTags });
                 const stage = autoApprove ? TASK_STAGES.READY : TASK_STAGES.PROPOSED;
@@ -365,7 +365,7 @@ class MissionPlannerProcessor {
                     },
                     policy: {
                         dependencies: Array.isArray(proposal?.depends_on)
-                            ? proposal.depends_on.map(d => String(d))
+                            ? proposal.depends_on.map(String)
                             : [],
                         execute_after: null,
                     },
