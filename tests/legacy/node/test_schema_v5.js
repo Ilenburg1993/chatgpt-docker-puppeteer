@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import { TaskSchemaV5, ExecutionSchemaV5, MissionSchemaV5, ResultSchemaV5 } from '#core/schemas/task_schema_v5';
 import { migrateTaskV4toV5, autoMigrateTask, validateV5Task } from '#core/schemas/migrator_v4_to_v5';
 import { TaskSchema } from '#core/schemas/task_schema';

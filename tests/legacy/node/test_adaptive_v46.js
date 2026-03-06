@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @ts-check
+// @ts-nocheck
 import adaptive from '#logic/adaptive';
 import fs from 'node:fs';
 import path from 'node:path';

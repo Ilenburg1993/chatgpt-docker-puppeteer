@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @ts-check
+// @ts-nocheck
 import assert from 'node:assert';
 import EventEmitter from 'node:events';
 

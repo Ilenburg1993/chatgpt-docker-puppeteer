@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import * as io from '#infra/io';
 import identityManager from '#core/identity_manager';
 

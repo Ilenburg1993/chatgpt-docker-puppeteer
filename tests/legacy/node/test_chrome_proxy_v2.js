@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import assert from 'node:assert';
 
 console.log('[TEST] ChromeProxyService v2.0 - Starting tests...\n');

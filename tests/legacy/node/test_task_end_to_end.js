@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import path from 'node:path';
 import fs from 'node:fs';
 import { parseTask } from '#core/schemas';

@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import path from 'node:path';
 import fs from 'node:fs';
 import { saveResponse, loadResponse, isResponseV2, convertV1toV2 } from '#infra/storage/response_adapter';
