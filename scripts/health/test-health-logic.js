@@ -14,7 +14,6 @@ async function testHealthLogic() {
     console.log('📡 1. Chrome Health Logic');
     try {
         const doctor = await import('#core/doctor').then(m => (/** @type {any} */ (m)).default ?? m);
-        // @ts-ignore - resolveJsonModule not available in this tsconfig
         const config = await import('../config.json').then(m => (/** @type {any} */ (m)).default ?? m);
 
         const chrome = await doctor.probeChromeConnection();

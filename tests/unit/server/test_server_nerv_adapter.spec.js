@@ -4,9 +4,9 @@ import assert from 'node:assert';
 import sinon from 'sinon';
 
 describe('Server NERV Adapter - Integração Server-NERV', () => {
-    let adapter;
-    let mockNERV;
-    let mockIO;
+    /** @type {any} */ let adapter;
+    /** @type {any} */ let mockNERV;
+    /** @type {any} */ let mockIO;
 
     beforeEach(() => {
         mockNERV = {

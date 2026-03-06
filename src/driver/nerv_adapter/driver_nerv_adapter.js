@@ -1090,7 +1090,10 @@ class DriverNERVAdapter extends EventEmitter {
             if (this.performanceMetrics.totalTimes.length > 100) this.performanceMetrics.totalTimes.shift();
         }
 
-        const avg = (/** @type {number[]} */ arr) => (arr.length > 0 ? arr.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0) / arr.length : 0);
+        const avg = (/** @type {number[]} */ arr) =>
+            arr.length > 0
+                ? arr.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0) / arr.length
+                : 0;
 
         this.performanceMetrics.avgPoolAcquire = Math.round(avg(this.performanceMetrics.poolAcquireTimes));
         this.performanceMetrics.avgContextAttach = Math.round(avg(this.performanceMetrics.contextAttachTimes));
@@ -1586,9 +1589,11 @@ class DriverNERVAdapter extends EventEmitter {
 
         // 2) Stabilizer (fast signal: if the page is still “busy”, prefer reschedule)
         try {
-            const stability = /** @type {any} */ (await (
-                await import('#shared/page_stability/stabilizer')
-            ).waitForStability(driver, 10000, signal || null));
+            const stability = /** @type {any} */ (
+                await (
+                    await import('#shared/page_stability/stabilizer')
+                ).waitForStability(driver, 10000, signal || null)
+            );
             diagnosis.stability = {
                 success: Boolean(stability?.success),
                 timeout: Boolean(stability?.timeout),

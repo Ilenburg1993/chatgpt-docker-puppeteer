@@ -43,7 +43,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
     describe('2. Criação de Drivers', () => {
         it('deve criar instância de ChatGPT driver', () => {
             const factory = {
-                create: type => {
+                create: (/** @type {any} */ type) => {
                     if (type === 'chatgpt') {
                         return { type: 'chatgpt', initialized: true };
                     }
@@ -58,7 +58,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
 
         it('deve criar instância de Gemini driver', () => {
             const factory = {
-                create: type => {
+                create: (/** @type {any} */ type) => {
                     if (type === 'gemini') {
                         return { type: 'gemini', initialized: true };
                     }
@@ -72,7 +72,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
 
         it('deve rejeitar driver desconhecido', () => {
             const factory = {
-                create: type => {
+                create: (/** @type {any} */ type) => {
                     const known = ['chatgpt', 'gemini'];
                     if (!known.includes(type)) {
                         throw new Error(`Driver desconhecido: ${type}`);
@@ -86,7 +86,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
 
     describe('3. Seleção Automática', () => {
         it('deve selecionar driver baseado em target', () => {
-            const selectDriver = target => {
+            const selectDriver = (/** @type {any} */ target) => {
                 const mapping = {
                     chatgpt: 'chatgpt',
                     gemini: 'gemini',
@@ -99,7 +99,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         });
 
         it('deve usar driver padrão se target inválido', () => {
-            const selectDriver = target => {
+            const selectDriver = (/** @type {any} */ target) => {
                 const mapping = {
                     chatgpt: 'chatgpt',
                     gemini: 'gemini',
@@ -194,7 +194,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         });
 
         it('deve comparar versões', () => {
-            const compareVersions = (v1, v2) => {
+            const compareVersions = (/** @type {any} */ v1, /** @type {any} */ v2) => {
                 const parts1 = v1.split('.').map(Number);
                 const parts2 = v2.split('.').map(Number);
 
@@ -230,7 +230,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                 capabilities: ['text-generation', 'conversation'],
             };
 
-            const hasCapability = cap => driver.capabilities.includes(cap);
+            const hasCapability = (/** @type {any} */ cap) => driver.capabilities.includes(cap);
 
             assert.ok(hasCapability('conversation'));
             assert.strictEqual(hasCapability('image-generation'), false);

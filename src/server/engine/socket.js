@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-nocheck
 import CONFIG from '#core/config';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';

@@ -1,5 +1,4 @@
 // @ts-check
-// @ts-ignore - helpers stubs not yet exported
 import { startAgent, stopAgent, waitForCondition, removeRunLock, cleanTmp } from './helpers.js';
 import fs from 'node:fs';
 import path from 'node:path';

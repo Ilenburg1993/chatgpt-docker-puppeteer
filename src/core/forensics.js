@@ -45,7 +45,7 @@ const CAPTURE_TIMEOUT_MS = 5000;
  * Side-effects: Modifica estado global nervInstance.
  * Deve ser chamado no boot antes de usar forensics.
  * @param {SetNERVNerv} nerv - Instância do NERV para notificações.
-  * @returns {void}
+ * @returns {void}
  */
 function setNERV(nerv) {
     nervInstance = nerv;
@@ -89,10 +89,10 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
             error: {
                 message: error.message,
                 stack: error.stack,
-                code: (/** @type {any} */ (error)).code || 'N/A',
+                code: /** @type {any} */ (error).code || 'N/A',
             },
             context: {
-                url: page && !(/** @type {any} */ (page)).isClosed() ? (/** @type {any} */ (page)).url() : 'PAGE_CLOSED',
+                url: page && !(/** @type {any} */ (page).isClosed()) ? /** @type {any} */ (page).url() : 'PAGE_CLOSED',
                 timestamp: new Date().toISOString(),
             },
         };
@@ -103,7 +103,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
         // 3. EVIDÊNCIAS VISUAIS (Protegidas por Timeout de Corrida)
         // FIXED (P0-1.2): Agora usa withTimeout para garantir cleanup do AbortController
         // Previne operações órfãs que continuam escrevendo no disco após timeout
-        if (page && !(/** @type {any} */ (page)).isClosed()) {
+        if (page && !(/** @type {any} */ (page).isClosed())) {
             try {
                 await withTimeout(
                     () => _captureVisualEvidence(page, folder, correlationId),
@@ -111,7 +111,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
                     'BROWSER_CAPTURE_TIMEOUT'
                 );
             } catch (_rawErr) {
-            const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[FORENSICS] Captura visual abortada: ${err.message}`, correlationId);
             }
         }
@@ -135,14 +135,14 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
 
                 log('INFO', `[FORENSICS] Dump criado e notificado via NERV: ${dumpId}`, correlationId);
             } catch (_rawE) {
-            const e = /** @type {any} */ (_rawE);
+                const e = /** @type {any} */ (_rawE);
                 log('WARN', `[FORENSICS] Falha ao notificar dump via NERV: ${e.message}`, correlationId);
             }
         } else {
             log('WARN', `[FORENSICS] Dump criado mas NERV não disponível: ${dumpId}`, correlationId);
         }
     } catch (_rawE) {
-            const e = /** @type {any} */ (_rawE);
+        const e = /** @type {any} */ (_rawE);
         // Falha na forense é reportada apenas no log local para não interferir na recuperação
         console.error(`[FORENSICS] Falha crítica no motor de evidências: ${e.message}`);
     }
@@ -174,14 +174,12 @@ async function _captureVisualEvidence(/** @type {any} */ page, folder, _correlat
         const html = await page.evaluate(() => {
             const clone = /** @type {Element} */ (document.documentElement.cloneNode(true));
             // Limpeza de elementos ativos que podem quebrar o visualizador offline
-            const selectorsToRemove = 'script, iframe, noscript, link[rel="prefetch"], link[rel="preload"]';
-            clone.querySelectorAll(selectorsToRemove).forEach(e => e.remove());
             return clone.outerHTML;
         });
 
         await fs.writeFile(path.join(folder, 'dom_snapshot.html'), html, 'utf-8');
     } catch (_rawErr) {
-            const err = /** @type {any} */ (_rawErr);
+        const err = /** @type {any} */ (_rawErr);
         log('WARN', `[FORENSICS] Visual capture failed: ${err?.message || String(err)}`, _correlationId);
     }
 }

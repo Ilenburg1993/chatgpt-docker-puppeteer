@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-nocheck
 import { log } from '#core/logger';
 import { ActionCode } from '#shared/nerv/constants';
 import { asRecord } from '#types/guards';

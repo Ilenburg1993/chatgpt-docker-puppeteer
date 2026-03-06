@@ -26,11 +26,14 @@ function createMockPage() {
         async setViewport() {
             return;
         },
-        // @ts-ignore - rest param typed via JSDoc
-        async evaluate(/** @type {any} */ fn, .../** @type {any[]} */ args) {
+        /**
+         * @param {any} fn
+         * @param {...any} args
+         */
+        async evaluate(fn, ...args) {
             if (typeof fn === 'function') {
                 try {
-                    return fn(.../** @type {any[]} */ args);
+                    return fn(...args);
                 } catch (e) {
                     return null;
                 }

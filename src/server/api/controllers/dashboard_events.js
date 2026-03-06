@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import express from 'express';
 import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createOllamaHostSupervisor } from '../../../src/inference_gateway/ollama_host_supervisor.js';
 
 test('supervisor marks ready on successful probe and emits state', async () => {
-    const events = [];
+    /** @type {any[]} */ const events = [];
     const supervisor = createOllamaHostSupervisor({
         fetch: async () => ({
             ok: true,

@@ -260,7 +260,11 @@ async function probeConnectivity(url) {
         const t0 = Date.now();
         const client = url.startsWith('https') ? https : http;
         const req = client.request(url, { method: 'HEAD', timeout: 5000 }, res => {
-            resolve({ ok: (/** @type {any} */ (res)).statusCode < 400, status: (/** @type {any} */ (res)).statusCode, ms: Date.now() - t0 });
+            resolve({
+                ok: /** @type {any} */ (res).statusCode < 400,
+                status: /** @type {any} */ (res).statusCode,
+                ms: Date.now() - t0,
+            });
         });
         req.on('error', () => resolve({ ok: false, status: 'OFFLINE', ms: Date.now() - t0 }));
         req.on('timeout', () => {
@@ -337,9 +341,12 @@ async function validateDNASanity() {
 async function runFullCheck() {
     const t0 = Date.now();
     const trends = await getTrends();
-    const io = await import('#infra/io').then(m => (/** @type {any} */ (m)).default ?? m); // Carrega dinamicamente para evitar ciclos
+    const io = await import('#infra/io').then(m => /** @type {any} */ (m).default ?? m); // Carrega dinamicamente para evitar ciclos
 
-    const targets = ['https://www.google.com', ...(CONFIG.allowedDomains || []).map(d => `https://${d}`)];
+    const targets = [
+        'https://www.google.com',
+        ...(CONFIG.allowedDomains || []).map((/** @type {string} */ d) => `https://${d}`),
+    ];
     const [networkResults, storage, dna, lag, chrome] = await Promise.all([
         Promise.all(targets.map(url => probeConnectivity(url))),
         checkStorageSLA(),

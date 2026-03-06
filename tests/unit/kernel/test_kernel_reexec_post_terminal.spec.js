@@ -13,7 +13,7 @@ class MockNERV extends EventEmitter {
         this.receiveHandlers = [];
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const index = this.receiveHandlers.indexOf(handler);
@@ -21,22 +21,22 @@ class MockNERV extends EventEmitter {
         };
     }
 
-    receive(envelope) {
+    receive(/** @type {any} */ envelope) {
         this.receiveHandlers.forEach(h => h(envelope));
     }
 
-    emitCommand(envelope) {
+    emitCommand(/** @type {any} */ envelope) {
         this.emittedCommands.push(envelope);
     }
 
-    emitEvent(envelope) {
+    emitEvent(/** @type {any} */ envelope) {
         this.emittedEvents.push(envelope);
     }
 }
 
 describe('Kernel ssot_gateway (re-dispatch safe)', () => {
-    let nerv;
-    let kernel;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let kernel;
 
     beforeEach(() => {
         nerv = new MockNERV();

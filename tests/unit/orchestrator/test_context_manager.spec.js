@@ -5,7 +5,7 @@ import { ContextManager, CHUNKING_STRATEGY, SUMMARIZATION_POLICY } from '#orches
 import MemoryStore from '#orchestrator/memory_store';
 
 describe('ContextManager Unit Tests', () => {
-    let contextManager;
+    /** @type {any} */ let contextManager;
 
     beforeEach(() => {
         contextManager = new ContextManager();
@@ -224,7 +224,7 @@ describe('ContextManager Unit Tests', () => {
 });
 
 describe('MemoryStore Unit Tests', () => {
-    let memoryStore;
+    /** @type {any} */ let memoryStore;
 
     beforeEach(() => {
         memoryStore = new MemoryStore({ maxSize: 10 });

@@ -78,26 +78,26 @@ function fillExecutionContext(/** @type {any} */ task, /** @type {any} */ option
             total_backoff_ms: options.totalBackoffMs || task.execution.retry?.total_backoff_ms || 0,
         };
 
-        // @ts-ignore
-
-        // @ts-ignore
-
-        logger.debug(`[EXECUTION_FILLER] Execution context preenchido para task ${task.meta.id}`, {
-            driver: task.execution.driver.type,
-            platform: task.execution.environment.platform,
-            tacticalAttempts: task.execution.retry.tactical_attempts,
-            strategicAttempts: task.execution.retry.strategic_attempts,
-        });
+        logger.debug(
+            `[EXECUTION_FILLER] Execution context preenchido para task ${task.meta.id}`,
+            /** @type {any} */ ({
+                driver: task.execution.driver.type,
+                platform: task.execution.environment.platform,
+                tacticalAttempts: task.execution.retry.tactical_attempts,
+                strategicAttempts: task.execution.retry.strategic_attempts,
+            })
+        );
 
         return task;
     } catch (error) {
         const _ce = /** @type {any} */ (error);
-        // @ts-ignore
-        // @ts-ignore
-        logger.error(`[EXECUTION_FILLER] Erro ao preencher execution context: ${_ce.message}`, {
-            task_id: task?.meta?.id,
-            error,
-        });
+        logger.error(
+            `[EXECUTION_FILLER] Erro ao preencher execution context: ${_ce.message}`,
+            /** @type {any} */ ({
+                task_id: task?.meta?.id,
+                error,
+            })
+        );
         // Não throw - retorna task sem modificar
         return task;
     }
@@ -126,9 +126,10 @@ function _detectContainer() {
         return false;
     } catch (error) {
         const _ce = /** @type {any} */ (error);
-        // @ts-ignore
-        // @ts-ignore
-        logger.debug('[EXECUTION_FILLER] Erro ao detectar container, assumindo false', { error: _ce.message });
+        logger.debug(
+            '[EXECUTION_FILLER] Erro ao detectar container, assumindo false',
+            /** @type {any} */ ({ error: _ce.message })
+        );
         return false;
     }
 }
@@ -152,9 +153,7 @@ async function _getChromeVersion(/** @type {any} */ browserPool) {
 
         // Fallback: tenta obter via puppeteer
         const puppeteer = await import('puppeteer').then(m => m.default ?? m);
-        // @ts-ignore
-        // @ts-ignore
-        if (puppeteer.executablePath) {
+        if (typeof puppeteer.executablePath === 'function') {
             // Versão está embutida no path geralmente
             return 'unknown';
         }
@@ -162,9 +161,7 @@ async function _getChromeVersion(/** @type {any} */ browserPool) {
         return 'unknown';
     } catch (error) {
         const _ce = /** @type {any} */ (error);
-        // @ts-ignore
-        // @ts-ignore
-        logger.debug('[EXECUTION_FILLER] Erro ao obter Chrome version', { error: _ce.message });
+        logger.debug('[EXECUTION_FILLER] Erro ao obter Chrome version', /** @type {any} */ ({ error: _ce.message }));
         return 'unknown';
     }
 }
@@ -180,9 +177,13 @@ async function _getChromeVersion(/** @type {any} */ browserPool) {
  * @param {IncrementTacticalAttemptsTask} task - Task V5 object
  * @param {string} [errorRecovered] - Erro recuperado (opcional)
  * @param {number} [backoffMs=0] - Tempo aguardado neste backoff
-  * @returns {void}
+ * @returns {void}
  */
-function incrementTacticalAttempts(/** @type {any} */ task, /** @type {any} */ errorRecovered, /** @type {any} */ backoffMs) {
+function incrementTacticalAttempts(
+    /** @type {any} */ task,
+    /** @type {any} */ errorRecovered,
+    /** @type {any} */ backoffMs
+) {
     errorRecovered = errorRecovered || null;
     backoffMs = backoffMs || 0;
 
@@ -204,15 +205,14 @@ function incrementTacticalAttempts(/** @type {any} */ task, /** @type {any} */ e
         task.execution.retry.errors_recovered.push(errorRecovered);
     }
 
-    // @ts-ignore
-
-    // @ts-ignore
-
-    logger.debug(`[EXECUTION_FILLER] Tactical attempt ${task.execution.retry.tactical_attempts}`, {
-        task_id: task.meta.id,
-        error: errorRecovered,
-        backoff_ms: backoffMs,
-    });
+    logger.debug(
+        `[EXECUTION_FILLER] Tactical attempt ${task.execution.retry.tactical_attempts}`,
+        /** @type {any} */ ({
+            task_id: task.meta.id,
+            error: errorRecovered,
+            backoff_ms: backoffMs,
+        })
+    );
 }
 
 /**
@@ -226,9 +226,13 @@ function incrementTacticalAttempts(/** @type {any} */ task, /** @type {any} */ e
  * @param {IncrementStrategicAttemptsTask} task - Task V5 object
  * @param {string} [errorRecovered] - Erro recuperado (opcional)
  * @param {number} [backoffMs=0] - Tempo aguardado neste backoff
-  * @returns {void}
+ * @returns {void}
  */
-function incrementStrategicAttempts(/** @type {any} */ task, /** @type {any} */ errorRecovered, /** @type {any} */ backoffMs) {
+function incrementStrategicAttempts(
+    /** @type {any} */ task,
+    /** @type {any} */ errorRecovered,
+    /** @type {any} */ backoffMs
+) {
     errorRecovered = errorRecovered || null;
     backoffMs = backoffMs || 0;
 
@@ -250,15 +254,14 @@ function incrementStrategicAttempts(/** @type {any} */ task, /** @type {any} */ 
         task.execution.retry.errors_recovered.push(errorRecovered);
     }
 
-    // @ts-ignore
-
-    // @ts-ignore
-
-    logger.debug(`[EXECUTION_FILLER] Strategic attempt ${task.execution.retry.strategic_attempts}`, {
-        task_id: task.meta.id,
-        error: errorRecovered,
-        backoff_ms: backoffMs,
-    });
+    logger.debug(
+        `[EXECUTION_FILLER] Strategic attempt ${task.execution.retry.strategic_attempts}`,
+        /** @type {any} */ ({
+            task_id: task.meta.id,
+            error: errorRecovered,
+            backoff_ms: backoffMs,
+        })
+    );
 }
 
 export { fillExecutionContext, incrementTacticalAttempts, incrementStrategicAttempts };

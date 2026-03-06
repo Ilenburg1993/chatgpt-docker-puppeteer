@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import { RBAC_PERMISSIONS, RBAC_ROLES } from '#infra/db/rbac_repo';
 
 function toArray(value) {

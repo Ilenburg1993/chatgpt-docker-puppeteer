@@ -30,7 +30,7 @@ test('resolveRuntime forces local for embedding operation', () => {
 });
 
 test('generateWithMetadata uses cloud first in auto mode', async () => {
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
     const client = new OllamaClient({
         cloudEnabled: true,
         cloudBaseUrl: 'https://cloud.example',
@@ -53,7 +53,7 @@ test('generateWithMetadata uses cloud first in auto mode', async () => {
 });
 
 test('generateWithMetadata falls back to local when cloud fails and fallback is enabled', async () => {
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
     const client = new OllamaClient({
         cloudEnabled: true,
         cloudBaseUrl: 'https://cloud.example',

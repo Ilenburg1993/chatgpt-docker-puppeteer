@@ -539,7 +539,7 @@ class ConfigurationManager extends EventEmitter {
             ? val
             : val
                   .split(',')
-                  .map(s => s.trim())
+                  .map((/** @type {string} */ s) => s.trim())
                   .filter(Boolean);
     }
     get DRIVER_POOL_ENABLED() {

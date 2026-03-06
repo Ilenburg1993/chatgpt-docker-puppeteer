@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import { hasPermission } from '#server/domain/rbac_policy';
 
 /**

@@ -55,6 +55,7 @@ function findChromeExecutable() {
     const fs = require('fs');
     const platform = os.platform();
 
+    /** @type {string[]} */
     let candidates = [];
 
     if (platform === 'linux') {

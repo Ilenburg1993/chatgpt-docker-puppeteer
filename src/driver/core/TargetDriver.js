@@ -143,7 +143,6 @@ class TargetDriver extends EventEmitter {
     /** @type {string} */
     _state;
 
-
     /**
      * Construtor do TargetDriver - Classe abstrata base.
      *
@@ -432,8 +431,10 @@ class TargetDriver extends EventEmitter {
                         `Valid capabilities: ${CAPABILITIES_SCHEMA.join(', ')}`
                 );
             }
-            if (typeof (/** @type {any} */ (caps))[key] !== 'boolean') {
-                throw new Error(`[${this.name}] Capability "${key}" must be boolean, got ${typeof (/** @type {any} */ (caps))[key]}`);
+            if (typeof (/** @type {any} */ (caps)[key]) !== 'boolean') {
+                throw new Error(
+                    `[${this.name}] Capability "${key}" must be boolean, got ${typeof (/** @type {any} */ (caps)[key])}`
+                );
             }
         }
     }
@@ -701,7 +702,7 @@ class TargetDriver extends EventEmitter {
         }
 
         // Validate state exists
-        if (!(/** @type {any} */ (STATES))[newState]) {
+        if (!(/** @type {any} */ (STATES)[newState])) {
             throw new Error(`[${this.name}] Tentativa de transição para estado inválido: "${newState}"`);
         }
 
@@ -971,8 +972,8 @@ class TargetDriver extends EventEmitter {
      * Envia prompt para LLM.
      * @abstract
      * @param {string} _text - Texto do prompt
-     * @param {object} _taskId - ID da task ou objeto de opções
-     * @param {AbortSignal} _signal - Sinal de cancelamento
+     * @param {string|object} [_taskId] - ID da task ou objeto de opções
+     * @param {AbortSignal} [_signal] - Sinal de cancelamento
      * @returns {Promise<void>}
      * @throws {Error} Sempre - deve ser implementado
      */
@@ -1084,7 +1085,7 @@ class TargetDriver extends EventEmitter {
             try {
                 this.detachContext();
             } catch (_rawErr) {
-            const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[${this.name}] Error detaching context during destroy: ${err.message}`);
             }
         }

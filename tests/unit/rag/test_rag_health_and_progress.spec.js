@@ -75,7 +75,7 @@ describe('ragHealth availability + indexing progress logs', () => {
             indexDir: path.join(store, 'rag-index'),
         };
         const embeddings = new FakeEmbeddingsProvider(8);
-        const logs = [];
+        /** @type {any[]} */ const logs = [];
         const oldLog = console.log;
 
         try {

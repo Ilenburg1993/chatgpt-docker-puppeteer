@@ -5,8 +5,8 @@ import { FeedbackProcessor, FEEDBACK_CATEGORY, INJECTION_FORMAT } from '#mission
 import { ContextManager } from '#orchestrator/context_manager';
 
 describe('FeedbackProcessor Unit Tests', () => {
-    let feedbackProcessor;
-    let contextManager;
+    /** @type {any} */ let feedbackProcessor;
+    /** @type {any} */ let contextManager;
 
     beforeEach(() => {
         contextManager = new ContextManager();
@@ -74,7 +74,7 @@ describe('FeedbackProcessor Unit Tests', () => {
         it('should include custom metadata', () => {
             const result = feedbackProcessor.processFeedback('Test feedback', {
                 mission_id: 'mission-123',
-                step_id: 'step-1'
+                step_id: 'step-1',
             });
 
             assert.strictEqual(result.metadata.mission_id, 'mission-123');
@@ -125,28 +125,28 @@ describe('FeedbackProcessor Unit Tests', () => {
             const patterns = feedbackProcessor.extractPatterns('Add more examples');
 
             assert.ok(patterns.length > 0);
-            assert.ok(patterns.some(p => p.includes('Add:') || p.includes('Include:')));
+            assert.ok(patterns.some((/** @type {any} */ p) => p.includes('Add:') || p.includes('Include:')));
         });
 
         it('should extract "improve" patterns', () => {
             const patterns = feedbackProcessor.extractPatterns('Improve the documentation');
 
             assert.ok(patterns.length > 0);
-            assert.ok(patterns.some(p => p.includes('Improve:')));
+            assert.ok(patterns.some((/** @type {any} */ p) => p.includes('Improve:')));
         });
 
         it('should extract "avoid" patterns', () => {
             const patterns = feedbackProcessor.extractPatterns('Avoid technical jargon');
 
             assert.ok(patterns.length > 0);
-            assert.ok(patterns.some(p => p.includes('Avoid:')));
+            assert.ok(patterns.some((/** @type {any} */ p) => p.includes('Avoid:')));
         });
 
         it('should extract "use" patterns', () => {
             const patterns = feedbackProcessor.extractPatterns('Use simpler language');
 
             assert.ok(patterns.length > 0);
-            assert.ok(patterns.some(p => p.includes('Use:')));
+            assert.ok(patterns.some((/** @type {any} */ p) => p.includes('Use:')));
         });
 
         it('should extract multiple patterns', () => {
@@ -158,7 +158,7 @@ describe('FeedbackProcessor Unit Tests', () => {
         it('should remove duplicate patterns', () => {
             const patterns = feedbackProcessor.extractPatterns('Add examples. Add more examples.');
 
-            const addPatterns = patterns.filter(p => p.includes('Add'));
+            const addPatterns = patterns.filter((/** @type {any} */ p) => p.includes('Add'));
             // Should not have exact duplicates (Set removes them)
             assert.ok(addPatterns.length >= 1);
         });
@@ -176,8 +176,8 @@ describe('FeedbackProcessor Unit Tests', () => {
 
             // May extract more than 2 due to imperative sentence detection
             assert.ok(result.actionItems.length >= 2);
-            assert.ok(result.actionItems.some(item => item.includes('Add examples')));
-            assert.ok(result.actionItems.some(item => item.includes('Fix typos')));
+            assert.ok(result.actionItems.some((/** @type {any} */ item) => item.includes('Add examples')));
+            assert.ok(result.actionItems.some((/** @type {any} */ item) => item.includes('Fix typos')));
         });
 
         it('should extract from bullet list', () => {
@@ -185,15 +185,19 @@ describe('FeedbackProcessor Unit Tests', () => {
 
             // Should extract at least 1 action item
             assert.ok(result.actionItems.length >= 1);
-            assert.ok(result.actionItems.some(item => item.includes('examples') || item.includes('typos')));
+            assert.ok(
+                result.actionItems.some(
+                    (/** @type {any} */ item) => item.includes('examples') || item.includes('typos')
+                )
+            );
         });
 
         it('should extract imperative sentences', () => {
             const result = feedbackProcessor.processFeedback('Add more examples. Improve clarity.');
 
             assert.ok(result.actionItems.length >= 2);
-            assert.ok(result.actionItems.some(item => item.includes('Add')));
-            assert.ok(result.actionItems.some(item => item.includes('Improve')));
+            assert.ok(result.actionItems.some((/** @type {any} */ item) => item.includes('Add')));
+            assert.ok(result.actionItems.some((/** @type {any} */ item) => item.includes('Improve')));
         });
 
         it('should capitalize action items', () => {
@@ -207,7 +211,7 @@ describe('FeedbackProcessor Unit Tests', () => {
         it('should remove duplicate action items', () => {
             const result = feedbackProcessor.processFeedback('Add examples. Add examples again.');
 
-            const addItems = result.actionItems.filter(item => item.includes('Add examples'));
+            const addItems = result.actionItems.filter((/** @type {any} */ item) => item.includes('Add examples'));
             // Should deduplicate (Set removes duplicates)
             assert.ok(addItems.length >= 1);
         });
@@ -217,7 +221,7 @@ describe('FeedbackProcessor Unit Tests', () => {
         it('should inject with DEFAULT format', () => {
             const processed = feedbackProcessor.processFeedback('Add more examples');
             const result = feedbackProcessor.injectIntoStep('Write a chapter', processed, {
-                format: INJECTION_FORMAT.DEFAULT
+                format: INJECTION_FORMAT.DEFAULT,
             });
 
             assert.ok(result.includes('Write a chapter'));
@@ -228,7 +232,7 @@ describe('FeedbackProcessor Unit Tests', () => {
         it('should inject with INLINE format', () => {
             const processed = feedbackProcessor.processFeedback('Add more examples');
             const result = feedbackProcessor.injectIntoStep('Write a chapter', processed, {
-                format: INJECTION_FORMAT.INLINE
+                format: INJECTION_FORMAT.INLINE,
             });
 
             assert.ok(result.includes('Write a chapter'));
@@ -239,7 +243,7 @@ describe('FeedbackProcessor Unit Tests', () => {
         it('should inject with STRUCTURED format', () => {
             const processed = feedbackProcessor.processFeedback('Add more examples');
             const result = feedbackProcessor.injectIntoStep('Write a chapter', processed, {
-                format: INJECTION_FORMAT.STRUCTURED
+                format: INJECTION_FORMAT.STRUCTURED,
             });
 
             assert.ok(result.includes('Write a chapter'));
@@ -252,7 +256,7 @@ describe('FeedbackProcessor Unit Tests', () => {
             const processed = feedbackProcessor.processFeedback('Add more examples');
             const result = feedbackProcessor.injectIntoStep('Write a chapter', processed, {
                 format: INJECTION_FORMAT.STRUCTURED,
-                includeCategory: true
+                includeCategory: true,
             });
 
             assert.ok(result.includes('Category:'));
@@ -262,7 +266,7 @@ describe('FeedbackProcessor Unit Tests', () => {
             const processed = feedbackProcessor.processFeedback('Add examples. Improve clarity.');
             const result = feedbackProcessor.injectIntoStep('Write a chapter', processed, {
                 format: INJECTION_FORMAT.STRUCTURED,
-                includeActionItems: true
+                includeActionItems: true,
             });
 
             assert.ok(result.includes('Action Items:'));
@@ -278,7 +282,7 @@ describe('FeedbackProcessor Unit Tests', () => {
     describe('7. MemoryStore Integration', () => {
         it('should add patterns to MemoryStore when ContextManager present', () => {
             const result = feedbackProcessor.processFeedback('Add more code examples', {
-                mission_id: 'mission-123'
+                mission_id: 'mission-123',
             });
 
             // Verifica que patterns foram extraídos
@@ -302,7 +306,7 @@ describe('FeedbackProcessor Unit Tests', () => {
         it('should store patterns with correct metadata', () => {
             feedbackProcessor.processFeedback('Add more examples', {
                 mission_id: 'mission-123',
-                step_id: 'step-1'
+                step_id: 'step-1',
             });
 
             const patterns = contextManager.getRelevantPatterns('examples', 5);

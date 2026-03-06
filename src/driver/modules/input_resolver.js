@@ -306,10 +306,11 @@ class InputResolver extends EventEmitter {
         // 2. CONSULTA À CONSTITUIÇÃO (DNA First)
         this.driver._emitVital('SADI_PERCEPTION', { status: 'CONSULTING_DNA', domain });
         /** @type {{ selectors?: { input_box?: string[] | string } }} */
-        const dnaRules = (await io.getTargetRules(domain)) || {};
+        const dnaRules = (await io.getTargetRules(/** @type {string} */ (domain))) || {};
 
-        if (dnaRules.selectors?.input_box) {
-            const dnaCandidate = await this._tryKnownSelectors(dnaRules.selectors.input_box);
+        const inputBox = dnaRules.selectors?.input_box;
+        if (inputBox) {
+            const dnaCandidate = await this._tryKnownSelectors(inputBox);
             if (dnaCandidate) {
                 this.stats.dnaMatches++;
                 return this._finalizeDiscovery(dnaCandidate, 'DNA_MATCH', dnaRules, 1.0);

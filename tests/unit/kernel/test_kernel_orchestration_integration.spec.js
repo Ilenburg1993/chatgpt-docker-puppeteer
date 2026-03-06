@@ -18,7 +18,7 @@ class MockNERV extends EventEmitter {
         this.receiveHandlers = [];
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.receiveHandlers.push(handler);
         return () => {
             const index = this.receiveHandlers.indexOf(handler);
@@ -26,26 +26,26 @@ class MockNERV extends EventEmitter {
         };
     }
 
-    receive(envelope) {
+    receive(/** @type {any} */ envelope) {
         this.receiveHandlers.forEach(h => h(envelope));
     }
 
-    emitCommand(envelope) {
+    emitCommand(/** @type {any} */ envelope) {
         this.emittedCommands.push(envelope);
     }
 
-    emitEvent(envelope) {
+    emitEvent(/** @type {any} */ envelope) {
         this.emittedEvents.push(envelope);
     }
 
-    emit(actionCode, payload) {
+    emit(/** @type {any} */ actionCode, /** @type {any} */ payload) {
         super.emit(actionCode, payload);
     }
 }
 
 describe('Kernel Orchestration Integration (V2.0)', () => {
-    let nerv;
-    let kernel;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let kernel;
 
     beforeEach(() => {
         nerv = new MockNERV();
@@ -310,20 +310,24 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
 });
 
 describe('TaskExecutionOrchestrator (standalone)', () => {
-    let nerv;
-    let nervBridge;
-    let orchestrator;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let nervBridge;
+    /** @type {any} */ let orchestrator;
 
     beforeEach(async () => {
         nerv = new MockNERV();
 
         // Mock simplificado do nervBridge
         nervBridge = {
-            beforeTaskExecution: async task => task,
-            afterTaskExecution: async (task, result) => ({ action: 'DONE', task, feedback: null }),
-            processOrchestrationDecision: async (decision, correlationId) => {},
-            emitCommand: params => nerv.emitCommand(params),
-            emitEvent: params => nerv.emitEvent(params),
+            beforeTaskExecution: async (/** @type {any} */ task) => task,
+            afterTaskExecution: async (/** @type {any} */ task, /** @type {any} */ result) => ({
+                action: 'DONE',
+                task,
+                feedback: null,
+            }),
+            processOrchestrationDecision: async (/** @type {any} */ decision, /** @type {any} */ correlationId) => {},
+            emitCommand: (/** @type {any} */ params) => nerv.emitCommand(params),
+            emitEvent: (/** @type {any} */ params) => nerv.emitEvent(params),
         };
 
         const { TaskExecutionOrchestrator } = await import('#kernel/task_execution_orchestrator');

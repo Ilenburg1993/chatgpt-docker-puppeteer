@@ -73,7 +73,12 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
         /**
          * Busca recursiva atravessando barreiras de Shadow DOM e IFrames.
          */
-        query: (/** @type {any} */ selector, /** @type {any} */ root = document, /** @type {any} */ onlyFrames = false, /** @type {any} */ accumulator = []) => {
+        query: (
+            /** @type {any} */ selector,
+            /** @type {any} */ root = document,
+            /** @type {any} */ onlyFrames = false,
+            /** @type {any} */ accumulator = []
+        ) => {
             try {
                 const nodes = root.querySelectorAll(selector);
                 for (let i = 0; i < nodes.length; i++) {
@@ -186,14 +191,14 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
             const cx = rect.left + rect.width / 2;
             const cy = rect.top + rect.height / 2;
 
-            const topEl = document.elementFromPoint(cx, cy);
+            const topEl = /** @type {any} */ (document).elementFromPoint(cx, cy);
             if (topEl && !el.contains(topEl) && !topEl.contains(el)) {
                 return true;
             }
 
             if (window !== window.top) {
                 try {
-                    const frameEl = window.frameElement;
+                    const frameEl = /** @type {any} */ (window).frameElement;
                     if (frameEl) {
                         const fRect = frameEl.getBoundingClientRect();
                         const pTopEl = window.parent.document.elementFromPoint(fRect.left + cx, fRect.top + cy);
@@ -394,7 +399,13 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
 
         const result = /** @type {SadiDetectionResult|null} */ (
             await page.evaluate(
-                (/** @type {any} */ terms, /** @type {any} */ svgSigs, /** @type {any} */ sadiLogicFn, /** @type {any} */ config, /** @type {any} */ startTs) => {
+                (
+                    /** @type {any} */ terms,
+                    /** @type {any} */ svgSigs,
+                    /** @type {any} */ sadiLogicFn,
+                    /** @type {any} */ config,
+                    /** @type {any} */ startTs
+                ) => {
                     // FIXED: Sem async (não tem await dentro)
                     const SADI = sadiLogicFn(terms, svgSigs);
                     const candidates = [
@@ -442,7 +453,9 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
                         return Math.max(0, score); // Never negative
                     };
 
-                    const best = candidates.sort((/** @type {any} */ a, /** @type {any} */ b) => scoreCandidate(b) - scoreCandidate(a))[0];
+                    const best = candidates.sort(
+                        (/** @type {any} */ a, /** @type {any} */ b) => scoreCandidate(b) - scoreCandidate(a)
+                    )[0];
                     const score = best ? scoreCandidate(best) : 0;
 
                     // v4.0: Confidence threshold
@@ -555,7 +568,13 @@ async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} *
 
         const result = /** @type {SadiDetectionResult|null} */ (
             await page.evaluate(
-                (/** @type {any} */ proto, /** @type {any} */ svgSigs, /** @type {any} */ sadiLogicFn, /** @type {any} */ config, /** @type {any} */ startTs) => {
+                (
+                    /** @type {any} */ proto,
+                    /** @type {any} */ svgSigs,
+                    /** @type {any} */ sadiLogicFn,
+                    /** @type {any} */ config,
+                    /** @type {any} */ startTs
+                ) => {
                     // FIXED: Sem async (não tem await dentro)
                     const SADI = sadiLogicFn([], svgSigs);
                     const input = SADI.query(proto.selector)[0];
@@ -605,7 +624,9 @@ async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} *
                         return score;
                     };
 
-                    const best = buttons.sort((/** @type {any} */ a, /** @type {any} */ b) => scoreButton(b) - scoreButton(a))[0];
+                    const best = buttons.sort(
+                        (/** @type {any} */ a, /** @type {any} */ b) => scoreButton(b) - scoreButton(a)
+                    )[0];
                     const score = best ? scoreButton(best) : 0;
 
                     // v4.0: Confidence threshold
@@ -668,7 +689,9 @@ async function findResponseArea(/** @type {any} */ page) {
                 (/** @type {any} */ sadiLogicFn, /** @type {any} */ config, /** @type {any} */ startTs) => {
                     // FIXED: Sem async (Promise simples em vez de await)
                     const SADI = sadiLogicFn([], []);
-                    const containers = SADI.query('div, article, section, pre').filter((/** @type {any} */ c) => c.innerText.length > 5);
+                    const containers = SADI.query('div, article, section, pre').filter(
+                        (/** @type {any} */ c) => c.innerText.length > 5
+                    );
                     const snapshot = containers.map((/** @type {any} */ c) => ({ el: c, len: c.innerText.length }));
 
                     // v4.0: Usar config para delay
@@ -692,7 +715,10 @@ async function findResponseArea(/** @type {any} */ page) {
                                 best ||
                                 containers
                                     .filter((/** @type {any} */ c) => c.isConnected)
-                                    .sort((/** @type {any} */ a, /** @type {any} */ b) => b.innerText.length - a.innerText.length)[0];
+                                    .sort(
+                                        (/** @type {any} */ a, /** @type {any} */ b) =>
+                                            b.innerText.length - a.innerText.length
+                                    )[0];
                             resolve(
                                 final
                                     ? {

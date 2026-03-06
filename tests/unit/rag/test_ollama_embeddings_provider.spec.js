@@ -100,7 +100,7 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
         const prevMax = process.env.OLLAMA_EMBED_MAX_CHARS;
         const prevFastShrink = process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK;
         const prevFetch = global.fetch;
-        const attempts = [];
+        /** @type {any[]} */ const attempts = [];
         try {
             process.env.OLLAMA_EMBED_MAX_CHARS = '8000';
             process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK = 'true';

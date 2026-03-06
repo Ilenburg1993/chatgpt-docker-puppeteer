@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { InferenceGateway } from '../../../src/inference_gateway/gateway.js';
 
 test('InferenceGateway generate uses policy precedence and validates route', async () => {
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
     const gateway = new InferenceGateway({
         ollamaClient: {
             async generate(prompt, model, options) {

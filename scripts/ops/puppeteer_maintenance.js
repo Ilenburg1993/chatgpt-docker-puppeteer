@@ -13,7 +13,7 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
 (async () => {
     // 1. Informações do cache
     console.log('📦 Cache Status:');
-    const cacheInfo = ConnectionOrchestrator.getCacheInfo();
+    const cacheInfo = /** @type {any} */ (ConnectionOrchestrator).getCacheInfo();
     console.log('  Path:', cacheInfo.path);
     console.log('  Exists:', cacheInfo.exists ? '✅' : '❌');
 
@@ -53,7 +53,7 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
         }
 
         console.log('\n  Cleaning...');
-        const cleaned = await ConnectionOrchestrator.cleanupTempProfiles();
+        const cleaned = await /** @type {any} */ (ConnectionOrchestrator).cleanupTempProfiles();
         console.log('  ✅ Removed:', cleaned, 'profiles');
     } else {
         console.log('  ✅ No temporary profiles found');

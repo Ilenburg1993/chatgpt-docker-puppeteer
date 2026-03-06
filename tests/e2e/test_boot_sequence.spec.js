@@ -14,10 +14,10 @@ console.log('🚀 Testando sequência de boot...\n');
 const PROXY_PORT = 9224;
 
 const log = {
-    section: msg => console.log(`\n=== ${msg} ===`),
+    section: (/** @type {string} */ msg) => console.log(`\n=== ${msg} ===`),
 };
 
-function ok(cond, msg) {
+function ok(/** @type {any} */ cond, /** @type {string} */ msg) {
     assert.ok(cond, msg);
     console.log(`✅ ${msg}`);
 }

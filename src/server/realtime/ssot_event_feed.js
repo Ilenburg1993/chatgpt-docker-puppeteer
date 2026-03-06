@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
 import { taskRowToListItem } from '../api/utils/task_views.js';

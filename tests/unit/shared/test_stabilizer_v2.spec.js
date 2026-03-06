@@ -3,9 +3,9 @@ import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 
 describe('stabilizer.js v2.0 - Unit Tests', () => {
-    let mockDriver;
-    let mockPage;
-    let stabilizerModule;
+    /** @type {any} */ let mockDriver;
+    /** @type {any} */ let mockPage;
+    /** @type {any} */ let stabilizerModule;
 
     beforeEach(async () => {
         // Mock page object
@@ -229,7 +229,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 // Simular erro durante DOM entropy phase
                 let observerCleanupCalled = false;
-                mockPage.evaluate = mock.fn(async fn => {
+                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('__STABILIZER_OBSERVERS')) {
                         observerCleanupCalled = true;
                         return;
@@ -252,7 +252,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
                 let hydrationSource = '';
 
-                mockPage.evaluate = mock.fn(async fn => {
+                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
                     const source = fn?.toString?.() || '';
                     if (source.includes("addEventListener('mousemove'")) {
                         hydrationSource = source;
@@ -278,7 +278,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const controller = new AbortController();
 
                 // Simular lag alto (loop infinito sem abort check)
-                mockPage.evaluate = mock.fn(async fn => {
+                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('eventLoopLag')) {
                         return 200; // Lag alto (threshold = 150)
                     }
@@ -293,7 +293,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 assert.strictEqual(result.success, false, 'Deve falhar quando abortado');
 
                 // Verificar evento STABILITY_ABORTED
-                const calls = mockDriver._emitVital.mock.calls;
+                /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
                 const abortEvents = calls.filter(c => c.arguments[0] === 'STABILITY_ABORTED');
                 assert.ok(abortEvents.length > 0, 'STABILITY_ABORTED event não emitido');
             });
@@ -308,7 +308,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 await waitForStability(mockDriver, 5000);
 
-                const calls = mockDriver._emitVital.mock.calls;
+                /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
                 const startEvents = calls.filter(c => c.arguments[0] === 'STABILITY_START');
 
                 assert.ok(startEvents.length > 0, 'STABILITY_START não emitido');
@@ -323,7 +323,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const result = await waitForStability(mockDriver, 5000);
 
                 if (result.success) {
-                    const calls = mockDriver._emitVital.mock.calls;
+                    /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
                     const completeEvents = calls.filter(c => c.arguments[0] === 'STABILITY_COMPLETE');
                     assert.ok(completeEvents.length > 0, 'STABILITY_COMPLETE não emitido');
                 }
@@ -337,7 +337,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 await waitForStability(mockDriver, 5000);
 
-                const calls = mockDriver._emitVital.mock.calls;
+                /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
                 const phaseStartEvents = calls.filter(c => c.arguments[0] === 'PHASE_START');
 
                 // Deve ter pelo menos 1 PHASE_START
@@ -352,7 +352,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 await waitForStability(mockDriver, 5000);
 
-                const calls = mockDriver._emitVital.mock.calls;
+                /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
                 const phaseSuccessEvents = calls.filter(c => c.arguments[0] === 'PHASE_SUCCESS');
 
                 assert.ok(phaseSuccessEvents.length > 0, 'PHASE_SUCCESS não emitido');
@@ -368,7 +368,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                     message: /page is closed/,
                 });
 
-                const calls = mockDriver._emitVital.mock.calls;
+                /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
                 const errorEvents = calls.filter(c => c.arguments[0] === 'STABILITY_ERROR');
 
                 assert.ok(errorEvents.length > 0, 'STABILITY_ERROR não emitido');
@@ -386,7 +386,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 assert.strictEqual(result.success, false);
 
-                const calls = mockDriver._emitVital.mock.calls;
+                /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
                 const abortEvents = calls.filter(c => c.arguments[0] === 'STABILITY_ABORTED');
                 assert.ok(abortEvents.length > 0);
             });
@@ -483,7 +483,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 let lagCallCount = 0;
-                mockPage.evaluate = mock.fn(async fn => {
+                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('eventLoopLag')) {
                         lagCallCount++;
                         return lagCallCount < 3 ? 200 : 100; // Lag alto → normal
@@ -594,7 +594,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 const { waitForStability } = stabilizerModule;
 
                 // Mock erro recuperável
-                mockPage.evaluate = mock.fn(async fn => {
+                mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
                     if (fn.toString().includes('MutationObserver')) {
                         throw new Error('Transient DOM error');
                     }
@@ -662,7 +662,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             }
 
             // Cada execução deve ter emitido STABILITY_START
-            const calls = mockDriver._emitVital.mock.calls;
+            /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
             const startEvents = calls.filter(c => c.arguments[0] === 'STABILITY_START');
 
             assert.ok(startEvents.length >= 3, `Esperado >= 3 STABILITY_START, obteve ${startEvents.length}`);
@@ -678,7 +678,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             const { waitForStability } = stabilizerModule;
 
             let spinnerChecks = 0;
-            mockPage.evaluate = mock.fn(async fn => {
+            mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
                 if (fn.toString().includes('spinner') || fn.toString().includes('loading')) {
                     spinnerChecks++;
                     return spinnerChecks <= 2; // Spinner por 2 checks, depois desaparece
@@ -697,7 +697,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             const { waitForStability } = stabilizerModule;
 
             let mutationChecks = 0;
-            mockPage.evaluate = mock.fn(async fn => {
+            mockPage.evaluate = mock.fn(async (/** @type {any} */ fn) => {
                 if (fn.toString().includes('MutationObserver')) {
                     mutationChecks++;
                     // DOM estabiliza após 3 checks

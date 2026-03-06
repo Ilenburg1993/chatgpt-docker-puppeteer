@@ -145,7 +145,7 @@ class BaseDriver extends TargetDriver {
         ];
 
         for (const moduleName of requiredModules) {
-            if (!(/** @type {any} */ (this))[moduleName]) {
+            if (!(/** @type {any} */ (this)[moduleName])) {
                 throw new Error(`Required module '${moduleName}' not instantiated`);
             }
         }
@@ -389,7 +389,6 @@ class BaseDriver extends TargetDriver {
      * @emits EXECUTION_ABORTED - Cancelamento durante execução
      * @emits TRIAGE_ALERT - Falha em tentativa individual
      */
-    // @ts-ignore TS2416: BaseDriver.sendPrompt is intentionally more permissive than TargetDriver.sendPrompt
     async sendPrompt(text, taskId, signal) {
         const resolvedTaskId =
             typeof taskId === 'string'
@@ -423,11 +422,13 @@ class BaseDriver extends TargetDriver {
         const baseStabilityTimeout = 10000; // 10s base
         const adaptiveStabilityTimeout = this._calculateAdaptiveTimeout(baseStabilityTimeout);
 
-        const readiness = /** @type {any} */ (await this.readinessGuard.validateReadiness({
-            stabilityTimeout: adaptiveStabilityTimeout, // ✅ Phase 2: Adaptive timeout
-            skipTriage: false,
-            skipSession: true, // Phase 1: Session tracking not implemented yet
-        }));
+        const readiness = /** @type {any} */ (
+            await this.readinessGuard.validateReadiness({
+                stabilityTimeout: adaptiveStabilityTimeout, // ✅ Phase 2: Adaptive timeout
+                skipTriage: false,
+                skipSession: true, // Phase 1: Session tracking not implemented yet
+            })
+        );
 
         timings.readinessCheck = Date.now() - stepStart;
 
@@ -449,7 +450,9 @@ class BaseDriver extends TargetDriver {
         // ✅ Phase 1: Abort if NOT ready
         if (!readiness.ready) {
             const fatalIssues = readiness.issues.filter((/** @type {any} */ i) => i.severity === 'FATAL');
-            const error = /** @type {any} */ (new Error('READINESS_CHECK_FAILED: ' + fatalIssues.map((/** @type {any} */ i) => i.message).join('; ')));
+            const error = /** @type {any} */ (
+                new Error('READINESS_CHECK_FAILED: ' + fatalIssues.map((/** @type {any} */ i) => i.message).join('; '))
+            );
             error.details = readiness;
             throw error;
         }
@@ -617,7 +620,9 @@ class BaseDriver extends TargetDriver {
                 const totalDuration = Date.now() - startTime;
 
                 // ✅ Phase 2 (P1-U1): Record response time
-                const { avgResponseTime, trend } = /** @type {any} */ (this.sessionTracker.recordResponseTime(totalDuration, true));
+                const { avgResponseTime, trend } = /** @type {any} */ (
+                    this.sessionTracker.recordResponseTime(totalDuration, true)
+                );
 
                 // ✅ Phase 2 (P1-U3): Emit session metrics
                 const sessionMetrics = /** @type {any} */ (this.sessionTracker.getMetrics());

@@ -13,7 +13,7 @@ test('mcp lsp cache stores definition/references and avoids duplicate calls', as
     contextBuilder._clearMcpLspCache();
     assert.equal(contextBuilder._getMcpLspCacheSize(), 0);
 
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
     const fakeResponse = {
         ok: true,
         status: 200,

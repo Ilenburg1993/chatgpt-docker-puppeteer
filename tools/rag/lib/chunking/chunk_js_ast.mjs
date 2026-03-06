@@ -1,12 +1,11 @@
 // @ts-check
 import { parse } from '@babel/parser';
-// @ts-ignore
 import traverseModule from '@babel/traverse';
 import { chunkPlain } from './chunk_plain.mjs';
 import { estimateCharsForLines } from '../text.mjs';
 import { RAG_CHUNK_MAX_CHARS, RAG_CHUNK_TARGET_CHARS } from '../contract.mjs';
 
-const traverse = typeof traverseModule === 'function' ? traverseModule : traverseModule.default;
+const traverse = typeof traverseModule === 'function' ? traverseModule : /** @type {any} */ (traverseModule).default;
 
 function buildCodeFromLines(/** @type {any} */ lines) {
     return lines.join('\n');
@@ -69,7 +68,12 @@ function jsDocStartLine(/** @type {any} */ node, /** @type {any} */ fallbackStar
     return fallbackStartLine;
 }
 
-function firstNonEmptyLine(/** @type {any} */ lines, /** @type {any} */ startLine, /** @type {any} */ endLine, /** @type {any} */ maxLookahead = 6) {
+function firstNonEmptyLine(
+    /** @type {any} */ lines,
+    /** @type {any} */ startLine,
+    /** @type {any} */ endLine,
+    /** @type {any} */ maxLookahead = 6
+) {
     const startIdx = Math.max(0, startLine - 1);
     const endIdx = Math.min(lines.length - 1, endLine - 1, startIdx + maxLookahead);
     for (let i = startIdx; i <= endIdx; i++) {
@@ -79,7 +83,12 @@ function firstNonEmptyLine(/** @type {any} */ lines, /** @type {any} */ startLin
     return null;
 }
 
-function splitLargeUnit(/** @type {any} */ unit, /** @type {any} */ lines, /** @type {any} */ maxChunkChars, /** @type {any} */ minChunkChars) {
+function splitLargeUnit(
+    /** @type {any} */ unit,
+    /** @type {any} */ lines,
+    /** @type {any} */ maxChunkChars,
+    /** @type {any} */ minChunkChars
+) {
     const startIdx = unit.startLine - 1;
     const endIdx = unit.endLine - 1;
     const subLines = lines.slice(startIdx, endIdx + 1);
@@ -90,18 +99,20 @@ function splitLargeUnit(/** @type {any} */ unit, /** @type {any} */ lines, /** @
         linesPerBlock: 50,
     });
 
-    return subRanges.map(/** @type {any} */ (r, idx) => ({
-        startLine: startIdx + r.startLine,
-        endLine: startIdx + r.endLine,
-        kind: `${unit.kind}_block`,
-        symbol: unit.symbol,
-        exported: unit.exported,
-        jsdoc: unit.jsdoc,
-        anchor: unit.anchor,
-        imports: unit.imports,
-        subchunkIndex: idx + 1,
-        subchunkTotal: subRanges.length,
-    }));
+    return subRanges.map(
+        /** @type {any} */ (r, idx) => ({
+            startLine: startIdx + r.startLine,
+            endLine: startIdx + r.endLine,
+            kind: `${unit.kind}_block`,
+            symbol: unit.symbol,
+            exported: unit.exported,
+            jsdoc: unit.jsdoc,
+            anchor: unit.anchor,
+            imports: unit.imports,
+            subchunkIndex: idx + 1,
+            subchunkTotal: subRanges.length,
+        })
+    );
 }
 
 function normalizeAndSplitUnits(/** @type {any} */ units, /** @type {any} */ lines, /** @type {any} */ maxChunkChars) {
@@ -117,7 +128,8 @@ function normalizeAndSplitUnits(/** @type {any} */ units, /** @type {any} */ lin
         normalized.push(...splitLargeUnit(unit, lines, maxChunkChars, minChunkChars));
     }
 
-    normalized.sort(/** @type {any} */ (a, b) =>
+    normalized.sort(
+        /** @type {any} */ (a, b) =>
             a.startLine - b.startLine ||
             a.endLine - b.endLine ||
             String(a.symbol || '').localeCompare(String(b.symbol || ''))
@@ -256,7 +268,9 @@ function collectUnits(/** @type {any} */ ast, /** @type {any} */ lines, /** @typ
     return units;
 }
 
-export function chunkJsAst(/** @type {any} */ { relPath, lines, language = 'js', maxChunkChars = RAG_CHUNK_MAX_CHARS }) {
+export function chunkJsAst(
+    /** @type {any} */ { relPath, lines, language = 'js', maxChunkChars = RAG_CHUNK_MAX_CHARS }
+) {
     const source = buildCodeFromLines(lines);
     const ast = parse(source, {
         sourceType: 'module',
@@ -273,16 +287,19 @@ export function chunkJsAst(/** @type {any} */ { relPath, lines, language = 'js',
     if (!units.length) return [];
 
     const normalized = normalizeAndSplitUnits(units, lines, maxChunkChars);
-    return normalized.map((/** @type {any} */ unit) => (/** @type {any} */ {
-        startLine: unit.startLine,
-        endLine: unit.endLine,
-        kind: unit.kind,
-        symbol: unit.symbol || null,
-        exported: Boolean(unit.exported),
-        jsdoc: unit.jsdoc || null,
-        anchor: unit.anchor || null,
-        imports: unit.imports || [],
-        subchunk_index: unit.subchunkIndex || null,
-        subchunk_total: unit.subchunkTotal || null,
-    }));
+    return normalized.map(
+        (/** @type {any} */ unit) =>
+            /** @type {any} */ ({
+                startLine: unit.startLine,
+                endLine: unit.endLine,
+                kind: unit.kind,
+                symbol: unit.symbol || null,
+                exported: Boolean(unit.exported),
+                jsdoc: unit.jsdoc || null,
+                anchor: unit.anchor || null,
+                imports: unit.imports || [],
+                subchunk_index: unit.subchunkIndex || null,
+                subchunk_total: unit.subchunkTotal || null,
+            })
+    );
 }

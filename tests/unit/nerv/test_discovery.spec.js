@@ -7,7 +7,7 @@ import * as Discovery from '#nerv/discovery';
 import { ActionCode } from '#shared/nerv/constants';
 
 function makeMockNerv() {
-    let listeners = [];
+    /** @type {any[]} */ let listeners = [];
     return {
         onEvent(handler) {
             listeners.push(handler);

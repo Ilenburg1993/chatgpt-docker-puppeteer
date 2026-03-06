@@ -32,7 +32,7 @@ const TIMESTAMP_SCHEMA = z
  * CLEAN_STRING_SCHEMA: O "Filtro Atômico".
  * Aplica automaticamente a sanitização centralizada do fs_utils.
  */
-const CLEAN_STRING_SCHEMA = z.string().transform(val => cleanText(val));
+const CLEAN_STRING_SCHEMA = z.string().transform((/** @type {string} */ val) => cleanText(val));
 
 /**
  * PRIORITY_SCHEMA: Controle de urgência.

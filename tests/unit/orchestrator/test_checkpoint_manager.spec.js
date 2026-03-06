@@ -6,8 +6,8 @@ import path from 'node:path';
 import fs from 'fs/promises';
 
 describe('CheckpointManager Unit Tests', () => {
-    let checkpointManager;
-    let testBaseDir;
+    /** @type {any} */ let checkpointManager;
+    /** @type {any} */ let testBaseDir;
 
     beforeEach(async () => {
         testBaseDir = path.join(import.meta.dirname, '../../test-checkpoints');

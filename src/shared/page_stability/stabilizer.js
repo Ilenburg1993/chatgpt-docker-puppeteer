@@ -82,7 +82,10 @@ class StabilizerAbortError extends Error {
  * @param {number} retries - Max retry attempts (default: 3)
  * @returns {Promise<number>} Event loop lag in ms
  */
-async function measureEventLoopLag(/** @type {any} */ page, /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT) {
+async function measureEventLoopLag(
+    /** @type {any} */ page,
+    /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT
+) {
     for (let i = 0; i < retries; i++) {
         try {
             return await page.evaluate(() => {
@@ -124,7 +127,10 @@ async function measureEventLoopLag(/** @type {any} */ page, /** @type {any} */ r
  * @param {number} retries - Max retry attempts (default: 3)
  * @returns {Promise<boolean>} `true` quando ainda há atividade de carregamento
  */
-async function getPageLoadStatus(/** @type {any} */ page, /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT) {
+async function getPageLoadStatus(
+    /** @type {any} */ page,
+    /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT
+) {
     for (let i = 0; i < retries; i++) {
         try {
             const busy = await page.evaluate((/** @type {any} */ config) => {
@@ -142,14 +148,16 @@ async function getPageLoadStatus(/** @type {any} */ page, /** @type {any} */ ret
                             if (node.matches(selector)) {
                                 // False positive filter: must be visible and have non-zero rects.
                                 const rects = node.getClientRects();
-                                if (rects.length > 0 && (/** @type {any} */ (node)).offsetParent !== null) {
+                                if (rects.length > 0 && /** @type {any} */ (node).offsetParent !== null) {
                                     const st = window.getComputedStyle(node);
                                     if (
                                         st.display !== 'none' &&
                                         st.visibility !== 'hidden' &&
                                         parseFloat(st.opacity || '1') > 0.1
                                     ) {
-                                        const hasSize = Array.from(rects).some((/** @type {any} */ r) => r.width > 0 && r.height > 0);
+                                        const hasSize = Array.from(rects).some(
+                                            (/** @type {any} */ r) => r.width > 0 && r.height > 0
+                                        );
                                         if (hasSize) return true;
                                     }
                                 }
@@ -223,7 +231,11 @@ async function getPageLoadStatus(/** @type {any} */ page, /** @type {any} */ ret
  * @returns {Promise<object>} Result object with success, duration, phases, etc.
  * @throws {TypeError} If required parameters are invalid
  */
-async function waitForStability(/** @type {any} */ driver, /** @type {any} */ timeoutMs = STABILIZER_CONFIG.DEFAULT_TIMEOUT, /** @type {any} */ signal = null) {
+async function waitForStability(
+    /** @type {any} */ driver,
+    /** @type {any} */ timeoutMs = STABILIZER_CONFIG.DEFAULT_TIMEOUT,
+    /** @type {any} */ signal = null
+) {
     // [v2.0] Parameter validation (Bug #1 fix)
     if (!driver || typeof driver !== 'object') {
         throw new TypeError('waitForStability: driver is required and must be a Driver object');
@@ -401,7 +413,7 @@ async function waitForStability(/** @type {any} */ driver, /** @type {any} */ ti
             let silenceWindow = STABILIZER_CONFIG.DOM_SILENCE_WINDOW_DEFAULT;
             try {
                 const metrics = await adaptive.getSnapshot();
-                const targetStats = (/** @type {any} */ (metrics)).targets[result.domain];
+                const targetStats = /** @type {any} */ (metrics).targets[result.domain];
 
                 if (targetStats) {
                     const avgStreamTime = targetStats.stream.avg;
@@ -421,102 +433,112 @@ async function waitForStability(/** @type {any} */ driver, /** @type {any} */ ti
 
             try {
                 await page.evaluate(
-                    async (/** @type {any} */ windowMs, /** @type {any} */ taskDomain, /** @type {any} */ maxWaitMs, /** @type {any} */ config) => {
+                    async (
+                        /** @type {any} */ windowMs,
+                        /** @type {any} */ taskDomain,
+                        /** @type {any} */ maxWaitMs,
+                        /** @type {any} */ config
+                    ) => {
                         /** @type {any[]} */ const observers = [];
-                        if (!(/** @type {any} */ (window)).__STABILIZER_OBSERVERS) {
-                            (/** @type {any} */ (window)).__STABILIZER_OBSERVERS = [];
+                        if (!(/** @type {any} */ (window).__STABILIZER_OBSERVERS)) {
+                            /** @type {any} */ (window).__STABILIZER_OBSERVERS = [];
                         }
 
                         try {
-                            return /** @type {Promise<void>} */ (new Promise((/** @type {any} */ resolve) => {
-                                let lastActivity = Date.now();
-                                const startTime = Date.now();
+                            return /** @type {Promise<void>} */ (
+                                new Promise((/** @type {any} */ resolve) => {
+                                    let lastActivity = Date.now();
+                                    const startTime = Date.now();
 
-                                const onMutation = (/** @type {any} */ mutations) => {
-                                    const isRelevant = mutations.some(
-                                        (/** @type {any} */ m) =>
-                                            m.type === 'childList' ||
-                                            m.type === 'characterData' ||
-                                            (m.type === 'attributes' &&
-                                                (m.attributeName.startsWith('data-') ||
-                                                    ['class', 'aria-busy'].includes(m.attributeName)))
-                                    );
-                                    if (isRelevant) {
-                                        lastActivity = Date.now();
-                                    }
-                                };
+                                    const onMutation = (/** @type {any} */ mutations) => {
+                                        const isRelevant = mutations.some(
+                                            (/** @type {any} */ m) =>
+                                                m.type === 'childList' ||
+                                                m.type === 'characterData' ||
+                                                (m.type === 'attributes' &&
+                                                    (m.attributeName.startsWith('data-') ||
+                                                        ['class', 'aria-busy'].includes(m.attributeName)))
+                                        );
+                                        if (isRelevant) {
+                                            lastActivity = Date.now();
+                                        }
+                                    };
 
-                                /** @type {(Document | ShadowRoot)[]} */
-                                const roots = [document];
-                                /** @type {(Document | ShadowRoot)[]} */
-                                const queue = [document];
-                                while (queue.length > 0) {
-                                    const curr = queue.shift();
-                                    if (!curr) break;
-                                    const walker = document.createTreeWalker(curr, NodeFilter.SHOW_ELEMENT);
-                                    /** @type {unknown} */
-                                    let node = walker.nextNode();
-                                    while (node) {
-                                        if (node instanceof Element) {
-                                            const nodeWithShadow =
-                                                /** @type {Element & {shadowRoot?: ShadowRoot|null}} */ (node);
-                                            const nodeWithContent =
-                                                /** @type {Element & {contentDocument?: Document|null}} */ (node);
-                                            if (nodeWithShadow.shadowRoot) {
-                                                roots.push(nodeWithShadow.shadowRoot);
-                                                queue.push(nodeWithShadow.shadowRoot);
-                                            }
-                                            if (node.tagName === 'IFRAME') {
-                                                try {
-                                                    if (nodeWithContent.contentDocument) {
-                                                        roots.push(nodeWithContent.contentDocument);
-                                                        queue.push(nodeWithContent.contentDocument);
+                                    /** @type {(Document | ShadowRoot)[]} */
+                                    const roots = [document];
+                                    /** @type {(Document | ShadowRoot)[]} */
+                                    const queue = [document];
+                                    while (queue.length > 0) {
+                                        const curr = queue.shift();
+                                        if (!curr) break;
+                                        const walker = document.createTreeWalker(curr, NodeFilter.SHOW_ELEMENT);
+                                        /** @type {unknown} */
+                                        let node = walker.nextNode();
+                                        while (node) {
+                                            if (node instanceof Element) {
+                                                const nodeWithShadow =
+                                                    /** @type {Element & {shadowRoot?: ShadowRoot|null}} */ (node);
+                                                const nodeWithContent =
+                                                    /** @type {Element & {contentDocument?: Document|null}} */ (node);
+                                                if (nodeWithShadow.shadowRoot) {
+                                                    roots.push(nodeWithShadow.shadowRoot);
+                                                    queue.push(nodeWithShadow.shadowRoot);
+                                                }
+                                                if (node.tagName === 'IFRAME') {
+                                                    try {
+                                                        if (nodeWithContent.contentDocument) {
+                                                            roots.push(nodeWithContent.contentDocument);
+                                                            queue.push(nodeWithContent.contentDocument);
+                                                        }
+                                                    } catch (_err) {
+                                                        const _ce = /** @type {any} */ (_err);
+                                                        // Ignore cross-origin iframe access errors
                                                     }
-                                                } catch (_err) {
-                                                    const _ce = /** @type {any} */ (_err);
-                                                    // Ignore cross-origin iframe access errors
                                                 }
                                             }
+                                            node = walker.nextNode();
                                         }
-                                        node = walker.nextNode();
                                     }
-                                }
 
-                                roots.forEach((/** @type {any} */ r) => {
-                                    const obs = new MutationObserver(onMutation);
-                                    const target = r instanceof ShadowRoot ? r : r.documentElement || r;
-                                    try {
-                                        // [v2.0] Optimized observer (Improvement #7)
-                                        obs.observe(target, {
-                                            childList: true,
-                                            subtree: true,
-                                            characterData: true,
-                                            attributes: true,
-                                            attributeFilter: ['class', 'aria-busy', 'data-loading', 'data-testid'],
-                                            attributeOldValue: false,
-                                        });
-                                        observers.push(obs);
-                                        (/** @type {any} */ (window)).__STABILIZER_OBSERVERS.push(obs);
-                                    } catch (_err) {
-                                        const _ce = /** @type {any} */ (_err);
-                                        // Ignore observer errors
-                                    }
-                                });
+                                    roots.forEach((/** @type {any} */ r) => {
+                                        const obs = new MutationObserver(onMutation);
+                                        const target = r instanceof ShadowRoot ? r : r.documentElement || r;
+                                        try {
+                                            // [v2.0] Optimized observer (Improvement #7)
+                                            obs.observe(target, {
+                                                childList: true,
+                                                subtree: true,
+                                                characterData: true,
+                                                attributes: true,
+                                                attributeFilter: ['class', 'aria-busy', 'data-loading', 'data-testid'],
+                                                attributeOldValue: false,
+                                            });
+                                            observers.push(obs);
+                                            /** @type {any} */ (window).__STABILIZER_OBSERVERS.push(obs);
+                                        } catch (_err) {
+                                            const _ce = /** @type {any} */ (_err);
+                                            // Ignore observer errors
+                                        }
+                                    });
 
-                                const check = setInterval(() => {
-                                    const now = Date.now();
-                                    if (!(/** @type {any} */ (window)).__SADI_PULSE) {
-                                        (/** @type {any} */ (window)).__SADI_PULSE = {};
-                                    }
-                                    const lastPulse = (/** @type {any} */ (window)).__SADI_PULSE[taskDomain] || 0;
-                                    const isPulsing = now - lastPulse < config.SADI_PULSE_THRESHOLD;
+                                    const check = setInterval(() => {
+                                        const now = Date.now();
+                                        if (!(/** @type {any} */ (window).__SADI_PULSE)) {
+                                            /** @type {any} */ (window).__SADI_PULSE = {};
+                                        }
+                                        const lastPulse = /** @type {any} */ (window).__SADI_PULSE[taskDomain] || 0;
+                                        const isPulsing = now - lastPulse < config.SADI_PULSE_THRESHOLD;
 
-                                    if ((!isPulsing && now - lastActivity > windowMs) || now - startTime > maxWaitMs) {
-                                        clearInterval(check);
-                                        resolve();
-                                    }
-                                }, config.ENTROPY_CHECK_INTERVAL);
-                            }));
+                                        if (
+                                            (!isPulsing && now - lastActivity > windowMs) ||
+                                            now - startTime > maxWaitMs
+                                        ) {
+                                            clearInterval(check);
+                                            resolve();
+                                        }
+                                    }, config.ENTROPY_CHECK_INTERVAL);
+                                })
+                            );
                         } finally {
                             observers.forEach((/** @type {any} */ o) => o.disconnect());
                         }
@@ -549,8 +571,8 @@ async function waitForStability(/** @type {any} */ driver, /** @type {any} */ ti
                 // [v2.0] Force cleanup (Bug #6 fix)
                 await page
                     .evaluate(() => {
-                        if ((/** @type {any} */ (window)).__STABILIZER_OBSERVERS) {
-                            (/** @type {any} */ (window)).__STABILIZER_OBSERVERS.forEach((/** @type {any} */ obs) => {
+                        if (/** @type {any} */ (window).__STABILIZER_OBSERVERS) {
+                            /** @type {any} */ (window).__STABILIZER_OBSERVERS.forEach((/** @type {any} */ obs) => {
                                 try {
                                     obs.disconnect();
                                 } catch (_err) {
@@ -558,7 +580,7 @@ async function waitForStability(/** @type {any} */ driver, /** @type {any} */ ti
                                     // Ignore observer cleanup errors
                                 }
                             });
-                            (/** @type {any} */ (window)).__STABILIZER_OBSERVERS = [];
+                            /** @type {any} */ (window).__STABILIZER_OBSERVERS = [];
                         }
                     })
                     .catch(() => {});
@@ -628,7 +650,7 @@ async function waitForStability(/** @type {any} */ driver, /** @type {any} */ ti
                         }
 
                         // Trigger one synthetic interaction tick to unblock hydration listeners when possible.
-                        document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+                        /** @type {any} */ (document).dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
                     });
                 }, STABILIZER_CONFIG);
 

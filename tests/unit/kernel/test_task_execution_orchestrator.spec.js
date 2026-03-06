@@ -25,9 +25,9 @@ class MockNERV extends EventEmitter {
 }
 
 describe('TaskExecutionOrchestrator', () => {
-    let nerv;
-    let nervBridge;
-    let orchestrator;
+    /** @type {any} */ let nerv;
+    /** @type {any} */ let nervBridge;
+    /** @type {any} */ let orchestrator;
 
     beforeEach(() => {
         nerv = new MockNERV();

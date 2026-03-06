@@ -6,7 +6,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 
 describe('Infra IO Operations - Operações de Entrada/Saída', () => {
-    let testDir;
+    /** @type {any} */ let testDir;
 
     before(() => {
         testDir = path.join(tmpdir(), `test-io-${Date.now()}`);

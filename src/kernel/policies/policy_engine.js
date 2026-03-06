@@ -116,7 +116,6 @@ class PolicyEngine {
      */
     async _createRejectionEnvelope(originalObs, reason) {
         // Cria um envelope virtual para ser enviado pelo NERV
-        // @ts-ignore
         const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => m.default ?? m);
         const { ActorRole } = await import('#shared/nerv/constants');
 
@@ -135,7 +134,6 @@ class PolicyEngine {
      * @param {any} reason
      */
     async _createTaskFailedEnvelope(task, reason) {
-        // @ts-ignore
         const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => m.default ?? m);
         const { ActorRole } = await import('#shared/nerv/constants');
 

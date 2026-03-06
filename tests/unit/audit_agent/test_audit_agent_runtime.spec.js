@@ -91,7 +91,7 @@ test('AuditAgentRuntime executes triageClient and records llm triage result', as
 
 test('AuditAgentRuntime executes patchAuthorClient for patch-like job and records result', async () => {
     let patchAuthorCalled = 0;
-    const savedPatches = [];
+    /** @type {any[]} */ const savedPatches = [];
     const rt = new AuditAgentRuntime({
         contextBuilder: {
             async collectQuickContext() {

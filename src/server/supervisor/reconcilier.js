@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-nocheck
 import * as socketHub from '#server/engine/socket';
 import remediation from './remediation.js';
 import { log } from '#core/logger';

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { collectQualityFindings } from '../../../scripts/audit/collectors/quality.mjs';
 
 test('quality collector records warning when lint fails without parseable JSON', async () => {
-    const calls = [];
+    /** @type {any[]} */ const calls = [];
 
     const result = await collectQualityFindings({
         profile: 'quick',

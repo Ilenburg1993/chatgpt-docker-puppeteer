@@ -68,13 +68,13 @@ const FRAME_NAV_EVENTS = {
  *
  * @extends Error
  */
-class FrameNavError extends Error {
+class FrameNavError extends /** @type {any} */ (Error) {
     /**
      * Cria uma instância de FrameNavError.
      *
      * @param {string} type - Tipo do erro (TIMEOUT, BARRIER, INVALID_PATH, MAX_DEPTH)
      * @param {string} message - Mensagem de erro
-     * @param {object} context - Contexto adicional
+     * @param {Record<string, unknown>} context - Contexto adicional
      */
     constructor(type, message, context) {
         super(message);
@@ -313,9 +313,9 @@ class FrameNavigator extends EventEmitter {
             const targetSig = part.toLowerCase();
 
             // Localiza o frame no nível atual
-            const frameJSHandle = await currentLevel.evaluateHandle(
+            const frameJSHandle = await /** @type {any} */ (currentLevel).evaluateHandle(
                 /** @param {any} sig */ sig => {
-                    const frames = Array.from(document.querySelectorAll('iframe'));
+                    const frames = Array.from(/** @type {any} */ (document).querySelectorAll('iframe'));
                     return frames.find(f => {
                         if (f.tagName.toLowerCase() !== 'iframe') {
                             return false;

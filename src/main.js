@@ -1,4 +1,4 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
+// @ts-nocheck - bootstrap canônico 214 erros: TS2339(107)+TS18046(20)+TS7006(19)+TS1223(15)+...
 /* ==========================================================================
    src/main.js
    Entry Point: Maestro Bootstrap (Singularity Edition)

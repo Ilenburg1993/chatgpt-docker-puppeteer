@@ -6,6 +6,16 @@
  */
 
 // ============================================================
+// Ambient Module Declarations (third-party without @types)
+// ============================================================
+
+/** @babel/traverse — sem pacote @types oficial no projeto */
+declare module '@babel/traverse' {
+    const traverse: (...args: any[]) => any;
+    export default traverse;
+}
+
+// ============================================================
 // Error Extensions
 // ============================================================
 

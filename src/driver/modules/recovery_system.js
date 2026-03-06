@@ -467,14 +467,16 @@ class RecoverySystem extends EventEmitter {
                 const killTimeout = this._timeout(KILL_TIMEOUT, 'browser_kill');
                 try {
                     await Promise.race([
-                        /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
-                            try {
-                                proc.kill('SIGKILL');
-                                resolve();
-                            } catch (/** @type {any} */ err) {
-                                reject(err);
-                            }
-                        })),
+                        /** @type {Promise<void>} */ (
+                            new Promise((resolve, reject) => {
+                                try {
+                                    proc.kill('SIGKILL');
+                                    resolve();
+                                } catch (/** @type {any} */ err) {
+                                    reject(err);
+                                }
+                            })
+                        ),
                         killTimeout.promise,
                     ]);
                 } finally {

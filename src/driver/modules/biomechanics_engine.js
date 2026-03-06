@@ -368,7 +368,7 @@ class BiomechanicsEngine extends EventEmitter {
             throw new Error('WAIT_ABORTED');
         }
 
-        const { timeout } = await adaptive.getAdjustedTimeout(this.driver.currentDomain, 0, 'INITIAL');
+        const { timeout } = await adaptive.getAdjustedTimeout(this.driver.currentDomain ?? '', 0, 'INITIAL');
 
         const start = Date.now();
         let iterations = 0;

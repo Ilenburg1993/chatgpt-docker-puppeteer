@@ -134,11 +134,13 @@ class DriverReadinessGuard {
             // CHECK 2: Page Stable (Stabilizer)
             // ============================================
             try {
-                const stabilityResult = /** @type {any} */ (await stabilizer.waitForStability(
-                    this.driver,
-                    Number(opts.stabilityTimeout) || 10000,
-                    this.driver.signal || null
-                ));
+                const stabilityResult = /** @type {any} */ (
+                    await stabilizer.waitForStability(
+                        this.driver,
+                        Number(opts.stabilityTimeout) || 10000,
+                        this.driver.signal || null
+                    )
+                );
 
                 if (!stabilityResult?.success) {
                     const reason = stabilityResult?.timeout ? 'timeout' : 'unstable';
@@ -160,7 +162,10 @@ class DriverReadinessGuard {
                     message: `Stability check failed: ${/** @type {any} */ (stabilityErr).message}`,
                 });
 
-                log('WARN', `[DriverReadinessGuard] Stability check error: ${/** @type {any} */ (stabilityErr).message}`);
+                log(
+                    'WARN',
+                    `[DriverReadinessGuard] Stability check error: ${/** @type {any} */ (stabilityErr).message}`
+                );
             }
 
             // ============================================
@@ -355,7 +360,11 @@ class DriverReadinessGuard {
 
             this.lastValidation = result;
 
-            log('ERROR', `[DriverReadinessGuard] Validation failed: ${/** @type {any} */ (err).message}`, this.driver.correlationId);
+            log(
+                'ERROR',
+                `[DriverReadinessGuard] Validation failed: ${/** @type {any} */ (err).message}`,
+                this.driver.correlationId
+            );
 
             throw err;
         }
@@ -377,7 +386,7 @@ class DriverReadinessGuard {
                 stabilityTimeout: 5000,
             });
 
-            return (/** @type {any} */ (result)).ready;
+            return /** @type {any} */ (result).ready;
         } catch (/** @type {any} */ _) {
             return false;
         }

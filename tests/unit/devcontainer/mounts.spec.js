@@ -9,7 +9,7 @@ import { join } from 'path';
 // helper that sources post-create.sh and then invokes a named function with args
 import { spawnSync } from 'child_process';
 
-function runPostCreateHelper(func, args = [], env = {}) {
+function runPostCreateHelper(/** @type {any} */ func, /** @type {any[]} */ args = [], env = {}) {
     // create a small wrapper script to avoid quoting headaches
     // we sometimes need to modify PATH for the helper function only while
     // keeping the original PATH available during the initial sourcing phase.
@@ -49,7 +49,7 @@ ${func} ${args.map(a => `'${a}'`).join(' ')}
 }
 
 // create a fake binary in a temp directory and prepend to PATH
-function withFakeBinary(name, content, fn) {
+function withFakeBinary(/** @type {any} */ name, /** @type {any} */ content, /** @type {any} */ fn) {
     const binDir = mkdtempSync(join(tmpdir(), 'fakebin-'));
     const pathFile = join(binDir, name);
     writeFileSync(pathFile, content, { mode: 0o755 });
@@ -66,7 +66,7 @@ function withFakeBinary(name, content, fn) {
 }
 
 // shorthand for creating a fake stat that returns a constant UID
-function fakeStat(uid) {
+function fakeStat(/** @type {any} */ uid) {
     return `#!/usr/bin/env bash
         # ignore args, always print uid
         echo ${uid}
@@ -74,7 +74,7 @@ function fakeStat(uid) {
 }
 
 // shorthand for creating a fake mount output
-function fakeMount(output) {
+function fakeMount(/** @type {any} */ output) {
     return `#!/usr/bin/env bash
         cat <<'MOUNTOUT'
 ${output}

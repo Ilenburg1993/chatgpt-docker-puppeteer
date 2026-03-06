@@ -10,7 +10,7 @@ function sleep(ms) {
 
 describe('RagWatchBatcher', () => {
     it('debounces events, deduplicates paths and splits by batch size', async () => {
-        const batches = [];
+        /** @type {any[]} */ const batches = [];
         const batcher = new RagWatchBatcher({
             debounceMs: 40,
             batchMax: 2,

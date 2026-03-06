@@ -32,7 +32,7 @@ describe('Server Middleware - Request Processing', () => {
         });
 
         it('deve logar erro antes de responder', () => {
-            const logs = [];
+            /** @type {any[]} */ const logs = [];
 
             const errorHandler = err => {
                 logs.push({
@@ -244,7 +244,7 @@ describe('Server Middleware - Request Processing', () => {
 
     describe('5. Logging Middleware', () => {
         it('deve logar requisição recebida', () => {
-            const logs = [];
+            /** @type {any[]} */ const logs = [];
 
             const logger = req => {
                 logs.push({

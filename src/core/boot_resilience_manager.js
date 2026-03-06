@@ -97,7 +97,7 @@ async function createBrowserPool(config, nerv = null) {
         log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
     }
 
-    await pool.initialize();
+    await /** @type {any} */ (pool).initialize();
     return pool;
 }
 
@@ -144,7 +144,7 @@ async function tryStartChrome() {
             return false;
         }
     } catch (_rawError) {
-            const error = /** @type {any} */ (_rawError);
+        const error = /** @type {any} */ (_rawError);
         log('WARN', `[RESILIENCE] Falha ao executar start-chrome.sh: ${error.message}`);
         return false;
     }
@@ -267,14 +267,16 @@ async function handleBrowserPoolFailure(error, options = {}) {
                         const { default: CONFIG } = await import('./config.js');
                         const all = /** @type {any} */ (CONFIG).all ?? {};
 
-                        const browserPool = await createBrowserPool(/** @type {any} */ ({
-                            poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
-                            allocationStrategy:
-                                process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
-                            healthCheckInterval:
-                                process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
-                            browserEndpoint: getBrowserEndpoint(),
-                        }));
+                        const browserPool = await createBrowserPool(
+                            /** @type {any} */ ({
+                                poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
+                                allocationStrategy:
+                                    process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
+                                healthCheckInterval:
+                                    process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
+                                browserEndpoint: getBrowserEndpoint(),
+                            })
+                        );
 
                         log('INFO', '[RESILIENCE] ✅ Browser Pool reconectado com sucesso após iniciar Chrome!');
 
@@ -355,12 +357,16 @@ async function handleBrowserPoolFailure(error, options = {}) {
                     const { default: CONFIG } = await import('./config.js');
                     const all = /** @type {any} */ (CONFIG).all ?? {};
 
-                    const browserPool = await createBrowserPool(/** @type {any} */ ({
-                        poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
-                        allocationStrategy: process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
-                        healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
-                        browserEndpoint: getBrowserEndpoint(),
-                    }));
+                    const browserPool = await createBrowserPool(
+                        /** @type {any} */ ({
+                            poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
+                            allocationStrategy:
+                                process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
+                            healthCheckInterval:
+                                process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
+                            browserEndpoint: getBrowserEndpoint(),
+                        })
+                    );
 
                     log('INFO', '[RESILIENCE] ✅ Browser Pool conectado com sucesso após correção manual!');
 
@@ -430,9 +436,9 @@ async function initializeBrowserPoolResilient(config, options = {}) {
             log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
         }
 
-        await browserPool.initialize();
+        await /** @type {any} */ (browserPool).initialize();
 
-        const poolHealth = /** @type {any} */ (await browserPool.getHealth());
+        const poolHealth = /** @type {any} */ (await /** @type {any} */ (browserPool).getHealth());
         log(
             'INFO',
             `[RESILIENCE] ✅ Browser Pool online (${poolHealth.healthy}/${poolHealth.poolSize} instâncias saudáveis)`
@@ -444,7 +450,7 @@ async function initializeBrowserPoolResilient(config, options = {}) {
             browserPool,
         };
     } catch (_rawError) {
-            const error = /** @type {any} */ (_rawError);
+        const error = /** @type {any} */ (_rawError);
         log('WARN', `[RESILIENCE] Browser Pool falhou na inicialização: ${error.message}`);
 
         // Delega para handler de falha

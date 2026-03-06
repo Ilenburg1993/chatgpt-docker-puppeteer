@@ -6,8 +6,8 @@ import { ValidationService } from '#orchestrator/validation/validation_service';
 import { STATUS_VALUES } from '#core/constants/tasks';
 
 describe('ValidationService', () => {
-    let validationService;
-    let mockNerv;
+    /** @type {any} */ let validationService;
+    /** @type {any} */ let mockNerv;
 
     beforeEach(() => {
         mockNerv = {
@@ -178,8 +178,8 @@ describe('ValidationService', () => {
 });
 
 describe('OrchestratorEngine', () => {
-    let orchestrator;
-    let mockNerv;
+    /** @type {any} */ let orchestrator;
+    /** @type {any} */ let mockNerv;
 
     beforeEach(() => {
         mockNerv = {

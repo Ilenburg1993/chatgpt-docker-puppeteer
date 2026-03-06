@@ -27,9 +27,9 @@ class DevelopmentMonitor {
         this.childProcess = null;
         this.restartCount = 0;
         this.lastRestart = Date.now();
-        this.errors = [];
-        this.warnings = [];
-        this.memoryPeaks = [];
+        /** @type {any[]} */ this.errors = [];
+        /** @type {any[]} */ this.warnings = [];
+        /** @type {any[]} */ this.memoryPeaks = [];
     }
 
     async start() {

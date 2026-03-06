@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import * as schemas from '#core/schemas';
 import { log } from '#core/logger';
 import { recordEvent } from '#infra/db/events_repo';

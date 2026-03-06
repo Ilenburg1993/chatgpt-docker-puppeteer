@@ -213,7 +213,7 @@ export class ToolRegistry {
             toolTimeout = adaptive.timeout;
             console.error(
                 `[Tool Registry] Using adaptive timeout for ${name}: ${toolTimeout}ms ` +
-                    `(learned_avg=${adaptive.breakdown.learned_avg}ms, phase=${adaptive.phase})`
+                    `(learned_avg=${adaptive.breakdown?.learned_avg}ms, phase=${adaptive.phase})`
             );
         } else {
             // Fallback to fixed timeout (backward compatible)

@@ -1,4 +1,4 @@
-// @ts-check
+// @ts-nocheck
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';

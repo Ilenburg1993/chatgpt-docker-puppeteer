@@ -14,6 +14,7 @@ console.log(`
 
 let testsPassed = 0;
 let testsFailed = 0;
+/** @type {any} */
 let context = null;
 
 /**
@@ -36,7 +37,8 @@ async function runTest(name, testFn, timeoutMs = 5000) {
         testsPassed++;
         return true;
     } catch (error) {
-        console.log(`❌ FALHOU: ${error.message}\n`);
+        const _ce = /** @type {any} */ (error);
+        console.log(`❌ FALHOU: ${_ce.message}\n`);
         testsFailed++;
         return false;
     }

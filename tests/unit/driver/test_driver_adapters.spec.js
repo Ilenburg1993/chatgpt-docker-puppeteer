@@ -165,13 +165,13 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
                 stopButton: 'button[aria-label="Stop"]',
             };
 
-            const isGenerating = page => {
+            const isGenerating = (/** @type {any} */ page) => {
                 // Simular verificação
                 return page.hasElement(selectors.generatingIndicator);
             };
 
             const mockPage = {
-                hasElement: sel => sel === '.generating-indicator',
+                hasElement: (/** @type {any} */ sel) => sel === '.generating-indicator',
             };
 
             assert.ok(isGenerating(mockPage));
@@ -256,7 +256,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve aguardar seletor aparecer', async () => {
             let apareceu = false;
 
-            const waitFor = async (selector, timeout) => {
+            const waitFor = async (/** @type {any} */ selector, /** @type {any} */ timeout) => {
                 await new Promise(resolve => {
                     setTimeout(resolve, 100);
                 });
@@ -269,7 +269,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         });
 
         it('deve falhar após timeout', async () => {
-            const waitFor = async (selector, timeout) => {
+            const waitFor = async (/** @type {any} */ selector, /** @type {any} */ timeout) => {
                 const start = Date.now();
                 await new Promise(resolve => {
                     setTimeout(resolve, timeout + 100);
@@ -290,7 +290,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             const events = [];
 
             const adapter = {
-                emit: event => events.push(event),
+                emit: (/** @type {any} */ event) => events.push(event),
             };
 
             adapter.emit({ type: 'DRIVER_READY' });
@@ -304,7 +304,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             let comandoRecebido = null;
 
             const adapter = {
-                onCommand: cmd => {
+                onCommand: (/** @type {any} */ cmd) => {
                     comandoRecebido = cmd;
                 },
             };
