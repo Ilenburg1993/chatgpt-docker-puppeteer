@@ -18,7 +18,7 @@ class FakeEmbeddingsProvider {
         return { ok: true, hasModel: true, models: [this.model] };
     }
 
-    async embed(text) {
+    async embed(/** @type {string} */ text) {
         const hash = crypto.createHash('sha256').update(String(text), 'utf8').digest();
         const vector = [];
         for (let i = 0; i < this.dim; i++) vector.push(hash[i] / 255);
@@ -35,7 +35,7 @@ describe('ragHealth availability + indexing progress logs', () => {
         };
 
         try {
-            const health = await ragHealth({ paths: ragPaths, embeddingsProvider: new FakeEmbeddingsProvider(8) });
+            const health = /** @type {any} */ (await ragHealth({ paths: ragPaths, embeddingsProvider: new FakeEmbeddingsProvider(8) }));
             assert.strictEqual(health.available, false);
             assert.strictEqual(health.ok, false);
         } finally {
@@ -57,7 +57,7 @@ describe('ragHealth availability + indexing progress logs', () => {
             await fs.writeFile(path.join(ws, 'a.ts'), 'export const A = 1;\n', 'utf8');
             await ragIndex({ root: ws, paths: ragPaths, embeddingsProvider: embeddings, profile: 'full' });
 
-            const health = await ragHealth({ paths: ragPaths, embeddingsProvider: embeddings });
+            const health = /** @type {any} */ (await ragHealth({ paths: ragPaths, embeddingsProvider: embeddings }));
             assert.strictEqual(health.available, true);
             assert.strictEqual(health.ok, true);
             assert.ok(typeof health.index_updated_at === 'number');

@@ -142,22 +142,26 @@ test(
 test(
     'inference profile and client policy repos support basic upsert/list/get',
     withTempDb(async () => {
-        const profile = /** @type {any} */ (upsertInferenceProfile({
-            name: 'patch_safe',
-            purpose: 'patch generation',
-            generation_params: { temperature: 0.1, top_p: 0.9 },
-            fallback_chain: [{ model: 'small' }],
-        }));
+        const profile = /** @type {any} */ (
+            upsertInferenceProfile({
+                name: 'patch_safe',
+                purpose: 'patch generation',
+                generation_params: { temperature: 0.1, top_p: 0.9 },
+                fallback_chain: [{ model: 'small' }],
+            })
+        );
         assert.equal(profile.name, 'patch_safe');
 
-        const policy = /** @type {any} */ (upsertInferenceClientPolicy({
-            client_tag: 'audit_agent_patch',
-            profile_id: profile.id,
-            allowed_models: ['qwen2.5-coder'],
-            allowed_backends: ['ollama_local'],
-            max_parallel: 1,
-            timeout_ms: 120000,
-        }));
+        const policy = /** @type {any} */ (
+            upsertInferenceClientPolicy({
+                client_tag: 'audit_agent_patch',
+                profile_id: profile.id,
+                allowed_models: ['qwen2.5-coder'],
+                allowed_backends: ['ollama_local'],
+                max_parallel: 1,
+                timeout_ms: 120000,
+            })
+        );
         assert.equal(policy.client_tag, 'audit_agent_patch');
         assert.equal(policy.profile_id, profile.id);
 

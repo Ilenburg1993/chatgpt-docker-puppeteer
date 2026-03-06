@@ -6,11 +6,11 @@ import { ActionCode } from '#shared/nerv/constants';
 
 class MockNerv {
     constructor() {
-        this.handlers = [];
+        this.handlers = /** @type {any[]} */ ([]);
         this.unsubCalls = 0;
     }
 
-    onReceive(handler) {
+    onReceive(/** @type {any} */ handler) {
         this.handlers.push(handler);
         return () => {
             this.unsubCalls += 1;
@@ -21,7 +21,7 @@ class MockNerv {
         };
     }
 
-    emitEnvelope(envelope) {
+    emitEnvelope(/** @type {any} */ envelope) {
         for (const handler of this.handlers) {
             handler(envelope);
         }

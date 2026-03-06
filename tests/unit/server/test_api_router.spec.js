@@ -237,7 +237,7 @@ describe('API Router - Rotas e Controllers', () => {
 
         it('deve criar nova tarefa', () => {
             const controller = {
-                createTask: body => {
+                createTask: (/** @type {any} */ body) => {
                     return {
                         id: 'task-new',
                         ...body,
@@ -256,10 +256,10 @@ describe('API Router - Rotas e Controllers', () => {
 
         it('deve buscar tarefa por ID', () => {
             const controller = {
-                getTask: id => {
-                    const tasks = {
+                getTask: (/** @type {any} */ id) => {
+                    const tasks = /** @type {Record<string, any>} */ ({
                         'task-001': { id: 'task-001', status: 'DONE' },
-                    };
+                    });
                     return tasks[id];
                 },
             };
@@ -288,7 +288,7 @@ describe('API Router - Rotas e Controllers', () => {
 
         it('deve processar comando de controle', () => {
             const controller = {
-                controlAgent: command => {
+                controlAgent: (/** @type {any} */ command) => {
                     return {
                         command,
                         executed: true,
@@ -321,7 +321,7 @@ describe('API Router - Rotas e Controllers', () => {
 
     describe('11. Tratamento de Erros', () => {
         it('deve capturar erro de validação', () => {
-            const validateTask = body => {
+            const validateTask = (/** @type {any} */ body) => {
                 if (!body.prompt) {
                     throw new Error('Prompt is required');
                 }

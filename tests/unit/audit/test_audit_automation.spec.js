@@ -60,7 +60,7 @@ test('audit runner fatal fallback emits valid AuditRunV3 payload and artifacts',
         }
         assert.ok(reportFiles.length > 0, 'runner must produce audit_report artifact when stdout JSON is unavailable');
         const latestReport = reportFiles.sort().at(-1);
-        const report = JSON.parse(fs.readFileSync(latestReport, 'utf8'));
+        const report = JSON.parse(fs.readFileSync(/** @type {string} */ (latestReport), 'utf8'));
         payload = {
             report,
             outputs: {
@@ -137,7 +137,7 @@ test('publishSnapshot creates immutable markdown copy from master', () => {
     const snapshotsDir = path.join(tmpDir, 'rodadas');
 
     fs.writeFileSync(masterPath, '# MASTER\nconteudo\n', 'utf8');
-    const out = publishSnapshot({ masterPath, snapshotsDir, now: new Date('2026-02-15T10:00:00Z') });
+    const out = publishSnapshot(/** @type {any} */ ({ masterPath, snapshotsDir, now: new Date('2026-02-15T10:00:00Z') }));
 
     assert.ok(fs.existsSync(out.path), 'snapshot file should exist');
     const content = fs.readFileSync(out.path, 'utf8');

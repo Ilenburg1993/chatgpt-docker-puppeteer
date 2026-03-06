@@ -156,7 +156,7 @@ describe('NERV Envelope - Protocolo Universal', () => {
                 payload,
             });
 
-            assert.deepStrictEqual(envelope.payload.nested.array, [1, 2, 3]);
+            assert.deepStrictEqual(/** @type {any} */ (envelope.payload).nested.array, [1, 2, 3]);
         });
     });
 

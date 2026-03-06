@@ -7,16 +7,16 @@ test('quality collector smart plan resolves docs-only run with selective executi
     /** @type {string[]} */
     const calledSteps = [];
 
-    const result = await collectQualityFindings({
+    const result = await collectQualityFindings(/** @type {any} */ ({
         profile: 'quick',
         changedFiles: ['README.md'],
         qualityMode: 'smart',
         qualityJsdoc: false,
-        exec: async stepId => {
+        exec: async (/** @type {any} */ stepId) => {
             calledSteps.push(stepId);
             return { ok: true, exitCode: 0, stdout: '', stderr: '' };
         },
-    });
+    }));
 
     assert.deepEqual(result.errors, []);
     assert.equal(result.telemetry.strategy, 'changed-only');
@@ -28,7 +28,7 @@ test('quality collector smart plan resolves docs-only run with selective executi
     assert.equal(result.telemetry.gates.prettier_ok, true);
     assert.equal(result.telemetry.gates.jsdoc_delta_ok, null);
     assert.equal(result.telemetry.gates.ts_ignore_ok, true);
-    assert.ok(result.telemetry.steps_skipped.some(item => item.step === 'quality.lint'));
+    assert.ok(result.telemetry.steps_skipped.some((/** @type {any} */ item) => item.step === 'quality.lint'));
     assert.ok(calledSteps.includes('quality.prettier_check'));
     assert.ok(calledSteps.includes('quality.ts_ignore_scan'));
 });

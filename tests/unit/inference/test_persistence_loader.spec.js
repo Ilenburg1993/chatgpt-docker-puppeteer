@@ -10,7 +10,7 @@ import { upsertInferenceClientPolicy } from '../../../src/infra/db/inference_cli
 import { loadInferencePoliciesFromDb } from '../../../src/inference_gateway/persistence.js';
 import { InferenceGateway } from '../../../src/inference_gateway/gateway.js';
 
-function withTempDb(fn) {
+function withTempDb(/** @type {any} */ fn) {
     return async () => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inference-loader-'));
         const dbPath = path.join(tmpDir, 'maestro.sqlite');
@@ -39,7 +39,7 @@ test(
         });
         upsertInferenceClientPolicy({
             client_tag: 'audit_agent_patch',
-            profile_id: profile.id,
+            profile_id: /** @type {any} */ (profile).id,
             max_parallel: 1,
             timeout_ms: 7777,
             allowed_models: ['qwen2.5-coder:7b'],

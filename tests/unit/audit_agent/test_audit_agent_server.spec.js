@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { createAuditAgentServer } from '../../../src/audit_agent/server.js';
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
 
-async function listen(server) {
-    await new Promise((resolve, reject) => {
-        server.listen(0, '127.0.0.1', err => (err ? reject(err) : resolve()));
-    });
+async function listen(/** @type {any} */ server) {
+    await /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
+        server.listen(0, '127.0.0.1', (/** @type {any} */ err) => (err ? reject(err) : resolve()));
+    }));
     const addr = server.address();
     return `http://${addr.address}:${addr.port}`;
 }
@@ -43,7 +43,7 @@ test('audit-agent server creates and runs jobs via HTTP', async () => {
         assert.equal(metricsJson.ok, true);
         assert.equal(metricsJson.metrics.jobs_total, 1);
     } finally {
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
     }
 });
 
@@ -63,6 +63,6 @@ test('audit-agent server returns patch-like jobs in WAITING_APPROVAL after run',
         const runJson = await runRes.json();
         assert.equal(runJson.job.status, 'WAITING_APPROVAL');
     } finally {
-        await new Promise(resolve => server.close(() => resolve()));
+        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
     }
 });

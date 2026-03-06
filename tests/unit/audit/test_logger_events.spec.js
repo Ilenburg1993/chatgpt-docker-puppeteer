@@ -9,12 +9,12 @@ import { AUDIT_EVENT_TYPES } from '../../../scripts/audit/lib/event_types.mjs';
 
 test('audit logger emits monotonic seq and validates payload shape', () => {
     const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-logger-'));
-    const logger = createAuditLogger({
+    const logger = /** @type {any} */ (createAuditLogger(/** @type {any} */ ({
         runId: 'RUN_TEST',
         runDir,
         logFormat: 'jsonl',
         enableConsole: false,
-    });
+    })));
 
     logger.emit({
         event_type: AUDIT_EVENT_TYPES.RUN_STARTED,

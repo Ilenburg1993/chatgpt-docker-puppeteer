@@ -18,7 +18,7 @@ class FakeEmbeddingsProvider {
         return { ok: true, hasModel: true, models: [this.model] };
     }
 
-    async embed(text) {
+    async embed(/** @type {string} */ text) {
         const hash = crypto.createHash('sha256').update(String(text), 'utf8').digest();
         const vector = [];
         for (let i = 0; i < this.dim; i += 1) vector.push(hash[i] / 255);

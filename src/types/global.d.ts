@@ -350,3 +350,5 @@ type Callback<T = void> = (error?: Error, result?: T) => void;
  * Type helper para promises que podem retornar void
  */
 type MaybePromise<T> = T | Promise<T>;
+
+declare module 'supertest';

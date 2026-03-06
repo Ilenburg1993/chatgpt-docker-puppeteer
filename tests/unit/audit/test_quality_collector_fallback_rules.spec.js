@@ -6,14 +6,14 @@ import { collectQualityFindings } from '../../../scripts/audit/collectors/qualit
 test('quality collector records warning when lint fails without parseable JSON', async () => {
     /** @type {any[]} */ const calls = [];
 
-    const result = await collectQualityFindings({
+    const result = await collectQualityFindings(/** @type {any} */ ({
         profile: 'quick',
         changedFiles: ['package.json'],
         qualityMode: 'smart',
         qualityJsdoc: false,
         qualityCache: false,
         qualityParallelism: 'serial',
-        exec: async stepId => {
+        exec: async (/** @type {any} */ stepId) => {
             calls.push(stepId);
             switch (stepId) {
                 case 'quality.lint':
@@ -27,11 +27,11 @@ test('quality collector records warning when lint fails without parseable JSON',
                     return { ok: true, exitCode: 0, stdout: '', stderr: '' };
             }
         },
-    });
+    }));
 
     assert.ok(calls.includes('quality.lint'));
     assert.equal(result.telemetry.strategy, 'full');
     assert.equal(result.telemetry.gates.lint_ok, false);
-    assert.equal(result.findings.filter(f => f.source_tool === 'quality:eslint').length, 0);
-    assert.ok(result.warnings.some(w => w.source === 'quality:lint' && /eslint/i.test(w.message)));
+    assert.equal(result.findings.filter((/** @type {any} */ f) => f.source_tool === 'quality:eslint').length, 0);
+    assert.ok(result.warnings.some((/** @type {any} */ w) => w.source === 'quality:lint' && /eslint/i.test(w.message)));
 });

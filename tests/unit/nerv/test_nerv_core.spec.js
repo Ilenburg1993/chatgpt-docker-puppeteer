@@ -215,8 +215,7 @@ describe('NERV Core - Event Bus Central', () => {
             try {
                 await nerv.aguardarEvento('NEVER_EMITTED', 100);
                 assert.fail('Deveria ter dado timeout');
-            } catch (/** @type {any} */ error) {
-            }
+            } catch (/** @type {any} */ error) {}
         });
     });
 

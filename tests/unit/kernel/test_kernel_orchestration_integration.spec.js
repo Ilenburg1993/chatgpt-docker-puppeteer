@@ -13,9 +13,9 @@ class MockNERV extends EventEmitter {
             dequeueInbound: () => null,
             dequeueOutbound: () => null,
         };
-        this.emittedCommands = [];
-        this.emittedEvents = [];
-        this.receiveHandlers = [];
+        this.emittedCommands = /** @type {any[]} */ ([]);
+        this.emittedEvents = /** @type {any[]} */ ([]);
+        this.receiveHandlers = /** @type {any[]} */ ([]);
     }
 
     onReceive(/** @type {any} */ handler) {
@@ -39,7 +39,7 @@ class MockNERV extends EventEmitter {
     }
 
     emit(/** @type {any} */ actionCode, /** @type {any} */ payload) {
-        super.emit(actionCode, payload);
+        return super.emit(actionCode, payload);
     }
 }
 

@@ -94,11 +94,11 @@ test('runtime collector ignores noisy warning when rag health JSON is healthy', 
         },
     ];
 
-    const result = await collectRuntimeFindings({
+    const result = await collectRuntimeFindings(/** @type {any} */ ({
         profile: 'quick',
         contracts,
         exec: mockExec,
-    });
+    }));
 
     assert.equal(result.telemetry.rag.ok, true);
     assert.equal(

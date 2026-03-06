@@ -9,13 +9,13 @@ import { ActionCode } from '#shared/nerv/constants';
 function makeMockNerv() {
     /** @type {any[]} */ let listeners = [];
     return {
-        onEvent(handler) {
+        onEvent(/** @type {any} */ handler) {
             listeners.push(handler);
             return () => {
                 listeners = listeners.filter(h => h !== handler);
             };
         },
-        emitEvent(envelope) {
+        emitEvent(/** @type {any} */ envelope) {
             listeners.slice().forEach(h => {
                 try {
                     h(envelope);
@@ -24,7 +24,7 @@ function makeMockNerv() {
                 }
             });
         },
-        emitCommand(envelope) {
+        emitCommand(/** @type {any} */ envelope) {
             listeners.slice().forEach(h => {
                 try {
                     h(envelope);
@@ -33,7 +33,7 @@ function makeMockNerv() {
                 }
             });
         },
-        emitAck(envelope) {
+        emitAck(/** @type {any} */ envelope) {
             listeners.slice().forEach(h => {
                 try {
                     h(envelope);
@@ -47,7 +47,7 @@ function makeMockNerv() {
 
 test('publishServerReady uses NERV emitEvent', async () => {
     const mock = makeMockNerv();
-    let captured = null;
+    /** @type {any} */ let captured = null;
     // Replace emitEvent to capture envelope
     mock.emitEvent = env => {
         captured = env;
@@ -69,7 +69,7 @@ test('waitForServerReady resolves when NERV emits SERVER_READY', async () => {
         mock.emitEvent({ type: { action_code: ActionCode.SERVER_READY }, payload: { port: 3010 } });
     }, 10);
 
-    const payload = await p;
+    const payload = /** @type {any} */ (await p);
     assert.strictEqual(payload.port, 3010);
 });
 

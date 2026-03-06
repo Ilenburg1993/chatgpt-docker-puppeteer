@@ -8,7 +8,7 @@ import { join } from 'path';
 
 const script = join(process.cwd(), '.devcontainer/scripts/post-attach.sh');
 
-function runAttach(env = {}, options = {}) {
+function runAttach(env = {}, /** @type {any} */ options = {}) {
     // ensure state directory fresh unless caller requests preservation
     const { clear = true } = options;
     const state = join(process.cwd(), '.devcontainer/state');

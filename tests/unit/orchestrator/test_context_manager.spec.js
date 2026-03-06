@@ -311,7 +311,7 @@ describe('MemoryStore Unit Tests', () => {
             const results = memoryStore.getPatternsByType('feedback', 10);
 
             assert.strictEqual(results.length, 2);
-            assert.ok(results.every(p => p.type === 'feedback'));
+            assert.ok(results.every((/** @type {any} */ p) => p.type === 'feedback'));
         });
 
         it('should return empty array for non-existent type', () => {
@@ -349,7 +349,7 @@ describe('MemoryStore Unit Tests', () => {
             }
 
             // Pattern 1 deveria ter sido preservado por ser muito acessado
-            const remaining = memoryStore.patterns.map(p => p.content);
+            const remaining = memoryStore.patterns.map((/** @type {any} */ p) => p.content);
             // (Nota: LRU simples, não garante que Pattern 1 seja mantido se outros foram acessados recentemente)
         });
     });

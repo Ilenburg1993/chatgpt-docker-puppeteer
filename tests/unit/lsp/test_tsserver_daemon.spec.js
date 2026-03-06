@@ -40,11 +40,11 @@ describe('TsserverDaemon', () => {
             assert.ok(Array.isArray(references));
             assert.ok(references.length >= 1);
 
-            const hover = await daemon.execute('hover', {
+            const hover = /** @type {any} */ (await daemon.execute('hover', {
                 filePath,
                 line: 2,
                 character: 13,
-            });
+            }));
             assert.ok(hover);
             assert.ok(typeof hover.display === 'string');
 
@@ -117,10 +117,10 @@ describe('TsserverDaemon', () => {
                 ],
             };
 
-            const preview = await daemon.execute('apply_code_action', {
+            const preview = /** @type {any} */ (await daemon.execute('apply_code_action', {
                 mode: 'preview',
                 action,
-            });
+            }));
             assert.strictEqual(preview.mode, 'preview');
             assert.strictEqual(preview.totalEdits, 1);
 
@@ -131,11 +131,11 @@ describe('TsserverDaemon', () => {
             );
 
             process.env.LSP_MUTATIONS_ENABLED = 'true';
-            const applied = await daemon.execute('apply_code_action', {
+            const applied = /** @type {any} */ (await daemon.execute('apply_code_action', {
                 mode: 'apply',
                 action,
                 confirmationToken: 'ok-token',
-            });
+            }));
             assert.strictEqual(applied.mode, 'apply');
             const text = await fs.readFile(filePath, 'utf8');
             assert.ok(text.startsWith('let  '));

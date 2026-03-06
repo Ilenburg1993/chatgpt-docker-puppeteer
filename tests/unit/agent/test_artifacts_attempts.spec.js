@@ -267,7 +267,9 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
         const proc = new MissionPlannerProcessor({ intervalMs: 999999 });
         await proc.tick();
 
-        const count = (/** @type {any} */ (db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(mission.id)))?.c || 0;
+        const count =
+            /** @type {any} */ (db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(mission.id))
+                ?.c || 0;
         assert.ok(count >= 2, 'deve criar pelo menos uma nova task proposal na missão');
 
         const rows = db

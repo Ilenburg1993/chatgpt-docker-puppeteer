@@ -14,7 +14,7 @@ describe('ValidationService', () => {
             emit: () => {}, // Mock NERV
             events: [],
         };
-        mockNerv.emit = (event, payload) => {
+        mockNerv.emit = (/** @type {any} */ event, /** @type {any} */ payload) => {
             mockNerv.events.push({ event, payload });
         };
 

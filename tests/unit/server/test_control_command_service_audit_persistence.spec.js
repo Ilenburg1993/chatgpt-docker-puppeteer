@@ -375,7 +375,11 @@ test(
             else process.env.INFERENCE_GATEWAY_HOST = prevGwHost;
             if (prevGwPort === undefined) delete process.env.INFERENCE_GATEWAY_PORT;
             else process.env.INFERENCE_GATEWAY_PORT = prevGwPort;
-            await /** @type {Promise<void>} */ (new Promise(resolve => { stub.server.close(() => resolve()); }));
+            await /** @type {Promise<void>} */ (
+                new Promise(resolve => {
+                    stub.server.close(() => resolve());
+                })
+            );
         }
     })
 );

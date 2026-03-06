@@ -25,7 +25,7 @@ test('pruneAuditRuns keeps max runs and preserves current run', () => {
         keepRunId: 'run-a',
     });
 
-    assert.ok(result.pruned.length >= 1);
+    assert.ok(/** @type {any} */ (result).pruned.length >= 1);
     assert.equal(fs.existsSync(path.join(runsRoot, 'run-a')), true);
     assert.ok(fs.existsSync(path.join(runsRoot, 'run-c')) || fs.existsSync(path.join(runsRoot, 'run-d')));
 });

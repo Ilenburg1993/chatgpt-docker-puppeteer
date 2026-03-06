@@ -282,8 +282,8 @@ describe('CheckpointManager Unit Tests', () => {
             const checkpoints = await manager.listCheckpoints('mission-456');
 
             assert.strictEqual(checkpoints.length, 2);
-            assert.strictEqual(checkpoints[0].step_index, 3); // Most recent
-            assert.strictEqual(checkpoints[1].step_index, 2); // Second most recent
+            assert.strictEqual(/** @type {any} */ (checkpoints[0]).step_index, 3); // Most recent
+            assert.strictEqual(/** @type {any} */ (checkpoints[1]).step_index, 2); // Second most recent
         });
     });
 

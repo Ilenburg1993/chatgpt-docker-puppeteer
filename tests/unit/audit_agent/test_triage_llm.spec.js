@@ -5,9 +5,11 @@ import http from 'node:http';
 import { createAuditAgentTriageLlmClient } from '../../../src/audit_agent/triage_llm.js';
 
 async function listen(/** @type {any} */ server) {
-    await /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
-        server.listen(0, '127.0.0.1', (/** @type {any} */ err) => (err ? reject(err) : resolve()));
-    }));
+    await /** @type {Promise<void>} */ (
+        new Promise((resolve, reject) => {
+            server.listen(0, '127.0.0.1', (/** @type {any} */ err) => (err ? reject(err) : resolve()));
+        })
+    );
     const addr = server.address();
     return { host: addr.address, port: addr.port };
 }

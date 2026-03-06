@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import { buildQualityExecutionPlan } from '../../../scripts/audit/lib/impact_classifier.mjs';
 
 test('impact classifier: docs-only quick smart skips lint/typecheck and keeps prettier delta', () => {
-    const plan = buildQualityExecutionPlan({
+    const plan = buildQualityExecutionPlan(/** @type {any} */ ({
         profile: 'quick',
         qualityMode: 'smart',
         changedFiles: ['README.md', 'DOCUMENTAÇÃO/AUDITORIAS/BUGS/foo.md'],
-    });
+    }));
 
     assert.equal(plan.strategy, 'changed-only');
     assert.equal(plan.risk, 'low');
@@ -19,11 +19,11 @@ test('impact classifier: docs-only quick smart skips lint/typecheck and keeps pr
 });
 
 test('impact classifier: server/domain change triggers node typecheck only', () => {
-    const plan = buildQualityExecutionPlan({
+    const plan = buildQualityExecutionPlan(/** @type {any} */ ({
         profile: 'quick',
         qualityMode: 'smart',
         changedFiles: ['src/server/domain/task_control_service.js'],
-    });
+    }));
 
     assert.equal(plan.steps.lint.mode, 'changed-only');
     assert.equal(plan.steps.typecheck_node.mode, 'full');
@@ -32,11 +32,11 @@ test('impact classifier: server/domain change triggers node typecheck only', () 
 });
 
 test('impact classifier: shared/types change triggers node + browser typecheck', () => {
-    const plan = buildQualityExecutionPlan({
+    const plan = buildQualityExecutionPlan(/** @type {any} */ ({
         profile: 'quick',
         qualityMode: 'smart',
         changedFiles: ['src/shared/page_stability/stabilizer.js', 'src/types/guards.js'],
-    });
+    }));
 
     assert.equal(plan.steps.typecheck_node.mode, 'full');
     assert.equal(plan.steps.typecheck_browser.mode, 'full');
@@ -44,11 +44,11 @@ test('impact classifier: shared/types change triggers node + browser typecheck',
 });
 
 test('impact classifier: package.json forces full quality strategy with fallback reason', () => {
-    const plan = buildQualityExecutionPlan({
+    const plan = buildQualityExecutionPlan(/** @type {any} */ ({
         profile: 'quick',
         qualityMode: 'smart',
         changedFiles: ['package.json'],
-    });
+    }));
 
     assert.equal(plan.strategy, 'full');
     assert.equal(plan.risk, 'high');

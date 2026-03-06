@@ -8,7 +8,7 @@ import { ActionCode, MessageType } from '#shared/nerv/constants';
 class MockNERV extends EventEmitter {
     constructor() {
         super();
-        this.receiveHandlers = [];
+        this.receiveHandlers = /** @type {any[]} */ ([]);
     }
 
     onReceive(/** @type {any} */ handler) {

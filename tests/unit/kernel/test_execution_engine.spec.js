@@ -114,7 +114,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
                 completedAt: new Date(fim).toISOString(),
             };
 
-            const duracao = new Date(tarefa.completedAt) - new Date(tarefa.startedAt);
+            const duracao = /** @type {any} */ (new Date(tarefa.completedAt)) - /** @type {any} */ (new Date(tarefa.startedAt));
 
             assert.ok(duracao >= 5000, 'Duração deve ser ~5 segundos');
         });
@@ -210,7 +210,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
 
             const ordenadas = [...tarefas].sort((a, b) => {
                 if (a.priority === b.priority) {
-                    return new Date(a.createdAt) - new Date(b.createdAt);
+                    return /** @type {any} */ (new Date(a.createdAt)) - /** @type {any} */ (new Date(b.createdAt));
                 }
                 return b.priority - a.priority;
             });
@@ -248,7 +248,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve notificar mudanças de estado', () => {
             let notificado = false;
 
-            const observador = (oldState, newState) => {
+            const observador = (/** @type {any} */ oldState, /** @type {any} */ newState) => {
                 notificado = true;
             };
 

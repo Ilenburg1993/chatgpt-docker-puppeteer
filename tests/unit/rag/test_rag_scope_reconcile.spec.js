@@ -18,7 +18,7 @@ class FakeEmbeddingsProvider {
         return { ok: true, hasModel: true, models: [this.model] };
     }
 
-    async embed(text) {
+    async embed(/** @type {string} */ text) {
         const hash = crypto.createHash('sha256').update(String(text), 'utf8').digest();
         const vector = [];
         for (let i = 0; i < this.dim; i++) vector.push(hash[i] / 255);
@@ -41,22 +41,26 @@ describe('RAG scope reconciliation', () => {
             await fs.writeFile(path.join(ws, 'a.ts'), 'export const A = 1;\n', 'utf8');
             await fs.writeFile(path.join(ws, 'README.md'), '# Title\n\nhello\n', 'utf8');
 
-            const first = await ragIndex({
-                root: ws,
-                paths: ragPaths,
-                embeddingsProvider: embeddings,
-                profile: 'full',
-                docsMode: 'include',
-            });
+            const first = /** @type {any} */ (
+                await ragIndex({
+                    root: ws,
+                    paths: ragPaths,
+                    embeddingsProvider: embeddings,
+                    profile: 'full',
+                    docsMode: 'include',
+                })
+            );
             assert.strictEqual(first.scope.docs_mode, 'include');
 
-            const second = await ragIndex({
-                root: ws,
-                paths: ragPaths,
-                embeddingsProvider: embeddings,
-                profile: 'full',
-                docsMode: 'exclude',
-            });
+            const second = /** @type {any} */ (
+                await ragIndex({
+                    root: ws,
+                    paths: ragPaths,
+                    embeddingsProvider: embeddings,
+                    profile: 'full',
+                    docsMode: 'exclude',
+                })
+            );
             assert.strictEqual(second.scope.docs_mode, 'exclude');
             assert.ok(second.scope_reconciled);
             assert.ok(second.pruned_files >= 1);
@@ -93,14 +97,16 @@ describe('RAG scope reconciliation', () => {
                 docsMode: 'include',
             });
 
-            const report = await ragIndexChanged({
-                root: ws,
-                paths: ragPaths,
-                embeddingsProvider: embeddings,
-                changedPaths: [],
-                profile: 'full',
-                docsMode: 'exclude',
-            });
+            const report = /** @type {any} */ (
+                await ragIndexChanged({
+                    root: ws,
+                    paths: ragPaths,
+                    embeddingsProvider: embeddings,
+                    changedPaths: [],
+                    profile: 'full',
+                    docsMode: 'exclude',
+                })
+            );
             assert.ok(report.scope_reconciled);
             assert.ok(report.pruned_files >= 1);
 

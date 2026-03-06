@@ -14,7 +14,7 @@ test('AuditAgentRuntime creates, queues and processes quick audit jobs to comple
     assert.equal(job.status, 'PENDING');
     rt.queueJob(job.id);
     await rt.tick();
-    const after = rt.getJob(job.id);
+    const after = /** @type {any} */ (rt.getJob(job.id));
     assert.equal(after.status, 'COMPLETED');
     assert.equal(after.current_step, 'completed');
 });
@@ -24,7 +24,7 @@ test('AuditAgentRuntime patch-like job ends in waiting approval', async () => {
     const job = rt.createJob({ kind: 'patch_suggest', trigger_type: 'api' });
     rt.queueJob(job.id);
     await rt.tick();
-    const after = rt.getJob(job.id);
+    const after = /** @type {any} */ (rt.getJob(job.id));
     assert.equal(after.status, 'WAITING_APPROVAL');
     assert.equal(after.result_json.patch_proposal_pending, true);
 });
@@ -82,7 +82,7 @@ test('AuditAgentRuntime executes triageClient and records llm triage result', as
     const job = rt.createJob({ kind: 'quick_audit', trigger_type: 'manual' });
     rt.queueJob(job.id);
     await rt.tick();
-    const after = rt.getJob(job.id);
+    const after = /** @type {any} */ (rt.getJob(job.id));
     assert.equal(triageCalled, 1);
     assert.equal(after.status, 'COMPLETED');
     assert.equal(after.result_json?.llm_triage?.ok, true);
@@ -138,7 +138,7 @@ test('AuditAgentRuntime executes patchAuthorClient for patch-like job and record
     const job = rt.createJob({ kind: 'patch_suggest', trigger_type: 'manual' });
     rt.queueJob(job.id);
     await rt.tick();
-    const after = rt.getJob(job.id);
+    const after = /** @type {any} */ (rt.getJob(job.id));
     assert.equal(after.status, 'WAITING_APPROVAL');
     assert.equal(patchAuthorCalled, 1);
     assert.equal(after.result_json?.llm_patch_author?.ok, true);

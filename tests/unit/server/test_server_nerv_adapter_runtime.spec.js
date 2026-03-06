@@ -6,7 +6,7 @@ import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 
 class MockNerv {
     constructor() {
-        this.receiveHandlers = [];
+        this.receiveHandlers = /** @type {any[]} */ ([]);
     }
 
     onReceive(/** @type {any} */ handler) {
@@ -27,7 +27,7 @@ class MockNerv {
 
 class MockSocketHub {
     constructor() {
-        this.events = [];
+        this.events = /** @type {any[]} */ ([]);
         this.handlers = new Map();
     }
 

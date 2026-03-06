@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 
 import { OllamaClient } from '../../../tools/ollama/client.mjs';
 
+/**
+ * @param {number} status
+ * @param {any} data
+ * @returns {any}
+ */
 function mockJsonResponse(status, data) {
     return {
         ok: status >= 200 && status < 300,

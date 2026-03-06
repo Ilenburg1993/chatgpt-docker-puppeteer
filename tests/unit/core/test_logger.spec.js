@@ -6,7 +6,7 @@ import path from 'node:path';
 import sinon from 'sinon';
 
 // Import logger module (ESM)
-const logger = await import('#core/logger').then(m => m.default ?? m);
+const logger = await import('#core/logger').then(m => /** @type {any} */ (m).default ?? m);
 
 describe('Logger - Sistema de Logging Unificado', () => {
     const TEST_LOG_DIR = path.join(import.meta.dirname, '../../tmp/logs');
@@ -237,8 +237,8 @@ describe('Logger - Sistema de Logging Unificado', () => {
 
     describe('8. Integração com Sistema', () => {
         it('deve ser usável como módulo singleton', async () => {
-            const logger1 = await import('#core/logger').then(m => m.default ?? m);
-            const logger2 = await import('#core/logger').then(m => m.default ?? m);
+            const logger1 = await import('#core/logger').then(m => /** @type {any} */ (m).default ?? m);
+            const logger2 = await import('#core/logger').then(m => /** @type {any} */ (m).default ?? m);
 
             assert.strictEqual(logger1, logger2, 'Deve retornar a mesma instância');
         });

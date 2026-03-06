@@ -16,12 +16,14 @@ test('static contract engine detects process.exit violation outside allowlist', 
     fs.writeFileSync(target, 'function bad(){ process.exit(1); }\n', 'utf8');
 
     const contracts = getLegacyStaticContracts().filter(item => item.id === 'CONTRACT-STATIC-PROCESS-EXIT');
-    const result = evaluateStaticContracts({
-        rootDir: tmpDir,
-        scanDir: srcDir,
-        contracts,
-        allowlists: {},
-    });
+    const result = /** @type {any} */ (
+        evaluateStaticContracts({
+            rootDir: tmpDir,
+            scanDir: srcDir,
+            contracts,
+            allowlists: {},
+        })
+    );
 
     assert.equal(result.findings.length, 1);
     assert.equal(result.findings[0].contract_id, 'CONTRACT-STATIC-PROCESS-EXIT');
@@ -46,12 +48,14 @@ test('static contract engine ignores hardcoded-port pattern inside template lite
     );
 
     const contracts = getLegacyStaticContracts().filter(item => item.id === 'CONTRACT-STATIC-HARDCODED-PORTS');
-    const result = evaluateStaticContracts({
-        rootDir: tmpDir,
-        scanDir: srcDir,
-        contracts,
-        allowlists: {},
-    });
+    const result = /** @type {any} */ (
+        evaluateStaticContracts({
+            rootDir: tmpDir,
+            scanDir: srcDir,
+            contracts,
+            allowlists: {},
+        })
+    );
 
     assert.equal(result.findings.length, 1);
     assert.equal(result.findings[0].line, 4);
@@ -63,11 +67,11 @@ test('evidence graph correlates findings into clusters', () => {
         { id: 'BUG-2', contract_id: 'CONTRACT-A', source_tool: 'y', file: 'src/b.js', root_cause_candidates: [] },
         { id: 'BUG-3', contract_id: null, source_tool: 'z', file: 'src/a.js', root_cause_candidates: [] },
     ];
-    const out = buildEvidenceGraph(findings);
+    const out = /** @type {any} */ (buildEvidenceGraph(findings));
     assert.ok(Array.isArray(out.graph.nodes));
     assert.ok(out.graph.nodes.length >= 2);
     assert.ok(
-        out.findings.every(item => item.evidence_graph_id),
+        out.findings.every((/** @type {any} */ item) => item.evidence_graph_id),
         'all findings should receive evidence_graph_id'
     );
 });

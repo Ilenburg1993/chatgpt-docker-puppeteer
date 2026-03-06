@@ -39,7 +39,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         it('deve calcular delay exponencial', () => {
             const baseDelay = 1000; // 1 segundo
 
-            const calcDelay = attempt => baseDelay * Math.pow(2, attempt);
+            const calcDelay = (/** @type {any} */ attempt) => baseDelay * Math.pow(2, attempt);
 
             assert.strictEqual(calcDelay(0), 1000); // 1s
             assert.strictEqual(calcDelay(1), 2000); // 2s
@@ -114,7 +114,7 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
         });
 
         it('deve calcular cooldown progressivo', () => {
-            const calcCooldown = attempts => {
+            const calcCooldown = (/** @type {any} */ attempts) => {
                 return 1000 * attempts; // 1s por tentativa
             };
 

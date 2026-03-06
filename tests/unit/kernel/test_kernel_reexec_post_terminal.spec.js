@@ -8,9 +8,9 @@ import { createKernel } from '#kernel/kernel';
 class MockNERV extends EventEmitter {
     constructor() {
         super();
-        this.emittedCommands = [];
-        this.emittedEvents = [];
-        this.receiveHandlers = [];
+        this.emittedCommands = /** @type {any[]} */ ([]);
+        this.emittedEvents = /** @type {any[]} */ ([]);
+        this.receiveHandlers = /** @type {any[]} */ ([]);
     }
 
     onReceive(/** @type {any} */ handler) {

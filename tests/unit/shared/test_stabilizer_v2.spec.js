@@ -771,7 +771,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
             // Não há como testar leak diretamente em unit test, mas podemos verificar
             // que cleanup foi chamado 10 vezes
-            const cleanupCalls = mockPage.evaluate.mock.calls.filter(c =>
+            const cleanupCalls = mockPage.evaluate.mock.calls.filter((/** @type {any} */ c) =>
                 c.arguments[0]?.toString().includes('__STABILIZER_OBSERVERS')
             );
 

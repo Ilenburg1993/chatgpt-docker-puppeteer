@@ -57,9 +57,8 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
         let receivedInputLength = 0;
         try {
             process.env.OLLAMA_EMBED_MAX_CHARS = '50';
-            global.fetch = async (_url, options = {}) => {
+            /** @type {any} */ (global).fetch = async (/** @type {any} */ _url, /** @type {any} */ options = {}) => {
                 const body = JSON.parse(options.body || '{}');
-                receivedInputLength = String(body.input || '').length;
                 return {
                     ok: true,
                     async json() {
@@ -104,7 +103,7 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
         try {
             process.env.OLLAMA_EMBED_MAX_CHARS = '8000';
             process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK = 'true';
-            global.fetch = async (_url, options = {}) => {
+            /** @type {any} */ (global).fetch = async (/** @type {any} */ _url, /** @type {any} */ options = {}) => {
                 const body = JSON.parse(options.body || '{}');
                 const size = String(body.input || '').length;
                 attempts.push(size);

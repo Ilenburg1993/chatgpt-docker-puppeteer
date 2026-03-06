@@ -301,7 +301,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         });
 
         it('deve responder a comandos NERV', () => {
-            let comandoRecebido = null;
+            let comandoRecebido = /** @type {any} */ (null);
 
             const adapter = {
                 onCommand: (/** @type {any} */ cmd) => {

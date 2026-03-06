@@ -70,12 +70,12 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const timeout = 100; // 100ms
 
             let cancelado = false;
-            const promise = new Promise(resolve => {
+            const promise = /** @type {Promise<void>} */ (new Promise(resolve => {
                 setTimeout(() => {
                     cancelado = true;
                     resolve();
                 }, timeout);
-            });
+            }));
 
             await promise;
 
@@ -143,7 +143,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             let recursos = { browser: {}, logger: {} };
 
             // Simular cleanup
-            recursos = null;
+            recursos = /** @type {any} */ (null);
 
             assert.strictEqual(recursos, null);
         });
@@ -198,7 +198,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
 
     describe('8. Tratamento de Erros', () => {
         it('deve capturar exceções do runtime', () => {
-            let errorCapturado = null;
+            let errorCapturado = /** @type {any} */ (null);
 
             try {
                 throw new Error('Runtime error');
@@ -214,7 +214,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             let recoveryExecutado = false;
 
             const runtime = {
-                onError: error => {
+                onError: (/** @type {any} */ error) => {
                     recoveryExecutado = true;
                 },
             };
@@ -231,7 +231,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             let runtime = { memory: initial };
 
             // Simular limpeza
-            runtime = null;
+            runtime = /** @type {any} */ (null);
 
             assert.strictEqual(runtime, null);
         });

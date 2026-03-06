@@ -47,10 +47,11 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                     if (type === 'chatgpt') {
                         return { type: 'chatgpt', initialized: true };
                     }
+                    return undefined;
                 },
             };
 
-            const driver = factory.create('chatgpt');
+            const driver = /** @type {any} */ (factory.create('chatgpt'));
 
             assert.strictEqual(driver.type, 'chatgpt');
             assert.ok(driver.initialized);
@@ -62,10 +63,11 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                     if (type === 'gemini') {
                         return { type: 'gemini', initialized: true };
                     }
+                    return undefined;
                 },
             };
 
-            const driver = factory.create('gemini');
+            const driver = /** @type {any} */ (factory.create('gemini'));
 
             assert.strictEqual(driver.type, 'gemini');
         });
@@ -87,10 +89,10 @@ describe('Driver Factory - Fábrica de Drivers', () => {
     describe('3. Seleção Automática', () => {
         it('deve selecionar driver baseado em target', () => {
             const selectDriver = (/** @type {any} */ target) => {
-                const mapping = {
+                const mapping = /** @type {Record<string, string>} */ ({
                     chatgpt: 'chatgpt',
                     gemini: 'gemini',
-                };
+                });
                 return mapping[target];
             };
 
@@ -100,10 +102,10 @@ describe('Driver Factory - Fábrica de Drivers', () => {
 
         it('deve usar driver padrão se target inválido', () => {
             const selectDriver = (/** @type {any} */ target) => {
-                const mapping = {
+                const mapping = /** @type {Record<string, string>} */ ({
                     chatgpt: 'chatgpt',
                     gemini: 'gemini',
-                };
+                });
                 return mapping[target] || 'chatgpt'; // default
             };
 
@@ -164,7 +166,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                 { id: 'driver-3', busy: true },
             ];
 
-            const available = pool.find(d => !d.busy);
+            const available = /** @type {any} */ (pool.find(d => !d.busy));
 
             assert.strictEqual(available.id, 'driver-2');
         });
@@ -247,7 +249,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
             // Simular cleanup
             driver = {
                 ...driver,
-                resources: null,
+                resources: /** @type {any} */ (null),
             };
 
             assert.strictEqual(driver.resources, null);
