@@ -20,7 +20,7 @@ function sanitizePathToken(value) {
  */
 /**
  * @param {CreateAuditLoggerOptions} options
-  * @returns {object}
+ * @returns {object}
  */
 export function createAuditLogger(options) {
     const runDir = options.runDir;

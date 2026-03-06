@@ -10,7 +10,7 @@ import path from 'node:path';
  */
 /**
  * @param {CreateEtaEstimatorOptions} options
-  * @returns {object}
+ * @returns {object}
  */
 export function createEtaEstimator(options) {
     const historyPath = options.historyPath;

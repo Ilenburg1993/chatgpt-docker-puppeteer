@@ -27,20 +27,26 @@ async function saveResponse(taskId, response, task, attemptId) {
             return await saveResponseV2Format(taskId, response, task, attemptId);
         } else {
             // Response V1 (string simples) - converter para V2
-            logger.debug('[RESPONSE_ADAPTER] Response V1 detectada, convertendo para V2', /** @type {any} */ ({
-                taskId,
-                responseLength: typeof response === 'string' ? response.length : 0,
-            }));
+            logger.debug(
+                '[RESPONSE_ADAPTER] Response V1 detectada, convertendo para V2',
+                /** @type {any} */ ({
+                    taskId,
+                    responseLength: typeof response === 'string' ? response.length : 0,
+                })
+            );
 
             const responseV2 = convertV1toV2(/** @type {any} */ (response), task);
             return await saveResponseV2Format(taskId, responseV2, task, attemptId);
         }
     } catch (error) {
-        logger.error('[RESPONSE_ADAPTER] Erro ao salvar response', /** @type {any} */ ({
-            taskId,
-            error: /** @type {any} */ (error).message,
-            stack: /** @type {any} */ (error).stack,
-        }));
+        logger.error(
+            '[RESPONSE_ADAPTER] Erro ao salvar response',
+            /** @type {any} */ ({
+                taskId,
+                error: /** @type {any} */ (error).message,
+                stack: /** @type {any} */ (error).stack,
+            })
+        );
         throw error;
     }
 }
@@ -59,7 +65,9 @@ async function saveResponse(taskId, response, task, attemptId) {
  */
 async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
     // Salvar em 4 formatos
-    const storage = /** @type {any} */ (await saveResponseV2(taskId, responseV2, { attemptId: attemptId || null, writeLegacyLatest: true }));
+    const storage = /** @type {any} */ (
+        await saveResponseV2(taskId, responseV2, { attemptId: attemptId || null, writeLegacyLatest: true })
+    );
 
     // Preencher task.result V5
     if (task && task.result) {
@@ -86,15 +94,18 @@ async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
         task.result.finish_reason = 'success';
     }
 
-    logger.info('[RESPONSE_ADAPTER] Response V2 salva com sucesso', /** @type {any} */ ({
-        taskId,
-        formats: 4,
-        storageSize: {
-            text: responseV2.content?.text?.length || 0,
-            markdown: responseV2.content?.markdown?.length || 0,
-            html: responseV2.content?.html?.length || 0,
-        },
-    }));
+    logger.info(
+        '[RESPONSE_ADAPTER] Response V2 salva com sucesso',
+        /** @type {any} */ ({
+            taskId,
+            formats: 4,
+            storageSize: {
+                text: responseV2.content?.text?.length || 0,
+                markdown: responseV2.content?.markdown?.length || 0,
+                html: responseV2.content?.html?.length || 0,
+            },
+        })
+    );
 
     return { storage, format: 'v2' };
 }
@@ -196,10 +207,13 @@ async function loadResponse(taskId, format) {
 
                 return text;
             } catch (_) {
-                logger.warn('[RESPONSE_ADAPTER] Response não encontrada (V1 e V2)', /** @type {any} */ ({
-                    taskId,
-                    format,
-                }));
+                logger.warn(
+                    '[RESPONSE_ADAPTER] Response não encontrada (V1 e V2)',
+                    /** @type {any} */ ({
+                        taskId,
+                        format,
+                    })
+                );
                 return null;
             }
         }

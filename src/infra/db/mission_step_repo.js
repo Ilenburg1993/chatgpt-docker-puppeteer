@@ -120,17 +120,19 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
             const stepId = String(step.id || `step-${index}`);
             const title = String(step.title || step.name || step.description || `Step ${index + 1}`);
 
-            const existing = /** @type {any} */ (db
-                .prepare(
-                    `
+            const existing = /** @type {any} */ (
+                db
+                    .prepare(
+                        `
                     SELECT *
                     FROM mission_steps
                     WHERE mission_id = ? AND step_id = ?
                     ORDER BY attempt_seq DESC
                     LIMIT 1
                 `
-                )
-                .get(mission, stepId));
+                    )
+                    .get(mission, stepId)
+            );
 
             if (!existing) {
                 db.prepare(
@@ -185,7 +187,14 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
  * @returns {MissionStep|null}
  */
 function markMissionStepStatus(options = {}) {
-    const { missionId, stepId, attemptSeq = null, status, currentTaskId = undefined, lastTaskId = undefined } = /** @type {any} */ (options);
+    const {
+        missionId,
+        stepId,
+        attemptSeq = null,
+        status,
+        currentTaskId = undefined,
+        lastTaskId = undefined,
+    } = /** @type {any} */ (options);
     const db = getDb();
     const mission = String(missionId || '').trim();
     const step = String(stepId || '').trim();

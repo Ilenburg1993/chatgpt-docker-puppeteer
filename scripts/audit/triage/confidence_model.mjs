@@ -11,7 +11,7 @@
 /**
  * @param {ScoreConfidenceFinding} finding
  * @param {ScoreConfidenceSignals} [signals]
-  * @returns {number}
+ * @returns {number}
  */
 export function scoreConfidence(finding, signals = {}) {
     let score = 0.45;

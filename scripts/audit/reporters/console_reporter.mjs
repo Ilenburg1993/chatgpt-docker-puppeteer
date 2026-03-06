@@ -10,7 +10,7 @@
  */
 /**
  * @param {PrintProgressPayload} payload
-  * @returns {void}
+ * @returns {void}
  */
 export function printProgress(payload) {
     const pct = Number(payload.progress?.progress_pct || 0).toFixed(2);
@@ -36,7 +36,7 @@ export function printProgress(payload) {
 /**
  * @param {import('../lib/schema.mjs').AuditRunV3} report
  * @param {PrintFinalReportOutputs} outputs
-  * @returns {void}
+ * @returns {void}
  */
 export function printFinalReport(report, outputs) {
     console.log('=== Audit Automation Report v3.2 ===');

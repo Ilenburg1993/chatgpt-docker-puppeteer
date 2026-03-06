@@ -13,7 +13,7 @@ import { evaluateRuntimeSignals } from './evaluate_runtime.mjs';
  */
 /**
  * @param {EvaluateChaosContractsOptions} options
-  * @returns {Promise<any>}
+ * @returns {Promise<any>}
  */
 export async function evaluateChaosContracts(options) {
     /** @type {Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>} */
@@ -31,7 +31,8 @@ export async function evaluateChaosContracts(options) {
         violations: 0,
     };
 
-    const record = (/** @type {any} */ payload) => fs.appendFileSync(eventsPath, `${JSON.stringify(payload)}\n`, 'utf8');
+    const record = (/** @type {any} */ payload) =>
+        fs.appendFileSync(eventsPath, `${JSON.stringify(payload)}\n`, 'utf8');
 
     if (options.profile !== 'nightly' || options.chaosProfile === 'off') {
         record({
@@ -98,10 +99,14 @@ export async function evaluateChaosContracts(options) {
         }
     }
 
-    const findings = /** @type {any[]} */ (evaluateRuntimeSignals(/** @type {any} */ ({
-        contracts: options.contracts,
-        signals,
-    })));
+    const findings = /** @type {any[]} */ (
+        evaluateRuntimeSignals(
+            /** @type {any} */ ({
+                contracts: options.contracts,
+                signals,
+            })
+        )
+    );
     summary.violations = findings.length;
 
     return {

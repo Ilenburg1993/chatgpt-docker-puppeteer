@@ -80,11 +80,13 @@ function _setModelEnabled(id, enabled) {
 function upsertInferenceModel(input = {}) {
     const db = getDb();
     const now = _now();
-    const existing = /** @type {any} */ (input.id
-        ? db.prepare('SELECT * FROM inference_models WHERE id = ?').get(String(input.id))
-        : input.alias
-          ? db.prepare('SELECT * FROM inference_models WHERE alias = ?').get(String(input.alias))
-          : null);
+    const existing = /** @type {any} */ (
+        input.id
+            ? db.prepare('SELECT * FROM inference_models WHERE id = ?').get(String(input.id))
+            : input.alias
+              ? db.prepare('SELECT * FROM inference_models WHERE alias = ?').get(String(input.alias))
+              : null
+    );
     const id = existing?.id || `infm-${uuidv4()}`;
     const alias = String(input.alias || existing?.alias || '').trim();
     const modelName = String(input.model_name || input.modelName || existing?.model_name || '').trim();

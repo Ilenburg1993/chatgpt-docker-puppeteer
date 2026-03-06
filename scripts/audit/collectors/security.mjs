@@ -68,15 +68,21 @@ export async function collectSecurityFindings(options) {
     /** @type {Array<{source:string,message:string}>} */
     const warnings = [];
 
-    const securityContracts = /** @type {any[]} */ (Array.isArray(options.contracts)
-        ? options.contracts.filter((/** @type {any} */ contract) => contract?.domain === 'security')
-        : []);
+    const securityContracts = /** @type {any[]} */ (
+        Array.isArray(options.contracts)
+            ? options.contracts.filter((/** @type {any} */ contract) => contract?.domain === 'security')
+            : []
+    );
 
-    const contractEval = /** @type {any} */ (evaluateStaticContracts(/** @type {any} */ ({
-        rootDir,
-        scanDir: path.join(rootDir, 'src'),
-        contracts: securityContracts,
-    })));
+    const contractEval = /** @type {any} */ (
+        evaluateStaticContracts(
+            /** @type {any} */ ({
+                rootDir,
+                scanDir: path.join(rootDir, 'src'),
+                contracts: securityContracts,
+            })
+        )
+    );
     for (const item of contractEval.findings) {
         findings.push(
             /** @type {RawFinding} */ ({
