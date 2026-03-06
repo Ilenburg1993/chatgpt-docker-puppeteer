@@ -19,7 +19,7 @@ export const useEventsVNextStore = defineStore('events_vnext', {
         hasMore: false,
     }),
     actions: {
-        pushBatch(payload) {
+        pushBatch(/** @type {any} */ payload) {
             const events = payload?.events || [];
             if (!Array.isArray(events) || events.length === 0) return;
             // Newest on top for UI
@@ -49,7 +49,7 @@ export const useEventsVNextStore = defineStore('events_vnext', {
             this.error = null;
         },
 
-        pushControlCommandStatus(payload) {
+        pushControlCommandStatus(/** @type {any} */ payload) {
             if (!payload || typeof payload !== 'object') return;
             const synthetic = {
                 id: `control-${payload.operation_id || Date.now()}`,
@@ -75,7 +75,7 @@ export const useEventsVNextStore = defineStore('events_vnext', {
             this.loading = true;
             this.error = null;
             try {
-                const params = { limit };
+                const params = /** @type {any} */ ({ limit });
                 if (this.filters.entity_type) params.entity_type = this.filters.entity_type;
                 if (this.filters.entity_id) params.entity_id = this.filters.entity_id;
                 if (this.filters.event_type) params.event_type = this.filters.event_type;
@@ -86,7 +86,8 @@ export const useEventsVNextStore = defineStore('events_vnext', {
                 const meta = res.data?.meta || {};
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (err) {
+            } catch (_rawErr) {
+    const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loading = false;
@@ -97,7 +98,7 @@ export const useEventsVNextStore = defineStore('events_vnext', {
             if (!this.hasMore || !this.cursor || this.loading) return;
             this.loading = true;
             try {
-                const params = { limit, cursor: this.cursor };
+                const params = /** @type {any} */ ({ limit, cursor: this.cursor });
                 if (this.filters.entity_type) params.entity_type = this.filters.entity_type;
                 if (this.filters.entity_id) params.entity_id = this.filters.entity_id;
                 if (this.filters.event_type) params.event_type = this.filters.event_type;
@@ -113,7 +114,8 @@ export const useEventsVNextStore = defineStore('events_vnext', {
                 }
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (err) {
+            } catch (_rawErr) {
+    const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loading = false;

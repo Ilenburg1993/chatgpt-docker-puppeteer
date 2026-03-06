@@ -17,7 +17,9 @@ import { useSocket } from './useSocket';
 
 /**
  * @typedef {object} UseRealtimeOptions
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {*} [_] Propriedades definidas em runtime.
+ * @property {boolean} [reloadOnReconnect]
+ * @property {Function} [loadInitialData]
  */
 /**
  * Composable para integração real-time com stores
@@ -25,7 +27,7 @@ import { useSocket } from './useSocket';
   * @returns {object}
  */
 export function useRealtime(options = {}) {
-    const { subscribe, unsubscribe, isConnected } = useSocket();
+    const { subscribe, unsubscribe, isConnected } = /** @type {any} */ (useSocket());
     const taskStore = useTaskStore();
     const telemetryStore = useTelemetryStore();
     const systemStore = useSystemStore();
@@ -33,31 +35,31 @@ export function useRealtime(options = {}) {
     // Handlers para eventos Socket.io
     const handlers = {
         // Telemetria (1Hz)
-        'telemetry:metrics': data => {
+        'telemetry:metrics': (/** @type {any} */ data) => {
             telemetryStore.handleTelemetryMetrics(data);
         },
 
         // Batch de updates de tasks (debounced)
-        'task:updates_batch': data => {
+        'task:updates_batch': (/** @type {any} */ data) => {
             taskStore.handleTaskUpdatesBatch(data);
         },
 
         // Alertas
-        'alert:triggered': data => {
+        'alert:triggered': (/** @type {any} */ data) => {
             systemStore.handleAlert(data);
         },
 
         // Health updates por componente
-        'health:api': data => {
+        'health:api': (/** @type {any} */ data) => {
             systemStore.handleHealthUpdate('api', data);
         },
-        'health:queue': data => {
+        'health:queue': (/** @type {any} */ data) => {
             systemStore.handleHealthUpdate('queue', data);
         },
-        'health:memory': data => {
+        'health:memory': (/** @type {any} */ data) => {
             systemStore.handleHealthUpdate('memory', data);
         },
-        'health:kernel': data => {
+        'health:kernel': (/** @type {any} */ data) => {
             systemStore.handleHealthUpdate('kernel', data);
         },
     };
@@ -100,7 +102,7 @@ export function useRealtime(options = {}) {
         setupListeners();
 
         // Carrega dados iniciais
-        if (options.loadInitialData !== false) {
+        if ((/** @type {any} */ (options)).loadInitialData !== false) {
             taskStore.fetchTasks();
             telemetryStore.fetchCurrent();
             systemStore.fetchHealth();

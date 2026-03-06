@@ -28,13 +28,13 @@ import { http } from '@/lib/http';
  * @property {() => string|null} getToken
  */
 
-const authUser = ref(null);
+const authUser = /** @type {import('vue').Ref<AuthUser|null>} */ (ref(null));
 const authLoading = ref(false);
-let verifyInFlight = null;
+let verifyInFlight = /** @type {any} */ (null);
 let authInitialized = false;
 
 const getTokenFromStorage = () => localStorage.getItem('auth_token');
-const setTokenInStorage = token => localStorage.setItem('auth_token', token);
+const setTokenInStorage = (/** @type {any} */ token) => localStorage.setItem('auth_token', /** @type {any} */ token);
 const clearTokenInStorage = () => localStorage.removeItem('auth_token');
 
 /**
@@ -63,7 +63,7 @@ export function useAuth() {
     const isOperator = computed(() => authUser.value?.role === 'operator');
     const permissions = computed(() => (Array.isArray(authUser.value?.permissions) ? authUser.value.permissions : []));
 
-    const can = permission => {
+    const can = (/** @type {any} */ permission) => {
         if (!permission) return false;
         const role = String(authUser.value?.role || '');
         if (role === 'owner') return true;
@@ -149,7 +149,8 @@ export function useAuth() {
 
             showError(data.error || 'Erro no login');
             return false;
-        } catch (error) {
+        } catch (_rawError) {
+    const error = /** @type {any} */ (_rawError);
             const apiError = error?.response?.data?.error || 'Erro de conexão';
             showError(apiError);
             return false;
@@ -160,7 +161,7 @@ export function useAuth() {
 
     /**
      * Faz logout
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     const logout = async () => {
         const token = getToken();
@@ -170,7 +171,8 @@ export function useAuth() {
             if (token) {
                 await http.post('/api/dashboard/auth/logout');
             }
-        } catch (error) {
+        } catch (_rawError) {
+    const error = /** @type {any} */ (_rawError);
             console.error('Logout error:', error);
         }
 
@@ -186,7 +188,7 @@ export function useAuth() {
      * @param {object} options - Opções do fetch
      * @returns {Promise<Response>} Response do fetch
      */
-    const authenticatedFetch = async (url, options = {}) => {
+    const authenticatedFetch = async (url, /** @type {any} */ options = {}) => {
         const token = getToken();
 
         const headers = {

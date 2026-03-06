@@ -3,12 +3,12 @@ import { defineStore } from 'pinia';
 import { http, formatHttpError } from '@/lib/http';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
 
-function _normalizeUpper(value) {
+function _normalizeUpper(/** @type {any} */ value) {
     return value ? String(value).toUpperCase().trim() : null;
 }
 
-function _buildListParams(filters, cursor, limit) {
-    const params = { limit: limit || 100 };
+function _buildListParams(/** @type {any} */ filters, /** @type {any} */ cursor, /** @type {any} */ limit) {
+    const params = /** @type {any} */ ({ limit: limit || 100 });
     if (cursor) params.cursor = cursor;
     const status = _normalizeUpper(filters?.status);
     const autonomy = _normalizeUpper(filters?.autonomy_mode);
@@ -19,7 +19,7 @@ function _buildListParams(filters, cursor, limit) {
     return params;
 }
 
-function _upsertById(list, byId, item) {
+function _upsertById(/** @type {any} */ list, /** @type {any} */ byId, /** @type {any} */ item) {
     if (!item?.id) return;
     const id = String(item.id);
     const existing = byId.get(id);
@@ -28,13 +28,13 @@ function _upsertById(list, byId, item) {
         list.unshift(item);
         return;
     }
-    const idx = list.findIndex(m => m.id === id);
+    const idx = list.findIndex((/** @type {any} */ m) => m.id === id);
     const merged = { ...existing, ...item };
     byId.set(id, merged);
     if (idx >= 0) list[idx] = merged;
 }
 
-async function _dispatchControlCommand(command, payload) {
+async function _dispatchControlCommand(/** @type {any} */ command, /** @type {any} */ payload) {
     const idempotencyKey = payload?.idempotency_key || `ui:${Date.now()}:${Math.random().toString(16).slice(2)}`;
     const response = await http.post('/api/control/commands', {
         command,
@@ -46,7 +46,7 @@ async function _dispatchControlCommand(command, payload) {
     return response.data;
 }
 
-async function _refreshTasksSliceForMission(missionId) {
+async function _refreshTasksSliceForMission(/** @type {any} */ missionId) {
     try {
         const tasks = useTasksVNextStore();
         const selectedMissionFilter = tasks.filters?.mission_id ? String(tasks.filters.mission_id) : null;
@@ -67,7 +67,7 @@ async function _refreshMissionSlice() {
     }
 }
 
-async function _syncMissionAndTasksContext(missionId) {
+async function _syncMissionAndTasksContext(/** @type {any} */ missionId) {
     await Promise.allSettled([_refreshTasksSliceForMission(missionId), _refreshMissionSlice()]);
 }
 
@@ -82,7 +82,7 @@ async function _syncMissionAndTasksContext(missionId) {
  * @param {ResolveIfVersionMission} mission
  * @returns {number|null}
  */
-function _resolveIfVersion(mission) {
+function _resolveIfVersion(/** @type {any} */ mission) {
     if (!mission) return null;
     // Prefer explicit ms field (some API shapes include both)
     if (typeof mission.updated_at_ms === 'number' && mission.updated_at_ms > 0) {
@@ -118,7 +118,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
         selectedEvents: [],
     }),
     getters: {
-        getById: state => id => state.byId.get(String(id)) || null,
+        getById: state => (/** @type {any} */ id) => state.byId.get(String(/** @type {any} */ id)) || null,
     },
     actions: {
         reset() {
@@ -148,7 +148,8 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
                 }
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (err) {
+            } catch (_rawErr) {
+    const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loading = false;
@@ -172,14 +173,15 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
                 }
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (err) {
+            } catch (_rawErr) {
+    const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loadingMore = false;
             }
         },
 
-        applyRealtimeUpdatesBatch(payload) {
+        applyRealtimeUpdatesBatch(/** @type {any} */ payload) {
             const updates = payload?.updates || [];
             for (const u of updates) {
                 const mission = u?.mission || null;
@@ -188,13 +190,13 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             }
         },
 
-        async fetchDetail(missionId) {
+        async fetchDetail(/** @type {any} */ missionId) {
             const res = await http.get(`/api/dashboard/missions/${missionId}`);
             this.selected = res.data?.data?.mission || null;
             return this.selected;
         },
 
-        async fetchMissionProgress(missionId) {
+        async fetchMissionProgress(/** @type {any} */ missionId) {
             try {
                 const res = await http.get(`/api/missions/${missionId}/progress`);
                 this.selectedProgress = {
@@ -208,8 +210,8 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             }
         },
 
-        async fetchMissionTasks(missionId, { stage = null, status = null, limit = 200, cursor = null } = {}) {
-            const params = { limit };
+        async fetchMissionTasks(/** @type {any} */ missionId, { stage = null, status = null, limit = 200, cursor = null } = {}) {
+            const params = /** @type {any} */ ({ limit });
             if (cursor) params.cursor = cursor;
             if (stage) params.stage = stage;
             if (status) params.status = status;
@@ -218,22 +220,22 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             return res.data;
         },
 
-        async fetchMissionProposals(missionId, { limit = 200, cursor = null } = {}) {
-            const params = { limit };
+        async fetchMissionProposals(/** @type {any} */ missionId, { limit = 200, cursor = null } = {}) {
+            const params = /** @type {any} */ ({ limit });
             if (cursor) params.cursor = cursor;
             const res = await http.get(`/api/dashboard/missions/${missionId}/proposals`, { params });
             this.selectedProposals = res.data?.data?.items || [];
             return res.data;
         },
 
-        async fetchMissionGraph(missionId) {
+        async fetchMissionGraph(/** @type {any} */ missionId) {
             const res = await http.get(`/api/dashboard/missions/${missionId}/graph`);
             this.selectedGraph = res.data?.data || null;
             return this.selectedGraph;
         },
 
-        async fetchMissionEvents(missionId, { limit = 200, cursor = null } = {}) {
-            const params = { limit };
+        async fetchMissionEvents(/** @type {any} */ missionId, { limit = 200, cursor = null } = {}) {
+            const params = /** @type {any} */ ({ limit });
             if (cursor) params.cursor = cursor;
             const res = await http.get(`/api/dashboard/missions/${missionId}/events`, { params });
             this.selectedEvents = res.data?.data?.items || [];
@@ -241,7 +243,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
         },
 
         // Mutations (mission domain)
-        async createMission(payload, reason = 'Criação de missão via control plane') {
+        async createMission(/** @type {any} */ payload, reason = 'Criação de missão via control plane') {
             const result = await _dispatchControlCommand('MISSION_CREATE', {
                 mission: payload || {},
                 reason,
@@ -249,7 +251,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             await _refreshMissionSlice();
             return result;
         },
-        async patchMission(missionId, payload) {
+        async patchMission(/** @type {any} */ missionId, /** @type {any} */ payload) {
             const mission = this.getById(missionId) || this.selected || null;
             // BUG-UI-1 fix: mission_repo returns `updated_at` (ISO string), not `updated_at_ms`.
             // Use _resolveIfVersion to correctly derive the ms timestamp for optimistic locking.
@@ -263,7 +265,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             await _syncMissionAndTasksContext(missionId);
             return result;
         },
-        async executeMission(missionId, { reason = 'Execução manual da missão' } = {}) {
+        async executeMission(/** @type {any} */ missionId, { reason = 'Execução manual da missão' } = {}) {
             const result = await _dispatchControlCommand('MISSION_EXECUTE', {
                 mission_id: missionId,
                 reason,
@@ -271,7 +273,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             await _syncMissionAndTasksContext(missionId);
             return result;
         },
-        async pauseMission(missionId, { reason = 'Pausa manual da missão' } = {}) {
+        async pauseMission(/** @type {any} */ missionId, { reason = 'Pausa manual da missão' } = {}) {
             const result = await _dispatchControlCommand('MISSION_PAUSE', {
                 mission_id: missionId,
                 reason,
@@ -279,7 +281,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             await _syncMissionAndTasksContext(missionId);
             return result;
         },
-        async resumeMission(missionId, { reason = 'Retomada manual da missão' } = {}) {
+        async resumeMission(/** @type {any} */ missionId, { reason = 'Retomada manual da missão' } = {}) {
             const result = await _dispatchControlCommand('MISSION_RESUME', {
                 mission_id: missionId,
                 reason,
@@ -287,7 +289,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             await _syncMissionAndTasksContext(missionId);
             return result;
         },
-        async cancelMission(missionId, { reason = 'Cancelamento manual da missão' } = {}) {
+        async cancelMission(/** @type {any} */ missionId, { reason = 'Cancelamento manual da missão' } = {}) {
             const result = await _dispatchControlCommand('MISSION_CANCEL', {
                 mission_id: missionId,
                 reason,
@@ -295,7 +297,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             await _syncMissionAndTasksContext(missionId);
             return result;
         },
-        async updatePolicy(missionId, { autonomy_mode, policy, reason = 'Atualização de policy/autonomia da missão' }) {
+        async updatePolicy(/** @type {any} */ missionId, /** @type {any} */ { autonomy_mode, policy, reason = 'Atualização de policy/autonomia da missão' }) {
             const mission = this.getById(missionId) || this.selected || null;
             // BUG-UI-1 fix: use _resolveIfVersion for correct optimistic locking
             const ifVersion = _resolveIfVersion(mission);
@@ -309,7 +311,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             await _syncMissionAndTasksContext(missionId);
             return result;
         },
-        async ensureMissionContext(missionId) {
+        async ensureMissionContext(/** @type {any} */ missionId) {
             await this.fetchDetail(missionId);
             await this.fetchMissionTasks(missionId, { limit: 100 });
             return {

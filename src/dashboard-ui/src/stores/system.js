@@ -26,7 +26,7 @@ export const useSystemStore = defineStore('system', {
         },
 
         // Alertas ativos
-        alerts: [],
+        alerts: /** @type {any[]} */ ([]),
 
         // Informações do sistema
         systemInfo: {
@@ -46,7 +46,7 @@ export const useSystemStore = defineStore('system', {
         error: null,
 
         // Última atualização
-        lastUpdate: null,
+        lastUpdate: /** @type {number|null} */ (null),
     }),
 
     getters: {
@@ -126,8 +126,9 @@ export const useSystemStore = defineStore('system', {
                 await this.fetchAlerts();
 
                 this.lastUpdate = Date.now();
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (_rawError) {
+    const error = /** @type {any} */ (_rawError);
+                this.error = (/** @type {any} */ (formatHttpError(error))).message;
                 this.overallStatus = 'error';
                 console.error('[SystemStore] Erro ao carregar health:', error);
             } finally {
@@ -142,7 +143,8 @@ export const useSystemStore = defineStore('system', {
             try {
                 const response = await http.get('/api/dashboard/alerts');
                 this.alerts = response.data.alerts || [];
-            } catch (error) {
+            } catch (_rawError) {
+    const error = /** @type {any} */ (_rawError);
                 console.error('[SystemStore] Erro ao carregar alertas:', error);
             }
         },
@@ -158,7 +160,8 @@ export const useSystemStore = defineStore('system', {
                     ...response.data.system,
                     ...response.data.versions,
                 };
-            } catch (error) {
+            } catch (_rawError) {
+    const error = /** @type {any} */ (_rawError);
                 console.error('[SystemStore] Erro ao carregar info:', error);
             }
         },
@@ -166,13 +169,14 @@ export const useSystemStore = defineStore('system', {
         /**
          * Atualiza thresholds de alerta
          */
-        async updateAlertThresholds(thresholds) {
+        async updateAlertThresholds(/** @type {any} */ thresholds) {
             try {
                 await http.put('/api/dashboard/alerts/thresholds', thresholds);
                 // Recarrega alertas
                 await this.fetchAlerts();
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (_rawError) {
+    const error = /** @type {any} */ (_rawError);
+                this.error = (/** @type {any} */ (formatHttpError(error))).message;
                 throw error;
             }
         },
@@ -180,7 +184,7 @@ export const useSystemStore = defineStore('system', {
         /**
          * Handler para alerta via Socket.io
          */
-        handleAlert(alert) {
+        handleAlert(/** @type {any} */ alert) {
             // Adiciona ou atualiza alerta
             const existingIndex = this.alerts.findIndex(a => a.name === alert.name);
 
@@ -194,10 +198,10 @@ export const useSystemStore = defineStore('system', {
         /**
          * Handler para health update via Socket.io
          */
-        handleHealthUpdate(component, data) {
-            if (this.components[component]) {
-                this.components[component] = {
-                    ...this.components[component],
+        handleHealthUpdate(/** @type {any} */ component, /** @type {any} */ data) {
+            if ((/** @type {any} */ (this.components))[component]) {
+                (/** @type {any} */ (this.components))[component] = {
+                    ...(/** @type {any} */ (this.components))[component],
                     ...data,
                 };
             }
@@ -206,7 +210,7 @@ export const useSystemStore = defineStore('system', {
         /**
          * Remove alerta (quando condição resolvida)
          */
-        removeAlert(alertName) {
+        removeAlert(/** @type {any} */ alertName) {
             this.alerts = this.alerts.filter(a => a.name !== alertName);
         },
 

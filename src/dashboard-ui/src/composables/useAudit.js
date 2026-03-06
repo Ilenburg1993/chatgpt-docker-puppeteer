@@ -1,8 +1,6 @@
 // @ts-check
 import { ref, computed } from 'vue';
 
-/** @typedef {{ baseUrl?: string }} UseAuditOptions */
-
 /**
  * @typedef {object} UseAuditOptions
  * @property {string} [baseUrl] - Base URL para a API do Audit Agent
@@ -34,7 +32,7 @@ export function useAudit(options = {}) {
      * Fetch wrapper com error handling
      * @param {string} url
      * @param {RequestInit} opts
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function fetchApi(url, opts = {}) {
         const res = await fetch(`${baseUrl}${url}`, {
@@ -64,7 +62,8 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/audit/jobs');
             jobs.value = data.jobs || [];
             return jobs.value;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -76,18 +75,19 @@ export function useAudit(options = {}) {
      * Detalhes de um job específico
      * @param {string} jobId
      * @param {object} [query]
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function getJob(jobId, query = {}) {
         loading.value = true;
         error.value = null;
         try {
-            const params = new URLSearchParams(query).toString();
+            const params = new URLSearchParams(/** @type {any} */ (query)).toString();
             const url = `/audit/jobs/${jobId}${params ? `?${params}` : ''}`;
             const data = await fetchApi(url);
             currentJob.value = data;
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -98,7 +98,7 @@ export function useAudit(options = {}) {
     /**
      * Cria um novo job de auditoria
      * @param {object} payload
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function createJob(payload) {
         loading.value = true;
@@ -109,7 +109,8 @@ export function useAudit(options = {}) {
                 body: JSON.stringify(payload),
             });
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -120,7 +121,7 @@ export function useAudit(options = {}) {
     /**
      * Executa um job existente
      * @param {string} jobId
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function runJob(jobId) {
         loading.value = true;
@@ -130,7 +131,8 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -141,7 +143,7 @@ export function useAudit(options = {}) {
     /**
      * Cancela um job em execução
      * @param {string} jobId
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function cancelJob(jobId) {
         loading.value = true;
@@ -151,7 +153,8 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -171,12 +174,13 @@ export function useAudit(options = {}) {
         loading.value = true;
         error.value = null;
         try {
-            const params = new URLSearchParams(query).toString();
+            const params = new URLSearchParams(/** @type {any} */ (query)).toString();
             const url = `/audit/jobs/${jobId}/patches${params ? `?${params}` : ''}`;
             const data = await fetchApi(url);
             patches.value = data.patches || [];
             return patches.value;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -188,17 +192,18 @@ export function useAudit(options = {}) {
      * Detalhes de um patch específico
      * @param {string} patchId
      * @param {object} [query]
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function getPatch(patchId, query = {}) {
         loading.value = true;
         error.value = null;
         try {
-            const params = new URLSearchParams(query).toString();
+            const params = new URLSearchParams(/** @type {any} */ (query)).toString();
             const url = `/audit/patches/${patchId}${params ? `?${params}` : ''}`;
             const data = await fetchApi(url);
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -209,7 +214,7 @@ export function useAudit(options = {}) {
     /**
      * Aprova um patch
      * @param {string} patchId
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function approvePatch(patchId) {
         loading.value = true;
@@ -219,7 +224,8 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -230,7 +236,7 @@ export function useAudit(options = {}) {
     /**
      * Rejeita um patch
      * @param {string} patchId
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function rejectPatch(patchId) {
         loading.value = true;
@@ -240,7 +246,8 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -251,7 +258,7 @@ export function useAudit(options = {}) {
     /**
      * Aplica um patch aprovado
      * @param {string} patchId
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function applyPatch(patchId) {
         loading.value = true;
@@ -261,7 +268,8 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -272,7 +280,7 @@ export function useAudit(options = {}) {
     /**
      * Valida readiness de apply
      * @param {string} patchId
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function getPatchApplyReadiness(patchId) {
         loading.value = true;
@@ -280,7 +288,8 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi(`/audit/patches/${patchId}/apply-readiness`);
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -302,7 +311,8 @@ export function useAudit(options = {}) {
             const data = await fetchApi(`/audit/jobs/${jobId}/findings`);
             findings.value = data.findings || [];
             return findings.value;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -323,7 +333,8 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/audit/watch-rules');
             watchRules.value = data.rules || [];
             return watchRules.value;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -334,7 +345,7 @@ export function useAudit(options = {}) {
     /**
      * Cria ou atualiza watch rule
      * @param {object} payload
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function upsertWatchRule(payload) {
         loading.value = true;
@@ -345,7 +356,8 @@ export function useAudit(options = {}) {
                 body: JSON.stringify(payload),
             });
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -356,7 +368,7 @@ export function useAudit(options = {}) {
     /**
      * Toggle watch rule
      * @param {string} ruleId
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function toggleWatchRule(ruleId) {
         loading.value = true;
@@ -366,7 +378,8 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -386,7 +399,8 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/profiles');
             return data.profiles || [];
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -404,7 +418,8 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/client-policies');
             return data.policies || [];
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -422,7 +437,8 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/backends');
             return data.backends || [];
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -440,7 +456,8 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/models-db');
             return data.models || [];
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -450,7 +467,7 @@ export function useAudit(options = {}) {
 
     /**
      * Resumo de inferência
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      */
     async function getInferenceSummary() {
         loading.value = true;
@@ -458,7 +475,8 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/summary');
             return data;
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {

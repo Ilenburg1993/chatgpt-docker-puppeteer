@@ -13,7 +13,7 @@ http.interceptors.request.use(
     config => {
         const token = localStorage.getItem('auth_token');
         if (token) {
-            const headers = /** @type {unknown} */ (config.headers || {});
+            const headers = /** @type {any} */ (config.headers || {});
             headers.Authorization = `Bearer ${token}`;
             config.headers = headers;
         }
@@ -31,7 +31,8 @@ http.interceptors.response.use(
             if (requestId) {
                 error.request_id = requestId;
             }
-        } catch (e) {
+        } catch (_rawE) {
+    const e = /** @type {any} */ (_rawE);
             // ignore
         }
         return Promise.reject(error);
@@ -41,7 +42,7 @@ http.interceptors.response.use(
 /**
  * Função exportada: formatHttpError.
  * @param {*} error
- * @returns {object}
+ * @returns {any}
  */
 export function formatHttpError(error) {
     const requestId = error?.request_id || error?.response?.data?.request_id || null;

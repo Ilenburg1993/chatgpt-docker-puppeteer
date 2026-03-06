@@ -10,19 +10,19 @@ const currentPreset = ref('dense');
 const loading = ref(false);
 let initialized = false;
 
-function _normalizePreset(value) {
+function _normalizePreset(/** @type {any} */ value) {
     const preset = String(value || '')
         .trim()
         .toLowerCase();
     return ALLOWED_PRESETS.has(preset) ? preset : 'dense';
 }
 
-function _applyPresetToDom(preset) {
+function _applyPresetToDom(/** @type {any} */ preset) {
     if (typeof document === 'undefined') return;
     document.documentElement.setAttribute('data-ui-preset', preset);
 }
 
-function _persistLocalPreset(preset) {
+function _persistLocalPreset(/** @type {any} */ preset) {
     try {
         localStorage.setItem(STORAGE_KEY, preset);
     } catch (_) {
@@ -37,7 +37,7 @@ async function _loadFromServer() {
     return { preset, prefs };
 }
 
-async function _saveToServer(preset) {
+async function _saveToServer(/** @type {any} */ preset) {
     await http.patch('/api/control/preferences/me', {
         layout: {
             preset,
@@ -80,7 +80,7 @@ export function useUiPreferences() {
         }
     };
 
-    const setPreset = async presetInput => {
+    const setPreset = async (/** @type {any} */ presetInput) => {
         const preset = _normalizePreset(presetInput);
         currentPreset.value = preset;
         _applyPresetToDom(preset);

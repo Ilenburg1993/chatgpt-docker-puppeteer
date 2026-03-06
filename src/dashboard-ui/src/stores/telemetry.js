@@ -17,10 +17,11 @@ import { formatHttpError, http } from '@/lib/http';
 class MetricBuffer {
     constructor(maxSize = 120) {
         this.maxSize = maxSize;
+        /** @type {any[]} */
         this.data = [];
     }
 
-    push(value, timestamp = Date.now()) {
+    push(/** @type {any} */ value, timestamp = Date.now()) {
         this.data.push({ value, timestamp });
         if (this.data.length > this.maxSize) {
             this.data.shift();
@@ -186,8 +187,9 @@ export const useTelemetryStore = defineStore('telemetry', {
                 if (metrics) {
                     this.updateMetrics(metrics);
                 }
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (_rawError) {
+    const error = /** @type {any} */ (_rawError);
+                this.error = (/** @type {any} */ (formatHttpError(error))).message;
                 console.error('[TelemetryStore] Erro ao carregar métricas:', error);
             }
         },
@@ -203,40 +205,41 @@ export const useTelemetryStore = defineStore('telemetry', {
                 // Popula buffers com histórico do servidor
                 if (data.cpu?.history) {
                     this.history.cpu.clear();
-                    data.cpu.history.forEach(item => {
+                    data.cpu.history.forEach((/** @type {any} */ item) => {
                         this.history.cpu.push(item.value, item.timestamp);
                     });
                 }
 
                 if (data.memory?.history) {
                     this.history.memory.clear();
-                    data.memory.history.forEach(item => {
+                    data.memory.history.forEach((/** @type {any} */ item) => {
                         this.history.memory.push(item.value, item.timestamp);
                     });
                 }
 
                 if (data.heap?.history) {
                     this.history.heap.clear();
-                    data.heap.history.forEach(item => {
+                    data.heap.history.forEach((/** @type {any} */ item) => {
                         this.history.heap.push(item.value, item.timestamp);
                     });
                 }
 
                 if (data.event_loop?.history) {
                     this.history.eventLoop.clear();
-                    data.event_loop.history.forEach(item => {
+                    data.event_loop.history.forEach((/** @type {any} */ item) => {
                         this.history.eventLoop.push(item.value, item.timestamp);
                     });
                 }
 
                 if (data.queue?.history) {
                     this.history.queueSize.clear();
-                    data.queue.history.forEach(item => {
+                    data.queue.history.forEach((/** @type {any} */ item) => {
                         this.history.queueSize.push(item.value, item.timestamp);
                     });
                 }
-            } catch (error) {
-                this.error = formatHttpError(error).message;
+            } catch (_rawError) {
+    const error = /** @type {any} */ (_rawError);
+                this.error = (/** @type {any} */ (formatHttpError(error))).message;
                 console.error('[TelemetryStore] Erro ao carregar histórico:', error);
             }
         },
@@ -244,7 +247,7 @@ export const useTelemetryStore = defineStore('telemetry', {
         /**
          * Atualiza métricas (usado por Socket.io handler)
          */
-        updateMetrics(metrics) {
+        updateMetrics(/** @type {any} */ metrics) {
             this.current = {
                 ...this.current,
                 ...metrics,
@@ -257,7 +260,7 @@ export const useTelemetryStore = defineStore('telemetry', {
             this.history.eventLoop.push(metrics.event_loop?.lag_ms || 0, metrics.timestamp);
             this.history.queueSize.push(metrics.queue?.size || 0, metrics.timestamp);
 
-            this.lastReceived = Date.now();
+            this.lastReceived = /** @type {any} */ (Date.now());
             this.receiving = true;
             this.samplesReceived++;
         },
@@ -265,14 +268,14 @@ export const useTelemetryStore = defineStore('telemetry', {
         /**
          * Handler para evento Socket.io telemetry:metrics
          */
-        handleTelemetryMetrics(data) {
+        handleTelemetryMetrics(/** @type {any} */ data) {
             this.updateMetrics(data);
         },
 
         /**
          * Define status de conexão
          */
-        setConnected(connected) {
+        setConnected(/** @type {any} */ connected) {
             this.connected = connected;
             if (!connected) {
                 this.receiving = false;

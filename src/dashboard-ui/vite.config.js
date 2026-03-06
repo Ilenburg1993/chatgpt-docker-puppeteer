@@ -8,7 +8,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 // https://vite.dev/config/
 /** Reexport público: default. */
 export default defineConfig({
-    plugins: [
+    plugins: /** @type {any} */ ([
         vue(),
         // Precompressed assets for production (served by the server when available)
         compression({
@@ -23,7 +23,7 @@ export default defineConfig({
                   brotliSize: true,
               })
             : null,
-    ].filter(Boolean),
+    ]).filter(Boolean),
 
     // Base path para servir em /dashboard
     base: '/dashboard/',
@@ -118,14 +118,16 @@ export default defineConfig({
                             return 'ui-components';
                         }
                     }
+                    return undefined;
                 },
                 assetFileNames: assetInfo => {
-                    const info = assetInfo.name.split('.');
+                    const name = assetInfo.name ?? 'asset';
+                    const info = name.split('.');
                     const extType = info[info.length - 1];
-                    if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(assetInfo.name)) {
+                    if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(name)) {
                         return `assets/images/[name]-[hash][extname]`;
                     }
-                    if (/\.(woff2?|eot|ttf|otf)$/i.test(assetInfo.name)) {
+                    if (/\.(woff2?|eot|ttf|otf)$/i.test(name)) {
                         return `assets/fonts/[name]-[hash][extname]`;
                     }
                     return `assets/[name]-[hash][extname]`;

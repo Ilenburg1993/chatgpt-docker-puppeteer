@@ -12,7 +12,7 @@ import { io } from 'socket.io-client';
 import { onMounted, onUnmounted, ref } from 'vue';
 
 // Singleton da conexão Socket.io
-let socketInstance = null;
+let socketInstance = /** @type {any} */ (null);
 let connectionCount = 0;
 let handlersInitialized = false;
 const isConnected = ref(false);
@@ -29,7 +29,8 @@ function getDashboardToken() {
 
 /**
  * @typedef {object} GetSocketInstanceOptions
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {*} [_] Propriedades definidas em runtime.
+ * @property {string} [url] Socket server URL.
  */
 /**
  * Cria ou retorna instância existente do Socket.io
@@ -54,12 +55,13 @@ function getSocketInstance(url = '', options = {}) {
 
 /**
  * @typedef {object} UseSocketOptions
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {*} [_] Propriedades definidas em runtime.
+ * @property {string} [url] Socket server URL.
  */
 /**
  * Composable para gerenciar conexão Socket.io
  * @param {UseSocketOptions} [options]
-  * @returns {object}
+  * @returns {any}
  */
 export function useSocket(options = {}) {
     const socket = getSocketInstance(options.url || '', options);
@@ -85,21 +87,21 @@ export function useSocket(options = {}) {
     /**
      * Inscreve em um evento
      */
-    const subscribe = (event, handler) => {
+    const subscribe = (/** @type {any} */ event, /** @type {any} */ handler) => {
         socket.on(event, handler);
     };
 
     /**
      * Remove inscrição de evento
      */
-    const unsubscribe = (event, handler) => {
+    const unsubscribe = (/** @type {any} */ event, /** @type {any} */ handler) => {
         socket.off(event, handler);
     };
 
     /**
      * Emite evento para o servidor
      */
-    const emit = (event, data) => {
+    const emit = (/** @type {any} */ event, /** @type {any} */ data) => {
         if (socket.connected) {
             socket.emit(event, data);
         }
@@ -121,14 +123,14 @@ export function useSocket(options = {}) {
             }
         });
 
-        socket.on('disconnect', reason => {
+        socket.on('disconnect', (/** @type {any} */ reason) => {
             isConnected.value = false;
             if (import.meta.env.DEV) {
                 console.info('[Socket.io] Disconnected:', reason);
             }
         });
 
-        socket.on('connect_error', err => {
+        socket.on('connect_error', (/** @type {any} */ err) => {
             error.value = err.message;
             isConnected.value = false;
             if (import.meta.env.DEV) {
@@ -136,7 +138,7 @@ export function useSocket(options = {}) {
             }
         });
 
-        socket.on('reconnect_attempt', attempt => {
+        socket.on('reconnect_attempt', (/** @type {any} */ attempt) => {
             reconnectAttempts.value = attempt;
             if (import.meta.env.DEV) {
                 console.info('[Socket.io] Reconnect attempt:', attempt);
