@@ -211,7 +211,7 @@ class SubmissionController extends EventEmitter {
             this.emit(SUBMISSION_EVENTS.SUBMISSION_FAILED, {
                 taskId,
                 selector,
-                error: err.message,
+                error: /** @type {any} */ (err).message,
                 timestamp: Date.now(),
             });
 
@@ -219,10 +219,10 @@ class SubmissionController extends EventEmitter {
             this.driver._emitVital('TRIAGE_ALERT', {
                 type: 'SUBMISSION_FAILED',
                 severity: 'HIGH',
-                evidence: { taskId, selector, error: err.message },
+                evidence: { taskId, selector, error: /** @type {any} */ (err).message },
             });
 
-            log('ERROR', `[SUBMISSION] Falha no processo de envio: ${err.message}`, correlationId);
+            log('ERROR', `[SUBMISSION] Falha no processo de envio: ${/** @type {any} */ (err).message}`, correlationId);
             throw err;
         } finally {
             timeoutP.cancel();
@@ -291,7 +291,7 @@ class SubmissionController extends EventEmitter {
             taskId,
         });
 
-        await this.driver.page.keyboard.press('Enter');
+        await /** @type {any} */ (this.driver.page).keyboard.press('Enter');
 
         // STEP 5: ADAPTIVE WAIT (debounce calculation)
         let debounceDelay = SUBMISSION_CONFIG.DEBOUNCE_FALLBACK_MS;
@@ -372,7 +372,7 @@ class SubmissionController extends EventEmitter {
      * @returns {Promise<boolean>} true se campo vazio, false caso contrário
      */
     async _verifyClearing(ctx, selector) {
-        return await ctx.evaluate(s => {
+        return await /** @type {any} */ (ctx).evaluate(s => {
             const el = document.querySelector(s);
             const content = el?.value || el?.innerText || '';
             return content.trim().length === 0;
@@ -396,7 +396,7 @@ class SubmissionController extends EventEmitter {
 
         for (let retry = 0; retry < maxRetries; retry++) {
             try {
-                await ctx.evaluate(sel => {
+                await /** @type {any} */ (ctx).evaluate(sel => {
                     const el = document.querySelector(sel);
                     if (!el) {
                         throw new Error(`Element not found: ${sel}`);
@@ -520,7 +520,7 @@ class SubmissionController extends EventEmitter {
      * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
-        let timerId;
+        let timerId = /** @type {any} */ (undefined);
         const p = /** @type {CancelableTimeoutPromise} */ (
             new Promise((_, reject) => {
                 timerId = setTimeout(() => {
@@ -542,7 +542,7 @@ class SubmissionController extends EventEmitter {
 /**
  * Factory function para criar instância de SubmissionController.
  *
- * @param {CreateDriver} driver - Instância do driver
+ * @param {any} driver - Instância do driver
  * @returns {SubmissionController} Nova instância
  *
  * @example

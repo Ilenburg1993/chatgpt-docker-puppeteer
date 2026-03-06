@@ -45,7 +45,7 @@ export class DriverLifecycleManager {
 
     /**
      * Cria/adquire um driver. Não faz attach a página por conta própria.
-     * @returns {Promise<void>} Instância do driver adquirido.
+     * @returns {Promise<any>} Instância do driver adquirido.
      * @throws {Error} Se falhar ao adquirir driver do pool ou criar novo.
      */
     async acquire() {
@@ -54,7 +54,7 @@ export class DriverLifecycleManager {
         const target = (this.target || driverFactory.getDefaultTarget()).toLowerCase();
 
         // Prefer pool se habilitado; cai para createDriver quando necessario.
-        let driver = null;
+        let driver = /** @type {any} */ (null);
         try {
             driver = await driverFactory.acquireFromPool(target);
         } catch {

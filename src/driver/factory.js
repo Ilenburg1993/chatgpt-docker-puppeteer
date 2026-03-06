@@ -341,7 +341,7 @@ class DriverFactory extends EventEmitter {
             return await operation();
         } finally {
             if (typeof release === 'function') {
-                (/** @type {() => void} */ (release))();
+                /** @type {() => void} */ (release)();
             }
         }
     }
@@ -721,7 +721,7 @@ class DriverFactory extends EventEmitter {
             this.metrics.errors++;
 
             log('ERROR', `[FACTORY] Erro na ativação do driver '${key}': ${/** @type {any} */ (e).message}`);
-            
+
             this.emit(FACTORY_EVENTS.ERROR, {
                 operation: 'createDriver',
                 target: key,
@@ -903,10 +903,12 @@ class DriverFactory extends EventEmitter {
                     return tempDriver;
                 }
 
-                const err = /** @type {any} */ (new Error(
-                    `[FACTORY] POOL_EXHAUSTED: All ${maxPoolSize} drivers for ${key} are busy ` +
-                        `(timeout waiting for release: ${backpressureTimeoutMs}ms)`
-                ));
+                const err = /** @type {any} */ (
+                    new Error(
+                        `[FACTORY] POOL_EXHAUSTED: All ${maxPoolSize} drivers for ${key} are busy ` +
+                            `(timeout waiting for release: ${backpressureTimeoutMs}ms)`
+                    )
+                );
                 err.code = 'DRIVER_POOL_EXHAUSTED';
                 err.details = {
                     target: key,
@@ -1056,7 +1058,7 @@ class DriverFactory extends EventEmitter {
         this.emit(FACTORY_EVENTS.DRIVER_RELEASED, {
             target: entry.target,
             totalUses: entry.totalUses,
-            poolSize: (/** @type {any} */ (pool)).length,
+            poolSize: /** @type {any} */ (pool).length,
             driversReleased: this.metrics.driversReleased,
         });
 
@@ -1493,7 +1495,7 @@ class DriverFactory extends EventEmitter {
             claude: 'claude.ai',
             openai: 'openai.com',
         };
-        return /** @type {any} */ ((/** @type {any} */ (domains))[target]) || null;
+        return /** @type {any} */ (/** @type {any} */ (domains)[target]) || null;
     }
 
     /**

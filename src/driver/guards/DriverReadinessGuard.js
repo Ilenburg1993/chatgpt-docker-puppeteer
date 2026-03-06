@@ -134,11 +134,11 @@ class DriverReadinessGuard {
             // CHECK 2: Page Stable (Stabilizer)
             // ============================================
             try {
-                const stabilityResult = await stabilizer.waitForStability(
+                const stabilityResult = /** @type {any} */ (await stabilizer.waitForStability(
                     this.driver,
                     Number(opts.stabilityTimeout) || 10000,
                     this.driver.signal || null
-                );
+                ));
 
                 if (!stabilityResult?.success) {
                     const reason = stabilityResult?.timeout ? 'timeout' : 'unstable';
@@ -157,10 +157,10 @@ class DriverReadinessGuard {
                 issues.push({
                     check: CHECK_TYPES.PAGE_STABLE,
                     severity: SEVERITY.WARNING,
-                    message: `Stability check failed: ${stabilityErr.message}`,
+                    message: `Stability check failed: ${/** @type {any} */ (stabilityErr).message}`,
                 });
 
-                log('WARN', `[DriverReadinessGuard] Stability check error: ${stabilityErr.message}`);
+                log('WARN', `[DriverReadinessGuard] Stability check error: ${/** @type {any} */ (stabilityErr).message}`);
             }
 
             // ============================================
@@ -172,7 +172,7 @@ class DriverReadinessGuard {
                         this.triage = new Triage(this.driver.page, this.driver.config.langCode || 'en');
                     }
 
-                    const triageResult = await this.triage.diagnose();
+                    const triageResult = /** @type {any} */ (await this.triage.diagnose());
 
                     if (triageResult.detected && triageResult.detected.length > 0) {
                         log(
@@ -220,17 +220,17 @@ class DriverReadinessGuard {
                     }
                 } catch (triageErr) {
                     // Triage error itself is not blocking (unless FATAL pattern detected)
-                    if (triageErr.message.startsWith('Triage FATAL:')) {
+                    if (/** @type {any} */ (triageErr).message.startsWith('Triage FATAL:')) {
                         throw triageErr;
                     }
 
                     issues.push({
                         check: CHECK_TYPES.TRIAGE_CLEAN,
                         severity: SEVERITY.WARNING,
-                        message: `Triage scan failed: ${triageErr.message}`,
+                        message: `Triage scan failed: ${/** @type {any} */ (triageErr).message}`,
                     });
 
-                    log('WARN', `[DriverReadinessGuard] Triage error: ${triageErr.message}`);
+                    log('WARN', `[DriverReadinessGuard] Triage error: ${/** @type {any} */ (triageErr).message}`);
                 }
             } else {
                 checks[CHECK_TYPES.TRIAGE_CLEAN] = true; // Skipped = pass
@@ -282,7 +282,7 @@ class DriverReadinessGuard {
             // ============================================
             if (!opts.skipSession && this.driver.sessionTracker) {
                 try {
-                    const sessionHealth = this.driver.sessionTracker.getSessionHealth();
+                    const sessionHealth = /** @type {any} */ (this.driver.sessionTracker.getSessionHealth());
 
                     // Check if session is DEGRADED or CRITICAL
                     const isDegraded = sessionHealth.level === 'DEGRADED' || sessionHealth.level === 'CRITICAL';
@@ -311,7 +311,7 @@ class DriverReadinessGuard {
                     issues.push({
                         check: CHECK_TYPES.SESSION_HEALTHY,
                         severity: SEVERITY.INFO,
-                        message: `Session health check failed: ${sessionErr.message}`,
+                        message: `Session health check failed: ${/** @type {any} */ (sessionErr).message}`,
                     });
                 }
             } else {
@@ -350,12 +350,12 @@ class DriverReadinessGuard {
                 timestamp: Date.now(),
                 duration: Date.now() - startTime,
                 validationCount: this.validationCount,
-                error: err.message,
+                error: /** @type {any} */ (err).message,
             };
 
             this.lastValidation = result;
 
-            log('ERROR', `[DriverReadinessGuard] Validation failed: ${err.message}`, this.driver.correlationId);
+            log('ERROR', `[DriverReadinessGuard] Validation failed: ${/** @type {any} */ (err).message}`, this.driver.correlationId);
 
             throw err;
         }
@@ -377,7 +377,7 @@ class DriverReadinessGuard {
                 stabilityTimeout: 5000,
             });
 
-            return result.ready;
+            return (/** @type {any} */ (result)).ready;
         } catch (_) {
             return false;
         }

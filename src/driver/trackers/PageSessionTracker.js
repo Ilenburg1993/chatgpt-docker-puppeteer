@@ -122,7 +122,7 @@ class PageSessionTracker {
 
         // Session metrics
         this.turnCount = 0;
-        this.responseTimes = []; // Array of {timestamp, duration} objects
+        this.responseTimes = /** @type {any[]} */ ([]); // Array of {timestamp, duration} objects
         this.sessionStartTime = Date.now();
         this.lastTurnTime = null;
 
@@ -258,7 +258,7 @@ class PageSessionTracker {
      * @returns {object} { score, level, factors }
      */
     getSessionHealth() {
-        const metrics = this.getMetrics();
+        const metrics = /** @type {any} */ (this.getMetrics());
 
         return {
             score: metrics.sessionHealth,
@@ -274,7 +274,7 @@ class PageSessionTracker {
      * @returns {number} Timeout multiplier (1.0 - 5.0)
      */
     getTimeoutMultiplier() {
-        return this.getMetrics().timeoutMultiplier;
+        return /** @type {any} */ (this.getMetrics()).timeoutMultiplier;
     }
 
     /**
@@ -537,7 +537,7 @@ class PageSessionTracker {
      * @private
      */
     _getCorrelationId() {
-        return this.driver?.correlationId || 'no-correlation';
+        return /** @type {any} */ (this.driver)?.correlationId || 'no-correlation';
     }
 }
 
