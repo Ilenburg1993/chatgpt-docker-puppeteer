@@ -45,16 +45,17 @@ async function main() {
 
     const components = {
         pm2: {
+            ...summarizeResult(pm2Status),
             ok: pm2Status.ok,
             details: pm2Status.ok ? 'daemon-status-ok' : 'daemon-status-failed',
-            ...summarizeResult(pm2Status),
         },
         mcp: {
+            ...summarizeResult(mcpDiagnose),
             ok: mcpDiagnose.ok,
             details: mcpDiagnose.ok ? 'mcp-diagnose-ok' : 'mcp-diagnose-failed',
-            ...summarizeResult(mcpDiagnose),
         },
         rag: {
+            ...summarizeResult(ragHealth),
             ok: ragHealth.ok && Boolean(ragJson?.ok || ragOkFromText),
             available:
                 ragJson && Object.prototype.hasOwnProperty.call(ragJson, 'available')
@@ -63,14 +64,13 @@ async function main() {
                       ? true
                       : null,
             details: ragHealth.ok ? 'rag-health-command-ok' : 'rag-health-command-failed',
-            ...summarizeResult(ragHealth),
         },
         lsp: {
+            ...summarizeResult(lspHealth),
             ok: lspHealth.ok && Boolean(lspJson?.ok),
             lsp_tools_present: Boolean(lspJson?.lsp_tools_present),
             lsp_functional_ok: Boolean(lspJson?.lsp_functional_ok),
             details: lspHealth.ok ? 'lsp-health-command-ok' : 'lsp-health-command-failed',
-            ...summarizeResult(lspHealth),
         },
     };
 

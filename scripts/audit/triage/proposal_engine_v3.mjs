@@ -5,20 +5,17 @@ import { buildTestPlan } from './test_planner.mjs';
 
 /**
  * @typedef {object} BuildProposalV3Options
- * @property {Array<{ cause: string} rankedCauses
- * @property {number} score
- * @property {boolean} proposeDiffs
- * @property {'basic'|'standard'|'deep'} depth
- * @property {unknown} contextPack
+ * @property {Array<any>} [rankedCauses]
+ * @property {number} [score]
+ * @property {boolean} [proposeDiffs]
+ * @property {'basic'|'standard'|'deep'} [depth]
+ * @property {any} [contextPack]
  */
-/**
- * @typedef {object} BuildProposalV3Finding
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} BuildProposalV3Finding */
 /**
  * @param {BuildProposalV3Finding} finding
  * @param {BuildProposalV3Options} [options]
-  * @returns {object}
+  * @returns {any}
  */
 export function buildProposalV3(finding, options = {}) {
     const depth = options.depth || 'standard';

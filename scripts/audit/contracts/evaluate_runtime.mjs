@@ -23,7 +23,7 @@ function buildSignalMap(contracts) {
 /**
  * @typedef {object} EvaluateRuntimeSignalsOptions
  * @property {ContractDefinitionV1[]} contracts
- * @property {Array<{ signal: string} signals
+ * @property {Array<any>} signals
  * @property {string} evidence
  * @property {string} source_tool
  * @property {string|null} file

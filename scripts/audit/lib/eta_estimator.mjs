@@ -31,14 +31,17 @@ export function createEtaEstimator(options) {
     /** @type {Map<string, number>} */
     const currentDurations = new Map();
 
+    /** @param {string} stepKey */
     function scopedStepKey(stepKey) {
         return `${scopeKey}::${stepKey}`;
     }
 
+    /** @param {string} stepKey */
     function beginStep(stepKey) {
         currentDurations.set(scopedStepKey(stepKey), Date.now());
     }
 
+    /** @param {string} stepKey */
     function endStep(stepKey) {
         const scoped = scopedStepKey(stepKey);
         const start = currentDurations.get(scoped);

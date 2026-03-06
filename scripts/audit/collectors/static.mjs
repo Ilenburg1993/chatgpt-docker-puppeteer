@@ -45,7 +45,7 @@ function isDistArtifactPath(value) {
 function parseForbiddenOutput(stdoutOrStderr) {
     const parsed = parseJsonFromMixedOutput(String(stdoutOrStderr || ''));
     if (parsed?.findings && Array.isArray(parsed.findings)) {
-        return parsed.findings.map(item => ({
+        return parsed.findings.map((/** @type {any} */ item) => ({
             source_tool: 'check:forbidden',
             contract_id: item.contract_id || null,
             domain: item.domain || null,
@@ -233,8 +233,7 @@ function parseMadgeOutput(output) {
 }
 
 /**
- * @typedef {object} ParseDepCruiseOutputDepcruiseJson
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {any} ParseDepCruiseOutputDepcruiseJson
  */
 /**
  * @param {ParseDepCruiseOutputDepcruiseJson} depcruiseJson
@@ -329,12 +328,8 @@ function parseJscpdReport(jscpdJsonPath) {
  * @property {'legacy'|'hybrid'|'strict'} contractsMode
  * @property {boolean} skipQuickSyntax
  * @property {boolean} skipLintTypecheck
- * @property {(stepId: string} exec
- * @property {string} command
- * @property {string[]} args
- * @property {unknown) => Promise<void>} options
- * @property {(binary: string} commandExistsFn
- * @property {string) => Promise<boolean>} stepId
+ * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
+ * @property {Function} commandExistsFn
  */
 /**
  * @param {CollectStaticFindingsOptions} options
@@ -349,9 +344,9 @@ export async function collectStaticFindings(options) {
     const warnings = [];
 
     const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
-    const exists = options.commandExistsFn || (async binary => commandExists(binary));
+    const exists = options.commandExistsFn || (async (/** @type {string} */ binary) => commandExists(binary));
 
-    const telemetry = {
+    const telemetry = /** @type {any} */ ({
         profile: options.profile,
         changed_files_count: options.changedFiles.length,
         gates: {
@@ -360,7 +355,7 @@ export async function collectStaticFindings(options) {
             typecheck_ok: null,
             depgraph_ok: null,
         },
-    };
+    });
 
     const changedJsFiles = options.changedFiles
         .filter(file => /\.(js|mjs|cjs)$/.test(file))

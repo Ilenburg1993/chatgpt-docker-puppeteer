@@ -3,17 +3,17 @@ import { spawn } from 'node:child_process';
 
 /**
  * @typedef {object} RunCommandOptions
- * @property {string} cwd
- * @property {Record<string} env
- * @property {number} timeoutMs
- * @property {number[]} acceptExitCodes
- * @property {number} maxStdoutBytes
- * @property {number} maxStderrBytes
- * @property {number} truncationHeadRatio
- * @property {boolean} shell
- * @property {unknown} stdio
- * @property {(chunk: string) => void} onStdout
- * @property {(chunk: string) => void} onStderr
+ * @property {string} [cwd]
+ * @property {Record<string, string>} [env]
+ * @property {number} [timeoutMs]
+ * @property {number[]} [acceptExitCodes]
+ * @property {number} [maxStdoutBytes]
+ * @property {number} [maxStderrBytes]
+ * @property {number} [truncationHeadRatio]
+ * @property {boolean} [shell]
+ * @property {any} [stdio]
+ * @property {(chunk: string) => void} [onStdout]
+ * @property {(chunk: string) => void} [onStderr]
  */
 /**
  * Runs a command and captures stdout/stderr without throwing.
@@ -198,8 +198,7 @@ function sliceByUtf8Bytes(text, maxBytes, fromEnd) {
 
 /**
  * @param {string} binary
- * @param {(command: string, args: string[], options?: unknown) => Promise<{ ok: boolean }>} [execFn]
- * @param {*} [execFn]
+ * @param {any} [execFn]
  * @returns {Promise<boolean>}
  */
 export async function commandExists(binary, execFn = runCommand) {
@@ -210,7 +209,7 @@ export async function commandExists(binary, execFn = runCommand) {
 
 /**
  * @param {string} text
- * @returns {unknown|null}
+ * @returns {any}
  */
 function tryParseJson(text) {
     try {
@@ -276,7 +275,7 @@ function extractBalancedJsonBlocks(text) {
                 stack.length = 0;
                 continue;
             }
-            if (stack.length === 0 && Number.isInteger(top?.start)) {
+            if (stack.length === 0 && top && Number.isInteger(top.start)) {
                 blocks.push(text.slice(top.start, index + 1));
             }
         }
@@ -287,13 +286,13 @@ function extractBalancedJsonBlocks(text) {
 
 /**
  * @typedef {object} ParseJsonFromMixedOutputOptions
- * @property {boolean} preferLast
+ * @property {boolean} [preferLast]
  */
 /**
  * Attempts to parse a JSON object from noisy stdout.
  * @param {string} stdout
  * @param {ParseJsonFromMixedOutputOptions} [options]
- * @returns {unknown|null}
+ * @returns {any}
  */
 export function parseJsonFromMixedOutput(stdout, options = {}) {
     const text = String(stdout || '')
@@ -313,7 +312,7 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
     // Prefer complete JSON blocks. By default, parse the last valid block first.
     const blocks = extractBalancedJsonBlocks(text);
     const orderedBlocks = preferLast ? [...blocks].reverse() : blocks;
-    /** @type {unknown[]} */
+    /** @type {any[]} */
     const parsedCandidates = [];
     for (const block of orderedBlocks) {
         const parsed = tryParseJson(block);
@@ -338,9 +337,8 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
 
     // Fallback: lines starting with "{" in case output is truncated around the block.
     const lines = text.split(/\r?\n/);
-    const indexes = preferLast
-        ? Array.from({ length: lines.length }, (_item, idx) => lines.length - idx - 1)
-        : Array.from({ length: lines.length }, (_item, idx) => idx);
+    const allLineIndexes = lines.map((_, idx) => idx);
+    const indexes = preferLast ? [...allLineIndexes].reverse() : allLineIndexes;
     for (const start of indexes) {
         if (
             !String(lines[start] || '')

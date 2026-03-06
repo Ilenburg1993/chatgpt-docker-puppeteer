@@ -111,7 +111,7 @@ export function normalizeFindings(rawFindings, options) {
     for (const raw of rawFindings) {
         const file = raw.file ? String(raw.file) : null;
         const fileKey = file ? path.normalize(file) : 'n/a';
-        const line = Number.isInteger(raw.line) ? raw.line : null;
+        const line = typeof raw.line === 'number' ? raw.line : null;
         const rule = String(raw.rule || 'rule:unknown');
         const sourceTool = String(raw.source_tool || 'unknown');
         const evidence = String(raw.evidence || '').trim();

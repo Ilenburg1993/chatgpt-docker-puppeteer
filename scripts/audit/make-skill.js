@@ -48,7 +48,7 @@ _TODO: escreva uma visão geral do skill._
         pkg.scripts[`audit:${name}`] = `echo \"run ${name} skill\"`;
         await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
     } catch (err) {
-        console.warn('unable to update package.json alias', err.message);
+        console.warn('unable to update package.json alias', /** @type {any} */ (err).message);
     }
 
     console.log(`skill ${name} created at ${skillDir}`);

@@ -11,10 +11,7 @@ import { buildProposalV3 } from './triage/proposal_engine_v3.mjs';
 
 const MCP_URL = process.env.MCP_DIAG_URL ? `${process.env.MCP_DIAG_URL}/api/mcp` : 'http://localhost:3008/api/mcp';
 
-/**
- * @typedef {object} CallMcpParams
- * @property {*} _ Propriedades definidas via runtime.
- */
+/** @typedef {Record<string, any>} CallMcpParams */
 /**
  * @param {string} method
  * @param {CallMcpParams} params
@@ -46,9 +43,9 @@ async function callMcp(method, params, id) {
 
 /**
  * @typedef {object} DeterministicFallbackOptions
- * @property {boolean} proposeDiffs
- * @property {'basic'|'standard'|'deep'} proposalDepth
- * @property {string} masterPath
+ * @property {boolean} [proposeDiffs]
+ * @property {'basic'|'standard'|'deep'} [proposalDepth]
+ * @property {string} [masterPath]
  */
 /**
  * @param {AuditFindingV3} finding
@@ -150,20 +147,16 @@ function deterministicFallback(finding, options) {
 
 /**
  * @typedef {object} TriageFindingsOptions
- * @property {boolean} enabled
- * @property {number} maxMcpFindings
- * @property {boolean} proposeDiffs
- * @property {'bug-first'|'all'} focusMode
- * @property {'basic'|'standard'|'deep'} proposalDepth
- * @property {'off'|'on'} cloudFallback
- * @property {string} masterPath
- * @property {number} maxDurationMs
- * @property {(payload: { phase: 'triage-intelligence'} onProgress
- * @property {number} processed
- * @property {number} total
- * @property {number} percent
- * @property {'mcp'|'fallback'|'disabled'|'timeout'} mode
- * @property {string|null} findingId
+ * @property {boolean} [enabled]
+ * @property {number} [maxMcpFindings]
+ * @property {boolean} [proposeDiffs]
+ * @property {'bug-first'|'all'} [focusMode]
+ * @property {'basic'|'standard'|'deep'} [proposalDepth]
+ * @property {'off'|'on'} [cloudFallback]
+ * @property {string} [masterPath]
+ * @property {number} [maxDurationMs]
+ * @property {(payload: any) => void} [onProgress]
+ * @property {string|null} [findingId]
  */
 /**
  * @param {AuditFindingV3[]} findings

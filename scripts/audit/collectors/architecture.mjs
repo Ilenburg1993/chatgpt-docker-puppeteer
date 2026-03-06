@@ -30,9 +30,10 @@ export async function collectArchitectureFindings(rootDir) {
         errors.push(...couplingResult.errors);
         warnings.push(...couplingResult.warnings);
     } catch (error) {
+        const _e = /** @type {any} */ (error);
         errors.push({
             source: 'architecture-collector',
-            message: `Failed to analyze coupling: ${error.message}`,
+            message: `Failed to analyze coupling: ${_e.message}`,
         });
     }
 
@@ -43,9 +44,10 @@ export async function collectArchitectureFindings(rootDir) {
         errors.push(...circularResult.errors);
         warnings.push(...circularResult.warnings);
     } catch (error) {
+        const _e = /** @type {any} */ (error);
         errors.push({
             source: 'architecture-collector',
-            message: `Failed to analyze circular dependencies: ${error.message}`,
+            message: `Failed to analyze circular dependencies: ${_e.message}`,
         });
     }
 
@@ -83,7 +85,9 @@ export async function collectArchitectureFindings(rootDir) {
  */
 async function analyzeCoupling(rootDir) {
     const findings = [];
+    /** @type {Array<{source:string,message:string}>} */
     const errors = [];
+    /** @type {Array<{source:string,message:string}>} */
     const warnings = [];
     const srcDir = path.join(rootDir, 'src');
     const files = await findJsFiles(srcDir);
@@ -129,7 +133,9 @@ async function analyzeCoupling(rootDir) {
  */
 async function analyzeCircularDependencies(rootDir) {
     const findings = [];
+    /** @type {Array<{source:string,message:string}>} */
     const errors = [];
+    /** @type {Array<{source:string,message:string}>} */
     const warnings = [];
 
     try {
@@ -174,8 +180,10 @@ async function analyzeCircularDependencies(rootDir) {
  * @returns {Promise<string[]>}
  */
 async function findJsFiles(dir) {
+    /** @type {string[]} */
     const files = [];
 
+    /** @param {string} currentDir */
     function scan(currentDir) {
         const items = fs.readdirSync(currentDir);
 

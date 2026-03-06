@@ -30,7 +30,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...complexityResult.findings);
         errors.push(...complexityResult.errors);
         warnings.push(...complexityResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze complexity: ${error.message}`,
@@ -43,7 +45,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...memoryResult.findings);
         errors.push(...memoryResult.errors);
         warnings.push(...memoryResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze memory leaks: ${error.message}`,
@@ -56,7 +60,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...queryResult.findings);
         errors.push(...queryResult.errors);
         warnings.push(...queryResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze query performance: ${error.message}`,
@@ -69,7 +75,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...timeoutRaceResult.findings);
         errors.push(...timeoutRaceResult.errors);
         warnings.push(...timeoutRaceResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze Promise.race timeout leaks: ${error.message}`,
@@ -82,7 +90,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...ownershipResult.findings);
         errors.push(...ownershipResult.errors);
         warnings.push(...ownershipResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze kernel dispatch ownership: ${error.message}`,
@@ -95,7 +105,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...missionTransitionResult.findings);
         errors.push(...missionTransitionResult.errors);
         warnings.push(...missionTransitionResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze mission transition bypass: ${error.message}`,
@@ -108,7 +120,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...lockCausalityResult.findings);
         errors.push(...lockCausalityResult.errors);
         warnings.push(...lockCausalityResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze lock release causality: ${error.message}`,
@@ -121,7 +135,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...dashboardAuthResult.findings);
         errors.push(...dashboardAuthResult.errors);
         warnings.push(...dashboardAuthResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze dashboard auth hardcoding: ${error.message}`,
@@ -134,7 +150,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...dashboardImportResult.findings);
         errors.push(...dashboardImportResult.errors);
         warnings.push(...dashboardImportResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze dashboard import side effects: ${error.message}`,
@@ -147,7 +165,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...controlSingleEntrypointResult.findings);
         errors.push(...controlSingleEntrypointResult.errors);
         warnings.push(...controlSingleEntrypointResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze control single entrypoint: ${error.message}`,
@@ -160,7 +180,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...pauseToEditResult.findings);
         errors.push(...pauseToEditResult.errors);
         warnings.push(...pauseToEditResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze control pause-to-edit guards: ${error.message}`,
@@ -173,7 +195,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...vnextCutoverResult.findings);
         errors.push(...vnextCutoverResult.errors);
         warnings.push(...vnextCutoverResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze dashboard vNext task mutation cutover: ${error.message}`,
@@ -186,7 +210,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...reassignResult.findings);
         errors.push(...reassignResult.errors);
         warnings.push(...reassignResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze task mission reassign/context contracts: ${error.message}`,
@@ -198,7 +224,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...bootImportSafetyResult.findings);
         errors.push(...bootImportSafetyResult.errors);
         warnings.push(...bootImportSafetyResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze boot import safety/signal ownership: ${error.message}`,
@@ -210,7 +238,9 @@ export async function collectPerformanceFindings(rootDir) {
         findings.push(...runtimeResourceShutdownResult.findings);
         errors.push(...runtimeResourceShutdownResult.errors);
         warnings.push(...runtimeResourceShutdownResult.warnings);
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
             message: `Failed to analyze runtime resource shutdown contracts: ${error.message}`,
@@ -267,8 +297,11 @@ export async function collectPerformanceFindings(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeComplexity(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     try {
@@ -276,7 +309,7 @@ async function analyzeComplexity(rootDir) {
         const eslintResult = await runCommand(
             'npx',
             ['eslint', '--format', 'json', '--rule', 'complexity: [2, 10]', 'src/'],
-            { cwd: rootDir }
+            /** @type {any} */ ({ cwd: rootDir })
         );
 
         if (eslintResult.ok && eslintResult.stdout) {
@@ -319,8 +352,11 @@ async function analyzeComplexity(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeMemoryLeaks(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     try {
@@ -353,7 +389,9 @@ async function analyzeMemoryLeaks(rootDir) {
                 });
             }
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-memory',
             message: `Failed to analyze memory leaks: ${error.message}`,
@@ -368,8 +406,11 @@ async function analyzeMemoryLeaks(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeQueryPerformance(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     const srcDir = path.join(rootDir, 'src');
@@ -409,8 +450,11 @@ async function analyzeQueryPerformance(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzePromiseRaceTimeoutLeaks(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     try {
@@ -440,7 +484,9 @@ async function analyzePromiseRaceTimeoutLeaks(rootDir) {
                 });
             }
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-timeout-race',
             message: `Failed to detect Promise.race timeout leaks: ${error.message}`,
@@ -457,8 +503,11 @@ async function analyzePromiseRaceTimeoutLeaks(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeKernelDispatchOwnership(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     try {
@@ -493,7 +542,9 @@ async function analyzeKernelDispatchOwnership(rootDir) {
                 });
             }
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-kernel-ownership',
             message: `Failed to detect kernel dispatch ownership violations: ${error.message}`,
@@ -510,8 +561,11 @@ async function analyzeKernelDispatchOwnership(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeLockReleaseCausality(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     const targets = ['src/agent/queue_worker.js', 'src/agent/task_state_projector.js'];
@@ -543,7 +597,9 @@ async function analyzeLockReleaseCausality(rootDir) {
                 });
             }
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-lock-causality',
             message: `Failed to detect lock release causality violations: ${error.message}`,
@@ -560,8 +616,11 @@ async function analyzeLockReleaseCausality(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeMissionTransitionBypass(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
     const targets = ['src/server/api/controllers/missions.js', 'src/agent/mission_runner.js'];
 
@@ -598,7 +657,9 @@ async function analyzeMissionTransitionBypass(rootDir) {
                 });
             }
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-mission-transition',
             message: `Failed to detect mission transition bypass: ${error.message}`,
@@ -615,8 +676,11 @@ async function analyzeMissionTransitionBypass(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeDashboardAuthInsecure(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     const relPath = 'src/server/api/controllers/dashboard.js';
@@ -646,7 +710,9 @@ async function analyzeDashboardAuthInsecure(rootDir) {
                 regression_risk: 'Alto',
             });
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-dashboard-auth',
             message: `Failed to analyze dashboard auth hardcoding: ${error.message}`,
@@ -663,8 +729,11 @@ async function analyzeDashboardAuthInsecure(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeDashboardImportSideEffects(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     const relPath = 'src/server/api/controllers/dashboard.js';
@@ -694,7 +763,9 @@ async function analyzeDashboardImportSideEffects(rootDir) {
                 regression_risk: 'Médio',
             });
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-dashboard-import',
             message: `Failed to analyze dashboard import side effects: ${error.message}`,
@@ -711,8 +782,11 @@ async function analyzeDashboardImportSideEffects(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeControlSingleEntrypoint(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     const targets = ['src/server/api/controllers/missions.js', 'src/server/api/controllers/tasks.js'];
@@ -761,7 +835,9 @@ async function analyzeControlSingleEntrypoint(rootDir) {
                 });
             }
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-control-plane',
             message: `Failed to analyze control single entrypoint: ${error.message}`,
@@ -778,8 +854,11 @@ async function analyzeControlSingleEntrypoint(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeControlPauseToEdit(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     const missionControlPath = path.join(rootDir, 'src/server/domain/mission_control_service.js');
@@ -827,7 +906,9 @@ async function analyzeControlPauseToEdit(rootDir) {
                 });
             }
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-control-pause-edit',
             message: `Failed to analyze control pause-to-edit guards: ${error.message}`,
@@ -844,8 +925,11 @@ async function analyzeControlPauseToEdit(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeDashboardVNextTaskMutationCutover(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
     const targets = [
         'src/dashboard-ui/src/views/TasksView.vue',
@@ -898,7 +982,9 @@ async function analyzeDashboardVNextTaskMutationCutover(rootDir) {
                 });
             }
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-dashboard-vnext-cutover',
             message: `Failed to detect direct /api/tasks or /api/missions mutation in vNext: ${error.message}`,
@@ -915,8 +1001,11 @@ async function analyzeDashboardVNextTaskMutationCutover(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeTaskMissionReassignAndContext(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     const taskControlPath = path.join(rootDir, 'src/server/domain/task_control_service.js');
@@ -953,7 +1042,9 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
                 regression_risk: 'Alto',
             });
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-task-reassign',
             message: `Failed to analyze TASK_REASSIGN_MISSION contract: ${error.message}`,
@@ -990,7 +1081,9 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
                 regression_risk: 'Médio',
             });
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-task-mission-context',
             message: `Failed to analyze task mission context contract: ${error.message}`,
@@ -1005,8 +1098,11 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeBootImportSafetyAndSignalOwnership(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     try {
@@ -1058,7 +1154,9 @@ async function analyzeBootImportSafetyAndSignalOwnership(rootDir) {
                 regression_risk: 'Médio',
             });
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-runtime-bootstrap',
             message: `Failed to analyze boot import safety/signal ownership: ${error.message}`,
@@ -1073,8 +1171,11 @@ async function analyzeBootImportSafetyAndSignalOwnership(rootDir) {
  * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
  */
 async function analyzeRuntimeResourceShutdownContracts(rootDir) {
+    /** @type {any[]} */
     const findings = [];
+    /** @type {any[]} */
     const errors = [];
+    /** @type {any[]} */
     const warnings = [];
 
     try {
@@ -1116,7 +1217,9 @@ async function analyzeRuntimeResourceShutdownContracts(rootDir) {
                 regression_risk: 'Médio',
             });
         }
-    } catch (error) {
+    } catch (_rawE) {
+
+        const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-runtime-resource-registry',
             message: `Failed to analyze runtime resource shutdown contracts: ${error.message}`,
@@ -1148,6 +1251,7 @@ function findRegexMatchesWithLine(content, pattern) {
  * @returns {Array<{line:number,evidence:string}>}
  */
 function findPromiseRaceTimeoutWithoutCleanup(content) {
+    /** @type {any[]} */
     const findings = [];
     const racePattern = /Promise\.race\s*\(\s*\[([\s\S]{0,3000}?)\]\s*\)/g;
 
@@ -1228,9 +1332,10 @@ function findPotentialNPlusOneLoops(content) {
  * @returns {Promise<string[]>}
  */
 async function findJsFiles(dir) {
+    /** @type {any[]} */
     const files = [];
 
-    function scan(currentDir) {
+    function scan(/** @type {string} */ currentDir) {
         const items = fs.readdirSync(currentDir);
 
         for (const item of items) {

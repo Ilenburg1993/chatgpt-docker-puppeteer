@@ -4,7 +4,7 @@ import fs from 'node:fs';
 /**
  * @typedef {object} AppendJsonlOptions
  * @property {string} filePath
- * @property {Record<string} payload
+ * @property {Record<string, any>} payload
  */
 /**
  * @param {AppendJsonlOptions} options

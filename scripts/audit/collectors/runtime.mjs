@@ -12,10 +12,7 @@ import path from 'node:path';
  * @typedef {object} CollectRuntimeFindingsOptions
  * @property {'quick'|'deep'|'nightly'} profile
  * @property {import('../contracts/load_registry.mjs').ContractDefinitionV1[]} contracts
- * @property {(stepId: string} exec
- * @property {string} command
- * @property {string[]} args
- * @property {unknown) => Promise<void>} options
+ * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
  */
 /**
  * @param {CollectRuntimeFindingsOptions} options
@@ -31,11 +28,11 @@ export async function collectRuntimeFindings(options) {
 
     const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
 
-    const telemetry = {
+    const telemetry = /** @type {any} */ ({
         mcp: { ok: false, details: '' },
         rag: { ok: false, available: null, degraded: null },
         lsp: { ok: false, details: '' },
-    };
+    });
     /** @type {Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>} */
     const signals = [];
 
@@ -52,7 +49,7 @@ export async function collectRuntimeFindings(options) {
             signal: 'runtime.mcp_diagnose.failed',
             evidence: (mcpDiag.stderr || mcpDiag.stdout || 'mcp:diagnose failed')
                 .split(/\r?\n/)
-                .filter(line => !line.includes('NO_COLOR'))
+                .filter((/** @type {string} */ line) => !line.includes('NO_COLOR'))
                 .join('\n')
                 .trim(),
             source_tool: 'mcp:diagnose',
@@ -82,7 +79,7 @@ export async function collectRuntimeFindings(options) {
             signal: 'runtime.rag_health.failed',
             evidence: (ragHealth.stderr || ragHealth.stdout || 'rag:health returned unhealthy state')
                 .split(/\r?\n/)
-                .filter(line => !line.includes('NO_COLOR'))
+                .filter((/** @type {string} */ line) => !line.includes('NO_COLOR'))
                 .join('\n')
                 .trim(),
             source_tool: 'rag:health',
@@ -118,7 +115,7 @@ export async function collectRuntimeFindings(options) {
             signal: 'runtime.lsp_tools.missing',
             evidence: (mcpDiag.stdout || mcpDiag.stderr || 'LSP tools not confirmed by MCP diagnose output')
                 .split(/\r?\n/)
-                .filter(line => !line.includes('NO_COLOR'))
+                .filter((/** @type {string} */ line) => !line.includes('NO_COLOR'))
                 .join('\n')
                 .trim(),
             source_tool: 'mcp:diagnose',
@@ -129,7 +126,7 @@ export async function collectRuntimeFindings(options) {
             signal: 'runtime.lsp_functional.failed',
             evidence: (lspHealth.stderr || lspHealth.stdout || 'LSP functional checks failed')
                 .split(/\r?\n/)
-                .filter(line => !line.includes('NO_COLOR'))
+                .filter((/** @type {string} */ line) => !line.includes('NO_COLOR'))
                 .join('\n')
                 .trim(),
             source_tool: 'lsp:health',
@@ -191,10 +188,12 @@ export async function collectRuntimeFindings(options) {
     }
 
     const runtimeFindings = /** @type {RawFinding[]} */ (
-        evaluateRuntimeSignals({
-            contracts: options.contracts || [],
-            signals,
-        })
+        evaluateRuntimeSignals(
+            /** @type {any} */ ({
+                contracts: options.contracts || [],
+                signals,
+            })
+        )
     );
     if (runtimeFindings.length > 0) {
         findings.push(...runtimeFindings);
@@ -248,6 +247,9 @@ export async function collectRuntimeFindings(options) {
     return { findings, errors, warnings, telemetry };
 }
 
+/**
+ * @param {string} rootDir
+ */
 function detectLockReleaseCausalityIssues(rootDir) {
     const targets = ['src/agent/queue_worker.js', 'src/agent/task_state_projector.js'];
     const pattern = /releaseTaskLock\s*\(\s*\{\s*taskId\s*\}\s*\)/g;
@@ -269,6 +271,9 @@ function detectLockReleaseCausalityIssues(rootDir) {
     return issues;
 }
 
+/**
+ * @param {string} rootDir
+ */
 function detectDashboardRuntimePolicySignals(rootDir) {
     const results = [];
     const dashboardControllerPath = path.join(rootDir, 'src/server/api/controllers/dashboard.js');
@@ -335,6 +340,9 @@ function detectDashboardRuntimePolicySignals(rootDir) {
     return results;
 }
 
+/**
+ * @param {string} rootDir
+ */
 function detectMissionTransitionBypass(rootDir) {
     const results = [];
     const targets = ['src/server/api/controllers/missions.js', 'src/agent/mission_runner.js'];
@@ -374,6 +382,9 @@ function detectMissionTransitionBypass(rootDir) {
     return results;
 }
 
+/**
+ * @param {string} rootDir
+ */
 function detectControlPlaneSignals(rootDir) {
     const results = [];
     const controlServicePath = path.join(rootDir, 'src/server/domain/control_command_service.js');
@@ -578,7 +589,7 @@ function detectControlPlaneSignals(rootDir) {
 
 /**
  * @param {string} rootDir
- * @param {(stepId: string, command: string, args: string[], options?: unknown) => Promise<void>} exec
+ * @param {(stepId: string, command: string, args: string[], options?: any) => Promise<any>} exec
  */
 async function detectBootAndLifecycleSignals(rootDir, exec) {
     const results = [];

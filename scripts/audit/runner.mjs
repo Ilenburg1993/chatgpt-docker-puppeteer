@@ -91,7 +91,7 @@ const cliOptions = {
     'quality-parallelism': { type: 'string', default: 'auto' },
 };
 
-/** @type {Record<string, unknown>} */
+/** @type {any} */
 let values = {};
 /** @type {Error|null} */
 let cliParseError = null;
@@ -349,32 +349,38 @@ async function main() {
     const runDir = path.join(outputRoot, 'runs', runId);
     const runsRoot = path.join(outputRoot, 'runs');
     let cleanupSignalHandlers = () => {};
-    const stateStore = createRunStateStore({ runDir });
+    const stateStore = /** @type {any} */ (createRunStateStore({ runDir }));
 
-    const logger = createAuditLogger({
-        runId,
-        runDir,
-        logLevel: String(values['log-level'] || 'info') === 'debug' ? 'debug' : 'info',
-        logFormat: String(values['log-format'] || 'console') === 'jsonl' ? 'jsonl' : 'console',
-        enableConsole: !values.json,
-    });
+    const logger = /** @type {any} */ (
+        createAuditLogger({
+            runId,
+            runDir,
+            logLevel: String(values['log-level'] || 'info') === 'debug' ? 'debug' : 'info',
+            logFormat: String(values['log-format'] || 'console') === 'jsonl' ? 'jsonl' : 'console',
+            enableConsole: !values.json,
+        })
+    );
     registerLifecycleGuards();
 
-    const phasePlan = buildPhasePlan({ profile, refreshContextMode, auditMode });
-    const plannedStepKeys = flattenPlannedStepKeys(phasePlan);
-    const phasePlanMap = new Map(phasePlan.map(phase => [phase.id, phase]));
+    const phasePlan = /** @type {any} */ (buildPhasePlan({ profile, refreshContextMode, auditMode }));
+    const plannedStepKeys = /** @type {any} */ (flattenPlannedStepKeys(phasePlan));
+    const phasePlanMap = new Map(phasePlan.map((/** @type {any} */ phase) => [phase.id, phase]));
 
-    const progress = createProgressTracker({ stepsTotal: plannedStepKeys.length, startedAt: Date.now() });
-    const etaEstimator = createEtaEstimator({
-        historyPath: path.join(outputRoot, 'step_metrics.json'),
-        scopeKey: `${auditMode}:${profile}`,
-        ewmaAlpha: 0.35,
-    });
+    const progress = /** @type {any} */ (
+        createProgressTracker({ stepsTotal: plannedStepKeys.length, startedAt: Date.now() })
+    );
+    const etaEstimator = /** @type {any} */ (
+        createEtaEstimator({
+            historyPath: path.join(outputRoot, 'step_metrics.json'),
+            scopeKey: `${auditMode}:${profile}`,
+            ewmaAlpha: 0.35,
+        })
+    );
 
     /** @type {Set<string>} */
     const completedStepKeys = new Set();
     /** @type {Array<import('./lib/schema.mjs').PhaseStatusEntry>} */
-    const phaseStatus = phasePlan.map(phase => ({
+    const phaseStatus = phasePlan.map((/** @type {any} */ phase) => ({
         phase: phase.id,
         status: 'pending',
         started_at: null,
@@ -421,16 +427,16 @@ async function main() {
     let abortRequested = false;
     let abortMessage = '';
     let fatalMessage = '';
-    /** @type {{ findings: unknown[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: unknown }} */
+    /** @type {any} */
     let securityResult = {
         findings: [],
         errors: [],
         warnings: [],
         telemetry: { contracts_scanned: 0, files_scanned: 0, checks: [], findings_by_kind: {} },
     };
-    /** @type {{ findings: unknown[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: unknown }} */
+    /** @type {any} */
     let performanceResult = { findings: [], errors: [], warnings: [], telemetry: { score: null, categories: {} } };
-    /** @type {{ findings: unknown[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: unknown }} */
+    /** @type {any} */
     let architectureResult = { findings: [], errors: [], warnings: [], telemetry: { findings_by_kind: {} } };
     const plannedStartEta = etaEstimator.estimateRemaining(plannedStepKeys);
     /** @type {{ stdout_bytes_total: number, stderr_bytes_total: number, stdout_truncated_steps: string[], stderr_truncated_steps: string[], steps_with_overflow: number, max_stdout_bytes: number, max_stderr_bytes: number }} */
@@ -522,7 +528,7 @@ async function main() {
     }
 
     function getRemainingStepKeys() {
-        return plannedStepKeys.filter(key => !completedStepKeys.has(key));
+        return plannedStepKeys.filter((/** @type {any} */ key) => !completedStepKeys.has(key));
     }
 
     /**
@@ -864,11 +870,15 @@ async function main() {
             eta_ms: etaBefore.eta_ms,
         });
 
-        const result = await runCommand(command, args, {
-            ...runOptions,
-            maxStdoutBytes,
-            maxStderrBytes,
-        });
+        const result = await runCommand(
+            command,
+            args,
+            /** @type {any} */ ({
+                ...runOptions,
+                maxStdoutBytes,
+                maxStderrBytes,
+            })
+        );
         etaEstimator.endStep(stepId);
         completedStepKeys.add(stepId);
 
@@ -1054,9 +1064,10 @@ async function main() {
         ['scripts/audit/preflight_semantic.mjs', '--json', '--no-fail'],
         { timeoutMs: 240000 }
     );
-    const semanticPreflightJson =
+    const semanticPreflightJson = /** @type {any} */ (
         parseJsonFromMixedOutput(semanticPreflightStep.stdout) ||
-        parseJsonFromMixedOutput(`${semanticPreflightStep.stdout}\n${semanticPreflightStep.stderr}`);
+            parseJsonFromMixedOutput(`${semanticPreflightStep.stdout}\n${semanticPreflightStep.stderr}`)
+    );
     if (semanticPreflightJson && typeof semanticPreflightJson === 'object') {
         semanticPreflight = {
             ok: Boolean(semanticPreflightJson.ok),
@@ -1133,9 +1144,10 @@ async function main() {
             ['scripts/check_forbidden_patterns.js', '--json', '--contracts-mode', 'hybrid', '--parity-mode'],
             { timeoutMs: 180000, acceptExitCodes: [0, 2] }
         );
-        const parityPayload =
+        const parityPayload = /** @type {any} */ (
             parseJsonFromMixedOutput(parityStep.stdout) ||
-            parseJsonFromMixedOutput(`${parityStep.stdout}\n${parityStep.stderr}`);
+                parseJsonFromMixedOutput(`${parityStep.stdout}\n${parityStep.stderr}`)
+        );
         if (parityPayload?.parity) {
             contractParity = parityPayload.parity;
         } else {
@@ -1170,7 +1182,7 @@ async function main() {
                 ['run', 'rag:health', '--', '--json'],
                 { timeoutMs: 180000 }
             );
-            const ragJson = parseJsonFromMixedOutput(`${ragHealth.stdout}\n${ragHealth.stderr}`);
+            const ragJson = /** @type {any} */ (parseJsonFromMixedOutput(`${ragHealth.stdout}\n${ragHealth.stderr}`));
 
             if (refreshContextMode === 'force' || !ragHealth.ok || !ragJson?.ok || !ragJson?.available) {
                 const rebuild = await execStep(
@@ -1219,18 +1231,20 @@ async function main() {
         'Resolving smart-hybrid quality execution plan',
         async () => ({ ok: true })
     );
-    const qualityResult = await collectQualityFindings({
-        profile,
-        changedFiles,
-        qualityMode,
-        qualityJsdoc,
-        qualityPrettier,
-        qualityJsdocFullThresholdPct,
-        qualityCache,
-        qualityCacheDir,
-        qualityParallelism,
-        exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_QUALITY, stepId, command, args, opts),
-    });
+    const qualityResult = /** @type {any} */ (
+        await collectQualityFindings({
+            profile,
+            changedFiles,
+            qualityMode,
+            qualityJsdoc,
+            qualityPrettier,
+            qualityJsdocFullThresholdPct,
+            qualityCache,
+            qualityCacheDir,
+            qualityParallelism,
+            exec: (stepId, command, args, opts) => execStep(AUDIT_PHASES.COLLECT_QUALITY, stepId, command, args, opts),
+        })
+    );
     rawFindings = rawFindings.concat(qualityResult.findings);
     errors.push(...qualityResult.errors);
     warnings.push(...qualityResult.warnings);
@@ -1255,7 +1269,7 @@ async function main() {
 
     // static
     const qualityCollectorActive = qualityMode !== 'off';
-    const staticResult = { findings: [], errors: [], warnings: [], telemetry: {} };
+    const staticResult = /** @type {any} */ ({ findings: [], errors: [], warnings: [], telemetry: {} });
     if (!shouldRunPhase(AUDIT_PHASES.COLLECT_STATIC)) {
         startPhase(AUDIT_PHASES.COLLECT_STATIC);
         for (const stepId of [
@@ -1275,16 +1289,22 @@ async function main() {
         startPhase(AUDIT_PHASES.COLLECT_STATIC);
         Object.assign(
             staticResult,
-            await collectStaticFindings({
-                profile,
-                changedFiles,
-                artifactsDir: runDir,
-                contractsMode,
-                skipQuickSyntax: qualityCollectorActive,
-                skipLintTypecheck: qualityCollectorActive,
-                exec: (stepId, command, args, opts) =>
-                    execStep(AUDIT_PHASES.COLLECT_STATIC, stepId, command, args, opts),
-            })
+            await collectStaticFindings(
+                /** @type {any} */ ({
+                    profile,
+                    changedFiles,
+                    artifactsDir: runDir,
+                    contractsMode,
+                    skipQuickSyntax: qualityCollectorActive,
+                    skipLintTypecheck: qualityCollectorActive,
+                    exec: (
+                        /** @type {any} */ stepId,
+                        /** @type {any} */ command,
+                        /** @type {any} */ args,
+                        /** @type {any} */ opts
+                    ) => execStep(AUDIT_PHASES.COLLECT_STATIC, stepId, command, args, opts),
+                })
+            )
         );
         rawFindings = rawFindings.concat(staticResult.findings);
         errors.push(...staticResult.errors);
@@ -1305,7 +1325,8 @@ async function main() {
         }
         if (
             staticResult.warnings.some(
-                item => item.source === 'dependency-cruiser' && /not installed/i.test(String(item.message || ''))
+                (/** @type {any} */ item) =>
+                    item.source === 'dependency-cruiser' && /not installed/i.test(String(item.message || ''))
             )
         ) {
             markStepSkipped(
@@ -1316,7 +1337,8 @@ async function main() {
         }
         if (
             staticResult.warnings.some(
-                item => item.source === 'semgrep' && /not installed/i.test(String(item.message || ''))
+                (/** @type {any} */ item) =>
+                    item.source === 'semgrep' && /not installed/i.test(String(item.message || ''))
             )
         ) {
             markStepSkipped(AUDIT_PHASES.COLLECT_STATIC, 'static.semgrep', 'Step skipped: semgrep não instalado');
@@ -1547,11 +1569,13 @@ async function main() {
                 now: startedAtDate,
             })
     );
-    const evidencePack = await runInternalStep(
-        AUDIT_PHASES.NORMALIZE_CORRELATE,
-        'normalize.evidence_graph',
-        'Building evidence graph',
-        async () => buildEvidenceGraph(findings)
+    const evidencePack = /** @type {any} */ (
+        await runInternalStep(
+            AUDIT_PHASES.NORMALIZE_CORRELATE,
+            'normalize.evidence_graph',
+            'Building evidence graph',
+            async () => buildEvidenceGraph(findings)
+        )
     );
     findings = evidencePack.findings;
     stateStore.writeEvidenceGraph(evidencePack.graph);
@@ -1581,41 +1605,44 @@ async function main() {
                 'triage.enrich',
                 `Running triage intelligence (budget=${triageBudget}, timeout=${triageTimeoutMs}ms)`,
                 async () =>
-                    triageFindings(findings, {
-                        enabled: triageEnabled && proposalDepth !== 'off',
-                        maxMcpFindings: triageBudget,
-                        proposeDiffs,
-                        focusMode,
-                        proposalDepth: effectiveProposalDepth,
-                        cloudFallback,
-                        masterPath: MASTER_PATH,
-                        maxDurationMs: triageTimeoutMs,
-                        onProgress: payload => {
-                            const now = Date.now();
-                            const shouldEmit =
-                                payload.processed <= 2 ||
-                                payload.processed === payload.total ||
-                                payload.processed % 20 === 0 ||
-                                now - lastTriageProgressTs >= 5000;
-                            if (!shouldEmit) {
-                                return;
-                            }
-                            lastTriageProgressTs = now;
-                            const triageRemaining = getRemainingStepKeys();
-                            const triageEta = etaEstimator.estimateRemaining(triageRemaining);
-                            const triageSnap = progress.snapshot(triageEta.eta_ms);
-                            logger.emit({
-                                level: 'debug',
-                                event_type: AUDIT_EVENT_TYPES.STEP_PROGRESS,
-                                phase: AUDIT_PHASES.TRIAGE_INTELLIGENCE,
-                                step_id: 'triage.enrich',
-                                status: 'running',
-                                progress_pct: triageSnap.progress_pct,
-                                eta_ms: triageSnap.eta_ms,
-                                message: `triage progress ${payload.processed}/${payload.total} (${payload.percent}%) mode=${payload.mode}`,
-                            });
-                        },
-                    }),
+                    triageFindings(
+                        findings,
+                        /** @type {any} */ ({
+                            enabled: triageEnabled && proposalDepth !== 'off',
+                            maxMcpFindings: triageBudget,
+                            proposeDiffs,
+                            focusMode,
+                            proposalDepth: effectiveProposalDepth,
+                            cloudFallback,
+                            masterPath: MASTER_PATH,
+                            maxDurationMs: triageTimeoutMs,
+                            onProgress: (/** @type {any} */ payload) => {
+                                const now = Date.now();
+                                const shouldEmit =
+                                    payload.processed <= 2 ||
+                                    payload.processed === payload.total ||
+                                    payload.processed % 20 === 0 ||
+                                    now - lastTriageProgressTs >= 5000;
+                                if (!shouldEmit) {
+                                    return;
+                                }
+                                lastTriageProgressTs = now;
+                                const triageRemaining = getRemainingStepKeys();
+                                const triageEta = etaEstimator.estimateRemaining(triageRemaining);
+                                const triageSnap = progress.snapshot(triageEta.eta_ms);
+                                logger.emit({
+                                    level: 'debug',
+                                    event_type: AUDIT_EVENT_TYPES.STEP_PROGRESS,
+                                    phase: AUDIT_PHASES.TRIAGE_INTELLIGENCE,
+                                    step_id: 'triage.enrich',
+                                    status: 'running',
+                                    progress_pct: triageSnap.progress_pct,
+                                    eta_ms: triageSnap.eta_ms,
+                                    message: `triage progress ${payload.processed}/${payload.total} (${payload.percent}%) mode=${payload.mode}`,
+                                });
+                            },
+                        })
+                    ),
                 { timeoutMs: triageTimeoutMs + 15000 }
             );
         } catch (error) {
@@ -1623,13 +1650,16 @@ async function main() {
                 source: 'triage_llm',
                 message: `triage internal step failed; deterministic fallback used (${error instanceof Error ? error.message : String(error)})`,
             });
-            triage = await triageFindings(findings, {
-                enabled: false,
-                focusMode,
-                proposalDepth: effectiveProposalDepth,
-                cloudFallback,
-                masterPath: MASTER_PATH,
-            });
+            triage = await triageFindings(
+                findings,
+                /** @type {any} */ ({
+                    enabled: false,
+                    focusMode,
+                    proposalDepth: effectiveProposalDepth,
+                    cloudFallback,
+                    masterPath: MASTER_PATH,
+                })
+            );
         }
         findings = triage.findings;
         warnings.push(...triage.warnings.map(message => ({ source: 'triage_llm', message })));
@@ -1838,8 +1868,12 @@ async function main() {
         if (runOutcome !== 'aborted' && runOutcome !== 'fatal') {
             runOutcome = summaryPartial ? 'partial' : 'success';
         }
-        const activePhases = phasePlan.filter(item => (item.planned_steps || []).length > 0).map(item => item.id);
-        const skippedPhases = phasePlan.filter(item => (item.planned_steps || []).length === 0).map(item => item.id);
+        const activePhases = phasePlan
+            .filter((/** @type {any} */ item) => (item.planned_steps || []).length > 0)
+            .map((/** @type {any} */ item) => item.id);
+        const skippedPhases = phasePlan
+            .filter((/** @type {any} */ item) => (item.planned_steps || []).length === 0)
+            .map((/** @type {any} */ item) => item.id);
         return /** @type {import('./lib/schema.mjs').AuditRunV3 & { errors_count: number, warnings_count: number }} */ ({
             schema_version: SCHEMA_VERSION,
             run_id: runId,
@@ -1912,7 +1946,9 @@ async function main() {
                 runtime_smoke_ok:
                     profile === 'quick'
                         ? null
-                        : runtimeResult.findings.every(item => item.source_tool !== 'runtime-smoke'),
+                        : runtimeResult.findings.every(
+                              (/** @type {any} */ item) => item.source_tool !== 'runtime-smoke'
+                          ),
                 tests_ok: testsResult.errors.length === 0,
             },
             quality_execution: {
@@ -2027,6 +2063,8 @@ async function main() {
         'Publishing JSON report artifacts',
         async () => publishJson(report, { outputDir: outputRoot, runDir })
     );
+    /** @type {any} */
+    /** @type {any} */
     const outputs = {
         json: publishedJson.path,
         run_json: publishedJson.runReportPath,
@@ -2051,7 +2089,8 @@ async function main() {
             'publish',
             'publish.snapshot',
             'Publishing immutable snapshot',
-            async () => publishSnapshot({ masterPath: MASTER_PATH, snapshotsDir: SNAPSHOTS_DIR, report })
+            async () =>
+                publishSnapshot(/** @type {any} */ ({ masterPath: MASTER_PATH, snapshotsDir: SNAPSHOTS_DIR, report }))
         );
         outputs.snapshot = snapshotPublished.path;
     } else {
@@ -2063,7 +2102,7 @@ async function main() {
             'publish',
             'publish.contract_reports',
             'Rendering contract coverage report summary',
-            async () => renderContractCoverage(contractCoverage, contractDrift)
+            async () => renderContractCoverage(contractCoverage, /** @type {any} */ (contractDrift))
         );
     } else {
         markStepSkipped('publish', 'publish.contract_reports', 'Step skipped: contract coverage report desabilitado');
@@ -2178,7 +2217,9 @@ async function main() {
             `- chaos_enabled: ${report.chaos_summary.enabled}`,
             `- chaos_violations: ${report.chaos_summary.violations}`,
             ``,
-            contractCoverageReport ? renderContractCoverage(contractCoverage, contractDrift) : null,
+            contractCoverageReport
+                ? renderContractCoverage(contractCoverage, /** @type {any} */ (contractDrift))
+                : null,
             ``,
             `## Artifacts`,
             `- report_json: ${outputs.json}`,
@@ -2194,11 +2235,13 @@ async function main() {
     );
 
     etaEstimator.persist();
-    const retentionResult = pruneAuditRuns({
-        runsRoot,
-        maxRuns: retentionMaxRuns,
-        keepRunId: runId,
-    });
+    const retentionResult = /** @type {any} */ (
+        pruneAuditRuns({
+            runsRoot,
+            maxRuns: retentionMaxRuns,
+            keepRunId: runId,
+        })
+    );
     if (retentionResult.pruned.length > 0) {
         logger.emit({
             level: 'info',
@@ -2247,14 +2290,16 @@ function writeFatalFallbackReport(error) {
     const runId = `WAVE_AUDIT_FATAL_${now.toISOString().replace(/[:.]/g, '-')}`;
     const runDir = path.join(outputRoot, 'runs', runId);
     const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    const stateStore = createRunStateStore({ runDir });
-    const logger = createAuditLogger({
-        runId,
-        runDir,
-        logLevel: 'info',
-        logFormat: 'jsonl',
-        enableConsole: false,
-    });
+    const stateStore = /** @type {any} */ (createRunStateStore({ runDir }));
+    const logger = /** @type {any} */ (
+        createAuditLogger({
+            runId,
+            runDir,
+            logLevel: 'info',
+            logFormat: 'jsonl',
+            enableConsole: false,
+        })
+    );
     const startedAtIso = now.toISOString();
     const finishedAtIso = new Date().toISOString();
 

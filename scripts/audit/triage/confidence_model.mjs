@@ -6,13 +6,12 @@
  * @property {boolean} [hasRuntimeEvidence]
  */
 /**
- * @typedef {object} ScoreConfidenceFinding
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {any} ScoreConfidenceFinding
  */
 /**
  * @param {ScoreConfidenceFinding} finding
  * @param {ScoreConfidenceSignals} [signals]
-  * @returns {object}
+  * @returns {number}
  */
 export function scoreConfidence(finding, signals = {}) {
     let score = 0.45;

@@ -39,7 +39,7 @@ export function createAuditLogger(options) {
     fs.mkdirSync(stepsDir, { recursive: true });
 
     /**
-     * @param {Record<string, unknown>} event
+     * @param {Record<string, any>} event
      */
     function emit(event) {
         const validationErrors = validateEvent(event);
@@ -83,7 +83,7 @@ export function createAuditLogger(options) {
     }
 
     /**
-     * @param {{ phase: string, stepId: string, command: string, args: string[], stdout: string, stderr: string, result: unknown }} input
+     * @param {{ phase: string, stepId: string, command: string, args: string[], stdout: string, stderr: string, result: any }} input
      */
     function writeStepArtifacts(input) {
         const safeStep = sanitizePathToken(input.stepId);
@@ -144,7 +144,7 @@ export function createAuditLogger(options) {
 }
 
 /**
- * @param {Record<string, unknown>} event
+ * @param {Record<string, any>} event
  * @returns {string[]}
  */
 function validateEvent(event) {

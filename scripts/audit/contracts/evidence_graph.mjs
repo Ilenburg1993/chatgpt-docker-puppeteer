@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * @typedef {object} GroupKeyFinding
- * @property {*} _ Propriedades definidas em runtime.
+ * @typedef {any} GroupKeyFinding
  */
 /**
  * @param {GroupKeyFinding} finding
@@ -26,14 +25,15 @@ function groupKey(finding) {
  * @returns {object}
  */
 export function buildEvidenceGraph(findings) {
-    /** @type {Map<string, unknown[]>} */
+    /** @type {Map<string, any[]>} */
     const groups = new Map();
     for (const finding of findings) {
         const key = groupKey(finding);
         if (!groups.has(key)) {
             groups.set(key, []);
         }
-        groups.get(key).push(finding);
+        const bucket = groups.get(key);
+        if (bucket) bucket.push(finding);
     }
 
     /** @type {Array<{ id: string, label: string, size: number, contract_id?: string|null }>} */

@@ -6,7 +6,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 const DEFAULT_MASTER = path.join(ROOT, 'DOCUMENTAÇÃO', 'BUGS', 'BUG_AUDIT_MASTER.md');
 
 /**
- * @param {string} filePath
+ * @param {string|null} filePath
  * @param {number|null} line
  * @param {number} radius
  */
@@ -66,14 +66,14 @@ function readMasterHistoryHints(masterPath, contractId) {
 /**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
  * @param {BuildContextPackSources} sources
-  * @returns {object}
+ * @returns {any}
  */
 export function buildContextPack(finding, sources = {}) {
     const codeContext = readLocalCodeContext(finding.file, finding.line, 8);
     const masterPath = sources.masterPath || DEFAULT_MASTER;
     const historyHints = Array.isArray(sources.history)
         ? sources.history
-        : readMasterHistoryHints(masterPath, finding.contract_id || null);
+        : readMasterHistoryHints(masterPath, String(finding.contract_id || ''));
 
     return {
         finding: {

@@ -3,8 +3,8 @@
  * @typedef {object} PrintProgressPayload
  * @property {string} runId
  * @property {string} profile
- * @property {unknown} progress
- * @property {unknown} eta
+ * @property {any} progress
+ * @property {any} eta
  * @property {string} phase
  * @property {string} message
  */

@@ -8,13 +8,12 @@
  * @property {number} [covered_by_tests]
  */
 /**
- * @typedef {object} ContractDrift
- * @property {unknown} [key] - Chave de drift detectado
+ * @typedef {any} ContractDrift
  */
 /**
  * @param {Record<string, ContractCoverageMap>} coverage
  * @param {ContractDrift} [drift]
- * @returns {string[]}
+ * @returns {string}
  */
 export function renderContractCoverage(coverage, drift = {}) {
     const lines = ['## Contract Coverage'];

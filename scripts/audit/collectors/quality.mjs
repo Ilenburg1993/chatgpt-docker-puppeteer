@@ -33,7 +33,10 @@ function toStringList(value) {
     return Array.isArray(value) ? value.map(v => String(v || '')).filter(Boolean) : [];
 }
 
-/** @param {unknown} value */
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 function stableJson(value) {
     if (Array.isArray(value)) {
         return `[${value.map(stableJson).join(',')}]`;
@@ -179,7 +182,7 @@ function finding(
 
 /**
  * @param {string} output
- * @returns {object}
+ * @returns {any[]}
  */
 export function parseTypecheckOutput(output) {
     /** @type {RawFinding[]} */
@@ -209,7 +212,7 @@ export function parseTypecheckOutput(output) {
 
 /**
  * @param {string} output
- * @returns {object}
+ * @returns {any[]}
  */
 export function parsePrettierCheckOutput(output) {
     /** @type {RawFinding[]} */
@@ -241,10 +244,10 @@ export function parsePrettierCheckOutput(output) {
 
 /**
  * @param {string} output
- * @returns {object}
+ * @returns {any[]}
  */
 export function parseEslintJsonOutput(output) {
-    const parsed = parseJsonFromMixedOutput(String(output || ''));
+    const parsed = /** @type {any} */ (parseJsonFromMixedOutput(String(output || '')));
     const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.results) ? parsed.results : [];
     /** @type {RawFinding[]} */
     const findings = [];
@@ -293,10 +296,10 @@ function parseNodeCheckFailure(file, stderr) {
 
 /**
  * @param {string} stdout
-  * @returns {object}
+ * @returns {any}
  */
 export function parseJSDocCoverageReport(stdout) {
-    return parseJsonFromMixedOutput(String(stdout || ''));
+    return /** @type {any} */ (parseJsonFromMixedOutput(String(stdout || '')));
 }
 
 /**
@@ -311,7 +314,7 @@ export function parseJSDocCoverageReport(stdout) {
 export function parseJSDocCoverageFindingsFromReport(report, contractId) {
     /** @type {RawFinding[]} */
     const findings = [];
-    const files = Array.isArray(report?.files) ? report.files : [];
+    const files = Array.isArray(/** @type {any} */ (report)?.files) ? /** @type {any} */ (report).files : [];
     for (const fr of files) {
         const symbols = Array.isArray(fr?.exported_symbols) ? fr.exported_symbols : [];
         for (const sym of symbols) {
@@ -383,14 +386,11 @@ export function parseTsIgnoreFindings(stdout, scopeFiles) {
  * @property {boolean} qualityCache
  * @property {string} qualityCacheDir
  * @property {'auto'|'serial'} qualityParallelism
- * @property {(stepId: string} exec
- * @property {string} command
- * @property {string[]} args
- * @property {unknown) => Promise<void>} options
+ * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
  */
 /**
  * @param {CollectQualityFindingsOptions} options
-  * @returns {Promise<void>}
+ * @returns {Promise<any>}
  */
 export async function collectQualityFindings(options) {
     /** @type {RawFinding[]} */
@@ -400,16 +400,21 @@ export async function collectQualityFindings(options) {
     /** @type {Array<{source:string,message:string}>} */
     const warnings = [];
 
-    const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
-    const plan = buildQualityExecutionPlan({
-        profile: options.profile,
-        changedFiles: options.changedFiles || [],
-        qualityMode: options.qualityMode,
-        qualityJsdoc: options.qualityJsdoc,
-        qualityPrettier: options.qualityPrettier,
-    });
+    /** @type {(stepId: any, command: any, args: any, runOpts: any) => Promise<any>} */
+    const exec =
+        /** @type {any} */ (options.exec) ||
+        (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
+    const plan = /** @type {any} */ (
+        buildQualityExecutionPlan({
+            profile: options.profile,
+            changedFiles: options.changedFiles || [],
+            qualityMode: options.qualityMode,
+            qualityJsdoc: options.qualityJsdoc,
+            qualityPrettier: options.qualityPrettier,
+        })
+    );
 
-    const telemetry = {
+    const telemetry = /** @type {any} */ ({
         strategy: plan.strategy,
         risk: plan.risk,
         reasons: plan.reasons,
@@ -461,7 +466,7 @@ export async function collectQualityFindings(options) {
             after: 0,
             removed: 0,
         },
-    };
+    });
 
     const cacheEnabled = telemetry.cache.enabled;
     const cacheDir = String(options.qualityCacheDir || 'artifacts/audit/cache/quality');
@@ -484,7 +489,7 @@ export async function collectQualityFindings(options) {
             telemetry.cache.steps_uncached.push(stepId);
             return { value: await producer(), cacheHit: false };
         }
-        const cachePath = makeCachePath(cacheDir, stepId, cacheInput);
+        const cachePath = makeCachePath(cacheDir, stepId, /** @type {any} */ (cacheInput));
         const cached = readCacheEntry(cachePath);
         if (cached && cached.version === 1 && Object.prototype.hasOwnProperty.call(cached, 'value')) {
             telemetry.cache.hits += 1;
@@ -548,11 +553,15 @@ export async function collectQualityFindings(options) {
         });
         const stepFindings = [];
         for (const file of plan.steps.node_check.files || []) {
-            const check = await runCommand('node', ['--check', file], {
-                timeoutMs: 30000,
-                env: { NO_COLOR: undefined },
-                acceptExitCodes: [0, 1],
-            });
+            const check = await runCommand(
+                'node',
+                ['--check', file],
+                /** @type {any} */ ({
+                    timeoutMs: 30000,
+                    env: { NO_COLOR: undefined },
+                    acceptExitCodes: [0, 1],
+                })
+            );
             if (!check.ok) stepFindings.push(parseNodeCheckFailure(file, check.stderr || check.stdout));
         }
         findings.push(...stepFindings);
@@ -577,11 +586,15 @@ export async function collectQualityFindings(options) {
             const stepFindings = [];
             for (const target of plan.steps.entrypoint_import_smoke.targets || []) {
                 const cmd = `import './${target}'; console.log('OK')`;
-                const check = await runCommand('node', ['--input-type=module', '-e', cmd], {
-                    timeoutMs: 45000,
-                    env: { NO_COLOR: undefined, NODE_APP_INSTANCE: undefined, DAEMON_MODE: undefined },
-                    acceptExitCodes: [0, 1],
-                });
+                const check = await runCommand(
+                    'node',
+                    ['--input-type=module', '-e', cmd],
+                    /** @type {any} */ ({
+                        timeoutMs: 45000,
+                        env: { NO_COLOR: undefined, NODE_APP_INSTANCE: undefined, DAEMON_MODE: undefined },
+                        acceptExitCodes: [0, 1],
+                    })
+                );
                 const out = `${check.stdout}\n${check.stderr}`;
                 const clean = out.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').trim();
                 if (!check.ok || !clean.endsWith('OK')) {
@@ -689,7 +702,9 @@ export async function collectQualityFindings(options) {
                 mode: plan.steps.typecheck_node.mode,
                 changed: fileSigs(plan.impact.changed),
                 configs: fileSigs(['package.json', 'tsconfig.json', 'jsconfig.json']),
-                types: fileSigs((plan.impact.changed || []).filter(f => String(f).startsWith('src/types/'))),
+                types: fileSigs(
+                    (plan.impact.changed || []).filter((/** @type {any} */ f) => String(f).startsWith('src/types/'))
+                ),
             },
             async () =>
                 exec('quality.typecheck_node', 'npm', ['run', '-s', 'typecheck:node'], {
@@ -854,7 +869,7 @@ export async function collectQualityFindings(options) {
             telemetry.jsdoc.delta_coverage_pct = Number(jsdocReport.coverage_pct);
         }
         const jsdocFindingsAll = parseJSDocCoverageFindingsFromReport(
-            jsdocReport,
+            /** @type {any} */ (jsdocReport),
             QUALITY_CONTRACTS.JSDOC_DELTA_EXPORT_DOCS
         );
         const quickCap = options.profile === 'quick' ? 50 : 1000;
@@ -966,7 +981,7 @@ export async function collectQualityFindings(options) {
             telemetry.jsdoc.full_coverage_pct = Number(jsdocReport.coverage_pct);
         }
         const jsdocFindings = parseJSDocCoverageFindingsFromReport(
-            jsdocReport,
+            /** @type {any} */ (jsdocReport),
             QUALITY_CONTRACTS.JSDOC_FULL_EXPORT_DOCS
         );
         const thresholdPct = Number(telemetry.jsdoc.threshold_pct || 80);

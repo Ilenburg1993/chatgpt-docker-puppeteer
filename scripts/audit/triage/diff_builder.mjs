@@ -27,10 +27,7 @@ function getIndentation(line) {
     return match ? match[0] : '';
 }
 
-/**
- * @typedef {object} BuildContractAwareReplacementFinding
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} BuildContractAwareReplacementFinding */
 /**
  * @param {BuildContractAwareReplacementFinding} finding
  * @param {string} oldLine
@@ -66,18 +63,15 @@ function buildContractAwareReplacement(finding, oldLine, fallback) {
 
 /**
  * @typedef {object} BuildSuggestedDiffContext
- * @property {string} title
- * @property {string} cause
- * @property {string} replacementHint
+ * @property {string} [title]
+ * @property {string} [cause]
+ * @property {string} [replacementHint]
  */
-/**
- * @typedef {object} BuildSuggestedDiffFinding
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} BuildSuggestedDiffFinding */
 /**
  * @param {BuildSuggestedDiffFinding} finding
  * @param {BuildSuggestedDiffContext} [context]
-  * @returns {object}
+  * @returns {any}
  */
 export function buildSuggestedDiff(finding, context = {}) {
     if (!finding?.file) {

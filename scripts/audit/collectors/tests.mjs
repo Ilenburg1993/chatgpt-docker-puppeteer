@@ -35,10 +35,7 @@ function testFailureFinding(sourceTool, evidence, contractId) {
 /**
  * @typedef {object} CollectTestFindingsOptions
  * @property {'quick'|'deep'|'nightly'} profile
- * @property {(stepId: string} exec
- * @property {string} command
- * @property {string[]} args
- * @property {unknown) => Promise<void>} options
+ * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
  */
 /**
  * @param {CollectTestFindingsOptions} options
