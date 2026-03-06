@@ -131,17 +131,18 @@ const CAPABILITIES_SCHEMA = Object.freeze([
  * @fires TargetDriver#CONTEXT_DETACHED - Context detached
  */
 class TargetDriver extends EventEmitter {
-    /** @type {Record<string, unknown>} */
+    /** @type {any} */
     config;
 
     /** @type {string} */
     name;
 
-    /** @type {number} */
+    /** @type {number|undefined} */
     _createdAt;
 
     /** @type {string} */
     _state;
+
 
     /**
      * Construtor do TargetDriver - Classe abstrata base.
@@ -201,6 +202,7 @@ class TargetDriver extends EventEmitter {
         this.stateUpdated = Date.now();
 
         // ✅ v2.0: State history tracking
+        /** @type {any[]} */
         this._stateHistory = [];
 
         // ✅ v2.0: Error tracking
@@ -214,6 +216,7 @@ class TargetDriver extends EventEmitter {
         this._abortHandler = null;
 
         // ✅ P0-8: Page lifecycle event listeners (configurados em attachContext)
+        /** @type {any[]} */
         this._pageEventListeners = [];
     }
 
@@ -287,7 +290,7 @@ class TargetDriver extends EventEmitter {
             this._pageEventListeners.push({ event: 'close', handler: closeHandler });
 
             // 2. Page error event
-            const errorHandler = err => {
+            const errorHandler = (/** @type {any} */ err) => {
                 log('ERROR', `[${this.name}] Page error: ${err.message}`, this.correlationId);
                 this.emit(EVENTS.WARNING, {
                     type: 'PAGE_ERROR',
@@ -335,7 +338,8 @@ class TargetDriver extends EventEmitter {
                 `[${this.name}] Page lifecycle handlers attached (${this._pageEventListeners.length})`,
                 this.correlationId
             );
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[${this.name}] Failed to attach page handlers: ${err.message}`, this.correlationId);
         }
     }
@@ -353,11 +357,12 @@ class TargetDriver extends EventEmitter {
 
         try {
             this._pageEventListeners.forEach(({ event, handler }) => {
-                this.page.off(event, handler);
+                /** @type {any} */ (this.page)?.off(event, handler);
             });
             this._pageEventListeners = [];
             log('DEBUG', `[${this.name}] Page lifecycle handlers removed`, this.correlationId);
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('WARN', `[${this.name}] Error removing page handlers: ${err.message}`, this.correlationId);
         }
     }
@@ -427,8 +432,8 @@ class TargetDriver extends EventEmitter {
                         `Valid capabilities: ${CAPABILITIES_SCHEMA.join(', ')}`
                 );
             }
-            if (typeof caps[key] !== 'boolean') {
-                throw new Error(`[${this.name}] Capability "${key}" must be boolean, got ${typeof caps[key]}`);
+            if (typeof (/** @type {any} */ (caps))[key] !== 'boolean') {
+                throw new Error(`[${this.name}] Capability "${key}" must be boolean, got ${typeof (/** @type {any} */ (caps))[key]}`);
             }
         }
     }
@@ -467,7 +472,7 @@ class TargetDriver extends EventEmitter {
      * driver.attachContext(page, abortSignal, 'task-123');
      * const response = await driver.execute(prompt);
      */
-    attachContext(page, signal, correlationId = null) {
+    attachContext(page, signal, /** @type {string|null} */ correlationId = null) {
         // Validações
         if (this.destroyed) {
             throw new Error(`[${this.name}] Cannot attach context: driver destroyed`);
@@ -503,7 +508,7 @@ class TargetDriver extends EventEmitter {
             if (
                 currentUrl !== 'about:blank' &&
                 currentUrl !== '' &&
-                !isDomainMatch(currentUrl, this.config.expectedDomain)
+                !isDomainMatch(currentUrl, /** @type {any} */ (this.config).expectedDomain)
             ) {
                 throw new Error(
                     `[${this.name}] Domain mismatch: expected ${this.config.expectedDomain}, got ${currentUrl}`
@@ -627,13 +632,14 @@ class TargetDriver extends EventEmitter {
         // Detach page + signal
         this.page = null;
         this.signal = null;
-        this.correlationId = null;
+        this.correlationId = /** @type {any} */ (null);
 
         // Transição: * → UNATTACHED
         // ✅ C2: Force setState (mesmo que validation falhe)
         try {
             this.setState(STATES.UNATTACHED);
-        } catch (stateError) {
+        } catch (_rawStateError) {
+            const stateError = /** @type {any} */ (_rawStateError);
             // ✅ C2: Se setState falhar (transition inválida), force state
             log(
                 'WARN',
@@ -695,7 +701,7 @@ class TargetDriver extends EventEmitter {
         }
 
         // Validate state exists
-        if (!STATES[newState]) {
+        if (!(/** @type {any} */ (STATES))[newState]) {
             throw new Error(`[${this.name}] Tentativa de transição para estado inválido: "${newState}"`);
         }
 
@@ -800,7 +806,7 @@ class TargetDriver extends EventEmitter {
     async getHealth() {
         const isPageAlive = !!(this.page && !this.page.isClosed());
         const stateAge = Date.now() - this.stateUpdated;
-        const uptime = Date.now() - this._createdAt;
+        const uptime = Date.now() - (this._createdAt ?? 0);
 
         return {
             // Status geral
@@ -1077,7 +1083,8 @@ class TargetDriver extends EventEmitter {
         if (this.isContextAttached()) {
             try {
                 this.detachContext();
-            } catch (err) {
+            } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[${this.name}] Error detaching context during destroy: ${err.message}`);
             }
         }

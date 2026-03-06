@@ -10,6 +10,7 @@ import { log } from './logger.js';
 import { withTimeout } from '#infra/abort_controller_utils';
 
 // NERV instance will be injected via setNERV()
+/** @type {any} */
 let nervInstance = null;
 
 /**
@@ -88,10 +89,10 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
             error: {
                 message: error.message,
                 stack: error.stack,
-                code: error.code || 'N/A',
+                code: (/** @type {any} */ (error)).code || 'N/A',
             },
             context: {
-                url: page && !page.isClosed() ? page.url() : 'PAGE_CLOSED',
+                url: page && !(/** @type {any} */ (page)).isClosed() ? (/** @type {any} */ (page)).url() : 'PAGE_CLOSED',
                 timestamp: new Date().toISOString(),
             },
         };
@@ -102,14 +103,15 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
         // 3. EVIDÊNCIAS VISUAIS (Protegidas por Timeout de Corrida)
         // FIXED (P0-1.2): Agora usa withTimeout para garantir cleanup do AbortController
         // Previne operações órfãs que continuam escrevendo no disco após timeout
-        if (page && !page.isClosed()) {
+        if (page && !(/** @type {any} */ (page)).isClosed()) {
             try {
                 await withTimeout(
                     () => _captureVisualEvidence(page, folder, correlationId),
                     CAPTURE_TIMEOUT_MS,
                     'BROWSER_CAPTURE_TIMEOUT'
                 );
-            } catch (err) {
+            } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[FORENSICS] Captura visual abortada: ${err.message}`, correlationId);
             }
         }
@@ -132,13 +134,15 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
                 );
 
                 log('INFO', `[FORENSICS] Dump criado e notificado via NERV: ${dumpId}`, correlationId);
-            } catch (e) {
+            } catch (_rawE) {
+            const e = /** @type {any} */ (_rawE);
                 log('WARN', `[FORENSICS] Falha ao notificar dump via NERV: ${e.message}`, correlationId);
             }
         } else {
             log('WARN', `[FORENSICS] Dump criado mas NERV não disponível: ${dumpId}`, correlationId);
         }
-    } catch (e) {
+    } catch (_rawE) {
+            const e = /** @type {any} */ (_rawE);
         // Falha na forense é reportada apenas no log local para não interferir na recuperação
         console.error(`[FORENSICS] Falha crítica no motor de evidências: ${e.message}`);
     }
@@ -154,7 +158,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
  * @private
  */
 /* global document */
-async function _captureVisualEvidence(page, folder, _correlationId) {
+async function _captureVisualEvidence(/** @type {any} */ page, folder, _correlationId) {
     try {
         if (!page || page.isClosed?.()) return;
 
@@ -176,7 +180,8 @@ async function _captureVisualEvidence(page, folder, _correlationId) {
         });
 
         await fs.writeFile(path.join(folder, 'dom_snapshot.html'), html, 'utf-8');
-    } catch (err) {
+    } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
         log('WARN', `[FORENSICS] Visual capture failed: ${err?.message || String(err)}`, _correlationId);
     }
 }

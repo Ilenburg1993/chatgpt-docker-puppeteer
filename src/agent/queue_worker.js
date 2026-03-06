@@ -262,10 +262,11 @@ class QueueWorker {
             const db = getDb();
             const now = Date.now();
 
-            const inflight = /** @type {any} */ (
-                db
-                    .prepare(
-                        `
+            const inflight =
+                /** @type {any} */ (
+                    db
+                        .prepare(
+                            `
                     SELECT COUNT(1) AS c
                     FROM tasks
                     WHERE locked_by = @workerId
@@ -274,8 +275,9 @@ class QueueWorker {
                       AND stage = @stage
                       AND status IN ('PENDING', 'RUNNING')
                 `
-                    )
-                    .get({ workerId: this.workerId, now, stage: TASK_STAGES.READY }))?.c || 0;
+                        )
+                        .get({ workerId: this.workerId, now, stage: TASK_STAGES.READY })
+                )?.c || 0;
 
             const availableSlots = Math.max(0, this.maxConcurrentTasks - Number(inflight || 0));
             if (availableSlots <= 0) {
@@ -283,11 +285,13 @@ class QueueWorker {
             }
 
             for (let i = 0; i < availableSlots; i++) {
-                const claimed = /** @type {any} */ (claimNextEligibleTask({
-                    workerId: this.workerId,
-                    nowMs: now,
-                    lockTtlMs: this.lockTtlMs,
-                }));
+                const claimed = /** @type {any} */ (
+                    claimNextEligibleTask({
+                        workerId: this.workerId,
+                        nowMs: now,
+                        lockTtlMs: this.lockTtlMs,
+                    })
+                );
 
                 if (!claimed || !claimed.task) {
                     break;

@@ -57,7 +57,7 @@ const METADATA_TYPES = {
  * - Transformador `{{REF:LAST|METRICS}}` para auditoria
  * - Transformador `{{REF:LAST|ERROR}}` para retry logic
  */
-function extractTaskMetadata(task, transformType) {
+function extractTaskMetadata(/** @type {any} */ task, transformType) {
     if (!task || !task.state) {
         return 'UNKNOWN';
     }

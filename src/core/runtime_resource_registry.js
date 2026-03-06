@@ -115,8 +115,8 @@ function upsertRuntimeResource(resource) {
 /**
  * @param {string} id
  * @param {RuntimeResourceState} state
- * @param {SetRuntimeResourceStateDetails} [details]
- * @returns {void}
+ * @param {any} [details]
+ * @returns {any}
  */
 function setRuntimeResourceState(id, state, details = {}) {
     return upsertRuntimeResource({
@@ -138,8 +138,8 @@ function setRuntimeResourceState(id, state, details = {}) {
 /**
  * Retorna snapshot serializável dos recursos runtime registrados.
  *
- * @param {GetRuntimeResourcesSnapshotOptions} [options]
- * @returns {Array<{id:string, owner:string, criticality:RuntimeResourceCriticality, state:RuntimeResourceState, reasonCode:string|null, message:string|null, updatedAt:number, health:unknown}>}
+ * @param {any} [options]
+ * @returns {any[]}
  */
 function getRuntimeResourcesSnapshot({ owner = null } = {}) {
     const values = [...runtimeResources.values()]
@@ -149,7 +149,8 @@ function getRuntimeResourcesSnapshot({ owner = null } = {}) {
             if (typeof item.health === 'function') {
                 try {
                     health = item.health();
-                } catch (error) {
+                } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
                     health = { error: error?.message || String(error) };
                 }
             }
@@ -176,7 +177,7 @@ function getRuntimeResourcesSnapshot({ owner = null } = {}) {
 /**
  * Consolida readiness/degraded/not-ready a partir do registry de recursos runtime.
  *
- * @param {GetRuntimeReadinessSummaryOptions} [options]
+ * @param {any} [options]
  * @returns {{
  *   status: 'ready'|'degraded'|'not-ready',
  *   required_components: Array<{id:string,state:string,reasonCode:string|null,message:string|null}>,
@@ -235,16 +236,16 @@ function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], all
  * @typedef {object} StopRuntimeResourcesOptions
  * @property {string|null} owner
  * @property {number} timeoutMs
- * @property {((level: string} logger
- * @property {string) => void)|null} message
+ * @property {any} logger
+ * @property {any} message
  */
 /**
  * Para recursos registrados em ordem reversa de criação, com timeout por recurso.
  *
- * @param {StopRuntimeResourcesOptions} [options]
+ * @param {any} [options]
  * @returns {Promise<Array<{id:string, ok:boolean, error?:string, timeout?:boolean}>>}
  */
-async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = null } = {}) {
+async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = /** @type {any} */ (null) } = {}) {
     const entries = [...runtimeResources.values()].filter(item => !owner || item.owner === owner);
     entries.reverse();
 
@@ -257,13 +258,14 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = n
         }
 
         try {
-            await runWithTimeout(() => Promise.resolve(resource.stop()), timeoutMs);
+            await runWithTimeout(() => Promise.resolve((/** @type {any} */ (resource)).stop()), timeoutMs);
             setRuntimeResourceState(resource.id, 'stopped', {
                 owner: resource.owner,
                 criticality: resource.criticality,
             });
             results.push({ id: resource.id, ok: true });
-        } catch (error) {
+        } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
             setRuntimeResourceState(resource.id, 'degraded', {
                 owner: resource.owner,
                 criticality: resource.criticality,
@@ -277,7 +279,7 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = n
                 error: error?.message || String(error),
             });
             if (logger && typeof logger === 'function') {
-                logger(
+                (/** @type {any} */ (logger))(
                     'WARN',
                     `[RUNTIME_REGISTRY] Falha ao parar recurso ${resource.id}: ${error?.message || String(error)}`
                 );

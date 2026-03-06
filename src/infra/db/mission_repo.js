@@ -124,10 +124,12 @@ function listMissions({ status = null, limit = 500 } = {}) {
         ORDER BY created_at_ms DESC
         LIMIT @limit
     `;
-    const rows = /** @type {any[]} */ (db.prepare(sql).all({
-        status,
-        limit: Math.max(1, Math.min(Number(limit) || 500, 5000)),
-    }));
+    const rows = /** @type {any[]} */ (
+        db.prepare(sql).all({
+            status,
+            limit: Math.max(1, Math.min(Number(limit) || 500, 5000)),
+        })
+    );
     return rows.map(_rowToMission);
 }
 

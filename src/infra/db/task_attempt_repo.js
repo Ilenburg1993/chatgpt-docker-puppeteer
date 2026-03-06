@@ -130,7 +130,9 @@ function updateAttempt(attemptId, updates = {}) {
 
     const next = /** @type {any} */ ({ .../** @type {any} */ (existing), ...updates });
     upsertAttempt(next);
-    return /** @type {TaskAttempt|null} */ (db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null);
+    return /** @type {TaskAttempt|null} */ (
+        db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null
+    );
 }
 
 /**
@@ -140,7 +142,9 @@ function updateAttempt(attemptId, updates = {}) {
  */
 function getAttemptById(attemptId) {
     const db = getDb();
-    return /** @type {TaskAttempt|null} */ (db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null);
+    return /** @type {TaskAttempt|null} */ (
+        db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null
+    );
 }
 
 /**
@@ -156,17 +160,19 @@ function getAttemptById(attemptId) {
 function listAttemptsByTask(taskId, { limit = 200 } = {}) {
     const db = getDb();
     const lim = Math.max(1, Math.min(Number(limit) || 200, 2000));
-    return /** @type {TaskAttempt[]} */ (db
-        .prepare(
-            `
+    return /** @type {TaskAttempt[]} */ (
+        db
+            .prepare(
+                `
             SELECT *
             FROM task_attempts
             WHERE task_id = ?
             ORDER BY created_at_ms DESC
             LIMIT ?
         `
-        )
-        .all(taskId, lim));
+            )
+            .all(taskId, lim)
+    );
 }
 
 export { upsertAttempt, updateAttempt, getAttemptById, listAttemptsByTask };

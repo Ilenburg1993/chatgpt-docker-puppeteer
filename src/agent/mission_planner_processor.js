@@ -201,9 +201,10 @@ class MissionPlannerProcessor {
 
         try {
             const db = getDb();
-            const rows = /** @type {any[]} */ (db
-                .prepare(
-                    `
+            const rows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT id, mission_id, task_json, result_json, latest_attempt_id, updated_at_ms
                     FROM tasks
                     WHERE mission_id IS NOT NULL
@@ -212,8 +213,9 @@ class MissionPlannerProcessor {
                     ORDER BY updated_at_ms DESC
                     LIMIT 50
                 `
-                )
-                .all());
+                    )
+                    .all()
+            );
 
             for (const row of rows) {
                 const taskId = row?.id;
@@ -314,7 +316,8 @@ class MissionPlannerProcessor {
         // Wrap count + inserts in a transaction to prevent budget overrun race
         const insertInTransaction = db.transaction(() => {
             const existingCount =
-                (/** @type {any} */ (db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(missionId)))?.c || 0;
+                /** @type {any} */ (db.prepare('SELECT COUNT(1) AS c FROM tasks WHERE mission_id = ?').get(missionId))
+                    ?.c || 0;
             let remaining = Math.max(0, maxTotal - existingCount);
             if (remaining <= 0) {
                 return;
@@ -364,9 +367,7 @@ class MissionPlannerProcessor {
                         },
                     },
                     policy: {
-                        dependencies: Array.isArray(proposal?.depends_on)
-                            ? proposal.depends_on.map(String)
-                            : [],
+                        dependencies: Array.isArray(proposal?.depends_on) ? proposal.depends_on.map(String) : [],
                         execute_after: null,
                     },
                     mission: {

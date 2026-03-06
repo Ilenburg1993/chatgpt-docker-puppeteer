@@ -428,7 +428,9 @@ class TaskOrchestrationWorker {
     _hasAppliedOrchestration({ taskId, attemptId } = {}) {
         const db = getDb();
         const dedupKey = `task:${taskId}:orchestrated:${attemptId}`;
-        return Boolean(/** @type {any} */ (db.prepare('SELECT 1 AS ok FROM events WHERE dedup_key = ? LIMIT 1').get(dedupKey))?.ok);
+        return Boolean(
+            /** @type {any} */ (db.prepare('SELECT 1 AS ok FROM events WHERE dedup_key = ? LIMIT 1').get(dedupKey))?.ok
+        );
     }
 
     /**
@@ -487,9 +489,10 @@ class TaskOrchestrationWorker {
         try {
             const db = getDb();
 
-            const rows = /** @type {any[]} */ (db
-                .prepare(
-                    `
+            const rows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT
                         t.id, t.mission_id, t.task_json, t.result_json, t.latest_attempt_id, t.updated_at_ms
                     FROM tasks t
@@ -502,8 +505,9 @@ class TaskOrchestrationWorker {
                     ORDER BY t.updated_at_ms ASC
                     LIMIT ?
                 `
-                )
-                .all(this.batchSize));
+                    )
+                    .all(this.batchSize)
+            );
 
             for (const row of rows) {
                 const taskId = row?.id;
@@ -673,10 +677,11 @@ class TaskOrchestrationWorker {
         const windowMs = Math.max(60000, Number(this.outputMissingEscalation?.windowMs || 600000) || 600000);
         const threshold = Math.max(1, Number(this.outputMissingEscalation?.threshold || 3) || 3);
 
-        const recent = /** @type {any} */ (
-            db
-                .prepare(
-                    `
+        const recent =
+            /** @type {any} */ (
+                db
+                    .prepare(
+                        `
                 SELECT COUNT(1) AS c
                 FROM events
                 WHERE entity_type = 'task'
@@ -684,8 +689,9 @@ class TaskOrchestrationWorker {
                   AND event_type = 'TASK_ORCHESTRATION_OUTPUT_MISSING'
                   AND ts_ms >= ?
             `
-                )
-                .get(taskId, now - windowMs))?.c || 0;
+                    )
+                    .get(taskId, now - windowMs)
+            )?.c || 0;
 
         if (Number(recent || 0) < threshold) {
             // First occurrences: keep it as-is; next tick may succeed once artifacts are persisted.

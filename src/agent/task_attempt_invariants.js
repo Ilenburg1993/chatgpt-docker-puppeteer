@@ -11,7 +11,9 @@ function getCurrentAttemptIdForTask(taskId) {
     if (!taskId) return null;
     try {
         const db = getDb();
-        const row = /** @type {any} */ (db.prepare('SELECT latest_attempt_id, last_correlation_id FROM tasks WHERE id = ?').get(taskId));
+        const row = /** @type {any} */ (
+            db.prepare('SELECT latest_attempt_id, last_correlation_id FROM tasks WHERE id = ?').get(taskId)
+        );
         return row?.latest_attempt_id ?? row?.last_correlation_id ?? null;
     } catch (_) {
         return null;

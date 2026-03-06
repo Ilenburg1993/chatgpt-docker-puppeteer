@@ -1,13 +1,13 @@
 // @ts-check
 
-function normalizeDomain(value) {
+function normalizeDomain(/** @type {any} */ value) {
     return String(value || '')
         .trim()
         .toLowerCase()
         .replace(/\.$/, '');
 }
 
-function extractHostname(value) {
+function extractHostname(/** @type {any} */ value) {
     const raw = String(value || '').trim();
     if (!raw) {
         return '';

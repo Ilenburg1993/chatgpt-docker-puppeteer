@@ -181,9 +181,10 @@ class TaskControlWatcher {
                 TaskControlWatcher.MIN_RECENT_WINDOW_MS,
                 this.intervalMs * TaskControlWatcher.INTERVAL_MULTIPLIER
             );
-            const rows = /** @type {any[]} */ (db
-                .prepare(
-                    `
+            const rows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT id, status, last_correlation_id, updated_at_ms, paused_at_ms, cancelled_at_ms
                     FROM tasks
                     WHERE status IN ('CANCELLED', 'PAUSED')
@@ -194,8 +195,9 @@ class TaskControlWatcher {
                     ORDER BY updated_at_ms DESC
                     LIMIT 50
                 `
-                )
-                .all({ recentMs: now - RECENT_WINDOW_MS }));
+                    )
+                    .all({ recentMs: now - RECENT_WINDOW_MS })
+            );
 
             for (const row of rows) {
                 const taskId = row?.id;

@@ -2,7 +2,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-function normalizePath(value) {
+function normalizePath(/** @type {any} */ value) {
     if (!value) return null;
     try {
         return resolve(String(value));
@@ -28,7 +28,7 @@ function parseEnvFlag(value, fallback = false) {
     return fallback;
 }
 
-function resolveEntrypointFile(importMetaUrl) {
+function resolveEntrypointFile(/** @type {any} */ importMetaUrl) {
     try {
         return normalizePath(fileURLToPath(importMetaUrl));
     } catch {

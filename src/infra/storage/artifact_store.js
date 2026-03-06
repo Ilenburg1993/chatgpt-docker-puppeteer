@@ -384,9 +384,9 @@ async function deleteArtifact(artifactId) {
         try {
             await fs.unlink(row.storage_uri);
         } catch (_rawErr) {
-        const err = /** @type {any} */ (_rawErr);
-        if (err.code !== 'ENOENT') throw err;
-    }
+            const err = /** @type {any} */ (_rawErr);
+            if (err.code !== 'ENOENT') throw err;
+        }
     }
 
     deleteArtifactById(artifactId);

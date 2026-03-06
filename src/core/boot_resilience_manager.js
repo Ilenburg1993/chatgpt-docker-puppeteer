@@ -30,7 +30,7 @@ import { asRecord } from '#types/guards';
  * @returns {string} URL do endpoint (ex: 'http://localhost:9224')
  */
 function resolveChromeEndpoint() {
-    return CONFIG.BROWSER_ENDPOINT.url;
+    return /** @type {any} */ (CONFIG).BROWSER_ENDPOINT.url;
 }
 
 /** * Retorna objeto browserEndpoint completo para ConnectionOrchestrator.
@@ -44,7 +44,7 @@ function resolveChromeEndpoint() {
  * @returns {{url: string, wsEndpoint?: string}}
  */
 function getBrowserEndpoint() {
-    return CONFIG.BROWSER_ENDPOINT;
+    return /** @type {any} */ (CONFIG).BROWSER_ENDPOINT;
 }
 
 /**
@@ -84,16 +84,16 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
  * entre boot normal, retry automático e retry manual.
  *
  * @param {CreateBrowserPoolConfig} config
- * @param {CreateBrowserPoolNerv} [nerv] - NERV bus para Circuit Breaker (opcional)
+ * @param {CreateBrowserPoolNerv|null} [nerv] - NERV bus para Circuit Breaker (opcional)
  * @returns {Promise<object>} BrowserPoolManager inicializado
  */
 async function createBrowserPool(config, nerv = null) {
     const { default: BrowserPoolManager } = await import('#infra/browser_pool/pool_manager');
-    const pool = new BrowserPoolManager(config);
+    const pool = new BrowserPoolManager(/** @type {any} */ (config));
 
     // ✅ Injeta NERV no Circuit Breaker
     if (nerv && pool.circuitBreaker) {
-        /** @type {unknown} */ (pool.circuitBreaker).nerv = nerv;
+        /** @type {any} */ (pool.circuitBreaker).nerv = nerv;
         log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
     }
 
@@ -143,7 +143,8 @@ async function tryStartChrome() {
             log('WARN', '[RESILIENCE] Script executou mas Chrome não está acessível');
             return false;
         }
-    } catch (error) {
+    } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
         log('WARN', `[RESILIENCE] Falha ao executar start-chrome.sh: ${error.message}`);
         return false;
     }
@@ -236,7 +237,7 @@ function getChromeInstructions(errorMessage) {
  * Oferece opções ao usuário e tenta recuperação automática.
  *
  * @param {Error} error - Erro original do Browser Pool
- * @param {HandleBrowserPoolFailureOptions} options - Opções de configuração
+ * @param {any} [options] - Opções de configuração
  *
  * @returns {Promise<BrowserPoolDecision>}
  * ⚠️ Esta função NUNCA é void.
@@ -264,16 +265,16 @@ async function handleBrowserPoolFailure(error, options = {}) {
                     // Chrome iniciado! Tenta reconectar Browser Pool usando createBrowserPool
                     try {
                         const { default: CONFIG } = await import('./config.js');
-                        const all = asRecord(/** @type {unknown} */ (CONFIG).all);
+                        const all = /** @type {any} */ (CONFIG).all ?? {};
 
-                        const browserPool = await createBrowserPool({
+                        const browserPool = await createBrowserPool(/** @type {any} */ ({
                             poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
                             allocationStrategy:
                                 process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
                             healthCheckInterval:
                                 process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
                             browserEndpoint: getBrowserEndpoint(),
-                        });
+                        }));
 
                         log('INFO', '[RESILIENCE] ✅ Browser Pool reconectado com sucesso após iniciar Chrome!');
 
@@ -282,7 +283,8 @@ async function handleBrowserPoolFailure(error, options = {}) {
                             mode: 'full',
                             browserPool,
                         };
-                    } catch (retryError) {
+                    } catch (_rawRetryError) {
+                        const retryError = /** @type {any} */ (_rawRetryError);
                         log('WARN', `[RESILIENCE] Falha ao reconectar após iniciar Chrome: ${retryError.message}`);
                     }
                 }
@@ -351,14 +353,14 @@ async function handleBrowserPoolFailure(error, options = {}) {
 
                 try {
                     const { default: CONFIG } = await import('./config.js');
-                    const all = asRecord(/** @type {unknown} */ (CONFIG).all);
+                    const all = /** @type {any} */ (CONFIG).all ?? {};
 
-                    const browserPool = await createBrowserPool({
+                    const browserPool = await createBrowserPool(/** @type {any} */ ({
                         poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
                         allocationStrategy: process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
                         healthCheckInterval: process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
                         browserEndpoint: getBrowserEndpoint(),
-                    });
+                    }));
 
                     log('INFO', '[RESILIENCE] ✅ Browser Pool conectado com sucesso após correção manual!');
 
@@ -367,7 +369,8 @@ async function handleBrowserPoolFailure(error, options = {}) {
                         mode: 'full',
                         browserPool,
                     };
-                } catch (retryError) {
+                } catch (_rawRetryError2) {
+                    const retryError = /** @type {any} */ (_rawRetryError2);
                     log('ERROR', `[RESILIENCE] Retry falhou: ${retryError.message}`);
                     return { success: false, mode: 'abort' };
                 }
@@ -411,7 +414,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
  * Substitui a inicialização direta no boot sequence.
  *
  * @param {InitializeBrowserPoolResilientConfig} config - Configuração do Browser Pool
- * @param {InitializeBrowserPoolResilientOptions} [options] - Opções de resiliência
+ * @param {any} [options] - Opções de resiliência
  * @returns {Promise<object>} - Resultado da inicialização
  */
 async function initializeBrowserPoolResilient(config, options = {}) {
@@ -419,17 +422,17 @@ async function initializeBrowserPoolResilient(config, options = {}) {
     const { default: BrowserPoolManager } = await import('#infra/browser_pool/pool_manager');
 
     try {
-        const browserPool = new BrowserPoolManager(config);
+        const browserPool = new BrowserPoolManager(/** @type {any} */ (config));
 
         // ✅ Injeta NERV no Circuit Breaker
         if (nerv && browserPool.circuitBreaker) {
-            /** @type {unknown} */ (browserPool.circuitBreaker).nerv = nerv;
+            /** @type {any} */ (browserPool.circuitBreaker).nerv = nerv;
             log('DEBUG', '[BrowserPool] NERV injetado no Circuit Breaker');
         }
 
         await browserPool.initialize();
 
-        const poolHealth = await browserPool.getHealth();
+        const poolHealth = /** @type {any} */ (await browserPool.getHealth());
         log(
             'INFO',
             `[RESILIENCE] ✅ Browser Pool online (${poolHealth.healthy}/${poolHealth.poolSize} instâncias saudáveis)`
@@ -440,7 +443,8 @@ async function initializeBrowserPoolResilient(config, options = {}) {
             mode: 'full',
             browserPool,
         };
-    } catch (error) {
+    } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
         log('WARN', `[RESILIENCE] Browser Pool falhou na inicialização: ${error.message}`);
 
         // Delega para handler de falha

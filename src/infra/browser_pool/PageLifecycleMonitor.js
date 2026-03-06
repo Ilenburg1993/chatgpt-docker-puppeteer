@@ -33,8 +33,8 @@ class PageLifecycleMonitor {
     /**
      * Cria monitor para página.
      *
-     * @param {object} page - Puppeteer Page instance
-     * @param {BrowserPoolManager} poolManager - Pool manager reference
+     * @param {any} page - Puppeteer Page instance
+     * @param {any} poolManager - Pool manager reference
      * @param {string} taskId - Task ID associado à página
      * @param {{ emit?: (event: unknown) => void } | null} [nerv=null] - NERV event bus (opcional)
      */
@@ -55,6 +55,7 @@ class PageLifecycleMonitor {
         this.poolManager = poolManager;
         this.taskId = taskId;
         this.nerv = nerv;
+        /** @type {any[]} */
         this.listeners = [];
         this.active = false;
 
@@ -88,7 +89,7 @@ class PageLifecycleMonitor {
             this.listeners.push({ event: 'close', handler: closeHandler });
 
             // 2. Page error event
-            const errorHandler = err => {
+            const errorHandler = (/** @type {any} */ err) => {
                 this.eventsReceived++;
                 log('ERROR', `[PageLifecycleMonitor] Page error: ${this.taskId} - ${err.message}`);
                 this.handlePageError(err);
@@ -111,7 +112,8 @@ class PageLifecycleMonitor {
                 'DEBUG',
                 `[PageLifecycleMonitor] Listeners attached for ${this.taskId} (${this.listeners.length} events)`
             );
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Failed to attach listeners: ${err.message}`);
         }
     }
@@ -131,7 +133,7 @@ class PageLifecycleMonitor {
 
             // 2. Emit NERV event (se disponível)
             if (this.nerv) {
-                this.nerv.emit({
+                (/** @type {any} */ (this.nerv)).emit({
                     type: LIFECYCLE_EVENTS.PAGE_CLOSED,
                     payload: {
                         taskId: this.taskId,
@@ -151,7 +153,8 @@ class PageLifecycleMonitor {
             this.cleanup();
 
             log('INFO', `[PageLifecycleMonitor] Page close handled: ${this.taskId}`);
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Error handling page close: ${err.message}`);
         }
     }
@@ -172,7 +175,7 @@ class PageLifecycleMonitor {
 
             // 2. Emit NERV event
             if (this.nerv) {
-                this.nerv.emit({
+                (/** @type {any} */ (this.nerv)).emit({
                     type: LIFECYCLE_EVENTS.PAGE_ERROR,
                     payload: {
                         taskId: this.taskId,
@@ -183,7 +186,8 @@ class PageLifecycleMonitor {
             }
 
             log('WARN', `[PageLifecycleMonitor] Page error recorded: ${this.taskId}`);
-        } catch (error) {
+        } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
             log('ERROR', `[PageLifecycleMonitor] Error handling page error: ${error.message}`);
         }
     }
@@ -205,7 +209,7 @@ class PageLifecycleMonitor {
 
             // 3. Emit NERV event
             if (this.nerv) {
-                this.nerv.emit({
+                (/** @type {any} */ (this.nerv)).emit({
                     type: LIFECYCLE_EVENTS.PAGE_DISCONNECTED,
                     payload: {
                         taskId: this.taskId,
@@ -218,7 +222,8 @@ class PageLifecycleMonitor {
             this.cleanup();
 
             log('INFO', `[PageLifecycleMonitor] Page disconnect handled: ${this.taskId}`);
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Error handling page disconnect: ${err.message}`);
         }
     }
@@ -244,7 +249,8 @@ class PageLifecycleMonitor {
             this.active = false;
 
             log('DEBUG', `[PageLifecycleMonitor] Cleanup completed for ${this.taskId}`);
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Cleanup failed: ${err.message}`);
         }
     }
@@ -272,7 +278,7 @@ class PageLifecycleMonitor {
         this.rebindCount++;
 
         if (this.nerv) {
-            this.nerv.emit({
+            (/** @type {any} */ (this.nerv)).emit({
                 type: 'BROWSER_PAGE_TASK_REBIND',
                 payload: {
                     oldTaskId: previousTaskId,

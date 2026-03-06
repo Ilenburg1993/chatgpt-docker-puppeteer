@@ -812,7 +812,8 @@ class TaskStateProjector {
                         const reasonCode = payload.reason_code || payload.reasonCode || payload.reason || null;
                         const causeLayer = payload.cause_layer || payload.causeLayer || null;
                         const diagStorage = /** @type {any} */ (
-                            payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null);
+                            payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null
+                        );
                         const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
                         const diagJson = JSON.stringify(diagIds);
                         const summary = payloadDetails.diagnosis_summary || payloadDetails.diagnosisSummary || null;
@@ -874,7 +875,9 @@ class TaskStateProjector {
             }
             const causeLayer = payload.cause_layer || payload.causeLayer || null;
 
-            const diagStorage = /** @type {any} */ (payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null);
+            const diagStorage = /** @type {any} */ (
+                payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null
+            );
             const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
             const diagJson = JSON.stringify(diagIds);
             const summary = payloadDetails.diagnosis_summary || payloadDetails.diagnosisSummary || null;
@@ -1046,7 +1049,9 @@ class TaskStateProjector {
                 let currentAttempts;
                 try {
                     const db = getDb();
-                    const row = /** @type {any} */ (db.prepare('SELECT attempts, task_json FROM tasks WHERE id = ?').get(taskId));
+                    const row = /** @type {any} */ (
+                        db.prepare('SELECT attempts, task_json FROM tasks WHERE id = ?').get(taskId)
+                    );
                     currentAttempts = Number(row?.attempts ?? 0) || 0;
                     try {
                         const taskJson = row?.task_json ? JSON.parse(row.task_json) : null;

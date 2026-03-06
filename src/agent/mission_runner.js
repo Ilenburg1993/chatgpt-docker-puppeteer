@@ -195,7 +195,9 @@ class MissionRunner {
         // If there is an active task, wait for terminal status.
         if (progress.current_task_id) {
             const db = getDb();
-            const row = /** @type {any} */ (db.prepare('SELECT status FROM tasks WHERE id = ?').get(progress.current_task_id));
+            const row = /** @type {any} */ (
+                db.prepare('SELECT status FROM tasks WHERE id = ?').get(progress.current_task_id)
+            );
             const status = row?.status || null;
 
             // BUG-MISSION-NULL-TASK: task deleted/purged — do not loop forever treating null as "in progress"
@@ -258,17 +260,19 @@ class MissionRunner {
                     current_step_index: Number(progress.current_step_index || 0) + 1,
                 };
 
-                const progressResult = updateMissionProgressState(/** @type {any} */ ({
-                    missionId,
-                    progress: nextProgress,
-                    expectedProgress: { currentTaskId: progress.current_task_id },
-                    actorType: 'system',
-                    dedupKey: `mission:${missionId}:task_done:${progress.current_task_id}`,
-                    payload: {
-                        task_id: progress.current_task_id,
-                        task_status: status,
-                    },
-                }));
+                const progressResult = updateMissionProgressState(
+                    /** @type {any} */ ({
+                        missionId,
+                        progress: nextProgress,
+                        expectedProgress: { currentTaskId: progress.current_task_id },
+                        actorType: 'system',
+                        dedupKey: `mission:${missionId}:task_done:${progress.current_task_id}`,
+                        payload: {
+                            task_id: progress.current_task_id,
+                            task_status: status,
+                        },
+                    })
+                );
                 if (!progressResult.ok) {
                     log(
                         'WARN',
@@ -432,18 +436,20 @@ class MissionRunner {
             },
         };
 
-        const progressResult = updateMissionProgressState(/** @type {any} */ ({
-            missionId,
-            progress: nextProgress,
-            expectedProgress: { currentTaskId: progress.current_task_id, currentStepIndex },
-            actorType: 'system',
-            dedupKey: `mission:${missionId}:step_progress:${stepId}:${nextAttemptSeq}`,
-            payload: {
-                task_id: taskId,
-                step_id: stepId,
-                step_index: currentStepIndex,
-            },
-        }));
+        const progressResult = updateMissionProgressState(
+            /** @type {any} */ ({
+                missionId,
+                progress: nextProgress,
+                expectedProgress: { currentTaskId: progress.current_task_id, currentStepIndex },
+                actorType: 'system',
+                dedupKey: `mission:${missionId}:step_progress:${stepId}:${nextAttemptSeq}`,
+                payload: {
+                    task_id: taskId,
+                    step_id: stepId,
+                    step_index: currentStepIndex,
+                },
+            })
+        );
         if (!progressResult.ok) {
             log('WARN', `[MissionRunner] step progress rejected: ${progressResult.code || progressResult.error}`);
         }

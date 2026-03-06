@@ -104,7 +104,8 @@ class IdentityManager {
 
                 log('WARN', `[IDENTITY] Novo DNA gerado (Nascimento): ${this.robotId}`);
             }
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('FATAL', `[IDENTITY] Falha crítica ao inicializar identidade: ${err.message}`);
             throw err;
         }

@@ -99,9 +99,10 @@ class HeartbeatWatchdog {
             const staleThreshold = now - this.staleThresholdMs;
 
             const db = getDb();
-            const staleAttempts = /** @type {any[]} */ (db
-                .prepare(
-                    `
+            const staleAttempts = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT
                         ta.id AS attempt_id,
                         ta.task_id,
@@ -119,8 +120,9 @@ class HeartbeatWatchdog {
                     ORDER BY ta.last_heartbeat_at_ms ASC
                     LIMIT 50
                     `
-                )
-                .all({ threshold: staleThreshold }));
+                    )
+                    .all({ threshold: staleThreshold })
+            );
 
             if (staleAttempts.length === 0) return;
 

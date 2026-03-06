@@ -113,9 +113,10 @@ class AttemptWatchdog {
             const acceptedCutoff = now - this.acceptedStuckMs;
             const runningCutoff = now - this.runningHeartbeatStuckMs;
 
-            const dispatchedRows = /** @type {any[]} */ (db
-                .prepare(
-                    `
+            const dispatchedRows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT t.id AS task_id,
                            t.latest_attempt_id AS attempt_id,
                            a.created_at_ms AS attempt_created_at_ms,
@@ -133,12 +134,14 @@ class AttemptWatchdog {
                     ORDER BY a.created_at_ms ASC
                     LIMIT @limit
                 `
-                )
-                .all({ now, cutoff, limit: this.maxBatch }));
+                    )
+                    .all({ now, cutoff, limit: this.maxBatch })
+            );
 
-            const acceptedRows = /** @type {any[]} */ (db
-                .prepare(
-                    `
+            const acceptedRows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT t.id AS task_id,
                            t.latest_attempt_id AS attempt_id,
                            a.created_at_ms AS attempt_created_at_ms,
@@ -159,12 +162,14 @@ class AttemptWatchdog {
                     ORDER BY a.last_heartbeat_at_ms ASC
                     LIMIT @limit
                 `
-                )
-                .all({ now, acceptedCutoff, limit: this.maxBatch }));
+                    )
+                    .all({ now, acceptedCutoff, limit: this.maxBatch })
+            );
 
-            const runningRows = /** @type {any[]} */ (db
-                .prepare(
-                    `
+            const runningRows = /** @type {any[]} */ (
+                db
+                    .prepare(
+                        `
                     SELECT t.id AS task_id,
                            t.latest_attempt_id AS attempt_id,
                            a.last_heartbeat_at_ms AS last_heartbeat_at_ms
@@ -184,8 +189,9 @@ class AttemptWatchdog {
                     ORDER BY COALESCE(a.last_heartbeat_at_ms, a.created_at_ms) ASC
                     LIMIT @limit
                 `
-                )
-                .all({ now, runningCutoff, limit: this.maxBatch }));
+                    )
+                    .all({ now, runningCutoff, limit: this.maxBatch })
+            );
 
             for (const row of dispatchedRows) {
                 const taskId = row?.task_id;
@@ -359,9 +365,10 @@ class AttemptWatchdog {
                 const envCutoff = now - this.envEscalationWindowMs;
                 const llmCutoff = now - this.llmTimeoutEscalationWindowMs;
 
-                const envLongRows = /** @type {any[]} */ (db
-                    .prepare(
-                        `
+                const envLongRows = /** @type {any[]} */ (
+                    db
+                        .prepare(
+                            `
                         SELECT t.id AS task_id,
                                COUNT(1) AS c,
                                MAX(a.ended_at_ms) AS last_ts,
@@ -399,17 +406,19 @@ class AttemptWatchdog {
                         ORDER BY last_ts DESC
                         LIMIT @limit
                     `
-                    )
-                    .all({
-                        now,
-                        cutoff: envCutoff,
-                        threshold: this.envEscalationThreshold,
-                        limit: this.maxBatch,
-                    }));
+                        )
+                        .all({
+                            now,
+                            cutoff: envCutoff,
+                            threshold: this.envEscalationThreshold,
+                            limit: this.maxBatch,
+                        })
+                );
 
-                const llmTimeoutRows = /** @type {any[]} */ (db
-                    .prepare(
-                        `
+                const llmTimeoutRows = /** @type {any[]} */ (
+                    db
+                        .prepare(
+                            `
                         SELECT t.id AS task_id,
                                COUNT(1) AS c,
                                MAX(a.ended_at_ms) AS last_ts,
@@ -437,13 +446,14 @@ class AttemptWatchdog {
                         ORDER BY last_ts DESC
                         LIMIT @limit
                     `
-                    )
-                    .all({
-                        now,
-                        cutoff: llmCutoff,
-                        threshold: this.llmTimeoutEscalationThreshold,
-                        limit: this.maxBatch,
-                    }));
+                        )
+                        .all({
+                            now,
+                            cutoff: llmCutoff,
+                            threshold: this.llmTimeoutEscalationThreshold,
+                            limit: this.maxBatch,
+                        })
+                );
 
                 for (const row of envLongRows) {
                     const taskId = row?.task_id;

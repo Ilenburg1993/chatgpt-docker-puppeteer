@@ -59,10 +59,10 @@ async function applyTransform(content, transform, targetTask) {
  * @param {AbortSignal} signal - Sinal para cancelamento imediato.
  * @param {number} depth - Nível atual de recursão.
  * @param {BudgetManager} budget - Gestor de volume de injeção.
-  * @returns {Promise<void>}
+  * @returns {Promise<any>}
  */
 
-async function resolveContext(text, currentTask = null, signal = null, depth = 0, budget = null) {
+async function resolveContext(text, /** @type {any} */ currentTask = null, /** @type {any} */ signal = null, depth = 0, /** @type {any} */ budget = null) {
     // 1. GUARDRAILS: Validação de segurança e aborto
     if (signal?.aborted) {
         throw new Error('CONTEXT_RESOLUTION_ABORTED');
@@ -83,7 +83,7 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
     }
 
     let resolvedText = text;
-    const projectId = currentTask?.meta?.project_id || 'default';
+    const projectId = (/** @type {any} */ (currentTask))?.meta?.project_id || 'default';
 
     for (const ref of refs) {
         // Check de aborto em cada iteração do loop para resposta imediata
@@ -157,7 +157,8 @@ async function resolveContext(text, currentTask = null, signal = null, depth = 0
 
             // Substituição atômica no texto (Literal Replacement)
             resolvedText = resolvedText.split(ref.fullMatch).join(injectedContent);
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `Falha ao resolver referência ${ref.fullMatch}: ${err.message}`);
             resolvedText = resolvedText.split(ref.fullMatch).join(`[ERRO_CONTEXTO]`);
         }

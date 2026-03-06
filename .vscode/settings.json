@@ -227,7 +227,7 @@
   "gitlens.codeLens.enabled": true,
   "outline.showFiles": true,
   "outline.showFunctions": true,
-  "outline.showModules": false,
+  "outline.showModules": true,
   "outline.showVariables": false,
 
   // ===========================================================================
@@ -238,7 +238,7 @@
   "diffEditor.codeLens": true,
   "diffEditor.diffAlgorithm": "advanced",
   "diffEditor.experimental.showMoves": true,
-  "diffEditor.ignoreTrimWhitespace": true,
+  "diffEditor.ignoreTrimWhitespace": false,
   "diffEditor.maxComputationTime": 0,
   "diffEditor.maxFileSize": 100,
   "diffEditor.renderIndicators": true,
@@ -963,5 +963,8 @@
   "workbench.settings.alwaysShowAdvancedSettings": true,
   "inlineChat.holdToSpeech": false,
   "explorer.fileNesting.enabled": true,
-  "scm.alwaysShowActions": true
+  "scm.alwaysShowActions": true,
+  "npm-intellisense.packageSubfoldersIntellisense": true,
+  "editor.inlineSuggest.edits.showCollapsed": true,
+  "diffEditor.hideUnchangedRegions.enabled": true
 }

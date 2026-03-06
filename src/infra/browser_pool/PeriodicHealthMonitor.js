@@ -122,7 +122,7 @@ class PeriodicHealthMonitor extends EventEmitter {
     /**
      * Creates monitor instance.
      *
-     * @param {object} poolManager - BrowserPoolManager instance
+     * @param {any} poolManager - BrowserPoolManager instance
      */
     constructor(poolManager) {
         super();
@@ -143,11 +143,12 @@ class PeriodicHealthMonitor extends EventEmitter {
             warningChecks: 0,
             criticalChecks: 0,
             consecutiveFailures: 0,
-            lastCheckTime: null,
+            lastCheckTime: /** @type {number|null} */ (null),
             lastHealthyTime: Date.now(),
         };
 
         // Health history (last 10 checks)
+        /** @type {any[]} */
         this.healthHistory = [];
         this._checkInFlight = null;
 
@@ -310,10 +311,11 @@ class PeriodicHealthMonitor extends EventEmitter {
                 ...results,
                 duration: Date.now() - startTime,
             });
-        } catch (checkErr) {
+        } catch (_rawCheckErr) {
+            const checkErr = /** @type {any} */ (_rawCheckErr);
             log('ERROR', `[PeriodicHealthMonitor] Check error: ${checkErr.message}`);
             results.overallStatus = HEALTH_STATUS.CRITICAL;
-            results.issues.push({
+            /** @type {any[]} */ (results.issues).push({
                 type: 'CHECK_ERROR',
                 severity: 'CRITICAL',
                 message: checkErr.message,
@@ -334,7 +336,7 @@ class PeriodicHealthMonitor extends EventEmitter {
      * Check 1: Connection health.
      * @private
      */
-    async _checkConnection(results) {
+    async _checkConnection(/** @type {any} */ results) {
         const browser = this.poolManager.browser;
 
         if (!browser) {
@@ -373,7 +375,8 @@ class PeriodicHealthMonitor extends EventEmitter {
                     message: 'Connected',
                 };
             }
-        } catch (connErr) {
+        } catch (_rawConnErr) {
+            const connErr = /** @type {any} */ (_rawConnErr);
             results.checks[CHECK_TYPES.CONNECTION] = {
                 passed: false,
                 status: HEALTH_STATUS.CRITICAL,
@@ -391,7 +394,7 @@ class PeriodicHealthMonitor extends EventEmitter {
      * Check 2: Page memory metrics (CDP).
      * @private
      */
-    async _checkPageMemory(results) {
+    async _checkPageMemory(/** @type {any} */ results) {
         const activePages = this.poolManager.getActivePages();
 
         if (activePages.length === 0) {
@@ -460,7 +463,8 @@ class PeriodicHealthMonitor extends EventEmitter {
                         threshold: MONITOR_CONFIG.DOM_NODES_WARNING_THRESHOLD,
                     });
                 }
-            } catch (metricsErr) {
+            } catch (_rawMetricsErr) {
+                const metricsErr = /** @type {any} */ (_rawMetricsErr);
                 log('WARN', `[PeriodicHealthMonitor] Page metrics failed (${taskId}): ${metricsErr.message}`);
             }
         }
@@ -488,7 +492,7 @@ class PeriodicHealthMonitor extends EventEmitter {
      * Check 3: Target health.
      * @private
      */
-    async _checkTargets(results) {
+    async _checkTargets(/** @type {any} */ results) {
         const browser = this.poolManager.browser;
 
         if (!browser || !browser.isConnected()) {
@@ -502,7 +506,7 @@ class PeriodicHealthMonitor extends EventEmitter {
 
         try {
             const targets = await browser.targets();
-            const pageTargets = targets.filter(t => t.type() === 'page');
+            const pageTargets = targets.filter((/** @type {any} */ t) => t.type() === 'page');
 
             results.checks[CHECK_TYPES.PAGE_TARGETS] = {
                 passed: true,
@@ -513,7 +517,8 @@ class PeriodicHealthMonitor extends EventEmitter {
                     pageTargets: pageTargets.length,
                 },
             };
-        } catch (targetsErr) {
+        } catch (_rawTargetsErr) {
+            const targetsErr = /** @type {any} */ (_rawTargetsErr);
             results.checks[CHECK_TYPES.PAGE_TARGETS] = {
                 passed: false,
                 status: HEALTH_STATUS.WARNING,
@@ -530,7 +535,7 @@ class PeriodicHealthMonitor extends EventEmitter {
      * Determines overall health status from check results.
      * @private
      */
-    _determineOverallStatus(results) {
+    _determineOverallStatus(/** @type {any} */ results) {
         const statuses = Object.values(results.checks).map(c => c.status);
 
         if (statuses.includes(HEALTH_STATUS.DISCONNECTED)) {
@@ -550,7 +555,7 @@ class PeriodicHealthMonitor extends EventEmitter {
      * Handles status change.
      * @private
      */
-    _handleStatusChange(newStatus, results) {
+    _handleStatusChange(/** @type {any} */ newStatus, /** @type {any} */ results) {
         const oldStatus = this.currentStatus;
         this.currentStatus = newStatus;
 
@@ -588,7 +593,7 @@ class PeriodicHealthMonitor extends EventEmitter {
      * Updates health history.
      * @private
      */
-    _updateHealthHistory(results) {
+    _updateHealthHistory(/** @type {any} */ results) {
         this.healthHistory.push({
             timestamp: results.timestamp,
             status: results.overallStatus,

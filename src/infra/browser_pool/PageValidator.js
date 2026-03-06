@@ -54,7 +54,7 @@ class PageValidator {
      * 3. Target URL validation (domain match - optional)
      * 4. DOM readiness (document.readyState)
      *
-     * @param {Page} page - Puppeteer Page instance
+     * @param {any} page - Puppeteer Page instance
      * @param {string} [target] - Target name (chatgpt, gemini, etc) para domain validation
      * @returns {Promise<object>} Validation result
      * @property {boolean} valid - true se pode alocar, false se bloqueado
@@ -67,7 +67,7 @@ class PageValidator {
      *     throw new Error(`Page invalid: ${JSON.stringify(result.issues)}`);
      * }
      */
-    static async validate(page, target = null) {
+    static async validate(page, /** @type {string|null} */ target = null) {
         const startTime = Date.now();
         const issues = [];
 
@@ -100,7 +100,8 @@ class PageValidator {
             // ============================================
             try {
                 await page.evaluate(() => document.readyState);
-            } catch (err) {
+            } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
                 issues.push({
                     type: ISSUE_TYPES.PAGE_DISCONNECTED,
                     severity: SEVERITY.FATAL,
@@ -146,7 +147,8 @@ class PageValidator {
                         readyState,
                     });
                 }
-            } catch (err) {
+            } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
                 issues.push({
                     type: ISSUE_TYPES.EVALUATION_FAILED,
                     severity: SEVERITY.WARNING,
@@ -166,7 +168,8 @@ class PageValidator {
                 timestamp: Date.now(),
                 duration: Date.now() - startTime,
             };
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageValidator] Validation failed: ${err.message}`);
 
             return {
@@ -189,7 +192,7 @@ class PageValidator {
      * Quick validation (apenas checks críticos).
      * Mais rápido que validate() full, usado para hot-path.
      *
-     * @param {Page} page - Puppeteer Page
+     * @param {any} page - Puppeteer Page
      * @returns {Promise<boolean>} true se válido, false se inválido
      */
     static async quickValidate(page) {

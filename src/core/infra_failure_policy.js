@@ -5,6 +5,7 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
 
 // NERV instance will be injected via setNERV()
+/** @type {any} */
 let nervInstance = null;
 
 /**
@@ -83,7 +84,7 @@ class InfraFailurePolicy {
     /**
      * Executa a manobra física e reporta para a malha sensorial (IPC).
      */
-    async _executeManeuver(type, pid, correlationId, ctx, forceKill = false) {
+    async _executeManeuver(/** @type {any} */ type, /** @type {any} */ pid, /** @type {any} */ correlationId, /** @type {any} */ ctx, forceKill = false) {
         if (!type || typeof type !== 'string') {
             log('ERROR', `[POLICY] Invalid maneuver type: ${type}`, correlationId);
             return;
@@ -109,7 +110,8 @@ class InfraFailurePolicy {
                     `[POLICY] Infraestrutura escalada e notificada via NERV: ${type} (PID: ${pid})`,
                     correlationId
                 );
-            } catch (e) {
+            } catch (_rawE) {
+            const e = /** @type {any} */ (_rawE);
                 log('ERROR', `[POLICY] Falha ao notificar infra escalation via NERV: ${e.message}`, correlationId);
             }
         } else {
@@ -135,14 +137,15 @@ class InfraFailurePolicy {
     /**
      * Extrai o PID de forma resiliente, suportando diferentes estados do driver.
      */
-    _getPID(ctx) {
+    _getPID(/** @type {any} */ ctx) {
         try {
             if (ctx?.browser) {
                 // Tenta pegar o PID do processo gerenciado pelo Puppeteer
                 const proc = ctx.browser.process();
                 return proc ? proc.pid : null;
             }
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('DEBUG', `[POLICY] Failed to extract PID: ${err?.message || String(err)}`);
             return null;
         }

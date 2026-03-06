@@ -9,7 +9,7 @@ class EnvironmentResolver {
      * Resolve o ambiente atual com base no contexto do navegador.
      * Implementa análise multi-fatorial para garantir precisão industrial.
      *
-     * @param {object} ctx - Contexto de execução { browser, page }.
+     * @param {any} ctx - Contexto de execução { browser, page }.
      * @returns {object} { target, confidence, reason, metadata }
      */
     resolve(ctx) {
@@ -74,7 +74,8 @@ class EnvironmentResolver {
 
             // 5. CASO DE BAIXA CONFIANÇA (Ambiente Desconhecido)
             return this._reject('TARGET_NOT_SUPPORTED', 0.2, { hostname });
-        } catch (e) {
+        } catch (_rawE) {
+            const e = /** @type {any} */ (_rawE);
             // Falha no parsing da URL ou erro de acesso à página
             return this._reject('PERCEPTION_CRASH', 0, { error: e.message });
         }
@@ -83,7 +84,7 @@ class EnvironmentResolver {
     /**
      * Helper para padronizar rejeições de percepção.
      */
-    _reject(reason, confidence, metadata = {}) {
+    _reject(/** @type {any} */ reason, /** @type {any} */ confidence, metadata = {}) {
         return {
             target: null,
             confidence,

@@ -64,38 +64,38 @@ concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gate
 
 ## Baseline por lane strict
 
-| Lane                    | Erros | Fase     | Status                   |
-| ----------------------- | ----: | -------- | ------------------------ |
-| `src.types`             |     0 | ✅ verde  | Manter                   |
-| `agents`                |     0 | ✅ verde  | Manter                   |
-| `scripts.ci`            |     0 | ✅ verde  | Manter                   |
-| `scripts.setup`         |     0 | ✅ verde  | Manter                   |
-| `tests.helpers`         |     0 | ✅ verde  | Manter                   |
-| `scripts.build`         |     0 | ✅ verde  | Manter                   |
-| `scripts.env`           |     0 | ✅ verde  | Manter                   |
-| `src.validation`        |     0 | ✅ verde  | Manter                   |
-| `tests.mocks`           |     0 | ✅ verde  | Manter                   |
-| `src.logic`             |     0 | ✅ verde  | Manter                   |
-| `scripts.analysis`      |     0 | ✅ verde  | Manter                   |
-| `src.inference_gateway` |     0 | ✅ verde  | Manter                   |
-| `src.dashboard-ui`      |     0 | ✅ verde  | Manter                   |
-| `tests.manual`          |     0 | ✅ verde  | Manter                   |
-| `src.audit_agent`       |     0 | ✅ verde  | Manter                   |
-| `src.nerv`              |     0 | ✅ verde  | Manter                   |
-| `scripts.health`        |     0 | ✅ verde  | Manter                   |
-| `src.missions`          |     0 | ✅ verde  | Manter                   |
-| `src.shared`            |     0 | ✅ verde  | Manter                   |
-| `src.orchestrator`      |     0 | ✅ verde  | Manter                   |
-| `src.integration`       |     0 | ✅ verde  | Manter                   |
-| `tools.workspace`       |     0 | ✅ Done   | ↓ era 1.013              |
-| `scripts.root`          |     0 | ✅ Done   | ↓ era 935, zerada Fase B |
-| `src.kernel`            |     0 | ✅ Done   | ↓ era 1.530              |
-| `src.agent`             |   447 | Fase B   | ↓ era 1.190              |
-| `src.core`              |   464 | Fase B   | ↓ era 1.053              |
-| `tests.legacy`          |   481 | Fase C   | ↓ era 1.403              |
-| `src.infra`             |   716 | Fase C   | ↓ era 2.232              |
-| `src.driver`            |   810 | Fase C   | ↓ era 1.558              |
-| `scripts.audit`         |   928 | Fase B   | —                        |
+| Lane                    | Erros | Fase    | Status                   |
+| ----------------------- | ----: | ------- | ------------------------ |
+| `src.types`             |     0 | ✅ verde | Manter                   |
+| `agents`                |     0 | ✅ verde | Manter                   |
+| `scripts.ci`            |     0 | ✅ verde | Manter                   |
+| `scripts.setup`         |     0 | ✅ verde | Manter                   |
+| `tests.helpers`         |     0 | ✅ verde | Manter                   |
+| `scripts.build`         |     0 | ✅ verde | Manter                   |
+| `scripts.env`           |     0 | ✅ verde | Manter                   |
+| `src.validation`        |     0 | ✅ verde | Manter                   |
+| `tests.mocks`           |     0 | ✅ verde | Manter                   |
+| `src.logic`             |     0 | ✅ verde | Manter                   |
+| `scripts.analysis`      |     0 | ✅ verde | Manter                   |
+| `src.inference_gateway` |     0 | ✅ verde | Manter                   |
+| `src.dashboard-ui`      |     0 | ✅ verde | Manter                   |
+| `tests.manual`          |     0 | ✅ verde | Manter                   |
+| `src.audit_agent`       |     0 | ✅ verde | Manter                   |
+| `src.nerv`              |     0 | ✅ verde | Manter                   |
+| `scripts.health`        |     0 | ✅ verde | Manter                   |
+| `src.missions`          |     0 | ✅ verde | Manter                   |
+| `src.shared`            |     0 | ✅ verde | Manter                   |
+| `src.orchestrator`      |     0 | ✅ verde | Manter                   |
+| `src.integration`       |     0 | ✅ verde | Manter                   |
+| `tools.workspace`       |     0 | ✅ Done  | ↓ era 1.013              |
+| `scripts.root`          |     0 | ✅ Done  | ↓ era 935, zerada Fase B |
+| `src.kernel`            |     0 | ✅ Done  | ↓ era 1.530              |
+| `src.agent`             |   447 | Fase B  | ↓ era 1.190              |
+| `src.core`              |   464 | Fase B  | ↓ era 1.053              |
+| `tests.legacy`          |   481 | Fase C  | ↓ era 1.403              |
+| `src.infra`             |   716 | Fase C  | ↓ era 2.232              |
+| `src.driver`            |   810 | Fase C  | ↓ era 1.558              |
+| `scripts.audit`         |   928 | Fase B  | —                        |
 
 ---
 

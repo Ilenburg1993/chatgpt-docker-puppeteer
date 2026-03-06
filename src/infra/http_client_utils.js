@@ -22,7 +22,7 @@ import https from 'node:https';
  * Ensures request is destroyed on timeout, error, or completion.
  *
  * @param {string|URL} url - The URL to request
- * @param {SafeHttpRequestOptions} [options={}] - Request options
+ * @param {any} [options={}] - Request options
  * @returns {Promise<{statusCode: number, headers: object, body: string}>}
  * @throws {Error} If request fails or times out
  *
@@ -35,8 +35,10 @@ export async function safeHttpRequest(url, options = {}) {
     const { timeout = 5000, method = 'GET', headers = {}, body = null } = options;
 
     return new Promise((resolve, reject) => {
+        /** @type {any} */
         let timeoutId = null;
         let requestCompleted = false;
+        /** @type {any} */
         let request = null;
 
         // Cleanup function to destroy request and clear timeout
@@ -51,7 +53,7 @@ export async function safeHttpRequest(url, options = {}) {
         };
 
         // Completion handler to prevent duplicate resolution
-        const complete = fn => {
+        const complete = (/** @type {any} */ fn) => {
             if (!requestCompleted) {
                 requestCompleted = true;
                 cleanup();
@@ -63,8 +65,8 @@ export async function safeHttpRequest(url, options = {}) {
         timeoutId = setTimeout(() => {
             complete(() => {
                 const error = new Error(`HTTP request timed out after ${timeout}ms`);
-                error.code = 'ETIMEDOUT';
-                error.url = String(url);
+                (/** @type {any} */ (error)).code = 'ETIMEDOUT';
+                (/** @type {any} */ (error)).url = String(url);
                 reject(error);
             });
         }, timeout);
@@ -81,6 +83,7 @@ export async function safeHttpRequest(url, options = {}) {
         };
 
         request = client.request(urlObj, requestOptions, response => {
+            /** @type {any[]} */
             const chunks = [];
 
             response.on('data', chunk => {
@@ -90,7 +93,7 @@ export async function safeHttpRequest(url, options = {}) {
             response.on('end', () => {
                 complete(() => {
                     resolve({
-                        statusCode: response.statusCode,
+                        statusCode: response.statusCode ?? 0,
                         headers: response.headers,
                         body: Buffer.concat(chunks).toString('utf8'),
                     });
@@ -102,15 +105,15 @@ export async function safeHttpRequest(url, options = {}) {
             });
         });
 
-        request.on('error', err => {
+        request.on('error', (/** @type {any} */ err) => {
             complete(() => reject(err));
         });
 
         request.on('timeout', () => {
             complete(() => {
                 const error = new Error(`HTTP request timed out after ${timeout}ms`);
-                error.code = 'ETIMEDOUT';
-                error.url = String(url);
+                (/** @type {any} */ (error)).code = 'ETIMEDOUT';
+                (/** @type {any} */ (error)).url = String(url);
                 reject(error);
             });
         });
@@ -155,7 +158,8 @@ export async function checkUrlHealth(url, timeout = 5000) {
             statusCode,
             latencyMs,
         };
-    } catch (err) {
+    } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         const latencyMs = Date.now() - startTime;
 
         return {
@@ -175,7 +179,7 @@ export async function checkUrlHealth(url, timeout = 5000) {
  * Fetches JSON from a URL with automatic parsing.
  *
  * @param {string|URL} url - URL to fetch
- * @param {FetchJsonOptions} [options] - Request options (see safeHttpRequest)
+ * @param {any} [options] - Request options (see safeHttpRequest)
  * @returns {Promise<object>} Parsed JSON response
  * @throws {Error} If request fails or JSON parsing fails
  *
@@ -194,10 +198,11 @@ export async function fetchJson(url, options = {}) {
 
     try {
         return JSON.parse(body);
-    } catch (err) {
+    } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
         const error = new Error(`Failed to parse JSON response: ${err.message}`);
-        error.code = 'INVALID_JSON';
-        error.body = body;
+        (/** @type {any} */ (error)).code = 'INVALID_JSON';
+        (/** @type {any} */ (error)).body = body;
         throw error;
     }
 }
@@ -210,7 +215,7 @@ export async function fetchJson(url, options = {}) {
  * Retries an HTTP request with exponential backoff.
  *
  * @param {string|URL} url - URL to request
- * @param {RetryHttpRequestOptions} [options={}] - Request options
+ * @param {any} [options={}] - Request options
  * @returns {Promise<object>} Response object
  *
  * @example
@@ -224,7 +229,7 @@ export async function retryHttpRequest(url, options = {}) {
     const {
         maxRetries = 3,
         backoffMs = 100,
-        shouldRetry = err => ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET'].includes(err.code),
+        shouldRetry = (/** @type {any} */ err) => ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET'].includes(err.code),
         ...requestOptions
     } = options;
 
@@ -232,8 +237,9 @@ export async function retryHttpRequest(url, options = {}) {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            return await safeHttpRequest(url, requestOptions);
-        } catch (err) {
+            return await safeHttpRequest(url, /** @type {any} */ (requestOptions));
+        } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
             lastError = err;
 
             // Don't retry if this was the last attempt or error is not retryable
@@ -249,10 +255,10 @@ export async function retryHttpRequest(url, options = {}) {
 
     // All retries failed
     const error = new Error(`HTTP request failed after ${maxRetries + 1} attempts: ${lastError.message}`);
-    error.code = 'MAX_RETRIES_EXCEEDED';
-    error.lastError = lastError;
-    error.attempts = maxRetries + 1;
-    error.url = String(url);
+    (/** @type {any} */ (error)).code = 'MAX_RETRIES_EXCEEDED';
+    (/** @type {any} */ (error)).lastError = lastError;
+    (/** @type {any} */ (error)).attempts = maxRetries + 1;
+    (/** @type {any} */ (error)).url = String(url);
     throw error;
 }
 
@@ -265,7 +271,7 @@ export async function retryHttpRequest(url, options = {}) {
  * Useful for waiting for services to start up.
  *
  * @param {string|URL} url - URL to poll
- * @param {PollUntilHealthyOptions} [options={}] - Polling options
+ * @param {any} [options={}] - Polling options
  * @returns {Promise<boolean>} True if URL became healthy
  *
  * @example
@@ -288,7 +294,8 @@ export async function pollUntilHealthy(url, options = {}) {
             if (ok) {
                 return true;
             }
-        } catch (err) {
+        } catch (_rawErr) {
+        const err = /** @type {any} */ (_rawErr);
             // Continue polling on error
         }
 

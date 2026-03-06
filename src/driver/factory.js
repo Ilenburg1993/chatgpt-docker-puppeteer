@@ -102,7 +102,7 @@ class DriverFactory extends EventEmitter {
          *   totalUses: number
          * }
          *
-         * @type {Map<string, Array<object>>}
+         * @type {Map<string, Array<any>>}
          * @private
          */
         this.pool = new Map();
@@ -119,7 +119,7 @@ class DriverFactory extends EventEmitter {
         /**
          * Métricas de performance e uso.
          *
-         * @type {object}
+         * @type {any}
          * @private
          */
         this.metrics = {
@@ -154,14 +154,14 @@ class DriverFactory extends EventEmitter {
 
         /**
          * ✅ v3.0: Global driver config (usado para criar novos drivers)
-         * @type {object}
+         * @type {any}
          * @private
          */
         this.config = {};
 
         /**
          * ✅ v3.1: Browser Pool reference (Hot Pool support)
-         * @type {object | null}
+         * @type {any}
          * @private
          */
         this.browserPool = null;
@@ -341,7 +341,7 @@ class DriverFactory extends EventEmitter {
             return await operation();
         } finally {
             if (typeof release === 'function') {
-                release();
+                (/** @type {() => void} */ (release))();
             }
         }
     }
@@ -383,7 +383,8 @@ class DriverFactory extends EventEmitter {
             let files;
             try {
                 files = fs.readdirSync(CONSTANTS.TARGETS_DIR);
-            } catch (readdirError) {
+            } catch (_rawReaddirError) {
+                const readdirError = /** @type {any} */ (_rawReaddirError);
                 const error = `Erro ao ler diretório de targets: ${readdirError.message}`;
                 log('FATAL', `[FACTORY] ${error}`);
                 throw new Error(error); // eslint-disable-line preserve-caught-error
@@ -415,7 +416,8 @@ class DriverFactory extends EventEmitter {
                     this.pool.set(targetKey, []);
 
                     discovered++;
-                } catch (fileError) {
+                } catch (_rawFileError) {
+                    const fileError = /** @type {any} */ (_rawFileError);
                     log('WARN', `[FACTORY] Erro ao processar ${file}: ${fileError.message}`);
                 }
             }
@@ -453,7 +455,8 @@ class DriverFactory extends EventEmitter {
                 defaultTarget: this.getDefaultTarget(),
                 discoveryTime: this.metrics.discoveryTime,
             });
-        } catch (e) {
+        } catch (_rawE) {
+            const e = /** @type {any} */ (_rawE);
             this.metrics.errors++;
             log('FATAL', `[FACTORY] Erro catastrófico no mapeamento de drivers: ${e.message}`);
 
@@ -477,6 +480,7 @@ class DriverFactory extends EventEmitter {
      * Cria MIN_POOL_SIZE drivers UNATTACHED para cada WARMUP_TARGET.
      * Drivers ficam em estado IDLE (ready para acquireFromPool).
      *
+     * @param {any} [options] - Opções de inicialização
      * @returns {Promise<void>}
      * @emits factory:pool_initialized - Quando warmup completa
      */
@@ -558,7 +562,8 @@ class DriverFactory extends EventEmitter {
             }
 
             return driver;
-        } catch (error) {
+        } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
             log('ERROR', `[FACTORY] Failed to create warm driver ${target}: ${error.message}`);
             throw error;
         }
@@ -578,6 +583,7 @@ class DriverFactory extends EventEmitter {
      * @param {string} [config.target] - Target específico (auto preenchido pelo factory)
      * @param {number} [config.timeout] - Timeout em milissegundos
      *
+     * @param {any} [options] - Opções extras
      * @returns {Promise<TargetDriver>} Driver em estado UNATTACHED
      * @throws {Error} Se target não existe ou erro na criação
      *
@@ -648,7 +654,8 @@ class DriverFactory extends EventEmitter {
                 } finally {
                     clearTimeout(lazyLoadTimerId);
                 }
-            } catch (requireError) {
+            } catch (_rawRequireError) {
+                const requireError = /** @type {any} */ (_rawRequireError);
                 this.failedDrivers.add(key);
                 log('ERROR', `[FACTORY] Failed to load driver class '${key}': ${requireError.message}`);
 
@@ -670,7 +677,8 @@ class DriverFactory extends EventEmitter {
             // ✅ v3.0: Instanciar COM APENAS CONFIG (NO page, NO signal)
             try {
                 instance = new DriverClass(enhancedConfig); // ✅ P0-U6: Uses enhancedConfig with expectedDomain
-            } catch (constructorError) {
+            } catch (_rawConstructorError) {
+                const constructorError = /** @type {any} */ (_rawConstructorError);
                 this.failedDrivers.add(key);
                 log('ERROR', `[FACTORY] Driver constructor failed for '${key}': ${constructorError.message}`);
                 throw new Error(`Driver construction failed: ${constructorError.message}`); // eslint-disable-line preserve-caught-error
@@ -712,14 +720,13 @@ class DriverFactory extends EventEmitter {
 
             this.metrics.errors++;
 
-            log('ERROR', `[FACTORY] Erro na ativação do driver '${key}': ${e.message}`);
-
+            log('ERROR', `[FACTORY] Erro na ativação do driver '${key}': ${/** @type {any} */ (e).message}`);
+            
             this.emit(FACTORY_EVENTS.ERROR, {
                 operation: 'createDriver',
                 target: key,
-                error: e.message,
+                error: /** @type {any} */ (e).message,
             });
-
             throw e;
         }
     }
@@ -760,7 +767,7 @@ class DriverFactory extends EventEmitter {
                 const pool = this.pool.get(key);
 
                 if (!pool) {
-                    const err = new Error(`[FACTORY] Invalid target: ${key}`);
+                    const err = /** @type {any} */ (new Error(`[FACTORY] Invalid target: ${key}`));
                     err.code = 'INVALID_TARGET';
                     err.details = { target: key };
                     throw err;
@@ -896,10 +903,10 @@ class DriverFactory extends EventEmitter {
                     return tempDriver;
                 }
 
-                const err = new Error(
+                const err = /** @type {any} */ (new Error(
                     `[FACTORY] POOL_EXHAUSTED: All ${maxPoolSize} drivers for ${key} are busy ` +
                         `(timeout waiting for release: ${backpressureTimeoutMs}ms)`
-                );
+                ));
                 err.code = 'DRIVER_POOL_EXHAUSTED';
                 err.details = {
                     target: key,
@@ -984,7 +991,7 @@ class DriverFactory extends EventEmitter {
                 this.emit(FACTORY_EVENTS.DRIVER_RELEASED, { target: entry.target });
                 this._notifyWaiters(entry.target);
             } catch (err) {
-                log('ERROR', `[FACTORY] Failed to recycle driver: ${err.message}. Evicting.`);
+                log('ERROR', `[FACTORY] Failed to recycle driver: ${/** @type {any} */ (err).message}. Evicting.`);
                 if (driver.page && !driver.page.isClosed()) {
                     await driver.page.close().catch(() => {});
                 }
@@ -1018,7 +1025,7 @@ class DriverFactory extends EventEmitter {
                 } catch (detachErr) {
                     log(
                         'ERROR',
-                        `[FACTORY] C3 CRITICAL: Force detach FAILED: ${detachErr.message}. ` +
+                        `[FACTORY] C3 CRITICAL: Force detach FAILED: ${/** @type {any} */ (detachErr).message}. ` +
                             `Driver compromised - removing from pool (will be destroyed on next GC).`
                     );
 
@@ -1049,18 +1056,19 @@ class DriverFactory extends EventEmitter {
         this.emit(FACTORY_EVENTS.DRIVER_RELEASED, {
             target: entry.target,
             totalUses: entry.totalUses,
-            poolSize: pool.length,
+            poolSize: (/** @type {any} */ (pool)).length,
             driversReleased: this.metrics.driversReleased,
         });
 
         this._notifyWaiters(entry.target);
+        return undefined;
     }
 
     /**
      * Helper para remover driver do pool.
      * @private
      */
-    _evictDriver(pool, entry) {
+    _evictDriver(/** @type {any} */ pool, /** @type {any} */ entry) {
         const index = pool.indexOf(entry);
         if (index !== -1) {
             pool.splice(index, 1);
@@ -1102,7 +1110,7 @@ class DriverFactory extends EventEmitter {
                             log('DEBUG', `[FACTORY] GC: Removing idle driver: ${target} (idle: ${idleTime}ms)`);
 
                             // Destrói driver
-                            entry.driver.destroy().catch(err => {
+                            entry.driver.destroy().catch((/** @type {any} */ err) => {
                                 log('WARN', `[FACTORY] GC: Error destroying driver: ${err.message}`);
                             });
 
@@ -1148,7 +1156,7 @@ class DriverFactory extends EventEmitter {
                     }
                 }
             } catch (err) {
-                log('ERROR', `[FACTORY] Health check error: ${err.message}`);
+                log('ERROR', `[FACTORY] Health check error: ${/** @type {any} */ (err).message}`);
             }
         }, CONSTANTS.HEALTH_CHECK_INTERVAL_MS);
     }
@@ -1175,13 +1183,13 @@ class DriverFactory extends EventEmitter {
                     this.metrics.waitersWoken++;
                     resolve();
                 },
-                reject: err => {
+                reject: (/** @type {any} */ err) => {
                     if (waiter.done) return;
                     waiter.done = true;
                     clearTimeout(waiter.timer);
                     reject(err);
                 },
-                timer: /** @type {NodeJS.Timeout} */ (null),
+                timer: /** @type {any} */ (null),
                 done: false,
             };
 
@@ -1447,7 +1455,7 @@ class DriverFactory extends EventEmitter {
                 }
                 if (!driver.destroyed) {
                     destroyPromises.push(
-                        driver.destroy().catch(err => {
+                        driver.destroy().catch((/** @type {any} */ err) => {
                             log('WARN', `[FACTORY] Error destroying driver ${target}: ${err.message}`);
                         })
                     );
@@ -1485,7 +1493,7 @@ class DriverFactory extends EventEmitter {
             claude: 'claude.ai',
             openai: 'openai.com',
         };
-        return domains[target] || null;
+        return /** @type {any} */ ((/** @type {any} */ (domains))[target]) || null;
     }
 
     /**
@@ -1530,7 +1538,7 @@ class DriverFactory extends EventEmitter {
      * Orquestra a criação do driver E a alocação de página do BrowserPool.
      *
      * @param {string} target - Target do driver (ex: 'chatgpt')
-     * @returns {Promise<void>} Driver em estado IDLE (com página anexa)
+     * @returns {Promise<any>} Driver em estado IDLE (com página anexa)
      * @private
      */
     async _createHotDriver(target) {
@@ -1567,7 +1575,7 @@ class DriverFactory extends EventEmitter {
             return driver;
         } catch (err) {
             // Rollback: Destrói driver se falhar alocação de página
-            log('ERROR', `[FACTORY] Failed to create Hot Driver for ${target}: ${err.message}`);
+            log('ERROR', `[FACTORY] Failed to create Hot Driver for ${target}: ${/** @type {any} */ (err).message}`);
 
             if (driver && typeof driver.destroy === 'function') {
                 void driver.destroy().catch(() => {});
@@ -1614,7 +1622,7 @@ export const acquireFromPool = factory.acquireFromPool.bind(factory);
 
 /**
  * Libera driver para o pool.
- * @type {function(object): void}
+ * @type {any}
  */
 export const releaseToPool = factory.releaseToPool.bind(factory);
 
@@ -1632,19 +1640,19 @@ export const shutdown = factory.shutdown.bind(factory);
 
 /**
  * Adiciona listener de evento.
- * @type {function(string, function): void}
+ * @type {any}
  */
 export const on = factory.on.bind(factory);
 
 /**
  * Adiciona listener único de evento.
- * @type {function(string, function): void}
+ * @type {any}
  */
 export const once = factory.once.bind(factory);
 
 /**
  * Remove listener de evento.
- * @type {function(string, function): void}
+ * @type {any}
  */
 export const off = factory.off.bind(factory);
 
@@ -1656,7 +1664,7 @@ export const emit = factory.emit.bind(factory);
 
 /**
  * Obtém metadados de driver específico.
- * @type {function(string): object}
+ * @type {function(string): any}
  */
 export const getDriverMetadata = factory.getDriverMetadata.bind(factory);
 

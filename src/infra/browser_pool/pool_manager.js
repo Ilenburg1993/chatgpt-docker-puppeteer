@@ -31,6 +31,7 @@ class BrowserPoolManager {
         };
 
         // Pool de instâncias: Array de { browser, pages, health, stats }
+        /** @type {any[]} */
         this.pool = [];
 
         // Índice para round-robin
@@ -72,6 +73,7 @@ class BrowserPoolManager {
         this.healthMonitor = null; // Inicializado após pool ready
         this.reconnectionInProgress = false;
         this.browser = null;
+        /** @type {any} */
         this.nerv = null;
         this._healthCheckInFlight = null;
     }
@@ -161,7 +163,8 @@ class BrowserPoolManager {
                 }
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} conectada e adicionada ao pool`);
-            } catch (error) {
+            } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
                 log('ERROR', `[BrowserPool] Falha ao conectar instância ${i}: ${error.message}`);
                 // Continua com pool degradado (menos instâncias)
             }
@@ -192,7 +195,7 @@ class BrowserPoolManager {
      * Usa estratégia configurada (round-robin, least-loaded, target-affinity).
      *
      * @param {string} target - Target da task (chatgpt, gemini, etc) para affinity
-     * @returns {Promise<Page>} Página Puppeteer alocada
+     * @returns {Promise<any>} Página Puppeteer alocada
      */
     async allocate(target = 'default') {
         if (!this.initialized) {
@@ -225,14 +228,15 @@ class BrowserPoolManager {
                 page = await poolEntry.browser.newPage();
 
                 // ✅ P0-U1: Valida página ANTES de alocar (BUG-01 FIX)
-                const validation = await PageValidator.validate(page, target);
+                const validation = /** @type {any} */ (await PageValidator.validate(page, target));
 
                 if (!validation.valid) {
                     log('ERROR', `[BrowserPool] Page validation failed: ${JSON.stringify(validation.issues)}`);
 
                     try {
                         await page.close();
-                    } catch (closeErr) {
+                    } catch (_rawCloseErr) {
+                        const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
                             `[BrowserPool] Error closing invalid page: ${closeErr?.message ?? String(closeErr)}`
@@ -240,7 +244,7 @@ class BrowserPoolManager {
                     }
 
                     const validationError = new Error('PAGE_VALIDATION_FAILED');
-                    validationError.details = validation.issues;
+                    (/** @type {any} */ (validationError)).details = validation.issues;
                     this._registerAllocationFailure(poolEntry, validationError, {
                         cause: FailureCause.TECHNICAL_CRASH,
                     });
@@ -287,13 +291,15 @@ class BrowserPoolManager {
                 log('DEBUG', `[BrowserPool] Lifecycle monitor attached for ${taskId}`);
 
                 return page;
-            } catch (error) {
+            } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
                 lastError = error;
 
                 if (page && !page.isClosed()) {
                     try {
                         await page.close();
-                    } catch (closeErr) {
+                    } catch (_rawCloseErr) {
+                        const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
                             `[BrowserPool] Error closing failed page: ${closeErr?.message ?? String(closeErr)}`
@@ -320,7 +326,7 @@ class BrowserPoolManager {
      * Chamado pelo adapter após criar task real, para manter pages Map sincronizado.
      * Melhora debugging (pages Map tem IDs reais, não temp-xxx).
      *
-     * @param {Page} page - Puppeteer page
+     * @param {any} page - Puppeteer page
      * @param {string} realTaskId - Real task ID (substitui temp ID)
      * @returns {void}
      */
@@ -393,7 +399,7 @@ class BrowserPoolManager {
     /**
      * Libera uma página de volta ao pool.
      *
-     * @param {Page} page - Página Puppeteer para liberar
+     * @param {any} page - Página Puppeteer para liberar
      */
     async release(page) {
         if (!page || !page._poolMetadata) {
@@ -421,7 +427,8 @@ class BrowserPoolManager {
         // Fecha a página (A004: best-effort — não deve bloquear limpeza do pool entry)
         try {
             await page.close();
-        } catch (closeErr) {
+        } catch (_rawCloseErr) {
+                        const closeErr = /** @type {any} */ (_rawCloseErr);
             log(
                 'WARN',
                 `[BrowserPool] page.close() falhou (página pode já estar fechada): ${closeErr?.message ?? String(closeErr)}`
@@ -443,7 +450,7 @@ class BrowserPoolManager {
      * Previne pool corruption (páginas closed no registro).
      *
      * @param {string} taskId - Task ID da página
-     * @param {Page|null} [pageRef=null] - Referência da página (fallback)
+     * @param {any} [pageRef=null] - Referência da página (fallback)
      * @returns {void}
      */
     removePageFromPool(taskId, pageRef = null) {
@@ -498,7 +505,8 @@ class BrowserPoolManager {
                 'INFO',
                 `[BrowserPool] Page removed from pool: ${resolvedTaskId} (${poolEntry.stats.activeTasks} active)`
             );
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[BrowserPool] Error removing page from pool: ${err.message}`);
         }
     }
@@ -507,7 +515,7 @@ class BrowserPoolManager {
      * Seleciona uma instância do pool baseado na estratégia configurada.
      * P9.2: Circuit breaker - filtra apenas instâncias HEALTHY com 0 falhas consecutivas
      */
-    _selectInstance(target) {
+    _selectInstance(/** @type {any} */ target) {
         const healthyInstances = this.pool.filter(
             entry => entry.health.status === STATUS_VALUES.HEALTHY && entry.health.consecutiveFailures === 0
         );
@@ -535,7 +543,7 @@ class BrowserPoolManager {
     /**
      * Estratégia Round-Robin: alterna entre instâncias sequencialmente.
      */
-    _selectRoundRobin(instances) {
+    _selectRoundRobin(/** @type {any} */ instances) {
         const selected = instances[this.roundRobinIndex % instances.length];
         this.roundRobinIndex = (this.roundRobinIndex + 1) % instances.length;
         return selected;
@@ -544,17 +552,17 @@ class BrowserPoolManager {
     /**
      * Estratégia Least-Loaded: seleciona instância com menos tasks ativas.
      */
-    _selectLeastLoaded(instances) {
-        return instances.reduce((min, entry) => (entry.stats.activeTasks < min.stats.activeTasks ? entry : min));
+    _selectLeastLoaded(/** @type {any} */ instances) {
+        return instances.reduce((/** @type {any} */ min, /** @type {any} */ entry) => (entry.stats.activeTasks < min.stats.activeTasks ? entry : min));
     }
 
     /**
      * Estratégia Target-Affinity: mantém tasks do mesmo target na mesma instância.
      * Útil para reutilizar cookies/sessões.
      */
-    _selectByAffinity(instances, target) {
+    _selectByAffinity(/** @type {any} */ instances, /** @type {any} */ target) {
         // Hash simples do target para selecionar instância consistente
-        const hash = target.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const hash = target.split('').reduce((/** @type {any} */ acc, /** @type {any} */ char) => acc + char.charCodeAt(0), 0);
         const index = hash % instances.length;
         return instances[index];
     }
@@ -566,7 +574,8 @@ class BrowserPoolManager {
         this.healthCheckTimer = setInterval(async () => {
             try {
                 await this.runHealthCheck();
-            } catch (err) {
+            } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
                 log('ERROR', `[BrowserPool] Health check failed: ${err?.message || String(err)}`);
             }
         }, this.config.healthCheckInterval);
@@ -649,7 +658,8 @@ class BrowserPoolManager {
                     // ✅ Circuit Breaker: Registra recovery
                     this.circuitBreaker.registerRecovery(poolEntry.id);
                 }
-            } catch (error) {
+            } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
                 log('WARN', `[BrowserPool] Health check falhou para ${poolEntry.id}: ${error.message}`);
 
                 poolEntry.health.consecutiveFailures++;
@@ -672,7 +682,7 @@ class BrowserPoolManager {
 
                     log(
                         'INFO',
-                        `[BrowserPool] Circuit Breaker: Causa detectada = ${result.cause}, Deve pausar = ${result.shouldPause}`
+                        `[BrowserPool] Circuit Breaker: Causa detectada = ${(/** @type {any} */ (result)).cause}, Deve pausar = ${(/** @type {any} */ (result)).shouldPause}`
                     );
                 }
             }
@@ -688,7 +698,7 @@ class BrowserPoolManager {
         await this._cleanupZombiePages();
     }
 
-    _registerAllocationFailure(poolEntry, error, context = {}) {
+    _registerAllocationFailure(/** @type {any} */ poolEntry, /** @type {any} */ error, context = {}) {
         poolEntry.health.status = STATUS_VALUES.UNHEALTHY;
         poolEntry.health.consecutiveFailures++;
 
@@ -740,7 +750,8 @@ class BrowserPoolManager {
                     if (age > ttlMs) {
                         zombiePages.push({ taskId, page, reason: 'TTL_EXCEEDED', age });
                     }
-                } catch (error) {
+                } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
                     log('ERROR', `[BrowserPool] Error checking page TTL for ${taskId}: ${error.message}`);
                 }
             }
@@ -756,7 +767,7 @@ class BrowserPoolManager {
                     );
 
                     // Close page
-                    await zombie.page.close();
+                    await (/** @type {any} */ (zombie)).page.close();
 
                     // Remove from pool entry
                     poolEntry.pages.delete(zombie.taskId);
@@ -770,7 +781,8 @@ class BrowserPoolManager {
                     }
 
                     zombieCount++;
-                } catch (error) {
+                } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
                     log('ERROR', `[BrowserPool] Error closing zombie page ${zombie.taskId}: ${error.message}`);
                 }
             }
@@ -857,7 +869,8 @@ class BrowserPoolManager {
             }
 
             log('INFO', `[BrowserPool] ✅ Chrome Proxy validado e disponível (${host}:${port})`);
-        } catch (error) {
+        } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
             const errorMsg = error.name === 'AbortError' ? 'timeout (3s)' : error.message;
 
             log('ERROR', `[BrowserPool] ❌ Chrome Proxy indisponível: ${url}`);
@@ -876,8 +889,8 @@ class BrowserPoolManager {
 
             const err = new Error(`Chrome Proxy Service não está disponível em ${host}:${port} - ${errorMsg}`);
             // Stable code for SSOT classification (avoid substring heuristics downstream).
-            err.code = 'CHROME_PROXY_UNAVAILABLE';
-            err.details = { host, port, url, error: errorMsg };
+            (/** @type {any} */ (err)).code = 'CHROME_PROXY_UNAVAILABLE';
+            (/** @type {any} */ (err)).details = { host, port, url, error: errorMsg };
             throw err;
         }
     }
@@ -908,7 +921,7 @@ class BrowserPoolManager {
             try {
                 // Fecha todas as páginas da instância
                 for (const [taskId, page] of poolEntry.pages.entries()) {
-                    await page.close().catch(err => {
+                    await page.close().catch((/** @type {any} */ err) => {
                         log('WARN', `[BrowserPool] Erro ao fechar página ${taskId}: ${err.message}`);
                     });
                 }
@@ -917,7 +930,8 @@ class BrowserPoolManager {
                 await poolEntry.browser.disconnect();
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} desconectada`);
-            } catch (error) {
+            } catch (_rawError) {
+            const error = /** @type {any} */ (_rawError);
                 log('ERROR', `[BrowserPool] Erro ao desconectar ${poolEntry.id}: ${error.message}`);
             }
         }
@@ -1151,7 +1165,8 @@ class BrowserPoolManager {
                         reconnected = true;
                         break;
                     }
-                } catch (reconnectErr) {
+                } catch (_rawReconnectErr) {
+            const reconnectErr = /** @type {any} */ (_rawReconnectErr);
                     log('WARN', `[BrowserPool] Reconnection attempt ${attempt} failed: ${reconnectErr.message}`);
                 }
 
@@ -1200,7 +1215,8 @@ class BrowserPoolManager {
 
                 return false;
             }
-        } catch (err) {
+        } catch (_rawErr) {
+            const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[BrowserPool] ConnectionRecoveryStrategy error: ${err.message}`);
             return false;
         } finally {
@@ -1221,7 +1237,8 @@ class BrowserPoolManager {
                         if (!page.isClosed()) {
                             await page.close();
                         }
-                    } catch (closeErr) {
+                    } catch (_rawCloseErr) {
+                        const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
                             `[BrowserPool] Error closing page ${taskId}: ${closeErr?.message ?? String(closeErr)}`
@@ -1247,7 +1264,8 @@ class BrowserPoolManager {
                 poolEntry.stats.activeTasks = 0;
 
                 log('INFO', `[BrowserPool] Cleared connections for ${poolEntry.id}`);
-            } catch (clearErr) {
+            } catch (_rawClearErr) {
+            const clearErr = /** @type {any} */ (_rawClearErr);
                 log('ERROR', `[BrowserPool] Error clearing ${poolEntry.id}: ${clearErr.message}`);
             }
         }
@@ -1298,7 +1316,7 @@ class BrowserPoolManager {
      * Gets active pages for monitoring.
      * Called by PeriodicHealthMonitor.
      *
-     * @returns {Array<{page, taskId}>} Active pages
+     * @returns {Array<{page: any, taskId: any}>} Active pages
      */
     getActivePages() {
         const pages = [];
