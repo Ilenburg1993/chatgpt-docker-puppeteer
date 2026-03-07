@@ -137,7 +137,9 @@ test('publishSnapshot creates immutable markdown copy from master', () => {
     const snapshotsDir = path.join(tmpDir, 'rodadas');
 
     fs.writeFileSync(masterPath, '# MASTER\nconteudo\n', 'utf8');
-    const out = publishSnapshot(/** @type {any} */ ({ masterPath, snapshotsDir, now: new Date('2026-02-15T10:00:00Z') }));
+    const out = publishSnapshot(
+        /** @type {any} */ ({ masterPath, snapshotsDir, now: new Date('2026-02-15T10:00:00Z') })
+    );
 
     assert.ok(fs.existsSync(out.path), 'snapshot file should exist');
     const content = fs.readFileSync(out.path, 'utf8');

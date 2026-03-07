@@ -71,14 +71,16 @@ test('static collector filters dist cycles and test-only duplication noise', asy
         return { ok: true, exitCode: 0, stdout: '', stderr: '' };
     }
 
-    const out = await collectStaticFindings(/** @type {any} */ ({
-        profile: 'deep',
-        changedFiles: [],
-        artifactsDir: tmpDir,
-        contractsMode: 'hybrid',
-        exec,
-        commandExistsFn: async () => false,
-    }));
+    const out = await collectStaticFindings(
+        /** @type {any} */ ({
+            profile: 'deep',
+            changedFiles: [],
+            artifactsDir: tmpDir,
+            contractsMode: 'hybrid',
+            exec,
+            commandExistsFn: async () => false,
+        })
+    );
 
     const madgeFindings = out.findings.filter(item => item.source_tool === 'madge');
     const jscpdFindings = out.findings.filter(item => item.source_tool === 'jscpd');

@@ -402,7 +402,7 @@ const rawVulnerabilities = /** @type {any[]} */ (Object.values(payload.vulnerabi
 const filtered = rawVulnerabilities.filter(item => {
     const severity = String(item?.severity || 'info');
     return (
-        /** @type {any} */ ((SEVERITY_RANK)[severity] ?? 0) >= /** @type {any} */ (SEVERITY_RANK)[options.minSeverity]
+        ((/** @type {any} */ (SEVERITY_RANK))[severity] ?? 0) >= /** @type {any} */ (SEVERITY_RANK)[options.minSeverity]
     );
 });
 

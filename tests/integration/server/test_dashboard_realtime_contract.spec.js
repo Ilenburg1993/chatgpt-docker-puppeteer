@@ -56,9 +56,11 @@ describe('Dashboard realtime contract (Socket.io)', () => {
         const app = express();
         httpServer = http.createServer(app);
 
-        await /** @type {Promise<void>} */ (new Promise(resolve => {
-            /** @type {any} */ (httpServer).listen(0, '127.0.0.1', () => resolve());
-        }));
+        await /** @type {Promise<void>} */ (
+            new Promise(resolve => {
+                /** @type {any} */ (httpServer).listen(0, '127.0.0.1', () => resolve());
+            })
+        );
 
         const address = httpServer.address();
         assert.ok(address && typeof address !== 'string', 'server should expose AddressInfo');
@@ -140,7 +142,9 @@ describe('Dashboard realtime contract (Socket.io)', () => {
 
         try {
             if (httpServer) {
-                await /** @type {Promise<void>} */ (new Promise(resolve => /** @type {any} */ (httpServer).close(() => resolve())));
+                await /** @type {Promise<void>} */ (
+                    new Promise(resolve => /** @type {any} */ (httpServer).close(() => resolve()))
+                );
                 httpServer = null;
             }
         } catch {}

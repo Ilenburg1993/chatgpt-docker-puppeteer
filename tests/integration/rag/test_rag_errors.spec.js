@@ -154,12 +154,14 @@ describe('RAG Error Scenarios', () => {
             };
 
             // Should succeed after retries
-            const result = /** @type {any} */ (await ragIndex({
-                root: ws,
-                paths,
-                embeddingsProvider: flakyProvider,
-                profile: 'full',
-            }));
+            const result = /** @type {any} */ (
+                await ragIndex({
+                    root: ws,
+                    paths,
+                    embeddingsProvider: flakyProvider,
+                    profile: 'full',
+                })
+            );
 
             assert.strictEqual(result.scanned_files, 1);
             assert.strictEqual(result.changed_files, 1);

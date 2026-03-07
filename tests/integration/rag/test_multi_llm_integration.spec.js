@@ -33,14 +33,16 @@ before(async () => {
     setupMCPHandler(app, registry);
 
     // Start server on random port
-    await /** @type {Promise<void>} */ (new Promise(resolve => {
-        server = app.listen(0, () => {
-            const { port } = server.address();
-            baseUrl = `http://localhost:${port}`;
-            console.log(`[Test] Server started on ${baseUrl}`);
-            resolve();
-        });
-    }));
+    await /** @type {Promise<void>} */ (
+        new Promise(resolve => {
+            server = app.listen(0, () => {
+                const { port } = server.address();
+                baseUrl = `http://localhost:${port}`;
+                console.log(`[Test] Server started on ${baseUrl}`);
+                resolve();
+            });
+        })
+    );
 });
 
 // Cleanup

@@ -15,9 +15,11 @@ function listenRandomPort(/** @type {any} */ server) {
 }
 
 function closeServer(/** @type {any} */ server) {
-    return /** @type {Promise<void>} */ (new Promise(resolve => {
-        server.close(() => resolve());
-    }));
+    return /** @type {Promise<void>} */ (
+        new Promise(resolve => {
+            server.close(() => resolve());
+        })
+    );
 }
 
 test('split mode external connection performs handshake and remains connected', async () => {

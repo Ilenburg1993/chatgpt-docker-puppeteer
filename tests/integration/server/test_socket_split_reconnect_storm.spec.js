@@ -15,9 +15,11 @@ function listenRandomPort(/** @type {any} */ server) {
 }
 
 function closeServer(/** @type {any} */ server) {
-    return /** @type {Promise<void>} */ (new Promise(resolve => {
-        server.close(() => resolve());
-    }));
+    return /** @type {Promise<void>} */ (
+        new Promise(resolve => {
+            server.close(() => resolve());
+        })
+    );
 }
 
 async function waitFor(/** @type {any} */ predicate, timeoutMs = 10000, intervalMs = 100) {

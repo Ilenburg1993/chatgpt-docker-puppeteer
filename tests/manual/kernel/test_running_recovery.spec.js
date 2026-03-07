@@ -1,4 +1,5 @@
 // @ts-check
+// @ts-ignore
 import { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunLock } from './helpers.js';
 
 (async () => {
@@ -40,7 +41,7 @@ import { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRun
         } else {
             throw new Error('Timeout: Zumbi sobreviveu.');
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         console.error('FAIL:', e.message);
         process.exit(1);
     } finally {

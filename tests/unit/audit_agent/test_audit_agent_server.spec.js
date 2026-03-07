@@ -5,9 +5,11 @@ import { createAuditAgentServer } from '../../../src/audit_agent/server.js';
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
 
 async function listen(/** @type {any} */ server) {
-    await /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
-        server.listen(0, '127.0.0.1', (/** @type {any} */ err) => (err ? reject(err) : resolve()));
-    }));
+    await /** @type {Promise<void>} */ (
+        new Promise((resolve, reject) => {
+            server.listen(0, '127.0.0.1', (/** @type {any} */ err) => (err ? reject(err) : resolve()));
+        })
+    );
     const addr = server.address();
     return `http://${addr.address}:${addr.port}`;
 }

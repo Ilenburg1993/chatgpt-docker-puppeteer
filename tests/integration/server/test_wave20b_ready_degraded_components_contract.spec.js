@@ -11,18 +11,22 @@ import {
 } from '../../../src/core/runtime_resource_registry.js';
 
 function listen(/** @type {any} */ server) {
-    return /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
-        server.listen(0, '127.0.0.1', (/** @type {any} */ err) => {
-            if (err) reject(err);
-            else resolve();
-        });
-    }));
+    return /** @type {Promise<void>} */ (
+        new Promise((resolve, reject) => {
+            server.listen(0, '127.0.0.1', (/** @type {any} */ err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        })
+    );
 }
 
 function close(/** @type {any} */ server) {
-    return /** @type {Promise<void>} */ (new Promise(resolve => {
-        server.close(() => resolve());
-    }));
+    return /** @type {Promise<void>} */ (
+        new Promise(resolve => {
+            server.close(() => resolve());
+        })
+    );
 }
 
 test('wave20b: /ready reporta status degraded com componentes opcionais indisponíveis', async () => {
@@ -72,7 +76,9 @@ test('wave20b: /ready reporta status degraded com componentes opcionais indispon
         assert.equal(payload.runtime_resources.status, 'degraded');
         assert.ok(
             Array.isArray(payload.runtime_resources.degraded_components) &&
-                payload.runtime_resources.degraded_components.some((/** @type {any} */ item) => item.id === 'mcp_upstreams'),
+                payload.runtime_resources.degraded_components.some(
+                    (/** @type {any} */ item) => item.id === 'mcp_upstreams'
+                ),
             'degraded_components deve incluir mcp_upstreams'
         );
     } finally {

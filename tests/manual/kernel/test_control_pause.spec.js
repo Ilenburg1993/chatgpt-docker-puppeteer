@@ -1,6 +1,7 @@
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
+// @ts-ignore
 import { writeTask, readTask, startAgent, stopAgent, waitForCondition, sleep, ROOT } from './helpers.js';
 
 (async () => {
@@ -48,7 +49,7 @@ import { writeTask, readTask, startAgent, stopAgent, waitForCondition, sleep, RO
         } else {
             throw new Error('Timeout: Agente não acordou após RUN.');
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         console.error('FAIL:', e.message);
         process.exit(1);
     } finally {

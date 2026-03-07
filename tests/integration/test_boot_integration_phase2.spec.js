@@ -21,12 +21,14 @@ describe('Boot Integration - Phase 2 Components', () => {
         // Simula boot sequence (sem browser pool)
 
         // Fase 2: NERV
-        nerv = await createNERV(/** @type {any} */ ({
-            mode: 'local',
-            correlation: true,
-            bufferSize: 1000,
-            telemetry: false,
-        }));
+        nerv = await createNERV(
+            /** @type {any} */ ({
+                mode: 'local',
+                correlation: true,
+                bufferSize: 1000,
+                telemetry: false,
+            })
+        );
 
         // Fase 3.5: ContextManager Compartilhado
         contextManager = new ContextManager({

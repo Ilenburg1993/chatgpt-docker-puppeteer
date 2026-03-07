@@ -49,12 +49,14 @@ describe('Mission System Integration (E2E)', () => {
     describe('1. Boot Sequence Integration', () => {
         it('should initialize NERV → Kernel → MissionManager in correct order', async () => {
             // 1. Inicializa NERV
-            nerv = await createNERV(/** @type {any} */ ({
-                mode: 'local',
-                correlation: true,
-                bufferSize: 100,
-                telemetry: false,
-            }));
+            nerv = await createNERV(
+                /** @type {any} */ ({
+                    mode: 'local',
+                    correlation: true,
+                    bufferSize: 100,
+                    telemetry: false,
+                })
+            );
 
             assert.ok(nerv, 'NERV deveria estar inicializado');
 
@@ -291,7 +293,9 @@ describe('Mission System Integration (E2E)', () => {
             assert.strictEqual(mission.workflow.steps.length, 17);
 
             // Verifica IDs dos steps expandidos
-            const chapterSteps = mission.workflow.steps.filter((/** @type {any} */ s) => s.id.startsWith('step-2-chapter-'));
+            const chapterSteps = mission.workflow.steps.filter((/** @type {any} */ s) =>
+                s.id.startsWith('step-2-chapter-')
+            );
             assert.strictEqual(chapterSteps.length, 15, 'Deveria ter 15 chapter steps');
 
             // Verifica numeração correta

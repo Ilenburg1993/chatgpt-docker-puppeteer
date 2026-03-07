@@ -8,11 +8,11 @@ import puppeteer from 'puppeteer-core';
         process.env.CHROME_WS_ENDPOINT ||
         process.env.CHROME_URL ||
         `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`;
-    const browser = await puppeteer.connect({
+    const browser = await puppeteer.connect(/** @type {any} */ ({
         browserURL,
         defaultViewport: { width: 1280, height: 800 },
         ignoreHTTPSErrors: true,
-    });
+    }));
 
     console.log('✅ Puppeteer conectado (connect-only)');
     console.log('   Versão:', await browser.version());

@@ -76,7 +76,7 @@ async function runTests() {
             console.log(`   Generated ${largeResult.length} chars`);
             const wordCount = largeResult.split(/\s+/).length;
             console.log(`   Throughput: ${Math.round((wordCount / timeoutTime) * 60000)} tokens/min`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const timeoutTime = Date.now() - timeoutStart;
             if (error.message.includes('timeout') || error.message.includes('aborted')) {
                 console.log(`✅ Timeout enforced at ${timeoutTime}ms (expected behavior)`);
@@ -102,7 +102,7 @@ async function runTests() {
         console.log('1. Test MCP integration: ./tests/manual/test_mcp_ollama.sh');
         console.log('2. Test with Claude Desktop or GitHub Copilot');
         console.log('3. Monitor performance: pm2 logs dashboard-web');
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('\n❌ Test failed:');
         console.error(error);
         process.exit(1);

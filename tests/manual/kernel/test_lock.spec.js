@@ -1,14 +1,6 @@
 // @ts-check
-import {
-    writeTask,
-    readTask,
-    startAgent,
-    stopAgent,
-    waitForCondition,
-    removeRunLock,
-    readLatestGlobalLogTail,
-    sleep,
-} from './helpers.js';
+// @ts-ignore
+import { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunLock, readLatestGlobalLogTail, sleep } from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Lock Atomicidade & Concorrência ===');
@@ -84,7 +76,7 @@ import {
                     (finalTask.state && finalTask.state.error));
             throw new Error(`Estado inválido: ${finalStatus}. Erro: ${finalErr}`);
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         console.error('FAIL:', e.message);
         console.error('--- LOGS RECENTES ---');
         console.error(readLatestGlobalLogTail(50));

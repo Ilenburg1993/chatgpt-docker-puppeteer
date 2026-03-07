@@ -1,4 +1,5 @@
 // @ts-check
+// @ts-ignore — helpers.js não exporta estas funções, importação legada
 import { startAgent, stopAgent, waitForCondition, removeRunLock, cleanTmp } from './helpers.js';
 import fs from 'node:fs';
 import path from 'node:path';

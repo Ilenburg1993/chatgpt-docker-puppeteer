@@ -35,7 +35,9 @@ describe('ragHealth availability + indexing progress logs', () => {
         };
 
         try {
-            const health = /** @type {any} */ (await ragHealth({ paths: ragPaths, embeddingsProvider: new FakeEmbeddingsProvider(8) }));
+            const health = /** @type {any} */ (
+                await ragHealth({ paths: ragPaths, embeddingsProvider: new FakeEmbeddingsProvider(8) })
+            );
             assert.strictEqual(health.available, false);
             assert.strictEqual(health.ok, false);
         } finally {

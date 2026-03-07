@@ -42,12 +42,14 @@ async function startHealthServer() {
         res.end();
     });
 
-    await /** @type {Promise<void>} */ (new Promise((resolve, reject) => {
-        /** @type {any} */ (server).listen(0, 'localhost', (/** @type {any} */ err) => {
-            if (err) reject(err);
-            else resolve();
-        });
-    }));
+    await /** @type {Promise<void>} */ (
+        new Promise((resolve, reject) => {
+            /** @type {any} */ (server).listen(0, 'localhost', (/** @type {any} */ err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        })
+    );
 
     const address = server.address();
     if (!address || typeof address !== 'object') {
@@ -58,9 +60,11 @@ async function startHealthServer() {
         server,
         port: address.port,
         close: () =>
-            /** @type {Promise<void>} */ (new Promise(resolve => {
-                server.close(() => resolve());
-            })),
+            /** @type {Promise<void>} */ (
+                new Promise(resolve => {
+                    server.close(() => resolve());
+                })
+            ),
     };
 }
 

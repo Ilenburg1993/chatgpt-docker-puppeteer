@@ -14,21 +14,22 @@ const colors = {
 };
 
 const log = {
-    info: msg => console.log(`${colors.blue}ℹ ${msg}${colors.reset}`),
-    success: msg => console.log(`${colors.green}✅ ${msg}${colors.reset}`),
-    error: msg => console.log(`${colors.red}❌ ${msg}${colors.reset}`),
-    warn: msg => console.log(`${colors.yellow}⚠️  ${msg}${colors.reset}`),
-    section: msg => console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`),
+    info: (/** @type {any} */ msg) => console.log(`${colors.blue}ℹ ${msg}${colors.reset}`),
+    success: (/** @type {any} */ msg) => console.log(`${colors.green}✅ ${msg}${colors.reset}`),
+    error: (/** @type {any} */ msg) => console.log(`${colors.red}❌ ${msg}${colors.reset}`),
+    warn: (/** @type {any} */ msg) => console.log(`${colors.yellow}⚠️  ${msg}${colors.reset}`),
+    section: (/** @type {any} */ msg) => console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`),
 };
 
-import GLOBAL_CONFIG from '/workspaces/chatgpt-docker-puppeteer/config.json' with { type: 'json' };
+import GLOBAL_CONFIG_RAW from '/workspaces/chatgpt-docker-puppeteer/config.json' with { type: 'json' };
+const GLOBAL_CONFIG = /** @type {any} */ (GLOBAL_CONFIG_RAW);
 const PROXY_PORT = GLOBAL_CONFIG.CHROME_PROXY_PORT || 9224;
 const CHROME_PORT = GLOBAL_CONFIG.CHROME_PORT || 9225;
 
 let passedTests = 0;
 let failedTests = 0;
 
-function assert(condition, message) {
+function assert(/** @type {any} */ condition, /** @type {any} */ message) {
     if (condition) {
         log.success(message);
         passedTests++;
@@ -51,7 +52,7 @@ function testConfigFiles() {
     try {
         config = JSON.parse(fs.readFileSync('/workspaces/chatgpt-docker-puppeteer/config.json', 'utf8'));
         assert(true, 'config.json existe e é JSON válido');
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         assert(false, `config.json inválido: ${e.message}`);
         return;
     }
@@ -84,7 +85,7 @@ function testConfigFiles() {
     try {
         chromeConfig = JSON.parse(fs.readFileSync('/workspaces/chatgpt-docker-puppeteer/chrome-config.json', 'utf8'));
         assert(true, 'chrome-config.json existe e é JSON válido');
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         assert(false, `chrome-config.json inválido: ${e.message}`);
         return;
     }
@@ -147,7 +148,7 @@ async function testScriptFiles() {
         assert(content.includes('rewriteWebSocketURL'), 'chrome-proxy-service.js tem método rewriteWebSocketURL');
         assert(content.includes('handleHTTPRequest'), 'chrome-proxy-service.js tem método handleHTTPRequest');
         assert(content.includes('handleWebSocketUpgrade'), 'chrome-proxy-service.js tem método handleWebSocketUpgrade');
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         assert(false, `Erro ao ler chrome-proxy-service.js: ${e.message}`);
     }
 
@@ -158,7 +159,7 @@ async function testScriptFiles() {
     // 2.4 - start-chrome-with-proxy.bat tem conteúdo válido
     try {
         const content = fs.readFileSync(launcherPath, 'utf8');
-        const cfg = await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m);
+        const cfg = /** @type {any} */ (await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m));
         const expectedChromePort = cfg.CHROME_PORT || cfg.CHROME_DIRECT_PORT || 9225;
         assert(
             content.includes(`CHROME_DEBUG_PORT=${expectedChromePort}`),
@@ -166,7 +167,7 @@ async function testScriptFiles() {
         );
         assert(content.includes('PROXY_PORT=' + PROXY_PORT), `Launcher configura porta Proxy ${PROXY_PORT}`);
         assert(content.includes('chrome-proxy-service.js'), 'Launcher referencia chrome-proxy-service.js');
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         assert(false, `Erro ao ler start-chrome-with-proxy.bat: ${e.message}`);
     }
 
@@ -188,7 +189,7 @@ async function testScriptFiles() {
             content.includes('Conectado via Chrome Proxy Service'),
             'ConnectionOrchestrator tem log específico de proxy'
         );
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         assert(false, `Erro ao ler ConnectionOrchestrator.js: ${e.message}`);
     }
 
@@ -203,9 +204,9 @@ async function testScriptFiles() {
 async function testPrioritizationLogic() {
     log.section('TESTE 3: Validação de Lógica de Priorização');
 
-    const chromeConfig = await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(
+    const chromeConfig = /** @type {any} */ (await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(
         m => m.default ?? m
-    );
+    ));
 
     // 3.1 - Ordem de portas está correta
     const ports = chromeConfig.connection.ports;
@@ -250,7 +251,7 @@ async function testPrioritizationLogic() {
 async function testURLRewriting() {
     log.section('TESTE 4: Simulação de URL Rewriting');
 
-    const config = await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m);
+    const config = /** @type {any} */ (await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m));
 
     // 4.1 - Mock de resposta do Chrome (localhost)
     const chromeResponse = {
@@ -263,7 +264,7 @@ async function testURLRewriting() {
     };
 
     // 4.2 - Simular rewrite do proxy (localhost → IP público)
-    const rewriteURL = (url, publicIP, proxyPort) => {
+    const rewriteURL = (/** @type {any} */ url, /** @type {any} */ publicIP, /** @type {any} */ proxyPort) => {
         return url
             .replace(`localhost:${proxyPort}`, `${publicIP}:${proxyPort}`)
             .replace(`127.0.0.1:${proxyPort}`, `${publicIP}:${proxyPort}`);
@@ -287,7 +288,7 @@ async function testURLRewriting() {
     log.info(`Reescrito:  ${rewrittenUrl}`);
 
     // 4.4 - Simular detecção de proxy attempt
-    const isProxyAttempt = (host, port) => {
+    const isProxyAttempt = (/** @type {any} */ host, /** @type {any} */ port) => {
         return port === PROXY_PORT || (host === '192.168.0.2' && port === PROXY_PORT);
     };
 
@@ -305,9 +306,9 @@ async function testURLRewriting() {
 async function testHealthEndpoints() {
     log.section('TESTE 5: Validação de Health Endpoints');
 
-    const chromeConfig = await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(
+    const chromeConfig = /** @type {any} */ (await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(
         m => m.default ?? m
-    );
+    ));
 
     // 5.1 - Health URLs estão definidas
     assert(chromeConfig.health.chromeDebugUrl !== undefined, 'chromeDebugUrl está definido');
@@ -419,7 +420,7 @@ ${colors.cyan}╔═════════════════════
             log.error(`⚠️  ${failedTests} teste(s) falharam. Corrija os problemas antes de prosseguir.`);
             process.exit(1);
         }
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         log.error(`Erro durante execução dos testes: ${error.message}`);
         console.error(error.stack);
         process.exit(1);

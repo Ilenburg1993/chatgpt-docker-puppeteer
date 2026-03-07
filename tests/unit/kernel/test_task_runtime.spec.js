@@ -70,12 +70,14 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             const timeout = 100; // 100ms
 
             let cancelado = false;
-            const promise = /** @type {Promise<void>} */ (new Promise(resolve => {
-                setTimeout(() => {
-                    cancelado = true;
-                    resolve();
-                }, timeout);
-            }));
+            const promise = /** @type {Promise<void>} */ (
+                new Promise(resolve => {
+                    setTimeout(() => {
+                        cancelado = true;
+                        resolve();
+                    }, timeout);
+                })
+            );
 
             await promise;
 

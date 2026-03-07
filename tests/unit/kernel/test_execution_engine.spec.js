@@ -114,7 +114,8 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
                 completedAt: new Date(fim).toISOString(),
             };
 
-            const duracao = /** @type {any} */ (new Date(tarefa.completedAt)) - /** @type {any} */ (new Date(tarefa.startedAt));
+            const duracao =
+                /** @type {any} */ (new Date(tarefa.completedAt)) - /** @type {any} */ (new Date(tarefa.startedAt));
 
             assert.ok(duracao >= 5000, 'Duração deve ser ~5 segundos');
         });

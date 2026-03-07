@@ -7,16 +7,18 @@ test('quality collector smart plan resolves docs-only run with selective executi
     /** @type {string[]} */
     const calledSteps = [];
 
-    const result = await collectQualityFindings(/** @type {any} */ ({
-        profile: 'quick',
-        changedFiles: ['README.md'],
-        qualityMode: 'smart',
-        qualityJsdoc: false,
-        exec: async (/** @type {any} */ stepId) => {
-            calledSteps.push(stepId);
-            return { ok: true, exitCode: 0, stdout: '', stderr: '' };
-        },
-    }));
+    const result = await collectQualityFindings(
+        /** @type {any} */ ({
+            profile: 'quick',
+            changedFiles: ['README.md'],
+            qualityMode: 'smart',
+            qualityJsdoc: false,
+            exec: async (/** @type {any} */ stepId) => {
+                calledSteps.push(stepId);
+                return { ok: true, exitCode: 0, stdout: '', stderr: '' };
+            },
+        })
+    );
 
     assert.deepEqual(result.errors, []);
     assert.equal(result.telemetry.strategy, 'changed-only');

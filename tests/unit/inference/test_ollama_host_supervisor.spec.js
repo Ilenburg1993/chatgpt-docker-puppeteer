@@ -6,14 +6,18 @@ import { createOllamaHostSupervisor } from '../../../src/inference_gateway/ollam
 test('supervisor marks ready on successful probe and emits state', async () => {
     /** @type {any[]} */ const events = [];
     const supervisor = createOllamaHostSupervisor({
-        fetch: /** @type {any} */ (async () => ({
-            ok: true,
-            status: 200,
-            async json() {
-                return { version: '0.7.0' };
-            },
-        })),
-        onStateChange: (/** @type {any} */ s) => { events.push(s.state); },
+        fetch: /** @type {any} */ (
+            async () => ({
+                ok: true,
+                status: 200,
+                async json() {
+                    return { version: '0.7.0' };
+                },
+            })
+        ),
+        onStateChange: (/** @type {any} */ s) => {
+            events.push(s.state);
+        },
         setIntervalFn: () => /** @type {any} */ (1),
         clearIntervalFn: () => {},
     });
