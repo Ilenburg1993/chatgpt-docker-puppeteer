@@ -29,7 +29,7 @@ function _responseDir() {
  * @param {SaveResponseV2ResponseData} responseData - Response V2 data
  * @param {{ attemptId?: string|null, writeLegacyLatest?: boolean }=} opts
  * @param {SaveResponseV2Options} [opts]
- * @returns {Promise<object>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile, htmlFile} }
+ * @returns {Promise<any>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile, htmlFile} }
  */
 async function saveResponseV2(taskId, responseData, opts = {}) {
     try {
@@ -94,13 +94,13 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
                     jsonFile: `${legacyBase}.json`,
                     htmlFile: `${legacyBase}.html`,
                 };
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore */
             }
         }
 
         return out;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         logger.error(
             '[RESPONSE_STORE_V2] Erro ao salvar resposta',
             /** @type {any} */ ({
@@ -150,7 +150,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
         }
 
         return await fs.readFile(filePath, 'utf-8');
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         // Fallback para .txt (compatibilidade V1)
         if (format !== 'text') {
             logger.warn(
@@ -192,7 +192,7 @@ async function listAvailableFormats(taskId) {
         try {
             await fs.access(filePath);
             available.push(format);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             // Arquivo não existe
         }
     }
@@ -213,7 +213,7 @@ async function responseExists(taskId) {
     try {
         await fs.access(txtPath);
         return true;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         return false;
     }
 }
@@ -234,7 +234,7 @@ async function deleteResponseV2(taskId) {
         try {
             await fs.unlink(filePath);
             deletedCount++;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             // Arquivo não existe (ok)
         }
     }

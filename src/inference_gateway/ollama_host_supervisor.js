@@ -222,7 +222,7 @@ export class OllamaHostSupervisor {
             };
             this._emitState();
             return this.getState();
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._consecutiveFailures += 1;
             if (this.circuitEnabled && this._consecutiveFailures >= this.circuitThreshold) {
                 this._circuitOpenUntil = this.now() + this.circuitTimeoutMs;

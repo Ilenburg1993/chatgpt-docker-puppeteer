@@ -96,7 +96,7 @@ async function getAgentStatus() {
             uptime: app.pm2_env.status === 'online' ? Date.now() - app.pm2_env.pm_uptime : 0,
             pid: app.pid,
         };
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         log('ERROR', `[SYSTEM] Falha ao obter status PM2: ${_ce.message}`);
         return { agent: 'offline', error: _ce.message };
@@ -153,12 +153,12 @@ async function controlAgent(action) {
                     try {
                         await execa('pm2', ['kill']);
                         return { success: true };
-                    } catch (err) {
+                    } catch (/** @type {any} */ err) {
                         const _ce = /** @type {any} */ (err);
                         try {
                             await execa('npx', ['pm2', 'kill']);
                             return { success: true };
-                        } catch (err2) {
+                        } catch (/** @type {any} */ err2) {
                             log('ERROR', `[SYSTEM] Falha ao matar daemon: ${/** @type {any} */ (err2).message}`);
                             return { success: false };
                         }
@@ -180,7 +180,7 @@ async function controlAgent(action) {
                 throw new Error(`Ação de controle inválida: ${action}`);
         }
         return { success: true };
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         log('ERROR', `[SYSTEM] Erro na operação ${action}: ${_ce.message}`);
         throw e;
@@ -213,20 +213,20 @@ async function killProcess(pid) {
                 // attempt to kill child processes first, then parent
                 try {
                     await execa('pkill', ['-P', String(pid)]);
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
                     const _ce = /** @type {any} */ (err);
                     void err;
                 }
                 try {
                     process.kill(pid, 'SIGKILL');
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
                     const _ce = /** @type {any} */ (err);
                     void err;
                 }
             }
             log('INFO', `Processo ${pid} e filhos encerrados.`);
             return;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             log(
                 'ERROR',
@@ -266,7 +266,7 @@ async function killChromeGlobal() {
             }
             log('INFO', 'Todos os Chromes encerrados.');
             return;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             log('WARN', `Falha no Kill Global (execa): ${err && _ce.message ? _ce.message : String(err)}`);
         }

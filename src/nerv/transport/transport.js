@@ -27,7 +27,7 @@ import createReconnect from './reconnect.js';
  * **Unidades:** Políticas de reconexão seguem typedef de createReconnect.
  *
  * @param {CreateTransportDeps} deps - Dependências do transporte
- * @returns {object} Transporte com métodos send, start, stop, onReceive
+ * @returns {any} Transporte com métodos send, start, stop, onReceive
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {

@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { COMMANDS, executeCommand, validateCommand } from '#server/domain/control_command_service';
 import { RBAC_PERMISSIONS, RBAC_ROLES, getRbacUserByUsername, upsertRbacUser } from '#infra/db/rbac_repo';
 import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_repo';
@@ -12,6 +12,7 @@ import schemaGuard from '../../middleware/schema_guard.js';
 
 /** Constante/valor exportado: default. */
 const router = express.Router();
+const typedRouter = /** @type {any} */ (router);
 
 const commandSchema = z.object({
     command: z.string().min(3).max(80),
@@ -38,12 +39,12 @@ const rbacPatchSchema = z.object({
     active: z.boolean().optional(),
 });
 
-router.post(
+typedRouter.post(
     '/commands',
     authenticate,
     requirePermission(RBAC_PERMISSIONS.CONTROL_EXECUTE),
     schemaGuard(commandSchema),
-    async (req, res) => {
+    async (/** @type {any} */ req, /** @type {any} */ res) => {
         try {
             const output = await executeCommand({
                 command: req.body.command,
@@ -60,25 +61,26 @@ router.post(
                 result: output.result,
                 request_id: req.id,
             });
-        } catch (err) {
-            res.status(Number(err?.statusCode || 500)).json({
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            res.status(Number(_e?.statusCode || 500)).json({
                 success: false,
-                code: err?.code || 'CONTROL_COMMAND_FAILED',
-                error: err?.message || 'Falha ao executar comando',
-                details: err?.details || null,
-                operation: err?.operation || null,
+                code: _e?.code || 'CONTROL_COMMAND_FAILED',
+                error: _e?.message || 'Falha ao executar comando',
+                details: _e?.details || null,
+                operation: _e?.operation || null,
                 request_id: req.id,
             });
         }
     }
 );
 
-router.post(
+typedRouter.post(
     '/validate',
     authenticate,
     requirePermission(RBAC_PERMISSIONS.CONTROL_VALIDATE),
     schemaGuard(validateSchema),
-    (req, res) => {
+    (/** @type {any} */ req, /** @type {any} */ res) => {
         const validation = validateCommand({
             command: req.body.command,
             payload: req.body.payload || {},
@@ -93,7 +95,7 @@ router.post(
     }
 );
 
-router.get('/commands/:id', authenticate, requirePermission(RBAC_PERMISSIONS.TASK_READ), (req, res) => {
+typedRouter.get('/commands/:id', authenticate, requirePermission(RBAC_PERMISSIONS.TASK_READ), (/** @type {any} */ req, /** @type {any} */ res) => {
     const id = String(req.params.id || '').trim();
     const operation = getControlOperationById(id);
     if (!operation) {
@@ -111,7 +113,7 @@ router.get('/commands/:id', authenticate, requirePermission(RBAC_PERMISSIONS.TAS
     });
 });
 
-router.get('/commands', authenticate, requirePermission(RBAC_PERMISSIONS.TASK_READ), (req, res) => {
+typedRouter.get('/commands', authenticate, requirePermission(RBAC_PERMISSIONS.TASK_READ), (/** @type {any} */ req, /** @type {any} */ res) => {
     const limit = Number(req.query.limit || 100) || 100;
     const entityType = req.query.entity_type ? String(req.query.entity_type) : null;
     const entityId = req.query.entity_id ? String(req.query.entity_id) : null;
@@ -125,14 +127,14 @@ router.get('/commands', authenticate, requirePermission(RBAC_PERMISSIONS.TASK_RE
     });
 });
 
-router.get('/commands/catalog', authenticate, requirePermission(RBAC_PERMISSIONS.CONTROL_VALIDATE), (_req, res) => {
+typedRouter.get('/commands/catalog', authenticate, requirePermission(RBAC_PERMISSIONS.CONTROL_VALIDATE), (/** @type {any} */ _req, /** @type {any} */ res) => {
     return res.json({
         success: true,
         commands: Object.values(COMMANDS),
     });
 });
 
-router.get('/preferences/me', authenticate, (req, res) => {
+typedRouter.get('/preferences/me', authenticate, (/** @type {any} */ req, /** @type {any} */ res) => {
     const userId = req.user?.username || req.user?.id;
     const prefs = getUserPreferences(userId) || {
         user_id: userId,
@@ -152,7 +154,7 @@ router.get('/preferences/me', authenticate, (req, res) => {
     });
 });
 
-router.patch('/preferences/me', authenticate, schemaGuard(prefsPatchSchema), (req, res) => {
+typedRouter.patch('/preferences/me', authenticate, schemaGuard(prefsPatchSchema), (/** @type {any} */ req, /** @type {any} */ res) => {
     const userId = req.user?.username || req.user?.id;
     const prefs = upsertUserPreferences(userId, req.body || {});
 
@@ -172,7 +174,7 @@ router.patch('/preferences/me', authenticate, schemaGuard(prefsPatchSchema), (re
     });
 });
 
-router.get('/rbac/users/:username', authenticate, requirePermission(RBAC_PERMISSIONS.RBAC_MANAGE), (req, res) => {
+typedRouter.get('/rbac/users/:username', authenticate, requirePermission(RBAC_PERMISSIONS.RBAC_MANAGE), (/** @type {any} */ req, /** @type {any} */ res) => {
     const user = getRbacUserByUsername(String(req.params.username));
     if (!user) {
         return res.status(404).json({
@@ -189,12 +191,12 @@ router.get('/rbac/users/:username', authenticate, requirePermission(RBAC_PERMISS
     });
 });
 
-router.put(
+typedRouter.put(
     '/rbac/users/:username',
     authenticate,
     requirePermission(RBAC_PERMISSIONS.RBAC_MANAGE),
     schemaGuard(rbacPatchSchema),
-    (req, res) => {
+    (/** @type {any} */ req, /** @type {any} */ res) => {
         const updated = upsertRbacUser({
             username: String(req.params.username),
             password: req.body.password,

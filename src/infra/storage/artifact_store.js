@@ -318,7 +318,7 @@ async function readText(artifactId) {
     if (!uri) return null;
     try {
         return await fs.readFile(uri, 'utf8');
-    } catch (_rawErr) {
+    } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
         if (err.code === 'ENOENT' || err.code === 'EACCES') return null;
         throw err;
@@ -335,7 +335,7 @@ async function readBuffer(artifactId) {
     if (!uri) return null;
     try {
         return await fs.readFile(uri);
-    } catch (_rawErr) {
+    } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
         if (err.code === 'ENOENT' || err.code === 'EACCES') return null;
         throw err;
@@ -383,7 +383,7 @@ async function deleteArtifact(artifactId) {
     if (row.storage_uri && _isUnderRoot(root, row.storage_uri)) {
         try {
             await fs.unlink(row.storage_uri);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             if (err.code !== 'ENOENT') throw err;
         }

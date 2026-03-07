@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { ActionCode } from '#shared/nerv/constants';
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
@@ -93,7 +93,7 @@ class RemediationEngine {
     /**
      * Avalia um diagnóstico técnico e prescreve a manobra de autocura.
      *
-     * @param {object} diagnosis - Payload do evento STALL_DETECTED vindo do Driver.
+     * @param {any} diagnosis - Payload do evento STALL_DETECTED vindo do Driver.
      * @returns {object|null} Prescrição técnica ou null se não houver ação necessária.
      */
     evaluate(diagnosis) {
@@ -102,7 +102,7 @@ class RemediationEngine {
         }
 
         const type = diagnosis.type;
-        const policy = RemediationPolicy[type];
+        const policy = (/** @type {Record<string, any>} */ (RemediationPolicy))[type];
 
         if (!policy) {
             log('DEBUG', `[REMEDIATION] Sem política de autocura para o sintoma: ${type}`);

@@ -567,7 +567,7 @@ class RecoverySystem extends EventEmitter {
      *
      * v2.0 Feature (BUG #5 fix)
      *
-     * @returns {object} Stats completas
+     * @returns {any} Stats completas
      *
      * Propriedades do objeto retornado:
      *   - tier0Applied (number): Tier 0 aplicados

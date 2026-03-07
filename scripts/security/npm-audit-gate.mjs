@@ -401,9 +401,7 @@ try {
 const rawVulnerabilities = /** @type {any[]} */ (Object.values(payload.vulnerabilities || {}));
 const filtered = rawVulnerabilities.filter(item => {
     const severity = String(item?.severity || 'info');
-    return (
-        ((/** @type {any} */ (SEVERITY_RANK))[severity] ?? 0) >= /** @type {any} */ (SEVERITY_RANK)[options.minSeverity]
-    );
+    return /** @type {any} */ (SEVERITY_RANK)[severity] >= SEVERITY_RANK[options.minSeverity];
 });
 
 /** @type {Array<Record<string, unknown>>} */

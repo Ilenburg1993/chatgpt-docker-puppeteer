@@ -112,7 +112,7 @@ class ExecutionEngine {
         let tasks;
         try {
             tasks = this.taskRuntime.listTasks();
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             this.telemetry.warning('execution_engine_list_tasks_failed', {
                 error: err?.message || String(err),
@@ -130,7 +130,7 @@ class ExecutionEngine {
                 if (Array.isArray(taskProposals)) {
                     proposals.push(...taskProposals);
                 }
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 this.telemetry.warning('execution_engine_task_evaluation_failed', {
                     taskId: task?.taskId || task?.meta?.id,
@@ -160,13 +160,13 @@ class ExecutionEngine {
      * @param {any} task
      * Snapshot imutável da tarefa.
      *
-     * @param {any} context
+     * @param {object} context
      * Contexto do ciclo.
      *
      * @returns {Array<object>}
      * Propostas geradas para esta tarefa.
      */
-    _evaluateTask(task, { tickId, at }) {
+    _evaluateTask(task, /** @type {any} */ { tickId, at }) {
         const proposals = /** @type {any[]} */ ([]);
 
         // 1. Recupera observações correlacionadas
@@ -182,7 +182,7 @@ class ExecutionEngine {
                 observations,
                 at,
             });
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             this.telemetry.warning('execution_engine_policy_assess_failed', {
                 taskId: task?.taskId || task?.meta?.id,
@@ -199,7 +199,7 @@ class ExecutionEngine {
                 observations,
                 at,
             });
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             this.telemetry.warning('execution_engine_interpret_failed', {
                 taskId: task?.taskId || task?.meta?.id,
@@ -209,7 +209,7 @@ class ExecutionEngine {
                 hasCompletionSignal: false,
                 hasErrorSignal: false,
                 hasProgressSignal: false,
-                lastObservationAt: null,
+                lastObservationAt: /** @type {number | null} */ (null),
             };
         }
 
@@ -248,7 +248,7 @@ class ExecutionEngine {
      * @param {any[]} params.observations
      * @param {number} params.at
      *
-     * @returns {object}
+     * @returns {any}
      * Resultado da interpretação semântica.
      */
     _interpretObservations({ task, observations, at }) {
@@ -256,7 +256,7 @@ class ExecutionEngine {
             hasCompletionSignal: false,
             hasErrorSignal: false,
             hasProgressSignal: false,
-            lastObservationAt: null,
+            lastObservationAt: /** @type {number | null} */ (null),
         };
 
         if (observations.length === 0) {

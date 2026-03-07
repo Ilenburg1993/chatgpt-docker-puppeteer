@@ -2,12 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chatgpt-docker-puppeteer.local/schemas/typing/tsserver-tool-contract.schema.json",
   "title": "Tsserver Tool Contract",
+  "description": "Wire-protocol contract for the local tsserver daemon wrapper. v1.1.0: baseline strict (strict:true, noImplicitAny, strictNullChecks, useUnknownInCatchVariables) + @import tag migration + isolatedDeclarations coverage for src/types/**/*.d.ts.",
   "type": "object",
   "required": ["schema_version", "operation", "params"],
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.0.0"
+      "enum": ["1.0.0", "1.1.0"],
+      "description": "Protocol version. 1.0.0 = original; 1.1.0 = strict-typed baseline."
     },
     "operation": {
       "type": "string",

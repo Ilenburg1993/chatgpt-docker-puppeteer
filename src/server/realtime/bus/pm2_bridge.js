@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { pm2Raw } from '#infra/system';
 import { notify } from '#server/engine/socket';
 import { log } from '#core/logger';
@@ -27,7 +27,9 @@ const MANAGED_PROCESSES = [
  * Estado operacional da ponte.
  */
 let isBusActive = false;
+/** @type {any} */
 let healthCheckInterval = null;
+/** @type {any} */
 let reconnectTimer = null;
 let lastProcessStates = new Map(); // Cache de estados
 
@@ -73,7 +75,7 @@ function init() {
              * Escuta eventos globais de TODOS os processos gerenciados pelo PM2.
              * Monitora: agente-gpt, dashboard-web, chrome-proxy
              */
-            bus.on('process:event', data => {
+            bus.on('process:event', (/** @type {any} */ data) => {
                 const processName = data.process ? data.process.name : null;
 
                 // Filtra apenas processos gerenciados
@@ -130,8 +132,8 @@ function _emitInitialSnapshot() {
         }
 
         const snapshot = processes
-            .filter(proc => MANAGED_PROCESSES.includes(proc.name))
-            .map(proc => ({
+            .filter((/** @type {any} */ proc) => MANAGED_PROCESSES.includes(proc.name))
+            .map((/** @type {any} */ proc) => ({
                 name: proc.name,
                 status: proc.pm2_env.status,
                 pid: proc.pid,
@@ -184,8 +186,8 @@ function _startHealthCheck() {
 
             // Emite métricas atualizadas de todos os processos
             const metrics = processes
-                .filter(proc => MANAGED_PROCESSES.includes(proc.name))
-                .map(proc => ({
+                .filter((/** @type {any} */ proc) => MANAGED_PROCESSES.includes(proc.name))
+                .map((/** @type {any} */ proc) => ({
                     name: proc.name,
                     status: proc.pm2_env.status,
                     pid: proc.pid,
@@ -232,10 +234,11 @@ function stop() {
     isBusActive = false;
     try {
         pm2Raw.disconnect();
-    } catch (disconnectErr) {
+    } catch (/** @type {any} */ disconnectErr) {
+        const _e = /** @type {any} */ (disconnectErr);
         log(
             'DEBUG',
-            `[PM2_BRIDGE] Disconnect error during stop: ${disconnectErr && disconnectErr.message ? disconnectErr.message : String(disconnectErr)}`
+            `[PM2_BRIDGE] Disconnect error during stop: ${disconnectErr && _e.message ? _e.message : String(_e)}`
         );
     }
     log('INFO', '[PM2_BRIDGE] Ponte de eventos encerrada.');
@@ -266,8 +269,8 @@ async function refreshSnapshot() {
             }
 
             const snapshot = processes
-                .filter(proc => MANAGED_PROCESSES.includes(proc.name))
-                .map(proc => ({
+                .filter((/** @type {any} */ proc) => MANAGED_PROCESSES.includes(proc.name))
+                .map((/** @type {any} */ proc) => ({
                     name: proc.name,
                     status: proc.pm2_env.status,
                     pid: proc.pid,

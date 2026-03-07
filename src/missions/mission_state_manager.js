@@ -34,7 +34,7 @@ class MissionStateManager {
         try {
             await fs.mkdir(this.baseDir, { recursive: true });
             logger.log('INFO', `[MissionStateManager] Diretório inicializado: ${this.baseDir}`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[MissionStateManager] Falha ao criar diretório: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
@@ -57,7 +57,7 @@ class MissionStateManager {
         try {
             await fs.access(missionDir);
             throw new Error(`Mission ${mission.id} já existe`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             if ((/** @type {any} */ (error)).code !== 'ENOENT') {
                 throw error;
             }
@@ -86,8 +86,8 @@ class MissionStateManager {
                 percent: 0
             },
             config: mission.config || {},
-            feedback: [],
-            checkpoints: [],
+            feedback: /** @type {any[]} */ ([]),
+            checkpoints: /** @type {any[]} */ ([]),
             history: [
                 {
                     ts: new Date().toISOString(),
@@ -115,7 +115,7 @@ class MissionStateManager {
             const statePath = path.join(this.baseDir, missionId, 'state.json');
             const content = await fs.readFile(statePath, 'utf8');
             return JSON.parse(content);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return null;
             }
@@ -152,7 +152,7 @@ class MissionStateManager {
             missions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
             return missions;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[MissionStateManager] Erro ao listar missões: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
@@ -211,7 +211,7 @@ class MissionStateManager {
         try {
             await fs.rm(missionDir, { recursive: true, force: true });
             logger.log('INFO', `[MissionStateManager] Missão deletada: ${missionId}`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[MissionStateManager] Erro ao deletar missão ${missionId}: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
@@ -230,7 +230,7 @@ class MissionStateManager {
         try {
             await fs.writeFile(outputPath, content, 'utf8');
             logger.log('DEBUG', `[MissionStateManager] Output salvo: ${missionId}/${stepId}`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[MissionStateManager] Erro ao salvar output: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
@@ -248,7 +248,7 @@ class MissionStateManager {
 
         try {
             return await fs.readFile(outputPath, 'utf8');
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return null;
             }
@@ -277,7 +277,7 @@ class MissionStateManager {
             await fs.writeFile(timestampedPath, data, 'utf8');
 
             logger.log('INFO', `[MissionStateManager] Checkpoint salvo: ${missionId}`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[MissionStateManager] Erro ao salvar checkpoint: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
@@ -295,7 +295,7 @@ class MissionStateManager {
         try {
             const content = await fs.readFile(checkpointPath, 'utf8');
             return JSON.parse(content);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return null;
             }

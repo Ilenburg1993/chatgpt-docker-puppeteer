@@ -56,7 +56,7 @@ class PageValidator {
      *
      * @param {any} page - Puppeteer Page instance
      * @param {string} [target] - Target name (chatgpt, gemini, etc) para domain validation
-     * @returns {Promise<object>} Validation result
+     * @returns {Promise<any>} Validation result
      * @property {boolean} valid - true se pode alocar, false se bloqueado
      * @property {Array<object>} issues - Lista de problemas detectados
      * @property {number} timestamp - Timestamp da validação
@@ -100,7 +100,7 @@ class PageValidator {
             // ============================================
             try {
                 await page.evaluate(() => document.readyState);
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
                 issues.push({
                     type: ISSUE_TYPES.PAGE_DISCONNECTED,
@@ -147,7 +147,7 @@ class PageValidator {
                         readyState,
                     });
                 }
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
                 issues.push({
                     type: ISSUE_TYPES.EVALUATION_FAILED,
@@ -168,7 +168,7 @@ class PageValidator {
                 timestamp: Date.now(),
                 duration: Date.now() - startTime,
             };
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageValidator] Validation failed: ${err.message}`);
 
@@ -203,7 +203,7 @@ class PageValidator {
         try {
             await page.evaluate(() => 1 + 1);
             return true;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             return false;
         }
     }

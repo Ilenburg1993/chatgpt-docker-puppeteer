@@ -32,7 +32,7 @@ const CIRCUIT_STATES = {
  * **Unidades:** mode segue CONNECTION_MODES, handlerId como contador incremental.
  *
  * @param {CreateHybridTransportConfig} config - Configuração do transporte híbrido
- * @returns {object} Transporte híbrido com métodos send, onReceive, start, stop
+ * @returns {any} Transporte híbrido com métodos send, onReceive, start, stop
  * @throws {Error} Se telemetry não for fornecida
  */
 function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = null, telemetry }) {
@@ -127,7 +127,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                     handlers.forEach(handler => {
                         try {
                             handler(envelope);
-                        } catch (err) {
+                        } catch (/** @type {any} */ err) {
                             const _e = /** @type {any} */ (err);
                             telemetry.emit('hybrid_transport_handler_error', {
                                 error: _e.message,
@@ -137,7 +137,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                             });
                         }
                     });
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
                     const _e = /** @type {any} */ (err);
                     telemetry.emit('hybrid_transport_parse_error', {
                         error: _e.message,
@@ -179,7 +179,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                     const frame = JSON.stringify(envelope);
                     socketAdapter.send(frame);
                     updateCircuitBreaker(true); // Sucesso na tentativa
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
                     const _e = /** @type {any} */ (err);
                     telemetry.emit('hybrid_transport_send_error', {
                         error: _e.message,

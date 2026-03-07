@@ -49,7 +49,7 @@ export const RAG_SCAN_PROFILES = {
         'jsconfig.json',
         'tsconfig.json',
     ],
-    full: [],
+    full: /** @type {string[]} */ ([]),
 };
 
 function isAllowedByExt(/** @type {any} */ relPath) {

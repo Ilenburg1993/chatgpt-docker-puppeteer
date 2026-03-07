@@ -286,7 +286,7 @@ class ConnectionOrchestrator {
                     defaultViewport: null,
                     protocolTimeout: 5000,
                 });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 const _ce = /** @type {any} */ (e);
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${_ce.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
@@ -315,7 +315,7 @@ class ConnectionOrchestrator {
                         defaultViewport: null,
                         protocolTimeout: 5000,
                     });
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     const _ce = /** @type {any} */ (e);
                     errors.push(`${host}:${port} - ${_ce.message}`);
                 }
@@ -351,7 +351,7 @@ class ConnectionOrchestrator {
                     defaultViewport: null,
                     protocolTimeout: 10000,
                 });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 const _ce = /** @type {any} */ (e);
                 const error = `browserEndpoint.wsEndpoint (${this.config.browserEndpoint.wsEndpoint}): ${_ce.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
@@ -396,7 +396,7 @@ class ConnectionOrchestrator {
                         clearTimeout(timeoutId);
                     }
                 }
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 const _ce = /** @type {any} */ (e);
                 const error = `browserEndpoint.url (${this.config.browserEndpoint.url}): ${_ce.message}`;
                 log('ERROR', `[ORCH] Fast path failed: ${error}`);
@@ -457,7 +457,7 @@ class ConnectionOrchestrator {
                         });
                     }
                     errors.push(`${host}:${port} - No WS URL in response`);
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     const _ce = /** @type {any} */ (e);
                     errors.push(`${host}:${port} - ${_ce.message}`);
                 }
@@ -566,7 +566,7 @@ class ConnectionOrchestrator {
                         log('INFO', `[ORCH] Browser conectado com sucesso em modo: ${currentMode}`);
                         return this.browser; // SUCCESS - sai imediatamente
                     }
-                } catch (error) {
+                } catch (/** @type {any} */ error) {
                     lastError = error;
                     this.attemptedModes.push(currentMode);
                     log('WARN', `[ORCH] Falha em modo ${currentMode}: ${/** @type {any} */ (error).message}`);
@@ -673,7 +673,7 @@ class ConnectionOrchestrator {
                 await new Promise(r => {
                     setTimeout(r, this.config.pageScanIntervalMs);
                 });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 const _ce = /** @type {any} */ (e);
                 if (_ce.message.includes('Browser lost')) {
                     // Joga erro para cima para reiniciar o ciclo do browser
@@ -704,7 +704,7 @@ class ConnectionOrchestrator {
             // await page.bringToFront().catch(() => {});
             this.setState(STATES.PAGE_VALIDATED, { url: page.url() });
             return true;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             this.page = null;
             this.setState(STATES.PAGE_INVALID);
             return false;
@@ -743,7 +743,7 @@ class ConnectionOrchestrator {
                     this.setState(STATES.READY);
                     return { browser: this.browser, page: this.page };
                 }
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 const _ce = /** @type {any} */ (e);
                 attempt++;
                 log('WARN', `[ORCH] Ciclo de recuperação (attempt ${attempt}/${maxRetries}): ${_ce.message}`);
@@ -815,7 +815,7 @@ class ConnectionOrchestrator {
                     entry.ws = json.webSocketDebuggerUrl || null;
                     report.reachable.push(entry);
                     report.checked.push(entry);
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
                     entry.error =
                         err && /** @type {any} */ (err).message ? /** @type {any} */ (err).message : String(err);
                     report.unreachable.push(entry);

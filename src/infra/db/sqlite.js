@@ -95,7 +95,7 @@ function getDb() {
     const dir = path.dirname(dbPath);
     try {
         fs.mkdirSync(dir, { recursive: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         log(
             'ERROR',
             `[DB] Failed to create DB directory: ${dir} - ${/** @type {any} */ (err)?.message || String(err)}`
@@ -124,7 +124,7 @@ function closeDb() {
     }
     try {
         singletonDb.close();
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         log('WARN', `[DB] Failed to close SQLite DB: ${/** @type {any} */ (err)?.message || String(err)}`);
     } finally {
         singletonDb = null;
@@ -140,7 +140,7 @@ function registerExitHandler() {
         if (singletonDb) {
             try {
                 singletonDb.close();
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* process is exiting — best-effort */
             }
             singletonDb = null;

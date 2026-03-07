@@ -68,7 +68,7 @@ function emptyMap() {
  * @param {number} [deps.limits.maxEntries] - Máximo de entradas por correlação
  * @param {number} [deps.limits.maxCorrelations=10000] - Máximo de correlações armazenadas em memória
  * @param {number} [deps.limits.ttl=3600000] - TTL em milissegundos (1 hora padrão)
- * @returns {object} Store de correlação com métodos addEntry, getCorrelation, listCorrelations
+ * @returns {any} Store de correlação com métodos addEntry, getCorrelation, listCorrelations
  * @throws {Error} Se telemetry não for fornecida ou inválida
  */
 function createCorrelationStore({ telemetry, limits = {} }) {
@@ -174,7 +174,7 @@ function createCorrelationStore({ telemetry, limits = {} }) {
      * Registra um envelope em sua correlação.
      *
      * @param {string} correlationId
-     * @param {object} envelope
+     * @param {any} envelope
      */
     function append(correlationId, envelope) {
         if (typeof correlationId !== 'string') {

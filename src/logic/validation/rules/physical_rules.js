@@ -28,7 +28,7 @@
  *
  * @param {CheckPhysicalIntegrityTask} task - Objeto da tarefa (Schema V4).
  * @param {CheckPhysicalIntegrityStats} stats - Objeto fs.Stats do arquivo em disco.
- * @returns {object} { ok: boolean, reason: string|null }
+ * @returns {any} { ok: boolean, reason: string|null }
  */
 function checkPhysicalIntegrity(task, stats) {
     // 1. Validação de Existência (Blindagem de Objeto)

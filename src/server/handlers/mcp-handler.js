@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 /**
  * MCP (Model Context Protocol) Handler for Express
  *
@@ -39,7 +39,7 @@ const handlers = {
      *
      * Minimal implementation: advertises tools/resources capabilities.
      */
-    initialize: async (params, registry) => {
+    initialize: async (/** @type {any} */ params, /** @type {any} */ registry) => {
         const clientProtocolVersion = params?.protocolVersion;
         const protocolVersion =
             typeof clientProtocolVersion === 'string' && clientProtocolVersion.trim()
@@ -73,7 +73,7 @@ const handlers = {
      * notifications/cancelled: client notifies that a request was cancelled
      * Notification (no response expected).
      */
-    'notifications/cancelled': async params => {
+    'notifications/cancelled': async (/** @type {any} */ params) => {
         console.error('[MCP Handler] notifications/cancelled (legacy handler):', params);
         return {};
     },
@@ -88,7 +88,7 @@ const handlers = {
     /**
      * tools/list: Return all available tools from registry
      */
-    'tools/list': async (params, registry) => {
+    'tools/list': async (/** @type {any} */ params, /** @type {any} */ registry) => {
         console.error('[MCP Handler] tools/list request');
         const tools = registry.getAllMetadata();
         console.error(`[MCP Handler] Returning ${tools.length} tools`);
@@ -98,7 +98,7 @@ const handlers = {
     /**
      * tools/call: Execute a tool by name
      */
-    'tools/call': async (params, registry, context = {}) => {
+    'tools/call': async (/** @type {any} */ params, /** @type {any} */ registry, /** @type {Record<string, any>} */ context = {}) => {
         const { name, arguments: args = {} } = params;
 
         console.error(`[MCP Handler] tools/call: ${name}`);
@@ -138,7 +138,8 @@ const handlers = {
                     flags: normalized.flags,
                 },
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             clearTimeout(timeoutId);
 
             // Check if aborted (timeout)
@@ -162,7 +163,7 @@ const handlers = {
                 content: [
                     {
                         type: 'text',
-                        text: `Error executing tool "${name}": ${error.message}`,
+                        text: `Error executing tool "${name}": ${_e.message}`,
                     },
                 ],
                 isError: true,
@@ -197,9 +198,10 @@ const handlers = {
                     description: 'List and read available mission templates via resources/templates/* methods',
                 });
             }
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
+            const _e = /** @type {any} */ (e);
             // ignore errors when listing templates; this resource is optional
-            console.error('[MCP Handler] failed to enumerate templates:', e.message);
+            console.error('[MCP Handler] failed to enumerate templates:', _e.message);
         }
 
         return { resources };
@@ -208,7 +210,7 @@ const handlers = {
     /**
      * resources/read: Read resource content
      */
-    'resources/read': async params => {
+    'resources/read': async (/** @type {any} */ params) => {
         const { uri } = params;
 
         console.error(`[MCP Handler] resources/read: ${uri}`);
@@ -241,8 +243,9 @@ const handlers = {
                         },
                     ],
                 };
-            } catch (error) {
-                throw new Error(`Failed to read resource ${uri}: ${error.message}`); // eslint-disable-line preserve-caught-error
+            } catch (/** @type {any} */ error) {
+                const _e = /** @type {any} */ (error);
+                throw new Error(`Failed to read resource ${uri}: ${_e.message}`); // eslint-disable-line preserve-caught-error
             }
         }
 
@@ -265,7 +268,7 @@ const handlers = {
      * resources/templates/read - fetch a single template by id
      * params: { id: string }
      */
-    'resources/templates/read': async params => {
+    'resources/templates/read': async (/** @type {any} */ params) => {
         const { id } = params || {};
         console.error(`[MCP Handler] resources/templates/read: ${id}`);
         if (!id) {
@@ -296,13 +299,13 @@ export function setupMCPHandler(app, registry) {
      *
      * Accepts JSON-RPC 2.0 requests and routes to appropriate handler
      */
-    app.post('/api/mcp', async (req, res) => {
+    app.post('/api/mcp', async (/** @type {any} */ req, /** @type {any} */ res) => {
         try {
             console.error('[MCP Handler] POST /api/mcp received');
 
             const payload = req.body;
 
-            const handleOne = async msg => {
+            const handleOne = async (/** @type {any} */ msg) => {
                 const { jsonrpc, id, method, params = {} } = msg || {};
                 const requestKey = id === undefined || id === null ? null : String(id);
 
@@ -322,7 +325,7 @@ export function setupMCPHandler(app, registry) {
                 }
 
                 // Find handler for method
-                const handler = handlers[method];
+                const handler = (/** @type {Record<string, any>} */ (handlers))[method];
                 if (!handler) {
                     return {
                         httpStatus: 404,
@@ -346,7 +349,7 @@ export function setupMCPHandler(app, registry) {
                         const controller = targetKey ? pendingRequests.get(targetKey) : null;
                         if (controller) {
                             controller.abort();
-                            pendingRequests.delete(targetKey);
+                            pendingRequests.delete(/** @type {string} */ (targetKey));
                             console.error(`[MCP Handler] Cancelled request ${targetKey}`);
                         } else {
                             console.error(`[MCP Handler] Cancellation received for unknown request ${targetKey}`);
@@ -389,7 +392,8 @@ export function setupMCPHandler(app, registry) {
             }
 
             res.status(single.httpStatus || 200).json(single.json);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             console.error('[MCP Handler] Error:', error);
 
             res.status(500).json({
@@ -398,7 +402,7 @@ export function setupMCPHandler(app, registry) {
                 error: {
                     code: -32603,
                     message: 'Internal error',
-                    data: error.message,
+                    data: _e.message,
                 },
             });
         }
@@ -409,7 +413,7 @@ export function setupMCPHandler(app, registry) {
      *
      * Returns server info, available tools, and methods
      */
-    app.get('/api/mcp', (req, res) => {
+    app.get('/api/mcp', (/** @type {any} */ req, /** @type {any} */ res) => {
         // Streamable HTTP clients (like Kilo) may probe a GET SSE stream by
         // sending `Accept: text/event-stream`.  Historically we replied 405 to
         // signal "SSE not supported" so others would fall back to JSON.  that
@@ -444,7 +448,7 @@ export function setupMCPHandler(app, registry) {
     console.error('[MCP Handler] MCP endpoint ready at POST/GET /api/mcp');
     console.error(`[MCP Handler] Exposed ${registry.getStats().totalTools} tools`);
 }
-function normalizeToolResultPayload(value) {
+function normalizeToolResultPayload(/** @type {any} */ value) {
     if (value && typeof value === 'object' && Array.isArray(value.content)) {
         return {
             text: JSON.stringify(value, null, 2),

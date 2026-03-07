@@ -31,7 +31,7 @@ http.interceptors.response.use(
             if (requestId) {
                 error.request_id = requestId;
             }
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             // ignore
         }

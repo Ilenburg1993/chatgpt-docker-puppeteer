@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { log } from '#core/logger';
 import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
@@ -35,9 +35,9 @@ const SHUTDOWN_BROADCAST_DELAY_MS = 1500;
  */
 class ServerNERVAdapter {
     /**
-     * @param {object} nerv      Instância NERV (obrigatória)
-     * @param {object} socketHub Hub Socket (obrigatório — wrapper, não raw io)
-     * @param {object} config    Configuração do sistema
+     * @param {any} nerv      Instância NERV (obrigatória)
+     * @param {any} socketHub Hub Socket (obrigatório — wrapper, não raw io)
+     * @param {any} [config]  Configuração do sistema
      */
     constructor(nerv, socketHub, config) {
         /* ---------------- validações de contrato ---------------- */
@@ -83,6 +83,7 @@ class ServerNERVAdapter {
         /**
          * Handlers registrados — necessários para cleanup.
          */
+        /** @type {{[key: string]: any}} */
         this._handlers = {
             nervReceive: null,
             dashboardCommand: null,
@@ -108,7 +109,7 @@ class ServerNERVAdapter {
      * Apenas EVENT é propagado.
      */
     _setupNERVListeners() {
-        this._handlers.nervReceive = envelope => {
+        this._handlers.nervReceive = (/** @type {any} */ envelope) => {
             if (this._shutdown) return;
 
             if (getMessageType(envelope) !== MessageType.EVENT) return;
@@ -131,24 +132,24 @@ class ServerNERVAdapter {
      * Registra listeners Socket → comandos dashboard.
      */
     _setupSocketListeners() {
-        this._handlers.dashboardCommand = data => {
+        this._handlers.dashboardCommand = (/** @type {any} */ data) => {
             this._handleDashboardCommand(data).catch(err => {
                 log('ERROR', `[ServerNERVAdapter] comando dashboard falhou: ${err.message}`);
             });
         };
 
-        this._handlers.dashboardStatus = data => {
+        this._handlers.dashboardStatus = (/** @type {any} */ data) => {
             this._handleStatusRequest(data).catch(err => {
                 log('ERROR', `[ServerNERVAdapter] status request falhou: ${err.message}`);
             });
         };
 
-        this._handlers.clientConnected = clientId => {
+        this._handlers.clientConnected = (/** @type {any} */ clientId) => {
             this.stats.clientsConnected++;
             log('INFO', `[ServerNERVAdapter] Cliente conectado: ${clientId}`);
         };
 
-        this._handlers.clientDisconnected = clientId => {
+        this._handlers.clientDisconnected = (/** @type {any} */ clientId) => {
             this.stats.clientsConnected = Math.max(0, this.stats.clientsConnected - 1);
             log('INFO', `[ServerNERVAdapter] Cliente desconectado: ${clientId}`);
         };
@@ -182,7 +183,7 @@ class ServerNERVAdapter {
      * @returns {{normalizedPayload: Record<string, unknown>, taskId: string|null, payloadCorrelationId: string|null}}
      */
     _normalizeDashboardPayload(payload) {
-        const normalizedPayload = payload && typeof payload === 'object' ? { ...payload } : {};
+        const normalizedPayload = /** @type {any} */ (payload && typeof payload === 'object' ? { ...payload } : {});
 
         const taskId =
             typeof normalizedPayload.taskId === 'string'
@@ -210,7 +211,7 @@ class ServerNERVAdapter {
     /**
      * Traduz comando dashboard → ActionCode NERV.
      */
-    async _handleDashboardCommand(data = {}) {
+    async _handleDashboardCommand(/** @type {any} */ data = {}) {
         const { command, payload, clientId, correlationId: requestedCorrelationId } = data;
 
         if (!command) return;
@@ -290,7 +291,7 @@ class ServerNERVAdapter {
    STATUS REQUEST HANDLER
 ========================================================================== */
 
-    async _handleStatusRequest(data = {}) {
+    async _handleStatusRequest(/** @type {any} */ data = {}) {
         const { requestType, clientId } = data;
         const correlationId = `status-${Date.now()}`;
 
@@ -314,9 +315,9 @@ class ServerNERVAdapter {
    EVENT BROADCAST
 ========================================================================== */
 
-    async _broadcastEvent(envelope) {
+    async _broadcastEvent(/** @type {any} */ envelope) {
         const actionCode = getActionCode(envelope);
-        if (!actionCode || PRIVATE_EVENTS.has(/** @type {unknown} */ (actionCode))) return;
+        if (!actionCode || PRIVATE_EVENTS.has(/** @type {any} */ (actionCode))) return;
 
         const socketEvent = this._translateEventName(actionCode);
         const payload = getPayload(envelope);
@@ -343,17 +344,18 @@ class ServerNERVAdapter {
    UTILITIES
 ========================================================================== */
 
-    _translateEventName(actionCode) {
+    _translateEventName(/** @type {any} */ actionCode) {
         const p = actionCode.toLowerCase().split('_');
         return `${p[0]}:${p.slice(1).join('_')}`;
     }
 
-    async _emitCommand(actionCode, payload, correlationId) {
+    async _emitCommand(/** @type {any} */ actionCode, /** @type {any} */ payload, /** @type {any} */ correlationId) {
         try {
             await HighLevelNERV.sendCommand(this.nerv, ActorRole.SERVER, actionCode, payload, correlationId);
             return true;
-        } catch (err) {
-            log('ERROR', `[ServerNERVAdapter] Falha ao emitir comando: ${err.message}`, correlationId);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('ERROR', `[ServerNERVAdapter] Falha ao emitir comando: ${_e.message}`, correlationId);
             return false;
         }
     }
@@ -374,10 +376,11 @@ class ServerNERVAdapter {
             if (this._handlers.nervReceive && this.nerv.offReceive) {
                 this.nerv.offReceive(this._handlers.nervReceive);
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             log(
                 'WARN',
-                `[ServerNERVAdapter] Falha ao remover nervReceive listener: ${err && err.message ? err.message : String(err)}`
+                `[ServerNERVAdapter] Falha ao remover nervReceive listener: ${err && _e.message ? _e.message : String(err)}`
             );
         }
 

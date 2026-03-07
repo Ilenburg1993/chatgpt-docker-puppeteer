@@ -1,13 +1,13 @@
-// @ts-nocheck
+// @ts-check
 import { hasPermission } from '#server/domain/rbac_policy';
 
 /**
  * Função exportada: requirePermission.
  * @param {*} permission
- * @returns {void}
+ * @returns {any}
  */
 function requirePermission(permission) {
-    return (req, res, next) => {
+    return (/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
         if (!req.user) {
             return res.status(401).json({
                 success: false,

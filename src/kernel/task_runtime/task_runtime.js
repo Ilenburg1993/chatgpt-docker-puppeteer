@@ -71,7 +71,7 @@ class TaskRuntime extends EventEmitter {
      * @param {object} [params.metadata]
      * Metadados iniciais (livre, não interpretado pelo TaskRuntime).
      *
-     * @returns {object}
+     * @returns {any}
      * Snapshot imutável da tarefa criada.
      */
     createTask({ taskId, metadata = {} }) {
@@ -95,7 +95,7 @@ class TaskRuntime extends EventEmitter {
              * Histórico interno da tarefa.
              * Lista de eventos técnicos (não semânticos).
              */
-            history: [],
+            history: /** @type {any[]} */ ([]),
 
             /**
              * [P2.2 FIX] Contador de ciclos sem progresso.
@@ -164,7 +164,7 @@ class TaskRuntime extends EventEmitter {
      * @param {string} params.reason
      * Descrição da decisão que motivou a transição.
      *
-     * @returns {object}
+     * @returns {any}
      * Snapshot atualizado da tarefa.
      */
     applyStateTransition({ taskId, newState, reason }) {
@@ -340,7 +340,7 @@ class TaskRuntime extends EventEmitter {
     /**
      * Retorna estatísticas técnicas.
      *
-     * @returns {object}
+     * @returns {any}
      */
     getStats() {
         const byState = /** @type {Record<string, number>} */ ({});
@@ -399,7 +399,7 @@ class TaskRuntime extends EventEmitter {
      * Produz snapshot imutável da tarefa.
      * Protege contra mutação externa.
      * @param {any} task
-     * @returns {object}
+     * @returns {any}
      */
     _snapshot(task) {
         return Object.freeze({

@@ -35,6 +35,7 @@
     "**/*.bundle.js",
     "**/*.d.ts.map",
     "**/*.js.map",
-    "scripts/legacy/**"
+    "scripts/legacy/**",
+    "scripts/dist/**"
   ]
 }

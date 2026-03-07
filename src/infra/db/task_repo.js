@@ -95,7 +95,7 @@ function _rowToTask(row) {
     let task;
     try {
         task = JSON.parse(row.task_json);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[task_repo] Invalid task_json for task ${row?.id}: ${msg}`);
         // Return null for corrupted tasks - they'll be invisible until fixed
@@ -130,7 +130,7 @@ function _rowToTask(row) {
     if (row.blocked_details_json) {
         try {
             task.state.blocked_details = JSON.parse(row.blocked_details_json);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             log.warn(
                 { taskId: task.id, field: 'blocked_details_json', error: (/** @type {any} */ (err))?.message },
                 '[task_repo] Fallback to raw string for malformed JSON'
@@ -143,7 +143,7 @@ function _rowToTask(row) {
     if (row.result_json) {
         try {
             task.result_db = JSON.parse(row.result_json);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             log.warn(
                 { taskId: task.id, field: 'result_json', error: (/** @type {any} */ (err))?.message },
                 '[task_repo] Fallback to raw string for malformed JSON'
@@ -425,7 +425,7 @@ function insertTask(
                 payload: JSON.stringify({ id, stage, status }),
                 dedup_key: dedupKey,
             });
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* ignore */
         }
     });
@@ -545,7 +545,7 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
                 parsed.policy.dependencies = nextDeps;
                 nextTaskJson = JSON.stringify(parsed);
             }
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* best-effort */
         }
     }

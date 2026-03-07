@@ -11,32 +11,54 @@
 
 ---
 
-## Estado geral — 6 de março de 2026 (Fase C em andamento)
+## Estado geral — 7 de março de 2026 🎉 FASES 0–D COMPLETAS
 
-| Indicador                     | Antes     | Agora         |
-| ----------------------------- | --------- | ------------- |
-| Arquivos com `// @ts-check`   | **670**   | **670**       |
-| `@ts-nocheck` em código real  | **0** ✅   | **0** ✅       |
-| Erros `typecheck:node` (base) | ~2.170    | **~1.800**    |
-| Erros `typecheck:strict:all`  | ~7.414    | **~720** ↓    |
-| Lanes com 0 erros             | 11 de 30+ | **28 de 30+** |
+| Indicador                          | Início do roadmap | Agora (7 mar 2026)     |
+| ---------------------------------- | ----------------- | ---------------------- |
+| Arquivos com `// @ts-check`        | **670**           | **721** ✅ (+51 src/)   |
+| `@ts-ignore` em código real        | desconhecido      | **0** ✅                |
+| `@ts-nocheck` em código real       | **0** ✅           | **0** ✅                |
+| Erros `typecheck:node` (base)      | ~2.170            | **0** ✅                |
+| Erros `typecheck:tools`            | ~2                | **0** ✅                |
+| Erros `typecheck:browser`          | ~285              | **0** ✅                |
+| Erros `typecheck:tests`            | 15                | **0** ✅                |
+| Erros `typecheck:isolated`         | N/A               | **0** ✅ (novo)         |
+| Erros `typecheck:strict:all`       | ~7.414            | **0** ✅ 🎉              |
+| Lanes strict com 0 erros           | 11 de 39          | **39 de 39** ✅         |
+| `strict: true` em tsconfig.base    | não               | **sim** ✅              |
+| `useUnknownInCatchVariables`       | não               | **sim** ✅              |
+| `strictNullChecks`                 | não               | **sim** ✅              |
+| `noImplicitAny` (via strict)       | não               | **sim** ✅              |
+| `isolatedDeclarations` (src/types) | não               | **sim** ✅              |
+| Schema tsserver-tool-contract      | v1.0.0            | **v1.1.0** ✅           |
+| JSDoc cobertura exports            | ~70%              | **100%** (1115/1115) ✅ |
+| Tags unsafe restantes (`@any`)     | ~alto             | ~404 (manter monit.)   |
 
-**Fase 0 concluída**: 214 erros JSDoc estruturais (TS8032=177, TS8024=37) eliminados. **Fase A
-concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gateway` ✅,
-`src.audit_agent` ✅, `src.dashboard-ui` ✅, `tests.manual` ✅.
+**Fases 0–D concluídas em 7 de março de 2026**: `strict: true` ativado globalmente em
+`tsconfig.base.json`, todos os targets em 0, `isolatedDeclarations` ativo para `src/types/`.
 
-**Fase B concluída (11/11)**: `src.nerv` ✅, `scripts.health` ✅, `src.missions` ✅, `src.shared`
-✅, `src.orchestrator` ✅, `src.integration` ✅, `tools.workspace` ✅, `scripts.root` ✅,
-`src.kernel` ✅, `src.agent` ✅, `src.core` ✅, `scripts.audit` ✅.
+**Fases 0–C concluídas em 6 de março de 2026**: todas as 39 lanes strict zeradas. Erros corrigidos
+na sessão final (6 mar 2026):
 
-**Fase C em andamento**: `src.infra` ✅ **zerado** (484→0), restam `src.driver` (431) e
-`tests.legacy` (289).
+- `scripts/security/npm-audit-gate.mjs` — TS7053 (indexação com `string`) ✅
+- `tests/manual/kernel/helpers.js` — 7 exports faltantes (TS2305) ✅
+- `tsconfig.tools.json` — `scripts/dist/` excluído (TS2307) ✅
 
-> **Cascata total**: Fases A+B+C zerou 28 lanes. Apenas `src.driver` e `tests.legacy` restam antes
-> da Fase D (flags noImplicitAny, strictNullChecks, strict:true).
+**Dependências instaladas**: `@types/better-sqlite3`, `@types/ws` (devDependencies).
 
-**Dependência nova instalada**: `@types/better-sqlite3` (devDependencies) — resolve TS7016 em
-`src/infra/db/sqlite.js`.
+**Fase D concluída em 7 de março de 2026**. Etapas completadas:
+
+- D.0: `typecheck:tests` → 0 (fixados erros de union types e spread params) ✅
+- D.1: `useUnknownInCatchVariables: true` ativado globalmente ✅
+- D.2: `noImplicitAny` zerado (55 callbacks tipados + via `strict: true`) ✅
+- D.3: `strictNullChecks: true` ativado globalmente ✅
+- D.4: `strict: true` em `tsconfig.base.json` ativado — todos os targets: 0 ✅
+- Extra: 51 arquivos `src/` receberam `// @ts-check`, `@ts-ignore` eliminados (→0) ✅
+- Extra: `tsconfig.isolated-declarations.json` criado, `typecheck:isolated` → 0 ✅
+- Extra: Schema `tsserver-tool-contract` atualizado para v1.1.0 ✅
+
+> **Próximo objetivo (Fase E)**: migração `@import` + redução de `@any` + expansão de
+> `isolatedDeclarations` para outros subdiretórios de `src/types/`.
 
 ---
 
@@ -64,38 +86,38 @@ concluída (6/6)**: `src.logic` ✅, `scripts.analysis` ✅, `src.inference_gate
 
 ## Baseline por lane strict
 
-| Lane                    | Erros | Fase    | Status      |
-| ----------------------- | ----: | ------- | ----------- |
-| `src.types`             |     0 | ✅ verde | Manter      |
-| `agents`                |     0 | ✅ verde | Manter      |
-| `scripts.ci`            |     0 | ✅ verde | Manter      |
-| `scripts.setup`         |     0 | ✅ verde | Manter      |
-| `tests.helpers`         |     0 | ✅ verde | Manter      |
-| `scripts.build`         |     0 | ✅ verde | Manter      |
-| `scripts.env`           |     0 | ✅ verde | Manter      |
-| `src.validation`        |     0 | ✅ verde | Manter      |
-| `tests.mocks`           |     0 | ✅ verde | Manter      |
-| `src.logic`             |     0 | ✅ verde | Manter      |
-| `scripts.analysis`      |     0 | ✅ verde | Manter      |
-| `src.inference_gateway` |     0 | ✅ verde | Manter      |
-| `src.dashboard-ui`      |     0 | ✅ verde | Manter      |
-| `tests.manual`          |     0 | ✅ verde | Manter      |
-| `src.audit_agent`       |     0 | ✅ verde | Manter      |
-| `src.nerv`              |     0 | ✅ verde | Manter      |
-| `scripts.health`        |     0 | ✅ verde | Manter      |
-| `src.missions`          |     0 | ✅ verde | Manter      |
-| `src.shared`            |     0 | ✅ verde | Manter      |
-| `src.orchestrator`      |     0 | ✅ verde | Manter      |
-| `src.integration`       |     0 | ✅ verde | Manter      |
-| `tools.workspace`       |     0 | ✅ Done  | ↓ era 1.013 |
-| `scripts.root`          |     0 | ✅ Done  | ↓ era 935   |
-| `src.kernel`            |     0 | ✅ Done  | ↓ era 1.530 |
-| `src.agent`             |     0 | ✅ Done  | ↓ era 1.190 |
-| `src.core`              |     0 | ✅ Done  | ↓ era 1.053 |
-| `scripts.audit`         |     0 | ✅ Done  | ↓ era 928   |
-| `src.infra`             |     0 | ✅ Done  | ↓ era 2.232 |
-| `src.driver`            |   431 | Fase C  | ↓ era 1.558 |
-| `tests.legacy`          |   289 | Fase C  | ↓ era 1.403 |
+| Lane                    | Erros | Fase    | Status               |
+| ----------------------- | ----: | ------- | -------------------- |
+| `src.types`             |     0 | ✅ verde | Manter               |
+| `agents`                |     0 | ✅ verde | Manter               |
+| `scripts.ci`            |     0 | ✅ verde | Manter               |
+| `scripts.setup`         |     0 | ✅ verde | Manter               |
+| `tests.helpers`         |     0 | ✅ verde | Manter               |
+| `scripts.build`         |     0 | ✅ verde | Manter               |
+| `scripts.env`           |     0 | ✅ verde | Manter               |
+| `src.validation`        |     0 | ✅ verde | Manter               |
+| `tests.mocks`           |     0 | ✅ verde | Manter               |
+| `src.logic`             |     0 | ✅ Done  | ↓ era 2              |
+| `scripts.analysis`      |     0 | ✅ Done  | ↓ era 181            |
+| `src.inference_gateway` |     0 | ✅ Done  | ↓ era 191            |
+| `src.dashboard-ui`      |     0 | ✅ Done  | ↓ era 285            |
+| `tests.manual`          |     0 | ✅ Done  | ↓ era 300            |
+| `src.audit_agent`       |     0 | ✅ Done  | ↓ era 358            |
+| `src.nerv`              |     0 | ✅ Done  | ↓ era 439            |
+| `scripts.health`        |     0 | ✅ Done  | ↓ era 441            |
+| `src.missions`          |     0 | ✅ Done  | ↓ era 608            |
+| `src.shared`            |     0 | ✅ Done  | ↓ era 746            |
+| `src.orchestrator`      |     0 | ✅ Done  | ↓ era 773            |
+| `src.integration`       |     0 | ✅ Done  | ↓ era 924            |
+| `scripts.audit`         |     0 | ✅ Done  | ↓ era 928            |
+| `scripts.root`          |     0 | ✅ Done  | ↓ era 935            |
+| `tools.workspace`       |     0 | ✅ Done  | ↓ era 1.013          |
+| `src.core`              |     0 | ✅ Done  | ↓ era 1.053          |
+| `src.agent`             |     0 | ✅ Done  | ↓ era 1.190          |
+| `src.kernel`            |     0 | ✅ Done  | ↓ era 1.530          |
+| `src.infra`             |     0 | ✅ Done  | ↓ era 2.232          |
+| `src.driver`            |     0 | ✅ Done  | ↓ era 1.558 (Fase C) |
+| `tests.legacy`          |     0 | ✅ Done  | ↓ era 1.403 (Fase C) |
 
 ---
 
@@ -191,61 +213,107 @@ src.kernel.
 4. `src/infra/storage/*.js`, `locks/*.js`, `fs/*.js`
 
 - [x] `src.infra`: 716 → 0 ✅ (↓ era 2.232)
-- [ ] `src.driver`: **431** → 0 ← próximo
-- [ ] `tests.legacy`: **289** → 0
+- [x] `src.driver`: 431 → 0 ✅ (↓ era 1.558)
+- [x] `tests.legacy`: 289 → 0 ✅ (↓ era 1.403)
+
+**Fase C concluída em 6 de março de 2026.** Correções finais desta sessão:
+
+- `scripts/security/npm-audit-gate.mjs`: TS7053 — cast `/** @type {any} */` aplicado antes da
+  indexação (não após)
+- `tests/manual/kernel/helpers.js`: 7 exports faltantes (TS2305) — reescrito com stubs corretos e
+  tipos
+- `tsconfig.tools.json`: `scripts/dist/**` adicionado ao exclude (TS2307 em artefatos gerados)
 
 ---
 
 ## Fase D — Convergência e ativação de flags
 
-Após Fases A–C com `typecheck:strict:all` próximo de 0, ativar flags progressivamente em
-`tsconfig.base.json`.
+**PRÉ-CONDIÇÃO ATINGIDA** (6 mar 2026): `typecheck:strict:all` → 0 ✅ — Fase D pode iniciar.
 
-| Etapa | Flag                         |  Erros diretos | Padrão de correção                   |
-| ----- | ---------------------------- | -------------: | ------------------------------------ |
-| D.1   | `useUnknownInCatchVariables` |            602 | `const e = /** @type {any} */ (err)` |
-| D.2   | `noImplicitAny`              |          1.675 | `@param` em todos os callbacks       |
-| D.3   | `strictNullChecks`           |            245 | `?.`, `?? default`, null guards      |
-| D.4   | `strict: true`               | (consolidação) | Todos os anteriores                  |
+Ativar flags progressivamente em `tsconfig.base.json`:
+
+| Etapa | Flag                         | Erros estimados | Padrão de correção                   | Status |
+| ----- | ---------------------------- | --------------: | ------------------------------------ | ------ |
+| D.0   | `typecheck:tests` → 0        |              15 | Fix union types + spread params      | ✅      |
+| D.1   | `useUnknownInCatchVariables` |             602 | `const e = /** @type {any} */ (err)` | ✅      |
+| D.2   | `noImplicitAny`              |           1.675 | `@param` em todos os callbacks       | ✅      |
+| D.3   | `strictNullChecks`           |             245 | `?.`, `?? default`, null guards      | ✅      |
+| D.4   | `strict: true`               |  (consolidação) | Todos os anteriores                  | ✅      |
 
 **Flags NÃO recomendadas**: `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`.
 
-- [ ] `typecheck:node` → 0
-- [ ] `useUnknownInCatchVariables: true` — sem regressão
-- [ ] `noImplicitAny: true` — sem regressão
-- [ ] `strictNullChecks: true` — sem regressão
-- [ ] `strict: true` em tsconfig.base.json — `typecheck:strict:all` → 0
+**Prioridade D.0** — 15 erros não-strict em `typecheck:tests`:
+
+- `tests/e2e/test_ariadne_thread.spec.js`: TS2339 em `.prototype` sobre union
+  `typeof Class | typeof module`
+- `tests/regression/test_wave14_driver_adapter_timeout_cleanup.spec.js`: TS2556 spread em parâmetro
+  não-rest
+- `tests/unit/core/test_config.spec.js`: TS2339 `.reload`/`.all`/`.isInitialized` em union type
+
+- [x] `typecheck:strict:all` → 0 ✅ (Fases 0–C concluídas em 6/3/2026)
+- [x] `typecheck:tests` → 0 ✅ (D.0 — resolvido em 7/3/2026)
+- [x] `useUnknownInCatchVariables: true` — sem regressão ✅ (D.1 — 7/3/2026)
+- [x] `noImplicitAny: true` — sem regressão ✅ (D.2 — 55 callbacks tipados — 7/3/2026)
+- [x] `strictNullChecks: true` — sem regressão ✅ (D.3 — 7/3/2026)
+- [x] `strict: true` em tsconfig.base.json ✅ (D.4 — 7/3/2026)
 
 ---
 
-## Lanes sempre-verde (manter em 0)
+## Lanes sempre-verde (manter em 0) — TODAS AS 39 LANES
 
-- [x] `src.types`
-- [x] `agents`
-- [x] `scripts.ci`
-- [x] `scripts.setup`
-- [x] `tests.helpers`
-- [x] `scripts.build`
-- [x] `scripts.env`
-- [x] `src.validation`
-- [x] `tests.mocks`
-- [x] `src.logic` — zerado em 4 mar 2026 ✅
-- [x] `scripts.analysis` — zerado em 4 mar 2026 ✅
+**Todas as 39 lanes strict são agora sempre-verde.** Qualquer regressão em qualquer lane bloqueia o
+merge.
 
-**Qualquer regressão nestas lanes bloqueia o merge.**
+- [x] `src.types` — verde desde início
+- [x] `agents` — verde desde início
+- [x] `scripts.ci` — verde desde início
+- [x] `scripts.setup` — verde desde início
+- [x] `tests.helpers` — verde desde início
+- [x] `scripts.build` — verde desde início
+- [x] `scripts.env` — verde desde início
+- [x] `src.validation` — verde desde início
+- [x] `tests.mocks` — verde desde início
+- [x] `src.logic` — zerado Fase A ✅
+- [x] `scripts.analysis` — zerado Fase A ✅
+- [x] `src.inference_gateway` — zerado Fase A ✅
+- [x] `src.dashboard-ui` — zerado Fase A ✅
+- [x] `tests.manual` — zerado Fase A ✅
+- [x] `src.audit_agent` — zerado Fase A ✅
+- [x] `src.nerv` — zerado Fase B ✅
+- [x] `scripts.health` — zerado Fase B ✅
+- [x] `src.missions` — zerado Fase B ✅
+- [x] `src.shared` — zerado Fase B ✅
+- [x] `src.orchestrator` — zerado Fase B ✅
+- [x] `src.integration` — zerado Fase B ✅
+- [x] `scripts.audit` — zerado Fase B ✅
+- [x] `scripts.root` — zerado Fase B ✅ (↓ era 935)
+- [x] `tools.workspace` — zerado Fase B ✅ (↓ era 1.013)
+- [x] `src.core` — zerado Fase B ✅ (↓ era 1.053)
+- [x] `src.agent` — zerado Fase B ✅ (↓ era 1.190)
+- [x] `src.kernel` — zerado Fase B ✅ (↓ era 1.530)
+- [x] `src.infra` — zerado Fase C ✅ (↓ era 2.232)
+- [x] `src.driver` — zerado Fase C ✅ (↓ era 1.558) — sessão 6/3/2026
+- [x] `tests.legacy` — zerado Fase C ✅ (↓ era 1.403) — sessão 6/3/2026
+
+**Gate de CI**: `npm run typecheck:strict` → deve retornar exit 0 em toda PR.
 
 ---
 
-## Estimativa de esforço
+## Histórico de esforço
 
-| Fase   | Erros atuais | Sessões estimadas | Status      |
-| ------ | -----------: | :---------------: | ----------- |
-| Fase 0 |            0 |         —         | ✅ Concluída |
-| Fase A |        1.134 |        2–3        | 2/6 feito   |
-| Fase B |        7.331 |        6–8        | —           |
-| Fase C |        6.723 |        5–6        | —           |
-| Fase D |         res. |        2–3        | —           |
+| Fase   | Erros eliminados | Lanes zeradas | Status            |
+| ------ | ---------------: | :-----------: | ----------------- |
+| Fase 0 |              214 |       —       | ✅ Concluída       |
+| Fase A |            1.134 |       6       | ✅ Concluída       |
+| Fase B |            7.331 |      12       | ✅ Concluída       |
+| Fase C |            6.723 |       3       | ✅ Concluída (6/3) |
+| Fase D |       ~2.537 est |       —       | ✅ Concluída (7/3) |
 
 > **Nota sobre cascata**: corrigir um typedef em `src/infra/db/task_repo.js` pode eliminar dezenas
 > de TS2339 em `src/agent/*.js` e `src/missions/*.js`. O número real de **linhas modificadas** é
 > muito menor que o número de erros reportados.
+
+**Total eliminado**: ~15.402 erros TypeScript (Fases 0–C) em 39 lanes. **Fase D concluída em
+7/3/2026**: `strict: true` ativado globalmente, todos os targets em 0. **Next action**: Fase E —
+migração `@import` + redução de `@any`. Ver [`AUDITORIA-2026-03-07.md`](./AUDITORIA-2026-03-07.md)
+para métricas completas da Fase D.

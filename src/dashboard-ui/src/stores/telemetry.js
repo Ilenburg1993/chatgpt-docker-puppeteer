@@ -187,7 +187,7 @@ export const useTelemetryStore = defineStore('telemetry', {
                 if (metrics) {
                     this.updateMetrics(metrics);
                 }
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
     const error = /** @type {any} */ (_rawError);
                 this.error = (/** @type {any} */ (formatHttpError(error))).message;
                 console.error('[TelemetryStore] Erro ao carregar métricas:', error);
@@ -237,7 +237,7 @@ export const useTelemetryStore = defineStore('telemetry', {
                         this.history.queueSize.push(item.value, item.timestamp);
                     });
                 }
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
     const error = /** @type {any} */ (_rawError);
                 this.error = (/** @type {any} */ (formatHttpError(error))).message;
                 console.error('[TelemetryStore] Erro ao carregar histórico:', error);

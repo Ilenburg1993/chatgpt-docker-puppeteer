@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import * as doctor from '#core/doctor';
 import { notify } from '#server/engine/socket';
 import { log } from '#core/logger';
@@ -7,6 +7,7 @@ import { log } from '#core/logger';
  * Referência privada para o temporizador do ciclo de amostragem.
  * Mantida fora do export para garantir a soberania do Singleton.
  */
+/** @type {any} */
 let pulseInterval = null;
 
 /**
@@ -76,9 +77,10 @@ function _pushMetrics() {
         // Broadcast global para todos os terminais conectados (Dashboards)
         // O método notify do socket.js V600 garante a entrega atômica.
         notify('sys_metrics', payload);
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
         // Falhas na telemetria de hardware são não-críticas e não devem parar o servidor
-        log('ERROR', `[TELEMETRY_HW] Erro no ciclo de amostragem: ${e.message}`);
+        log('ERROR', `[TELEMETRY_HW] Erro no ciclo de amostragem: ${_e.message}`);
     }
 }
 

@@ -181,7 +181,7 @@ class HeartbeatWatchdog {
                         reason_code: 'HEARTBEAT_TIMEOUT',
                         cause_layer: 'WATCHDOG',
                     });
-                } catch (_rawAttemptErr) {
+                } catch (/** @type {any} */ _rawAttemptErr) {
                     const attemptErr = /** @type {any} */ (_rawAttemptErr);
                     log(
                         'WARN',
@@ -199,7 +199,7 @@ class HeartbeatWatchdog {
                             execute_after_ms: now + 5000,
                             last_error: errorMsg,
                         });
-                    } catch (_rawTaskErr) {
+                    } catch (/** @type {any} */ _rawTaskErr) {
                         const taskErr = /** @type {any} */ (_rawTaskErr);
                         log(
                             'WARN',
@@ -209,7 +209,7 @@ class HeartbeatWatchdog {
 
                     try {
                         releaseTaskLock({ taskId });
-                    } catch (_rawLockErr) {
+                    } catch (/** @type {any} */ _rawLockErr) {
                         const lockErr = /** @type {any} */ (_rawLockErr);
                         log(
                             'DEBUG',
@@ -223,7 +223,7 @@ class HeartbeatWatchdog {
                     `[HeartbeatWatchdog] Task ${taskId} rescheduled after heartbeat timeout (attempt ${attemptId})`
                 );
             }
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[HeartbeatWatchdog] tick failed: ${err?.message || String(err)}`);
         }

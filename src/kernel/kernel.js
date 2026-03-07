@@ -61,7 +61,7 @@ function _makeRetryableEmitError(err) {
 /**
  * Cria um kernel SSOT-first com gateway de execução e pump NERV.
  * @param {SsotGatewayKernelOptions} [config={}] - Configuração do kernel.
- * @returns {object} Instância do kernel com métodos start/stop/executeTask.
+ * @returns {any} Instância do kernel com métodos start/stop/executeTask.
  * @throws {Error} Se nerv não for fornecido.
  */
 function createSsotGatewayKernel(config = {}) {
@@ -109,7 +109,7 @@ function createSsotGatewayKernel(config = {}) {
                 if (!raw) break;
                 try {
                     nerv.receive(raw);
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     telemetry.warning('kernel_ssot_gateway_inbound_receive_failed', {
                         error: err?.message || String(err),
@@ -130,13 +130,13 @@ function createSsotGatewayKernel(config = {}) {
                 if (transport && typeof transport.send === 'function') {
                     try {
                         transport.send(envelope);
-                    } catch (_rawErr) {
+                    } catch (/** @type {any} */ _rawErr) {
                         const err = /** @type {any} */ (_rawErr);
                         try {
                             const serialized = JSON.stringify(envelope);
                             const buffer = Buffer.from(serialized, 'utf8');
                             transport.send(buffer);
-                        } catch (_rawFallback) {
+                        } catch (/** @type {any} */ _rawFallback) {
                             const fallbackError = /** @type {any} */ (_rawFallback);
                             telemetry.critical('kernel_ssot_gateway_outbound_send_failed', {
                                 error: fallbackError?.message || err?.message || String(fallbackError || err),
@@ -148,7 +148,7 @@ function createSsotGatewayKernel(config = {}) {
                     // Local fallback: deliver directly to NERV reception in-process.
                     try {
                         nerv.receive(envelope);
-                    } catch (_rawErr) {
+                    } catch (/** @type {any} */ _rawErr) {
                         const err = /** @type {any} */ (_rawErr);
                         telemetry.warning('kernel_ssot_gateway_outbound_loopback_failed', {
                             error: err?.message || String(err),
@@ -262,7 +262,7 @@ function createSsotGatewayKernel(config = {}) {
                 correlationId || null,
                 ActorRole.DRIVER
             );
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             throw _makeRetryableEmitError(err);
         }
     }
@@ -274,7 +274,7 @@ function createSsotGatewayKernel(config = {}) {
         executeTask,
         /**
          * Obtém o status atual do kernel.
-         * @returns {object} Status do kernel com informações sobre pump, nerv e telemetria.
+         * @returns {any} Status do kernel com informações sobre pump, nerv e telemetria.
          */
         getStatus() {
             const status = {
@@ -332,7 +332,7 @@ function createSsotGatewayKernel(config = {}) {
  * @param {object} config.loop
  * @param {number} [config.loop.interval] - Intervalo do loop em ms
  *
- * @returns {object} Interface pública do Kernel
+ * @returns {any} Interface pública do Kernel
  *
  * @throws {Error} Se NERV não for fornecido
  */
@@ -452,7 +452,7 @@ function createLegacyKernel({
             cleanupTaskDispatchState(taskId);
             try {
                 taskRuntime.forgetTask(taskId);
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore */
             }
             return;
@@ -467,7 +467,7 @@ function createLegacyKernel({
         cleanupTaskDispatchState(taskId);
         try {
             taskRuntime.forgetTask(taskId);
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* ignore */
         }
     };
@@ -534,7 +534,7 @@ function createLegacyKernel({
         // A limpeza deve ocorrer em "terminate"/"completed".
         try {
             await taskExecutor.executeTask(queued.task, queued.correlationId);
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             telemetry.warning('kernel_activate_dispatch_failed', {
                 taskId,
@@ -639,7 +639,7 @@ function createLegacyKernel({
 
         /**
          * Obtém o status atual do kernel.
-         * @returns {object} Status do kernel com informações sobre loop, tarefas, observações, nerv e telemetria.
+         * @returns {any} Status do kernel com informações sobre loop, tarefas, observações, nerv e telemetria.
          */
         getStatus() {
             return Object.freeze({
@@ -667,7 +667,7 @@ function createLegacyKernel({
          * @param {object} params - Parâmetros da tarefa.
          * @param {string} params.taskId - ID da tarefa.
          * @param {object} [params.metadata={}] - Metadados adicionais.
-         * @returns {object} Tarefa criada.
+         * @returns {any} Tarefa criada.
          */
         createTask({ taskId, metadata = {} }) {
             return taskRuntime.createTask({ taskId, metadata });
@@ -710,7 +710,7 @@ function createLegacyKernel({
                 // Allow SSOT to re-dispatch the same taskId after terminal by forgetting runtime state.
                 try {
                     taskRuntime.forgetTask(taskId);
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
             }
@@ -767,7 +767,7 @@ function createLegacyKernel({
  * - Opcional: Kernel legado "decisor soberano" (mode='legacy')
  *
  * @param {KernelOptions} [config={}] - Configuração do kernel.
- * @returns {object} Instância do kernel configurado.
+ * @returns {any} Instância do kernel configurado.
  * Side-effects: Cria e inicializa os componentes do kernel conforme a configuração.
  */
 function createKernel(config = {}) {

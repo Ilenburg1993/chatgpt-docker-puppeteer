@@ -457,7 +457,7 @@ async function registerOneUpstream(
                                 arguments: params,
                                 signal: /** @type {any} */ (execOptions).signal,
                             });
-                        } catch (_raw_err) {
+                        } catch (/** @type {any} */ _raw_err) {
                             const err = /** @type {any} */ (_raw_err);
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
                             throw err;
@@ -515,7 +515,7 @@ async function registerOneUpstream(
                                 arguments: params,
                                 signal: /** @type {any} */ (execOptions).signal,
                             });
-                        } catch (_raw_err) {
+                        } catch (/** @type {any} */ _raw_err) {
                             const err = /** @type {any} */ (_raw_err);
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
                             throw err;
@@ -530,7 +530,7 @@ async function registerOneUpstream(
         st.state = 'ready';
         _registeredAliases.add(cfg.alias);
         clearRetry(cfg.alias);
-    } catch (_raw_err) {
+    } catch (/** @type {any} */ _raw_err) {
         const err = /** @type {any} */ (_raw_err);
         st.ready = false;
         st.state = 'not-ready';

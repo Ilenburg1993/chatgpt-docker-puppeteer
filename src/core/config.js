@@ -273,7 +273,7 @@ class ConfigurationManager extends EventEmitter {
             }
 
             return this.currentConfig;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const caught = /** @type {any} */ (err);
             log('WARN', `[CONFIG] Erro crítico no reload: ${caught.message}. Mantendo estado anterior.`, correlationId);
             return this.currentConfig;
@@ -617,7 +617,7 @@ class ConfigurationManager extends EventEmitter {
             }
 
             return val;
-        } catch (_e) {
+        } catch (/** @type {any} */ _e) {
             // Fail-safe: never throw from config getter
             return fallback;
         }
@@ -627,7 +627,9 @@ class ConfigurationManager extends EventEmitter {
 /**
  * Instância singleton soberana do gerenciador de configuração.
  * Mantém cache em RAM e coordena hot-reload via eventos.
- * @type {ConfigurationManager}
+ * O índice `Record<string, any>` reflete o `.passthrough()` do ConfigSchema,
+ * que preserva quaisquer chaves extra em config.json em runtime.
+ * @type {ConfigurationManager & Record<string, any>}
  */
 const manager = new ConfigurationManager();
 

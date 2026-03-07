@@ -40,7 +40,7 @@ async function saveTask(task) {
         await atomicWrite(filepath, JSON.stringify(validatedTask, null, 2));
 
         return validatedTask;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         throw new Error(`[TASK_STORE] Falha ao persistir tarefa: ${_ce.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -84,7 +84,7 @@ async function deleteTask(id) {
         if (fs.existsSync(filepath)) {
             await fsp.unlink(filepath);
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         throw new Error(`[TASK_STORE] Erro ao remover arquivo: ${_ce.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -97,7 +97,7 @@ async function deleteTask(id) {
 function listTaskFiles() {
     try {
         return fs.readdirSync(PATHS.QUEUE).filter(f => f.endsWith('.json'));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         const _ce = /** @type {any} */ (_);
         return [];
     }
@@ -127,7 +127,7 @@ async function clearQueue() {
 
             await fsp.unlink(filepath);
             deleted++;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             const _ce = /** @type {any} */ (_);
             // Em caso de erro de leitura ou exclusão de um arquivo específico, incrementa preservados
             preserved++;

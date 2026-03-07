@@ -120,7 +120,7 @@ export class MCPUpstreamStdio extends EventEmitter {
 
             this.initialized = true;
             console.error('[MCP Upstream] Ready');
-        } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+        } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
             this.stop();
             throw new Error(`Failed to initialize upstream: ${error.message}`); // eslint-disable-line preserve-caught-error
         }
@@ -152,7 +152,7 @@ export class MCPUpstreamStdio extends EventEmitter {
             try {
                 const msg = JSON.parse(trimmed);
                 this._handleMessage(msg);
-            } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+            } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
                 console.error('[MCP Upstream] JSON parse error:', error.message);
                 console.error('[MCP Upstream] Invalid line:', trimmed.slice(0, 200));
             }
@@ -315,7 +315,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         // Graceful shutdown: close stdin
         try {
             (/** @type {any} */ (this.process)).stdin.end();
-        } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+        } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
             console.error('[MCP Upstream] Error closing stdin:', error.message);
         }
 

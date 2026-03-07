@@ -1,7 +1,6 @@
 // @ts-check
 import puppeteer from 'puppeteer-core';
 
-// @ts-ignore
 import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondition, sleep } from './helpers.js';
 
 (async () => {
@@ -41,11 +40,11 @@ import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondi
         await page.evaluate(() => {
             // Sabota as variáveis exatas que o src/driver/browser.js usa
             // window.__wd_last_change é a chave do novo driver
-            (/** @type {any} */ (window)).__wd_last_change = Date.now() - 300000; // 5 minutos atrás
+            /** @type {any} */ (window).__wd_last_change = Date.now() - 300000; // 5 minutos atrás
 
             // Garante que o observer existe para não ser recriado imediatamente
-            if (!(/** @type {any} */ (window)).__wd_obs) {
-                (/** @type {any} */ (window)).__wd_obs = true;
+            if (!(/** @type {any} */ (window).__wd_obs)) {
+                /** @type {any} */ (window).__wd_obs = true;
             }
         });
 

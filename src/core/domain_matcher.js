@@ -15,7 +15,7 @@ function extractHostname(/** @type {any} */ value) {
 
     try {
         return normalizeDomain(new URL(raw).hostname);
-    } catch (_err) {
+    } catch (/** @type {any} */ _err) {
         // Fallback para hostnames sem protocolo (ex: chatgpt.com)
         return normalizeDomain(raw);
     }

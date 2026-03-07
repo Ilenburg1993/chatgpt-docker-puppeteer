@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import * as schemas from '#core/schemas';
 import { log } from '#core/logger';
 import { recordEvent } from '#infra/db/events_repo';
@@ -14,7 +14,7 @@ function _now() {
     return Date.now();
 }
 
-function _error(statusCode, code, message, details = null) {
+function _error(/** @type {any} */ statusCode, /** @type {any} */ code, /** @type {any} */ message, /** @type {any} */ details = undefined) {
     const err = new Error(message || code);
     err.statusCode = Number(statusCode) || 500;
     err.code = String(code || 'TASK_CONTROL_ERROR');
@@ -22,16 +22,16 @@ function _error(statusCode, code, message, details = null) {
     return err;
 }
 
-function _safeJsonParse(raw, fallback = {}) {
+function _safeJsonParse(/** @type {any} */ raw, fallback = {}) {
     if (!raw) return fallback;
     try {
         return JSON.parse(String(raw));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
 
-function _readTaskRowTx(db, taskId) {
+function _readTaskRowTx(/** @type {any} */ db, /** @type {any} */ taskId) {
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get(String(taskId || '').trim());
     if (!row) {
         throw _error(404, 'TASK_NOT_FOUND', 'Task não encontrada');
@@ -39,7 +39,7 @@ function _readTaskRowTx(db, taskId) {
     return row;
 }
 
-function _assertIfVersion(row, ifVersion) {
+function _assertIfVersion(/** @type {any} */ row, /** @type {any} */ ifVersion) {
     if (ifVersion === undefined || ifVersion === null) return;
     const expected = Number(ifVersion);
     const actual = Number(row.updated_at_ms || 0);
@@ -51,7 +51,7 @@ function _assertIfVersion(row, ifVersion) {
     }
 }
 
-function _assertPauseToEditTask(row) {
+function _assertPauseToEditTask(/** @type {any} */ row) {
     const status = String(row.status || '').toUpperCase();
     const canEditPendingNotStarted =
         status === 'PENDING' &&
@@ -73,7 +73,7 @@ function _assertPauseToEditTask(row) {
     }
 }
 
-function _buildTaskV5FromPayload(payload = {}) {
+function _buildTaskV5FromPayload(/** @type {any} */ payload = {}) {
     const nowIso = new Date().toISOString();
     const providedId = payload?.meta?.id ? String(payload.meta.id) : null;
     const taskId = (providedId || `task-${uuidv4()}`).replace(/[^a-zA-Z0-9._-]/g, '');
@@ -124,7 +124,7 @@ function _buildTaskV5FromPayload(payload = {}) {
     return task;
 }
 
-function _recordTaskEvent({ taskId, actor, eventType, reason, payload = {} }) {
+function _recordTaskEvent(/** @type {any} */ { taskId, actor, eventType, reason, payload = {} }) {
     try {
         recordEvent({
             entityType: 'task',
@@ -138,12 +138,13 @@ function _recordTaskEvent({ taskId, actor, eventType, reason, payload = {} }) {
             },
             dedupKey: `task:${taskId}:${eventType}:${Date.now()}`,
         });
-    } catch (err) {
-        log('WARN', `[TaskControl] Falha ao registrar evento ${eventType}: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('WARN', `[TaskControl] Falha ao registrar evento ${eventType}: ${_e?.message || String(_e)}`);
     }
 }
 
-function _recordMissionEvent({ missionId, actor, eventType, reason, payload = {} }) {
+function _recordMissionEvent(/** @type {any} */ { missionId, actor, eventType, reason, payload = {} }) {
     if (!missionId) return;
     try {
         recordEvent({
@@ -158,19 +159,20 @@ function _recordMissionEvent({ missionId, actor, eventType, reason, payload = {}
             },
             dedupKey: `mission:${missionId}:${eventType}:${Date.now()}`,
         });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         log(
             'WARN',
-            `[TaskControl] Falha ao registrar evento ${eventType} na mission ${missionId}: ${err?.message || String(err)}`
+            `[TaskControl] Falha ao registrar evento ${eventType} na mission ${missionId}: ${_e?.message || String(_e)}`
         );
     }
 }
 
-function _hasOwn(obj, key) {
+function _hasOwn(/** @type {any} */ obj, /** @type {any} */ key) {
     return Boolean(obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key));
 }
 
-function _patchTouchesMissionBinding(patch = {}) {
+function _patchTouchesMissionBinding(/** @type {any} */ patch = {}) {
     if (_hasOwn(patch, 'mission_id')) return true;
     if (_hasOwn(patch, 'missionId')) return true;
     if (_hasOwn(patch, 'parent_id') || _hasOwn(patch, 'workflow_id')) return true;
@@ -200,7 +202,7 @@ function _patchTouchesMissionBinding(patch = {}) {
     return false;
 }
 
-function _isReadyNotStarted(row) {
+function _isReadyNotStarted(/** @type {any} */ row) {
     return (
         String(row.status || '').toUpperCase() === 'PENDING' &&
         String(row.stage || '').toUpperCase() === TASK_STAGES.READY &&
@@ -209,7 +211,7 @@ function _isReadyNotStarted(row) {
     );
 }
 
-function _assertTaskMissionReassignEligibility(row) {
+function _assertTaskMissionReassignEligibility(/** @type {any} */ row) {
     const status = String(row.status || '').toUpperCase();
     if (status === 'PAUSED') return;
     if (_isReadyNotStarted(row)) return;
@@ -226,7 +228,7 @@ function _assertTaskMissionReassignEligibility(row) {
     );
 }
 
-function _assertMissionDestinationAllowed(destination, missionId) {
+function _assertMissionDestinationAllowed(/** @type {any} */ destination, /** @type {any} */ missionId) {
     if (!destination) {
         throw _error(404, 'MISSION_NOT_FOUND', 'Missão de destino não encontrada', { mission_id: missionId });
     }
@@ -239,7 +241,7 @@ function _assertMissionDestinationAllowed(destination, missionId) {
     }
 }
 
-function _isTaskBoundToMissionStep(db, row, task) {
+function _isTaskBoundToMissionStep(/** @type {any} */ db, /** @type {any} */ row, /** @type {any} */ task) {
     const taskMission = task?.mission || _safeJsonParse(row.task_json, {})?.mission || {};
     const stepId = taskMission?.step_id || taskMission?.stepId || null;
     if (stepId) return true;
@@ -280,12 +282,12 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
     const task = _buildTaskV5FromPayload(payloadView);
     const stage = String(payloadView.stage || TASK_STAGES.READY).toUpperCase();
     const status = String(payloadView.status || 'PENDING').toUpperCase();
-    const created = insertTask(task, {
+    const created = /** @type {any} */ (insertTask(task, {
         stage,
         status,
         actor: String(actorView.username || actorView.id || 'user'),
         ifNotExists,
-    });
+    }));
 
     _recordTaskEvent({
         taskId: created?.meta?.id || task.meta.id,
@@ -333,7 +335,7 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
         );
     }
 
-    const existingTask = getTaskById(taskId);
+    const existingTask = /** @type {any} */ (getTaskById(taskId));
     if (!existingTask) {
         throw _error(404, 'TASK_NOT_FOUND', 'Task não encontrada');
     }
@@ -392,7 +394,7 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
         blocked_details_json:
             patchView.blocked_details !== undefined ? JSON.stringify(patchView.blocked_details ?? null) : undefined,
     });
-    const updatedView = /** @type {unknown} */ (updated);
+    const updatedView = /** @type {any} */ (updated);
 
     _recordTaskEvent({
         taskId,
@@ -446,7 +448,7 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
     const destinationMission = getMissionById(destinationMissionId);
     _assertMissionDestinationAllowed(destinationMission, destinationMissionId);
 
-    const existingTask = getTaskById(taskId);
+    const existingTask = /** @type {any} */ (getTaskById(taskId));
     if (!existingTask) {
         throw _error(404, 'TASK_NOT_FOUND', 'Task não encontrada');
     }
@@ -551,7 +553,7 @@ function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
     try {
         releaseTaskLock({ taskId });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 
@@ -603,7 +605,7 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
     try {
         releaseTaskLock({ taskId });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 
@@ -649,7 +651,7 @@ function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
     try {
         releaseTaskLock({ taskId });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 
@@ -699,7 +701,7 @@ function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 
     try {
         releaseTaskLock({ taskId });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 
@@ -824,22 +826,23 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                 case 'REASSIGN_MISSION':
                     result = reassignTaskMissionCommand({
                         taskId,
-                        missionId: paramsView.mission_id,
+                        missionId: /** @type {any} */ (paramsView.mission_id),
                         actor,
                         reason,
-                        ifVersion: paramsView.if_version,
+                        ifVersion: /** @type {any} */ (paramsView.if_version),
                     });
                     break;
                 default:
                     throw _error(422, 'TASK_BULK_ACTION_INVALID', `Ação não suportada: ${action}`);
             }
             results.push({ id: taskId, ok: true, result });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             failed.push({
                 id: taskId,
                 ok: false,
-                code: err?.code || 'TASK_BULK_ITEM_FAILED',
-                error: err?.message || String(err),
+                code: _e?.code || 'TASK_BULK_ITEM_FAILED',
+                error: _e?.message || String(_e),
             });
         }
     }

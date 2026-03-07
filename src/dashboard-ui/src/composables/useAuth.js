@@ -1,4 +1,5 @@
 // @ts-check
+/** @import { ComputedRef, Ref } from 'vue' */
 import { ref, computed, onMounted } from 'vue';
 import { useNotifications } from './useNotifications.js';
 import { http } from '@/lib/http';
@@ -13,13 +14,13 @@ import { http } from '@/lib/http';
 
 /**
  * @typedef {object} UseAuthReturn
- * @property {import('vue').Ref<AuthUser|null>} user
- * @property {import('vue').Ref<boolean>} loading
- * @property {import('vue').ComputedRef<boolean>} isAuthenticated
- * @property {import('vue').ComputedRef<boolean>} isAdmin
- * @property {import('vue').ComputedRef<boolean>} isOwner
- * @property {import('vue').ComputedRef<boolean>} isOperator
- * @property {import('vue').ComputedRef<string[]>} permissions
+ * @property {Ref<AuthUser|null>} user
+ * @property {Ref<boolean>} loading
+ * @property {ComputedRef<boolean>} isAuthenticated
+ * @property {ComputedRef<boolean>} isAdmin
+ * @property {ComputedRef<boolean>} isOwner
+ * @property {ComputedRef<boolean>} isOperator
+ * @property {ComputedRef<string[]>} permissions
  * @property {(permission: string) => boolean} can
  * @property {(username: string, password: string) => Promise<boolean>} login
  * @property {() => Promise<void>} logout
@@ -28,7 +29,7 @@ import { http } from '@/lib/http';
  * @property {() => string|null} getToken
  */
 
-const authUser = /** @type {import('vue').Ref<AuthUser|null>} */ (ref(null));
+const authUser = /** @type {Ref<AuthUser|null>} */ (ref(null));
 const authLoading = ref(false);
 let verifyInFlight = /** @type {any} */ (null);
 let authInitialized = false;
@@ -115,7 +116,7 @@ export function useAuth() {
                 const payload = response?.data || {};
                 authUser.value = payload.user || null;
                 return Boolean(payload.user);
-            } catch (_error) {
+            } catch (/** @type {any} */ _error) {
                 removeToken();
                 authUser.value = null;
                 return false;
@@ -149,7 +150,7 @@ export function useAuth() {
 
             showError(data.error || 'Erro no login');
             return false;
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
     const error = /** @type {any} */ (_rawError);
             const apiError = error?.response?.data?.error || 'Erro de conexão';
             showError(apiError);
@@ -171,7 +172,7 @@ export function useAuth() {
             if (token) {
                 await http.post('/api/dashboard/auth/logout');
             }
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
     const error = /** @type {any} */ (_rawError);
             console.error('Logout error:', error);
         }

@@ -49,7 +49,7 @@ export async function withTimeout(operation, timeoutMs, timeoutMessage = 'Operat
         if (timeoutId !== null) clearTimeout(timeoutId);
 
         return result;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         // Ensure timeout is cleared even on error
         if (timeoutId !== null) clearTimeout(timeoutId);
         controller.abort('operation_failed');
@@ -96,7 +96,7 @@ export async function withAbort(operation, timeoutMs, timeoutMessage = 'Operatio
         if (timeoutId !== null) clearTimeout(timeoutId);
 
         return result;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         // Ensure timeout is cleared even on error
         if (timeoutId !== null) clearTimeout(timeoutId);
         controller.abort('operation_failed');
@@ -224,7 +224,7 @@ export async function withRetry(operation, options = {}) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             return await withTimeout(operation, timeoutMs, `RETRY_ATTEMPT_${attempt}_TIMEOUT`);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             lastError = err;
 
             // Don't retry if we've exhausted attempts or error is not retryable

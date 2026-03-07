@@ -173,7 +173,7 @@ async function probeChromeConnection() {
                 });
             });
         });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         return {
             connected: false,
@@ -212,7 +212,7 @@ async function saveTrends(/** @type {any} */ trends) {
             ts: new Date().toISOString(),
         };
         await fsp.writeFile(TREND_FILE, JSON.stringify(simplified, null, 2));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         const _ce = /** @type {any} */ (_);
         /* Fail-safe */
     }
@@ -292,7 +292,7 @@ async function checkStorageSLA() {
         await fsp.unlink(testFile);
         ioLatency = Date.now() - t0;
         writeOk = true;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         const _ce = /** @type {any} */ (_);
         writeOk = false;
     }
@@ -362,7 +362,7 @@ async function runFullCheck() {
     let proxyReport;
     try {
         proxyReport = await ConnectionOrchestrator.synchronize();
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         proxyReport = { error: err && _ce.message ? _ce.message : String(err) };
     }

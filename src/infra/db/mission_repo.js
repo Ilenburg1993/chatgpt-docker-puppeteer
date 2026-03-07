@@ -154,7 +154,7 @@ function _rowToMission(row) {
     if (row.policy_json) {
         try {
             policy = JSON.parse(row.policy_json);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[mission_repo] Invalid policy_json for mission ${row?.id}: ${msg}`);
             policy = {}; // Fallback to empty object
@@ -166,7 +166,7 @@ function _rowToMission(row) {
     if (row.context_json) {
         try {
             context = JSON.parse(row.context_json);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[mission_repo] Invalid context_json for mission ${row?.id}: ${msg}`);
             context = {}; // Fallback to empty object

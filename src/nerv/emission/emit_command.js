@@ -28,7 +28,7 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
  * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
  * @param {CreateEmitCommandDeps} deps - Dependências do emissor
- * @returns {object} Emissor com método emitCommand
+ * @returns {any} Emissor com método emitCommand
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
@@ -59,7 +59,7 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
 
             // 2. Validação estrutural
             envelopes.assertValid(normalized);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:emission:rejected', {
                 kind: MessageType.COMMAND,

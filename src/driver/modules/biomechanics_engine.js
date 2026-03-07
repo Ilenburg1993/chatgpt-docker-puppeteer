@@ -291,7 +291,7 @@ class BiomechanicsEngine extends EventEmitter {
 
             this.modifierTimestamp = Date.now();
             this.stats.modifierDetections++;
-        } catch (_modErr) {
+        } catch (/** @type {any} */ _modErr) {
             this.modifier = MODIFIER_KEYS.CONTROL;
             this.modifierTimestamp = Date.now();
         }
@@ -326,13 +326,13 @@ class BiomechanicsEngine extends EventEmitter {
                     try {
                         await _page.keyboard.up(mod);
                         released.push(mod);
-                    } catch (err) {
+                    } catch (/** @type {any} */ err) {
                         const _ce = /** @type {any} */ (err);
                         log('WARN', `[BIOMECH] Failed to release ${mod}: ${_ce.message}`, this.driver.correlationId);
                     }
                 }
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             log('ERROR', `[BIOMECH] releaseModifiers error: ${_ce.message}`, this.driver.correlationId);
             throw _ce;
@@ -391,7 +391,7 @@ class BiomechanicsEngine extends EventEmitter {
                 this.stats.keepAliveTriggered++;
             }
 
-            const responseInfo = await analyzer.findResponseArea(this.driver.page).catch(() => null);
+            const responseInfo = await analyzer.findResponseArea(this.driver.page).catch(() => /** @type {null} */ (null));
             if (!responseInfo || !responseInfo.isBusy) {
                 const isBusy = await stabilizer.getPageLoadStatus(this.driver.page);
                 if (!isBusy) {
@@ -446,7 +446,7 @@ class BiomechanicsEngine extends EventEmitter {
                     return rect;
                 }
                 lastRect = rect;
-            } catch (_rectErr) {
+            } catch (/** @type {any} */ _rectErr) {
                 return null;
             }
             await new Promise(r => setTimeout(r, BIOMECH_CONFIG.STABLE_RECT_POLL_MS));
@@ -457,7 +457,7 @@ class BiomechanicsEngine extends EventEmitter {
     /**
      * Obtém bounding rect estável do elemento com timeout protection.
      *
-     * @param {object} ctx - Context (page ou frame)
+     * @param {any} ctx - Context (page ou frame)
      * @param {string} selector - Seletor CSS do elemento
      * @returns {Promise<object|null>} Rect { x, y, w, h } ou null
      *
@@ -528,7 +528,7 @@ class BiomechanicsEngine extends EventEmitter {
                     baseOffset,
                     BIOMECH_CONFIG.SCROLL_MAX_OFFSET_RATIO
                 );
-            } catch (_scrollErr) {
+            } catch (/** @type {any} */ _scrollErr) {
                 // Continue with click
             }
         }
@@ -794,7 +794,7 @@ class BiomechanicsEngine extends EventEmitter {
             this.stats.maxTypingDuration = Math.max(this.stats.maxTypingDuration, duration);
 
             this.emit(BIOMECH_EVENTS.TYPING_COMPLETED, { selector, length: text.length, duration });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             this.emit(BIOMECH_EVENTS.TYPING_COMPLETED, {
                 selector,
@@ -808,7 +808,7 @@ class BiomechanicsEngine extends EventEmitter {
     /**
      * Retorna estatísticas de biomechanics.
      *
-     * @returns {object} Objeto com métricas de biomechanics
+     * @returns {any} Objeto com métricas de biomechanics
      * Propriedades do objeto retornado:
      *   - totalClicks (number): Total de cliques executados
      *   - totalTyping (number): Total de digitações
@@ -876,7 +876,7 @@ class BiomechanicsEngine extends EventEmitter {
 /**
  * Factory function para criar instância de BiomechanicsEngine.
  *
- * @param {any} driver - Instância do driver
+ * @param {object} driver - Instância do driver
  * @returns {BiomechanicsEngine} Nova instância
  *
  * @example
@@ -884,7 +884,7 @@ class BiomechanicsEngine extends EventEmitter {
  * const engine = create(driver);
  */
 function create(driver) {
-    return new BiomechanicsEngine(driver);
+    return new BiomechanicsEngine(/** @type {any} */ (driver));
 }
 
 export { BiomechanicsEngine, BIOMECH_CONFIG, BIOMECH_EVENTS, MODIFIER_KEYS, MODIFIER_KEYS_ARRAY, create };

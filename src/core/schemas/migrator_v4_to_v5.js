@@ -217,7 +217,7 @@ function migrateTaskV4toV5(taskV4) {
 
         logger.info(`Task ${taskV4.meta.id} migrada com sucesso para V5`);
         return validatedTask;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _e = /** @type {any} */ (error);
         logger.error(`Falha ao migrar task ${taskV4?.meta?.id || 'unknown'} para V5: ${_e.message}`);
         throw new Error(`Schema migration failed for task ${taskV4?.meta?.id}: ${_e.message}`, { cause: error });
@@ -247,7 +247,7 @@ function migrateBatchV4toV5(tasksV4) {
                 const taskV5 = migrateTaskV4toV5(taskV4);
                 results.migrated.push(taskV5);
             }
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const _e = /** @type {any} */ (error);
             results.failed.push({
                 task_id: taskV4?.meta?.id || 'unknown',
@@ -275,7 +275,7 @@ function validateV5Task(task) {
     try {
         TaskSchemaV5.parse(task);
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _e = /** @type {any} */ (error);
         logger.error(`Task ${task?.meta?.id} não é V5 válida: ${_e.message}`);
         return false;

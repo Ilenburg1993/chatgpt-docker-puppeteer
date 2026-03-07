@@ -64,7 +64,7 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
     try {
         const { ok } = await checkUrlHealth(url, timeout);
         return ok;
-    } catch (_err) {
+    } catch (/** @type {any} */ _err) {
         // checkUrlHealth já trata erros internamente e retorna ok:false
         // Este catch é para casos extremos
         return false;
@@ -85,7 +85,7 @@ async function checkChromeHealth(endpoint = null, timeout = 2000) {
  *
  * @param {CreateBrowserPoolConfig} config
  * @param {CreateBrowserPoolNerv|null} [nerv] - NERV bus para Circuit Breaker (opcional)
- * @returns {Promise<object>} BrowserPoolManager inicializado
+ * @returns {Promise<any>} BrowserPoolManager inicializado
  */
 async function createBrowserPool(config, nerv = null) {
     const { default: BrowserPoolManager } = await import('#infra/browser_pool/pool_manager');
@@ -143,7 +143,7 @@ async function tryStartChrome() {
             log('WARN', '[RESILIENCE] Script executou mas Chrome não está acessível');
             return false;
         }
-    } catch (_rawError) {
+    } catch (/** @type {any} */ _rawError) {
         const error = /** @type {any} */ (_rawError);
         log('WARN', `[RESILIENCE] Falha ao executar start-chrome.sh: ${error.message}`);
         return false;
@@ -285,7 +285,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                             mode: 'full',
                             browserPool,
                         };
-                    } catch (_rawRetryError) {
+                    } catch (/** @type {any} */ _rawRetryError) {
                         const retryError = /** @type {any} */ (_rawRetryError);
                         log('WARN', `[RESILIENCE] Falha ao reconectar após iniciar Chrome: ${retryError.message}`);
                     }
@@ -375,7 +375,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
                         mode: 'full',
                         browserPool,
                     };
-                } catch (_rawRetryError2) {
+                } catch (/** @type {any} */ _rawRetryError2) {
                     const retryError = /** @type {any} */ (_rawRetryError2);
                     log('ERROR', `[RESILIENCE] Retry falhou: ${retryError.message}`);
                     return { success: false, mode: 'abort' };
@@ -421,7 +421,7 @@ async function handleBrowserPoolFailure(error, options = {}) {
  *
  * @param {InitializeBrowserPoolResilientConfig} config - Configuração do Browser Pool
  * @param {any} [options] - Opções de resiliência
- * @returns {Promise<object>} - Resultado da inicialização
+ * @returns {Promise<any>} - Resultado da inicialização
  */
 async function initializeBrowserPoolResilient(config, options = {}) {
     const { nerv = null, ...resilienceOptions } = options;
@@ -449,7 +449,7 @@ async function initializeBrowserPoolResilient(config, options = {}) {
             mode: 'full',
             browserPool,
         };
-    } catch (_rawError) {
+    } catch (/** @type {any} */ _rawError) {
         const error = /** @type {any} */ (_rawError);
         log('WARN', `[RESILIENCE] Browser Pool falhou na inicialização: ${error.message}`);
 

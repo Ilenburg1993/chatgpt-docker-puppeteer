@@ -335,7 +335,7 @@ class BaseDriver extends TargetDriver {
      * Retorna status de saúde de todos os módulos.
      * ✅ v2.0: NEW - Module health diagnostics
      *
-     * @returns {Promise<object>} Health status de cada módulo
+     * @returns {Promise<any>} Health status de cada módulo
      */
     async getModuleHealth() {
         return {

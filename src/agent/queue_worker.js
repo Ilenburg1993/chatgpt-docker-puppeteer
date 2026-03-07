@@ -66,14 +66,14 @@ async function _readTextFromTaskLatestResult(taskId) {
     let parsed;
     try {
         parsed = JSON.parse(row.result_json);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         parsed = null;
     }
     const p = parsed?.storage?.text_file || parsed?.storage?.textFile || null;
     if (!p) return '';
     try {
         return await fs.readFile(String(p), 'utf8');
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return '';
     }
 }
@@ -124,7 +124,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
                     if (guess) {
                         text = await fs.readFile(guess, 'utf8');
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     text = '';
                 }
             }
@@ -147,7 +147,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
             try {
                 const raw = await readText(artifactId);
                 text = typeof raw === 'string' ? raw : '';
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 text = '';
             }
             if (!text) continue;
@@ -203,7 +203,7 @@ class QueueWorker {
         try {
             updateTask(taskId, updates);
             return true;
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             if (err && err.name === 'OptimisticLockError') {
                 log('WARN', `[QueueWorker] ${context || 'Update'}: Task ${taskId} conflict`, String(taskId));
@@ -408,7 +408,7 @@ class QueueWorker {
                         });
                         this._safeUpdateTask(taskId, { prompt_template_artifact_id: artId });
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[QueueWorker] Prompt template artifact storage failed for ${taskId}: ${err?.message}`);
                 }
@@ -446,7 +446,7 @@ class QueueWorker {
                         latest_attempt_id: correlationId,
                         latest_rendered_prompt_artifact_id: renderedPromptArtifactId,
                     });
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[QueueWorker] Rendered prompt artifact failed for ${taskId}: ${err?.message}`);
                     renderedPromptArtifactId = null;
@@ -460,7 +460,7 @@ class QueueWorker {
 
                 try {
                     await this.kernel.executeTask(runtimeTask, correlationId);
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     const msg = err?.message || String(err);
                     log('ERROR', `[QueueWorker] dispatch failed for ${taskId}: ${msg}`, correlationId);
@@ -476,7 +476,7 @@ class QueueWorker {
                             ended_at_ms: Date.now(),
                             error: msg,
                         });
-                    } catch (_rawErr) {
+                    } catch (/** @type {any} */ _rawErr) {
                         const err = /** @type {any} */ (_rawErr);
                         log('WARN', `[QueueWorker] Attempt update failed for ${taskId}: ${err?.message}`);
                     }

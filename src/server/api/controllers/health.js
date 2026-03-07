@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { log } from '#core/logger';
 import { resolveDbPath } from '#infra/db/sqlite';
 import { _resolveArtifactsRoot } from '#infra/storage/artifact_store';
@@ -31,9 +31,10 @@ async function getHealth(req, res) {
             memory: process.memoryUsage(),
             pid: process.pid,
         });
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no health check: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 
@@ -70,11 +71,12 @@ async function getChromeHealth(req, res) {
                 timestamp: Date.now(),
             });
         }
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no Chrome health check: ${err.message}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no Chrome health check: ${_e.message}`);
         res.status(500).json({
             status: 'error',
-            message: err.message,
+            message: _e.message,
             timestamp: Date.now(),
         });
     }
@@ -96,9 +98,10 @@ async function getPm2Health(req, res) {
             processes: snapshot || [],
             timestamp: Date.now(),
         });
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no PM2 health check: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no PM2 health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 
@@ -122,10 +125,10 @@ async function getKernelHealth(req, res) {
             return;
         }
 
-        if (typeof kernel.getStatus === 'function') {
+        if (typeof (/** @type {any} */ (kernel).getStatus) === 'function') {
             res.json({
                 status: 'ok',
-                kernel: kernel.getStatus(),
+                kernel: /** @type {any} */ (kernel).getStatus(),
                 timestamp: Date.now(),
             });
             return;
@@ -136,9 +139,10 @@ async function getKernelHealth(req, res) {
             message: 'Kernel injected but getStatus() is unavailable',
             timestamp: Date.now(),
         });
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no Kernel health check: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no Kernel health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 
@@ -167,7 +171,7 @@ async function getDiskHealth(req, res) {
             try {
                 await fs.stat(t.path);
                 entry.exists = true;
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 entry.exists = false;
             }
 
@@ -175,7 +179,7 @@ async function getDiskHealth(req, res) {
             try {
                 if (typeof fs.statfs === 'function') {
                     const s = await fs.statfs(t.path);
-                    entry.statfs = {
+                    (/** @type {any} */ (entry)).statfs = {
                         bsize: s.bsize,
                         blocks: s.blocks,
                         bfree: s.bfree,
@@ -184,7 +188,7 @@ async function getDiskHealth(req, res) {
                         total_bytes: Number(s.bsize) * Number(s.blocks),
                     };
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 entry.statfs = null;
             }
 
@@ -194,9 +198,10 @@ async function getDiskHealth(req, res) {
 
         const status = okCount === targets.length ? 'ok' : 'degraded';
         res.json({ status, targets: out, timestamp: Date.now() });
-    } catch (err) {
-        log('ERROR', `[HEALTH] Erro no Disk health check: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[HEALTH] Erro no Disk health check: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 

@@ -249,7 +249,7 @@ class KernelLoop {
 
             // 4. Drenagem de buffer outbound (COMMANDs/EVENTs a enviar)
             this._drainOutbound();
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             this.state = KernelLoopState.DEGRADED;
 
@@ -365,14 +365,14 @@ class KernelLoop {
             try {
                 transport.send(envelope);
                 drained++;
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const error = /** @type {any} */ (_rawErr);
                 try {
                     const serialized = JSON.stringify(envelope);
                     const buffer = Buffer.from(serialized, 'utf8');
                     transport.send(buffer);
                     drained++;
-                } catch (_rawFallback) {
+                } catch (/** @type {any} */ _rawFallback) {
                     const fallbackError = /** @type {any} */ (_rawFallback);
                     this.telemetry.critical('kernel_loop_outbound_send_failed', {
                         error: fallbackError?.message || error?.message || String(fallbackError || error),
@@ -426,7 +426,7 @@ class KernelLoop {
             proposals.map(async proposal => {
                 try {
                     await this._applyDecision(proposal, context);
-                } catch (_rawError) {
+                } catch (/** @type {any} */ _rawError) {
                     const error = /** @type {any} */ (_rawError);
                     this.telemetry.critical('kernel_loop_decision_application_failed', {
                         proposal,
@@ -440,7 +440,7 @@ class KernelLoop {
         // Race entre decisions e timeout; sempre limpa o timer (A005)
         try {
             await Promise.race([decisionsPromise, timeoutPromise]);
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             if (error.message.includes('timeout')) {
                 this.telemetry.critical('kernel_loop_decision_timeout', {

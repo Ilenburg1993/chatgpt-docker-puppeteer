@@ -126,7 +126,7 @@ export const useSystemStore = defineStore('system', {
                 await this.fetchAlerts();
 
                 this.lastUpdate = Date.now();
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
     const error = /** @type {any} */ (_rawError);
                 this.error = (/** @type {any} */ (formatHttpError(error))).message;
                 this.overallStatus = 'error';
@@ -143,7 +143,7 @@ export const useSystemStore = defineStore('system', {
             try {
                 const response = await http.get('/api/dashboard/alerts');
                 this.alerts = response.data.alerts || [];
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
     const error = /** @type {any} */ (_rawError);
                 console.error('[SystemStore] Erro ao carregar alertas:', error);
             }
@@ -160,7 +160,7 @@ export const useSystemStore = defineStore('system', {
                     ...response.data.system,
                     ...response.data.versions,
                 };
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
     const error = /** @type {any} */ (_rawError);
                 console.error('[SystemStore] Erro ao carregar info:', error);
             }
@@ -174,7 +174,7 @@ export const useSystemStore = defineStore('system', {
                 await http.put('/api/dashboard/alerts/thresholds', thresholds);
                 // Recarrega alertas
                 await this.fetchAlerts();
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
     const error = /** @type {any} */ (_rawError);
                 this.error = (/** @type {any} */ (formatHttpError(error))).message;
                 throw error;

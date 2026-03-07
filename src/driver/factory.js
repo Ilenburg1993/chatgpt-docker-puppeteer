@@ -1,3 +1,4 @@
+/** @import { IDriver } from '#types/driver/contracts' */
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 import CONFIG from '#core/config';
@@ -266,7 +267,7 @@ class DriverFactory extends EventEmitter {
 
         try {
             await this._startPromise;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             this._ready = false;
             this._startPromise = null;
             throw err;
@@ -383,7 +384,7 @@ class DriverFactory extends EventEmitter {
             let files;
             try {
                 files = fs.readdirSync(CONSTANTS.TARGETS_DIR);
-            } catch (_rawReaddirError) {
+            } catch (/** @type {any} */ _rawReaddirError) {
                 const readdirError = /** @type {any} */ (_rawReaddirError);
                 const error = `Erro ao ler diretório de targets: ${readdirError.message}`;
                 log('FATAL', `[FACTORY] ${error}`);
@@ -416,7 +417,7 @@ class DriverFactory extends EventEmitter {
                     this.pool.set(targetKey, []);
 
                     discovered++;
-                } catch (_rawFileError) {
+                } catch (/** @type {any} */ _rawFileError) {
                     const fileError = /** @type {any} */ (_rawFileError);
                     log('WARN', `[FACTORY] Erro ao processar ${file}: ${fileError.message}`);
                 }
@@ -455,7 +456,7 @@ class DriverFactory extends EventEmitter {
                 defaultTarget: this.getDefaultTarget(),
                 discoveryTime: this.metrics.discoveryTime,
             });
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
             const e = /** @type {any} */ (_rawE);
             this.metrics.errors++;
             log('FATAL', `[FACTORY] Erro catastrófico no mapeamento de drivers: ${e.message}`);
@@ -513,7 +514,7 @@ class DriverFactory extends EventEmitter {
             for (let i = 0; i < minPoolSize; i++) {
                 const promise = this._createWarmDriver(targetKey).catch(err => {
                     log('WARN', `[FACTORY] Failed to create warm driver ${targetKey}[${i}]: ${err.message}`);
-                    return null;
+                    return /** @type {null} */ (null);
                 });
                 warmupPromises.push(promise);
             }
@@ -562,7 +563,7 @@ class DriverFactory extends EventEmitter {
             }
 
             return driver;
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             log('ERROR', `[FACTORY] Failed to create warm driver ${target}: ${error.message}`);
             throw error;
@@ -654,7 +655,7 @@ class DriverFactory extends EventEmitter {
                 } finally {
                     clearTimeout(lazyLoadTimerId);
                 }
-            } catch (_rawRequireError) {
+            } catch (/** @type {any} */ _rawRequireError) {
                 const requireError = /** @type {any} */ (_rawRequireError);
                 this.failedDrivers.add(key);
                 log('ERROR', `[FACTORY] Failed to load driver class '${key}': ${requireError.message}`);
@@ -677,7 +678,7 @@ class DriverFactory extends EventEmitter {
             // ✅ v3.0: Instanciar COM APENAS CONFIG (NO page, NO signal)
             try {
                 instance = new DriverClass(enhancedConfig); // ✅ P0-U6: Uses enhancedConfig with expectedDomain
-            } catch (_rawConstructorError) {
+            } catch (/** @type {any} */ _rawConstructorError) {
                 const constructorError = /** @type {any} */ (_rawConstructorError);
                 this.failedDrivers.add(key);
                 log('ERROR', `[FACTORY] Driver constructor failed for '${key}': ${constructorError.message}`);
@@ -708,12 +709,12 @@ class DriverFactory extends EventEmitter {
             });
 
             return instance;
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             // Cleanup em caso de erro
             if (instance && typeof instance.destroy === 'function') {
                 try {
                     instance.destroy().catch(() => {});
-                } catch (_cleanupError) {
+                } catch (/** @type {any} */ _cleanupError) {
                     // Ignore cleanup errors
                 }
             }
@@ -877,14 +878,14 @@ class DriverFactory extends EventEmitter {
                 this.metrics.poolBackpressureRecovered++;
                 log('INFO', `[FACTORY] Backpressure recovered: driver released for ${key}`);
                 continue;
-            } catch (_timeoutError) {
+            } catch (/** @type {any} */ _timeoutError) {
                 if (CONFIG.DRIVER_BACKPRESSURE_TEMP) {
                     log(
                         'WARN',
                         '[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)'
                     );
                     const tempDriver = await this.createDriver(key, this.config, { skipEnsureReady: true });
-                    /** @type {import('#types/driver/contracts').IDriver} */ (
+                    /** @type {IDriver} */ (
                         /** @type {unknown} */ (tempDriver)
                     )._isTemporary = true;
                     this.metrics.temporaryDriversCreated++;
@@ -992,7 +993,7 @@ class DriverFactory extends EventEmitter {
                 this.metrics.driversReleased++;
                 this.emit(FACTORY_EVENTS.DRIVER_RELEASED, { target: entry.target });
                 this._notifyWaiters(entry.target);
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log('ERROR', `[FACTORY] Failed to recycle driver: ${/** @type {any} */ (err).message}. Evicting.`);
                 if (driver.page && !driver.page.isClosed()) {
                     await driver.page.close().catch(() => {});
@@ -1024,7 +1025,7 @@ class DriverFactory extends EventEmitter {
                         `[FACTORY] C3: Force detach succeeded. Driver now ${driver.state}. ` +
                             `Marking available (warning: incomplete cleanup may have occurred).`
                     );
-                } catch (detachErr) {
+                } catch (/** @type {any} */ detachErr) {
                     log(
                         'ERROR',
                         `[FACTORY] C3 CRITICAL: Force detach FAILED: ${/** @type {any} */ (detachErr).message}. ` +
@@ -1157,7 +1158,7 @@ class DriverFactory extends EventEmitter {
                         }
                     }
                 }
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log('ERROR', `[FACTORY] Health check error: ${/** @type {any} */ (err).message}`);
             }
         }, CONSTANTS.HEALTH_CHECK_INTERVAL_MS);
@@ -1283,7 +1284,7 @@ class DriverFactory extends EventEmitter {
     /**
      * Obtém metadata de todos os drivers.
      *
-     * @returns {object} Clone do registry completo
+     * @returns {any} Clone do registry completo
      */
     getAllDriversMetadata() {
         return { ...this.registry };
@@ -1395,7 +1396,7 @@ class DriverFactory extends EventEmitter {
     /**
      * Obtém métricas de performance.
      *
-     * @returns {object} Métricas completas
+     * @returns {any} Métricas completas
      */
     getMetrics() {
         return { ...this.metrics };
@@ -1575,7 +1576,7 @@ class DriverFactory extends EventEmitter {
 
             log('DEBUG', `[FACTORY] Hot Driver created: ${target} (IDLE)`);
             return driver;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             // Rollback: Destrói driver se falhar alocação de página
             log('ERROR', `[FACTORY] Failed to create Hot Driver for ${target}: ${/** @type {any} */ (err).message}`);
 

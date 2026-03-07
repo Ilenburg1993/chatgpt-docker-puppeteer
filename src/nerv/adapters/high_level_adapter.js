@@ -14,7 +14,7 @@ import { MessageType } from '#shared/nerv/constants';
 /**
  * Função exportada: makeEnvelope.
  * @param {MakeEnvelopeOptions} options
- * @returns {object}
+ * @returns {any}
  */
 function makeEnvelope({ actor, target = null, messageType, actionCode, payload = {}, correlationId = null }) {
     return createEnvelope({ actor, target, messageType, actionCode, payload, correlationId });
@@ -29,7 +29,7 @@ function makeEnvelope({ actor, target = null, messageType, actionCode, payload =
  * @param {Record<string, any>} [payload={}] - Event payload
  * @param {string|null} [correlationId=null] - Correlation ID
  * @param {string|null} [target=null] - Target actor
- * @returns {Promise<object>} Resolved envelope
+ * @returns {Promise<any>} Resolved envelope
  * @throws {Error} If emission fails
  */
 async function sendEvent(nerv, actor, actionCode, payload = {}, correlationId = null, target = null) {
@@ -57,7 +57,7 @@ async function sendEvent(nerv, actor, actionCode, payload = {}, correlationId = 
  * @param {Record<string, any>} [payload={}] - Command payload
  * @param {string|null} [correlationId=null] - Correlation ID
  * @param {string|null} [target=null] - Target actor
- * @returns {Promise<object>} Resolved envelope
+ * @returns {Promise<any>} Resolved envelope
  * @throws {Error} If emission fails
  */
 async function sendCommand(nerv, actor, actionCode, payload = {}, correlationId = null, target = null) {
@@ -84,7 +84,7 @@ async function sendCommand(nerv, actor, actionCode, payload = {}, correlationId 
  * @param {string} actionCode - Action code
  * @param {string|null} [correlationId=null] - Correlation ID
  * @param {string|null} [target=null] - Target actor
- * @returns {Promise<object>} Resolved envelope
+ * @returns {Promise<any>} Resolved envelope
  * @throws {Error} If emission fails
  */
 async function sendAck(nerv, actor, actionCode, correlationId = null, target = null) {

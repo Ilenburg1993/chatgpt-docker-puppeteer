@@ -238,7 +238,7 @@ async function detectKeyboardLayout(/** @type {any} */ page) {
             const lang = (navigator.language || 'en').toLowerCase();
             return lang.includes('fr') ? 'azerty' : 'qwerty';
         });
-    } catch (_err) {
+    } catch (/** @type {any} */ _err) {
         const _ce = /** @type {any} */ (_err);
         return 'qwerty';
     }
@@ -273,7 +273,7 @@ async function getElementRect(
                 const r = el.getBoundingClientRect();
                 return r.width > 0 && r.height > 0 ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
             }, selector)
-            .catch(() => null);
+            .catch(() => /** @type {null} */ (null));
 
         if (rect) return rect;
 
@@ -318,7 +318,7 @@ async function wakeUpMove(/** @type {any} */ page) {
         const y = padY + Math.random() * (view.height - padY * 2);
 
         await cursor.move({ x, y });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         _log('DEBUG', '[HUMAN] wakeUpMove error (ignored)', _ce.message);
     }
@@ -445,7 +445,7 @@ async function humanClickCore(
         if (onPulse) {
             onPulse({ type: 'CLICK_COMPLETE', totalTime: Date.now() - startTime });
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         // [v2.0] Error telemetry (Bug #7 fix)
         if (onPulse) {
@@ -873,7 +873,7 @@ async function humanClick(/** @type {any} */ ...args) {
         try {
             await page.waitForSelector(selector);
             break;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             if (attempt >= HUMAN_CONFIG.ELEMENT_RETRY_COUNT) {
                 driver._emitVital('CLICK_ERROR', { selector, error: _ce?.message || String(_ce), attempt });
@@ -909,7 +909,7 @@ async function humanClick(/** @type {any} */ ...args) {
             x = box.x + (box.width || 0) / 2;
             y = box.y + (box.height || 0) / 2;
         }
-    } catch (_err) {
+    } catch (/** @type {any} */ _err) {
         const _ce = /** @type {any} */ (_err);
         // ignore
     }
@@ -1012,7 +1012,7 @@ async function humanType(/** @type {any} */ ...args) {
                     try {
                         await page.focus(selector);
                         await _sleep(HUMAN_CONFIG.TYPE_FOCUS_RESTORE_DELAY);
-                    } catch (_e) {
+                    } catch (/** @type {any} */ _e) {
                         const _ce = /** @type {any} */ (_e);
                         driver._emitVital('TYPE_ABORTED', {
                             selector,
@@ -1083,7 +1083,7 @@ async function humanType(/** @type {any} */ ...args) {
                 }
             }
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         driver._emitVital('TYPE_ERROR', { selector, error: _ce?.message || String(_ce), critical: true });
         throw err;

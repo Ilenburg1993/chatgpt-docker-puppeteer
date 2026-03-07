@@ -12,7 +12,7 @@ function _now() {
 function _safeJsonString(value, fallback = '{}') {
     try {
         return JSON.stringify(value ?? {});
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
@@ -25,7 +25,7 @@ function _parseJson(raw, fallback = {}) {
     if (!raw) return fallback;
     try {
         return JSON.parse(String(raw));
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }

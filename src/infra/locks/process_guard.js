@@ -28,7 +28,7 @@ function isProcessAlive(pid) {
          */
         process.kill(pid, 0);
         return true;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         /**
          * EPERM: O processo existe, mas o usuário atual não tem permissão

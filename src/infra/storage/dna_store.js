@@ -32,7 +32,7 @@ let cachedDna = null;
  * Mantém últimas 10 versões em memory (hot backup).
  *
  * @private
- * @param {object} dna - DNA atual a ser backupeado
+ * @param {any} dna - DNA atual a ser backupeado
  * @returns {boolean} - true se backup foi criado
  */
 /** @type {any[]} */
@@ -56,7 +56,7 @@ function backupDna(/** @type {any} */ dna) {
 
         log('DEBUG', `[DNA_STORE] Backup criado: v${backup.version} (${DNA_HISTORY.length}/${MAX_HISTORY})`);
         return true;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         log('WARN', `[DNA_STORE] Falha ao criar backup: ${_ce.message}`);
         return false;
@@ -67,7 +67,7 @@ function backupDna(/** @type {any} */ dna) {
  * Recupera o DNA completo do sistema.
  * Implementa cache em RAM com fallback para disco e inicialização V4 Gold.
  *
- * @returns {Promise<object>} Objeto DNA validado.
+ * @returns {Promise<any>} Objeto DNA validado.
  */
 async function getDna() {
     // 1. Hit de Cache (Performance O(1))
@@ -94,7 +94,7 @@ async function getDna() {
         backupDna(cachedDna);
 
         return cachedDna;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         log('ERROR', `[DNA_STORE] DNA corrompido: ${_ce.message}`);
 
@@ -112,7 +112,7 @@ async function getDna() {
 
                 log('INFO', `[DNA_STORE] DNA recuperado com sucesso do backup v${DNA_HISTORY[0].version}`);
                 return cachedDna;
-            } catch (recoveryError) {
+            } catch (/** @type {any} */ recoveryError) {
                 const _ce = /** @type {any} */ (recoveryError);
                 log('ERROR', `[DNA_STORE] Falha no recovery: ${_ce.message}. Usando baseline.`);
             }
@@ -165,7 +165,7 @@ async function saveDna(dna, author = 'system') {
             `[DNA_STORE] DNA Evoluído: v${validatedDna._meta.version} por ${author} (${validatedDna._meta.evolution_count} evoluções totais)`
         );
         return true;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         log('ERROR', `[DNA_STORE] Falha ao persistir evolução genômica: ${_ce.message}`);
         throw new Error(`DNA_PERSISTENCE_FAILURE: ${_ce.message}`); // eslint-disable-line preserve-caught-error
@@ -176,7 +176,7 @@ async function saveDna(dna, author = 'system') {
  * Recupera as regras específicas para um domínio IA com lógica de fallback.
  *
  * @param {string} domain - Ex: 'chatgpt.com'.
- * @returns {Promise<object>} Regras do alvo mescladas com globais.
+ * @returns {Promise<any>} Regras do alvo mescladas com globais.
  */
 async function getTargetRules(domain) {
     const dna = /** @type {any} */ (await getDna());
@@ -211,7 +211,7 @@ function invalidateCache() {
  * Restaura DNA de uma versão anterior do histórico.
  *
  * @param {number} versionIndex - Índice no histórico (0 = mais recente)
- * @returns {Promise<object>} - DNA restaurado
+ * @returns {Promise<any>} - DNA restaurado
  * @throws {Error} - Se versão não existir
  */
 async function rollbackDna(versionIndex = 0) {

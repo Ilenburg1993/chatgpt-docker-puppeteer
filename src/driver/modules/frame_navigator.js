@@ -195,7 +195,7 @@ class FrameNavigator extends EventEmitter {
             try {
                 await handle.dispose();
                 return true;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 log(
                     'WARN',
                     `[FRAME_NAV] Dispose attempt ${attempt + 1}/${FRAME_NAV_CONFIG.DISPOSE_RETRY_ATTEMPTS} failed for ${handleName}: ${/** @type {any} */ (err).message}`,
@@ -222,14 +222,14 @@ class FrameNavigator extends EventEmitter {
      * @private
      * @param {any} protocol - Protocolo SADI contendo framePath
      * @param {AbortSignal} signal - AbortSignal para cancelamento
-     * @returns {Promise<object>} Contexto de execução
+     * @returns {Promise<any>} Contexto de execução
      */
     async _executeGetExecutionContext(protocol, signal) {
         const result = {
             ctx: this.driver.page,
             offsetX: 0,
             offsetY: 0,
-            frameStack: [],
+            frameStack: /** @type {any[]} */ ([]),
         };
 
         // Caso base: Elemento está na raiz (Root)
@@ -403,7 +403,7 @@ class FrameNavigator extends EventEmitter {
      *
      * @param {any} protocol - Protocolo SADI contendo framePath
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
-     * @returns {Promise<object>} Contexto de execução
+     * @returns {Promise<any>} Contexto de execução
      * Propriedades do objeto retornado:
      *   - ctx (Object): Context (page ou frame)
      *   - offsetX (number): Offset horizontal acumulado
@@ -476,7 +476,7 @@ class FrameNavigator extends EventEmitter {
             });
 
             return result;
-        } catch (lineageErr) {
+        } catch (/** @type {any} */ lineageErr) {
             this.stats.failedNavigations++;
 
             log(
@@ -521,7 +521,7 @@ class FrameNavigator extends EventEmitter {
     /**
      * Retorna estatísticas de navegação de frames.
      *
-     * @returns {object} Objeto com métricas de navegação
+     * @returns {any} Objeto com métricas de navegação
      * Propriedades do objeto retornado:
      *   - totalNavigations (number): Total de navegações
      *   - successfulNavigations (number): Navegações bem-sucedidas
@@ -595,7 +595,7 @@ class FrameNavigator extends EventEmitter {
 /**
  * Factory function para criar instância de FrameNavigator.
  *
- * @param {any} driver - Instância do driver
+ * @param {object} driver - Instância do driver
  * @returns {FrameNavigator} Nova instância
  *
  * @example
@@ -603,7 +603,7 @@ class FrameNavigator extends EventEmitter {
  * const navigator = create(driver);
  */
 function create(driver) {
-    return new FrameNavigator(driver);
+    return new FrameNavigator(/** @type {any} */ (driver));
 }
 
 export { FrameNavigator, FRAME_NAV_CONFIG, FRAME_NAV_EVENTS, FrameNavError, create };

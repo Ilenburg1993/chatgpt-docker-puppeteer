@@ -1,4 +1,5 @@
-// @ts-nocheck - DOM/window augmentation (__wd_obs/__wd_last_change), page.evaluate callbacks, TS2416 base type incompatibilities
+// @ts-check
+/** @import { Page } from 'puppeteer-core' */
 import BaseDriver from '#driver/core/BaseDriver';
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { DRIVER_NAMES } from '#core/constants';
@@ -156,7 +157,7 @@ class ChatGPTDriver extends BaseDriver {
      * Executa 1 prompt → 1 resposta (contrato do TargetDriver).
      *
      * @param {string} prompt
-     * @returns {Promise<void>}
+     * @returns {Promise<any>}
      * @override
      */
     async execute(prompt) {
@@ -179,7 +180,7 @@ class ChatGPTDriver extends BaseDriver {
         const startSnapshot = await this.captureState();
         await this.prepareContext({ model: this.config?.model, config: this.config });
         await this.sendPrompt(text, { humanTyping: true });
-        const result = await this.waitForCompletion(startSnapshot, this.signal);
+        const result = await this.waitForCompletion(startSnapshot, /** @type {any} */ (this.signal));
 
         this.setState(STATUS_VALUES.IDLE);
         return result;
@@ -196,7 +197,7 @@ class ChatGPTDriver extends BaseDriver {
         const { validateLLMPage, validateLLMInterface } = await import('#core/validators/prerequisite_validator');
 
         // Valida URL
-        const pageValidation = await validateLLMPage(this.page);
+        const pageValidation = await validateLLMPage(/** @type {any} */ (this.page));
         if (!pageValidation.valid) {
             const err = new Error(`PREREQUISITE_FAILED: ${pageValidation.reason}`);
             err.details = pageValidation.details;
@@ -205,7 +206,7 @@ class ChatGPTDriver extends BaseDriver {
 
         // Valida interface carregada
         const interfaceValidation = await validateLLMInterface(
-            /** @type {import('puppeteer-core').Page} */ (this.page)
+            /** @type {any} */ (this.page)
         );
         if (!interfaceValidation.valid) {
             const err = new Error(`PREREQUISITE_FAILED: ${interfaceValidation.reason}`);
@@ -224,8 +225,8 @@ class ChatGPTDriver extends BaseDriver {
      */
     async captureState() {
         try {
-            return await this.page.evaluate(() => {
-                const msgs = document.querySelectorAll(
+            return await (/** @type {any} */ (this.page)).evaluate(() => {
+                const msgs = (/** @type {any} */ (document)).querySelectorAll(
                     'div[data-message-author-role="assistant"], article[data-testid*="conversation-turn"]'
                 );
                 return msgs.length;
@@ -277,7 +278,7 @@ class ChatGPTDriver extends BaseDriver {
         });
 
         const targetUrl = `https://chatgpt.com/?model=${modelId}`;
-        const currentUrl = this.page.url();
+        const currentUrl = (/** @type {any} */ (this.page)).url();
         const isConversation = currentUrl.includes('/c/');
         const wrongModel = !currentUrl.includes(modelId) && !currentUrl.includes(`model=${modelId}`);
         const forceReset = taskSpec?.config?.reset_context;
@@ -288,7 +289,7 @@ class ChatGPTDriver extends BaseDriver {
             try {
                 // ✅ BUG #4: Validar navegação
                 const response = /** @type {HttpResponseLike | null} */ (
-                    await this.page.goto(targetUrl, {
+                    await (/** @type {any} */ (this.page)).goto(targetUrl, {
                         waitUntil: 'networkidle2',
                         timeout: CHATGPT_CONFIG.NAVIGATION_TIMEOUT_MS,
                     })
@@ -346,18 +347,18 @@ class ChatGPTDriver extends BaseDriver {
         });
 
         // 1. Encontrar textarea via SADI
-        const inputProtocol = await analyzer.findChatInputSelector(this.page);
+        const inputProtocol = await analyzer.findChatInputSelector(/** @type {any} */ (this.page));
         if (!inputProtocol || !inputProtocol.protocol) {
             throw new Error('Textarea not found');
         }
 
         const { ctx } = await this.frameNavigator.getExecutionContext(
             toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (inputProtocol.protocol))),
-            this.signal
+            /** @type {any} */ (this.signal)
         );
 
         // 2. Limpar textarea
-        await ctx.evaluate(proto => {
+        await ctx.evaluate((/** @type {any} */ proto) => {
             const textarea = document.querySelector(proto.selector);
             if (textarea) {
                 textarea.value = '';
@@ -367,7 +368,7 @@ class ChatGPTDriver extends BaseDriver {
 
         // 3. Digitar prompt
         if (humanTyping) {
-            await this.biomechanics.typeText(ctx, inputProtocol.protocol.selector, prompt, this.signal);
+            await this.biomechanics.typeText(ctx, inputProtocol.protocol.selector, prompt, /** @type {any} */ (this.signal));
         } else {
             await ctx.type(inputProtocol.protocol.selector, prompt);
         }
@@ -378,7 +379,7 @@ class ChatGPTDriver extends BaseDriver {
         }
 
         // 5. Encontrar e clicar botão send
-        const sendProtocol = await analyzer.findSendButtonSelector(this.page, inputProtocol.protocol);
+        const sendProtocol = await analyzer.findSendButtonSelector(/** @type {any} */ (this.page), inputProtocol.protocol);
         if (!sendProtocol || !sendProtocol.protocol) {
             throw new Error('Send button not found');
         }
@@ -389,7 +390,7 @@ class ChatGPTDriver extends BaseDriver {
             offsetY,
         } = await this.frameNavigator.getExecutionContext(
             toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (sendProtocol.protocol))),
-            this.signal
+            /** @type {any} */ (this.signal)
         );
         const rect = await this.biomechanics.getStableRect(sendCtx, sendProtocol.protocol.selector);
 
@@ -397,7 +398,7 @@ class ChatGPTDriver extends BaseDriver {
             throw new Error('Send button rect not stable');
         }
 
-        await this.page.mouse.click(offsetX + rect.x + rect.w / 2, offsetY + rect.y + rect.h / 2);
+        await (/** @type {any} */ (this.page)).mouse.click(offsetX + (/** @type {any} */ (rect)).x + (/** @type {any} */ (rect)).w / 2, offsetY + (/** @type {any} */ (rect)).y + (/** @type {any} */ (rect)).h / 2);
 
         this._emitVital('PROGRESS_UPDATE', { step: 'PROMPT_SENT' });
 
@@ -414,9 +415,9 @@ class ChatGPTDriver extends BaseDriver {
      *
      * ✅ v2.0: AbortSignal integration, timeout máximo, telemetria expandida, empty response detection
      *
-     * @param {number} startSnapshot - Estado inicial (message count)
+     * @param {any} startSnapshot - Estado inicial (message count)
      * @param {AbortSignal} [signal] - Sinal de cancelamento externo
-     * @returns {Promise<void>} Resposta completa com metadados de captura
+     * @returns {Promise<any>} Resposta completa com metadados de captura
      * @throws {Error} OPERATION_ABORTED, STALL_DETECTED, LIMIT_REACHED, EMPTY_RESPONSE, etc
      * @override
      */
@@ -433,7 +434,7 @@ class ChatGPTDriver extends BaseDriver {
         this.setState('WAITING');
 
         // Watchdog de Mutação (Browser-Side) para detecção de Stall
-        await this.page.evaluate(() => {
+        await (/** @type {any} */ (this.page)).evaluate(() => {
             if (window.__wd_obs) {
                 window.__wd_obs.disconnect();
             }
@@ -466,8 +467,8 @@ class ChatGPTDriver extends BaseDriver {
                 this._assertPageAlive();
 
                 // 1. Diagnóstico de Bloqueios (Triage)
-                const lang = await this.page.evaluate(() => document.documentElement.lang || 'pt');
-                const diagnosis = await triage.diagnoseStall(this.page, lang);
+                const lang = await (/** @type {any} */ (this.page)).evaluate(() => document.documentElement.lang || 'pt');
+                const diagnosis = await triage.diagnoseStall(/** @type {any} */ (this.page), lang);
 
                 if (['LIMIT_REACHED', 'CAPTCHA_CHALLENGE', 'LOGIN_REQUIRED'].includes(diagnosis.type)) {
                     this._emitVital('TRIAGE_ALERT', diagnosis);
@@ -475,7 +476,7 @@ class ChatGPTDriver extends BaseDriver {
                 }
 
                 // 2. Extração via SADI V19
-                const responseArea = await analyzer.findResponseArea(this.page);
+                const responseArea = await analyzer.findResponseArea(/** @type {any} */ (this.page));
                 let currentText = '';
 
                 if (responseArea && responseArea.protocol) {
@@ -483,12 +484,12 @@ class ChatGPTDriver extends BaseDriver {
                         toFrameNavProtocol(
                             /** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (responseArea.protocol))
                         ),
-                        this.signal
+                        /** @type {any} */ (this.signal)
                     );
 
                     // Extração com Poda de Pensamento (NASA Standard Pruning)
-                    const extractionResult = await ctx.evaluate(proto => {
-                        const msgs = Array.from(document.querySelectorAll(proto.selector));
+                    const extractionResult = await ctx.evaluate((/** @type {any} */ proto) => {
+                        const msgs = Array.from((/** @type {any} */ (document)).querySelectorAll(proto.selector));
                         const targetMsg = msgs[msgs.length - 1];
                         if (!targetMsg) {
                             return { text: '', pruned: 0, textLengthBefore: 0 };
@@ -510,7 +511,7 @@ class ChatGPTDriver extends BaseDriver {
                             '.sr-only' // Screen reader only elements
                         );
                         const count = thoughts.length;
-                        thoughts.forEach(t => t.remove());
+                        thoughts.forEach((/** @type {any} */ t) => t.remove());
 
                         return {
                             text: clone.innerText.trim(),
@@ -575,8 +576,8 @@ class ChatGPTDriver extends BaseDriver {
                 }
 
                 // 4. Auto-Continuação
-                const didContinue = await this.page.evaluate(() => {
-                    const buttons = Array.from(document.querySelectorAll('button'));
+                const didContinue = await (/** @type {any} */ (this.page)).evaluate(() => {
+                    const buttons = Array.from((/** @type {any} */ (document)).querySelectorAll('button'));
                     const btn = buttons.find(b => {
                         const txt = (b.innerText || '').toLowerCase();
                         return b.offsetParent !== null && (txt.includes('continue') || txt.includes('regenerate'));
@@ -640,7 +641,7 @@ class ChatGPTDriver extends BaseDriver {
                     });
 
                     // ✅ Response Capture V2.0: Extração estruturada
-                    const extractedContent = await this.structuredExtractor.extract(this.page, responseArea.protocol);
+                    const extractedContent = await this.structuredExtractor.extract(/** @type {any} */ (this.page), (/** @type {any} */ (responseArea)).protocol);
 
                     // ✅ Response Capture V2.0: Telemetria de geração
                     const generation = {
@@ -658,7 +659,7 @@ class ChatGPTDriver extends BaseDriver {
                     let validation = null;
                     if (this.llmJudge.enabled && this.currentPrompt) {
                         try {
-                            validation = await this.llmJudge.validate(this.currentPrompt, currentText, signal);
+                            validation = await this.llmJudge.validate(this.currentPrompt, currentText, /** @type {any} */ (signal));
                         } catch (/** @type {any} */ _err) {
                             log(
                                 'WARN',
@@ -681,15 +682,15 @@ class ChatGPTDriver extends BaseDriver {
                 }
 
                 // 6. Stall Adaptativo
-                const lastChange = await this.page.evaluate(() => window.__wd_last_change);
-                const browserNow = await this.page.evaluate(() => Date.now());
+                const lastChange = await (/** @type {any} */ (this.page)).evaluate(() => window.__wd_last_change);
+                const browserNow = await (/** @type {any} */ (this.page)).evaluate(() => Date.now());
                 const adaptiveData = await adaptive.getAdjustedTimeout(this.currentDomain, 0, 'STREAM');
-                const watchdogIdleTime = browserNow - lastChange;
+                const watchdogIdleTime = browserNow - (/** @type {any} */ (lastChange));
 
                 if (watchdogIdleTime > adaptiveData.timeout) {
                     if (responseArea && responseArea.isBusy) {
                         // IA ainda ativa fisicamente, renovamos a paciência
-                        await this.page.evaluate(() => (window.__wd_last_change = Date.now()));
+                        await (/** @type {any} */ (this.page)).evaluate(() => (window.__wd_last_change = Date.now()));
                         continue;
                     }
 
@@ -701,7 +702,7 @@ class ChatGPTDriver extends BaseDriver {
                         stableCycles,
                         continuations: continuationCount,
                         responseAreaBusy: responseArea?.isBusy || false,
-                        currentUrl: this.page.url(),
+                        currentUrl: (/** @type {any} */ (this.page)).url(),
                         watchdogIdleSince: watchdogIdleTime,
                     });
 
@@ -765,19 +766,19 @@ class ChatGPTDriver extends BaseDriver {
      * @private
      */
     async _tryStopGeneration() {
-        const stopProtocol = await analyzer.findSendButtonSelector(this.page, {
+        const stopProtocol = await analyzer.findSendButtonSelector(/** @type {any} */ (this.page), {
             selector: '[aria-label*="Stop"], .stop-button',
         });
 
         if (stopProtocol && stopProtocol.protocol) {
             const { ctx, offsetX, offsetY } = await this.frameNavigator.getExecutionContext(
                 toFrameNavProtocol(/** @type {AnalyzerProtocol} */ (/** @type {unknown} */ (stopProtocol.protocol))),
-                this.signal
+                /** @type {any} */ (this.signal)
             );
             const rect = await this.biomechanics.getStableRect(ctx, stopProtocol.protocol.selector);
 
             if (rect) {
-                await this.page.mouse.click(offsetX + rect.x + rect.w / 2, offsetY + rect.y + rect.h / 2);
+                await (/** @type {any} */ (this.page)).mouse.click(offsetX + (/** @type {any} */ (rect)).x + (/** @type {any} */ (rect)).w / 2, offsetY + (/** @type {any} */ (rect)).y + (/** @type {any} */ (rect)).h / 2);
                 this._emitVital('GENERATION_STOPPED', { method: 'STOP_BUTTON' });
                 return true;
             }
@@ -785,7 +786,7 @@ class ChatGPTDriver extends BaseDriver {
 
         // ✅ BUG #6: Fallback com ESC key
         log('WARN', `[${this.name}] Stop button not found, trying ESC key...`, this.correlationId);
-        await this.page.keyboard.press('Escape');
+        await (/** @type {any} */ (this.page)).keyboard.press('Escape');
 
         this._emitVital('GENERATION_STOPPED', {
             method: 'ESC_FALLBACK',
@@ -805,7 +806,7 @@ class ChatGPTDriver extends BaseDriver {
      */
     async destroy() {
         try {
-            if (this.page && !this.page.isClosed()) {
+            if (this.page && !(/** @type {any} */ (this.page)).isClosed()) {
                 // ✅ BUG #7: Validar cleanup de MutationObserver
                 const wasDisconnected = await this.page.evaluate(() => {
                     if (window.__wd_obs) {

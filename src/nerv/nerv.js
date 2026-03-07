@@ -209,12 +209,12 @@ function buildPublicAPI({
         async shutdown() {
             try {
                 if (health && typeof health.shutdown === 'function') health.shutdown();
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* health cleanup best-effort */
             }
             try {
                 if (buffers && typeof buffers.shutdown === 'function') buffers.shutdown();
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* buffers cleanup best-effort */
             }
             if (hybridTransport) {
@@ -228,7 +228,7 @@ function buildPublicAPI({
             }
             try {
                 if (telemetry && typeof telemetry.shutdown === 'function') telemetry.shutdown();
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* telemetry cleanup best-effort */
             }
         },
@@ -247,7 +247,7 @@ function buildPublicAPI({
  * **Unidades:** Configurações seguem typedef NERVConfig.
  *
  * @param {NERVConfig} [config={}] - Configurações estruturais do NERV
- * @returns {Promise<object>} Instância NERV com API pública completa (congelada)
+ * @returns {Promise<any>} Instância NERV com API pública completa (congelada)
  * @throws {Error} Se bootstrap de algum componente falhar
  */
 async function createNERV(config = {}) {

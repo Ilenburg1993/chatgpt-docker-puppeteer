@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 /**
  * RAG API Controller
  *
@@ -24,15 +24,8 @@ import {
 import { resolveRagScopeConfig } from '../../../../tools/rag/lib/scope_config.mjs';
 import { asRecord } from '#types/guards';
 
-/**
- * @typedef {object} HandleRagAskReq
- * @property {object} body
- * @property {string} body
- */
-/**
- * @typedef {object} HandleRagAskRes
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} HandleRagAskReq */
+/** @typedef {any} HandleRagAskRes */
 /**
  * Handler para POST /api/rag/ask - Busca semântica com output em Markdown.
  *
@@ -72,33 +65,27 @@ export async function handleRagAsk(req, res) {
         return res.json({
             success: true,
             markdown: result.markdown,
-            chunks: result.result.results.length,
+            chunks: (/** @type {any} */ (result)).result.results.length,
             metadata: {
                 query,
-                topK: result.result.topK,
-                dim: result.result.dim,
+                topK: (/** @type {any} */ (result)).result.topK,
+                dim: (/** @type {any} */ (result)).result.dim,
                 timestamp: Date.now(),
             },
         });
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         log.error('[RAG API] handleRagAsk error:', error);
         return res.status(500).json({
             success: false,
-            error: error.message,
-            code: error.code || 'RAG_ASK_ERROR',
+            error: _e.message,
+            code: _e.code || 'RAG_ASK_ERROR',
         });
     }
 }
 
-/**
- * @typedef {object} HandleRagQueryReq
- * @property {object} body
- * @property {string} body
- */
-/**
- * @typedef {object} HandleRagQueryRes
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} HandleRagQueryReq */
+/** @typedef {any} HandleRagQueryRes */
 /**
  * Handler para POST /api/rag/query - Busca raw com resultados estruturados.
  *
@@ -133,7 +120,7 @@ export async function handleRagQuery(req, res) {
 
         return res.json({
             success: true,
-            results: result.results.map(r => ({
+            results: (/** @type {any} */ (result)).results.map((/** @type {any} */ r) => ({
                 path: r.path,
                 score: r.score,
                 startLine: r.start_line,
@@ -148,35 +135,30 @@ export async function handleRagQuery(req, res) {
             })),
             metadata: {
                 query,
-                topK: result.topK,
-                dim: result.dim,
-                index_mode: result.index_mode || 'full',
-                index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
-                index_updated_at_iso: result.index_updated_at_iso || null,
-                last_index_scope: result.last_index_scope || null,
-                scope_hash: result.scope_hash || null,
-                query_at_iso: result.query_at_iso || null,
+                topK: (/** @type {any} */ (result)).topK,
+                dim: (/** @type {any} */ (result)).dim,
+                index_mode: (/** @type {any} */ (result)).index_mode || 'full',
+                index_freshness_ms: typeof (/** @type {any} */ (result)).index_freshness_ms === 'number' ? (/** @type {any} */ (result)).index_freshness_ms : null,
+                index_updated_at_iso: (/** @type {any} */ (result)).index_updated_at_iso || null,
+                last_index_scope: (/** @type {any} */ (result)).last_index_scope || null,
+                scope_hash: (/** @type {any} */ (result)).scope_hash || null,
+                query_at_iso: (/** @type {any} */ (result)).query_at_iso || null,
                 timestamp: Date.now(),
             },
         });
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         log.error('[RAG API] handleRagQuery error:', error);
         return res.status(500).json({
             success: false,
-            error: error.message,
-            code: error.code || 'RAG_QUERY_ERROR',
+            error: _e.message,
+            code: _e.code || 'RAG_QUERY_ERROR',
         });
     }
 }
 
-/**
- * @typedef {object} HandleRagHealthReq
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
- * @typedef {object} HandleRagHealthRes
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} HandleRagHealthReq */
+/** @typedef {any} HandleRagHealthRes */
 /**
  * Handler para GET /api/rag/health - Health check do sistema RAG.
  *
@@ -191,28 +173,23 @@ export async function handleRagHealth(req, res) {
     try {
         const health = await ragHealth();
         return res.json({
-            ...health,
+            ...(/** @type {any} */ (health)),
             timestamp: Date.now(),
         });
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         log.error('[RAG API] handleRagHealth error:', error);
         return res.status(500).json({
             success: false,
             ok: false,
-            error: error.message,
-            code: error.code || 'RAG_HEALTH_ERROR',
+            error: _e.message,
+            code: _e.code || 'RAG_HEALTH_ERROR',
         });
     }
 }
 
-/**
- * @typedef {object} HandleRagIndexReq
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
- * @typedef {object} HandleRagIndexRes
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} HandleRagIndexReq */
+/** @typedef {any} HandleRagIndexRes */
 /**
  * Handler para POST /api/rag/index - Trigger reindexação em background.
  *
@@ -272,25 +249,19 @@ export async function handleRagIndex(req, res) {
             scope: resolvedScope.scope,
             timestamp: Date.now(),
         });
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         log.error('[RAG API] handleRagIndex error:', error);
         return res.status(500).json({
             success: false,
-            error: error.message,
-            code: error.code || 'RAG_INDEX_ERROR',
+            error: _e.message,
+            code: _e.code || 'RAG_INDEX_ERROR',
         });
     }
 }
 
-/**
- * @typedef {object} HandleRagHybridSearchReq
- * @property {object} body
- * @property {string} body
- */
-/**
- * @typedef {object} HandleRagHybridSearchRes
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} HandleRagHybridSearchReq */
+/** @typedef {any} HandleRagHybridSearchRes */
 /**
  * Handler para POST /api/rag/hybrid - Busca híbrida (Vetor + FTS + Reranking + MMR).
  *
@@ -347,7 +318,7 @@ export async function handleRagHybridSearch(req, res) {
 
         return res.json({
             success: true,
-            results: result.results.map(r => ({
+            results: result.results.map((/** @type {any} */ r) => ({
                 path: r.path,
                 score: r.score,
                 distance: r.distance,
@@ -373,7 +344,7 @@ export async function handleRagHybridSearch(req, res) {
                 mmr: result.mmr,
                 mmrLambda: result.mmrLambda,
                 index_mode: result.index_mode || 'full',
-                index_freshness_ms: typeof result.index_freshness_ms === 'number' ? result.index_freshness_ms : null,
+                index_freshness_ms: typeof result.index_freshness_ms === 'number' ? (/** @type {any} */ (result)).index_freshness_ms : null,
                 index_updated_at_iso: result.index_updated_at_iso || null,
                 last_index_scope: result.last_index_scope || null,
                 scope_hash: result.scope_hash || null,
@@ -381,24 +352,19 @@ export async function handleRagHybridSearch(req, res) {
                 timestamp: Date.now(),
             },
         });
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         log.error('[RAG API] handleRagHybridSearch error:', error);
         return res.status(500).json({
             success: false,
-            error: error.message,
-            code: error.code || 'RAG_HYBRID_SEARCH_ERROR',
+            error: _e.message,
+            code: _e.code || 'RAG_HYBRID_SEARCH_ERROR',
         });
     }
 }
 
-/**
- * @typedef {object} HandleRagStatsReq
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
- * @typedef {object} HandleRagStatsRes
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} HandleRagStatsReq */
+/** @typedef {any} HandleRagStatsRes */
 /**
  * Handler para GET /api/rag/stats - Estatísticas do cache de embeddings.
  *
@@ -425,12 +391,13 @@ export async function handleRagStats(req, res) {
             },
             timestamp: Date.now(),
         });
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
         log.error('[RAG API] handleRagStats error:', error);
         return res.status(500).json({
             success: false,
-            error: error.message,
-            code: error.code || 'RAG_STATS_ERROR',
+            error: _e.message,
+            code: _e.code || 'RAG_STATS_ERROR',
         });
     }
 }

@@ -78,7 +78,7 @@ function _extractJson(text) {
     // 1) Direct JSON
     try {
         return JSON.parse(raw);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         /* continue */
     }
 
@@ -87,7 +87,7 @@ function _extractJson(text) {
     if (fence && fence[1]) {
         try {
             return JSON.parse(fence[1].trim());
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* continue */
         }
     }
@@ -99,7 +99,7 @@ function _extractJson(text) {
         const slice = raw.slice(first, last + 1);
         try {
             return JSON.parse(slice);
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* ignore */
         }
     }
@@ -225,7 +225,7 @@ class MissionPlannerProcessor {
                 let task = null;
                 try {
                     task = row?.task_json ? JSON.parse(row.task_json) : null;
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     task = null;
                 }
 
@@ -278,7 +278,7 @@ class MissionPlannerProcessor {
             let parsed = null;
             try {
                 parsed = resultJson ? JSON.parse(resultJson) : null;
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 parsed = null;
             }
             const textFile = parsed?.storage?.text_file || parsed?.storage?.textFile || null;
@@ -287,7 +287,7 @@ class MissionPlannerProcessor {
             } else {
                 text = '';
             }
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             text = '';
         }
 

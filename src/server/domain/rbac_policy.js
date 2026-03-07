@@ -1,7 +1,7 @@
-// @ts-nocheck
+// @ts-check
 import { RBAC_PERMISSIONS, RBAC_ROLES } from '#infra/db/rbac_repo';
 
-function toArray(value) {
+function toArray(/** @type {any} */ value) {
     if (!value) return [];
     return Array.isArray(value) ? value : [value];
 }
@@ -10,7 +10,7 @@ function toArray(value) {
  * Função exportada: hasPermission.
  * @param {*} user
  * @param {*} permission
- * @returns {object}
+ * @returns {any}
  */
 function hasPermission(user, permission) {
     if (!user) return false;
@@ -42,7 +42,7 @@ function assertPermission(user, permission) {
 /**
  * Função exportada: normalizeActor.
  * @param {*} user
- * @returns {object}
+ * @returns {any}
  */
 function normalizeActor(user) {
     return {

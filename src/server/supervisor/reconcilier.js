@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import * as socketHub from '#server/engine/socket';
 import remediation from './remediation.js';
 import { log } from '#core/logger';
@@ -42,7 +42,7 @@ class SupervisorReconciler {
             return;
         }
 
-        const io = /** @type {unknown} */ (socketHub.getIO());
+        const io = /** @type {any} */ (socketHub.getIO());
         if (!io) {
             log('WARN', '[RECONCILER] Barramento indisponível. Re-tentando acoplamento em 5s...');
             if (this._retryAttachTimer) {
@@ -59,8 +59,8 @@ class SupervisorReconciler {
          * Intercepta eventos de diagnóstico (STALL_DETECTED) no milissegundo
          * em que são emitidos pelo robô, permitindo reação instantânea do Supervisor.
          */
-        io.on('connection', socket => {
-            socket.on('message', envelope => {
+        io.on('connection', (/** @type {any} */ socket) => {
+            socket.on('message', (/** @type {any} */ envelope) => {
                 if (envelope.kind === MessageType.EVENT && envelope.actionCode === ActionCode.STALL_DETECTED) {
                     this._handleStallSignal(socket.robot_id, envelope);
                 }
@@ -104,7 +104,7 @@ class SupervisorReconciler {
      * Processa um alerta de Stall e aplica a manobra de remediação prescrita.
      *
      * @param {string} robotId - Identidade do robô que emitiu o alerta.
-     * @param {object} envelope - O Envelope IPC contendo o diagnóstico técnico.
+     * @param {any} envelope - O Envelope IPC contendo o diagnóstico técnico.
      */
     async _handleStallSignal(robotId, envelope) {
         const diagnosis = envelope.payload;
@@ -113,7 +113,7 @@ class SupervisorReconciler {
         log('INFO', `[RECONCILER] Analisando sintoma "${diagnosis.type}" no robô ${robotId}`, correlationId);
 
         // Consulta a "Farmacopeia" (Remediation Engine) para obter a prescrição
-        const prescription = remediation.evaluate(diagnosis);
+        const prescription = /** @type {any} */ (remediation.evaluate(diagnosis));
 
         if (prescription) {
             log('WARN', `[RECONCILER] Executando Autocura: ${prescription.command}`, correlationId);
@@ -148,7 +148,7 @@ class SupervisorReconciler {
     /**
      * Verifica inconsistências entre o que o robô reporta e o que a fila exige.
      */
-    _checkTaskDrift(agent, now) {
+    _checkTaskDrift(/** @type {any} */ agent, /** @type {any} */ now) {
         // Implementação futura: detecção de inconsistência entre disco (Tarefa RUNNING) e memória (Robô IDLE).
         // Referências temporárias para evitar avisos de variáveis não utilizadas até a implementação completa.
         void agent;

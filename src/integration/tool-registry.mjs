@@ -292,7 +292,7 @@ export class ToolRegistry {
 
                 console.error(`[Tool Registry] Tool execution completed: ${name} (${duration}ms)`);
                 return result;
-            } catch (_raw_error) {
+            } catch (/** @type {any} */ _raw_error) {
                 const error = /** @type {any} */ (_raw_error);
                 clearTimeout(timeoutId);
                 lastError = error;
@@ -429,7 +429,7 @@ export class ToolRegistry {
     /**
      * Get registry stats
      *
-     * @returns {object} Stats object
+     * @returns {any} Stats object
      */
     getStats() {
         return {
@@ -503,7 +503,7 @@ export async function initialize() {
                 if (totalCount > 0) {
                     console.error(`[Tool Registry] Upstreams: ${readyCount}/${totalCount} ready`);
                 }
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 console.error('[Tool Registry] Upstream manager failed (continuing without upstreams):', error);
             }
 
@@ -512,7 +512,7 @@ export async function initialize() {
             const stats = /** @type {any} */ (registry.getStats());
             console.error(`[Tool Registry] Initialization complete: ${stats.totalTools} tools registered`);
             console.error(`[Tool Registry] Available tools: ${stats.tools.join(', ')}`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error('[Tool Registry] Initialization error:', error);
             // Reset promise so initialization can be retried
             initPromise = null;

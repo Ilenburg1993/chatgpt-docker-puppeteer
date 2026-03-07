@@ -22,7 +22,7 @@ import fs from 'node:fs';
  *
  * @param {FillExecutionContextTask} task - Task V5 object (mutável)
  * @param {FillExecutionContextOptions} options - Opções de preenchimento
- * @returns {object} Task com execution context preenchido
+ * @returns {any} Task com execution context preenchido
  */
 function fillExecutionContext(/** @type {any} */ task, /** @type {any} */ options) {
     options = options || {};
@@ -89,7 +89,7 @@ function fillExecutionContext(/** @type {any} */ task, /** @type {any} */ option
         );
 
         return task;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _ce = /** @type {any} */ (error);
         logger.error(
             `[EXECUTION_FILLER] Erro ao preencher execution context: ${_ce.message}`,
@@ -124,7 +124,7 @@ function _detectContainer() {
         }
 
         return false;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _ce = /** @type {any} */ (error);
         logger.debug(
             '[EXECUTION_FILLER] Erro ao detectar container, assumindo false',
@@ -159,7 +159,7 @@ async function _getChromeVersion(/** @type {any} */ browserPool) {
         }
 
         return 'unknown';
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _ce = /** @type {any} */ (error);
         logger.debug('[EXECUTION_FILLER] Erro ao obter Chrome version', /** @type {any} */ ({ error: _ce.message }));
         return 'unknown';

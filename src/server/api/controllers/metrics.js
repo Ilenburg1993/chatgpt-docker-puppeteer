@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { log } from '#core/logger';
 import { countTasksByStatus } from '#infra/db/task_repo';
 
@@ -25,9 +25,10 @@ async function getMetrics(req, res) {
         };
 
         res.json({ status: 'ok', metrics });
-    } catch (err) {
-        log('ERROR', `[METRICS] Erro ao obter métricas: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[METRICS] Erro ao obter métricas: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 
@@ -53,9 +54,10 @@ async function getTaskMetrics(req, res) {
                 total,
             },
         });
-    } catch (err) {
-        log('ERROR', `[METRICS] Erro ao obter métricas de tasks: ${err.message}`);
-        res.status(500).json({ status: 'error', message: err.message });
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[METRICS] Erro ao obter métricas de tasks: ${_e.message}`);
+        res.status(500).json({ status: 'error', message: _e.message });
     }
 }
 

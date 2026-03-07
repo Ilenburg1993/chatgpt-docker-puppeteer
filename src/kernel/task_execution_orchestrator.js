@@ -102,7 +102,7 @@ class TaskExecutionOrchestrator {
         try {
             // Hook: beforeExecution (orchestrator prepara task)
             preparedTask = await this.nervBridge.beforeTaskExecution(task);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
@@ -139,7 +139,7 @@ class TaskExecutionOrchestrator {
                     task: preparedTask,
                 },
             });
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log('ERROR', `[TaskExecutionOrchestrator] emitCommand falhou: ${taskId} - ${msg}`, correlationId);
@@ -167,7 +167,7 @@ class TaskExecutionOrchestrator {
         if (this.unsubscribeNerv) {
             try {
                 this.unsubscribeNerv();
-            } catch (_rawUnsubErr) {
+            } catch (/** @type {any} */ _rawUnsubErr) {
                 const unsubscribeError = /** @type {any} */ (_rawUnsubErr);
                 logger.log(
                     'WARN',
@@ -188,7 +188,7 @@ class TaskExecutionOrchestrator {
             let correlationId = null;
             try {
                 correlationId = getCorrelationId(envelope) || null;
-            } catch (_rawCorrErr) {
+            } catch (/** @type {any} */ _rawCorrErr) {
                 const correlationReadError = /** @type {any} */ (_rawCorrErr);
                 logger.log(
                     'DEBUG',
@@ -321,7 +321,7 @@ class TaskExecutionOrchestrator {
         try {
             // Hook: afterExecution (orchestrator decide próxima ação)
             decision = await this.nervBridge.afterTaskExecution(task, result);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
@@ -353,7 +353,7 @@ class TaskExecutionOrchestrator {
 
         try {
             await this.nervBridge.processOrchestrationDecision(decision, correlationId);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             const msg = err?.message || String(err);
             logger.log(
@@ -504,7 +504,7 @@ class TaskExecutionOrchestrator {
                     retriesAttempted: safePayload.retriesAttempted ?? null,
                 },
             });
-        } catch (_rawEmitErr) {
+        } catch (/** @type {any} */ _rawEmitErr) {
             const emitError = /** @type {any} */ (_rawEmitErr);
             logger.log(
                 'ERROR',
@@ -537,7 +537,7 @@ class TaskExecutionOrchestrator {
         if (this.unsubscribeNerv) {
             try {
                 this.unsubscribeNerv();
-            } catch (_rawUnsubErr) {
+            } catch (/** @type {any} */ _rawUnsubErr) {
                 const unsubscribeError = /** @type {any} */ (_rawUnsubErr);
                 logger.log(
                     'WARN',

@@ -40,7 +40,7 @@ async function validateLLMPage(page) {
     let url;
     try {
         url = page.url();
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         return ValidationResult.fail('PAGE_ERROR', {
             message: 'Erro ao obter URL da página',
@@ -132,13 +132,13 @@ async function validateLLMInterface(page) {
             if (!responseArea) {
                 log('WARN', `[PrerequisiteValidator] Área de resposta não detectada (não-crítico)`);
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             log('WARN', `[PrerequisiteValidator] Erro ao detectar área de resposta: ${_ce.message}`);
         }
 
         return ValidationResult.ok();
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         return ValidationResult.fail('INTERFACE_CHECK_ERROR', {
             message: 'Erro ao verificar interface LLM usando SADI',

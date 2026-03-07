@@ -172,7 +172,7 @@ class InputResolver extends EventEmitter {
      * 4. Heuristic Second (analyzer.findChatInputSelector com retry)
      * 5. Finalize discovery (resolve sendButton + cache update)
      *
-     * @returns {Promise<object>} Protocolo resolvido
+     * @returns {Promise<any>} Protocolo resolvido
      * Propriedades do objeto retornado:
      *   - selector (string): Seletor CSS do input
      *   - context (string): Contexto do seletor ('root' ou frame)
@@ -218,7 +218,7 @@ class InputResolver extends EventEmitter {
             this.stats.maxResolutionDuration = Math.max(this.stats.maxResolutionDuration, duration);
 
             return result;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             this.stats.failedResolutions++;
 
@@ -240,7 +240,7 @@ class InputResolver extends EventEmitter {
      * Executa lógica interna de resolução (sem timeout wrapper).
      *
      * @private
-     * @returns {Promise<object>} Protocolo resolvido
+     * @returns {Promise<any>} Protocolo resolvido
      */
     async _executeResolve() {
         this.driver._assertPageAlive();
@@ -263,7 +263,7 @@ class InputResolver extends EventEmitter {
                     analyzer.validateCandidateInteractivity(this.driver.page, cached.protocol),
                     cacheTimeoutP,
                 ]);
-            } catch (validationErr) {
+            } catch (/** @type {any} */ validationErr) {
                 const _ce = /** @type {any} */ (validationErr);
                 log('WARN', `[INPUT_RESOLVER] Cache validation timeout/error: ${_ce.message}`, correlationId);
             } finally {
@@ -338,7 +338,7 @@ class InputResolver extends EventEmitter {
                         heuristicResult.confidence || 0.8
                     );
                 }
-            } catch (heuristicErr) {
+            } catch (/** @type {any} */ heuristicErr) {
                 const _ce = /** @type {any} */ (heuristicErr);
                 if (retry < maxRetries - 1) {
                     log(
@@ -397,7 +397,7 @@ class InputResolver extends EventEmitter {
                 if (ok) {
                     return protocol;
                 }
-            } catch (_err) {
+            } catch (/** @type {any} */ _err) {
                 // Continue to next candidate
                 continue;
             }
@@ -415,7 +415,7 @@ class InputResolver extends EventEmitter {
      * @param {object} dnaRules - Regras DNA do domínio
      * @param {number} [confidence=1.0] - Nível de confiança (0-1)
      *
-     * @returns {Promise<object>} Protocolo final com sendButton
+     * @returns {Promise<any>} Protocolo final com sendButton
      *
      * @emits RESOLVER_EVENTS.DNA_MATCH
      * @emits RESOLVER_EVENTS.HEURISTIC_MATCH
@@ -492,7 +492,7 @@ class InputResolver extends EventEmitter {
      *
      * @private
      * @param {string} domain - Domain atual
-     * @param {object} protocol - Protocolo a cachear
+     * @param {any} protocol - Protocolo a cachear
      * @param {number} confidence - Nível de confiança
      *
      * @example
@@ -565,7 +565,7 @@ class InputResolver extends EventEmitter {
     /**
      * Retorna estatísticas de resolution.
      *
-     * @returns {object} Objeto com métricas de resolution
+     * @returns {any} Objeto com métricas de resolution
      * Propriedades do objeto retornado:
      *   - totalResolutions (number): Total de resoluções executadas
      *   - successfulResolutions (number): Resoluções bem-sucedidas
@@ -627,7 +627,7 @@ class InputResolver extends EventEmitter {
 /**
  * Factory function para criar instância de InputResolver.
  *
- * @param {any} driver - Instância do driver
+ * @param {object} driver - Instância do driver
  * @returns {InputResolver} Nova instância
  *
  * @example
@@ -635,7 +635,7 @@ class InputResolver extends EventEmitter {
  * const resolver = create(driver);
  */
 function create(driver) {
-    return new InputResolver(driver);
+    return new InputResolver(/** @type {any} */ (driver));
 }
 
 export { InputResolver, RESOLVER_CONFIG, RESOLVER_EVENTS, create };

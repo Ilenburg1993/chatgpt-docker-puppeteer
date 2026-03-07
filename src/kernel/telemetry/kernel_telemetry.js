@@ -117,7 +117,7 @@ class KernelTelemetry {
                         discardedAt: Date.now(),
                         discardedEventType: discarded.type,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     // Best-effort: don't crash telemetry on emit failures
                 }
             }
@@ -126,7 +126,7 @@ class KernelTelemetry {
         // ONDA 2.5: Emissão via NERV (desacoplado)
         try {
             await HighLevelNERV.sendEvent(this.nerv, ActorRole.KERNEL, ActionCode.KERNEL_TELEMETRY, event);
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Best-effort: avoid failing kernel telemetry on emission errors
         }
 

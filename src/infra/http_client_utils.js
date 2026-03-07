@@ -158,7 +158,7 @@ export async function checkUrlHealth(url, timeout = 5000) {
             statusCode,
             latencyMs,
         };
-    } catch (_rawErr) {
+    } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
         const latencyMs = Date.now() - startTime;
 
@@ -180,7 +180,7 @@ export async function checkUrlHealth(url, timeout = 5000) {
  *
  * @param {string|URL} url - URL to fetch
  * @param {any} [options] - Request options (see safeHttpRequest)
- * @returns {Promise<object>} Parsed JSON response
+ * @returns {Promise<any>} Parsed JSON response
  * @throws {Error} If request fails or JSON parsing fails
  *
  * @example
@@ -198,7 +198,7 @@ export async function fetchJson(url, options = {}) {
 
     try {
         return JSON.parse(body);
-    } catch (_rawErr) {
+    } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
         const error = new Error(`Failed to parse JSON response: ${err.message}`);
         (/** @type {any} */ (error)).code = 'INVALID_JSON';
@@ -216,7 +216,7 @@ export async function fetchJson(url, options = {}) {
  *
  * @param {string|URL} url - URL to request
  * @param {any} [options={}] - Request options
- * @returns {Promise<object>} Response object
+ * @returns {Promise<any>} Response object
  *
  * @example
  * const response = await retryHttpRequest('http://unstable-service/api', {
@@ -238,7 +238,7 @@ export async function retryHttpRequest(url, options = {}) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             return await safeHttpRequest(url, /** @type {any} */ (requestOptions));
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
             lastError = err;
 
@@ -294,7 +294,7 @@ export async function pollUntilHealthy(url, options = {}) {
             if (ok) {
                 return true;
             }
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
             // Continue polling on error
         }

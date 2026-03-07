@@ -34,7 +34,7 @@
 function safeCall(handler, payload) {
     try {
         handler(payload);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // transporte nunca falha semanticamente
     }
 }
@@ -66,7 +66,7 @@ function safeCall(handler, payload) {
  *  - send(frame)
  *  - onReceive(handler)
  *  - onError(handler) [opcional]
- * @returns {object}
+ * @returns {any}
  */
 function createConnection({ telemetry, adapter }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {

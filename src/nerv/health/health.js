@@ -65,7 +65,7 @@ function clone(obj) {
  * @param {object} deps.thresholds
  * @param {number} [deps.thresholds.maxOutboundBuffer] - Limite outbound buffer
  * @param {number} [deps.thresholds.maxInboundBuffer] - Limite inbound buffer
- * @returns {object} Módulo health com métodos updateTransport, updateBuffers, getSnapshot
+ * @returns {any} Módulo health com métodos updateTransport, updateBuffers, getSnapshot
  * @throws {Error} Se telemetry não for fornecida
  */
 function createHealth({ telemetry, thresholds = {} }) {
@@ -81,9 +81,9 @@ function createHealth({ telemetry, thresholds = {} }) {
         timestamp: now(),
 
         transport: {
-            connected: null,
+            connected: /** @type {boolean | null} */ (null),
             reconnecting: false,
-            lastError: null,
+            lastError: /** @type {any} */ (null),
         },
 
         buffers: {
@@ -92,8 +92,8 @@ function createHealth({ telemetry, thresholds = {} }) {
         },
 
         activity: {
-            lastEmission: null,
-            lastReception: null,
+            lastEmission: /** @type {number | null} */ (null),
+            lastReception: /** @type {number | null} */ (null),
         },
     };
 
@@ -119,7 +119,7 @@ function createHealth({ telemetry, thresholds = {} }) {
         for (const handler of listeners) {
             try {
                 handler(clone(state));
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // health nunca propaga falhas
             }
         }

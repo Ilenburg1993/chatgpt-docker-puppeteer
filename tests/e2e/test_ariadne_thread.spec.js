@@ -55,7 +55,7 @@ async function test1_BootSequence() {
             console.log('  (BrowserPool desabilitado para testes sem Chrome externo)');
 
             // Temporariamente mocka o BrowserPool para não tentar conectar
-            const BrowserPoolManager = await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m);
+            const BrowserPoolManager = /** @type {any} */ (await import('#infra/browser_pool/pool_manager').then(m => m.default ?? m));
             const originalInitialize = BrowserPoolManager.prototype.initialize;
             const originalGetHealth = BrowserPoolManager.prototype.getHealth;
             const originalShutdown = BrowserPoolManager.prototype.shutdown;

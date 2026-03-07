@@ -19,7 +19,7 @@ async function publishServerReady(nerv, payload = {}) {
     if (nerv) {
         try {
             return await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _e = /** @type {any} */ (err);
                         log('WARN', `[DISCOVERY] Falha ao publicar SERVER_READY via NERV: ${_e.message}`);
         }
@@ -53,7 +53,7 @@ function unpublishServerReady() {
  *
  * @param {any} nerv - Instância NERV com método onEvent
  * @param {Record<string, any>} [options={}] - Opções de configuração
- * @returns {Promise<object>} Payload do envelope SERVER_READY
+ * @returns {Promise<any>} Payload do envelope SERVER_READY
  * @throws {Error} Se NERV não tem onEvent ou timeout expirar
  */
 function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
@@ -78,11 +78,11 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
                         if (typeof unsub === 'function') unsub();
                         resolve(envelope.payload || envelope);
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     // ignore malformed envelopes
                 }
             });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             clearTimeout(timer);
             reject(err);
         }
@@ -113,7 +113,7 @@ function listenForServerReady(nerv, handler) {
             if (action === ActionCode.SERVER_READY) {
                 handler(envelope.payload || envelope);
             }
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // ignore
         }
     });

@@ -1,4 +1,6 @@
-// @ts-nocheck
+// @ts-check
+/** @import { NextFunction, Request, Response } from 'express' */
+/** @import { VerifyOptions } from 'jsonwebtoken' */
 import jwt from 'jsonwebtoken';
 import { log } from '#core/logger';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
@@ -9,10 +11,10 @@ import { isTokenRevoked } from '#infra/db/token_blocklist';
  * Middleware de autenticação JWT para proteger rotas do dashboard
  * Verifica se o token JWT é válido e adiciona informações do usuário à requisição
  *
- * @param {import('express').Request} req - Requisição Express
- * @param {import('express').Response} res - Resposta Express
- * @param {import('express').NextFunction} next - Próxima função middleware
- * @returns {import('express').Response|void}
+ * @param {Request} req - Requisição Express
+ * @param {Response} res - Resposta Express
+ * @param {NextFunction} next - Próxima função middleware
+ * @returns {Response|void}
  * @sideEffects - Pode enviar resposta de erro 401 se autenticação falhar
  */
 export function authenticate(req, res, next) {
@@ -32,12 +34,12 @@ export function authenticate(req, res, next) {
     try {
         // Verificar token JWT usando secret centralizado e validado
         const decoded = /** @type {{[k:string]: unknown}} */ (
-            jwt.verify(token, getJwtSecret(), /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS))
+            jwt.verify(token, getJwtSecret(), /** @type {VerifyOptions} */ (JWT_VERIFY_OPTIONS))
         );
 
         // SEC-02 FIX: Verificar se o token foi revogado (logout explícito)
         const jti = decoded.jti;
-        if (jti && isTokenRevoked(jti)) {
+        if (jti && isTokenRevoked(String(jti))) {
             log('WARN', `[AUTH] Token revogado apresentado pelo usuário: ${decoded.username}`, req.id);
             return res.status(401).json({
                 success: false,
@@ -73,10 +75,11 @@ export function authenticate(req, res, next) {
 
         log('DEBUG', `[AUTH] User authenticated: ${req.user.username}`, req.id);
         next();
-    } catch (error) {
-        log('WARN', `[AUTH] Token verification failed: ${error.message}`, req.id);
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
+        log('WARN', `[AUTH] Token verification failed: ${_e.message}`, req.id);
 
-        if (error.name === 'TokenExpiredError') {
+        if (_e.name === 'TokenExpiredError') {
             return res.status(401).json({
                 success: false,
                 error: 'Token expirado',
@@ -96,9 +99,9 @@ export function authenticate(req, res, next) {
  * Middleware opcional de autenticação - permite acesso público mas adiciona user se token válido
  * Útil para funcionalidades públicas que podem ser aprimoradas com autenticação
  *
- * @param {import('express').Request} req - Requisição Express
- * @param {import('express').Response} res - Resposta Express
- * @param {import('express').NextFunction} next - Próxima função middleware
+ * @param {Request} req - Requisição Express
+ * @param {Response} res - Resposta Express
+ * @param {NextFunction} next - Próxima função middleware
  * @returns {void}
  * @sideEffects - Adiciona req.user se token for válido, mas nunca bloqueia
  */
@@ -113,11 +116,11 @@ export function optionalAuthenticate(req, res, next) {
                 jwt.verify(
                     token,
                     getJwtSecret(),
-                    /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS)
+                    /** @type {VerifyOptions} */ (JWT_VERIFY_OPTIONS)
                 )
             );
             const jti = decoded.jti;
-            if (jti && isTokenRevoked(jti)) {
+            if (jti && isTokenRevoked(String(jti))) {
                 log('DEBUG', '[AUTH] Optional auth ignored due to revoked token', req.id);
                 return next();
             }
@@ -145,7 +148,8 @@ export function optionalAuthenticate(req, res, next) {
                 exp: decoded.exp,
             };
             log('DEBUG', `[AUTH] Optional auth successful: ${req.user.username}`, req.id);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             // Ignorar erro - autenticação opcional
             log('DEBUG', `[AUTH] Optional auth failed, continuing without user`, req.id);
         }
@@ -163,7 +167,7 @@ export function optionalAuthenticate(req, res, next) {
  * @sideEffects - Pode enviar resposta de erro 403 se autorização falhar
  */
 export function requireRole(requiredRoles) {
-    return (req, res, next) => {
+    return (/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
         if (!req.user) {
             return res.status(401).json({
                 success: false,

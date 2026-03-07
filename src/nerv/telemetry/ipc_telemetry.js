@@ -41,7 +41,7 @@ function now() {
 function safeCall(handler, payload) {
     try {
         handler(payload);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // Falha silenciosa: telemetria nunca interfere
     }
 }
@@ -62,7 +62,7 @@ function safeCall(handler, payload) {
  * @param {CreateIPCTelemetryConfig} config
  * Configuração estritamente técnica (opcional):
  * - enabled: boolean
-  * @returns {object}
+  * @returns {any}
  */
 function createIPCTelemetry(config = {}) {
     const enabled = config.enabled !== false;

@@ -162,7 +162,7 @@ class PageSessionTracker {
      *
      * @param {number} durationMs - Total response time in milliseconds
      * @param {boolean} [success=true] - Whether turn was successful
-     * @returns {object} { avgResponseTime, trend }
+     * @returns {any} { avgResponseTime, trend }
      */
     recordResponseTime(durationMs, success = true) {
         const entry = {
@@ -206,7 +206,7 @@ class PageSessionTracker {
      * Gets comprehensive session metrics.
      * Results are cached for 1s to avoid recalculation overhead.
      *
-     * @returns {object} Session metrics
+     * @returns {any} Session metrics
      */
     getMetrics() {
         const now = Date.now();
@@ -255,7 +255,7 @@ class PageSessionTracker {
      * Gets session health score and level.
      * Quick method for health checks.
      *
-     * @returns {object} { score, level, factors }
+     * @returns {any} { score, level, factors }
      */
     getSessionHealth() {
         const metrics = /** @type {any} */ (this.getMetrics());
@@ -443,7 +443,7 @@ class PageSessionTracker {
 
     /**
      * Gets detailed health factors for debugging.
-     * @returns {object} Health contributing factors
+     * @returns {any} Health contributing factors
      * @private
      */
     _getHealthFactors() {

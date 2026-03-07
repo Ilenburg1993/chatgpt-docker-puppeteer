@@ -1,3 +1,4 @@
+/** @import { Page } from 'puppeteer-core' */
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import EventEmitter from 'node:events';
 import { STATUS_VALUES } from '#core/constants/tasks';
@@ -110,7 +111,7 @@ const CAPABILITIES_SCHEMA = Object.freeze([
  * @abstract
  * @extends EventEmitter
  *
- * @property {import('puppeteer-core').Page|null} page - Puppeteer page instance (null se UNATTACHED)
+ * @property {Page|null} page - Puppeteer page instance (null se UNATTACHED)
  * @property {object} config - Driver configuration (immutable)
  * @property {AbortSignal|null} signal - Cancellation signal (null se UNATTACHED)
  * @property {string} name - Driver name
@@ -171,7 +172,7 @@ class TargetDriver extends EventEmitter {
         }
 
         // ✅ v3.0: page e signal são NULL inicialmente (estado UNATTACHED)
-        /** @type {import('puppeteer-core').Page|null} */
+        /** @type {Page|null} */
         this.page = null;
         this.signal = null;
 
@@ -278,7 +279,7 @@ class TargetDriver extends EventEmitter {
                 if (this._state !== STATES.UNATTACHED) {
                     try {
                         this.setState(STATES.IDLE);
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         // If setState fails, force update
                         this._state = STATES.IDLE;
                         this.stateUpdated = Date.now();
@@ -322,7 +323,7 @@ class TargetDriver extends EventEmitter {
                 if (this._state !== STATES.UNATTACHED) {
                     try {
                         this.setState(STATES.IDLE);
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         // If setState fails, force update
                         this._state = STATES.IDLE;
                         this.stateUpdated = Date.now();
@@ -337,7 +338,7 @@ class TargetDriver extends EventEmitter {
                 `[${this.name}] Page lifecycle handlers attached (${this._pageEventListeners.length})`,
                 this.correlationId
             );
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[${this.name}] Failed to attach page handlers: ${err.message}`, this.correlationId);
         }
@@ -360,7 +361,7 @@ class TargetDriver extends EventEmitter {
             });
             this._pageEventListeners = [];
             log('DEBUG', `[${this.name}] Page lifecycle handlers removed`, this.correlationId);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('WARN', `[${this.name}] Error removing page handlers: ${err.message}`, this.correlationId);
         }
@@ -387,7 +388,7 @@ class TargetDriver extends EventEmitter {
         if (this._state !== STATES.IDLE) {
             try {
                 this.setState(STATES.IDLE);
-            } catch (_err) {
+            } catch (/** @type {any} */ _err) {
                 // Force reset se validação falhar
                 this._state = STATES.IDLE;
                 this.stateUpdated = Date.now();
@@ -461,7 +462,7 @@ class TargetDriver extends EventEmitter {
      * - Signal attached + listener configurado
      * - Evento CONTEXT_ATTACHED emitido
      *
-     * @param {import('puppeteer-core').Page} page - Puppeteer page instance
+     * @param {Page} page - Puppeteer page instance
      * @param {AbortSignal} signal - Cancellation signal
      * @param {string} [correlationId] - Correlation ID para tracing
      *
@@ -639,7 +640,7 @@ class TargetDriver extends EventEmitter {
         // ✅ C2: Force setState (mesmo que validation falhe)
         try {
             this.setState(STATES.UNATTACHED);
-        } catch (_rawStateError) {
+        } catch (/** @type {any} */ _rawStateError) {
             const stateError = /** @type {any} */ (_rawStateError);
             // ✅ C2: Se setState falhar (transition inválida), force state
             log(
@@ -786,7 +787,7 @@ class TargetDriver extends EventEmitter {
 
     /**
      * Retorna cópia das capabilities atuais.
-     * @returns {object} Capabilities
+     * @returns {any} Capabilities
      */
     getCapabilities() {
         return { ...this._capabilities };
@@ -802,7 +803,7 @@ class TargetDriver extends EventEmitter {
      *
      * Usado pelo Supervisor para detecção de Drifts.
      *
-     * @returns {Promise<object>} Health status com métricas
+     * @returns {Promise<any>} Health status com métricas
      */
     async getHealth() {
         const isPageAlive = !!(this.page && !this.page.isClosed());
@@ -842,7 +843,7 @@ class TargetDriver extends EventEmitter {
      * Retorna estatísticas de erros.
      * ✅ v2.0: Error tracking
      *
-     * @returns {object} Error stats
+     * @returns {any} Error stats
      */
     getErrorStats() {
         return {
@@ -1002,7 +1003,7 @@ class TargetDriver extends EventEmitter {
     /**
      * Captura estado atual da interface.
      * @abstract
-     * @returns {Promise<object>}
+     * @returns {Promise<any>}
      * @throws {Error} Sempre - deve ser implementado
      */
     async captureState() {
@@ -1084,7 +1085,7 @@ class TargetDriver extends EventEmitter {
         if (this.isContextAttached()) {
             try {
                 this.detachContext();
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[${this.name}] Error detaching context during destroy: ${err.message}`);
             }
@@ -1107,7 +1108,7 @@ class TargetDriver extends EventEmitter {
                 `[${this.name}] Driver destruído. Referências de memória limpas. Errors: ${this._errorCount}`,
                 this.correlationId
             );
-        } catch (_e) {
+        } catch (/** @type {any} */ _e) {
             // Ignore logging errors during cleanup
         }
     }

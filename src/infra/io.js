@@ -70,7 +70,7 @@ export const cleanupOrphans = async function () {
                 await fs.unlink(path.join(dir, file)).catch(() => {});
                 totalCleaned++;
             }
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             const _ce = /** @type {any} */ (_);
             /* Falha em diretório específico não interrompe a higiene */
         }
@@ -135,7 +135,7 @@ export const loadTask = async id => {
         if (stats.isSymbolicLink()) {
             throw new Error('SECURITY_SYMLINK_DENIED: Symbolic links not allowed in queue');
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         if (_ce.message && _ce.message.includes('SECURITY_SYMLINK_DENIED')) {
             throw err;

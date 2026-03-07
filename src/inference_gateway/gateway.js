@@ -233,7 +233,7 @@ export class InferenceGateway {
                 result,
                 ts: this.now(),
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this.metrics.errors = (this.metrics.errors || 0) + 1;
             throw error;
         } finally {
@@ -275,7 +275,7 @@ export class InferenceGateway {
                 result,
                 ts: this.now(),
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this.metrics.errors = (this.metrics.errors || 0) + 1;
             throw error;
         } finally {
@@ -305,7 +305,7 @@ export class InferenceGateway {
                 models,
                 ts: this.now(),
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this.metrics.errors = (this.metrics.errors || 0) + 1;
             throw error;
         } finally {

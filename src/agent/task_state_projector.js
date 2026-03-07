@@ -61,7 +61,7 @@ function _statSizeBytes(filePath) {
     try {
         const st = fs.statSync(filePath);
         return Number(st.size) || 0;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return 0;
     }
 }
@@ -110,7 +110,7 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
                 created_at_ms: Date.now(),
             });
             ids[k] = id;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             ids[k] = null;
         }
     }
@@ -172,7 +172,7 @@ function _registerResponseArtifacts({ storage, actor = 'system' } = {}) {
                 created_at_ms: Date.now(),
             });
             ids[k] = id;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             ids[k] = null;
         }
     }
@@ -186,7 +186,7 @@ function _getMissionIdForTask(taskId) {
         const db = getDb();
         const row = /** @type {any} */ (db.prepare('SELECT mission_id FROM tasks WHERE id = ?').get(taskId));
         return row?.mission_id ?? null;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return null;
     }
 }
@@ -236,7 +236,7 @@ class TaskStateProjector {
         try {
             updateTask(taskId, updates);
             return true;
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             if (err && err.name === 'OptimisticLockError') {
                 const msg = context
@@ -266,7 +266,7 @@ class TaskStateProjector {
         const maybeUnsub = this.nerv.onReceive((/** @type {any} */ envelope) => {
             try {
                 this._handleEnvelope(envelope);
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log('ERROR', `[TaskStateProjector] handler error: ${err?.message || String(err)}`);
             }
@@ -284,7 +284,7 @@ class TaskStateProjector {
         if (this._unsub) {
             try {
                 this._unsub();
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore */
             }
             this._unsub = null;
@@ -386,7 +386,7 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[PROJECTOR] heartbeat/accepted attempt failed: ${err?.message || String(err)}`);
             }
@@ -433,7 +433,7 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[PROJECTOR] RUNNING attempt transition failed: ${err?.message || String(err)}`);
             }
@@ -449,7 +449,7 @@ class TaskStateProjector {
                     payload: { taskId, actionCode },
                     dedupKey: `attempt-started:${attemptId}:${now}`,
                 });
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* best-effort */
             }
 
@@ -525,7 +525,7 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
@@ -547,7 +547,7 @@ class TaskStateProjector {
                         },
                         dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:${now}`,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* NERV emit is best-effort */
                 }
             }
@@ -591,7 +591,7 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
@@ -614,7 +614,7 @@ class TaskStateProjector {
                         },
                         dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:${now}`,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* NERV emit is best-effort */
                 }
             }
@@ -630,7 +630,7 @@ class TaskStateProjector {
                     payload: { taskId, actionCode, hasArtifacts: Boolean(artifactIds.text || artifactIds.md) },
                     dedupKey: `attempt-done:${attemptId}:${now}`,
                 });
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* best-effort */
             }
 
@@ -675,7 +675,7 @@ class TaskStateProjector {
                     if (row?.status === 'PAUSED') {
                         nextStatus = 'PAUSED';
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[PROJECTOR] ABORTED attempt registration failed: ${err?.message || String(err)}`);
                 }
@@ -701,7 +701,7 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
@@ -722,7 +722,7 @@ class TaskStateProjector {
                         },
                         dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:${now}`,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* NERV emit is best-effort */
                 }
             }
@@ -776,7 +776,7 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
@@ -798,7 +798,7 @@ class TaskStateProjector {
                             },
                             dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:dup:${now}`,
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* NERV emit is best-effort */
                     }
                 }
@@ -831,7 +831,7 @@ class TaskStateProjector {
                             diagnosis_json: summaryJson,
                         });
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
@@ -853,7 +853,7 @@ class TaskStateProjector {
                             },
                             dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:stale:${now}`,
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* NERV emit is best-effort */
                     }
                 }
@@ -932,7 +932,7 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
@@ -954,7 +954,7 @@ class TaskStateProjector {
                             },
                             dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:block:${now}`,
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* NERV emit is best-effort */
                     }
                 }
@@ -1011,7 +1011,7 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
@@ -1033,7 +1033,7 @@ class TaskStateProjector {
                             },
                             dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:env:${now}`,
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* NERV emit is best-effort */
                     }
                 }
@@ -1056,10 +1056,10 @@ class TaskStateProjector {
                     try {
                         const taskJson = row?.task_json ? JSON.parse(row.task_json) : null;
                         maxAttempts = Math.max(1, Number(taskJson?.policy?.max_attempts ?? 3) || 3);
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         maxAttempts = 3;
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     currentAttempts = 0;
                     maxAttempts = 3;
                 }
@@ -1101,7 +1101,7 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
@@ -1123,7 +1123,7 @@ class TaskStateProjector {
                             },
                             dedupKey: `art-fail:${taskId}:${attemptId}:${actionCode}:terr:${now}`,
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* NERV emit is best-effort */
                     }
                 }
@@ -1236,7 +1236,7 @@ class TaskStateProjector {
                             });
                         }
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[PROJECTOR] diagnostic artifact registration failed: ${err?.message || String(err)}`);
                 }
@@ -1285,7 +1285,7 @@ class TaskStateProjector {
                         });
                     }
                 }
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[PROJECTOR] attempt state update failed: ${err?.message || String(err)}`);
             }

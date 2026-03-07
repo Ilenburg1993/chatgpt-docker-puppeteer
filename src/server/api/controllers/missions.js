@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-check
+/** @import { Router } from 'express' */
 import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
 import { executeCommand } from '#server/domain/control_command_service';
@@ -49,7 +50,7 @@ const patchMissionSchema = z
         autonomy_mode: AUTONOMY_SCHEMA.optional(),
         autonomyMode: AUTONOMY_SCHEMA.optional(),
     })
-    .refine(v => Object.keys(v).length > 0, { message: 'Body vazio' });
+    .refine((/** @type {any} */ v) => Object.keys(v).length > 0, { message: 'Body vazio' });
 
 const updatePolicySchema = z.object({
     autonomy_mode: AUTONOMY_SCHEMA.optional(),
@@ -88,26 +89,26 @@ const proposalsRejectSchema = z
         all: z.boolean().optional(),
         task_ids: z.array(z.string()).max(2000).optional(),
     })
-    .refine(v => v.all === true || (Array.isArray(v.task_ids) && v.task_ids.length > 0), {
+    .refine((/** @type {any} */ v) => v.all === true || (Array.isArray(v.task_ids) && v.task_ids.length > 0), {
         message: 'Body inválido: forneça {all:true} ou {task_ids:[...]}',
     });
 
-function _asUpper(value) {
+function _asUpper(/** @type {any} */ value) {
     return value ? String(value).toUpperCase().trim() : null;
 }
 
-function _asTrimmedString(value, fallback = '') {
+function _asTrimmedString(/** @type {any} */ value, fallback = '') {
     if (value === null || value === undefined) return fallback;
     return String(value).trim();
 }
 
-function _coerceAutonomyMode(raw) {
+function _coerceAutonomyMode(/** @type {any} */ raw) {
     const value = _asUpper(raw);
     if (!value) return AUTONOMY_MODES.USER_ONLY;
-    return AUTONOMY_MODES[value] ? value : AUTONOMY_MODES.USER_ONLY;
+    return (/** @type {any} */ (AUTONOMY_MODES))[value] ? value : AUTONOMY_MODES.USER_ONLY;
 }
 
-function _computeProgressView(mission) {
+function _computeProgressView(/** @type {any} */ mission) {
     const workflow = mission?.context?.workflow || null;
     const steps = Array.isArray(workflow?.steps) ? workflow.steps : [];
 
@@ -154,7 +155,7 @@ function _pickAllowedTarget(options = /** @type {{requested?: unknown, allowedTa
     return 'auto';
 }
 
-function _resolveIfVersion(mission, requestedIfVersion) {
+function _resolveIfVersion(/** @type {any} */ mission, /** @type {any} */ requestedIfVersion) {
     if (requestedIfVersion !== undefined && requestedIfVersion !== null) {
         return requestedIfVersion;
     }
@@ -163,7 +164,7 @@ function _resolveIfVersion(mission, requestedIfVersion) {
     return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-async function _runMissionControlCommand(req, res, command, payload = {}) {
+async function _runMissionControlCommand(/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ command, /** @type {Record<string, any>} */ payload = {}) {
     try {
         const result = await executeCommand({
             command,
@@ -177,12 +178,13 @@ async function _runMissionControlCommand(req, res, command, payload = {}) {
         });
 
         return result;
-    } catch (err) {
-        res.status(Number(err?.statusCode || 500)).json({
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        res.status(Number(_e?.statusCode || 500)).json({
             success: false,
-            code: err?.code || 'MISSION_CONTROL_FAILED',
-            error: err?.message || 'Falha no comando de missão',
-            details: err?.details || null,
+            code: _e?.code || 'MISSION_CONTROL_FAILED',
+            error: _e?.message || 'Falha no comando de missão',
+            details: _e?.details || null,
             request_id: req.id,
         });
         return null;
@@ -205,12 +207,13 @@ router.get('/templates/list', async (req, res) => {
             templates,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao listar templates: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao listar templates: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao listar templates',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -275,12 +278,12 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
 
         recordEvent({
             entityType: 'mission',
-            entityId: missionRecord.id,
+            entityId: (/** @type {any} */ (missionRecord)).id,
             actorType: 'user',
             actorId: req.ip || null,
             eventType: 'MISSION_CREATED',
             payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:mission:${missionRecord.id}:created`,
+            dedupKey: `req:${req.id}:mission:${(/** @type {any} */ (missionRecord)).id}:created`,
         });
 
         res.status(201).json({
@@ -288,12 +291,13 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
             mission,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao criar missão: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao criar missão: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao criar missão',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -327,12 +331,13 @@ router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
         });
         if (!control) return;
         res.json({ success: true, mission: control?.result?.after || mission, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao atualizar missão: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao atualizar missão: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao atualizar missão',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -351,12 +356,13 @@ router.get('/', async (req, res) => {
             missions,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao listar missões: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao listar missões: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao listar missões',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -382,12 +388,13 @@ router.get('/:id', async (req, res) => {
             mission,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao buscar missão: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao buscar missão: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao buscar missão',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -430,10 +437,10 @@ router.get('/:id/progress', async (req, res) => {
         const byStage = {};
         let totalTasks = 0;
         for (const r of countRows) {
-            const c = Number(r.c) || 0;
+            const c = Number((/** @type {any} */ (r)).c) || 0;
             totalTasks += c;
-            byStatus[String(r.status)] = (byStatus[String(r.status)] || 0) + c;
-            byStage[String(r.stage)] = (byStage[String(r.stage)] || 0) + c;
+            byStatus[String((/** @type {any} */ (r)).status)] = (byStatus[String((/** @type {any} */ (r)).status)] || 0) + c;
+            byStage[String((/** @type {any} */ (r)).stage)] = (byStage[String((/** @type {any} */ (r)).stage)] || 0) + c;
         }
 
         const liveCounts = {
@@ -454,12 +461,13 @@ router.get('/:id/progress', async (req, res) => {
             live_counts: liveCounts,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao buscar progresso: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao buscar progresso: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao buscar progresso',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -487,12 +495,13 @@ router.post('/:id/execute', async (req, res) => {
             mission: control?.result?.after || null,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao executar missão: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao executar missão: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao executar missão',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -513,12 +522,13 @@ router.post('/:id/pause', async (req, res) => {
             mission: control?.result?.after || null,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao pausar missão: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao pausar missão: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao pausar missão',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -539,12 +549,13 @@ router.post('/:id/resume', async (req, res) => {
             mission: control?.result?.after || null,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao resumir missão: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao resumir missão: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao resumir missão',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -560,7 +571,7 @@ router.post('/:id/resume', async (req, res) => {
  */
 router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => {
     try {
-        const missionId = req.params.id;
+        const missionId = String(req.params.id);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
@@ -583,12 +594,13 @@ router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => 
             mission: control?.result?.after || null,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao atualizar policy: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao atualizar policy: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao atualizar policy',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -645,20 +657,21 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
             mission: updated,
             request_id: req.id,
         });
-    } catch (err) {
-        if (err?.code === 'CONFLICT') {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        if (_e?.code === 'CONFLICT') {
             return res.status(409).json({
                 success: false,
                 error: 'Conflito de concorrência ao salvar feedback',
-                details: err?.message || String(err),
+                details: _e?.message || String(_e),
                 request_id: req.id,
             });
         }
-        log('ERROR', `[MISSIONS_API] Erro ao adicionar feedback: ${err?.message || String(err)}`, req.id);
+        log('ERROR', `[MISSIONS_API] Erro ao adicionar feedback: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao adicionar feedback',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -829,12 +842,13 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
             task_id: taskId,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao criar planner task: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao criar planner task: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao criar planner task',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -908,7 +922,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                         /[^a-zA-Z0-9._-]/g,
                         '-'
                     ),
-                    tags: Array.isArray(proposal?.tags) ? proposal.tags.map(t => String(t)) : [],
+                    tags: Array.isArray(proposal?.tags) ? proposal.tags.map((/** @type {any} */ t) => String(t)) : [],
                 },
                 spec: {
                     target,
@@ -918,7 +932,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                     },
                 },
                 policy: {
-                    dependencies: Array.isArray(proposal?.depends_on) ? proposal.depends_on.map(d => String(d)) : [],
+                    dependencies: Array.isArray(proposal?.depends_on) ? proposal.depends_on.map((/** @type {any} */ d) => String(d)) : [],
                     execute_after: null,
                 },
                 mission: {
@@ -954,12 +968,13 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
             task_ids: createdTaskIds,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao aceitar proposals: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao aceitar proposals: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao aceitar proposals',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -984,7 +999,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
         const all = Boolean(req.body?.all);
         const taskIdsRaw = Array.isArray(req.body?.task_ids) ? req.body.task_ids : null;
         const taskIds = taskIdsRaw
-            ? taskIdsRaw.map(t => String(t).replace(/[^a-zA-Z0-9._-]/g, '')).filter(Boolean)
+            ? taskIdsRaw.map((/** @type {any} */ t) => String(t).replace(/[^a-zA-Z0-9._-]/g, '')).filter(Boolean)
             : [];
 
         const db = getDb();
@@ -996,7 +1011,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
                     `SELECT id FROM tasks WHERE mission_id = @mission_id AND stage = 'PROPOSED' ORDER BY created_at_ms ASC LIMIT 2000`
                 )
                 .all({ mission_id: missionId })
-                .map(r => String(r.id));
+                .map((/** @type {any} */ r) => String(r.id));
         } else {
             ids = taskIds.slice(0, 2000);
         }
@@ -1009,7 +1024,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
         const belongs = db
             .prepare(`SELECT id FROM tasks WHERE id IN (${placeholders}) AND mission_id = ?`)
             .all(...ids, missionId)
-            .map(r => String(r.id));
+            .map((/** @type {any} */ r) => String(r.id));
 
         const belongsSet = new Set(belongs);
         const rejectedIds = ids.filter(id => belongsSet.has(id));
@@ -1065,12 +1080,13 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
             task_ids: rejectedIds,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao rejeitar proposals: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao rejeitar proposals: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao rejeitar proposals',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -1096,12 +1112,13 @@ router.delete('/:id', async (req, res) => {
             mission: control?.result?.after || null,
             request_id: req.id,
         });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao cancelar missão: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao cancelar missão: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao cancelar missão',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
             request_id: req.id,
         });
     }
@@ -1129,8 +1146,9 @@ router.delete('/:id/purge', async (req, res) => {
             dedupKey: `req:${req.id}:mission:${missionId}:purge`,
         });
         res.json({ success: true, request_id: req.id });
-    } catch (err) {
-        log('ERROR', `[MISSIONS_API] Erro ao purgar missão: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[MISSIONS_API] Erro ao purgar missão: ${_e?.message || String(_e)}`, req.id);
         res.status(500).json({ success: false, error: 'Erro ao purgar missão', request_id: req.id });
     }
 });
@@ -1142,7 +1160,7 @@ router.delete('/:id/purge', async (req, res) => {
  * **Semântica:** Gerencia ciclo de vida completo de missões, incluindo criação, listagem, atualização e exclusão.
  * **Unidades:** N/A
  *
- * @type {import('express').Router}
+ * @type {Router}
  */
 export default router;
 

@@ -10,9 +10,9 @@ export function createEmptyManifest() {
         updated_at: now,
         fingerprint: { xxhash64: true, sha256: true },
         chunker_version: CHUNKER_VERSION,
-        embedding: { model: DEFAULT_EMBEDDING_MODEL, dim: null, base_url_default: DEFAULT_OLLAMA_BASE_URL },
-        last_scope: null,
-        last_scope_hash: null,
+        embedding: { model: DEFAULT_EMBEDDING_MODEL, dim: /** @type {number | null} */ (null), base_url_default: DEFAULT_OLLAMA_BASE_URL },
+        last_scope: /** @type {string | null} */ (null),
+        last_scope_hash: /** @type {string | null} */ (null),
         files: {},
     };
 }

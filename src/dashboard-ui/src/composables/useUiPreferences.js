@@ -25,7 +25,7 @@ function _applyPresetToDom(/** @type {any} */ preset) {
 function _persistLocalPreset(/** @type {any} */ preset) {
     try {
         localStorage.setItem(STORAGE_KEY, preset);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // noop
     }
 }
@@ -48,7 +48,7 @@ async function _saveToServer(/** @type {any} */ preset) {
 
 /**
  * Função exportada: useUiPreferences.
- * @returns {object}
+ * @returns {any}
  */
 export function useUiPreferences() {
     const { isAuthenticated } = useAuth();
@@ -61,7 +61,7 @@ export function useUiPreferences() {
             let localPreset = 'dense';
             try {
                 localPreset = _normalizePreset(localStorage.getItem(STORAGE_KEY));
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 localPreset = 'dense';
             }
             currentPreset.value = localPreset;
@@ -73,7 +73,7 @@ export function useUiPreferences() {
                 _applyPresetToDom(preset);
                 _persistLocalPreset(preset);
             }
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             _applyPresetToDom(currentPreset.value);
         } finally {
             loading.value = false;
@@ -89,7 +89,7 @@ export function useUiPreferences() {
         if (isAuthenticated.value) {
             try {
                 await _saveToServer(preset);
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // best effort: mantém persistência local.
             }
         }

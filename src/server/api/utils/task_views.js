@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { log } from '#core/logger';
 
 /**
@@ -57,7 +57,7 @@ import { log } from '#core/logger';
  * }} TaskJsonShape
  */
 
-function _preview(text, maxChars) {
+function _preview(/** @type {any} */ text, /** @type {any} */ maxChars) {
     const s = typeof text === 'string' ? text : String(text ?? '');
     if (s.length <= maxChars) return s;
     return s.slice(0, maxChars);
@@ -71,12 +71,12 @@ function _preview(text, maxChars) {
 function parseTaskJson(raw) {
     try {
         return raw ? JSON.parse(String(raw)) : null;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return null;
     }
 }
 
-function getOrchestrationSummary(taskJson, row) {
+function getOrchestrationSummary(/** @type {any} */ taskJson, /** @type {any} */ row) {
     const strategy = taskJson?.spec?.execution?.strategy || 'SINGLE_SHOT';
 
     const iteration = Number(taskJson?.state?.iteration_state?.current_iteration || 0) || 0;
@@ -91,7 +91,7 @@ function getOrchestrationSummary(taskJson, row) {
     };
 }
 
-function _isEditable(row) {
+function _isEditable(/** @type {any} */ row) {
     const status = String(row?.status || '').toUpperCase();
     const stage = String(row?.stage || '').toUpperCase();
     const attempts = Number(row?.attempts || 0);
@@ -119,7 +119,7 @@ function buildTaskCommandCaps(row) {
     };
 }
 
-function buildMissionRef(row) {
+function buildMissionRef(/** @type {any} */ row) {
     if (!row?.mission_id) return null;
     return {
         id: row.mission_id,
@@ -210,7 +210,7 @@ function taskRowToDetailTask(row) {
     if (row.blocked_details_json) {
         try {
             task.blocked_details = JSON.parse(String(row.blocked_details_json));
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             log(
                 'WARN',
                 `[task_views] malformed JSON in blocked_details_json for task ${row.id} — using raw string fallback`

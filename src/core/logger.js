@@ -25,7 +25,7 @@ const MAX_ARCHIVES = process.env.LOG_MAX_ARCHIVES ? parseInt(process.env.LOG_MAX
 // em todo o codebase sem `await`, resultando em Promises não tratadas.
 try {
     fs.mkdirSync(LOG_DIR, { recursive: true });
-} catch (_) {
+} catch (/** @type {any} */ _) {
     // Ignorar: pode já existir ou não ter permissão (fallback para console.log)
 }
 
@@ -50,12 +50,12 @@ function cleanOldFiles(prefix) {
             files.slice(MAX_ARCHIVES).forEach(f => {
                 try {
                     fs.unlinkSync(path.join(LOG_DIR, f.name));
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     // Ignore cleanup errors
                 }
             });
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         console.error(
             `[LOGGER] Erro na limpeza de arquivos (${prefix}): ${e instanceof Error ? e.message : String(e)}`
         );
@@ -86,7 +86,7 @@ function rotateFile(filePath, prefix, maxSize) {
             fs.renameSync(filePath, archivePath);
             cleanOldFiles(prefix);
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         console.error(`[LOGGER] Erro ao rotacionar ${prefix}: ${e instanceof Error ? e.message : String(e)}`);
     }
 }
@@ -134,7 +134,7 @@ function log(level, msg, taskId = '-') {
     } else if (typeof msg === 'object') {
         try {
             content = JSON.stringify(msg);
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* Use String fallback */ content = String(msg);
         }
     }
@@ -143,7 +143,7 @@ function log(level, msg, taskId = '-') {
     console.log(line);
     try {
         fs.appendFileSync(LOG_FILE, `${line}\n`, 'utf-8');
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // Silent failure - console.log already logged
     }
 }
@@ -186,7 +186,7 @@ function audit(action, details) {
 
     try {
         fs.appendFileSync(AUDIT_FILE, entry, 'utf-8');
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // Fallback para console em caso de falha crítica de I/O na auditoria
         console.error(`[CRITICAL_AUDIT_FAIL] ${entry}`);
     }
@@ -214,7 +214,7 @@ function metric(name, payload) {
             )
         );
         fs.appendFileSync(METRICS_FILE, `${entry}\n`, 'utf-8');
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // Silent failure - metrics are non-critical
     }
 }

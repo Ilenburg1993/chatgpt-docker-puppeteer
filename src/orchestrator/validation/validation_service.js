@@ -74,7 +74,7 @@ class ValidationService {
                     score: 100,
                     feedback: 'Valid JSON',
                 };
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 const _err = /** @type {any} */ (error);
                 return {
                     passed: false,
@@ -93,7 +93,7 @@ class ValidationService {
             if (format === 'json') {
                 try {
                     JSON.parse(output);
-                } catch (error) {
+                } catch (/** @type {any} */ error) {
                     const _err = /** @type {any} */ (error);
                     passed = false;
                     feedback = `Not valid JSON: ${_err.message}`;
@@ -125,12 +125,12 @@ class ValidationService {
             );
             return {
                 passed: true, // Não bloqueia o fluxo
-                score: null, // null = não validado (vs 0 = falhou)
+                score: /** @type {number | null} */ (null), // null = não validado (vs 0 = falhou)
                 validation_mode: 'bypassed',
                 feedback: 'LLM-as-judge não configurado. Validação em modo bypass.',
-                strengths: [],
-                weaknesses: [],
-                suggestions: [],
+                strengths: /** @type {any[]} */ ([]),
+                weaknesses: /** @type {any[]} */ ([]),
+                suggestions: /** @type {any[]} */ ([]),
                 _bypass_reason: 'LLM_JUDGE_NOT_IMPLEMENTED',
             };
         });
@@ -202,7 +202,7 @@ class ValidationService {
                 if (!result.passed) {
                     issues.push(`${type}: ${result.feedback}`);
                 }
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 const _err = /** @type {any} */ (error);
                 logger.error(`[ValidationService] Validator ${type} failed: ${_err.message}`);
                 issues.push(`${type} error: ${_err.message}`);
@@ -239,7 +239,7 @@ class ValidationService {
                     num_validators: validators.length,
                     num_issues: issues.length,
                 });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 const _e = /** @type {any} */ (e);
                 logger.error('[ValidationService] Falha ao emitir VALIDATION_COMPLETED via NERV:', _e.message);
             }

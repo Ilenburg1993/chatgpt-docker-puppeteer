@@ -217,7 +217,7 @@ class ResilientLockManager {
                 /** @type {any} */ (metadata)
             );
             return true;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _err = /** @type {any} */ (err);
             this._stats.totalFailedAcquire++;
             log('ERROR', `[ResilientLock] Error acquiring ${lockKey}: ${_err.message}`, /** @type {any} */ (metadata));
@@ -257,7 +257,7 @@ class ResilientLockManager {
                 /** @type {any} */ (lock.metadata)
             );
             return true;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _err2 = /** @type {any} */ (err);
             this._stats.totalFailedRelease++;
             log(
@@ -310,7 +310,7 @@ class ResilientLockManager {
                 const success = await Promise.race([releasePromise, timeoutPromise]);
                 if (success) released++;
                 else failed++;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 const _err3 = /** @type {any} */ (err);
                 failed++;
                 log('WARN', `[ResilientLock] Failed to release lock ${lockKey}: ${_err3.message}`);
@@ -360,7 +360,7 @@ class ResilientLockManager {
     /**
      * Gets statistics about lock operations.
      *
-     * @returns {object} Lock statistics
+     * @returns {any} Lock statistics
      *
      * @example
      * const stats = resilientLock.getStats();
@@ -437,7 +437,7 @@ class ResilientLockManager {
             }
 
             return extended;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _err4 = /** @type {any} */ (err);
             log(
                 'ERROR',

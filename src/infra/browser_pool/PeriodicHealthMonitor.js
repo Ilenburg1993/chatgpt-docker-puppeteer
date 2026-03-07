@@ -244,7 +244,7 @@ class PeriodicHealthMonitor extends EventEmitter {
     /**
      * Executes comprehensive health check.
      *
-     * @returns {Promise<object>} Health check result
+     * @returns {Promise<any>} Health check result
      */
     async runHealthCheck() {
         if (this._checkInFlight) {
@@ -268,7 +268,7 @@ class PeriodicHealthMonitor extends EventEmitter {
         const results = {
             timestamp: startTime,
             checks: {},
-            issues: [],
+            issues: /** @type {any[]} */ ([]),
             overallStatus: HEALTH_STATUS.HEALTHY,
         };
 
@@ -311,7 +311,7 @@ class PeriodicHealthMonitor extends EventEmitter {
                 ...results,
                 duration: Date.now() - startTime,
             });
-        } catch (_rawCheckErr) {
+        } catch (/** @type {any} */ _rawCheckErr) {
             const checkErr = /** @type {any} */ (_rawCheckErr);
             log('ERROR', `[PeriodicHealthMonitor] Check error: ${checkErr.message}`);
             results.overallStatus = HEALTH_STATUS.CRITICAL;
@@ -375,7 +375,7 @@ class PeriodicHealthMonitor extends EventEmitter {
                     message: 'Connected',
                 };
             }
-        } catch (_rawConnErr) {
+        } catch (/** @type {any} */ _rawConnErr) {
             const connErr = /** @type {any} */ (_rawConnErr);
             results.checks[CHECK_TYPES.CONNECTION] = {
                 passed: false,
@@ -463,7 +463,7 @@ class PeriodicHealthMonitor extends EventEmitter {
                         threshold: MONITOR_CONFIG.DOM_NODES_WARNING_THRESHOLD,
                     });
                 }
-            } catch (_rawMetricsErr) {
+            } catch (/** @type {any} */ _rawMetricsErr) {
                 const metricsErr = /** @type {any} */ (_rawMetricsErr);
                 log('WARN', `[PeriodicHealthMonitor] Page metrics failed (${taskId}): ${metricsErr.message}`);
             }
@@ -517,7 +517,7 @@ class PeriodicHealthMonitor extends EventEmitter {
                     pageTargets: pageTargets.length,
                 },
             };
-        } catch (_rawTargetsErr) {
+        } catch (/** @type {any} */ _rawTargetsErr) {
             const targetsErr = /** @type {any} */ (_rawTargetsErr);
             results.checks[CHECK_TYPES.PAGE_TARGETS] = {
                 passed: false,
@@ -613,7 +613,7 @@ class PeriodicHealthMonitor extends EventEmitter {
     /**
      * Gets monitor stats.
      *
-     * @returns {object} Stats
+     * @returns {any} Stats
      */
     getStats() {
         return {

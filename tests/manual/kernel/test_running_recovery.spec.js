@@ -1,5 +1,4 @@
 // @ts-check
-// @ts-ignore
 import { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunLock } from './helpers.js';
 
 (async () => {

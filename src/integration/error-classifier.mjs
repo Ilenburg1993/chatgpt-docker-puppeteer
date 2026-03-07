@@ -253,6 +253,7 @@ export function getSmallerModel(/** @type {any} */ currentModel) {
         .toLowerCase();
 
     // Fallback chain: cloud → local 7b → local 3b → local 1.5b → null
+    /** @type {Record<string, string | null>} */
     const fallbackChain = {
         // Cloud models (slow) → Local medium
         'qwen3-coder-next': 'qwen2.5-coder:7b',

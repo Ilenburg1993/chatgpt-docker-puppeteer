@@ -301,7 +301,7 @@ const MIGRATIONS = [
                           AND json_extract(task_json, '$.meta.workflow_id') IS NOT NULL;
                     `);
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // Skip backfill if JSON1 is unavailable.
             }
         },

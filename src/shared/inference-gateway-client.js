@@ -241,7 +241,7 @@ export function createGatewayClient(options = {}) {
                     return { ok: false, error: `HTTP ${result.status}` };
                 }
                 return { ok: true, health: result.json };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return { ok: false, error: getErrorMessage(err) };
             }
         },
@@ -257,7 +257,7 @@ export function createGatewayClient(options = {}) {
                     return { ok: false, error: `HTTP ${result.status}` };
                 }
                 return { ok: true, models: result.json?.models || [] };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return { ok: false, error: getErrorMessage(err) };
             }
         },
@@ -288,7 +288,7 @@ export function createGatewayClient(options = {}) {
                     };
                 }
                 return { ok: true, validated: true, details: result.json };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return { ok: false, validated: false, error: getErrorMessage(err) };
             }
         },
@@ -399,7 +399,7 @@ export function createGatewayClient(options = {}) {
                     model: mod,
                     ts: result.json?.ts || Date.now(),
                 };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return {
                     ok: false,
                     skipped: false,
@@ -470,7 +470,7 @@ export function createGatewayClient(options = {}) {
                     embedding: embeddings[0] || null,
                     embeddings: embeddings.length > 1 ? embeddings : undefined,
                 };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return {
                     ok: false,
                     error: getErrorMessage(err),
@@ -503,7 +503,7 @@ export function createGatewayClient(options = {}) {
                     };
                 }
                 return { ok: true, validated: true };
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 return { ok: false, validated: false, error: getErrorMessage(err) };
             }
         },

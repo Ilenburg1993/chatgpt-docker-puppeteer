@@ -1,4 +1,6 @@
-// @ts-nocheck
+// @ts-check
+/** @import { Server } from 'http' */
+/** @import { ServerOptions } from 'https' */
 import { log } from '#core/logger';
 import { SSL_OP_NO_TLSv1, SSL_OP_NO_TLSv1_1 } from 'node:constants';
 import fs from 'node:fs';
@@ -7,7 +9,7 @@ import https from 'node:https';
 import path from 'node:path';
 import app from './app.js';
 
-/** @type {import('http').Server|import('https').Server|null} */
+/** @type {Server|import('https').Server|null} */
 let httpServer = null;
 
 /* ---------------------------------------------------------------------------
@@ -35,7 +37,7 @@ const MAX_PORT_OFFSET = Number.parseInt(process.env.PORT_HUNT_LIMIT || '5', 10);
  * Obtém opções SSL/TLS para servidor HTTPS.
  * Suporta certificados auto-assinados para desenvolvimento.
  *
- * @returns {import('https').ServerOptions|null} - Opções SSL ou null se HTTP
+ * @returns {ServerOptions|null} - Opções SSL ou null se HTTP
  * @throws {Error} - Se certificados obrigatórios estiverem ausentes
  */
 function getSSLOptions() {
@@ -73,8 +75,9 @@ function getSSLOptions() {
                 'ECDHE-RSA-AES256-SHA384',
             ].join(':'),
         };
-    } catch (err) {
-        throw new Error(`[ENGINE] Erro ao carregar certificados SSL: ${err.message}`); // eslint-disable-line preserve-caught-error
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        throw new Error(`[ENGINE] Erro ao carregar certificados SSL: ${_e.message}`); // eslint-disable-line preserve-caught-error
     }
 }
 
@@ -127,7 +130,7 @@ function start(port, attempt = 0) {
             log.info(`\n🚀 MISSION CONTROL PRIME ONLINE`);
             log.info(`🔗 ${scheme}://localhost:${port}\n`);
 
-            resolve({ server: httpServer, port, protocol });
+            resolve({ server: /** @type {any} */ (httpServer), port, protocol });
         });
 
         httpServer.on('error', err => {
@@ -137,11 +140,12 @@ function start(port, attempt = 0) {
                 log('WARN', `[ENGINE] Porta ${port} ocupada → ${nextPort} (${attempt + 1}/${MAX_PORT_OFFSET})`);
 
                 try {
-                    httpServer.close();
-                } catch (errClose) {
+                    (/** @type {any} */ (httpServer)).close();
+                } catch (/** @type {any} */ errClose) {
+                    const _e = /** @type {any} */ (errClose);
                     log(
                         'DEBUG',
-                        `[ENGINE] httpServer.close() failed: ${errClose && errClose.message ? errClose.message : String(errClose)}`
+                        `[ENGINE] httpServer.close() failed: ${errClose && _e.message ? _e.message : String(_e)}`
                     );
                 }
                 httpServer = null;
@@ -178,7 +182,8 @@ async function stop(gracefulTimeout = 30000) {
         if (typeof notifyShutdown === 'function') {
             notifyShutdown(gracefulTimeout);
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         // Socket.IO pode não estar inicializado
         log('DEBUG', '[ENGINE] Socket.IO shutdown notification skipped (not initialized)');
     }
@@ -196,8 +201,8 @@ async function stop(gracefulTimeout = 30000) {
             log('WARN', `[ENGINE] Forçando shutdown após ${gracefulTimeout}ms...`);
 
             // Force close all active connections (Node.js 18.2+)
-            if (typeof httpServer.closeAllConnections === 'function') {
-                httpServer.closeAllConnections();
+            if (typeof (/** @type {any} */ (httpServer)).closeAllConnections === 'function') {
+                (/** @type {any} */ (httpServer)).closeAllConnections();
                 log('INFO', '[ENGINE] Todas conexões forçadamente fechadas.');
             } else {
                 log('WARN', '[ENGINE] closeAllConnections() não disponível (Node.js < 18.2)');
@@ -233,7 +238,7 @@ async function stop(gracefulTimeout = 30000) {
  * Retorna instância HTTP/HTTPS bruta para camadas de transporte.
  * Somente leitura — não alterar lifecycle externamente.
  *
- * @returns {import('http').Server|import('https').Server|null} - Instância HTTP/HTTPS ou null se não inicializado
+ * @returns {Server|import('https').Server|null} - Instância HTTP/HTTPS ou null se não inicializado
  */
 function getRawServer() {
     return httpServer;

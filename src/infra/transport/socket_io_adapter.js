@@ -11,7 +11,7 @@ import EventEmitter from 'node:events';
 /**
  * Cria uma instância do adaptador de transporte para Socket.io.
  * * @param {CreateSocketAdapterConfig} config
-  * @returns {object}
+  * @returns {any}
  */
 function createSocketAdapter(config) {
     // Bus de eventos para comunicar mudanças de estado ao NERV Core
@@ -99,7 +99,7 @@ function createSocketAdapter(config) {
             if (inboundHandler) {
                 try {
                     inboundHandler(rawFrame);
-                } catch (err) {
+                } catch (/** @type {any} */ err) {
                     const _e = /** @type {any} */ (err);
                     events.emit('error', {
                         code: 'INBOUND_HANDLER_FAIL',

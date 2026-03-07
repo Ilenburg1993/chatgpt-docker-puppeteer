@@ -166,7 +166,7 @@ class AgentLoop {
                 this._next.kernelAt = now + this.intervals.kernelMs;
                 try {
                     await this.kernel.step();
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('ERROR', `[AgentLoop] kernel.step failed: ${err?.message || String(err)}`);
                 }
@@ -181,7 +181,7 @@ class AgentLoop {
                 this._next.controlAt = now + this.intervals.controlMs;
                 try {
                     await this.taskControlWatcher.tick();
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] taskControlWatcher.tick failed: ${err?.message || String(err)}`);
                 }
@@ -192,7 +192,7 @@ class AgentLoop {
                 this._next.watchdogAt = now + this.intervals.watchdogMs;
                 try {
                     await this.attemptWatchdog.tick();
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] attemptWatchdog.tick failed: ${err?.message || String(err)}`);
                 }
@@ -203,7 +203,7 @@ class AgentLoop {
                 this._next.queueAt = now + this.intervals.queueMs;
                 try {
                     await this.queueWorker.tick();
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] queueWorker.tick failed: ${err?.message || String(err)}`);
                 }
@@ -214,7 +214,7 @@ class AgentLoop {
                 this._next.missionAt = now + this.intervals.missionMs;
                 try {
                     await this.missionRunner.tick();
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] missionRunner.tick failed: ${err?.message || String(err)}`);
                 }
@@ -224,7 +224,7 @@ class AgentLoop {
                 this._next.plannerAt = now + this.intervals.plannerMs;
                 try {
                     await this.missionPlannerProcessor.tick();
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] missionPlannerProcessor.tick failed: ${err?.message || String(err)}`);
                 }
@@ -235,7 +235,7 @@ class AgentLoop {
                 this._next.orchestrationAt = now + this.intervals.orchestrationMs;
                 try {
                     await this.taskOrchestrationWorker.tick();
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log('WARN', `[AgentLoop] taskOrchestrationWorker.tick failed: ${err?.message || String(err)}`);
                 }

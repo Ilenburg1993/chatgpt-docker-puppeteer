@@ -380,10 +380,10 @@ RUN apt-get update \
 # - `fd-find` package exposes `fdfind`
 # The repo and operator workflows expect the canonical upstream names `bat` and `fd`.
 RUN if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then \
-      ln -sf /usr/bin/batcat /usr/local/bin/bat; \
+    ln -sf /usr/bin/batcat /usr/local/bin/bat; \
     fi \
     && if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then \
-      ln -sf /usr/bin/fdfind /usr/local/bin/fd; \
+    ln -sf /usr/bin/fdfind /usr/local/bin/fd; \
     fi
 
 # Curated upstream CLI binaries
@@ -393,9 +393,9 @@ RUN if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; th
 RUN set -e; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
-      amd64) gh_arch='amd64'; actionlint_arch='amd64'; hadolint_arch='x86_64' ;; \
-      arm64) gh_arch='arm64'; actionlint_arch='arm64'; hadolint_arch='arm64' ;; \
-      *) echo "Unsupported architecture for curated CLIs: $arch" >&2; exit 1 ;; \
+    amd64) gh_arch='amd64'; actionlint_arch='amd64'; hadolint_arch='x86_64' ;; \
+    arm64) gh_arch='arm64'; actionlint_arch='arm64'; hadolint_arch='arm64' ;; \
+    *) echo "Unsupported architecture for curated CLIs: $arch" >&2; exit 1 ;; \
     esac; \
     gh_asset="gh_${GH_VERSION}_linux_${gh_arch}.tar.gz"; \
     curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${gh_asset}" -o /tmp/gh.tgz; \
@@ -604,6 +604,12 @@ RUN mkdir -p \
     "/home/${USER_NAME}-history" \
     && touch "/home/${USER_NAME}-history/.bash_history" \
     && chown "${USER_NAME}:${USER_NAME}" "/home/${USER_NAME}-history/.bash_history" \
+    # .hushlogin: suprime MOTD em shells login+interativos (ex.: userEnvProbe loginInteractiveShell)
+    # Elimina: 50-motd-news (rede), 50-landscape-sysinfo (CPU/disco), 91-contract-ua-esm-status (rede)
+    # Mantém intactos todos os scripts de /etc/profile.d/ (runtime.sh, gatekeeper-nss.sh, etc.)
+    && touch "${HOME_DIR}/.hushlogin" \
+    && chown "${USER_NAME}:${USER_NAME}" "${HOME_DIR}/.hushlogin" \
+    && chmod 0644 "${HOME_DIR}/.hushlogin" \
     && chmod 1777 /tmp \
     && chmod 0700 "${HOME_DIR}/.ssh" "${HOME_DIR}/.gnupg" \
     && touch "${HOME_DIR}/.ssh/config" \

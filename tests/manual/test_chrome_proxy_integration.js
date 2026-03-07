@@ -18,7 +18,8 @@ const log = {
     success: (/** @type {any} */ msg) => console.log(`${colors.green}✅ ${msg}${colors.reset}`),
     error: (/** @type {any} */ msg) => console.log(`${colors.red}❌ ${msg}${colors.reset}`),
     warn: (/** @type {any} */ msg) => console.log(`${colors.yellow}⚠️  ${msg}${colors.reset}`),
-    section: (/** @type {any} */ msg) => console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`),
+    section: (/** @type {any} */ msg) =>
+        console.log(`\n${colors.cyan}${'='.repeat(70)}\n${msg}\n${'='.repeat(70)}${colors.reset}\n`),
 };
 
 import GLOBAL_CONFIG_RAW from '/workspaces/chatgpt-docker-puppeteer/config.json' with { type: 'json' };
@@ -159,7 +160,9 @@ async function testScriptFiles() {
     // 2.4 - start-chrome-with-proxy.bat tem conteúdo válido
     try {
         const content = fs.readFileSync(launcherPath, 'utf8');
-        const cfg = /** @type {any} */ (await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m));
+        const cfg = /** @type {any} */ (
+            await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m)
+        );
         const expectedChromePort = cfg.CHROME_PORT || cfg.CHROME_DIRECT_PORT || 9225;
         assert(
             content.includes(`CHROME_DEBUG_PORT=${expectedChromePort}`),
@@ -204,9 +207,9 @@ async function testScriptFiles() {
 async function testPrioritizationLogic() {
     log.section('TESTE 3: Validação de Lógica de Priorização');
 
-    const chromeConfig = /** @type {any} */ (await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(
-        m => m.default ?? m
-    ));
+    const chromeConfig = /** @type {any} */ (
+        await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(m => m.default ?? m)
+    );
 
     // 3.1 - Ordem de portas está correta
     const ports = chromeConfig.connection.ports;
@@ -251,7 +254,9 @@ async function testPrioritizationLogic() {
 async function testURLRewriting() {
     log.section('TESTE 4: Simulação de URL Rewriting');
 
-    const config = /** @type {any} */ (await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m));
+    const config = /** @type {any} */ (
+        await import('/workspaces/chatgpt-docker-puppeteer/config.json').then(m => m.default ?? m)
+    );
 
     // 4.1 - Mock de resposta do Chrome (localhost)
     const chromeResponse = {
@@ -306,9 +311,9 @@ async function testURLRewriting() {
 async function testHealthEndpoints() {
     log.section('TESTE 5: Validação de Health Endpoints');
 
-    const chromeConfig = /** @type {any} */ (await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(
-        m => m.default ?? m
-    ));
+    const chromeConfig = /** @type {any} */ (
+        await import('/workspaces/chatgpt-docker-puppeteer/chrome-config.json').then(m => m.default ?? m)
+    );
 
     // 5.1 - Health URLs estão definidas
     assert(chromeConfig.health.chromeDebugUrl !== undefined, 'chromeDebugUrl está definido');

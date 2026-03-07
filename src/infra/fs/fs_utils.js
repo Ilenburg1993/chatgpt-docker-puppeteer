@@ -27,7 +27,7 @@ function ensureInfrastructure() {
         if (!fs.existsSync(dir)) {
             try {
                 fs.mkdirSync(dir, { recursive: true });
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 // Falha na criação de pastas é um erro fatal de boot
                 console.error(
                     `[FS_UTILS] Falha crítica ao criar diretório ${dir}: ${/** @type {any} */ (err).message}`

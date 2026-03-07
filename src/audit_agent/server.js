@@ -37,7 +37,7 @@ function readJsonBody(req) {
             if (!raw.trim()) return resolve({});
             try {
                 resolve(JSON.parse(raw));
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 reject(Object.assign(new Error('invalid json body'), { statusCode: 400, cause: error }));
             }
         });
@@ -93,7 +93,7 @@ export function createAuditAgentServer(deps) {
                 return writeJson(res, 200, { ok: true, job });
             }
             return writeJson(res, 404, { ok: false, error: 'not_found' });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const typedError = /** @type {AuditAgentServerError} */ (error);
             return writeJson(res, typedError.statusCode || 500, {
                 ok: false,

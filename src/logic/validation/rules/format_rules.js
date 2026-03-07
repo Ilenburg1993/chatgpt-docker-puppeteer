@@ -14,7 +14,7 @@
  *
  * @param {string} content - Conteúdo acumulado para validação.
  * @param {AbortSignal} [signal] - Sinal de cancelamento opcional.
- * @returns {object} { ok: boolean, reason: string|null }
+ * @returns {any} { ok: boolean, reason: string|null }
  */
 function validateJSON(content, signal = undefined) {
     if (!content || typeof content !== 'string') {
@@ -44,7 +44,7 @@ function validateJSON(content, signal = undefined) {
                     JSON.parse(jsonCandidate);
                     found = true;
                     break;
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     return {
                         ok: false,
                         reason: `JSON_CORRUPTED: Estrutura inválida. ${e instanceof Error ? e.message : String(e)}`,
@@ -88,7 +88,7 @@ function validateRegex(content, patternStr, signal = undefined) {
             };
         }
         return { ok: true, reason: null };
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return { ok: false, reason: 'INVALID_REGEX_RULE: Expressão regular malformada.' };
     }
 }

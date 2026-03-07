@@ -234,7 +234,7 @@ class KernelNERVBridge {
                 correlationId: data.correlationId,
                 at: Date.now(),
             });
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             this.telemetry.critical('nerv_bridge_event_ingestion_failed', {
                 msgId: data.msgId,
@@ -284,7 +284,7 @@ class KernelNERVBridge {
                 target: target ?? 'unknown',
                 at: Date.now(),
             });
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             this.telemetry.critical('nerv_bridge_command_emission_failed', {
                 error: error.message,
@@ -333,7 +333,7 @@ class KernelNERVBridge {
                 target: target ?? 'broadcast',
                 at: Date.now(),
             });
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             this.telemetry.critical('nerv_bridge_event_emission_failed', {
                 error: error.message,

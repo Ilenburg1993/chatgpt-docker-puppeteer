@@ -95,7 +95,7 @@ function _recordMissionEvent({
             payload,
             dedupKey,
         });
-    } catch (_rawErr) {
+    } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
         log('WARN', `[MissionExecutionService] Falha ao registrar evento ${eventType}: ${err?.message || String(err)}`);
     }
@@ -207,7 +207,7 @@ function transitionMission(params) {
             ...(params.completedAtMs !== undefined ? { completed_at_ms: params.completedAtMs } : {}),
         });
         _applyTaskMutation(params.taskMutation, now);
-    } catch (_rawErr) {
+    } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
         if (err?.code === 'CONFLICT') {
             return {
@@ -313,7 +313,7 @@ function updateMissionProgressState(params) {
     let updated;
     try {
         updated = updateMission(missionId, { context: nextContext });
-    } catch (_rawErr) {
+    } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
         if (err?.code === 'CONFLICT') {
             return {

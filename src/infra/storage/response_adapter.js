@@ -15,7 +15,7 @@ const RESPONSE_DIR = path.join(ROOT, 'respostas');
  * @param {string|object} response - Response V1 (string) ou V2 (object)
  * @param {SaveResponseTask} task - Task object (para preencher result)
  * @param {string=} attemptId - attempt/correlation id (opcional)
- * @returns {Promise<object>} - { storage, format }
+ * @returns {Promise<any>} - { storage, format }
  */
 async function saveResponse(taskId, response, task, attemptId) {
     try {
@@ -38,7 +38,7 @@ async function saveResponse(taskId, response, task, attemptId) {
             const responseV2 = convertV1toV2(/** @type {any} */ (response), task);
             return await saveResponseV2Format(taskId, responseV2, task, attemptId);
         }
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         logger.error(
             '[RESPONSE_ADAPTER] Erro ao salvar response',
             /** @type {any} */ ({
@@ -60,7 +60,7 @@ async function saveResponse(taskId, response, task, attemptId) {
  * @param {SaveResponseV2FormatResponseV2} responseV2 - Response V2 object
  * @param {SaveResponseV2FormatTask} task - Task object
  * @param {string=} attemptId - attempt/correlation id (opcional)
- * @returns {Promise<object>} - { storage, format }
+ * @returns {Promise<any>} - { storage, format }
  * @private
  */
 async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
@@ -136,7 +136,7 @@ function isResponseV2(response) {
  *
  * @param {string} responseText - Response V1 (texto plano)
  * @param {ConvertV1toV2Task} task - Task object (para metadata)
- * @returns {object} - Response V2
+ * @returns {any} - Response V2
  * @private
  */
 function convertV1toV2(responseText, task) {
@@ -191,7 +191,7 @@ async function loadResponse(taskId, format) {
     try {
         // Tentar carregar V2
         return await loadResponseV2(taskId, format);
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         // Fallback: tentar carregar V1 (apenas .txt)
         logger.debug('[RESPONSE_ADAPTER] V2 não encontrada, tentando V1', /** @type {any} */ ({ taskId }));
 
@@ -206,7 +206,7 @@ async function loadResponse(taskId, format) {
                 }
 
                 return text;
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 logger.warn(
                     '[RESPONSE_ADAPTER] Response não encontrada (V1 e V2)',
                     /** @type {any} */ ({

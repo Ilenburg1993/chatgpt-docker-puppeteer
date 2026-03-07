@@ -1,3 +1,4 @@
+/** @import { VerifyOptions } from 'jsonwebtoken' */
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 
 /**
@@ -83,7 +84,7 @@ export const JWT_SIGN_OPTIONS = /** @type {unknown} */ (
  * Opções padrão para `jwt.verify()`.
  * Restringe ao algoritmo HS256 para prevenir ataques de algorithm confusion.
  */
-export const JWT_VERIFY_OPTIONS = /** @type {import('jsonwebtoken').VerifyOptions} */ (
+export const JWT_VERIFY_OPTIONS = /** @type {VerifyOptions} */ (
     Object.freeze({
         algorithms: ['HS256'],
     })

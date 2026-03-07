@@ -33,7 +33,7 @@ function createObservationRecord({ msgId, correlationId, source, payload, origin
     let payloadSerialized;
     try {
         payloadSerialized = JSON.stringify(payload ?? null);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         payloadSerialized = JSON.stringify({ error: 'payload_json_stringify_failed' });
     }
 
@@ -108,7 +108,7 @@ class ObservationStore extends EventEmitter {
      * - EVENT nunca é rejeitado por duplicação
      * - EVENT nunca é interpretado
      *
-     * @returns {object}
+     * @returns {any}
      * Registro criado.
      */
     ingestEvent(eventEnvelope) {
@@ -305,7 +305,7 @@ class ObservationStore extends EventEmitter {
     /**
      * Retorna estatísticas técnicas.
      *
-     * @returns {object}
+     * @returns {any}
      */
     getStats() {
         let totalObservations = 0;

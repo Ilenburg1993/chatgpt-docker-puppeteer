@@ -53,7 +53,7 @@ async function retryWithBackoff(operation, config) {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
             return await operation();
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             lastError = error;
             if (attempt >= maxAttempts) break;
 

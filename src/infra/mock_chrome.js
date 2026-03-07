@@ -34,7 +34,7 @@ function createMockPage() {
             if (typeof fn === 'function') {
                 try {
                     return fn(...args);
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     return null;
                 }
             }
@@ -66,7 +66,7 @@ function createMockPage() {
 
 /**
  * Função exportada: createMockBrowser.
- * @returns {object}
+ * @returns {any}
  */
 function createMockBrowser() {
     const pages = [createMockPage()];
@@ -98,7 +98,7 @@ function createMockBrowser() {
             for (const p of pages) {
                 try {
                     if (!p.isClosed()) await p.close();
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     // swallow
                 }
             }

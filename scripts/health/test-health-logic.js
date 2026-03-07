@@ -13,8 +13,8 @@ async function testHealthLogic() {
     // Test 1: Chrome Health
     console.log('📡 1. Chrome Health Logic');
     try {
-        const doctor = await import('#core/doctor').then(m => (/** @type {any} */ (m)).default ?? m);
-        const config = await import('../../config.json').then(m => (/** @type {any} */ (m)).default ?? m);
+        const doctor = await import('#core/doctor').then(m => /** @type {any} */ (m).default ?? m);
+        const config = await import('../../config.json').then(m => /** @type {any} */ (m).default ?? m);
 
         const chrome = await doctor.probeChromeConnection();
 
@@ -37,7 +37,7 @@ async function testHealthLogic() {
     // Test 2: PM2 Health
     console.log('📡 2. PM2 Health Logic');
     try {
-        const system = await import('#infra/system').then(m => (/** @type {any} */ (m)).default ?? m);
+        const system = await import('#infra/system').then(m => /** @type {any} */ (m).default ?? m);
 
         const status = await system.getAgentStatus();
 
@@ -46,7 +46,7 @@ async function testHealthLogic() {
 
         // Try to list PM2 processes
         try {
-            const pm2 = await import('pm2').then(m => (/** @type {any} */ (m)).default ?? m);
+            const pm2 = await import('pm2').then(m => /** @type {any} */ (m).default ?? m);
             const allProcesses = await new Promise((resolve, reject) => {
                 pm2.list((/** @type {any} */ err, /** @type {any} */ list) => {
                     if (err) {
@@ -55,10 +55,10 @@ async function testHealthLogic() {
                         resolve(
                             list.map((/** @type {any} */ proc) => ({
                                 name: proc.name,
-                                status: (/** @type {any} */ (proc)).pm2_env.status,
+                                status: /** @type {any} */ (proc).pm2_env.status,
                                 pid: proc.pid,
-                                memory: Math.floor((/** @type {any} */ (proc)).monit.memory / 1024 / 1024) + 'MB',
-                                cpu: (/** @type {any} */ (proc)).monit.cpu + '%',
+                                memory: Math.floor(/** @type {any} */ (proc).monit.memory / 1024 / 1024) + 'MB',
+                                cpu: /** @type {any} */ (proc).monit.cpu + '%',
                             }))
                         );
                     }
@@ -66,7 +66,10 @@ async function testHealthLogic() {
             });
 
             console.log('   ✓ Total processes:', allProcesses.length);
-            console.log('   ✓ Online processes:', allProcesses.filter((/** @type {any} */ p) => p.status === 'online').length);
+            console.log(
+                '   ✓ Online processes:',
+                allProcesses.filter((/** @type {any} */ p) => p.status === 'online').length
+            );
             if (allProcesses.length > 0) {
                 console.log('   ✓ Processes:');
                 allProcesses.forEach((/** @type {any} */ p) => {
@@ -87,7 +90,7 @@ async function testHealthLogic() {
     // Test 3: Disk Health
     console.log('📡 3. Disk Health Logic');
     try {
-        const fs = await import('node:fs').then(m => (/** @type {any} */ (m)).default ?? m);
+        const fs = await import('node:fs').then(m => /** @type {any} */ (m).default ?? m);
         const { execSync } = await import('node:child_process');
 
         const getDirSize = (/** @type {any} */ dirPath) => {
@@ -148,7 +151,7 @@ async function testHealthLogic() {
     // Test 4: Kernel Health (simplified without NERV)
     console.log('📡 4. Kernel Health Logic (Simplified)');
     try {
-        const io = await import('#infra/io').then(m => (/** @type {any} */ (m)).default ?? m);
+        const io = await import('#infra/io').then(m => /** @type {any} */ (m).default ?? m);
         const { STATUS_VALUES } = await import('#core/constants/tasks');
 
         const tasks = await io.loadAllTasks();

@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { Buffer } from 'node:buffer';
 
 /**
@@ -66,7 +66,7 @@ function encodeCursor(obj) {
     try {
         const raw = JSON.stringify(obj);
         return Buffer.from(raw, 'utf8').toString('base64');
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return null;
     }
 }
@@ -82,7 +82,7 @@ function decodeCursor(cursor) {
         const raw = Buffer.from(String(cursor), 'base64').toString('utf8');
         const parsed = /** @type {unknown} */ (JSON.parse(raw));
         return parsed && typeof parsed === 'object' ? /** @type {Record<string, unknown>} */ (parsed) : null;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return null;
     }
 }

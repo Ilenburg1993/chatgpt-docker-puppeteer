@@ -149,7 +149,7 @@ function getRuntimeResourcesSnapshot({ owner = null } = {}) {
             if (typeof item.health === 'function') {
                 try {
                     health = item.health();
-                } catch (_rawError) {
+                } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
                     health = { error: error?.message || String(error) };
                 }
@@ -264,7 +264,7 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = /
                 criticality: resource.criticality,
             });
             results.push({ id: resource.id, ok: true });
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             setRuntimeResourceState(resource.id, 'degraded', {
                 owner: resource.owner,

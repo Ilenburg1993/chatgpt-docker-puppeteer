@@ -90,7 +90,7 @@ if (isLaunchDisabled) {
         puppeteer = await import('puppeteer-core');
         // handle default export: puppeteer-core might export via default
         if (puppeteer.default) puppeteer = puppeteer.default;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // puppeteer-core não carregado — ambiente ainda não o requer
     }
 
@@ -129,7 +129,7 @@ if (isLaunchDisabled) {
                 configurable: false,
                 writable: false,
             });
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Ambiente não permite redefinir property — ignora
         }
 

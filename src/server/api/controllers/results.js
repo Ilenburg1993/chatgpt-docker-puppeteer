@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,13 +13,13 @@ import { log } from '#core/logger';
 const router = express.Router();
 const fsp = fs.promises;
 
-function _safeId(raw) {
+function _safeId(/** @type {any} */ raw) {
     const id = String(raw || '').replace(/[^a-zA-Z0-9._-]/g, '');
     if (id.includes('..')) throw new Error('invalid id');
     return id;
 }
 
-function _pickAttemptArtifactId(attempt, ext) {
+function _pickAttemptArtifactId(/** @type {any} */ attempt, /** @type {any} */ ext) {
     if (!attempt || typeof attempt !== 'object') return null;
     if (ext === '.txt') return attempt.response_text_artifact_id || null;
     if (ext === '.md') return attempt.response_md_artifact_id || null;
@@ -28,7 +28,7 @@ function _pickAttemptArtifactId(attempt, ext) {
     return attempt.response_text_artifact_id || null;
 }
 
-function _contentTypeForExt(ext) {
+function _contentTypeForExt(/** @type {any} */ ext) {
     if (ext === '.json') return 'application/json; charset=utf-8';
     if (ext === '.html') return 'text/html; charset=utf-8';
     if (ext === '.md') return 'text/markdown; charset=utf-8';
@@ -59,7 +59,7 @@ router.get('/:id', async (req, res) => {
             json: '.json',
             html: '.html',
         };
-        const ext = extByFormat[format] || '.txt';
+        const ext = (/** @type {Record<string, string>} */ (extByFormat))[format] || '.txt';
 
         const artifactsRoot = _resolveArtifactsRoot();
         const legacyRoot = io.RESPONSE_DIR;
@@ -93,7 +93,7 @@ router.get('/:id', async (req, res) => {
         } else {
             // Latest attempt resolution from SSOT task row (best-effort)
             const task = getTaskById(taskId);
-            const storage = task?.result_db?.storage || null;
+            const storage = (/** @type {any} */ (task))?.result_db?.storage || null;
             if (storage) {
                 const candidate =
                     ext === '.txt'
@@ -130,7 +130,7 @@ router.get('/:id', async (req, res) => {
 
         try {
             await fsp.access(filePath);
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             return res.status(404).json({ success: false, error: 'Resultado indisponível', request_id: requestId });
         }
 
@@ -157,8 +157,9 @@ router.get('/:id', async (req, res) => {
             }
         });
         stream.pipe(res);
-    } catch (err) {
-        log('ERROR', `[API_RESULTS] download failed: ${err?.message || String(err)}`, requestId);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[API_RESULTS] download failed: ${_e?.message || String(_e)}`, requestId);
         res.status(500).json({ success: false, error: 'Falha no download do resultado.', request_id: requestId });
     }
 });

@@ -104,7 +104,7 @@ class LLMJudge {
             );
 
             return validation;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.error(
                 `[LLM_JUDGE] Erro ao validar resposta: ${error instanceof Error ? error.message : String(error)}`,
                 String(error instanceof Error ? (error.stack ?? '-') : '-')
@@ -135,7 +135,7 @@ class LLMJudge {
                 reasoning: parsed.reasoning,
                 isComplete: parsed.score >= 70,
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.warn(
                 `[LLM_JUDGE] Erro ao verificar completeness, usando fallback: ${error instanceof Error ? error.message : String(error)}`
             );
@@ -164,7 +164,7 @@ class LLMJudge {
                 reasoning: parsed.reasoning,
                 isRelevant: parsed.score >= 70,
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.warn(
                 `[LLM_JUDGE] Erro ao verificar relevance, usando fallback: ${error instanceof Error ? error.message : String(error)}`
             );
@@ -191,7 +191,7 @@ class LLMJudge {
                 score: parsed.score,
                 reasoning: parsed.reasoning,
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.warn(
                 `[LLM_JUDGE] Erro ao verificar quality, usando fallback: ${error instanceof Error ? error.message : String(error)}`
             );
@@ -354,7 +354,7 @@ Respond ONLY in JSON format:
                 clearTimeout(timeoutId);
             }
             return response;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.error(`[LLM_JUDGE] Erro ao chamar LLM: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
         }
@@ -376,7 +376,7 @@ Respond ONLY in JSON format:
                 score: this._normalizeScore(parsed.score),
                 reasoning: parsed.reasoning || 'No reasoning provided',
             };
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             // Fallback: tenta extrair JSON de texto
             const jsonMatch = result.match(/\{[\s\S]*"score"[\s\S]*\}/);
             if (jsonMatch) {
@@ -386,7 +386,7 @@ Respond ONLY in JSON format:
                         score: this._normalizeScore(parsed.score),
                         reasoning: parsed.reasoning || 'No reasoning provided',
                     };
-                } catch (e) {
+                } catch (/** @type {any} */ e) {
                     // Ignora
                 }
             }

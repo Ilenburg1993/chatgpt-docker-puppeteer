@@ -169,7 +169,7 @@ function deepFreeze(obj) {
 /**
  * Normaliza envelopes NERV de diferentes formatos para o formato canônico
  * @param {Record<string, any>} envelope - Envelope a ser normalizado (canônico ou legado)
- * @returns {object} Envelope NERV canônico e validado
+ * @returns {any} Envelope NERV canônico e validado
  * @throws {Error} Se o envelope não puder ser normalizado
  * @sideEffects Nenhum - função pura
  */

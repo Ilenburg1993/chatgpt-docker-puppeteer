@@ -44,7 +44,7 @@ function recordEvent(params) {
     let payload_json;
     try {
         payload_json = JSON.stringify(payload ?? {});
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const msg = err instanceof Error ? err.message : String(err);
         throw new TypeError(`recordEvent: payload is not JSON-serializable: ${msg}`); // eslint-disable-line preserve-caught-error
     }

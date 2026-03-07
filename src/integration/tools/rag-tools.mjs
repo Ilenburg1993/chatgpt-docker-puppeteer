@@ -264,7 +264,7 @@ async function ragSearchHandler({
                 partial: Boolean(result.degraded),
             },
         };
-    } catch (_raw_error) {
+    } catch (/** @type {any} */ _raw_error) {
         const error = /** @type {any} */ (_raw_error);
         console.error('[RAG Tool] rag_search error:', error);
         throw new Error(`RAG search failed: ${error.message}`); // eslint-disable-line preserve-caught-error
@@ -338,7 +338,7 @@ async function ragHealthHandler() {
         }
 
         return status;
-    } catch (_raw_error) {
+    } catch (/** @type {any} */ _raw_error) {
         const error = /** @type {any} */ (_raw_error);
         console.error('[RAG Tool] rag_health error:', error);
         throw new Error(`RAG health check failed: ${error.message}`); // eslint-disable-line preserve-caught-error

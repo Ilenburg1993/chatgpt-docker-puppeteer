@@ -124,7 +124,7 @@ class CheckpointManager {
             );
 
             return checkpoint;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 logger.warn(`[CheckpointManager] No checkpoint found for mission: ${missionId}`);
                 return null;
@@ -148,7 +148,7 @@ class CheckpointManager {
         try {
             const data = await fs.readFile(checkpointPath, 'utf-8');
             return JSON.parse(data);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return null;
             }
@@ -198,7 +198,7 @@ class CheckpointManager {
             checkpoints.sort((a, b) => b.timestamp - a.timestamp);
 
             return checkpoints;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             if ((/** @type {any} */ (error)).code === 'ENOENT') {
                 return [];
             }
@@ -218,7 +218,7 @@ class CheckpointManager {
         try {
             await fs.unlink(checkpointPath);
             logger.info(`[CheckpointManager] Checkpoint deleted: ${missionId}/${checkpointId}`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             if ((/** @type {any} */ (error)).code !== 'ENOENT') {
                 logger.error(
                     `[CheckpointManager] Error deleting checkpoint ${missionId}/${checkpointId}: ${(/** @type {any} */ (error)).message}`
@@ -238,7 +238,7 @@ class CheckpointManager {
         try {
             await fs.rm(checkpointsDir, { recursive: true, force: true });
             logger.info(`[CheckpointManager] All checkpoints deleted: ${missionId}`);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.error(`[CheckpointManager] Error deleting checkpoints for ${missionId}: ${(/** @type {any} */ (error)).message}`);
         }
     }
@@ -255,7 +255,7 @@ class CheckpointManager {
         try {
             await fs.access(latestPath);
             return true;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             return false;
         }
     }
@@ -287,7 +287,7 @@ class CheckpointManager {
      * Retorna estatísticas do CheckpointManager.
      *
      * @param {string} [missionId] - ID da missão (opcional, se omitido retorna stats globais)
-     * @returns {Promise<object>} - Estatísticas
+     * @returns {Promise<any>} - Estatísticas
      */
     async getStats(/** @type {any} */ missionId = undefined) {
         if (missionId) {

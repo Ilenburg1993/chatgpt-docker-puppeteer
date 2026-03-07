@@ -76,7 +76,7 @@ class DriverReadinessGuard {
      * @param {boolean} [options.skipTriage=false] - Skip triage scan (fast mode)
      * @param {boolean} [options.skipSession=false] - Skip session health check
      *
-     * @returns {Promise<object>} Validation result
+     * @returns {Promise<any>} Validation result
      * @property {boolean} ready - true se pode executar
      * @property {object} checks - Status de cada check (pass/fail)
      * @property {Array<object>} issues - Lista de problemas detectados

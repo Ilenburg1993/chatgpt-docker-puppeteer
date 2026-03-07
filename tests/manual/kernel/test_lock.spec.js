@@ -1,6 +1,14 @@
 // @ts-check
-// @ts-ignore
-import { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunLock, readLatestGlobalLogTail, sleep } from './helpers.js';
+import {
+    writeTask,
+    readTask,
+    startAgent,
+    stopAgent,
+    waitForCondition,
+    removeRunLock,
+    readLatestGlobalLogTail,
+    sleep,
+} from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Lock Atomicidade & Concorrência ===');

@@ -487,7 +487,7 @@ class SubmissionController extends EventEmitter {
     /**
      * Retorna estatísticas de submission.
      *
-     * @returns {object} Objeto com métricas de submission
+     * @returns {any} Objeto com métricas de submission
      * Propriedades do objeto retornado:
      *   - totalSubmissions (number): Total de submissions executadas
      *   - successfulSubmissions (number): Submissions bem-sucedidas
@@ -542,7 +542,7 @@ class SubmissionController extends EventEmitter {
 /**
  * Factory function para criar instância de SubmissionController.
  *
- * @param {any} driver - Instância do driver
+ * @param {object} driver - Instância do driver
  * @returns {SubmissionController} Nova instância
  *
  * @example
@@ -550,7 +550,7 @@ class SubmissionController extends EventEmitter {
  * const controller = create(driver);
  */
 function create(driver) {
-    return new SubmissionController(driver);
+    return new SubmissionController(/** @type {any} */ (driver));
 }
 
 export { SubmissionController, SUBMISSION_CONFIG, SUBMISSION_EVENTS, create };

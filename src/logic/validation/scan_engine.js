@@ -106,7 +106,7 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         }
 
         return { ok: true, reason: null };
-    } catch (scanErr) {
+    } catch (/** @type {any} */ scanErr) {
         const caught = /** @type {any} */ (scanErr);
         // Tratamento de interrupção via sinal
         if (caught.name === 'AbortError' || caught.message === 'VALIDATION_ABORTED') {

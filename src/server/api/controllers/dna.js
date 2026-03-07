@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import express from 'express';
 /** Constante/valor exportado: default. */
 const router = express.Router();
@@ -28,8 +28,9 @@ router.get('/', async (req, res) => {
             config,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_DNA] Falha ao ler config.json: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_DNA] Falha ao ler config.json: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao acessar base de configuração.',
@@ -66,8 +67,9 @@ router.put('/', denyIfDelegated, async (req, res) => {
             success: true,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_DNA] Falha ao persistir configuração: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_DNA] Falha ao persistir configuração: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha catastrófica na escrita do arquivo.',
@@ -97,8 +99,9 @@ router.get('/dna', async (req, res) => {
             dna,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_DNA] Falha ao recuperar DNA: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_DNA] Falha ao recuperar DNA: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao acessar o genoma do sistema.',
@@ -125,11 +128,12 @@ router.put('/dna', denyIfDelegated, async (req, res) => {
             success: true,
             request_id: req.id,
         });
-    } catch (e) {
-        log('WARN', `[API_DNA] Evolução de DNA rejeitada: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('WARN', `[API_DNA] Evolução de DNA rejeitada: ${_e.message}`, req.id);
         res.status(400).json({
             success: false,
-            error: `O novo DNA viola o contrato de integridade: ${e.message}`,
+            error: `O novo DNA viola o contrato de integridade: ${_e.message}`,
             request_id: req.id,
         });
     }
@@ -157,8 +161,9 @@ router.get('/dna/history', async (req, res) => {
             max_capacity: 10,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_DNA] Falha ao recuperar histórico: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_DNA] Falha ao recuperar histórico: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao acessar histórico de backups.',
@@ -201,11 +206,12 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
             current_version: dna.version,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_DNA] Falha no rollback: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_DNA] Falha no rollback: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
-            error: `Rollback falhou: ${e.message}`,
+            error: `Rollback falhou: ${_e.message}`,
             request_id: req.id,
         });
     }
@@ -215,7 +221,7 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
  * GET /dna/stats
  * Retorna estatísticas de evolução do DNA (session counters).
  *
- * @returns {object} stats - Evolution counters per domain
+ * @returns {any} stats - Evolution counters per domain
  */
 router.get('/dna/stats', async (req, res) => {
     try {
@@ -232,8 +238,9 @@ router.get('/dna/stats', async (req, res) => {
             },
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_DNA] Falha ao recuperar stats: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_DNA] Falha ao recuperar stats: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Erro ao acessar estatísticas de evolução.',
@@ -286,11 +293,12 @@ router.post('/dna/evolve', denyIfDelegated, async (req, res) => {
                 request_id: req.id,
             });
         }
-    } catch (e) {
-        log('ERROR', `[API_DNA] Falha na evolução manual: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_DNA] Falha na evolução manual: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
-            error: `Evolução falhou: ${e.message}`,
+            error: `Evolução falhou: ${_e.message}`,
             request_id: req.id,
         });
     }

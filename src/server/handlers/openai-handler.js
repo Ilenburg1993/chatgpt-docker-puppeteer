@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 /**
  * OpenAI-Compatible Handler for Express
  *
@@ -34,13 +34,13 @@ import {
  * @example
  * const { setupOpenAIHandler } = await import('./openai-handler.js');
  * setupOpenAIHandler(app);
-  * @returns {object}
+  * @returns {any}
  */
 export function setupOpenAIHandler(app) {
     console.error('[OpenAI Handler] setupOpenAIHandler() called, registering routes...');
 
     // Debug: Test route
-    app.get('/v1/test', (req, res) => {
+    app.get('/v1/test', (/** @type {any} */ req, /** @type {any} */ res) => {
         console.error('[OpenAI Handler] TEST ROUTE CALLED!');
         res.json({ message: 'Test route works!' });
     });
@@ -74,7 +74,7 @@ export function setupOpenAIHandler(app) {
      *   "usage": { "prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7 }
      * }
      */
-    app.post('/v1/chat/completions', async (req, res) => {
+    app.post('/v1/chat/completions', async (/** @type {any} */ req, /** @type {any} */ res) => {
         console.error('[OpenAI Handler] POST /v1/chat/completions called');
         const startTime = Date.now();
 
@@ -130,33 +130,34 @@ export function setupOpenAIHandler(app) {
 
             // 6. Return OpenAI-compatible response
             res.json(openaiResponse);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
             const duration = Date.now() - startTime;
 
             // Handle validation errors (already formatted as OpenAI errors)
-            if (error.openaiError) {
-                console.error(`[OpenAI Handler] Validation error (${duration}ms): ${error.message}`);
-                return res.status(error.statusCode || 400).json(error.openaiError);
+            if (_e.openaiError) {
+                console.error(`[OpenAI Handler] Validation error (${duration}ms): ${_e.message}`);
+                return res.status(_e.statusCode || 400).json(_e.openaiError);
             }
 
             // Handle Ollama errors (translate to OpenAI format)
-            console.error(`[OpenAI Handler] Error (${duration}ms):`, error.message);
+            console.error(`[OpenAI Handler] Error (${duration}ms):`, _e.message);
 
             // Map error types to appropriate HTTP status codes
-            const statusCode = error.message.includes('timeout')
+            const statusCode = _e.message.includes('timeout')
                 ? 504 // Gateway Timeout
-                : error.message.includes('cancelled')
+                : _e.message.includes('cancelled')
                   ? 499 // Client Closed Request
-                  : error.message.includes('authentication')
+                  : _e.message.includes('authentication')
                     ? 401 // Unauthorized
-                    : error.message.includes('Cloud')
+                    : _e.message.includes('Cloud')
                       ? 502 // Bad Gateway
                       : 500; // Internal Server Error
 
             const errorType =
                 statusCode === 401 ? 'authentication_error' : statusCode === 504 ? 'timeout_error' : 'internal_error';
 
-            res.status(statusCode).json(buildOpenAIError(error.message, errorType, statusCode));
+            res.status(statusCode).json(buildOpenAIError(_e.message, errorType, statusCode));
         }
     });
 
@@ -181,7 +182,7 @@ export function setupOpenAIHandler(app) {
      * Note: Ollama's /api/tags endpoint has different format,
      * so we return hardcoded list for simplicity.
      */
-    app.get('/v1/models', async (req, res) => {
+    app.get('/v1/models', async (/** @type {any} */ req, /** @type {any} */ res) => {
         console.error('[OpenAI Handler] GET /v1/models called');
         try {
             // Return hardcoded list of models
@@ -202,8 +203,9 @@ export function setupOpenAIHandler(app) {
                 object: 'list',
                 data: models,
             });
-        } catch (error) {
-            console.error('[OpenAI Handler] Error listing models:', error.message);
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
+            console.error('[OpenAI Handler] Error listing models:', _e.message);
             res.status(500).json(buildOpenAIError('Failed to list models', 'internal_error', 500));
         }
     });

@@ -97,7 +97,7 @@ class TaskControlWatcher {
                 );
 
                 return { ok: true, attempt };
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const error = /** @type {any} */ (_rawErr);
                 lastError = error;
                 log(
@@ -237,7 +237,7 @@ class TaskControlWatcher {
                 try {
                     releaseTaskLock({ taskId });
                     lockReleased = true;
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const _ = /** @type {any} */ (_rawErr);
                     lockReleaseError = _?.message || String(_);
                 }

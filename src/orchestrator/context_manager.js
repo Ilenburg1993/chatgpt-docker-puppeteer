@@ -57,7 +57,7 @@ class ContextManager {
 
         const context = {
             mission_id: missionId,
-            steps: [], // Array de { step_id, output, timestamp }
+            steps: /** @type {any[]} */ ([]), // Array de { step_id, output, timestamp }
             summary: initialContext.summary || null, // Summary acumulado (se houver)
             metadata: initialContext.metadata || {},
             created_at: Date.now(),

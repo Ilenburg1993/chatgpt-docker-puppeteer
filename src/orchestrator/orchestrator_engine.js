@@ -231,7 +231,7 @@ class OrchestratorEngine {
             task_id: task.meta.id,
             current_iteration: 0,
             max_iterations: task.spec.execution.iterative_config?.max_iterations || 3,
-            iterations_history: [],
+            iterations_history: /** @type {any[]} */ ([]),
         };
 
         this.activeIterations.set(task.meta.id, iterationState);
@@ -285,8 +285,8 @@ class OrchestratorEngine {
                 task_id: task.meta.id,
                 steps,
                 current_step_index: 0,
-                completed_steps: [],
-                failed_steps: [],
+                completed_steps: /** @type {any[]} */ ([]),
+                failed_steps: /** @type {any[]} */ ([]),
                 accumulated_context: {},
             };
 
@@ -684,7 +684,7 @@ class OrchestratorEngine {
 
                     logger.info(`[OrchestratorEngine] ✓ RAG context injected (${ragResult.results.length} chunks)`);
                 }
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 const _err = /** @type {any} */ (err);
                 logger.warn(`[OrchestratorEngine] RAG auto-injection failed: ${_err.message}`);
                 // Continuar sem RAG se falhar (graceful degradation)
@@ -810,7 +810,7 @@ class OrchestratorEngine {
             try {
                 const code = /** @type {any} */ (ActionCode)[actionCode] || actionCode;
                 await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, code, payload); // ✅ P1-4: Added await
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 const _e = /** @type {any} */ (e);
                 logger.error('[OrchestratorEngine] Falha ao emitir evento NERV:', _e.message);
                 // ✅ P1-4: Re-throw para que caller saiba da falha

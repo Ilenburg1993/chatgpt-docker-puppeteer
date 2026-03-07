@@ -157,7 +157,7 @@ async function resolveContext(text, /** @type {any} */ currentTask = null, /** @
 
             // Substituição atômica no texto (Literal Replacement)
             resolvedText = resolvedText.split(ref.fullMatch).join(injectedContent);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `Falha ao resolver referência ${ref.fullMatch}: ${err.message}`);
             resolvedText = resolvedText.split(ref.fullMatch).join(`[ERRO_CONTEXTO]`);

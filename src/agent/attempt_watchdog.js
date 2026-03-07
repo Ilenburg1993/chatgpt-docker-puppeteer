@@ -216,7 +216,7 @@ class AttemptWatchdog {
                         ended_at_ms: now,
                         error: 'WATCHDOG: stuck in DISPATCHED without driver response',
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -227,13 +227,13 @@ class AttemptWatchdog {
                         execute_after_ms: now + this.rescheduleDelayMs,
                         last_error: 'ATTEMPT_STUCK_DISPATCHED',
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
                 try {
                     releaseTaskLock({ taskId });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -265,7 +265,7 @@ class AttemptWatchdog {
                         reason_class: 'ENV_UNAVAILABLE',
                         count_attempt: 0,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -276,13 +276,13 @@ class AttemptWatchdog {
                         execute_after_ms: now + this.rescheduleDelayMs,
                         last_error: 'ATTEMPT_STUCK_ACCEPTED_NO_START',
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
                 try {
                     releaseTaskLock({ taskId });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -318,7 +318,7 @@ class AttemptWatchdog {
                             ActorRole.DRIVER
                         );
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
@@ -335,7 +335,7 @@ class AttemptWatchdog {
                         reason_class: 'ENV_UNAVAILABLE',
                         count_attempt: 0,
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -346,13 +346,13 @@ class AttemptWatchdog {
                         execute_after_ms: now + this.rescheduleDelayMs,
                         last_error: 'ATTEMPT_STUCK_RUNNING_NO_HEARTBEAT',
                     });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
                 try {
                     releaseTaskLock({ taskId });
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     /* ignore */
                 }
 
@@ -496,13 +496,13 @@ class AttemptWatchdog {
                             execute_after_ms: null,
                             last_error: String(row?.last_error || 'ENV_UNAVAILABLE_LONG').slice(0, 2000),
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
 
                     try {
                         releaseTaskLock({ taskId });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
 
@@ -548,19 +548,19 @@ class AttemptWatchdog {
                             execute_after_ms: null,
                             last_error: String(row?.last_error || 'LLM_TIMEOUT_PERSISTENT').slice(0, 2000),
                         });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
 
                     try {
                         releaseTaskLock({ taskId });
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
 
                     await _sleep(0);
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore escalation errors */
             }
         } finally {

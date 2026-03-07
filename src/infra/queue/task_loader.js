@@ -90,7 +90,7 @@ async function loadNextTask(targetFilter = null) {
             try {
                 await saveTask(task);
                 queueWasMutated = true;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 const _ce = /** @type {any} */ (err);
                 log('ERROR', `[LOADER] Falha ao persistir cura da tarefa ${task.meta.id}: ${_ce.message}`);
             }
@@ -138,7 +138,7 @@ async function bulkRetryFailed() {
 
             await saveTask(task);
             count++;
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             log('ERROR', `[LOADER] Erro no retry da tarefa ${originalTask.meta.id}: ${_ce.message}`);
         }

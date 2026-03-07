@@ -17,7 +17,7 @@ export const DnaSchema = schemaCore.DnaSchema;
  * Função de parsing e migração de tarefas.
  * Side-effects: Pode modificar objetos raw durante migração V4→V5.
  * @param {Record<string, unknown>} raw - Objeto raw da tarefa.
- * @returns {object} Tarefa validada e migrada.
+ * @returns {any} Tarefa validada e migrada.
  * @throws {Error} Se parsing ou migração falhar.
  */
 export const parseTask = schemaCore.parseTask;

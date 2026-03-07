@@ -129,9 +129,9 @@ export function resolveInferencePolicy(input = {}) {
     const base = {
         timeoutMs: 120000,
         maxParallel: 1,
-        maxTokens: null,
-        allowedModels: null,
-        allowedBackends: null,
+        maxTokens: /** @type {number | null} */ (null),
+        allowedModels: /** @type {string[] | null} */ (null),
+        allowedBackends: /** @type {string[] | null} */ (null),
         degradedBehavior: /** @type {'degraded_continue'|'fail_closed'} */ ('degraded_continue'),
     };
 

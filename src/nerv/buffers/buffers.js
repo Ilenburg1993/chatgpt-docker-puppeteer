@@ -27,7 +27,7 @@ import createBackpressure from './backpressure.js';
  * - outbound: Limite de fila outbound
  * - inbound: Limite de fila inbound
  * - blockOnPressure: Se true, bloqueia quando buffer cheio (default: false)
- * @returns {object}
+ * @returns {any}
  */
 function createBuffers({ telemetry, limits = {} }) {
     if (!telemetry || typeof telemetry.emit !== 'function') {

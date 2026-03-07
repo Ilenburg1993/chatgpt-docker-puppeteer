@@ -163,7 +163,7 @@ class BrowserPoolManager {
                 }
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} conectada e adicionada ao pool`);
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
                 log('ERROR', `[BrowserPool] Falha ao conectar instância ${i}: ${error.message}`);
                 // Continua com pool degradado (menos instâncias)
@@ -235,7 +235,7 @@ class BrowserPoolManager {
 
                     try {
                         await page.close();
-                    } catch (_rawCloseErr) {
+                    } catch (/** @type {any} */ _rawCloseErr) {
                         const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
@@ -291,14 +291,14 @@ class BrowserPoolManager {
                 log('DEBUG', `[BrowserPool] Lifecycle monitor attached for ${taskId}`);
 
                 return page;
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
                 lastError = error;
 
                 if (page && !page.isClosed()) {
                     try {
                         await page.close();
-                    } catch (_rawCloseErr) {
+                    } catch (/** @type {any} */ _rawCloseErr) {
                         const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
@@ -427,7 +427,7 @@ class BrowserPoolManager {
         // Fecha a página (A004: best-effort — não deve bloquear limpeza do pool entry)
         try {
             await page.close();
-        } catch (_rawCloseErr) {
+        } catch (/** @type {any} */ _rawCloseErr) {
                         const closeErr = /** @type {any} */ (_rawCloseErr);
             log(
                 'WARN',
@@ -505,7 +505,7 @@ class BrowserPoolManager {
                 'INFO',
                 `[BrowserPool] Page removed from pool: ${resolvedTaskId} (${poolEntry.stats.activeTasks} active)`
             );
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[BrowserPool] Error removing page from pool: ${err.message}`);
         }
@@ -574,7 +574,7 @@ class BrowserPoolManager {
         this.healthCheckTimer = setInterval(async () => {
             try {
                 await this.runHealthCheck();
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
                 log('ERROR', `[BrowserPool] Health check failed: ${err?.message || String(err)}`);
             }
@@ -658,7 +658,7 @@ class BrowserPoolManager {
                     // ✅ Circuit Breaker: Registra recovery
                     this.circuitBreaker.registerRecovery(poolEntry.id);
                 }
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
                 log('WARN', `[BrowserPool] Health check falhou para ${poolEntry.id}: ${error.message}`);
 
@@ -750,7 +750,7 @@ class BrowserPoolManager {
                     if (age > ttlMs) {
                         zombiePages.push({ taskId, page, reason: 'TTL_EXCEEDED', age });
                     }
-                } catch (_rawError) {
+                } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
                     log('ERROR', `[BrowserPool] Error checking page TTL for ${taskId}: ${error.message}`);
                 }
@@ -781,7 +781,7 @@ class BrowserPoolManager {
                     }
 
                     zombieCount++;
-                } catch (_rawError) {
+                } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
                     log('ERROR', `[BrowserPool] Error closing zombie page ${zombie.taskId}: ${error.message}`);
                 }
@@ -869,7 +869,7 @@ class BrowserPoolManager {
             }
 
             log('INFO', `[BrowserPool] ✅ Chrome Proxy validado e disponível (${host}:${port})`);
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             const errorMsg = error.name === 'AbortError' ? 'timeout (3s)' : error.message;
 
@@ -930,7 +930,7 @@ class BrowserPoolManager {
                 await poolEntry.browser.disconnect();
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} desconectada`);
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
                 log('ERROR', `[BrowserPool] Erro ao desconectar ${poolEntry.id}: ${error.message}`);
             }
@@ -1165,7 +1165,7 @@ class BrowserPoolManager {
                         reconnected = true;
                         break;
                     }
-                } catch (_rawReconnectErr) {
+                } catch (/** @type {any} */ _rawReconnectErr) {
             const reconnectErr = /** @type {any} */ (_rawReconnectErr);
                     log('WARN', `[BrowserPool] Reconnection attempt ${attempt} failed: ${reconnectErr.message}`);
                 }
@@ -1215,7 +1215,7 @@ class BrowserPoolManager {
 
                 return false;
             }
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[BrowserPool] ConnectionRecoveryStrategy error: ${err.message}`);
             return false;
@@ -1237,7 +1237,7 @@ class BrowserPoolManager {
                         if (!page.isClosed()) {
                             await page.close();
                         }
-                    } catch (_rawCloseErr) {
+                    } catch (/** @type {any} */ _rawCloseErr) {
                         const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
@@ -1264,7 +1264,7 @@ class BrowserPoolManager {
                 poolEntry.stats.activeTasks = 0;
 
                 log('INFO', `[BrowserPool] Cleared connections for ${poolEntry.id}`);
-            } catch (_rawClearErr) {
+            } catch (/** @type {any} */ _rawClearErr) {
             const clearErr = /** @type {any} */ (_rawClearErr);
                 log('ERROR', `[BrowserPool] Error clearing ${poolEntry.id}: ${clearErr.message}`);
             }

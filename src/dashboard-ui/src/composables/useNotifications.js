@@ -1,4 +1,5 @@
 // @ts-check
+/** @import { Ref } from 'vue' */
 import { ref, reactive } from 'vue';
 
 /**
@@ -10,7 +11,7 @@ import { ref, reactive } from 'vue';
  * @property {number} createdAt - Timestamp de criação
  */
 
-/** @type {import('vue').Ref<Notification[]>} */
+/** @type {Ref<Notification[]>} */
 const notifications = ref([]);
 
 /** @type {Map<string, ReturnType<typeof setTimeout>>} */
@@ -18,7 +19,7 @@ const notifTimers = new Map();
 
 /**
  * @typedef {object} UseNotificationsReturn
- * @property {import('vue').Ref<Notification[]>} notifications
+ * @property {Ref<Notification[]>} notifications
  * @property {(message: string, type?: 'success'|'error'|'warning'|'info', duration?: number) => string} addNotification
  * @property {(id: string) => void} removeNotification
  * @property {(message: string, duration?: number) => string} showSuccess

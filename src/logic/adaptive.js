@@ -117,7 +117,7 @@ async function init() {
             const rawContent = await fs.readFile(STATE_FILE, 'utf-8');
             try {
                 state = AdaptiveStateSchema.parse(JSON.parse(rawContent));
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 // [FIX] Preservação forense de dados corrompidos
                 const bak = `${STATE_FILE}.bak.${Date.now()}`;
                 await fs.writeFile(bak, rawContent);
@@ -125,7 +125,7 @@ async function init() {
                 state = defaultState;
             }
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         log('WARN', `[ADAPTIVE] Falha no boot: ${e instanceof Error ? e.message : String(e)}`);
         state = defaultState;
     } finally {
@@ -175,7 +175,7 @@ async function persist() {
         const tmp = `${STATE_FILE}.tmp`;
         await fs.writeFile(tmp, JSON.stringify(state, null, 2));
         await fs.rename(tmp, STATE_FILE);
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         log('ERROR', `[ADAPTIVE] Falha de escrita: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
         persistLock = false;
@@ -613,7 +613,7 @@ function getPercentileTimeout(stats, percentile = 95) {
  * **Semântica:** Deep clone do estado para inspeção externa sem risco de mutação.
  * **Unidades:** Retorna objeto JavaScript puro.
  *
- * @returns {object} Snapshot imutável do estado interno
+ * @returns {any} Snapshot imutável do estado interno
  */
 export const getSnapshot = () => structuredClone(state);
 /**

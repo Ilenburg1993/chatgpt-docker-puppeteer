@@ -299,7 +299,7 @@ class TsserverDaemon {
             const tree = languageService.getNavigationTree(filePath);
             if (!tree) return [];
             const out = /** @type {any[]} */ ([]);
-            const walk = (/** @type {any} */ node, parent = null) => {
+            const walk = (/** @type {any} */ node, /** @type {any} */ parent = null) => {
                 for (const span of node.spans || []) {
                     out.push({
                         name: node.text,

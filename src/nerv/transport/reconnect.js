@@ -31,7 +31,7 @@
 function safeCall(fn) {
     try {
         fn();
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // falha física não deve propagar
     }
 }
@@ -73,7 +73,7 @@ function now() {
  * @param {object} deps.policy
  * @param {number} [deps.policy.interval=1000] - Intervalo entre tentativas (ms)
  * @param {number|null} [deps.policy.maxAttempts=null] - Máximo de tentativas (null=infinito)
- * @returns {object} Controlador com métodos start, stop, onConnectionUp, onConnectionDown
+ * @returns {any} Controlador com métodos start, stop, onConnectionUp, onConnectionDown
  * @throws {Error} Se dependências obrigatórias estiverem ausentes ou inválidas
  */
 function createReconnect({ telemetry, start, stop, policy = {} }) {

@@ -64,7 +64,7 @@ test('wave5: chrome proxy installs and removes signal handlers deterministically
         assert.equal(process.listenerCount('SIGINT'), sigintBefore);
         assert.equal(process.listenerCount('SIGTERM'), sigtermBefore);
     } finally {
-        if (service && (/** @type {any} */ (service)).server) {
+        if (service && /** @type {any} */ (service).server) {
             await service.stop().catch(() => {});
         }
 

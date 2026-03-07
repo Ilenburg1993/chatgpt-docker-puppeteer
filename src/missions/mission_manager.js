@@ -134,7 +134,7 @@ class MissionManager {
                     params,
                 },
             });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             // Rollback: if context init fails after mission created, log and rethrow
             logger.log(
                 'ERROR',
@@ -417,7 +417,7 @@ class MissionManager {
                     missionCache.taskIds.push(taskV5.meta.id);
                 }
             }
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[MissionManager] Erro ao despachar task (${dispatchMode}): ${(/** @type {any} */ (error)).message}`);
             await this._failMission(missionId, (/** @type {any} */ (error)).message);
         }
@@ -497,7 +497,7 @@ class MissionManager {
                 started_at_ms: startedAtMs,
                 completed_at_ms: completedAtMs,
             });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('WARN', `[MissionManager] Falha ao sincronizar missão no SQLite: ${(/** @type {any} */ (error)).message}`);
         }
     }
@@ -505,7 +505,7 @@ class MissionManager {
     /**
      * Gera Task V5 a partir de um step do workflow.
      */
-    _generateTaskV5FromStep(/** @type {any} */ step, /** @type {any} */ missionState, { stepIndex = null, parentTaskId = null, correlationId = null } = {}) {
+    _generateTaskV5FromStep(/** @type {any} */ step, /** @type {any} */ missionState, { stepIndex = /** @type {any} */ (null), parentTaskId = /** @type {any} */ (null), correlationId = /** @type {any} */ (null) } = {}) {
         const stableSeed = `${missionState?.id || 'mission'}|${step?.id || 'step'}|${stepIndex ?? 'na'}`;
         const taskId = `task-${_hashId(stableSeed)}`;
 
@@ -592,7 +592,7 @@ class MissionManager {
             },
             policy: {
                 max_cost_cents: 500, // TODO: calcular baseado em estimate
-                dependencies: []
+                dependencies: /** @type {any[]} */ ([]),
             },
             result: {},
         };
@@ -702,7 +702,7 @@ class MissionManager {
 
                 logger.log('INFO', `[MissionManager] ✅ Mission ${mission.id} recovered and resumed`);
             }
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[MissionManager] Error during crash recovery: ${(/** @type {any} */ (error)).message}`);
         }
     }

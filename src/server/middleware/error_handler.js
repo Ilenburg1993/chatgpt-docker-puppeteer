@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { log, audit } from '#core/logger';
 
 /**
@@ -15,14 +15,8 @@ function notFound(req, res, next) {
     next(error);
 }
 
-/**
- * @typedef {object} ErrorHandlerReq
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
- * @typedef {object} ErrorHandlerRes
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} ErrorHandlerReq */
+/** @typedef {any} ErrorHandlerRes */
 /**
  * Middleware Global de Erros (500).
  * Captura qualquer exceção lançada nos controllers ou middlewares anteriores.

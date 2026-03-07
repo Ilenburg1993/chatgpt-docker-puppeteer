@@ -25,7 +25,7 @@ import createReceive from './receive.js';
  * **Unidades:** Dependências seguem contratos NERV (envelopes, correlation, telemetry).
  *
  * @param {CreateReceptionDeps} deps - Dependências do módulo
- * @returns {object} Módulo de recepção com método onMessage
+ * @returns {any} Módulo de recepção com método onMessage
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createReception({ envelopes, correlation, telemetry }) {

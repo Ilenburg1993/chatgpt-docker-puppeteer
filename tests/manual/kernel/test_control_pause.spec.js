@@ -1,7 +1,6 @@
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
-// @ts-ignore
 import { writeTask, readTask, startAgent, stopAgent, waitForCondition, sleep, ROOT } from './helpers.js';
 
 (async () => {

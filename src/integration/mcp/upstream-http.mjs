@@ -48,7 +48,7 @@ export class MCPUpstreamError extends Error {
  */
 /**
  * @param {CreateMcpHttpClientConfig} [config]
- * @returns {object}
+ * @returns {any}
  */
 export function createMcpHttpClient(/** @type {any} */ config = {}) {
     const { url, headers } = /** @type {{ url?: string, headers?: Headers | Record<string, string> }} */ (config);
@@ -81,7 +81,7 @@ export function createMcpHttpClient(/** @type {any} */ config = {}) {
                 body: JSON.stringify(body),
                 signal,
             });
-        } catch (_raw_error) {
+        } catch (/** @type {any} */ _raw_error) {
             const error = /** @type {any} */ (_raw_error);
             if (error?.name === 'AbortError') {
                 throw error;

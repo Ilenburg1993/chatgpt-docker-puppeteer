@@ -84,7 +84,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                 for (let i = 0; i < nodes.length; i++) {
                     accumulator.push(nodes[i]);
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 const _ce = /** @type {any} */ (_);
                 return accumulator;
             }
@@ -100,7 +100,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                     if (f.contentDocument) {
                         SADI.query(selector, f.contentDocument, onlyFrames, accumulator);
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     const _ce = /** @type {any} */ (_);
                     // Ignore cross-origin frame access errors
                 }
@@ -135,7 +135,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                     if (url.protocol.startsWith('http')) {
                         srcPath = `[src*="${CSS.escape(url.pathname)}"]`;
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     const _ce = /** @type {any} */ (_);
                     // Ignore URL parse errors
                 }
@@ -206,7 +206,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                             return true;
                         }
                     }
-                } catch (_) {
+                } catch (/** @type {any} */ _) {
                     const _ce = /** @type {any} */ (_);
                     // Ignore DOM access errors
                 }
@@ -276,7 +276,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                         break;
                     }
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 const _ce = /** @type {any} */ (_);
                 path.push('barrier');
             }
@@ -339,7 +339,7 @@ async function findFrameByPath(/** @type {any} */ page, /** @type {any} */ frame
                 return framePath.includes(validPath);
             }
             return framePath.includes(f.name());
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             const _ce = /** @type {any} */ (_);
             return false;
         }
@@ -529,7 +529,7 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
                     } else {
                         debug('findChatInputSelector: DNA evolution rejected - %s', evolutionResult.reason);
                     }
-                } catch (evolutionError) {
+                } catch (/** @type {any} */ evolutionError) {
                     const _ce = /** @type {any} */ (evolutionError);
                     // Graceful degradation - don't fail if evolution fails
                     log.warn('[SADI] DNA evolution failed:', _ce.message);
@@ -538,7 +538,7 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
         }
 
         return result;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _ce = /** @type {any} */ (error);
         log.error('[SADI] findChatInputSelector error:', _ce.message);
         return null; // Graceful fallback
@@ -660,7 +660,7 @@ async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} *
         );
 
         return result;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _ce = /** @type {any} */ (error);
         log.error('[SADI] findSendButtonSelector error:', _ce.message);
         return null; // Graceful fallback
@@ -743,7 +743,7 @@ async function findResponseArea(/** @type {any} */ page) {
         debug('findResponseArea: detection completed in %dms, growth=%d', detectionTime, result?.growth_delta || 0);
 
         return result;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _ce = /** @type {any} */ (error);
         log.error('[SADI] findResponseArea error:', _ce.message);
         return null; // Graceful fallback
@@ -788,7 +788,7 @@ async function validateCandidateInteractivity(/** @type {any} */ page, /** @type
 
                     try {
                         el.focus();
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         const _ce = /** @type {any} */ (_);
                         return false;
                     }
@@ -802,7 +802,7 @@ async function validateCandidateInteractivity(/** @type {any} */ page, /** @type
 
         debug('validateCandidateInteractivity: result=%s', isInteractive);
         return isInteractive;
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         const _ce = /** @type {any} */ (e);
         log.error('[SADI] validateCandidateInteractivity error:', _ce.message);
         return false;

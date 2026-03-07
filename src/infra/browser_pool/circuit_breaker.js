@@ -27,6 +27,7 @@ const CircuitState = Object.freeze({
 // Gerenciador inteligente de falhas do Chrome.
 /** Classe exportada: CircuitBreakerManager. */
 class CircuitBreakerManager {
+    /** @param {{ poolSize?: number, nerv?: any }} opts */
     constructor({ poolSize = 3, nerv = null }) {
         this.poolSize = poolSize;
         /** @type {any} */
@@ -111,7 +112,7 @@ class CircuitBreakerManager {
      * @param {string} instanceId - ID da instância (ex: "browser-0")
      * @param {Error} error - Erro capturado
      * @param {object} context - Contexto adicional (browser version, PID, etc.)
-     * @returns {object} - { cause, shouldPause, policy }
+     * @returns {any} - { cause, shouldPause, policy }
      */
     registerFailure(/** @type {any} */ instanceId, /** @type {any} */ error, /** @type {any} */ context = {}) {
         const timestamp = Date.now();

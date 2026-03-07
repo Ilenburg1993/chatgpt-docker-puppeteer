@@ -72,7 +72,7 @@ function healTask(raw) {
     // O Zod aplicará os valores padrão (defaults) definidos nos sub-schemas.
     try {
         return TaskSchema.parse(task);
-    } catch (healErr) {
+    } catch (/** @type {any} */ healErr) {
         const _ce = /** @type {any} */ (healErr);
         // [FIX 1.1] Nomenclatura contextual para evitar shadowing
         log('ERROR', `[HEALER] Falha crítica na integridade da tarefa: ${_ce.message}`);

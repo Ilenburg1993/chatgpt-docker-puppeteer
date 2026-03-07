@@ -581,7 +581,7 @@ export async function ragHealth(/** @type {any} */ options = {}) {
             const db = await openDb(paths.dbDir).catch((/** @type {any} */ err) => (/** @type {any} */ { error: String(err?.message || err) }));
             let tableNames = null;
             if (!('error' in db)) {
-                tableNames = await db.tableNames().catch(() => null);
+                tableNames = await db.tableNames().catch(() => /** @type {null} */ (null));
                 try {
                     await db.close();
                 } catch (_) {
@@ -687,7 +687,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                 }
 
                 const db = await openDb(paths.dbDir);
-                const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => []));
+                const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => /** @type {string[]} */ ([])));
                 let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
 
                 const throttler = createRagAdaptiveThrottler({ mode: 'full' });
@@ -1019,7 +1019,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                 };
 
                 const db = await openDb(paths.dbDir);
-                const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => []));
+                const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => /** @type {string[]} */ ([])));
                 let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
                 let dimValidated = manifest.embedding.dim === null;
                 await reconcileScopeChanges({ manifest, resolvedScope, table, report });
@@ -1789,7 +1789,7 @@ export async function ragExpand(/** @type {any} */ options = {}) {
     const db = await openDb(paths.dbDir);
     let dbClosed = false;
     try {
-        const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => []));
+        const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => /** @type {string[]} */ ([])));
         if (!tableNames.includes(TABLE_NAME)) {
             return buildStructuredExpandError(
                 'INDEX_NOT_FOUND',
@@ -1899,7 +1899,7 @@ export async function getRagStorageStats(/** @type {any} */ options = {}) {
     let dbClosed = false;
 
     try {
-        const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => []));
+        const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => /** @type {string[]} */ ([])));
         if (!tableNames.includes(TABLE_NAME)) {
             return {
                 table_name: TABLE_NAME,
@@ -1963,7 +1963,7 @@ function computeExt(/** @type {any} */ relPath) {
 }
 
 async function rmContents(/** @type {any} */ dirPath) {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => []);
+    const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => /** @type {any[]} */ ([]));
     for (const ent of entries) {
         const full = path.join(dirPath, ent.name);
         await fs.rm(full, { recursive: true, force: true }).catch(() => {});

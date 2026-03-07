@@ -54,7 +54,7 @@ export function revokeToken(jti, expiresAtMs) {
             .prepare('INSERT OR IGNORE INTO revoked_tokens (jti, revoked_at_ms, expires_at_ms) VALUES (?, ?, ?)')
             .run(jti, Date.now(), Number(expiresAtMs) || Date.now() + 86400000);
         return result.changes > 0;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         log('ERROR', `[TOKEN_BLOCKLIST] Erro ao revogar token: ${/** @type {any} */ (err).message}`);
         return false;
     }
@@ -73,7 +73,7 @@ export function isTokenRevoked(jti) {
         const db = getDb();
         const row = db.prepare('SELECT 1 FROM revoked_tokens WHERE jti = ? AND expires_at_ms > ?').get(jti, Date.now());
         return !!row;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         log('WARN', `[TOKEN_BLOCKLIST] Erro ao verificar token: ${/** @type {any} */ (err).message}`);
         return false; // Fail-open: se não conseguimos verificar, permitir (log gerado)
     }
@@ -93,7 +93,7 @@ export function cleanExpiredTokens() {
             log('DEBUG', `[TOKEN_BLOCKLIST] Limpeza: ${removed} tokens expirados removidos`);
         }
         return removed;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         log('WARN', `[TOKEN_BLOCKLIST] Erro na limpeza de tokens: ${/** @type {any} */ (err).message}`);
         return 0;
     }

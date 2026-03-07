@@ -63,7 +63,7 @@ function cloneRecords(records) {
  * **Unidades:** correlationId como string não vazia, histórico como array de registros.
  *
  * @param {CreateCorrelationContextDeps} deps - Dependências do contexto
- * @returns {object} Contexto com métodos getHistory, getLatest, getStats
+ * @returns {any} Contexto com métodos getHistory, getLatest, getStats
  * @throws {Error} Se store ou telemetry forem inválidos
  */
 function createCorrelationContext({ store, telemetry }) {

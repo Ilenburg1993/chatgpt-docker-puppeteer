@@ -86,7 +86,7 @@ export const useEventsVNextStore = defineStore('events_vnext', {
                 const meta = res.data?.meta || {};
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
     const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
@@ -114,7 +114,7 @@ export const useEventsVNextStore = defineStore('events_vnext', {
                 }
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
     const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {

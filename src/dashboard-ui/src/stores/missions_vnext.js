@@ -53,7 +53,7 @@ async function _refreshTasksSliceForMission(/** @type {any} */ missionId) {
         if (!selectedMissionFilter || selectedMissionFilter === String(missionId)) {
             await tasks.fetchFirstPage({ limit: 200 });
         }
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort para manter stores sincronizadas sem travar fluxo principal
     }
 }
@@ -62,7 +62,7 @@ async function _refreshMissionSlice() {
     try {
         const missions = useMissionsVNextStore();
         await missions.fetchFirstPage({ limit: 100 });
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         // best effort
     }
 }
@@ -148,7 +148,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
                 }
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
     const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
@@ -173,7 +173,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
                 }
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
     const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
@@ -204,7 +204,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
                     live_counts: res.data?.live_counts || null,
                 };
                 return this.selectedProgress;
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 this.selectedProgress = null;
                 return null;
             }

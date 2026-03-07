@@ -62,7 +62,7 @@ export function isValidNERV(/** @type {any} */ nerv) {
 
         log('DEBUG', '[NERV_UTILS] NERV instance validation passed');
         return true;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('ERROR', `[NERV_UTILS] Error validating NERV instance: ${_ce.message}`);
         return false;
@@ -91,7 +91,7 @@ export async function safeNERVOperation(
     try {
         log('DEBUG', `[NERV_UTILS] Executing safe NERV operation: ${operation}`);
         return await operationFn();
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('ERROR', `[NERV_UTILS] Error in NERV operation ${operation}: ${_ce.message}`);
         throw _ce;

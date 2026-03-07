@@ -15,7 +15,7 @@ function getCurrentAttemptIdForTask(taskId) {
             db.prepare('SELECT latest_attempt_id, last_correlation_id FROM tasks WHERE id = ?').get(taskId)
         );
         return row?.latest_attempt_id ?? row?.last_correlation_id ?? null;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return null;
     }
 }

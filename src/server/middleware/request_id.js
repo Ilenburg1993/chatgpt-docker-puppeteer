@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import crypto from 'node:crypto';
 
 /**
@@ -7,14 +7,8 @@ import crypto from 'node:crypto';
  */
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * @typedef {object} RequestIdReq
- * @property {*} _ Propriedades definidas em runtime.
- */
-/**
- * @typedef {object} RequestIdRes
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} RequestIdReq */
+/** @typedef {any} RequestIdRes */
 /**
  * Middleware de Injeção de Identidade de Requisição.
  *

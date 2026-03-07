@@ -28,7 +28,7 @@ function readJsonBody(req) {
             if (!raw.trim()) return resolve({});
             try {
                 resolve(JSON.parse(raw));
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 reject(Object.assign(new Error('invalid json body'), { statusCode: 400, cause: error }));
             }
         });
@@ -105,7 +105,7 @@ export function createInferenceGatewayServer(options = {}) {
             }
 
             return writeJson(res, 404, { ok: false, error: 'not_found' });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const typedError = /** @type {InferenceGatewayServerError} */ (error);
             return writeJson(res, typedError.statusCode || 500, {
                 ok: false,

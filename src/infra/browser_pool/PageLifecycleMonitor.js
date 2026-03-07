@@ -112,7 +112,7 @@ class PageLifecycleMonitor {
                 'DEBUG',
                 `[PageLifecycleMonitor] Listeners attached for ${this.taskId} (${this.listeners.length} events)`
             );
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Failed to attach listeners: ${err.message}`);
         }
@@ -153,7 +153,7 @@ class PageLifecycleMonitor {
             this.cleanup();
 
             log('INFO', `[PageLifecycleMonitor] Page close handled: ${this.taskId}`);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Error handling page close: ${err.message}`);
         }
@@ -186,7 +186,7 @@ class PageLifecycleMonitor {
             }
 
             log('WARN', `[PageLifecycleMonitor] Page error recorded: ${this.taskId}`);
-        } catch (_rawError) {
+        } catch (/** @type {any} */ _rawError) {
             const error = /** @type {any} */ (_rawError);
             log('ERROR', `[PageLifecycleMonitor] Error handling page error: ${error.message}`);
         }
@@ -222,7 +222,7 @@ class PageLifecycleMonitor {
             this.cleanup();
 
             log('INFO', `[PageLifecycleMonitor] Page disconnect handled: ${this.taskId}`);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Error handling page disconnect: ${err.message}`);
         }
@@ -249,7 +249,7 @@ class PageLifecycleMonitor {
             this.active = false;
 
             log('DEBUG', `[PageLifecycleMonitor] Cleanup completed for ${this.taskId}`);
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('ERROR', `[PageLifecycleMonitor] Cleanup failed: ${err.message}`);
         }
@@ -295,7 +295,7 @@ class PageLifecycleMonitor {
     /**
      * Retorna status do monitor.
      *
-     * @returns {object} Status object
+     * @returns {any} Status object
      */
     getStatus() {
         return {

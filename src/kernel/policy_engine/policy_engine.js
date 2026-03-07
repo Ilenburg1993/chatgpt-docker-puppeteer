@@ -105,7 +105,7 @@ class PolicyEngine {
      * @param {number} params.at
      * Timestamp do ciclo lógico.
      *
-     * @returns {object}
+     * @returns {any}
      * Avaliação normativa consultiva.
      */
     assess({ task, observations, at }) {
@@ -415,7 +415,7 @@ class PolicyEngine {
     /**
      * Retorna limites atuais.
      *
-     * @returns {object}
+     * @returns {any}
      */
     getLimits() {
         return Object.freeze({ ...this.limits });

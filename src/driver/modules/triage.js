@@ -1,4 +1,4 @@
-// @ts-nocheck - DOM code inside page.evaluate() callbacks is not checkable in Node.js strict context
+// @ts-check
 import EventEmitter from 'node:events';
 import * as stabilizer from '#shared/page_stability/stabilizer';
 import { STATUS_VALUES } from '#core/constants/tasks';
@@ -93,7 +93,7 @@ class TriageError extends Error {
         super(message);
         this.name = ERROR_NAMES.TRIAGE_ERROR;
         this.type = type;
-        this.context = context;
+        this.context = /** @type {Record<string, unknown>} */ (context);
         this.timestamp = Date.now();
     }
 }
@@ -220,6 +220,7 @@ class Triage extends EventEmitter {
      * const lag = await this._measureLagWithRetry();
      */
     async _measureLagWithRetry() {
+        let _lastError;
         for (let attempt = 0; attempt < TRIAGE_CONFIG.LAG_RETRY_ATTEMPTS; attempt++) {
             try {
                 const lag = await stabilizer.measureEventLoopLag(this.page);
@@ -253,6 +254,7 @@ class Triage extends EventEmitter {
                 await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
             }
         }
+        throw new TriageError('LAG_MEASUREMENT_FAILED', 'All lag measurement attempts exhausted', { langCode: this.langCode });
     }
 
     /**
@@ -260,7 +262,7 @@ class Triage extends EventEmitter {
      *
      * @private
      * @param {AbortSignal} signal - AbortSignal para cancelamento
-     * @returns {Promise<object>} Resultado do diagnóstico
+     * @returns {Promise<any>} Resultado do diagnóstico
      */
     async _executeDiagnosis(signal) {
         // ✅ BUG #7 fix: AbortSignal check
@@ -299,21 +301,21 @@ class Triage extends EventEmitter {
 
         try {
             const diagnosis = await this.page.evaluate(
-                async (errors, closers, config) => {
+                async (/** @type {any} */ errors, /** @type {any} */ closers, /** @type {any} */ config) => {
                     const Probe = {
                         /**
                          * Varredura Consolidada em passagem única (Single-Pass Scan).
                          */
                         scan: (
                             /** @type {Document|ShadowRoot} */ root = document,
-                            acc = { textParts: [], nodeCount: 0, hasPassword: false, spinners: [], buttons: [] },
+                            acc = { textParts: /** @type {any[]} */ ([]), nodeCount: 0, hasPassword: false, spinners: /** @type {any[]} */ ([]), buttons: /** @type {any[]} */ ([]) },
                             depth = 0
                         ) => {
                             if (depth > config.maxScanDepth) {
                                 return acc;
                             }
                             const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-                            let node = walker.currentNode;
+                            let node = /** @type {any} */ (walker.currentNode);
 
                             while (node) {
                                 if (node.nodeType === 1) {
@@ -361,8 +363,8 @@ class Triage extends EventEmitter {
                         /**
                          * Detecta erros visuais (vermelho/laranja) em botões e alertas.
                          */
-                        checkVisualError: (buttons, config) => {
-                            const candidates = buttons.filter(b =>
+                        checkVisualError: (/** @type {any} */ buttons, /** @type {any} */ config) => {
+                            const candidates = buttons.filter((/** @type {any} */ b) =>
                                 b.matches('[role="alert"], .error, .warning, [class*="error"]')
                             );
                             for (const el of candidates) {
@@ -378,7 +380,7 @@ class Triage extends EventEmitter {
                                     continue;
                                 }
 
-                                const parseRGB = str => {
+                                const parseRGB = (/** @type {any} */ str) => {
                                     const m = str.match(/\d+/g);
                                     return m && m.length >= 3 ? { r: +m[0], g: +m[1], b: +m[2] } : null;
                                 };
@@ -386,7 +388,7 @@ class Triage extends EventEmitter {
                                 const fg = parseRGB(style.color);
                                 const bg = parseRGB(style.backgroundColor);
 
-                                const isAlert = c =>
+                                const isAlert = (/** @type {any} */ c) =>
                                     c &&
                                     ((c.r > config.redThreshold && c.g < 100 && c.b < 100) || // Vermelho
                                         (c.r > config.orangeThreshold && c.g > 100 && c.g < 200 && c.b < 80)); // Laranja
@@ -434,7 +436,7 @@ class Triage extends EventEmitter {
                     }
 
                     // 3. BARREIRAS DE RENDERIZAÇÃO
-                    const hasMajorBarrier = Array.from(document.querySelectorAll('iframe')).some(f => {
+                    const hasMajorBarrier = Array.from((/** @type {any} */ (document)).querySelectorAll('iframe')).some((/** @type {any} */ f) => {
                         try {
                             if (f.contentDocument) {
                                 return false;
@@ -461,7 +463,7 @@ class Triage extends EventEmitter {
                         return { type: 'LIMIT_REACHED', severity: 'HIGH', evidence: { text: 'quota_exhausted' } };
                     }
 
-                    const foundError = errors.find(term => fullText.includes(term.toLowerCase()));
+                    const foundError = errors.find((/** @type {any} */ term) => fullText.includes(term.toLowerCase()));
                     if (foundError) {
                         return { type: 'GENERIC_ERROR_TEXT', severity: 'MEDIUM', evidence: { term: foundError } };
                     }
@@ -478,7 +480,7 @@ class Triage extends EventEmitter {
 
                     // 6. FIM ABRUPTO (Botão de Retry sem botão de Stop)
                     const retryBtn = snap2.buttons.find(
-                        b => closers.some(c => (b.innerText || '').toLowerCase().includes(c)) && b.offsetParent !== null
+                        b => closers.some((/** @type {any} */ c) => (b.innerText || '').toLowerCase().includes(c)) && b.offsetParent !== null
                     );
                     const stopBtn = snap2.buttons.find(
                         b =>
@@ -529,7 +531,7 @@ class Triage extends EventEmitter {
 
             // Track pattern detection
             if (diagnosis && Object.hasOwn(this.stats.patternsDetected, diagnosis.type)) {
-                this.stats.patternsDetected[diagnosis.type]++;
+                (/** @type {any} */ (this.stats.patternsDetected))[diagnosis.type]++;
                 this.emit(TRIAGE_EVENTS.PATTERN_DETECTED, {
                     pattern: diagnosis.type,
                     result,
@@ -562,7 +564,7 @@ class Triage extends EventEmitter {
      * 9. LOGICAL_LOOP (spinning without progress)
      *
      * @param {AbortSignal} [signal] - AbortSignal para cancelamento
-     * @returns {Promise<object>} Diagnóstico estruturado
+     * @returns {Promise<any>} Diagnóstico estruturado
      * Propriedades do objeto retornado:
      *   - type (string): Tipo de diagnóstico
      *   - severity (string): Severidade (CRITICAL, HIGH, MEDIUM, NONE)
@@ -610,7 +612,7 @@ class Triage extends EventEmitter {
         try {
             // ✅ BUG #5 fix: Timeout protection
             const result = await Promise.race([
-                this._executeDiagnosis(signal),
+                this._executeDiagnosis(/** @type {any} */ (signal)),
                 this._timeout(TRIAGE_CONFIG.DIAGNOSIS_TIMEOUT_MS, 'diagnose'),
             ]);
 
@@ -649,7 +651,7 @@ class Triage extends EventEmitter {
     /**
      * Retorna estatísticas de diagnóstico.
      *
-     * @returns {object} Objeto com métricas de diagnóstico
+     * @returns {any} Objeto com métricas de diagnóstico
      * Propriedades do objeto retornado:
      *   - totalDiagnoses (number): Total de diagnósticos
      *   - successfulDiagnoses (number): Diagnósticos bem-sucedidos
@@ -742,7 +744,7 @@ class Triage extends EventEmitter {
  * const triage = create(page, 'en');
  */
 function create(page, langCode = 'en') {
-    return new Triage(page, langCode);
+    return new Triage(/** @type {any} */ (page), langCode);
 }
 
 /**
@@ -756,7 +758,7 @@ function create(page, langCode = 'en') {
  *
  * @param {DiagnoseStallPage} page - Puppeteer Page instance
  * @param {string} [langCode='en'] - Código de idioma
- * @returns {Promise<object>} Resultado do diagnóstico
+ * @returns {Promise<any>} Resultado do diagnóstico
  *
  * @deprecated Use new Triage(page, langCode).diagnose() instead
  *
@@ -766,7 +768,7 @@ function create(page, langCode = 'en') {
  * const result = await diagnoseStall(page, 'en');
  */
 async function diagnoseStall(page, langCode = 'en') {
-    const triage = new Triage(page, langCode);
+    const triage = new Triage(/** @type {any} */ (page), langCode);
     return await triage.diagnose();
 }
 

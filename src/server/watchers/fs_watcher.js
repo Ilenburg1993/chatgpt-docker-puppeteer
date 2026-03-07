@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import fs from 'node:fs';
 import { promises as fsp } from 'node:fs';
 import * as io from '#infra/io';
@@ -8,6 +8,7 @@ import { log } from '#core/logger';
 /**
  * Instância ativa do watcher do SO.
  */
+/** @type {any} */
 let fsWatcher = null;
 
 /**
@@ -18,6 +19,7 @@ let signaling = false;
 /**
  * Timer para debounce de eventos do filesystem.
  */
+/** @type {any} */
 let debounceTimer = null;
 
 /**
@@ -36,12 +38,14 @@ function init() {
     (async () => {
         try {
             await fsp.access(queuePath);
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
+            const _e = /** @type {any} */ (e);
             log('WARN', `[FS_WATCHER] Alvo ausente: ${queuePath}. Tentando restauração...`);
             try {
                 await fsp.mkdir(queuePath, { recursive: true });
-            } catch (err) {
-                log('ERROR', `[FS_WATCHER] Falha crítica ao preparar alvo: ${err.message}`);
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
+                log('ERROR', `[FS_WATCHER] Falha crítica ao preparar alvo: ${_e.message}`);
                 return;
             }
         }
@@ -62,8 +66,9 @@ function init() {
                     }, 100);
                 }
             });
-        } catch (e) {
-            log('ERROR', `[FS_WATCHER] Falha ao acoplar sensor ao SO: ${e.message}`);
+        } catch (/** @type {any} */ e) {
+            const _e = /** @type {any} */ (e);
+            log('ERROR', `[FS_WATCHER] Falha ao acoplar sensor ao SO: ${_e.message}`);
         }
     })();
 }

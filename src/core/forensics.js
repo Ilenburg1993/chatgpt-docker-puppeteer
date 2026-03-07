@@ -110,7 +110,7 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
                     CAPTURE_TIMEOUT_MS,
                     'BROWSER_CAPTURE_TIMEOUT'
                 );
-            } catch (_rawErr) {
+            } catch (/** @type {any} */ _rawErr) {
                 const err = /** @type {any} */ (_rawErr);
                 log('WARN', `[FORENSICS] Captura visual abortada: ${err.message}`, correlationId);
             }
@@ -134,14 +134,14 @@ async function createCrashDump(page, error, taskId = 'unknown', correlationId = 
                 );
 
                 log('INFO', `[FORENSICS] Dump criado e notificado via NERV: ${dumpId}`, correlationId);
-            } catch (_rawE) {
+            } catch (/** @type {any} */ _rawE) {
                 const e = /** @type {any} */ (_rawE);
                 log('WARN', `[FORENSICS] Falha ao notificar dump via NERV: ${e.message}`, correlationId);
             }
         } else {
             log('WARN', `[FORENSICS] Dump criado mas NERV não disponível: ${dumpId}`, correlationId);
         }
-    } catch (_rawE) {
+    } catch (/** @type {any} */ _rawE) {
         const e = /** @type {any} */ (_rawE);
         // Falha na forense é reportada apenas no log local para não interferir na recuperação
         console.error(`[FORENSICS] Falha crítica no motor de evidências: ${e.message}`);
@@ -178,7 +178,7 @@ async function _captureVisualEvidence(/** @type {any} */ page, folder, _correlat
         });
 
         await fs.writeFile(path.join(folder, 'dom_snapshot.html'), html, 'utf-8');
-    } catch (_rawErr) {
+    } catch (/** @type {any} */ _rawErr) {
         const err = /** @type {any} */ (_rawErr);
         log('WARN', `[FORENSICS] Visual capture failed: ${err?.message || String(err)}`, _correlationId);
     }

@@ -84,7 +84,7 @@ function _rowToReport(row) {
 /**
  * Cria um novo job de diagnóstico
  * @param {CreateDiagnosticJobInput} input
- * @returns {object}
+ * @returns {any}
  */
 export function createDiagnosticJob(input) {
     const db = getDb();
@@ -274,7 +274,7 @@ export function updateDiagnosticJob(id, updates = {}) {
 /**
  * Cria um novo relatório de diagnóstico
  * @param {CreateDiagnosticReportInput} input
- * @returns {object}
+ * @returns {any}
  */
 export function createDiagnosticReport(input) {
     const db = getDb();

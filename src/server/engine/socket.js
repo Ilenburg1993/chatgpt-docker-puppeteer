@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-check
+/** @import { VerifyOptions } from 'jsonwebtoken' */
 import CONFIG from '#core/config';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';
@@ -15,6 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 /**
  * Instância única do barramento (Singleton).
  */
+/** @type {any} */
 let ioInstance = null;
 
 /* ==========================================================================
@@ -22,9 +24,10 @@ let ioInstance = null;
 ========================================================================== */
 
 let dashboardAllowedOrigins = new Set();
+/** @type {any} */
 let configUpdatedHandler = null;
 
-function parseBooleanEnv(name, defaultValue) {
+function parseBooleanEnv(/** @type {any} */ name, /** @type {any} */ defaultValue) {
     const raw = process.env[name];
     if (raw === undefined) {
         return defaultValue;
@@ -44,7 +47,7 @@ function getDashboardSocketPolicy() {
     };
 }
 
-function normalizeOrigins(originsLike) {
+function normalizeOrigins(/** @type {any} */ originsLike) {
     if (Array.isArray(originsLike)) {
         return originsLike.map(origin => String(origin).trim()).filter(Boolean);
     }
@@ -75,8 +78,8 @@ function ensureConfigUpdatedListener() {
         log('INFO', `[HUB] Socket CORS allowlist atualizada (${dashboardAllowedOrigins.size} origens)`);
     };
 
-    if (typeof (/** @type {unknown} */ (CONFIG).on) === 'function') {
-        /** @type {unknown} */ (CONFIG).on('updated', configUpdatedHandler);
+    if (typeof (/** @type {any} */ (CONFIG)).on === 'function') {
+        (/** @type {any} */ (CONFIG)).on('updated', configUpdatedHandler);
     }
 }
 
@@ -84,13 +87,13 @@ function removeConfigUpdatedListener() {
     if (!configUpdatedHandler) {
         return;
     }
-    if (typeof (/** @type {unknown} */ (CONFIG).off) === 'function') {
-        /** @type {unknown} */ (CONFIG).off('updated', configUpdatedHandler);
+    if (typeof (/** @type {any} */ (CONFIG)).off === 'function') {
+        (/** @type {any} */ (CONFIG)).off('updated', configUpdatedHandler);
     }
     configUpdatedHandler = null;
 }
 
-function isDashboardOriginAllowed(origin) {
+function isDashboardOriginAllowed(/** @type {any} */ origin) {
     if (!origin) return true;
     if (dashboardAllowedOrigins.has(origin)) {
         return true;
@@ -99,14 +102,14 @@ function isDashboardOriginAllowed(origin) {
     return false;
 }
 
-function verifyDashboardToken(token) {
+function verifyDashboardToken(/** @type {any} */ token) {
     if (!token || typeof token !== 'string') {
         return { ok: false, code: 'AUTH_TOKEN_MISSING', message: 'Token JWT ausente no handshake' };
     }
 
     try {
-        const decoded = /** @type {unknown} */ (
-            jwt.verify(token, getJwtSecret(), /** @type {import('jsonwebtoken').VerifyOptions} */ (JWT_VERIFY_OPTIONS))
+        const decoded = /** @type {any} */ (
+            jwt.verify(token, getJwtSecret(), /** @type {VerifyOptions} */ (JWT_VERIFY_OPTIONS))
         );
         const jti = decoded?.jti;
 
@@ -117,20 +120,21 @@ function verifyDashboardToken(token) {
         return {
             ok: true,
             user: {
-                id: decoded.id,
-                username: decoded.username,
-                role: decoded.role || 'viewer',
-                roles: Array.isArray(decoded.roles) ? decoded.roles.map(r => String(r)) : [],
-                permissions: Array.isArray(decoded.permissions) ? decoded.permissions.map(p => String(p)) : [],
-                jti: decoded.jti || null,
-                exp: decoded.exp || null,
+                id: (/** @type {any} */ (decoded)).id,
+                username: (/** @type {any} */ (decoded)).username,
+                role: (/** @type {any} */ (decoded)).role || 'viewer',
+                roles: Array.isArray((/** @type {any} */ (decoded)).roles) ? (/** @type {any} */ (decoded)).roles.map((/** @type {any} */ r) => String(r)) : [],
+                permissions: Array.isArray((/** @type {any} */ (decoded)).permissions) ? (/** @type {any} */ (decoded)).permissions.map((/** @type {any} */ p) => String(p)) : [],
+                jti: (/** @type {any} */ (decoded)).jti || null,
+                exp: (/** @type {any} */ (decoded)).exp || null,
             },
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return {
             ok: false,
-            code: err?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
-            message: err?.message || 'Token inválido',
+            code: _e?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID',
+            message: _e?.message || 'Token inválido',
         };
     }
 }
@@ -152,6 +156,7 @@ const agentRegistry = new Map();
  * Estrutura: taskId -> { data, timestamp }
  */
 const taskUpdateBuffer = new Map();
+/** @type {any} */
 let taskUpdateTimer = null;
 
 /**
@@ -191,7 +196,7 @@ function flushTaskUpdates() {
  * Implementa lógica de reset automático para suporte a testes e reconexões.
  *
  * @param {InitHttpServer} httpServer - Instância ativa do servidor HTTP.
- * @returns {object} A instância do Socket.io configurada.
+ * @returns {any} A instância do Socket.io configurada.
  */
 function init(httpServer) {
     if (ioInstance) {
@@ -205,13 +210,13 @@ function init(httpServer) {
 
     log('INFO', '[HUB] Mission Control Hub V600 Online (IPC 2.0 Native).');
 
-    ioInstance = new Server(httpServer, {
+    ioInstance = new Server(/** @type {any} */ (httpServer), {
         cors: {
             origin(origin, callback) {
                 if (isDashboardOriginAllowed(origin)) {
-                    return callback(null, true);
+                    return (/** @type {any} */ (callback))(null, true);
                 }
-                return callback(new Error(`Socket CORS blocked for origin: ${origin}`), false);
+                return (/** @type {any} */ (callback))(new Error(`Socket CORS blocked for origin: ${origin}`), false);
             },
             methods: ['GET', 'POST'],
             credentials: true,
@@ -221,7 +226,7 @@ function init(httpServer) {
         pingInterval: 5000,
     });
 
-    ioInstance.on('connection', socket => {
+    ioInstance.on('connection', (/** @type {any} */ socket) => {
         // 1. FILTRO DE INFRAESTRUTURA (Token de Acesso)
         const token = socket.handshake.auth?.token;
         const isAgentAttempt = token === 'SYSTEM_MAESTRO_PRIME';
@@ -254,7 +259,7 @@ function init(httpServer) {
             internalEmitter.emit('client:connected', socket.id);
 
             // Setup dashboard command listeners
-            socket.on('dashboard:command', data => {
+            socket.on('dashboard:command', (/** @type {any} */ data) => {
                 const policy = getDashboardSocketPolicy();
                 if (!policy.commandsEnabled) {
                     socket.emit('dashboard:command:error', {
@@ -265,7 +270,7 @@ function init(httpServer) {
                 }
 
                 if (policy.authRequired) {
-                    const dashboardUser = /** @type {unknown} */ (socket.dashboardUser);
+                    const dashboardUser = /** @type {any} */ (socket.dashboardUser);
                     const userRole = dashboardUser?.role || null;
                     const roleAllowed = userRole === policy.commandRole || userRole === 'owner';
                     const permAllowed = hasPermission(dashboardUser, RBAC_PERMISSIONS.DASHBOARD_COMMAND);
@@ -294,13 +299,13 @@ function init(httpServer) {
                 });
             });
 
-            socket.on('dashboard:status_request', data => {
+            socket.on('dashboard:status_request', (/** @type {any} */ data) => {
                 log('DEBUG', `[HUB] Dashboard status request received`);
                 internalEmitter.emit('dashboard:status_request', data);
             });
         }
 
-        socket.on('disconnect', reason => {
+        socket.on('disconnect', (/** @type {any} */ reason) => {
             if (socket.robot_id) {
                 agentRegistry.delete(socket.robot_id);
                 log('WARN', `[HUB] Maestro ${socket.robot_id} desconectado. Causa: ${reason}`);
@@ -336,7 +341,7 @@ function _setupMaestroProtocol(socket) {
     }, 5000);
 
     // 1. CERIMÔNIA DE APRESENTAÇÃO (Handshake V2)
-    socket.on('handshake:present', data => {
+    socket.on('handshake:present', (/** @type {any} */ data) => {
         try {
             // Validação Nativa (Shared Kernel) - Audit 410
             const identity = validateRobotIdentity(data.identity);
@@ -373,15 +378,16 @@ function _setupMaestroProtocol(socket) {
 
             // Notifica Dashboards sobre o novo agente pronto para missões
             ioInstance.to('dashboards').emit('hub:agent_online', identity);
-        } catch (err) {
-            log('ERROR', `[HUB] Handshake rejeitado para ${socket.id}: ${err.message}`);
-            socket.emit('handshake:rejected', { reason: err.message });
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('ERROR', `[HUB] Handshake rejeitado para ${socket.id}: ${_e.message}`);
+            socket.emit('handshake:rejected', { reason: _e.message });
             socket.disconnect();
         }
     });
 
     // 2. RECEPTOR DE MENSAGENS ESTRUTURADAS (Envelope V2)
-    socket.on('message', rawEnvelope => {
+    socket.on('message', (/** @type {any} */ rawEnvelope) => {
         if (!socket.authorized) {
             return;
         }
@@ -401,8 +407,9 @@ function _setupMaestroProtocol(socket) {
             if (agentRegistry.has(socket.robot_id)) {
                 agentRegistry.get(socket.robot_id).last_seen = Date.now();
             }
-        } catch (err) {
-            log('ERROR', `[HUB] Envelope malformado de ${socket.robot_id}: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('ERROR', `[HUB] Envelope malformado de ${socket.robot_id}: ${_e.message}`);
         }
     });
 }
@@ -420,8 +427,8 @@ function _setupMaestroProtocol(socket) {
  *
  * @param {string} command - Constante ActionCode (ex: ENGINE_PAUSE).
  * @param {SendCommandPayload} payload - Conteúdo útil do comando.
- * @param {string} [robotId] - ID do robô alvo. Se nulo, envia para todos (Broadcast).
- * @returns {string} O msg_id gerado para rastreamento de ACK.
+ * @param {string|null} [robotId] - ID do robô alvo. Se nulo, envia para todos (Broadcast).
+ * @returns {string | null} O msg_id gerado para rastreamento de ACK.
  */
 function sendCommand(command, payload, robotId = null) {
     if (!ioInstance) {
@@ -429,7 +436,7 @@ function sendCommand(command, payload, robotId = null) {
     }
 
     const msgId = uuidv4();
-    const correlationId = payload.correlation_id || uuidv4();
+    const correlationId = (/** @type {any} */ (payload)).correlation_id || uuidv4();
 
     const envelope = {
         header: {
@@ -477,12 +484,12 @@ async function stop() {
             s.disconnect(true);
         }
 
-        await new Promise(resolve => {
+        await new Promise(/** @type {(resolve: (v?: any) => void) => void} */ (resolve => {
             ioInstance.close(() => {
                 ioInstance = null;
                 resolve();
             });
-        });
+        }));
 
         agentRegistry.clear();
         log('INFO', '[HUB] Barramento Socket.io limpo com sucesso.');
@@ -493,7 +500,7 @@ async function stop() {
  * Notify: Broadcast global informativo para todos os conectados.
  * @param {*} event
  * @param {*} data
- * @returns {void}
+ * @returns {boolean | void}
  */
 function notify(event, data) {
     if (!ioInstance) {
@@ -503,16 +510,13 @@ function notify(event, data) {
     return true;
 }
 
-/**
- * @typedef {object} NotifyAgentInput
- * @property {*} _ Propriedades definidas em runtime.
- */
+/** @typedef {any} NotifyAgentInput */
 /**
  * Notify agents (system room) with a lightweight signal event.
  * Used for wake-ups (e.g. cache invalidation) without a full IPC envelope.
  * @param {*} event
  * @param {NotifyAgentInput} [data]
- * @returns {void}
+ * @returns {boolean | void}
  */
 function notifyAgent(event, data = {}) {
     if (!ioInstance) {
@@ -545,8 +549,8 @@ function broadcastTaskUpdate(taskId, data) {
 
     if (taskId && typeof taskId === 'object' && data === undefined) {
         // Suporta chamada acidental broadcastTaskUpdate({ taskId, state })
-        normalizedTaskId = taskId.taskId;
-        normalizedState = taskId.state;
+        normalizedTaskId = (/** @type {any} */ (taskId)).taskId;
+        normalizedState = (/** @type {any} */ (taskId)).state;
     }
 
     if (!normalizedTaskId) {
@@ -596,8 +600,8 @@ export const off = (eventName, handler) => internalEmitter.off(eventName, handle
 /** Constante/valor exportado: emit.
  * @param {*} eventName
  */
-export const emit = (eventName, ...args) =>
-    /** @type {import('node:events').EventEmitter} */ (internalEmitter).emit(eventName, ...args);
+export const emit = (/** @type {any} */ eventName, /** @type {...any} */ ...args) =>
+    /** @type {EventEmitter} */ (internalEmitter).emit(eventName, ...args);
 
 /** Constante/valor exportado: sendToClient.
  * @param {*} clientId
@@ -645,18 +649,18 @@ export const connectExternal = async (port = 3008) => {
     };
 
     const performHandshake = async () =>
-        new Promise((resolve, reject) => {
+        new Promise(/** @type {(resolve: (v?: any) => void, reject: (e: any) => void) => void} */ ((resolve, reject) => {
             const onAuthorized = () => {
                 cleanup();
                 resolve();
             };
 
-            const onRejected = payload => {
+            const onRejected = (/** @type {any} */ payload) => {
                 cleanup();
                 reject(new Error(`Handshake rejected: ${payload?.reason || 'unknown reason'}`));
             };
 
-            const onDisconnect = reason => {
+            const onDisconnect = (/** @type {any} */ reason) => {
                 cleanup();
                 reject(new Error(`Disconnected before handshake authorization: ${reason}`));
             };
@@ -677,9 +681,10 @@ export const connectExternal = async (port = 3008) => {
             clientSocket.on('handshake:rejected', onRejected);
             clientSocket.on('disconnect', onDisconnect);
             clientSocket.emit('handshake:present', { identity: handshakeIdentity });
-        });
+        }));
 
     // Reaplica handshake a cada (re)conexão para evitar queda por timeout no servidor.
+    /** @type {any} */
     let handshakeInFlight = null;
     const runHandshake = async () => {
         if (!handshakeInFlight) {
@@ -691,7 +696,7 @@ export const connectExternal = async (port = 3008) => {
     };
 
     let initialReadySettled = false;
-    await new Promise((resolve, reject) => {
+    await new Promise(/** @type {(resolve: (v?: any) => void, reject: (e: any) => void) => void} */ ((resolve, reject) => {
         const initialReadyTimeoutMs = connectTimeoutMs + handshakeTimeoutMs;
         const timer = setTimeout(() => {
             settleReject(new Error(`Timeout connecting and authorizing external server (${initialReadyTimeoutMs}ms)`));
@@ -707,7 +712,7 @@ export const connectExternal = async (port = 3008) => {
             resolve();
         };
 
-        const settleReject = err => {
+        const settleReject = (/** @type {any} */ err) => {
             if (initialReadySettled) {
                 return;
             }
@@ -717,7 +722,7 @@ export const connectExternal = async (port = 3008) => {
             reject(err);
         };
 
-        const onConnectError = err => {
+        const onConnectError = (/** @type {any} */ err) => {
             if (!initialReadySettled) {
                 settleReject(err);
             }
@@ -729,18 +734,19 @@ export const connectExternal = async (port = 3008) => {
                 await runHandshake();
                 log('INFO', '[HUB] ✅ Handshake autorizado pelo servidor externo');
                 settleResolve();
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
                 if (!initialReadySettled) {
                     settleReject(err);
                 } else {
-                    log('WARN', `[HUB] Handshake em reconexão falhou: ${err?.message || String(err)}`);
+                    log('WARN', `[HUB] Handshake em reconexão falhou: ${_e?.message || String(err)}`);
                 }
             }
         };
 
         clientSocket.on('connect', onConnect);
         clientSocket.on('connect_error', onConnectError);
-    });
+    }));
 
     clientSocket.on('reconnect_attempt', attempt => {
         log('DEBUG', `[HUB] Tentativa de reconexão ao servidor externo (#${attempt})`);
@@ -765,11 +771,11 @@ export const connectExternal = async (port = 3008) => {
 
     // Retornar adaptador compatível com interface esperada
     return {
-        on: (event, handler) => clientSocket.on(event, handler),
-        off: (event, handler) => clientSocket.off(event, handler),
-        emit: (event, data) => clientSocket.emit(event, data),
+        on: (/** @type {any} */ event, /** @type {any} */ handler) => clientSocket.on(event, handler),
+        off: (/** @type {any} */ event, /** @type {any} */ handler) => clientSocket.off(event, handler),
+        emit: (/** @type {any} */ event, /** @type {any} */ data) => clientSocket.emit(event, data),
         // Best-effort in split mode: preserve API shape even without direct server-side socket lookup.
-        sendToClient: (clientId, event, data) => clientSocket.emit(event, { clientId, payload: data }),
+        sendToClient: (/** @type {any} */ clientId, /** @type {any} */ event, /** @type {any} */ data) => clientSocket.emit(event, { clientId, payload: data }),
         connected: () => clientSocket.connected,
         disconnect: () => clientSocket.disconnect(),
     };

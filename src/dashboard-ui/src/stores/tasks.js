@@ -259,7 +259,7 @@ export const useTaskStore = defineStore('tasks', {
 
                 this.tasks = all;
                 this.lastUpdate = Date.now();
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 this.error = /** @type {any} */ (formatHttpError(error)).message;
                 console.error('[TaskStore] Erro ao carregar tasks:', error);
@@ -292,7 +292,7 @@ export const useTaskStore = defineStore('tasks', {
                 }
 
                 return task;
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
@@ -315,7 +315,7 @@ export const useTaskStore = defineStore('tasks', {
                         by_priority: this.stats.by_priority,
                     };
                 }
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 console.error('[TaskStore] Erro ao carregar stats:', error);
             }
@@ -330,7 +330,7 @@ export const useTaskStore = defineStore('tasks', {
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
@@ -351,7 +351,7 @@ export const useTaskStore = defineStore('tasks', {
                 }
 
                 return response.data;
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
@@ -365,7 +365,7 @@ export const useTaskStore = defineStore('tasks', {
             try {
                 await http.delete(`/api/tasks/${taskId}`);
                 this.tasks = this.tasks.filter(t => t.meta?.id !== taskId);
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
@@ -381,7 +381,7 @@ export const useTaskStore = defineStore('tasks', {
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
@@ -397,7 +397,7 @@ export const useTaskStore = defineStore('tasks', {
                 // Recarrega lista
                 await this.fetchTasks();
                 return response.data;
-            } catch (_rawError) {
+            } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;

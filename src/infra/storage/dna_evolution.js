@@ -137,7 +137,7 @@ async function evolveWithSadiProtocol(protocol, domain, intent) {
                 session_evolutions: count + 1,
             },
         };
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _ce = /** @type {any} */ (error);
         log('ERROR', `[DNA_EVOLUTION] Falha ao evoluir DNA: ${_ce.message}`);
         return { accepted: false, reason: 'ERROR', error: _ce.message };
@@ -182,7 +182,7 @@ async function evolveWithFullProtocol(fullProtocol, domain, intent) {
 
         log('INFO', `[DNA_EVOLUTION] Protocolo estruturado salvo: ${domain}/${intent}`);
         return true;
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _ce = /** @type {any} */ (error);
         log('ERROR', `[DNA_EVOLUTION] Falha ao salvar protocolo: ${_ce.message}`);
         return false;
@@ -201,7 +201,7 @@ function resetEvolutionCounters() {
 /**
  * Retorna estatísticas de evolução da sessão atual.
  *
- * @returns {object} - {domain: count}
+ * @returns {any} - {domain: count}
  */
 function getEvolutionStats() {
     const stats = /** @type {any} */ ({});

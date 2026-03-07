@@ -155,7 +155,7 @@ async function runNodeScript(scriptArgs, timeoutMs = 10000) {
             cwd: process.cwd(),
         });
         return { ok: true, stdout, stderr };
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         return {
             ok: false,
             error: getErrorMessage(error),
@@ -189,8 +189,8 @@ async function probeInferenceGateway() {
             models_count: modelEntries ? modelEntries.length : null,
             health,
         };
-    } catch (error) {
-        return { ok: false, status: null, error: getErrorMessage(error) };
+    } catch (/** @type {any} */ error) {
+        return { ok: false, status: /** @type {number | null} */ (null), error: getErrorMessage(error) };
     }
 }
 
@@ -270,7 +270,7 @@ async function callMcpTool(name, args, options = {}) {
             json,
             text,
         };
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         return {
             ok: false,
             status: null,

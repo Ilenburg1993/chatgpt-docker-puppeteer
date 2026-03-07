@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { probeChromeConnection } from '#core/doctor';
 import { log } from '#core/logger';
 import { apiLimiter } from '#server/engine/app';
@@ -35,7 +35,7 @@ async function applyRoutes(app) {
     // FIXED (P1-14): Global request timeout middleware (30s default)
     // Previne requests órfãos que bloqueiam workers indefinidamente
     const REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT || '30000', 10);
-    app.use((req, res, next) => {
+    app.use((/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
         // Set timeout on the request
         req.setTimeout(REQUEST_TIMEOUT_MS, () => {
             if (!res.headersSent) {
@@ -57,14 +57,15 @@ async function applyRoutes(app) {
 
     // Bloqueio global para métodos mutantes quando o server roda em modo delegated.
     // Evita duplicar checks em todos os controllers: usa o middleware central `denyIfDelegated`.
-    app.use((req, res, next) => {
+    app.use((/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
         const MUTATING = ['POST', 'PUT', 'DELETE', 'PATCH'];
         try {
             if (MUTATING.includes(req.method)) {
                 return denyIfDelegated(req, res, next);
             }
-        } catch (err) {
-            log('WARN', `[GATEWAY] Falha no guard mutante: ${err.message}`);
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
+            log('WARN', `[GATEWAY] Falha no guard mutante: ${_e.message}`);
         }
         return next();
     });
@@ -75,15 +76,16 @@ async function applyRoutes(app) {
 
     // Health endpoints
     // GET /api/health
-    app.get('/api/health', async (req, res) => {
+    app.get('/api/health', async (/** @type {any} */ req, /** @type {any} */ res) => {
         try {
             const chrome = await probeChromeConnection();
             res.json({ success: true, ts: Date.now(), chrome, request_id: req.id });
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             res.status(503).json({
                 success: false,
                 ts: Date.now(),
-                chrome: { connected: false, error: err?.message || String(err) },
+                chrome: { connected: false, error: _e?.message || String(err) },
                 request_id: req.id,
             });
         }
@@ -210,7 +212,7 @@ async function applyRoutes(app) {
                 };
 
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: true });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // Non-fatal observability failure
             }
 
@@ -223,13 +225,14 @@ async function applyRoutes(app) {
                     app.locals = app.locals || {};
                     app.locals.getMcpUpstreamsStatus = () => getUpstreamStatus().upstreams;
                 }
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // noop
             }
 
             log('INFO', '[MCP] Handler registered at POST/GET /api/mcp');
-        } catch (error) {
-            log('ERROR', `[MCP] Failed to setup MCP handler: ${error.message}`);
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
+            log('ERROR', `[MCP] Failed to setup MCP handler: ${_e.message}`);
             log('WARN', '[MCP] MCP features will be unavailable');
             // Don't crash server, just disable MCP
             try {
@@ -239,10 +242,10 @@ async function applyRoutes(app) {
                     ready: false,
                     toolCount: null,
                     lastInitAt: new Date().toISOString(),
-                    lastInitError: error && error.message ? error.message : String(error),
+                    lastInitError: error && _e.message ? _e.message : String(error),
                 };
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // noop
             }
         }
@@ -258,7 +261,7 @@ async function applyRoutes(app) {
                 lastInitError: null,
             };
             app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             // noop
         }
     }
@@ -286,13 +289,14 @@ async function applyRoutes(app) {
                 };
 
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { openai: true });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // Non-fatal observability failure
             }
 
             log('INFO', '[OpenAI] Handler registered at POST /v1/chat/completions, GET /v1/models');
-        } catch (error) {
-            log('ERROR', `[OpenAI] Failed to setup handler: ${error.message}`);
+        } catch (/** @type {any} */ error) {
+            const _e = /** @type {any} */ (error);
+            log('ERROR', `[OpenAI] Failed to setup handler: ${_e.message}`);
             log('WARN', '[OpenAI] OpenAI-compatible features will be unavailable');
 
             // Don't crash server, just disable feature
@@ -302,10 +306,10 @@ async function applyRoutes(app) {
                     enabled: true,
                     ready: false,
                     lastInitAt: new Date().toISOString(),
-                    lastInitError: error.message,
+                    lastInitError: _e.message,
                 };
                 app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { openai: false });
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // noop
             }
         }

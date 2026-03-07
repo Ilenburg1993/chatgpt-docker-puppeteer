@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { log } from '#core/logger';
 
 /**
@@ -20,8 +20,9 @@ function denyIfDelegated(req, res, next) {
                 request_id: req.id,
             });
         }
-    } catch (e) {
-        log('ERROR', `[MW] Erro no denyIfDelegated: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[MW] Erro no denyIfDelegated: ${_e.message}`, req.id);
     }
     return next();
 }

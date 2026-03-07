@@ -110,7 +110,7 @@ class InfraFailurePolicy {
                     `[POLICY] Infraestrutura escalada e notificada via NERV: ${type} (PID: ${pid})`,
                     correlationId
                 );
-            } catch (_rawE) {
+            } catch (/** @type {any} */ _rawE) {
             const e = /** @type {any} */ (_rawE);
                 log('ERROR', `[POLICY] Falha ao notificar infra escalation via NERV: ${e.message}`, correlationId);
             }
@@ -144,7 +144,7 @@ class InfraFailurePolicy {
                 const proc = ctx.browser.process();
                 return proc ? proc.pid : null;
             }
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             log('DEBUG', `[POLICY] Failed to extract PID: ${err?.message || String(err)}`);
             return null;

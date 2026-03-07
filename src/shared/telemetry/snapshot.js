@@ -59,7 +59,7 @@ let isRunning = false;
 
 /**
  * Coleta métricas de sistema
- * @returns {Promise<object>}
+ * @returns {Promise<any>}
  */
 async function collectSystemMetrics() {
     try {
@@ -71,7 +71,7 @@ async function collectSystemMetrics() {
             memory: Math.round(memUsage.heapUsed / 1024 / 1024), // MB
             uptime: Math.round(process.uptime()),
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('WARN', `[SNAPSHOT] Falha ao coletar métricas de sistema: ${_ce.message}`);
         return { cpu: 0, memory: 0, uptime: 0 };
@@ -85,7 +85,7 @@ async function collectSystemMetrics() {
 /**
  * Coleta métricas do NERV
  * @param {CollectNervMetricsNerv} [nerv] - Instância do NERV
- * @returns {Promise<object>}
+ * @returns {Promise<any>}
  */
 async function collectNervMetrics(/** @type {any} */ nerv) {
     try {
@@ -99,7 +99,7 @@ async function collectNervMetrics(/** @type {any} */ nerv) {
             eventsPerSecond: status.activity?.eventsPerSecond || 0,
             bufferSize: status.buffers?.size || 0,
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('WARN', `[SNAPSHOT] Falha ao coletar métricas do NERV: ${_ce.message}`);
         return { connected: false, eventsPerSecond: 0, bufferSize: 0 };
@@ -108,7 +108,7 @@ async function collectNervMetrics(/** @type {any} */ nerv) {
 
 /**
  * Coleta métricas do PM2
- * @returns {Promise<object>}
+ * @returns {Promise<any>}
  */
 async function collectPm2Metrics() {
     // Nota: PM2 metrics seriam coletadas via PM2 API se disponível
@@ -126,7 +126,7 @@ async function collectPm2Metrics() {
 /**
  * Coleta métricas do Kernel
  * @param {CollectKernelMetricsKernel} [kernel] - Instância do Kernel
- * @returns {Promise<object>}
+ * @returns {Promise<any>}
  */
 async function collectKernelMetrics(/** @type {any} */ kernel) {
     try {
@@ -142,7 +142,7 @@ async function collectKernelMetrics(/** @type {any} */ kernel) {
             activeMissions: 0, // Placeholder
             queueSize: 0, // Placeholder
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('WARN', `[SNAPSHOT] Falha ao coletar métricas do Kernel: ${_ce.message}`);
         return { activeMissions: 0, queueSize: 0 };
@@ -156,7 +156,7 @@ async function collectKernelMetrics(/** @type {any} */ kernel) {
 /**
  * Coleta métricas do Browser Pool
  * @param {CollectBrowserMetricsBrowserPool} [browserPool] - Instância do Browser Pool
- * @returns {Promise<object>}
+ * @returns {Promise<any>}
  */
 async function collectBrowserMetrics(/** @type {any} */ browserPool) {
     try {
@@ -172,7 +172,7 @@ async function collectBrowserMetrics(/** @type {any} */ browserPool) {
             instances: 0, // Placeholder
             pages: 0, // Placeholder
         };
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('WARN', `[SNAPSHOT] Falha ao coletar métricas do Browser: ${_ce.message}`);
         return { instances: 0, pages: 0 };
@@ -231,7 +231,7 @@ export async function start(/** @type {any} */ intervalMs = 60000, /** @type {an
         snapshotInterval = setInterval(async () => {
             try {
                 currentSnapshot = await collectSnapshot(context);
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 const _ce = /** @type {any} */ (err);
                 log('ERROR', `[SNAPSHOT] Erro na coleta periódica: ${_ce.message}`);
                 // Continua rodando mesmo com erro
@@ -239,7 +239,7 @@ export async function start(/** @type {any} */ intervalMs = 60000, /** @type {an
         }, intervalMs);
 
         log('INFO', '[SNAPSHOT] Coletor iniciado com sucesso');
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('ERROR', `[SNAPSHOT] Falha ao iniciar coletor: ${_ce.message}`);
         throw err;

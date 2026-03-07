@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import { log, audit } from '#core/logger';
 
 /**
@@ -25,10 +25,10 @@ const schemaGuard = schema => (req, res, next) => {
     // safeParse não lança exceções, permitindo controle total sobre o fluxo de erro.
     const result = /** @type {unknown} */ (schema.safeParse(req.body));
 
-    if (!result.success) {
+    if (!(/** @type {any} */ (result)).success) {
         // 3. Formatação Amigável de Erros
         // Converte a árvore de erros do Zod em uma lista simples de campo/mensagem.
-        const errorDetails = result.error.issues.map(issue => ({
+        const errorDetails = (/** @type {any} */ (result)).error.issues.map((/** @type {any} */ issue) => ({
             field: issue.path.join('.'),
             message: issue.message,
         }));
@@ -63,7 +63,7 @@ const schemaGuard = schema => (req, res, next) => {
      * e realiza coerções de tipo (ex: string para número). Isso garante que o
      * Controller receba um objeto "limpo" e confiável.
      */
-    req.body = result.data;
+    req.body = (/** @type {any} */ (result)).data;
 
     next();
 };

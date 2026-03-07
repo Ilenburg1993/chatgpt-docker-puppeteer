@@ -157,7 +157,7 @@ class HandleManager extends EventEmitter {
      * - Limite MAX_HANDLES não pode ser ultrapassado
      *
      * @param {any} handle - Handle Puppeteer (JSHandle com método dispose)
-     * @returns {object} Handle registrado (para chaining)
+     * @returns {any} Handle registrado (para chaining)
      * @throws {Error} Se handle inválido ou limite atingido
      *
      * @emits HANDLE_EVENTS.HANDLE_REGISTERED - Handle registrado com sucesso
@@ -238,7 +238,7 @@ class HandleManager extends EventEmitter {
      * evitando promises órfãs rodando indefinidamente em background.
      *
      * @async
-     * @returns {Promise<object>} Resultado do cleanup
+     * @returns {Promise<any>} Resultado do cleanup
      *
      * Propriedades do objeto retornado:
      *   - cleaned (number): Handles limpos com sucesso
@@ -463,7 +463,7 @@ class HandleManager extends EventEmitter {
      *
      * v2.0 New Method - introspection completa para debugging/monitoring.
      *
-     * @returns {object} Stats object com todas as métricas
+     * @returns {any} Stats object com todas as métricas
      *
      * Propriedades do objeto retornado:
      *   - handlesRegistered (number): Total registrados (histórico)

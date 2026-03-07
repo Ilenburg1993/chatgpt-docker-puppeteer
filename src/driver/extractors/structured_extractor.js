@@ -1,4 +1,4 @@
-// @ts-nocheck - DOM code in page.evaluate callbacks and missing turndown @types
+// @ts-check
 import TurndownService from 'turndown';
 import { parse as parseHTML } from 'node-html-parser';
 import * as logger from '#core/logger';
@@ -26,9 +26,9 @@ class StructuredExtractor {
     /**
      * Extrai resposta em múltiplos formatos
      *
-     * @param {object} page - Puppeteer page instance
-     * @param {object} protocol - SADI protocol (selector, etc)
-     * @returns {Promise<object>} - { text, markdown, html, json }
+     * @param {any} page - Puppeteer page instance
+     * @param {any} protocol - SADI protocol (selector, etc)
+     * @returns {Promise<any>} - { text, markdown, html, json }
      */
     async extract(page, protocol) {
         try {
@@ -49,12 +49,12 @@ class StructuredExtractor {
             // 4. Preview estruturado
             const preview = this._generatePreview(rawExtraction.text, structured);
 
-            logger.debug('[STRUCTURED_EXTRACTOR] Extração completa', {
+            logger.debug('[STRUCTURED_EXTRACTOR] Extração completa', /** @type {any} */ ({
                 textLength: rawExtraction.text.length,
                 codeBlocks: structured.codeBlocks.length,
                 links: structured.links.length,
                 sections: structured.sections.length,
-            });
+            }));
 
             return {
                 text: rawExtraction.text,
@@ -64,7 +64,7 @@ class StructuredExtractor {
                 preview,
             };
         } catch (/** @type {any} */ error) {
-            logger.error('[STRUCTURED_EXTRACTOR] Erro ao extrair resposta', { error: error.message });
+            logger.error('[STRUCTURED_EXTRACTOR] Erro ao extrair resposta', /** @type {any} */ ({ error: error.message }));
             return this._emptyResponse();
         }
     }
@@ -72,13 +72,13 @@ class StructuredExtractor {
     /**
      * Extrai HTML do browser (browser-side function)
      *
-     * @param {object} protocol - SADI protocol
-     * @returns {object} - { html, text, thoughtBlocksRemoved }
+     * @param {any} protocol - SADI protocol
+     * @returns {any} - { html, text, thoughtBlocksRemoved }
      * @private
      */
     _extractHTML(protocol) {
         // Esta função roda NO BROWSER (não tem acesso a Node.js)
-        const msgs = Array.from(document.querySelectorAll(protocol.selector));
+        const msgs = Array.from((/** @type {any} */ (document)).querySelectorAll(protocol.selector));
         const targetMsg = msgs[msgs.length - 1];
 
         if (!targetMsg) {
@@ -101,7 +101,7 @@ class StructuredExtractor {
         let thoughtBlocksRemoved = 0;
         thoughtSelectors.forEach(selector => {
             const thoughts = clone.querySelectorAll(selector);
-            thoughts.forEach(t => {
+            thoughts.forEach((/** @type {any} */ t) => {
                 t.remove();
                 thoughtBlocksRemoved++;
             });
@@ -125,7 +125,7 @@ class StructuredExtractor {
         try {
             return this.turndownService.turndown(html);
         } catch (/** @type {any} */ error) {
-            logger.warn('[STRUCTURED_EXTRACTOR] Erro ao converter HTML → Markdown', { error: error.message });
+            logger.warn('[STRUCTURED_EXTRACTOR] Erro ao converter HTML → Markdown', /** @type {any} */ ({ error: error.message }));
             // Fallback: retorna HTML como texto
             return html.replace(/<[^>]*>/g, '');
         }
@@ -135,7 +135,7 @@ class StructuredExtractor {
      * Parseia HTML para JSON estruturado
      *
      * @param {string} html - HTML bruto
-     * @returns {object} - { sections, codeBlocks, links, images, tables }
+     * @returns {any} - { sections, codeBlocks, links, images, tables }
      * @private
      */
     _parseStructured(html) {
@@ -150,7 +150,7 @@ class StructuredExtractor {
                 tables: this._extractTables(root),
             };
         } catch (/** @type {any} */ error) {
-            logger.warn('[STRUCTURED_EXTRACTOR] Erro ao parsear HTML', { error: error.message });
+            logger.warn('[STRUCTURED_EXTRACTOR] Erro ao parsear HTML', /** @type {any} */ ({ error: error.message }));
             return {
                 sections: [],
                 codeBlocks: [],
@@ -164,15 +164,15 @@ class StructuredExtractor {
     /**
      * Extrai seções (headings)
      *
-     * @param {object} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ level, text, content }]
      * @private
      */
     _extractSections(root) {
-        const sections = [];
+        const sections = /** @type {any[]} */ ([]);
         const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
 
-        headings.forEach(heading => {
+        headings.forEach((/** @type {any} */ heading) => {
             const level = parseInt(heading.tagName[1], 10);
             const text = heading.text.trim();
 
@@ -197,16 +197,16 @@ class StructuredExtractor {
     /**
      * Extrai code blocks
      *
-     * @param {object} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ language, code, isInline }]
      * @private
      */
     _extractCodeBlocks(root) {
-        const codeBlocks = [];
+        const codeBlocks = /** @type {any[]} */ ([]);
 
         // Code blocks (fenced)
         const preBlocks = root.querySelectorAll('pre code, pre');
-        preBlocks.forEach(el => {
+        preBlocks.forEach((/** @type {any} */ el) => {
             const codeEl = el.tagName === 'PRE' ? el.querySelector('code') || el : el;
             const language = this._detectLanguage(codeEl);
             const code = codeEl.text.trim();
@@ -222,7 +222,7 @@ class StructuredExtractor {
 
         // Inline code
         const inlineCodes = root.querySelectorAll('code:not(pre code)');
-        inlineCodes.forEach(el => {
+        inlineCodes.forEach((/** @type {any} */ el) => {
             const code = el.text.trim();
             if (code && code.length < 100) {
                 // Apenas code curtos
@@ -240,7 +240,7 @@ class StructuredExtractor {
     /**
      * Detecta linguagem de code block
      *
-     * @param {object} codeEl - Code element
+     * @param {any} codeEl - Code element
      * @returns {string} - Language (python, javascript, etc)
      * @private
      */
@@ -265,15 +265,15 @@ class StructuredExtractor {
     /**
      * Extrai links
      *
-     * @param {object} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ text, href, title }]
      * @private
      */
     _extractLinks(root) {
-        const links = [];
+        const links = /** @type {any[]} */ ([]);
         const anchors = root.querySelectorAll('a[href]');
 
-        anchors.forEach(a => {
+        anchors.forEach((/** @type {any} */ a) => {
             const href = a.getAttribute('href');
             const text = a.text.trim();
             const title = a.getAttribute('title') || null;
@@ -289,15 +289,15 @@ class StructuredExtractor {
     /**
      * Extrai images
      *
-     * @param {object} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ src, alt, title }]
      * @private
      */
     _extractImages(root) {
-        const images = [];
+        const images = /** @type {any[]} */ ([]);
         const imgs = root.querySelectorAll('img[src]');
 
-        imgs.forEach(img => {
+        imgs.forEach((/** @type {any} */ img) => {
             const src = img.getAttribute('src');
             const alt = img.getAttribute('alt') || '';
             const title = img.getAttribute('title') || null;
@@ -313,29 +313,29 @@ class StructuredExtractor {
     /**
      * Extrai tables
      *
-     * @param {object} root - Parsed HTML
+     * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ headers, rows }]
      * @private
      */
     _extractTables(root) {
-        const tables = [];
+        const tables = /** @type {any[]} */ ([]);
         const tableEls = root.querySelectorAll('table');
 
-        tableEls.forEach(table => {
+        tableEls.forEach((/** @type {any} */ table) => {
             // Headers
-            const headers = [];
+            const headers = /** @type {any[]} */ ([]);
             const headerCells = table.querySelectorAll('thead th, thead td');
-            headerCells.forEach(th => {
+            headerCells.forEach((/** @type {any} */ th) => {
                 headers.push(th.text.trim());
             });
 
             // Rows
-            const rows = [];
+            const rows = /** @type {any[]} */ ([]);
             const bodyRows = table.querySelectorAll('tbody tr, tr:not(thead tr)');
-            bodyRows.forEach(tr => {
-                const cells = [];
+            bodyRows.forEach((/** @type {any} */ tr) => {
+                const cells = /** @type {any[]} */ ([]);
                 const tds = tr.querySelectorAll('td, th');
-                tds.forEach(td => {
+                tds.forEach((/** @type {any} */ td) => {
                     cells.push(td.text.trim());
                 });
                 if (cells.length > 0) {
@@ -355,8 +355,8 @@ class StructuredExtractor {
      * Gera preview estruturado
      *
      * @param {string} text - Texto plano
-     * @param {object} structured - Dados estruturados
-     * @returns {object} - { text, sections_count, code_blocks_count, links_count, images_count }
+     * @param {any} structured - Dados estruturados
+     * @returns {any} - { text, sections_count, code_blocks_count, links_count, images_count }
      * @private
      */
     _generatePreview(text, structured) {
@@ -366,7 +366,7 @@ class StructuredExtractor {
         return {
             text: previewText,
             sections_count: structured.sections.length,
-            code_blocks_count: structured.codeBlocks.filter(cb => !cb.isInline).length,
+            code_blocks_count: structured.codeBlocks.filter((/** @type {any} */ cb) => !cb.isInline).length,
             links_count: structured.links.length,
             images_count: structured.images.length,
         };
@@ -375,7 +375,7 @@ class StructuredExtractor {
     /**
      * Resposta vazia (fallback)
      *
-     * @returns {object}
+     * @returns {any}
      * @private
      */
     _emptyResponse() {

@@ -72,16 +72,16 @@ async function atomicWrite(filepath, content) {
             try {
                 fs.renameSync(tmp, filepath);
                 return;
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 attempts++;
                 await sleep(100 * attempts);
             }
         }
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         if (fs.existsSync(tmp)) {
             try {
                 fs.unlinkSync(tmp);
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* Ignore cleanup errors */
             }
         }
@@ -120,7 +120,7 @@ async function loadVocab() {
                 return vocabCache;
             }
         }
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         log('ERROR', `[i18n] Vocabulário corrompido ou ilegível. Restaurando base.`);
     }
 
@@ -197,7 +197,7 @@ async function learnTerm(langCode, category, term) {
             await atomicWrite(VOCAB_FILE, JSON.stringify(v, null, 2));
             vocabCache = v; // Atualiza cache em memória
             log('INFO', `[i18n] Aprendizado consolidado (${lang}): "${cleanTerm}"`);
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             log('ERROR', `[i18n] Falha ao persistir aprendizado: ${/** @type {any} */ (e).message}`);
         }
     }

@@ -48,7 +48,7 @@ export const parseTask = raw => {
                 },
             };
             return TaskSchemaV5.parse(patched);
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // fallback below
         }
     }

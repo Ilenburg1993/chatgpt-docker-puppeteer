@@ -116,7 +116,7 @@ function _sleep(ms) {
 function _safeJsonString(value) {
     try {
         return JSON.stringify(value ?? null);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return JSON.stringify({ error: 'json_stringify_failed' });
     }
 }
@@ -186,7 +186,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                         return text;
                     }
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore */
             }
         }
@@ -206,7 +206,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                     }
                     return raw;
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore */
             }
         }
@@ -215,7 +215,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
         let parsed = null;
         try {
             parsed = resultJson ? JSON.parse(String(resultJson)) : null;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Parse failed, keep null
         }
         const p = parsed?.storage?.text_file || parsed?.storage?.textFile || null;
@@ -232,7 +232,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                     }
                     return raw;
                 }
-            } catch (_) {
+            } catch (/** @type {any} */ _) {
                 /* ignore */
             }
         }
@@ -398,7 +398,7 @@ class TaskOrchestrationWorker {
         try {
             updateTask(taskId, updates);
             return true;
-        } catch (_rawErr) {
+        } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
             if (err && err.name === 'OptimisticLockError') {
                 const msg = context
@@ -540,7 +540,7 @@ class TaskOrchestrationWorker {
                                 });
                                 return true;
                             });
-                        } catch (_rawExtErr) {
+                        } catch (/** @type {any} */ _rawExtErr) {
                             const extErr = /** @type {any} */ (_rawExtErr);
                             log(
                                 'WARN',
@@ -565,7 +565,7 @@ class TaskOrchestrationWorker {
                     } finally {
                         clearInterval(lockExtensionInterval);
                     }
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
@@ -600,7 +600,7 @@ class TaskOrchestrationWorker {
         let task = null;
         try {
             task = row.task_json ? JSON.parse(String(row.task_json)) : null;
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             // Parse failed, keep null
         }
         if (!task || typeof task !== 'object') return { finalized: true };
@@ -1022,7 +1022,7 @@ class TaskOrchestrationWorker {
                 eventType: 'ORCHESTRATION_FEEDBACK_STORED',
                 payload: { taskId, attemptId, kind: 'orchestration_feedback' },
             });
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             /* best-effort */
         }
 

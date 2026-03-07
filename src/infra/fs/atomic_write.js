@@ -30,7 +30,7 @@ async function atomicWrite(filepath, content, encoding) {
             try {
                 await fs.rename(tmpPath, filepath);
                 return true;
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 const _ce = /** @type {any} */ (err);
                 // [FIX 1.4] Suporte a Docker/Volumes (Cross-device link error)
                 if (_ce.code === 'EXDEV') {
@@ -48,7 +48,7 @@ async function atomicWrite(filepath, content, encoding) {
         }
         // P0: All rename retries exhausted — throw so callers don't assume success.
         throw new Error(`atomicWrite: rename failed after 10 retries (EPERM/EBUSY) for ${filepath}`);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         if (fss.existsSync(tmpPath)) {
             await fs.unlink(tmpPath).catch(() => {});

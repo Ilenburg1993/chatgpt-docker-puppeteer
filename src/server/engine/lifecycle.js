@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import * as server from './server.js';
 import * as socketHub from './socket.js';
 import { log } from '#core/logger';
@@ -21,7 +21,7 @@ let isShuttingDown = false;
  */
 let allowProcessExit = true;
 let signalsListening = false;
-const signalHandlers = {
+const signalHandlers = /** @type {Record<string, any>} */ ({
     sigint: null,
     sigterm: null,
     sigusr2: null,
@@ -31,7 +31,7 @@ const signalHandlers = {
     sigchld: null,
     uncaughtException: null,
     unhandledRejection: null,
-};
+});
 
 /**
  * Função exportada: setAllowProcessExit.
@@ -42,19 +42,20 @@ function setAllowProcessExit(flag) {
     allowProcessExit = !!flag;
 }
 
-function registerSignalSafely(signal, key, handler) {
+function registerSignalSafely(/** @type {any} */ signal, /** @type {any} */ key, /** @type {any} */ handler) {
     try {
         process.on(signal, handler);
         signalHandlers[key] = handler;
         return true;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         signalHandlers[key] = null;
-        log('DEBUG', `[LIFECYCLE] ${signal} não suportado nesta plataforma: ${err.message}`);
+        log('DEBUG', `[LIFECYCLE] ${signal} não suportado nesta plataforma: ${_e.message}`);
         return false;
     }
 }
 
-function removeSignalListenerSafely(signal, key) {
+function removeSignalListenerSafely(/** @type {any} */ signal, /** @type {any} */ key) {
     if (!signalHandlers[key]) {
         return;
     }
@@ -117,8 +118,8 @@ async function gracefulShutdown(signal) {
             import('#server/dashboard-api/task_sync_bridge'),
             import('#server/dashboard-api/telemetry_aggregator'),
         ]);
-        const taskSyncBridge = /** @type {unknown} */ (taskSyncBridgeModule?.default);
-        const telemetryAggregator = /** @type {unknown} */ (telemetryAggregatorModule?.default);
+        const taskSyncBridge = /** @type {any} */ (taskSyncBridgeModule?.default);
+        const telemetryAggregator = /** @type {any} */ (telemetryAggregatorModule?.default);
 
         if (
             !stopResults.some(result => result.id === 'task_sync_bridge' && result.ok) &&
@@ -156,10 +157,11 @@ async function gracefulShutdown(signal) {
                     '[LIFECYCLE] Pulando limpeza do arquivo de estado legado (não habilitado ou não presente)'
                 );
             }
-        } catch (cleanupErr) {
+        } catch (/** @type {any} */ cleanupErr) {
+            const _e = /** @type {any} */ (cleanupErr);
             log(
                 'WARN',
-                `[LIFECYCLE] Falha ao tentar unpublish arquivo de estado legado via Discovery: ${cleanupErr.message}`
+                `[LIFECYCLE] Falha ao tentar unpublish arquivo de estado legado via Discovery: ${_e.message}`
             );
         }
 
@@ -178,8 +180,9 @@ async function gracefulShutdown(signal) {
         } else {
             log('INFO', '[LIFECYCLE] Encerramento concluído (exit suprimido por allowProcessExit=false)');
         }
-    } catch (e) {
-        log('ERROR', `[LIFECYCLE] Colapso durante a sequência de encerramento: ${e.message}`);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[LIFECYCLE] Colapso durante a sequência de encerramento: ${_e.message}`);
         if (allowProcessExit) {
             process.exit(1);
         } else {
@@ -248,13 +251,13 @@ function listenToSignals() {
     }
 
     // Captura de falhas catastróficas para evitar encerramento "sujo" da infraestrutura
-    signalHandlers.uncaughtException = err => {
+    signalHandlers.uncaughtException = (/** @type {any} */ err) => {
         log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
         gracefulShutdown('UNCAUGHT_EXCEPTION');
     };
     process.on('uncaughtException', signalHandlers.uncaughtException);
 
-    signalHandlers.unhandledRejection = reason => {
+    signalHandlers.unhandledRejection = (/** @type {any} */ reason) => {
         log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
         gracefulShutdown('UNHANDLED_REJECTION');
     };

@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import express from 'express';
 /** Constante/valor exportado: default. */
 const router = express.Router();
@@ -39,8 +39,9 @@ router.get('/agents', (req, res) => {
             agents,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha ao listar agentes: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha ao listar agentes: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao acessar o Registry de Agentes.',
@@ -92,8 +93,9 @@ router.post('/agents/:id/command', async (req, res) => {
             target: id,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha no despacho de comando: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha no despacho de comando: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha interna no barramento de comando.',
@@ -117,8 +119,9 @@ router.get('/health', async (req, res) => {
             ...report,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha no motor de diagnóstico: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha no motor de diagnóstico: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao executar diagnóstico de saúde.',
@@ -138,8 +141,9 @@ router.get('/status', async (req, res) => {
             ...status,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha ao obter status do processo: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha ao obter status do processo: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao obter status do processo.',
@@ -174,8 +178,9 @@ router.post('/control/:action', async (req, res) => {
             ...result,
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha na operação ${action}: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha na operação ${action}: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: `Falha ao executar comando de processo: ${action}`,
@@ -215,8 +220,9 @@ router.get('/locks', async (req, res) => {
             locks: locks.filter(l => l !== null),
             request_id: req.id,
         });
-    } catch (e) {
-        log('ERROR', `[API_SYSTEM] Falha ao listar travas: ${e.message}`, req.id);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[API_SYSTEM] Falha ao listar travas: ${_e.message}`, req.id);
         res.status(500).json({
             success: false,
             error: 'Falha ao listar travas ativas no sistema.',

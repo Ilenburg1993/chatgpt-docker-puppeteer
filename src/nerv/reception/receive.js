@@ -38,7 +38,7 @@ import { getCorrelationId, getMessageType } from '#shared/nerv/envelope_reader';
 function safeCall(handler, envelope, telemetry) {
     try {
         handler(envelope);
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         const _e = /** @type {any} */ (error);
         telemetry.emit('nerv:reception:handler_error', {
             message: _e.message,
@@ -70,7 +70,7 @@ function safeCall(handler, envelope, telemetry) {
  * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
  * @param {CreateReceptionDeps} deps - Dependências do receptor
- * @returns {object} Receptor com métodos onMessage, receive
+ * @returns {any} Receptor com métodos onMessage, receive
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createReception({ envelopes, correlation, telemetry }) {
@@ -98,7 +98,7 @@ function createReception({ envelopes, correlation, telemetry }) {
         try {
             // 1. Desserialização técnica (se necessário)
             envelope = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:reception:deserialization_failed', {
                 message: _e.message,
@@ -114,7 +114,7 @@ function createReception({ envelopes, correlation, telemetry }) {
 
             // 3. Validação estrutural
             envelopes.assertValid(normalized);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             const _e = /** @type {any} */ (error);
             telemetry.emit('nerv:reception:invalid_envelope', {
                 message: _e.message,

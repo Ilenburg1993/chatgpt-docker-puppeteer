@@ -58,7 +58,7 @@ async function ollamaGenerateHandler(/** @type {any} */ params, /** @type {any} 
     let validated;
     try {
         validated = OllamaGenerateSchema.parse(params);
-    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
         if (error instanceof z.ZodError) {
             const issues = (/** @type {any} */ (error)).issues ?? [];
             const message =
@@ -100,7 +100,7 @@ async function ollamaGenerateHandler(/** @type {any} */ params, /** @type {any} 
         formatted += '\n';
 
         return formatted;
-    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_generate error:', error);
         throw new Error(`Ollama generate failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -110,7 +110,7 @@ async function ollamaEmbedHandler(/** @type {any} */ params, /** @type {any} */ 
     let validated;
     try {
         validated = OllamaEmbedSchema.parse(params);
-    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
         if (error instanceof z.ZodError) {
             const issues = (/** @type {any} */ (error)).issues ?? [];
             const message =
@@ -150,7 +150,7 @@ async function ollamaEmbedHandler(/** @type {any} */ params, /** @type {any} */ 
         formatted += `- Mean: ${(embedding.reduce((a, b) => a + b, 0) / embedding.length).toFixed(6)}\n`;
 
         return formatted;
-    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_embed error:', error);
         throw new Error(`Ollama embed failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -194,7 +194,7 @@ async function ollamaModelsHandler() {
         formatted += '- Local non-embedding remains available for fallback/specific objectives\n';
 
         return formatted;
-    } catch (_raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_models error:', error);
         let formatted = '# Available Ollama Models\n\n';
         formatted += '**priority:** cloud-first-non-embedding\n\n';

@@ -35,7 +35,7 @@ function listTaskFiles() {
             .readdirSync(PATHS.QUEUE)
             .filter(file => file.endsWith('.json'))
             .map(file => path.join(PATHS.QUEUE, file));
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('ERROR', `[CACHE] Falha ao listar diretório da fila: ${_ce.message}`);
         return [];
@@ -50,7 +50,7 @@ async function loadTask(filePath) {
     try {
         const raw = await fs.promises.readFile(filePath, 'utf-8');
         return JSON.parse(raw);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         const _ce = /** @type {any} */ (_);
         // Falha silenciosa para arquivos em processo de escrita/deleção
         return null;

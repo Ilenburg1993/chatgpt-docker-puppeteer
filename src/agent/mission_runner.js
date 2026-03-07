@@ -57,7 +57,7 @@ function _sleep(ms) {
 function _safeJson(obj, fallback) {
     try {
         return structuredClone(obj);
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return fallback;
     }
 }
@@ -130,7 +130,7 @@ class MissionRunner {
             for (const mission of missions) {
                 try {
                     await this._processMission(mission.id);
-                } catch (_rawErr) {
+                } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',

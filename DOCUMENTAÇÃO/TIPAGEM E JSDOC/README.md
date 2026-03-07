@@ -1,6 +1,6 @@
 # Hub Oficial — Tipagem e JSDoc
 
-> **Última revisão**: 4 de março de 2026 **Status**: Canônico — este diretório é o ponto de entrada
+> **Última revisão**: 6 de março de 2026 **Status**: Canônico — este diretório é o ponto de entrada
 > único para tipagem e JSDoc neste repositório.
 
 ---
@@ -25,6 +25,7 @@ trabalhar com tipagem e JSDoc neste repositório:
 | `ROADMAP.md`                | Roadmap de execução ativo (fases, erros, checklist)       |
 | `SCRIPTS-E-AUTOMACAO.md`    | Scripts de análise, comandos npm, automações disponíveis  |
 | `CONFIGURACOES-TSCONFIG.md` | Arquivos tsconfig, lanes strict, flags e suas implicações |
+| `AUDITORIA-2026-03-06.md`   | Auditoria completa do sistema (6 mar 2026) — Fases 0–C ✅  |
 
 ---
 
@@ -56,19 +57,28 @@ Skills de apoio (carregar antes de executar):
 
 ---
 
-## Estado corrente (4 de março de 2026)
+## Estado corrente (6 de março de 2026) — 🎉 FASES 0–C CONCLUÍDAS
 
-| Indicador                    | Valor         |
-| ---------------------------- | ------------- |
-| Arquivos com `// @ts-check`  | **670**       |
-| `@ts-nocheck` em código real | **0** ✅       |
-| Erros `typecheck:node`       | ~1.956        |
-| Erros `typecheck:strict:all` | em medição    |
-| Lanes com 0 erros            | **10 de 30**  |
-| Fase 0 (JSDoc estrutural)    | ✅ Concluída   |
-| Fase A (lanes ≤ 400 erros)   | 1/6 concluída |
+| Indicador                    | Valor                        |
+| ---------------------------- | ---------------------------- |
+| TypeScript                   | **5.9.3** (latest)           |
+| Node.js                      | **v24.13.0**                 |
+| Arquivos com `// @ts-check`  | **246** (src/)               |
+| `@ts-nocheck` em código real | **0** ✅                      |
+| Erros `typecheck:node`       | **0** ✅                      |
+| Erros `typecheck:tools`      | **0** ✅                      |
+| Erros `typecheck:browser`    | **0** ✅                      |
+| Erros `typecheck:strict:all` | **0** ✅ (41/41 lanes)        |
+| Erros `typecheck:tests`      | **15** ⚠️ (Fase D.0 pendente) |
+| JSDoc cobertura de exports   | **100%** (363 arquivos)      |
+| `@type {any}` no código      | **1.809** (a reduzir em P2)  |
+| Fase 0 (JSDoc estrutural)    | ✅ Concluída                  |
+| Fase A (6 lanes)             | ✅ Concluída                  |
+| Fase B (12 lanes)            | ✅ Concluída                  |
+| Fase C (3 lanes)             | ✅ Concluída (6/3/2026)       |
+| Fase D (flags base)          | ⬜ A iniciar                  |
 
-Ver `ROADMAP.md` para detalhe completo por lane.
+Ver `ROADMAP.md` para detalhe completo por lane e `AUDITORIA-2026-03-06.md` para análise profunda.
 
 ---
 

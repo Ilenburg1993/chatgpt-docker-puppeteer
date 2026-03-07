@@ -87,7 +87,7 @@ export function createTopLevelInit(initFn) {
     return (async () => {
         try {
             return await initFn();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             // Log to stderr since logging system may not be ready
             console.error('[INIT_ERROR]', /** @type {any} */ (err).message);
             throw err;
@@ -116,7 +116,7 @@ export async function initDirectory(dirPath, options = { recursive: true }) {
     try {
         const fs = await import('node:fs/promises');
         await fs.mkdir(dirPath, options);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         // EEXIST is OK - directory already exists (another process created it)
         if (/** @type {any} */ (err).code === 'EEXIST') {
             return;
@@ -147,7 +147,7 @@ export async function ensureFile(filePath, defaultContent = '') {
 
         // Try to access file
         await fs.access(filePath);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         // File doesn't exist, create it
         if (/** @type {any} */ (err).code === 'ENOENT') {
             const fs = await import('node:fs/promises');
@@ -261,7 +261,7 @@ export function waitForInit(initPromise, fn) {
  * }
  */
 export function combineInits(...initPromises) {
-    return Promise.all(initPromises).then(() => undefined);
+    return Promise.all(initPromises).then(() => /** @type {void} */ (undefined));
 }
 
 /**
@@ -295,7 +295,7 @@ export async function initWithTimeout(initFn, timeoutMs, name = 'Initialization'
         const result = await Promise.race([initFn(), timeoutPromise]);
         clearTimeout(timeoutId);
         return result;
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         clearTimeout(timeoutId);
         throw err;
     }

@@ -35,9 +35,9 @@ export class MCPStdioUpstreamClient {
         this.initTimeoutMs = Number(opts.initTimeoutMs || 30000);
         this.callTimeoutMs = Number(opts.callTimeoutMs || 90000);
 
-        /** @type {import('@modelcontextprotocol/sdk/client').Client | null} */
+        /** @type {Client | null} */
         this.client = null;
-        /** @type {import('@modelcontextprotocol/sdk/client/stdio.js').StdioClientTransport | null} */
+        /** @type {StdioClientTransport | null} */
         this.transport = null;
         this.connected = false;
     }
@@ -62,15 +62,15 @@ export class MCPStdioUpstreamClient {
             this.client = client;
             this.transport = transport;
             this.connected = true;
-        } catch (_raw_err) { const err = /** @type {any} */ (_raw_err);
+        } catch (/** @type {any} */ _raw_err) { const err = /** @type {any} */ (_raw_err);
             try {
                 await client.close();
-            } catch (_raw_e) { const e = /** @type {any} */ (_raw_e);
+            } catch (/** @type {any} */ _raw_e) { const e = /** @type {any} */ (_raw_e);
                 // ignore
             }
             try {
                 await transport.close();
-            } catch (_raw_e) { const e = /** @type {any} */ (_raw_e);
+            } catch (/** @type {any} */ _raw_e) { const e = /** @type {any} */ (_raw_e);
                 // ignore
             }
             throw err;
@@ -102,7 +102,7 @@ export class MCPStdioUpstreamClient {
                 this.callTimeoutMs,
                 `[MCP stdio:${this.alias}] tools/call(${name})`
             );
-        } catch (_raw_err) { const err = /** @type {any} */ (_raw_err);
+        } catch (/** @type {any} */ _raw_err) { const err = /** @type {any} */ (_raw_err);
             // If call timed out or any transport error occurred, mark connection dead.
             await this.close().catch(() => {});
             throw err;

@@ -27,7 +27,7 @@ if (cfg.persistDb) {
     try {
         const { createAuditAgentDbStore } = await import('./db_store.js');
         store = createAuditAgentDbStore();
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.warn(
             `[audit-agent] db store unavailable (fallback in-memory): ${error instanceof Error ? error.message : String(error)}`
         );
@@ -37,7 +37,7 @@ let contextBuilder = null;
 try {
     const { createAuditAgentContextBuilder } = await import('./context_builder.js');
     contextBuilder = createAuditAgentContextBuilder();
-} catch (error) {
+} catch (/** @type {any} */ error) {
     console.warn(
         `[audit-agent] context builder unavailable (read-only probes disabled): ${error instanceof Error ? error.message : String(error)}`
     );
@@ -46,7 +46,7 @@ let triageClient = null;
 try {
     const { createAuditAgentTriageLlmClient } = await import('./triage_llm.js');
     triageClient = createAuditAgentTriageLlmClient();
-} catch (error) {
+} catch (/** @type {any} */ error) {
     console.warn(
         `[audit-agent] triage llm client unavailable (LLM triage disabled): ${error instanceof Error ? error.message : String(error)}`
     );
@@ -55,7 +55,7 @@ let patchAuthorClient = null;
 try {
     const { createAuditAgentPatchAuthorLlmClient } = await import('./patch_author_llm.js');
     patchAuthorClient = createAuditAgentPatchAuthorLlmClient();
-} catch (error) {
+} catch (/** @type {any} */ error) {
     console.warn(
         `[audit-agent] patch author llm client unavailable (LLM patch author disabled): ${error instanceof Error ? error.message : String(error)}`
     );

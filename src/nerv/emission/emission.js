@@ -29,7 +29,7 @@ import createEmitEvent from './emit_event.js';
  * **Unidades:** Dependências seguem contratos NERV (envelopes, buffers, correlation, telemetry).
  *
  * @param {CreateEmissionDeps} deps - Dependências do módulo
- * @returns {object} Módulo de emissão com métodos sendCommand, sendEvent, sendAck
+ * @returns {any} Módulo de emissão com métodos sendCommand, sendEvent, sendAck
  * @throws {Error} Se dependências obrigatórias estiverem ausentes
  */
 function createEmission({ envelopes, buffers, correlation, telemetry }) {

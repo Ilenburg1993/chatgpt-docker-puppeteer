@@ -170,9 +170,10 @@ export class OllamaCircuitBreaker {
 
     /**
      * Record call in sliding window
+     * @param {boolean} success
      * @private
      */
-    _recordCall(/** @type {any} */ success) {
+    _recordCall(success) {
         this.callHistory.push({ timestamp: Date.now(), success });
 
         // Keep only windowSize recent calls
@@ -196,7 +197,7 @@ export class OllamaCircuitBreaker {
     /**
      * Get current circuit breaker status
      *
-     * @returns {object} Status object with current state and metrics
+     * @returns {any} Status object with current state and metrics
      */
     getStatus() {
         const now = Date.now();
@@ -300,7 +301,7 @@ export function getCircuitBreaker(/** @type {any} */ endpoint, /** @type {any} *
 /**
  * Get all circuit breaker statuses
  *
- * @returns {object} Map of endpoint → status
+ * @returns {any} Map of endpoint → status
  *
  * @example
  * const statuses = getAllStatuses();
@@ -309,14 +310,14 @@ export function getCircuitBreaker(/** @type {any} */ endpoint, /** @type {any} *
 export function getAllStatuses() {
     const statuses = {};
     for (const [endpoint, breaker] of circuitBreakers.entries()) {
-        (/** @type {any} */ (statuses))[endpoint] = breaker.getStatus();
+        /** @type {any} */ (statuses)[endpoint] = breaker.getStatus();
     }
     return statuses;
 }
 
 /**
  * Reset all circuit breakers (for testing)
-  * @returns {void}
+ * @returns {void}
  */
 export function resetAll() {
     for (const breaker of circuitBreakers.values()) {

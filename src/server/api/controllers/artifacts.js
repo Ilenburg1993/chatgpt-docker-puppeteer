@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import express from 'express';
 import fs from 'node:fs';
 import { log } from '#core/logger';
@@ -19,12 +19,13 @@ router.get('/:id', async (req, res) => {
 
         const withStat = await statArtifact(artifactId);
         ok(res, req, { artifact: withStat }, {});
-    } catch (err) {
-        log('ERROR', `[API_ARTIFACTS] metadata failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[API_ARTIFACTS] metadata failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'ARTIFACT_METADATA_FAILED',
             error: 'Erro ao recuperar artefato',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -46,7 +47,7 @@ router.get('/:id/content', async (req, res) => {
         let st = null;
         try {
             st = fs.statSync(uri);
-        } catch (_) {
+        } catch (/** @type {any} */ _) {
             st = null;
         }
         if (!st || !st.isFile()) {
@@ -71,12 +72,13 @@ router.get('/:id/content', async (req, res) => {
             }
         });
         stream.pipe(res);
-    } catch (err) {
-        log('ERROR', `[API_ARTIFACTS] content failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[API_ARTIFACTS] content failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'ARTIFACT_CONTENT_FAILED',
             error: 'Erro ao baixar artefato',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -107,12 +109,13 @@ router.get('/:id/text', async (req, res) => {
             },
             { max_chars: maxChars }
         );
-    } catch (err) {
-        log('ERROR', `[API_ARTIFACTS] text failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[API_ARTIFACTS] text failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'ARTIFACT_TEXT_FAILED',
             error: 'Erro ao ler artefato',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });

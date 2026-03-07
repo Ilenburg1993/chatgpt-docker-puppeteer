@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import express from 'express';
 import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
@@ -9,21 +9,22 @@ import { taskRowToListItem, taskRowToDetailTask } from '../utils/task_views.js';
 /** Constante/valor exportado: default. */
 const router = express.Router();
 
-function _asInt(raw, fallback) {
+function _asInt(/** @type {any} */ raw, /** @type {any} */ fallback) {
     const n = Number(raw);
     return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
-function _parseJson(raw, fallback = null) {
+function _parseJson(/** @type {any} */ raw, /** @type {any} */ fallback = null) {
     try {
         return raw ? JSON.parse(String(raw)) : fallback;
-    } catch (err) {
-        log.debug({ error: err?.message }, '[dashboard_tasks] _parseJson fallback to default');
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log.debug({ error: _e?.message }, '[dashboard_tasks] _parseJson fallback to default');
         return fallback;
     }
 }
 
-function _buildMissionContext(db, missionId) {
+function _buildMissionContext(/** @type {any} */ db, /** @type {any} */ missionId) {
     if (!missionId) return null;
     const mission = db
         .prepare(
@@ -49,8 +50,8 @@ function _buildMissionContext(db, missionId) {
 
     const counts = {
         tasks_total: 0,
-        by_stage: {},
-        by_status: {},
+        by_stage: /** @type {Record<string, number>} */ ({}),
+        by_status: /** @type {Record<string, number>} */ ({}),
     };
     for (const row of countsRows) {
         const count = Number(row.c) || 0;
@@ -138,7 +139,7 @@ function _buildTasksWhere({ status, stage, missionId, target, blocked, search, p
     return { where, params };
 }
 
-function _applyCursorToWhere(where, params, cursor) {
+function _applyCursorToWhere(/** @type {any} */ where, /** @type {any} */ params, /** @type {any} */ cursor) {
     if (!cursor) return;
     const updated = Number(cursor.updated_at_ms);
     const id = cursor.id ? String(cursor.id) : null;
@@ -216,20 +217,21 @@ router.get('/tasks', async (req, res) => {
         const hasMore = rows.length > limit;
         const page = hasMore ? rows.slice(0, limit) : rows;
 
-        const items = page.map(taskRowToListItem);
+        const items = page.map((/** @type {any} */ r) => taskRowToListItem(r));
         const last = page.length ? page[page.length - 1] : null;
         const nextCursor =
             hasMore && last
-                ? encodeCursor({ sort: 'updated_desc', updated_at_ms: last.updated_at_ms, id: last.id })
+                ? encodeCursor({ sort: 'updated_desc', updated_at_ms: (/** @type {any} */ (last)).updated_at_ms, id: (/** @type {any} */ (last)).id })
                 : null;
 
         ok(res, req, { items }, { limit, next_cursor: nextCursor, has_more: hasMore });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] tasks list failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] tasks list failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'TASKS_LIST_FAILED',
             error: 'Erro ao recuperar tasks',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -244,7 +246,7 @@ router.get('/tasks/:id', async (req, res) => {
         const taskId = String(req.params.id);
         const include = parseIncludeParam(req.query.include);
 
-        const row = db
+        const row = /** @type {any} */ (db
             .prepare(
                 `
                 SELECT
@@ -258,7 +260,7 @@ router.get('/tasks/:id', async (req, res) => {
                 LIMIT 1
             `
             )
-            .get(taskId);
+            .get(taskId));
         if (!row) {
             return fail(res, req, 404, {
                 code: 'TASK_NOT_FOUND',
@@ -290,13 +292,13 @@ router.get('/tasks/:id', async (req, res) => {
                 `
                 )
                 .all(taskId)
-                .map(e => ({
+                .map((/** @type {any} */ e) => ({
                     ...e,
                     payload: (() => {
                         try {
-                            return JSON.parse(e.payload_json);
-                        } catch (_) {
-                            return e.payload_json;
+                            return JSON.parse((/** @type {any} */ (e)).payload_json);
+                        } catch (/** @type {any} */ _) {
+                            return (/** @type {any} */ (e)).payload_json;
                         }
                     })(),
                 }));
@@ -319,7 +321,7 @@ router.get('/tasks/:id', async (req, res) => {
                 `
                 )
                 .all(taskId);
-            data.dependencies = deps.map(taskRowToListItem);
+            data.dependencies = deps.map((/** @type {any} */ r) => taskRowToListItem(r));
         }
 
         if (include.has('children')) {
@@ -342,7 +344,7 @@ router.get('/tasks/:id', async (req, res) => {
                 `
                 )
                 .all(taskId);
-            data.children = children.map(taskRowToListItem);
+            data.children = children.map((/** @type {any} */ r) => taskRowToListItem(r));
         }
 
         if (include.has('workflow')) {
@@ -369,7 +371,7 @@ router.get('/tasks/:id', async (req, res) => {
                     .all(workflowId);
                 data.workflow = {
                     workflow_id: workflowId,
-                    tasks: wfTasks.map(taskRowToListItem),
+                    tasks: wfTasks.map((/** @type {any} */ r) => taskRowToListItem(r)),
                 };
             } else {
                 data.workflow = null;
@@ -404,7 +406,7 @@ router.get('/tasks/:id', async (req, res) => {
                         task_id: taskId,
                         limit: Math.max(1, Math.min(_asInt(req.query.siblings_limit, 25), 100)),
                     });
-                data.siblings = siblings.map(taskRowToListItem);
+                data.siblings = siblings.map((/** @type {any} */ r) => taskRowToListItem(r));
             }
         }
 
@@ -416,7 +418,7 @@ router.get('/tasks/:id', async (req, res) => {
                 artifactIds.add(String(row.latest_response_v2_json_artifact_id));
 
             const attempts = include.has('attempts')
-                ? /** @type {unknown} */ (data).attempts
+                ? (/** @type {any} */ (data)).attempts
                 : listAttemptsByTask(taskId, { limit: 50 });
             for (const a of attempts || []) {
                 for (const k of [
@@ -438,7 +440,7 @@ router.get('/tasks/:id', async (req, res) => {
                                 }
                             }
                         }
-                    } catch (_) {
+                    } catch (/** @type {any} */ _) {
                         /* ignore */
                     }
                 }
@@ -454,12 +456,13 @@ router.get('/tasks/:id', async (req, res) => {
         }
 
         ok(res, req, data, { includes: Array.from(include) });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] task detail failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] task detail failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'TASK_DETAIL_FAILED',
             error: 'Erro ao recuperar task',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -481,19 +484,20 @@ router.get('/tasks-stats', async (req, res) => {
             )
             .all();
 
-        const byStatus = {};
-        for (const r of rows) {
-            byStatus[String(r.status)] = Number(r.c) || 0;
+        const byStatus = /** @type {Record<string, number>} */ ({});
+        for (const /** @type {any} */ r of rows) {
+            byStatus[String((/** @type {any} */ (r)).status)] = Number((/** @type {any} */ (r)).c) || 0;
         }
 
         const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
         ok(res, req, { total, by_status: byStatus }, {});
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] tasks stats failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] tasks stats failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'TASKS_STATS_FAILED',
             error: 'Erro ao calcular estatísticas',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -509,7 +513,7 @@ router.get('/tasks/:id/attempts', async (req, res) => {
         const cursor = decodeCursor(req.query.cursor);
 
         const where = ['task_id = @task_id'];
-        const params = { task_id: taskId, limit: limit + 1 };
+        const params = /** @type {Record<string, any>} */ ({ task_id: taskId, limit: limit + 1 });
 
         const cMs = cursor && Number(cursor.created_at_ms);
         const cId = cursor && cursor.id ? String(cursor.id) : null;
@@ -536,16 +540,17 @@ router.get('/tasks/:id/attempts', async (req, res) => {
         const last = page.length ? page[page.length - 1] : null;
         const nextCursor =
             hasMore && last
-                ? encodeCursor({ sort: 'created_desc', created_at_ms: last.created_at_ms, id: last.id })
+                ? encodeCursor({ sort: 'created_desc', created_at_ms: (/** @type {any} */ (last)).created_at_ms, id: (/** @type {any} */ (last)).id })
                 : null;
 
         ok(res, req, { items: page }, { limit, next_cursor: nextCursor, has_more: hasMore });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] attempts list failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] attempts list failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'ATTEMPTS_LIST_FAILED',
             error: 'Erro ao listar attempts',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -587,13 +592,13 @@ router.get('/tasks/:id/events', async (req, res) => {
             `
             )
             .all(params)
-            .map(e => ({
+            .map((/** @type {any} */ e) => ({
                 ...e,
                 payload: (() => {
                     try {
-                        return JSON.parse(e.payload_json);
-                    } catch (_) {
-                        return e.payload_json;
+                        return JSON.parse((/** @type {any} */ (e)).payload_json);
+                    } catch (/** @type {any} */ _) {
+                        return (/** @type {any} */ (e)).payload_json;
                     }
                 })(),
             }));
@@ -604,12 +609,13 @@ router.get('/tasks/:id/events', async (req, res) => {
         const nextCursor = hasMore && last ? encodeCursor({ sort: 'id_desc', id: last.id }) : null;
 
         ok(res, req, { items: page }, { limit, next_cursor: nextCursor, has_more: hasMore });
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] events list failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] events list failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'EVENTS_LIST_FAILED',
             error: 'Erro ao listar eventos',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -645,24 +651,25 @@ router.get('/tasks/:id/timeline', async (req, res) => {
             `
             )
             .all(taskId)
-            .map(e => ({
+            .map((/** @type {any} */ e) => ({
                 ...e,
                 payload: (() => {
                     try {
-                        return JSON.parse(e.payload_json);
-                    } catch (_) {
-                        return e.payload_json;
+                        return JSON.parse((/** @type {any} */ (e)).payload_json);
+                    } catch (/** @type {any} */ _) {
+                        return (/** @type {any} */ (e)).payload_json;
                     }
                 })(),
             }));
 
         ok(res, req, { task, attempts, events }, {});
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] timeline failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] timeline failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'TASK_TIMELINE_FAILED',
             error: 'Erro ao recuperar timeline',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -691,7 +698,7 @@ router.get('/workflows/:workflow_id', async (req, res) => {
             return ok(res, req, { workflow_id: workflowId, tasks: [], edges: [] }, {});
         }
 
-        const taskIds = new Set(tasks.map(t => t.id));
+        const taskIds = new Set(tasks.map((/** @type {any} */ t) => t.id));
         const deps = db
             .prepare(
                 `
@@ -700,16 +707,17 @@ router.get('/workflows/:workflow_id', async (req, res) => {
                 WHERE task_id IN (${tasks.map(() => '?').join(',')})
             `
             )
-            .all(...tasks.map(t => t.id))
-            .filter(e => taskIds.has(e.task_id) && taskIds.has(e.depends_on_task_id));
+            .all(...tasks.map((/** @type {any} */ t) => t.id))
+            .filter((/** @type {any} */ e) => taskIds.has(e.task_id) && taskIds.has(e.depends_on_task_id));
 
-        ok(res, req, { workflow_id: workflowId, tasks: tasks.map(taskRowToListItem), edges: deps }, {});
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] workflow view failed: ${err?.message || String(err)}`, req.id);
+        ok(res, req, { workflow_id: workflowId, tasks: tasks.map((/** @type {any} */ r) => taskRowToListItem(r)), edges: deps }, {});
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] workflow view failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'WORKFLOW_VIEW_FAILED',
             error: 'Erro ao recuperar workflow',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });

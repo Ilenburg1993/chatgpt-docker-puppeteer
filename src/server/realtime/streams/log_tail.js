@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import fs from 'node:fs';
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
@@ -14,8 +14,10 @@ const LOG_FILE = path.join(PATHS.LOGS, 'agente_current.log');
 /**
  * Estado operacional do motor de streaming.
  */
+/** @type {any} */
 let logWatcher = null;
 let logReadActive = false;
+/** @type {any} */
 let retryTimeout = null;
 
 /**
@@ -55,10 +57,11 @@ function init() {
                 });
 
                 internalLog('INFO', '[LOG_TAIL] Streaming de telemetria textual ativo.');
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
+                const _e = /** @type {any} */ (err);
                 internalLog(
                     'ERROR',
-                    `[LOG_TAIL] Falha catastrófica no watcher: ${err && err.message ? err.message : String(err)}`
+                    `[LOG_TAIL] Falha catastrófica no watcher: ${err && _e.message ? _e.message : String(_e)}`
                 );
                 retryTimeout = setTimeout(init, 10000);
             }
@@ -108,7 +111,7 @@ async function _streamLastChunk() {
             internalLog('ERROR', `[LOG_TAIL] Erro no stream de leitura: ${err.message}`);
             release();
         });
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
         logReadActive = false;
     }
 }
@@ -120,7 +123,7 @@ function _clearInternalResources() {
     if (logWatcher) {
         try {
             logWatcher.close();
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             /* Ignore watcher close errors */
         }
         logWatcher = null;

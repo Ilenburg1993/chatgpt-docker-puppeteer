@@ -1,11 +1,13 @@
-// @ts-nocheck
+// @ts-check
 import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
 import { taskRowToListItem } from '../api/utils/task_views.js';
 
+/** @type {any} */
 let _timer = null;
 let _running = false;
 let _stopped = false;
+/** @type {any} */
 let _lastEventId = null;
 let _lastErrorLogAtMs = 0;
 let _errorCount = 0;
@@ -23,7 +25,7 @@ let _errorCount = 0;
  * @property {number} [batchLimit=500] - Número máximo de eventos por lote
  */
 
-function _asInt(raw, fallback) {
+function _asInt(/** @type {any} */ raw, /** @type {any} */ fallback) {
     const n = Number(raw);
     return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
@@ -35,7 +37,7 @@ function _isCompatEmitEnabled() {
     return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
 
-function _fetchMissionCounts(db, missionIds) {
+function _fetchMissionCounts(/** @type {any} */ db, /** @type {any} */ missionIds) {
     if (!missionIds || missionIds.length === 0) return {};
 
     // Otimização: Uma única query para buscar counts de todas as missões ativas
@@ -66,9 +68,9 @@ function _fetchMissionCounts(db, missionIds) {
         )
         .all(...missionIds, ...missionIds);
 
-    /** @type {Record<string, unknown>} */
+    /** @type {Record<string, any>} */
     const out = {};
-    for (const r of rows) {
+    for (const /** @type {any} */ r of rows) {
         const mid = String(r.mission_id);
         if (!out[mid]) {
             out[mid] = {
@@ -102,19 +104,19 @@ function _fetchMissionCounts(db, missionIds) {
     return out;
 }
 
-function _safeParsePayloadJson(raw) {
+function _safeParsePayloadJson(/** @type {any} */ raw) {
     try {
         return raw ? JSON.parse(String(raw)) : {};
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return raw ?? {};
     }
 }
 
-function _getInitialLastEventId(db, { fromStart = false } = {}) {
+function _getInitialLastEventId(/** @type {any} */ db, { fromStart = false } = {}) {
     if (fromStart) return 0;
     try {
         return Number(db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM events').get()?.id) || 0;
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         return 0;
     }
 }
@@ -134,7 +136,7 @@ async function _tick(options) {
     _running = true;
 
     try {
-        const io = socketHub?.getIO?.();
+        const io = (/** @type {any} */ (socketHub))?.getIO?.();
         if (!io) {
             return;
         }
@@ -160,7 +162,8 @@ async function _tick(options) {
             return;
         }
 
-        const lastId = Number(events[events.length - 1]?.id) || _lastEventId;
+        /** @type {any} */
+        const lastId = Number((/** @type {any} */ (events[events.length - 1]))?.id) || _lastEventId;
         _lastEventId = lastId;
 
         /** @type {Set<string>} */
@@ -169,19 +172,19 @@ async function _tick(options) {
         const missionIds = new Set();
 
         for (const e of events) {
-            if (e.entity_type === 'task') taskIds.add(String(e.entity_id));
-            if (e.entity_type === 'mission') missionIds.add(String(e.entity_id));
+            if ((/** @type {any} */ (e)).entity_type === 'task') taskIds.add(String((/** @type {any} */ (e)).entity_id));
+            if ((/** @type {any} */ (e)).entity_type === 'mission') missionIds.add(String((/** @type {any} */ (e)).entity_id));
         }
 
         const normalizedEvents = events.map(e => ({
-            id: e.id,
-            entity_type: e.entity_type,
-            entity_id: e.entity_id,
-            ts_ms: e.ts_ms,
-            actor_type: e.actor_type,
-            actor_id: e.actor_id,
-            event_type: e.event_type,
-            payload: _safeParsePayloadJson(e.payload_json),
+            id: (/** @type {any} */ (e)).id,
+            entity_type: (/** @type {any} */ (e)).entity_type,
+            entity_id: (/** @type {any} */ (e)).entity_id,
+            ts_ms: (/** @type {any} */ (e)).ts_ms,
+            actor_type: (/** @type {any} */ (e)).actor_type,
+            actor_id: (/** @type {any} */ (e)).actor_id,
+            event_type: (/** @type {any} */ (e)).event_type,
+            payload: _safeParsePayloadJson((/** @type {any} */ (e)).payload_json),
         }));
 
         io.to('dashboards').emit('ssot:events_batch', {
@@ -216,9 +219,9 @@ async function _tick(options) {
                 .all(...ids);
 
             const updates = rows.map(r => {
-                const task = taskRowToListItem(r);
+                const task = taskRowToListItem(/** @type {any} */ (r));
                 return {
-                    taskId: r.id,
+                    taskId: (/** @type {any} */ (r)).id,
                     task,
                     // Legacy compatibility: keep a minimal `state` for consumers that only
                     // care about status transitions.
@@ -256,18 +259,18 @@ async function _tick(options) {
 
             const counts = _fetchMissionCounts(db, ids);
             const updates = rows.map(r => ({
-                missionId: r.id,
+                missionId: (/** @type {any} */ (r)).id,
                 mission: {
-                    id: r.id,
-                    title: r.title,
-                    description: r.description,
-                    status: r.status,
-                    autonomy_mode: r.autonomy_mode,
-                    created_at_ms: r.created_at_ms,
-                    updated_at_ms: r.updated_at_ms,
-                    started_at_ms: r.started_at_ms ?? null,
-                    completed_at_ms: r.completed_at_ms ?? null,
-                    counts: counts[String(r.id)] || null,
+                    id: (/** @type {any} */ (r)).id,
+                    title: (/** @type {any} */ (r)).title,
+                    description: (/** @type {any} */ (r)).description,
+                    status: (/** @type {any} */ (r)).status,
+                    autonomy_mode: (/** @type {any} */ (r)).autonomy_mode,
+                    created_at_ms: (/** @type {any} */ (r)).created_at_ms,
+                    updated_at_ms: (/** @type {any} */ (r)).updated_at_ms,
+                    started_at_ms: (/** @type {any} */ (r)).started_at_ms ?? null,
+                    completed_at_ms: (/** @type {any} */ (r)).completed_at_ms ?? null,
+                    counts: counts[String((/** @type {any} */ (r)).id)] || null,
                 },
             }));
 
@@ -284,13 +287,14 @@ async function _tick(options) {
                 }
             }
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         _errorCount += 1;
         const now = Date.now();
         const minIntervalMs = 5000;
         if (now - _lastErrorLogAtMs >= minIntervalMs) {
             _lastErrorLogAtMs = now;
-            log('ERROR', `[SSOTEventFeed] tick failed (count=${_errorCount}): ${err?.message || String(err)}`);
+            log('ERROR', `[SSOTEventFeed] tick failed (count=${_errorCount}): ${_e?.message || String(_e)}`);
         }
     } finally {
         _running = false;

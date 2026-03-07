@@ -45,7 +45,7 @@ class WorkflowGenerator {
 
             logger.log('INFO', `[WorkflowGenerator] Template carregado: ${templateId}`);
             return template;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[WorkflowGenerator] Erro ao carregar template ${templateId}: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }
@@ -56,7 +56,7 @@ class WorkflowGenerator {
      *
      * @param {string} templateId - ID do template
      * @param {object} params - Parâmetros fornecidos pelo usuário
-     * @returns {Promise<object>} - Workflow estruturado
+     * @returns {Promise<any>} - Workflow estruturado
      */
     async generateWorkflow(templateId, params = {}) {
         const template = await this.loadTemplate(templateId);
@@ -181,7 +181,7 @@ class WorkflowGenerator {
                     let expandedStep;
                     try {
                         expandedStep = structuredClone(step);
-                    } catch (cloneErr) {
+                    } catch (/** @type {any} */ cloneErr) {
                         logger.error(`[WorkflowGenerator] structuredClone failed for step ${step.id}: ${(/** @type {any} */ (cloneErr))?.message}`);
                         expandedStep = JSON.parse(JSON.stringify(step)); // Fallback to JSON clone
                     }
@@ -285,7 +285,7 @@ class WorkflowGenerator {
                 .map(f => f.replace('.json', ''));
 
             return templates;
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             logger.log('ERROR', `[WorkflowGenerator] Erro ao listar templates: ${(/** @type {any} */ (error)).message}`);
             throw error;
         }

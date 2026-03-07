@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import express from 'express';
 import { log } from '#core/logger';
 import { ok, fail } from '../utils/api_envelope.js';
@@ -12,11 +12,11 @@ import { listAuditWatchRules } from '#infra/db/audit_watch_rule_repo';
 /** @type {ReturnType<typeof express.Router>} */
 const router = express.Router();
 
-function _actorFromReq(req) {
+function _actorFromReq(/** @type {any} */ req) {
     return req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] };
 }
 
-async function _runControl(req, res, command, payload = {}) {
+async function _runControl(/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ command, /** @type {Record<string, any>} */ payload = {}) {
     try {
         const result = await executeCommand({
             command,
@@ -32,22 +32,23 @@ async function _runControl(req, res, command, payload = {}) {
             actor: _actorFromReq(req),
         });
         return result;
-    } catch (err) {
-        fail(res, req, Number(err?.statusCode || 500), {
-            code: err?.code || 'AUDIT_CONTROL_COMMAND_FAILED',
-            error: err?.message || 'Falha em comando de auditoria',
-            details: err?.details || null,
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        fail(res, req, Number(_e?.statusCode || 500), {
+            code: _e?.code || 'AUDIT_CONTROL_COMMAND_FAILED',
+            error: _e?.message || 'Falha em comando de auditoria',
+            details: _e?.details || null,
         });
         return null;
     }
 }
 
-function _positiveIntEnv(name, fallback) {
+function _positiveIntEnv(/** @type {any} */ name, /** @type {any} */ fallback) {
     const n = Number(process.env[name]);
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
-function _computeDryRunState(patch) {
+function _computeDryRunState(/** @type {any} */ patch) {
     const dryRun = patch?.dry_run_result_json;
     if (!dryRun || typeof dryRun !== 'object') {
         return { state: 'missing', reason: 'no_dry_run_result' };
@@ -76,17 +77,17 @@ function _computeDryRunState(patch) {
     };
 }
 
-function _enrichPatch(patch) {
+function _enrichPatch(/** @type {any} */ patch) {
     const summary = _safeObject(patch?.patch_summary_json);
     const proposedChanges = Array.isArray(summary?.proposed_changes)
         ? summary.proposed_changes
-              .map(v => String(v || '').trim())
+              .map((/** @type {any} */ v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 20)
         : [];
     const candidateFiles = Array.isArray(summary?.candidate_files)
         ? summary.candidate_files
-              .map(v => String(v || '').trim())
+              .map((/** @type {any} */ v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 20)
         : [];
@@ -131,24 +132,25 @@ async function _fetchApplyReadiness(patchId, actor) {
             actor,
         });
         return result?.result?.metadata?.validation || null;
-    } catch (err) {
-        log('WARN', `[dashboard_audit] _fetchApplyReadiness failed for ${patchId}: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('WARN', `[dashboard_audit] _fetchApplyReadiness failed for ${patchId}: ${_e?.message || String(_e)}`);
         return null;
     }
 }
 
-function _safeObject(value) {
+function _safeObject(/** @type {any} */ value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
 }
 
-function _deriveLlmTriageSummary(job) {
+function _deriveLlmTriageSummary(/** @type {any} */ job) {
     const result = _safeObject(job?.result_json);
     const triage = _safeObject(result?.llm_triage);
     if (!triage) return null;
     const parsed = _safeObject(triage.parsed);
     const nextActions = Array.isArray(parsed?.next_actions)
         ? parsed.next_actions
-              .map(v => String(v || '').trim())
+              .map((/** @type {any} */ v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 5)
         : [];
@@ -166,7 +168,7 @@ function _deriveLlmTriageSummary(job) {
     };
 }
 
-function _deriveLlmPatchAuthorSummary(job) {
+function _deriveLlmPatchAuthorSummary(/** @type {any} */ job) {
     const result = _safeObject(job?.result_json);
     const patchAuthor = _safeObject(result?.llm_patch_author);
     if (!patchAuthor) return null;
@@ -174,13 +176,13 @@ function _deriveLlmPatchAuthorSummary(job) {
     const validation = _safeObject(patchAuthor.validation);
     const candidateFiles = Array.isArray(parsed?.candidate_files)
         ? parsed.candidate_files
-              .map(v => String(v || '').trim())
+              .map((/** @type {any} */ v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 10)
         : [];
     const proposedChanges = Array.isArray(parsed?.proposed_changes)
         ? parsed.proposed_changes
-              .map(v => String(v || '').trim())
+              .map((/** @type {any} */ v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 10)
         : [];
@@ -200,7 +202,7 @@ function _deriveLlmPatchAuthorSummary(job) {
     };
 }
 
-function _enrichAuditJob(job) {
+function _enrichAuditJob(/** @type {any} */ job) {
     if (!job || typeof job !== 'object') return job;
     return {
         ...job,
@@ -243,13 +245,13 @@ function _isDiagnosticKind(kind) {
  * @returns {unknown[]}
  */
 function _filterDiagnosticJobs(jobs) {
-    return (jobs || []).filter(job => _isDiagnosticKind(job.kind));
+    return (jobs || []).filter((/** @type {any} */ job) => _isDiagnosticKind(job.kind));
 }
 
-async function safeFetchJson(url, timeoutMs = 2000, init = undefined) {
+async function safeFetchJson(/** @type {any} */ url, timeoutMs = 2000, init = undefined) {
     try {
         const res = await fetch(url, {
-            ...init,
+            ...(/** @type {any} */ (init)),
             signal: AbortSignal.timeout(timeoutMs),
         });
         const text = await res.text();
@@ -260,12 +262,13 @@ async function safeFetchJson(url, timeoutMs = 2000, init = undefined) {
             json = null;
         }
         return { ok: res.ok, status: res.status, json, text };
-    } catch (error) {
-        return { ok: false, status: null, json: null, text: null, error: error?.message || String(error) };
+    } catch (/** @type {any} */ error) {
+        const _e = /** @type {any} */ (error);
+        return { ok: false, status: null, json: null, text: null, error: _e?.message || String(_e) };
     }
 }
 
-async function _fetchAuditJobWithFallback(id) {
+async function _fetchAuditJobWithFallback(/** @type {any} */ id) {
     const baseUrl = getAuditAgentBaseUrl();
     const upstream = await safeFetchJson(`${baseUrl}/jobs/${encodeURIComponent(String(id || ''))}`, 2500);
     if (upstream.ok) {
@@ -302,7 +305,7 @@ router.get('/audit/runtime', authenticate, async (req, res) => {
         ]);
 
         const resources = Array.isArray(runtimeSummary?.resources)
-            ? runtimeSummary.resources.filter(item => ['audit_agent'].includes(String(item.id)))
+            ? runtimeSummary.resources.filter((/** @type {any} */ item) => ['audit_agent'].includes(String(item.id)))
             : [];
 
         ok(
@@ -316,12 +319,13 @@ router.get('/audit/runtime', authenticate, async (req, res) => {
             },
             { readiness_status: runtimeSummary?.status || 'unknown' }
         );
-    } catch (err) {
-        log('ERROR', `[DASHBOARD_API] audit runtime failed: ${err?.message || String(err)}`, req.id);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[DASHBOARD_API] audit runtime failed: ${_e?.message || String(_e)}`, req.id);
         fail(res, req, 500, {
             code: 'AUDIT_RUNTIME_FAILED',
             error: 'Erro ao recuperar runtime do audit agent',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -348,11 +352,12 @@ router.get('/audit/jobs', authenticate, async (req, res) => {
         }
 
         return ok(res, req, (upstream.json?.items || []).map(_enrichAuditJob), { source: 'audit-agent' });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 500, {
             code: 'AUDIT_JOBS_LIST_FAILED',
             error: 'Erro ao listar jobs do audit agent',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -559,11 +564,12 @@ router.get('/audit/patches/:id/apply-readiness', authenticate, async (req, res) 
                 operation_id: result.operation?.id || null,
             }
         );
-    } catch (err) {
-        return fail(res, req, Number(err?.statusCode || 500), {
-            code: err?.code || 'AUDIT_PATCH_APPLY_VALIDATE_FAILED',
-            error: err?.message || 'Falha ao validar readiness de apply',
-            details: err?.details || null,
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        return fail(res, req, Number(_e?.statusCode || 500), {
+            code: _e?.code || 'AUDIT_PATCH_APPLY_VALIDATE_FAILED',
+            error: _e?.message || 'Falha ao validar readiness de apply',
+            details: _e?.details || null,
         });
     }
 });
@@ -798,11 +804,12 @@ router.get('/audit/diagnostic/runtime', authenticate, async (req, res) => {
             },
             { source: 'audit-agent', routing_note: 'diagnostic consolidated into audit-agent' }
         );
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 503, {
             code: 'DIAGNOSTIC_TO_AUDIT_AGENT_FAILED',
             error: 'Falha ao rotear Diagnostic para Audit Agent',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });
@@ -840,11 +847,12 @@ router.get('/audit/diagnostic/jobs', authenticate, async (req, res) => {
             count: diagJobs.length,
             total_filtered: allJobs.length,
         });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
         return fail(res, req, 500, {
             code: 'DIAGNOSTIC_JOBS_LIST_FAILED',
             error: 'Erro ao listar jobs diagnósticos',
-            details: err?.message || String(err),
+            details: _e?.message || String(_e),
         });
     }
 });

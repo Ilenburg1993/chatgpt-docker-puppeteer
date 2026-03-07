@@ -9,7 +9,7 @@ async function _listLegacyQueueFiles() {
     try {
         const files = await fsp.readdir(PATHS.QUEUE);
         return files.filter(f => f.endsWith('.json')).map(f => path.join(PATHS.QUEUE, f));
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         if (err && /** @type {any} */ (err).code === 'ENOENT') {
             return [];
         }
@@ -56,7 +56,7 @@ async function importLegacyQueueFromDisk({ limit = 100000 } = {}) {
             } else {
                 skipped++;
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             failed++;
             log(
                 'WARN',

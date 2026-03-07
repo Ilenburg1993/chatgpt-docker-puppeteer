@@ -37,7 +37,7 @@ function _asArray(value) {
 /**
  * @param {Record<string, any>|null|undefined} job
  * @param {Record<string, any>|null|undefined} contextPack
- * @returns {object}
+ * @returns {any}
  */
 function _derivePatchDraftFromContext(job, contextPack) {
     const context = contextPack?.context || {};
@@ -194,7 +194,7 @@ export class AuditAgentRuntime {
         if (!this.store || typeof this.store.saveJob !== 'function' || !job) return;
         try {
             this.store.saveJob(job);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] saveJob failed', {
                 id: job?.id,
                 error: error instanceof Error ? error.message : String(error),
@@ -210,7 +210,7 @@ export class AuditAgentRuntime {
         if (!this.store || typeof this.store.onRunStart !== 'function' || !job) return;
         try {
             this.store.onRunStart(job);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] onRunStart failed', {
                 id: job?.id,
                 error: error instanceof Error ? error.message : String(error),
@@ -226,7 +226,7 @@ export class AuditAgentRuntime {
         if (!this.store || typeof this.store.onRunFinish !== 'function' || !job) return;
         try {
             this.store.onRunFinish(job);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] onRunFinish failed', {
                 id: job?.id,
                 error: error instanceof Error ? error.message : String(error),
@@ -243,7 +243,7 @@ export class AuditAgentRuntime {
         if (!this.store || typeof this.store.saveFindings !== 'function') return;
         try {
             this.store.saveFindings(jobId, Array.isArray(findings) ? findings : []);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] saveFindings failed', {
                 id: jobId,
                 error: error instanceof Error ? error.message : String(error),
@@ -260,7 +260,7 @@ export class AuditAgentRuntime {
         if (!this.store || typeof this.store.savePatchProposals !== 'function') return;
         try {
             this.store.savePatchProposals(jobId, Array.isArray(patches) ? patches : []);
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] savePatchProposals failed', {
                 id: jobId,
                 error: error instanceof Error ? error.message : String(error),
@@ -305,7 +305,7 @@ export class AuditAgentRuntime {
         assertTriggerType(triggerType);
         const id = `aj_${randomUUID()}`;
         const ts = this.now();
-        const job = {
+        const job = /** @type {Record<string, any>} */ ({
             id,
             kind,
             trigger_type: triggerType,
@@ -322,7 +322,7 @@ export class AuditAgentRuntime {
             result_json: null,
             error_json: null,
             history: /** @type {any[]} */ ([]),
-        };
+        });
         job.history.push({ ts, event: 'created', status: job.status });
         this.jobs.set(id, job);
         this._persistJob(job);
@@ -455,7 +455,7 @@ export class AuditAgentRuntime {
         ) {
             try {
                 contextPack = await this.contextBuilder.collectQuickContext(job);
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 contextPack = {
                     context: {
                         mode: 'read_only_probe_v0',
@@ -486,7 +486,7 @@ export class AuditAgentRuntime {
             this._persistJob(job);
             try {
                 llmTriage = /** @type {Record<string, any>} */ (await this.triageClient.runTriage(job, contextPack));
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 llmTriage = {
                     ok: false,
                     skipped: false,
@@ -505,7 +505,7 @@ export class AuditAgentRuntime {
                 llmPatchAuthor = /** @type {Record<string, any>} */ (
                     await this.patchAuthorClient.runPatchAuthor(job, contextPack, llmTriage)
                 );
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 llmPatchAuthor = {
                     ok: false,
                     skipped: false,
@@ -531,7 +531,7 @@ export class AuditAgentRuntime {
             this._persistJob(job);
             try {
                 diagnosticResult = await this.diagnosticClient.runDiagnostic(job.kind, job.scope_json);
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 diagnosticResult = {
                     success: false,
                     error: error instanceof Error ? error.message : String(error),
@@ -648,7 +648,7 @@ export class AuditAgentRuntime {
             for (const job of queued) {
                 try {
                     await this._processJob(job);
-                } catch (error) {
+                } catch (/** @type {any} */ error) {
                     this._failed += 1;
                     const ts = this.now();
                     job.status = AUDIT_JOB_STATUS.FAILED;

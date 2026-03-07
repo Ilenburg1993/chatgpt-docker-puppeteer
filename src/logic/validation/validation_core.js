@@ -26,7 +26,7 @@ import { log } from '#core/logger';
  * @param {ValidateTaskResultTask} task - Objeto da tarefa (Schema V4).
  * @param {string} filePath - Caminho absoluto para o arquivo de resposta.
  * @param {AbortSignal} [signal] - Sinal soberano para interrupção imediata.
- * @returns {Promise<object>} { ok: boolean, reason: string|null }
+ * @returns {Promise<any>} { ok: boolean, reason: string|null }
  */
 async function validateTaskResult(task, filePath, signal = undefined) {
     const taskId = task?.meta?.id || 'unknown';
@@ -64,7 +64,7 @@ async function validateTaskResult(task, filePath, signal = undefined) {
         }
 
         return result;
-    } catch (valErr) {
+    } catch (/** @type {any} */ valErr) {
         const caught = /** @type {any} */ (valErr);
         // 6. TRATAMENTO DE INTERRUPÇÃO SILENCIOSA
         if (caught.message === 'VALIDATION_ABORTED' || caught.name === 'AbortError') {

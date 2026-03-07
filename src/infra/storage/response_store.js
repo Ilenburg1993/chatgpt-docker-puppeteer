@@ -43,7 +43,7 @@ async function loadResponse(taskId, signal = null) {
 
             // 4. Sanitização Universal (Remoção de caracteres de controle)
             return cleanText(content);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             const _ce = /** @type {any} */ (err);
             // Tratamento de interrupção externa
             if (_ce.name === 'AbortError' || _ce.message === 'OPERATION_ABORTED') {
@@ -77,7 +77,7 @@ async function deleteResponse(taskId) {
         if (fss.existsSync(filepath)) {
             await fs.unlink(filepath);
         }
-    } catch (_) {
+    } catch (/** @type {any} */ _) {
         const _ce = /** @type {any} */ (_);
         // Falha no delete não deve interromper o fluxo principal (Best-effort)
     }

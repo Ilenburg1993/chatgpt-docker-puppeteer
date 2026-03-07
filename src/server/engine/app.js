@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import * as hardware from '#core/hardware';
 import CONFIG from '#core/config';
 import { log } from '#core/logger';
@@ -21,7 +21,7 @@ import requestId from '../middleware/request_id.js';
 const app = express();
 const RAG_MANIFEST_PATH = process.env.RAG_MANIFEST_PATH || '/home/node/.local/share/rag-index/manifest.v1.json';
 
-function formatIsoSecond(epochMs) {
+function formatIsoSecond(/** @type {any} */ epochMs) {
     if (!Number.isFinite(epochMs)) return null;
     return new Date(epochMs).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
@@ -65,7 +65,7 @@ if (process.env.NODE_ENV === 'production') {
 /* --------------------------------------------------------------------------
    1. TRACEABILITY ABSOLUTA
 -------------------------------------------------------------------------- */
-app.use(requestId);
+(/** @type {any} */ (app)).use(requestId);
 
 /* --------------------------------------------------------------------------
    1.1 RESPONSE TIMING (OBSERVABILIDADE)
@@ -78,7 +78,7 @@ app.use((req, res, next) => {
     res.writeHead = function (...args) {
         const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
         res.setHeader('X-Response-Time', `${durationMs.toFixed(2)}ms`);
-        return originalWriteHead.apply(this, args);
+        return originalWriteHead.apply(this, /** @type {any} */ (args));
     };
 
     next();
@@ -165,8 +165,8 @@ function updateCorsOrigins() {
 
 // Inicializa e escuta mudanças
 updateCorsOrigins();
-if (typeof (/** @type {unknown} */ (CONFIG).on) === 'function') {
-    /** @type {unknown} */ (CONFIG).on('updated', updateCorsOrigins);
+if (typeof (/** @type {any} */ (CONFIG).on) === 'function') {
+    /** @type {any} */ (CONFIG).on('updated', updateCorsOrigins);
 }
 
 app.use(
@@ -368,7 +368,7 @@ app.get('/ready', (req, res) => {
             if (upstreams && Array.isArray(upstreams)) {
                 mcp = Object.assign({}, mcpBase || {}, { upstreams });
             }
-        } catch (e) {
+        } catch (/** @type {any} */ e) {
             // ignore
         }
 
@@ -381,11 +381,11 @@ app.get('/ready', (req, res) => {
             // Non-required readiness hints
             try {
                 if (mcp && Array.isArray(mcp.upstreams)) {
-                    const requiredUpstreams = mcp.upstreams.filter(u => u?.required);
+                    const requiredUpstreams = mcp.upstreams.filter((/** @type {any} */ u) => u?.required);
                     runtime.mcp_upstreams =
-                        requiredUpstreams.length === 0 ? true : requiredUpstreams.every(u => !u?.enabled || u?.ready);
+                        requiredUpstreams.length === 0 ? true : requiredUpstreams.every((/** @type {any} */ u) => !u?.enabled || u?.ready);
                 }
-            } catch (e) {
+            } catch (/** @type {any} */ e) {
                 // ignore
             }
 
@@ -405,8 +405,9 @@ app.get('/ready', (req, res) => {
             hardwareMetrics || {}
         );
         res.json(payload);
-    } catch (err) {
-        log('ERROR', `[STATUS] Health check failed: ${err?.message || String(err)}`);
+    } catch (/** @type {any} */ err) {
+        const _e = /** @type {any} */ (err);
+        log('ERROR', `[STATUS] Health check failed: ${_e?.message || String(_e)}`);
         res.status(500).json({ status: 'unknown', error: 'Internal server error' });
     }
 });
@@ -423,7 +424,7 @@ app.use((req, res, next) => {
 /* --------------------------------------------------------------------------
    9. ERROR BOUNDARY GLOBAL
 -------------------------------------------------------------------------- */
-app.use((err, req, res, next) => {
+app.use((/** @type {any} */ err, /** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
     const status = err.status || 500;
     log('ERROR', `[APP] Unhandled error: ${err?.message || String(err)}${err?.stack ? `\n${err.stack}` : ''}`);
 

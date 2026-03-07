@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import fs from 'node:fs';
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
@@ -12,7 +12,9 @@ const LOG_FILE = path.join(LOG_DIR, 'agente_current.log');
 /**
  * Estado interno do observador.
  */
+/** @type {any} */
 let watcher = null;
+/** @type {any} */
 let reconnectTimeout = null;
 
 /**
@@ -27,7 +29,8 @@ async function init() {
     // 2. Verificação de Existência Física (Pre-flight Check)
     try {
         await fsp.access(LOG_FILE);
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
         log('WARN', '[LOG_WATCHER] Arquivo de log ausente. Aguardando criação pelo Maestro...');
         _scheduleReconnect(5000); // Tenta novamente em 5s
         return;
@@ -53,12 +56,13 @@ async function init() {
         });
 
         // Captura falhas no nível do driver de eventos do Sistema Operacional
-        watcher.on('error', err => {
+        watcher.on('error', (/** @type {any} */ err) => {
             log('ERROR', `[LOG_WATCHER] Falha no driver de observação: ${err.message}`);
             _handleRotation();
         });
-    } catch (e) {
-        log('ERROR', `[LOG_WATCHER] Erro ao acessar descritor de arquivo: ${e.message}`);
+    } catch (/** @type {any} */ e) {
+        const _e = /** @type {any} */ (e);
+        log('ERROR', `[LOG_WATCHER] Erro ao acessar descritor de arquivo: ${_e.message}`);
         _scheduleReconnect(10000); // Backoff de 10s para erros graves de I/O
     }
 }
@@ -95,9 +99,10 @@ function stop() {
     if (watcher) {
         try {
             watcher.close();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
+            const _e = /** @type {any} */ (err);
             // Falha ao fechar watcher já inválido — registra debug e segue
-            log('DEBUG', `[LOG_WATCHER] watcher.close failed: ${err && err.message ? err.message : String(err)}`);
+            log('DEBUG', `[LOG_WATCHER] watcher.close failed: ${err && _e.message ? _e.message : String(_e)}`);
         }
         watcher = null;
     }

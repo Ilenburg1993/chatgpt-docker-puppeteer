@@ -29,7 +29,7 @@ async function safeReadJSON(filepath) {
             }
 
             return JSON.parse(content);
-        } catch (readErr) {
+        } catch (/** @type {any} */ readErr) {
             // Tratamento de concorrência (Arquivo sendo escrito ou indexado pelo SO)
             const re = /** @type {any} */ (readErr);
             if (re.code === 'EBUSY' || re.code === 'EPERM') {
@@ -59,7 +59,7 @@ async function safeReadJSON(filepath) {
             try {
                 await fs.rename(filepath, badFile);
                 console.error(`[FS] ✅ Quarantine successful: ${fileName} → ${path.basename(badFile)}`);
-            } catch (renameErr) {
+            } catch (/** @type {any} */ renameErr) {
                 console.error(
                     `[FS] ❌ Quarantine failed: ${/** @type {any} */ (renameErr).message} - attempting deletion`
                 );
@@ -67,7 +67,7 @@ async function safeReadJSON(filepath) {
                 try {
                     await fs.unlink(filepath);
                     console.error(`[FS] ✅ Deleted corrupted file: ${fileName}`);
-                } catch (unlinkErr) {
+                } catch (/** @type {any} */ unlinkErr) {
                     console.error(
                         `[FS] ❌ Cannot delete corrupted file: ${fileName} - ${/** @type {any} */ (unlinkErr).message}`
                     );

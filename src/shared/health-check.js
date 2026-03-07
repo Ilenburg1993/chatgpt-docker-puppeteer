@@ -148,7 +148,7 @@ export async function checkOllamaHealth(depth = 'quick') {
         } else {
             result.error = `HTTP ${response.status}: ${response.statusText}`;
         }
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         result.error = getErrorMessage(error);
         result.responseTimeMs = Date.now() - start;
     }
@@ -230,7 +230,7 @@ export async function checkGatewayHealth(depth = 'quick') {
         } else {
             result.error = `HTTP ${response.status}: ${response.statusText}`;
         }
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         result.error = getErrorMessage(error);
         result.responseTimeMs = Date.now() - start;
     }

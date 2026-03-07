@@ -58,7 +58,7 @@ export async function acquireIndexLock(/** @type {any} */ paths, /** @type {any}
 
     try {
         const stat = await fs.stat(paths.lockPath);
-        const lockRaw = await fs.readFile(paths.lockPath, 'utf8').catch(/** @type {any} */ () => null);
+        const lockRaw = await fs.readFile(paths.lockPath, 'utf8').catch(() => /** @type {null} */ (null));
         let lockJson = null;
         if (lockRaw) {
             try {

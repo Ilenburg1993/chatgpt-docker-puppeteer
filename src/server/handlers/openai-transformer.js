@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 /**
  * OpenAI ↔ Ollama Schema Transformer
  *
@@ -15,7 +15,7 @@
  */
 
 /**
- * @typedef {object} ValidateOpenAIRequestBody
+ * @typedef {any} ValidateOpenAIRequestBody
  * @property {*} _ Propriedades definidas em runtime.
  */
 /**
@@ -54,14 +54,14 @@ export function validateOpenAIRequest(body) {
 }
 
 /**
- * @typedef {object} TranslateRequestToOllamaOpenaiReq
+ * @typedef {any} TranslateRequestToOllamaOpenaiReq
  * @property {*} _ Propriedades definidas em runtime.
  */
 /**
  * Translates OpenAI Chat Completions request to Ollama /api/generate format
  *
  * @param {TranslateRequestToOllamaOpenaiReq} openaiReq - OpenAI request body
- * @returns {object} Ollama request body
+ * @returns {any} Ollama request body
  *
  * @example
  * translateRequestToOllama({
@@ -85,7 +85,7 @@ export function translateRequestToOllama(openaiReq) {
     // Concatenate all messages into single prompt with role prefixes
     // Format: "Role: content\nRole: content\n..."
     const prompt = messages
-        .map(msg => {
+        .map((/** @type {any} */ msg) => {
             // Map OpenAI roles to readable prefixes
             const rolePrefix = msg.role === 'system' ? 'System' : msg.role === 'assistant' ? 'Assistant' : 'User';
 
@@ -119,7 +119,7 @@ export function translateRequestToOllama(openaiReq) {
  *
  * @param {TranslateResponseToOpenAIOllamaResp} ollamaResp - Ollama response body
  * @param {TranslateResponseToOpenAIOriginalReq} originalReq - Original OpenAI request (for token estimation)
- * @returns {object} OpenAI Chat Completions response
+ * @returns {any} OpenAI Chat Completions response
  *
  * @example
  * translateResponseToOpenAI(
@@ -145,14 +145,14 @@ export function translateResponseToOpenAI(ollamaResp, originalReq) {
     // Estimate tokens using rough heuristic: words * 1.3
     // (Ollama doesn't return exact token counts)
     const promptWords = originalReq.messages.reduce((sum, msg) => {
-        const content = msg.content || '';
-        const words = content.split(/\s+/).filter(w => w.length > 0).length;
+        const content = (/** @type {any} */ (msg)).content || '';
+        const words = content.split(/\s+/).filter((/** @type {any} */ w) => w.length > 0).length;
         return sum + words;
     }, 0);
 
     const completionWords = response.split(/\s+/).filter(w => w.length > 0).length;
 
-    const promptTokens = Math.ceil(promptWords * 1.3);
+    const promptTokens = Math.ceil((/** @type {any} */ (promptWords)) * 1.3);
     const completionTokens = Math.ceil(completionWords * 1.3);
 
     return {
@@ -185,7 +185,7 @@ export function translateResponseToOpenAI(ollamaResp, originalReq) {
  * @param {string} message - Error message
  * @param {string} [type='invalid_request_error'] - Error type
  * @param {number} [code=400] - HTTP status code
- * @returns {object} OpenAI error object
+ * @returns {any} OpenAI error object
  *
  * @example
  * buildOpenAIError('Missing model parameter', 'invalid_request_error', 400)

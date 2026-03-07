@@ -1,4 +1,5 @@
 // @ts-check
+/** @import { Ref } from 'vue' */
 import { ref, computed } from 'vue';
 
 /**
@@ -8,24 +9,24 @@ import { ref, computed } from 'vue';
 /**
  * Composable para interação com APIs do Audit Agent
  * @param {UseAuditOptions} options
- * @returns {object}
+ * @returns {any}
  */
 export function useAudit(options = {}) {
     const baseUrl = options.baseUrl || '/api/dashboard';
 
-    /** @type {import('vue').Ref<any[]>} */
+    /** @type {Ref<any[]>} */
     const jobs = ref([]);
-    /** @type {import('vue').Ref<any|null>} */
+    /** @type {Ref<any|null>} */
     const currentJob = ref(null);
-    /** @type {import('vue').Ref<any[]>} */
+    /** @type {Ref<any[]>} */
     const patches = ref([]);
-    /** @type {import('vue').Ref<any[]>} */
+    /** @type {Ref<any[]>} */
     const findings = ref([]);
-    /** @type {import('vue').Ref<any[]>} */
+    /** @type {Ref<any[]>} */
     const watchRules = ref([]);
-    /** @type {import('vue').Ref<boolean>} */
+    /** @type {Ref<boolean>} */
     const loading = ref(false);
-    /** @type {import('vue').Ref<string|null>} */
+    /** @type {Ref<string|null>} */
     const error = ref(null);
 
     /**
@@ -62,7 +63,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/audit/jobs');
             jobs.value = data.jobs || [];
             return jobs.value;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -86,7 +87,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi(url);
             currentJob.value = data;
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -109,7 +110,7 @@ export function useAudit(options = {}) {
                 body: JSON.stringify(payload),
             });
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -131,7 +132,7 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -153,7 +154,7 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -179,7 +180,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi(url);
             patches.value = data.patches || [];
             return patches.value;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -202,7 +203,7 @@ export function useAudit(options = {}) {
             const url = `/audit/patches/${patchId}${params ? `?${params}` : ''}`;
             const data = await fetchApi(url);
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -224,7 +225,7 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -246,7 +247,7 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -268,7 +269,7 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -288,7 +289,7 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi(`/audit/patches/${patchId}/apply-readiness`);
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -311,7 +312,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi(`/audit/jobs/${jobId}/findings`);
             findings.value = data.findings || [];
             return findings.value;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -333,7 +334,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/audit/watch-rules');
             watchRules.value = data.rules || [];
             return watchRules.value;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -356,7 +357,7 @@ export function useAudit(options = {}) {
                 body: JSON.stringify(payload),
             });
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -378,7 +379,7 @@ export function useAudit(options = {}) {
                 method: 'POST',
             });
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -399,7 +400,7 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/profiles');
             return data.profiles || [];
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -418,7 +419,7 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/client-policies');
             return data.policies || [];
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -437,7 +438,7 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/backends');
             return data.backends || [];
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -456,7 +457,7 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/models-db');
             return data.models || [];
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
@@ -475,7 +476,7 @@ export function useAudit(options = {}) {
         try {
             const data = await fetchApi('/inference/summary');
             return data;
-        } catch (_rawE) {
+        } catch (/** @type {any} */ _rawE) {
     const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;

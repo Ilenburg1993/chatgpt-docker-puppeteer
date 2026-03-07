@@ -26,7 +26,7 @@ function reloadPolicies() {
             ...loaded.meta,
             summary: inferenceGateway.getPolicySummary(),
         };
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         return {
             ok: false,
             error: /** @type {any} */ (error)?.message || String(error),

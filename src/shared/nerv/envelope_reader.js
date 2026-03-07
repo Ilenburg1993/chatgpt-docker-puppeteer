@@ -57,7 +57,7 @@ function getMsgId(envelope) {
 /**
  * Extrai o payload de envelope NERV
  * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
- * @returns {object} Payload da mensagem (objeto vazio se não encontrado)
+ * @returns {any} Payload da mensagem (objeto vazio se não encontrado)
  * @sideEffects Nenhum - função pura
  */
 function getPayload(envelope) {
