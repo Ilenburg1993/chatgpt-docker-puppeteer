@@ -6,7 +6,7 @@ console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
 (async () => {
     // TESTE 1: Modo Launcher (padrão)
     console.log('TESTE 1: Modo Launcher (Puppeteer inicia Chrome)');
-    const orch1 = new ConnectionOrchestrator({ mode: 'launcher' });
+    const orch1 = /** @type {any} */ (new ConnectionOrchestrator({ mode: 'launcher' }));
 
     const browser1 = await orch1.connect();
     console.log('  ✅ Browser iniciado');
@@ -23,13 +23,13 @@ console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
 
     // TESTE 2: Modo Auto (tenta todos os métodos)
     console.log('TESTE 2: Modo Auto (fallback automático)');
-    const orch2 = new ConnectionOrchestrator({
+    const orch2 = /** @type {any} */ (new ConnectionOrchestrator({
         mode: 'auto',
         ports: [9999], // Porta inválida para forçar fallback
         hosts: ['192.168.999.999'], // Host inválido
         autoFallback: true,
         maxConnectionAttempts: 1, // Evita retry infinito
-    });
+    }));
 
     const browser2 = await orch2.connect();
     console.log('  ✅ Browser conectado após fallback');
@@ -40,7 +40,7 @@ console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
 
     // TESTE 3: Reutilização de instância (cache)
     console.log('TESTE 3: Reutilização de Browser (cache interno)');
-    const orch3 = new ConnectionOrchestrator({ mode: 'launcher' });
+    const orch3 = /** @type {any} */ (new ConnectionOrchestrator({ mode: 'launcher' }));
 
     const browser3a = await orch3.connect();
     console.log('  ✅ Browser conectado (primeira vez)');
@@ -54,11 +54,11 @@ console.log('🔌 Teste Completo do ConnectionOrchestrator\n');
 
     // TESTE 4: Argumentos customizados
     console.log('TESTE 4: Argumentos Customizados');
-    const orch4 = new ConnectionOrchestrator({
+    const orch4 = /** @type {any} */ (new ConnectionOrchestrator({
         mode: 'launcher',
         headless: 'new',
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1280,720'],
-    });
+    }));
 
     const browser4 = await orch4.connect();
     console.log('  ✅ Browser iniciado com args customizados');

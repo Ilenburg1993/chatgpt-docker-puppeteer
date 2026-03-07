@@ -8,7 +8,7 @@
     "lib": ["ES2024", "ES2022.Error", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["tests/**/*"],
+  "include": ["tests/**/*", "src/types/**/*.d.ts"],
   "exclude": [
     "node_modules",
     "dist",

@@ -10,6 +10,7 @@
     "noEmit": true
   },
   "include": [
-    "../../../src/driver/**/*"
+    "../../../src/driver/**/*",
+    "../../../src/types/**/*"
   ]
 }

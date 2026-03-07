@@ -13,6 +13,7 @@
     "../../../tests/legacy/**/*",
     "../../../tests/nightly/**/*",
     "../../../tests/scripts/**/*",
-    "../../../tests/support/**/*"
+    "../../../tests/support/**/*",
+    "../../../src/types/**/*.d.ts"
   ]
 }

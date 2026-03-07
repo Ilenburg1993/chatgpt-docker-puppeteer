@@ -368,7 +368,7 @@ router.post('/', async (req, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             created,
             id: safeId,
@@ -378,7 +378,7 @@ router.post('/', async (req, res) => {
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('WARN', `[API_TASKS] Ingestão rejeitada: ${_e.message}`, req.id);
-        res.status(400).json({
+        return res.status(400).json({
             success: false,
             error: `Dados da tarefa inválidos: ${_e.message}`,
             request_id: req.id,
@@ -636,11 +636,11 @@ router.get('/:id/prompt', async (req, res) => {
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Content-Disposition', `inline; filename="${safeId}-${attemptId}-prompt.txt"`);
-        res.send(text);
+        return res.send(text);
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('ERROR', `[API_TASKS] Falha ao baixar prompt: ${_e.message}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao baixar prompt.', request_id: req.id });
+        return res.status(500).json({ success: false, error: 'Falha ao baixar prompt.', request_id: req.id });
     }
 });
 
@@ -663,11 +663,11 @@ router.get('/:id/dependencies', async (req, res) => {
             )
             .all(taskId);
         const deps = rows.map((/** @type {any} */ r) => String(r.depends_on_task_id));
-        res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
+        return res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[API_TASKS] Falha ao ler dependências: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao ler dependências.', request_id: req.id });
+        return res.status(500).json({ success: false, error: 'Falha ao ler dependências.', request_id: req.id });
     }
 });
 
@@ -782,11 +782,11 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
             throw txErr; // Re-throw unexpected errors
         }
 
-        res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
+        return res.json({ success: true, task_id: taskId, dependencies: deps, request_id: req.id });
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[API_TASKS] Falha ao atualizar dependências: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao atualizar dependências.', request_id: req.id });
+        return res.status(500).json({ success: false, error: 'Falha ao atualizar dependências.', request_id: req.id });
     }
 });
 
@@ -835,11 +835,11 @@ router.post('/:id/approve', async (req, res) => {
             dedupKey: `req:${req.id}:task:${safeId}:approve`,
         });
 
-        res.json({ success: true, task: updated, request_id: req.id });
+        return res.json({ success: true, task: updated, request_id: req.id });
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('ERROR', `[API_TASKS] Falha ao aprovar task: ${_e.message}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao aprovar task.', request_id: req.id });
+        return res.status(500).json({ success: false, error: 'Falha ao aprovar task.', request_id: req.id });
     }
 });
 
@@ -882,11 +882,11 @@ router.post('/:id/reject', async (req, res) => {
             dedupKey: `req:${req.id}:task:${safeId}:reject`,
         });
 
-        res.json({ success: true, task: updated, request_id: req.id });
+        return res.json({ success: true, task: updated, request_id: req.id });
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('ERROR', `[API_TASKS] Falha ao rejeitar task: ${_e.message}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha ao rejeitar task.', request_id: req.id });
+        return res.status(500).json({ success: false, error: 'Falha ao rejeitar task.', request_id: req.id });
     }
 });
 
@@ -1294,11 +1294,11 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
             }
         }
 
-        res.json({ success: true, updated, failed, request_id: req.id });
+        return res.json({ success: true, updated, failed, request_id: req.id });
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[API_TASKS] Falha no bulk: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({ success: false, error: 'Falha em operação bulk.', request_id: req.id });
+        return res.status(500).json({ success: false, error: 'Falha em operação bulk.', request_id: req.id });
     }
 });
 

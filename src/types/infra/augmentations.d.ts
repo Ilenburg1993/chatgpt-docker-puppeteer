@@ -9,6 +9,10 @@
 // ============================================================
 
 declare module '#infra/io' {
+    /** Raiz do projeto (PATHS.ROOT) */
+    export const ROOT: string;
+    /** Diretório de respostas */
+    export const RESPONSE_DIR: string;
     // Task operations
     export function findLast(projectId: string): Promise<unknown>;
     export function findFirstByTag(projectId: string, tag: string): Promise<unknown>;
@@ -133,11 +137,13 @@ declare module '#infra/ConnectionOrchestrator' {
     }
 
     export class ConnectionOrchestrator {
-        connect(options: ConnectionOptions): Promise<ConnectionResult>;
+        constructor(options?: Record<string, any>);
+        connect(options?: ConnectionOptions): Promise<any>;
         disconnect(): Promise<void>;
+        getStatus(): unknown;
         getStats(): unknown;
         static synchronize(options?: Record<string, unknown>): Promise<Record<string, unknown>>;
-        [key: string]: unknown;
+        [key: string]: any;
     }
     export const STATES: Record<string, string>;
 }
@@ -195,7 +201,7 @@ declare module '#infra/browser_pool/pool_manager' {
         cleanup(): Promise<void>;
         initialize?(): Promise<void>;
         shutdown?(): Promise<void>;
-        removePageFromPool?(taskId: string): void;
+        removePageFromPool(taskId: string, page?: any): void;
         getHealth?(): Promise<{ healthy: number; poolSize: number; [key: string]: unknown }>;
         initialized?: boolean;
         shuttingDown?: boolean;

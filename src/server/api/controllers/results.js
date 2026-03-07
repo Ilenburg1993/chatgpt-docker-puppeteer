@@ -147,20 +147,21 @@ router.get('/:id', async (req, res) => {
         stream.on('error', err => {
             log('ERROR', `[API_RESULTS] stream error for ${taskId}: ${err?.message || String(err)}`, requestId);
             if (!res.headersSent) {
-                res.status(500).json({
+                return res.status(500).json({
                     success: false,
                     error: 'Erro na transmissão do arquivo.',
                     request_id: requestId,
                 });
             } else {
-                res.end();
+                return res.end();
             }
         });
         stream.pipe(res);
+        return;
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[API_RESULTS] download failed: ${_e?.message || String(_e)}`, requestId);
-        res.status(500).json({ success: false, error: 'Falha no download do resultado.', request_id: requestId });
+        return res.status(500).json({ success: false, error: 'Falha no download do resultado.', request_id: requestId });
     }
 });
 

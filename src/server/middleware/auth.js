@@ -73,7 +73,7 @@ export function authenticate(req, res, next) {
             exp: decoded.exp,
         };
 
-        log('DEBUG', `[AUTH] User authenticated: ${req.user.username}`, req.id);
+        log('DEBUG', `[AUTH] User authenticated: ${req.user?.username}`, req.id);
         next();
     } catch (/** @type {any} */ error) {
         const _e = /** @type {any} */ (error);
@@ -147,7 +147,7 @@ export function optionalAuthenticate(req, res, next) {
                 iat: decoded.iat,
                 exp: decoded.exp,
             };
-            log('DEBUG', `[AUTH] Optional auth successful: ${req.user.username}`, req.id);
+            log('DEBUG', `[AUTH] Optional auth successful: ${req.user?.username}`, req.id);
         } catch (/** @type {any} */ error) {
             const _e = /** @type {any} */ (error);
             // Ignorar erro - autenticação opcional

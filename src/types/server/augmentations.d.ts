@@ -18,7 +18,7 @@ declare module '#server/engine/socket' {
     };
 
     export function init(httpServer: unknown): unknown;
-    export function getIO(): unknown | null;
+    export function getIO(): { fetchSockets(): Promise<any[]>; [key: string]: any } | null;
     export function getRegistry(): AgentRegistryEntry[];
     export function sendCommand(
         command: string,

@@ -86,7 +86,7 @@ router.post('/agents/:id/command', async (req, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             msg_id: msgId,
             status: 'DISPATCHED',
@@ -96,7 +96,7 @@ router.post('/agents/:id/command', async (req, res) => {
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('ERROR', `[API_SYSTEM] Falha no despacho de comando: ${_e.message}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Falha interna no barramento de comando.',
             request_id: req.id,
@@ -174,14 +174,14 @@ router.post('/control/:action', async (req, res) => {
         }
         await audit('PROCESS_CONTROL', { action, source: 'API', request_id: req.id });
         const result = await system.controlAgent(action);
-        res.json({
+        return res.json({
             ...result,
             request_id: req.id,
         });
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('ERROR', `[API_SYSTEM] Falha na operação ${action}: ${_e.message}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: `Falha ao executar comando de processo: ${action}`,
             request_id: req.id,

@@ -63,14 +63,14 @@ router.put('/', denyIfDelegated, async (req, res) => {
         // Persistência blindada contra quedas de energia/processo
         await io.atomicWrite(CONFIG_PATH, JSON.stringify(req.body, null, 2));
 
-        res.json({
+        return res.json({
             success: true,
             request_id: req.id,
         });
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('ERROR', `[API_DNA] Falha ao persistir configuração: ${_e.message}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Falha catastrófica na escrita do arquivo.',
             request_id: req.id,
@@ -200,7 +200,7 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
 
         const dna = await io.getDna();
 
-        res.json({
+        return res.json({
             success: true,
             message: `DNA restaurado para versão index ${versionIndex}`,
             current_version: dna.version,
@@ -209,7 +209,7 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('ERROR', `[API_DNA] Falha no rollback: ${_e.message}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: `Rollback falhou: ${_e.message}`,
             request_id: req.id,
@@ -280,14 +280,14 @@ router.post('/dna/evolve', denyIfDelegated, async (req, res) => {
         const result = await io.evolveWithSadiProtocol(protocol, domain, intent);
 
         if (result.accepted) {
-            res.json({
+            return res.json({
                 success: true,
                 message: 'DNA evoluído com sucesso',
                 stats: result.stats,
                 request_id: req.id,
             });
         } else {
-            res.status(400).json({
+            return res.status(400).json({
                 success: false,
                 error: `Evolução rejeitada: ${result.reason}`,
                 request_id: req.id,
@@ -296,7 +296,7 @@ router.post('/dna/evolve', denyIfDelegated, async (req, res) => {
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
         log('ERROR', `[API_DNA] Falha na evolução manual: ${_e.message}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: `Evolução falhou: ${_e.message}`,
             request_id: req.id,

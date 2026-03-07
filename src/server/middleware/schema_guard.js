@@ -65,7 +65,7 @@ const schemaGuard = schema => (req, res, next) => {
      */
     req.body = (/** @type {any} */ (result)).data;
 
-    next();
+    return next();
 };
 
 export default schemaGuard;

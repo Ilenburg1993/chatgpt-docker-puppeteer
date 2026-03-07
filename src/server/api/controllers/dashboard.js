@@ -189,7 +189,7 @@ router.post('/auth/login', authLimiter, async (req, res) => {
         );
 
         log('INFO', `[AUTH] User logged in: ${authUser.username}`, req.id);
-        res.json({
+        return res.json({
             success: true,
             token,
             user: {
@@ -205,7 +205,7 @@ router.post('/auth/login', authLimiter, async (req, res) => {
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[AUTH] Login error: ${_e.message}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro interno no login',
             request_id: req.id,
@@ -300,11 +300,11 @@ router.get('/telemetry/history/:metric', async (req, res) => {
             return res.status(400).json({ success: false, error: history.error, request_id: req.id });
         }
 
-        res.json({ success: true, ...history, request_id: req.id });
+        return res.json({ success: true, ...history, request_id: req.id });
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[DASHBOARD_API] Erro ao buscar histórico: ${_e.message}`, req.id);
-        res.status(500).json({ success: false, error: 'Erro ao recuperar histórico', request_id: req.id });
+        return res.status(500).json({ success: false, error: 'Erro ao recuperar histórico', request_id: req.id });
     }
 });
 

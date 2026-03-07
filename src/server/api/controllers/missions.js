@@ -286,7 +286,7 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
             dedupKey: `req:${req.id}:mission:${(/** @type {any} */ (missionRecord)).id}:created`,
         });
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             mission,
             request_id: req.id,
@@ -294,7 +294,7 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao criar missão: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao criar missão',
             details: _e?.message || String(_e),
@@ -330,11 +330,11 @@ router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
             },
         });
         if (!control) return;
-        res.json({ success: true, mission: control?.result?.after || mission, request_id: req.id });
+        return res.json({ success: true, mission: control?.result?.after || mission, request_id: req.id });
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao atualizar missão: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao atualizar missão',
             details: _e?.message || String(_e),
@@ -383,7 +383,7 @@ router.get('/:id', async (req, res) => {
                 request_id: req.id,
             });
         }
-        res.json({
+        return res.json({
             success: true,
             mission,
             request_id: req.id,
@@ -391,7 +391,7 @@ router.get('/:id', async (req, res) => {
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao buscar missão: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao buscar missão',
             details: _e?.message || String(_e),
@@ -455,7 +455,7 @@ router.get('/:id/progress', async (req, res) => {
             cancelled: byStatus['CANCELLED'] || 0,
         };
 
-        res.json({
+        return res.json({
             success: true,
             progress: _computeProgressView(mission),
             live_counts: liveCounts,
@@ -464,7 +464,7 @@ router.get('/:id/progress', async (req, res) => {
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao buscar progresso: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao buscar progresso',
             details: _e?.message || String(_e),
@@ -589,7 +589,7 @@ router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => 
         });
         if (!control) return;
 
-        res.json({
+        return res.json({
             success: true,
             mission: control?.result?.after || null,
             request_id: req.id,
@@ -597,7 +597,7 @@ router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => 
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao atualizar policy: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao atualizar policy',
             details: _e?.message || String(_e),
@@ -651,7 +651,7 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
             dedupKey: `req:${req.id}:mission:${missionId}:feedback`,
         });
 
-        res.json({
+        return res.json({
             success: true,
             message: 'Feedback adicionado',
             mission: updated,
@@ -668,7 +668,7 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
             });
         }
         log('ERROR', `[MISSIONS_API] Erro ao adicionar feedback: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao adicionar feedback',
             details: _e?.message || String(_e),
@@ -836,7 +836,7 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
             dedupKey: `req:${req.id}:mission:${missionId}:planner_task`,
         });
 
-        res.json({
+        return res.json({
             success: true,
             mission_id: missionId,
             task_id: taskId,
@@ -845,7 +845,7 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao criar planner task: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao criar planner task',
             details: _e?.message || String(_e),
@@ -961,7 +961,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
             dedupKey: `req:${req.id}:mission:${missionId}:proposals_accept`,
         });
 
-        res.json({
+        return res.json({
             success: true,
             mission_id: missionId,
             created: createdTaskIds.length,
@@ -971,7 +971,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao aceitar proposals: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao aceitar proposals',
             details: _e?.message || String(_e),
@@ -1073,7 +1073,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             mission_id: missionId,
             rejected: rejectedIds.length,
@@ -1083,7 +1083,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao rejeitar proposals: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Erro ao rejeitar proposals',
             details: _e?.message || String(_e),
@@ -1145,11 +1145,11 @@ router.delete('/:id/purge', async (req, res) => {
             payload: { request_id: req.id },
             dedupKey: `req:${req.id}:mission:${missionId}:purge`,
         });
-        res.json({ success: true, request_id: req.id });
+        return res.json({ success: true, request_id: req.id });
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[MISSIONS_API] Erro ao purgar missão: ${_e?.message || String(_e)}`, req.id);
-        res.status(500).json({ success: false, error: 'Erro ao purgar missão', request_id: req.id });
+        return res.status(500).json({ success: false, error: 'Erro ao purgar missão', request_id: req.id });
     }
 });
 

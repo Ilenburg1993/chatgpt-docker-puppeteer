@@ -10,6 +10,7 @@
     "noEmit": true
   },
   "include": [
-    "../../../tests/fixtures/**/*"
+    "../../../tests/fixtures/**/*",
+    "../../../src/types/**/*.d.ts"
   ]
 }

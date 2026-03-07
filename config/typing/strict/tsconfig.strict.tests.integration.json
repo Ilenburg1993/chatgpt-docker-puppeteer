@@ -10,6 +10,7 @@
     "noEmit": true
   },
   "include": [
-    "../../../tests/integration/**/*"
+    "../../../tests/integration/**/*",
+    "../../../src/types/**/*.d.ts"
   ]
 }

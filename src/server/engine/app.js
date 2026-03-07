@@ -240,7 +240,7 @@ app.use((req, res, next) => {
             request_id: req.id,
         });
     }
-    next();
+    return next();
 });
 
 app.use(express.json({ limit: '10mb', strict: true }));

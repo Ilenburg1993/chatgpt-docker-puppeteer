@@ -141,6 +141,12 @@ declare namespace Express {
         [key: string]: any;
     }
     interface Request {
+        /** Request ID adicionado pelo middleware request_id */
+        id: string;
+        /** Usuário autenticado adicionado pelo middleware de autenticação */
+        user?: Record<string, any>;
+        /** Token JWT bruto (header Authorization) */
+        token?: string;
         [key: string]: any;
     }
     interface Response {

@@ -20,7 +20,7 @@ test('wave14: updatePageTaskId rebinds lifecycle monitor taskId on hot-reuse', (
     const realTaskId = 'task-real-123';
 
     poolEntry.pages.set(tempTaskId, page);
-    manager.pool = [poolEntry];
+    manager.pool = /** @type {any[]} */ ([poolEntry]);
 
     page._poolEntry = poolEntry;
     page._tempTaskId = tempTaskId;
@@ -54,7 +54,7 @@ test('wave14: removePageFromPool supports fallback by page reference when taskId
         stats: { activeTasks: 1 },
     };
 
-    manager.pool = [poolEntry];
+    manager.pool = /** @type {any[]} */ ([poolEntry]);
 
     let cleaned = false;
     manager.lifecycleMonitors.set('task-live', {
