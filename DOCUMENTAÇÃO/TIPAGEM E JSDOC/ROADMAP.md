@@ -1,6 +1,6 @@
 # Roadmap de Execução — Tipagem e JSDoc
 
-> **Última revisão**: 6 de março de 2026 **Branch ativa**: `feat/typing-fullstrict-roadmap` **PR
+> **Última revisão**: 7 de março de 2026 **Branch ativa**: `feat/typing-fullstrict-roadmap` **PR
 > ativa**: <https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/pull/99>
 >
 > Este é o documento operacional de execução. As regras normativas vivem em
@@ -32,19 +32,27 @@
 | `isolatedDeclarations` (src/types) | não               | **sim** ✅              |
 | Schema tsserver-tool-contract      | v1.0.0            | **v1.1.0** ✅           |
 | JSDoc cobertura exports            | ~70%              | **100%** (1115/1115) ✅ |
-| Tags unsafe restantes (`@any`)     | ~alto             | ~404 (manter monit.)   |
+| Tags unsafe restantes (`@any`)     | ~404              | ~404 (manter monit.)   |
 
 **Fases 0–D concluídas em 7 de março de 2026**: `strict: true` ativado globalmente em
 `tsconfig.base.json`, todos os targets em 0, `isolatedDeclarations` ativo para `src/types/`.
 
-**Fases 0–C concluídas em 6 de março de 2026**: todas as 39 lanes strict zeradas. Erros corrigidos
-na sessão final (6 mar 2026):
+**Correções complementares — sessão 7 mar 2026 (2ª parte)**:
 
-- `scripts/security/npm-audit-gate.mjs` — TS7053 (indexação com `string`) ✅
-- `tests/manual/kernel/helpers.js` — 7 exports faltantes (TS2305) ✅
-- `tsconfig.tools.json` — `scripts/dist/` excluído (TS2307) ✅
+- `src/server/api/controllers/*.js` — TS7030: explicit `return` em 6 controllers ✅
+- `src/server/middleware/auth.js` — TS18048: optional chaining `req.user?.username` ✅
+- `src/server/engine/app.js` + `schema_guard.js` — TS7030: explicit `return` before `next()` ✅
+- `src/types/global.d.ts` — Express.Request augmented: `id: string`, `user?: Record<string, any>` ✅
+- `src/types/core/augmentations.d.ts` — identity_manager: `initialize`, `robotId`, `instanceId` ✅
+- `src/types/infra/augmentations.d.ts` — io: `ROOT`, `RESPONSE_DIR`; ConnectionOrchestrator: constructor+connect; BrowserPoolManager: `removePageFromPool(taskId, page?)` ✅
+- `src/types/server/augmentations.d.ts` — `getIO()` retorna tipo com `fetchSockets()` ✅
+- `tsconfig.tests.json` + 7 strict test lanes — incluem `src/types/**/*.d.ts` ✅
+- `tests/fixtures/mcp/stdio-server.mjs` — TS2769: cast `@type {any}` em McpServer ✅
+- `tests/manual/test_browser_pool.js` — `@type {any}` cast em BrowserPoolManager ✅
+- `tests/manual/test_connection_orchestrator.js` — `@type {any}` cast em ConnectionOrchestrator ✅
+- `tests/regression/test_wave14_hot_pool_monitor_taskid_rebind.spec.js` — `@type {any[]}` cast em `manager.pool` ✅
 
-**Dependências instaladas**: `@types/better-sqlite3`, `@types/ws` (devDependencies).
+**Fases 0–C concluídas em 6 de março de 2026**: todas as 39 lanes strict zeradas.
 
 **Fase D concluída em 7 de março de 2026**. Etapas completadas:
 
