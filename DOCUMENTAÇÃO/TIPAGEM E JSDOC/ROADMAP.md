@@ -495,8 +495,10 @@ complexos (`Promise<inferred>`) podem gerar erros de declaração.
 - [x] F.1 — Criar `tsconfig.declarations-full.json` (Opção F.C) ✅
 - [x] F.2 — Adicionar script `typecheck:declarations:full` no `package.json` ✅
 - [x] F.3 — Executar e atingir 0 erros em `typecheck:declarations:full` ✅
-- [ ] F.4 — Adicionar `declarations-full` ao CI (gate de regressão)
+- [x] F.4 — Adicionar `declarations-full` ao CI (gate de regressão) ✅ (8 mar 2026)
 - [ ] F.5 — Expandir `tsconfig.isolated-declarations.json` para `src/core/` e `src/nerv/`
+  (⚠️ **Bloqueado por H.1**: `isolatedDeclarations: true` é incompatível com `allowJs: true` —
+  requer arquivos `.ts`, não `.js`)
 
 **Gate F.3**: `npm run typecheck:declarations:full` → 0 erros.
 
