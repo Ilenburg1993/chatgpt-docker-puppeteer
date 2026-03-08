@@ -3,7 +3,7 @@ import { buildWorkflowNextStepTask as defaultWorkflowBuilder } from '#agent/work
 import { recordEvent } from '#infra/db/events_repo';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
-import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
+import { ActionCode, ActorRole, MessageType, OrchestrationAction } from '#shared/nerv/constants';
 import { getCorrelationId, getMessageType, getMsgId, getPayload } from '#shared/nerv/envelope_reader';
 
 /* ===========================
@@ -395,7 +395,7 @@ class KernelNERVBridge {
     async afterTaskExecution(task, executionResult) {
         if (!this.orchestrator) {
             // V1.x fallback: sempre DONE
-            return { action: 'DONE', task, feedback: null };
+            return { action: OrchestrationAction.DONE, task, feedback: null };
         }
 
         // Recupera task cacheada (pode ter sido modificada por beforeExecution)
@@ -420,7 +420,7 @@ class KernelNERVBridge {
         });
 
         // Limpa cache se decisão for DONE
-        if (decision.action === 'DONE') {
+        if (decision.action === OrchestrationAction.DONE) {
             this.orchestrationCache.delete(task.meta.id);
         }
 
@@ -439,17 +439,17 @@ class KernelNERVBridge {
         const { action, task, feedback, nextStep } = decision;
 
         switch (action) {
-            case 'RETRY':
+            case OrchestrationAction.RETRY:
                 // Injeta feedback no prompt e reenvia para execução
                 await this._handleRetryAction(task, feedback, correlationId);
                 break;
 
-            case 'NEXT_STEP':
+            case OrchestrationAction.NEXT_STEP:
                 // Cria nova task para próximo step do workflow
                 await this._handleNextStepAction(task, nextStep, feedback, correlationId);
                 break;
 
-            case 'DONE':
+            case OrchestrationAction.DONE:
                 // Finaliza task (já processado em afterTaskExecution)
                 this.telemetry.info('nerv_bridge_orchestration_done', {
                     taskId: task.meta.id,

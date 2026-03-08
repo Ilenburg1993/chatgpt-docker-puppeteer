@@ -68,10 +68,32 @@ const PATTERNS = [
 
     // Switch statements
     {
-        name: "case 'ACTIONCODE':",
-        regex: /case\s+['"](?!ActionCode\.)([A-Z_]{3,})['"]\s*:/g,
+        name: "case 'ACTIONCODE': (genérico — use enum específico)",
+        regex: /case\s+['"](?!ActionCode\.|TaskControlCommand\.|OrchestrationAction\.)([A-Z_]{3,})['"]\s*:/g,
         severity: 'MEDIUM',
-        fix: 'Use case ActionCode.CONSTANT:',
+        fix: 'Use case ActionCode.CONSTANT / TaskControlCommand.CONSTANT / OrchestrationAction.CONSTANT',
+    },
+
+    // OrchestrationAction — decision.action comparisons
+    {
+        name: "decision.action === 'STRING'",
+        regex: /\.action\s*===?\s*['"](?!OrchestrationAction\.)(DONE|RETRY|NEXT_STEP)['"]/g,
+        severity: 'MEDIUM',
+        fix: 'Use OrchestrationAction.DONE / .RETRY / .NEXT_STEP',
+    },
+    {
+        name: "action: 'STRING' (decision literal)",
+        regex: /\{\s*action:\s*['"](?!OrchestrationAction\.)(DONE|RETRY|NEXT_STEP)['"]/g,
+        severity: 'HIGH',
+        fix: 'Use OrchestrationAction.DONE / .RETRY / .NEXT_STEP in decision object',
+    },
+
+    // TaskControlCommand strings fora de switch
+    {
+        name: "command: 'CONTROL_STRING'",
+        regex: /command:\s*['"](?!TaskControlCommand\.)(PAUSE|RESUME|UNBLOCK|CANCEL|APPROVE|REJECT|REASSIGN_MISSION)['"]/g,
+        severity: 'HIGH',
+        fix: 'Use TaskControlCommand.CONSTANT',
     },
 
     // Object literals (envelope creation)
@@ -109,6 +131,11 @@ function scanFile(filePath) {
                 const lines = content.substring(0, match.index).split('\n');
                 const lineNum = lines.length;
                 const lineContent = (lines[lineNum - 1] ?? '').trim();
+
+                // Ignora linhas de comentário (JSDoc, inline, bloco)
+                if (lineContent.startsWith('*') || lineContent.startsWith('//') || lineContent.startsWith('/*')) {
+                    return;
+                }
 
                 results.push({
                     pattern: pattern.name,
@@ -281,7 +308,8 @@ function main() {
     } else {
         console.log(`❌ ACTION REQUIRED: ${srcResults.length} magic string(s) found in src/\n`);
         console.log('Please replace hardcoded strings with constants from:');
-        console.log('  - src/shared/nerv/constants.js (ActorRole, MessageType, ActionCode)\n');
+        console.log('  - src/shared/nerv/constants.js (ActorRole, MessageType, ActionCode)');
+        console.log('  - src/shared/nerv/constants.js (OrchestrationAction, TaskControlCommand)\n');
         return 1;
     }
 }

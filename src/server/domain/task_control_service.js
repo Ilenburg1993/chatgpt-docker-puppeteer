@@ -6,6 +6,7 @@ import { getMissionById } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
 import { getTaskById, insertTask, purgeTask, releaseTaskLock, TASK_STAGES, updateTask } from '#infra/db/task_repo';
 import { asRecord } from '#types/guards';
+import { TaskControlCommand } from '#shared/nerv/constants';
 import { v4 as uuidv4 } from 'uuid';
 
 const TERMINAL_TASK = new Set(['DONE', 'FAILED', 'CANCELLED', 'SKIPPED']);
@@ -788,38 +789,38 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
         try {
             let result;
             switch (String(action || '').toUpperCase()) {
-                case 'PAUSE':
+                case TaskControlCommand.PAUSE:
                     result = pauseTaskCommand({ taskId, actor, reason });
                     break;
-                case 'RESUME':
-                case 'UNBLOCK':
+                case TaskControlCommand.RESUME:
+                case TaskControlCommand.UNBLOCK:
                     result = resumeTaskCommand({ taskId, actor, reason });
                     break;
-                case 'RETRY':
+                case TaskControlCommand.RETRY:
                     result = retryTaskCommand({ taskId, actor, reason });
                     break;
-                case 'CANCEL':
+                case TaskControlCommand.CANCEL:
                     result = cancelTaskCommand({ taskId, actor, reason });
                     break;
-                case 'PATCH':
+                case TaskControlCommand.PATCH:
                     result = patchTaskCommand({ taskId, actor, reason, patch: params || {} });
                     break;
-                case 'APPROVE':
+                case TaskControlCommand.APPROVE:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { stage: 'READY' } });
                     break;
-                case 'REJECT':
+                case TaskControlCommand.REJECT:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { stage: 'REJECTED' } });
                     break;
-                case 'SET_STAGE':
+                case TaskControlCommand.SET_STAGE:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { stage: paramsView.stage } });
                     break;
-                case 'SET_TARGET':
+                case TaskControlCommand.SET_TARGET:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { target: paramsView.target } });
                     break;
-                case 'SET_PRIORITY':
+                case TaskControlCommand.SET_PRIORITY:
                     result = patchTaskCommand({ taskId, actor, reason, patch: { priority: paramsView.priority } });
                     break;
-                case 'SET_EXECUTE_AFTER':
+                case TaskControlCommand.SET_EXECUTE_AFTER:
                     result = patchTaskCommand({
                         taskId,
                         actor,
@@ -829,7 +830,7 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                         },
                     });
                     break;
-                case 'SET_DEPENDENCIES':
+                case TaskControlCommand.SET_DEPENDENCIES:
                     result = patchTaskCommand({
                         taskId,
                         actor,
@@ -839,7 +840,7 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                         },
                     });
                     break;
-                case 'REASSIGN_MISSION':
+                case TaskControlCommand.REASSIGN_MISSION:
                     result = reassignTaskMissionCommand({
                         taskId,
                         missionId: /** @type {any} */ (paramsView.mission_id),

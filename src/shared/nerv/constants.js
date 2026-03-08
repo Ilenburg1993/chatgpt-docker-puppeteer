@@ -44,6 +44,7 @@ const ActionCode = Object.freeze({
     TASK_FAILED: 'TASK_FAILED', // Task execution failed
     TASK_REJECTED: 'TASK_REJECTED', // Task rejected by policy
     TASK_OBSERVED: 'TASK_OBSERVED', // Task observation event
+    QUEUE_DISPATCH_FAILED: 'QUEUE_DISPATCH_FAILED', // Queue dispatch failure lock release
 
     // ---- PROPOSAL / POLICY ----
     PROPOSE_TASK: 'PROPOSE_TASK', // Policy engine task proposal
@@ -200,4 +201,51 @@ const TechnicalCode = Object.freeze({
     HANDSHAKE_FAILED: 'HANDSHAKE_FAILED',
 });
 
-export { ActionCode, ActorRole, ChannelState, MessageType, PROTOCOL_VERSION, TechnicalCode };
+/**
+ * ## ORCHESTRATION ACTION (DECISION)
+ *
+ * Decisões internas do orchestrator loop após execução de uma task.
+ * Conjunto fechado. Representa a próxima ação sobre a task/workflow.
+ */
+const OrchestrationAction = Object.freeze({
+    /** Reexecutar a task com feedback injetado */
+    RETRY: 'RETRY',
+    /** Criar nova task para o próximo passo do workflow */
+    NEXT_STEP: 'NEXT_STEP',
+    /** Finalizar — task/workflow concluído */
+    DONE: 'DONE',
+});
+
+/**
+ * ## TASK CONTROL COMMAND (HTTP API)
+ *
+ * Comandos de controle de tasks via HTTP API.
+ * Extensivel apenas por adição explícita (requer atualizar task_control_service).
+ */
+const TaskControlCommand = Object.freeze({
+    PAUSE: 'PAUSE',
+    RESUME: 'RESUME',
+    UNBLOCK: 'UNBLOCK', // Alias semântico de RESUME
+    RETRY: 'RETRY',
+    CANCEL: 'CANCEL',
+    PATCH: 'PATCH',
+    APPROVE: 'APPROVE',
+    REJECT: 'REJECT',
+    SET_STAGE: 'SET_STAGE',
+    SET_TARGET: 'SET_TARGET',
+    SET_PRIORITY: 'SET_PRIORITY',
+    SET_EXECUTE_AFTER: 'SET_EXECUTE_AFTER',
+    SET_DEPENDENCIES: 'SET_DEPENDENCIES',
+    REASSIGN_MISSION: 'REASSIGN_MISSION',
+});
+
+export {
+    ActionCode,
+    ActorRole,
+    ChannelState,
+    MessageType,
+    OrchestrationAction,
+    PROTOCOL_VERSION,
+    TaskControlCommand,
+    TechnicalCode,
+};

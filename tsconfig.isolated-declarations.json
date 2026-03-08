@@ -37,11 +37,7 @@
       "#validation/*": ["src/validation/*"]
     }
   },
-  "include": [
-    "src/types/**/*.d.ts",
-    "src/integration/lsp/tsserver-contract.d.ts",
-    "src/core/constants/**/*.ts"
-  ],
+  "include": ["src/types/**/*.d.ts", "src/integration/lsp/tsserver-contract.d.ts", "src/core/constants/**/*.ts"],
   "exclude": ["node_modules", "dist", "tmp", "DOCUMENTAÇÃO"],
   "display": "isolated declarations validation (pure .d.ts files)"
 }

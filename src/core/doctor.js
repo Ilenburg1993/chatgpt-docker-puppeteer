@@ -1,4 +1,5 @@
 // @ts-check
+import { STATUS_VALUES } from '#core/constants/tasks';
 import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
 import { exec } from 'node:child_process';
 import fs, { promises as fsp } from 'node:fs';
@@ -7,7 +8,6 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import CONFIG from './config.js';
-import { STATUS_VALUES } from '#core/constants/tasks';
 
 const ROOT = path.resolve(import.meta.dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');

@@ -1,6 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { releaseTaskLockForAttempt } from '#agent/task_attempt_invariants';
 import { log } from '#core/logger';
+import { ActionCode } from '#shared/nerv/constants';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
@@ -534,7 +535,7 @@ class QueueWorker {
                     releaseTaskLockForAttempt({
                         taskId,
                         attemptId: correlationId,
-                        actionCode: 'QUEUE_DISPATCH_FAILED',
+                        actionCode: ActionCode.QUEUE_DISPATCH_FAILED,
                         correlationId,
                         context: 'queue_dispatch_failed',
                     });

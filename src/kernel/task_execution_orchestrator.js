@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as logger from '#core/logger';
-import { ActionCode, MessageType } from '#shared/nerv/constants';
+import { ActionCode, MessageType, OrchestrationAction } from '#shared/nerv/constants';
 import { getActionCode, getCorrelationId, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
 
 /**
@@ -431,7 +431,7 @@ class TaskExecutionOrchestrator {
         }
 
         // Remove do cache se DONE
-        if (decision?.action === 'DONE') {
+        if (decision?.action === OrchestrationAction.DONE) {
             if (typeof this.onTaskCompleted === 'function') {
                 await this.onTaskCompleted({ taskId, correlationId, decision });
             }

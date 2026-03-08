@@ -2,7 +2,7 @@
 import * as logger from '#core/logger';
 import { resilientLock } from '#infra/locks/resilient_lock';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
-import { ActionCode, ActorRole } from '#shared/nerv/constants';
+import { ActionCode, ActorRole, OrchestrationAction } from '#shared/nerv/constants';
 import { ContextManager } from './context_manager.js';
 import { ValidationService } from './validation/validation_service.js';
 
@@ -175,7 +175,7 @@ class OrchestratorEngine {
      *
      * @param {any} task - Task V5 com estado atualizado
      * @param {any} executionResult - Resultado da execução do Driver (com sucesso/erro)
-     * @returns {Promise<any>} - Decision com { action: 'DONE'|'RETRY'|'NEXT_STEP', task, feedback }
+     * @returns {Promise<any>} - Decision com { action: OrchestrationAction.DONE|'RETRY'|'NEXT_STEP', task, feedback }
      * @throws {Error} - Se estratégia for inválida ou handlers falharem
      * @sideEffects - Emite eventos NERV 'ORCHESTRATION_COMPLETED' ou warnings no log
      */
@@ -191,7 +191,7 @@ class OrchestratorEngine {
             });
 
             return {
-                action: 'DONE',
+                action: OrchestrationAction.DONE,
                 task,
                 feedback: null,
             };
@@ -210,7 +210,7 @@ class OrchestratorEngine {
         // Estratégias não implementadas: TREE_OF_THOUGHT, CHAIN_OF_THOUGHT
         logger.warn(`[OrchestratorEngine] Strategy ${strategy} not implemented yet, fallback to SINGLE_SHOT`);
         return {
-            action: 'DONE',
+            action: OrchestrationAction.DONE,
             task,
             feedback: null,
         };
@@ -329,7 +329,7 @@ class OrchestratorEngine {
      * @private
      * @param {any} task - Task V5 com estado de iteração
      * @param {any} executionResult - Resultado da execução com output para validação
-     * @returns {Promise<any>} - Decision { action: 'DONE'|'RETRY', task, feedback }
+     * @returns {Promise<any>} - Decision { action: OrchestrationAction.DONE|'RETRY', task, feedback }
      * @throws {Error} - Se iteration state não for encontrado
      * @sideEffects - Emite eventos NERV, atualiza activeIterations Map, chama ValidationService
      */
@@ -337,7 +337,7 @@ class OrchestratorEngine {
         const iterationState = this.activeIterations.get(task.meta.id);
         if (!iterationState) {
             logger.error(`[OrchestratorEngine] Iteration state not found for task ${task.meta.id}`);
-            return { action: 'DONE', task, feedback: null };
+            return { action: OrchestrationAction.DONE, task, feedback: null };
         }
 
         iterationState.current_iteration++;
@@ -405,7 +405,7 @@ class OrchestratorEngine {
             });
 
             return {
-                action: 'DONE',
+                action: OrchestrationAction.DONE,
                 task: nextTask,
                 feedback: validationResult.feedback,
             };
@@ -429,7 +429,7 @@ class OrchestratorEngine {
             });
 
             return {
-                action: 'DONE',
+                action: OrchestrationAction.DONE,
                 task: nextTask,
                 feedback: `Max iterations reached. Best score: ${validationResult.overall_score}/100`,
             };
@@ -444,7 +444,7 @@ class OrchestratorEngine {
         const feedbackPrompt = this._buildIterationFeedback(iterationState, validationResult);
 
         return {
-            action: 'RETRY',
+            action: OrchestrationAction.RETRY,
             task: nextTask,
             feedback: feedbackPrompt,
         };
@@ -459,7 +459,7 @@ class OrchestratorEngine {
      * @private
      * @param {any} task - Task V5 com estado de workflow
      * @param {any} executionResult - Resultado da execução do step atual
-     * @returns {Promise<any>} - Decision { action: 'DONE'|'NEXT_STEP', task, feedback, nextStep? }
+     * @returns {Promise<any>} - Decision { action: OrchestrationAction.DONE|'NEXT_STEP', task, feedback, nextStep? }
      * @throws {Error} - Se workflow state não for encontrado
      * @sideEffects - Atualiza activeWorkflows Map, chama ContextManager, emite eventos NERV
      */
@@ -470,7 +470,7 @@ class OrchestratorEngine {
         const lockAcquired = await this._acquireWorkflowLock(workflow_id);
         if (!lockAcquired) {
             logger.error(`[OrchestratorEngine] Failed to acquire workflow lock for ${workflow_id}`);
-            return { action: 'DONE', task, feedback: null, error: 'LOCK_ACQUISITION_FAILED' };
+            return { action: OrchestrationAction.DONE, task, feedback: null, error: 'LOCK_ACQUISITION_FAILED' };
         }
 
         try {
@@ -478,7 +478,7 @@ class OrchestratorEngine {
 
             if (!workflowState) {
                 logger.error(`[OrchestratorEngine] Workflow state not found for ${workflow_id}`);
-                return { action: 'DONE', task, feedback: null };
+                return { action: OrchestrationAction.DONE, task, feedback: null };
             }
 
             const currentStepIndex = workflowState.current_step_index;
@@ -532,7 +532,7 @@ class OrchestratorEngine {
                 });
 
                 return {
-                    action: 'DONE',
+                    action: OrchestrationAction.DONE,
                     task: nextTask,
                     feedback: `Workflow completed: ${workflowState.completed_steps.length} steps`,
                 };
@@ -561,7 +561,7 @@ class OrchestratorEngine {
             );
 
             return {
-                action: 'NEXT_STEP',
+                action: OrchestrationAction.NEXT_STEP,
                 task: nextTask,
                 feedback: nextStepPrompt,
                 nextStep,
