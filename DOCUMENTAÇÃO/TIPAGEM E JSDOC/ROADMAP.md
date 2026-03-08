@@ -490,13 +490,15 @@ override ou lane por lane.
 
 | Etapa | Flag                                 | Erros medidos | Padrão de correção                                                | Status |
 | ----- | ------------------------------------ | ------------: | ----------------------------------------------------------------- | ------ |
-| G.1   | `noUncheckedIndexedAccess`           |            45 | `arr[i]!` ou guard `if (v !== undefined)`                         | [ ]    |
-| G.2   | `exactOptionalPropertyTypes`         |            31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | [ ]    |
+| G.1   | `noUncheckedIndexedAccess`           |            45 | `arr[i]!` ou guard `if (v !== undefined)`                         | ✅     |
+| G.2   | `exactOptionalPropertyTypes`         |            31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | ✅     |
 | G.3   | `noPropertyAccessFromIndexSignature` |            ≈0 | Trocar `.prop` por `["prop"]` em `Record<K,V>`                    | [ ]    |
 | G.4   | `allowUnreachableCode: false`        |            ≈0 | Remover código morto após `return`/`throw`                        | [ ]    |
 | G.5   | `allowUnusedLabels: false`           |            ≈0 | Remover labels JS não-utilizados                                  | [ ]    |
 
-### G.1 — `noUncheckedIndexedAccess` (45 erros)
+### G.1 — `noUncheckedIndexedAccess` (45 erros) ✅ CONCLUÍDA
+
+> **Status**: ativada em `tsconfig.base.json`. 0 erros em todos os 40+ lanes strict. Commit: `3a7867e4`.
 
 **O que faz**: acesso a array/objeto por índice (`arr[0]`, `obj[key]`) retorna `T | undefined` em
 vez de `T`. Força verificação de limite de array.
@@ -511,7 +513,9 @@ vez de `T`. Força verificação de limite de array.
 
 **Critério de ativação**: após concluir E.2 (redução de unsafe tags). Ativar em `tsconfig.base.json`.
 
-### G.2 — `exactOptionalPropertyTypes` (31 erros)
+### G.2 — `exactOptionalPropertyTypes` (31 erros) ✅ CONCLUÍDA
+
+> **Status**: ativada em `tsconfig.base.json`. 0 erros em todos os lanes strict. Commit: `3a7867e4`.
 
 **O que faz**: `{ a?: string }` significa apenas `{a: string}` ou `{}` — nunca `{a: undefined}`.
 Sem essa flag, TypeScript aceita `{a: undefined}` como satisfazendo `{a?: string}`.
