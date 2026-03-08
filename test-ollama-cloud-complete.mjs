@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Teste COMPLETO: Ollama Cloud v5.0
- * Modelos: qwen3-coder-next (código) + qwen3-next:80b-cloud (chat)
+ * Teste COMPLETO: Ollama Cloud v5.0 Modelos: qwen3-coder-next (código) + qwen3-next:80b-cloud (chat)
  */
 
 import { config } from 'dotenv';
@@ -42,7 +41,7 @@ try {
     const code = await ollama.generate(
         'Write a TypeScript function called validateCPF that validates a Brazilian CPF number. Include format validation and check digit verification. Just the code with comments.',
         'qwen3-coder-next',
-        { temperature: 0.3, num_predict: 300 }
+        { temperature: 0.3, num_predict: 300 },
     );
 
     const duration = ((Date.now() - start) / 1000).toFixed(2);
@@ -76,7 +75,7 @@ try {
     const explanation = await ollama.generate(
         'Explain what is a closure in JavaScript. Include a simple example and explain when to use it. Keep it concise (3-4 sentences).',
         'qwen3-next:80b-cloud',
-        { temperature: 0.7, num_predict: 200 }
+        { temperature: 0.7, num_predict: 200 },
     );
 
     const duration = ((Date.now() - start) / 1000).toFixed(2);
@@ -110,7 +109,7 @@ try {
     const reactCode = await ollama.generate(
         'Write a React component called UserProfile that uses useState and useEffect hooks to fetch and display user data from an API. Include loading state and error handling. TypeScript with JSX. Just the code.',
         'qwen3-coder-next',
-        { temperature: 0.3, num_predict: 400 }
+        { temperature: 0.3, num_predict: 400 },
     );
 
     const duration = ((Date.now() - start) / 1000).toFixed(2);

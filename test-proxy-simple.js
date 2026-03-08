@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * test-proxy-simple.js
- * Simple test for Chrome Proxy (Docker Desktop Edition)
- * Tests: Proxy → host.docker.internal:9225 → Windows Chrome
+ * test-proxy-simple.js Simple test for Chrome Proxy (Docker Desktop Edition) Tests: Proxy → host.docker.internal:9225 →
+ * Windows Chrome
  */
 
 const puppeteer = require('puppeteer');
@@ -93,7 +92,7 @@ async function main() {
     console.log('\nArchitecture: Container → Proxy (0.0.0.0:9224) → host.docker.internal:9225 → Windows Chrome');
 }
 
-main().catch(err => {
+main().catch((err) => {
     console.error('\n💥 TEST SUITE FAILED:', err.message);
     process.exit(1);
 });

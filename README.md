@@ -105,7 +105,7 @@ pip install -r agents/code_explainer/requirements.txt \
 > 2. Use `pipx` ou `pip install --user` para colocar as dependências em seu diretório de usuário:
 >    ```bash
 >    python3 -m pip install --user -r agents/code_explainer/requirements.txt \
->                -r agents/cooking_ai/requirements.txt
+>      -r agents/cooking_ai/requirements.txt
 >    ```
 > 3. Ou simplesmente execute os comandos dentro de um ambiente controlado (venv/conda) fora deste
 >    contêiner.
@@ -175,7 +175,7 @@ npm run rag:rebuild:zero
 npm run rag:watch
 
 # Expandir um resultado específico por chunk_id
-npm run rag:expand -- --chunk-id <chunk_id> --mode symbol
+npm run rag:expand -- --chunk-id symbol < chunk_id > --mode
 ```
 
 ### Docker
@@ -212,7 +212,7 @@ servidor MCP compatível com Puppeteer, permitindo o uso do painel do Chrome Dev
 - Há um script disponível:
 
 ```bash
-npm run mcp:start    # dispara o servidor MCP na porta 9222 (pode ajustar com --port)
+npm run mcp:start # dispara o servidor MCP na porta 9222 (pode ajustar com --port)
 ```
 
 Após iniciá‑lo, abra `chrome://inspect` no Chrome e adicione `localhost:9222` como destino. Você
@@ -450,18 +450,18 @@ DOCUMENTAÇÃO/      # Documentação técnica completa
 
 ```bash
 # Testes
-npm test                    # Todos os testes
-npm run test:unit          # Apenas unitários
-npm run test:integration   # Integração
+npm test                 # Todos os testes
+npm run test:unit        # Apenas unitários
+npm run test:integration # Integração
 
 # Qualidade de Código
-npm run lint               # Verificar linting
-npm run lint:fix           # Corrigir automaticamente
-npm run format             # Formatar código
+npm run lint     # Verificar linting
+npm run lint:fix # Corrigir automaticamente
+npm run format   # Formatar código
 
 # Análise
-npm run analyze:deps       # Dependências circulares
-npm run analyze:jsdoc      # Cobertura JSDoc
+npm run analyze:deps  # Dependências circulares
+npm run analyze:jsdoc # Cobertura JSDoc
 ```
 
 ### Adicionando Novos Drivers

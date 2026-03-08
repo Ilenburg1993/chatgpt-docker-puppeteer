@@ -9,7 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../src/inference_gateway/**/*"
-  ]
+  "include": ["../../../src/inference_gateway/**/*"]
 }

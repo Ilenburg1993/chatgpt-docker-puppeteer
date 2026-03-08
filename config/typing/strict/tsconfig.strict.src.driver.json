@@ -9,8 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../src/driver/**/*",
-    "../../../src/types/**/*"
-  ]
+  "include": ["../../../src/driver/**/*", "../../../src/types/**/*"]
 }

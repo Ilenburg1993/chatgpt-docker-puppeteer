@@ -9,7 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../src/audit_agent/**/*"
-  ]
+  "include": ["../../../src/audit_agent/**/*"]
 }

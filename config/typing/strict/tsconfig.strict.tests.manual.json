@@ -9,8 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../tests/manual/**/*",
-    "../../../src/types/**/*.d.ts"
-  ]
+  "include": ["../../../tests/manual/**/*", "../../../src/types/**/*.d.ts"]
 }

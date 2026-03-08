@@ -39,7 +39,7 @@ const coreFiles = [
     'src/main.js',
 ];
 
-const files = [...coreDirs.flatMap(dir => findFiles(dir)), ...coreFiles.filter(f => fs.existsSync(f))];
+const files = [...coreDirs.flatMap((dir) => findFiles(dir)), ...coreFiles.filter((f) => fs.existsSync(f))];
 
 console.log(`🔧 Habilitando // @ts-check em ${files.length} arquivos CORE\n`);
 
@@ -47,7 +47,7 @@ let added = 0;
 
 for (const file of files) {
     try {
-        let content = fs.readFileSync(file, 'utf8');
+        const content = fs.readFileSync(file, 'utf8');
 
         // Skip se já tem @ts-check ou @ts-nocheck
         if (content.includes('@ts-check') || content.includes('@ts-nocheck')) {

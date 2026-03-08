@@ -1,6 +1,5 @@
 /**
- * RAG v4.0 Live Demo
- * Demonstração prática do sistema MCP funcionando
+ * RAG v4.0 Live Demo Demonstração prática do sistema MCP funcionando
  */
 
 import express from 'express';
@@ -16,7 +15,7 @@ app.use(express.json());
 
 // Aguardar Tool Registry inicializar
 console.log('⏳ Aguardando Tool Registry inicializar...');
-await new Promise(resolve => setTimeout(resolve, 3000));
+await new Promise((resolve) => setTimeout(resolve, 3000));
 
 // Aplicar rotas (inclui MCP handler)
 console.log('🔧 Configurando rotas MCP...');

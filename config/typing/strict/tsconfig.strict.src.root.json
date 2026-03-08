@@ -9,7 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "files": [
-    "../../../src/main.js"
-  ]
+  "files": ["../../../src/main.js"]
 }

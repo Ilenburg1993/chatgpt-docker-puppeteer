@@ -27,7 +27,7 @@ O agente também pode ser executado como servidor HTTP compartilhado com o coman
 interface é a mesma para os dois agentes e pode ser manipulada pelo AI Toolkit Agent Inspector:
 
 ```bash
-python agents/server.py --server  # porta padrão 8087
+python agents/server.py --server # porta padrão 8087
 ```
 
 ### Depuração com Agent Inspector

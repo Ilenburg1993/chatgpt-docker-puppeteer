@@ -9,7 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../scripts/ops/**/*"
-  ]
+  "include": ["../../../scripts/ops/**/*"]
 }

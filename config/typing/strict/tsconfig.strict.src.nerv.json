@@ -9,7 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../src/nerv/**/*"
-  ]
+  "include": ["../../../src/nerv/**/*"]
 }

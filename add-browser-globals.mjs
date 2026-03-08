@@ -21,7 +21,7 @@ const browserGlobals =
 
 for (const file of files) {
     try {
-        let content = fs.readFileSync(file, 'utf8');
+        const content = fs.readFileSync(file, 'utf8');
 
         // Skip if already has global declaration
         if (content.includes('/* global document')) {

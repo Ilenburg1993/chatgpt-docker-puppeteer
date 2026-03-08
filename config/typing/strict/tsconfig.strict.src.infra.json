@@ -9,7 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../src/infra/**/*"
-  ]
+  "include": ["../../../src/infra/**/*"]
 }

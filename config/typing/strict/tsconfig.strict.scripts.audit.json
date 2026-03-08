@@ -9,7 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../scripts/audit/**/*"
-  ]
+  "include": ["../../../scripts/audit/**/*"]
 }

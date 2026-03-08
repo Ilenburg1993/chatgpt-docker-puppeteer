@@ -34,10 +34,7 @@
     },
     "scope": {
       "type": "string",
-      "enum": [
-        "changed",
-        "full"
-      ]
+      "enum": ["changed", "full"]
     },
     "files_scanned": {
       "type": "number"
@@ -152,17 +149,10 @@
         },
         "quality_level": {
           "type": "string",
-          "enum": [
-            "none",
-            "minimal",
-            "complete"
-          ]
+          "enum": ["none", "minimal", "complete"]
         },
         "line": {
-          "type": [
-            "number",
-            "null"
-          ]
+          "type": ["number", "null"]
         },
         "param_count": {
           "type": "number"

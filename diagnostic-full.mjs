@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * Script de Diagnóstico Completo do Projeto
- * Usa a API do TypeScript para analisar TODO o projeto
+ * Script de Diagnóstico Completo do Projeto Usa a API do TypeScript para analisar TODO o projeto
  */
 
-import ts from 'typescript';
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, 'jsconfig.json');
@@ -103,7 +102,7 @@ if (categories.error.length > 0) {
         console.log(`\n📄 ${file} (${diagnostics.length} erro(s))`);
         for (const d of diagnostics) {
             console.log(
-                `   ${d.line}:${d.column} - TS${d.code}: ${d.message.substring(0, 120)}${d.message.length > 120 ? '...' : ''}`
+                `   ${d.line}:${d.column} - TS${d.code}: ${d.message.substring(0, 120)}${d.message.length > 120 ? '...' : ''}`,
             );
         }
     }
@@ -147,7 +146,7 @@ const report = {
         suggestions: categories.suggestion.length,
         messages: categories.message.length,
     },
-    errors: categories.error.map(d => {
+    errors: categories.error.map((d) => {
         if (!d.file)
             return { global: true, message: ts.flattenDiagnosticMessageText(d.messageText, '\n'), code: d.code };
 
@@ -163,7 +162,7 @@ const report = {
             category: 'error',
         };
     }),
-    warnings: categories.warning.map(d => {
+    warnings: categories.warning.map((d) => {
         if (!d.file)
             return { global: true, message: ts.flattenDiagnosticMessageText(d.messageText, '\n'), code: d.code };
 

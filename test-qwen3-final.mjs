@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Teste FINAL com modelos Qwen3 Cloud
+ *
  * - qwen3-coder-next: Código (confirmado funcionando!)
  * - qwen3: Chat geral (alternativa ao qwen3-next)
  */
@@ -31,7 +32,7 @@ try {
     const result = await ollama.generate(
         'Write a Python function to calculate factorial recursively. Just the code.',
         'qwen3-coder-next',
-        { temperature: 0.3, num_predict: 100 }
+        { temperature: 0.3, num_predict: 100 },
     );
     const duration = (Date.now() - start) / 1000;
 
@@ -55,7 +56,7 @@ try {
     const result = await ollama.generate(
         'What are the main benefits of using TypeScript over JavaScript? Answer in 2-3 sentences.',
         'qwen3',
-        { temperature: 0.7, num_predict: 150 }
+        { temperature: 0.7, num_predict: 150 },
     );
     const duration = (Date.now() - start) / 1000;
 
@@ -79,7 +80,7 @@ try {
     const result = await ollama.generate(
         'Write a JavaScript class called ApiClient with async methods get(), post(), put(), delete() that use fetch. Include error handling. Just the code.',
         'qwen3-coder-next',
-        { temperature: 0.3, num_predict: 300 }
+        { temperature: 0.3, num_predict: 300 },
     );
     const duration = (Date.now() - start) / 1000;
 

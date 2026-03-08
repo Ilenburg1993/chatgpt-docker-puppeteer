@@ -24,7 +24,7 @@ Inspector). O modo servidor é ativado com **--server** (e será iniciado automa
 comando for informado):
 
 ```bash
-python agents/server.py --server      # escuta na porta 8087 por padrão
+python agents/server.py --server # escuta na porta 8087 por padrão
 ```
 
 Os endpoints disponíveis são descritos em `agents/server.py` e podem ser acessados via POST com

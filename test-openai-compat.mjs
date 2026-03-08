@@ -4,6 +4,7 @@
  * Tests end-to-end flow: HTTP → Handler → Ollama → Response
  *
  * Prerequisites:
+ *
  * - Server running: npx pm2 start ecosystem.config.cjs --only dashboard-web
  * - OPENAI_COMPATIBLE_ENABLED=true in .env.local
  * - Ollama Cloud configured with API key
@@ -135,11 +136,11 @@ await runTest('GET /v1/models', async () => {
     if (!Array.isArray(data.data) || data.data.length === 0) {
         throw new Error('No models returned');
     }
-    if (!data.data.some(m => m.id === 'qwen3-coder-next')) {
+    if (!data.data.some((m) => m.id === 'qwen3-coder-next')) {
         throw new Error('qwen3-coder-next not in model list');
     }
 
-    console.log(`\n   Models: ${data.data.map(m => m.id).join(', ')}`);
+    console.log(`\n   Models: ${data.data.map((m) => m.id).join(', ')}`);
 });
 
 // Test 4: Error handling (empty messages)

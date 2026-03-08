@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Teste com modelos qwen3 usando tag :cloud
- * Baseado em https://ollama.com/library/qwen3-coder-next:cloud
+ * Teste com modelos qwen3 usando tag :cloud Baseado em https://ollama.com/library/qwen3-coder-next:cloud
  */
 
 console.log('='.repeat(80));
@@ -49,7 +48,7 @@ try {
         console.log('  - Tokens gerados:', data.eval_count || 'N/A');
         console.log(
             '  - Velocidade:',
-            data.eval_count ? (data.eval_count / (data.eval_duration / 1e9)).toFixed(2) + ' tokens/s' : 'N/A'
+            data.eval_count ? (data.eval_count / (data.eval_duration / 1e9)).toFixed(2) + ' tokens/s' : 'N/A',
         );
     }
     console.log();
@@ -98,7 +97,7 @@ try {
         console.log('  - Tokens gerados:', data.eval_count || 'N/A');
         console.log(
             '  - Velocidade:',
-            data.eval_count ? (data.eval_count / (data.eval_duration / 1e9)).toFixed(2) + ' tokens/s' : 'N/A'
+            data.eval_count ? (data.eval_count / (data.eval_duration / 1e9)).toFixed(2) + ' tokens/s' : 'N/A',
         );
     }
     console.log();

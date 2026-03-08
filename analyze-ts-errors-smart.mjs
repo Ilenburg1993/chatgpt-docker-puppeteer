@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 /**
- * Análise Inteligente de Erros TypeScript
- * Categoriza erros e sugere correções em lote
+ * Análise Inteligente de Erros TypeScript Categoriza erros e sugere correções em lote
  */
 
 import fs from 'node:fs';
-import path from 'node:path';
 
 const data = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 
@@ -23,7 +21,7 @@ const categories = {
 };
 
 // Agrupa erros por código
-data.errors.forEach(err => {
+data.errors.forEach((err) => {
     const code = `TS${err.code}`;
     if (categories[code]) {
         categories[code].push(err);
@@ -43,7 +41,7 @@ if (categories.TS2554.length > 0) {
     console.log('─'.repeat(80));
 
     const byFile = {};
-    categories.TS2554.forEach(err => {
+    categories.TS2554.forEach((err) => {
         const file = err.file.replace('/workspaces/chatgpt-docker-puppeteer/', '');
         if (!byFile[file]) byFile[file] = [];
         byFile[file].push({ line: err.line, message: err.message });
@@ -51,7 +49,7 @@ if (categories.TS2554.length > 0) {
 
     Object.entries(byFile).forEach(([file, errors]) => {
         console.log(`\n📄 ${file} (${errors.length} erros)`);
-        errors.forEach(e => {
+        errors.forEach((e) => {
             console.log(`   Linha ${e.line}: ${e.message.slice(0, 100)}...`);
         });
     });
@@ -72,7 +70,7 @@ if (categories.TS2339.length > 0) {
 
     // Extrai propriedades faltantes
     const missingProps = new Map();
-    categories.TS2339.forEach(err => {
+    categories.TS2339.forEach((err) => {
         const match = err.message.match(/Property '(\w+)' does not exist on type '(.+?)'/);
         if (match) {
             const [, prop, type] = match;
@@ -110,7 +108,7 @@ if (categories.TS2345.length > 0) {
     console.log(`\n\n🔧 CATEGORIA 3: TS2345 - Type Not Assignable to Parameter (${categories.TS2345.length} erros)`);
     console.log('─'.repeat(80));
 
-    const iDriverErrors = categories.TS2345.filter(e => e.message.includes('IDriver'));
+    const iDriverErrors = categories.TS2345.filter((e) => e.message.includes('IDriver'));
 
     if (iDriverErrors.length > 0) {
         console.log(`\n🎯 IDriver errors: ${iDriverErrors.length}`);
@@ -122,10 +120,10 @@ if (categories.TS2345.length > 0) {
         console.log('   Exemplo: driverId: string → driverId?: string');
     }
 
-    const otherErrors = categories.TS2345.filter(e => !e.message.includes('IDriver'));
+    const otherErrors = categories.TS2345.filter((e) => !e.message.includes('IDriver'));
     if (otherErrors.length > 0) {
         console.log(`\n📋 Outros TS2345: ${otherErrors.length}`);
-        otherErrors.slice(0, 3).forEach(e => {
+        otherErrors.slice(0, 3).forEach((e) => {
             const file = e.file.replace('/workspaces/chatgpt-docker-puppeteer/', '');
             console.log(`   ${file}:${e.line} - ${e.message.slice(0, 80)}...`);
         });
@@ -141,10 +139,10 @@ if (categories.TS2322.length > 0) {
 
     // Agrupa por padrão
     const literalTypes = categories.TS2322.filter(
-        e =>
+        (e) =>
             e.message.includes("is not assignable to type '1000'") ||
             e.message.includes('is not assignable to type \'"UNATTACHED"\'') ||
-            e.message.includes('is not assignable to type \'"OPERATIONAL"\'')
+            e.message.includes('is not assignable to type \'"OPERATIONAL"\''),
     );
 
     if (literalTypes.length > 0) {
@@ -158,11 +156,11 @@ if (categories.TS2322.length > 0) {
     }
 
     const arrayTypes = categories.TS2322.filter(
-        e => e.message.includes('is not assignable to type') && e.message.includes('[]')
+        (e) => e.message.includes('is not assignable to type') && e.message.includes('[]'),
     );
     if (arrayTypes.length > 0) {
         console.log(`\n📚 Array Types (${arrayTypes.length} erros):`);
-        arrayTypes.slice(0, 2).forEach(e => {
+        arrayTypes.slice(0, 2).forEach((e) => {
             const file = e.file.replace('/workspaces/chatgpt-docker-puppeteer/', '');
             console.log(`   ${file}:${e.line}`);
         });
@@ -186,7 +184,7 @@ if (categories.TS2694.length > 0) {
 if (categories.TS2351.length > 0) {
     console.log(`\n\n🔧 CATEGORIA 6: TS2351 - Not Constructable (${categories.TS2351.length} erros)`);
     console.log('─'.repeat(80));
-    categories.TS2351.slice(0, 3).forEach(e => {
+    categories.TS2351.slice(0, 3).forEach((e) => {
         const file = e.file.replace('/workspaces/chatgpt-docker-puppeteer/', '');
         console.log(`   ${file}:${e.line} - ${e.message.slice(0, 100)}...`);
     });
@@ -221,7 +219,7 @@ console.log('\n📊 Estimativa de redução:');
 console.log(`   Após Fase 1: ~${totalErrors - categories.TS2694.length} erros`);
 console.log(`   Após Fase 2: ~${totalErrors - categories.TS2694.length - categories.TS2345.length} erros`);
 console.log(
-    `   Após Fase 3: ~${totalErrors - categories.TS2694.length - categories.TS2345.length - categories.TS2339.length} erros`
+    `   Após Fase 3: ~${totalErrors - categories.TS2694.length - categories.TS2345.length - categories.TS2339.length} erros`,
 );
 console.log(`   Após Fases 4-6: ~0-20 erros`);
 

@@ -9,7 +9,5 @@
     "useUnknownInCatchVariables": true,
     "noEmit": true
   },
-  "include": [
-    "../../../scripts/health/**/*"
-  ]
+  "include": ["../../../scripts/health/**/*"]
 }

@@ -3,7 +3,7 @@ import fs from 'fs';
 const report = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 
 // Filtrar apenas TS1223
-const jsdocErrors = report.errors.filter(e => e.code === 1223);
+const jsdocErrors = report.errors.filter((e) => e.code === 1223);
 
 // Agrupar por arquivo
 const byFile = {};
@@ -18,7 +18,7 @@ console.log(`🔧 Corrigindo @returns duplicados em ${Object.keys(byFile).length
 let totalFixed = 0;
 
 for (const [file, errors] of Object.entries(byFile)) {
-    let content = fs.readFileSync(file, 'utf8');
+    const content = fs.readFileSync(file, 'utf8');
     const lines = content.split('\n');
 
     // Agrupar erros consecutivos (mesmo bloco JSDoc)
@@ -65,7 +65,7 @@ for (const [file, errors] of Object.entries(byFile)) {
             lines.splice(startLine, endLine - startLine + 1);
 
             // Inserir propriedades como comentário descritivo
-            const propDescLines = properties.map(p => `     *   - ${p.name} (${p.type}): ${p.desc}`);
+            const propDescLines = properties.map((p) => `     *   - ${p.name} (${p.type}): ${p.desc}`);
             lines.splice(startLine, 0, `     * Propriedades do objeto retornado:`, ...propDescLines);
 
             totalFixed++;

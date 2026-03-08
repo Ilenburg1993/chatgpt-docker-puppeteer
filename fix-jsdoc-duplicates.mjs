@@ -3,7 +3,9 @@ import fs from 'fs';
 const report = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 
 // Filtrar apenas TS1223 (@returns duplicados)
-const jsdocErrors = report.errors.filter(e => e.code === 1223 && e.message.includes("'returns' tag already specified"));
+const jsdocErrors = report.errors.filter(
+    (e) => e.code === 1223 && e.message.includes("'returns' tag already specified"),
+);
 
 console.log(`🔧 Corrigindo ${jsdocErrors.length} @returns duplicados\n`);
 
@@ -21,7 +23,7 @@ let files = 0;
 for (const [file, errors] of Object.entries(byFile)) {
     console.log(`📄 ${file} (${errors.length} duplicações)`);
 
-    let content = fs.readFileSync(file, 'utf8');
+    const content = fs.readFileSync(file, 'utf8');
     const lines = content.split('\n');
 
     // Marcar linhas para remover (evitar duplicados)

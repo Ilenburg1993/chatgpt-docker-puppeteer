@@ -1,5 +1,4 @@
-import fs from 'fs';
-import { readFileSync } from 'fs';
+import fs, { readFileSync } from 'fs';
 
 const report = JSON.parse(readFileSync('typescript-diagnostics.json', 'utf8'));
 
@@ -19,7 +18,7 @@ const testFilesWithManyErrors = Object.entries(errorsByFile)
                 file.includes('/test_') ||
                 file.includes('.spec.js') ||
                 file.includes('.test.js')) &&
-            errors.length > 10
+            errors.length > 10,
     )
     .map(([file, errors]) => ({ file, count: errors.length }))
     .sort((a, b) => b.count - a.count);
@@ -28,7 +27,7 @@ console.log(`🔧 Adicionando // @ts-nocheck em ${testFilesWithManyErrors.length
 
 for (const { file, count } of testFilesWithManyErrors) {
     try {
-        let content = fs.readFileSync(file, 'utf8');
+        const content = fs.readFileSync(file, 'utf8');
 
         // Skip se já tem @ts-nocheck
         if (content.includes('@ts-nocheck')) {

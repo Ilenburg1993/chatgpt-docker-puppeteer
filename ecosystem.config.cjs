@@ -62,7 +62,7 @@ const debugPortEnv = process.env.DEBUG_PORT;
 if (debugPortEnv) {
     const ports = debugPortEnv
         .split(',')
-        .map(p => p.trim())
+        .map((p) => p.trim())
         .filter(Boolean);
     for (const p of ports) {
         NODE_ARGS_BASE.push(`--inspect=0.0.0.0:${p}`);

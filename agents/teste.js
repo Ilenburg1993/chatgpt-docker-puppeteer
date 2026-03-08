@@ -1,19 +1,18 @@
 /**
- * ============================================================================
+ * # ============================================================================
  * GitHub Models — GPT-5-Mini Agent Loop (Node.js)
- * ============================================================================
- * Requirements:
- *   npm install openai
  *
- * Environment:
- *   export GITHUB_TOKEN=gho_xxxxxxxxxxxxxxxxx
+ * Requirements: npm install openai
+ *
+ * Environment: export GITHUB_TOKEN=gho_xxxxxxxxxxxxxxxxx
  *
  * This implementation is:
- *   - Safe (no eval)
- *   - Deterministic
- *   - Agent-ready (tool dispatch)
- *   - Optimized for reasoning models (gpt-5-mini)
- * ============================================================================
+ *
+ * - Safe (no eval)
+ * - Deterministic
+ * - Agent-ready (tool dispatch)
+ * - Optimized for reasoning models (gpt-5-mini)
+ *   ============================================================================
  */
 
 import OpenAI from 'openai';
@@ -39,7 +38,7 @@ const tools = {
         return new Date().toISOString();
     },
 
-    echo: (/** @type {{text: string}} */ { text }) => {
+    echo: (/** @type {{ text: string }} */ { text }) => {
         return `Echo: ${text}`;
     },
 };
@@ -124,7 +123,7 @@ async function runAgent() {
             messages.push(message);
 
             for (const _call of message.tool_calls) {
-                const call = /** @type {{id: string, function: {name: string, arguments: string}}} */ (
+                const call = /** @type {{ id: string; function: { name: string; arguments: string } }} */ (
                     /** @type {any} */ (_call)
                 );
                 const toolName = call.function.name;
@@ -149,7 +148,7 @@ async function runAgent() {
                                 text: String(result),
                             },
                         ],
-                    })
+                    }),
                 );
             }
 
@@ -164,8 +163,8 @@ async function runAgent() {
             console.log('\n[MODEL OUTPUT]\n');
             console.log(
                 /** @type {any[]} */ (/** @type {unknown} */ (message.content))
-                    .map((/** @type {{text?: string}} */ c) => c.text)
-                    .join('\n')
+                    .map((/** @type {{ text?: string }} */ c) => c.text)
+                    .join('\n'),
             );
             break;
         }
@@ -178,7 +177,7 @@ async function runAgent() {
  * Entrypoint
  * ---------------------------------------------------------------------------
  */
-runAgent().catch(err => {
+runAgent().catch((err) => {
     console.error('Agent failure:', err);
     process.exit(1);
 });

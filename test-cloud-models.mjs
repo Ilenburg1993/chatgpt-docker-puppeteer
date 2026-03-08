@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Teste FOCUSED: Ollama Cloud Models
- * Usando modelos cloud disponíveis via proxy local do Ollama
+ * Teste FOCUSED: Ollama Cloud Models Usando modelos cloud disponíveis via proxy local do Ollama
  */
 
 import { ollama } from './tools/ollama/client.mjs';

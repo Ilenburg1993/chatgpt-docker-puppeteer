@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Comprehensive MCP Server Test Suite
- * Tests all MCP endpoints and methods for chatgpt-docker-puppeteer
+ * Comprehensive MCP Server Test Suite Tests all MCP endpoints and methods for chatgpt-docker-puppeteer
  */
 
 const BASE_URL = 'http://localhost:3008/api/mcp';
@@ -191,7 +190,7 @@ async function runTests() {
         assert(tool.inputSchema !== undefined, 'Tool should have inputSchema');
 
         log('gray', `    Found ${res.body.result.tools.length} tools:`);
-        res.body.result.tools.forEach(t => {
+        res.body.result.tools.forEach((t) => {
             log('gray', `      - ${t.name}: ${t.description.substring(0, 60)}...`);
         });
     });
@@ -435,7 +434,7 @@ async function runTests() {
                 id: 200 + i,
                 method: 'ping',
                 params: {},
-            })
+            }),
         );
 
         const results = await Promise.all(promises);
@@ -470,7 +469,7 @@ async function runTests() {
 }
 
 // Run tests
-runTests().catch(error => {
+runTests().catch((error) => {
     log('red', `\n✗ Fatal error: ${error.message}`);
     console.error(error);
     process.exit(1);
