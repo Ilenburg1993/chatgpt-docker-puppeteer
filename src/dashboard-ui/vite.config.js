@@ -1,9 +1,9 @@
 // @ts-check
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath, URL } from 'node:url';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 import { compression } from 'vite-plugin-compression2';
-import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
 /** Reexport público: default. */
@@ -70,7 +70,7 @@ export default defineConfig({
         cssCodeSplit: true, // Separate CSS per chunk for better caching
         rollupOptions: {
             output: {
-                manualChunks: id => {
+                manualChunks: (id) => {
                     // Vendor libraries
                     if (id.includes('node_modules')) {
                         if (id.includes('vue') || id.includes('vue-router') || id.includes('pinia')) {
@@ -120,7 +120,7 @@ export default defineConfig({
                     }
                     return undefined;
                 },
-                assetFileNames: assetInfo => {
+                assetFileNames: (assetInfo) => {
                     const name = assetInfo.name ?? 'asset';
                     const info = name.split('.');
                     const extType = info[info.length - 1];

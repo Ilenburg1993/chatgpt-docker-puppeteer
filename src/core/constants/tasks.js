@@ -1,14 +1,15 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
- * Task-related constants
- * Centralized definitions for task states and status values
+ * Task-related constants Centralized definitions for task states and status values
  *
  * Audit Level: 35 - Core Constants
+ *
  * @module constants/tasks
  */
 
 /**
  * Task lifecycle states
+ *
  * @readonly
  * @enum {string}
  */
@@ -28,6 +29,7 @@ const TASK_STATES = {
 
 /**
  * Task execution status values
+ *
  * @readonly
  * @enum {string}
  */
@@ -86,12 +88,14 @@ const STATUS_VALUES = {
 
 /**
  * Array of all valid task states (for validation)
+ *
  * @type {ReadonlyArray<string>}
  */
 const TASK_STATES_ARRAY = Object.values(TASK_STATES);
 
 /**
  * Array of all valid status values (for validation)
+ *
  * @type {ReadonlyArray<string>}
  */
 const STATUS_VALUES_ARRAY = Object.values(STATUS_VALUES);
@@ -106,4 +110,4 @@ Object.freeze(TASK_STATES);
  */
 Object.freeze(STATUS_VALUES);
 
-export { TASK_STATES, STATUS_VALUES, TASK_STATES_ARRAY, STATUS_VALUES_ARRAY };
+export { STATUS_VALUES, STATUS_VALUES_ARRAY, TASK_STATES, TASK_STATES_ARRAY };

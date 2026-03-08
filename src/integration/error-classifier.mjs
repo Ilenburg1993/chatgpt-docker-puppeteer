@@ -3,24 +3,27 @@
  * Error Classification for Tool Execution Retry Logic
  *
  * Integrates with existing error taxonomy from task_state_projector.js:
+ *
  * - ENV_UNAVAILABLE: Infrastructure failures (don't count attempts)
  * - TASK_ERROR: Application failures (count attempts)
  * - USER_ACTION_REQUIRED: Permanent failures (no retry)
  *
  * Usage:
+ *
  * ```javascript
  * import { classifyError, calculateBackoff } from './error-classifier.mjs';
  *
  * const classification = classifyError(error, { tool: 'ollama_generate', model: 'qwen3' });
  * if (classification.retryable) {
- *   const delay = calculateBackoff(attempt, classification.suggestedDelayMs);
- *   await sleep(delay);
+ *     const delay = calculateBackoff(attempt, classification.suggestedDelayMs);
+ *     await sleep(delay);
  * }
  * ```
  */
 
 /**
  * Error classification categories
+ *
  * @enum {string}
  */
 export const ErrorClass = Object.freeze({
@@ -32,6 +35,7 @@ export const ErrorClass = Object.freeze({
 
 /**
  * Retry strategies
+ *
  * @enum {string}
  */
 export const RetryStrategy = Object.freeze({
@@ -43,29 +47,29 @@ export const RetryStrategy = Object.freeze({
 
 /**
  * @typedef {object} ClassifyErrorContext
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {any} _ Propriedades definidas via runtime.
  */
 /**
  * Classify error for retry decision
  *
+ * @example
+ *     const classification = classifyError(new Error('ECONNREFUSED'), {
+ *         tool: 'ollama_models',
+ *         attempt: 1,
+ *     });
+ *     // Returns: {
+ *     //   errorClass: 'TRANSIENT',
+ *     //   reasonClass: 'ENV_UNAVAILABLE',
+ *     //   reasonCode: 'NETWORK_ERROR',
+ *     //   strategy: 'EXPONENTIAL_BACKOFF',
+ *     //   retryable: true,
+ *     //   countAttempt: false,
+ *     //   suggestedDelayMs: 1000
+ *     // }
+ *
  * @param {Error} error - Error object from tool execution
  * @param {ClassifyErrorContext} context - Execution context
  * @returns {any} Classification result with strategy
- *
- * @example
- * const classification = classifyError(new Error('ECONNREFUSED'), {
- *   tool: 'ollama_models',
- *   attempt: 1
- * });
- * // Returns: {
- * //   errorClass: 'TRANSIENT',
- * //   reasonClass: 'ENV_UNAVAILABLE',
- * //   reasonCode: 'NETWORK_ERROR',
- * //   strategy: 'EXPONENTIAL_BACKOFF',
- * //   retryable: true,
- * //   countAttempt: false,
- * //   suggestedDelayMs: 1000
- * // }
  */
 export function classifyError(/** @type {any} */ error, /** @type {any} */ context = {}) {
     const msg = String(error?.message || '');
@@ -237,12 +241,12 @@ export function classifyError(/** @type {any} */ error, /** @type {any} */ conte
  *
  * Implements fallback chain: large cloud → medium local → small local
  *
- * @param {string} currentModel - Current model that timed out
- * @returns {string|null} Fallback model, or null if no fallback available
- *
  * @example
- * getSmallerModel('qwen3-coder-next')  // → 'qwen2.5-coder:7b'
- * getSmallerModel('qwen2.5-coder:3b')  // → 'qwen2.5-coder:1.5b' (new 1.5b tier)
+ *     getSmallerModel('qwen3-coder-next'); // → 'qwen2.5-coder:7b'
+ *     getSmallerModel('qwen2.5-coder:3b'); // → 'qwen2.5-coder:1.5b' (new 1.5b tier)
+ *
+ * @param {string} currentModel - Current model that timed out
+ * @returns {string | null} Fallback model, or null if no fallback available
  */
 export function getSmallerModel(/** @type {any} */ currentModel) {
     if (!currentModel) return null;
@@ -275,24 +279,23 @@ export function getSmallerModel(/** @type {any} */ currentModel) {
 /**
  * Calculate exponential backoff with jitter
  *
- * Formula: delay = baseDelay * 2^(attempt-1) * jitter
- * Jitter: random value in [0.5, 1.0] to prevent thundering herd
+ * Formula: delay = baseDelay * 2^(attempt-1) * jitter Jitter: random value in [0.5, 1.0] to prevent thundering herd
+ *
+ * @example
+ *     calculateBackoff(1, 1000); // → ~500-1000ms   (1s * 2^0 * [0.5-1.0])
+ *     calculateBackoff(2, 1000); // → ~1000-2000ms  (1s * 2^1 * [0.5-1.0])
+ *     calculateBackoff(3, 1000); // → ~2000-4000ms  (1s * 2^2 * [0.5-1.0])
+ *     calculateBackoff(10, 1000); // → ~30000-60000ms (capped at maxDelayMs)
  *
  * @param {number} attempt - Current attempt number (1-based)
  * @param {number} baseDelayMs - Base delay in milliseconds
- * @param {number} [maxDelayMs=60000] - Maximum delay cap (default 60s)
+ * @param {number} [maxDelayMs=60000] - Maximum delay cap (default 60s). Default is `60000`
  * @returns {number} Calculated delay in milliseconds
- *
- * @example
- * calculateBackoff(1, 1000)  // → ~500-1000ms   (1s * 2^0 * [0.5-1.0])
- * calculateBackoff(2, 1000)  // → ~1000-2000ms  (1s * 2^1 * [0.5-1.0])
- * calculateBackoff(3, 1000)  // → ~2000-4000ms  (1s * 2^2 * [0.5-1.0])
- * calculateBackoff(10, 1000) // → ~30000-60000ms (capped at maxDelayMs)
  */
 export function calculateBackoff(
     /** @type {any} */ attempt,
     /** @type {any} */ baseDelayMs,
-    /** @type {any} */ maxDelayMs = 60000
+    /** @type {any} */ maxDelayMs = 60000,
 ) {
     // Exponential growth: 2^(attempt-1)
     const exponential = baseDelayMs * Math.pow(2, attempt - 1);
@@ -309,18 +312,18 @@ export function calculateBackoff(
 
 /**
  * @typedef {object} IsRetryableContext
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {any} _ Propriedades definidas via runtime.
  */
 /**
  * Check if error is retryable based on classification
  *
+ * @example
+ *     isRetryable(new Error('ECONNREFUSED')); // → true
+ *     isRetryable(new Error('401 Unauthorized')); // → false
+ *
  * @param {Error} error - Error to check
  * @param {IsRetryableContext} context - Context for classification
  * @returns {boolean} True if error is retryable
- *
- * @example
- * isRetryable(new Error('ECONNREFUSED'))  // → true
- * isRetryable(new Error('401 Unauthorized'))  // → false
  */
 export function isRetryable(/** @type {any} */ error, /** @type {any} */ context = {}) {
     const classification = /** @type {any} */ (classifyError(error, context));
@@ -329,18 +332,18 @@ export function isRetryable(/** @type {any} */ error, /** @type {any} */ context
 
 /**
  * @typedef {object} GetErrorSummaryContext
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {any} _ Propriedades definidas via runtime.
  */
 /**
  * Get human-readable error summary
  *
+ * @example
+ *     getErrorSummary(new Error('ECONNREFUSED'));
+ *     // → "Network connectivity issue (TRANSIENT) - will retry with backoff"
+ *
  * @param {Error} error - Error to summarize
  * @param {GetErrorSummaryContext} context - Context for classification
  * @returns {string} Human-readable summary
- *
- * @example
- * getErrorSummary(new Error('ECONNREFUSED'))
- * // → "Network connectivity issue (TRANSIENT) - will retry with backoff"
  */
 export function getErrorSummary(/** @type {any} */ error, /** @type {any} */ context = {}) {
     const classification = /** @type {any} */ (classifyError(error, context));

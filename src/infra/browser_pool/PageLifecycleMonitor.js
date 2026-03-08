@@ -3,6 +3,7 @@ import { log } from '#core/logger';
 
 /**
  * Event types emitidos pelo monitor.
+ *
  * @readonly
  * @enum {string}
  */
@@ -14,6 +15,7 @@ const LIFECYCLE_EVENTS = {
 
 /**
  * Reason codes para page close events.
+ *
  * @readonly
  * @enum {string}
  */
@@ -36,7 +38,7 @@ class PageLifecycleMonitor {
      * @param {any} page - Puppeteer Page instance
      * @param {any} poolManager - Pool manager reference
      * @param {string} taskId - Task ID associado à página
-     * @param {{ emit?: (event: unknown) => void } | null} [nerv=null] - NERV event bus (opcional)
+     * @param {{ emit?: (event: unknown) => void } | null} [nerv=null] - NERV event bus (opcional). Default is `null`
      */
     constructor(page, poolManager, taskId, nerv = null) {
         if (!page) {
@@ -70,6 +72,7 @@ class PageLifecycleMonitor {
 
     /**
      * Anexa listeners para eventos de página.
+     *
      * @private
      */
     _attachListeners() {
@@ -110,7 +113,7 @@ class PageLifecycleMonitor {
 
             log(
                 'DEBUG',
-                `[PageLifecycleMonitor] Listeners attached for ${this.taskId} (${this.listeners.length} events)`
+                `[PageLifecycleMonitor] Listeners attached for ${this.taskId} (${this.listeners.length} events)`,
             );
         } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
@@ -122,6 +125,7 @@ class PageLifecycleMonitor {
      * Handler para page.on('close').
      *
      * Chamado quando:
+     *
      * - Usuário fecha tab manualmente
      * - Browser fecha
      * - Page.close() é chamado programaticamente
@@ -133,7 +137,7 @@ class PageLifecycleMonitor {
 
             // 2. Emit NERV event (se disponível)
             if (this.nerv) {
-                (/** @type {any} */ (this.nerv)).emit({
+                /** @type {any} */ (this.nerv).emit({
                     type: LIFECYCLE_EVENTS.PAGE_CLOSED,
                     payload: {
                         taskId: this.taskId,
@@ -175,7 +179,7 @@ class PageLifecycleMonitor {
 
             // 2. Emit NERV event
             if (this.nerv) {
-                (/** @type {any} */ (this.nerv)).emit({
+                /** @type {any} */ (this.nerv).emit({
                     type: LIFECYCLE_EVENTS.PAGE_ERROR,
                     payload: {
                         taskId: this.taskId,
@@ -209,7 +213,7 @@ class PageLifecycleMonitor {
 
             // 3. Emit NERV event
             if (this.nerv) {
-                (/** @type {any} */ (this.nerv)).emit({
+                /** @type {any} */ (this.nerv).emit({
                     type: LIFECYCLE_EVENTS.PAGE_DISCONNECTED,
                     payload: {
                         taskId: this.taskId,
@@ -232,6 +236,7 @@ class PageLifecycleMonitor {
      * Remove todos os event listeners.
      *
      * Chamado:
+     *
      * - Automaticamente após page close/disconnect
      * - Manualmente ao liberar página normalmente
      */
@@ -278,7 +283,7 @@ class PageLifecycleMonitor {
         this.rebindCount++;
 
         if (this.nerv) {
-            (/** @type {any} */ (this.nerv)).emit({
+            /** @type {any} */ (this.nerv).emit({
                 type: 'BROWSER_PAGE_TASK_REBIND',
                 payload: {
                     oldTaskId: previousTaskId,
@@ -308,4 +313,4 @@ class PageLifecycleMonitor {
     }
 }
 
-export { PageLifecycleMonitor, LIFECYCLE_EVENTS, CLOSE_REASONS };
+export { CLOSE_REASONS, LIFECYCLE_EVENTS, PageLifecycleMonitor };

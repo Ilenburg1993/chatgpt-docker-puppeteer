@@ -24,8 +24,11 @@ function topModules(report) {
 }
 
 /**
- * @param {Record<string, { total: number, violated: number, covered: number, covered_by_run?: number, covered_by_tests?: number }>} coverage
- * @param {*} coverage
+ * @param {Record<
+ *     string,
+ *     { total: number; violated: number; covered: number; covered_by_run?: number; covered_by_tests?: number }
+ * >} coverage
+ * @param {any} coverage
  */
 function coverageLines(coverage) {
     const domains = Object.keys(coverage || {}).sort();
@@ -33,7 +36,7 @@ function coverageLines(coverage) {
         return '- Sem cobertura de contrato registrada.';
     }
     return domains
-        .map(domain => {
+        .map((domain) => {
             const item = coverage[domain] || {
                 total: 0,
                 violated: 0,
@@ -52,7 +55,7 @@ function coverageLines(coverage) {
  * @param {import('./lib/schema.mjs').AuditRunV3} report
  */
 function findingLines(report) {
-    const primary = report.primary_findings.slice(0, 50).map(item => {
+    const primary = report.primary_findings.slice(0, 50).map((item) => {
         const location = item.file ? `${item.file}${item.line ? `:${item.line}` : ''}` : 'n/a';
         return [
             `- ${item.id} | ${item.severity} | ${item.type} | ${item.contract_id || item.source_tool} | ${location}`,
@@ -60,7 +63,7 @@ function findingLines(report) {
             `  - Proposta: ${item.proposal?.summary || item.suggested_patch || 'n/a'}`,
         ].join('\n');
     });
-    const backlog = report.backlog_findings.slice(0, 30).map(item => {
+    const backlog = report.backlog_findings.slice(0, 30).map((item) => {
         const location = item.file ? `${item.file}${item.line ? `:${item.line}` : ''}` : 'n/a';
         return `- ${item.id} | ${item.severity} | ${item.type} | ${item.contract_id || item.source_tool} | ${location}`;
     });
@@ -78,7 +81,7 @@ function buildAutomationSection(report) {
     const findings = findingLines(report);
     const modulesText =
         modules.length > 0
-            ? modules.map(item => `- ${item.module}: ${item.count}`).join('\n')
+            ? modules.map((item) => `- ${item.module}: ${item.count}`).join('\n')
             : '- Sem concentração de risco.';
     const staleContracts = report.contract_drift.stale_contracts || [];
     const unowned = report.contract_drift.unowned_critical || [];
@@ -210,7 +213,7 @@ function ensureMaster(options) {
             '## Changelog do Arquivo',
             '',
         ].join('\n'),
-        'utf8'
+        'utf8',
     );
 }
 

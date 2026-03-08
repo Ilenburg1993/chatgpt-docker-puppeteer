@@ -62,7 +62,7 @@ function walk(/** @type {string} */ dirPath, /** @type {string[]} */ files = [])
 }
 
 function collectEnvVarsFromCode() {
-    const files = SCAN_ROOTS.flatMap(rel => walk(path.join(ROOT, rel)));
+    const files = SCAN_ROOTS.flatMap((rel) => walk(path.join(ROOT, rel)));
     const vars = new Set();
     const pattern = /process\.env\.([A-Z0-9_]+)/g;
 
@@ -104,7 +104,7 @@ function collectEnvVarsFromTemplates() {
 function main() {
     const codeVars = collectEnvVarsFromCode();
     const templateVars = collectEnvVarsFromTemplates();
-    const uncovered = codeVars.filter(key => !templateVars.has(key) && !RUNTIME_ONLY.has(key));
+    const uncovered = codeVars.filter((key) => !templateVars.has(key) && !RUNTIME_ONLY.has(key));
 
     const report = {
         scanned_roots: SCAN_ROOTS,

@@ -26,9 +26,9 @@ console.log(`\n🔧 Processing ${unusedVars.length} unused variable(s)...\n`);
 const changes = /** @type {any} */ ({});
 
 // Parse ESLint output
-unusedVars.forEach(line => {
+unusedVars.forEach((line) => {
     const match = line.match(
-        /^(.*?):(\d+):(\d+):\s+'(.+?)' is (defined but never used|assigned a value but never used)/
+        /^(.*?):(\d+):(\d+):\s+'(.+?)' is (defined but never used|assigned a value but never used)/,
     );
     if (!match) {
         return;

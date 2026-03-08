@@ -6,16 +6,15 @@ import { getDb } from './sqlite.js';
  * @property {string} entityType - The type of entity (e.g., 'task', 'queue')
  * @property {string} entityId - The entity ID
  * @property {number} [tsMs] - Timestamp in ms (defaults to Date.now())
- * @property {string} [actorType='system'] - Actor type
- * @property {unknown} [actorId=null] - Actor ID
+ * @property {string} [actorType='system'] - Actor type. Default is `'system'`
+ * @property {unknown} [actorId=null] - Actor ID. Default is `null`
  * @property {string} eventType - Event type
- * @property {unknown} [payload={}] - Event payload (JSON-serializable)
- * @property {string|null} [dedupKey=null] - Deduplication key
+ * @property {unknown} [payload={}] - Event payload (JSON-serializable). Default is `{}`
+ * @property {string | null} [dedupKey=null] - Deduplication key. Default is `null`
  */
 
 /**
- * Records an event in the database.
- * Returns true if inserted, false if duplicate (INSERT OR IGNORE).
+ * Records an event in the database. Returns true if inserted, false if duplicate (INSERT OR IGNORE).
  *
  * @param {RecordEventParams} params
  * @returns {boolean} True if inserted, false if duplicate
@@ -56,7 +55,7 @@ function recordEvent(params) {
         (entity_type, entity_id, ts_ms, actor_type, actor_id, event_type, payload_json, dedup_key)
       VALUES
         (@entity_type, @entity_id, @ts_ms, @actor_type, @actor_id, @event_type, @payload_json, @dedup_key)
-      `
+      `,
         )
         .run({
             entity_type: String(entityType),
@@ -78,10 +77,9 @@ function recordEvent(params) {
  * @property {number} [maxRows] Máximo de linhas a reter.
  */
 /**
- * Prune events older than the specified retention period.
- * Keeps events table bounded to prevent unbounded disk growth.
+ * Prune events older than the specified retention period. Keeps events table bounded to prevent unbounded disk growth.
  *
- * @param {PruneEventsOptions} [options={}]
+ * @param {PruneEventsOptions} [options={}] Default is `{}`
  * @returns {{ deleted: number }} Number of rows deleted
  */
 function pruneEvents(options = {}) {
@@ -107,4 +105,4 @@ function pruneEvents(options = {}) {
     return { deleted: (res1?.changes ?? 0) + res2Changes };
 }
 
-export { recordEvent, pruneEvents };
+export { pruneEvents, recordEvent };

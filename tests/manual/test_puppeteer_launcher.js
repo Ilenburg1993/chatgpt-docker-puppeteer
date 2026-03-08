@@ -13,7 +13,7 @@ import puppeteer from 'puppeteer-core';
             browserURL,
             defaultViewport: { width: 1280, height: 800 },
             ignoreHTTPSErrors: true,
-        })
+        }),
     );
 
     console.log('✅ Puppeteer conectado (connect-only)');
@@ -33,7 +33,7 @@ import puppeteer from 'puppeteer-core';
     console.log('✅ Desconectado (não encerra o Chrome remoto)');
 
     process.exit(0);
-})().catch(err => {
+})().catch((err) => {
     console.error('❌ Erro no teste:', err);
     process.exit(1);
 });

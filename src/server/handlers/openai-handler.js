@@ -2,10 +2,11 @@
 /**
  * OpenAI-Compatible Handler for Express
  *
- * Exposes Ollama via OpenAI Chat Completions API for GitHub Copilot.
- * Mounted at: POST /v1/chat/completions, GET /v1/models
+ * Exposes Ollama via OpenAI Chat Completions API for GitHub Copilot. Mounted at: POST /v1/chat/completions, GET
+ * /v1/models
  *
  * Architecture:
+ *
  * - Follows mcp-handler.js pattern (setup function + internal handlers)
  * - Uses OllamaClient directly (no Tool Registry - lower latency)
  * - Pure transformation via openai-transformer.js (testable)
@@ -16,25 +17,27 @@
 
 import { ollama } from '../../../tools/ollama/client.mjs';
 import {
-    validateOpenAIRequest,
+    buildOpenAIError,
     translateRequestToOllama,
     translateResponseToOpenAI,
-    buildOpenAIError,
+    validateOpenAIRequest,
 } from './openai-transformer.js';
 
 /**
  * Setup OpenAI-compatible endpoints in Express app
  *
+ * @example
+ *     const { setupOpenAIHandler } = await import('./openai-handler.js');
+ *     setupOpenAIHandler(app);
+ *
  * @param {Express.Application} app - Express app instance
  *
- * Registers:
- * - POST /v1/chat/completions (OpenAI Chat Completions API)
- * - GET /v1/models (List available models)
+ *   Registers:
  *
- * @example
- * const { setupOpenAIHandler } = await import('./openai-handler.js');
- * setupOpenAIHandler(app);
-  * @returns {any}
+ *   - POST /v1/chat/completions (OpenAI Chat Completions API)
+ *   - GET /v1/models (List available models)
+ *
+ * @returns {any}
  */
 export function setupOpenAIHandler(app) {
     console.error('[OpenAI Handler] setupOpenAIHandler() called, registering routes...');
@@ -50,29 +53,12 @@ export function setupOpenAIHandler(app) {
      *
      * Main endpoint for chat completions (OpenAI-compatible)
      *
-     * Request body (OpenAI format):
-     * {
-     *   "model": "qwen3-coder-next",
-     *   "messages": [
-     *     { "role": "user", "content": "Hello" }
-     *   ],
-     *   "temperature": 0.7,
-     *   "max_tokens": 1000
-     * }
+     * Request body (OpenAI format): { "model": "qwen3-coder-next", "messages": [ { "role": "user", "content": "Hello" }
+     * ], "temperature": 0.7, "max_tokens": 1000 }
      *
-     * Response (OpenAI format):
-     * {
-     *   "id": "chatcmpl-abc123",
-     *   "object": "chat.completion",
-     *   "created": 1672531200,
-     *   "model": "qwen3-coder-next",
-     *   "choices": [{
-     *     "index": 0,
-     *     "message": { "role": "assistant", "content": "Hi!" },
-     *     "finish_reason": "stop"
-     *   }],
-     *   "usage": { "prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7 }
-     * }
+     * Response (OpenAI format): { "id": "chatcmpl-abc123", "object": "chat.completion", "created": 1672531200, "model":
+     * "qwen3-coder-next", "choices": [{ "index": 0, "message": { "role": "assistant", "content": "Hi!" },
+     * "finish_reason": "stop" }], "usage": { "prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7 } }
      */
     app.post('/v1/chat/completions', async (/** @type {any} */ req, /** @type {any} */ res) => {
         console.error('[OpenAI Handler] POST /v1/chat/completions called');
@@ -86,14 +72,14 @@ export function setupOpenAIHandler(app) {
             if (req.body.tools || req.body.tool_choice) {
                 console.warn(
                     '[OpenAI Handler] Tool calling requested but not supported - ignoring. ' +
-                        'Set toolCalling:false in VSCode customOAIModels config to avoid this warning.'
+                        'Set toolCalling:false in VSCode customOAIModels config to avoid this warning.',
                 );
             }
 
             if (req.body.stream) {
                 console.warn(
                     '[OpenAI Handler] Streaming requested but not supported in v1.0 - ' +
-                        'will return complete response instead.'
+                        'will return complete response instead.',
                 );
             }
 
@@ -103,7 +89,7 @@ export function setupOpenAIHandler(app) {
             console.error(
                 `[OpenAI Handler] Generating with model=${ollamaReq.model}, ` +
                     `prompt_length=${ollamaReq.prompt.length} chars, ` +
-                    `temperature=${ollamaReq.options.temperature}`
+                    `temperature=${ollamaReq.options.temperature}`,
             );
 
             // 4. Call Ollama (uses OllamaClient with circuit breaker, adaptive timeout)
@@ -117,7 +103,7 @@ export function setupOpenAIHandler(app) {
             // 5. Translate Ollama response → OpenAI format
             const openaiResponse = translateResponseToOpenAI(
                 { response: ollamaResponse, model: ollamaReq.model },
-                req.body
+                req.body,
             );
 
             const duration = Date.now() - startTime;
@@ -125,7 +111,7 @@ export function setupOpenAIHandler(app) {
                 `[OpenAI Handler] Completed in ${duration}ms, ` +
                     `tokens=${openaiResponse.usage.total_tokens} ` +
                     `(prompt=${openaiResponse.usage.prompt_tokens}, ` +
-                    `completion=${openaiResponse.usage.completion_tokens})`
+                    `completion=${openaiResponse.usage.completion_tokens})`,
             );
 
             // 6. Return OpenAI-compatible response
@@ -166,21 +152,10 @@ export function setupOpenAIHandler(app) {
      *
      * Lists available models (OpenAI-compatible)
      *
-     * Response (OpenAI format):
-     * {
-     *   "object": "list",
-     *   "data": [
-     *     {
-     *       "id": "qwen3-coder-next",
-     *       "object": "model",
-     *       "created": 1672531200,
-     *       "owned_by": "ollama"
-     *     }
-     *   ]
-     * }
+     * Response (OpenAI format): { "object": "list", "data": [ { "id": "qwen3-coder-next", "object": "model", "created":
+     * 1672531200, "owned_by": "ollama" } ] }
      *
-     * Note: Ollama's /api/tags endpoint has different format,
-     * so we return hardcoded list for simplicity.
+     * Note: Ollama's /api/tags endpoint has different format, so we return hardcoded list for simplicity.
      */
     app.get('/v1/models', async (/** @type {any} */ req, /** @type {any} */ res) => {
         console.error('[OpenAI Handler] GET /v1/models called');

@@ -3,6 +3,7 @@ import sinon from 'sinon';
 
 /**
  * Cria uma página mockada do Puppeteer
+ *
  * @returns {object}
  */
 function criarPaginaMock() {
@@ -28,7 +29,7 @@ function criarPaginaMock() {
         // Helpers
         limpar: function () {
             const self = /** @type {Record<string, any>} */ (this);
-            Object.keys(self).forEach(key => {
+            Object.keys(self).forEach((key) => {
                 if (typeof self[key]?.resetHistory === 'function') {
                     self[key].resetHistory();
                 }
@@ -39,6 +40,7 @@ function criarPaginaMock() {
 
 /**
  * Cria um browser mockado do Puppeteer
+ *
  * @returns {object}
  */
 function criarBrowserMock() {
@@ -68,6 +70,7 @@ function criarBrowserMock() {
 
 /**
  * Cria um BrowserPoolManager mockado
+ *
  * @returns {object}
  */
 function criarBrowserPoolMock() {
@@ -99,6 +102,7 @@ function criarBrowserPoolMock() {
 
 /**
  * Cria um ConnectionOrchestrator mockado
+ *
  * @returns {object}
  */
 function criarConnectionOrchestratorMock() {
@@ -116,4 +120,4 @@ function criarConnectionOrchestratorMock() {
     };
 }
 
-export { criarPaginaMock, criarBrowserMock, criarBrowserPoolMock, criarConnectionOrchestratorMock };
+export { criarBrowserMock, criarBrowserPoolMock, criarConnectionOrchestratorMock, criarPaginaMock };

@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { createInferenceGatewayServer } from '../../../src/inference_gateway/server.js';
 
 async function listen(/** @type {any} */ server) {
@@ -46,7 +46,7 @@ test('inference gateway server exposes validate/generate preflight endpoint', as
         assert.equal(json.clientTag, 'audit_agent_triage');
         assert.equal(validateCalls, 1);
     } finally {
-        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });
 
@@ -73,6 +73,6 @@ test('inference gateway server returns 400 when preflight route is rejected', as
         assert.equal(json.ok, false);
         assert.equal(json.reason, 'model not allowed');
     } finally {
-        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });

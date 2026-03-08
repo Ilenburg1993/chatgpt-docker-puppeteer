@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 test('wave17: server/main exige contingência explícita para bridge legado', async () => {
     const content = await fs.readFile(path.join(process.cwd(), 'src/server/main.js'), 'utf8');
@@ -17,10 +17,10 @@ test('wave17: SSOT feed só emite eventos compat quando flag explícita está at
     assert.match(content, /function _isCompatEmitEnabled/);
     assert.match(
         content,
-        /if \(_isCompatEmitEnabled\(\)\)\s*{\s*for \(const u of updates\)\s*{\s*io\.to\('dashboards'\)\.emit\('task:updated'/s
+        /if \(_isCompatEmitEnabled\(\)\)\s*{\s*for \(const u of updates\)\s*{\s*io\.to\('dashboards'\)\.emit\('task:updated'/s,
     );
     assert.match(
         content,
-        /if \(_isCompatEmitEnabled\(\)\)\s*{\s*for \(const u of updates\)\s*{\s*io\.to\('dashboards'\)\.emit\('mission:updated'/s
+        /if \(_isCompatEmitEnabled\(\)\)\s*{\s*for \(const u of updates\)\s*{\s*io\.to\('dashboards'\)\.emit\('mission:updated'/s,
     );
 });

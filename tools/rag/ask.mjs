@@ -1,6 +1,6 @@
 // @ts-check
-import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
+import './lib/env-bootstrap.mjs';
 import { ragAsk } from './lib/facade.mjs';
 
 const { positionals, values } = parseArgs({

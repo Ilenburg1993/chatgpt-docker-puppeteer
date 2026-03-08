@@ -25,16 +25,16 @@ import { log } from './logger.js';
 -------------------------------------------------------------------------- */
 
 /**
- * Valida variáveis de ambiente obrigatórias e recomendadas.
- * Side-effects: Registra logs de erro/aviso se faltarem variáveis.
+ * Valida variáveis de ambiente obrigatórias e recomendadas. Side-effects: Registra logs de erro/aviso se faltarem
+ * variáveis.
  */
 function validateEnvFile() {
     const requiredEnvVars = ['NODE_ENV'];
 
     const recommendedEnvVars = ['SERVER_PORT', 'BROWSER_MODE', 'CHROME_PROXY_PORT'];
 
-    const missing = requiredEnvVars.filter(v => !process.env[v]);
-    const missingRecommended = recommendedEnvVars.filter(v => !process.env[v]);
+    const missing = requiredEnvVars.filter((v) => !process.env[v]);
+    const missingRecommended = recommendedEnvVars.filter((v) => !process.env[v]);
 
     if (missing.length > 0) {
         log('ERROR', `[CONFIG] Missing required env vars: ${missing.join(', ')}`);
@@ -59,8 +59,7 @@ function emitDeprecatedPortWarning() {
 }
 
 /**
- * 1. SCHEMA MESTRE (O Contrato Paramétrico)
- * Define a estrutura rigorosa e os limites de segurança para cada parâmetro.
+ * 1. SCHEMA MESTRE (O Contrato Paramétrico) Define a estrutura rigorosa e os limites de segurança para cada parâmetro.
  */
 const ConfigSchema = z
     .object({
@@ -205,13 +204,11 @@ const ConfigSchema = z
     .passthrough(); // Preserva chaves de comentário "//"
 
 /**
- * 2. GESTOR REATIVO DE CONFIGURAÇÃO
- * Implementa o padrão Singleton com capacidades de emissão de eventos.
+ * 2. GESTOR REATIVO DE CONFIGURAÇÃO Implementa o padrão Singleton com capacidades de emissão de eventos.
  */
 /**
- * Gerenciador reativo de configuração com cache em RAM e hot-reload.
- * Extends EventEmitter para notificar mudanças de configuração.
- * Side-effects: Emite evento 'updated' quando configuração muda.
+ * Gerenciador reativo de configuração com cache em RAM e hot-reload. Extends EventEmitter para notificar mudanças de
+ * configuração. Side-effects: Emite evento 'updated' quando configuração muda.
  */
 class ConfigurationManager extends EventEmitter {
     constructor() {
@@ -225,9 +222,10 @@ class ConfigurationManager extends EventEmitter {
     }
 
     /**
-     * Realiza a carga ou recarga (Hot-Reload) das configurações mestras.
-     * Side-effects: Lê arquivo config.json, valida, atualiza cache, emite evento 'updated'.
-     * @param {string} [correlationId='sys-boot'] - Rastro de causalidade para rastreio no log.
+     * Realiza a carga ou recarga (Hot-Reload) das configurações mestras. Side-effects: Lê arquivo config.json, valida,
+     * atualiza cache, emite evento 'updated'.
+     *
+     * @param {string} [correlationId='sys-boot'] - Rastro de causalidade para rastreio no log. Default is `'sys-boot'`
      * @returns {Promise<Record<string, unknown>>} A configuração consolidada e validada.
      * @throws {Error} Nunca lança erro - opera em modo fail-safe.
      */
@@ -281,8 +279,7 @@ class ConfigurationManager extends EventEmitter {
     }
 
     /**
-     * Getters de Acesso Direto (Proxy para o Cache em RAM)
-     * Permitem leitura síncrona de alta performance pelo Kernel.
+     * Getters de Acesso Direto (Proxy para o Cache em RAM) Permitem leitura síncrona de alta performance pelo Kernel.
      */
     get all() {
         // Return cached frozen object to avoid recreating on every access
@@ -332,18 +329,19 @@ class ConfigurationManager extends EventEmitter {
     }
 
     /**
-     * WebSocket endpoint do Chrome (opcional, para conexões diretas WS)
-     * Fonte: 1. process.env.CHROME_WS_ENDPOINT 2. config.json WS_ENDPOINT 3. null
+     * WebSocket endpoint do Chrome (opcional, para conexões diretas WS) Fonte: 1. process.env.CHROME_WS_ENDPOINT 2.
+     * config.json WS_ENDPOINT 3. null
      */
     get WS_ENDPOINT() {
         return this.currentConfig.WS_ENDPOINT || null;
     }
 
     /**
-     * Retorna browserEndpoint consolidado (objeto canônico para ConnectionOrchestrator)
-     * Estrutura: { url: string, wsEndpoint?: string }
+     * Retorna browserEndpoint consolidado (objeto canônico para ConnectionOrchestrator) Estrutura: { url: string,
+     * wsEndpoint?: string }
      *
      * Ordem de precedência:
+     *
      * - url: CHROME_WS_ENDPOINT > BROWSER_URL > DEBUG_PORT > localhost:CHROME_PROXY_PORT
      * - wsEndpoint: CHROME_WS_ENDPOINT (se definido)
      */
@@ -580,9 +578,8 @@ class ConfigurationManager extends EventEmitter {
     }
 
     /**
-     * Backwards-compatible getter used by legacy callers.
-     * Supports dot-separated paths (e.g. "a.b.c") and a fallback value when the key is absent.
-     * Also falls back to process.env when the requested key exists there.
+     * Backwards-compatible getter used by legacy callers. Supports dot-separated paths (e.g. "a.b.c") and a fallback
+     * value when the key is absent. Also falls back to process.env when the requested key exists there.
      *
      * @param {string} key - The key or dot-path to retrieve from the current configuration.
      * @param {unknown} [fallback] - Value to return when the key is not present.
@@ -625,10 +622,10 @@ class ConfigurationManager extends EventEmitter {
 }
 
 /**
- * Instância singleton soberana do gerenciador de configuração.
- * Mantém cache em RAM e coordena hot-reload via eventos.
- * O índice `Record<string, any>` reflete o `.passthrough()` do ConfigSchema,
- * que preserva quaisquer chaves extra em config.json em runtime.
+ * Instância singleton soberana do gerenciador de configuração. Mantém cache em RAM e coordena hot-reload via eventos. O
+ * índice `Record<string, any>` reflete o `.passthrough()` do ConfigSchema, que preserva quaisquer chaves extra em
+ * config.json em runtime.
+ *
  * @type {ConfigurationManager & Record<string, any>}
  */
 const manager = new ConfigurationManager();

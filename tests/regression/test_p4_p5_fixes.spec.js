@@ -42,7 +42,7 @@ async function test1_StabilizerCleanup() {
         'src',
         'shared',
         'page_stability',
-        'stabilizer.js'
+        'stabilizer.js',
     );
     const content = await fs.readFile(stabilizerPath, 'utf-8');
 
@@ -65,9 +65,9 @@ async function test1_StabilizerCleanup() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -105,9 +105,9 @@ async function test2_ServerShutdown() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -149,9 +149,9 @@ async function test3_SignalGuard() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -174,7 +174,7 @@ async function test4_KernelLocking() {
         'src',
         'kernel',
         'task_runtime',
-        'task_runtime.js'
+        'task_runtime.js',
     );
     const content = await fs.readFile(taskRuntimePath, 'utf-8');
 
@@ -201,9 +201,9 @@ async function test4_KernelLocking() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -224,10 +224,10 @@ async function test5_CacheInvalidation() {
 
     // Verificar ordem dentro das funções saveTask e deleteTask
     const saveTaskFuncMatch = content.match(
-        /export const saveTask\s*=\s*async function\s*\(task\)\s*\{([\s\S]*?)\n\};/
+        /export const saveTask\s*=\s*async function\s*\(task\)\s*\{([\s\S]*?)\n\};/,
     );
     const deleteTaskFuncMatch = content.match(
-        /export const deleteTask\s*=\s*async function\s*\(id\)\s*\{([\s\S]*?)\n\};/
+        /export const deleteTask\s*=\s*async function\s*\(id\)\s*\{([\s\S]*?)\n\};/,
     );
 
     let saveTaskOrderCorrect = false;
@@ -262,9 +262,9 @@ async function test5_CacheInvalidation() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -294,7 +294,7 @@ async function test6_ConcurrentSignals() {
         shutdownCalls++;
 
         // Simula shutdown delay
-        await new Promise(r => {
+        await new Promise((r) => {
             setTimeout(r, 100);
         });
         return true;
@@ -310,8 +310,8 @@ async function test6_ConcurrentSignals() {
         gracefulShutdown('SIGTERM'),
     ]);
 
-    const successCalls = results.filter(r => r).length;
-    const blockedCalls = results.filter(r => !r).length;
+    const successCalls = results.filter((r) => r).length;
+    const blockedCalls = results.filter((r) => !r).length;
 
     log('INFO', `Shutdowns executados: ${successCalls}`);
     log('INFO', `Shutdowns bloqueados: ${blockedCalls}`);
@@ -323,9 +323,9 @@ async function test6_ConcurrentSignals() {
         { name: 'Flag ativada', pass: /** @type {boolean} */ (_shutdownInProgress) === true },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -423,7 +423,7 @@ async function runAllTests() {
     console.log(results.test7 ? '✅' : '❌', 'Optimistic Lock:', results.test7 ? 'PASSOU' : 'FALHOU');
 
     const totalTests = Object.keys(results).length;
-    const passedTests = Object.values(results).filter(r => r).length;
+    const passedTests = Object.values(results).filter((r) => r).length;
 
     console.log('');
     console.log(`${colors.cyan}📊 Score: ${passedTests}/${totalTests} testes passaram${colors.reset}`);
@@ -449,7 +449,7 @@ async function runAllTests() {
 }
 
 // Executa
-runAllTests().catch(err => {
+runAllTests().catch((err) => {
     console.error(`${colors.red}❌ Erro fatal nos testes:`, err.message + colors.reset);
     console.error(err.stack);
     process.exit(1);

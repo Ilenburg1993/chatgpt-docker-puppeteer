@@ -1,6 +1,6 @@
 <script setup>
+import { CheckCircle, Clock, Pause, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
-import { Clock, CheckCircle, XCircle, Pause } from 'lucide-vue-next';
 import Badge from '../ui/Badge.vue';
 import Card from '../ui/Card.vue';
 
@@ -23,7 +23,7 @@ const statusIcon = computed(() => {
     return icons[props.task.unified_status] || Clock;
 });
 
-const getStatusVariant = status => {
+const getStatusVariant = (status) => {
     const variants = {
         RUNNING: 'info',
         PENDING: 'default',
@@ -35,13 +35,13 @@ const getStatusVariant = status => {
     return variants[status] || 'default';
 };
 
-const getPriorityVariant = priority => {
+const getPriorityVariant = (priority) => {
     if (priority >= 8) return 'error';
     if (priority >= 5) return 'warning';
     return 'default';
 };
 
-const getPriorityLabel = priority => {
+const getPriorityLabel = (priority) => {
     if (priority >= 8) return 'HIGH';
     if (priority >= 5) return 'MEDIUM';
     return 'LOW';

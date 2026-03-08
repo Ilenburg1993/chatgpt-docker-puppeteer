@@ -73,18 +73,18 @@ class StabilizerAbortError extends Error {
 
 /**
  * @typedef {object} MeasureEventLoopLagPage
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
- * Mede o atraso (lag) do Event Loop no contexto do Browser.
- * v2.0: Added retry logic and error logging.
+ * Mede o atraso (lag) do Event Loop no contexto do Browser. v2.0: Added retry logic and error logging.
+ *
  * @param {MeasureEventLoopLagPage} page - Puppeteer Page instance
  * @param {number} retries - Max retry attempts (default: 3)
  * @returns {Promise<number>} Event loop lag in ms
  */
 async function measureEventLoopLag(
     /** @type {any} */ page,
-    /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT
+    /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT,
 ) {
     for (let i = 0; i < retries; i++) {
         try {
@@ -118,24 +118,25 @@ async function measureEventLoopLag(
 
 /**
  * @typedef {object} GetPageLoadStatusPage
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
- * Verifica a presença de indicadores de carregamento (spinners) e tráfego de rede.
- * v2.0: Enhanced error handling, false positive filter, optimizations.
+ * Verifica a presença de indicadores de carregamento (spinners) e tráfego de rede. v2.0: Enhanced error handling, false
+ * positive filter, optimizations.
+ *
  * @param {GetPageLoadStatusPage} page - Puppeteer Page instance
  * @param {number} retries - Max retry attempts (default: 3)
  * @returns {Promise<boolean>} `true` quando ainda há atividade de carregamento
  */
 async function getPageLoadStatus(
     /** @type {any} */ page,
-    /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT
+    /** @type {any} */ retries = STABILIZER_CONFIG.HELPER_RETRY_COUNT,
 ) {
     for (let i = 0; i < retries; i++) {
         try {
             const busy = await page.evaluate((/** @type {any} */ config) => {
                 // Returns true when the page still appears "busy" (spinner OR recent network).
-                /** @param {Document | ShadowRoot} [root=document] */
+                /** @param {Document | ShadowRoot} [root=document] Default is `document` */
                 const checkSpinnersDeep = (root = document) => {
                     const selector =
                         '[role="progressbar"], .spinner, .loading, svg.animate-spin, [aria-busy="true"], [data-loading="true"]';
@@ -156,14 +157,16 @@ async function getPageLoadStatus(
                                         parseFloat(st.opacity || '1') > 0.1
                                     ) {
                                         const hasSize = Array.from(rects).some(
-                                            (/** @type {any} */ r) => r.width > 0 && r.height > 0
+                                            (/** @type {any} */ r) => r.width > 0 && r.height > 0,
                                         );
                                         if (hasSize) return true;
                                     }
                                 }
                             }
-                            const nodeWithShadow = /** @type {Element & {shadowRoot?: ShadowRoot|null}} */ (node);
-                            const nodeWithContent = /** @type {Element & {contentDocument?: Document|null}} */ (node);
+                            const nodeWithShadow = /** @type {Element & { shadowRoot?: ShadowRoot | null }} */ (node);
+                            const nodeWithContent = /** @type {Element & { contentDocument?: Document | null }} */ (
+                                node
+                            );
                             if (nodeWithShadow.shadowRoot && checkSpinnersDeep(nodeWithShadow.shadowRoot)) return true;
                             if (node.tagName === 'IFRAME') {
                                 try {
@@ -191,7 +194,7 @@ async function getPageLoadStatus(
                 if (entries.length > 0) {
                     const latest = /** @type {PerformanceResourceTiming[]} */ (entries).reduce(
                         (a, b) => (b.responseEnd > a.responseEnd ? b : a),
-                        /** @type {PerformanceResourceTiming} */ (entries[0])
+                        /** @type {PerformanceResourceTiming} */ (entries[0]),
                     );
                     if (performance.now() - Number(latest.responseEnd || 0) < config.RECENT_NETWORK_THRESHOLD) {
                         return true;
@@ -220,11 +223,12 @@ async function getPageLoadStatus(
 
 /**
  * @typedef {object} WaitForStabilityDriver
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
- * Orquestra a estabilização multi-fase da página.
- * v2.0: Added validation, telemetry, abort support, enriched return value.
+ * Orquestra a estabilização multi-fase da página. v2.0: Added validation, telemetry, abort support, enriched return
+ * value.
+ *
  * @param {WaitForStabilityDriver} driver - Instância do BaseDriver (required)
  * @param {number} timeoutMs - Tempo máximo de espera (default: 30000)
  * @param {AbortSignal} signal - Optional abort signal
@@ -234,7 +238,7 @@ async function getPageLoadStatus(
 async function waitForStability(
     /** @type {any} */ driver,
     /** @type {any} */ timeoutMs = STABILIZER_CONFIG.DEFAULT_TIMEOUT,
-    /** @type {any} */ signal = null
+    /** @type {any} */ signal = null,
 ) {
     // [v2.0] Parameter validation (Bug #1 fix)
     if (!driver || typeof driver !== 'object') {
@@ -437,7 +441,7 @@ async function waitForStability(
                         /** @type {any} */ windowMs,
                         /** @type {any} */ taskDomain,
                         /** @type {any} */ maxWaitMs,
-                        /** @type {any} */ config
+                        /** @type {any} */ config,
                     ) => {
                         /** @type {any[]} */ const observers = [];
                         if (!(/** @type {any} */ (window).__STABILIZER_OBSERVERS)) {
@@ -457,7 +461,7 @@ async function waitForStability(
                                                 m.type === 'characterData' ||
                                                 (m.type === 'attributes' &&
                                                     (m.attributeName.startsWith('data-') ||
-                                                        ['class', 'aria-busy'].includes(m.attributeName)))
+                                                        ['class', 'aria-busy'].includes(m.attributeName))),
                                         );
                                         if (isRelevant) {
                                             lastActivity = Date.now();
@@ -477,9 +481,11 @@ async function waitForStability(
                                         while (node) {
                                             if (node instanceof Element) {
                                                 const nodeWithShadow =
-                                                    /** @type {Element & {shadowRoot?: ShadowRoot|null}} */ (node);
+                                                    /** @type {Element & { shadowRoot?: ShadowRoot | null }} */ (node);
                                                 const nodeWithContent =
-                                                    /** @type {Element & {contentDocument?: Document|null}} */ (node);
+                                                    /** @type {Element & { contentDocument?: Document | null }} */ (
+                                                        node
+                                                    );
                                                 if (nodeWithShadow.shadowRoot) {
                                                     roots.push(nodeWithShadow.shadowRoot);
                                                     queue.push(nodeWithShadow.shadowRoot);
@@ -546,7 +552,7 @@ async function waitForStability(
                     silenceWindow,
                     result.domain,
                     Math.max(STABILIZER_CONFIG.DOM_ENTROPY_MIN_WAIT, phase3Deadline - Date.now()),
-                    STABILIZER_CONFIG
+                    STABILIZER_CONFIG,
                 );
 
                 throwIfAborted('DOM_ENTROPY');
@@ -687,7 +693,7 @@ async function waitForStability(
                         () =>
                             new Promise((/** @type {any} */ r) => {
                                 requestAnimationFrame(() => requestAnimationFrame(r));
-                            })
+                            }),
                     ),
                     new Promise((/** @type {any} */ r) => setTimeout(r, STABILIZER_CONFIG.FRAME_SYNC_TIMEOUT)),
                 ]);

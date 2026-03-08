@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import sinon from 'sinon';
 import * as contextBuilder from '../../../src/audit_agent/context_builder.js';
 

@@ -68,8 +68,8 @@ const stabilizer = require('@shared/page_stability/stabilizer');
 
 const driver = {
   page: puppeteerPage,
-  emit: event => console.log(event),
-  logEvent: msg => console.log(msg),
+  emit: (event) => console.log(event),
+  logEvent: (msg) => console.log(msg),
   config: { timeouts: { pageLoad: 30000 } },
 };
 

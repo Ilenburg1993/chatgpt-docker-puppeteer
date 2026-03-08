@@ -2,24 +2,20 @@
 /**
  * MCP Upstream Stdio Handler
  *
- * Spawns an MCP server as child process (stdio transport) and proxies tools
- * to our unified Tool Registry with namespace prefix.
+ * Spawns an MCP server as child process (stdio transport) and proxies tools to our unified Tool Registry with namespace
+ * prefix.
  *
  * Use case: Import tools from GitHub MCP Server without HTTP overhead
  *
- * Example:
- * const upstream = new MCPUpstreamStdio(
- *   'npx',
- *   ['-y', '@modelcontextprotocol/server-github'],
- *   { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_xxx' }
- * );
- * await upstream.start();
- * const tools = await upstream.listTools();
- * const result = await upstream.callTool('create_issue', { ... });
+ * Example: const upstream = new MCPUpstreamStdio( 'npx', ['-y', '@modelcontextprotocol/server-github'], {
+ * GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_xxx' } ); await upstream.start(); const tools = await upstream.listTools(); const
+ * result = await upstream.callTool('create_issue', { ... });
  *
  * @status IN_PROGRESS (70% complete)
  * @todo Implement robust JSON-RPC message parsing
+ *
  * @todo Add reconnection logic on process crash
+ *
  * @todo Implement graceful shutdown
  */
 
@@ -54,6 +50,7 @@ export class MCPUpstreamStdio extends EventEmitter {
      * Start the upstream MCP server process
      *
      * Steps:
+     *
      * 1. Spawn child process with stdio pipes
      * 2. Setup message parsers for stdout/stderr
      * 3. Send initialize handshake
@@ -72,12 +69,12 @@ export class MCPUpstreamStdio extends EventEmitter {
         });
 
         // Handle stdout (JSON-RPC responses)
-        (/** @type {any} */ (this.process)).stdout.on('data', (/** @type {any} */ data) => {
+        /** @type {any} */ (this.process).stdout.on('data', (/** @type {any} */ data) => {
             this._handleStdout(data);
         });
 
         // Handle stderr (logs from upstream server)
-        (/** @type {any} */ (this.process)).stderr.on('data', (/** @type {any} */ data) => {
+        /** @type {any} */ (this.process).stderr.on('data', (/** @type {any} */ data) => {
             const msg = data.toString().trim();
             if (msg) {
                 console.error(`[MCP Upstream] stderr: ${msg}`);
@@ -85,7 +82,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         });
 
         // Handle process exit
-        (/** @type {any} */ (this.process)).on('exit', (/** @type {any} */ code, /** @type {any} */ signal) => {
+        /** @type {any} */ (this.process).on('exit', (/** @type {any} */ code, /** @type {any} */ signal) => {
             console.error(`[MCP Upstream] Process exited: code=${code} signal=${signal}`);
             this.initialized = false;
             this.emit('exit', { code, signal });
@@ -98,6 +95,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         });
 
         // Wait for process to be ready (heuristic wait)
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval -- resolve is a function, not a string; no-implied-eval is a false positive here
         await new Promise((/** @type {any} */ resolve) => setTimeout(resolve, 1000));
 
         // Send initialize handshake
@@ -120,8 +118,9 @@ export class MCPUpstreamStdio extends EventEmitter {
 
             this.initialized = true;
             console.error('[MCP Upstream] Ready');
-        } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
-            this.stop();
+        } catch (/** @type {any} */ _raw_error) {
+            const error = /** @type {any} */ (_raw_error);
+            void this.stop();
             throw new Error(`Failed to initialize upstream: ${error.message}`); // eslint-disable-line preserve-caught-error
         }
     }
@@ -129,11 +128,10 @@ export class MCPUpstreamStdio extends EventEmitter {
     /**
      * Handle stdout data (JSON-RPC messages)
      *
-     * MCP stdio transport sends one JSON-RPC message per line.
-     * We buffer incomplete lines and parse complete ones.
+     * MCP stdio transport sends one JSON-RPC message per line. We buffer incomplete lines and parse complete ones.
      *
-     * @param {Buffer} data - Raw stdout data
      * @private
+     * @param {Buffer} data - Raw stdout data
      */
     _handleStdout(data) {
         this.buffer += data.toString();
@@ -152,7 +150,8 @@ export class MCPUpstreamStdio extends EventEmitter {
             try {
                 const msg = JSON.parse(trimmed);
                 this._handleMessage(msg);
-            } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
+            } catch (/** @type {any} */ _raw_error) {
+                const error = /** @type {any} */ (_raw_error);
                 console.error('[MCP Upstream] JSON parse error:', error.message);
                 console.error('[MCP Upstream] Invalid line:', trimmed.slice(0, 200));
             }
@@ -162,14 +161,14 @@ export class MCPUpstreamStdio extends EventEmitter {
     /**
      * Handle parsed JSON-RPC message
      *
+     * @private
      * @param {object} msg - Parsed JSON-RPC message
      * @param {string} msg.jsonrpc - JSON-RPC version (should be "2.0")
-     * @param {number|string} msg.id - Request ID (undefined for notifications)
+     * @param {number | string} msg.id - Request ID (undefined for notifications)
      * @param {object} msg.result - Result (for responses)
      * @param {object} msg.error - Error (for error responses)
      * @param {string} [msg.method] - Notification method
      * @param {object} [msg.params] - Notification params
-     * @private
      */
     _handleMessage(msg) {
         const { id, result, error, method } = msg;
@@ -191,7 +190,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         this.pendingRequests.delete(id);
 
         if (error) {
-            pending.reject(new Error((/** @type {any} */ (error)).message || JSON.stringify(error)));
+            pending.reject(new Error(/** @type {any} */ (error).message || JSON.stringify(error)));
         } else {
             pending.resolve(result);
         }
@@ -200,11 +199,11 @@ export class MCPUpstreamStdio extends EventEmitter {
     /**
      * Send JSON-RPC request and wait for response
      *
+     * @private
      * @param {string} method - JSON-RPC method name
      * @param {object} params - Method parameters
      * @param {number} timeout - Timeout in milliseconds (default: 30s)
      * @returns {Promise<void>} Response result
-     * @private
      */
     _sendRequest(method, params = {}, timeout = 30000) {
         const id = this.requestId++;
@@ -221,7 +220,7 @@ export class MCPUpstreamStdio extends EventEmitter {
 
             // Send to stdin (one line per message)
             const line = JSON.stringify(request) + '\n';
-            (/** @type {any} */ (this.process)).stdin.write(line);
+            /** @type {any} */ (this.process).stdin.write(line);
 
             // Timeout handling
             const timeoutId = setTimeout(() => {
@@ -251,9 +250,9 @@ export class MCPUpstreamStdio extends EventEmitter {
     /**
      * Send JSON-RPC notification (no response expected)
      *
+     * @private
      * @param {string} method - JSON-RPC method name
      * @param {object} params - Method parameters
-     * @private
      */
     _sendNotification(method, params = {}) {
         const notification = {
@@ -263,13 +262,13 @@ export class MCPUpstreamStdio extends EventEmitter {
         };
 
         const line = JSON.stringify(notification) + '\n';
-        (/** @type {any} */ (this.process)).stdin.write(line);
+        /** @type {any} */ (this.process).stdin.write(line);
     }
 
     /**
      * List all available tools from upstream server
      *
-     * @returns {Promise<{tools: Array<any>}>} Tools list
+     * @returns {Promise<{ tools: any[] }>} Tools list
      * @throws {Error} If not initialized or request fails
      */
     async listTools() {
@@ -314,8 +313,9 @@ export class MCPUpstreamStdio extends EventEmitter {
 
         // Graceful shutdown: close stdin
         try {
-            (/** @type {any} */ (this.process)).stdin.end();
-        } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
+            /** @type {any} */ (this.process).stdin.end();
+        } catch (/** @type {any} */ _raw_error) {
+            const error = /** @type {any} */ (_raw_error);
             console.error('[MCP Upstream] Error closing stdin:', error.message);
         }
 
@@ -328,7 +328,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         const timeoutPromise = new Promise((/** @type {any} */ resolve) => {
             killTimeoutId = setTimeout(() => {
                 console.error('[MCP Upstream] Process did not exit gracefully, killing...');
-                (/** @type {any} */ (this.process)).kill('SIGTERM');
+                /** @type {any} */ (this.process).kill('SIGTERM');
                 resolve();
             }, 5000);
         });
@@ -339,7 +339,7 @@ export class MCPUpstreamStdio extends EventEmitter {
         // Force kill if still alive
         if (!this.process.killed) {
             console.error('[MCP Upstream] Force killing process...');
-            (/** @type {any} */ (this.process)).kill('SIGKILL');
+            /** @type {any} */ (this.process).kill('SIGKILL');
         }
 
         /** @type {any} */ this.process = null;

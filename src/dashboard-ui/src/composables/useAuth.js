@@ -1,8 +1,11 @@
 // @ts-check
-/** @import { ComputedRef, Ref } from 'vue' */
-import { ref, computed, onMounted } from 'vue';
-import { useNotifications } from './useNotifications.js';
+/** @import {
+  ComputedRef,
+  Ref
+} from "vue" */
 import { http } from '@/lib/http';
+import { computed, onMounted, ref } from 'vue';
+import { useNotifications } from './useNotifications.js';
 
 /**
  * @typedef {object} AuthUser
@@ -14,7 +17,7 @@ import { http } from '@/lib/http';
 
 /**
  * @typedef {object} UseAuthReturn
- * @property {Ref<AuthUser|null>} user
+ * @property {Ref<AuthUser | null>} user
  * @property {Ref<boolean>} loading
  * @property {ComputedRef<boolean>} isAuthenticated
  * @property {ComputedRef<boolean>} isAdmin
@@ -26,10 +29,10 @@ import { http } from '@/lib/http';
  * @property {() => Promise<void>} logout
  * @property {() => Promise<boolean>} verifyToken
  * @property {(url: string, options?: RequestInit) => Promise<Response>} authenticatedFetch
- * @property {() => string|null} getToken
+ * @property {() => string | null} getToken
  */
 
-const authUser = /** @type {Ref<AuthUser|null>} */ (ref(null));
+const authUser = /** @type {Ref<AuthUser | null>} */ (ref(null));
 const authLoading = ref(false);
 let verifyInFlight = /** @type {any} */ (null);
 let authInitialized = false;
@@ -39,8 +42,7 @@ const setTokenInStorage = (/** @type {any} */ token) => localStorage.setItem('au
 const clearTokenInStorage = () => localStorage.removeItem('auth_token');
 
 /**
- * Composable para gerenciamento de autenticação JWT
- * Gerencia login, logout, e verificação de token automaticamente
+ * Composable para gerenciamento de autenticação JWT Gerencia login, logout, e verificação de token automaticamente
  *
  * @returns {UseAuthReturn} Estado e funções de autenticação
  * @sideEffects - Gerencia token JWT no localStorage, faz verificações automáticas
@@ -74,7 +76,8 @@ export function useAuth() {
 
     /**
      * Obtém token do localStorage
-     * @returns {string|null} Token JWT ou null
+     *
+     * @returns {string | null} Token JWT ou null
      */
     const getToken = () => {
         return getTokenFromStorage();
@@ -82,9 +85,10 @@ export function useAuth() {
 
     /**
      * Salva token no localStorage
+     *
      * @param {string} token - Token JWT
      */
-    const setToken = token => {
+    const setToken = (token) => {
         setTokenInStorage(token);
     };
 
@@ -97,6 +101,7 @@ export function useAuth() {
 
     /**
      * Verifica se token é válido fazendo request para /auth/me
+     *
      * @returns {Promise<boolean>} True se token válido
      */
     const verifyToken = async () => {
@@ -130,6 +135,7 @@ export function useAuth() {
 
     /**
      * Faz login com credenciais
+     *
      * @param {string} username - Nome do usuário
      * @param {string} password - Senha
      * @returns {Promise<boolean>} True se login bem-sucedido
@@ -151,7 +157,7 @@ export function useAuth() {
             showError(data.error || 'Erro no login');
             return false;
         } catch (/** @type {any} */ _rawError) {
-    const error = /** @type {any} */ (_rawError);
+            const error = /** @type {any} */ (_rawError);
             const apiError = error?.response?.data?.error || 'Erro de conexão';
             showError(apiError);
             return false;
@@ -162,6 +168,7 @@ export function useAuth() {
 
     /**
      * Faz logout
+     *
      * @returns {Promise<any>}
      */
     const logout = async () => {
@@ -173,7 +180,7 @@ export function useAuth() {
                 await http.post('/api/dashboard/auth/logout');
             }
         } catch (/** @type {any} */ _rawError) {
-    const error = /** @type {any} */ (_rawError);
+            const error = /** @type {any} */ (_rawError);
             console.error('Logout error:', error);
         }
 
@@ -185,6 +192,7 @@ export function useAuth() {
 
     /**
      * Faz fetch autenticado com token automático
+     *
      * @param {string} url - URL da API
      * @param {object} options - Opções do fetch
      * @returns {Promise<Response>} Response do fetch

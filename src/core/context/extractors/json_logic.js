@@ -8,6 +8,7 @@
 
 /**
  * Captura o primeiro bloco JSON {...} ignorando ruído textual.
+ *
  * @param {string} content - Texto bruto vindo da IA.
  * @returns {string} Objeto JSON serializado ou "{}" se não encontrado.
  */

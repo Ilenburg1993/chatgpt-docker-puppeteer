@@ -1,8 +1,8 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
-import * as stabilizer from '#shared/page_stability/stabilizer';
 import { log } from '#core/logger';
 import { createSharedTimeout } from '#infra/abort_controller_utils';
+import * as stabilizer from '#shared/page_stability/stabilizer';
+import EventEmitter from 'node:events';
 
 /* ==========================================================================
    RECOVERY_CONFIG v2.0 - Zero Magic Numbers
@@ -50,6 +50,7 @@ const RECOVERY_EVENTS = {
  * RecoverySystem v2.0 - Sistema de recuperação escalonada (4 tiers)
  *
  * Responsabilidades:
+ *
  * - Executar recovery tiers baseado em attempt count (0-3)
  * - Tier 0: Cache invalidation + tactical delay
  * - Tier 1: Focus recovery (mouse click + window.focus)
@@ -65,13 +66,13 @@ class RecoverySystem extends EventEmitter {
     /**
      * Cria RecoverySystem instance v2.0
      *
-     * @constructor
+     * @example
+     *     const recovery = new RecoverySystem(driver);
+     *     recovery.on(RECOVERY_EVENTS.TIER_STARTED, (data) => { ... });
+     *
+     * @class
      * @param {any} driver - Driver Puppeteer (BaseDriver instance)
      * @throws {Error} Se driver inválido ou missing methods
-     *
-     * @example
-     * const recovery = new RecoverySystem(driver);
-     * recovery.on(RECOVERY_EVENTS.TIER_STARTED, (data) => { ... });
      */
     constructor(driver) {
         super();
@@ -118,6 +119,7 @@ class RecoverySystem extends EventEmitter {
      * Aplica tier de recuperação baseado em attempt count.
      *
      * v2.0 Features:
+     *
      * - EventEmitter telemetry (tier_started, tier_completed, tier_failed)
      * - IPC telemetry via _emitVital (TRIAGE_ALERT, PROGRESS_UPDATE)
      * - Metrics tracking (tier usage, success/failure, timing)
@@ -125,19 +127,18 @@ class RecoverySystem extends EventEmitter {
      * - Timeout protection em todas operações
      *
      * @async
+     * @fires RECOVERY_EVENTS.TIER_STARTED - Quando tier inicia
+     * @fires RECOVERY_EVENTS.TIER_COMPLETED - Quando tier completa com sucesso
+     * @fires RECOVERY_EVENTS.TIER_FAILED - Quando tier falha
+     * @fires RECOVERY_EVENTS.CACHE_CLEARED - Quando cache é limpo (tier 0)
+     * @fires RECOVERY_EVENTS.FOCUS_RESTORED - Quando focus restaurado (tier 1)
+     * @fires RECOVERY_EVENTS.PAGE_RELOADED - Quando page recarregada (tier 2)
+     * @fires RECOVERY_EVENTS.PROCESS_KILLED - Quando processo morto (tier 3)
      * @param {Error} recoveryErr - Erro original que triggered recovery
      * @param {number} attempt - Índice tier (0-3)
      * @param {string} taskId - ID da tarefa
      * @returns {Promise<void>}
      * @throws {Error} Se tier 3 falhar (fatal - escalates to ExecutionEngine)
-     *
-     * @emits RECOVERY_EVENTS.TIER_STARTED - Quando tier inicia
-     * @emits RECOVERY_EVENTS.TIER_COMPLETED - Quando tier completa com sucesso
-     * @emits RECOVERY_EVENTS.TIER_FAILED - Quando tier falha
-     * @emits RECOVERY_EVENTS.CACHE_CLEARED - Quando cache é limpo (tier 0)
-     * @emits RECOVERY_EVENTS.FOCUS_RESTORED - Quando focus restaurado (tier 1)
-     * @emits RECOVERY_EVENTS.PAGE_RELOADED - Quando page recarregada (tier 2)
-     * @emits RECOVERY_EVENTS.PROCESS_KILLED - Quando processo morto (tier 3)
      */
     async applyTier(recoveryErr, attempt, taskId) {
         const startTime = Date.now();
@@ -251,7 +252,7 @@ class RecoverySystem extends EventEmitter {
         const delay = baseDelay + this.stats.tier0Applied * increment;
 
         log('DEBUG', `[RECOVERY] Tier 0: Cache cleared, waiting ${delay}ms`, correlationId);
-        await new Promise(r => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, delay));
 
         // Page alive check
         this.driver._assertPageAlive();
@@ -261,6 +262,7 @@ class RecoverySystem extends EventEmitter {
      * Executa Tier 1: Focus Recovery (no bringToFront)
      *
      * v2.0 Features:
+     *
      * - Timeout protection em mouse.click e window.focus (P3 fix)
      * - Browser connection validation
      * - EventEmitter telemetry
@@ -324,6 +326,7 @@ class RecoverySystem extends EventEmitter {
      * Executa Tier 2: Hard Page Reload + Stabilizer Wait
      *
      * v2.0 Features:
+     *
      * - Timeout protection em reload (P2 fix)
      * - Retry logic (MAX_TIER_RETRIES - P3 fix)
      * - EventEmitter telemetry
@@ -349,7 +352,7 @@ class RecoverySystem extends EventEmitter {
                 log(
                     'WARN',
                     `[RECOVERY] Tier 2: Forçando reload da aba ativa (attempt ${retry + 1}/${maxRetries})...`,
-                    correlationId
+                    correlationId,
                 );
 
                 // ✅ Timeout wrapper (B009: timer cancelado após race settle)
@@ -390,14 +393,14 @@ class RecoverySystem extends EventEmitter {
                     log(
                         'WARN',
                         `[RECOVERY] Tier 2: Reload failed (retry ${retry + 1}/${maxRetries}): ${reloadErr.message}`,
-                        correlationId
+                        correlationId,
                     );
-                    await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
+                    await new Promise((r) => setTimeout(r, 1000 * (retry + 1))); // Backoff
                 } else {
                     log(
                         'ERROR',
                         `[RECOVERY] Tier 2: Falha crítica no reload após ${maxRetries} tentativas: ${reloadErr.message}`,
-                        correlationId
+                        correlationId,
                     );
                     throw reloadErr; // Max retries
                 }
@@ -409,12 +412,13 @@ class RecoverySystem extends EventEmitter {
      * Executa Tier 3: Graceful Disconnect (External Browser Mode)
      *
      * v3.0 Features (External Connection):
+     *
      * - Disconnect Puppeteer connection gracefully
      * - Emit user notification (browser needs manual restart)
      * - Escalation to ExecutionEngine
      *
-     * Note: Em modo EXTERNAL, browser.process() retorna null.
-     * Chrome roda no Windows (user-managed), não pode ser killed remotamente.
+     * Note: Em modo EXTERNAL, browser.process() retorna null. Chrome roda no Windows (user-managed), não pode ser
+     * killed remotamente.
      *
      * @private
      * @param {string} correlationId - Correlation ID
@@ -444,7 +448,7 @@ class RecoverySystem extends EventEmitter {
             log(
                 'WARN',
                 '[RECOVERY] Cannot perform Tier 3 recovery: driver is in UNATTACHED state (page is null)',
-                correlationId
+                correlationId,
             );
             throw recoveryErr;
         }
@@ -460,7 +464,7 @@ class RecoverySystem extends EventEmitter {
                 log(
                     'DEBUG',
                     `[RECOVERY] Tier 3: Killing browser process with timeout=${KILL_TIMEOUT}ms...`,
-                    correlationId
+                    correlationId,
                 );
 
                 // B009: timer cancelado via finally para evitar timer pendente após race settle
@@ -489,7 +493,7 @@ class RecoverySystem extends EventEmitter {
                 log(
                     'WARN',
                     `[RECOVERY] Tier 3: Kill failed/timeout: ${killErr.message}. Continua o fluxo...`,
-                    correlationId
+                    correlationId,
                 );
             }
         } else {
@@ -534,14 +538,13 @@ class RecoverySystem extends EventEmitter {
     /**
      * Helper: Timeout promise wrapper
      *
-     * Returns a promise that rejects after `ms` milliseconds.
-     * The timer is automatically cancelled when the returned promise's
-     * `cancel()` method is called (use in Promise.race finalization).
+     * Returns a promise that rejects after `ms` milliseconds. The timer is automatically cancelled when the returned
+     * promise's `cancel()` method is called (use in Promise.race finalization).
      *
      * @private
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para logs)
-     * @returns {{ promise: Promise<never>, cancel: () => void }}
+     * @returns {{ promise: Promise<never>; cancel: () => void }}
      */
     _timeout(ms, operation) {
         /** @type {any} */
@@ -567,9 +570,14 @@ class RecoverySystem extends EventEmitter {
      *
      * v2.0 Feature (BUG #5 fix)
      *
+     * @example
+     *     const stats = recovery.getStats();
+     *     console.log(`Tier 0 applied: ${stats.tier0Applied} times`);
+     *
      * @returns {any} Stats completas
      *
-     * Propriedades do objeto retornado:
+     *   Propriedades do objeto retornado:
+     *
      *   - tier0Applied (number): Tier 0 aplicados
      *   - tier1Applied (number): Tier 1 aplicados
      *   - tier2Applied (number): Tier 2 aplicados
@@ -580,10 +588,6 @@ class RecoverySystem extends EventEmitter {
      *   - totalRecoveryDuration (number): Tempo total (ms)
      *   - maxRecoveryDuration (number): Tempo máximo (ms)
      *   - config (Object): Configuração atual (RECOVERY_CONFIG)
-     *
-     * @example
-     * const stats = recovery.getStats();
-     * console.log(`Tier 0 applied: ${stats.tier0Applied} times`);
      */
     getStats() {
         return {
@@ -596,20 +600,18 @@ class RecoverySystem extends EventEmitter {
 /**
  * Factory function para criar instância do RecoverySystem
  *
- * **Side-effects:** N/A
- * **Semântica:** Cria nova instância do RecoverySystem associada ao driver fornecido.
+ * **Side-effects:** N/A **Semântica:** Cria nova instância do RecoverySystem associada ao driver fornecido.
  * **Unidades:** N/A
  *
  * @param {any} driver - Instância do driver para sistema de recuperação
  * @returns {RecoverySystem} Nova instância do RecoverySystem
  */
-export const create = driver => new RecoverySystem(driver);
+export const create = (driver) => new RecoverySystem(driver);
 
 /**
  * Classe do sistema de recuperação escalonada
  *
- * **Side-effects:** N/A
- * **Semântica:** Classe principal para implementação de sistema de recuperação de falhas.
+ * **Side-effects:** N/A **Semântica:** Classe principal para implementação de sistema de recuperação de falhas.
  * **Unidades:** N/A
  *
  * @type {function}
@@ -619,9 +621,8 @@ export { RecoverySystem };
 /**
  * Configurações do sistema de recuperação
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações de timeouts e limites para recuperação de falhas.
- * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
+ * **Side-effects:** N/A **Semântica:** Configurações de timeouts e limites para recuperação de falhas. **Unidades:**
+ * Milissegundos para timeouts, números inteiros para contadores.
  *
  * @type {Object<string, number>}
  */
@@ -630,9 +631,7 @@ export { RECOVERY_CONFIG };
 /**
  * Eventos emitidos pelo sistema de recuperação
  *
- * **Side-effects:** N/A
- * **Semântica:** Enumeração de eventos para comunicação com sistemas externos.
- * **Unidades:** N/A
+ * **Side-effects:** N/A **Semântica:** Enumeração de eventos para comunicação com sistemas externos. **Unidades:** N/A
  *
  * @type {Object<string, string>}
  */

@@ -1,9 +1,9 @@
 // @ts-check
-import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import path from 'node:path';
 import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
 describe('Infra IO Operations - Operações de Entrada/Saída', () => {
     /** @type {any} */ let testDir;
@@ -169,7 +169,7 @@ describe('Infra IO Operations - Operações de Entrada/Saída', () => {
             fs.writeFileSync(path.join(filaDir, 'task-2.json'), '{}');
             fs.writeFileSync(path.join(filaDir, 'task-3.json'), '{}');
 
-            const arquivos = fs.readdirSync(filaDir).filter(f => f.endsWith('.json'));
+            const arquivos = fs.readdirSync(filaDir).filter((f) => f.endsWith('.json'));
 
             assert.strictEqual(arquivos.length, 3);
         });
@@ -182,7 +182,7 @@ describe('Infra IO Operations - Operações de Entrada/Saída', () => {
             fs.writeFileSync(path.join(dir, 'readme.txt'), 'texto');
             fs.writeFileSync(path.join(dir, 'data.csv'), 'csv');
 
-            const jsons = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+            const jsons = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
 
             assert.strictEqual(jsons.length, 1);
         });

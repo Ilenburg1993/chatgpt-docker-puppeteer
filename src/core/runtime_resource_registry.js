@@ -1,18 +1,20 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 
 /**
- * @typedef {'required'|'optional'} RuntimeResourceCriticality
- * @typedef {'ready'|'degraded'|'not-ready'|'stopped'|'unknown'} RuntimeResourceState
+ * @typedef {'required' | 'optional'} RuntimeResourceCriticality
+ *
+ * @typedef {'ready' | 'degraded' | 'not-ready' | 'stopped' | 'unknown'} RuntimeResourceState
+ *
  * @typedef {{
- *   id: string,
- *   owner: string,
- *   criticality: RuntimeResourceCriticality,
- *   state: RuntimeResourceState,
- *   reasonCode: string|null,
- *   message: string|null,
- *   updatedAt: number,
- *   stop?: (() => Promise<void>|void)|null,
- *   health?: (() => unknown)|null
+ *     id: string;
+ *     owner: string;
+ *     criticality: RuntimeResourceCriticality;
+ *     state: RuntimeResourceState;
+ *     reasonCode: string | null;
+ *     message: string | null;
+ *     updatedAt: number;
+ *     stop?: (() => Promise<void> | void) | null;
+ *     health?: (() => unknown) | null;
  * }} RuntimeResource
  */
 
@@ -47,11 +49,11 @@ function normalizeState(value) {
 }
 
 /**
- * Executa uma operação assíncrona com timeout cancelável.
- * Evita Promise.race com timer órfão sem clearTimeout no mesmo escopo.
+ * Executa uma operação assíncrona com timeout cancelável. Evita Promise.race com timer órfão sem clearTimeout no mesmo
+ * escopo.
  *
  * @template T
- * @param {() => Promise<T>|T} operation
+ * @param {() => Promise<T> | T} operation
  * @param {number} timeoutMs
  * @returns {Promise<T>}
  */
@@ -63,20 +65,20 @@ async function runWithTimeout(operation, timeoutMs) {
 
         Promise.resolve()
             .then(() => operation())
-            .then(result => {
+            .then((result) => {
                 clearTimeout(timer);
                 resolve(result);
             })
-            .catch(error => {
+            .catch((error) => {
                 clearTimeout(timer);
-                reject(error);
+                reject(error instanceof Error ? error : new Error(String(error)));
             });
     });
 }
 
 /**
- * @param {Partial<RuntimeResource> & {id: string}} resource
- * @param {*} resource
+ * @param {Partial<RuntimeResource> & { id: string }} resource
+ * @param {any} resource
  * @returns {RuntimeResource}
  */
 function upsertRuntimeResource(resource) {
@@ -133,7 +135,7 @@ function setRuntimeResourceState(id, state, details = {}) {
 
 /**
  * @typedef {object} GetRuntimeResourcesSnapshotOptions
- * @property {string|null} owner
+ * @property {string | null} owner
  */
 /**
  * Retorna snapshot serializável dos recursos runtime registrados.
@@ -143,14 +145,14 @@ function setRuntimeResourceState(id, state, details = {}) {
  */
 function getRuntimeResourcesSnapshot({ owner = null } = {}) {
     const values = [...runtimeResources.values()]
-        .filter(item => !owner || item.owner === owner)
-        .map(item => {
+        .filter((item) => !owner || item.owner === owner)
+        .map((item) => {
             let health = null;
             if (typeof item.health === 'function') {
                 try {
                     health = item.health();
                 } catch (/** @type {any} */ _rawError) {
-            const error = /** @type {any} */ (_rawError);
+                    const error = /** @type {any} */ (_rawError);
                     health = { error: error?.message || String(error) };
                 }
             }
@@ -170,7 +172,7 @@ function getRuntimeResourcesSnapshot({ owner = null } = {}) {
 
 /**
  * @typedef {object} GetRuntimeReadinessSummaryOptions
- * @property {string|null} owner
+ * @property {string | null} owner
  * @property {string[]} requiredComponents
  * @property {boolean} allowDegradedReady
  */
@@ -179,11 +181,11 @@ function getRuntimeResourcesSnapshot({ owner = null } = {}) {
  *
  * @param {any} [options]
  * @returns {{
- *   status: 'ready'|'degraded'|'not-ready',
- *   required_components: Array<{id:string,state:string,reasonCode:string|null,message:string|null}>,
- *   degraded_components: Array<{id:string,state:string,reasonCode:string|null,message:string|null}>,
- *   not_ready_components: Array<{id:string,state:string,reasonCode:string|null,message:string|null}>,
- *   resources: ReturnType<typeof getRuntimeResourcesSnapshot>,
+ *     status: 'ready' | 'degraded' | 'not-ready';
+ *     required_components: { id: string; state: string; reasonCode: string | null; message: string | null }[];
+ *     degraded_components: { id: string; state: string; reasonCode: string | null; message: string | null }[];
+ *     not_ready_components: { id: string; state: string; reasonCode: string | null; message: string | null }[];
+ *     resources: ReturnType<typeof getRuntimeResourcesSnapshot>;
  * }}
  */
 function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], allowDegradedReady = true } = {}) {
@@ -213,7 +215,7 @@ function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], all
         }
     }
 
-    const requiredNotReady = required.filter(item => item.state !== 'ready');
+    const requiredNotReady = required.filter((item) => item.state !== 'ready');
     const status =
         requiredNotReady.length > 0
             ? 'not-ready'
@@ -234,7 +236,7 @@ function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], all
 
 /**
  * @typedef {object} StopRuntimeResourcesOptions
- * @property {string|null} owner
+ * @property {string | null} owner
  * @property {number} timeoutMs
  * @property {any} logger
  * @property {any} message
@@ -243,13 +245,13 @@ function getRuntimeReadinessSummary({ owner = null, requiredComponents = [], all
  * Para recursos registrados em ordem reversa de criação, com timeout por recurso.
  *
  * @param {any} [options]
- * @returns {Promise<Array<{id:string, ok:boolean, error?:string, timeout?:boolean}>>}
+ * @returns {Promise<{ id: string; ok: boolean; error?: string; timeout?: boolean }[]>}
  */
 async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = /** @type {any} */ (null) } = {}) {
-    const entries = [...runtimeResources.values()].filter(item => !owner || item.owner === owner);
+    const entries = [...runtimeResources.values()].filter((item) => !owner || item.owner === owner);
     entries.reverse();
 
-    /** @type {Array<{id:string, ok:boolean, error?:string, timeout?:boolean}>} */
+    /** @type {{ id: string; ok: boolean; error?: string; timeout?: boolean }[]} */
     const results = [];
 
     for (const resource of entries) {
@@ -258,7 +260,7 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = /
         }
 
         try {
-            await runWithTimeout(() => Promise.resolve((/** @type {any} */ (resource)).stop()), timeoutMs);
+            await runWithTimeout(() => Promise.resolve(/** @type {any} */ (resource).stop()), timeoutMs);
             setRuntimeResourceState(resource.id, 'stopped', {
                 owner: resource.owner,
                 criticality: resource.criticality,
@@ -279,9 +281,9 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = /
                 error: error?.message || String(error),
             });
             if (logger && typeof logger === 'function') {
-                (/** @type {any} */ (logger))(
+                /** @type {any} */ (logger)(
                     'WARN',
-                    `[RUNTIME_REGISTRY] Falha ao parar recurso ${resource.id}: ${error?.message || String(error)}`
+                    `[RUNTIME_REGISTRY] Falha ao parar recurso ${resource.id}: ${error?.message || String(error)}`,
                 );
             }
         }
@@ -293,7 +295,7 @@ async function stopRuntimeResources({ owner = null, timeoutMs = 5000, logger = /
 /**
  * Remove recursos do registry (todos ou apenas de um owner).
  *
- * @param {string|null} [owner=null]
+ * @param {string | null} [owner=null] Default is `null`
  * @returns {void}
  */
 function clearRuntimeResources(owner = null) {

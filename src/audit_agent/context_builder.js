@@ -6,11 +6,11 @@ const execFile = promisify(execFileCb);
 
 /**
  * @typedef {{
- *     ok: boolean,
- *     status: number | null,
- *     json: Record<string, unknown> | null,
- *     text: string,
- *     error?: string
+ *     ok: boolean;
+ *     status: number | null;
+ *     json: Record<string, unknown> | null;
+ *     text: string;
+ *     error?: string;
  * }} McpToolCallResult
  */
 
@@ -21,28 +21,33 @@ const execFile = promisify(execFileCb);
  */
 
 /**
- * @typedef {(name: string, args: Record<string, unknown>, options?: McpToolCallOptions) => Promise<McpToolCallResult>} CallMcpToolOverride
+ * @typedef {(
+ *     name: string,
+ *     args: Record<string, unknown>,
+ *     options?: McpToolCallOptions,
+ * ) => Promise<McpToolCallResult>} CallMcpToolOverride
  */
 
 /**
  * @typedef {{
- *     ok: true,
- *     stdout: string,
- *     stderr: string
- * } | {
- *     ok: false,
- *     error: string,
- *     stdout: string,
- *     stderr: string
- * }} ScriptRunResult
+ *           ok: true;
+ *           stdout: string;
+ *           stderr: string;
+ *       }
+ *     | {
+ *           ok: false;
+ *           error: string;
+ *           stdout: string;
+ *           stderr: string;
+ *       }} ScriptRunResult
  */
 
 /**
  * @typedef {{
- *     ok: false,
- *     error: string,
- *     stdout: string,
- *     stderr: string
+ *     ok: false;
+ *     error: string;
+ *     stdout: string;
+ *     stderr: string;
  * }} FailedScriptRunResult
  */
 
@@ -52,12 +57,12 @@ const execFile = promisify(execFileCb);
 
 /**
  * @typedef {{
- *     runtime?: Record<string, unknown>,
- *     inference_gateway?: Record<string, unknown>,
- *     mcp_tools?: Record<string, unknown> | null,
- *     semantic_quality?: string,
- *     rag_quality?: string,
- *     runtime_quality?: string
+ *     runtime?: Record<string, unknown>;
+ *     inference_gateway?: Record<string, unknown>;
+ *     mcp_tools?: Record<string, unknown> | null;
+ *     semantic_quality?: string;
+ *     rag_quality?: string;
+ *     runtime_quality?: string;
  * }} AuditContext
  */
 
@@ -67,17 +72,17 @@ const execFile = promisify(execFileCb);
  */
 
 /**
- * @typedef {{ context: Record<string, unknown>, findings: Array<Record<string, unknown>>, patches: unknown[] }} AuditAgentQuickContextResult
+ * @typedef {{ context: Record<string, unknown>; findings: Record<string, unknown>[]; patches: unknown[] }} AuditAgentQuickContextResult
  */
 
 /**
- * @typedef {{ tools: Record<string, unknown>, raw: Record<string, unknown> }} AuditAgentSemanticContextResult
+ * @typedef {{ tools: Record<string, unknown>; raw: Record<string, unknown> }} AuditAgentSemanticContextResult
  */
 
 /**
  * @typedef {object} AuditAgentContextBuilderFacade
- * @property {(job?: AuditAgentContextJob|null) => Promise<AuditAgentQuickContextResult>} collectQuickContext
- * @property {(job?: AuditAgentContextJob|null) => Promise<AuditAgentSemanticContextResult>} collectMcpSemanticContext
+ * @property {(job?: AuditAgentContextJob | null) => Promise<AuditAgentQuickContextResult>} collectQuickContext
+ * @property {(job?: AuditAgentContextJob | null) => Promise<AuditAgentSemanticContextResult>} collectMcpSemanticContext
  */
 
 /**
@@ -121,7 +126,7 @@ function getStructuredContentData(json) {
 
 /**
  * @param {unknown} text
- * @param {unknown} [fallback=null]
+ * @param {unknown} [fallback=null] Default is `null`
  * @returns {unknown}
  */
 function parseJsonSafe(text, fallback = null) {
@@ -140,12 +145,12 @@ function getServerBaseUrl() {
 
 /**
  * @param {string[]} scriptArgs
- * @param {number} [timeoutMs=10000]
+ * @param {number} [timeoutMs=10000] Default is `10000`
  * @returns {Promise<ScriptRunResult>}
  */
 async function runNodeScript(scriptArgs, timeoutMs = 10000) {
     try {
-        /** @type {Record<string, string|undefined>} */
+        /** @type {Record<string, string | undefined>} */
         const childEnv = { ...process.env, FORCE_COLOR: '0' };
         delete childEnv.NO_COLOR;
         const { stdout, stderr } = await execFile('npm', scriptArgs, {
@@ -227,6 +232,7 @@ function _ensureCacheSpace() {
 
 /**
  * Limpa o cache interno de resultados MCP/LSP mantido pelo context builder.
+ *
  * @returns {void}
  */
 function _clearMcpLspCache() {
@@ -235,6 +241,7 @@ function _clearMcpLspCache() {
 
 /**
  * Retorna o tamanho atual do cache interno MCP/LSP.
+ *
  * @returns {number}
  */
 function _getMcpLspCacheSize() {
@@ -284,7 +291,7 @@ async function callMcpTool(name, args, options = {}) {
 /**
  * @param {AuditAgentContextJob} job
  * @param {CallMcpToolOverride | undefined} callToolOverride
- * @returns {Promise<{ tools: Record<string, unknown>, raw: Record<string, unknown> }>}
+ * @returns {Promise<{ tools: Record<string, unknown>; raw: Record<string, unknown> }>}
  */
 async function collectMcpSemanticContext(job, callToolOverride) {
     // allows tests or external callers to provide a fake MCP tool implementation
@@ -297,7 +304,7 @@ async function collectMcpSemanticContext(job, callToolOverride) {
     const query = String(scope.query || scope.rag_query || 'AUDIT_AGENT');
     const mcpBudget = Math.max(
         1,
-        Math.min(Number(scope.mcp_budget || process.env.AUDIT_AGENT_CONTEXT_MCP_BUDGET || 5) || 5, 8)
+        Math.min(Number(scope.mcp_budget || process.env.AUDIT_AGENT_CONTEXT_MCP_BUDGET || 5) || 5, 8),
     );
     let budgetUsed = 0;
 
@@ -329,7 +336,7 @@ async function collectMcpSemanticContext(job, callToolOverride) {
             lspDefinition = await call(
                 'lsp_definition',
                 { filePath, line, character, maxResults: 10 },
-                { timeoutMs: 5000, id: 203 }
+                { timeoutMs: 5000, id: 203 },
             );
             if (lspDefinition.ok) {
                 _ensureCacheSpace();
@@ -349,7 +356,7 @@ async function collectMcpSemanticContext(job, callToolOverride) {
         ragExpand = await call(
             'rag_expand',
             { chunk_id: firstChunkId, mode: 'lines', before_lines: 20, after_lines: 20 },
-            { timeoutMs: 5000, id: 204 }
+            { timeoutMs: 5000, id: 204 },
         );
     }
     const ragExpandData = getStructuredContentData(ragExpand?.json || null);
@@ -365,7 +372,7 @@ async function collectMcpSemanticContext(job, callToolOverride) {
             lspReferences = await call(
                 'lsp_references',
                 { filePath, line, character, maxResults: 20 },
-                { timeoutMs: 5000, id: 205 }
+                { timeoutMs: 5000, id: 205 },
             );
             if (lspReferences.ok) {
                 _ensureCacheSpace();
@@ -382,7 +389,7 @@ async function collectMcpSemanticContext(job, callToolOverride) {
         lspDocumentSymbols = await call(
             'lsp_document_symbols',
             { filePath, maxResults: 100 },
-            { timeoutMs: 5000, id: 206 }
+            { timeoutMs: 5000, id: 206 },
         );
     }
     const symbolsData = getStructuredContentData(lspDocumentSymbols?.json || null);
@@ -449,10 +456,10 @@ async function collectMcpSemanticContext(job, callToolOverride) {
 
 /**
  * @param {AuditContext} context
- * @returns {Array<Record<string, unknown>>}
+ * @returns {Record<string, unknown>[]}
  */
 function deriveContextFindings(context) {
-    /** @type {Array<Record<string, unknown>>} */
+    /** @type {Record<string, unknown>[]} */
     const findings = [];
     const runtime = asRecord(context.runtime) || {};
     const mcp = asRecord(runtime.mcp) || {};
@@ -585,7 +592,7 @@ function buildProbeState(probe, parsedJson) {
 }
 
 /**
- * @param {AuditAgentContextBuilderOptions} [options={}]
+ * @param {AuditAgentContextBuilderOptions} [options={}] Default is `{}`
  * @returns {AuditAgentContextBuilderFacade}
  */
 export function createAuditAgentContextBuilder(options = {}) {
@@ -639,4 +646,4 @@ export function createAuditAgentContextBuilder(options = {}) {
     };
 }
 // Exported helpers for testing and external introspection
-export { callMcpTool, _clearMcpLspCache, _getMcpLspCacheSize };
+export { _clearMcpLspCache, _getMcpLspCacheSize, callMcpTool };

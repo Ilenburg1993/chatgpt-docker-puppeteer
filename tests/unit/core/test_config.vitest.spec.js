@@ -1,8 +1,8 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 
 describe('Core Config Completo - Configuração (Vitest)', () => {
     it('deve existir e ser JSON válido', () => {

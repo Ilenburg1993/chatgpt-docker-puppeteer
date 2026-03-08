@@ -2,8 +2,8 @@
 /**
  * CI gate: verifica que `tsconfig.base.json` tem `compilerOptions.strict: true`.
  *
- * Este gate deve falhar na Fase 5 do roadmap até que a base seja endurecida.
- * Antes da Fase 5, adicione este script ao job de CI mas com `continue-on-error: true`.
+ * Este gate deve falhar na Fase 5 do roadmap até que a base seja endurecida. Antes da Fase 5, adicione este script ao
+ * job de CI mas com `continue-on-error: true`.
  *
  * @module check-base-strict
  */

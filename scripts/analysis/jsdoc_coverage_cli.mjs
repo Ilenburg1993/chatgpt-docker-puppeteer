@@ -150,7 +150,7 @@ const format = String(values.format || 'console').toLowerCase();
 const filesArg = String(values.files || '').trim();
 const roots = String(values.roots || 'src,scripts,tests')
     .split(',')
-    .map(item => item.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
 const expectedSchemaVersion =
     String(values['schema-version'] || JSDOC_COVERAGE_SCHEMA_VERSION).trim() || JSDOC_COVERAGE_SCHEMA_VERSION;
@@ -159,7 +159,7 @@ const quiet = Boolean(values.quiet);
 const files = filesArg
     ? filesArg
           .split(',')
-          .map(item => item.trim())
+          .map((item) => item.trim())
           .filter(Boolean)
     : collectJsSourceFiles(roots);
 const report = analyzeJSDocCoverage({ files, scope });
@@ -215,7 +215,7 @@ if (quiet) {
                 right.functions_missing_param_tags - left.functions_missing_param_tags ||
                 right.functions_missing_options_typedef - left.functions_missing_options_typedef ||
                 right.unsafe_generic_tags_total - left.unsafe_generic_tags_total ||
-                left.file.localeCompare(right.file)
+                left.file.localeCompare(right.file),
         )
         .slice(0, 25);
 
@@ -230,7 +230,7 @@ if (quiet) {
             continue;
         }
         console.log(
-            `- ${item.file}: exports ${item.coverage_pct}% (${item.exports_with_jsdoc}/${item.exports_total}), returns ${item.function_returns_coverage_pct}% (${item.functions_with_returns_tag}/${item.functions_total}), params ${item.functions_with_complete_param_tags}/${item.functions_total}, options typedef missing ${item.functions_missing_options_typedef}, unsafe tags ${item.unsafe_generic_tags_total}`
+            `- ${item.file}: exports ${item.coverage_pct}% (${item.exports_with_jsdoc}/${item.exports_total}), returns ${item.function_returns_coverage_pct}% (${item.functions_with_returns_tag}/${item.functions_total}), params ${item.functions_with_complete_param_tags}/${item.functions_total}, options typedef missing ${item.functions_missing_options_typedef}, unsafe tags ${item.unsafe_generic_tags_total}`,
         );
     }
 }
@@ -247,7 +247,7 @@ if (values.gaps) {
         for (const symbol of fileReport.exported_symbols) {
             if (symbol.missing_tags.length > 0) {
                 fileGaps.push(
-                    `  ${symbol.export_name}:${symbol.line ?? '?'}  missing=[${symbol.missing_tags.join(',')}]`
+                    `  ${symbol.export_name}:${symbol.line ?? '?'}  missing=[${symbol.missing_tags.join(',')}]`,
                 );
                 gapCount++;
             }

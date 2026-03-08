@@ -39,8 +39,8 @@ function _parseJson(raw, fallback = {}) {
  * @property {string} category
  * @property {string} title
  * @property {string} source
- * @property {string|null} contract_id
- * @property {string|null} dedup_key
+ * @property {string | null} contract_id
+ * @property {string | null} dedup_key
  * @property {string} status
  * @property {Record<string, any>} evidence_json
  * @property {number} created_at_ms
@@ -48,8 +48,8 @@ function _parseJson(raw, fallback = {}) {
  */
 
 /**
- * @param {Record<string, any>|null|undefined} row
- * @returns {AuditFinding|null}
+ * @param {Record<string, any> | null | undefined} row
+ * @returns {AuditFinding | null}
  */
 function _rowToFinding(row) {
     if (!row) return null;
@@ -85,8 +85,9 @@ function _rowToFinding(row) {
  */
 /**
  * Função exportada: upsertAuditFinding.
+ *
  * @param {UpsertAuditFindingInput} [input]
- * @returns {AuditFinding|null}
+ * @returns {AuditFinding | null}
  */
 function upsertAuditFinding(input = /** @type {UpsertAuditFindingInput} */ ({})) {
     const db = getDb();
@@ -97,7 +98,7 @@ function upsertAuditFinding(input = /** @type {UpsertAuditFindingInput} */ ({}))
     const dedupKey = input.dedup_key ? String(input.dedup_key) : null;
 
     if (dedupKey) {
-        const existing = /** @type {Record<string, any>|null} */ (
+        const existing = /** @type {Record<string, any> | null} */ (
             db.prepare('SELECT * FROM audit_job_findings WHERE job_id = ? AND dedup_key = ?').get(jobId, dedupKey)
         );
         if (existing) {
@@ -107,7 +108,7 @@ function upsertAuditFinding(input = /** @type {UpsertAuditFindingInput} */ ({}))
                     severity=@severity, category=@category, title=@title, source=@source,
                     contract_id=@contract_id, status=@status, evidence_json=@evidence_json, updated_at_ms=@updated_at_ms
                 WHERE id=@id
-            `
+            `,
             ).run({
                 id: existing.id,
                 severity: String(input.severity || existing.severity || 'info'),
@@ -130,7 +131,7 @@ function upsertAuditFinding(input = /** @type {UpsertAuditFindingInput} */ ({}))
         ) VALUES (
             @id, @job_id, @severity, @category, @title, @source, @contract_id, @dedup_key, @status, @evidence_json, @created_at_ms, @updated_at_ms
         )
-    `
+    `,
     ).run({
         id,
         job_id: jobId,
@@ -150,15 +151,16 @@ function upsertAuditFinding(input = /** @type {UpsertAuditFindingInput} */ ({}))
 
 /**
  * Função exportada: getAuditFindingById.
+ *
  * @param {string} id Unique identifier.
- * @returns {AuditFinding|null}
+ * @returns {AuditFinding | null}
  */
 function getAuditFindingById(id) {
     const db = getDb();
     return _rowToFinding(
-        /** @type {Record<string, any>|null} */ (
+        /** @type {Record<string, any> | null} */ (
             db.prepare('SELECT * FROM audit_job_findings WHERE id = ?').get(String(id || '').trim())
-        )
+        ),
     );
 }
 
@@ -168,6 +170,7 @@ function getAuditFindingById(id) {
  */
 /**
  * Função exportada: listAuditFindingsByJobId.
+ *
  * @param {string} jobId
  * @param {ListAuditFindingsByJobIdOptions} [options]
  * @returns {AuditFinding[]}
@@ -181,7 +184,7 @@ function listAuditFindingsByJobId(jobId, { limit = 200 } = {}) {
             WHERE job_id = ?
             ORDER BY created_at_ms DESC
             LIMIT ?
-        `
+        `,
         )
         .all(String(jobId || '').trim(), Math.max(1, Math.min(Number(limit) || 200, 1000)));
     return /** @type {AuditFinding[]} */ (

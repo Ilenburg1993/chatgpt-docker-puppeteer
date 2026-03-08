@@ -1,6 +1,6 @@
 // @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
-import * as io from '#infra/io';
 import identityManager from '#core/identity_manager';
+import * as io from '#infra/io';
 
 // Test counters
 let passed = 0;
@@ -12,6 +12,7 @@ console.log('========================================\n');
 
 /**
  * Função exportada: runTests.
+ *
  * @returns {Promise<void>}
  */
 async function runTests() {
@@ -31,7 +32,7 @@ async function runTests() {
                 'DNA_EVOLUTION_TRACKING',
             ];
 
-            const hasAll = expectedCapabilities.every(cap => identity.capabilities.includes(cap));
+            const hasAll = expectedCapabilities.every((cap) => identity.capabilities.includes(cap));
 
             if (hasAll && identity.capabilities.length >= 20) {
                 console.log(`✅ ${testName}`);
@@ -39,7 +40,7 @@ async function runTests() {
                 passed++;
             } else {
                 throw new Error(
-                    `Missing capabilities. Expected ${expectedCapabilities.length}+, got ${identity.capabilities.length}`
+                    `Missing capabilities. Expected ${expectedCapabilities.length}+, got ${identity.capabilities.length}`,
                 );
             }
         } catch (error) {
@@ -215,10 +216,10 @@ async function runTests() {
 // Run
 if (import.meta.filename === process.argv[1]) {
     runTests()
-        .then(success => {
+        .then((success) => {
             process.exit(success ? 0 : 1);
         })
-        .catch(error => {
+        .catch((error) => {
             console.error('\n🔥 TEST SUITE CRASHED:', error);
             process.exit(1);
         });

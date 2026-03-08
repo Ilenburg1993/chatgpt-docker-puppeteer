@@ -1,10 +1,9 @@
 // @ts-check
-import fs from 'node:fs';
-import { promises as fsp } from 'node:fs';
-import path from 'node:path';
-import * as PATHS from '#infra/fs/paths';
 import { log as internalLog } from '#core/logger';
+import * as PATHS from '#infra/fs/paths';
 import { notify } from '#server/engine/socket';
+import fs, { promises as fsp } from 'node:fs';
+import path from 'node:path';
 
 /**
  * Localização física do alvo de streaming.
@@ -21,9 +20,10 @@ let logReadActive = false;
 let retryTimeout = null;
 
 /**
- * Inicializa o motor de streaming de logs.
- * Implementa vigilância de Inode para suportar a troca física de arquivos (Rotação).
-  * @returns {void}
+ * Inicializa o motor de streaming de logs. Implementa vigilância de Inode para suportar a troca física de arquivos
+ * (Rotação).
+ *
+ * @returns {void}
  */
 function init() {
     // 1. Limpeza de estado anterior (Idempotência de Boot)
@@ -35,14 +35,13 @@ function init() {
         .then(() => {
             try {
                 /**
-                 * fs.watch: Monitoramento de baixo nível via Kernel do SO.
-                 * Detecta mudanças de conteúdo (change) e de referência física (rename).
+                 * fs.watch: Monitoramento de baixo nível via Kernel do SO. Detecta mudanças de conteúdo (change) e de
+                 * referência física (rename).
                  */
-                logWatcher = fs.watch(LOG_FILE, event => {
+                logWatcher = fs.watch(LOG_FILE, (event) => {
                     if (event === 'rename') {
                         /**
-                         * ROTAÇÃO DETECTADA:
-                         * O handle atual tornou-se inválido (o arquivo foi movido para backup).
+                         * ROTAÇÃO DETECTADA: O handle atual tornou-se inválido (o arquivo foi movido para backup).
                          * Reiniciamos o motor para capturar o novo arquivo que será criado.
                          */
                         internalLog('DEBUG', '[LOG_TAIL] Inode alterado (Rotação). Re-anexando handle...');
@@ -52,7 +51,7 @@ function init() {
 
                     if (event === 'change' && !logReadActive) {
                         // Conteúdo adicionado. Dispara leitura incremental do final do arquivo.
-                        _streamLastChunk();
+                        void _streamLastChunk();
                     }
                 });
 
@@ -61,7 +60,7 @@ function init() {
                 const _e = /** @type {any} */ (err);
                 internalLog(
                     'ERROR',
-                    `[LOG_TAIL] Falha catastrófica no watcher: ${err && _e.message ? _e.message : String(_e)}`
+                    `[LOG_TAIL] Falha catastrófica no watcher: ${err && _e.message ? _e.message : String(_e)}`,
                 );
                 retryTimeout = setTimeout(init, 10000);
             }
@@ -73,8 +72,8 @@ function init() {
 }
 
 /**
- * Lê o fragmento final do arquivo (Tail) e transmite via barramento Socket.io.
- * Implementa trava de concorrência para proteger a estabilidade do processo.
+ * Lê o fragmento final do arquivo (Tail) e transmite via barramento Socket.io. Implementa trava de concorrência para
+ * proteger a estabilidade do processo.
  */
 async function _streamLastChunk() {
     logReadActive = true;
@@ -83,9 +82,8 @@ async function _streamLastChunk() {
         const stats = await fsp.stat(LOG_FILE);
 
         /**
-         * Lógica de Janela Deslizante:
-         * Lemos apenas os últimos 2KB de dados. Isso garante performance
-         * instantânea mesmo que o arquivo de log tenha centenas de megabytes.
+         * Lógica de Janela Deslizante: Lemos apenas os últimos 2KB de dados. Isso garante performance instantânea mesmo
+         * que o arquivo de log tenha centenas de megabytes.
          */
         const bufferSize = 2048;
         const start = Math.max(0, stats.size - bufferSize);
@@ -96,7 +94,7 @@ async function _streamLastChunk() {
             highWaterMark: bufferSize,
         });
 
-        stream.on('data', chunk => {
+        stream.on('data', (chunk) => {
             // Transmite o fragmento para o barramento soberano
             notify('log_stream', chunk.toString());
         });
@@ -107,7 +105,7 @@ async function _streamLastChunk() {
 
         stream.on('end', release);
         stream.on('close', release);
-        stream.on('error', err => {
+        stream.on('error', (err) => {
             internalLog('ERROR', `[LOG_TAIL] Erro no stream de leitura: ${err.message}`);
             release();
         });
@@ -135,9 +133,9 @@ function _clearInternalResources() {
 }
 
 /**
- * Encerramento atômico do streamer.
- * Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
-  * @returns {void}
+ * Encerramento atômico do streamer. Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
+ *
+ * @returns {void}
  */
 function stop() {
     _clearInternalResources();

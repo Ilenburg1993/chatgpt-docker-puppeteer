@@ -1,10 +1,10 @@
 // @ts-check
-import { test } from 'node:test';
-import assert from 'node:assert';
-import fs from 'node:fs';
 import * as PATHS from '#infra/fs/paths';
 import * as Discovery from '#nerv/discovery';
 import { ActionCode } from '#shared/nerv/constants';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import { test } from 'node:test';
 
 function makeMockNerv() {
     /** @type {any[]} */ let listeners = [];
@@ -12,11 +12,11 @@ function makeMockNerv() {
         onEvent(/** @type {any} */ handler) {
             listeners.push(handler);
             return () => {
-                listeners = listeners.filter(h => h !== handler);
+                listeners = listeners.filter((h) => h !== handler);
             };
         },
         emitEvent(/** @type {any} */ envelope) {
-            listeners.slice().forEach(h => {
+            listeners.slice().forEach((h) => {
                 try {
                     h(envelope);
                 } catch (e) {
@@ -25,7 +25,7 @@ function makeMockNerv() {
             });
         },
         emitCommand(/** @type {any} */ envelope) {
-            listeners.slice().forEach(h => {
+            listeners.slice().forEach((h) => {
                 try {
                     h(envelope);
                 } catch (e) {
@@ -34,7 +34,7 @@ function makeMockNerv() {
             });
         },
         emitAck(/** @type {any} */ envelope) {
-            listeners.slice().forEach(h => {
+            listeners.slice().forEach((h) => {
                 try {
                     h(envelope);
                 } catch (e) {
@@ -49,7 +49,7 @@ test('publishServerReady uses NERV emitEvent', async () => {
     const mock = makeMockNerv();
     /** @type {any} */ let captured = null;
     // Replace emitEvent to capture envelope
-    mock.emitEvent = env => {
+    mock.emitEvent = (env) => {
         captured = env;
     };
 
@@ -76,7 +76,7 @@ test('waitForServerReady resolves when NERV emits SERVER_READY', async () => {
 test('listenForServerReady calls handler and unsubscribe works', async () => {
     const mock = makeMockNerv();
     let calls = 0;
-    const unsub = Discovery.listenForServerReady(mock, payload => {
+    const unsub = Discovery.listenForServerReady(mock, (payload) => {
         calls++;
     });
 

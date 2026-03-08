@@ -165,17 +165,16 @@ const PROXY_PORT = Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_P
 /**
  * Orquestrador de conexões browser com suporte a múltiplos modos de conexão.
  *
- * Gerencia ciclo de vida completo: detecção de ambiente → conexão browser →
- * seleção de página → validação. Suporta fallbacks automáticos entre modos
- * (WebSocket endpoint, connect direto, auto-detecção).
+ * Gerencia ciclo de vida completo: detecção de ambiente → conexão browser → seleção de página → validação. Suporta
+ * fallbacks automáticos entre modos (WebSocket endpoint, connect direto, auto-detecção).
  *
- * **Side-effects:** Inicia processos Chrome, gerencia conexões WebSocket.
- * **Semântica:** Estados finitos bem definidos com transições controladas.
+ * **Side-effects:** Inicia processos Chrome, gerencia conexões WebSocket. **Semântica:** Estados finitos bem definidos
+ * com transições controladas.
  *
  * @example
- * const orchestrator = new ConnectionOrchestrator({ mode: 'auto' });
- * await orchestrator.connect();
- * const page = await orchestrator.getPage();
+ *     const orchestrator = new ConnectionOrchestrator({ mode: 'auto' });
+ *     await orchestrator.connect();
+ *     const page = await orchestrator.getPage();
  */
 class ConnectionOrchestrator {
     constructor(options = {}) {
@@ -261,10 +260,10 @@ class ConnectionOrchestrator {
     // --- MÉTODOS DE CONEXÃO (Apenas modos suportados: connect, wsEndpoint) ---
 
     /**
-     * BROWSER_URL: Conecta via http://host:port
-     * Para Chrome externo com --remote-debugging-port
+     * BROWSER_URL: Conecta via http://host:port Para Chrome externo com --remote-debugging-port
      *
      * Estratégia:
+     *
      * 1. FAST PATH: browserEndpoint.url definido → conecta direto (1 tentativa)
      * 2. FALLBACK: hosts/ports custom → loops (configs não-DevContainer)
      */
@@ -326,10 +325,10 @@ class ConnectionOrchestrator {
     }
 
     /**
-     * WS_ENDPOINT: Conecta via WebSocket Debugger URL
-     * Para Chrome externo, mais estável que browserURL
+     * WS_ENDPOINT: Conecta via WebSocket Debugger URL Para Chrome externo, mais estável que browserURL
      *
      * Estratégia:
+     *
      * 1. FAST PATH: browserEndpoint.url ou .wsEndpoint → conecta direto (1 tentativa)
      * 2. FALLBACK: hosts/ports custom → loops (configs não-DevContainer)
      */
@@ -586,7 +585,7 @@ class ConnectionOrchestrator {
             this.classifyIssue(
                 ISSUE_KIND.EVENT,
                 ISSUE_TYPES.BROWSER_NOT_STARTED,
-                /** @type {any} */ (lastError)?.message || 'Todos os modos falharam'
+                /** @type {any} */ (lastError)?.message || 'Todos os modos falharam',
             );
             this.setState(STATES.RETRY_BROWSER, { retry: this.retryCount, attemptedModes: this.attemptedModes });
 
@@ -594,11 +593,11 @@ class ConnectionOrchestrator {
             if (this.retryCount < this.config.maxConnectionAttempts) {
                 const delay = Math.min(
                     this.config.retryDelayMs * Math.pow(1.5, this.retryCount - 1),
-                    this.config.maxRetryDelayMs
+                    this.config.maxRetryDelayMs,
                 );
 
                 log('WARN', `[ORCH] Retry ${this.retryCount}/${this.config.maxConnectionAttempts} em ${delay}ms`);
-                await new Promise(r => setTimeout(r, delay));
+                await new Promise((r) => setTimeout(r, delay));
 
                 // Reseta modos tentados para permitir nova rodada
                 this.attemptedModes = [];
@@ -608,7 +607,7 @@ class ConnectionOrchestrator {
 
         // Esgotou todas as tentativas
         throw new Error(
-            `Falha ao conectar após ${this.retryCount} tentativas: ${/** @type {any} */ (lastError)?.message || 'Unknown error'}`
+            `Falha ao conectar após ${this.retryCount} tentativas: ${/** @type {any} */ (lastError)?.message || 'Unknown error'}`,
         );
     }
 
@@ -623,10 +622,10 @@ class ConnectionOrchestrator {
             try {
                 const parsed = new URL(url);
                 return this.config.allowedDomains.some(
-                    /** @type {any} */ d => {
+                    /** @type {any} */ (d) => {
                         // Match exact hostname or subdomain
                         return parsed.hostname === d || parsed.hostname.endsWith(`.${d}`);
-                    }
+                    },
                 );
             } catch {
                 return false; // Invalid URL
@@ -670,7 +669,7 @@ class ConnectionOrchestrator {
                 }
 
                 this.classifyIssue(ISSUE_KIND.EVENT, ISSUE_TYPES.PAGE_NOT_FOUND, 'Aguardando aba alvo...');
-                await new Promise(r => {
+                await new Promise((r) => {
                     setTimeout(r, this.config.pageScanIntervalMs);
                 });
             } catch (/** @type {any} */ e) {
@@ -685,7 +684,7 @@ class ConnectionOrchestrator {
                     throw new Error(`Failed to ensure page after ${maxRetries} attempts: ${_ce.message}`, { cause: e });
                 }
 
-                await new Promise(r => {
+                await new Promise((r) => {
                     setTimeout(r, 1000);
                 });
             }
@@ -714,8 +713,7 @@ class ConnectionOrchestrator {
     // --- API PÚBLICA ---
 
     /**
-     * Conecta/inicia browser e retorna instância.
-     * Usado pelo BrowserPoolManager para obter múltiplas instâncias.
+     * Conecta/inicia browser e retorna instância. Usado pelo BrowserPoolManager para obter múltiplas instâncias.
      */
     async connect() {
         await this.ensureBrowser();
@@ -752,7 +750,7 @@ class ConnectionOrchestrator {
                     throw new Error(`Failed to acquire context after ${maxRetries} attempts: ${_ce.message}`); // eslint-disable-line preserve-caught-error
                 }
 
-                await new Promise(r => {
+                await new Promise((r) => {
                     setTimeout(r, 1000);
                 });
             }
@@ -774,8 +772,7 @@ class ConnectionOrchestrator {
     }
 
     /**
-     * Sincroniza e valida endpoints de Chrome/Proxy.
-     * Retorna um relatório com tentativas em hosts/ports configurados.
+     * Sincroniza e valida endpoints de Chrome/Proxy. Retorna um relatório com tentativas em hosts/ports configurados.
      * Útil para scripts de bootstrap/diagnóstico.
      */
     static async synchronize(/** @type {any} */ options = {}) {

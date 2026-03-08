@@ -6,7 +6,7 @@ import path from 'node:path';
 // Parse arguments
 const args = process.argv.slice(2);
 const INCLUDE_TESTS = args.includes('--include-tests');
-const CUSTOM_DIR = args.find(arg => arg.startsWith('--directory='))?.split('=')[1];
+const CUSTOM_DIR = args.find((arg) => arg.startsWith('--directory='))?.split('=')[1];
 
 const ROOT = CUSTOM_DIR || '/workspaces/chatgpt-docker-puppeteer';
 const DEFAULT_EXCLUDES = ['node_modules', 'backups', '.git', 'logs', 'coverage', 'profile', 'dist'];
@@ -93,6 +93,7 @@ const PATTERNS = [
 
 /**
  * Scan a single file for magic string patterns
+ *
  * @param {any} filePath
  * @returns {any[]}
  */
@@ -101,10 +102,10 @@ function scanFile(filePath) {
     /** @type {any[]} */
     const results = [];
 
-    PATTERNS.forEach(pattern => {
+    PATTERNS.forEach((pattern) => {
         const matches = [...content.matchAll(pattern.regex)];
         if (matches.length > 0) {
-            matches.forEach(match => {
+            matches.forEach((match) => {
                 const lines = content.substring(0, match.index).split('\n');
                 const lineNum = lines.length;
                 const lineContent = (lines[lineNum - 1] ?? '').trim();
@@ -127,6 +128,7 @@ function scanFile(filePath) {
 
 /**
  * Recursively scan directory for JS files
+ *
  * @param {any} dir
  * @param {any[]} [results]
  * @param {any[]} [excludeDirs]
@@ -135,7 +137,7 @@ function scanFile(filePath) {
 function scanDirectory(dir, results = [], excludeDirs = DEFAULT_EXCLUDES) {
     const items = fs.readdirSync(dir);
 
-    items.forEach(item => {
+    items.forEach((item) => {
         if (item.startsWith('.')) {
             return;
         }
@@ -156,6 +158,7 @@ function scanDirectory(dir, results = [], excludeDirs = DEFAULT_EXCLUDES) {
 
 /**
  * Print results grouped by file
+ *
  * @param {any[]} results
  * @param {any} label
  */
@@ -171,19 +174,23 @@ function printResults(results, label) {
     /** @type {any} */
     const byFile = {};
     results.forEach(
-        /** @param {any} r */ r => {
+        /** @param {any} r */ (r) => {
             const shortPath = r.file.replace(ROOT + '/', '');
             if (!byFile[shortPath]) {
                 byFile[shortPath] = [];
             }
             byFile[shortPath].push(r);
-        }
+        },
     );
 
     // Group by severity
     /** @type {Record<string, number>} */
     const bySeverity = { HIGH: 0, MEDIUM: 0, LOW: 0 };
-    results.forEach(/** @param {any} r */ r => { bySeverity[r.severity] = (bySeverity[r.severity] ?? 0) + 1; });
+    results.forEach(
+        /** @param {any} r */ (r) => {
+            bySeverity[r.severity] = (bySeverity[r.severity] ?? 0) + 1;
+        },
+    );
 
     console.log('📊 SEVERITY BREAKDOWN:');
     console.log(`   🔴 HIGH: ${bySeverity.HIGH} (must fix)`);
@@ -193,7 +200,7 @@ function printResults(results, label) {
     // Print details
     Object.keys(byFile)
         .sort()
-        .forEach(file => {
+        .forEach((file) => {
             const issues = byFile[file] ?? [];
             /** @type {Record<string, string>} */
             const severityIcon = {
@@ -204,14 +211,14 @@ function printResults(results, label) {
 
             console.log(`\n📄 ${file} (${issues.length} issue${issues.length > 1 ? 's' : ''}):`);
             issues.forEach(
-                /** @param {any} r */ r => {
+                /** @param {any} r */ (r) => {
                     console.log(`   ${severityIcon[r.severity]} Line ${r.line}: ${r.pattern}`);
                     console.log(`      Match: ${r.match}`);
                     console.log(`      Fix: ${r.fix}`);
                     console.log(
-                        `      Code: ${r.lineContent.substring(0, 80)}${r.lineContent.length > 80 ? '...' : ''}`
+                        `      Code: ${r.lineContent.substring(0, 80)}${r.lineContent.length > 80 ? '...' : ''}`,
                     );
-                }
+                },
             );
         });
 }
@@ -246,18 +253,18 @@ function main() {
             /** @type {any} */
             const byFile = {};
             testResults.forEach(
-                /** @param {any} r */ r => {
+                /** @param {any} r */ (r) => {
                     const shortPath = r.file.replace(ROOT + '/', '');
                     if (!byFile[shortPath]) {
                         byFile[shortPath] = [];
                     }
                     byFile[shortPath].push(r);
-                }
+                },
             );
 
             Object.keys(byFile)
                 .sort()
-                .forEach(file => {
+                .forEach((file) => {
                     console.log(`  ${file}: ${(byFile[file] ?? []).length} occurrence(s)`);
                 });
         }
@@ -292,4 +299,4 @@ if (import.meta.filename === process.argv[1]) {
     }
 }
 
-export { scanFile, scanDirectory, PATTERNS };
+export { PATTERNS, scanDirectory, scanFile };

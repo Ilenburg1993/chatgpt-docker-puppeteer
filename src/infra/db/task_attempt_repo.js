@@ -9,27 +9,27 @@ function _now() {
  * @typedef {object} AttemptUpsert
  * @property {string} id
  * @property {string} task_id
- * @property {string|null|undefined} [mission_id]
+ * @property {string | null | undefined} [mission_id]
  * @property {string} status
- * @property {string|null|undefined} [worker_id]
- * @property {number|undefined} [created_at_ms]
- * @property {number|null|undefined} [started_at_ms]
- * @property {number|null|undefined} [ended_at_ms]
- * @property {string|null|undefined} [rendered_prompt_artifact_id]
- * @property {string|null|undefined} [response_text_artifact_id]
- * @property {string|null|undefined} [response_v2_json_artifact_id]
- * @property {string|null|undefined} [response_md_artifact_id]
- * @property {string|null|undefined} [response_html_artifact_id]
- * @property {string|null|undefined} [error]
- * @property {string|null|undefined} [driver_target]
- * @property {string|null|undefined} [model]
- * @property {string|null|undefined} [reason_class]
- * @property {number|null|undefined} [count_attempt]
- * @property {number|null|undefined} [last_heartbeat_at_ms]
- * @property {string|null|undefined} [reason_code]
- * @property {string|null|undefined} [cause_layer]
- * @property {string|null|undefined} [diagnostic_artifacts_json]
- * @property {string|null|undefined} [diagnosis_json]
+ * @property {string | null | undefined} [worker_id]
+ * @property {number | undefined} [created_at_ms]
+ * @property {number | null | undefined} [started_at_ms]
+ * @property {number | null | undefined} [ended_at_ms]
+ * @property {string | null | undefined} [rendered_prompt_artifact_id]
+ * @property {string | null | undefined} [response_text_artifact_id]
+ * @property {string | null | undefined} [response_v2_json_artifact_id]
+ * @property {string | null | undefined} [response_md_artifact_id]
+ * @property {string | null | undefined} [response_html_artifact_id]
+ * @property {string | null | undefined} [error]
+ * @property {string | null | undefined} [driver_target]
+ * @property {string | null | undefined} [model]
+ * @property {string | null | undefined} [reason_class]
+ * @property {number | null | undefined} [count_attempt]
+ * @property {number | null | undefined} [last_heartbeat_at_ms]
+ * @property {string | null | undefined} [reason_code]
+ * @property {string | null | undefined} [cause_layer]
+ * @property {string | null | undefined} [diagnostic_artifacts_json]
+ * @property {string | null | undefined} [diagnosis_json]
  */
 /**
  * @param {AttemptUpsert} input
@@ -83,7 +83,7 @@ function upsertAttempt(input) {
             cause_layer = COALESCE(excluded.cause_layer, task_attempts.cause_layer),
             diagnostic_artifacts_json = COALESCE(excluded.diagnostic_artifacts_json, task_attempts.diagnostic_artifacts_json),
             diagnosis_json = COALESCE(excluded.diagnosis_json, task_attempts.diagnosis_json)
-    `
+    `,
     ).run({
         id: String(input.id),
         task_id: String(input.task_id),
@@ -119,9 +119,10 @@ function upsertAttempt(input) {
  */
 /**
  * Função exportada: updateAttempt.
- * @param {*} attemptId
+ *
+ * @param {any} attemptId
  * @param {UpdateAttemptUpdates} [updates]
- * @returns {TaskAttempt|null}
+ * @returns {TaskAttempt | null}
  */
 function updateAttempt(attemptId, updates = {}) {
     const db = getDb();
@@ -130,30 +131,32 @@ function updateAttempt(attemptId, updates = {}) {
 
     const next = /** @type {any} */ ({ .../** @type {any} */ (existing), ...updates });
     upsertAttempt(next);
-    return /** @type {TaskAttempt|null} */ (
+    return /** @type {TaskAttempt | null} */ (
         db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null
     );
 }
 
 /**
  * Função exportada: getAttemptById.
+ *
  * @param {string} attemptId Unique identifier.
- * @returns {TaskAttempt|null}
+ * @returns {TaskAttempt | null}
  */
 function getAttemptById(attemptId) {
     const db = getDb();
-    return /** @type {TaskAttempt|null} */ (
+    return /** @type {TaskAttempt | null} */ (
         db.prepare('SELECT * FROM task_attempts WHERE id = ?').get(attemptId) || null
     );
 }
 
 /**
  * @typedef {object} ListAttemptsByTaskOptions
- * @property {*} [limit]
+ * @property {any} [limit]
  */
 /**
  * Função exportada: listAttemptsByTask.
- * @param {*} taskId
+ *
+ * @param {any} taskId
  * @param {ListAttemptsByTaskOptions} [options]
  * @returns {TaskAttempt[]}
  */
@@ -169,10 +172,10 @@ function listAttemptsByTask(taskId, { limit = 200 } = {}) {
             WHERE task_id = ?
             ORDER BY created_at_ms DESC
             LIMIT ?
-        `
+        `,
             )
             .all(taskId, lim)
     );
 }
 
-export { upsertAttempt, updateAttempt, getAttemptById, listAttemptsByTask };
+export { getAttemptById, listAttemptsByTask, updateAttempt, upsertAttempt };

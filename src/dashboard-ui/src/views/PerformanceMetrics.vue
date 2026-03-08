@@ -215,11 +215,11 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
-import { useTelemetryStore } from '@/stores/telemetry';
-import { useTaskStore } from '@/stores/tasks';
+import { BarChart, GaugeChart, LineChart } from '@/components/charts/index';
 import { useRealtime } from '@/composables/useRealtime';
-import { LineChart, GaugeChart, BarChart } from '@/components/charts/index';
+import { useTaskStore } from '@/stores/tasks';
+import { useTelemetryStore } from '@/stores/telemetry';
+import { computed, onMounted, ref } from 'vue';
 
 export default {
     name: 'PerformanceMetrics',
@@ -244,22 +244,22 @@ export default {
         // Computed chart data arrays (values only)
         const cpuChartData = computed(() => {
             const history = telemetry.cpuHistory;
-            return history.slice(-timeWindow.value).map(item => item.value);
+            return history.slice(-timeWindow.value).map((item) => item.value);
         });
 
         const memoryChartData = computed(() => {
             const history = telemetry.memoryHistory;
-            return history.slice(-timeWindow.value).map(item => item.value);
+            return history.slice(-timeWindow.value).map((item) => item.value);
         });
 
         const heapChartData = computed(() => {
             const history = telemetry.heapHistory;
-            return history.slice(-timeWindow.value).map(item => item.value);
+            return history.slice(-timeWindow.value).map((item) => item.value);
         });
 
         const eventLoopChartData = computed(() => {
             const history = telemetry.history.eventLoop.getLast(120);
-            return history.slice(-timeWindow.value).map(item => item.value);
+            return history.slice(-timeWindow.value).map((item) => item.value);
         });
 
         // Time labels from timestamps
@@ -269,7 +269,7 @@ export default {
             if (slice.length === 0) return [];
 
             const now = Date.now();
-            return slice.map(item => {
+            return slice.map((item) => {
                 const diff = Math.round((now - item.timestamp) / 1000);
                 if (diff <= 0) return 'Agora';
                 if (diff < 60) return `-${diff}s`;

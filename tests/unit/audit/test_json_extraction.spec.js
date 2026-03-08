@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { parseJsonFromMixedOutput } from '../../../scripts/audit/lib/exec.mjs';
 
 test('parseJsonFromMixedOutput parses final valid JSON block with noisy logs', () => {
@@ -32,7 +32,7 @@ test('parseJsonFromMixedOutput returns null for invalid payload', () => {
 
 test('parseJsonFromMixedOutput parses JSON array blocks from noisy output', () => {
     const mixed = ['(node:1) warning', 'random log', '[["src/a.js","src/b.js"],["src/c.js","src/d.js"]]', 'tail'].join(
-        '\n'
+        '\n',
     );
 
     const parsed = parseJsonFromMixedOutput(mixed);

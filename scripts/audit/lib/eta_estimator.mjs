@@ -17,7 +17,7 @@ export function createEtaEstimator(options) {
     const scopeKey = String(options.scopeKey || 'default');
     const ewmaAlpha = Math.max(0.05, Math.min(1, Number(options.ewmaAlpha || 0.35)));
 
-    /** @type {Record<string, { avg_ms: number, count: number }>} */
+    /** @type {Record<string, { avg_ms: number; count: number }>} */
     let history = {};
 
     if (fs.existsSync(historyPath)) {

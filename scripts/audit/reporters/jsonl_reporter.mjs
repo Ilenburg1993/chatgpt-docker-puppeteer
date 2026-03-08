@@ -8,7 +8,7 @@ import fs from 'node:fs';
  */
 /**
  * @param {AppendJsonlOptions} options
-  * @returns {void}
+ * @returns {void}
  */
 export function appendJsonl(options) {
     fs.appendFileSync(options.filePath, `${JSON.stringify(options.payload)}\n`, 'utf8');

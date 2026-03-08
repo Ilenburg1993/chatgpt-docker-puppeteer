@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 // @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
-import path from 'node:path';
 
 console.log('\n🧪 SADI Analyzer v4.0 - Upgrade Validation\n');
 
 // Test 1: Module loads
 console.log('✅ Test 1: Module loading');
 try {
-    const analyzer = await import('#shared/sadi/analyzer').then(m => m.default ?? m);
+    const analyzer = await import('#shared/sadi/analyzer').then((m) => m.default ?? m);
     console.log('   ✓ SADI module loaded');
     console.log('   Exports:', Object.keys(analyzer).join(', '));
 
@@ -27,7 +26,7 @@ try {
 console.log('✅ Test 2: Parameter validation (defensive programming)');
 
 (async () => {
-    const analyzer = await import('#shared/sadi/analyzer').then(m => m.default ?? m);
+    const analyzer = await import('#shared/sadi/analyzer').then((m) => m.default ?? m);
 
     try {
         // Should throw on invalid page

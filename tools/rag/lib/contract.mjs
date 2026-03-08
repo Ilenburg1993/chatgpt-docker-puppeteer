@@ -46,7 +46,9 @@ export function buildFileId(/** @type {any} */ relPath) {
     return sha256HexForString(`file:${normalizeRelPath(relPath)}`);
 }
 
-export function buildChunkId(/** @type {any} */ { relPath, startByte, endByte, contentSha256, chunkerVersion = CHUNKER_VERSION }) {
+export function buildChunkId(
+    /** @type {any} */ { relPath, startByte, endByte, contentSha256, chunkerVersion = CHUNKER_VERSION },
+) {
     const base = `${normalizeRelPath(relPath)}:${startByte}:${endByte}:${contentSha256}:${chunkerVersion}`;
     return sha256HexForString(base);
 }

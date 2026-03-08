@@ -1,7 +1,7 @@
 // @ts-check
 import puppeteer from 'puppeteer-core';
 
-import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondition, sleep } from './helpers.js';
+import { readLatestGlobalLogTail, sleep, startAgent, stopAgent, waitForCondition, writeTask } from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Stall Mitigation (Watchdog V4) ===');
@@ -27,7 +27,7 @@ import { writeTask, startAgent, stopAgent, readLatestGlobalLogTail, waitForCondi
                 `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`,
         });
         const pages = await browser.pages();
-        const page = pages.find(p => p.url().includes('chatgpt.com'));
+        const page = pages.find((p) => p.url().includes('chatgpt.com'));
 
         if (!page) {
             throw new Error('Aba ChatGPT não encontrada.');

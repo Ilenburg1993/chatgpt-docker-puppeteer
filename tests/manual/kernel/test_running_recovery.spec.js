@@ -1,5 +1,5 @@
 // @ts-check
-import { writeTask, readTask, startAgent, stopAgent, waitForCondition, removeRunLock } from './helpers.js';
+import { readTask, removeRunLock, startAgent, stopAgent, waitForCondition, writeTask } from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Recovery de Zumbis (Schema V3) ===');

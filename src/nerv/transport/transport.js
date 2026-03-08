@@ -11,20 +11,19 @@ import createReconnect from './reconnect.js';
  * @typedef {object} CreateTransportDeps
  * @property {any} telemetry
  * @property {any} adapter
- * @property {*} [reconnect]
+ * @property {any} [reconnect]
  */
 /**
  * @typedef {object} CreateTransportOptions
- * @property {*} [telemetry]
- * @property {*} [adapter]
- * @property {*} [reconnect]
+ * @property {any} [telemetry]
+ * @property {any} [adapter]
+ * @property {any} [reconnect]
  */
 /**
  * Cria o subsistema de transporte físico do NERV.
  *
- * **Side-effects:** Inicializa framing, conexão e reconexão automática.
- * **Semântica:** Composição completa do plano físico de comunicação.
- * **Unidades:** Políticas de reconexão seguem typedef de createReconnect.
+ * **Side-effects:** Inicializa framing, conexão e reconexão automática. **Semântica:** Composição completa do plano
+ * físico de comunicação. **Unidades:** Políticas de reconexão seguem typedef de createReconnect.
  *
  * @param {CreateTransportDeps} deps - Dependências do transporte
  * @returns {any} Transporte com métodos send, start, stop, onReceive
@@ -109,7 +108,7 @@ function createTransport({ telemetry, adapter, reconnect: reconnectPolicy }) {
     /**
      * Envia frame opaco pelo meio físico.
      *
-     * @param {Buffer|Uint8Array} frame
+     * @param {Buffer | Uint8Array} frame
      */
     function send(frame) {
         const packed = framing.pack(frame);

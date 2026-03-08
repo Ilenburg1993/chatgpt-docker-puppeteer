@@ -29,7 +29,8 @@ const colors = {
 // ============================================================================
 /**
  * Função exportada: parseEnvFile.
- * @param {*} filePath
+ *
+ * @param {any} filePath
  * @returns {Record<string, string>}
  */
 function parseEnvFile(filePath) {
@@ -101,10 +102,10 @@ class EnvValidator {
         this.validateConstraints(envData);
 
         // Report unrecognised keys (extras that exist in the file but are not defined in the schema).
-        const schemaKeys = Object.values(this.schema.categories).flatMap(c =>
-            c.properties ? Object.keys(c.properties) : []
+        const schemaKeys = Object.values(this.schema.categories).flatMap((c) =>
+            c.properties ? Object.keys(c.properties) : [],
         );
-        const extras = Object.keys(envData).filter(k => !schemaKeys.includes(k));
+        const extras = Object.keys(envData).filter((k) => !schemaKeys.includes(k));
         if (extras.length) {
             const list = extras.join(', ');
             this.warnings.push(`Extras not in schema: ${list}`);
@@ -184,7 +185,7 @@ class EnvValidator {
 
             if (spec.enum && !(/** @type {number[]} */ (spec.enum).includes(num))) {
                 this.errors.push(
-                    `${categoryName}: ${varName} deve ser um de [${/** @type {number[]} */ (spec.enum).join(', ')}] (recebido: ${num})`
+                    `${categoryName}: ${varName} deve ser um de [${/** @type {number[]} */ (spec.enum).join(', ')}] (recebido: ${num})`,
                 );
             }
         }
@@ -208,7 +209,7 @@ class EnvValidator {
         if (spec.type === 'string') {
             if (spec.enum && !(/** @type {string[]} */ (spec.enum).includes(value))) {
                 this.errors.push(
-                    `${categoryName}: ${varName} deve ser um de [${/** @type {string[]} */ (spec.enum).join(', ')}] (recebido: ${value})`
+                    `${categoryName}: ${varName} deve ser um de [${/** @type {string[]} */ (spec.enum).join(', ')}] (recebido: ${value})`,
                 );
             }
 
@@ -216,7 +217,7 @@ class EnvValidator {
                 const regex = new RegExp(/** @type {string} */ (spec.pattern));
                 if (!regex.test(value)) {
                     this.errors.push(
-                        `${categoryName}: ${varName} não corresponde ao padrão ${spec.pattern} (recebido: ${value})`
+                        `${categoryName}: ${varName} não corresponde ao padrão ${spec.pattern} (recebido: ${value})`,
                     );
                 }
             }
@@ -238,7 +239,7 @@ class EnvValidator {
         console.log(`\n${colors.gray}[CONSTRAINTS]${colors.reset}`);
 
         // Unique ports
-        const ports = ['SERVER_PORT', 'CHROME_PORT', 'CHROME_PROXY_PORT'].map(p => envData[p]).filter(p => p);
+        const ports = ['SERVER_PORT', 'CHROME_PORT', 'CHROME_PROXY_PORT'].map((p) => envData[p]).filter((p) => p);
 
         const uniquePorts = new Set(ports);
         if (ports.length !== uniquePorts.size) {
@@ -251,12 +252,12 @@ class EnvValidator {
         // BROWSER_MODE=wsEndpoint → requires CHROME_*
         if (envData.BROWSER_MODE === 'wsEndpoint') {
             const required = ['CHROME_PROXY_PORT', 'CHROME_PORT', 'CHROME_HOST'];
-            const missing = required.filter(v => !envData[v]);
+            const missing = required.filter((v) => !envData[v]);
 
             if (missing.length > 0) {
                 this.errors.push(`CONSTRAINT: BROWSER_MODE=wsEndpoint requer ${missing.join(', ')}`);
                 console.log(
-                    `  ${colors.red}✗${colors.reset} BROWSER_MODE dependencies: FALHOU (falta: ${missing.join(', ')})`
+                    `  ${colors.red}✗${colors.reset} BROWSER_MODE dependencies: FALHOU (falta: ${missing.join(', ')})`,
                 );
             } else {
                 console.log(`  ${colors.green}✓${colors.reset} BROWSER_MODE dependencies: OK`);
@@ -289,7 +290,7 @@ class EnvValidator {
 
             if (legacyRequired && !String(envData.MCP_UPSTREAM_URL || '').trim()) {
                 this.errors.push(
-                    'CONSTRAINT: MCP_UPSTREAM_ENABLED=true requer MCP_UPSTREAM_URL (quando MCP_UPSTREAMS_JSON está vazio)'
+                    'CONSTRAINT: MCP_UPSTREAM_ENABLED=true requer MCP_UPSTREAM_URL (quando MCP_UPSTREAMS_JSON está vazio)',
                 );
                 console.log(`  ${colors.red}✗${colors.reset} MCP upstream (legacy): FALHOU (falta: MCP_UPSTREAM_URL)`);
             } else {
@@ -303,7 +304,7 @@ class EnvValidator {
             const token = String(envData.GITHUB_PERSONAL_ACCESS_TOKEN || '').trim();
             if (!token) {
                 this.warnings.push(
-                    'CONSTRAINT: MCP_GITHUB_PROXY_ENABLED=true mas GITHUB_PERSONAL_ACCESS_TOKEN está vazio (upstream GitHub ficará not-ready)'
+                    'CONSTRAINT: MCP_GITHUB_PROXY_ENABLED=true mas GITHUB_PERSONAL_ACCESS_TOKEN está vazio (upstream GitHub ficará not-ready)',
                 );
                 console.log(`  ${colors.yellow}!${colors.reset} GitHub proxy: WARNING (token ausente)`);
             } else {
@@ -319,12 +320,12 @@ class EnvValidator {
 
         if (this.errors.length > 0) {
             console.log(`\n${colors.red}ERROS (${this.errors.length}):${colors.reset}`);
-            this.errors.forEach(err => console.log(`  ${colors.red}✗${colors.reset} ${err}`));
+            this.errors.forEach((err) => console.log(`  ${colors.red}✗${colors.reset} ${err}`));
         }
 
         if (this.warnings.length > 0) {
             console.log(`\n${colors.yellow}AVISOS (${this.warnings.length}):${colors.reset}`);
-            this.warnings.forEach(warn => console.log(`  ${colors.yellow}!${colors.reset} ${warn}`));
+            this.warnings.forEach((warn) => console.log(`  ${colors.yellow}!${colors.reset} ${warn}`));
         }
 
         if (this.errors.length === 0) {
@@ -364,7 +365,7 @@ function main() {
     const validator = new EnvValidator(SCHEMA_PATH);
     let totalErrors = 0;
 
-    envFiles.forEach(envFile => {
+    envFiles.forEach((envFile) => {
         const filePath = path.join(ROOT, envFile);
 
         if (!fs.existsSync(filePath)) {
@@ -381,7 +382,7 @@ function main() {
             }
         } catch (error) {
             console.error(
-                `${colors.red}ERRO ao processar ${envFile}: ${error instanceof Error ? error.message : String(error)}${colors.reset}\n`
+                `${colors.red}ERRO ao processar ${envFile}: ${error instanceof Error ? error.message : String(error)}${colors.reset}\n`,
             );
             totalErrors++;
         }

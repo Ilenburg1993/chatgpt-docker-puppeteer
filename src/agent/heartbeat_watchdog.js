@@ -2,15 +2,15 @@
 /**
  * Heartbeat Watchdog Worker (P1-10)
  *
- * Detecta e força falha de tasks que ficaram em RUNNING com heartbeat stale.
- * Resolve casos onde:
+ * Detecta e força falha de tasks que ficaram em RUNNING com heartbeat stale. Resolve casos onde:
+ *
  * - Driver crashea sem enviar DRIVER_TASK_FAILED
  * - Network partition previne entrega de eventos NERV
  * - Deadlock no driver trava execução
  *
- * IMPLEMENTAÇÃO: aplica updateTask+updateAttempt+releaseTaskLock diretamente no DB.
- * Não usa recordEvent para "disparar" o projector — o projector escuta o NERV bus,
- * não a tabela de eventos, portanto essa abordagem anterior era inefetiva.
+ * IMPLEMENTAÇÃO: aplica updateTask+updateAttempt+releaseTaskLock diretamente no DB. Não usa recordEvent para "disparar"
+ * o projector — o projector escuta o NERV bus, não a tabela de eventos, portanto essa abordagem anterior era
+ * inefetiva.
  */
 
 import { log } from '#core/logger';
@@ -25,7 +25,7 @@ function _now() {
 
 /**
  * @typedef {object} HeartbeatWatchdogConfig
- * @property {string|null} [workerId]
+ * @property {string | null} [workerId]
  * @property {number} [intervalMs]
  * @property {number} [staleThresholdMs]
  */
@@ -46,19 +46,20 @@ class HeartbeatWatchdog {
         /** @type {number} */
         this.staleThresholdMs = Math.max(60000, Number(staleThresholdMs) || 180000);
 
-        /** @type {NodeJS.Timeout|null} */
+        /** @type {NodeJS.Timeout | null} */
         this._timer = null;
         /** @type {boolean} */
         this._stopped = false;
 
         log(
             'INFO',
-            `[HeartbeatWatchdog] initialized (interval=${this.intervalMs}ms, threshold=${this.staleThresholdMs}ms)`
+            `[HeartbeatWatchdog] initialized (interval=${this.intervalMs}ms, threshold=${this.staleThresholdMs}ms)`,
         );
     }
 
     /**
      * Inicia o watchdog, começando a monitorar heartbeats de tarefas.
+     *
      * @returns {void}
      * @sideEffects Inicia timer interno e executa tick imediatamente.
      */
@@ -72,6 +73,7 @@ class HeartbeatWatchdog {
 
     /**
      * Para o watchdog, cancelando o timer de monitoramento.
+     *
      * @returns {void}
      * @sideEffects Cancela timer interno.
      */
@@ -85,8 +87,9 @@ class HeartbeatWatchdog {
     }
 
     /**
-     * Executa um ciclo de monitoramento: detecta tentativas RUNNING com heartbeat stale
-     * e força falha emitindo evento DRIVER_TASK_FAILED.
+     * Executa um ciclo de monitoramento: detecta tentativas RUNNING com heartbeat stale e força falha emitindo evento
+     * DRIVER_TASK_FAILED.
+     *
      * @returns {Promise<void>}
      * @throws {Error} Erros são logados mas não relançados.
      * @sideEffects Modifica estado do banco (status de attempts) e registra eventos.
@@ -119,7 +122,7 @@ class HeartbeatWatchdog {
                       AND ta.created_at_ms < @threshold
                     ORDER BY ta.last_heartbeat_at_ms ASC
                     LIMIT 50
-                    `
+                    `,
                     )
                     .all({ threshold: staleThreshold })
             );
@@ -162,7 +165,7 @@ class HeartbeatWatchdog {
 
                 log(
                     'WARN',
-                    `[HeartbeatWatchdog] Force-failing stale task (task_id=${taskId}, attempt_id=${attemptId}, stale_ms=${staleDurationMs})`
+                    `[HeartbeatWatchdog] Force-failing stale task (task_id=${taskId}, attempt_id=${attemptId}, stale_ms=${staleDurationMs})`,
                 );
 
                 // BUG-HB-WATCHDOG: recordEvent(eventType=DRIVER_TASK_FAILED) was used previously,
@@ -185,7 +188,7 @@ class HeartbeatWatchdog {
                     const attemptErr = /** @type {any} */ (_rawAttemptErr);
                     log(
                         'WARN',
-                        `[HeartbeatWatchdog] updateAttempt failed for ${attemptId}: ${attemptErr?.message || String(attemptErr)}`
+                        `[HeartbeatWatchdog] updateAttempt failed for ${attemptId}: ${attemptErr?.message || String(attemptErr)}`,
                     );
                 }
 
@@ -203,7 +206,7 @@ class HeartbeatWatchdog {
                         const taskErr = /** @type {any} */ (_rawTaskErr);
                         log(
                             'WARN',
-                            `[HeartbeatWatchdog] updateTask failed for ${taskId}: ${taskErr?.message || String(taskErr)}`
+                            `[HeartbeatWatchdog] updateTask failed for ${taskId}: ${taskErr?.message || String(taskErr)}`,
                         );
                     }
 
@@ -213,14 +216,14 @@ class HeartbeatWatchdog {
                         const lockErr = /** @type {any} */ (_rawLockErr);
                         log(
                             'DEBUG',
-                            `[HeartbeatWatchdog] lock release skipped for ${taskId}: ${lockErr?.message || String(lockErr)}`
+                            `[HeartbeatWatchdog] lock release skipped for ${taskId}: ${lockErr?.message || String(lockErr)}`,
                         );
                     }
                 }
 
                 log(
                     'INFO',
-                    `[HeartbeatWatchdog] Task ${taskId} rescheduled after heartbeat timeout (attempt ${attemptId})`
+                    `[HeartbeatWatchdog] Task ${taskId} rescheduled after heartbeat timeout (attempt ${attemptId})`,
                 );
             }
         } catch (/** @type {any} */ _rawErr) {

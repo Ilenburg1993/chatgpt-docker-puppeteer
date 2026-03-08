@@ -1,27 +1,27 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { log } from '#core/logger';
-import * as schemas from '#core/schemas';
-import { getMissionById, listMissions, MISSION_STATUS } from '#infra/db/mission_repo';
 import {
     completeMissionTransition,
     failMissionTransition,
     pauseMissionTransition,
     updateMissionProgressState,
 } from '#agent/mission_execution_service';
+import { log } from '#core/logger';
+import * as schemas from '#core/schemas';
 import { recordEvent } from '#infra/db/events_repo';
+import { getMissionById, listMissions, MISSION_STATUS } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
 import crypto from 'node:crypto';
 
 /**
  * @typedef {object} MissionRunnerOptions
- * @property {number} [intervalMs=1000] - Intervalo entre ticks em ms.
+ * @property {number} [intervalMs=1000] - Intervalo entre ticks em ms. Default is `1000`
  */
 
 /**
  * @typedef {object} MissionProgress
  * @property {number} current_step_index - Índice do passo atual.
- * @property {string|null} current_task_id - ID da tarefa atual.
+ * @property {string | null} current_task_id - ID da tarefa atual.
  * @property {string[]} completed - IDs de tarefas completadas.
  * @property {string[]} failed - IDs de tarefas falhadas.
  * @property {number} [created_count] - Contador de tarefas criadas.
@@ -47,7 +47,7 @@ import crypto from 'node:crypto';
  * @param {any} ms
  */
 function _sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -70,13 +70,13 @@ function _hashId(input) {
 }
 
 /**
- * Executor de missões com workflow automatizado.
- * Processa missões em execução, cria tarefas para cada passo do workflow.
- * Side-effects: Atualiza status de missões, cria tarefas no banco, loga progresso.
+ * Executor de missões com workflow automatizado. Processa missões em execução, cria tarefas para cada passo do
+ * workflow. Side-effects: Atualiza status de missões, cria tarefas no banco, loga progresso.
  */
 class MissionRunner {
     /**
      * Cria uma nova instância do executor de missões.
+     *
      * @param {MissionRunnerOptions} [options] - Opções de configuração.
      */
     constructor({ intervalMs = 1000 } = {}) {
@@ -87,8 +87,8 @@ class MissionRunner {
     }
 
     /**
-     * Inicia o processamento contínuo de missões.
-     * Side-effects: Inicia timer, loga início.
+     * Inicia o processamento contínuo de missões. Side-effects: Inicia timer, loga início.
+     *
      * @returns {void}
      */
     start() {
@@ -100,8 +100,8 @@ class MissionRunner {
     }
 
     /**
-     * Para o processamento de missões.
-     * Side-effects: Para timer, loga parada.
+     * Para o processamento de missões. Side-effects: Para timer, loga parada.
+     *
      * @returns {void}
      */
     stop() {
@@ -114,9 +114,9 @@ class MissionRunner {
     }
 
     /**
-     * Executa um ciclo de processamento de missões.
-     * Processa todas as missões em execução, evitando concorrência.
+     * Executa um ciclo de processamento de missões. Processa todas as missões em execução, evitando concorrência.
      * Side-effects: Processa missões, cria tarefas, atualiza status.
+     *
      * @returns {Promise<void>} Não retorna valor.
      * @throws {Error} Nunca lança erro - opera em modo fail-safe.
      */
@@ -134,7 +134,7 @@ class MissionRunner {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
-                        `[MissionRunner] mission ${mission.id} processing failed: ${err?.message || String(err)}`
+                        `[MissionRunner] mission ${mission.id} processing failed: ${err?.message || String(err)}`,
                     );
                 }
                 await _sleep(0);
@@ -145,8 +145,8 @@ class MissionRunner {
     }
 
     /**
-     * Processa uma missão específica.
-     * Avança workflow, cria tarefas, atualiza progresso.
+     * Processa uma missão específica. Avança workflow, cria tarefas, atualiza progresso.
+     *
      * @param {string} missionId - ID da missão a processar.
      * @returns {Promise<void>} Não retorna valor.
      * @throws {Error} Nunca lança erro - opera em modo fail-safe.
@@ -221,7 +221,7 @@ class MissionRunner {
                 if (!failResult.ok) {
                     log(
                         'WARN',
-                        `[MissionRunner] fail (task_not_found) rejected: ${failResult.code || failResult.error}`
+                        `[MissionRunner] fail (task_not_found) rejected: ${failResult.code || failResult.error}`,
                     );
                 }
                 return;
@@ -244,7 +244,7 @@ class MissionRunner {
                 if (!pauseResult.ok && pauseResult.code !== 'MISSION_TRANSITION_NOOP') {
                     log(
                         'WARN',
-                        `[MissionRunner] pause (task_paused_cascade) rejected: ${pauseResult.code || pauseResult.error}`
+                        `[MissionRunner] pause (task_paused_cascade) rejected: ${pauseResult.code || pauseResult.error}`,
                     );
                 }
                 return;
@@ -271,12 +271,12 @@ class MissionRunner {
                             task_id: progress.current_task_id,
                             task_status: status,
                         },
-                    })
+                    }),
                 );
                 if (!progressResult.ok) {
                     log(
                         'WARN',
-                        `[MissionRunner] progress update rejected: ${progressResult.code || progressResult.error}`
+                        `[MissionRunner] progress update rejected: ${progressResult.code || progressResult.error}`,
                     );
                 }
                 return;
@@ -294,7 +294,7 @@ class MissionRunner {
                 if (!pauseResult.ok && pauseResult.code !== 'MISSION_TRANSITION_NOOP') {
                     log(
                         'WARN',
-                        `[MissionRunner] pause (task_blocked) rejected: ${pauseResult.code || pauseResult.error}`
+                        `[MissionRunner] pause (task_blocked) rejected: ${pauseResult.code || pauseResult.error}`,
                     );
                 }
                 return;
@@ -448,7 +448,7 @@ class MissionRunner {
                     step_id: stepId,
                     step_index: currentStepIndex,
                 },
-            })
+            }),
         );
         if (!progressResult.ok) {
             log('WARN', `[MissionRunner] step progress rejected: ${progressResult.code || progressResult.error}`);
@@ -458,6 +458,7 @@ class MissionRunner {
 
 /**
  * Classe executora de missões com workflow automatizado.
+ *
  * @type {typeof MissionRunner}
  */
 export { MissionRunner };

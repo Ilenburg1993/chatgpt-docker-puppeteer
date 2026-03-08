@@ -3,13 +3,14 @@
  * Pinia Store: Tasks
  *
  * Gerencia estado de tarefas no dashboard.
+ *
  * - Carrega tasks da API
  * - Mantém filtros ativos
  * - Recebe updates em tempo real via Socket.io
  */
 
-import { defineStore } from 'pinia';
 import { formatHttpError, http } from '@/lib/http';
+import { defineStore } from 'pinia';
 
 function _msToIso(/** @type {any} */ ms) {
     const n = Number(ms);
@@ -130,10 +131,10 @@ export const useTaskStore = defineStore('tasks', {
         },
 
         // Última atualização
-        lastUpdate: /** @type {number|null} */ (null),
+        lastUpdate: /** @type {number | null} */ (null),
 
         // Cursor de paginação do snapshot
-        nextCursor: /** @type {string|null} */ (null),
+        nextCursor: /** @type {string | null} */ (null),
         hasMore: false,
     }),
 
@@ -141,26 +142,26 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Tasks filtradas conforme filtros ativos
          */
-        filteredTasks: state => {
+        filteredTasks: (state) => {
             let filtered = state.tasks;
 
             // Filtro por status
             if (state.filters.status) {
-                filtered = filtered.filter(t => t.unified_status === state.filters.status);
+                filtered = filtered.filter((t) => t.unified_status === state.filters.status);
             }
 
             // Filtro por prioridade mínima
             if (state.filters.priority !== null) {
-                filtered = filtered.filter(t => (t.meta?.priority || 0) >= (state.filters.priority ?? 0));
+                filtered = filtered.filter((t) => (t.meta?.priority || 0) >= (state.filters.priority ?? 0));
             }
 
             // Filtro por busca (ID ou prompt)
             if (state.filters.search) {
                 const search = state.filters.search.toLowerCase();
                 filtered = filtered.filter(
-                    t =>
+                    (t) =>
                         t.meta?.id?.toLowerCase().includes(search) ||
-                        t.spec?.payload?.user_message?.toLowerCase().includes(search)
+                        t.spec?.payload?.user_message?.toLowerCase().includes(search),
                 );
             }
 
@@ -170,44 +171,44 @@ export const useTaskStore = defineStore('tasks', {
         /**
          * Tasks em execução
          */
-        runningTasks: state => state.tasks.filter(t => t.unified_status === 'RUNNING'),
+        runningTasks: (state) => state.tasks.filter((t) => t.unified_status === 'RUNNING'),
 
         /**
          * Tasks pendentes
          */
-        pendingTasks: state => state.tasks.filter(t => t.unified_status === 'PENDING'),
+        pendingTasks: (state) => state.tasks.filter((t) => t.unified_status === 'PENDING'),
 
         /**
          * Tasks concluídas
          */
-        completedTasks: state => state.tasks.filter(t => t.unified_status === 'DONE'),
+        completedTasks: (state) => state.tasks.filter((t) => t.unified_status === 'DONE'),
 
         /**
          * Tasks com erro
          */
-        failedTasks: state => state.tasks.filter(t => t.unified_status === 'FAILED'),
+        failedTasks: (state) => state.tasks.filter((t) => t.unified_status === 'FAILED'),
 
         /**
          * Busca task por ID
          */
-        taskById: state => (/** @type {any} */ id) =>
-            state.tasks.find(t => t.meta?.id === id || t.id === /** @type {any} */ id),
+        taskById: (state) => (/** @type {any} */ id) =>
+            state.tasks.find((t) => t.meta?.id === id || t.id === /** @type {any} */ id),
 
         /**
          * Task selecionada
          */
-        selectedTask: state => state.tasks.find(t => t.meta?.id === state.selectedTaskId),
+        selectedTask: (state) => state.tasks.find((t) => t.meta?.id === state.selectedTaskId),
 
         /**
          * Contadores por status
          */
-        statusCounts: state => ({
-            RUNNING: state.tasks.filter(t => t.unified_status === 'RUNNING').length,
-            PENDING: state.tasks.filter(t => t.unified_status === 'PENDING').length,
-            DONE: state.tasks.filter(t => t.unified_status === 'DONE').length,
-            FAILED: state.tasks.filter(t => t.unified_status === 'FAILED').length,
-            PAUSED: state.tasks.filter(t => t.unified_status === 'PAUSED').length,
-            CANCELLED: state.tasks.filter(t => t.unified_status === 'CANCELLED').length,
+        statusCounts: (state) => ({
+            RUNNING: state.tasks.filter((t) => t.unified_status === 'RUNNING').length,
+            PENDING: state.tasks.filter((t) => t.unified_status === 'PENDING').length,
+            DONE: state.tasks.filter((t) => t.unified_status === 'DONE').length,
+            FAILED: state.tasks.filter((t) => t.unified_status === 'FAILED').length,
+            PAUSED: state.tasks.filter((t) => t.unified_status === 'PAUSED').length,
+            CANCELLED: state.tasks.filter((t) => t.unified_status === 'CANCELLED').length,
         }),
     },
 
@@ -284,7 +285,7 @@ export const useTaskStore = defineStore('tasks', {
                 }
 
                 // Atualiza na lista local
-                const index = this.tasks.findIndex(t => t.meta?.id === taskId);
+                const index = this.tasks.findIndex((t) => t.meta?.id === taskId);
                 if (index !== -1) {
                     this.tasks[index] = _mergeTask(this.tasks[index], task);
                 } else {
@@ -345,7 +346,7 @@ export const useTaskStore = defineStore('tasks', {
                 const response = await http.put(`/api/tasks/${taskId}`, taskData);
 
                 // Atualiza na lista local
-                const index = this.tasks.findIndex(t => t.meta?.id === taskId);
+                const index = this.tasks.findIndex((t) => t.meta?.id === taskId);
                 if (index !== -1) {
                     this.tasks[index] = { ...this.tasks[index], ...taskData };
                 }
@@ -364,7 +365,7 @@ export const useTaskStore = defineStore('tasks', {
         async deleteTask(/** @type {any} */ taskId) {
             try {
                 await http.delete(`/api/tasks/${taskId}`);
-                this.tasks = this.tasks.filter(t => t.meta?.id !== taskId);
+                this.tasks = this.tasks.filter((t) => t.meta?.id !== taskId);
             } catch (/** @type {any} */ _rawError) {
                 const error = /** @type {any} */ (_rawError);
                 this.error = /** @type {any} */ (formatHttpError(error)).message;
@@ -414,7 +415,7 @@ export const useTaskStore = defineStore('tasks', {
 
             if (!taskId) return;
 
-            const index = this.tasks.findIndex(t => t.meta?.id === taskId || t.id === taskId);
+            const index = this.tasks.findIndex((t) => t.meta?.id === taskId || t.id === taskId);
 
             if (index !== -1) {
                 let incoming = null;

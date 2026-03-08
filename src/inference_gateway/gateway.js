@@ -1,17 +1,17 @@
 // @ts-check
 
 import { ollama as defaultOllamaClient } from '../../tools/ollama/client.mjs';
-import { resolveInferencePolicy, validateInferenceRoute } from './policy_config.js';
 import { requireInferenceClientTag } from './client_tags.js';
+import { resolveInferencePolicy, validateInferenceRoute } from './policy_config.js';
 
 /**
  * @typedef {{
- *   generate?: number,
- *   embed?: number,
- *   listModels?: number,
- *   errors?: number,
- *   byClientTag: Record<string, number>,
- *   byOperation: Record<string, number>
+ *     generate?: number;
+ *     embed?: number;
+ *     listModels?: number;
+ *     errors?: number;
+ *     byClientTag: Record<string, number>;
+ *     byOperation: Record<string, number>;
  * }} InferenceGatewayMetrics
  */
 
@@ -25,14 +25,21 @@ function parsePositiveIntEnv(name, fallback) {
 }
 
 /**
- * @returns {{ timeoutMs:number, maxParallel:number, maxTokens:number|null, allowedModels:string[]|null, allowedBackends:string[]|null, degradedBehavior:'degraded_continue'|'fail_closed' }}
+ * @returns {{
+ *     timeoutMs: number;
+ *     maxParallel: number;
+ *     maxTokens: number | null;
+ *     allowedModels: string[] | null;
+ *     allowedBackends: string[] | null;
+ *     degradedBehavior: 'degraded_continue' | 'fail_closed';
+ * }}
  */
 export function getInferenceEnvBootstrapPolicy() {
     const allowedModelsRaw = String(process.env.OLLAMA_LOCAL_ALLOWED_MODELS || '').trim();
     const allowedModels = allowedModelsRaw
         ? allowedModelsRaw
               .split(',')
-              .map(v => v.trim())
+              .map((v) => v.trim())
               .filter(Boolean)
         : null;
 
@@ -50,18 +57,18 @@ export function getInferenceEnvBootstrapPolicy() {
 }
 
 /**
- * Gateway de inferência para geração, embedding e listagem de modelos.
- * Aplica políticas por cliente/perfil e controla concorrência por clientTag.
+ * Gateway de inferência para geração, embedding e listagem de modelos. Aplica políticas por cliente/perfil e controla
+ * concorrência por clientTag.
  */
 export class InferenceGateway {
     /**
      * @param {{
-     *   ollamaClient?: unknown,
-     *   now?: () => number,
-     *   globalPolicy?: unknown,
-     *   profilePolicies?: Record<string, unknown>,
-     *   clientPolicies?: Record<string, unknown>,
-     *   defaults?: unknown,
+     *     ollamaClient?: unknown;
+     *     now?: () => number;
+     *     globalPolicy?: unknown;
+     *     profilePolicies?: Record<string, unknown>;
+     *     clientPolicies?: Record<string, unknown>;
+     *     defaults?: unknown;
      * }} [options]
      */
     constructor(options = {}) {
@@ -89,7 +96,12 @@ export class InferenceGateway {
 
     /**
      * Atualiza policies em memória (reload explícito, sem reiniciar processo).
-     * @param {{ globalPolicy?: unknown, profilePolicies?: Record<string, unknown>, clientPolicies?: Record<string, unknown> }} input
+     *
+     * @param {{
+     *     globalPolicy?: unknown;
+     *     profilePolicies?: Record<string, unknown>;
+     *     clientPolicies?: Record<string, unknown>;
+     * }} input
      */
     setPolicies(input = {}) {
         if (input.globalPolicy !== undefined) this.globalPolicy = input.globalPolicy || null;
@@ -99,7 +111,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @returns {{ globalPolicyPresent: boolean, profileCount: number, clientPolicyCount: number }}
+     * @returns {{ globalPolicyPresent: boolean; profileCount: number; clientPolicyCount: number }}
      */
     getPolicySummary() {
         return {
@@ -147,7 +159,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string | undefined, overrides?: unknown }} options
+     * @param {{ clientTag: unknown; profileName?: string | undefined; overrides?: unknown }} options
      */
     resolvePolicy(options) {
         const clientTag = requireInferenceClientTag(options?.clientTag);
@@ -156,7 +168,7 @@ export class InferenceGateway {
             options?.profileName ||
                 /** @type {any} */ (clientPolicy)?.profile_name ||
                 /** @type {any} */ (clientPolicy)?.profileName ||
-                ''
+                '',
         ).trim();
         return resolveInferencePolicy({
             clientTag,
@@ -170,7 +182,13 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, model?: string, backend?: string, policyOverrides?: unknown }} request
+     * @param {{
+     *     clientTag: unknown;
+     *     profileName?: string;
+     *     model?: string;
+     *     backend?: string;
+     *     policyOverrides?: unknown;
+     * }} request
      */
     validateGenerate(request) {
         const policy = this.resolvePolicy({
@@ -197,7 +215,16 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, prompt: string, model?: string, backend?: string, maxTokens?: number, runtime?: 'auto'|'cloud'|'local', profileName?: string, policyOverrides?: unknown }} request
+     * @param {{
+     *     clientTag: unknown;
+     *     prompt: string;
+     *     model?: string;
+     *     backend?: string;
+     *     maxTokens?: number;
+     *     runtime?: 'auto' | 'cloud' | 'local';
+     *     profileName?: string;
+     *     policyOverrides?: unknown;
+     * }} request
      */
     async generate(request) {
         const policy = this.resolvePolicy({
@@ -242,7 +269,15 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, text: string, model?: string, backend?: string, runtime?: 'auto'|'cloud'|'local', profileName?: string, policyOverrides?: unknown }} request
+     * @param {{
+     *     clientTag: unknown;
+     *     text: string;
+     *     model?: string;
+     *     backend?: string;
+     *     runtime?: 'auto' | 'cloud' | 'local';
+     *     profileName?: string;
+     *     policyOverrides?: unknown;
+     * }} request
      */
     async embed(request) {
         const policy = this.resolvePolicy({
@@ -284,7 +319,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, policyOverrides?: unknown }} request
+     * @param {{ clientTag: unknown; profileName?: string; policyOverrides?: unknown }} request
      */
     async listModels(request) {
         const policy = this.resolvePolicy({
@@ -323,6 +358,7 @@ export class InferenceGateway {
 
 /**
  * Instância singleton do gateway de inferência usada pelo servidor HTTP do módulo.
+ *
  * @type {InferenceGateway}
  */
 export const inferenceGateway = new InferenceGateway();

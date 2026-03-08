@@ -8,14 +8,15 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 /**
  * Opções do construtor do TaskControlWatcher.
+ *
  * @typedef {object} TaskControlWatcherOptions
  * @property {object} nerv - Instância do sistema nerv para comunicação.
- * @property {number} [intervalMs=500] - Intervalo entre ticks em ms.
+ * @property {number} [intervalMs=500] - Intervalo entre ticks em ms. Default is `500`
  */
 
 /**
- * Watcher que monitora tarefas em estados de controle (PAUSED/CANCELLED) e emite comandos de abort.
- * Responsável por notificar drivers quando tarefas são canceladas ou pausadas pelo usuário.
+ * Watcher que monitora tarefas em estados de controle (PAUSED/CANCELLED) e emite comandos de abort. Responsável por
+ * notificar drivers quando tarefas são canceladas ou pausadas pelo usuário.
  */
 class TaskControlWatcher {
     /** Minimum recent-window to detect PAUSED/CANCELLED tasks regardless of interval (ms). */
@@ -26,6 +27,7 @@ class TaskControlWatcher {
 
     /**
      * Cria um watcher para monitorar controles de tarefas.
+     *
      * @param {TaskControlWatcherOptions} options - Opções de configuração.
      */
     constructor(options) {
@@ -44,7 +46,7 @@ class TaskControlWatcher {
 
     /** @param {any} ms */
     _sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     /** @param {any} promise @param {any} timeoutMs @param {any} operation */
@@ -60,18 +62,18 @@ class TaskControlWatcher {
             }, timeoutMs);
 
             Promise.resolve(promise).then(
-                value => {
+                (value) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
                     resolve(value);
                 },
-                error => {
+                (error) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
-                    reject(error);
-                }
+                    reject(error instanceof Error ? error : new Error(String(error)));
+                },
             );
         });
     }
@@ -90,10 +92,10 @@ class TaskControlWatcher {
                         ActionCode.DRIVER_ABORT,
                         { taskId, reason },
                         correlationId,
-                        ActorRole.DRIVER
+                        ActorRole.DRIVER,
                     ),
                     this.abortTimeoutMs,
-                    `sendCommand(DRIVER_ABORT:${taskId})`
+                    `sendCommand(DRIVER_ABORT:${taskId})`,
                 );
 
                 return { ok: true, attempt };
@@ -103,7 +105,7 @@ class TaskControlWatcher {
                 log(
                     'WARN',
                     `[TaskControlWatcher] Abort emit attempt ${attempt}/${totalAttempts} falhou para ${taskId}: ${error?.message || String(error)}`,
-                    correlationId
+                    correlationId,
                 );
 
                 if (attempt < totalAttempts) {
@@ -121,6 +123,7 @@ class TaskControlWatcher {
 
     /**
      * Inicia o watcher, começando a monitorar tarefas em estados de controle.
+     *
      * @returns {void}
      * @sideEffects Inicia timer interno e executa tick imediatamente.
      */
@@ -136,6 +139,7 @@ class TaskControlWatcher {
 
     /**
      * Para o watcher, cancelando o timer de monitoramento.
+     *
      * @returns {void}
      * @sideEffects Cancela timer interno.
      */
@@ -149,14 +153,13 @@ class TaskControlWatcher {
     }
 
     /**
-     * Executa um ciclo de monitoramento: busca tarefas PAUSED/CANCELLED com locks ativos
-     * ou modificadas recentemente (cobrindo race condition onde o lock já foi liberado antes
-     * do watcher rodar), e emite comandos DRIVER_ABORT via nerv, liberando locks após.
+     * Executa um ciclo de monitoramento: busca tarefas PAUSED/CANCELLED com locks ativos ou modificadas recentemente
+     * (cobrindo race condition onde o lock já foi liberado antes do watcher rodar), e emite comandos DRIVER_ABORT via
+     * nerv, liberando locks após.
      *
-     * Race condition coberta: `pauseTaskCommand` libera o lock antes que este watcher
-     * possa enviar o DRIVER_ABORT. A janela temporal (`this.intervalMs * 600`) garante que
-     * pelo menos um ciclo do watcher detecte a task mesmo sem lock ativo. A dedupKey em
-     * `CONTROL_ABORT_INTENT` (baseada em `intentAt`) garante idempotência.
+     * Race condition coberta: `pauseTaskCommand` libera o lock antes que este watcher possa enviar o DRIVER_ABORT. A
+     * janela temporal (`this.intervalMs * 600`) garante que pelo menos um ciclo do watcher detecte a task mesmo sem
+     * lock ativo. A dedupKey em `CONTROL_ABORT_INTENT` (baseada em `intentAt`) garante idempotência.
      *
      * @returns {Promise<void>}
      * @throws {Error} Erros são logados mas não relançados.
@@ -179,7 +182,7 @@ class TaskControlWatcher {
             //    The dedupKey on CONTROL_ABORT_INTENT prevents duplicate abort signals.
             const RECENT_WINDOW_MS = Math.max(
                 TaskControlWatcher.MIN_RECENT_WINDOW_MS,
-                this.intervalMs * TaskControlWatcher.INTERVAL_MULTIPLIER
+                this.intervalMs * TaskControlWatcher.INTERVAL_MULTIPLIER,
             );
             const rows = /** @type {any[]} */ (
                 db
@@ -194,7 +197,7 @@ class TaskControlWatcher {
                       )
                     ORDER BY updated_at_ms DESC
                     LIMIT 50
-                `
+                `,
                     )
                     .all({ recentMs: now - RECENT_WINDOW_MS })
             );
@@ -281,7 +284,7 @@ class TaskControlWatcher {
                     log(
                         'WARN',
                         `[TaskControlWatcher] CONTROL_ABORT_FAILED para ${taskId} (lockReleased=${lockReleased}, reason=${lockReason})`,
-                        correlationId
+                        correlationId,
                     );
                 }
             }

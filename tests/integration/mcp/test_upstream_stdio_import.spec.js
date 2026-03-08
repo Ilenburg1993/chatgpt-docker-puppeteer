@@ -1,10 +1,10 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import test from 'node:test';
 
-import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 import { registerUpstreams, shutdownUpstreams } from '../../../src/integration/mcp/upstream-manager.mjs';
+import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 
 test('imports tools from stdio upstream (SDK) and proxies calls', async () => {
     const registry = new ToolRegistry();

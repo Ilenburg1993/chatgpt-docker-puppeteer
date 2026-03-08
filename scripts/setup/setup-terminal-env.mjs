@@ -2,11 +2,10 @@
 // @ts-check
 
 /**
- * @fileoverview Configuração visual do ambiente no terminal
- * Define prompts e indicadores visuais para desenvolvimento vs produção
- *
- * @author Sistema de Ambiente
  * @version 1.0.0
+ * @file Configuração visual do ambiente no terminal Define prompts e indicadores visuais para desenvolvimento vs
+ *   produção
+ * @author Sistema de Ambiente
  */
 
 import { existsSync } from 'fs';
@@ -26,6 +25,7 @@ const projectRoot = resolve(__dirname, '..');
 
 /**
  * Detecta o ambiente atual
+ *
  * @returns {EnvironmentInfo} Informações do ambiente
  */
 function detectEnvironment() {
@@ -50,6 +50,7 @@ function detectEnvironment() {
  */
 /**
  * Gera configuração do prompt do terminal
+ *
  * @param {GeneratePromptConfigEnv} env - Informações do ambiente
  * @returns {string} Comando para configurar o prompt
  */
@@ -82,6 +83,7 @@ export PROMPT_COMMAND='echo -e "\\e[1;32m💻 Ambiente de Desenvolvimento\\e[0m"
  */
 /**
  * Gera aliases úteis baseados no ambiente
+ *
  * @param {GenerateAliasesEnv} env - Informações do ambiente
  * @returns {string} Comandos de alias
  */

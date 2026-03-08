@@ -1,8 +1,7 @@
 // @ts-check
-import fs from 'node:fs';
-import { promises as fsp } from 'node:fs';
-import path from 'node:path';
 import { LOG_DIR, log } from '#core/logger';
+import fs, { promises as fsp } from 'node:fs';
+import path from 'node:path';
 
 /**
  * Caminho absoluto do alvo de vigilância.
@@ -18,9 +17,10 @@ let watcher = null;
 let reconnectTimeout = null;
 
 /**
- * Inicializa o monitoramento de integridade do log.
- * Focado em resiliência de sistema de arquivos e persistência de handle.
-  * @returns {Promise<void>}
+ * Inicializa o monitoramento de integridade do log. Focado em resiliência de sistema de arquivos e persistência de
+ * handle.
+ *
+ * @returns {Promise<void>}
  */
 async function init() {
     // 1. Prevenção de Duplicidade: Limpa recursos antes de iniciar
@@ -40,15 +40,14 @@ async function init() {
         log('INFO', '[LOG_WATCHER] Vigilância de integridade do log operacional ativa.');
 
         /**
-         * fs.watch: Monitora mudanças no diretório/arquivo via Kernel do SO.
-         * No Windows, o evento 'rename' é disparado quando o Logger rotaciona o arquivo.
+         * fs.watch: Monitora mudanças no diretório/arquivo via Kernel do SO. No Windows, o evento 'rename' é disparado
+         * quando o Logger rotaciona o arquivo.
          */
-        watcher = fs.watch(LOG_FILE, event => {
+        watcher = fs.watch(LOG_FILE, (event) => {
             if (event === 'rename') {
                 /**
-                 * ROTAÇÃO DETECTADA:
-                 * O handle atual tornou-se inválido. Precisamos descartar o
-                 * watcher e aguardar o novo arquivo ser estabilizado no disco.
+                 * ROTAÇÃO DETECTADA: O handle atual tornou-se inválido. Precisamos descartar o watcher e aguardar o
+                 * novo arquivo ser estabilizado no disco.
                  */
                 log('DEBUG', '[LOG_WATCHER] Inode alterado (Rotação). Re-sincronizando...');
                 _handleRotation();
@@ -86,14 +85,14 @@ function _scheduleReconnect(ms) {
         clearTimeout(reconnectTimeout);
     }
     reconnectTimeout = setTimeout(() => {
-        init();
+        void init();
     }, ms);
 }
 
 /**
- * Encerramento gracioso do observador e limpeza de timers.
- * Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
-  * @returns {void}
+ * Encerramento gracioso do observador e limpeza de timers. Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
+ *
+ * @returns {void}
  */
 function stop() {
     if (watcher) {

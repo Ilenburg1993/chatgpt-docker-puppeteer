@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { InferenceGateway } from '../../../src/inference_gateway/gateway.js';
 
 test('InferenceGateway generate uses policy precedence and validates route', async () => {
@@ -45,13 +45,13 @@ test('InferenceGateway rejects disallowed route by client policy', async () => {
 
     await assert.rejects(
         () => gateway.generate({ clientTag: 'audit_agent_patch', prompt: 'x', model: 'other-model' }),
-        /não permitido/
+        /não permitido/,
     );
 });
 
 test('InferenceGateway enforces per-client concurrency limit', async () => {
     let release;
-    const blocker = new Promise(resolve => {
+    const blocker = new Promise((resolve) => {
         release = resolve;
     });
     const gateway = new InferenceGateway({

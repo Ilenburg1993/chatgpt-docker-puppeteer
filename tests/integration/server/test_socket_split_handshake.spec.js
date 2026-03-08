@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
+import * as socketEngine from '#server/engine/socket';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import * as socketEngine from '#server/engine/socket';
+import test from 'node:test';
 
 function listenRandomPort(/** @type {any} */ server) {
     return new Promise((resolve, reject) => {
@@ -16,7 +16,7 @@ function listenRandomPort(/** @type {any} */ server) {
 
 function closeServer(/** @type {any} */ server) {
     return /** @type {Promise<void>} */ (
-        new Promise(resolve => {
+        new Promise((resolve) => {
             server.close(() => resolve());
         })
     );
@@ -36,7 +36,7 @@ test('split mode external connection performs handshake and remains connected', 
     assert.equal(adapter.connected(), true);
 
     // Guard against handshake-timeout disconnects (server timeout is 5s)
-    await new Promise(resolve => setTimeout(resolve, 5500));
+    await new Promise((resolve) => setTimeout(resolve, 5500));
     assert.equal(adapter.connected(), true, 'connection should survive server handshake timeout window');
 
     adapter.disconnect();

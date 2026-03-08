@@ -7,7 +7,7 @@ const ROOT = path.resolve(import.meta.dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');
 
 /**
- * @typedef {'DEBUG'|'INFO'|'WARN'|'ERROR'|'FATAL'} LogLevel
+ * @typedef {'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'} LogLevel
  */
 
 // --- DEFINIÇÃO DE ARQUIVOS ---
@@ -34,20 +34,20 @@ try {
 ========================================================================== */
 
 /**
- * Apaga arquivos antigos para economizar espaço em disco.
- * Side-effects: Remove arquivos do sistema de arquivos.
+ * Apaga arquivos antigos para economizar espaço em disco. Side-effects: Remove arquivos do sistema de arquivos.
+ *
  * @param {string} prefix - Prefixo dos arquivos a limpar.
  */
 function cleanOldFiles(prefix) {
     try {
         const files = fs
             .readdirSync(LOG_DIR)
-            .filter(f => f.startsWith(prefix) && (f.endsWith('.log') || f.endsWith('.bak') || f.endsWith('.json')))
-            .map(f => ({ name: f, time: fs.statSync(path.join(LOG_DIR, f)).mtime.getTime() }))
+            .filter((f) => f.startsWith(prefix) && (f.endsWith('.log') || f.endsWith('.bak') || f.endsWith('.json')))
+            .map((f) => ({ name: f, time: fs.statSync(path.join(LOG_DIR, f)).mtime.getTime() }))
             .sort((a, b) => b.time - a.time);
 
         if (files.length > MAX_ARCHIVES) {
-            files.slice(MAX_ARCHIVES).forEach(f => {
+            files.slice(MAX_ARCHIVES).forEach((f) => {
                 try {
                     fs.unlinkSync(path.join(LOG_DIR, f.name));
                 } catch (/** @type {any} */ _) {
@@ -57,15 +57,15 @@ function cleanOldFiles(prefix) {
         }
     } catch (/** @type {any} */ e) {
         console.error(
-            `[LOGGER] Erro na limpeza de arquivos (${prefix}): ${e instanceof Error ? e.message : String(e)}`
+            `[LOGGER] Erro na limpeza de arquivos (${prefix}): ${e instanceof Error ? e.message : String(e)}`,
         );
     }
 }
 
 /**
- * Rotaciona um arquivo se ele exceder o limite definido.
- * Rotaciona arquivo de log quando excede tamanho máximo.
+ * Rotaciona um arquivo se ele exceder o limite definido. Rotaciona arquivo de log quando excede tamanho máximo.
  * Side-effects: Renomeia arquivo atual para .bak e limpa arquivos antigos.
+ *
  * @param {string} filePath - Caminho do arquivo a rotacionar.
  * @param {string} prefix - Prefixo para arquivos de backup.
  * @param {number} maxSize - Tamanho máximo em bytes.
@@ -109,14 +109,15 @@ const configuredLevel = process.env.LOG_LEVEL?.toUpperCase() || 'INFO';
 let minLevel = /** @type {Record<string, number>} */ (LOG_LEVELS)[configuredLevel] ?? LOG_LEVELS.INFO;
 
 /**
- * Log Operacional: Registra eventos do fluxo de trabalho com filtragem por nível.
- * BUG-02 FIX: Refatorado para função síncrona. O diretório de logs é criado na carga do módulo.
- * Side-effects: Escreve no console e arquivo de log, rotaciona arquivos se necessário.
+ * Log Operacional: Registra eventos do fluxo de trabalho com filtragem por nível. BUG-02 FIX: Refatorado para função
+ * síncrona. O diretório de logs é criado na carga do módulo. Side-effects: Escreve no console e arquivo de log,
+ * rotaciona arquivos se necessário.
+ *
  * @param {LogLevel} level - Nível do log.
- * @param {string|Error|Record<string, unknown>} msg - Mensagem ou objeto a logar.
- * @param {string | null} [taskId='-'] - ID da tarefa associada.
- * @throws {Error} Nunca lança erro - opera em modo fail-safe.
+ * @param {string | Error | Record<string, unknown>} msg - Mensagem ou objeto a logar.
+ * @param {string | null} [taskId='-'] - ID da tarefa associada. Default is `'-'`
  * @returns {void}
+ * @throws {Error} Nunca lança erro - opera em modo fail-safe.
  */
 function log(level, msg, taskId = '-') {
     // Filter: Only log if level >= configured threshold
@@ -150,17 +151,18 @@ function log(level, msg, taskId = '-') {
 
 /**
  * Retorna o nível de log configurado atualmente.
+ *
  * @returns {string} Nível de log atual.
  */
 log.getLevel = () => configuredLevel;
 
 /**
- * Define o nível de log dinamicamente em runtime.
- * Side-effects: Altera o filtro de logs globalmente.
+ * Define o nível de log dinamicamente em runtime. Side-effects: Altera o filtro de logs globalmente.
+ *
  * @param {LogLevel} newLevel - Novo nível de log.
  * @throws {Error} Nunca lança erro - valida entrada e loga avisos.
  */
-log.setLevel = newLevel => {
+log.setLevel = (newLevel) => {
     const upperLevel = newLevel.toUpperCase();
     if (/** @type {Record<string, number>} */ (LOG_LEVELS)[upperLevel] !== undefined) {
         minLevel = /** @type {Record<string, number>} */ (LOG_LEVELS)[upperLevel];
@@ -171,12 +173,13 @@ log.setLevel = newLevel => {
 };
 
 /**
- * Auditoria Governamental: Registra ações administrativas e mudanças de estado.
- * Side-effects: Escreve no arquivo de auditoria, rotaciona se necessário.
+ * Auditoria Governamental: Registra ações administrativas e mudanças de estado. Side-effects: Escreve no arquivo de
+ * auditoria, rotaciona se necessário.
+ *
  * @param {string} action - Ação auditada.
  * @param {Record<string, unknown>} details - Detalhes da ação.
- * @throws {Error} Nunca lança erro - opera em modo fail-safe com fallback para console.
  * @returns {void}
+ * @throws {Error} Nunca lança erro - opera em modo fail-safe com fallback para console.
  */
 function audit(action, details) {
     rotateFile(AUDIT_FILE, 'audit_', MAX_AUDIT_SIZE);
@@ -193,12 +196,13 @@ function audit(action, details) {
 }
 
 /**
- * Métricas de Performance: Registra dados para análise estatística futura.
- * Side-effects: Escreve no arquivo de métricas, rotaciona se necessário.
+ * Métricas de Performance: Registra dados para análise estatística futura. Side-effects: Escreve no arquivo de
+ * métricas, rotaciona se necessário.
+ *
  * @param {string} name - Nome da métrica.
  * @param {Record<string, unknown>} [payload] - Payload da métrica.
- * @throws {Error} Nunca lança erro - opera em modo fail-safe.
  * @returns {void}
+ * @throws {Error} Nunca lança erro - opera em modo fail-safe.
  */
 function metric(name, payload) {
     rotateFile(METRICS_FILE, 'metrics_', MAX_LOG_SIZE);
@@ -210,8 +214,8 @@ function metric(name, payload) {
                     ts: new Date().toISOString(),
                     metric: name,
                 },
-                payload || {}
-            )
+                payload || {},
+            ),
         );
         fs.appendFileSync(METRICS_FILE, `${entry}\n`, 'utf-8');
     } catch (/** @type {any} */ _) {
@@ -224,13 +228,8 @@ function metric(name, payload) {
 ========================================================================== */
 
 /**
- * Wrappers de conveniência para níveis de log mais comuns.
- * Uso:
- *   log.debug('Mensagem', taskId)
- *   log.info('Mensagem', taskId)
- *   log.warn('Mensagem', taskId)
- *   log.error('Mensagem', taskId)
- *   log.fatal('Mensagem', taskId)
+ * Wrappers de conveniência para níveis de log mais comuns. Uso: log.debug('Mensagem', taskId) log.info('Mensagem',
+ * taskId) log.warn('Mensagem', taskId) log.error('Mensagem', taskId) log.fatal('Mensagem', taskId)
  */
 log.debug = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @type {string} */ taskId = '-') =>
     log('DEBUG', msg, taskId);
@@ -250,61 +249,71 @@ cleanOldFiles('audit_');
 
 /**
  * Wrapper para log.debug.
- * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ *
+ * @param {string | Error | Record<string, unknown>} msg - Mensagem.
  * @param {string} [taskId] - ID da tarefa.
  */
 export const debug = log.debug;
 
 /**
  * Wrapper para log.info.
- * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ *
+ * @param {string | Error | Record<string, unknown>} msg - Mensagem.
  * @param {string} [taskId] - ID da tarefa.
  */
 export const info = log.info;
 
 /**
  * Wrapper para log.warn.
- * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ *
+ * @param {string | Error | Record<string, unknown>} msg - Mensagem.
  * @param {string} [taskId] - ID da tarefa.
  */
 export const warn = log.warn;
 
 /**
  * Wrapper para log.error.
- * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ *
+ * @param {string | Error | Record<string, unknown>} msg - Mensagem.
  * @param {string} [taskId] - ID da tarefa.
  */
 export const error = log.error;
 
 /**
  * Wrapper para log.fatal.
- * @param {string|Error|Record<string, unknown>} msg - Mensagem.
+ *
+ * @param {string | Error | Record<string, unknown>} msg - Mensagem.
  * @param {string} [taskId] - ID da tarefa.
  */
 export const fatal = log.fatal;
 
 /**
- * Função principal de logging com métodos auxiliares.
- * Side-effects: Escreve logs, rotaciona arquivos, filtra por nível.
- * @type {((level: LogLevel, msg: string|Error|Record<string, unknown>, taskId?: string) => void) & {getLevel: () => string, setLevel: (newLevel: LogLevel) => void, debug: (msg: string|Error|Record<string, unknown>, taskId?: string) => void, info: (msg: string|Error|Record<string, unknown>, taskId?: string) => void, warn: (msg: string|Error|Record<string, unknown>, taskId?: string) => void, error: (msg: string|Error|Record<string, unknown>, taskId?: string) => void, fatal: (msg: string|Error|Record<string, unknown>, taskId?: string) => void}}
+ * Função principal de logging com métodos auxiliares. Side-effects: Escreve logs, rotaciona arquivos, filtra por nível.
+ *
+ * @type {((level: LogLevel, msg: string | Error | Record<string, unknown>, taskId?: string) => void) & {
+ *     getLevel: () => string;
+ *     setLevel: (newLevel: LogLevel) => void;
+ *     debug: (msg: string | Error | Record<string, unknown>, taskId?: string) => void;
+ *     info: (msg: string | Error | Record<string, unknown>, taskId?: string) => void;
+ *     warn: (msg: string | Error | Record<string, unknown>, taskId?: string) => void;
+ *     error: (msg: string | Error | Record<string, unknown>, taskId?: string) => void;
+ *     fatal: (msg: string | Error | Record<string, unknown>, taskId?: string) => void;
+ * }}
  */
 export { log };
 
 /**
- * Função de auditoria.
- * Side-effects: Escreve auditoria em arquivo.
+ * Função de auditoria. Side-effects: Escreve auditoria em arquivo.
  */
 export { audit };
 
 /**
- * Função de métricas.
- * Side-effects: Escreve métricas em arquivo.
+ * Função de métricas. Side-effects: Escreve métricas em arquivo.
  */
 export { metric };
 
 /**
- * Alias para metric.
- * Side-effects: Escreve métricas em arquivo.
+ * Alias para metric. Side-effects: Escreve métricas em arquivo.
  */
 export { metric as logMetric };
 

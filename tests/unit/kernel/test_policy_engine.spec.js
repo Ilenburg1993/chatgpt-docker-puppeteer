@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Kernel Policy Engine - Motor de Políticas', () => {
     describe('1. Políticas de Retry', () => {

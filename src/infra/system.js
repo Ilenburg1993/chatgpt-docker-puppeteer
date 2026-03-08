@@ -1,11 +1,11 @@
 // @ts-check
+import { log } from '#core/logger';
+import { execa } from 'execa';
 import { exec } from 'node:child_process';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import pm2 from 'pm2';
 import treeKill from 'tree-kill';
-import path from 'node:path';
-import { execa } from 'execa';
-import { log } from '#core/logger';
 
 const AGENTE_NAME = 'agente-gpt';
 
@@ -14,13 +14,12 @@ const require_ = createRequire(import.meta.url);
 const ecosystemConfig = require_(path.join(import.meta.dirname, '../../ecosystem.config.cjs'));
 
 /**
- * Interface Promisificada interna para o PM2.
- * Evita o aninhamento de callbacks e facilita o tratamento de erros.
+ * Interface Promisificada interna para o PM2. Evita o aninhamento de callbacks e facilita o tratamento de erros.
  */
 const pm2p = /** @type {any} */ ({
     connect: () =>
         new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
-            pm2.connect(err => {
+            pm2.connect((err) => {
                 if (err) {
                     rej(err);
                 } else {
@@ -28,7 +27,7 @@ const pm2p = /** @type {any} */ ({
                 }
             });
         }),
-    describe: /** @param {any} name */ name =>
+    describe: /** @param {any} name */ (name) =>
         new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
             pm2.describe(name, (err, list) => {
                 if (err) {
@@ -40,7 +39,7 @@ const pm2p = /** @type {any} */ ({
         }),
     start: (/** @type {any} */ opts) =>
         new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
-            pm2.start(opts, err => {
+            pm2.start(opts, (err) => {
                 if (err) {
                     rej(err);
                 } else {
@@ -50,7 +49,7 @@ const pm2p = /** @type {any} */ ({
         }),
     stop: (/** @type {any} */ name) =>
         new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
-            pm2.stop(name, err => {
+            pm2.stop(name, (err) => {
                 if (err) {
                     rej(err);
                 } else {
@@ -60,7 +59,7 @@ const pm2p = /** @type {any} */ ({
         }),
     restart: (/** @type {any} */ name) =>
         new Promise((/** @type {any} */ res, /** @type {any} */ rej) => {
-            pm2.restart(name, err => {
+            pm2.restart(name, (err) => {
                 if (err) {
                     rej(err);
                 } else {
@@ -76,8 +75,8 @@ const pm2p = /** @type {any} */ ({
 ========================================================================== */
 
 /**
- * Retorna o status detalhado do processo do Agente.
- * Mapeia os dados brutos do PM2 para um contrato limpo.
+ * Retorna o status detalhado do processo do Agente. Mapeia os dados brutos do PM2 para um contrato limpo.
+ *
  * @returns {Promise<any>}
  */
 async function getAgentStatus() {
@@ -104,9 +103,10 @@ async function getAgentStatus() {
 }
 
 /**
- * Executa uma ação de controle no Agente (start/stop/restart/kill_daemon).
- * Contém a inteligência de decisão de comando baseada no estado atual.
- * @param {*} action
+ * Executa uma ação de controle no Agente (start/stop/restart/kill_daemon). Contém a inteligência de decisão de comando
+ * baseada no estado atual.
+ *
+ * @param {any} action
  * @returns {Promise<any>}
  */
 async function controlAgent(action) {
@@ -167,7 +167,7 @@ async function controlAgent(action) {
 
                 // Fallback to original exec behavior
                 return new Promise((/** @type {any} */ res) => {
-                    exec('npx pm2 kill', err => {
+                    exec('npx pm2 kill', (err) => {
                         if (err) {
                             log('ERROR', `[SYSTEM] Falha ao matar daemon: ${err.message}`);
                         }
@@ -193,7 +193,8 @@ async function controlAgent(action) {
 
 /**
  * Mata um processo específico e sua árvore de filhos com SIGKILL.
- * @param {*} pid
+ *
+ * @param {any} pid
  * @returns {Promise<any>}
  */
 async function killProcess(pid) {
@@ -230,18 +231,18 @@ async function killProcess(pid) {
             const _ce = /** @type {any} */ (err);
             log(
                 'ERROR',
-                `Falha ao matar PID ${pid}: ${err && _ce.message ? _ce.message : String(err)} — usando fallback tree-kill`
+                `Falha ao matar PID ${pid}: ${err && _ce.message ? _ce.message : String(err)} — usando fallback tree-kill`,
             );
         }
     }
 
     // Fallback to tree-kill (legacy behavior)
     await new Promise((/** @type {any} */ resolve) => {
-        treeKill(pid, 'SIGKILL', err => {
+        treeKill(pid, 'SIGKILL', (err) => {
             if (err) {
                 log('ERROR', `Falha ao matar PID ${pid} com tree-kill: ${err.message}`);
                 // As a last resort, attempt a global Chrome kill
-                killChromeGlobal().then(() => resolve());
+                void killChromeGlobal().then(() => resolve());
             } else {
                 log('INFO', `Processo ${pid} e filhos encerrados via tree-kill.`);
                 resolve();
@@ -252,6 +253,7 @@ async function killProcess(pid) {
 
 /**
  * Mata TODOS os processos do Chrome (Fallback Nuclear).
+ *
  * @returns {Promise<any>}
  */
 async function killChromeGlobal() {
@@ -275,7 +277,7 @@ async function killChromeGlobal() {
     // Fallback to exec
     return new Promise((/** @type {any} */ resolve) => {
         const cmd = isWin ? 'taskkill /F /IM chrome.exe /T' : 'pkill -9 chrome';
-        exec(cmd, err => {
+        exec(cmd, (err) => {
             if (err) {
                 log('WARN', `Falha no Kill Global: ${err.message}`);
             } else {
@@ -287,4 +289,4 @@ async function killChromeGlobal() {
 }
 
 /** Reexport público: pm2Raw. */
-export { getAgentStatus, controlAgent, killProcess, killChromeGlobal, pm2 as pm2Raw };
+export { controlAgent, getAgentStatus, killChromeGlobal, killProcess, pm2 as pm2Raw };

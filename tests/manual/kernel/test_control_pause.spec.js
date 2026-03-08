@@ -1,7 +1,7 @@
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
-import { writeTask, readTask, startAgent, stopAgent, waitForCondition, sleep, ROOT } from './helpers.js';
+import { readTask, ROOT, sleep, startAgent, stopAgent, waitForCondition, writeTask } from './helpers.js';
 
 (async () => {
     console.log('\n=== TEST: Controle de Pausa Dinâmica ===');

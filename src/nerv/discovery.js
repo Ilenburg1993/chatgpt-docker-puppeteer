@@ -6,22 +6,22 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
 /**
  * Publica evento SERVER_READY para descoberta de serviço.
  *
- * **Side-effects:** Envia evento via NERV ou registra estado (modo legado).
- * **Semântica:** Sinaliza que servidor está pronto para aceitar conexões.
- * **Unidades:** Timeout em milissegundos.
+ * **Side-effects:** Envia evento via NERV ou registra estado (modo legado). **Semântica:** Sinaliza que servidor está
+ * pronto para aceitar conexões. **Unidades:** Timeout em milissegundos.
  *
  * @param {any} [nerv] - Instância NERV para publicação (opcional)
- * @param {Record<string, any>} [payload={}] - Payload adicional do evento
- * @returns {Promise<object|null>} Envelope enviado ou null se falhar
+ * @param {Record<string, any>} [payload={}] - Payload adicional do evento. Default is `{}`
+ * @returns {Promise<object | null>} Envelope enviado ou null se falhar
  */
 async function publishServerReady(nerv, payload = {}) {
     // Prefer NERV when available
     if (nerv) {
         try {
+            // eslint-disable-next-line @typescript-eslint/await-thenable
             return await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
         } catch (/** @type {any} */ err) {
             const _e = /** @type {any} */ (err);
-                        log('WARN', `[DISCOVERY] Falha ao publicar SERVER_READY via NERV: ${_e.message}`);
+            log('WARN', `[DISCOVERY] Falha ao publicar SERVER_READY via NERV: ${_e.message}`);
         }
     }
 
@@ -33,8 +33,7 @@ async function publishServerReady(nerv, payload = {}) {
 /**
  * Remove publicação de SERVER_READY (modo legado).
  *
- * **Side-effects:** Remove arquivo de estado legado se existir.
- * **Semântica:** Limpa sinal de prontidão do servidor.
+ * **Side-effects:** Remove arquivo de estado legado se existir. **Semântica:** Limpa sinal de prontidão do servidor.
  * **Unidades:** N/A
  *
  * @returns {boolean} True se arquivo foi removido, false caso contrário
@@ -47,12 +46,11 @@ function unpublishServerReady() {
 /**
  * Aguarda o primeiro evento SERVER_READY via NERV.
  *
- * **Side-effects:** Registra listener temporário no NERV, configura timeout.
- * **Semântica:** Promise que resolve quando servidor sinaliza prontidão.
- * **Unidades:** timeoutMs em milissegundos (padrão 10000).
+ * **Side-effects:** Registra listener temporário no NERV, configura timeout. **Semântica:** Promise que resolve quando
+ * servidor sinaliza prontidão. **Unidades:** timeoutMs em milissegundos (padrão 10000).
  *
  * @param {any} nerv - Instância NERV com método onEvent
- * @param {Record<string, any>} [options={}] - Opções de configuração
+ * @param {Record<string, any>} [options={}] - Opções de configuração. Default is `{}`
  * @returns {Promise<any>} Payload do envelope SERVER_READY
  * @throws {Error} Se NERV não tem onEvent ou timeout expirar
  */
@@ -84,7 +82,7 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
             });
         } catch (/** @type {any} */ err) {
             clearTimeout(timer);
-            reject(err);
+            reject(err instanceof Error ? err : new Error(String(err)));
         }
     });
 }
@@ -92,9 +90,8 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
 /**
  * Escuta continuamente eventos SERVER_READY e chama handler.
  *
- * **Side-effects:** Registra listener permanente no NERV.
- * **Semântica:** Observador contínuo de eventos de prontidão do servidor.
- * **Unidades:** N/A
+ * **Side-effects:** Registra listener permanente no NERV. **Semântica:** Observador contínuo de eventos de prontidão do
+ * servidor. **Unidades:** N/A
  *
  * @param {any} nerv - Instância NERV com método onEvent
  * @param {function(object): void} handler - Callback invocado para cada SERVER_READY

@@ -1,14 +1,13 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { http, formatHttpError } from '@/lib/http';
-import Card from '@/components/ui/Card.vue';
-import Button from '@/components/ui/Button.vue';
 import Badge from '@/components/ui/Badge.vue';
-import { useTasksVNextStore } from '@/stores/tasks_vnext';
-import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import Button from '@/components/ui/Button.vue';
 import { useSocket } from '@/composables/useSocket';
 import { useSsotRealtime } from '@/composables/useSsotRealtime';
+import { formatHttpError, http } from '@/lib/http';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const tasks = useTasksVNextStore();
@@ -33,7 +32,7 @@ const cancelled = computed(() => Number(stats.value.by_status?.CANCELLED || 0));
 const totalTasks = computed(() => Number(stats.value.total || 0));
 const totalMissions = computed(() => missions.items?.length || 0);
 const activeMissions = computed(
-    () => missions.items?.filter(m => m.status === 'RUNNING' || m.status === 'READY').length || 0
+    () => missions.items?.filter((m) => m.status === 'RUNNING' || m.status === 'READY').length || 0,
 );
 
 const uptimeFormatted = computed(() => {

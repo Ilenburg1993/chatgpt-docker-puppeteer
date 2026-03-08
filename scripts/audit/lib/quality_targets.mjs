@@ -6,8 +6,8 @@ const JS_SOURCE_RE = /\.(js|mjs|cjs)$/i;
 const CODE_EXT_RE = /\.(js|mjs|cjs|ts|tsx|jsx|vue|json)$/i;
 
 /**
- * Arquivos que, quando alterados, exigem smoke de import dos entrypoints no `audit:quick`.
- * A lista cobre acoplamentos que historicamente geraram side effects no import.
+ * Arquivos que, quando alterados, exigem smoke de import dos entrypoints no `audit:quick`. A lista cobre acoplamentos
+ * que historicamente geraram side effects no import.
  */
 export const ENTRYPOINT_SMOKE_IMPACT_PATHS = Object.freeze([
     'src/main.js',
@@ -19,7 +19,7 @@ export const ENTRYPOINT_SMOKE_IMPACT_PATHS = Object.freeze([
 ]);
 
 /**
- * @param {string|null|undefined} file
+ * @param {string | null | undefined} file
  * @returns {string}
  */
 export function normalizeRepoPath(file) {
@@ -143,7 +143,7 @@ export function isHighRiskQualityConfigFile(file) {
  * @returns {string[]}
  */
 export function filterExistingFiles(files) {
-    return files.filter(file => {
+    return files.filter((file) => {
         try {
             return fs.existsSync(file);
         } catch {
@@ -175,8 +175,8 @@ export function pickPrettierFiles(changed) {
 export function pickJSDocDeltaFiles(changed) {
     return filterExistingFiles(
         changed.filter(
-            file => isJsSourceFile(file) && !file.includes('/dist/') && !file.startsWith('src/dashboard-ui/dist/')
-        )
+            (file) => isJsSourceFile(file) && !file.includes('/dist/') && !file.startsWith('src/dashboard-ui/dist/'),
+        ),
     );
 }
 
@@ -193,9 +193,9 @@ export function summarizeChangeImpact(changed) {
         hasHighRiskConfig: normalized.some(isHighRiskQualityConfigFile),
         hasNodeTypeImpact: normalized.some(isNodeTypeImpactFile),
         hasBrowserTypeImpact: normalized.some(isBrowserTypeImpactFile),
-        hasSrcOutsideDashboard: normalized.some(f => f.startsWith('src/') && !f.startsWith('src/dashboard-ui/')),
-        hasTypes: normalized.some(f => f.startsWith('src/types/')),
-        hasAuditInfra: normalized.some(f => f.startsWith('scripts/audit/')),
+        hasSrcOutsideDashboard: normalized.some((f) => f.startsWith('src/') && !f.startsWith('src/dashboard-ui/')),
+        hasTypes: normalized.some((f) => f.startsWith('src/types/')),
+        hasAuditInfra: normalized.some((f) => f.startsWith('scripts/audit/')),
     };
 }
 
@@ -219,5 +219,5 @@ export function resolveEntrypointSmokeTargets(changed) {
         if (file === 'src/main.js') impacted.add('src/main.js');
         if (file === 'src/server/main.js') impacted.add('src/server/main.js');
     }
-    return [...impacted].filter(file => fs.existsSync(file));
+    return [...impacted].filter((file) => fs.existsSync(file));
 }

@@ -6,17 +6,26 @@ import fs from 'node:fs/promises';
 
 /**
  * @typedef {{ app?: { locals?: { kernel?: { getStatus?: () => unknown } } } }} HealthRequestLike
- * @typedef {{ json: (payload: unknown) => unknown, status: (code: number) => HealthResponseLike }} HealthResponseLike
- * @typedef {{ bsize: number, blocks: number, bfree: number, bavail: number, free_bytes: number, total_bytes: number }} DiskStatfsSummary
- * @typedef {{ path: string, exists: boolean, statfs: DiskStatfsSummary|null }} DiskHealthEntry
+ *
+ * @typedef {{ json: (payload: unknown) => unknown; status: (code: number) => HealthResponseLike }} HealthResponseLike
+ *
+ * @typedef {{
+ *     bsize: number;
+ *     blocks: number;
+ *     bfree: number;
+ *     bavail: number;
+ *     free_bytes: number;
+ *     total_bytes: number;
+ * }} DiskStatfsSummary
+ *
+ * @typedef {{ path: string; exists: boolean; statfs: DiskStatfsSummary | null }} DiskHealthEntry
  */
 
 /**
  * GET /api/health - Health check geral do sistema.
  *
- * **Side-effects:** Coleta métricas de sistema (uptime, memória, PID).
- * **Semântica:** Verificação básica de saúde do processo Node.js.
- * **Unidades:** uptime em segundos, memory em bytes, timestamp em milissegundos.
+ * **Side-effects:** Coleta métricas de sistema (uptime, memória, PID). **Semântica:** Verificação básica de saúde do
+ * processo Node.js. **Unidades:** uptime em segundos, memory em bytes, timestamp em milissegundos.
  *
  * @param {HealthRequestLike} req - Requisição HTTP
  * @param {HealthResponseLike} res - Resposta HTTP
@@ -41,9 +50,8 @@ async function getHealth(req, res) {
 /**
  * GET /api/health/chrome - Health check do Chrome remote debugging.
  *
- * **Side-effects:** Testa conectividade com Chrome via WebSocket endpoint.
- * **Semântica:** Verifica se Chrome está acessível e respondendo.
- * **Unidades:** Timeout de 3000ms para verificação.
+ * **Side-effects:** Testa conectividade com Chrome via WebSocket endpoint. **Semântica:** Verifica se Chrome está
+ * acessível e respondendo. **Unidades:** Timeout de 3000ms para verificação.
  *
  * @param {HealthRequestLike} req - Requisição HTTP
  * @param {HealthResponseLike} res - Resposta HTTP
@@ -84,6 +92,7 @@ async function getChromeHealth(req, res) {
 
 /**
  * GET /api/health/pm2 - Health check dos processos PM2
+ *
  * @param {HealthRequestLike} req
  * @param {HealthResponseLike} res
  * @returns {Promise<void>}
@@ -107,6 +116,7 @@ async function getPm2Health(req, res) {
 
 /**
  * GET /api/health/kernel - Health check do Kernel
+ *
  * @param {HealthRequestLike} req
  * @param {HealthResponseLike} res
  * @returns {Promise<void>}
@@ -148,6 +158,7 @@ async function getKernelHealth(req, res) {
 
 /**
  * GET /api/health/disk - Health check do disco
+ *
  * @param {HealthRequestLike} req
  * @param {HealthResponseLike} res
  * @returns {Promise<void>}
@@ -179,7 +190,7 @@ async function getDiskHealth(req, res) {
             try {
                 if (typeof fs.statfs === 'function') {
                     const s = await fs.statfs(t.path);
-                    (/** @type {any} */ (entry)).statfs = {
+                    /** @type {any} */ (entry).statfs = {
                         bsize: s.bsize,
                         blocks: s.blocks,
                         bfree: s.bfree,

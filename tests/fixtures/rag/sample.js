@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * Sample JavaScript file for testing code chunking
- * This file contains various code patterns that should be detected
+ * Sample JavaScript file for testing code chunking This file contains various code patterns that should be detected
  */
 
 export const CONFIG_VALUE = 42;
@@ -22,6 +21,7 @@ export const CHROME_PROXY_PORT = 9224;
 
 /**
  * Main function that does something important
+ *
  * @param {string} input - The input parameter
  * @returns {string} The processed output
  */
@@ -33,7 +33,7 @@ export function processInput(input) {
 /** Classe exportada: DataProcessor. */
 export class DataProcessor {
     /**
-     * @param {ConfigOptions} [options={}]
+     * @param {ConfigOptions} [options={}] Default is `{}`
      */
     constructor(options = {}) {
         this.maxSize = options.maxSize || 1000;
@@ -41,7 +41,7 @@ export class DataProcessor {
     }
 
     /**
-     * @param {Array<Record<string, unknown>>} data
+     * @param {Record<string, unknown>[]} data
      * @returns {Promise<ProcessedItem[]>}
      */
     async process(data) {
@@ -54,11 +54,11 @@ export class DataProcessor {
     }
 
     /**
-     * @param {Array<Record<string, unknown>>} data
+     * @param {Record<string, unknown>[]} data
      * @returns {ProcessedItem[]}
      */
     transform(data) {
-        return data.map(item => ({
+        return data.map((item) => ({
             ...item,
             processed: true,
         }));

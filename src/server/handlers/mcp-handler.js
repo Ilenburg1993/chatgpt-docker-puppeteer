@@ -3,6 +3,7 @@
  * MCP (Model Context Protocol) Handler for Express
  *
  * Exposes Tool Registry via MCP Streamable HTTP for all LLMs:
+ *
  * - Claude Desktop
  * - GitHub Copilot
  * - OpenCode
@@ -10,6 +11,7 @@
  * Mounted at: POST/GET /api/mcp
  *
  * Architecture:
+ *
  * - Direct JSON-RPC 2.0 implementation (simpler than SDK)
  * - Tool Registry provides unified tool implementations
  * - Same tools available via MCP, REST API, and direct code calls
@@ -25,9 +27,10 @@ const workflowGenerator = new WorkflowGenerator();
  * Lightweight, compatible MCP-ish HTTP endpoint.
  *
  * Notes:
+ *
  * - Supports core MCP initialization methods enough for common clients.
- * - Does NOT implement SSE streaming, but returns 405 for SSE GET requests
- *   so Streamable HTTP clients can fall back to plain JSON responses.
+ * - Does NOT implement SSE streaming, but returns 405 for SSE GET requests so Streamable HTTP clients can fall back to
+ *   plain JSON responses.
  */
 
 /**
@@ -61,8 +64,7 @@ const handlers = {
     },
 
     /**
-     * notifications/initialized: client indicates init is complete
-     * Notification (no response expected).
+     * notifications/initialized: client indicates init is complete Notification (no response expected).
      */
     'notifications/initialized': async () => {
         console.error('[MCP Handler] notifications/initialized');
@@ -70,8 +72,7 @@ const handlers = {
     },
 
     /**
-     * notifications/cancelled: client notifies that a request was cancelled
-     * Notification (no response expected).
+     * notifications/cancelled: client notifies that a request was cancelled Notification (no response expected).
      */
     'notifications/cancelled': async (/** @type {any} */ params) => {
         console.error('[MCP Handler] notifications/cancelled (legacy handler):', params);
@@ -98,7 +99,11 @@ const handlers = {
     /**
      * tools/call: Execute a tool by name
      */
-    'tools/call': async (/** @type {any} */ params, /** @type {any} */ registry, /** @type {Record<string, any>} */ context = {}) => {
+    'tools/call': async (
+        /** @type {any} */ params,
+        /** @type {any} */ registry,
+        /** @type {Record<string, any>} */ context = {},
+    ) => {
         const { name, arguments: args = {} } = params;
 
         console.error(`[MCP Handler] tools/call: ${name}`);
@@ -265,8 +270,7 @@ const handlers = {
     },
 
     /**
-     * resources/templates/read - fetch a single template by id
-     * params: { id: string }
+     * resources/templates/read - fetch a single template by id params: { id: string }
      */
     'resources/templates/read': async (/** @type {any} */ params) => {
         const { id } = params || {};
@@ -282,8 +286,8 @@ const handlers = {
 /**
  * Configura endpoint MCP (Model Context Protocol) no servidor Express.
  *
- * **Side-effects:** Registra rotas POST/GET /api/mcp no app Express.
- * **Semântica:** Suporte completo a JSON-RPC 2.0 com batch requests, notifications e SSE discovery.
+ * **Side-effects:** Registra rotas POST/GET /api/mcp no app Express. **Semântica:** Suporte completo a JSON-RPC 2.0 com
+ * batch requests, notifications e SSE discovery.
  *
  * @param {Express.Application} app - Instância do Express app
  * @param {ToolRegistry} registry - Registry de ferramentas MCP
@@ -325,7 +329,7 @@ export function setupMCPHandler(app, registry) {
                 }
 
                 // Find handler for method
-                const handler = (/** @type {Record<string, any>} */ (handlers))[method];
+                const handler = /** @type {Record<string, any>} */ (handlers)[method];
                 if (!handler) {
                     return {
                         httpStatus: 404,
@@ -379,7 +383,7 @@ export function setupMCPHandler(app, registry) {
 
             // Batch support
             if (Array.isArray(payload)) {
-                const results = (await Promise.all(payload.map(handleOne))).map(r => r?.json).filter(Boolean);
+                const results = (await Promise.all(payload.map(handleOne))).map((r) => r?.json).filter(Boolean);
                 if (results.length === 0) {
                     return res.status(202).end();
                 }
@@ -428,9 +432,9 @@ export function setupMCPHandler(app, registry) {
         // while preserving backward compatibility with clients that reject
         // unexpected content-types.
 
-        /* eslint-disable no-unused-vars */
+        /* eslint-disable @typescript-eslint/no-unused-vars */
         const accept = String(req.headers?.accept || '');
-        /* eslint-enable no-unused-vars */
+        /* eslint-enable @typescript-eslint/no-unused-vars */
 
         res.json({
             sse: false, // explicit hint to clients that streaming is not available

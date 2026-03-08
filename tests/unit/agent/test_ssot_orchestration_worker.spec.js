@@ -1,16 +1,16 @@
 // @ts-check
-import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { after, before, beforeEach, describe, it } from 'node:test';
 
-import { getDb, closeDb } from '#infra/db/sqlite';
-import { insertTask, updateTask } from '#infra/db/task_repo';
-import { upsertAttempt } from '#infra/db/task_attempt_repo';
-import { insertArtifact } from '#infra/db/artifact_repo';
-import { putText } from '#infra/storage/artifact_store';
 import { TaskOrchestrationWorker } from '#agent/task_orchestration_worker';
+import { insertArtifact } from '#infra/db/artifact_repo';
+import { closeDb, getDb } from '#infra/db/sqlite';
+import { upsertAttempt } from '#infra/db/task_attempt_repo';
+import { insertTask, updateTask } from '#infra/db/task_repo';
+import { putText } from '#infra/storage/artifact_store';
 
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
@@ -24,7 +24,7 @@ function makeArtifactsDir() {
         process.cwd(),
         'tmp',
         'test-artifacts',
-        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     );
     fs.mkdirSync(dir, { recursive: true });
     return dir;
@@ -35,7 +35,7 @@ function hashId(/** @type {any} */ input) {
 }
 
 async function makeResponseTextArtifact(
-    /** @type {{ taskId: any, attemptId: any, text: any }} */ { taskId, attemptId, text }
+    /** @type {{ taskId: any; attemptId: any; text: any }} */ { taskId, attemptId, text },
 ) {
     const now = Date.now();
     const stored = await putText({
@@ -124,7 +124,7 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
                 state: { status: 'DONE' },
                 result: {},
             },
-            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' }
+            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' },
         );
 
         const responseTextArtifactId = await makeResponseTextArtifact({ taskId, attemptId, text: 'FAIL' });
@@ -148,13 +148,13 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         assert.strictEqual(row.status, 'PENDING');
         assert.ok(
             typeof row.execute_after_ms === 'number' && row.execute_after_ms > Date.now(),
-            'execute_after_ms deve estar no futuro'
+            'execute_after_ms deve estar no futuro',
         );
 
         const task = JSON.parse(row.task_json);
         const inputs = task?.spec?.payload?.context?.inputs || [];
         const fb = inputs.find(
-            (/** @type {any} */ i) => i && i.type === 'artifact_text' && i.label === 'orchestration_feedback'
+            (/** @type {any} */ i) => i && i.type === 'artifact_text' && i.label === 'orchestration_feedback',
         );
         assert.ok(fb && fb.artifact_id, 'deve injetar input artifact_text orchestration_feedback');
 
@@ -203,7 +203,7 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
                 state: { status: 'DONE' },
                 result: {},
             },
-            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' }
+            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' },
         );
 
         const responseTextArtifactId = await makeResponseTextArtifact({ taskId, attemptId, text: 'FAIL' });
@@ -272,7 +272,7 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
                 state: { status: 'DONE' },
                 result: {},
             },
-            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' }
+            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' },
         );
 
         const responseTextArtifactId = await makeResponseTextArtifact({ taskId, attemptId, text: 'OUTPUT STEP0' });
@@ -312,7 +312,7 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
         assert.strictEqual(childTask.meta.parent_id, taskId);
         assert.ok(
             Array.isArray(childTask.policy.dependencies) && childTask.policy.dependencies.includes(taskId),
-            'child task deve depender do parent'
+            'child task deve depender do parent',
         );
     });
 });

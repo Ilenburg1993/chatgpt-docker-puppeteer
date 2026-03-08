@@ -1,8 +1,8 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildPhasePlan } from '../../../scripts/audit/lib/phase_plan.mjs';
 import { AUDIT_PHASES } from '../../../scripts/audit/lib/event_types.mjs';
+import { buildPhasePlan } from '../../../scripts/audit/lib/phase_plan.mjs';
 
 function getPhase(/** @type {any} */ plan, /** @type {any} */ phaseId) {
     return plan.find((/** @type {any} */ item) => item.id === phaseId);

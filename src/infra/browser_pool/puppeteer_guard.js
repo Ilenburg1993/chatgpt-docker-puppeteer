@@ -1,62 +1,50 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
- * ============================================================================
+ * # ============================================================================
  * Puppeteer Launch Guard — Architectural Enforcement Layer
- * ============================================================================
  *
- * OBJETIVO
- * --------
- * Impedir, em tempo de execução, qualquer uso de `puppeteer.launch()`
- * dentro do sistema, reforçando a decisão arquitetural de:
+ * ## OBJETIVO
  *
- *   • Chrome externo
- *   • Conexão exclusiva via `puppeteer.connect()`
- *   • Ciclo de vida do browser fora do Node.js
+ * Impedir, em tempo de execução, qualquer uso de `puppeteer.launch()` dentro do sistema, reforçando a decisão
+ * arquitetural de:
+ *
+ * • Chrome externo • Conexão exclusiva via `puppeteer.connect()` • Ciclo de vida do browser fora do Node.js
  *
  * Este módulo transforma uma convenção de projeto em uma LEI TÉCNICA.
  *
- * ----------------------------------------------------------------------------
- * CONTEXTO ARQUITETURAL
- * ---------------------
+ * ## CONTEXTO ARQUITETURAL
+ *
  * - O sistema opera exclusivamente em modo "external browser"
  * - Chrome é iniciado fora do container / processo Node
  * - Puppeteer atua APENAS como cliente CDP
  *
- * Consequência direta:
- * --------------------
+ * ## Consequência direta:
+ *
  * - `puppeteer.launch()` é semanticamente inválido
  * - Qualquer chamada indica regressão arquitetural
  *
- * ----------------------------------------------------------------------------
- * COMPORTAMENTO
- * -------------
+ * ## COMPORTAMENTO
+ *
  * - Se PUPPETEER_LOCAL_LAUNCH_DISABLED !== 'true' → NO-OP (não interfere)
  * - Se puppeteer-core não estiver carregado → NO-OP (ambiente parcial)
  * - Se `launch` existir → substitui por função que lança erro fatal
  *
- * ----------------------------------------------------------------------------
- * PROPRIEDADES
- * ------------
- * ✔ Seguro para require múltiplo (idempotente)
- * ✔ Não depende de ordem exata de imports
- * ✔ Não afeta testes que não carregam puppeteer-core
- * ✔ Erro explícito, legível e auditável
+ * ## PROPRIEDADES
  *
- * ----------------------------------------------------------------------------
- * ATIVAÇÃO
- * --------
- * Exportação automática por efeito colateral.
- * Basta importar este módulo UMA vez, cedo no boot.
+ * ✔ Seguro para require múltiplo (idempotente) ✔ Não depende de ordem exata de imports ✔ Não afeta testes que não
+ * carregam puppeteer-core ✔ Erro explícito, legível e auditável
  *
- * Exemplo:
- *   import './infra/browser_pool/puppeteer_guard.js';
+ * ## ATIVAÇÃO
+ *
+ * Exportação automática por efeito colateral. Basta importar este módulo UMA vez, cedo no boot.
+ *
+ * Exemplo: import './infra/browser_pool/puppeteer_guard.js';
  *
  * ============================================================================
  */
 
 /**
- * Mensagem única e canônica de violação arquitetural.
- * Centralizada para facilitar auditoria e grep.
+ * Mensagem única e canônica de violação arquitetural. Centralizada para facilitar auditoria e grep.
  */
 const ARCH_VIOLATION_MESSAGE =
     '[ARCHITECTURE VIOLATION] puppeteer.launch() is forbidden.\n' +
@@ -65,8 +53,7 @@ const ARCH_VIOLATION_MESSAGE =
     'If you believe this is necessary, the architecture must be revised — not bypassed.';
 
 /**
- * Flag de ativação explícita.
- * Sem essa flag, o módulo é completamente inerte.
+ * Flag de ativação explícita. Sem essa flag, o módulo é completamente inerte.
  */
 const isLaunchDisabled = process.env.PUPPETEER_LOCAL_LAUNCH_DISABLED === 'true';
 
@@ -82,8 +69,8 @@ if (isLaunchDisabled) {
     active = true;
 
     /**
-     * Tentativa defensiva de carregar puppeteer-core.
-     * Não falha se não estiver presente (ambientes parciais, testes, lint, etc).
+     * Tentativa defensiva de carregar puppeteer-core. Não falha se não estiver presente (ambientes parciais, testes,
+     * lint, etc).
      */
     let puppeteer = null;
     try {
@@ -95,8 +82,8 @@ if (isLaunchDisabled) {
     }
 
     /**
-     * Aplica o guard apenas se `launch` existir e for função.
-     * Isso cobre:
+     * Aplica o guard apenas se `launch` existir e for função. Isso cobre:
+     *
      * - puppeteer-core
      * - puppeteer-extra (que reexporta launch)
      */
@@ -104,10 +91,7 @@ if (isLaunchDisabled) {
         originalLaunch = puppeteer.launch;
 
         /**
-         * Substituição explícita.
-         * NÃO chama o original.
-         * NÃO tenta fallback.
-         * Falha de forma inequívoca.
+         * Substituição explícita. NÃO chama o original. NÃO tenta fallback. Falha de forma inequívoca.
          */
         /** @type {any} */ (puppeteer).launch = function forbiddenLaunch() {
             const error = new Error(ARCH_VIOLATION_MESSAGE);
@@ -121,8 +105,7 @@ if (isLaunchDisabled) {
         };
 
         /**
-         * Congela a propriedade para impedir redefinição posterior.
-         * (best-effort: não falha se não for possível)
+         * Congela a propriedade para impedir redefinição posterior. (best-effort: não falha se não for possível)
          */
         try {
             Object.defineProperty(puppeteer, 'launch', {

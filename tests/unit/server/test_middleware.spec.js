@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Server Middleware - Request Processing', () => {
     describe('1. Error Handler Middleware', () => {
@@ -96,7 +96,7 @@ describe('Server Middleware - Request Processing', () => {
                     res.headers = res.headers || {};
                     res.headers[name] = value;
                 },
-                headers: /** @type {Record<string,string>} */ ({}),
+                headers: /** @type {Record<string, string>} */ ({}),
             });
 
             const requestId = 'req-12345';
@@ -118,7 +118,7 @@ describe('Server Middleware - Request Processing', () => {
         });
 
         it('deve disponibilizar Request ID no req.id', () => {
-            const req = { id: /** @type {string|undefined} */ (undefined) };
+            const req = { id: /** @type {string | undefined} */ (undefined) };
 
             req.id = 'req-12345';
 
@@ -142,7 +142,7 @@ describe('Server Middleware - Request Processing', () => {
                 target: 'gemini',
             };
 
-            const hasRequired = schema.required.every(field => field in body);
+            const hasRequired = schema.required.every((field) => field in body);
 
             assert.ok(hasRequired);
         });
@@ -157,7 +157,7 @@ describe('Server Middleware - Request Processing', () => {
                 // target ausente
             };
 
-            const isValid = schema.required.every(field => field in body);
+            const isValid = schema.required.every((field) => field in body);
 
             assert.strictEqual(isValid, false);
         });
@@ -220,7 +220,7 @@ describe('Server Middleware - Request Processing', () => {
                     res.headers = res.headers || {};
                     res.headers[name] = value;
                 },
-                headers: /** @type {Record<string,string>} */ ({}),
+                headers: /** @type {Record<string, string>} */ ({}),
             });
 
             res.setHeader('Access-Control-Allow-Origin', '*');

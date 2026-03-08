@@ -10,7 +10,7 @@ import path from 'node:path';
 /**
  * @param {import('./lib/schema.mjs').AuditRunV3} report
  * @param {PublishJsonOptions} options
- * @returns {{ path: string, runReportPath: string }}
+ * @returns {{ path: string; runReportPath: string }}
  */
 export function publishJson(report, options) {
     fs.mkdirSync(options.outputDir, { recursive: true });

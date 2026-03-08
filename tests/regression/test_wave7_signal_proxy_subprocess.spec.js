@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import test from 'node:test';
 
 async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ matcher, timeoutMs = 15000) {
     const start = Date.now();
@@ -11,7 +11,7 @@ async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ ma
         if (matcher.test(output)) {
             return output;
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw new Error(`Timeout waiting for output: ${String(matcher)}`);
 }
@@ -115,18 +115,18 @@ test('wave7: real SIGTERM with inline proxy active triggers single coordinated s
     let stdout = '';
     let stderr = '';
 
-    child.stdout.on('data', chunk => {
+    child.stdout.on('data', (chunk) => {
         stdout += chunk.toString();
     });
 
-    child.stderr.on('data', chunk => {
+    child.stderr.on('data', (chunk) => {
         stderr += chunk.toString();
     });
 
     await waitForOutput(() => stdout, /W7_READY:/, 20000);
 
     child.kill('SIGTERM');
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await new Promise((resolve) => setTimeout(resolve, 20));
     try {
         child.kill('SIGINT');
     } catch {
@@ -190,11 +190,11 @@ test('wave7: SIGUSR2 is wired to canonical shutdown path', async () => {
     let stdout = '';
     let stderr = '';
 
-    child.stdout.on('data', chunk => {
+    child.stdout.on('data', (chunk) => {
         stdout += chunk.toString();
     });
 
-    child.stderr.on('data', chunk => {
+    child.stderr.on('data', (chunk) => {
         stderr += chunk.toString();
     });
 

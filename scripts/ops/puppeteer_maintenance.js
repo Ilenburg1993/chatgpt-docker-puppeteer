@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // @ts-check
 import { ConnectionOrchestrator } from '#infra/ConnectionOrchestrator';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
 const cleanCache = args.includes('--clean-cache');
@@ -35,7 +35,7 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
     // 2. Profiles temporários
     console.log('🗑️  Temporary Profiles:');
     const tmpDir = '/tmp';
-    const profiles = fs.readdirSync(tmpDir).filter(f => f.startsWith('puppeteer_dev_chrome_profile-'));
+    const profiles = fs.readdirSync(tmpDir).filter((f) => f.startsWith('puppeteer_dev_chrome_profile-'));
 
     console.log('  Found:', profiles.length);
 
@@ -101,7 +101,7 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
     console.log('✅ Maintenance complete!');
 
     process.exit(0);
-})().catch(error => {
+})().catch((error) => {
     console.error('\n❌ Error:', error.message);
     process.exit(1);
 });

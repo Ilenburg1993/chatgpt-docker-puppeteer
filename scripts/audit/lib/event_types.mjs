@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * Enum canônico de eventos emitidos pelo runner de auditoria.
- * Consumido por logger, timeline de fases e análise posterior de artefatos.
+ * Enum canônico de eventos emitidos pelo runner de auditoria. Consumido por logger, timeline de fases e análise
+ * posterior de artefatos.
  */
 export const AUDIT_EVENT_TYPES = Object.freeze({
     RUN_STARTED: 'run_started',
@@ -30,8 +30,7 @@ export const AUDIT_EVENT_TYPES = Object.freeze({
 });
 
 /**
- * Enum canônico de fases do pipeline de auditoria.
- * Mantém estabilidade de nomes para progress, schema e contratos.
+ * Enum canônico de fases do pipeline de auditoria. Mantém estabilidade de nomes para progress, schema e contratos.
  */
 export const AUDIT_PHASES = Object.freeze({
     PREFLIGHT: 'preflight',

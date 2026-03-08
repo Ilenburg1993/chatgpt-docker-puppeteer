@@ -33,7 +33,7 @@ function _parseJson(raw, fallback) {
 
 /**
  * @param {any} row
- * @returns {InferenceClientPolicy|null}
+ * @returns {InferenceClientPolicy | null}
  */
 function _rowToPolicy(row) {
     if (!row) return null;
@@ -62,12 +62,12 @@ function _rowToPolicy(row) {
  * @property {string} id
  * @property {string} client_tag
  * @property {boolean} enabled
- * @property {string|null} profile_id
+ * @property {string | null} profile_id
  * @property {any[]} allowed_backends_json
  * @property {any[]} allowed_models_json
  * @property {number} max_parallel
  * @property {object} rate_limit_json
- * @property {number|null} timeout_ms
+ * @property {number | null} timeout_ms
  * @property {object} token_budget_json
  * @property {number} priority
  * @property {object} degraded_behavior_json
@@ -80,7 +80,7 @@ function _rowToPolicy(row) {
  * @property {string} [client_tag]
  * @property {string} [clientTag]
  * @property {boolean} [enabled]
- * @property {string|null} [profile_id]
+ * @property {string | null} [profile_id]
  * @property {any} [allowed_backends_json]
  * @property {any} [allowed_backends]
  * @property {any} [allowed_models_json]
@@ -88,7 +88,7 @@ function _rowToPolicy(row) {
  * @property {number} [max_parallel]
  * @property {any} [rate_limit_json]
  * @property {any} [rate_limit]
- * @property {number|null} [timeout_ms]
+ * @property {number | null} [timeout_ms]
  * @property {any} [token_budget_json]
  * @property {any} [token_budget]
  * @property {number} [priority]
@@ -99,8 +99,9 @@ function _rowToPolicy(row) {
  */
 /**
  * Função exportada: upsertInferenceClientPolicy.
+ *
  * @param {UpsertInferenceClientPolicyInput} [input]
- * @returns {InferenceClientPolicy|null}
+ * @returns {InferenceClientPolicy | null}
  */
 function upsertInferenceClientPolicy(input = {}) {
     const db = getDb();
@@ -137,7 +138,7 @@ function upsertInferenceClientPolicy(input = {}) {
             degraded_behavior_json = excluded.degraded_behavior_json,
             approval_policy_json = excluded.approval_policy_json,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         id,
         client_tag: clientTag,
@@ -165,23 +166,25 @@ function upsertInferenceClientPolicy(input = {}) {
 
 /**
  * Função exportada: getInferenceClientPolicyByTag.
- * @param {*} clientTag
- * @returns {InferenceClientPolicy|null}
+ *
+ * @param {any} clientTag
+ * @returns {InferenceClientPolicy | null}
  */
 function getInferenceClientPolicyByTag(clientTag) {
     const db = getDb();
     return _rowToPolicy(
-        db.prepare('SELECT * FROM inference_client_policies WHERE client_tag = ?').get(String(clientTag || '').trim())
+        db.prepare('SELECT * FROM inference_client_policies WHERE client_tag = ?').get(String(clientTag || '').trim()),
     );
 }
 
 /**
  * @typedef {object} ListInferenceClientPoliciesOptions
- * @property {*} [enabledOnly]
- * @property {*} [limit]
+ * @property {any} [enabledOnly]
+ * @property {any} [limit]
  */
 /**
  * Função exportada: listInferenceClientPolicies.
+ *
  * @param {ListInferenceClientPoliciesOptions} [options]
  * @returns {InferenceClientPolicy[]}
  */
@@ -194,12 +197,12 @@ function listInferenceClientPolicies({ enabledOnly = false, limit = 100 } = {}) 
             ${enabledOnly ? 'WHERE enabled = 1' : ''}
             ORDER BY priority DESC, updated_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all({ limit: Math.max(1, Math.min(Number(limit) || 100, 500)) });
     return rows
         .map(_rowToPolicy)
-        .filter(/** @param {InferenceClientPolicy|null} x @returns {x is InferenceClientPolicy} */ x => x != null);
+        .filter(/** @param {InferenceClientPolicy | null} x @returns {x is InferenceClientPolicy} */ (x) => x != null);
 }
 
 export { getInferenceClientPolicyByTag, listInferenceClientPolicies, upsertInferenceClientPolicy };

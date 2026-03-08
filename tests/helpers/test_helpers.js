@@ -1,7 +1,7 @@
 // @ts-check
+import child_process from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import child_process from 'node:child_process';
 
 /** Constante/valor exportado: ROOT. */
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -18,16 +18,17 @@ if (!fs.existsSync(TMP_DIR)) {
 
 /** Constante/valor exportado: sleep. */
 const sleep = (/** @type {number} */ ms) =>
-    new Promise(r => {
+    new Promise((r) => {
         setTimeout(r, ms);
     });
 
 /**
  * Função exportada: ensureDirs.
+ *
  * @returns {void}
  */
 function ensureDirs() {
-    [QUEUE_DIR, LOG_DIR, TMP_DIR].forEach(d => {
+    [QUEUE_DIR, LOG_DIR, TMP_DIR].forEach((d) => {
         if (!fs.existsSync(d)) {
             fs.mkdirSync(d, { recursive: true });
         }
@@ -40,14 +41,15 @@ function ensureDirs() {
  * @property {string} [id] - ID explícito da tarefa (default: gerado automaticamente)
  * @property {string} type - Tipo da tarefa
  * @property {string} [target] - Target URL
- * @property {*} [prompt] - Prompt da tarefa
- * @property {*} [context] - Contexto adicional
+ * @property {any} [prompt] - Prompt da tarefa
+ * @property {any} [context] - Contexto adicional
  * @property {number} [priority] - Prioridade (default: 5)
  * @property {string} [status] - Status inicial (default: PENDING)
- * @property {string|null} [startedEm] - Data de início (para testes de recovery)
+ * @property {string | null} [startedEm] - Data de início (para testes de recovery)
  */
 /**
  * Função exportada: writeTask.
+ *
  * @param {WriteTaskOptions} options
  * @returns {string}
  */
@@ -92,8 +94,9 @@ function writeTask(options) {
 
 /**
  * Função exportada: readTask.
+ *
  * @param {string} id
- * @returns {object|null}
+ * @returns {object | null}
  */
 function readTask(id) {
     try {
@@ -109,6 +112,7 @@ function readTask(id) {
 
 /**
  * Função exportada: removeRunLock.
+ *
  * @returns {void}
  */
 function removeRunLock() {
@@ -123,12 +127,13 @@ function removeRunLock() {
 
 /**
  * Função exportada: cleanTmp.
+ *
  * @returns {void}
  */
 function cleanTmp() {
     try {
         if (fs.existsSync(TMP_DIR)) {
-            fs.readdirSync(TMP_DIR).forEach(f => fs.unlinkSync(path.join(TMP_DIR, f)));
+            fs.readdirSync(TMP_DIR).forEach((f) => fs.unlinkSync(path.join(TMP_DIR, f)));
         }
     } catch (e) {
         /* Ignore temp cleanup errors */
@@ -137,7 +142,8 @@ function cleanTmp() {
 
 /**
  * Função exportada: readLatestGlobalLogTail.
- * @param {*} [lines]
+ *
+ * @param {any} [lines]
  * @returns {string}
  */
 function readLatestGlobalLogTail(lines = 50) {
@@ -154,7 +160,8 @@ function readLatestGlobalLogTail(lines = 50) {
 
 /**
  * Função exportada: startAgent.
- * @param {*} [timeoutMs]
+ *
+ * @param {any} [timeoutMs]
  * @returns {object}
  */
 function startAgent(timeoutMs = 15000) {
@@ -205,7 +212,8 @@ function startAgent(timeoutMs = 15000) {
 
 /**
  * Função exportada: stopAgent.
- * @param {*} proc
+ *
+ * @param {any} proc
  * @returns {void}
  */
 function stopAgent(proc) {
@@ -228,6 +236,7 @@ function stopAgent(proc) {
 
 /**
  * Função exportada: waitForCondition.
+ *
  * @param {function(): Promise<boolean>|boolean} fn
  * @param {number} [timeout]
  * @param {number} [interval]
@@ -249,16 +258,16 @@ async function waitForCondition(fn, timeout = 10000, interval = 500) {
 }
 
 export {
-    writeTask,
+    QUEUE_DIR,
+    ROOT,
+    cleanTmp,
+    ensureDirs,
+    readLatestGlobalLogTail,
     readTask,
     removeRunLock,
-    cleanTmp,
+    sleep,
     startAgent,
     stopAgent,
     waitForCondition,
-    readLatestGlobalLogTail,
-    sleep,
-    ensureDirs,
-    ROOT,
-    QUEUE_DIR,
+    writeTask,
 };

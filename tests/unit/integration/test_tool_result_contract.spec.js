@@ -1,7 +1,7 @@
 // @ts-check
+import express from 'express';
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import express from 'express';
 import { ToolRegistry, normalizeToolResultPayload } from '../../../src/integration/tool-registry.mjs';
 import { setupMCPHandler } from '../../../src/server/handlers/mcp-handler.js';
 
@@ -36,14 +36,14 @@ describe('Tool Result Contract', () => {
                 text: 'structured-ok',
                 json: { healthy: true },
                 flags: { degraded: false, mutating: false, partial: false },
-            })
+            }),
         );
 
         const app = express();
         app.use(express.json());
         setupMCPHandler(app, registry);
 
-        const server = await new Promise(resolve => {
+        const server = await new Promise((resolve) => {
             const s = app.listen(0, () => resolve(s));
         });
 

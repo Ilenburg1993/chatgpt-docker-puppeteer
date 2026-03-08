@@ -1,8 +1,8 @@
 // @ts-check - Type checking rigoroso habilitado
 
 /**
- * @fileoverview Core Type Definitions for JSDoc / TypeScript checking.
- * Centralizing types to reduce use of @type {unknown} across the codebase.
+ * @file Core Type Definitions for JSDoc / TypeScript checking. Centralizing types to reduce use of @type {unknown}
+ *   across the codebase.
  */
 
 // ============================================================================
@@ -21,6 +21,7 @@
 
 /**
  * NERV Envelope - Message structure for IPC communication
+ *
  * @typedef {object} Envelope
  * @property {object} header - Protocol header
  * @property {string} header.version - Protocol version
@@ -35,17 +36,20 @@
 
 /**
  * Action codes for NERV commands
+ *
  * @typedef {string} ActionCode
  */
 
 /**
  * Actor roles in the system
- * @typedef {'SERVER'|'MAESTRO'|'KERNEL'|'DRIVER'|'DASHBOARD'|'MISSION_CONTROL'} ActorRole
+ *
+ * @typedef {'SERVER' | 'MAESTRO' | 'KERNEL' | 'DRIVER' | 'DASHBOARD' | 'MISSION_CONTROL'} ActorRole
  */
 
 /**
  * Message types
- * @typedef {'COMMAND'|'EVENT'|'ACK'|'RESPONSE'} MessageType
+ *
+ * @typedef {'COMMAND' | 'EVENT' | 'ACK' | 'RESPONSE'} MessageType
  */
 
 // ============================================================================
@@ -62,6 +66,7 @@
 
 /**
  * Pool allocation result
+ *
  * @typedef {object} PoolAllocation
  * @property {object} page - Puppeteer page instance
  * @property {string} poolEntryId - Pool entry identifier
@@ -71,7 +76,8 @@
 
 /**
  * Health status values
- * @typedef {'HEALTHY'|'UNHEALTHY'|'DEGRADED'|'CRASHED'} HealthStatus
+ *
+ * @typedef {'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' | 'CRASHED'} HealthStatus
  */
 
 // ============================================================================
@@ -80,10 +86,11 @@
 
 /**
  * Task V5 - Complete task structure
+ *
  * @typedef {object} TaskV5
  * @property {object} meta - Task metadata
  * @property {string} meta.id - Unique Task ID
- * @property {string} [meta.version='5.0'] - Schema version
+ * @property {string} [meta.version='5.0'] - Schema version. Default is `'5.0'`
  * @property {string} [meta.mission_id] - Parent mission ID
  * @property {string} [meta.parent_id] - Parent task ID
  * @property {number} [meta.priority] - Task priority (0-100)
@@ -105,12 +112,14 @@
 
 /**
  * Task status values
- * @typedef {'PENDING'|'RUNNING'|'DONE'|'FAILED'|'CANCELLED'|'PAUSED'} TaskStatus
+ *
+ * @typedef {'PENDING' | 'RUNNING' | 'DONE' | 'FAILED' | 'CANCELLED' | 'PAUSED'} TaskStatus
  */
 
 /**
  * Task stage values
- * @typedef {'DRAFT'|'PROPOSED'|'READY'|'REJECTED'|'ARCHIVED'} TaskStage
+ *
+ * @typedef {'DRAFT' | 'PROPOSED' | 'READY' | 'REJECTED' | 'ARCHIVED'} TaskStage
  */
 
 // ============================================================================
@@ -119,6 +128,7 @@
 
 /**
  * Mission structure
+ *
  * @typedef {object} Mission
  * @property {string} id - Mission ID
  * @property {string} name - Mission name
@@ -131,7 +141,8 @@
 
 /**
  * Mission status values
- * @typedef {'PENDING'|'RUNNING'|'COMPLETED'|'FAILED'|'CANCELLED'} MissionStatus
+ *
+ * @typedef {'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'} MissionStatus
  */
 
 // ============================================================================
@@ -140,17 +151,19 @@
 
 /**
  * Driver interface
+ *
  * @typedef {object} IDriver
  * @property {string} name - Driver name
  * @property {string} currentDomain - Current domain
- * @property {object|null} page - Puppeteer page instance
- * @property {object|null} signal - AbortSignal
+ * @property {object | null} page - Puppeteer page instance
+ * @property {object | null} signal - AbortSignal
  * @property {Function} execute - Execute prompt
  * @property {Function} destroy - Cleanup resources
  */
 
 /**
  * Driver capabilities
+ *
  * @typedef {object} DriverCapabilities
  * @property {boolean} text_generation - Supports text generation
  * @property {boolean} image_generation - Supports image generation
@@ -167,17 +180,19 @@
 
 /**
  * API Response wrapper
+ *
  * @typedef {object} ApiResponse
  * @property {boolean} success - Success flag
- * @property {object|null} data - Response data
- * @property {string|null} error - Error message
+ * @property {object | null} data - Response data
+ * @property {string | null} error - Error message
  * @property {string} [requestId] - Request tracking ID
  */
 
 /**
  * Paginated response
+ *
  * @typedef {object} PaginatedResponse
- * @property {Array<unknown>} items - Array of items
+ * @property {unknown[]} items - Array of items
  * @property {number} total - Total count
  * @property {number} page - Current page
  * @property {number} limit - Items per page
@@ -186,6 +201,7 @@
 
 /**
  * Express Request with typed body
+ *
  * @typedef {object} TypedRequest
  * @property {object} params - URL parameters
  * @property {object} query - Query string
@@ -199,6 +215,7 @@
 
 /**
  * System event
+ *
  * @typedef {object} SystemEvent
  * @property {string} type - Event type
  * @property {string} action - Event action
@@ -209,6 +226,7 @@
 
 /**
  * Telemetry event
+ *
  * @typedef {object} TelemetryEvent
  * @property {string} name - Event name
  * @property {object} metrics - Event metrics
@@ -221,6 +239,7 @@
 
 /**
  * System configuration
+ *
  * @typedef {object} SystemConfig
  * @property {number} poolSize - Browser pool size
  * @property {string} allocationStrategy - Pool allocation strategy

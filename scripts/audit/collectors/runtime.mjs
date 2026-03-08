@@ -1,27 +1,36 @@
 // @ts-check
-import { parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
-import { evaluateRuntimeSignals } from '../contracts/evaluate_runtime.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
+import { evaluateRuntimeSignals } from '../contracts/evaluate_runtime.mjs';
+import { parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
 
-/** @import { RawFinding } from '../normalize/findings.mjs' */
+/** @import {RawFinding} from "../normalize/findings.mjs" */
 
 /**
  * @typedef {object} CollectRuntimeFindingsOptions
- * @property {'quick'|'deep'|'nightly'} profile
+ * @property {'quick' | 'deep' | 'nightly'} profile
  * @property {import('../contracts/load_registry.mjs').ContractDefinitionV1[]} contracts
  * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
  */
 /**
  * @param {CollectRuntimeFindingsOptions} options
- * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: { mcp: { ok: boolean, details?: string }, rag: { ok: boolean, available?: boolean|null, degraded?: boolean|null }, lsp: { ok: boolean, details?: string } } }>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ *     telemetry: {
+ *         mcp: { ok: boolean; details?: string };
+ *         rag: { ok: boolean; available?: boolean | null; degraded?: boolean | null };
+ *         lsp: { ok: boolean; details?: string };
+ *     };
+ * }>}
  */
 export async function collectRuntimeFindings(options) {
     /** @type {RawFinding[]} */
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
     const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
@@ -31,7 +40,13 @@ export async function collectRuntimeFindings(options) {
         rag: { ok: false, available: null, degraded: null },
         lsp: { ok: false, details: '' },
     });
-    /** @type {Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>} */
+    /** @type {{
+    signal: string;
+    evidence: string;
+    source_tool: string;
+    file?: string | null;
+    line?: number | null;
+}[]} */
     const signals = [];
 
     const mcpDiag = await exec('runtime.mcp_diagnose', 'npm', ['run', 'mcp:diagnose', '--', '--json'], {
@@ -93,12 +108,12 @@ export async function collectRuntimeFindings(options) {
     const hasLspTools = Boolean(
         lspJson && Object.prototype.hasOwnProperty.call(lspJson, 'lsp_tools_present')
             ? lspJson.lsp_tools_present
-            : mcpJson?.lsp_tools_present
+            : mcpJson?.lsp_tools_present,
     );
     const lspFunctionalOk = Boolean(
         lspJson && Object.prototype.hasOwnProperty.call(lspJson, 'lsp_functional_ok')
             ? lspJson.lsp_functional_ok
-            : mcpJson?.lsp_functional_ok
+            : mcpJson?.lsp_functional_ok,
     );
 
     telemetry.lsp.ok = Boolean(hasLspTools && lspFunctionalOk);
@@ -134,7 +149,7 @@ export async function collectRuntimeFindings(options) {
     const lockCausalityIssues = detectLockReleaseCausalityIssues(process.cwd());
     if (lockCausalityIssues.length > 0) {
         const evidence = lockCausalityIssues
-            .map(item => `${item.file}:${item.line} ${item.evidence}`)
+            .map((item) => `${item.file}:${item.line} ${item.evidence}`)
             .slice(0, 10)
             .join('\n');
         signals.push({
@@ -172,7 +187,7 @@ export async function collectRuntimeFindings(options) {
                 'tests/regression/test_wave10_lifecycle_signal_matrix.spec.js',
                 'tests/regression/test_wave11_main_server_bootstrap_unification.spec.js',
             ],
-            { timeoutMs: 300000 }
+            { timeoutMs: 300000 },
         );
 
         if (!smoke.ok) {
@@ -190,14 +205,14 @@ export async function collectRuntimeFindings(options) {
             /** @type {any} */ ({
                 contracts: options.contracts || [],
                 signals,
-            })
+            }),
         )
     );
     if (runtimeFindings.length > 0) {
         findings.push(...runtimeFindings);
     }
     if (runtimeFindings.length < signals.length) {
-        const coveredSignals = new Set(runtimeFindings.map(item => item.rule));
+        const coveredSignals = new Set(runtimeFindings.map((item) => item.rule));
         for (const signal of signals) {
             if (coveredSignals.has(signal.signal)) {
                 continue;
@@ -604,7 +619,7 @@ async function detectBootAndLifecycleSignals(rootDir, exec) {
                     DAEMON_MODE: 'true',
                     MAESTRO_ENTRY_AUTOSTART: 'false',
                 },
-            }
+            },
         );
 
         const mainOutput = `${mainImport.stdout || ''}\n${mainImport.stderr || ''}`;
@@ -635,7 +650,7 @@ async function detectBootAndLifecycleSignals(rootDir, exec) {
                     pm_exec_path: '/tmp/not-server-main.js',
                     MAESTRO_ENTRY_AUTOSTART: 'false',
                 },
-            }
+            },
         );
 
         const serverOutput = `${serverImport.stdout || ''}\n${serverImport.stderr || ''}`;

@@ -12,6 +12,6 @@ test('wave20b: wrapper PM2 do chrome-proxy mantém ownership único de sinais', 
     assert.doesNotMatch(
         source,
         /process\.removeAllListeners\s*\(/,
-        'wrapper não deve usar cleanup global de listeners'
+        'wrapper não deve usar cleanup global de listeners',
     );
 });

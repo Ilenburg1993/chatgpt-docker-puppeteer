@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding
-  * @returns {object}
+ * @returns {object}
  */
 export function buildTestPlan(finding) {
     const plan = [];

@@ -40,10 +40,10 @@ function extractOperationsFromDaemon(text) {
         Array.from(
             new Set(
                 Array.from(text.matchAll(/case '([A-Za-z_]+)':/g))
-                    .map(match => match[1] ?? '')
-                    .filter(Boolean)
-            )
-        )
+                    .map((match) => match[1] ?? '')
+                    .filter(Boolean),
+            ),
+        ),
     );
 }
 
@@ -56,10 +56,10 @@ function extractOperationsFromSkill(text) {
         Array.from(
             new Set(
                 Array.from(text.matchAll(/^- `([A-Za-z_]+)`:/gm))
-                    .map(match => match[1] ?? '')
-                    .filter(Boolean)
-            )
-        )
+                    .map((match) => match[1] ?? '')
+                    .filter(Boolean),
+            ),
+        ),
     );
 }
 
@@ -70,7 +70,7 @@ function extractOperationsFromSkill(text) {
  */
 function diff(left, right) {
     const rightSet = new Set(right);
-    return left.filter(item => !rightSet.has(item));
+    return left.filter((item) => !rightSet.has(item));
 }
 
 const issues = [];
@@ -112,7 +112,7 @@ if (issues.length === 0) {
             schemaOperations = sorted(Object.keys(operations));
             const operationProperty = isRecord(properties.operation) ? properties.operation : null;
             const enumValues = Array.isArray(operationProperty?.enum)
-                ? operationProperty.enum.filter(item => typeof item === 'string')
+                ? operationProperty.enum.filter((item) => typeof item === 'string')
                 : [];
             const sortedEnumValues = sorted(/** @type {string[]} */ (enumValues));
             if (JSON.stringify(schemaOperations) !== JSON.stringify(sortedEnumValues)) {

@@ -11,9 +11,9 @@ Este documento lista todos os scripts utilitários e suas finalidades.
 **Uso**:
 
 ```bash
-node scripts/scan_magic_strings.js                    # Scan src/ only
-node scripts/scan_magic_strings.js --include-tests    # Include tests/
-node scripts/scan_magic_strings.js --directory path/  # Custom directory
+node scripts/scan_magic_strings.js                   # Scan src/ only
+node scripts/scan_magic_strings.js --include-tests   # Include tests/
+node scripts/scan_magic_strings.js --directory path/ # Custom directory
 ```
 
 **Detecta 11 padrões**:
@@ -47,9 +47,9 @@ node scripts/scan_magic_strings.js --directory path/  # Custom directory
 **Uso**:
 
 ```bash
-node scripts/validate-nerv-constants.js                # Validação padrão
-node scripts/validate-nerv-constants.js --strict       # Exit 1 se houver constantes não usadas
-node scripts/validate-nerv-constants.js --json         # Output JSON
+node scripts/validate-nerv-constants.js          # Validação padrão
+node scripts/validate-nerv-constants.js --strict # Exit 1 se houver constantes não usadas
+node scripts/validate-nerv-constants.js --json   # Output JSON
 ```
 
 **Verifica**:
@@ -102,8 +102,8 @@ node scripts/audit-dependencies.js --json # JSON output
 **Uso**:
 
 ```bash
-node scripts/audit-tmp-scripts.js                  # Apenas análise
-node scripts/audit-tmp-scripts.js --auto-cleanup   # Executa recomendações
+node scripts/audit-tmp-scripts.js                # Apenas análise
+node scripts/audit-tmp-scripts.js --auto-cleanup # Executa recomendações
 ```
 
 **Categorias**:
@@ -125,8 +125,8 @@ node scripts/audit-tmp-scripts.js --auto-cleanup   # Executa recomendações
 **Uso**:
 
 ```bash
-node scripts/scan_literals.js          # Scan básico
-node scripts/scan_literals_deep.js     # Scan profundo com mais padrões
+node scripts/scan_literals.js      # Scan básico
+node scripts/scan_literals_deep.js # Scan profundo com mais padrões
 ```
 
 **Diferenças**:
@@ -145,8 +145,8 @@ node scripts/scan_literals_deep.js     # Scan profundo com mais padrões
 **Uso**:
 
 ```bash
-node scripts/run-tests.js              # Roda todos os testes
-node scripts/run-tests.js --unit       # Apenas unit tests
+node scripts/run-tests.js               # Roda todos os testes
+node scripts/run-tests.js --unit        # Apenas unit tests
 node scripts/run-tests.js --integration # Apenas integration tests
 ```
 
@@ -255,8 +255,8 @@ node scripts/healthcheck.js
 **Uso**:
 
 ```bash
-bash scripts/apply-all-codemods.sh         # Aplica todas as transformações
-bash scripts/test-codemods.sh              # Testa antes de aplicar
+bash scripts/apply-all-codemods.sh # Aplica todas as transformações
+bash scripts/test-codemods.sh      # Testa antes de aplicar
 ```
 
 ---
@@ -268,8 +268,8 @@ bash scripts/test-codemods.sh              # Testa antes de aplicar
 **Uso**:
 
 ```bash
-node scripts/fix-empty-catch.js              # Fix empty catch blocks
-node scripts/fix-promise-executor-return.js  # Fix promise executor returns
+node scripts/fix-empty-catch.js             # Fix empty catch blocks
+node scripts/fix-promise-executor-return.js # Fix promise executor returns
 ```
 
 **Alterações**:
@@ -323,10 +323,10 @@ npx eslint . --quiet
 **Uso**:
 
 ```bash
-node scripts/status_fila.js              # Status textual
-node scripts/visualizar_fila.js          # Visualização detalhada
-npm run queue:status                     # Alias
-npm run queue:status -- --watch          # Live watch
+node scripts/status_fila.js     # Status textual
+node scripts/visualizar_fila.js # Visualização detalhada
+npm run queue:status            # Alias
+npm run queue:status -- --watch # Live watch
 ```
 
 ---
@@ -339,7 +339,7 @@ npm run queue:status -- --watch          # Live watch
 
 ```bash
 node scripts/gerador_tarefa.js --prompt "Texto" --target chatgpt
-npm run queue:add                        # Modo interativo
+npm run queue:add # Modo interativo
 ```
 
 ---
@@ -367,8 +367,8 @@ node scripts/importar_prompts.js prompts.txt
 **Uso**:
 
 ```bash
-bash scripts/setup.sh              # Setup inicial
-bash scripts/setup-dev-tools.sh    # Dev tools (ESLint, Prettier, etc)
+bash scripts/setup.sh           # Setup inicial
+bash scripts/setup-dev-tools.sh # Dev tools (ESLint, Prettier, etc)
 ```
 
 ---

@@ -17,10 +17,23 @@ import { spawn } from 'node:child_process';
  */
 /**
  * Runs a command and captures stdout/stderr without throwing.
+ *
  * @param {string} command
  * @param {string[]} args
  * @param {RunCommandOptions} [options]
- * @returns {Promise<{ ok: boolean, exitCode: number|null, stdout: string, stderr: string, durationMs: number, timedOut: boolean, command: string, stdoutBytes: number, stderrBytes: number, stdoutTruncated: boolean, stderrTruncated: boolean }>}
+ * @returns {Promise<{
+ *     ok: boolean;
+ *     exitCode: number | null;
+ *     stdout: string;
+ *     stderr: string;
+ *     durationMs: number;
+ *     timedOut: boolean;
+ *     command: string;
+ *     stdoutBytes: number;
+ *     stderrBytes: number;
+ *     stdoutTruncated: boolean;
+ *     stderrTruncated: boolean;
+ * }>}
  */
 export async function runCommand(command, args = [], options = {}) {
     const startedAt = Date.now();
@@ -29,10 +42,10 @@ export async function runCommand(command, args = [], options = {}) {
     const maxStderrBytes = Math.max(65536, Number(options.maxStderrBytes || 1024 * 1024));
     const headRatio = Math.max(0.2, Math.min(0.8, Number(options.truncationHeadRatio || 0.6)));
     const acceptExitCodes = Array.isArray(options.acceptExitCodes)
-        ? options.acceptExitCodes.map(value => Number(value)).filter(Number.isInteger)
+        ? options.acceptExitCodes.map((value) => Number(value)).filter(Number.isInteger)
         : [];
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn(command, args, {
             cwd: options.cwd || process.cwd(),
             env: { ...process.env, ...(options.env || {}) },
@@ -50,7 +63,7 @@ export async function runCommand(command, args = [], options = {}) {
         let timeout = null;
 
         if (child.stdout) {
-            child.stdout.on('data', chunk => {
+            child.stdout.on('data', (chunk) => {
                 const text = String(chunk);
                 const bounded = appendBoundedOutput({
                     current: stdout,
@@ -71,7 +84,7 @@ export async function runCommand(command, args = [], options = {}) {
         }
 
         if (child.stderr) {
-            child.stderr.on('data', chunk => {
+            child.stderr.on('data', (chunk) => {
                 const text = String(chunk);
                 const bounded = appendBoundedOutput({
                     current: stderr,
@@ -98,7 +111,7 @@ export async function runCommand(command, args = [], options = {}) {
             }, timeoutMs);
         }
 
-        child.on('error', err => {
+        child.on('error', (err) => {
             if (timeout) {
                 clearTimeout(timeout);
             }
@@ -117,7 +130,7 @@ export async function runCommand(command, args = [], options = {}) {
             });
         });
 
-        child.on('close', code => {
+        child.on('close', (code) => {
             if (timeout) {
                 clearTimeout(timeout);
             }
@@ -220,15 +233,16 @@ function tryParseJson(text) {
 }
 
 /**
- * Extracts balanced JSON blocks (objects/arrays) from a mixed output stream.
- * Scans with string-escape awareness to avoid braces/brackets inside quoted strings.
+ * Extracts balanced JSON blocks (objects/arrays) from a mixed output stream. Scans with string-escape awareness to
+ * avoid braces/brackets inside quoted strings.
+ *
  * @param {string} text
  * @returns {string[]}
  */
 function extractBalancedJsonBlocks(text) {
     /** @type {string[]} */
     const blocks = [];
-    /** @type {Array<{ start: number, opener: '{'|'[' }>} */
+    /** @type */
     const stack = [];
     let inString = false;
     let stringQuote = '';
@@ -263,7 +277,7 @@ function extractBalancedJsonBlocks(text) {
         if (ch === '{' || ch === '[') {
             stack.push({
                 start: index,
-                opener: /** @type {'{'|'['} */ (ch),
+                opener: /** @type */ (ch),
             });
             continue;
         }
@@ -290,6 +304,7 @@ function extractBalancedJsonBlocks(text) {
  */
 /**
  * Attempts to parse a JSON object from noisy stdout.
+ *
  * @param {string} stdout
  * @param {ParseJsonFromMixedOutputOptions} [options]
  * @returns {any}
@@ -328,7 +343,7 @@ export function parseJsonFromMixedOutput(stdout, options = {}) {
         }
     }
     if (parsedCandidates.length > 0) {
-        const withKeys = parsedCandidates.find(item => !Array.isArray(item) && Object.keys(item).length > 0);
+        const withKeys = parsedCandidates.find((item) => !Array.isArray(item) && Object.keys(item).length > 0);
         if (withKeys) {
             return withKeys;
         }

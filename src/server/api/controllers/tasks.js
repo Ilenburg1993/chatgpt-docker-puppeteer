@@ -7,7 +7,6 @@ const router = express.Router();
 
 import { audit, log } from '#core/logger';
 import * as schemas from '#core/schemas';
-import { executeCommand } from '#server/domain/control_command_service';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
@@ -16,13 +15,14 @@ import {
     clearQueuePreserveRunning,
     countTasks,
     getTaskById,
-    insertTask as persistTaskInsert,
     listTasks,
+    insertTask as persistTaskInsert,
+    updateTask as persistTaskUpdate,
     releaseTaskLock,
     retryFailedTasks,
-    updateTask as persistTaskUpdate,
 } from '#infra/db/task_repo';
 import { putJson, readText as readArtifactText } from '#infra/storage/artifact_store';
+import { executeCommand } from '#server/domain/control_command_service';
 import schemaGuard from '../../middleware/schema_guard.js';
 import { fail, ok } from '../utils/api_envelope.js';
 
@@ -46,12 +46,13 @@ function _safeId(/** @type {any} */ raw) {
 /** @typedef {any} SafeUpdateTaskUpdates */
 /** @typedef {any} SafeUpdateTaskOptions */
 /**
- * ✅ P1-17: Safe wrapper for _safeUpdateTask() that catches OptimisticLockError.
- * Returns null on conflict, allowing API to return 409 Conflict.
+ * ✅ P1-17: Safe wrapper for _safeUpdateTask() that catches OptimisticLockError. Returns null on conflict, allowing API
+ * to return 409 Conflict.
+ *
  * @param {string} taskId - Task ID
  * @param {SafeUpdateTaskUpdates} updates - Updates
  * @param {SafeUpdateTaskOptions} [options] - Options
- * @returns {object|null} Updated task or null on conflict
+ * @returns {object | null} Updated task or null on conflict
  */
 function _safeUpdateTask(taskId, updates, { throwOnConflict = false } = {}) {
     try {
@@ -69,10 +70,11 @@ function _safeUpdateTask(taskId, updates, { throwOnConflict = false } = {}) {
 
 /**
  * Detects cycles in task dependency graph using DFS.
+ *
  * @param {string} taskId - Starting task ID
  * @param {string[]} newDeps - New dependencies being added
  * @param {Set<string>} [visited] - Already visited in current path
- * @returns {{ hasCycle: boolean, path?: string[] }}
+ * @returns {{ hasCycle: boolean; path?: string[] }}
  */
 function _detectDependencyCycle(taskId, newDeps, visited = new Set()) {
     if (visited.has(taskId)) {
@@ -111,7 +113,9 @@ function _detectDependencyCycle(taskId, newDeps, visited = new Set()) {
 
 function _getLockSnapshot(/** @type {any} */ taskId) {
     const db = getDb();
-    const row = /** @type {any} */ (db.prepare('SELECT locked_by, lock_expires_at_ms, status, stage FROM tasks WHERE id = ?').get(taskId));
+    const row = /** @type {any} */ (
+        db.prepare('SELECT locked_by, lock_expires_at_ms, status, stage FROM tasks WHERE id = ?').get(taskId)
+    );
     if (!row) return null;
     return {
         locked_by: row.locked_by ? String(row.locked_by) : null,
@@ -145,7 +149,12 @@ function _uniqStrings(/** @type {any} */ list) {
     return out;
 }
 
-async function _runTaskControlCommand(/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ command, /** @type {any} */ payload = {}) {
+async function _runTaskControlCommand(
+    /** @type {any} */ req,
+    /** @type {any} */ res,
+    /** @type {any} */ command,
+    /** @type {any} */ payload = {},
+) {
     try {
         const result = await executeCommand({
             command,
@@ -178,9 +187,7 @@ async function _runTaskControlCommand(/** @type {any} */ req, /** @type {any} */
 -------------------------------------------------------------------------- */
 
 /**
- * GET /
- * Lista tarefas com paginação.
- * Query params: page (default 1), limit (default 100, max 1000)
+ * GET / Lista tarefas com paginação. Query params: page (default 1), limit (default 100, max 1000)
  */
 router.get('/', async (req, res) => {
     try {
@@ -212,7 +219,7 @@ router.get('/', async (req, res) => {
                 total,
                 page,
                 totalPages,
-            }
+            },
         );
     } catch (/** @type {any} */ e) {
         const _e = /** @type {any} */ (e);
@@ -226,8 +233,7 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * POST /
- * Ingestão de nova tarefa com cura automática para o padrão V4 Gold.
+ * POST / Ingestão de nova tarefa com cura automática para o padrão V4 Gold.
  */
 router.post('/', async (req, res) => {
     try {
@@ -338,7 +344,7 @@ router.post('/', async (req, res) => {
                 log(
                     'INFO',
                     `[API_TASKS] Idempotent retry detected for task ${safeId} with client_request_id ${clientRequestId}`,
-                    req.id
+                    req.id,
                 );
             }
             // Return existing task
@@ -352,6 +358,7 @@ router.post('/', async (req, res) => {
             });
             created = true;
 
+            // eslint-disable-next-line @typescript-eslint/await-thenable
             await audit('CREATE_TASK', {
                 id: safeId,
                 source: 'GUI',
@@ -387,10 +394,10 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * PUT /:id
- * Atualização parcial ou total de uma tarefa existente.
- * @param {*} req
- * @param {*} res
+ * PUT /:id Atualização parcial ou total de uma tarefa existente.
+ *
+ * @param {any} req
+ * @param {any} res
  */
 async function handleTaskUpdate(req, res) {
     try {
@@ -409,7 +416,10 @@ async function handleTaskUpdate(req, res) {
                 error: 'Task em processamento (claim)',
                 message:
                     'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
-                details: { locked_by: (/** @type {any} */ (lockSnapshot)).locked_by, lock_expires_at_ms: (/** @type {any} */ (lockSnapshot)).lock_expires_at_ms },
+                details: {
+                    locked_by: /** @type {any} */ (lockSnapshot).locked_by,
+                    lock_expires_at_ms: /** @type {any} */ (lockSnapshot).lock_expires_at_ms,
+                },
                 request_id: req.id,
             });
         }
@@ -556,6 +566,7 @@ async function handleTaskUpdate(req, res) {
             }
         }
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('EDIT_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -659,7 +670,7 @@ router.get('/:id/dependencies', async (req, res) => {
         const db = getDb();
         const rows = db
             .prepare(
-                'SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ? ORDER BY depends_on_task_id ASC'
+                'SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ? ORDER BY depends_on_task_id ASC',
             )
             .all(taskId);
         const deps = rows.map((/** @type {any} */ r) => String(r.depends_on_task_id));
@@ -702,13 +713,16 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
                 error: 'Task em processamento (claim)',
                 message:
                     'A task foi clamada por um worker e pode estar prestes a iniciar. Pause/cancele e tente novamente.',
-                details: { locked_by: (/** @type {any} */ (lockSnapshot)).locked_by, lock_expires_at_ms: (/** @type {any} */ (lockSnapshot)).lock_expires_at_ms },
+                details: {
+                    locked_by: /** @type {any} */ (lockSnapshot).locked_by,
+                    lock_expires_at_ms: /** @type {any} */ (lockSnapshot).lock_expires_at_ms,
+                },
                 request_id: req.id,
             });
         }
 
         const incoming = _uniqStrings(req.body.dependencies).map(_safeId).filter(Boolean);
-        const deps = incoming.filter(d => d && d !== taskId);
+        const deps = incoming.filter((d) => d && d !== taskId);
 
         const db = getDb();
         if (deps.length > 0) {
@@ -718,7 +732,7 @@ router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (r
                 .all(...deps)
                 .map((/** @type {any} */ r) => String(r.id));
             const foundSet = new Set(found);
-            const missing = deps.filter(d => !foundSet.has(d));
+            const missing = deps.filter((d) => !foundSet.has(d));
             if (missing.length > 0) {
                 return res.status(400).json({
                     success: false,
@@ -824,6 +838,7 @@ router.post('/:id/approve', async (req, res) => {
             /* ignore */
         }
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('APPROVE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -871,6 +886,7 @@ router.post('/:id/reject', async (req, res) => {
             /* ignore */
         }
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('REJECT_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         recordEvent({
             entityType: 'task',
@@ -895,6 +911,7 @@ router.post('/:id/pause', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_PAUSE', { task_id: safeId });
         if (!control) return;
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('PAUSE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -909,6 +926,7 @@ router.post('/:id/resume', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_RESUME', { task_id: safeId });
         if (!control) return;
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('RESUME_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -924,6 +942,7 @@ router.post('/:id/unblock', async (req, res) => {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_UNBLOCK', { task_id: safeId });
         if (!control) return;
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('UNBLOCK_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -939,6 +958,7 @@ router.post('/:id/retry', async (req, res) => {
         const control = await _runTaskControlCommand(req, res, 'TASK_RETRY', { task_id: safeId });
         if (!control) return;
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('RETRY_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, task: control?.result?.after || null, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -949,14 +969,14 @@ router.post('/:id/retry', async (req, res) => {
 });
 
 /**
- * DELETE /:id/purge
- * Remoção física (SSOT) — uso administrativo.
+ * DELETE /:id/purge Remoção física (SSOT) — uso administrativo.
  */
 router.delete('/:id/purge', async (req, res) => {
     try {
         const safeId = _safeId(req.params.id);
         const control = await _runTaskControlCommand(req, res, 'TASK_PURGE', { task_id: safeId });
         if (!control) return;
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('PURGE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({ success: true, operation: control.operation, request_id: req.id });
     } catch (/** @type {any} */ e) {
@@ -967,8 +987,7 @@ router.delete('/:id/purge', async (req, res) => {
 });
 
 /**
- * DELETE /:id
- * Remoção física da intenção de execução.
+ * DELETE /:id Remoção física da intenção de execução.
  */
 router.delete('/:id', async (req, res) => {
     try {
@@ -976,6 +995,7 @@ router.delete('/:id', async (req, res) => {
         const control = await _runTaskControlCommand(req, res, 'TASK_CANCEL', { task_id: safeId });
         if (!control) return;
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('DELETE_TASK', { id: safeId, user: 'GUI', request_id: req.id });
         res.json({
             success: true,
@@ -1303,12 +1323,12 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
 });
 
 /**
- * POST /retry-failed
- * Reinicia o ciclo de vida de todas as tarefas com status FAILED.
+ * POST /retry-failed Reinicia o ciclo de vida de todas as tarefas com status FAILED.
  */
 router.post('/retry-failed', async (req, res) => {
     try {
         const count = retryFailedTasks();
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('RETRY_BATCH', { count, request_id: req.id });
         recordEvent({
             entityType: 'queue',
@@ -1336,12 +1356,12 @@ router.post('/retry-failed', async (req, res) => {
 });
 
 /**
- * POST /clear
- * Limpeza higiênica da fila (preserva tarefas em execução).
+ * POST /clear Limpeza higiênica da fila (preserva tarefas em execução).
  */
 router.post('/clear', async (req, res) => {
     try {
         const report = clearQueuePreserveRunning();
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('CLEAR_QUEUE', { ...report, request_id: req.id });
         recordEvent({
             entityType: 'queue',

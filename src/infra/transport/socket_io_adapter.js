@@ -1,17 +1,19 @@
 // @ts-check
 
-import { io } from 'socket.io-client';
 import EventEmitter from 'node:events';
+import { io } from 'socket.io-client';
 
 /**
  * @typedef {object} CreateSocketAdapterConfig
  * @property {string} url
- * @property {*} [options]
+ * @property {any} [options]
  */
 /**
  * Cria uma instância do adaptador de transporte para Socket.io.
- * * @param {CreateSocketAdapterConfig} config
-  * @returns {any}
+ *
+ * - @param {CreateSocketAdapterConfig} config
+ *
+ * @returns {any}
  */
 function createSocketAdapter(config) {
     // Bus de eventos para comunicar mudanças de estado ao NERV Core
@@ -21,7 +23,7 @@ function createSocketAdapter(config) {
     let _shuttingDown = false;
 
     // Adiciona handler de erro padrão para evitar crashes
-    events.on('error', errorData => {
+    events.on('error', (errorData) => {
         // Log silencioso - erros de conexão são esperados durante shutdown
         if (!_shuttingDown) {
             // Apenas emite no log interno, não propaga
@@ -125,7 +127,8 @@ function createSocketAdapter(config) {
 
     /**
      * Envia dados brutos para o servidor.
-     * @param {string|object} frame - O pacote já serializado pelo NERV.
+     *
+     * @param {string | object} frame - O pacote já serializado pelo NERV.
      */
     function send(frame) {
         if (!socket || !socket.connected) {
@@ -141,6 +144,7 @@ function createSocketAdapter(config) {
 
     /**
      * Registra a função que o NERV usará para processar o que chega.
+     *
      * @param {function} handler - Função (frame) => void
      */
     function onReceive(handler) {

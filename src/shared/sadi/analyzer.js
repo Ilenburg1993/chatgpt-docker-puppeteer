@@ -27,9 +27,8 @@ function debug(/** @type {any} */ msg, /** @type {any} */ ...args) {
 }
 
 /**
- * Assinaturas vetoriais (SVG) para identificação de botões - EXPANDIDO v4.0
- * Ignora variações de cor/tamanho focando apenas na geometria do ícone.
- * v4.0: 4 → 12 signatures (3x coverage)
+ * Assinaturas vetoriais (SVG) para identificação de botões - EXPANDIDO v4.0 Ignora variações de cor/tamanho focando
+ * apenas na geometria do ícone. v4.0: 4 → 12 signatures (3x coverage)
  */
 const SVG_SIGNATURES = [
     // Paper plane variants (send)
@@ -58,16 +57,15 @@ const SVG_SIGNATURES = [
 ].map((/** @type {any} */ sig) => sig.replace(/[\s,]/g, '').slice(0, 20));
 
 /**
- * Detection cache (v4.0)
- * 90% faster em detecções subsequentes
+ * Detection cache (v4.0) 90% faster em detecções subsequentes
  */
 const detectionCache = new Map();
 
 /**
- * SADI_LOGIC: Motor de percepção injetado no contexto do Browser.
- * Este código roda via page.evaluate(), então tem acesso a APIs do browser.
+ * SADI_LOGIC: Motor de percepção injetado no contexto do Browser. Este código roda via page.evaluate(), então tem
+ * acesso a APIs do browser.
  */
-// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
     const SADI = {
         /**
@@ -77,7 +75,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
             /** @type {any} */ selector,
             /** @type {any} */ root = document,
             /** @type {any} */ onlyFrames = false,
-            /** @type {any} */ accumulator = []
+            /** @type {any} */ accumulator = [],
         ) => {
             try {
                 const nodes = root.querySelectorAll(selector);
@@ -298,11 +296,40 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
 ========================================================================== */
 
 /**
- * @typedef {{ url: () => string, name: () => string }} SadiFrameLike
- * @typedef {{ frames: () => Promise<SadiFrameLike[]>, mainFrame: () => SadiFrameLike, evaluate: (...args: unknown[]) => Promise<unknown>, url: () => string }} SadiPageLike
- * @typedef {{ selector: string, isShadow?: boolean, isShadowRoot?: boolean, context?: string, framePath?: string, timestamp?: number }} SadiElementProtocol
- * @typedef {{ protocol: SadiElementProtocol, confidence: number, candidates_count?: number, detection_time_ms: number, has_svg?: boolean, is_disabled?: boolean }} SadiDetectionResult
- * @typedef {{ protocol: SadiElementProtocol, isBusy: boolean, growth_delta: number, detection_time_ms: number, content_length: number }} SadiResponseDetectionResult
+ * @typedef {{ url: () => string; name: () => string }} SadiFrameLike
+ *
+ * @typedef {{
+ *     frames: () => Promise<SadiFrameLike[]>;
+ *     mainFrame: () => SadiFrameLike;
+ *     evaluate: (...args: unknown[]) => Promise<unknown>;
+ *     url: () => string;
+ * }} SadiPageLike
+ *
+ * @typedef {{
+ *     selector: string;
+ *     isShadow?: boolean;
+ *     isShadowRoot?: boolean;
+ *     context?: string;
+ *     framePath?: string;
+ *     timestamp?: number;
+ * }} SadiElementProtocol
+ *
+ * @typedef {{
+ *     protocol: SadiElementProtocol;
+ *     confidence: number;
+ *     candidates_count?: number;
+ *     detection_time_ms: number;
+ *     has_svg?: boolean;
+ *     is_disabled?: boolean;
+ * }} SadiDetectionResult
+ *
+ * @typedef {{
+ *     protocol: SadiElementProtocol;
+ *     isBusy: boolean;
+ *     growth_delta: number;
+ *     detection_time_ms: number;
+ *     content_length: number;
+ * }} SadiResponseDetectionResult
  */
 
 /**
@@ -310,7 +337,7 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
  *
  * @param {SadiPageLike} page - Puppeteer Page instance
  * @param {string} framePath - Frame path identifier
- * @returns {Promise<SadiFrameLike|SadiPageLike>} Frame encontrado ou main frame
+ * @returns {Promise<SadiFrameLike | SadiPageLike>} Frame encontrado ou main frame
  * @throws {Error} Se page for inválido
  */
 async function findFrameByPath(/** @type {any} */ page, /** @type {any} */ framePath) {
@@ -359,15 +386,14 @@ async function findFrameByPath(/** @type {any} */ page, /** @type {any} */ frame
  * v4.0: Localiza o campo de input com validação, cache e telemetria
  *
  * @param {SadiPageLike} page - Puppeteer Page instance
- * @param {string} [langCode='en'] - Language code for i18n keywords (en, pt, es, etc.)
- * @returns {Promise<SadiDetectionResult|null>} Detection result with protocol and confidence
+ * @param {string} [langCode='en'] - Language code for i18n keywords (en, pt, es, etc.). Default is `'en'`
+ * @returns {Promise<SadiDetectionResult | null>} Detection result with protocol and confidence
  *
  * @typedef {object} DetectionResult
  * @property {SadiElementProtocol} protocol - Element protocol (selector, framePath, etc.)
  * @property {number} confidence - Confidence score (0-500+)
  * @property {number} candidates_count - Total candidates evaluated
  * @property {number} detection_time_ms - Time taken for detection
- *
  * @throws {Error} If page is invalid or langCode is invalid
  */
 async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */ langCode = 'en') {
@@ -397,14 +423,14 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
         const keywords = await i18n.getTerms('input_placeholders', langCode);
         debug('findChatInputSelector: starting detection with %d keywords', keywords.length);
 
-        const result = /** @type {SadiDetectionResult|null} */ (
+        const result = /** @type {SadiDetectionResult | null} */ (
             await page.evaluate(
                 (
                     /** @type {any} */ terms,
                     /** @type {any} */ svgSigs,
                     /** @type {any} */ sadiLogicFn,
                     /** @type {any} */ config,
-                    /** @type {any} */ startTs
+                    /** @type {any} */ startTs,
                 ) => {
                     // FIXED: Sem async (não tem await dentro)
                     const SADI = sadiLogicFn(terms, svgSigs);
@@ -454,7 +480,7 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
                     };
 
                     const best = candidates.sort(
-                        (/** @type {any} */ a, /** @type {any} */ b) => scoreCandidate(b) - scoreCandidate(a)
+                        (/** @type {any} */ a, /** @type {any} */ b) => scoreCandidate(b) - scoreCandidate(a),
                     )[0];
                     const score = best ? scoreCandidate(best) : 0;
 
@@ -490,7 +516,7 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
                 SVG_SIGNATURES,
                 sadiLogic,
                 SADI_CONFIG,
-                startTime
+                startTime,
             )
         );
 
@@ -498,7 +524,7 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
         debug(
             'findChatInputSelector: detection completed in %dms, confidence=%d',
             detectionTime,
-            result?.confidence || 0
+            result?.confidence || 0,
         );
 
         // v4.0: Cache result
@@ -517,14 +543,14 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
                             shadowRoot: result.protocol.isShadowRoot || false,
                         },
                         domain,
-                        'input_box'
+                        'input_box',
                     );
 
                     if (evolutionResult.accepted) {
                         debug(
                             'findChatInputSelector: DNA evolved - %s (confidence %d)',
                             result.protocol.selector,
-                            result.confidence
+                            result.confidence,
                         );
                     } else {
                         debug('findChatInputSelector: DNA evolution rejected - %s', evolutionResult.reason);
@@ -550,7 +576,7 @@ async function findChatInputSelector(/** @type {any} */ page, /** @type {any} */
  *
  * @param {SadiPageLike} page - Puppeteer Page instance
  * @param {SadiElementProtocol} inputProtocol - Input protocol from findChatInputSelector
- * @returns {Promise<SadiDetectionResult|null>} Detection result with protocol and confidence
+ * @returns {Promise<SadiDetectionResult | null>} Detection result with protocol and confidence
  * @throws {Error} If page or inputProtocol is invalid
  */
 async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} */ inputProtocol) {
@@ -566,14 +592,14 @@ async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} *
         const startTime = Date.now();
         debug('findSendButtonSelector: starting detection for input=%s', inputProtocol.selector);
 
-        const result = /** @type {SadiDetectionResult|null} */ (
+        const result = /** @type {SadiDetectionResult | null} */ (
             await page.evaluate(
                 (
                     /** @type {any} */ proto,
                     /** @type {any} */ svgSigs,
                     /** @type {any} */ sadiLogicFn,
                     /** @type {any} */ config,
-                    /** @type {any} */ startTs
+                    /** @type {any} */ startTs,
                 ) => {
                     // FIXED: Sem async (não tem await dentro)
                     const SADI = sadiLogicFn([], svgSigs);
@@ -625,7 +651,7 @@ async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} *
                     };
 
                     const best = buttons.sort(
-                        (/** @type {any} */ a, /** @type {any} */ b) => scoreButton(b) - scoreButton(a)
+                        (/** @type {any} */ a, /** @type {any} */ b) => scoreButton(b) - scoreButton(a),
                     )[0];
                     const score = best ? scoreButton(best) : 0;
 
@@ -648,7 +674,7 @@ async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} *
                 SVG_SIGNATURES,
                 sadiLogic,
                 SADI_CONFIG,
-                startTime
+                startTime,
             )
         );
 
@@ -656,7 +682,7 @@ async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} *
         debug(
             'findSendButtonSelector: detection completed in %dms, confidence=%d',
             detectionTime,
-            result?.confidence || 0
+            result?.confidence || 0,
         );
 
         return result;
@@ -671,7 +697,7 @@ async function findSendButtonSelector(/** @type {any} */ page, /** @type {any} *
  * v4.0: Monitora a área de resposta para detectar atividade da IA
  *
  * @param {SadiPageLike} page - Puppeteer Page instance
- * @returns {Promise<SadiResponseDetectionResult|null>} Detection result with protocol and busy status
+ * @returns {Promise<SadiResponseDetectionResult | null>} Detection result with protocol and busy status
  * @throws {Error} If page is invalid
  */
 async function findResponseArea(/** @type {any} */ page) {
@@ -684,13 +710,13 @@ async function findResponseArea(/** @type {any} */ page) {
         debug('findResponseArea: starting growth detection');
         const startTime = Date.now();
 
-        const result = /** @type {SadiResponseDetectionResult|null} */ (
+        const result = /** @type {SadiResponseDetectionResult | null} */ (
             await page.evaluate(
                 (/** @type {any} */ sadiLogicFn, /** @type {any} */ config, /** @type {any} */ startTs) => {
                     // FIXED: Sem async (Promise simples em vez de await)
                     const SADI = sadiLogicFn([], []);
                     const containers = SADI.query('div, article, section, pre').filter(
-                        (/** @type {any} */ c) => c.innerText.length > 5
+                        (/** @type {any} */ c) => c.innerText.length > 5,
                     );
                     const snapshot = containers.map((/** @type {any} */ c) => ({ el: c, len: c.innerText.length }));
 
@@ -717,7 +743,7 @@ async function findResponseArea(/** @type {any} */ page) {
                                     .filter((/** @type {any} */ c) => c.isConnected)
                                     .sort(
                                         (/** @type {any} */ a, /** @type {any} */ b) =>
-                                            b.innerText.length - a.innerText.length
+                                            b.innerText.length - a.innerText.length,
                                     )[0];
                             resolve(
                                 final
@@ -728,14 +754,14 @@ async function findResponseArea(/** @type {any} */ page) {
                                           detection_time_ms: Date.now() - startTs,
                                           content_length: final.innerText.length,
                                       }
-                                    : null
+                                    : null,
                             );
                         }, config.RESPONSE_GROWTH_DELAY);
                     });
                 },
                 sadiLogic,
                 SADI_CONFIG,
-                startTime
+                startTime,
             )
         );
 
@@ -796,7 +822,7 @@ async function validateCandidateInteractivity(/** @type {any} */ page, /** @type
                     return active === el || el.contains(active);
                 },
                 protocol,
-                sadiLogic
+                sadiLogic,
             )
         );
 

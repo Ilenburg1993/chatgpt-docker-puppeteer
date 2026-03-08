@@ -1,43 +1,45 @@
 // @ts-check
-import EventEmitter from 'node:events';
 import { log } from '#core/logger';
+import EventEmitter from 'node:events';
 
 /**
- * @fileoverview PeriodicHealthMonitor - CDP-based browser health monitoring
+ * @file PeriodicHealthMonitor - CDP-based browser health monitoring
  *
- * **Purpose**: Monitor browser/connection health via Chrome DevTools Protocol (CDP)
- *              to detect issues proactively WITHOUT requiring process-level access.
+ *   **Purpose**: Monitor browser/connection health via Chrome DevTools Protocol (CDP) to detect issues proactively
+ *   WITHOUT requiring process-level access.
  *
- * **Phase**: 3 (Monitoring) - P2-U1
- * **Status**: Production Ready (External Browser Mode)
- * **Version**: 1.0 (CDP-only, no process control)
+ *   **Phase**: 3 (Monitoring) - P2-U1 **Status**: Production Ready (External Browser Mode) **Version**: 1.0 (CDP-only, no
+ *   process control)
  *
- * **Architecture Context**:
- * - Chrome runs on Windows host (user-managed)
- * - Container connects via Puppeteer (puppeteer.connect)
- * - No access to browser process (browser.process() returns null)
- * - All monitoring via CDP (Chrome DevTools Protocol)
+ *   **Architecture Context**:
  *
- * **Responsibilities**:
- * - Periodic connection health checks (browser.isConnected)
- * - Page-level memory metrics (page.metrics via CDP)
- * - Target monitoring (Target.detached events)
- * - Alert emission when health degrades
- * - Auto-trigger reconnection strategy (via events)
+ *   - Chrome runs on Windows host (user-managed)
+ *   - Container connects via Puppeteer (puppeteer.connect)
+ *   - No access to browser process (browser.process() returns null)
+ *   - All monitoring via CDP (Chrome DevTools Protocol)
  *
- * **NOT Included** (requires process access):
- * - Process-level CPU/memory monitoring
- * - Browser process restart
- * - File system monitoring
- * - Task Manager metrics
+ *   **Responsibilities**:
  *
- * **Integration**:
- * - pool_manager.js: Monitor all active browser connections
- * - ConnectionRecoveryStrategy: Triggered on critical issues
- * - NERV Events: Health alerts for external monitoring
+ *   - Periodic connection health checks (browser.isConnected)
+ *   - Page-level memory metrics (page.metrics via CDP)
+ *   - Target monitoring (Target.detached events)
+ *   - Alert emission when health degrades
+ *   - Auto-trigger reconnection strategy (via events)
  *
- * **Created**: February 2026 (Phase 3 implementation)
- * **Related**: DRIVER_BROWSER_INTEGRATION_ANALYSIS.md (P2-U1)
+ *   **NOT Included** (requires process access):
+ *
+ *   - Process-level CPU/memory monitoring
+ *   - Browser process restart
+ *   - File system monitoring
+ *   - Task Manager metrics
+ *
+ *   **Integration**:
+ *
+ *   - pool_manager.js: Monitor all active browser connections
+ *   - ConnectionRecoveryStrategy: Triggered on critical issues
+ *   - NERV Events: Health alerts for external monitoring
+ *
+ *   **Created**: February 2026 (Phase 3 implementation) **Related**: DRIVER_BROWSER_INTEGRATION_ANALYSIS.md (P2-U1)
  */
 
 /* ==========================================================================
@@ -46,6 +48,7 @@ import { log } from '#core/logger';
 
 /**
  * Monitor configuration constants.
+ *
  * @readonly
  */
 const MONITOR_CONFIG = Object.freeze({
@@ -73,6 +76,7 @@ const MONITOR_CONFIG = Object.freeze({
 
 /**
  * Health status levels.
+ *
  * @readonly
  * @enum {string}
  */
@@ -86,6 +90,7 @@ const HEALTH_STATUS = {
 
 /**
  * Health check types.
+ *
  * @readonly
  * @enum {string}
  */
@@ -98,6 +103,7 @@ const CHECK_TYPES = {
 
 /**
  * Monitor events.
+ *
  * @readonly
  */
 const MONITOR_EVENTS = {
@@ -143,7 +149,7 @@ class PeriodicHealthMonitor extends EventEmitter {
             warningChecks: 0,
             criticalChecks: 0,
             consecutiveFailures: 0,
-            lastCheckTime: /** @type {number|null} */ (null),
+            lastCheckTime: /** @type {number | null} */ (null),
             lastHealthyTime: Date.now(),
         };
 
@@ -175,13 +181,13 @@ class PeriodicHealthMonitor extends EventEmitter {
         log('INFO', `[PeriodicHealthMonitor] Starting with ${intervalMs}ms interval`);
 
         // Initial check immediately
-        this.runHealthCheck().catch(err => {
+        this.runHealthCheck().catch((err) => {
             log('ERROR', `[PeriodicHealthMonitor] Initial check failed: ${err.message}`);
         });
 
         // Setup periodic checks
         this.intervalHandle = setInterval(() => {
-            this.runHealthCheck().catch(err => {
+            this.runHealthCheck().catch((err) => {
                 log('ERROR', `[PeriodicHealthMonitor] Check failed: ${err.message}`);
             });
         }, intervalMs);
@@ -334,6 +340,7 @@ class PeriodicHealthMonitor extends EventEmitter {
 
     /**
      * Check 1: Connection health.
+     *
      * @private
      */
     async _checkConnection(/** @type {any} */ results) {
@@ -392,6 +399,7 @@ class PeriodicHealthMonitor extends EventEmitter {
 
     /**
      * Check 2: Page memory metrics (CDP).
+     *
      * @private
      */
     async _checkPageMemory(/** @type {any} */ results) {
@@ -409,7 +417,7 @@ class PeriodicHealthMonitor extends EventEmitter {
         let totalMemoryMB = 0;
         let totalJSHeapMB = 0;
         let maxPageMemoryMB = 0;
-        let pageIssues = [];
+        const pageIssues = [];
 
         for (const pageInfo of activePages) {
             const { page, taskId } = pageInfo;
@@ -470,8 +478,8 @@ class PeriodicHealthMonitor extends EventEmitter {
         }
 
         // Determine status
-        const hasCritical = pageIssues.some(i => i.severity === 'CRITICAL');
-        const hasWarning = pageIssues.some(i => i.severity === 'WARNING');
+        const hasCritical = pageIssues.some((i) => i.severity === 'CRITICAL');
+        const hasWarning = pageIssues.some((i) => i.severity === 'WARNING');
 
         results.checks[CHECK_TYPES.PAGE_MEMORY] = {
             passed: !hasCritical,
@@ -490,6 +498,7 @@ class PeriodicHealthMonitor extends EventEmitter {
 
     /**
      * Check 3: Target health.
+     *
      * @private
      */
     async _checkTargets(/** @type {any} */ results) {
@@ -533,10 +542,11 @@ class PeriodicHealthMonitor extends EventEmitter {
 
     /**
      * Determines overall health status from check results.
+     *
      * @private
      */
     _determineOverallStatus(/** @type {any} */ results) {
-        const statuses = Object.values(results.checks).map(c => c.status);
+        const statuses = Object.values(results.checks).map((c) => c.status);
 
         if (statuses.includes(HEALTH_STATUS.DISCONNECTED)) {
             results.overallStatus = HEALTH_STATUS.DISCONNECTED;
@@ -553,6 +563,7 @@ class PeriodicHealthMonitor extends EventEmitter {
 
     /**
      * Handles status change.
+     *
      * @private
      */
     _handleStatusChange(/** @type {any} */ newStatus, /** @type {any} */ results) {
@@ -591,6 +602,7 @@ class PeriodicHealthMonitor extends EventEmitter {
 
     /**
      * Updates health history.
+     *
      * @private
      */
     _updateHealthHistory(/** @type {any} */ results) {
@@ -640,8 +652,7 @@ export default PeriodicHealthMonitor;
 /**
  * Constantes de status de saúde do browser
  *
- * **Side-effects:** N/A
- * **Semântica:** Enumeração de níveis de saúde para monitoramento de conexões browser.
+ * **Side-effects:** N/A **Semântica:** Enumeração de níveis de saúde para monitoramento de conexões browser.
  * **Unidades:** N/A
  *
  * @type {Object<string, string>}
@@ -651,9 +662,8 @@ export { HEALTH_STATUS };
 /**
  * Tipos de verificações de saúde disponíveis
  *
- * **Side-effects:** N/A
- * **Semântica:** Enumeração dos tipos de verificação implementados pelo monitor.
- * **Unidades:** N/A
+ * **Side-effects:** N/A **Semântica:** Enumeração dos tipos de verificação implementados pelo monitor. **Unidades:**
+ * N/A
  *
  * @type {Object<string, string>}
  */
@@ -662,9 +672,7 @@ export { CHECK_TYPES };
 /**
  * Eventos emitidos pelo monitor de saúde
  *
- * **Side-effects:** N/A
- * **Semântica:** Enumeração de eventos para comunicação com sistemas externos.
- * **Unidades:** N/A
+ * **Side-effects:** N/A **Semântica:** Enumeração de eventos para comunicação com sistemas externos. **Unidades:** N/A
  *
  * @type {Object<string, string>}
  */
@@ -673,9 +681,8 @@ export { MONITOR_EVENTS };
 /**
  * Configuração padrão do monitor de saúde
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações padrão para intervalos e limites de monitoramento.
- * **Unidades:** N/A
+ * **Side-effects:** N/A **Semântica:** Configurações padrão para intervalos e limites de monitoramento. **Unidades:**
+ * N/A
  *
  * @type {Object<string, number>}
  */

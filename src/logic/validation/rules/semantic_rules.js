@@ -9,12 +9,12 @@
 ========================================================================== */
 
 /**
- * Avalia uma linha de texto individual em busca de violações semânticas.
- * Projetado para ser invocado dentro de um loop de stream (Single-Pass).
+ * Avalia uma linha de texto individual em busca de violações semânticas. Projetado para ser invocado dentro de um loop
+ * de stream (Single-Pass).
  *
  * @param {string} line - Linha de texto atual.
- * @param {Array<string>} forbiddenTerms - Lista consolidada e PRÉ-NORMALIZADA.
- * @returns {string|null} O termo original encontrado ou null se a linha estiver limpa.
+ * @param {string[]} forbiddenTerms - Lista consolidada e PRÉ-NORMALIZADA.
+ * @returns {string | null} O termo original encontrado ou null se a linha estiver limpa.
  */
 function evaluateLine(line, forbiddenTerms) {
     // 1. Guardrail de entrada: Evita processamento em linhas vazias ou sem regras
@@ -28,16 +28,16 @@ function evaluateLine(line, forbiddenTerms) {
     // 3. Busca exaustiva com Short-circuit
     // [OPTIMIZATION] Como os termos já foram normalizados no 'compileForbiddenList',
     // eliminamos milhares de chamadas redundantes a .toLowerCase() por arquivo.
-    return forbiddenTerms.find(term => normalizedLine.includes(term)) || null;
+    return forbiddenTerms.find((term) => normalizedLine.includes(term)) || null;
 }
 
 /**
- * Prepara a lista consolidada de termos (Sistema + Usuário).
- * Realiza a higienização e normalização prévia para ganho de performance.
+ * Prepara a lista consolidada de termos (Sistema + Usuário). Realiza a higienização e normalização prévia para ganho de
+ * performance.
  *
- * @param {Array<string>} systemTerms - Termos vindos do i18n.js.
- * @param {Array<string>} userTerms - Termos definidos na Task Spec.
- * @returns {Array<string>} Lista de termos únicos, limpos e em minúsculas.
+ * @param {string[]} systemTerms - Termos vindos do i18n.js.
+ * @param {string[]} userTerms - Termos definidos na Task Spec.
+ * @returns {string[]} Lista de termos únicos, limpos e em minúsculas.
  */
 function compileForbiddenList(systemTerms = [], userTerms = []) {
     // 1. Garantia de Tipagem (Defensive Coding)
@@ -50,9 +50,9 @@ function compileForbiddenList(systemTerms = [], userTerms = []) {
     // 3. Filtragem e Normalização (Hardening V68)
     return combined
         .filter(
-            t => typeof t === 'string' && t.trim().length > 2 // [FIX] Impede falsos-positivos com conectores curtos
+            (t) => typeof t === 'string' && t.trim().length > 2, // [FIX] Impede falsos-positivos com conectores curtos
         )
-        .map(t => t.trim().toLowerCase());
+        .map((t) => t.trim().toLowerCase());
 }
 
-export { evaluateLine, compileForbiddenList };
+export { compileForbiddenList, evaluateLine };

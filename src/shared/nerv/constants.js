@@ -14,20 +14,16 @@
 ========================================================================== */
 
 /**
- * --------------------------------------------------------------------------
- * PROTOCOL
- * --------------------------------------------------------------------------
- * Versão explícita do protocolo IPC.
- * Nunca inferida. Nunca omitida.
+ * ## PROTOCOL
+ *
+ * Versão explícita do protocolo IPC. Nunca inferida. Nunca omitida.
  */
 const PROTOCOL_VERSION = '2.0.0';
 
 /**
- * --------------------------------------------------------------------------
- * MESSAGE TYPE (ONTOLOGICAL)
- * --------------------------------------------------------------------------
- * Define O QUE a mensagem É.
- * Conjunto fechado. Nunca extensível.
+ * ## MESSAGE TYPE (ONTOLOGICAL)
+ *
+ * Define O QUE a mensagem É. Conjunto fechado. Nunca extensível.
  */
 const MessageType = Object.freeze({
     COMMAND: 'COMMAND', // Intenção declarada de ação futura
@@ -36,12 +32,9 @@ const MessageType = Object.freeze({
 });
 
 /**
- * --------------------------------------------------------------------------
- * ACTION CODE (REFERENTIAL)
- * --------------------------------------------------------------------------
- * Define SOBRE O QUE a mensagem fala.
- * Extensível apenas por adição explícita.
- * Nunca redefine o tipo ontológico.
+ * ## ACTION CODE (REFERENTIAL)
+ *
+ * Define SOBRE O QUE a mensagem fala. Extensível apenas por adição explícita. Nunca redefine o tipo ontológico.
  */
 const ActionCode = Object.freeze({
     // ---- TASK / EXECUTION ----
@@ -168,11 +161,9 @@ const ActionCode = Object.freeze({
 });
 
 /**
- * --------------------------------------------------------------------------
- * ACTOR ROLE
- * --------------------------------------------------------------------------
- * Define QUEM emite a mensagem.
- * Não define soberania. Não define decisão.
+ * ## ACTOR ROLE
+ *
+ * Define QUEM emite a mensagem. Não define soberania. Não define decisão.
  */
 const ActorRole = Object.freeze({
     KERNEL: 'KERNEL',
@@ -184,11 +175,9 @@ const ActorRole = Object.freeze({
 });
 
 /**
- * --------------------------------------------------------------------------
- * CHANNEL STATE (TECHNICAL)
- * --------------------------------------------------------------------------
- * Estados técnicos do cliente IPC.
- * Não possuem semântica de mundo.
+ * ## CHANNEL STATE (TECHNICAL)
+ *
+ * Estados técnicos do cliente IPC. Não possuem semântica de mundo.
  */
 const ChannelState = Object.freeze({
     INACTIVE: 'INACTIVE',
@@ -199,11 +188,9 @@ const ChannelState = Object.freeze({
 });
 
 /**
- * --------------------------------------------------------------------------
- * TECHNICAL CODE (DIAGNOSTIC)
- * --------------------------------------------------------------------------
- * Códigos auxiliares puramente técnicos.
- * Nunca utilizados para decisão de negócio.
+ * ## TECHNICAL CODE (DIAGNOSTIC)
+ *
+ * Códigos auxiliares puramente técnicos. Nunca utilizados para decisão de negócio.
  */
 const TechnicalCode = Object.freeze({
     BUFFERED: 'BUFFERED',

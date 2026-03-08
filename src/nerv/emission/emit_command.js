@@ -15,17 +15,16 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
  */
 /**
  * @typedef {object} CreateEmitCommandOptions
- * @property {*} [envelopes]
- * @property {*} [buffers]
- * @property {*} [correlation]
- * @property {*} [telemetry]
+ * @property {any} [envelopes]
+ * @property {any} [buffers]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
  */
 /**
  * Cria o emissor técnico de COMMANDs.
  *
- * **Side-effects:** Registra emissão na correlação histórica.
- * **Semântica:** Emissor especializado para mensagens de comando NERV.
- * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
+ * **Side-effects:** Registra emissão na correlação histórica. **Semântica:** Emissor especializado para mensagens de
+ * comando NERV. **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
  * @param {CreateEmitCommandDeps} deps - Dependências do emissor
  * @returns {any} Emissor com método emitCommand
@@ -43,8 +42,7 @@ function createEmitCommand({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope COMMAND.
      *
-     * @param {object} envelope
-     * Envelope estruturalmente válido.
+     * @param {object} envelope Envelope estruturalmente válido.
      */
     function emitCommand(envelope) {
         telemetry.emit('nerv:emission:attempt', {

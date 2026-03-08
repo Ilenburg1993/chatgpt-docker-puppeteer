@@ -45,7 +45,7 @@ import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 
     // Força encerramento do processo
     process.exit(0);
-})().catch(err => {
+})().catch((err) => {
     console.error('❌ Erro no teste:', err);
     process.exit(1);
 });

@@ -15,9 +15,8 @@ const PATTERN_TYPE = {
 /**
  * MemoryStore - Armazenamento de padrões aprendidos para orquestração adaptativa.
  *
- * **Side-effects:** Mantém estado em memória, opcionalmente persiste em disco.
- * **Semântica:** Indexa padrões por tipo para busca rápida e aprendizado contínuo.
- * **Unidades:** maxSize limita número de padrões armazenados.
+ * **Side-effects:** Mantém estado em memória, opcionalmente persiste em disco. **Semântica:** Indexa padrões por tipo
+ * para busca rápida e aprendizado contínuo. **Unidades:** maxSize limita número de padrões armazenados.
  *
  * @class
  */
@@ -32,7 +31,7 @@ class MemoryStore {
         if (options.persistToDisk) {
             log(
                 'WARN',
-                '[MemoryStore] persistToDisk=true não está implementado. Os patterns serão armazenados apenas em memória.'
+                '[MemoryStore] persistToDisk=true não está implementado. Os patterns serão armazenados apenas em memória.',
             );
         }
 
@@ -121,7 +120,7 @@ class MemoryStore {
         matches.sort((a, b) => b.score - a.score);
 
         // Pega top N
-        const results = matches.slice(0, limit).map(m => {
+        const results = matches.slice(0, limit).map((m) => {
             // Atualiza last_accessed e access_count
             m.pattern.last_accessed = Date.now();
             m.pattern.access_count++;
@@ -271,8 +270,7 @@ export default MemoryStore;
 /**
  * Constantes de tipos de patterns suportados.
  *
- * **Side-effects:** Nenhum (constante imutável).
- * **Semântica:** Define tipos padrão para categorização de patterns.
+ * **Side-effects:** Nenhum (constante imutável). **Semântica:** Define tipos padrão para categorização de patterns.
  * **Unidades:** Strings que representam categorias de patterns.
  */
 export { PATTERN_TYPE };

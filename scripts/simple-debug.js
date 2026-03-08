@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * Runtime Debug - Versão Simplificada
- * Teste básico sem Node inspect para validar funcionamento
+ * Runtime Debug - Versão Simplificada Teste básico sem Node inspect para validar funcionamento
  */
 
 import { spawn } from 'node:child_process';
@@ -49,7 +48,7 @@ async function runSimpleScenario(scenario) {
     console.log(`   📝 ${scenario.description}`);
     console.log(`   ⏱️  ${scenario.duration}ms`);
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn('node', [scenario.script, ...scenario.args], {
             cwd: ROOT_DIR,
             env: { ...process.env, ...scenario.env },
@@ -58,13 +57,13 @@ async function runSimpleScenario(scenario) {
 
         let stdout = '';
         let stderr = '';
-        let startTime = Date.now();
+        const startTime = Date.now();
 
-        child.stdout.on('data', data => {
+        child.stdout.on('data', (data) => {
             stdout += data.toString();
         });
 
-        child.stderr.on('data', data => {
+        child.stderr.on('data', (data) => {
             stderr += data.toString();
         });
 
@@ -97,15 +96,15 @@ async function runSimpleScenario(scenario) {
             if (result.hasErrors) {
                 console.log(
                     `   🚨 Erros detectados: ${
-                        stderr.split('\n').filter(line => line.includes('Error') || line.includes('uncaught')).length
-                    }`
+                        stderr.split('\n').filter((line) => line.includes('Error') || line.includes('uncaught')).length
+                    }`,
                 );
             }
 
             resolve(result);
         });
 
-        child.on('error', error => {
+        child.on('error', (error) => {
             clearTimeout(timeout);
             console.error(`   ❌ Erro: ${error.message}`);
             resolve({
@@ -119,6 +118,7 @@ async function runSimpleScenario(scenario) {
 
 /**
  * Função exportada: runSimpleDebug.
+ *
  * @returns {Promise<void>}
  */
 async function main() {
@@ -138,7 +138,7 @@ async function main() {
             const result = await runSimpleScenario(scenario);
             results.push(result);
             // Pequena pausa entre cenários
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
         } catch (error) {
             const _ce = /** @type {any} */ (error);
             console.error(`❌ Erro crítico no cenário ${scenario.name}: ${_ce.message}`);
@@ -154,10 +154,10 @@ async function main() {
     console.log('\n📊 RESULTADOS FINAIS');
     console.log('====================');
 
-    const successful = results.filter(r => r.success).length;
+    const successful = results.filter((r) => r.success).length;
     const failed = results.length - successful;
-    const withErrors = results.filter(r => r.hasErrors).length;
-    const withWarnings = results.filter(r => r.hasWarnings).length;
+    const withErrors = results.filter((r) => r.hasErrors).length;
+    const withWarnings = results.filter((r) => r.hasWarnings).length;
 
     console.log(`✅ Cenários bem-sucedidos: ${successful}`);
     console.log(`❌ Cenários com falha: ${failed}`);
@@ -167,8 +167,8 @@ async function main() {
     if (withErrors > 0) {
         console.log('\n🔍 CENÁRIOS COM ERROS:');
         results
-            .filter(r => r.hasErrors)
-            .forEach(result => {
+            .filter((r) => r.hasErrors)
+            .forEach((result) => {
                 console.log(`   • ${result.scenario}`);
             });
     }
@@ -185,8 +185,8 @@ async function main() {
                 summary: { successful, failed, withErrors, withWarnings },
             },
             null,
-            2
-        )
+            2,
+        ),
     );
 
     console.log(`\n💾 Relatório salvo: ${reportPath}`);

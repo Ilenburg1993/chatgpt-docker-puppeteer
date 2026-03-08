@@ -3,21 +3,22 @@ import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
 import { ConnectionOrchestrator } from '../ConnectionOrchestrator.js';
 import { CircuitBreakerManager, FailureCause } from './circuit_breaker.js';
-import { PageValidator } from './PageValidator.js';
 import { PageLifecycleMonitor } from './PageLifecycleMonitor.js';
+import { PageValidator } from './PageValidator.js';
 import PeriodicHealthMonitor from './PeriodicHealthMonitor.js';
 
 /** Classe exportada: default. */
 class BrowserPoolManager {
     /**
      * @param {{
-     *   poolSize?: number,
-     *   allocationStrategy?: 'round-robin'|'least-loaded'|'target-affinity',
-     *   healthCheckInterval?: number,
-     *   pageTtlMs?: number,
-     *   allocateMaxAttempts?: number|null,
-     *   browserEndpoint?: { url?: string, wsEndpoint?: string, [key: string]: unknown }
-     * }} [config={}] - Configuração do pool
+     *     poolSize?: number;
+     *     allocationStrategy?: 'round-robin' | 'least-loaded' | 'target-affinity';
+     *     healthCheckInterval?: number;
+     *     pageTtlMs?: number;
+     *     allocateMaxAttempts?: number | null;
+     *     browserEndpoint?: { url?: string; wsEndpoint?: string; [key: string]: unknown };
+     * }} [config={}]
+     *   - Configuração do pool. Default is `{}`
      */
     constructor(config = {}) {
         this.config = {
@@ -79,11 +80,10 @@ class BrowserPoolManager {
     }
 
     /**
-     * Inicializa o pool de browsers.
-     * Conecta às instâncias Chrome remotas usando ConnectionOrchestrator.
+     * Inicializa o pool de browsers. Conecta às instâncias Chrome remotas usando ConnectionOrchestrator.
      *
-     * [V800] Promise Memoization: Se chamado múltiplas vezes simultaneamente,
-     * retorna a mesma promise de inicialização (previne dupla inicialização).
+     * [V800] Promise Memoization: Se chamado múltiplas vezes simultaneamente, retorna a mesma promise de inicialização
+     * (previne dupla inicialização).
      */
     async initialize() {
         // Retorna imediatamente se já inicializado
@@ -118,13 +118,13 @@ class BrowserPoolManager {
         // Arquitetura de conexão: exige browserEndpoint.url
         if (!this.config.browserEndpoint || !this.config.browserEndpoint.url) {
             throw new Error(
-                '[ARCHITECTURE ERROR] browserEndpoint.url é obrigatório. Este sistema não suporta launch de browsers.'
+                '[ARCHITECTURE ERROR] browserEndpoint.url é obrigatório. Este sistema não suporta launch de browsers.',
             );
         }
 
         // ✅ Bug #3: Validar proxy ANTES de tentar conectar
         const CONFIG = /** @type {import('#core/config').default} */ (
-            await import('#core/config').then(m => m.default ?? m)
+            await import('#core/config').then((m) => m.default ?? m)
         );
         if (CONFIG.CHROME_PROXY_ENABLED !== false) {
             await this._validateProxyAvailability();
@@ -164,7 +164,7 @@ class BrowserPoolManager {
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} conectada e adicionada ao pool`);
             } catch (/** @type {any} */ _rawError) {
-            const error = /** @type {any} */ (_rawError);
+                const error = /** @type {any} */ (_rawError);
                 log('ERROR', `[BrowserPool] Falha ao conectar instância ${i}: ${error.message}`);
                 // Continua com pool degradado (menos instâncias)
             }
@@ -191,8 +191,7 @@ class BrowserPoolManager {
     }
 
     /**
-     * Aloca uma página do pool para uma task.
-     * Usa estratégia configurada (round-robin, least-loaded, target-affinity).
+     * Aloca uma página do pool para uma task. Usa estratégia configurada (round-robin, least-loaded, target-affinity).
      *
      * @param {string} target - Target da task (chatgpt, gemini, etc) para affinity
      * @returns {Promise<any>} Página Puppeteer alocada
@@ -208,7 +207,7 @@ class BrowserPoolManager {
 
         const configuredAttempts = Number.parseInt(
             String(process.env.BROWSER_ALLOCATE_MAX_ATTEMPTS ?? this.config.allocateMaxAttempts ?? ''),
-            10
+            10,
         );
         const defaultMaxAttempts = Math.max(1, Number(this.config.poolSize || this.pool.length || 1) * 3);
         const maxAttempts =
@@ -239,12 +238,12 @@ class BrowserPoolManager {
                         const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
-                            `[BrowserPool] Error closing invalid page: ${closeErr?.message ?? String(closeErr)}`
+                            `[BrowserPool] Error closing invalid page: ${closeErr?.message ?? String(closeErr)}`,
                         );
                     }
 
                     const validationError = new Error('PAGE_VALIDATION_FAILED');
-                    (/** @type {any} */ (validationError)).details = validation.issues;
+                    /** @type {any} */ (validationError).details = validation.issues;
                     this._registerAllocationFailure(poolEntry, validationError, {
                         cause: FailureCause.TECHNICAL_CRASH,
                     });
@@ -269,7 +268,7 @@ class BrowserPoolManager {
 
                 log(
                     'DEBUG',
-                    `[BrowserPool] Página alocada de ${poolEntry.id} (${poolEntry.stats.activeTasks} ativas; attempt ${attempt}/${maxAttempts})`
+                    `[BrowserPool] Página alocada de ${poolEntry.id} (${poolEntry.stats.activeTasks} ativas; attempt ${attempt}/${maxAttempts})`,
                 );
 
                 // Anexa metadata à página para rastreamento
@@ -292,7 +291,7 @@ class BrowserPoolManager {
 
                 return page;
             } catch (/** @type {any} */ _rawError) {
-            const error = /** @type {any} */ (_rawError);
+                const error = /** @type {any} */ (_rawError);
                 lastError = error;
 
                 if (page && !page.isClosed()) {
@@ -302,7 +301,7 @@ class BrowserPoolManager {
                         const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
-                            `[BrowserPool] Error closing failed page: ${closeErr?.message ?? String(closeErr)}`
+                            `[BrowserPool] Error closing failed page: ${closeErr?.message ?? String(closeErr)}`,
                         );
                     }
                 }
@@ -311,7 +310,7 @@ class BrowserPoolManager {
 
                 log(
                     'ERROR',
-                    `[BrowserPool] Erro ao alocar página de ${poolEntry.id} (attempt ${attempt}/${maxAttempts}): ${error.message}`
+                    `[BrowserPool] Erro ao alocar página de ${poolEntry.id} (attempt ${attempt}/${maxAttempts}): ${error.message}`,
                 );
             }
         }
@@ -323,8 +322,8 @@ class BrowserPoolManager {
     /**
      * ✅ P0-U5: Atualiza taskId de página de temporário para real.
      *
-     * Chamado pelo adapter após criar task real, para manter pages Map sincronizado.
-     * Melhora debugging (pages Map tem IDs reais, não temp-xxx).
+     * Chamado pelo adapter após criar task real, para manter pages Map sincronizado. Melhora debugging (pages Map tem
+     * IDs reais, não temp-xxx).
      *
      * @param {any} page - Puppeteer page
      * @param {string} realTaskId - Real task ID (substitui temp ID)
@@ -338,7 +337,7 @@ class BrowserPoolManager {
 
         const poolEntry =
             page._poolEntry ||
-            this.pool.find(entry => {
+            this.pool.find((entry) => {
                 for (const pooledPage of entry.pages.values()) {
                     if (pooledPage === page) return true;
                 }
@@ -409,7 +408,7 @@ class BrowserPoolManager {
 
         const { poolEntryId, taskId } = page._poolMetadata;
 
-        const poolEntry = this.pool.find(entry => entry.id === poolEntryId);
+        const poolEntry = this.pool.find((entry) => entry.id === poolEntryId);
 
         if (!poolEntry) {
             log('WARN', `[BrowserPool] PoolEntry ${poolEntryId} não encontrado ao liberar página`);
@@ -428,10 +427,10 @@ class BrowserPoolManager {
         try {
             await page.close();
         } catch (/** @type {any} */ _rawCloseErr) {
-                        const closeErr = /** @type {any} */ (_rawCloseErr);
+            const closeErr = /** @type {any} */ (_rawCloseErr);
             log(
                 'WARN',
-                `[BrowserPool] page.close() falhou (página pode já estar fechada): ${closeErr?.message ?? String(closeErr)}`
+                `[BrowserPool] page.close() falhou (página pode já estar fechada): ${closeErr?.message ?? String(closeErr)}`,
             );
         }
 
@@ -446,18 +445,18 @@ class BrowserPoolManager {
     /**
      * ✅ P0-U2: Remove página do pool (chamado por lifecycle monitor).
      *
-     * Usado quando página fecha/disconnecta inesperadamente (usuário ou crash).
-     * Previne pool corruption (páginas closed no registro).
+     * Usado quando página fecha/disconnecta inesperadamente (usuário ou crash). Previne pool corruption (páginas closed
+     * no registro).
      *
      * @param {string} taskId - Task ID da página
-     * @param {any} [pageRef=null] - Referência da página (fallback)
+     * @param {any} [pageRef=null] - Referência da página (fallback). Default is `null`
      * @returns {void}
      */
     removePageFromPool(taskId, pageRef = null) {
         try {
             // Find pool entry que contém esta página
             let resolvedTaskId = taskId;
-            let poolEntry = this.pool.find(entry => entry.pages.has(taskId));
+            let poolEntry = this.pool.find((entry) => entry.pages.has(taskId));
 
             if (!poolEntry && pageRef) {
                 for (const entry of this.pool) {
@@ -478,7 +477,7 @@ class BrowserPoolManager {
             if (!poolEntry) {
                 log(
                     'WARN',
-                    `[BrowserPool] TaskId ${taskId} not found in pool (already removed? pageRef=${Boolean(pageRef)})`
+                    `[BrowserPool] TaskId ${taskId} not found in pool (already removed? pageRef=${Boolean(pageRef)})`,
                 );
                 return;
             }
@@ -503,7 +502,7 @@ class BrowserPoolManager {
 
             log(
                 'INFO',
-                `[BrowserPool] Page removed from pool: ${resolvedTaskId} (${poolEntry.stats.activeTasks} active)`
+                `[BrowserPool] Page removed from pool: ${resolvedTaskId} (${poolEntry.stats.activeTasks} active)`,
             );
         } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
@@ -512,12 +511,12 @@ class BrowserPoolManager {
     }
 
     /**
-     * Seleciona uma instância do pool baseado na estratégia configurada.
-     * P9.2: Circuit breaker - filtra apenas instâncias HEALTHY com 0 falhas consecutivas
+     * Seleciona uma instância do pool baseado na estratégia configurada. P9.2: Circuit breaker - filtra apenas
+     * instâncias HEALTHY com 0 falhas consecutivas
      */
     _selectInstance(/** @type {any} */ target) {
         const healthyInstances = this.pool.filter(
-            entry => entry.health.status === STATUS_VALUES.HEALTHY && entry.health.consecutiveFailures === 0
+            (entry) => entry.health.status === STATUS_VALUES.HEALTHY && entry.health.consecutiveFailures === 0,
         );
 
         if (healthyInstances.length === 0) {
@@ -553,16 +552,20 @@ class BrowserPoolManager {
      * Estratégia Least-Loaded: seleciona instância com menos tasks ativas.
      */
     _selectLeastLoaded(/** @type {any} */ instances) {
-        return instances.reduce((/** @type {any} */ min, /** @type {any} */ entry) => (entry.stats.activeTasks < min.stats.activeTasks ? entry : min));
+        return instances.reduce((/** @type {any} */ min, /** @type {any} */ entry) =>
+            entry.stats.activeTasks < min.stats.activeTasks ? entry : min,
+        );
     }
 
     /**
-     * Estratégia Target-Affinity: mantém tasks do mesmo target na mesma instância.
-     * Útil para reutilizar cookies/sessões.
+     * Estratégia Target-Affinity: mantém tasks do mesmo target na mesma instância. Útil para reutilizar
+     * cookies/sessões.
      */
     _selectByAffinity(/** @type {any} */ instances, /** @type {any} */ target) {
         // Hash simples do target para selecionar instância consistente
-        const hash = target.split('').reduce((/** @type {any} */ acc, /** @type {any} */ char) => acc + char.charCodeAt(0), 0);
+        const hash = target
+            .split('')
+            .reduce((/** @type {any} */ acc, /** @type {any} */ char) => acc + char.charCodeAt(0), 0);
         const index = hash % instances.length;
         return instances[index];
     }
@@ -575,7 +578,7 @@ class BrowserPoolManager {
             try {
                 await this.runHealthCheck();
             } catch (/** @type {any} */ _rawErr) {
-            const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 log('ERROR', `[BrowserPool] Health check failed: ${err?.message || String(err)}`);
             }
         }, this.config.healthCheckInterval);
@@ -589,8 +592,7 @@ class BrowserPoolManager {
     }
 
     /**
-     * Realiza health check em todas as instâncias do pool.
-     * P3.2: Detecta tanto crashes quanto degradação de performance
+     * Realiza health check em todas as instâncias do pool. P3.2: Detecta tanto crashes quanto degradação de performance
      * V1.0: Integrado com Circuit Breaker para detecção inteligente de falhas
      */
     async _performHealthCheck() {
@@ -629,7 +631,7 @@ class BrowserPoolManager {
                     poolEntry.health.consecutiveFailures++;
                     log(
                         'WARN',
-                        `[BrowserPool] Instância ${poolEntry.id} DEGRADED (${duration}ms) - ${poolEntry.health.consecutiveFailures}/3 falhas`
+                        `[BrowserPool] Instância ${poolEntry.id} DEGRADED (${duration}ms) - ${poolEntry.health.consecutiveFailures}/3 falhas`,
                     );
 
                     // Auto-restart após 3 degradações consecutivas
@@ -646,7 +648,7 @@ class BrowserPoolManager {
 
                         log(
                             'ERROR',
-                            `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED após degradações repetidas`
+                            `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED após degradações repetidas`,
                         );
                     }
                 } else {
@@ -659,7 +661,7 @@ class BrowserPoolManager {
                     this.circuitBreaker.registerRecovery(poolEntry.id);
                 }
             } catch (/** @type {any} */ _rawError) {
-            const error = /** @type {any} */ (_rawError);
+                const error = /** @type {any} */ (_rawError);
                 log('WARN', `[BrowserPool] Health check falhou para ${poolEntry.id}: ${error.message}`);
 
                 poolEntry.health.consecutiveFailures++;
@@ -677,12 +679,12 @@ class BrowserPoolManager {
 
                     log(
                         'ERROR',
-                        `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED (${poolEntry.health.consecutiveFailures} falhas consecutivas)`
+                        `[BrowserPool] Instância ${poolEntry.id} marcada como CRASHED (${poolEntry.health.consecutiveFailures} falhas consecutivas)`,
                     );
 
                     log(
                         'INFO',
-                        `[BrowserPool] Circuit Breaker: Causa detectada = ${(/** @type {any} */ (result)).cause}, Deve pausar = ${(/** @type {any} */ (result)).shouldPause}`
+                        `[BrowserPool] Circuit Breaker: Causa detectada = ${/** @type {any} */ (result).cause}, Deve pausar = ${/** @type {any} */ (result).shouldPause}`,
                     );
                 }
             }
@@ -712,8 +714,8 @@ class BrowserPoolManager {
     /**
      * ✅ Phase 2 Fix #19: Cleanup zombie browser contexts (TTL expiration)
      *
-     * Closes pages that have been allocated for longer than TTL without being
-     * explicitly released. Prevents memory leaks from forgotten contexts.
+     * Closes pages that have been allocated for longer than TTL without being explicitly released. Prevents memory
+     * leaks from forgotten contexts.
      *
      * Called automatically during health checks (every 30s by default).
      *
@@ -721,16 +723,16 @@ class BrowserPoolManager {
      */
     async _cleanupZombiePages() {
         const CONFIG = /** @type {import('#core/config').default} */ (
-            await import('#core/config').then(m => m.default ?? m)
+            await import('#core/config').then((m) => m.default ?? m)
         );
         const ttlMs = Number(
-            this.config.pageTtlMs || CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000
+            this.config.pageTtlMs || CONFIG.BROWSER_PAGE_TTL_MS || process.env.BROWSER_PAGE_TTL_MS || 3600000,
         );
         const now = Date.now();
         let zombieCount = 0;
 
         for (const poolEntry of this.pool) {
-            /** @type {Array<{ taskId: string, page: unknown, reason: string, age: number | 'unknown' }>} */
+            /** @type {{ taskId: string; page: unknown; reason: string; age: number | 'unknown' }[]} */
             const zombiePages = [];
 
             // Find pages that exceeded TTL
@@ -751,7 +753,7 @@ class BrowserPoolManager {
                         zombiePages.push({ taskId, page, reason: 'TTL_EXCEEDED', age });
                     }
                 } catch (/** @type {any} */ _rawError) {
-            const error = /** @type {any} */ (_rawError);
+                    const error = /** @type {any} */ (_rawError);
                     log('ERROR', `[BrowserPool] Error checking page TTL for ${taskId}: ${error.message}`);
                 }
             }
@@ -763,11 +765,11 @@ class BrowserPoolManager {
 
                     log(
                         'WARN',
-                        `[BrowserPool] Closing zombie page: ${zombie.taskId} (age: ${ageMinutes}min, reason: ${zombie.reason})`
+                        `[BrowserPool] Closing zombie page: ${zombie.taskId} (age: ${ageMinutes}min, reason: ${zombie.reason})`,
                     );
 
                     // Close page
-                    await (/** @type {any} */ (zombie)).page.close();
+                    await /** @type {any} */ (zombie).page.close();
 
                     // Remove from pool entry
                     poolEntry.pages.delete(zombie.taskId);
@@ -782,7 +784,7 @@ class BrowserPoolManager {
 
                     zombieCount++;
                 } catch (/** @type {any} */ _rawError) {
-            const error = /** @type {any} */ (_rawError);
+                    const error = /** @type {any} */ (_rawError);
                     log('ERROR', `[BrowserPool] Error closing zombie page ${zombie.taskId}: ${error.message}`);
                 }
             }
@@ -797,9 +799,9 @@ class BrowserPoolManager {
      * Retorna health status do pool incluindo Circuit Breaker.
      */
     async getHealth() {
-        const healthyCount = this.pool.filter(e => e.health.status === STATUS_VALUES.HEALTHY).length;
-        const unhealthyCount = this.pool.filter(e => e.health.status === STATUS_VALUES.UNHEALTHY).length;
-        const crashedCount = this.pool.filter(e => e.health.status === STATUS_VALUES.CRASHED).length;
+        const healthyCount = this.pool.filter((e) => e.health.status === STATUS_VALUES.HEALTHY).length;
+        const unhealthyCount = this.pool.filter((e) => e.health.status === STATUS_VALUES.UNHEALTHY).length;
+        const crashedCount = this.pool.filter((e) => e.health.status === STATUS_VALUES.CRASHED).length;
 
         const circuitBreakerStatus = this.circuitBreaker.getStatus();
 
@@ -815,14 +817,13 @@ class BrowserPoolManager {
     }
 
     /**
-     * Valida disponibilidade do Chrome Proxy Service antes de tentar conectar.
-     * Fail-fast com mensagens claras.
+     * Valida disponibilidade do Chrome Proxy Service antes de tentar conectar. Fail-fast com mensagens claras.
      *
      * @throws {Error} Se proxy não estiver disponível ou unhealthy
      */
     async _validateProxyAvailability() {
         const CONFIG = /** @type {import('#core/config').default} */ (
-            await import('#core/config').then(m => m.default ?? m)
+            await import('#core/config').then((m) => m.default ?? m)
         );
 
         /*
@@ -889,14 +890,13 @@ class BrowserPoolManager {
 
             const err = new Error(`Chrome Proxy Service não está disponível em ${host}:${port} - ${errorMsg}`);
             // Stable code for SSOT classification (avoid substring heuristics downstream).
-            (/** @type {any} */ (err)).code = 'CHROME_PROXY_UNAVAILABLE';
-            (/** @type {any} */ (err)).details = { host, port, url, error: errorMsg };
+            /** @type {any} */ (err).code = 'CHROME_PROXY_UNAVAILABLE';
+            /** @type {any} */ (err).details = { host, port, url, error: errorMsg };
             throw err;
         }
     }
     /**
-     * Shutdown gracioso do pool.
-     * Fecha todas as páginas e desconecta browsers.
+     * Shutdown gracioso do pool. Fecha todas as páginas e desconecta browsers.
      */
     async shutdown() {
         this.shuttingDown = true;
@@ -931,7 +931,7 @@ class BrowserPoolManager {
 
                 log('INFO', `[BrowserPool] Instância ${poolEntry.id} desconectada`);
             } catch (/** @type {any} */ _rawError) {
-            const error = /** @type {any} */ (_rawError);
+                const error = /** @type {any} */ (_rawError);
                 log('ERROR', `[BrowserPool] Erro ao desconectar ${poolEntry.id}: ${error.message}`);
             }
         }
@@ -949,6 +949,7 @@ class BrowserPoolManager {
 
     /**
      * Anexa event handlers do PeriodicHealthMonitor.
+     *
      * @private
      */
     async _attachHealthMonitorEvents() {
@@ -959,7 +960,7 @@ class BrowserPoolManager {
         const { MONITOR_EVENTS } = await import('./PeriodicHealthMonitor.js');
 
         // Status changes
-        this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, data => {
+        this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, (data) => {
             log('INFO', `[BrowserPool] Health status changed: ${data.oldStatus} → ${data.newStatus}`);
 
             // Emit via NERV se disponível
@@ -973,7 +974,7 @@ class BrowserPoolManager {
         });
 
         // Critical issues
-        this.healthMonitor.on(MONITOR_EVENTS.CRITICAL_ISSUE, results => {
+        this.healthMonitor.on(MONITOR_EVENTS.CRITICAL_ISSUE, (results) => {
             log('ERROR', `[BrowserPool] Critical health issue detected: ${JSON.stringify(results.issues)}`);
 
             // Emit via NERV
@@ -987,7 +988,7 @@ class BrowserPoolManager {
         });
 
         // Connection lost - trigger reconnection
-        this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async data => {
+        this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async (data) => {
             log('ERROR', `[BrowserPool] Recovery needed: ${data.reason}`);
 
             // Emit via NERV
@@ -1006,7 +1007,7 @@ class BrowserPoolManager {
         });
 
         // Warnings
-        this.healthMonitor.on(MONITOR_EVENTS.WARNING_DETECTED, results => {
+        this.healthMonitor.on(MONITOR_EVENTS.WARNING_DETECTED, (results) => {
             log('WARN', `[BrowserPool] Health warnings: ${JSON.stringify(results.issues)}`);
         });
 
@@ -1017,10 +1018,12 @@ class BrowserPoolManager {
      * ✅ INTEGRATION: Estabelece ponte entre CircuitBreaker e PeriodicHealthMonitor.
      *
      * **Responsabilidades**:
+     *
      * - Monitor → CB: Notificar recovery quando voltando para HEALTHY
      * - Monitor → CB: Registrar falhas detectadas via health checks
      *
      * **Benefícios**:
+     *
      * - Kernel retoma execução automaticamente após reconexão
      * - CircuitBreaker sempre sincronizado com estado real
      * - Zero intervenção manual necessária
@@ -1037,7 +1040,7 @@ class BrowserPoolManager {
         const { HEALTH_STATUS, CHECK_TYPES } = await import('./PeriodicHealthMonitor.js');
 
         // Bridge 1: Monitor → CircuitBreaker (Recovery Notification)
-        this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, data => {
+        this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, (data) => {
             // Detecta volta para HEALTHY (recovery completo)
             if (data.oldStatus !== HEALTH_STATUS.HEALTHY && data.newStatus === HEALTH_STATUS.HEALTHY) {
                 log('INFO', '[BrowserPool] Bridge: HEALTHY status detected, notifying CircuitBreaker...');
@@ -1053,14 +1056,14 @@ class BrowserPoolManager {
         });
 
         // Bridge 2: Monitor → CircuitBreaker (Failure Detection)
-        this.healthMonitor.on(MONITOR_EVENTS.CRITICAL_ISSUE, results => {
+        this.healthMonitor.on(MONITOR_EVENTS.CRITICAL_ISSUE, (results) => {
             // Detecta falhas críticas via health check
             const connCheck = results.checks[CHECK_TYPES.CONNECTION];
 
             if (connCheck && !connCheck.passed) {
                 log(
                     'WARN',
-                    '[BrowserPool] Bridge: CONNECTION failure detected by monitor, notifying CircuitBreaker...'
+                    '[BrowserPool] Bridge: CONNECTION failure detected by monitor, notifying CircuitBreaker...',
                 );
 
                 const error = new Error('Connection lost (detected by PeriodicHealthMonitor)');
@@ -1087,6 +1090,7 @@ class BrowserPoolManager {
      * Chamado automaticamente quando PeriodicHealthMonitor detecta CONNECTION_LOST.
      *
      * **Flow**:
+     *
      * 1. Detect: browser.isConnected() === false
      * 2. Clear: Close all page connections
      * 3. Poll: Retry puppeteer.connect() with exponential backoff
@@ -1094,6 +1098,7 @@ class BrowserPoolManager {
      * 5. Notify: Alert user if manual restart needed
      *
      * **External Browser Mode**:
+     *
      * - Cannot restart Chrome process (user-managed)
      * - Can only reconnect via CDP
      * - User must manually restart Chrome if crashed
@@ -1166,13 +1171,13 @@ class BrowserPoolManager {
                         break;
                     }
                 } catch (/** @type {any} */ _rawReconnectErr) {
-            const reconnectErr = /** @type {any} */ (_rawReconnectErr);
+                    const reconnectErr = /** @type {any} */ (_rawReconnectErr);
                     log('WARN', `[BrowserPool] Reconnection attempt ${attempt} failed: ${reconnectErr.message}`);
                 }
 
                 // Wait before next attempt
                 if (attempt < maxAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, backoff));
+                    await new Promise((resolve) => setTimeout(resolve, backoff));
                 }
             }
 
@@ -1226,6 +1231,7 @@ class BrowserPoolManager {
 
     /**
      * Clear all page connections (before reconnection).
+     *
      * @private
      */
     async _clearAllPageConnections() {
@@ -1241,7 +1247,7 @@ class BrowserPoolManager {
                         const closeErr = /** @type {any} */ (_rawCloseErr);
                         log(
                             'WARN',
-                            `[BrowserPool] Error closing page ${taskId}: ${closeErr?.message ?? String(closeErr)}`
+                            `[BrowserPool] Error closing page ${taskId}: ${closeErr?.message ?? String(closeErr)}`,
                         );
                     }
 
@@ -1265,7 +1271,7 @@ class BrowserPoolManager {
 
                 log('INFO', `[BrowserPool] Cleared connections for ${poolEntry.id}`);
             } catch (/** @type {any} */ _rawClearErr) {
-            const clearErr = /** @type {any} */ (_rawClearErr);
+                const clearErr = /** @type {any} */ (_rawClearErr);
                 log('ERROR', `[BrowserPool] Error clearing ${poolEntry.id}: ${clearErr.message}`);
             }
         }
@@ -1273,6 +1279,7 @@ class BrowserPoolManager {
 
     /**
      * Notifica usuário que restart manual do Chrome é necessário.
+     *
      * @private
      */
     _notifyUserManualRestartNeeded() {
@@ -1313,10 +1320,9 @@ class BrowserPoolManager {
     }
 
     /**
-     * Gets active pages for monitoring.
-     * Called by PeriodicHealthMonitor.
+     * Gets active pages for monitoring. Called by PeriodicHealthMonitor.
      *
-     * @returns {Array<{page: any, taskId: any}>} Active pages
+     * @returns {{ page: any; taskId: any }[]} Active pages
      */
     getActivePages() {
         const pages = [];
@@ -1332,6 +1338,7 @@ class BrowserPoolManager {
 
     /**
      * Retorna snapshot das métricas atuais do pool.
+     *
      * @returns {Record<string, number>}
      */
     getStats() {

@@ -36,9 +36,9 @@ export function buildEvidenceGraph(findings) {
         if (bucket) bucket.push(finding);
     }
 
-    /** @type {Array<{ id: string, label: string, size: number, contract_id?: string|null }>} */
+    /** @type {{ id: string; label: string; size: number; contract_id?: string | null }[]} */
     const nodes = [];
-    /** @type {Array<{ from: string, to: string, reason: string }>} */
+    /** @type {{ from: string; to: string; reason: string }[]} */
     const edges = [];
 
     let index = 1;

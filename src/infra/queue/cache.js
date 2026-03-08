@@ -1,8 +1,8 @@
 // @ts-check
+import { log } from '#core/logger';
 import fs from 'node:fs';
 import path from 'node:path';
 import pLimit from 'p-limit';
-import { log } from '#core/logger';
 import * as PATHS from '../fs/paths.js';
 
 // --- CONFIGURAÇÃO DE CADÊNCIA ---
@@ -27,14 +27,15 @@ let cacheMisses = 0;
 
 /**
  * Lista arquivos de tarefa existentes no diretório físico.
+ *
  * @returns {string[]} Lista de caminhos absolutos para arquivos .json.
  */
 function listTaskFiles() {
     try {
         return fs
             .readdirSync(PATHS.QUEUE)
-            .filter(file => file.endsWith('.json'))
-            .map(file => path.join(PATHS.QUEUE, file));
+            .filter((file) => file.endsWith('.json'))
+            .map((file) => path.join(PATHS.QUEUE, file));
     } catch (/** @type {any} */ err) {
         const _ce = /** @type {any} */ (err);
         log('ERROR', `[CACHE] Falha ao listar diretório da fila: ${_ce.message}`);
@@ -44,6 +45,7 @@ function listTaskFiles() {
 
 /**
  * Carrega o conteúdo de uma tarefa individual.
+ *
  * @param {string} filePath - Caminho do arquivo.
  */
 async function loadTask(filePath) {
@@ -58,8 +60,8 @@ async function loadTask(filePath) {
 }
 
 /**
- * Executa uma varredura completa do disco e atualiza o snapshot em RAM.
- * Implementa o padrão Singleton para evitar concorrência de I/O.
+ * Executa uma varredura completa do disco e atualiza o snapshot em RAM. Implementa o padrão Singleton para evitar
+ * concorrência de I/O.
  */
 async function scanQueue() {
     if (currentScanPromise) {
@@ -72,7 +74,7 @@ async function scanQueue() {
 
             // P9.7: Limita a 10 reads simultâneos para prevenir I/O spikes
             const limit = pLimit(10);
-            const results = await Promise.all(files.map(file => limit(() => loadTask(file))));
+            const results = await Promise.all(files.map((file) => limit(() => loadTask(file))));
 
             // Filtra nulos (falhas de leitura) e atualiza o estado global
             globalQueueCache = results.filter(Boolean);
@@ -90,8 +92,8 @@ async function scanQueue() {
 }
 
 /**
- * Abre uma janela de observação para estabilizar gatilhos externos.
- * Sinais de sensores (Watchers) apenas marcam o cache como sujo e chamam esta função.
+ * Abre uma janela de observação para estabilizar gatilhos externos. Sinais de sensores (Watchers) apenas marcam o cache
+ * como sujo e chamam esta função.
  */
 function openObservationWindow() {
     if (windowTimer) {
@@ -102,7 +104,7 @@ function openObservationWindow() {
         windowTimer = null;
         if (isCacheDirty) {
             // Erros de scanQueue são logados; não devem virar unhandled rejection
-            scanQueue().catch(err => {
+            scanQueue().catch((err) => {
                 log('ERROR', `[CACHE] Falha na varredura da fila (observation window): ${err.message}`);
             });
         }
@@ -110,10 +112,10 @@ function openObservationWindow() {
 }
 
 /**
- * API PÚBLICA: Retorna o snapshot atual da fila.
- * Implementa o Heartbeat de segurança para garantir consistência eventual.
- * P9.6: Adiciona tracking de cache hits/misses
-  * @returns {Promise<any>}
+ * API PÚBLICA: Retorna o snapshot atual da fila. Implementa o Heartbeat de segurança para garantir consistência
+ * eventual. P9.6: Adiciona tracking de cache hits/misses
+ *
+ * @returns {Promise<any>}
  */
 async function getQueue() {
     const now = Date.now();
@@ -138,9 +140,10 @@ async function getQueue() {
 }
 
 /**
- * Sinalização Externa: Marca o cache como inconsistente.
- * Chamado exclusivamente por sensores (fs_watcher) ou comandos IPC.
-  * @returns {any}
+ * Sinalização Externa: Marca o cache como inconsistente. Chamado exclusivamente por sensores (fs_watcher) ou comandos
+ * IPC.
+ *
+ * @returns {any}
  */
 function markDirty() {
     isCacheDirty = true;
@@ -149,6 +152,7 @@ function markDirty() {
 
 /**
  * P9.6: Retorna métricas de cache para observabilidade.
+ *
  * @returns {any} Cache metrics
  */
 function getCacheMetrics() {
@@ -166,4 +170,4 @@ function getCacheMetrics() {
     };
 }
 
-export { getQueue, markDirty, getCacheMetrics };
+export { getCacheMetrics, getQueue, markDirty };

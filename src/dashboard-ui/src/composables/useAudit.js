@@ -1,6 +1,6 @@
 // @ts-check
-/** @import { Ref } from 'vue' */
-import { ref, computed } from 'vue';
+/** @import {Ref} from "vue" */
+import { ref } from 'vue';
 
 /**
  * @typedef {object} UseAuditOptions
@@ -8,6 +8,7 @@ import { ref, computed } from 'vue';
  */
 /**
  * Composable para interação com APIs do Audit Agent
+ *
  * @param {UseAuditOptions} options
  * @returns {any}
  */
@@ -16,7 +17,7 @@ export function useAudit(options = {}) {
 
     /** @type {Ref<any[]>} */
     const jobs = ref([]);
-    /** @type {Ref<any|null>} */
+    /** @type {Ref<any | null>} */
     const currentJob = ref(null);
     /** @type {Ref<any[]>} */
     const patches = ref([]);
@@ -26,11 +27,12 @@ export function useAudit(options = {}) {
     const watchRules = ref([]);
     /** @type {Ref<boolean>} */
     const loading = ref(false);
-    /** @type {Ref<string|null>} */
+    /** @type {Ref<string | null>} */
     const error = ref(null);
 
     /**
      * Fetch wrapper com error handling
+     *
      * @param {string} url
      * @param {RequestInit} opts
      * @returns {Promise<any>}
@@ -54,6 +56,7 @@ export function useAudit(options = {}) {
 
     /**
      * Lista todos os jobs de auditoria
+     *
      * @returns {Promise<any[]>}
      */
     async function listJobs() {
@@ -64,7 +67,7 @@ export function useAudit(options = {}) {
             jobs.value = data.jobs || [];
             return jobs.value;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -74,6 +77,7 @@ export function useAudit(options = {}) {
 
     /**
      * Detalhes de um job específico
+     *
      * @param {string} jobId
      * @param {object} [query]
      * @returns {Promise<any>}
@@ -88,7 +92,7 @@ export function useAudit(options = {}) {
             currentJob.value = data;
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -98,6 +102,7 @@ export function useAudit(options = {}) {
 
     /**
      * Cria um novo job de auditoria
+     *
      * @param {object} payload
      * @returns {Promise<any>}
      */
@@ -111,7 +116,7 @@ export function useAudit(options = {}) {
             });
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -121,6 +126,7 @@ export function useAudit(options = {}) {
 
     /**
      * Executa um job existente
+     *
      * @param {string} jobId
      * @returns {Promise<any>}
      */
@@ -133,7 +139,7 @@ export function useAudit(options = {}) {
             });
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -143,6 +149,7 @@ export function useAudit(options = {}) {
 
     /**
      * Cancela um job em execução
+     *
      * @param {string} jobId
      * @returns {Promise<any>}
      */
@@ -155,7 +162,7 @@ export function useAudit(options = {}) {
             });
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -167,6 +174,7 @@ export function useAudit(options = {}) {
 
     /**
      * Lista patches de um job
+     *
      * @param {string} jobId
      * @param {object} [query]
      * @returns {Promise<any[]>}
@@ -181,7 +189,7 @@ export function useAudit(options = {}) {
             patches.value = data.patches || [];
             return patches.value;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -191,6 +199,7 @@ export function useAudit(options = {}) {
 
     /**
      * Detalhes de um patch específico
+     *
      * @param {string} patchId
      * @param {object} [query]
      * @returns {Promise<any>}
@@ -204,7 +213,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi(url);
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -214,6 +223,7 @@ export function useAudit(options = {}) {
 
     /**
      * Aprova um patch
+     *
      * @param {string} patchId
      * @returns {Promise<any>}
      */
@@ -226,7 +236,7 @@ export function useAudit(options = {}) {
             });
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -236,6 +246,7 @@ export function useAudit(options = {}) {
 
     /**
      * Rejeita um patch
+     *
      * @param {string} patchId
      * @returns {Promise<any>}
      */
@@ -248,7 +259,7 @@ export function useAudit(options = {}) {
             });
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -258,6 +269,7 @@ export function useAudit(options = {}) {
 
     /**
      * Aplica um patch aprovado
+     *
      * @param {string} patchId
      * @returns {Promise<any>}
      */
@@ -270,7 +282,7 @@ export function useAudit(options = {}) {
             });
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -280,6 +292,7 @@ export function useAudit(options = {}) {
 
     /**
      * Valida readiness de apply
+     *
      * @param {string} patchId
      * @returns {Promise<any>}
      */
@@ -290,7 +303,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi(`/audit/patches/${patchId}/apply-readiness`);
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -302,6 +315,7 @@ export function useAudit(options = {}) {
 
     /**
      * Lista findings de um job
+     *
      * @param {string} jobId
      * @returns {Promise<any[]>}
      */
@@ -313,7 +327,7 @@ export function useAudit(options = {}) {
             findings.value = data.findings || [];
             return findings.value;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -325,6 +339,7 @@ export function useAudit(options = {}) {
 
     /**
      * Lista watch rules
+     *
      * @returns {Promise<any[]>}
      */
     async function listWatchRules() {
@@ -335,7 +350,7 @@ export function useAudit(options = {}) {
             watchRules.value = data.rules || [];
             return watchRules.value;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -345,6 +360,7 @@ export function useAudit(options = {}) {
 
     /**
      * Cria ou atualiza watch rule
+     *
      * @param {object} payload
      * @returns {Promise<any>}
      */
@@ -358,7 +374,7 @@ export function useAudit(options = {}) {
             });
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -368,6 +384,7 @@ export function useAudit(options = {}) {
 
     /**
      * Toggle watch rule
+     *
      * @param {string} ruleId
      * @returns {Promise<any>}
      */
@@ -380,7 +397,7 @@ export function useAudit(options = {}) {
             });
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -392,6 +409,7 @@ export function useAudit(options = {}) {
 
     /**
      * Lista profiles de inferência
+     *
      * @returns {Promise<any[]>}
      */
     async function listInferenceProfiles() {
@@ -401,7 +419,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/inference/profiles');
             return data.profiles || [];
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -411,6 +429,7 @@ export function useAudit(options = {}) {
 
     /**
      * Lista client policies
+     *
      * @returns {Promise<any[]>}
      */
     async function listInferenceClientPolicies() {
@@ -420,7 +439,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/inference/client-policies');
             return data.policies || [];
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -430,6 +449,7 @@ export function useAudit(options = {}) {
 
     /**
      * Lista backends de inferência
+     *
      * @returns {Promise<any[]>}
      */
     async function listInferenceBackends() {
@@ -439,7 +459,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/inference/backends');
             return data.backends || [];
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -449,6 +469,7 @@ export function useAudit(options = {}) {
 
     /**
      * Lista models de inferência
+     *
      * @returns {Promise<any[]>}
      */
     async function listInferenceModels() {
@@ -458,7 +479,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/inference/models-db');
             return data.models || [];
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {
@@ -468,6 +489,7 @@ export function useAudit(options = {}) {
 
     /**
      * Resumo de inferência
+     *
      * @returns {Promise<any>}
      */
     async function getInferenceSummary() {
@@ -477,7 +499,7 @@ export function useAudit(options = {}) {
             const data = await fetchApi('/inference/summary');
             return data;
         } catch (/** @type {any} */ _rawE) {
-    const e = /** @type {any} */ (_rawE);
+            const e = /** @type {any} */ (_rawE);
             error.value = e.message;
             throw e;
         } finally {

@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { MissionManager } from '#missions/mission_manager';
@@ -12,12 +12,12 @@ function makeDbPath() {
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave15-mission-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave15-mission-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
 function makeMissionManager(
-    /** @type {{ missionState: any, kernelExecuteTask: any }} */ { missionState, kernelExecuteTask }
+    /** @type {{ missionState: any; kernelExecuteTask: any }} */ { missionState, kernelExecuteTask },
 ) {
     const stateRef = { value: JSON.parse(JSON.stringify(missionState)) };
 
@@ -91,7 +91,7 @@ function makeMissionManager(
     });
 }
 
-test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)', async t => {
+test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
     process.env.MISSION_STEP_DISPATCH_MODE = 'ssot_queue';
@@ -154,7 +154,7 @@ test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)'
     assert.equal(row.status, 'PENDING');
 });
 
-test('wave15: MissionManager mantém fallback legacy_direct por env', async t => {
+test('wave15: MissionManager mantém fallback legacy_direct por env', async (t) => {
     process.env.MISSION_STEP_DISPATCH_MODE = 'legacy_direct';
     process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED = 'true';
 

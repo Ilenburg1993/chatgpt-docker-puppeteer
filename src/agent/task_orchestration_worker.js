@@ -1,4 +1,5 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import { buildWorkflowNextStepTask } from '#agent/workflow_next_step_builder';
 import { log } from '#core/logger';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
@@ -8,21 +9,22 @@ import { extendTaskLock, insertTask, releaseTaskLock, TASK_STAGES, updateTask } 
 import { resilientLock } from '#infra/locks/resilient_lock';
 import { putText, readText } from '#infra/storage/artifact_store';
 import { ValidationService } from '#orchestrator/validation/validation_service';
-import { buildWorkflowNextStepTask } from '#agent/workflow_next_step_builder';
 import fs from 'node:fs/promises';
 
 /**
- * @file Task orchestration worker
- * @description Orchestrates post-run task processing for ITERATIVE and MULTI_STEP strategies.
- * Claims DB locks, records events, persists feedback artifacts and creates child tasks when needed.
+ * Orchestrates post-run task processing for ITERATIVE and MULTI_STEP strategies. Claims DB locks, records events,
+ * persists feedback artifacts and creates child tasks when needed.
+ *
  * @module src/agent/task_orchestration_worker.js
+ * @file Task orchestration worker
  */
 
 /**
  * Options for `TaskOrchestrationWorker` constructor.
+ *
  * @typedef {object} WorkerOptions
  * @property {any} [browserPool] - Browser pool instance used for circuit-breaker checks.
- * @property {string|null} [workerId] - Optional worker identifier.
+ * @property {string | null} [workerId] - Optional worker identifier.
  * @property {number} [intervalMs] - Tick interval in milliseconds.
  * @property {number} [batchSize] - Maximum number of tasks to fetch per tick.
  * @property {number} [pausedRescheduleDelayMs] - Delay applied when dispatch is paused.
@@ -37,17 +39,19 @@ import fs from 'node:fs/promises';
 
 /**
  * Row returned by the worker's DB query in `tick()`.
+ *
  * @typedef {object} TaskRow
  * @property {unknown} id
  * @property {unknown} mission_id
- * @property {string|null} task_json
- * @property {string|null} result_json
+ * @property {string | null} task_json
+ * @property {string | null} result_json
  * @property {unknown} latest_attempt_id
  * @property {number} updated_at_ms
  */
 
 /**
  * Minimal in-memory Task shape (parsed from task_json). Fields are optional and dynamic.
+ *
  * @typedef {object} Task
  * @property {Object<string, any>} [spec]
  * @property {Object<string, any>} [meta]
@@ -58,6 +62,7 @@ import fs from 'node:fs/promises';
 
 /**
  * Partial Attempt record shape.
+ *
  * @typedef {object} Attempt
  * @property {unknown} id
  * @property {unknown} response_v2_json_artifact_id
@@ -66,14 +71,16 @@ import fs from 'node:fs/promises';
 
 /**
  * Result returned by ValidationService.validate().
+ *
  * @typedef {object} ValidationResult
  * @property {boolean} passed
  * @property {number} overall_score
- * @property {Array<string|Object>} issues
+ * @property {(string | Object)[]} issues
  */
 
 /**
  * Workflow orchestration state stored inside `task.state.workflow_state`.
+ *
  * @typedef {object} WorkflowState
  * @property {number} current_step_index
  * @property {string[]} completed_steps
@@ -83,6 +90,7 @@ import fs from 'node:fs/promises';
 
 /**
  * Return shape from `putText()` used to create artifacts.
+ *
  * @typedef {object} PutTextResult
  * @property {string} mime
  * @property {number} sizeBytes
@@ -92,9 +100,10 @@ import fs from 'node:fs/promises';
 
 /**
  * Shape of event records passed to `recordEvent()`.
+ *
  * @typedef {object} EventRecord
  * @property {string} entityType
- * @property {string|number} entityId
+ * @property {string | number} entityId
  * @property {number} tsMs
  * @property {string} actorType
  * @property {string} eventType
@@ -104,12 +113,13 @@ import fs from 'node:fs/promises';
 
 /**
  * Minimal DB interface expected from `getDb()` (better-sqlite3-like).
+ *
  * @typedef {object} DBInterface
  * @property {function(string): {get: function(...any): unknown, all: function(...any): unknown[], run: function(...any): {changes?: number}}} prepare
  * @param {number} ms
  */
 function _sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** @param {any} value */
@@ -141,16 +151,16 @@ function _computeBackoffMs({ iteration = 1, minMs = 2000, maxMs = 120000 } = {})
 
 /**
  * @typedef {object} ReadAttemptOutputTextOptions
- * @property {string|number} taskId
- * @property {string|number} attemptId
- * @property {string|Object} resultJson
+ * @property {string | number} taskId
+ * @property {string | number} attemptId
+ * @property {string | Object} resultJson
  * @property {number} maxRetries
  * @property {number} retryDelayMs
  */
 /**
- * Read the most relevant textual output for an attempt.
- * ✅ P0-14: Retry logic para lidar com race entre putText() e read.
- * Sources checked: response_v2_json artifact, response_text artifact, legacy result_json storage file.
+ * Read the most relevant textual output for an attempt. ✅ P0-14: Retry logic para lidar com race entre putText() e
+ * read. Sources checked: response_v2_json artifact, response_text artifact, legacy result_json storage file.
+ *
  * @private
  * @param {any} [opts]
  * @returns {Promise<string>} Returns empty string when no output is available.
@@ -180,7 +190,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                             log(
                                 'DEBUG',
                                 `[_readAttemptOutputText] Found output after ${retryCount} retries`,
-                                String(taskId)
+                                String(taskId),
                             );
                         }
                         return text;
@@ -201,7 +211,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                         log(
                             'DEBUG',
                             `[_readAttemptOutputText] Found output after ${retryCount} retries`,
-                            String(taskId)
+                            String(taskId),
                         );
                     }
                     return raw;
@@ -227,7 +237,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
                         log(
                             'DEBUG',
                             `[_readAttemptOutputText] Found output after ${retryCount} retries`,
-                            String(taskId)
+                            String(taskId),
                         );
                     }
                     return raw;
@@ -253,14 +263,15 @@ function _ensureArray(value) {
 
 /**
  * @typedef {object} SetOrReplaceInputOptions
- * @property {Array<object>} inputs
+ * @property {object[]} inputs
  * @property {object} next
  */
 /**
  * Add or replace an input object into an inputs array by matching `type` or `label`.
+ *
  * @private
  * @param {any} [opts]
- * @returns {Array<object>}
+ * @returns {object[]}
  */
 function _setOrReplaceInput({ inputs, next } = {}) {
     const list = _ensureArray(inputs).filter(Boolean);
@@ -269,7 +280,7 @@ function _setOrReplaceInput({ inputs, next } = {}) {
     const type = next.type ? String(next.type) : '';
     const label = next.label ? String(next.label) : '';
 
-    const filtered = list.filter(item => {
+    const filtered = list.filter((item) => {
         if (!item || typeof item !== 'object') return false;
         if (type && String(item.type || '') !== type) return true;
         if (label && String(item.label || '') !== label) return true;
@@ -303,14 +314,12 @@ function _workflowStateFromTask(task) {
 /**
  * TaskOrchestrationWorker
  *
- * Scans the database for finished tasks with orchestration strategies and
- * applies orchestration logic (ITERATIVE or MULTI_STEP). This worker claims
- * task locks, records events, persists feedback artifacts and creates child
- * tasks when required.
+ * Scans the database for finished tasks with orchestration strategies and applies orchestration logic (ITERATIVE or
+ * MULTI_STEP). This worker claims task locks, records events, persists feedback artifacts and creates child tasks when
+ * required.
  *
- * Side effects: updates `tasks` rows, records events via `recordEvent()`,
- * writes artifact storage via `putText()` and `insertArtifact()`, and creates
- * child tasks via `insertTask()`.
+ * Side effects: updates `tasks` rows, records events via `recordEvent()`, writes artifact storage via `putText()` and
+ * `insertArtifact()`, and creates child tasks via `insertTask()`.
  *
  * @class
  * @param {WorkerOptions} [options] - Configuration options for the worker.
@@ -318,6 +327,7 @@ function _workflowStateFromTask(task) {
 class TaskOrchestrationWorker {
     /**
      * Create a new TaskOrchestrationWorker.
+     *
      * @param {WorkerOptions} [options]
      */
     constructor({
@@ -346,8 +356,9 @@ class TaskOrchestrationWorker {
 
     /**
      * Start the worker main loop. Non-blocking.
-     * @public
+     *
      * @returns {void}
+     * @public
      */
     start() {
         if (this._timer) return;
@@ -358,10 +369,10 @@ class TaskOrchestrationWorker {
     }
 
     /**
-     * Stop the worker.
-     * ✅ P0-2.5: Lock cleanup automático via ResilientLockManager (sem manual cleanup).
-     * @public
+     * Stop the worker. ✅ P0-2.5: Lock cleanup automático via ResilientLockManager (sem manual cleanup).
+     *
      * @returns {void}
+     * @public
      */
     stop() {
         this._stopped = true;
@@ -374,6 +385,7 @@ class TaskOrchestrationWorker {
 
     /**
      * Verifica se o dispatch deve ser pausado baseado no circuit breaker do browser pool.
+     *
      * @private
      * @returns {boolean} True se o sistema deve pausar dispatch.
      */
@@ -382,15 +394,16 @@ class TaskOrchestrationWorker {
     }
 
     /**
-     * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError.
-     * Prevents worker crashes when concurrent updates cause optimistic lock conflicts.
+     * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError. Prevents worker crashes when concurrent
+     * updates cause optimistic lock conflicts.
      *
      * @private
      * @param {string} taskId - Task ID to update
      * @param {object} updates - Update payload
      * @param {object} [options] - Options
-     * @param {boolean} [options.critical=false] - If true, re-throws OptimisticLockError (caller MUST handle)
-     * @param {string} [options.context=''] - Context string for logging
+     * @param {boolean} [options.critical=false] - If true, re-throws OptimisticLockError (caller MUST handle). Default
+     *   is `false`
+     * @param {string} [options.context=''] - Context string for logging. Default is `''`
      * @returns {boolean} True if update succeeded, false if conflict occurred (non-critical only)
      * @throws {Error} Re-throws OptimisticLockError if options.critical=true
      */
@@ -421,23 +434,25 @@ class TaskOrchestrationWorker {
 
     /**
      * Check events table to see whether orchestration was already applied for a given task+attempt.
+     *
      * @private
-     * @param {{taskId?: any, attemptId?: unknown}} [opts]
+     * @param {{ taskId?: any; attemptId?: unknown }} [opts]
      * @returns {boolean}
      */
     _hasAppliedOrchestration({ taskId, attemptId } = {}) {
         const db = getDb();
         const dedupKey = `task:${taskId}:orchestrated:${attemptId}`;
         return Boolean(
-            /** @type {any} */ (db.prepare('SELECT 1 AS ok FROM events WHERE dedup_key = ? LIMIT 1').get(dedupKey))?.ok
+            /** @type {any} */ (db.prepare('SELECT 1 AS ok FROM events WHERE dedup_key = ? LIMIT 1').get(dedupKey))?.ok,
         );
     }
 
     /**
-     * Try to claim orchestration lock on a task row using ResilientLockManager.
-     * ✅ P0-2.5: Usa ResilientLockManager para garantir cleanup automático em crash.
+     * Try to claim orchestration lock on a task row using ResilientLockManager. ✅ P0-2.5: Usa ResilientLockManager para
+     * garantir cleanup automático em crash.
+     *
      * @private
-     * @param {{taskId?: any, nowMs?: number, lockTtlMs?: number}} [opts]
+     * @param {{ taskId?: any; nowMs?: number; lockTtlMs?: number }} [opts]
      * @returns {Promise<boolean>} True when lock was acquired.
      */
     async _claimOrchestrationLock({ taskId, nowMs, lockTtlMs = 300000 } = {}) {
@@ -459,7 +474,7 @@ class TaskOrchestrationWorker {
                             updated_at_ms = @now
                         WHERE id = @id
                           AND (locked_by IS NULL OR lock_expires_at_ms IS NULL OR lock_expires_at_ms <= @now)
-                    `
+                    `,
                     )
                     .run({ id: taskId, workerId: this.workerId, now, expires });
 
@@ -469,14 +484,15 @@ class TaskOrchestrationWorker {
                 // Release: Clear DB lock
                 releaseTaskLock({ taskId, workerId: this.workerId });
             },
-            { taskId, workerId: this.workerId, acquiredAt: now }
+            { taskId, workerId: this.workerId, acquiredAt: now },
         );
     }
 
     /**
-     * Processa um lote de tarefas concluídas que requerem orquestração pós-execução.
-     * Busca tarefas ARCHIVED/DONE com estratégias ITERATIVE ou MULTI_STEP, reivindica locks
-     * e aplica lógica de orquestração (feedback, child tasks, etc.).
+     * Processa um lote de tarefas concluídas que requerem orquestração pós-execução. Busca tarefas ARCHIVED/DONE com
+     * estratégias ITERATIVE ou MULTI_STEP, reivindica locks e aplica lógica de orquestração (feedback, child tasks,
+     * etc.).
+     *
      * @returns {Promise<void>}
      * @throws {Error} Erros são logados mas não relançados para não interromper o loop.
      * @sideEffects Modifica estado do banco de dados, cria artifacts, child tasks e eventos.
@@ -504,7 +520,7 @@ class TaskOrchestrationWorker {
                       AND (t.mission_id IS NULL OR m.status = 'RUNNING')
                     ORDER BY t.updated_at_ms ASC
                     LIMIT ?
-                `
+                `,
                     )
                     .all(this.batchSize)
             );
@@ -544,7 +560,7 @@ class TaskOrchestrationWorker {
                             const extErr = /** @type {any} */ (_rawExtErr);
                             log(
                                 'WARN',
-                                `[TaskOrchestrationWorker] lock extension failed for ${taskId}: ${extErr?.message || String(extErr)}`
+                                `[TaskOrchestrationWorker] lock extension failed for ${taskId}: ${extErr?.message || String(extErr)}`,
                             );
                         }
                     }, 30000); // Extend every 30s
@@ -569,7 +585,7 @@ class TaskOrchestrationWorker {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
-                        `[TaskOrchestrationWorker] task ${taskId} orchestration failed: ${err?.message || String(err)}`
+                        `[TaskOrchestrationWorker] task ${taskId} orchestration failed: ${err?.message || String(err)}`,
                     );
                     recordEvent({
                         entityType: 'task',
@@ -617,7 +633,7 @@ class TaskOrchestrationWorker {
                     blocked_at_ms: _now(),
                     blocked_details_json: _safeJsonString({ attemptId, strategy }),
                 },
-                { context: 'Block unknown strategy' }
+                { context: 'Block unknown strategy' },
             );
             recordEvent({
                 entityType: 'task',
@@ -653,8 +669,9 @@ class TaskOrchestrationWorker {
 
     /**
      * Handle missing output for an attempt. If threshold exceeded inside window, blocks the task.
+     *
      * @private
-     * @param {{taskId?: any, attemptId?: any}} [opts]
+     * @param {{ taskId?: any; attemptId?: any }} [opts]
      * @returns {Promise<boolean>} True if task was blocked due to missing output.
      */
     async _handleMissingOutput({ taskId, attemptId } = {}) {
@@ -688,7 +705,7 @@ class TaskOrchestrationWorker {
                   AND entity_id = ?
                   AND event_type = 'TASK_ORCHESTRATION_OUTPUT_MISSING'
                   AND ts_ms >= ?
-            `
+            `,
                     )
                     .get(taskId, now - windowMs)
             )?.c || 0;
@@ -707,7 +724,7 @@ class TaskOrchestrationWorker {
                 blocked_at_ms: now,
                 blocked_details_json: _safeJsonString({ attemptId, recent, windowMs }),
             },
-            { context: 'Block output missing' }
+            { context: 'Block output missing' },
         );
 
         recordEvent({
@@ -725,8 +742,9 @@ class TaskOrchestrationWorker {
 
     /**
      * Handle ITERATIVE orchestration: validate output, persist iteration_state, schedule retry or block.
+     *
      * @private
-     * @param {{taskId?: any, attemptId?: any, task?: any, outputText?: any}} [opts]
+     * @param {{ taskId?: any; attemptId?: any; task?: any; outputText?: any }} [opts]
      * @returns {Promise<void>}
      */
     async _handleIterative({ taskId, attemptId, task, outputText } = {}) {
@@ -816,7 +834,7 @@ class TaskOrchestrationWorker {
                         feedback_artifact_id: feedbackArtifactId,
                     }),
                 },
-                { context: 'Block for manual review' }
+                { context: 'Block for manual review' },
             );
 
             recordEvent({
@@ -844,7 +862,7 @@ class TaskOrchestrationWorker {
                     failed_at_ms: now,
                     last_error: `VALIDATION_HOPELESS: score ${validationResult.overall_score.toFixed(2)} < ${MIN_SCORE_THRESHOLD} after ${nextIteration} iterations`,
                 },
-                { context: 'Mark as failed (hopeless)' }
+                { context: 'Mark as failed (hopeless)' },
             );
             recordEvent({
                 entityType: 'task',
@@ -876,7 +894,7 @@ class TaskOrchestrationWorker {
                     failed_at_ms: now,
                     last_error: `MAX_ITERATIONS_REACHED: validation did not pass after ${nextIteration} iterations (max=${maxIterations})`,
                 },
-                { context: 'Mark failed at max iterations' }
+                { context: 'Mark failed at max iterations' },
             );
             recordEvent({
                 entityType: 'task',
@@ -929,7 +947,7 @@ class TaskOrchestrationWorker {
                 last_error:
                     `ORCHESTRATION_RETRY_SCHEDULED(iter=${nextIteration}, score=${Number(validationResult.overall_score || 0).toFixed(1)})`.slice(
                         0,
-                        2000
+                        2000,
                     ),
                 started_at_ms: null,
                 completed_at_ms: null,
@@ -945,7 +963,7 @@ class TaskOrchestrationWorker {
                 latest_response_v2_json_artifact_id: null,
                 result_json: null,
             },
-            { critical: true, context: 'Rearm task for retry' }
+            { critical: true, context: 'Rearm task for retry' },
         ); // CRITICAL: must succeed for retry
 
         // ✅ P0-14: Small delay para garantir artifact flush completo antes de próxima leitura
@@ -969,8 +987,9 @@ class TaskOrchestrationWorker {
 
     /**
      * Persist a human-readable feedback artifact and register it in the artifacts repo.
+     *
      * @private
-     * @param {{taskId?: any, attemptId?: any, validationResult?: any, outputPreview?: any}} [opts]
+     * @param {{ taskId?: any; attemptId?: any; validationResult?: any; outputPreview?: any }} [opts]
      * @returns {Promise<any>} Artifact id returned by insertArtifact().
      */
     async _persistFeedbackArtifact({ taskId, attemptId, validationResult, outputPreview } = {}) {
@@ -985,7 +1004,7 @@ class TaskOrchestrationWorker {
             `overall_score=${score.toFixed(1)}`,
             ``,
             `Issues:`,
-            ...issues.map(i => `- ${i}`),
+            ...issues.map((i) => `- ${i}`),
             ``,
             `Output preview (first 2000 chars):`,
             outputPreview || '',
@@ -1030,9 +1049,11 @@ class TaskOrchestrationWorker {
     }
 
     /**
-     * Handle MULTI_STEP orchestration: update workflow_state, persist completed step and create child task for next step.
+     * Handle MULTI_STEP orchestration: update workflow_state, persist completed step and create child task for next
+     * step.
+     *
      * @private
-     * @param {{taskId?: any, attemptId?: any, task?: any, outputText?: any}} [opts]
+     * @param {{ taskId?: any; attemptId?: any; task?: any; outputText?: any }} [opts]
      * @returns {Promise<void>}
      */
     async _handleMultiStep({ taskId, attemptId, task, outputText } = {}) {
@@ -1049,7 +1070,7 @@ class TaskOrchestrationWorker {
                     blocked_at_ms: now,
                     blocked_details_json: _safeJsonString({ attemptId }),
                 },
-                { context: 'Block workflow config missing' }
+                { context: 'Block workflow config missing' },
             );
             recordEvent({
                 entityType: 'task',
@@ -1080,7 +1101,7 @@ class TaskOrchestrationWorker {
                     blocked_at_ms: now,
                     blocked_details_json: _safeJsonString({ attemptId, step_id: currentStepId, action }),
                 },
-                { context: 'Block workflow action unsupported' }
+                { context: 'Block workflow action unsupported' },
             );
             recordEvent({
                 entityType: 'task',
@@ -1152,7 +1173,7 @@ class TaskOrchestrationWorker {
                     blocked_at_ms: now,
                     blocked_details_json: _safeJsonString({ attemptId, step_id: nextStepId, action: nextAction }),
                 },
-                { context: 'Block next step action unsupported' }
+                { context: 'Block next step action unsupported' },
             );
             recordEvent({
                 entityType: 'task',
@@ -1177,7 +1198,7 @@ class TaskOrchestrationWorker {
             nextStep,
             nextStepIndex: nextIndex,
             workflowConfig: wf,
-            completedStepIds: Array.from(completed).map(stepId => String(stepId)),
+            completedStepIds: Array.from(completed).map((stepId) => String(stepId)),
             accumulatedContext: acc,
             nowMs: now,
             source: 'self_generated',

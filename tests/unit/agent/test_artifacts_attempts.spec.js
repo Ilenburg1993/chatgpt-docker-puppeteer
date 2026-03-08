@@ -1,22 +1,22 @@
 // @ts-check
-import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { after, before, beforeEach, describe, it } from 'node:test';
 
+import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import { createEnvelope } from '#shared/nerv/envelope';
-import { ActorRole, ActionCode, MessageType } from '#shared/nerv/constants';
 
-import { getDb, closeDb } from '#infra/db/sqlite';
-import { insertTask, updateTask } from '#infra/db/task_repo';
-import { createMission, AUTONOMY_MODES, updateMission, MISSION_STATUS } from '#infra/db/mission_repo';
 import { getArtifactById } from '#infra/db/artifact_repo';
+import { AUTONOMY_MODES, createMission, MISSION_STATUS, updateMission } from '#infra/db/mission_repo';
+import { closeDb, getDb } from '#infra/db/sqlite';
 import { getAttemptById } from '#infra/db/task_attempt_repo';
+import { insertTask, updateTask } from '#infra/db/task_repo';
 import { saveResponse } from '#infra/storage/response_adapter';
 
+import { MissionPlannerProcessor } from '../../../src/agent/mission_planner_processor.js';
 import { QueueWorker } from '../../../src/agent/queue_worker.js';
 import { TaskStateProjector } from '../../../src/agent/task_state_projector.js';
-import { MissionPlannerProcessor } from '../../../src/agent/mission_planner_processor.js';
 
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
@@ -30,7 +30,7 @@ function makeArtifactsDir() {
         process.cwd(),
         'tmp',
         'test-artifacts',
-        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     );
     fs.mkdirSync(dir, { recursive: true });
     return dir;
@@ -230,7 +230,7 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
                 state: { status: 'DONE' },
                 result: {},
             },
-            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' }
+            { stage: 'ARCHIVED', status: 'DONE', actor: 'system' },
         );
 
         const attemptId = 'att-planner-1';
@@ -277,7 +277,7 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
             .all(mission.id, plannerTaskId);
         assert.ok(
             rows.some((/** @type {any} */ r) => r.stage === 'PROPOSED'),
-            'em LLM_SUGGEST, proposals devem entrar como PROPOSED'
+            'em LLM_SUGGEST, proposals devem entrar como PROPOSED',
         );
     });
 });

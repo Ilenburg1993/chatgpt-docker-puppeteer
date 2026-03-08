@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { log } from './logger.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../../');
@@ -54,14 +54,15 @@ let vocabCache = /** @type {Record<string, any> | null} */ (null);
 ========================================================================== */
 
 const sleep = (/** @type {number} */ ms) =>
-    new Promise(r => {
+    new Promise((r) => {
         setTimeout(r, ms);
     });
 
 /**
  * Escrita Atômica com Retry (Proteção Windows EPERM)
- * @param {*} filepath
- * @param {*} content
+ *
+ * @param {any} filepath
+ * @param {any} content
  */
 async function atomicWrite(filepath, content) {
     const tmp = `${filepath}.tmp.${crypto.randomBytes(4).toString('hex')}`;
@@ -91,7 +92,8 @@ async function atomicWrite(filepath, content) {
 
 /**
  * Normaliza códigos de idioma (ex: 'pt-BR' -> 'pt', 'EN_US' -> 'en')
- * @param {*} langCode
+ *
+ * @param {any} langCode
  */
 function normalizeLang(langCode) {
     if (!langCode || typeof langCode !== 'string') {
@@ -132,8 +134,9 @@ async function loadVocab() {
 
 /**
  * Retorna termos de uma categoria com fallback hierárquico para o Inglês.
- * @param {*} category
- * @param {*} [langCode]
+ *
+ * @param {any} category
+ * @param {any} [langCode]
  * @returns {Promise<string[]>}
  */
 async function getTerms(category, langCode = 'en') {
@@ -159,9 +162,10 @@ async function getTerms(category, langCode = 'en') {
 
 /**
  * Aprende e persiste um novo termo após validação semântica.
- * @param {*} langCode
- * @param {*} category
- * @param {*} term
+ *
+ * @param {any} langCode
+ * @param {any} category
+ * @param {any} term
  * @returns {Promise<void>}
  */
 async function learnTerm(langCode, category, term) {

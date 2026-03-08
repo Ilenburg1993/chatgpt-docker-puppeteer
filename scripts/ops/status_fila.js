@@ -9,8 +9,8 @@ const QUEUE_DIR = path.join(ROOT, 'fila');
 const args = process.argv.slice(2);
 const WATCH_MODE = args.includes('--watch');
 const ONLY_FAILED = args.includes('--failed');
-const TAG_FILTER = args.find(a => a.startsWith('--tag='))?.split('=')[1];
-const LIMIT = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1] ?? '15', 10) || 15;
+const TAG_FILTER = args.find((a) => a.startsWith('--tag='))?.split('=')[1];
+const LIMIT = parseInt(args.find((a) => a.startsWith('--limit='))?.split('=')[1] ?? '15', 10) || 15;
 
 // Cores ANSI
 const C = {
@@ -49,7 +49,7 @@ const getSchedule = (/** @type {any} */ t) => t.policy?.execute_after;
 const getTags = (/** @type {any} */ t) => t.meta?.tags || [];
 
 /**
- * @param {string|undefined} isoDate
+ * @param {string | undefined} isoDate
  * @returns {string}
  */
 function timeAgo(isoDate) {
@@ -74,13 +74,13 @@ function render() {
         return;
     }
 
-    const files = fs.readdirSync(QUEUE_DIR).filter(f => f.endsWith('.json'));
+    const files = fs.readdirSync(QUEUE_DIR).filter((f) => f.endsWith('.json'));
     const stats = { TOTAL: 0, PENDING: 0, RUNNING: 0, DONE: 0, FAILED: 0, PAUSED: 0, SCHEDULED: 0, SKIPPED: 0 };
     const activeTasks = /** @type {any[]} */ ([]);
     const recentFailures = /** @type {any[]} */ ([]);
     const completedDurations = /** @type {any[]} */ ([]); // Para cálculo de ETA
 
-    files.forEach(f => {
+    files.forEach((f) => {
         try {
             const t = JSON.parse(fs.readFileSync(path.join(QUEUE_DIR, f), 'utf-8'));
             let status = getStatus(t);
@@ -155,7 +155,7 @@ function render() {
     console.log(`Progresso: [${C.GREEN}${bar}${C.RESET}] ${(donePct * 100).toFixed(1)}%`);
     if (etaMin > 0) {
         console.log(
-            `${C.DIM}ETA p/ Fila: ~${etaMin} min (baseado nas últimas ${recentDurations.length} tarefas)${C.RESET}\n`
+            `${C.DIM}ETA p/ Fila: ~${etaMin} min (baseado nas últimas ${recentDurations.length} tarefas)${C.RESET}\n`,
         );
     } else {
         console.log('');
@@ -163,7 +163,7 @@ function render() {
 
     // Linha de Status
     console.log(
-        `${C.BRIGHT}TOTAL: ${stats.TOTAL}${C.RESET} | ${C.GREEN}DONE: ${stats.DONE}${C.RESET} | ${C.YELLOW}RUN: ${stats.RUNNING}${C.RESET} | PEND: ${stats.PENDING} | ${C.BLUE}SCHED: ${stats.SCHEDULED}${C.RESET} | ${C.RED}FAIL: ${stats.FAILED}${C.RESET}`
+        `${C.BRIGHT}TOTAL: ${stats.TOTAL}${C.RESET} | ${C.GREEN}DONE: ${stats.DONE}${C.RESET} | ${C.YELLOW}RUN: ${stats.RUNNING}${C.RESET} | PEND: ${stats.PENDING} | ${C.BLUE}SCHED: ${stats.SCHEDULED}${C.RESET} | ${C.RED}FAIL: ${stats.FAILED}${C.RESET}`,
     );
 
     // Alertas Críticos
@@ -179,7 +179,7 @@ function render() {
     activeTasks
         .sort((a, b) => (a.status === 'RUNNING' ? -1 : 1) || b.prio - a.prio)
         .slice(0, LIMIT)
-        .forEach(t => {
+        .forEach((t) => {
             const color = /** @type {any} */ (STATUS_COLORS)[t.status] || C.WHITE;
             let timeLabel = t.status === 'RUNNING' ? timeAgo(t.started) : timeAgo(t.created);
             if (t.status === 'SCHEDULED') {
@@ -187,7 +187,7 @@ function render() {
                 timeLabel = `🕒 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
             }
             console.log(
-                `${color}${t.id.padEnd(24)} ${t.status.padEnd(11)} ${String(t.prio).padEnd(6)} ${timeLabel.padEnd(7)} ${t.prompt.replace(/\n/g, ' ').slice(0, 30)}...${C.RESET}`
+                `${color}${t.id.padEnd(24)} ${t.status.padEnd(11)} ${String(t.prio).padEnd(6)} ${timeLabel.padEnd(7)} ${t.prompt.replace(/\n/g, ' ').slice(0, 30)}...${C.RESET}`,
             );
         });
 
@@ -197,7 +197,7 @@ function render() {
         recentFailures
             .sort((a, b) => Number(new Date(b.created)) - Number(new Date(a.created)))
             .slice(0, 3)
-            .forEach(f => {
+            .forEach((f) => {
                 console.log(`  ${C.RED}✖${C.RESET} ${f.id.padEnd(20)} | ${f.error.slice(0, 60)}...`);
             });
     }

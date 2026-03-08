@@ -1,12 +1,12 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import test from 'node:test';
 import { evaluateStaticContracts } from '../../../scripts/audit/contracts/evaluate_static.mjs';
-import { getLegacyStaticContracts } from '../../../scripts/audit/contracts/legacy_adapter.mjs';
 import { buildEvidenceGraph } from '../../../scripts/audit/contracts/evidence_graph.mjs';
+import { getLegacyStaticContracts } from '../../../scripts/audit/contracts/legacy_adapter.mjs';
 
 test('static contract engine detects process.exit violation outside allowlist', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'contract-engine-static-'));
@@ -15,7 +15,7 @@ test('static contract engine detects process.exit violation outside allowlist', 
     const target = path.join(srcDir, 'module.js');
     fs.writeFileSync(target, 'function bad(){ process.exit(1); }\n', 'utf8');
 
-    const contracts = getLegacyStaticContracts().filter(item => item.id === 'CONTRACT-STATIC-PROCESS-EXIT');
+    const contracts = getLegacyStaticContracts().filter((item) => item.id === 'CONTRACT-STATIC-PROCESS-EXIT');
     const result = /** @type {any} */ (
         evaluateStaticContracts({
             rootDir: tmpDir,
@@ -44,10 +44,10 @@ test('static contract engine ignores hardcoded-port pattern inside template lite
             'const proxyPort = CONFIG.CHROME_PROXY_PORT || 9224;',
             '',
         ].join('\n'),
-        'utf8'
+        'utf8',
     );
 
-    const contracts = getLegacyStaticContracts().filter(item => item.id === 'CONTRACT-STATIC-HARDCODED-PORTS');
+    const contracts = getLegacyStaticContracts().filter((item) => item.id === 'CONTRACT-STATIC-HARDCODED-PORTS');
     const result = /** @type {any} */ (
         evaluateStaticContracts({
             rootDir: tmpDir,
@@ -72,6 +72,6 @@ test('evidence graph correlates findings into clusters', () => {
     assert.ok(out.graph.nodes.length >= 2);
     assert.ok(
         out.findings.every((/** @type {any} */ item) => item.evidence_graph_id),
-        'all findings should receive evidence_graph_id'
+        'all findings should receive evidence_graph_id',
     );
 });

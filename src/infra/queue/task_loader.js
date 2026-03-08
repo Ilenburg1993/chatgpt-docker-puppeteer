@@ -1,16 +1,15 @@
 // @ts-check
-import * as cache from './cache.js';
-import { STATUS_VALUES } from '#core/constants/tasks';
-import { getNextEligible } from './scheduler.js';
-import { saveTask } from '../storage/task_store.js';
 import CONFIG from '#core/config';
+import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
+import { saveTask } from '../storage/task_store.js';
+import * as cache from './cache.js';
+import { getNextEligible } from './scheduler.js';
 
 /**
- * Analisa o snapshot da fila, recupera inconsistências e retorna a próxima
- * tarefa elegível para o motor de execução.
+ * Analisa o snapshot da fila, recupera inconsistências e retorna a próxima tarefa elegível para o motor de execução.
  *
- * @param {string|null} targetFilter - Filtro de IA alvo (ex: 'chatgpt').
+ * @param {string | null} targetFilter - Filtro de IA alvo (ex: 'chatgpt').
  * @returns {Promise<any>}
  */
 
@@ -111,6 +110,7 @@ async function loadNextTask(targetFilter = null) {
 
 /**
  * Operação Administrativa: Reinicia em lote todas as tarefas que falharam.
+ *
  * @returns {Promise<number>} Total de tarefas movidas para PENDING.
  */
 async function bulkRetryFailed() {
@@ -150,4 +150,4 @@ async function bulkRetryFailed() {
     return count;
 }
 
-export { loadNextTask, bulkRetryFailed };
+export { bulkRetryFailed, loadNextTask };

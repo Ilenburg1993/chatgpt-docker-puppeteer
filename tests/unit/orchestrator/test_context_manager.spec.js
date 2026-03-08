@@ -1,8 +1,8 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
-import { ContextManager, CHUNKING_STRATEGY, SUMMARIZATION_POLICY } from '#orchestrator/context_manager';
+import { CHUNKING_STRATEGY, ContextManager, SUMMARIZATION_POLICY } from '#orchestrator/context_manager';
 import MemoryStore from '#orchestrator/memory_store';
+import assert from 'node:assert';
+import { beforeEach, describe, it } from 'node:test';
 
 describe('ContextManager Unit Tests', () => {
     /** @type {any} */ let contextManager;

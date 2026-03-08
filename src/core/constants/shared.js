@@ -1,15 +1,14 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
- * Shared system constants
- * Centralized definitions for common values used across multiple modules
+ * Shared system constants Centralized definitions for common values used across multiple modules
  *
  * Audit Level: 40 - Shared Constants
+ *
  * @module constants/shared
  */
 
 /**
- * Common status values used throughout the application.
- * These are frozen to prevent accidental modifications.
+ * Common status values used throughout the application. These are frozen to prevent accidental modifications.
  *
  * @readonly
  * @enum {string}
@@ -211,12 +210,14 @@ const DRIVER_NAMES = {
 
 /**
  * Array of all shared status values
+ *
  * @type {ReadonlyArray<string>}
  */
 const SHARED_STATUS_ARRAY = Object.values(SHARED_STATUS);
 
 /**
  * Array of all driver domains
+ *
  * @type {ReadonlyArray<string>}
  */
 const DRIVER_DOMAINS_ARRAY = Object.values(DRIVER_DOMAINS);
@@ -235,15 +236,15 @@ Object.freeze(ERROR_NAMES);
 Object.freeze(DRIVER_NAMES);
 
 export {
+    CHAR_LIMITS,
+    COUNTER_DEFAULTS,
+    DRIVER_DOMAINS,
+    DRIVER_DOMAINS_ARRAY,
+    DRIVER_NAMES,
+    ERROR_NAMES,
+    PAGINATION,
+    RETRY_CONFIG,
     SHARED_STATUS,
     SHARED_STATUS_ARRAY,
     TIMEOUTS,
-    RETRY_CONFIG,
-    PAGINATION,
-    CHAR_LIMITS,
-    DRIVER_DOMAINS,
-    DRIVER_DOMAINS_ARRAY,
-    COUNTER_DEFAULTS,
-    ERROR_NAMES,
-    DRIVER_NAMES,
 };

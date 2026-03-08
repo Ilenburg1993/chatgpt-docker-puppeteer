@@ -2,18 +2,17 @@
 /**
  * Auditoria de cobertura de lanes strict (tsconfig.strict.*.json).
  *
- * Emite `strict_uncovered_files_total` e `strict_uncovered_files[]` para todos
- * os arquivos `.js`/`.mjs`/`.ts`/`.vue` elegíveis que não estão cobertos por
- * nenhuma lane strict do repositório.
+ * Emite `strict_uncovered_files_total` e `strict_uncovered_files[]` para todos os arquivos `.js`/`.mjs`/`.ts`/`.vue`
+ * elegíveis que não estão cobertos por nenhuma lane strict do repositório.
  *
  * Pode ser importado como módulo ESM ou executado diretamente via CLI.
  *
  * @module strict_lane_audit
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve, relative, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 
 const ROOT = resolve('.');
 
@@ -36,13 +35,13 @@ function listEligibleFiles() {
             'fd -e js -e mjs -e cjs -e ts -e tsx -e vue . src scripts tests agents tools' +
                 ' --exclude node_modules --exclude dist --exclude coverage --exclude tmp' +
                 ' --exclude backups',
-            { encoding: 'utf8' }
+            { encoding: 'utf8' },
         );
         return raw
             .trim()
             .split('\n')
             .filter(Boolean)
-            .map(f => relative(ROOT, resolve(f)));
+            .map((f) => relative(ROOT, resolve(f)));
     } catch {
         return [];
     }
@@ -65,8 +64,8 @@ function listStrictLanes() {
 }
 
 /**
- * Obtém o conjunto de arquivos explicitamente declarados em `files[]` de uma lane strict.
- * Padrões de `include` são resolvidos de forma simplificada (prefixo de diretório).
+ * Obtém o conjunto de arquivos explicitamente declarados em `files[]` de uma lane strict. Padrões de `include` são
+ * resolvidos de forma simplificada (prefixo de diretório).
  *
  * @param {string} laneFile - Caminho para o arquivo tsconfig.strict.*.json.
  * @returns {Set<string>} Caminhos relativos à raiz cobertos pela lane.
@@ -130,13 +129,13 @@ export function runStrictLaneAudit() {
         }
     }
 
-    const uncovered = eligibleFiles.filter(f => !isCovered(f, allCovered));
+    const uncovered = eligibleFiles.filter((f) => !isCovered(f, allCovered));
 
     return {
         strict_uncovered_files_total: uncovered.length,
         strict_uncovered_files: uncovered,
         lane_count: lanes.length,
-        lanes: lanes.map(l => relative(ROOT, resolve(l))),
+        lanes: lanes.map((l) => relative(ROOT, resolve(l))),
     };
 }
 

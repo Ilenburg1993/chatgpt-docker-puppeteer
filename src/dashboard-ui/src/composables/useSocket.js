@@ -3,6 +3,7 @@
  * Composable: useSocket
  *
  * Gerencia conexão Socket.io com o backend.
+ *
  * - Conecta/desconecta automaticamente
  * - Expõe métodos para subscribe/emit
  * - Mantém status de conexão reativo
@@ -29,11 +30,12 @@ function getDashboardToken() {
 
 /**
  * @typedef {object} GetSocketInstanceOptions
- * @property {*} [_] Propriedades definidas em runtime.
+ * @property {any} [_] Propriedades definidas em runtime.
  * @property {string} [url] Socket server URL.
  */
 /**
  * Cria ou retorna instância existente do Socket.io
+ *
  * @param {string} [url]
  * @param {GetSocketInstanceOptions} [options]
  */
@@ -46,7 +48,7 @@ function getSocketInstance(url = '', options = {}) {
             reconnectionAttempts: 10,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
-            auth: cb => cb({ token: getDashboardToken() }),
+            auth: (cb) => cb({ token: getDashboardToken() }),
             ...options,
         });
     }
@@ -55,13 +57,14 @@ function getSocketInstance(url = '', options = {}) {
 
 /**
  * @typedef {object} UseSocketOptions
- * @property {*} [_] Propriedades definidas em runtime.
+ * @property {any} [_] Propriedades definidas em runtime.
  * @property {string} [url] Socket server URL.
  */
 /**
  * Composable para gerenciar conexão Socket.io
+ *
  * @param {UseSocketOptions} [options]
-  * @returns {any}
+ * @returns {any}
  */
 export function useSocket(options = {}) {
     const socket = getSocketInstance(options.url || '', options);

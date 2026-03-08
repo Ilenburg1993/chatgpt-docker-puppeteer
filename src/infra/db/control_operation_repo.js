@@ -69,11 +69,21 @@ function _rowToOperation(row) {
 /** @typedef {any} CreateControlOperationOptions */
 /**
  * Função exportada: createControlOperation.
+ *
  * @param {any} [opts]
- * @returns {ControlOperation|null}
+ * @returns {ControlOperation | null}
  */
 function createControlOperation(opts = {}) {
-    const { command, entityType, entityId, actorId = null, actorRole = null, reason, idempotencyKey, payload = {} } = /** @type {any} */ (opts);
+    const {
+        command,
+        entityType,
+        entityId,
+        actorId = null,
+        actorRole = null,
+        reason,
+        idempotencyKey,
+        payload = {},
+    } = /** @type {any} */ (opts);
     const db = getDb();
     const now = _now();
     const id = `cop-${uuidv4()}`;
@@ -93,7 +103,7 @@ function createControlOperation(opts = {}) {
             NULL, NULL,
             @created_at_ms, @updated_at_ms
         )
-    `
+    `,
     ).run({
         id,
         command: String(command || '')
@@ -116,8 +126,9 @@ function createControlOperation(opts = {}) {
 
 /**
  * Função exportada: getControlOperationById.
+ *
  * @param {string} id Unique identifier.
- * @returns {ControlOperation|null}
+ * @returns {ControlOperation | null}
  */
 function getControlOperationById(id) {
     const db = getDb();
@@ -127,8 +138,9 @@ function getControlOperationById(id) {
 
 /**
  * Função exportada: getControlOperationByIdempotencyKey.
- * @param {*} idempotencyKey
- * @returns {ControlOperation|null}
+ *
+ * @param {any} idempotencyKey
+ * @returns {ControlOperation | null}
  */
 function getControlOperationByIdempotencyKey(idempotencyKey) {
     const db = getDb();
@@ -141,9 +153,10 @@ function getControlOperationByIdempotencyKey(idempotencyKey) {
 /** @typedef {any} UpdateControlOperationUpdates */
 /**
  * Função exportada: updateControlOperation.
+ *
  * @param {string} id
  * @param {any} [updates]
- * @returns {ControlOperation|null}
+ * @returns {ControlOperation | null}
  */
 function updateControlOperation(id, updates = {}) {
     const db = getDb();
@@ -161,7 +174,7 @@ function updateControlOperation(id, updates = {}) {
             error_message = @error_message,
             updated_at_ms = @updated_at_ms
         WHERE id = @id
-    `
+    `,
     ).run({
         id: existing.id,
         status: updates.status ? String(updates.status).trim().toUpperCase() : existing.status,
@@ -182,6 +195,7 @@ function updateControlOperation(id, updates = {}) {
 /** @typedef {any} ListControlOperationsOptions */
 /**
  * Função exportada: listControlOperations.
+ *
  * @param {ListControlOperationsOptions} [options]
  * @returns {ControlOperation[]}
  */
@@ -208,7 +222,7 @@ function listControlOperations({ limit = 100, entityType = null, entityId = null
             ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY created_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all(params);
 

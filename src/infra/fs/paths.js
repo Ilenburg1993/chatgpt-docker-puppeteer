@@ -41,114 +41,133 @@ const LIMITS = {
 
 /**
  * Diretório raiz do projeto.
+ *
  * @type {string}
  */
 export { ROOT };
 
 /**
  * Diretório da fila de tarefas.
+ *
  * @type {string}
  */
 export const QUEUE = DIRS.QUEUE;
 
 /**
  * Diretório de respostas.
+ *
  * @type {string}
  */
 export const RESPONSE = DIRS.RESPONSE;
 
 /**
  * Diretório de artefatos.
+ *
  * @type {string}
  */
 export const ARTIFACTS = DIRS.ARTIFACTS;
 
 /**
  * Diretório de logs.
+ *
  * @type {string}
  */
 export const LOGS = DIRS.LOGS;
 
 /**
  * Diretório de arquivos corrompidos.
+ *
  * @type {string}
  */
 export const CORRUPT = DIRS.CORRUPT;
 
 /**
  * Diretório de relatórios.
+ *
  * @type {string}
  */
 export const REPORTS = DIRS.REPORTS;
 
 /**
  * Arquivo de configuração principal.
+ *
  * @type {string}
  */
 export const CONFIG = FILES.CONFIG;
 
 /**
  * Arquivo de regras dinâmicas.
+ *
  * @type {string}
  */
 export const RULES = FILES.RULES;
 
 /**
  * Arquivo de controle.
+ *
  * @type {string}
  */
 export const CONTROL = FILES.CONTROL;
 
 /**
  * Arquivo de estado.
+ *
  * @type {string}
  */
 export const STATE = FILES.STATE;
 
 /**
  * Arquivo de identidade do robô.
+ *
  * @type {string}
  */
 export const IDENTITY = FILES.IDENTITY;
 
 /**
  * Arquivo de vocabulário.
+ *
  * @type {string}
  */
 export const VOCAB = FILES.VOCAB;
 
 /**
  * Limite máximo para arquivos JSON.
+ *
  * @type {number}
  */
 export const MAX_JSON_SIZE = LIMITS.MAX_JSON_SIZE;
 
 /**
  * Limite máximo para arquivos de log.
+ *
  * @type {number}
  */
 export const MAX_LOG_SIZE = LIMITS.MAX_LOG_SIZE;
 
 /**
  * Diretório da fila de tarefas (alias).
+ *
  * @type {string}
  */
 export const QUEUE_DIR = DIRS.QUEUE;
 
 /**
  * Diretório de respostas (alias).
+ *
  * @type {string}
  */
 export const RESPONSE_DIR = DIRS.RESPONSE;
 
 /**
  * Diretório de artefatos (alias).
+ *
  * @type {string}
  */
 export const ARTIFACTS_DIR = DIRS.ARTIFACTS;
 
 /**
  * Diretório de logs (alias).
+ *
  * @type {string}
  */
 export const LOG_DIR = DIRS.LOGS;
@@ -156,9 +175,8 @@ export const LOG_DIR = DIRS.LOGS;
 /**
  * Constantes de caminhos do sistema
  *
- * **Side-effects:** N/A
- * **Semântica:** Estruturas de dados com caminhos absolutos para diretórios e arquivos do sistema.
- * **Unidades:** N/A
+ * **Side-effects:** N/A **Semântica:** Estruturas de dados com caminhos absolutos para diretórios e arquivos do
+ * sistema. **Unidades:** N/A
  *
  * Exporta `DIRS`, `FILES` e `LIMITS` como constantes nomeadas.
  */

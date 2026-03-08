@@ -111,6 +111,7 @@ const LAYOUTS = {
 
 /**
  * Generate a typo by transposing characters or using neighboring keys.
+ *
  * @param {string} char - Original character
  * @returns {string} Typo character
  */
@@ -146,7 +147,7 @@ function _generateTypo(/** @type {any} */ char) {
     };
 
     const lowerChar = char.toLowerCase();
-    const neighbors = (/** @type {any} */ (keyboardMap))[lowerChar];
+    const neighbors = /** @type {any} */ (keyboardMap)[lowerChar];
 
     if (neighbors && neighbors.length > 0) {
         // 70% chance of transposing with adjacent character, 30% chance of neighbor key
@@ -165,8 +166,8 @@ function _generateTypo(/** @type {any} */ char) {
 }
 
 /**
- * Generate gaussian random with Box-Muller transform.
- * v2.0: Caches second sample for 2x performance, clamps outliers.
+ * Generate gaussian random with Box-Muller transform. v2.0: Caches second sample for 2x performance, clamps outliers.
+ *
  * @param {number} mean - Mean value
  * @param {number} stdev - Standard deviation
  * @param {number} clampStdev - Clamp to ±N standard deviations (default: 3)
@@ -175,7 +176,7 @@ function _generateTypo(/** @type {any} */ char) {
 function gaussianRandom(
     /** @type {any} */ mean = 0,
     /** @type {any} */ stdev = 1,
-    /** @type {any} */ clampStdev = BIOMECHANICS_CONFIG.GAUSSIAN_CLAMP_SIGMA
+    /** @type {any} */ clampStdev = BIOMECHANICS_CONFIG.GAUSSIAN_CLAMP_SIGMA,
 ) {
     // Use cached value if available (Box-Muller generates 2 samples)
     if (_gaussianCache !== null) {
@@ -232,7 +233,7 @@ function getCursor(/** @type {any} */ page) {
 async function detectKeyboardLayout(/** @type {any} */ page) {
     try {
         return page.evaluate(() => {
-            if ((/** @type {any} */ (navigator)).keyboard && (/** @type {any} */ (navigator)).keyboard.getLayoutMap) {
+            if (/** @type {any} */ (navigator).keyboard && /** @type {any} */ (navigator).keyboard.getLayoutMap) {
                 return 'qwerty';
             }
             const lang = (navigator.language || 'en').toLowerCase();
@@ -249,21 +250,22 @@ async function detectKeyboardLayout(/** @type {any} */ page) {
 // ============================================
 /**
  * @typedef {object} GetElementRectContext
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {any} _ Propriedades definidas via runtime.
  */
 /**
  * Retry element lookup with exponential backoff.
+ *
  * @param {GetElementRectContext} ctx - Execution context
  * @param {string} selector - CSS selector
  * @param {number} retries - Max retry attempts
  * @param {number} delayMs - Base delay between retries
- * @returns {Promise<object|null>} Element rect or null
+ * @returns {Promise<object | null>} Element rect or null
  */
 async function getElementRect(
     /** @type {any} */ ctx,
     /** @type {any} */ selector,
     /** @type {any} */ retries = BIOMECHANICS_CONFIG.ELEMENT_RETRY_COUNT,
-    /** @type {any} */ delayMs = BIOMECHANICS_CONFIG.ELEMENT_RETRY_DELAY
+    /** @type {any} */ delayMs = BIOMECHANICS_CONFIG.ELEMENT_RETRY_DELAY,
 ) {
     for (let i = 0; i < retries; i++) {
         const rect = await ctx
@@ -290,10 +292,11 @@ async function getElementRect(
 
 /**
  * @typedef {object} WakeUpMovePage
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Executa movimento de "acordar" o mouse para posição aleatória na viewport
+ *
  * @param {WakeUpMovePage} page - Instância da página Puppeteer
  * @returns {Promise<void>} Completa quando movimento terminar ou falhar silenciosamente
  * @sideEffects Move mouse para posição aleatória - operação I/O
@@ -329,14 +332,15 @@ async function wakeUpMove(/** @type {any} */ page) {
 // ============================================
 /**
  * @typedef {object} HumanClickCoreContext
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {any} _ Propriedades definidas via runtime.
  */
 /**
  * @typedef {object} HumanClickCorePage
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Realiza um clique humano com variância gaussiana.
+ *
  * @param {HumanClickCorePage} page - Puppeteer Page instance (required)
  * @param {HumanClickCoreContext} ctx - Execution context (Page or Frame) (required)
  * @param {string} selector - CSS selector (required)
@@ -353,7 +357,7 @@ async function humanClickCore(
     /** @type {any} */ offsetX = 0,
     /** @type {any} */ offsetY = 0,
     /** @type {any} */ signal = null,
-    /** @type {any} */ onPulse = null
+    /** @type {any} */ onPulse = null,
 ) {
     // [v2.0] Parameter validation (Bug #2 fix)
     if (!page || typeof page !== 'object') {
@@ -460,6 +464,7 @@ async function humanClickCore(
 // ============================================
 /**
  * Realiza digitação humana com erros, correções e ritmo adaptativo.
+ *
  * @param {object} page - Puppeteer Page instance (required)
  * @param {object} ctx - Execution context (Page or Frame) (required)
  * @param {string} selector - CSS selector (required)
@@ -480,7 +485,7 @@ async function humanTypeCore(
     /** @type {any} */ currentLag = 0,
     /** @type {any} */ signal = null,
     /** @type {any} */ onPulse = null,
-    /** @type {any} */ profile = 'average'
+    /** @type {any} */ profile = 'average',
 ) {
     // [v2.0] Parameter validation (Bug #3 fix)
     if (!page || typeof page !== 'object') {
@@ -501,8 +506,8 @@ async function humanTypeCore(
 
     const startTime = Date.now();
     const layoutKey = await detectKeyboardLayout(page);
-    const neighbors = (/** @type {any} */ (LAYOUTS))[layoutKey] || LAYOUTS.qwerty;
-    const speed = (/** @type {any} */ (TYPING_PROFILES))[profile] || TYPING_PROFILES.average;
+    const neighbors = /** @type {any} */ (LAYOUTS)[layoutKey] || LAYOUTS.qwerty;
+    const speed = /** @type {any} */ (TYPING_PROFILES)[profile] || TYPING_PROFILES.average;
     let charsSinceLastPause = 0;
 
     // [P8.1] SECURITY: Sanitize prompt to remove control characters
@@ -562,7 +567,9 @@ async function humanTypeCore(
                             onPulse({ type: 'FOCUS_ERROR', error: err.message, retry });
                         }
                     });
-                    await new Promise((/** @type {any} */ r) => setTimeout(r, BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY * (retry + 1)));
+                    await new Promise((/** @type {any} */ r) =>
+                        setTimeout(r, BIOMECHANICS_CONFIG.FOCUS_RESTORE_DELAY * (retry + 1)),
+                    );
                 }
             }
 
@@ -601,7 +608,9 @@ async function humanTypeCore(
                 onPulse({ type: 'TYPO_GENERATED', typo: typoChar, original: char, index: i });
             }
 
-            await new Promise((/** @type {any} */ r) => setTimeout(r, BIOMECHANICS_CONFIG.TYPO_BACKSPACE_DELAY + currentLag * 0.5));
+            await new Promise((/** @type {any} */ r) =>
+                setTimeout(r, BIOMECHANICS_CONFIG.TYPO_BACKSPACE_DELAY + currentLag * 0.5),
+            );
             await page.keyboard.press('Backspace');
 
             // [v2.0] Telemetry: Typo corrected
@@ -641,7 +650,9 @@ async function humanTypeCore(
         if (currentLag > 100) {
             flightTime += currentLag * BIOMECHANICS_CONFIG.LAG_COMPENSATION_FACTOR;
         }
-        await new Promise((/** @type {any} */ r) => setTimeout(r, Math.min(flightTime, BIOMECHANICS_CONFIG.MAX_FLIGHT_TIME)));
+        await new Promise((/** @type {any} */ r) =>
+            setTimeout(r, Math.min(flightTime, BIOMECHANICS_CONFIG.MAX_FLIGHT_TIME)),
+        );
 
         // Fadiga Estocástica ([v2.0] Use config constants)
         charsSinceLastPause++;
@@ -729,6 +740,7 @@ const _gaussianParamCache = new Map();
 
 /**
  * Gera número aleatório com distribuição gaussiana (normal) usando cache de parâmetros
+ *
  * @param {number} mean - Média da distribuição
  * @param {number} sigma - Desvio padrão da distribuição
  * @returns {number} Valor aleatório gaussiano
@@ -803,7 +815,7 @@ function _resolveTypingProfile(/** @type {any} */ profile) {
     if (normalized === 'balanced') {
         return TYPING_PROFILES.average;
     }
-    return (/** @type {any} */ (TYPING_PROFILES))[normalized] || TYPING_PROFILES.average;
+    return /** @type {any} */ (TYPING_PROFILES)[normalized] || TYPING_PROFILES.average;
 }
 
 function _computeFlightTime(/** @type {any} */ profileConfig, /** @type {any} */ char, /** @type {any} */ page) {
@@ -819,8 +831,8 @@ function _computeFlightTime(/** @type {any} */ profileConfig, /** @type {any} */
     return Math.max(0, Math.min(BIOMECHANICS_CONFIG.MAX_FLIGHT_TIME, scaled));
 }
 
-/** @typedef {{ page: unknown, _emitVital: (event: string, payload?: Record<string, unknown>) => void }} HumanDriverLike */
-/** @typedef {{ signal?: AbortSignal|null, profile?: string }} HumanActionOptions */
+/** @typedef {{ page: unknown; _emitVital: (event: string, payload?: Record<string, unknown>) => void }} HumanDriverLike */
+/** @typedef {{ signal?: AbortSignal | null; profile?: string }} HumanActionOptions */
 
 // ============================================
 // PUBLIC API (Driver-first) + Legacy Compatibility
@@ -828,6 +840,7 @@ function _computeFlightTime(/** @type {any} */ profileConfig, /** @type {any} */
 
 /**
  * Executa clique humano realista em elemento usando biometria comportamental
+ *
  * @param {...unknown} args - Driver-first `(driver, selector, options?)` ou legacy `(page, ctx, selector, ...)`
  * @returns {Promise<boolean>} true se clique foi executado com sucesso
  * @throws {TypeError} Se parâmetros obrigatórios estiverem ausentes ou inválidos
@@ -924,7 +937,9 @@ async function humanClick(/** @type {any} */ ...args) {
 
 /**
  * Executa digitação humana realista com suporte ao contrato driver-first e ao wrapper legado.
- * @param {...unknown} args - Driver-first `(driver, selector, text, options?)` ou legacy `(page, ctx, selector, text, ...)`
+ *
+ * @param {...unknown} args - Driver-first `(driver, selector, text, options?)` ou legacy `(page, ctx, selector, text,
+ *   ...)`
  * @returns {Promise<boolean>}
  */
 async function humanType(/** @type {any} */ ...args) {
@@ -1004,8 +1019,9 @@ async function humanType(/** @type {any} */ ...args) {
             // Focus check every N characters
             if (typed % HUMAN_CONFIG.TYPE_FOCUS_CHECK_EVERY === 0) {
                 const focused = await page.evaluate(
-                    () => document.activeElement === document.querySelector(arguments[0]),
-                    selector
+                    /** @param {string} sel */
+                    (sel) => document.activeElement === document.querySelector(sel),
+                    selector,
                 );
                 if (!focused) {
                     driver._emitVital('TYPE_FOCUS_LOST', { selector, attempt: typed });

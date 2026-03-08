@@ -27,10 +27,10 @@ Use os comandos npm modernos em vez disso.
 
 ```bash
 # Windows/Linux/macOS
-npm run daemon:start    # Inicia PM2 com ecosystem.config.js
-npm run daemon:status   # Verifica status
-npm run daemon:logs     # Vê logs
-npm run daemon:stop     # Para tudo
+npm run daemon:start  # Inicia PM2 com ecosystem.config.js
+npm run daemon:status # Verifica status
+npm run daemon:logs   # Vê logs
+npm run daemon:stop   # Para tudo
 ```
 
 **Por que foi deprecado**:

@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 const filePath = path.join(process.cwd(), 'src/infra/ConnectionOrchestrator.js');
 
@@ -12,7 +12,7 @@ test('wave20: fast-path failures preserve fallback guard with autoFallback gate'
 
     assert.ok(
         guards.length >= 3,
-        'ConnectionOrchestrator should guard fast-path throw with autoFallback in browserURL/wsEndpoint paths'
+        'ConnectionOrchestrator should guard fast-path throw with autoFallback in browserURL/wsEndpoint paths',
     );
 });
 
@@ -20,11 +20,11 @@ test('wave20: wsEndpoint resolution paths clear timeout timers in finally blocks
     const content = await fs.readFile(filePath, 'utf8');
 
     const timeoutFinallyBlocks = content.match(
-        /let\s+timeoutId\s*=\s*null[\s\S]*?finally\s*\{[\s\S]*?clearTimeout\(timeoutId\);[\s\S]*?\}/g
+        /let\s+timeoutId\s*=\s*null[\s\S]*?finally\s*\{[\s\S]*?clearTimeout\(timeoutId\);[\s\S]*?\}/g,
     );
 
     assert.ok(
         Array.isArray(timeoutFinallyBlocks) && timeoutFinallyBlocks.length >= 2,
-        'wsEndpoint fast-path and fallback fetch blocks must clear timeout timers in finally'
+        'wsEndpoint fast-path and fallback fetch blocks must clear timeout timers in finally',
     );
 });

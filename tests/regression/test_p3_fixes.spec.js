@@ -36,7 +36,7 @@ function createMockSystem(/** @type {any} */ delayMs) {
     return {
         killProcess: (/** @type {any} */ pid) => {
             return /** @type {Promise<void>} */ (
-                new Promise(resolve => {
+                new Promise((resolve) => {
                     setTimeout(() => {
                         resolve();
                     }, delayMs);
@@ -112,9 +112,9 @@ async function test1_FastKill() {
         { name: 'Tempo ≈ 500ms', pass: elapsed >= 500 && elapsed < 1000 },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -148,9 +148,9 @@ async function test2_SlowKillTimeout() {
         { name: 'Não aguardou 7s', pass: elapsed < 6000 },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -183,9 +183,9 @@ async function test3_BorderlineKill() {
         { name: 'Respeitou timeout máximo', pass: elapsed < 6000 },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -229,15 +229,18 @@ async function test4_SequentialKills() {
     // Validações
     const checks = [
         { name: '3 kills executados', pass: results.length === 3 },
-        { name: 'Kill 1 completou', pass: (/** @type {any} */ (results[0])).status === 'SUCCESS' },
-        { name: 'Kill 2 timeout', pass: (/** @type {any} */ (results[1])).status === 'TIMEOUT' },
-        { name: 'Kill 3 completou', pass: (/** @type {any} */ (results[2])).status === 'SUCCESS' },
-        { name: 'Isolamento mantido', pass: (/** @type {any} */ (results[0])).status !== (/** @type {any} */ (results[1])).status },
+        { name: 'Kill 1 completou', pass: /** @type {any} */ (results[0]).status === 'SUCCESS' },
+        { name: 'Kill 2 timeout', pass: /** @type {any} */ (results[1]).status === 'TIMEOUT' },
+        { name: 'Kill 3 completou', pass: /** @type {any} */ (results[2]).status === 'SUCCESS' },
+        {
+            name: 'Isolamento mantido',
+            pass: /** @type {any} */ (results[0]).status !== /** @type {any} */ (results[1]).status,
+        },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -260,7 +263,7 @@ async function test5_CodeValidation() {
         'src',
         'driver',
         'modules',
-        'recovery_system.js'
+        'recovery_system.js',
     );
     const content = await fs.readFile(recoverySystemPath, 'utf-8');
 
@@ -287,9 +290,9 @@ async function test5_CodeValidation() {
         },
     ];
 
-    const allPassed = checks.every(c => c.pass);
+    const allPassed = checks.every((c) => c.pass);
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         log(check.pass ? 'SUCCESS' : 'FAIL', check.name);
     });
 
@@ -321,7 +324,7 @@ async function runAllTests() {
     console.log(results.test5 ? '✅' : '❌', 'Validação de Código:', results.test5 ? 'PASSOU' : 'FALHOU');
 
     const totalTests = Object.keys(results).length;
-    const passedTests = Object.values(results).filter(r => r).length;
+    const passedTests = Object.values(results).filter((r) => r).length;
 
     console.log('');
     console.log(`${colors.cyan}📊 Score: ${passedTests}/${totalTests} testes passaram${colors.reset}`);
@@ -340,7 +343,7 @@ async function runAllTests() {
 }
 
 // Executa
-runAllTests().catch(err => {
+runAllTests().catch((err) => {
     console.error(`${colors.red}❌ Erro fatal nos testes:`, err.message + colors.reset);
     console.error(err.stack);
     process.exit(1);

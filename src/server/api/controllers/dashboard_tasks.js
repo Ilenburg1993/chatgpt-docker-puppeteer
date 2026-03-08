@@ -1,10 +1,10 @@
 // @ts-check
-import express from 'express';
 import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
 import { listAttemptsByTask } from '#infra/db/task_attempt_repo';
-import { ok, fail, encodeCursor, decodeCursor, parseIncludeParam } from '../utils/api_envelope.js';
-import { taskRowToListItem, taskRowToDetailTask } from '../utils/task_views.js';
+import express from 'express';
+import { decodeCursor, encodeCursor, fail, ok, parseIncludeParam } from '../utils/api_envelope.js';
+import { taskRowToDetailTask, taskRowToListItem } from '../utils/task_views.js';
 
 /** Constante/valor exportado: default. */
 const router = express.Router();
@@ -32,7 +32,7 @@ function _buildMissionContext(/** @type {any} */ db, /** @type {any} */ missionI
             SELECT id, title, description, status, autonomy_mode, policy_json, context_json, created_at_ms, updated_at_ms, started_at_ms, completed_at_ms
             FROM missions
             WHERE id = ?
-        `
+        `,
         )
         .get(missionId);
     if (!mission) return null;
@@ -44,7 +44,7 @@ function _buildMissionContext(/** @type {any} */ db, /** @type {any} */ missionI
             FROM tasks
             WHERE mission_id = ?
             GROUP BY stage, status
-        `
+        `,
         )
         .all(missionId);
 
@@ -80,13 +80,13 @@ function _buildMissionContext(/** @type {any} */ db, /** @type {any} */ missionI
 
 /**
  * @typedef {object} BuildTasksWhereOptions
- * @property {*} [status]
- * @property {*} [stage]
- * @property {*} [missionId]
- * @property {*} [target]
- * @property {*} [blocked]
- * @property {*} [search]
- * @property {*} [priorityGte]
+ * @property {any} [status]
+ * @property {any} [stage]
+ * @property {any} [missionId]
+ * @property {any} [target]
+ * @property {any} [blocked]
+ * @property {any} [search]
+ * @property {any} [priorityGte]
  */
 /**
  * @typedef {object} BuildTasksWhereFilters
@@ -99,7 +99,7 @@ function _buildMissionContext(/** @type {any} */ db, /** @type {any} */ missionI
  * @property {number | string | null} [priorityGte]
  */
 /**
- * @param {BuildTasksWhereFilters} filters={}]
+ * @param {BuildTasksWhereFilters}
  */
 function _buildTasksWhere({ status, stage, missionId, target, blocked, search, priorityGte } = {}) {
     const where = [];
@@ -151,8 +151,7 @@ function _applyCursorToWhere(/** @type {any} */ where, /** @type {any} */ params
 }
 
 /**
- * GET /api/dashboard/tasks
- * Cursor-based, SSOT-first list view for the dashboard.
+ * GET /api/dashboard/tasks Cursor-based, SSOT-first list view for the dashboard.
  */
 router.get('/tasks', async (req, res) => {
     try {
@@ -221,7 +220,11 @@ router.get('/tasks', async (req, res) => {
         const last = page.length ? page[page.length - 1] : null;
         const nextCursor =
             hasMore && last
-                ? encodeCursor({ sort: 'updated_desc', updated_at_ms: (/** @type {any} */ (last)).updated_at_ms, id: (/** @type {any} */ (last)).id })
+                ? encodeCursor({
+                      sort: 'updated_desc',
+                      updated_at_ms: /** @type {any} */ (last).updated_at_ms,
+                      id: /** @type {any} */ (last).id,
+                  })
                 : null;
 
         ok(res, req, { items }, { limit, next_cursor: nextCursor, has_more: hasMore });
@@ -237,8 +240,7 @@ router.get('/tasks', async (req, res) => {
 });
 
 /**
- * GET /api/dashboard/tasks/:id
- * Rich detail view (includes are opt-in).
+ * GET /api/dashboard/tasks/:id Rich detail view (includes are opt-in).
  */
 router.get('/tasks/:id', async (req, res) => {
     try {
@@ -246,9 +248,10 @@ router.get('/tasks/:id', async (req, res) => {
         const taskId = String(req.params.id);
         const include = parseIncludeParam(req.query.include);
 
-        const row = /** @type {any} */ (db
-            .prepare(
-                `
+        const row = /** @type {any} */ (
+            db
+                .prepare(
+                    `
                 SELECT
                     t.*,
                     m.title AS mission_title,
@@ -258,9 +261,10 @@ router.get('/tasks/:id', async (req, res) => {
                 LEFT JOIN missions m ON m.id = t.mission_id
                 WHERE t.id = ?
                 LIMIT 1
-            `
-            )
-            .get(taskId));
+            `,
+                )
+                .get(taskId)
+        );
         if (!row) {
             return fail(res, req, 404, {
                 code: 'TASK_NOT_FOUND',
@@ -289,16 +293,16 @@ router.get('/tasks/:id', async (req, res) => {
                       AND entity_id = ?
                     ORDER BY id DESC
                     LIMIT 200
-                `
+                `,
                 )
                 .all(taskId)
                 .map((/** @type {any} */ e) => ({
                     ...e,
                     payload: (() => {
                         try {
-                            return JSON.parse((/** @type {any} */ (e)).payload_json);
+                            return JSON.parse(/** @type {any} */ (e).payload_json);
                         } catch (/** @type {any} */ _) {
-                            return (/** @type {any} */ (e)).payload_json;
+                            return /** @type {any} */ (e).payload_json;
                         }
                     })(),
                 }));
@@ -318,7 +322,7 @@ router.get('/tasks/:id', async (req, res) => {
                     LEFT JOIN missions m ON m.id = t.mission_id
                     WHERE d.task_id = ?
                     ORDER BY t.created_at_ms ASC
-                `
+                `,
                 )
                 .all(taskId);
             data.dependencies = deps.map((/** @type {any} */ r) => taskRowToListItem(r));
@@ -341,7 +345,7 @@ router.get('/tasks/:id', async (req, res) => {
                     WHERE parent_id = ?
                     ORDER BY created_at_ms ASC
                     LIMIT 500
-                `
+                `,
                 )
                 .all(taskId);
             data.children = children.map((/** @type {any} */ r) => taskRowToListItem(r));
@@ -366,7 +370,7 @@ router.get('/tasks/:id', async (req, res) => {
                         WHERE workflow_id = ?
                         ORDER BY created_at_ms ASC
                         LIMIT 2000
-                    `
+                    `,
                     )
                     .all(workflowId);
                 data.workflow = {
@@ -399,7 +403,7 @@ router.get('/tasks/:id', async (req, res) => {
                         WHERE t.mission_id = @mission_id AND t.id <> @task_id
                         ORDER BY t.updated_at_ms DESC, t.id DESC
                         LIMIT @limit
-                    `
+                    `,
                     )
                     .all({
                         mission_id: row.mission_id,
@@ -418,7 +422,7 @@ router.get('/tasks/:id', async (req, res) => {
                 artifactIds.add(String(row.latest_response_v2_json_artifact_id));
 
             const attempts = include.has('attempts')
-                ? (/** @type {any} */ (data)).attempts
+                ? /** @type {any} */ (data).attempts
                 : listAttemptsByTask(taskId, { limit: 50 });
             for (const a of attempts || []) {
                 for (const k of [
@@ -468,8 +472,7 @@ router.get('/tasks/:id', async (req, res) => {
 });
 
 /**
- * GET /api/dashboard/tasks-stats
- * Aggregated counters for tasks.
+ * GET /api/dashboard/tasks-stats Aggregated counters for tasks.
  */
 router.get('/tasks-stats', async (req, res) => {
     try {
@@ -480,13 +483,13 @@ router.get('/tasks-stats', async (req, res) => {
                 SELECT status, COUNT(*) AS c
                 FROM tasks
                 GROUP BY status
-            `
+            `,
             )
             .all();
 
         const byStatus = /** @type {Record<string, number>} */ ({});
         for (const /** @type {any} */ r of rows) {
-            byStatus[String((/** @type {any} */ (r)).status)] = Number((/** @type {any} */ (r)).c) || 0;
+            byStatus[String(/** @type {any} */ (r).status)] = Number(/** @type {any} */ (r).c) || 0;
         }
 
         const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
@@ -531,7 +534,7 @@ router.get('/tasks/:id/attempts', async (req, res) => {
                 WHERE ${where.join(' AND ')}
                 ORDER BY created_at_ms DESC, id DESC
                 LIMIT @limit
-            `
+            `,
             )
             .all(params);
 
@@ -540,7 +543,11 @@ router.get('/tasks/:id/attempts', async (req, res) => {
         const last = page.length ? page[page.length - 1] : null;
         const nextCursor =
             hasMore && last
-                ? encodeCursor({ sort: 'created_desc', created_at_ms: (/** @type {any} */ (last)).created_at_ms, id: (/** @type {any} */ (last)).id })
+                ? encodeCursor({
+                      sort: 'created_desc',
+                      created_at_ms: /** @type {any} */ (last).created_at_ms,
+                      id: /** @type {any} */ (last).id,
+                  })
                 : null;
 
         ok(res, req, { items: page }, { limit, next_cursor: nextCursor, has_more: hasMore });
@@ -589,16 +596,16 @@ router.get('/tasks/:id/events', async (req, res) => {
                 WHERE ${where.join(' AND ')}
                 ORDER BY id DESC
                 LIMIT @limit
-            `
+            `,
             )
             .all(params)
             .map((/** @type {any} */ e) => ({
                 ...e,
                 payload: (() => {
                     try {
-                        return JSON.parse((/** @type {any} */ (e)).payload_json);
+                        return JSON.parse(/** @type {any} */ (e).payload_json);
                     } catch (/** @type {any} */ _) {
-                        return (/** @type {any} */ (e)).payload_json;
+                        return /** @type {any} */ (e).payload_json;
                     }
                 })(),
             }));
@@ -621,8 +628,7 @@ router.get('/tasks/:id/events', async (req, res) => {
 });
 
 /**
- * GET /api/dashboard/tasks/:id/timeline
- * One-shot payload for UI: task + recent attempts + recent events.
+ * GET /api/dashboard/tasks/:id/timeline One-shot payload for UI: task + recent attempts + recent events.
  */
 router.get('/tasks/:id/timeline', async (req, res) => {
     try {
@@ -648,16 +654,16 @@ router.get('/tasks/:id/timeline', async (req, res) => {
                   AND entity_id = ?
                 ORDER BY id DESC
                 LIMIT 500
-            `
+            `,
             )
             .all(taskId)
             .map((/** @type {any} */ e) => ({
                 ...e,
                 payload: (() => {
                     try {
-                        return JSON.parse((/** @type {any} */ (e)).payload_json);
+                        return JSON.parse(/** @type {any} */ (e).payload_json);
                     } catch (/** @type {any} */ _) {
-                        return (/** @type {any} */ (e)).payload_json;
+                        return /** @type {any} */ (e).payload_json;
                     }
                 })(),
             }));
@@ -690,7 +696,7 @@ router.get('/workflows/:workflow_id', async (req, res) => {
                 WHERE workflow_id = ?
                 ORDER BY created_at_ms ASC
                 LIMIT 5000
-            `
+            `,
             )
             .all(workflowId);
 
@@ -705,12 +711,17 @@ router.get('/workflows/:workflow_id', async (req, res) => {
                 SELECT task_id, depends_on_task_id
                 FROM task_dependencies
                 WHERE task_id IN (${tasks.map(() => '?').join(',')})
-            `
+            `,
             )
             .all(...tasks.map((/** @type {any} */ t) => t.id))
             .filter((/** @type {any} */ e) => taskIds.has(e.task_id) && taskIds.has(e.depends_on_task_id));
 
-        ok(res, req, { workflow_id: workflowId, tasks: tasks.map((/** @type {any} */ r) => taskRowToListItem(r)), edges: deps }, {});
+        ok(
+            res,
+            req,
+            { workflow_id: workflowId, tasks: tasks.map((/** @type {any} */ r) => taskRowToListItem(r)), edges: deps },
+            {},
+        );
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[DASHBOARD_API] workflow view failed: ${_e?.message || String(_e)}`, req.id);

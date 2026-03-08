@@ -35,8 +35,8 @@ const STRICT_LANES_DIR = path.join('config', 'typing', 'strict');
 /** Descobre dinamicamente todas as lanes strict presentes na pasta dedicada. */
 const STRICT_CONFIGS = fs
     .readdirSync(STRICT_LANES_DIR)
-    .filter(f => f.startsWith('tsconfig.strict.') && f.endsWith('.json'))
-    .map(f => path.join(STRICT_LANES_DIR, f))
+    .filter((f) => f.startsWith('tsconfig.strict.') && f.endsWith('.json'))
+    .map((f) => path.join(STRICT_LANES_DIR, f))
     .sort();
 
 /**
@@ -64,18 +64,18 @@ function hasTsCheckDirective(file) {
 
 /**
  * @param {string[]} files
- * @returns {{ total: number, withTsCheck: number, coveragePct: number }}
+ * @returns {{ total: number; withTsCheck: number; coveragePct: number }}
  */
 function summarizeTsCheck(files) {
     const total = files.length;
-    const withTsCheck = files.filter(file => hasTsCheckDirective(file)).length;
+    const withTsCheck = files.filter((file) => hasTsCheckDirective(file)).length;
     const coveragePct = total > 0 ? Number(((withTsCheck / total) * 100).toFixed(1)) : 100;
     return { total, withTsCheck, coveragePct };
 }
 
 /**
  * @param {string} configPath
- * @returns {{ files: number, fileNames: string[] }}
+ * @returns {{ files: number; fileNames: string[] }}
  */
 function getStrictLaneFiles(configPath) {
     const absolutePath = path.resolve(configPath);
@@ -86,7 +86,7 @@ function getStrictLaneFiles(configPath) {
     const parsed = ts.parseJsonConfigFileContent(readResult.config, ts.sys, path.dirname(absolutePath));
     return {
         files: parsed.fileNames.length,
-        fileNames: parsed.fileNames.map(fileName => path.relative(process.cwd(), fileName).replace(/\\/g, '/')),
+        fileNames: parsed.fileNames.map((fileName) => path.relative(process.cwd(), fileName).replace(/\\/g, '/')),
     };
 }
 
@@ -104,9 +104,9 @@ function countDirective(files) {
 }
 
 // Active files (excluindo legacy) para cálculo de cobertura de thresholds
-const sourceFiles = collectJsSourceFiles(['src']).filter(file => !isLegacyFile(file));
-const scriptFiles = collectJsSourceFiles(['scripts']).filter(file => !isLegacyFile(file));
-const testFiles = collectJsSourceFiles(['tests']).filter(file => !isLegacyFile(file));
+const sourceFiles = collectJsSourceFiles(['src']).filter((file) => !isLegacyFile(file));
+const scriptFiles = collectJsSourceFiles(['scripts']).filter((file) => !isLegacyFile(file));
+const testFiles = collectJsSourceFiles(['tests']).filter((file) => !isLegacyFile(file));
 const combinedFiles = [...new Set([...sourceFiles, ...scriptFiles, ...testFiles])];
 
 // Legacy files rastreados como gap explícito (nunca ignorados)
@@ -122,7 +122,7 @@ const requestedScope =
         .toLowerCase() === 'public'
         ? 'public'
         : 'full';
-const publicScopeFiles = collectJsSourceFiles(PUBLIC_ROOTS).filter(file => !isLegacyFile(file));
+const publicScopeFiles = collectJsSourceFiles(PUBLIC_ROOTS).filter((file) => !isLegacyFile(file));
 const jsdocReport = analyzeJSDocCoverage({ files: combinedFiles, scope: 'full' });
 const publicJSDocReport = analyzeJSDocCoverage({ files: publicScopeFiles, scope: 'full' });
 const srcCoverage = summarizeTsCheck(sourceFiles);
@@ -133,14 +133,14 @@ const publicCoverage = summarizeTsCheck(publicScopeFiles);
 const tsExpectErrorCount = countDirective(combinedFiles);
 
 // Arquivos sem @ts-check (gap explícito)
-const jsMissingTsCheck = combinedFiles.filter(file => !hasTsCheckDirective(file));
-const legacyMissingTsCheck = legacyFiles.filter(file => !hasTsCheckDirective(file));
+const jsMissingTsCheck = combinedFiles.filter((file) => !hasTsCheckDirective(file));
+const legacyMissingTsCheck = legacyFiles.filter((file) => !hasTsCheckDirective(file));
 const allMissingTsCheck = [...jsMissingTsCheck, ...legacyMissingTsCheck];
 
 // Análise de lanes strict
 const strictLaneAudit = runStrictLaneAudit();
 
-/** @type {Record<string, { files: number, fileNames: string[] }>} */
+/** @type {Record<string, { files: number; fileNames: string[] }>} */
 const strictLanes = {};
 for (const config of STRICT_CONFIGS) {
     strictLanes[config] = getStrictLaneFiles(config);
@@ -149,27 +149,27 @@ for (const config of STRICT_CONFIGS) {
 const publicAnyTagsTotal = jsdocReport.files.reduce(
     (total, fileReport) =>
         total + fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
-    0
+    0,
 );
 
 const publicUnknownTagsTotal = jsdocReport.files.reduce(
     (total, fileReport) =>
         total +
         fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_unknown_tags_count, 0),
-    0
+    0,
 );
 
 const publicScopePublicAnyTagsTotal = publicJSDocReport.files.reduce(
     (total, fileReport) =>
         total + fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_any_tags_count, 0),
-    0
+    0,
 );
 
 const publicScopePublicUnknownTagsTotal = publicJSDocReport.files.reduce(
     (total, fileReport) =>
         total +
         fileReport.exported_symbols.reduce((fileTotal, symbol) => fileTotal + symbol.public_unknown_tags_count, 0),
-    0
+    0,
 );
 
 const fullScopePasses =
@@ -236,13 +236,13 @@ if (String(values.format || 'console').toLowerCase() === 'json') {
     console.log('='.repeat(80));
     if (requestedScope === 'public') {
         console.log(
-            `@ts-check public scope: ${publicCoverage.withTsCheck}/${publicCoverage.total} (${publicCoverage.coveragePct}%)`
+            `@ts-check public scope: ${publicCoverage.withTsCheck}/${publicCoverage.total} (${publicCoverage.coveragePct}%)`,
         );
         console.log(`public_scope_files: ${publicCoverage.total}`);
         console.log(`public_scope_exports_total: ${publicJSDocReport.exports_total}`);
         console.log(`public_scope_functions_missing_param_tags: ${publicJSDocReport.functions_missing_param_tags}`);
         console.log(
-            `public_scope_functions_missing_options_typedef: ${publicJSDocReport.functions_missing_options_typedef}`
+            `public_scope_functions_missing_options_typedef: ${publicJSDocReport.functions_missing_options_typedef}`,
         );
         console.log(`public_scope_unsafe_generic_tags_total: ${publicJSDocReport.unsafe_generic_tags_total}`);
         console.log(`public_scope_public_any_tags_total: ${publicScopePublicAnyTagsTotal}`);
@@ -252,13 +252,13 @@ if (String(values.format || 'console').toLowerCase() === 'json') {
     } else {
         console.log(`@ts-check src: ${srcCoverage.withTsCheck}/${srcCoverage.total} (${srcCoverage.coveragePct}%)`);
         console.log(
-            `@ts-check scripts: ${scriptsCoverage.withTsCheck}/${scriptsCoverage.total} (${scriptsCoverage.coveragePct}%)`
+            `@ts-check scripts: ${scriptsCoverage.withTsCheck}/${scriptsCoverage.total} (${scriptsCoverage.coveragePct}%)`,
         );
         console.log(
-            `@ts-check tests: ${testsCoverage.withTsCheck}/${testsCoverage.total} (${testsCoverage.coveragePct}%)`
+            `@ts-check tests: ${testsCoverage.withTsCheck}/${testsCoverage.total} (${testsCoverage.coveragePct}%)`,
         );
         console.log(
-            `@ts-check overall: ${overallCoverage.withTsCheck}/${overallCoverage.total} (${overallCoverage.coveragePct}%)`
+            `@ts-check overall: ${overallCoverage.withTsCheck}/${overallCoverage.total} (${overallCoverage.coveragePct}%)`,
         );
         console.log(`public_any_tags_total: ${publicAnyTagsTotal}`);
         console.log(`public_unknown_tags_total: ${publicUnknownTagsTotal}`);

@@ -73,11 +73,11 @@ const DISALLOWED_PATTERNS = [
 
 /**
  * @typedef {{
- *   file: string,
- *   prefix: string | string[],
- *   scope: string,
- *   body: string | string[],
- *   description: string
+ *     file: string;
+ *     prefix: string | string[];
+ *     scope: string;
+ *     body: string | string[];
+ *     description: string;
  * }} SnippetDefinition
  */
 
@@ -95,7 +95,7 @@ const format = String(values.format || 'console').toLowerCase();
 const strict = Boolean(values.strict);
 const expectedFamilies = String(values.families || DEFAULT_EXPECTED_FAMILIES.join(','))
     .split(',')
-    .map(item => item.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
 
 const report = analyzeSnippetCatalog({
@@ -129,7 +129,7 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
     const issues = [];
 
     for (const [name, snippet] of entries) {
-        const missing = ['prefix', 'scope', 'body', 'description'].filter(key => !(key in snippet));
+        const missing = ['prefix', 'scope', 'body', 'description'].filter((key) => !(key in snippet));
         if (missing.length > 0) {
             issues.push({
                 type: 'missing_fields',
@@ -200,7 +200,7 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
         }
     }
 
-    const prefixSet = new Set(prefixes.map(entry => entry.prefix));
+    const prefixSet = new Set(prefixes.map((entry) => entry.prefix));
     for (const expectedPrefix of RECOMMENDED_PREFIXES) {
         if (!prefixSet.has(expectedPrefix)) {
             gaps.push({
@@ -237,15 +237,15 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
         scopes,
         families: Object.keys(familyCounts)
             .sort()
-            .map(family => ({ family, count: familyCounts[family] })),
+            .map((family) => ({ family, count: familyCounts[family] })),
         issues,
         gaps,
     };
 }
 
 /**
- * @param {{ prefix: string, snippet: string }[]} prefixes
- * @param {*} prefixes
+ * @param {{ prefix: string; snippet: string }[]} prefixes
+ * @param {any} prefixes
  */
 function collectDuplicatePrefixes(prefixes) {
     const map = new Map();

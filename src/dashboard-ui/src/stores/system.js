@@ -3,13 +3,14 @@
  * Pinia Store: System
  *
  * Gerencia estado do sistema e alertas.
+ *
  * - Status de saúde dos componentes
  * - Alertas ativos
  * - Informações do sistema
  */
 
-import { defineStore } from 'pinia';
 import { formatHttpError, http } from '@/lib/http';
+import { defineStore } from 'pinia';
 
 /** Constante/valor exportado: useSystemStore. */
 export const useSystemStore = defineStore('system', {
@@ -46,29 +47,29 @@ export const useSystemStore = defineStore('system', {
         error: null,
 
         // Última atualização
-        lastUpdate: /** @type {number|null} */ (null),
+        lastUpdate: /** @type {number | null} */ (null),
     }),
 
     getters: {
         /**
          * Número de alertas ativos
          */
-        alertCount: state => state.alerts.length,
+        alertCount: (state) => state.alerts.length,
 
         /**
          * Alertas críticos
          */
-        criticalAlerts: state => state.alerts.filter(a => a.severity === 'critical'),
+        criticalAlerts: (state) => state.alerts.filter((a) => a.severity === 'critical'),
 
         /**
          * Alertas de warning
          */
-        warningAlerts: state => state.alerts.filter(a => a.severity === 'warning'),
+        warningAlerts: (state) => state.alerts.filter((a) => a.severity === 'warning'),
 
         /**
          * Todos os componentes com status
          */
-        componentsList: state =>
+        componentsList: (state) =>
             Object.entries(state.components).map(([name, data]) => ({
                 name,
                 ...data,
@@ -77,7 +78,7 @@ export const useSystemStore = defineStore('system', {
         /**
          * Componentes com problema
          */
-        problemComponents: state =>
+        problemComponents: (state) =>
             Object.entries(state.components)
                 .filter(([, data]) => data.status !== 'healthy')
                 .map(([name, data]) => ({ name, ...data })),
@@ -85,12 +86,12 @@ export const useSystemStore = defineStore('system', {
         /**
          * Sistema está saudável
          */
-        isHealthy: state => state.overallStatus === 'healthy',
+        isHealthy: (state) => state.overallStatus === 'healthy',
 
         /**
          * Uptime formatado
          */
-        uptimeFormatted: state => {
+        uptimeFormatted: (state) => {
             const seconds = state.uptimeSeconds;
             const days = Math.floor(seconds / 86400);
             const hours = Math.floor((seconds % 86400) / 3600);
@@ -127,8 +128,8 @@ export const useSystemStore = defineStore('system', {
 
                 this.lastUpdate = Date.now();
             } catch (/** @type {any} */ _rawError) {
-    const error = /** @type {any} */ (_rawError);
-                this.error = (/** @type {any} */ (formatHttpError(error))).message;
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 this.overallStatus = 'error';
                 console.error('[SystemStore] Erro ao carregar health:', error);
             } finally {
@@ -144,7 +145,7 @@ export const useSystemStore = defineStore('system', {
                 const response = await http.get('/api/dashboard/alerts');
                 this.alerts = response.data.alerts || [];
             } catch (/** @type {any} */ _rawError) {
-    const error = /** @type {any} */ (_rawError);
+                const error = /** @type {any} */ (_rawError);
                 console.error('[SystemStore] Erro ao carregar alertas:', error);
             }
         },
@@ -161,7 +162,7 @@ export const useSystemStore = defineStore('system', {
                     ...response.data.versions,
                 };
             } catch (/** @type {any} */ _rawError) {
-    const error = /** @type {any} */ (_rawError);
+                const error = /** @type {any} */ (_rawError);
                 console.error('[SystemStore] Erro ao carregar info:', error);
             }
         },
@@ -175,8 +176,8 @@ export const useSystemStore = defineStore('system', {
                 // Recarrega alertas
                 await this.fetchAlerts();
             } catch (/** @type {any} */ _rawError) {
-    const error = /** @type {any} */ (_rawError);
-                this.error = (/** @type {any} */ (formatHttpError(error))).message;
+                const error = /** @type {any} */ (_rawError);
+                this.error = /** @type {any} */ (formatHttpError(error)).message;
                 throw error;
             }
         },
@@ -186,7 +187,7 @@ export const useSystemStore = defineStore('system', {
          */
         handleAlert(/** @type {any} */ alert) {
             // Adiciona ou atualiza alerta
-            const existingIndex = this.alerts.findIndex(a => a.name === alert.name);
+            const existingIndex = this.alerts.findIndex((a) => a.name === alert.name);
 
             if (existingIndex !== -1) {
                 this.alerts[existingIndex] = alert;
@@ -199,9 +200,9 @@ export const useSystemStore = defineStore('system', {
          * Handler para health update via Socket.io
          */
         handleHealthUpdate(/** @type {any} */ component, /** @type {any} */ data) {
-            if ((/** @type {any} */ (this.components))[component]) {
-                (/** @type {any} */ (this.components))[component] = {
-                    ...(/** @type {any} */ (this.components))[component],
+            if (/** @type {any} */ (this.components)[component]) {
+                /** @type {any} */ (this.components)[component] = {
+                    .../** @type {any} */ (this.components)[component],
                     ...data,
                 };
             }
@@ -211,7 +212,7 @@ export const useSystemStore = defineStore('system', {
          * Remove alerta (quando condição resolvida)
          */
         removeAlert(/** @type {any} */ alertName) {
-            this.alerts = this.alerts.filter(a => a.name !== alertName);
+            this.alerts = this.alerts.filter((a) => a.name !== alertName);
         },
 
         /**

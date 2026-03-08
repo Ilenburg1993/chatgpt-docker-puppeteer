@@ -1,33 +1,33 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
+import test from 'node:test';
 import { createAuditAgentDbStore } from '../../../src/audit_agent/db_store.js';
-import { closeDb, getDb } from '../../../src/infra/db/sqlite.js';
+import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
+import { listAuditFindingsByJobId } from '../../../src/infra/db/audit_finding_repo.js';
 import { getAuditJobById, listAuditJobs } from '../../../src/infra/db/audit_job_repo.js';
 import { listAuditJobRunsByJobId } from '../../../src/infra/db/audit_job_run_repo.js';
-import { listAuditFindingsByJobId } from '../../../src/infra/db/audit_finding_repo.js';
 import { listAuditPatchProposalsByJobId } from '../../../src/infra/db/audit_patch_repo.js';
 import { listAuditWatchRules, upsertAuditWatchRule } from '../../../src/infra/db/audit_watch_rule_repo.js';
-import { listInferenceProfiles, upsertInferenceProfile } from '../../../src/infra/db/inference_profile_repo.js';
 import {
     listInferenceBackends,
     setInferenceBackendEnabled,
     upsertInferenceBackend,
 } from '../../../src/infra/db/inference_backend_repo.js';
 import {
-    listInferenceModels,
-    setInferenceModelEnabled,
-    upsertInferenceModel,
-} from '../../../src/infra/db/inference_model_repo.js';
-import {
     getInferenceClientPolicyByTag,
     listInferenceClientPolicies,
     upsertInferenceClientPolicy,
 } from '../../../src/infra/db/inference_client_policy_repo.js';
+import {
+    listInferenceModels,
+    setInferenceModelEnabled,
+    upsertInferenceModel,
+} from '../../../src/infra/db/inference_model_repo.js';
+import { listInferenceProfiles, upsertInferenceProfile } from '../../../src/infra/db/inference_profile_repo.js';
+import { closeDb, getDb } from '../../../src/infra/db/sqlite.js';
 
 function withTempDb(/** @type {(arg: any) => Promise<void>} */ fn) {
     return async () => {
@@ -66,8 +66,8 @@ test(
         assert.equal(runs[0].status, 'COMPLETED');
 
         const list = listAuditJobs({ limit: 10 });
-        assert.ok(list.some(item => item.id === job.id));
-    })
+        assert.ok(list.some((item) => item.id === job.id));
+    }),
 );
 
 test(
@@ -136,7 +136,7 @@ test(
         assert.equal(patches[0].patch_summary_json?.context_signals?.diagnostics_count, 2);
         assert.equal(patches[0].patch_summary_json?.context_budget?.remaining, 1);
         assert.equal(patches[0].dry_run_result_json?.pending, true);
-    })
+    }),
 );
 
 test(
@@ -166,14 +166,14 @@ test(
         assert.equal(policy.profile_id, profile.id);
 
         const profiles = listInferenceProfiles();
-        assert.ok(profiles.some(p => p.id === profile.id));
+        assert.ok(profiles.some((p) => p.id === profile.id));
         const policies = listInferenceClientPolicies();
-        assert.ok(policies.some(p => p.client_tag === 'audit_agent_patch'));
+        assert.ok(policies.some((p) => p.client_tag === 'audit_agent_patch'));
 
         const loaded = /** @type {any} */ (getInferenceClientPolicyByTag('audit_agent_patch'));
         assert.equal(loaded.allowed_models_json[0], 'qwen2.5-coder');
         assert.equal(loaded.allowed_backends_json[0], 'ollama_local');
-    })
+    }),
 );
 
 test(
@@ -199,14 +199,14 @@ test(
 
         const backends = listInferenceBackends();
         const models = listInferenceModels({ backendId: backend.id });
-        assert.ok(backends.some(item => item.id === backend.id));
-        assert.ok(models.some(item => item.id === model.id));
+        assert.ok(backends.some((item) => item.id === backend.id));
+        assert.ok(models.some((item) => item.id === model.id));
 
         const backendDisabled = setInferenceBackendEnabled(backend.id, false);
         const modelDisabled = setInferenceModelEnabled(model.id, false);
         assert.equal(backendDisabled?.enabled, false);
         assert.equal(modelDisabled?.enabled, false);
-    })
+    }),
 );
 
 test(
@@ -234,5 +234,5 @@ test(
         const rules = listAuditWatchRules();
         assert.equal(rules.length, 1);
         assert.equal(rules[0].trigger_type, 'schedule');
-    })
+    }),
 );

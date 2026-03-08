@@ -8,7 +8,7 @@ import path from 'node:path';
  */
 /**
  * @param {CreateRunStateStoreOptions} options
-  * @returns {object}
+ * @returns {object}
  */
 export function createRunStateStore(options) {
     const runDir = options.runDir;

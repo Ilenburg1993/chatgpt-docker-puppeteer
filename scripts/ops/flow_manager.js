@@ -1,7 +1,7 @@
 // @ts-check
+import yaml from 'js-yaml';
 import fs from 'node:fs';
 import path from 'node:path';
-import yaml from 'js-yaml';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
@@ -20,7 +20,7 @@ function atomicWrite(/** @type {string} */ filepath, /** @type {string} */ conte
 }
 
 // Garante infraestrutura
-[BLUEPRINTS_DIR, QUEUE_DIR].forEach(d => {
+[BLUEPRINTS_DIR, QUEUE_DIR].forEach((d) => {
     if (!fs.existsSync(d)) {
         fs.mkdirSync(d, { recursive: true });
     }
@@ -32,7 +32,7 @@ const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
 const afterArgIndex = args.indexOf('--after');
 const executeAfterInput = afterArgIndex !== -1 ? (args[afterArgIndex + 1] ?? null) : null;
-const blueprintArg = args.find(a => !a.startsWith('--') && a !== executeAfterInput);
+const blueprintArg = args.find((a) => !a.startsWith('--') && a !== executeAfterInput);
 
 if (!blueprintArg) {
     console.log(`
@@ -50,7 +50,7 @@ Exemplo:
 
 // --- PARSER DE AGENDAMENTO ---
 
-function parseSchedule(/** @type {string|null} */ input) {
+function parseSchedule(/** @type {string | null} */ input) {
     if (!input) {
         return null;
     }
@@ -148,7 +148,7 @@ try {
     let skipped = 0;
     /** @type {any} */ let previousTaskId = null;
 
-    tasks.forEach(t => {
+    tasks.forEach((t) => {
         const realDeps = (t.depends_on || []).map((/** @type {any} */ d) => idMap[d]);
 
         // Suporte a {{REF:LAST}}
@@ -160,7 +160,7 @@ try {
 
         // Resolução de Referências no Prompt
         let finalPrompt = t.prompt;
-        Object.keys(idMap).forEach(shortId => {
+        Object.keys(idMap).forEach((shortId) => {
             const regex = new RegExp(`\\{\\{REF:${shortId}\\}\\}`, 'g');
             finalPrompt = finalPrompt.replace(regex, `{{REF:${idMap[shortId]}}}`);
         });
@@ -215,7 +215,11 @@ try {
         if (!isDryRun) {
             atomicWrite(filePath, JSON.stringify(taskObj, null, 2));
             console.log(`   [${action}] ${t.id} -> ${t.realId}`);
-            action === 'CREATE' ? created++ : updated++;
+            if (action === 'CREATE') {
+                created++;
+            } else {
+                updated++;
+            }
         } else {
             console.log(`   [DRY] ${action}: ${t.id} (Deps: ${realDeps.length})`);
         }

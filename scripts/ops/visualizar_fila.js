@@ -37,11 +37,11 @@ if (MODE_HTML && !fs.existsSync(PUBLIC_DIR)) {
     fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 }
 
-const files = fs.readdirSync(QUEUE_DIR).filter(f => f.endsWith('.json'));
+const files = fs.readdirSync(QUEUE_DIR).filter((f) => f.endsWith('.json'));
 /** @type {any[]} */
 const tasks = [];
 
-files.forEach(f => {
+files.forEach((f) => {
     try {
         const content = fs.readFileSync(path.join(QUEUE_DIR, f), 'utf-8');
         tasks.push(JSON.parse(content));
@@ -53,7 +53,7 @@ files.forEach(f => {
 // --- MODO HTML (Vis.js) ---
 
 if (MODE_HTML) {
-    const nodes = tasks.map(t => {
+    const nodes = tasks.map((t) => {
         const status = getStatus(t);
         const attempts = getAttempts(t);
         const prio = getPrio(t);
@@ -81,9 +81,9 @@ if (MODE_HTML) {
     });
 
     /** @type {any[]} */ const edges = [];
-    tasks.forEach(t => {
+    tasks.forEach((t) => {
         getDeps(t).forEach((/** @type {any} */ depId) => {
-            const exists = tasks.some(x => getId(x) === depId);
+            const exists = tasks.some((x) => getId(x) === depId);
             edges.push({
                 from: depId,
                 to: getId(t),
@@ -158,14 +158,14 @@ if (MODE_HTML) {
     console.log('  node [shape=box, style="filled,rounded", fontname="Arial", fontcolor="#ffffff", color="#30363d"];');
     console.log('  edge [color="#8b949e", arrowsize=0.7];');
 
-    tasks.forEach(t => {
+    tasks.forEach((t) => {
         const id = getId(t);
         const status = getStatus(t);
         const color = /** @type {any} */ (COLORS)[status] || '#ffffff';
         console.log(`  "${id}" [label="${id}\\n(${status})", fillcolor="${color}"];`);
 
         getDeps(t).forEach((/** @type {any} */ depId) => {
-            const exists = tasks.some(x => getId(x) === depId);
+            const exists = tasks.some((x) => getId(x) === depId);
             const edgeColor = exists ? '#8b949e' : '#f85149';
             const style = exists ? 'solid' : 'dashed';
             console.log(`  "${depId}" -> "${id}" [color="${edgeColor}", style="${style}"];`);

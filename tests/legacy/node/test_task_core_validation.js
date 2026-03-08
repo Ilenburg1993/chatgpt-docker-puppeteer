@@ -56,7 +56,7 @@ test('ResponseV2: Structure validation', () => {
 
 test('ResponseV2: Detect V2 format', () => {
     // Inline implementation to avoid module-alias issues
-    const isResponseV2 = response => {
+    const isResponseV2 = (response) => {
         return (
             response &&
             typeof response === 'object' &&
@@ -81,7 +81,7 @@ test('ResponseV2: Detect V2 format', () => {
 });
 
 test('ResponseV2: Detect V1 format (string)', () => {
-    const isResponseV2 = response => {
+    const isResponseV2 = (response) => {
         return (
             response &&
             typeof response === 'object' &&
@@ -229,7 +229,7 @@ test('Multi-format storage: File paths generation', () => {
     const basePath = `/tmp/responses/${taskId}`;
 
     const formats = ['txt', 'md', 'json', 'html'];
-    const paths = formats.map(ext => `${basePath}.${ext}`);
+    const paths = formats.map((ext) => `${basePath}.${ext}`);
 
     if (paths.length !== 4) {
         throw new Error('Should generate 4 file paths');

@@ -26,6 +26,7 @@
 
 /**
  * Executa função de forma segura.
+ *
  * @param {Function} fn
  */
 function safeCall(fn) {
@@ -52,27 +53,26 @@ function now() {
  * @property {any} telemetry
  * @property {function(): void} start
  * @property {function(): void} stop
- * @property {*} [policy]
+ * @property {any} [policy]
  */
 /**
  * @typedef {object} CreateReconnectOptions
- * @property {*} [telemetry]
- * @property {*} [start]
- * @property {*} [stop]
- * @property {*} [policy]
+ * @property {any} [telemetry]
+ * @property {any} [start]
+ * @property {any} [stop]
+ * @property {any} [policy]
  */
 /**
  * Cria um controlador técnico de reconexão.
  *
- * **Side-effects:** Agenda timers de reconexão, emite telemetria.
- * **Semântica:** Política técnica de retry para transporte físico.
- * **Unidades:** interval em ms (padrão 1000), maxAttempts como inteiro ou null.
+ * **Side-effects:** Agenda timers de reconexão, emite telemetria. **Semântica:** Política técnica de retry para
+ * transporte físico. **Unidades:** interval em ms (padrão 1000), maxAttempts como inteiro ou null.
  *
  * @param {CreateReconnectDeps} deps - Dependências do controlador
  * @param {object} deps
  * @param {object} deps.policy
- * @param {number} [deps.policy.interval=1000] - Intervalo entre tentativas (ms)
- * @param {number|null} [deps.policy.maxAttempts=null] - Máximo de tentativas (null=infinito)
+ * @param {number} [deps.policy.interval=1000] - Intervalo entre tentativas (ms). Default is `1000`
+ * @param {number | null} [deps.policy.maxAttempts=null] - Máximo de tentativas (null=infinito). Default is `null`
  * @returns {any} Controlador com métodos start, stop, onConnectionUp, onConnectionDown
  * @throws {Error} Se dependências obrigatórias estiverem ausentes ou inválidas
  */

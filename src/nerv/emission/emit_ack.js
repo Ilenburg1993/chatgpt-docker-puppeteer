@@ -15,17 +15,16 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
  */
 /**
  * @typedef {object} CreateEmitAckOptions
- * @property {*} [envelopes]
- * @property {*} [buffers]
- * @property {*} [correlation]
- * @property {*} [telemetry]
+ * @property {any} [envelopes]
+ * @property {any} [buffers]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
  */
 /**
  * Cria o emissor técnico de ACKs.
  *
- * **Side-effects:** Registra emissão na correlação histórica.
- * **Semântica:** Emissor especializado para acknowledgments NERV.
- * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
+ * **Side-effects:** Registra emissão na correlação histórica. **Semântica:** Emissor especializado para acknowledgments
+ * NERV. **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
  * @param {CreateEmitAckDeps} deps - Dependências do emissor
  * @returns {any} Emissor com método emitAck
@@ -43,8 +42,7 @@ function createEmitAck({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope ACK técnico.
      *
-     * @param {object} envelope
-     * Envelope estruturalmente válido do tipo ACK.
+     * @param {object} envelope Envelope estruturalmente válido do tipo ACK.
      */
     function emitAck(envelope) {
         telemetry.emit('nerv:emission:attempt', {

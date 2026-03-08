@@ -48,10 +48,10 @@ function _normalizePolicy(policy) {
 
 /**
  * @typedef {object} CreateMissionOptions
- * @property {*} [title]
- * @property {*} [description]
- * @property {*} [autonomy_mode]
- * @property {*} [policy]
+ * @property {any} [title]
+ * @property {any} [description]
+ * @property {any} [autonomy_mode]
+ * @property {any} [policy]
  */
 /**
  * @typedef {object} CreateMissionInput
@@ -63,7 +63,7 @@ function _normalizePolicy(policy) {
  */
 /**
  * @param {CreateMissionInput} [input]
- * @returns {Mission|null}
+ * @returns {Mission | null}
  */
 function createMission({
     title,
@@ -89,7 +89,7 @@ function createMission({
             (id, title, description, status, autonomy_mode, policy_json, context_json, created_at_ms, updated_at_ms, started_at_ms, completed_at_ms)
         VALUES
             (@id, @title, @description, @status, @autonomy_mode, @policy_json, @context_json, @created_at_ms, @updated_at_ms, NULL, NULL)
-    `
+    `,
     ).run({
         id,
         title: String(title),
@@ -107,11 +107,12 @@ function createMission({
 
 /**
  * @typedef {object} ListMissionsOptions
- * @property {*} [status]
- * @property {*} [limit]
+ * @property {any} [status]
+ * @property {any} [limit]
  */
 /**
  * Função exportada: listMissions.
+ *
  * @param {ListMissionsOptions} [options]
  * @returns {Mission[]}
  */
@@ -135,8 +136,9 @@ function listMissions({ status = null, limit = 500 } = {}) {
 
 /**
  * Função exportada: getMissionById.
+ *
  * @param {string} missionId Unique identifier.
- * @returns {Mission|null}
+ * @returns {Mission | null}
  */
 function getMissionById(missionId) {
     const db = getDb();
@@ -190,9 +192,10 @@ function _rowToMission(row) {
 
 /**
  * Função exportada: updateMission.
- * @param {*} missionId
+ *
+ * @param {any} missionId
  * @param {UpdateMissionUpdates} [updates]
- * @returns {Mission|null}
+ * @returns {Mission | null}
  */
 function updateMission(missionId, updates = {}) {
     const db = getDb();
@@ -235,7 +238,7 @@ function updateMission(missionId, updates = {}) {
             started_at_ms = @started_at_ms,
             completed_at_ms = @completed_at_ms
         WHERE id = @id AND updated_at_ms = @expected_updated_at_ms
-    `
+    `,
         )
         .run({
             id: missionId,
@@ -253,7 +256,7 @@ function updateMission(missionId, updates = {}) {
 
     if (result.changes === 0) {
         // Concurrent modification detected — throw conflict error for caller to handle
-        const error = /** @type {Error & { code?: string, status?: number, missionId?: string }} */ (
+        const error = /** @type {Error & { code?: string; status?: number; missionId?: string }} */ (
             new Error('Concurrent modification detected — mission was updated by another process')
         );
         error.code = 'CONFLICT';
@@ -267,7 +270,8 @@ function updateMission(missionId, updates = {}) {
 
 /**
  * Função exportada: deleteMission.
- * @param {*} missionId
+ *
+ * @param {any} missionId
  * @returns {number}
  */
 function deleteMission(missionId) {
@@ -276,4 +280,4 @@ function deleteMission(missionId) {
     return res.changes || 0;
 }
 
-export { MISSION_STATUS, AUTONOMY_MODES, createMission, listMissions, getMissionById, updateMission, deleteMission };
+export { AUTONOMY_MODES, createMission, deleteMission, getMissionById, listMissions, MISSION_STATUS, updateMission };

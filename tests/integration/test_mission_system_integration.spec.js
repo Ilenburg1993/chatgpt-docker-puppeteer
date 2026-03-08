@@ -1,21 +1,22 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it, before, after } from 'node:test';
+import { createKernel } from '#kernel/kernel';
 import { MissionManager } from '#missions/mission_manager';
 import { createNERV } from '#nerv/nerv';
-import { createKernel } from '#kernel/kernel';
 import fs from 'fs/promises';
+import assert from 'node:assert';
 import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
 /**
  * Suite de testes de integração do sistema de missões.
  *
  * OBJETIVO: Validar que todas as integrações funcionam corretamente:
- *   - MissionManager ↔ Kernel
- *   - MissionManager ↔ NERV
- *   - WorkflowGenerator ↔ Templates
- *   - MissionStateManager ↔ Filesystem
- *   - REST API ↔ MissionManager
+ *
+ * - MissionManager ↔ Kernel
+ * - MissionManager ↔ NERV
+ * - WorkflowGenerator ↔ Templates
+ * - MissionStateManager ↔ Filesystem
+ * - REST API ↔ MissionManager
  */
 describe('Mission System Integration (E2E)', () => {
     /** @type {any} */ let nerv;
@@ -55,7 +56,7 @@ describe('Mission System Integration (E2E)', () => {
                     correlation: true,
                     bufferSize: 100,
                     telemetry: false,
-                })
+                }),
             );
 
             assert.ok(nerv, 'NERV deveria estar inicializado');
@@ -169,7 +170,7 @@ describe('Mission System Integration (E2E)', () => {
             await missionManager.executeMission(testMissionId);
 
             // Aguarda processamento assíncrono
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 100));
 
             // Verifica que mission está RUNNING
             const mission = await missionManager.getMission(testMissionId);
@@ -228,7 +229,7 @@ describe('Mission System Integration (E2E)', () => {
             await missionManager.executeMission(feedbackMissionId);
 
             // Aguarda processamento
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 100));
 
             // NOTA: Validação completa requer mock do driver para capturar task gerada
             // Por ora, verificamos apenas que execução não falhou
@@ -255,7 +256,7 @@ describe('Mission System Integration (E2E)', () => {
             assert.strictEqual(
                 mission.workflow.steps.length,
                 12,
-                'Workflow deveria ter 12 steps (10 chapters + outline + consistency)'
+                'Workflow deveria ter 12 steps (10 chapters + outline + consistency)',
             );
         });
 
@@ -274,7 +275,7 @@ describe('Mission System Integration (E2E)', () => {
                     });
                 },
                 /num_chapters deve ser >= 5/,
-                'Deveria rejeitar num_chapters inválido'
+                'Deveria rejeitar num_chapters inválido',
             );
         });
 
@@ -294,18 +295,18 @@ describe('Mission System Integration (E2E)', () => {
 
             // Verifica IDs dos steps expandidos
             const chapterSteps = mission.workflow.steps.filter((/** @type {any} */ s) =>
-                s.id.startsWith('step-2-chapter-')
+                s.id.startsWith('step-2-chapter-'),
             );
             assert.strictEqual(chapterSteps.length, 15, 'Deveria ter 15 chapter steps');
 
             // Verifica numeração correta
             assert.ok(
                 mission.workflow.steps.some((/** @type {any} */ s) => s.id === 'step-2-chapter-1'),
-                'Deveria ter chapter-1'
+                'Deveria ter chapter-1',
             );
             assert.ok(
                 mission.workflow.steps.some((/** @type {any} */ s) => s.id === 'step-2-chapter-15'),
-                'Deveria ter chapter-15'
+                'Deveria ter chapter-15',
             );
         });
 
@@ -327,7 +328,7 @@ describe('Mission System Integration (E2E)', () => {
             assert.ok(outlineStep.prompt_template.includes('JavaScript Advanced'), 'Prompt deveria conter topic');
             assert.ok(
                 outlineStep.prompt_template.includes('senior developers'),
-                'Prompt deveria conter target_audience'
+                'Prompt deveria conter target_audience',
             );
         });
     });

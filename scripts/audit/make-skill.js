@@ -45,7 +45,7 @@ _TODO: escreva uma visão geral do skill._
         const pkgText = await fs.readFile(pkgPath, 'utf8');
         const pkg = JSON.parse(pkgText);
         pkg.scripts = pkg.scripts || {};
-        pkg.scripts[`audit:${name}`] = `echo \"run ${name} skill\"`;
+        pkg.scripts[`audit:${name}`] = `echo "run ${name} skill"`;
         await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
     } catch (err) {
         console.warn('unable to update package.json alias', /** @type {any} */ (err).message);
@@ -55,7 +55,7 @@ _TODO: escreva uma visão geral do skill._
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-    main().catch(err => {
+    main().catch((err) => {
         console.error(err);
         process.exit(1);
     });

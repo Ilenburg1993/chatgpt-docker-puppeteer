@@ -60,7 +60,7 @@ function _isEnabled() {
  * @param {string} url
  * @param {unknown} body
  * @param {number} timeoutMs
- * @returns {Promise<{ok: boolean, status: number, text: string, json: unknown}>}
+ * @returns {Promise<{ ok: boolean; status: number; text: string; json: unknown }>}
  */
 async function _postJson(url, body, timeoutMs) {
     const res = await fetch(url, {
@@ -109,12 +109,12 @@ function _buildPatchPrompt(job, contextPack, llmTriage) {
         `rag_expand=${JSON.stringify(mcpTools.rag_expand || null)}`,
         `findings=${JSON.stringify(
             findings.slice(0, 10).map(
-                /** @param {Record<string, any>} f */ f => ({
+                /** @param {Record<string, any>} f */ (f) => ({
                     title: f?.title,
                     severity: f?.severity,
                     category: f?.category,
-                })
-            )
+                }),
+            ),
         ).slice(0, 5000)}`,
     ].join('\n');
 }
@@ -131,12 +131,12 @@ function _coercePatchAuthorParsed(rawParsed) {
         : null;
     const candidateFiles = Array.isArray(parsed.candidate_files)
         ? parsed.candidate_files
-              .map(/** @param {unknown} v */ v => String(v || '').trim())
+              .map(/** @param {unknown} v */ (v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 10)
         : null;
     const proposedChanges = Array.isArray(parsed.proposed_changes)
-        ? parsed.proposed_changes.map(/** @param {unknown} v */ v => String(v || '').trim())
+        ? parsed.proposed_changes.map(/** @param {unknown} v */ (v) => String(v || '').trim())
         : null;
 
     return {
@@ -172,7 +172,7 @@ function _normalizePatchProposal(job, contextPack, llmOut) {
     const targetFile = _safeString(scope.filePath || scope.file_path, 'src/main.js');
     const candidateFiles = Array.isArray(parsed.candidate_files)
         ? parsed.candidate_files
-              .map(/** @param {unknown} v */ v => String(v || '').trim())
+              .map(/** @param {unknown} v */ (v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 10)
         : [targetFile];
@@ -182,7 +182,7 @@ function _normalizePatchProposal(job, contextPack, llmOut) {
     const patchUnifiedDiff = typeof parsed.patch_unified_diff === 'string' ? parsed.patch_unified_diff : '';
     const proposedChanges = Array.isArray(parsed.proposed_changes)
         ? parsed.proposed_changes
-              .map(/** @param {unknown} v */ v => String(v || '').trim())
+              .map(/** @param {unknown} v */ (v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 20)
         : [];
@@ -228,11 +228,12 @@ function _normalizePatchProposal(job, contextPack, llmOut) {
 }
 
 /**
- * Cria o cliente de geração de propostas de patch do Audit Agent.
- * O cliente opera em modo proposal-only e depende do Inference Gateway.
+ * Cria o cliente de geração de propostas de patch do Audit Agent. O cliente opera em modo proposal-only e depende do
+ * Inference Gateway.
+ *
  * @returns {{
- *   isEnabled: () => boolean,
- *   runPatchAuthor: (job: unknown, contextPack: unknown, llmTriage: unknown) => Promise<any>
+ *     isEnabled: () => boolean;
+ *     runPatchAuthor: (job: unknown, contextPack: unknown, llmTriage: unknown) => Promise<any>;
  * }}
  */
 export function createAuditAgentPatchAuthorLlmClient() {
@@ -255,7 +256,7 @@ export function createAuditAgentPatchAuthorLlmClient() {
             const preflight = await _postJson(
                 `${baseUrl}/v1/validate/generate`,
                 basePayload,
-                Math.min(timeoutMs, 10_000)
+                Math.min(timeoutMs, 10_000),
             );
             if (!preflight.ok || !_asRecord(preflight.json).ok) {
                 return {
@@ -275,7 +276,7 @@ export function createAuditAgentPatchAuthorLlmClient() {
                     prompt,
                     maxTokens: Number(process.env.AUDIT_AGENT_PATCH_AUTHOR_MAX_TOKENS || 700) || 700,
                 },
-                timeoutMs
+                timeoutMs,
             );
             if (!out.ok || !_asRecord(out.json).ok) {
                 return {

@@ -1,28 +1,29 @@
-/** @import { IDriver } from '#types/driver/contracts' */
+/** @import {IDriver} from "#types/driver/contracts" */
 // @ts-check - Type checking rigoroso habilitado
 
 import * as driverFactory from './factory.js';
 
 /**
  * Opções do construtor do DriverLifecycleManager.
+ *
  * @typedef {object} DriverLifecycleOptions
- * @property {string|null} [taskId] - ID da tarefa associada.
- * @property {string|null} [target] - Nome do target do driver.
+ * @property {string | null} [taskId] - ID da tarefa associada.
+ * @property {string | null} [target] - Nome do target do driver.
  * @property {object} [driverConfig] - Configuração adicional do driver.
  */
 
 /**
  * DriverLifecycleManager
  *
- * Responsabilidade: coordenar o ciclo de vida de um driver por task, com soberania
- * de interrupcao via AbortController.
+ * Responsabilidade: coordenar o ciclo de vida de um driver por task, com soberania de interrupcao via AbortController.
  *
  * Nota: este modulo nao deve importar KERNEL nem SERVER. Ele so orquestra drivers.
  */
 export class DriverLifecycleManager {
     /**
      * Cria um gerenciador de ciclo de vida para drivers.
-     * @param {DriverLifecycleOptions} [options={}] - Opções de configuração.
+     *
+     * @param {DriverLifecycleOptions} [options={}] - Opções de configuração. Default is `{}`
      */
     constructor({ taskId = null, target = null, driverConfig = {} } = {}) {
         this.taskId = taskId;
@@ -46,6 +47,7 @@ export class DriverLifecycleManager {
 
     /**
      * Cria/adquire um driver. Não faz attach a página por conta própria.
+     *
      * @returns {Promise<any>} Instância do driver adquirido.
      * @throws {Error} Se falhar ao adquirir driver do pool ou criar novo.
      */
@@ -71,7 +73,8 @@ export class DriverLifecycleManager {
 
     /**
      * Interrompe a execução associada.
-     * @param {string} [reason='aborted'] - Motivo da interrupção.
+     *
+     * @param {string} [reason='aborted'] - Motivo da interrupção. Default is `'aborted'`
      * @returns {void}
      * @sideEffects Aborta o AbortController associado.
      */
@@ -86,6 +89,7 @@ export class DriverLifecycleManager {
 
     /**
      * Libera o driver de volta ao pool quando aplicável.
+     *
      * @returns {Promise<void>}
      * @sideEffects Retorna driver ao pool e limpa referência local.
      */

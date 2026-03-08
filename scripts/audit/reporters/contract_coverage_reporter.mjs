@@ -26,7 +26,7 @@ export function renderContractCoverage(coverage, drift = {}) {
             const coveredByRun = Number.isFinite(row.covered_by_run) ? row.covered_by_run : row.covered;
             const coveredByTests = Number.isFinite(row.covered_by_tests) ? row.covered_by_tests : 0;
             lines.push(
-                `- ${domain}: total=${row.total}, cobertos_run=${coveredByRun}, cobertos_testes=${coveredByTests}, violados=${row.violated}`
+                `- ${domain}: total=${row.total}, cobertos_run=${coveredByRun}, cobertos_testes=${coveredByTests}, violados=${row.violated}`,
             );
         }
     }

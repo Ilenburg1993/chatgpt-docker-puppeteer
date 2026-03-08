@@ -51,9 +51,9 @@ import { log } from '#core/logger';
 
 /**
  * @typedef {Record<string, unknown> & {
- *   meta?: Record<string, unknown>,
- *   state?: Record<string, unknown>,
- *   spec?: Record<string, unknown>
+ *     meta?: Record<string, unknown>;
+ *     state?: Record<string, unknown>;
+ *     spec?: Record<string, unknown>;
  * }} TaskJsonShape
  */
 
@@ -65,8 +65,9 @@ function _preview(/** @type {any} */ text, /** @type {any} */ maxChars) {
 
 /**
  * Faz parse seguro do `task_json` persistido em banco.
+ *
  * @param {unknown} raw
- * @returns {TaskJsonShape|null}
+ * @returns {TaskJsonShape | null}
  */
 function parseTaskJson(raw) {
     try {
@@ -101,6 +102,7 @@ function _isEditable(/** @type {any} */ row) {
 
 /**
  * Constrói as capacidades de mutação disponíveis para uma task.
+ *
  * @param {TaskViewRow} row
  * @returns {TaskCommandCaps}
  */
@@ -131,6 +133,7 @@ function buildMissionRef(/** @type {any} */ row) {
 
 /**
  * Projeta uma task persistida para o formato de listagem.
+ *
  * @param {TaskViewRow} row
  * @returns {TaskJsonShape}
  */
@@ -176,6 +179,7 @@ function taskRowToListItem(row) {
 
 /**
  * Projeta uma task persistida para o formato detalhado consumido pela UI.
+ *
  * @param {TaskViewRow} row
  * @returns {TaskJsonShape}
  */
@@ -186,8 +190,7 @@ function taskRowToDetailTask(row) {
     task.latest_attempt_id = row.latest_attempt_id ?? null;
     task.prompt_template_artifact_id = row.prompt_template_artifact_id ?? null;
 
-    task.meta =
-        task.meta && typeof task.meta === 'object' ? /** @type {Record<string, unknown>} */ (task.meta) : {};
+    task.meta = task.meta && typeof task.meta === 'object' ? /** @type {Record<string, unknown>} */ (task.meta) : {};
     const taskMeta = /** @type {Record<string, unknown>} */ (task.meta);
     if (row.parent_id) taskMeta.parent_id = row.parent_id;
     if (row.workflow_id) taskMeta.workflow_id = row.workflow_id;
@@ -199,13 +202,13 @@ function taskRowToDetailTask(row) {
 
     // Expose DB columns that are not stored inside task_json so the UI
     // can show actionable information for BLOCKED/FAILED tasks.
-    /** @type {string|null} Reason code set when task was blocked (e.g. 'ENV_UNAVAILABLE_LONG'). */
+    /** @type {string | null} Reason code set when task was blocked (e.g. 'ENV_UNAVAILABLE_LONG'). */
     task.blocked_reason = row.blocked_reason ?? null;
-    /** @type {number|null} Timestamp (ms) when task was blocked. */
+    /** @type {number | null} Timestamp (ms) when task was blocked. */
     task.blocked_at_ms = row.blocked_at_ms ?? null;
-    /** @type {string|null} Last error text from most recent failed attempt. */
+    /** @type {string | null} Last error text from most recent failed attempt. */
     task.last_error = row.last_error ?? null;
-    /** @type {Record<string, unknown>|string|null} Parsed blocked_details_json, or raw string if invalid JSON. */
+    /** @type {Record<string, unknown> | string | null} Parsed blocked_details_json, or raw string if invalid JSON. */
     task.blocked_details = null;
     if (row.blocked_details_json) {
         try {
@@ -213,7 +216,7 @@ function taskRowToDetailTask(row) {
         } catch (/** @type {any} */ _) {
             log(
                 'WARN',
-                `[task_views] malformed JSON in blocked_details_json for task ${row.id} — using raw string fallback`
+                `[task_views] malformed JSON in blocked_details_json for task ${row.id} — using raw string fallback`,
             );
             task.blocked_details = row.blocked_details_json;
         }
@@ -225,4 +228,4 @@ function taskRowToDetailTask(row) {
     return task;
 }
 
-export { buildTaskCommandCaps, parseTaskJson, taskRowToListItem, taskRowToDetailTask };
+export { buildTaskCommandCaps, parseTaskJson, taskRowToDetailTask, taskRowToListItem };

@@ -29,11 +29,11 @@
 import { getCorrelationId, getMessageType } from '#shared/nerv/envelope_reader';
 
 /**
- * Executa handlers de forma isolada.
- * Falhas são capturadas e observadas.
+ * Executa handlers de forma isolada. Falhas são capturadas e observadas.
+ *
  * @param {Function} handler
- * @param {*} envelope
- * @param {*} telemetry
+ * @param {any} envelope
+ * @param {any} telemetry
  */
 function safeCall(handler, envelope, telemetry) {
     try {
@@ -58,16 +58,15 @@ function safeCall(handler, envelope, telemetry) {
  */
 /**
  * @typedef {object} CreateReceptionOptions
- * @property {*} [envelopes]
- * @property {*} [correlation]
- * @property {*} [telemetry]
+ * @property {any} [envelopes]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
  */
 /**
  * Cria o módulo de recepção bruta do NERV.
  *
- * **Side-effects:** Registra envelopes na correlação histórica, notifica handlers.
- * **Semântica:** Receptor técnico que processa frames inbound desserializados.
- * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
+ * **Side-effects:** Registra envelopes na correlação histórica, notifica handlers. **Semântica:** Receptor técnico que
+ * processa frames inbound desserializados. **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
  * @param {CreateReceptionDeps} deps - Dependências do receptor
  * @returns {any} Receptor com métodos onMessage, receive
@@ -85,8 +84,7 @@ function createReception({ envelopes, correlation, telemetry }) {
   =========================== */
 
     /**
-     * Recebe um frame inbound já desserializado
-     * (objeto bruto ou buffer convertido).
+     * Recebe um frame inbound já desserializado (objeto bruto ou buffer convertido).
      *
      * @param {object} raw
      */

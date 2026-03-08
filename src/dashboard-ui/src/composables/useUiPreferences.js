@@ -1,7 +1,7 @@
 // @ts-check
-import { computed, ref } from 'vue';
-import { http } from '@/lib/http';
 import { useAuth } from '@/composables/useAuth';
+import { http } from '@/lib/http';
+import { computed, ref } from 'vue';
 
 const STORAGE_KEY = 'ui_preset_v1';
 const ALLOWED_PRESETS = new Set(['dense', 'balanced', 'focus']);
@@ -48,6 +48,7 @@ async function _saveToServer(/** @type {any} */ preset) {
 
 /**
  * Função exportada: useUiPreferences.
+ *
  * @returns {any}
  */
 export function useUiPreferences() {

@@ -45,8 +45,7 @@ function emptyMap() {
 /**
  * Cria um repositório técnico de métricas.
  *
- * @returns {any}
- * Estrutura contendo operações puramente técnicas.
+ * @returns {any} Estrutura contendo operações puramente técnicas.
  */
 function createMetrics() {
     const counters = emptyMap();

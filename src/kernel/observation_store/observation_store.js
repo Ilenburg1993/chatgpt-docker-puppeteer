@@ -16,15 +16,14 @@ import EventEmitter from 'node:events';
  */
 /**
  * @typedef {object} CreateObservationRecordOptions
- * @property {*} [msgId]
- * @property {*} [correlationId]
- * @property {*} [source]
- * @property {*} [payload]
- * @property {*} [originalTimestamp]
+ * @property {any} [msgId]
+ * @property {any} [correlationId]
+ * @property {any} [source]
+ * @property {any} [payload]
+ * @property {any} [originalTimestamp]
  */
 /**
- * Cria registro imutável de uma observação.
- * P9.5: Adiciona memoization de JSON serialization
+ * Cria registro imutável de uma observação. P9.5: Adiciona memoization de JSON serialization
  *
  * @param {CreateObservationRecordParams} params
  * @returns {any}
@@ -58,11 +57,8 @@ function createObservationRecord({ msgId, correlationId, source, payload, origin
 class ObservationStore extends EventEmitter {
     /**
      * @param {object} params
-     * @param {any} params.telemetry
-     * Canal de telemetria do Kernel.
-     *
-     * @param {number | null} [params.maxObservationsPerCorrelation]
-     * Limite técnico opcional (default: sem limite).
+     * @param {any} params.telemetry Canal de telemetria do Kernel.
+     * @param {number | null} [params.maxObservationsPerCorrelation] Limite técnico opcional (default: sem limite).
      */
     constructor({ telemetry, maxObservationsPerCorrelation = null }) {
         super();
@@ -75,20 +71,17 @@ class ObservationStore extends EventEmitter {
         this.maxObservationsPerCorrelation = maxObservationsPerCorrelation;
 
         /**
-         * Armazenamento primário:
-         * correlation_id -> lista de observações (ordem de chegada)
+         * Armazenamento primário: correlation_id -> lista de observações (ordem de chegada)
          */
         this.byCorrelation = new Map();
 
         /**
-         * Índice auxiliar para detecção de duplicação:
-         * msg_id -> true
+         * Índice auxiliar para detecção de duplicação: msg_id -> true
          */
         this.seenMsgIds = new Set();
 
         /**
-         * Índice temporal:
-         * Array de [timestamp, correlationId] para queries temporais
+         * Índice temporal: Array de [timestamp, correlationId] para queries temporais
          */
         this.temporalIndex = /** @type {any[]} */ ([]);
     }
@@ -100,16 +93,15 @@ class ObservationStore extends EventEmitter {
     /**
      * Ingere um EVENT como fato observado.
      *
-     * @param {any} eventEnvelope
-     * Envelope IPC do tipo EVENT.
+     * @param {any} eventEnvelope Envelope IPC do tipo EVENT.
      *
-     * Regras:
-     * - EVENT nunca é rejeitado por atraso
-     * - EVENT nunca é rejeitado por duplicação
-     * - EVENT nunca é interpretado
+     *   Regras:
      *
-     * @returns {any}
-     * Registro criado.
+     *   - EVENT nunca é rejeitado por atraso
+     *   - EVENT nunca é rejeitado por duplicação
+     *   - EVENT nunca é interpretado
+     *
+     * @returns {any} Registro criado.
      */
     ingestEvent(eventEnvelope) {
         if (!eventEnvelope || typeof eventEnvelope !== 'object') {
@@ -207,8 +199,7 @@ class ObservationStore extends EventEmitter {
      * Retorna todas as observações de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {ReadonlyArray<object>}
-     * Lista imutável de observações.
+     * @returns {ReadonlyArray<object>} Lista imutável de observações.
      */
     getByCorrelation(correlationId) {
         const list = this.byCorrelation.get(correlationId);
@@ -235,8 +226,8 @@ class ObservationStore extends EventEmitter {
                 const observations = this.getByCorrelation(correlationId);
                 results.push(
                     ...observations.filter(
-                        (/** @type {any} */ obs) => obs.ingestedAt >= startAt && obs.ingestedAt <= endAt
-                    )
+                        (/** @type {any} */ obs) => obs.ingestedAt >= startAt && obs.ingestedAt <= endAt,
+                    ),
                 );
             }
         }
@@ -248,7 +239,7 @@ class ObservationStore extends EventEmitter {
      * Retorna última observação de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {object|null}
+     * @returns {object | null}
      */
     getLastObservation(correlationId) {
         const list = this.byCorrelation.get(correlationId);
@@ -296,7 +287,7 @@ class ObservationStore extends EventEmitter {
     /**
      * Lista todas as correlation_ids ativas.
      *
-     * @returns {Array<string>}
+     * @returns {string[]}
      */
     listCorrelations() {
         return Array.from(this.byCorrelation.keys());
@@ -351,8 +342,7 @@ class ObservationStore extends EventEmitter {
      * Limpa observações antigas por critério temporal.
      *
      * @param {object} params
-     * @param {number} params.olderThan
-     * Timestamp limite.
+     * @param {number} params.olderThan Timestamp limite.
      */
     purgeOlderThan({ olderThan }) {
         let purgedCount = 0;

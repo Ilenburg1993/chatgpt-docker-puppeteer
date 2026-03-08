@@ -1,7 +1,7 @@
 // @ts-check
-import TurndownService from 'turndown';
-import { parse as parseHTML } from 'node-html-parser';
 import * as logger from '#core/logger';
+import { parse as parseHTML } from 'node-html-parser';
+import TurndownService from 'turndown';
 
 /**
  * StructuredExtractor - Extrai resposta LLM em múltiplos formatos
@@ -49,12 +49,15 @@ class StructuredExtractor {
             // 4. Preview estruturado
             const preview = this._generatePreview(rawExtraction.text, structured);
 
-            logger.debug('[STRUCTURED_EXTRACTOR] Extração completa', /** @type {any} */ ({
-                textLength: rawExtraction.text.length,
-                codeBlocks: structured.codeBlocks.length,
-                links: structured.links.length,
-                sections: structured.sections.length,
-            }));
+            logger.debug(
+                '[STRUCTURED_EXTRACTOR] Extração completa',
+                /** @type {any} */ ({
+                    textLength: rawExtraction.text.length,
+                    codeBlocks: structured.codeBlocks.length,
+                    links: structured.links.length,
+                    sections: structured.sections.length,
+                }),
+            );
 
             return {
                 text: rawExtraction.text,
@@ -64,7 +67,10 @@ class StructuredExtractor {
                 preview,
             };
         } catch (/** @type {any} */ error) {
-            logger.error('[STRUCTURED_EXTRACTOR] Erro ao extrair resposta', /** @type {any} */ ({ error: error.message }));
+            logger.error(
+                '[STRUCTURED_EXTRACTOR] Erro ao extrair resposta',
+                /** @type {any} */ ({ error: error.message }),
+            );
             return this._emptyResponse();
         }
     }
@@ -72,13 +78,13 @@ class StructuredExtractor {
     /**
      * Extrai HTML do browser (browser-side function)
      *
+     * @private
      * @param {any} protocol - SADI protocol
      * @returns {any} - { html, text, thoughtBlocksRemoved }
-     * @private
      */
     _extractHTML(protocol) {
         // Esta função roda NO BROWSER (não tem acesso a Node.js)
-        const msgs = Array.from((/** @type {any} */ (document)).querySelectorAll(protocol.selector));
+        const msgs = Array.from(/** @type {any} */ (document).querySelectorAll(protocol.selector));
         const targetMsg = msgs[msgs.length - 1];
 
         if (!targetMsg) {
@@ -99,7 +105,7 @@ class StructuredExtractor {
         ];
 
         let thoughtBlocksRemoved = 0;
-        thoughtSelectors.forEach(selector => {
+        thoughtSelectors.forEach((selector) => {
             const thoughts = clone.querySelectorAll(selector);
             thoughts.forEach((/** @type {any} */ t) => {
                 t.remove();
@@ -117,15 +123,18 @@ class StructuredExtractor {
     /**
      * Converte HTML para Markdown
      *
+     * @private
      * @param {string} html - HTML bruto
      * @returns {string} - Markdown formatado
-     * @private
      */
     _convertToMarkdown(html) {
         try {
             return this.turndownService.turndown(html);
         } catch (/** @type {any} */ error) {
-            logger.warn('[STRUCTURED_EXTRACTOR] Erro ao converter HTML → Markdown', /** @type {any} */ ({ error: error.message }));
+            logger.warn(
+                '[STRUCTURED_EXTRACTOR] Erro ao converter HTML → Markdown',
+                /** @type {any} */ ({ error: error.message }),
+            );
             // Fallback: retorna HTML como texto
             return html.replace(/<[^>]*>/g, '');
         }
@@ -134,9 +143,9 @@ class StructuredExtractor {
     /**
      * Parseia HTML para JSON estruturado
      *
+     * @private
      * @param {string} html - HTML bruto
      * @returns {any} - { sections, codeBlocks, links, images, tables }
-     * @private
      */
     _parseStructured(html) {
         try {
@@ -164,9 +173,9 @@ class StructuredExtractor {
     /**
      * Extrai seções (headings)
      *
+     * @private
      * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ level, text, content }]
-     * @private
      */
     _extractSections(root) {
         const sections = /** @type {any[]} */ ([]);
@@ -197,9 +206,9 @@ class StructuredExtractor {
     /**
      * Extrai code blocks
      *
+     * @private
      * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ language, code, isInline }]
-     * @private
      */
     _extractCodeBlocks(root) {
         const codeBlocks = /** @type {any[]} */ ([]);
@@ -240,9 +249,9 @@ class StructuredExtractor {
     /**
      * Detecta linguagem de code block
      *
+     * @private
      * @param {any} codeEl - Code element
      * @returns {string} - Language (python, javascript, etc)
-     * @private
      */
     _detectLanguage(codeEl) {
         // Tenta pegar de class (language-python, lang-js, etc)
@@ -265,9 +274,9 @@ class StructuredExtractor {
     /**
      * Extrai links
      *
+     * @private
      * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ text, href, title }]
-     * @private
      */
     _extractLinks(root) {
         const links = /** @type {any[]} */ ([]);
@@ -289,9 +298,9 @@ class StructuredExtractor {
     /**
      * Extrai images
      *
+     * @private
      * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ src, alt, title }]
-     * @private
      */
     _extractImages(root) {
         const images = /** @type {any[]} */ ([]);
@@ -313,9 +322,9 @@ class StructuredExtractor {
     /**
      * Extrai tables
      *
+     * @private
      * @param {any} root - Parsed HTML
      * @returns {unknown[]} - [{ headers, rows }]
-     * @private
      */
     _extractTables(root) {
         const tables = /** @type {any[]} */ ([]);
@@ -354,10 +363,10 @@ class StructuredExtractor {
     /**
      * Gera preview estruturado
      *
+     * @private
      * @param {string} text - Texto plano
      * @param {any} structured - Dados estruturados
      * @returns {any} - { text, sections_count, code_blocks_count, links_count, images_count }
-     * @private
      */
     _generatePreview(text, structured) {
         // Primeiro parágrafo (até 500 chars)
@@ -375,8 +384,8 @@ class StructuredExtractor {
     /**
      * Resposta vazia (fallback)
      *
-     * @returns {any}
      * @private
+     * @returns {any}
      */
     _emptyResponse() {
         return {

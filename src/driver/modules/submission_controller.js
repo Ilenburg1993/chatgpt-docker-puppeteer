@@ -1,10 +1,11 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
-import * as adaptive from '#logic/adaptive';
 import { log } from '#core/logger';
+import * as adaptive from '#logic/adaptive';
+import EventEmitter from 'node:events';
 
 /**
  * A Promise that also exposes a `.cancel()` method to clear its internal timer.
+ *
  * @typedef {Promise<never> & { cancel: () => void }} CancelableTimeoutPromise
  */
 
@@ -72,10 +73,11 @@ const SUBMISSION_EVENTS = {
 /**
  * SubmissionController v2.0 - Controlador de Submissão Atômica
  *
- * Gerencia a submissão atômica de mensagens com proteção anti-race condition
- * (lock temporal de 3s) e fallback sintético se Enter key física falhar.
+ * Gerencia a submissão atômica de mensagens com proteção anti-race condition (lock temporal de 3s) e fallback sintético
+ * se Enter key física falhar.
  *
  * FEATURES v2.0:
+ *
  * - EventEmitter inheritance (8 eventos locais)
  * - SUBMISSION_CONFIG (7 keys configuráveis via env vars)
  * - Timeout protection em submit (SUBMIT_TIMEOUT_MS)
@@ -85,42 +87,41 @@ const SUBMISSION_EVENTS = {
  * - JSDoc 100% (class, constructor, methods, events)
  * - getStats() method para introspection
  *
- * @extends EventEmitter
- *
  * @example
- * const controller = new SubmissionController(driver);
+ *     const controller = new SubmissionController(driver);
  *
- * // Listen to events
- * controller.on(SUBMISSION_EVENTS.SUBMISSION_STARTED, (data) => {
- *     console.log('Submission started:', data);
- * });
+ *     // Listen to events
+ *     controller.on(SUBMISSION_EVENTS.SUBMISSION_STARTED, (data) => {
+ *         console.log('Submission started:', data);
+ *     });
  *
- * controller.on(SUBMISSION_EVENTS.SUBMISSION_COMPLETED, (data) => {
- *     console.log('Submission completed:', data);
- * });
+ *     controller.on(SUBMISSION_EVENTS.SUBMISSION_COMPLETED, (data) => {
+ *         console.log('Submission completed:', data);
+ *     });
  *
- * // Execute submission
- * await controller.submit(page, '#prompt-textarea', 'task-123');
+ *     // Execute submission
+ *     await controller.submit(page, '#prompt-textarea', 'task-123');
  *
- * // Get metrics
- * const stats = controller.getStats();
- * console.log('Total submissions:', stats.totalSubmissions);
+ *     // Get metrics
+ *     const stats = controller.getStats();
+ *     console.log('Total submissions:', stats.totalSubmissions);
+ *
+ * @extends EventEmitter
  */
 class SubmissionController extends EventEmitter {
     /**
      * Cria uma instância do SubmissionController.
+     *
+     * @example
+     *     const controller = new SubmissionController(driver);
      *
      * @param {object} driver - Instância do driver (BaseDriver ou subclasses)
      * @param {function} driver._emitVital - Método IPC para telemetria vital
      * @param {string} driver.correlationId - ID de correlação para logs
      * @param {object} driver.page - Instância Puppeteer Page
      * @param {string} driver.currentDomain - Domain atual para adaptive timeout
-     *
      * @throws {Error} Se driver não for fornecido
      * @throws {Error} Se driver._emitVital não for uma função
-     *
-     * @example
-     * const controller = new SubmissionController(driver);
      */
     constructor(driver) {
         super(); // EventEmitter constructor
@@ -153,6 +154,7 @@ class SubmissionController extends EventEmitter {
      * Executa submissão atômica de mensagem.
      *
      * FLUXO DE EXECUÇÃO:
+     *
      * 1. Gate de duplicidade (anti-race lock check)
      * 2. Lock acquisition (timestamp + evento)
      * 3. Biomechanical pause (PRE_PRESS_DELAY_MS)
@@ -162,27 +164,24 @@ class SubmissionController extends EventEmitter {
      * 7. Synthetic fallback (se physical falhou, retry loop)
      * 8. Post-send stabilization (POST_SEND_DELAY_MS)
      *
+     * @example
+     *     await controller.submit(page, '#prompt-textarea', 'task-123');
+     *
+     * @fires SUBMISSION_EVENTS.SUBMISSION_STARTED
+     * @fires SUBMISSION_EVENTS.LOCK_ACQUIRED
+     * @fires SUBMISSION_EVENTS.ENTER_SENT
+     * @fires SUBMISSION_EVENTS.CLEARED_CONFIRMED
+     * @fires SUBMISSION_EVENTS.SYNTHETIC_TRIGGERED
+     * @fires SUBMISSION_EVENTS.SUBMISSION_COMPLETED
+     * @fires SUBMISSION_EVENTS.SUBMISSION_FAILED
      * @param {object} ctx - Context (Page ou Frame) para execução
      * @param {string} selector - Seletor CSS do campo de input
      * @param {string} taskId - ID da task para telemetria
-     *
      * @returns {Promise<void>}
-     *
      * @throws {Error} Se ctx for null/undefined
      * @throws {Error} Se selector for vazio/inválido
      * @throws {Error} Se taskId não for fornecido
      * @throws {Error} Se timeout exceder SUBMIT_TIMEOUT_MS
-     *
-     * @emits SUBMISSION_EVENTS.SUBMISSION_STARTED
-     * @emits SUBMISSION_EVENTS.LOCK_ACQUIRED
-     * @emits SUBMISSION_EVENTS.ENTER_SENT
-     * @emits SUBMISSION_EVENTS.CLEARED_CONFIRMED
-     * @emits SUBMISSION_EVENTS.SYNTHETIC_TRIGGERED
-     * @emits SUBMISSION_EVENTS.SUBMISSION_COMPLETED
-     * @emits SUBMISSION_EVENTS.SUBMISSION_FAILED
-     *
-     * @example
-     * await controller.submit(page, '#prompt-textarea', 'task-123');
      */
     async submit(ctx, selector, taskId) {
         // ✅ Validação de parâmetros (BUG #3 fix)
@@ -238,7 +237,6 @@ class SubmissionController extends EventEmitter {
      * @param {string} selector - Seletor CSS
      * @param {string} taskId - Task ID
      * @param {string} correlationId - Correlation ID para logs
-     *
      * @returns {Promise<void>}
      */
     async _executeSubmit(ctx, selector, taskId, correlationId) {
@@ -277,7 +275,7 @@ class SubmissionController extends EventEmitter {
         });
 
         // STEP 3: BIOMECHANICAL PAUSE (pre-press delay)
-        await new Promise(r => setTimeout(r, SUBMISSION_CONFIG.PRE_PRESS_DELAY_MS));
+        await new Promise((r) => setTimeout(r, SUBMISSION_CONFIG.PRE_PRESS_DELAY_MS));
 
         // STEP 4: PHYSICAL TRIGGER (Enter key)
         this.emit(SUBMISSION_EVENTS.ENTER_SENT, {
@@ -302,7 +300,7 @@ class SubmissionController extends EventEmitter {
             // Fallback to default
         }
 
-        await new Promise(r => setTimeout(r, debounceDelay));
+        await new Promise((r) => setTimeout(r, debounceDelay));
 
         // STEP 6: EMPTINESS VERIFICATION (confirmation)
         const wasCleared = await this._verifyClearing(ctx, selector);
@@ -344,7 +342,7 @@ class SubmissionController extends EventEmitter {
         }
 
         // STEP 8: POST-SEND STABILIZATION
-        await new Promise(r => setTimeout(r, SUBMISSION_CONFIG.POST_SEND_DELAY_MS));
+        await new Promise((r) => setTimeout(r, SUBMISSION_CONFIG.POST_SEND_DELAY_MS));
 
         // Success metrics
         this.stats.successfulSubmissions++;
@@ -368,7 +366,6 @@ class SubmissionController extends EventEmitter {
      * @private
      * @param {object} ctx - Context (Page/Frame)
      * @param {string} selector - Seletor CSS
-     *
      * @returns {Promise<boolean>} true se campo vazio, false caso contrário
      */
     async _verifyClearing(ctx, selector) {
@@ -386,9 +383,7 @@ class SubmissionController extends EventEmitter {
      * @param {object} ctx - Context (Page/Frame)
      * @param {string} selector - Seletor CSS
      * @param {string} correlationId - Correlation ID para logs
-     *
      * @returns {Promise<void>}
-     *
      * @throws {Error} Se todas as tentativas falharem
      */
     async _executeSyntheticSubmit(ctx, selector, correlationId) {
@@ -410,7 +405,7 @@ class SubmissionController extends EventEmitter {
                         keyCode: 13,
                     };
 
-                    ['keydown', 'keypress', 'keyup'].forEach(t => {
+                    ['keydown', 'keypress', 'keyup'].forEach((t) => {
                         el.dispatchEvent(new KeyboardEvent(t, evParams));
                     });
                 }, selector);
@@ -423,7 +418,7 @@ class SubmissionController extends EventEmitter {
                 });
 
                 // Verify clearing after synthetic
-                await new Promise(r => setTimeout(r, SUBMISSION_CONFIG.DEBOUNCE_FALLBACK_MS));
+                await new Promise((r) => setTimeout(r, SUBMISSION_CONFIG.DEBOUNCE_FALLBACK_MS));
                 const wasCleared = await this._verifyClearing(ctx, selector);
 
                 if (wasCleared) {
@@ -435,9 +430,9 @@ class SubmissionController extends EventEmitter {
                     log(
                         'WARN',
                         `[SUBMISSION] Synthetic fallback failed (retry ${retry + 1}/${maxRetries})`,
-                        correlationId
+                        correlationId,
                     );
-                    await new Promise(r => setTimeout(r, 500 * (retry + 1))); // Backoff
+                    await new Promise((r) => setTimeout(r, 500 * (retry + 1))); // Backoff
                 } else {
                     throw syntheticErr; // Max retries exceeded
                 }
@@ -452,12 +447,11 @@ class SubmissionController extends EventEmitter {
      *
      * Útil para testes ou recovery de estados travados.
      *
-     * @returns {void}
-     *
-     * @emits SUBMISSION_EVENTS.LOCK_CLEARED
-     *
      * @example
-     * controller.clearLock();
+     *     controller.clearLock();
+     *
+     * @fires SUBMISSION_EVENTS.LOCK_CLEARED
+     * @returns {void}
      */
     clearLock() {
         this.submissionLock = null;
@@ -473,12 +467,12 @@ class SubmissionController extends EventEmitter {
     /**
      * Verifica se o controlador está em período de cooldown.
      *
-     * @returns {boolean} true se locked, false se disponível
-     *
      * @example
-     * if (!controller.isLocked()) {
-     *     await controller.submit(ctx, selector, taskId);
-     * }
+     *     if (!controller.isLocked()) {
+     *         await controller.submit(ctx, selector, taskId);
+     *     }
+     *
+     * @returns {boolean} true se locked, false se disponível
      */
     isLocked() {
         return !!(this.submissionLock && Date.now() - this.submissionLock < SUBMISSION_CONFIG.LOCK_DURATION_MS);
@@ -487,8 +481,16 @@ class SubmissionController extends EventEmitter {
     /**
      * Retorna estatísticas de submission.
      *
-     * @returns {any} Objeto com métricas de submission
-     * Propriedades do objeto retornado:
+     * @example
+     *     const stats = controller.getStats();
+     *     console.log('Total submissions:', stats.totalSubmissions);
+     *     console.log(
+     *         'Success rate:',
+     *         ((stats.successfulSubmissions / stats.totalSubmissions) * 100).toFixed(2) + '%',
+     *     );
+     *
+     * @returns {any} Objeto com métricas de submission Propriedades do objeto retornado:
+     *
      *   - totalSubmissions (number): Total de submissions executadas
      *   - successfulSubmissions (number): Submissions bem-sucedidas
      *   - failedSubmissions (number): Submissions que falharam
@@ -497,11 +499,6 @@ class SubmissionController extends EventEmitter {
      *   - totalSubmissionDuration (number): Duração total acumulada (ms)
      *   - maxSubmissionDuration (number): Duração máxima individual (ms)
      *   - config (Object): Configuração atual (SUBMISSION_CONFIG)
-     *
-     * @example
-     * const stats = controller.getStats();
-     * console.log('Total submissions:', stats.totalSubmissions);
-     * console.log('Success rate:', (stats.successfulSubmissions / stats.totalSubmissions * 100).toFixed(2) + '%');
      */
     getStats() {
         return {
@@ -516,7 +513,6 @@ class SubmissionController extends EventEmitter {
      * @private
      * @param {number} ms - Timeout em milissegundos
      * @param {string} operation - Nome da operação (para error message)
-     *
      * @returns {CancelableTimeoutPromise} Promise que rejeita após timeout com método `.cancel()` para limpar o timer
      */
     _timeout(ms, operation) {
@@ -537,20 +533,20 @@ class SubmissionController extends EventEmitter {
 
 /**
  * @typedef {object} CreateDriver
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Factory function para criar instância de SubmissionController.
  *
+ * @example
+ *     const { create } = require('./submission_controller');
+ *     const controller = create(driver);
+ *
  * @param {object} driver - Instância do driver
  * @returns {SubmissionController} Nova instância
- *
- * @example
- * const { create } = require('./submission_controller');
- * const controller = create(driver);
  */
 function create(driver) {
     return new SubmissionController(/** @type {any} */ (driver));
 }
 
-export { SubmissionController, SUBMISSION_CONFIG, SUBMISSION_EVENTS, create };
+export { create, SUBMISSION_CONFIG, SUBMISSION_EVENTS, SubmissionController };

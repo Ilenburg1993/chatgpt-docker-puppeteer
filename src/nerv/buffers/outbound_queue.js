@@ -27,6 +27,7 @@
 
 /**
  * Cria um array vazio isolado.
+ *
  * @returns {any[]}
  */
 function createQueue() {
@@ -40,20 +41,19 @@ function createQueue() {
 /**
  * @typedef {object} CreateOutboundQueueDeps
  * @property {any} telemetry
- * @property {number|null} maxSize
+ * @property {number | null} maxSize
  */
 /**
  * @typedef {object} CreateOutboundQueueOptions
- * @property {*} [telemetry]
- * @property {*} [maxSize]
+ * @property {any} [telemetry]
+ * @property {any} [maxSize]
  */
 /**
  * Cria a fila técnica de saída.
  *
- * @param {CreateOutboundQueueDeps} deps
- * Interface de telemetria do NERV (observação técnica).
+ * @param {CreateOutboundQueueDeps} deps Interface de telemetria do NERV (observação técnica).
  *
- * Limite máximo técnico da fila (opcional).
+ *   Limite máximo técnico da fila (opcional).
  * @returns {any}
  */
 function createOutboundQueue({ telemetry, maxSize = null }) {
@@ -81,8 +81,7 @@ function createOutboundQueue({ telemetry, maxSize = null }) {
     /**
      * Enfileira item na fila outbound.
      *
-     * @param {object} item
-     * Item opaco (frame, bytes ou estrutura técnica)
+     * @param {object} item Item opaco (frame, bytes ou estrutura técnica)
      * @returns {boolean} true se aceito, false se recusado por pressão
      */
     function enqueue(item) {

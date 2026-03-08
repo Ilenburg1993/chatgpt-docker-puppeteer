@@ -1,13 +1,13 @@
 // @ts-check
-import express from 'express';
 import { log } from '#core/logger';
-import { ok, fail } from '../utils/api_envelope.js';
-import { authenticate } from '../../middleware/auth.js';
-import { COMMANDS, executeCommand } from '#server/domain/control_command_service';
 import { listInferenceBackends } from '#infra/db/inference_backend_repo';
+import { listInferenceClientPolicies } from '#infra/db/inference_client_policy_repo';
 import { listInferenceModels } from '#infra/db/inference_model_repo';
 import { listInferenceProfiles } from '#infra/db/inference_profile_repo';
-import { listInferenceClientPolicies } from '#infra/db/inference_client_policy_repo';
+import { COMMANDS, executeCommand } from '#server/domain/control_command_service';
+import express from 'express';
+import { authenticate } from '../../middleware/auth.js';
+import { fail, ok } from '../utils/api_envelope.js';
 
 /** @type {ReturnType<typeof express.Router>} */
 const router = express.Router();
@@ -16,7 +16,12 @@ function _actorFromReq(/** @type {any} */ req) {
     return req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] };
 }
 
-async function _runControl(/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ command, /** @type {Record<string, any>} */ payload = {}) {
+async function _runControl(
+    /** @type {any} */ req,
+    /** @type {any} */ res,
+    /** @type {any} */ command,
+    /** @type {Record<string, any>} */ payload = {},
+) {
     try {
         const result = await executeCommand({
             command,
@@ -76,12 +81,12 @@ function _enrichModelDb(/** @type {any} */ model) {
 }
 
 /**
- * @param {{ backends?: any[], models?: any[], profiles?: any[], clientPolicies?: any[] }} param0
+ * @param {{ backends?: any[]; models?: any[]; profiles?: any[]; clientPolicies?: any[] }} param0
  * @returns {any}
  */
 function _buildInferenceSummary({ backends = [], models = [], profiles = [], clientPolicies = [] }) {
-    const enabledBackends = backends.filter(b => b?.enabled);
-    const enabledModels = models.filter(m => m?.enabled);
+    const enabledBackends = backends.filter((b) => b?.enabled);
+    const enabledModels = models.filter((m) => m?.enabled);
     const byBackend = /** @type {Record<string, any>} */ ({});
     for (const backend of backends) {
         byBackend[backend.id] = {
@@ -115,16 +120,16 @@ function _buildInferenceSummary({ backends = [], models = [], profiles = [], cli
             models_total: models.length,
             models_enabled: enabledModels.length,
             profiles_total: profiles.length,
-            profiles_enabled: profiles.filter(p => p?.enabled).length,
+            profiles_enabled: profiles.filter((p) => p?.enabled).length,
             client_policies_total: clientPolicies.length,
-            client_policies_enabled: clientPolicies.filter(p => p?.enabled).length,
+            client_policies_enabled: clientPolicies.filter((p) => p?.enabled).length,
         },
         by_backend: Object.values(byBackend),
         capability_totals: {
-            code_patch_models: models.filter(m => _capabilitySummary(m).supports_code_patch).length,
-            embedding_models: models.filter(m => _capabilitySummary(m).supports_embeddings).length,
-            json_strict_models: models.filter(m => _capabilitySummary(m).supports_json_strict).length,
-            long_context_models: models.filter(m => _capabilitySummary(m).supports_long_context).length,
+            code_patch_models: models.filter((m) => _capabilitySummary(m).supports_code_patch).length,
+            embedding_models: models.filter((m) => _capabilitySummary(m).supports_embeddings).length,
+            json_strict_models: models.filter((m) => _capabilitySummary(m).supports_json_strict).length,
+            long_context_models: models.filter((m) => _capabilitySummary(m).supports_long_context).length,
         },
     };
 }
@@ -193,7 +198,7 @@ router.get('/inference/runtime', authenticate, async (req, res) => {
 
         const resources = Array.isArray(runtimeSummary?.resources)
             ? runtimeSummary.resources.filter((/** @type {any} */ item) =>
-                  ['ollama_host', 'inference_gateway', 'audit_agent'].includes(String(item.id))
+                  ['ollama_host', 'inference_gateway', 'audit_agent'].includes(String(item.id)),
               )
             : [];
 
@@ -210,7 +215,7 @@ router.get('/inference/runtime', authenticate, async (req, res) => {
             },
             {
                 readiness_status: runtimeSummary?.status || 'unknown',
-            }
+            },
         );
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
@@ -391,14 +396,14 @@ router.post('/inference/triage/preflight', authenticate, async (req, res) => {
                 model: model ? String(model) : undefined,
                 backend: backend ? String(backend) : undefined,
             },
-            timeoutMs
+            timeoutMs,
         );
         const modelsProbe =
             String(body.probe_models || 'false').toLowerCase() === 'true'
                 ? await safePostJson(
                       `${urls.inferenceGateway}/v1/models`,
                       { clientTag: 'diagnostics_probe' },
-                      Math.min(timeoutMs + 1000, 5000)
+                      Math.min(timeoutMs + 1000, 5000),
                   )
                 : null;
         if (!out.ok) {
@@ -422,7 +427,7 @@ router.post('/inference/triage/preflight', authenticate, async (req, res) => {
                     client_tag: 'audit_agent_triage',
                 },
             },
-            { source: 'inference-gateway', endpoint: '/v1/validate/generate' }
+            { source: 'inference-gateway', endpoint: '/v1/validate/generate' },
         );
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
@@ -451,7 +456,7 @@ router.post('/inference/patch/preflight', authenticate, async (req, res) => {
                 model: model ? String(model) : undefined,
                 backend: backend ? String(backend) : undefined,
             },
-            timeoutMs
+            timeoutMs,
         );
         if (!out.ok) {
             return fail(res, req, out.status || 503, {
@@ -473,7 +478,7 @@ router.post('/inference/patch/preflight', authenticate, async (req, res) => {
                     client_tag: 'audit_agent_patch',
                 },
             },
-            { source: 'inference-gateway', endpoint: '/v1/validate/generate' }
+            { source: 'inference-gateway', endpoint: '/v1/validate/generate' },
         );
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);

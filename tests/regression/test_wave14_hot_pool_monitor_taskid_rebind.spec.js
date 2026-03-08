@@ -1,10 +1,10 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import EventEmitter from 'node:events';
+import test from 'node:test';
 
-import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 import { PageLifecycleMonitor } from '#infra/browser_pool/PageLifecycleMonitor';
+import BrowserPoolManager from '#infra/browser_pool/pool_manager';
 
 test('wave14: updatePageTaskId rebinds lifecycle monitor taskId on hot-reuse', () => {
     const manager = new BrowserPoolManager({ poolSize: 1 });

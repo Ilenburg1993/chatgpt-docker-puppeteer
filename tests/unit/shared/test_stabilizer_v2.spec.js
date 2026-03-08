@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 describe('stabilizer.js v2.0 - Unit Tests', () => {
     /** @type {any} */ let mockDriver;
@@ -266,7 +266,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 assert.ok(
                     hydrationSource.includes("removeEventListener('mousemove'"),
-                    'Hydration guard deve remover listener de mousemove explicitamente'
+                    'Hydration guard deve remover listener de mousemove explicitamente',
                 );
             });
         });
@@ -294,7 +294,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 // Verificar evento STABILITY_ABORTED
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const abortEvents = calls.filter(c => c.arguments[0] === 'STABILITY_ABORTED');
+                const abortEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_ABORTED');
                 assert.ok(abortEvents.length > 0, 'STABILITY_ABORTED event não emitido');
             });
         });
@@ -309,7 +309,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 await waitForStability(mockDriver, 5000);
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const startEvents = calls.filter(c => c.arguments[0] === 'STABILITY_START');
+                const startEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_START');
 
                 assert.ok(startEvents.length > 0, 'STABILITY_START não emitido');
             });
@@ -324,7 +324,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 if (result.success) {
                     /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                    const completeEvents = calls.filter(c => c.arguments[0] === 'STABILITY_COMPLETE');
+                    const completeEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_COMPLETE');
                     assert.ok(completeEvents.length > 0, 'STABILITY_COMPLETE não emitido');
                 }
             });
@@ -338,7 +338,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 await waitForStability(mockDriver, 5000);
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const phaseStartEvents = calls.filter(c => c.arguments[0] === 'PHASE_START');
+                const phaseStartEvents = calls.filter((c) => c.arguments[0] === 'PHASE_START');
 
                 // Deve ter pelo menos 1 PHASE_START
                 assert.ok(phaseStartEvents.length > 0, 'PHASE_START não emitido');
@@ -353,7 +353,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 await waitForStability(mockDriver, 5000);
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const phaseSuccessEvents = calls.filter(c => c.arguments[0] === 'PHASE_SUCCESS');
+                const phaseSuccessEvents = calls.filter((c) => c.arguments[0] === 'PHASE_SUCCESS');
 
                 assert.ok(phaseSuccessEvents.length > 0, 'PHASE_SUCCESS não emitido');
             });
@@ -369,7 +369,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 });
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const errorEvents = calls.filter(c => c.arguments[0] === 'STABILITY_ERROR');
+                const errorEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_ERROR');
 
                 assert.ok(errorEvents.length > 0, 'STABILITY_ERROR não emitido');
             });
@@ -387,7 +387,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 assert.strictEqual(result.success, false);
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const abortEvents = calls.filter(c => c.arguments[0] === 'STABILITY_ABORTED');
+                const abortEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_ABORTED');
                 assert.ok(abortEvents.length > 0);
             });
 
@@ -400,11 +400,11 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
                 setTimeout(() => controller.abort(), 100);
 
                 mockPage.evaluate = mock.fn(async () => {
-                    await new Promise(r => setTimeout(r, 50)); // Delay para permitir abort
+                    await new Promise((r) => setTimeout(r, 50)); // Delay para permitir abort
                     return false;
                 });
                 mockPage.waitForNetworkIdle = mock.fn(async () => {
-                    await new Promise(r => setTimeout(r, 50));
+                    await new Promise((r) => setTimeout(r, 50));
                 });
 
                 const result = await waitForStability(mockDriver, 10000, controller.signal);
@@ -509,11 +509,11 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
                 // Força o deadline global expirar antes da fase 2 iniciar.
                 mockPage.evaluate = mock.fn(async () => {
-                    await new Promise(r => setTimeout(r, 200)); // Delay longo
+                    await new Promise((r) => setTimeout(r, 200)); // Delay longo
                     return false;
                 });
                 mockPage.waitForNetworkIdle = mock.fn(async () => {
-                    await new Promise(r => setTimeout(r, 200));
+                    await new Promise((r) => setTimeout(r, 200));
                 });
 
                 const result = await waitForStability(mockDriver, 100); // Timeout bem curto
@@ -638,11 +638,11 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             setTimeout(() => controller.abort(), 200);
 
             mockPage.evaluate = mock.fn(async () => {
-                await new Promise(r => setTimeout(r, 100)); // Delay para permitir abort
+                await new Promise((r) => setTimeout(r, 100)); // Delay para permitir abort
                 return false;
             });
             mockPage.waitForNetworkIdle = mock.fn(async () => {
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise((r) => setTimeout(r, 100));
             });
 
             const result = await waitForStability(mockDriver, 30000, controller.signal);
@@ -663,7 +663,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
             // Cada execução deve ter emitido STABILITY_START
             /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-            const startEvents = calls.filter(c => c.arguments[0] === 'STABILITY_START');
+            const startEvents = calls.filter((c) => c.arguments[0] === 'STABILITY_START');
 
             assert.ok(startEvents.length >= 3, `Esperado >= 3 STABILITY_START, obteve ${startEvents.length}`);
         });
@@ -718,11 +718,11 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
 
             // Mock operações longas
             mockPage.evaluate = mock.fn(async () => {
-                await new Promise(r => setTimeout(r, 2000)); // 2s cada
+                await new Promise((r) => setTimeout(r, 2000)); // 2s cada
                 return false;
             });
             mockPage.waitForNetworkIdle = mock.fn(async () => {
-                await new Promise(r => setTimeout(r, 2000));
+                await new Promise((r) => setTimeout(r, 2000));
             });
 
             const result = await waitForStability(mockDriver, 3000); // Timeout 3s
@@ -772,7 +772,7 @@ describe('stabilizer.js v2.0 - Unit Tests', () => {
             // Não há como testar leak diretamente em unit test, mas podemos verificar
             // que cleanup foi chamado 10 vezes
             const cleanupCalls = mockPage.evaluate.mock.calls.filter((/** @type {any} */ c) =>
-                c.arguments[0]?.toString().includes('__STABILIZER_OBSERVERS')
+                c.arguments[0]?.toString().includes('__STABILIZER_OBSERVERS'),
             );
 
             console.log(`  🧹 Observer cleanup calls: ${cleanupCalls.length}`);

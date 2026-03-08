@@ -1,13 +1,12 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it, before } from 'node:test';
-import { MissionManager } from '#missions/mission_manager';
+import { createKernel } from '#kernel/kernel';
 import { FeedbackProcessor } from '#missions/feedback_processor';
+import { MissionManager } from '#missions/mission_manager';
+import { createNERV } from '#nerv/nerv';
 import { CheckpointManager } from '#orchestrator/checkpoint_manager';
 import { ContextManager } from '#orchestrator/context_manager';
-import { OrchestratorEngine } from '#orchestrator/orchestrator_engine';
-import { createKernel } from '#kernel/kernel';
-import { createNERV } from '#nerv/nerv';
+import assert from 'node:assert';
+import { before, describe, it } from 'node:test';
 
 describe('Boot Integration - Phase 2 Components', () => {
     /** @type {any} */ let nerv;
@@ -27,7 +26,7 @@ describe('Boot Integration - Phase 2 Components', () => {
                 correlation: true,
                 bufferSize: 1000,
                 telemetry: false,
-            })
+            }),
         );
 
         // Fase 3.5: ContextManager Compartilhado

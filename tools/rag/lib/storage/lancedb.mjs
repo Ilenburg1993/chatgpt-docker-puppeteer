@@ -1,10 +1,10 @@
 // @ts-check
 import { connect, Index } from '@lancedb/lancedb';
-import { Schema, Field, Utf8, Int32, Int64, Float32, FixedSizeList, List, Bool } from 'apache-arrow';
-import { rerank } from '../retrieve/reranker.mjs';
-import { maximalMarginalRelevance } from '../retrieve/diversity.mjs';
-import { normalizeContentClass } from '../content_class.mjs';
+import { Bool, Field, FixedSizeList, Float32, Int32, Int64, List, Schema, Utf8 } from 'apache-arrow';
 import { withTimeout } from '../../../../src/infra/abort_controller_utils.js';
+import { normalizeContentClass } from '../content_class.mjs';
+import { maximalMarginalRelevance } from '../retrieve/diversity.mjs';
+import { rerank } from '../retrieve/reranker.mjs';
 
 export const TABLE_NAME = 'chunks_v2';
 
@@ -40,8 +40,9 @@ export function buildSchema(/** @type {any} */ embeddingDim) {
     ]);
 }
 
-export async function ensureTable(/** @type {any} */ db,  /** @type {any} */ embeddingDim) {
-    return await withTimeout(/** @type {any} */ async () => {
+export async function ensureTable(/** @type {any} */ db, /** @type {any} */ embeddingDim) {
+    return await withTimeout(
+        /** @type {any} */ async () => {
             const tables = await db.tableNames();
             if (tables.includes(TABLE_NAME)) {
                 return db.openTable(TABLE_NAME);
@@ -51,7 +52,7 @@ export async function ensureTable(/** @type {any} */ db,  /** @type {any} */ emb
             return db.openTable(TABLE_NAME);
         },
         15000,
-        'LANCEDB_ENSURE_TABLE_TIMEOUT'
+        'LANCEDB_ENSURE_TABLE_TIMEOUT',
     );
 }
 
@@ -71,18 +72,24 @@ export async function createFTSIndex(/** @type {any} */ table) {
     }
 }
 
-export async function deleteByPath(/** @type {any} */ table,  /** @type {any} */ relPath) {
-    return await withTimeout(/** @type {any} */ async () => {
+export async function deleteByPath(/** @type {any} */ table, /** @type {any} */ relPath) {
+    return await withTimeout(
+        /** @type {any} */ async () => {
             const safe = relPath.replace(/'/g, "''");
             await table.delete(`path = '${safe}'`);
         },
         30000,
-        'LANCEDB_DELETE_BY_PATH_TIMEOUT'
+        'LANCEDB_DELETE_BY_PATH_TIMEOUT',
     );
 }
 
-export async function addChunks(/** @type {any} */ table, /** @type {any} */ rows, /** @type {any} */ { batchSize = 32 } = {}) {
-    return await withTimeout(/** @type {any} */ async () => {
+export async function addChunks(
+    /** @type {any} */ table,
+    /** @type {any} */ rows,
+    /** @type {any} */ { batchSize = 32 } = {},
+) {
+    return await withTimeout(
+        /** @type {any} */ async () => {
             let total = 0;
             let retriedWithoutContentClass = false;
             for (let i = 0; i < rows.length; i += batchSize) {
@@ -97,12 +104,15 @@ export async function addChunks(/** @type {any} */ table, /** @type {any} */ row
                     if (!schemaCompatIssue) {
                         throw error;
                     }
-                    const fallbackBatch = batch.map((/** @type {any} */ row) => { const { content_class: _contentClass, ...rest } = row; return rest; });
+                    const fallbackBatch = batch.map((/** @type {any} */ row) => {
+                        const { content_class: _contentClass, ...rest } = row;
+                        return rest;
+                    });
                     await table.add(fallbackBatch);
                     if (!retriedWithoutContentClass) {
                         retriedWithoutContentClass = true;
                         console.warn(
-                            '[RAG] Table schema without content_class detected; writing fallback rows (rebuild recommended).'
+                            '[RAG] Table schema without content_class detected; writing fallback rows (rebuild recommended).',
                         );
                     }
                 }
@@ -111,24 +121,26 @@ export async function addChunks(/** @type {any} */ table, /** @type {any} */ row
             return total;
         },
         60000,
-        'LANCEDB_ADD_CHUNKS_TIMEOUT'
+        'LANCEDB_ADD_CHUNKS_TIMEOUT',
     );
 }
 
-export async function getChunkById(/** @type {any} */ table,  /** @type {any} */ chunkId) {
-    return await withTimeout(/** @type {any} */ async () => {
+export async function getChunkById(/** @type {any} */ table, /** @type {any} */ chunkId) {
+    return await withTimeout(
+        /** @type {any} */ async () => {
             const safe = String(chunkId || '').replace(/'/g, "''");
             const rows = await table.query().where(`chunk_id = '${safe}'`).limit(1).toArray();
             if (!rows.length) return null;
             return formatResult(rows[0]);
         },
         15000,
-        'LANCEDB_GET_CHUNK_BY_ID_TIMEOUT'
+        'LANCEDB_GET_CHUNK_BY_ID_TIMEOUT',
     );
 }
 
 export async function getChunkStats(/** @type {any} */ table) {
-    return await withTimeout(/** @type {any} */ async () => {
+    return await withTimeout(
+        /** @type {any} */ async () => {
             let chunkCount = null;
             const counters = ['countRows', 'count_rows', 'count'];
             for (const fn of counters) {
@@ -151,8 +163,8 @@ export async function getChunkStats(/** @type {any} */ table) {
                 chunk_count: chunkCount,
                 has_rows: Boolean(sampleRow),
                 sample_has_v2_fields: sampleRow
-                    ? ['kind', 'symbol', 'header_text', 'embed_text', 'chunk_prev_id', 'chunk_next_id'].every((/** @type {any} */ k) =>
-                          Object.prototype.hasOwnProperty.call(sampleRow, k)
+                    ? ['kind', 'symbol', 'header_text', 'embed_text', 'chunk_prev_id', 'chunk_next_id'].every(
+                          (/** @type {any} */ k) => Object.prototype.hasOwnProperty.call(sampleRow, k),
                       )
                     : null,
                 sample_has_content_class: sampleRow
@@ -161,12 +173,12 @@ export async function getChunkStats(/** @type {any} */ table) {
             };
         },
         15000,
-        'LANCEDB_CHUNK_STATS_TIMEOUT'
+        'LANCEDB_CHUNK_STATS_TIMEOUT',
     );
 }
 
 /**
- * @param {{ pathPrefix?: string, ext?: string, tags?: string[] }} [filters]
+ * @param {{ pathPrefix?: string; ext?: string; tags?: string[] }} [filters]
  */
 function buildWhere(/** @type {any} */ { pathPrefix, ext, tags } = {}) {
     const parts = [];
@@ -187,10 +199,19 @@ function buildWhere(/** @type {any} */ { pathPrefix, ext, tags } = {}) {
 /**
  * @param {any} table
  * @param {number[]} vector
- * @param {{ topK?: number, filters?: { pathPrefix?: string, ext?: string, tags?: string[] }, distanceRange?: [number, number] | { min?: number, max?: number } }} [options]
+ * @param {{
+ *     topK?: number;
+ *     filters?: { pathPrefix?: string; ext?: string; tags?: string[] };
+ *     distanceRange?: [number, number] | { min?: number; max?: number };
+ * }} [options]
  */
-export async function search(/** @type {any} */ table, /** @type {any} */ vector, /** @type {any} */ { topK = 8, filters = {}, distanceRange } = {}) {
-    return await withTimeout(/** @type {any} */ async () => {
+export async function search(
+    /** @type {any} */ table,
+    /** @type {any} */ vector,
+    /** @type {any} */ { topK = 8, filters = {}, distanceRange } = {},
+) {
+    return await withTimeout(
+        /** @type {any} */ async () => {
             const where = buildWhere(filters);
             let q = table.search(vector);
 
@@ -208,7 +229,10 @@ export async function search(/** @type {any} */ table, /** @type {any} */ vector
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter((/** @type {any} */ r) => Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)));
+                filtered = rows.filter(
+                    (/** @type {any} */ r) =>
+                        Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)),
+                );
             }
 
             filtered.sort((/** @type {any} */ a, /** @type {any} */ b) => {
@@ -223,7 +247,7 @@ export async function search(/** @type {any} */ table, /** @type {any} */ vector
             return filtered.slice(0, topK).map(formatResult);
         },
         45000,
-        'LANCEDB_SEARCH_TIMEOUT'
+        'LANCEDB_SEARCH_TIMEOUT',
     );
 }
 
@@ -231,10 +255,25 @@ export async function search(/** @type {any} */ table, /** @type {any} */ vector
  * @param {any} table
  * @param {number[]} vector
  * @param {string} textQuery
- * @param {{ topK?: number, filters?: { pathPrefix?: string, ext?: string, tags?: string[] }, distanceRange?: [number, number] | { min?: number, max?: number }, rerank?: boolean, rerankWeights?: object, intentScope?: 'code-first'|'docs-first'|'all', mmr?: boolean, mmrLambda?: number }} [options]
+ * @param {{
+ *     topK?: number;
+ *     filters?: { pathPrefix?: string; ext?: string; tags?: string[] };
+ *     distanceRange?: [number, number] | { min?: number; max?: number };
+ *     rerank?: boolean;
+ *     rerankWeights?: object;
+ *     intentScope?: 'code-first' | 'docs-first' | 'all';
+ *     mmr?: boolean;
+ *     mmrLambda?: number;
+ * }} [options]
  */
-export async function hybridSearch(/** @type {any} */ table, /** @type {any} */ vector, /** @type {any} */ textQuery, /** @type {any} */ options = {}) {
-    return await withTimeout(/** @type {any} */ async () => {
+export async function hybridSearch(
+    /** @type {any} */ table,
+    /** @type {any} */ vector,
+    /** @type {any} */ textQuery,
+    /** @type {any} */ options = {},
+) {
+    return await withTimeout(
+        /** @type {any} */ async () => {
             const {
                 topK = 8,
                 filters = {},
@@ -266,7 +305,10 @@ export async function hybridSearch(/** @type {any} */ table, /** @type {any} */ 
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter((/** @type {any} */ r) => Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)));
+                filtered = rows.filter(
+                    (/** @type {any} */ r) =>
+                        Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)),
+                );
             }
 
             filtered.sort((/** @type {any} */ a, /** @type {any} */ b) => {
@@ -298,12 +340,17 @@ export async function hybridSearch(/** @type {any} */ table, /** @type {any} */ 
             return results;
         },
         60000,
-        'LANCEDB_HYBRID_SEARCH_TIMEOUT'
+        'LANCEDB_HYBRID_SEARCH_TIMEOUT',
     );
 }
 
-export async function lexicalSearch(/** @type {any} */ table,  /** @type {any} */ textQuery,  /** @type {any} */ options = {}) {
-    return await withTimeout(/** @type {any} */ async () => {
+export async function lexicalSearch(
+    /** @type {any} */ table,
+    /** @type {any} */ textQuery,
+    /** @type {any} */ options = {},
+) {
+    return await withTimeout(
+        /** @type {any} */ async () => {
             const { topK = 8, filters = {} } = options;
 
             let q = table
@@ -319,7 +366,10 @@ export async function lexicalSearch(/** @type {any} */ table,  /** @type {any} *
             let filtered = rows;
             if (filters?.tags?.length) {
                 const required = new Set(filters.tags.map(String));
-                filtered = rows.filter((/** @type {any} */ r) => Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)));
+                filtered = rows.filter(
+                    (/** @type {any} */ r) =>
+                        Array.isArray(r.tags) && [...required].every((/** @type {any} */ t) => r.tags.includes(t)),
+                );
             }
 
             filtered.sort((/** @type {any} */ a, /** @type {any} */ b) => {
@@ -331,13 +381,16 @@ export async function lexicalSearch(/** @type {any} */ table,  /** @type {any} *
                 return String(a.chunk_id).localeCompare(String(b.chunk_id));
             });
 
-            return filtered.slice(0, topK).map((/** @type {any} */ row) => (/** @type {any} */ {
-                ...formatResult(row),
-                score: typeof row._score === 'number' ? row._score : 0,
-            }));
+            return filtered.slice(0, topK).map(
+                (/** @type {any} */ row) =>
+                    /** @type {any} */ ({
+                        ...formatResult(row),
+                        score: typeof row._score === 'number' ? row._score : 0,
+                    }),
+            );
         },
         45000,
-        'LANCEDB_LEXICAL_SEARCH_TIMEOUT'
+        'LANCEDB_LEXICAL_SEARCH_TIMEOUT',
     );
 }
 

@@ -6,8 +6,8 @@ import * as driverFactory from '#driver/factory';
  */
 class EnvironmentResolver {
     /**
-     * Resolve o ambiente atual com base no contexto do navegador.
-     * Implementa análise multi-fatorial para garantir precisão industrial.
+     * Resolve o ambiente atual com base no contexto do navegador. Implementa análise multi-fatorial para garantir
+     * precisão industrial.
      *
      * @param {any} ctx - Contexto de execução { browser, page }.
      * @returns {any} { target, confidence, reason, metadata }
@@ -41,9 +41,8 @@ class EnvironmentResolver {
 
             for (const target of availableTargets) {
                 /**
-                 * Lógica de Correspondência Estrita:
-                 * Verificamos se o nome do alvo (ex: 'chatgpt') é um segmento
-                 * exato do domínio ou se é o sufixo principal.
+                 * Lógica de Correspondência Estrita: Verificamos se o nome do alvo (ex: 'chatgpt') é um segmento exato
+                 * do domínio ou se é o sufixo principal.
                  */
                 if (domainSegments.includes(target)) {
                     identifiedTarget = target;

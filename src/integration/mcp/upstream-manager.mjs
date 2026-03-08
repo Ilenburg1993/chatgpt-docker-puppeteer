@@ -2,21 +2,23 @@
 /**
  * MCP Upstream Manager
  *
- * Imports tools from one or more upstream MCP servers and registers them
- * into the local Tool Registry with prefixes (namespaces).
+ * Imports tools from one or more upstream MCP servers and registers them into the local Tool Registry with prefixes
+ * (namespaces).
  *
  * Supported transports:
+ *
  * - HTTP JSON-RPC 2.0 (Streamable HTTP fallback)
  * - Stdio (via MCP SDK client + StdioClientTransport)
  *
  * Backwards compatibility:
+ *
  * - MCP_UPSTREAM_ENABLED/MCP_UPSTREAM_URL/... (single HTTP upstream)
  * - GitHub proxy preset via MCP_GITHUB_PROXY_ENABLED (+ GITHUB_PERSONAL_ACCESS_TOKEN)
  */
 
+import { computeExponentialBackoffDelay, readPositiveInt } from '../../core/retry_policy.js';
 import { createMcpHttpClient } from './upstream-http.mjs';
 import { MCPStdioUpstreamClient } from './upstream-stdio-sdk.mjs';
-import { computeExponentialBackoffDelay, readPositiveInt } from '../../core/retry_policy.js';
 
 function safeJsonParse(/** @type {any} */ s) {
     try {
@@ -62,11 +64,11 @@ function sanitizeToolMetadata(/** @type {any} */ tool) {
 /**
  * @typedef {object} UpstreamConfig
  * @property {string} alias
- * @property {'http'|'stdio'} transport
+ * @property {'http' | 'stdio'} transport
  * @property {string} toolPrefix
  * @property {boolean} [required]
  * @property {string} [url]
- * @property {Record<string,string>} [headers]
+ * @property {Record<string, string>} [headers]
  * @property {string} [command]
  * @property {string[]} [args]
  * @property {string[]} [envFrom]
@@ -77,7 +79,7 @@ function sanitizeToolMetadata(/** @type {any} */ tool) {
 /**
  * @typedef {object} UpstreamStatus
  * @property {string} alias
- * @property {'http'|'stdio'} transport
+ * @property {'http' | 'stdio'} transport
  * @property {string} toolPrefix
  * @property {string} target
  * @property {boolean} enabled
@@ -86,7 +88,7 @@ function sanitizeToolMetadata(/** @type {any} */ tool) {
  * @property {number} registeredCount
  * @property {string | null} lastInitAt
  * @property {string | null} lastError
- * @property {'ready'|'not-ready'|'disabled'} state
+ * @property {'ready' | 'not-ready' | 'disabled'} state
  */
 
 /** @type {{ upstreams: UpstreamStatus[] }} */
@@ -98,12 +100,12 @@ const _registeredAliases = new Set();
 /** @type {Map<string, MCPStdioUpstreamClient>} */
 const _stdioClients = new Map();
 
-/** @type {Map<string, { attempts: number, timer: NodeJS.Timeout | null }>} */
+/** @type {Map<string, { attempts: number; timer: NodeJS.Timeout | null }>} */
 const _retryState = new Map();
 
 /** @type {boolean} */
 let _shutdownHookInstalled = false;
-/** @type {{ exit: (()=>void)|null, sigint: (()=>void)|null, sigterm: (()=>void)|null }} */
+/** @type {{ exit: (() => void) | null; sigint: (() => void) | null; sigterm: (() => void) | null }} */
 const _shutdownHookHandlers = {
     exit: null,
     sigint: null,
@@ -173,6 +175,7 @@ function setOneStatus(/** @type {any} */ next) {
 
 /**
  * Função exportada: getUpstreamStatus.
+ *
  * @returns {{ upstreams: any[] }}
  */
 export function getUpstreamStatus() {
@@ -324,7 +327,7 @@ function scheduleRetry(
     /** @type {any} */ cfg,
     /** @type {any} */ registry,
     /** @type {any} */ env,
-    /** @type {any} */ options
+    /** @type {any} */ options,
 ) {
     const { restart } = options;
     if (!restart.enabled) return;
@@ -373,7 +376,7 @@ async function registerOneUpstream(
     /** @type {any} */ cfg,
     /** @type {any} */ registry,
     /** @type {any} */ env,
-    /** @type {any} */ options
+    /** @type {any} */ options,
 ) {
     const { refresh, restart } = options;
 
@@ -462,7 +465,7 @@ async function registerOneUpstream(
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
                             throw err;
                         }
-                    }
+                    },
                 );
                 if (refresh || !prev) st.registeredCount += 1;
             }
@@ -520,7 +523,7 @@ async function registerOneUpstream(
                             markUpstreamCallFailure(cfg, err, registry, env, restart);
                             throw err;
                         }
-                    }
+                    },
                 );
                 if (refresh || !prev) st.registeredCount += 1;
             }
@@ -548,7 +551,7 @@ function markUpstreamCallFailure(
     /** @type {any} */ err,
     /** @type {any} */ registry,
     /** @type {any} */ env,
-    /** @type {any} */ restart
+    /** @type {any} */ restart,
 ) {
     const prev = _status.upstreams.find((/** @type {any} */ u) => u.alias === cfg.alias);
     const next = {
@@ -582,7 +585,7 @@ function markUpstreamCallFailure(
  *
  * @param {import('../tool-registry.mjs').ToolRegistry} registry
  * @param {RegisterUpstreamsOptions} [options]
- * @returns {Promise<{upstreams: UpstreamStatus[]}>}
+ * @returns {Promise<{ upstreams: UpstreamStatus[] }>}
  */
 export async function registerUpstreams(/** @type {any} */ registry, /** @type {any} */ options = {}) {
     const env = options.env || process.env;
@@ -617,6 +620,7 @@ export async function registerUpstreams(/** @type {any} */ registry, /** @type {
 
 /**
  * Função exportada: shutdownUpstreams.
+ *
  * @returns {Promise<void>}
  */
 export async function shutdownUpstreams() {

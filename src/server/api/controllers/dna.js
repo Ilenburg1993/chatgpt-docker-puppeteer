@@ -1,12 +1,12 @@
 // @ts-check
-import express from 'express';
-/** Constante/valor exportado: default. */
-const router = express.Router();
-import path from 'node:path';
-import * as io from '#infra/io';
 import { audit, log } from '#core/logger';
 import { ROOT } from '#infra/fs/fs_utils';
+import * as io from '#infra/io';
+import express from 'express';
+import path from 'node:path';
 import denyIfDelegated from '../../middleware/deny_if_delegated.js';
+/** Constante/valor exportado: default. */
+const router = express.Router();
 
 // Caminho físico absoluto para o arquivo de configuração mestre
 const CONFIG_PATH = path.join(ROOT, 'config.json');
@@ -17,8 +17,7 @@ const CONFIG_PATH = path.join(ROOT, 'config.json');
 -------------------------------------------------------------------------- */
 
 /**
- * GET /
- * Recupera as definições de comportamento globais (Timeouts, Delays, etc).
+ * GET / Recupera as definições de comportamento globais (Timeouts, Delays, etc).
  */
 router.get('/', async (req, res) => {
     try {
@@ -40,8 +39,7 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * PUT /
- * Sobrescreve as preferências globais via escrita atômica resiliente.
+ * PUT / Sobrescreve as preferências globais via escrita atômica resiliente.
  */
 router.put('/', denyIfDelegated, async (req, res) => {
     try {
@@ -54,6 +52,7 @@ router.put('/', denyIfDelegated, async (req, res) => {
         }
 
         // Auditoria administrativa da mutação vinculada ao Request ID
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('UPDATE_CONFIG', {
             user: 'GUI',
             request_id: req.id,
@@ -84,8 +83,7 @@ router.put('/', denyIfDelegated, async (req, res) => {
 -------------------------------------------------------------------------- */
 
 /**
- * GET /dna
- * Recupera o mapa atual de seletores e regras dinâmicas aprendidas.
+ * GET /dna Recupera o mapa atual de seletores e regras dinâmicas aprendidas.
  */
 router.get('/dna', async (req, res) => {
     try {
@@ -111,11 +109,11 @@ router.get('/dna', async (req, res) => {
 });
 
 /**
- * PUT /dna
- * Evolui o genoma com validação nativa de integridade (Audit 410).
+ * PUT /dna Evolui o genoma com validação nativa de integridade (Audit 410).
  */
 router.put('/dna', denyIfDelegated, async (req, res) => {
     try {
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('UPDATE_DNA', {
             user: 'GUI',
             request_id: req.id,
@@ -145,8 +143,7 @@ router.put('/dna', denyIfDelegated, async (req, res) => {
 -------------------------------------------------------------------------- */
 
 /**
- * GET /dna/history
- * Retorna histórico de backups do DNA (últimas 10 versões).
+ * GET /dna/history Retorna histórico de backups do DNA (últimas 10 versões).
  *
  * @returns {unknown[]} history - Array de backups com timestamp, version, author
  */
@@ -173,8 +170,7 @@ router.get('/dna/history', async (req, res) => {
 });
 
 /**
- * POST /dna/rollback
- * Restaura DNA para uma versão anterior do backup.
+ * POST /dna/rollback Restaura DNA para uma versão anterior do backup.
  *
  * @body {number} versionIndex - Index do backup (0 = mais recente)
  */
@@ -190,6 +186,7 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
             });
         }
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('DNA_ROLLBACK', {
             user: 'GUI',
             request_id: req.id,
@@ -218,8 +215,7 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
 });
 
 /**
- * GET /dna/stats
- * Retorna estatísticas de evolução do DNA (session counters).
+ * GET /dna/stats Retorna estatísticas de evolução do DNA (session counters).
  *
  * @returns {any} stats - Evolution counters per domain
  */
@@ -250,8 +246,7 @@ router.get('/dna/stats', async (req, res) => {
 });
 
 /**
- * POST /dna/evolve
- * Trigger manual de evolução DNA via SADI protocol.
+ * POST /dna/evolve Trigger manual de evolução DNA via SADI protocol.
  *
  * @body {Object} protocol - SADI protocol (target, selector, confidence, shadowRoot)
  * @body {string} domain - Domain (e.g., 'chatgpt.com')
@@ -269,6 +264,7 @@ router.post('/dna/evolve', denyIfDelegated, async (req, res) => {
             });
         }
 
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         await audit('DNA_MANUAL_EVOLUTION', {
             user: 'GUI',
             request_id: req.id,

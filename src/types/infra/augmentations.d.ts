@@ -43,7 +43,7 @@ declare module '#infra/io' {
     export function evolveWithSadiProtocol(
         protocol: { selector?: string; confidence?: number; [key: string]: unknown },
         domain: string,
-        intent: string
+        intent: string,
     ): Promise<{ accepted: boolean; reason?: string; stats?: unknown; error?: string; [key: string]: unknown }>;
 
     // Queue operations
@@ -106,7 +106,7 @@ declare module '#shared/sadi/analyzer' {
     export function findInputSelector(page: unknown, langCode?: string): Promise<SADIDetectionResult | null>;
     export function findSendButtonSelector(
         page: unknown,
-        inputProtocol?: SADIProtocol | null
+        inputProtocol?: SADIProtocol | null,
     ): Promise<SADIDetectionResult | null>;
     export function findResponseArea(page: unknown, langCode?: string): Promise<SADIDetectionResult | null>;
     export function findFrameByPath(page: unknown, framePath?: string[] | string): Promise<unknown>;

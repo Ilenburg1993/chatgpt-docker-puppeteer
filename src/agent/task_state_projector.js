@@ -1,10 +1,10 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import CONFIG from '#core/config';
 import {
     emitStaleAttemptIgnoredEvent,
     evaluateAttemptInvariants,
     releaseTaskLockForAttempt,
 } from '#agent/task_attempt_invariants';
+import CONFIG from '#core/config';
 import { log } from '#core/logger';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
@@ -36,7 +36,7 @@ function _safeDelayMs(payload) {
 /** @param {any} taskId @returns {any} */
 function _storagePointers(taskId) {
     const artifactsRoot = path.resolve(
-        process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || PATHS.ARTIFACTS
+        process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || PATHS.ARTIFACTS,
     );
     const basePath = path.join(artifactsRoot, 'responses', taskId, 'latest');
     return {
@@ -68,8 +68,8 @@ function _statSizeBytes(filePath) {
 
 /**
  * @typedef {object} RegisterResponseArtifactsOptions
- * @property {*} [storage]
- * @property {*} [actor]
+ * @property {any} [storage]
+ * @property {any} [actor]
  */
 /**
  * @typedef {object} RegisterResponseArtifactsArg0
@@ -80,7 +80,7 @@ function _statSizeBytes(filePath) {
  * @param {RegisterResponseArtifactsArg0} [arg0]
  */
 function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
-    /** @type {Record<string, string|null>} */
+    /** @type {Record<string, string | null>} */
     const ids = {
         screenshot: null,
         html: null,
@@ -120,8 +120,8 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
 
 /**
  * @typedef {object} RegisterDiagnosticArtifactsOptions
- * @property {*} [storage]
- * @property {*} [actor]
+ * @property {any} [storage]
+ * @property {any} [actor]
  */
 /**
  * @typedef {object} RegisterDiagnosticArtifactsArg0
@@ -132,7 +132,7 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
  * @param {RegisterDiagnosticArtifactsArg0} [arg0]
  */
 function _registerResponseArtifacts({ storage, actor = 'system' } = {}) {
-    /** @type {Record<string, string|null>} */
+    /** @type {Record<string, string | null>} */
     const ids = {
         text: null,
         md: null,
@@ -193,18 +193,20 @@ function _getMissionIdForTask(taskId) {
 
 /**
  * Opções do construtor do TaskStateProjector.
+ *
  * @typedef {object} TaskStateProjectorOptions
  * @property {any} nerv - Instância do sistema nerv com método onReceive.
- * @property {string|null} [workerId] - ID opcional do worker.
+ * @property {string | null} [workerId] - ID opcional do worker.
  */
 
 /**
- * Projetor que escuta mensagens NERV e projeta estado de tarefas no SQLite.
- * Responsável por manter consistência entre mensagens do sistema e estado persistido.
+ * Projetor que escuta mensagens NERV e projeta estado de tarefas no SQLite. Responsável por manter consistência entre
+ * mensagens do sistema e estado persistido.
  */
 class TaskStateProjector {
     /**
      * Cria um projetor de estado de tarefas.
+     *
      * @param {TaskStateProjectorOptions} options - Opções de configuração.
      */
     constructor(options) {
@@ -222,13 +224,13 @@ class TaskStateProjector {
     }
 
     /**
-     * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError.
-     * Prevents projector crashes when concurrent updates cause optimistic lock conflicts.
+     * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError. Prevents projector crashes when
+     * concurrent updates cause optimistic lock conflicts.
      *
      * @private
      * @param {string} taskId - Task ID to update
      * @param {Record<string, unknown>} updates - Update payload (status, stage, timestamps, etc.)
-     * @param {{ critical?: boolean, context?: string }} [options] - Options
+     * @param {{ critical?: boolean; context?: string }} [options] - Options
      * @returns {boolean} True if update succeeded, false if conflict occurred (non-critical only)
      * @throws {Error} Re-throws OptimisticLockError if options.critical=true
      */
@@ -258,6 +260,7 @@ class TaskStateProjector {
 
     /**
      * Inicia o projetor, registrando handler para mensagens NERV.
+     *
      * @returns {void}
      * @sideEffects Registra listener no nerv e inicia projeção de estado.
      */
@@ -277,6 +280,7 @@ class TaskStateProjector {
 
     /**
      * Para o projetor, removendo handler de mensagens NERV.
+     *
      * @returns {void}
      * @sideEffects Remove listener do nerv.
      */
@@ -294,6 +298,7 @@ class TaskStateProjector {
 
     /**
      * Processa um envelope NERV, projetando estado de tarefa no SQLite se for evento suportado.
+     *
      * @private
      * @param {any} envelope - Envelope NERV contendo mensagem.
      * @returns {void}
@@ -529,7 +534,7 @@ class TaskStateProjector {
                 const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
-                    `[PROJECTOR] Failed to register attempt for DRIVER_TASK_FAILED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                    `[PROJECTOR] Failed to register attempt for DRIVER_TASK_FAILED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`,
                 );
                 // Emit NERV event for visibility
                 try {
@@ -595,7 +600,7 @@ class TaskStateProjector {
                 const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
-                    `[PROJECTOR] CRITICAL: Failed to link artifacts for completed task (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                    `[PROJECTOR] CRITICAL: Failed to link artifacts for completed task (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`,
                 );
                 // Emit NERV event for visibility - this is critical as task may complete without artifacts
                 try {
@@ -705,7 +710,7 @@ class TaskStateProjector {
                 const err = /** @type {any} */ (_rawErr);
                 log(
                     'ERROR',
-                    `[PROJECTOR] Failed to register attempt for DRIVER_TASK_ABORTED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                    `[PROJECTOR] Failed to register attempt for DRIVER_TASK_ABORTED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`,
                 );
                 try {
                     recordEvent({
@@ -780,7 +785,7 @@ class TaskStateProjector {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
-                        `[PROJECTOR] Failed to register attempt for duplicate dispatch (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                        `[PROJECTOR] Failed to register attempt for duplicate dispatch (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`,
                     );
                     try {
                         recordEvent({
@@ -835,7 +840,7 @@ class TaskStateProjector {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
-                        `[PROJECTOR] Failed to register diagnostic artifacts for stale attempt (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                        `[PROJECTOR] Failed to register diagnostic artifacts for stale attempt (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`,
                     );
                     try {
                         recordEvent({
@@ -936,7 +941,7 @@ class TaskStateProjector {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
-                        `[PROJECTOR] Failed to register diagnostic artifacts for USER_ACTION_REQUIRED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                        `[PROJECTOR] Failed to register diagnostic artifacts for USER_ACTION_REQUIRED (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`,
                     );
                     try {
                         recordEvent({
@@ -1015,7 +1020,7 @@ class TaskStateProjector {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
-                        `[PROJECTOR] Failed to register diagnostic artifacts for ENV_UNAVAILABLE (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                        `[PROJECTOR] Failed to register diagnostic artifacts for ENV_UNAVAILABLE (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`,
                     );
                     try {
                         recordEvent({
@@ -1105,7 +1110,7 @@ class TaskStateProjector {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'ERROR',
-                        `[PROJECTOR] Failed to register diagnostic artifacts for TASK_ERROR (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`
+                        `[PROJECTOR] Failed to register diagnostic artifacts for TASK_ERROR (taskId=${taskId}, attemptId=${attemptId}): ${err?.message || String(err)}`,
                     );
                     try {
                         recordEvent({

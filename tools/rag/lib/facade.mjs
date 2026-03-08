@@ -1,29 +1,9 @@
 // @ts-check
-import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { getRagPaths, ensureDirs, atomicWriteJson, acquireIndexLock, releaseIndexLock } from './paths.mjs';
-import { createEmptyManifest, loadManifest } from './manifest.mjs';
-import {
-    scanWorkspace,
-    findProjectRoot,
-    RAG_SCAN_PROFILES,
-    loadWorkspaceFile,
-    isRagIndexableRelPath,
-} from './scan.mjs';
-import { fingerprintBuffer } from './fingerprint.mjs';
-import { buildLineIndex, sliceByLines } from './text.mjs';
-import {
-    buildChunkId,
-    buildFileId,
-    sha256HexForString,
-    normalizeRelPath,
-    CHUNKER_VERSION,
-    RAG_CHUNK_MAX_CHARS,
-} from './contract.mjs';
-import { chunkByType, detectLanguage, buildTags } from './chunking/chunk_dispatcher.mjs';
-import { OllamaEmbeddingsProvider } from './embeddings/ollama.mjs';
-import { EmbeddingCache } from './embeddings/embed_cache.mjs';
+import path from 'node:path';
+import { withTimeout } from '../../../src/infra/abort_controller_utils.js';
 import { createRagAdaptiveThrottler } from './adaptive_throttler.mjs';
+import { buildTags, chunkByType, detectLanguage } from './chunking/chunk_dispatcher.mjs';
 import {
     classifyContentClass,
     isPreferredByIntent,
@@ -31,22 +11,42 @@ import {
     normalizeIntentScope,
 } from './content_class.mjs';
 import {
-    openDb,
-    ensureTable,
-    deleteByPath,
+    buildChunkId,
+    buildFileId,
+    CHUNKER_VERSION,
+    normalizeRelPath,
+    RAG_CHUNK_MAX_CHARS,
+    sha256HexForString,
+} from './contract.mjs';
+import { EmbeddingCache } from './embeddings/embed_cache.mjs';
+import { OllamaEmbeddingsProvider } from './embeddings/ollama.mjs';
+import { fingerprintBuffer } from './fingerprint.mjs';
+import { formatMarkdownResults } from './format.mjs';
+import { createEmptyManifest, loadManifest } from './manifest.mjs';
+import { acquireIndexLock, atomicWriteJson, ensureDirs, getRagPaths, releaseIndexLock } from './paths.mjs';
+import {
+    findProjectRoot,
+    isRagIndexableRelPath,
+    loadWorkspaceFile,
+    RAG_SCAN_PROFILES,
+    scanWorkspace,
+} from './scan.mjs';
+import { resolveRagScopeConfig } from './scope_config.mjs';
+import {
     addChunks,
-    search,
-    hybridSearch,
-    lexicalSearch,
     createFTSIndex,
+    deleteByPath,
+    ensureTable,
     getChunkById,
     getChunkStats,
+    hybridSearch,
+    lexicalSearch,
+    openDb,
+    search,
     TABLE_NAME,
 } from './storage/lancedb.mjs';
-import { formatMarkdownResults } from './format.mjs';
+import { buildLineIndex, sliceByLines } from './text.mjs';
 import { normalizeQuery } from './text/query_normalizer.mjs';
-import { resolveRagScopeConfig } from './scope_config.mjs';
-import { withTimeout } from '../../../src/infra/abort_controller_utils.js';
 
 // Singleton query embedding cache
 const queryEmbedCache = new EmbeddingCache(100);
@@ -172,14 +172,16 @@ function formatDurationMs(/** @type {any} */ durationMs) {
     return `${seconds}s`;
 }
 
-function buildProgressSnapshot(/** @type {any} */ { startedAtMs, processedFiles, totalFiles, embeddedChunks, estimatedTotalChunks }) {
+function buildProgressSnapshot(
+    /** @type {any} */ { startedAtMs, processedFiles, totalFiles, embeddedChunks, estimatedTotalChunks },
+) {
     const elapsedMs = Math.max(1, Date.now() - startedAtMs);
     const filesPct = totalFiles > 0 ? clampPercent((processedFiles / totalFiles) * 100) : 100;
     const filesRemainingPct = clampPercent(100 - filesPct);
 
     const safeEstimatedChunks = Math.max(
         embeddedChunks,
-        Number.isFinite(estimatedTotalChunks) ? estimatedTotalChunks : embeddedChunks
+        Number.isFinite(estimatedTotalChunks) ? estimatedTotalChunks : embeddedChunks,
     );
     const chunksPct = safeEstimatedChunks > 0 ? clampPercent((embeddedChunks / safeEstimatedChunks) * 100) : 0;
     const chunksRemainingPct = clampPercent(100 - chunksPct);
@@ -428,13 +430,15 @@ async function reconcileScopeChanges(/** @type {any} */ { manifest, resolvedScop
 
 function buildIndexLockError(/** @type {any} */ lock) {
     const lockInfo = lock?.existingLock || {};
-    const err = /** @type {any} */ (new Error(
-        `RAG_INDEX_LOCKED: Another indexing process is running.\n` +
-            `Lock held by PID ${lockInfo.pid || 'unknown'} since ${lockInfo.started_at ? new Date(lockInfo.started_at).toISOString() : 'unknown'}\n\n` +
-            `If no indexing is running, the lock may be stale.\n` +
-            `It will auto-clear after 6 hours, or you can manually remove:\n` +
-            `  rm /home/node/.local/share/rag-index/index.lock\n`
-    ));
+    const err = /** @type {any} */ (
+        new Error(
+            `RAG_INDEX_LOCKED: Another indexing process is running.\n` +
+                `Lock held by PID ${lockInfo.pid || 'unknown'} since ${lockInfo.started_at ? new Date(lockInfo.started_at).toISOString() : 'unknown'}\n\n` +
+                `If no indexing is running, the lock may be stale.\n` +
+                `It will auto-clear after 6 hours, or you can manually remove:\n` +
+                `  rm /home/node/.local/share/rag-index/index.lock\n`,
+        )
+    );
     err.details = lock;
     err.reason_code = RAG_REASON_CODES.INDEX_LOCKED;
     return err;
@@ -459,7 +463,10 @@ function buildEmbedText(/** @type {any} */ headerText, /** @type {any} */ text) 
     return `${headerText}\n\n${text}`;
 }
 
-function toChunkDescriptor(/** @type {any} */ range, /** @type {any} */ { relPath, lineStarts, fileBuffer, manifestChunkerVersion, language, tags }) {
+function toChunkDescriptor(
+    /** @type {any} */ range,
+    /** @type {any} */ { relPath, lineStarts, fileBuffer, manifestChunkerVersion, language, tags },
+) {
     const { startByte, endByte, text } = sliceByLines(fileBuffer, lineStarts, range.startLine, range.endLine);
     const content_sha256 = sha256HexForString(text);
     const chunk_id = buildChunkId({
@@ -489,11 +496,14 @@ function toChunkDescriptor(/** @type {any} */ range, /** @type {any} */ { relPat
 }
 
 function withNeighborIds(/** @type {any} */ descriptors) {
-    return descriptors.map((/** @type {any} */ d, /** @type {any} */ idx) => (/** @type {any} */ {
-        ...d,
-        chunk_prev_id: idx > 0 ? descriptors[idx - 1].chunk_id : null,
-        chunk_next_id: idx + 1 < descriptors.length ? descriptors[idx + 1].chunk_id : null,
-    }));
+    return descriptors.map(
+        (/** @type {any} */ d, /** @type {any} */ idx) =>
+            /** @type {any} */ ({
+                ...d,
+                chunk_prev_id: idx > 0 ? descriptors[idx - 1].chunk_id : null,
+                chunk_next_id: idx + 1 < descriptors.length ? descriptors[idx + 1].chunk_id : null,
+            }),
+    );
 }
 
 function parsePositiveIntWithDefault(/** @type {any} */ value, /** @type {any} */ fallback) {
@@ -507,7 +517,7 @@ function getExpandConfig() {
     const maxLines = parsePositiveIntWithDefault(process.env.RAG_EXPAND_MAX_LINES, fallbackMaxLines);
     const defaultLines = Math.min(
         parsePositiveIntWithDefault(process.env.RAG_EXPAND_DEFAULT_LINES, fallbackDefaultLines),
-        maxLines
+        maxLines,
     );
     return { defaultLines, maxLines };
 }
@@ -527,8 +537,7 @@ function buildStructuredExpandError(/** @type {any} */ reasonCode, /** @type {an
 }
 
 /**
- * Retry wrapper for embedding operations
- * Applies exponential backoff to any embedding provider
+ * Retry wrapper for embedding operations Applies exponential backoff to any embedding provider
  *
  * @param {Function} fn - Async function to retry
  * @param {any} options - Retry options
@@ -549,7 +558,7 @@ async function retryWithBackoff(/** @type {any} */ fn, /** @type {any} */ option
                 if (onRetry) {
                     onRetry(error, attempt + 1, maxRetries, delay);
                 }
-                await new Promise(resolve => setTimeout(resolve, delay));
+                await new Promise((resolve) => setTimeout(resolve, delay));
             }
         }
     }
@@ -566,7 +575,12 @@ export async function ragHealth(/** @type {any} */ options = {}) {
             await ensureDirs(paths);
 
             const writable = (await canWrite(paths.indexDir)) && (await canWrite(paths.dbDir));
-            const manifest = await loadManifest(paths).catch((/** @type {any} */ err) => (/** @type {any} */ { error: String(err?.message || err) }));
+            const manifest = await loadManifest(paths).catch(
+                (/** @type {any} */ err) =>
+                    /** @type {any} */ ({
+                        error: String(err?.message || err),
+                    }),
+            );
 
             const embeddings =
                 options.embeddingsProvider ||
@@ -574,11 +588,20 @@ export async function ragHealth(/** @type {any} */ options = {}) {
                     baseURL: options.ollamaBaseUrl,
                     model: options.model,
                 });
-            const embHealth = await embeddings
-                .health()
-                .catch((/** @type {any} */ err) => (/** @type {any} */ { ok: false, error: String(err?.message || err) }));
+            const embHealth = await embeddings.health().catch(
+                (/** @type {any} */ err) =>
+                    /** @type {any} */ ({
+                        ok: false,
+                        error: String(err?.message || err),
+                    }),
+            );
 
-            const db = await openDb(paths.dbDir).catch((/** @type {any} */ err) => (/** @type {any} */ { error: String(err?.message || err) }));
+            const db = await openDb(paths.dbDir).catch(
+                (/** @type {any} */ err) =>
+                    /** @type {any} */ ({
+                        error: String(err?.message || err),
+                    }),
+            );
             let tableNames = null;
             if (!('error' in db)) {
                 tableNames = await db.tableNames().catch(() => /** @type {null} */ (null));
@@ -616,7 +639,7 @@ export async function ragHealth(/** @type {any} */ options = {}) {
             };
         },
         30000,
-        'RAG_HEALTH_TIMEOUT'
+        'RAG_HEALTH_TIMEOUT',
     );
 }
 
@@ -650,7 +673,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                             `This happens when the RAG chunking logic changes.\n` +
                             `Solution: Reset and rebuild the index:\n` +
                             `  npm run rag:reset -- --yes\n` +
-                            `  npm run rag:index\n`
+                            `  npm run rag:index\n`,
                     );
                 }
 
@@ -680,14 +703,16 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                         throw new Error(
                             `EMBEDDING_DIM_MISMATCH: Manifest expects dim=${manifest.embedding.dim}, ` +
                                 `but model '${embeddings.model}' returned dim=${actualDim}.\n` +
-                                `Solution: Run 'npm run rag:reset -- --yes' then 'npm run rag:index'`
+                                `Solution: Run 'npm run rag:reset -- --yes' then 'npm run rag:index'`,
                         );
                     }
                     console.log(`[RAG] Dimension validated: ${actualDim}`);
                 }
 
                 const db = await openDb(paths.dbDir);
-                const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => /** @type {string[]} */ ([])));
+                const tableNames = /** @type {string[]} */ (
+                    await db.tableNames().catch(() => /** @type {string[]} */ ([]))
+                );
                 let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
 
                 const throttler = createRagAdaptiveThrottler({ mode: 'full' });
@@ -695,7 +720,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                 console.log(
                     `[RAG] Adaptive throttle enabled=${throttleStats.enabled} metric=${throttleStats.metric} ` +
                         `target=${throttleStats.targetCPU}% delay=${Math.round(throttleStats.currentDelay)}ms ` +
-                        `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`
+                        `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`,
                 );
 
                 const report = {
@@ -731,7 +756,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                         processedCount > 0
                             ? Math.max(
                                   report.changed_files,
-                                  Math.round((report.changed_files / processedCount) * files.length)
+                                  Math.round((report.changed_files / processedCount) * files.length),
                               )
                             : report.changed_files;
                     const avgChunksPerChangedFile =
@@ -740,7 +765,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                         estimatedChangedFiles > 0
                             ? Math.max(
                                   report.embedded_chunks,
-                                  Math.round(avgChunksPerChangedFile * estimatedChangedFiles)
+                                  Math.round(avgChunksPerChangedFile * estimatedChangedFiles),
                               )
                             : report.embedded_chunks;
                     const snapshot = buildProgressSnapshot({
@@ -755,7 +780,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                             ` | chunks~${snapshot.chunksPct.toFixed(1)}% remaining~${snapshot.chunksRemainingPct.toFixed(1)}%` +
                             ` | eta=${snapshot.etaMs === null ? 'n/a' : formatDurationMs(snapshot.etaMs)}` +
                             ` | throughput=${snapshot.throughputFilesPerMin.toFixed(2)} files/min` +
-                            ` | scanned=${processedCount}/${files.length} changed=${report.changed_files} skipped=${report.skipped_files}`
+                            ` | scanned=${processedCount}/${files.length} changed=${report.changed_files} skipped=${report.skipped_files}`,
                     );
                 };
 
@@ -783,7 +808,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                         lines,
                         maxChunkChars: Math.min(
                             RAG_CHUNK_MAX_CHARS,
-                            Number(options.maxChunkChars || RAG_CHUNK_MAX_CHARS)
+                            Number(options.maxChunkChars || RAG_CHUNK_MAX_CHARS),
                         ),
                     });
                     const ext = computeExt(relPath);
@@ -801,8 +826,8 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                                 manifestChunkerVersion: manifest.chunker_version,
                                 language,
                                 tags,
-                            })
-                        )
+                            }),
+                        ),
                     );
                     observedTotalChunksInChangedFiles += descriptors.length;
 
@@ -812,13 +837,18 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                         // Embed with retry logic (handles transient failures)
                         console.log(
                             `[RAG]   → Embedding chunk file ${fileChunkIndex + 1}/${descriptors.length} (global ${report.embedded_chunks + 1}): ` +
-                                `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`
+                                `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`,
                         );
                         const vector = await retryWithBackoff(() => embeddings.embed(descriptor.embed_text), {
                             maxRetries: 3,
                             initialDelay: 1000,
                             maxDelay: 10000,
-                            onRetry: (/** @type {any} */ err, /** @type {any} */ attempt, /** @type {any} */ max, /** @type {any} */ delay) => {
+                            onRetry: (
+                                /** @type {any} */ err,
+                                /** @type {any} */ attempt,
+                                /** @type {any} */ max,
+                                /** @type {any} */ delay,
+                            ) => {
                                 console.warn(`[RAG] Embed retry ${attempt}/${max} after ${delay}ms: ${err.message}`);
                             },
                         });
@@ -832,7 +862,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                             manifest.embedding.dim = vector.length;
                         } else if (manifest.embedding.dim !== vector.length) {
                             throw new Error(
-                                `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`
+                                `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`,
                             );
                         }
 
@@ -907,7 +937,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                 console.log(`  Files scanned:    ${report.scanned_files}`);
                 console.log(`  Files changed:    ${report.changed_files}`);
                 console.log(
-                    `  Files skipped:    ${report.skipped_files} (${((report.skipped_files / report.scanned_files) * 100).toFixed(1)}%)`
+                    `  Files skipped:    ${report.skipped_files} (${((report.skipped_files / report.scanned_files) * 100).toFixed(1)}%)`,
                 );
                 console.log(`  Chunks embedded:  ${report.embedded_chunks}`);
                 console.log(`  Chunks inserted:  ${report.inserted_chunks}`);
@@ -930,13 +960,13 @@ export async function ragIndex(/** @type {any} */ options = {}) {
             }
         },
         1800000, // 30 minutes
-        'RAG_INDEX_TIMEOUT'
+        'RAG_INDEX_TIMEOUT',
     );
 }
 
 /**
- * Selective incremental indexing for changed/deleted paths.
- * Indexes only the provided file paths and preserves manifest/storage contracts.
+ * Selective incremental indexing for changed/deleted paths. Indexes only the provided file paths and preserves
+ * manifest/storage contracts.
  */
 export async function ragIndexChanged(/** @type {any} */ options = {}) {
     return await withTimeout(
@@ -970,7 +1000,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                             `This happens when the RAG chunking logic changes.\n` +
                             `Solution: Reset and rebuild the index:\n` +
                             `  npm run rag:reset -- --yes\n` +
-                            `  npm run rag:index\n`
+                            `  npm run rag:index\n`,
                     );
                 }
 
@@ -997,7 +1027,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                               : []
                         )
                             .map((/** @type {any} */ p) => normalizeRelPath(String(p || '').replace(/\\/g, '/')))
-                            .filter(Boolean)
+                            .filter(Boolean),
                     ),
                 ];
 
@@ -1019,7 +1049,9 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                 };
 
                 const db = await openDb(paths.dbDir);
-                const tableNames = /** @type {string[]} */ (await db.tableNames().catch(() => /** @type {string[]} */ ([])));
+                const tableNames = /** @type {string[]} */ (
+                    await db.tableNames().catch(() => /** @type {string[]} */ ([]))
+                );
                 let table = tableNames.includes(TABLE_NAME) ? await db.openTable(TABLE_NAME) : null;
                 let dimValidated = manifest.embedding.dim === null;
                 await reconcileScopeChanges({ manifest, resolvedScope, table, report });
@@ -1046,7 +1078,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                 console.log(
                     `[RAG] Adaptive throttle enabled=${throttleStats.enabled} metric=${throttleStats.metric} ` +
                         `target=${throttleStats.targetCPU}% delay=${Math.round(throttleStats.currentDelay)}ms ` +
-                        `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`
+                        `(min=${Math.round(throttleStats.minDelay)} max=${Math.round(throttleStats.maxDelay)})`,
                 );
                 const startedAtMs = Date.now();
                 let observedTotalChunksInChangedFiles = 0;
@@ -1059,8 +1091,8 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                                   report.embedded_chunks,
                                   Math.round(
                                       (observedTotalChunksInChangedFiles / report.changed_files) *
-                                          Math.max(report.changed_files, changedPaths.length)
-                                  )
+                                          Math.max(report.changed_files, changedPaths.length),
+                                  ),
                               )
                             : report.embedded_chunks;
                     const snapshot = buildProgressSnapshot({
@@ -1076,7 +1108,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                             ` | eta=${snapshot.etaMs === null ? 'n/a' : formatDurationMs(snapshot.etaMs)}` +
                             ` | throughput=${snapshot.throughputFilesPerMin.toFixed(2)} files/min` +
                             ` | processed=${report.processed_paths}/${changedPaths.length} changed=${report.changed_files}` +
-                            ` deleted=${report.deleted_files} skipped=${report.skipped_files}`
+                            ` deleted=${report.deleted_files} skipped=${report.skipped_files}`,
                     );
                 };
 
@@ -1118,7 +1150,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                             throw new Error(
                                 `EMBEDDING_DIM_MISMATCH: Manifest expects dim=${manifest.embedding.dim}, ` +
                                     `but model '${embeddings.model}' returned dim=${actualDim}.\n` +
-                                    `Solution: Run 'npm run rag:reset -- --yes' then 'npm run rag:index'`
+                                    `Solution: Run 'npm run rag:reset -- --yes' then 'npm run rag:index'`,
                             );
                         }
                         dimValidated = true;
@@ -1132,7 +1164,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                         lines,
                         maxChunkChars: Math.min(
                             RAG_CHUNK_MAX_CHARS,
-                            Number(options.maxChunkChars || RAG_CHUNK_MAX_CHARS)
+                            Number(options.maxChunkChars || RAG_CHUNK_MAX_CHARS),
                         ),
                     });
                     const ext = computeExt(relPath);
@@ -1150,8 +1182,8 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                                 manifestChunkerVersion: manifest.chunker_version,
                                 language,
                                 tags,
-                            })
-                        )
+                            }),
+                        ),
                     );
                     observedTotalChunksInChangedFiles += descriptors.length;
 
@@ -1160,7 +1192,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                         const descriptor = descriptors[fileChunkIndex];
                         console.log(
                             `[RAG]   → Embedding chunk file ${fileChunkIndex + 1}/${descriptors.length} (global ${report.embedded_chunks + 1}): ` +
-                                `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`
+                                `${descriptor.embed_text.length} chars (lines ${descriptor.startLine}-${descriptor.endLine})`,
                         );
                         const vector = await retryWithBackoff(() => embeddings.embed(descriptor.embed_text), {
                             maxRetries: 3,
@@ -1174,7 +1206,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                             manifest.embedding.dim = vector.length;
                         } else if (manifest.embedding.dim !== vector.length) {
                             throw new Error(
-                                `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`
+                                `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`,
                             );
                         }
 
@@ -1255,7 +1287,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
             }
         },
         900000,
-        'RAG_INDEX_CHANGED_TIMEOUT'
+        'RAG_INDEX_CHANGED_TIMEOUT',
     );
 }
 
@@ -1289,7 +1321,7 @@ export async function ragQuery(/** @type {any} */ options = {}) {
             );
 
             /** @param {any} base */
-            const finalizeResult = async base => {
+            const finalizeResult = async (base) => {
                 const decorated = decorateResultsWithSourceMetadata(base.results || [], manifest);
                 const scoped = applyIntentScopePolicy(decorated, intentScope, requestedTopK);
                 const expanded = await maybeAutoExpandResults(scoped.results, {
@@ -1356,7 +1388,9 @@ export async function ragQuery(/** @type {any} */ options = {}) {
                     let results = [];
                     try {
                         const table = await db.openTable(TABLE_NAME);
-                        results = /** @type {any[]} */ (await lexicalSearch(table, query, { topK: fetchTopK, filters }));
+                        results = /** @type {any[]} */ (
+                            await lexicalSearch(table, query, { topK: fetchTopK, filters })
+                        );
                     } catch (lexicalError) {
                         const _ce = /** @type {any} */ (lexicalError);
                         console.warn(`[RAG] Lexical fallback failed: ${_ce?.message || _ce}`);
@@ -1408,7 +1442,7 @@ export async function ragQuery(/** @type {any} */ options = {}) {
 
                     if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
                         throw new Error(
-                            `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`
+                            `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`,
                         );
                     }
 
@@ -1455,14 +1489,13 @@ export async function ragQuery(/** @type {any} */ options = {}) {
             }
         },
         60000, // 60 seconds
-        'RAG_QUERY_TIMEOUT'
+        'RAG_QUERY_TIMEOUT',
     );
 }
 
 /**
- * Hybrid search (vector + FTS + reranking + MMR) with formatted output
- * Combines semantic vector search with lexical full-text search,
- * multi-signal reranking, and MMR diversity algorithm
+ * Hybrid search (vector + FTS + reranking + MMR) with formatted output Combines semantic vector search with lexical
+ * full-text search, multi-signal reranking, and MMR diversity algorithm
  *
  * ✅ P1-1: Wrapped with timeout (90s) to prevent hanging on slow hybrid searches
  *
@@ -1480,12 +1513,12 @@ export async function ragQuery(/** @type {any} */ options = {}) {
  * @param {unknown} [options.embeddingsProvider] - Provider de embeddings injetado
  * @param {string} [options.ollamaBaseUrl] - Base URL local do Ollama
  * @param {string} [options.model] - Modelo de embedding
- * @param {'code-first'|'docs-first'|'all'} [options.intentScope] - Política de prioridade por classe de conteúdo
- * @param {'code-first'|'docs-first'|'all'} [options.intent_scope] - Alias snake_case de intentScope
+ * @param {'code-first' | 'docs-first' | 'all'} [options.intentScope] - Política de prioridade por classe de conteúdo
+ * @param {'code-first' | 'docs-first' | 'all'} [options.intent_scope] - Alias snake_case de intentScope
  * @param {boolean} [options.autoExpand] - Habilita expansão automática de contexto
  * @param {boolean} [options.auto_expand] - Alias snake_case de autoExpand
- * @param {'lines'|'symbol'} [options.expandMode] - Modo de expansão automática
- * @param {'lines'|'symbol'} [options.expand_mode] - Alias snake_case de expandMode
+ * @param {'lines' | 'symbol'} [options.expandMode] - Modo de expansão automática
+ * @param {'lines' | 'symbol'} [options.expand_mode] - Alias snake_case de expandMode
  * @param {number} [options.expandTopN] - Quantidade de resultados para auto expansão
  * @param {number} [options.expand_top_n] - Alias snake_case de expandTopN
  * @param {number} [options.expandBudgetChars] - Orçamento máximo de caracteres para auto expansão
@@ -1543,7 +1576,7 @@ export async function ragHybridSearch(options = {}) {
             const fetchTopK = intentScope === 'all' ? requestedTopK : Math.min(requestedTopK * 4, 80);
 
             /** @param {any} base */
-            const finalizeResult = async base => {
+            const finalizeResult = async (base) => {
                 const decorated = decorateResultsWithSourceMetadata(base.results || [], manifest);
                 const scoped = applyIntentScopePolicy(decorated, intentScope, requestedTopK);
                 const expanded = await maybeAutoExpandResults(scoped.results, {
@@ -1614,7 +1647,9 @@ export async function ragHybridSearch(options = {}) {
                     let results = [];
                     try {
                         const table = await db.openTable(TABLE_NAME);
-                        results = /** @type {any[]} */ (await lexicalSearch(table, queryText, { topK: fetchTopK, filters }));
+                        results = /** @type {any[]} */ (
+                            await lexicalSearch(table, queryText, { topK: fetchTopK, filters })
+                        );
                     } catch (lexicalError) {
                         const _ce = /** @type {any} */ (lexicalError);
                         console.warn(`[RAG] Lexical fallback failed: ${_ce?.message || _ce}`);
@@ -1667,13 +1702,13 @@ export async function ragHybridSearch(options = {}) {
 
                     if (manifest.embedding.dim && vector.length !== manifest.embedding.dim) {
                         throw new Error(
-                            `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`
+                            `EMBEDDING_DIM_MISMATCH expected=${manifest.embedding.dim} got=${vector.length}`,
                         );
                     }
 
                     const table = await ensureTable(db, manifest.embedding.dim || vector.length);
                     console.log(
-                        `[RAG] Hybrid search: query="${queryText}", topK=${requestedTopK}, rerank=${rerank}, mmr=${mmr}, intent=${intentScope}`
+                        `[RAG] Hybrid search: query="${queryText}", topK=${requestedTopK}, rerank=${rerank}, mmr=${mmr}, intent=${intentScope}`,
                     );
                     const results = await hybridSearch(table, vector, queryText, {
                         topK: fetchTopK,
@@ -1727,7 +1762,7 @@ export async function ragHybridSearch(options = {}) {
             }
         },
         90000, // 90 seconds (hybrid search is more expensive)
-        'RAG_HYBRID_SEARCH_TIMEOUT'
+        'RAG_HYBRID_SEARCH_TIMEOUT',
     );
 }
 
@@ -1742,7 +1777,7 @@ export async function ragReset(/** @type {any} */ options = {}) {
     if (!options.yes) {
         throw new Error(
             'RAG_RESET_REQUIRES_YES: This operation will delete all indexed data.\n' +
-                'To confirm, run: npm run rag:reset -- --yes'
+                'To confirm, run: npm run rag:reset -- --yes',
         );
     }
     await ensureDirs(paths);
@@ -1751,14 +1786,14 @@ export async function ragReset(/** @type {any} */ options = {}) {
 }
 
 /**
- * Get query embedding cache statistics
- * Useful for monitoring cache performance and hit rates
- * @returns {any} - Cache stats { size, maxSize, hits, misses, hitRate }
+ * Get query embedding cache statistics Useful for monitoring cache performance and hit rates
  *
  * @example
- * const stats = getRagCacheStats();
- * console.log(`Cache hit rate: ${(stats.hitRate * 100).toFixed(1)}%`);
- * console.log(`Cache size: ${stats.size}/${stats.maxSize}`);
+ *     const stats = getRagCacheStats();
+ *     console.log(`Cache hit rate: ${(stats.hitRate * 100).toFixed(1)}%`);
+ *     console.log(`Cache size: ${stats.size}/${stats.maxSize}`);
+ *
+ * @returns {any} - Cache stats { size, maxSize, hits, misses, hitRate }
  */
 export function getRagCacheStats() {
     return queryEmbedCache.getStats();
@@ -1797,7 +1832,7 @@ export async function ragExpand(/** @type {any} */ options = {}) {
                 {
                     chunk_id: chunkId,
                     ...buildIndexStatus(manifest),
-                }
+                },
             );
         }
 
@@ -1822,11 +1857,13 @@ export async function ragExpand(/** @type {any} */ options = {}) {
         if (mode === 'symbol' && chunk.symbol) {
             const safePath = String(chunk.path).replace(/'/g, "''");
             const rows = await table.query().where(`path = '${safePath}'`).limit(10000).toArray();
-            const sameSymbol = rows.filter((/** @type {any} */ row) => String(row.symbol || '') === String(chunk.symbol));
+            const sameSymbol = rows.filter(
+                (/** @type {any} */ row) => String(row.symbol || '') === String(chunk.symbol),
+            );
             if (sameSymbol.length > 0) {
                 baseStartLine = sameSymbol.reduce(
                     (min, row) => Math.min(min, Number(row.start_line || min)),
-                    baseStartLine
+                    baseStartLine,
                 );
                 baseEndLine = sameSymbol.reduce((max, row) => Math.max(max, Number(row.end_line || max)), baseEndLine);
                 expansionBasis = 'symbol';

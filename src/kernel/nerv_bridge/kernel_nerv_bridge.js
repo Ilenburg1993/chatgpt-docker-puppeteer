@@ -1,10 +1,10 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { ActorRole, MessageType, ActionCode } from '#shared/nerv/constants';
-import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
-import { getCorrelationId, getMessageType, getMsgId, getPayload } from '#shared/nerv/envelope_reader';
 import { buildWorkflowNextStepTask as defaultWorkflowBuilder } from '#agent/workflow_next_step_builder';
 import { recordEvent } from '#infra/db/events_repo';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
+import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
+import { getCorrelationId, getMessageType, getMsgId, getPayload } from '#shared/nerv/envelope_reader';
 
 /* ===========================
    Utilitários internos
@@ -12,7 +12,8 @@ import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
 
 /**
  * Valida envelope recebido do NERV.
- * @param {*} envelope
+ *
+ * @param {any} envelope
  */
 function isValidEnvelope(envelope) {
     if (!envelope || typeof envelope !== 'object') return false;
@@ -24,7 +25,8 @@ function isValidEnvelope(envelope) {
 
 /**
  * Extrai dados estruturais do envelope de forma segura.
- * @param {*} envelope
+ *
+ * @param {any} envelope
  */
 function extractEnvelopeData(envelope) {
     return {
@@ -45,20 +47,11 @@ function extractEnvelopeData(envelope) {
  * Cria a ponte de integração entre Kernel e NERV.
  *
  * @param {object} deps
- * @param {any} deps.nerv
- * Instância do NERV já configurada.
- *
- * @param {any} deps.taskRuntime
- * Instância do TaskRuntime.
- *
- * @param {any} deps.observationStore
- * Instância do ObservationStore.
- *
- * @param {any} deps.telemetry
- * Canal de telemetria do Kernel.
- *
- * @param {any} [deps.orchestrator]
- * Instância do OrchestratorEngine (V2.0 - opcional para backward compatibility).
+ * @param {any} deps.nerv Instância do NERV já configurada.
+ * @param {any} deps.taskRuntime Instância do TaskRuntime.
+ * @param {any} deps.observationStore Instância do ObservationStore.
+ * @param {any} deps.telemetry Canal de telemetria do Kernel.
+ * @param {any} [deps.orchestrator] Instância do OrchestratorEngine (V2.0 - opcional para backward compatibility).
  */
 class KernelNERVBridge {
     /**
@@ -165,9 +158,11 @@ class KernelNERVBridge {
      * Processa envelope recebido do NERV.
      *
      * IMPORTANTE:
+     *
      * - Apenas EVENTs são processados (fatos do mundo)
      * - ACKs são ignorados (confirmações físicas)
      * - COMMANDs recebidos são anomalia (Kernel não recebe comandos)
+     *
      * @param {any} envelope
      */
     _handleInboundEnvelope(envelope) {
@@ -221,6 +216,7 @@ class KernelNERVBridge {
 
     /**
      * Processa EVENT recebido, encaminhando ao ObservationStore.
+     *
      * @param {any} envelope
      * @param {any} data
      */
@@ -249,8 +245,7 @@ class KernelNERVBridge {
   =========================== */
 
     /**
-     * Emite um COMMAND via NERV.
-     * ✅ P1-4: Agora async para aguardar emissão e garantir telemetria correta.
+     * Emite um COMMAND via NERV. ✅ P1-4: Agora async para aguardar emissão e garantir telemetria correta.
      *
      * @param {object} params
      * @param {string} params.target
@@ -267,13 +262,14 @@ class KernelNERVBridge {
 
         try {
             const envelope = /** @type {any} */ (
+                // eslint-disable-next-line @typescript-eslint/await-thenable
                 await HighLevelNERV.sendCommand(
                     this.nerv,
                     ActorRole.KERNEL,
                     actionCode,
                     payload,
                     correlationId,
-                    targetRole
+                    targetRole,
                 )
             ); // ✅ P1-4: Added await
             const msgId = envelope && envelope.causality && envelope.causality.msg_id;
@@ -297,8 +293,7 @@ class KernelNERVBridge {
     }
 
     /**
-     * Emite um EVENT via NERV.
-     * ✅ P1-4: Agora async para aguardar emissão e garantir telemetria correta.
+     * Emite um EVENT via NERV. ✅ P1-4: Agora async para aguardar emissão e garantir telemetria correta.
      *
      * @param {object} params
      * @param {string | null} [params.target]
@@ -316,13 +311,14 @@ class KernelNERVBridge {
 
         try {
             const envelope = /** @type {any} */ (
+                // eslint-disable-next-line @typescript-eslint/await-thenable
                 await HighLevelNERV.sendEvent(
                     this.nerv,
                     ActorRole.KERNEL,
                     actionCode,
                     payload,
                     correlationId,
-                    targetRole
+                    targetRole,
                 )
             ); // ✅ P1-4: Added await
             const msgId = envelope && envelope.causality && envelope.causality.msg_id;
@@ -350,8 +346,7 @@ class KernelNERVBridge {
   =========================== */
 
     /**
-     * Hook: Intercepta task ANTES da execução.
-     * Permite orchestrator preparar task (ITERATIVE, MULTI_STEP).
+     * Hook: Intercepta task ANTES da execução. Permite orchestrator preparar task (ITERATIVE, MULTI_STEP).
      *
      * @param {any} task - Task V5
      * @returns {Promise<any>} - Task modificada (se orquestrada)
@@ -391,8 +386,7 @@ class KernelNERVBridge {
     }
 
     /**
-     * Hook: Intercepta task APÓS a execução.
-     * Permite orchestrator decidir próxima ação (DONE/RETRY/NEXT_STEP).
+     * Hook: Intercepta task APÓS a execução. Permite orchestrator decidir próxima ação (DONE/RETRY/NEXT_STEP).
      *
      * @param {any} task - Task V5
      * @param {any} executionResult - Resultado da execução do driver
@@ -434,8 +428,8 @@ class KernelNERVBridge {
     }
 
     /**
-     * Processa decisão do orchestrator.
-     * Aplica ação: RETRY → reenviar task, NEXT_STEP → criar nova task, DONE → finalizar.
+     * Processa decisão do orchestrator. Aplica ação: RETRY → reenviar task, NEXT_STEP → criar nova task, DONE →
+     * finalizar.
      *
      * @param {any} decision - Decisão do orchestrator
      * @param {any} correlationId - ID de correlação NERV
@@ -475,6 +469,7 @@ class KernelNERVBridge {
 
     /**
      * Handler interno: RETRY action
+     *
      * @param {any} task
      * @param {any} feedback
      * @param {any} correlationId
@@ -512,6 +507,7 @@ class KernelNERVBridge {
 
     /**
      * Handler interno: NEXT_STEP action
+     *
      * @param {any} task
      * @param {any} nextStep
      * @param {any} feedback
@@ -553,7 +549,7 @@ class KernelNERVBridge {
                 nextStep?.stepIndex ??
                 nextStep?.index ??
                 workflowState.current_step_index ??
-                completedStepIds.length
+                completedStepIds.length,
         );
         const nextStepIndex = Number.isFinite(inferredIndex)
             ? Math.max(0, inferredIndex)

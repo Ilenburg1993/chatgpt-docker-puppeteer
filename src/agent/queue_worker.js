@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { log } from '#core/logger';
 import { releaseTaskLockForAttempt } from '#agent/task_attempt_invariants';
+import { log } from '#core/logger';
 import { insertArtifact } from '#infra/db/artifact_repo';
 import { recordEvent } from '#infra/db/events_repo';
 import { getDb } from '#infra/db/sqlite';
@@ -11,16 +11,18 @@ import { promises as fs } from 'node:fs';
 
 /**
  * Opções do construtor do QueueWorker.
+ *
  * @typedef {object} QueueWorkerOptions
  * @property {any} kernel - Instância do kernel com método executeTask() (obrigatório).
  * @property {string} workerId - ID único do worker (obrigatório).
- * @property {number} [intervalMs=250] - Intervalo entre ticks em ms.
- * @property {number} [lockTtlMs=60000] - TTL do lock em ms.
- * @property {number} [maxConcurrentTasks=2] - Máximo de tarefas concorrentes.
+ * @property {number} [intervalMs=250] - Intervalo entre ticks em ms. Default is `250`
+ * @property {number} [lockTtlMs=60000] - TTL do lock em ms. Default is `60000`
+ * @property {number} [maxConcurrentTasks=2] - Máximo de tarefas concorrentes. Default is `2`
  */
 
 /**
  * Parâmetros para composição de prompt do driver.
+ *
  * @typedef {object} DriverPromptParams
  * @property {string} [systemMessage] - Mensagem do sistema.
  * @property {string} [userMessage] - Mensagem do usuário.
@@ -28,7 +30,7 @@ import { promises as fs } from 'node:fs';
 
 /** @param {any} ms */
 function _sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function _makeCorrelationId() {
@@ -47,7 +49,8 @@ function _truncate(text, maxLen) {
 
 /**
  * Compõe um prompt para o driver baseado em mensagens do sistema e usuário.
- * @param {DriverPromptParams} [params={}] - Parâmetros do prompt.
+ *
+ * @param {DriverPromptParams} [params={}] - Parâmetros do prompt. Default is `{}`
  * @returns {string} Prompt composto ou string vazia se não houver mensagem do usuário.
  */
 function _composeDriverPrompt(params = {}) {
@@ -97,7 +100,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
             if (currentTaskId && srcTaskId === currentTaskId) {
                 log(
                     'WARN',
-                    `[QUEUE] Skipping self-referencing context input (task_id=${srcTaskId}) in task ${currentTaskId}`
+                    `[QUEUE] Skipping self-referencing context input (task_id=${srcTaskId}) in task ${currentTaskId}`,
                 );
                 continue;
             }
@@ -108,7 +111,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
                 // BUG-CONTEXT-INPUT-SILENT-DROP: non-text formats silently ignored → warn for debuggability
                 log(
                     'WARN',
-                    `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`
+                    `[QUEUE] context.inputs: unsupported format '${format}' for task_result(task_id=${srcTaskId}) — only 'text' is supported. Update the task spec to use format='text'.`,
                 );
                 continue;
             }
@@ -171,6 +174,7 @@ async function _resolveContextInputs(inputs = [], currentTaskId = null) {
 class QueueWorker {
     /**
      * Cria um worker da fila para reivindicar e executar tarefas.
+     *
      * @param {QueueWorkerOptions} options - Opções de configuração do worker.
      */
     constructor(options) {
@@ -195,6 +199,7 @@ class QueueWorker {
 
     /**
      * ✅ P1-17: Safe wrapper for updateTask() that catches OptimisticLockError.
+     *
      * @private
      * @param {any} taskId
      * @param {any} updates
@@ -216,6 +221,7 @@ class QueueWorker {
 
     /**
      * Inicia o worker, começando a reivindicar e executar tarefas periodicamente.
+     *
      * @returns {void}
      * @sideEffects Inicia timer interno e executa tick imediatamente.
      */
@@ -235,6 +241,7 @@ class QueueWorker {
 
     /**
      * Para o worker, cancelando o timer e impedindo novas execuções.
+     *
      * @returns {void}
      * @sideEffects Cancela timer interno e marca worker como parado.
      */
@@ -249,6 +256,7 @@ class QueueWorker {
 
     /**
      * Executa um ciclo do worker: reivindica tarefas elegíveis e as executa.
+     *
      * @returns {Promise<void>}
      * @throws {Error} Se houver erro na execução de tarefa (logado, não relançado).
      * @sideEffects Modifica estado do banco de dados, executa tarefas via kernel.
@@ -274,7 +282,7 @@ class QueueWorker {
                       AND lock_expires_at_ms > @now
                       AND stage = @stage
                       AND status IN ('PENDING', 'RUNNING')
-                `
+                `,
                         )
                         .get({ workerId: this.workerId, now, stage: TASK_STAGES.READY })
                 )?.c || 0;

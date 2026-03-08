@@ -1,23 +1,23 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import { MissionRunner } from '#agent/mission_runner';
-import { closeDb, getDb } from '#infra/db/sqlite';
 import { getMissionById, updateMission } from '#infra/db/mission_repo';
+import { closeDb, getDb } from '#infra/db/sqlite';
 
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave17-idempotency-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave17-idempotency-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
-test('wave17: MissionRunner cria task de step com id determinístico e sem duplicar em reprocessamento', async t => {
+test('wave17: MissionRunner cria task de step com id determinístico e sem duplicar em reprocessamento', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
 
@@ -55,7 +55,7 @@ test('wave17: MissionRunner cria task de step com id determinístico e sem dupli
           (id, title, description, status, autonomy_mode, policy_json, context_json, created_at_ms, updated_at_ms, started_at_ms, completed_at_ms)
         VALUES
           (@id, @title, @description, @status, @autonomy_mode, @policy_json, @context_json, @created_at_ms, @updated_at_ms, @started_at_ms, NULL)
-    `
+    `,
     ).run({
         id: missionId,
         title: 'Wave17 mission',

@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Kernel Task Runtime - Ambiente de Execução', () => {
     describe('1. Contexto de Execução', () => {
@@ -71,7 +71,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
 
             let cancelado = false;
             const promise = /** @type {Promise<void>} */ (
-                new Promise(resolve => {
+                new Promise((resolve) => {
                     setTimeout(() => {
                         cancelado = true;
                         resolve();
@@ -248,7 +248,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             ];
 
             assert.strictEqual(runtimes.length, 3);
-            assert.notStrictEqual((/** @type {any} */ (runtimes[0])).id, (/** @type {any} */ (runtimes[1])).id);
+            assert.notStrictEqual(/** @type {any} */ (runtimes[0]).id, /** @type {any} */ (runtimes[1]).id);
         });
     });
 });

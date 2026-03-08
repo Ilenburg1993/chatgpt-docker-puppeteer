@@ -1,9 +1,9 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { promises as fs } from 'node:fs';
+import { describe, it } from 'node:test';
 import { TsserverDaemon } from '../../../src/integration/lsp/tsserver-daemon.mjs';
 
 describe('TsserverDaemon', () => {
@@ -16,7 +16,7 @@ describe('TsserverDaemon', () => {
                     compilerOptions: { checkJs: true, allowJs: true, module: 'NodeNext', moduleResolution: 'NodeNext' },
                     include: ['**/*.js'],
                 }),
-                'utf8'
+                'utf8',
             );
             const filePath = path.join(rootDir, 'sample.js');
             await fs.writeFile(filePath, 'const value = 1;\nconsole.log(value);\n', 'utf8');
@@ -65,7 +65,7 @@ describe('TsserverDaemon', () => {
                     compilerOptions: { checkJs: true, allowJs: true, module: 'NodeNext', moduleResolution: 'NodeNext' },
                     include: ['**/*.js'],
                 }),
-                'utf8'
+                'utf8',
             );
             const filePath = path.join(rootDir, 'auto.js');
             await fs.writeFile(filePath, 'function foo() { return 42; }\nfoo();\n', 'utf8');
@@ -79,7 +79,7 @@ describe('TsserverDaemon', () => {
                 character: 1,
             });
             assert.ok(Array.isArray(comps));
-            assert.ok(comps.some(c => c.name === 'foo'));
+            assert.ok(comps.some((c) => c.name === 'foo'));
 
             const update = await daemon.execute('updateFile', {
                 filePath,
@@ -131,7 +131,7 @@ describe('TsserverDaemon', () => {
             process.env.LSP_MUTATIONS_ENABLED = 'false';
             await assert.rejects(
                 async () => daemon.execute('apply_code_action', { mode: 'apply', action, confirmationToken: 'token' }),
-                /LSP_MUTATIONS_DISABLED/
+                /LSP_MUTATIONS_DISABLED/,
             );
 
             process.env.LSP_MUTATIONS_ENABLED = 'true';

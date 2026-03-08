@@ -1,8 +1,8 @@
 // @ts-check
-import fs from 'node:fs';
-import path from 'node:path';
 import identityManager from '#core/identity_manager';
 import * as io from '#infra/io';
+import fs from 'node:fs';
+import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 
 // Caminho físico do DNA (Sincronizado com identity_manager.js)

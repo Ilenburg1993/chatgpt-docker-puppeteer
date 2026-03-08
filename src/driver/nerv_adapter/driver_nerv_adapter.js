@@ -1,10 +1,9 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
-import * as driverFactory from '../factory.js';
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
-import { ActionCode, MessageType, ActorRole } from '#shared/nerv/constants';
+import { putBuffer, putJson, putText } from '#infra/storage/artifact_store';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole, MessageType } from '#shared/nerv/constants';
 import {
     getActionCode,
     getCorrelationId,
@@ -12,17 +11,17 @@ import {
     getPayload,
     getTaskIdFromPayload,
 } from '#shared/nerv/envelope_reader';
-import { putBuffer, putJson, putText } from '#infra/storage/artifact_store';
+import EventEmitter from 'node:events';
+import * as driverFactory from '../factory.js';
 
 // ============================================================================
 // ADAPTER_CONFIG - Zero Magic Numbers
 // ============================================================================
 
 /**
- * Configuração do DriverNERVAdapter.
- * Todas as constantes configuráveis via environment variables.
+ * Configuração do DriverNERVAdapter. Todas as constantes configuráveis via environment variables.
  *
- * @const {object} ADAPTER_CONFIG
+ * @constant {object} ADAPTER_CONFIG
  */
 const ADAPTER_CONFIG = {
     /** Timeout máximo para execução de task (ms) - Default: 5 minutos */
@@ -77,11 +76,10 @@ const ADAPTER_CONFIG = {
 // ============================================================================
 
 /**
- * Eventos emitidos pelo DriverNERVAdapter (EventEmitter).
- * Estes são eventos LOCAIS (subscribers no mesmo processo).
+ * Eventos emitidos pelo DriverNERVAdapter (EventEmitter). Estes são eventos LOCAIS (subscribers no mesmo processo).
  * Para eventos NERV (IPC), usar ActionCode.DRIVER_*.
  *
- * @const {object} ADAPTER_EVENTS
+ * @constant {object} ADAPTER_EVENTS
  */
 const ADAPTER_EVENTS = {
     TASK_STARTED: 'adapter:task_started',
@@ -204,7 +202,7 @@ class DriverNERVAdapter extends EventEmitter {
         log('INFO', '[DriverNERVAdapter] v2.0 inicializado e conectado ao NERV');
         log(
             'INFO',
-            `[DriverNERVAdapter] Config: MAX_ACTIVE_DRIVERS=${ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS}, EXECUTE_TIMEOUT=${ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS}ms`
+            `[DriverNERVAdapter] Config: MAX_ACTIVE_DRIVERS=${ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS}, EXECUTE_TIMEOUT=${ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS}ms`,
         );
     }
 
@@ -221,7 +219,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'ERROR',
                     `[DriverNERVAdapter] Erro ao processar comando: ${err?.message || String(err)}`,
-                    correlationId
+                    correlationId,
                 );
 
                 let taskId;
@@ -231,7 +229,7 @@ class DriverNERVAdapter extends EventEmitter {
                     log(
                         'WARN',
                         `[DriverNERVAdapter] Falha ao extrair taskId do comando: ${taskIdError?.message || String(taskIdError)}`,
-                        correlationId
+                        correlationId,
                     );
                     taskId = undefined;
                 }
@@ -246,12 +244,12 @@ class DriverNERVAdapter extends EventEmitter {
                         originalCommand: actionCode,
                         reason: 'INFRASTRUCTURE_ERROR',
                     },
-                    correlationId
+                    correlationId,
                 ).catch((/** @type {any} */ emitErr) => {
                     log(
                         'ERROR',
                         `[DriverNERVAdapter] Falha ao emitir DRIVER_ERROR: ${emitErr?.message || String(emitErr)}`,
-                        correlationId
+                        correlationId,
                     );
                 });
             });
@@ -276,7 +274,7 @@ class DriverNERVAdapter extends EventEmitter {
             log(
                 'DEBUG',
                 `[DriverNERVAdapter] getTaskIdFromPayload falhou, aplicando fallback: ${taskIdError?.message || String(taskIdError)}`,
-                correlationId
+                correlationId,
             );
             taskId = payload?.taskId || payload?.task?.meta?.id || payload?.task?.id || null;
         }
@@ -287,7 +285,7 @@ class DriverNERVAdapter extends EventEmitter {
             log(
                 'WARN',
                 `[DriverNERVAdapter] REJEITADO: Sistema em modo degradado (Browser Pool não disponível)`,
-                correlationId
+                correlationId,
             );
 
             await this._emitBoth(
@@ -307,7 +305,7 @@ class DriverNERVAdapter extends EventEmitter {
                         'Configure o browserEndpoint/proxy com remote debugging exposto ao container (ver CONFIG.DEBUG_PORT ou CHROME_WS_ENDPOINT) e reinicie o sistema',
                     suggestedDelayMs: 1000,
                 },
-                correlationId
+                correlationId,
             );
             return;
         }
@@ -339,7 +337,7 @@ class DriverNERVAdapter extends EventEmitter {
                             ...(retryable ? { suggestedDelayMs: Math.max(250, suggestedDelayMs || 1000) } : {}),
                             count_attempt: false,
                         },
-                        correlationId
+                        correlationId,
                     );
                     return;
                 }
@@ -380,7 +378,14 @@ class DriverNERVAdapter extends EventEmitter {
         const taskId = task.meta.id;
         const startTime = Date.now();
 
-        /** @type {{ total: number, poolAcquire: number|null, contextAttach: number|null, execute: number|null, detach: number|null, release: number|null }} */
+        /** @type {{
+    total: number;
+    poolAcquire: number | null;
+    contextAttach: number | null;
+    execute: number | null;
+    detach: number | null;
+    release: number | null;
+}} */
         const timings = {
             total: startTime,
             poolAcquire: null,
@@ -403,7 +408,7 @@ class DriverNERVAdapter extends EventEmitter {
                     log(
                         'DEBUG',
                         `[DriverNERVAdapter] Abort reason inválido para ${taskId}, usando abort sem reason: ${abortReasonError?.message || String(abortReasonError)}`,
-                        correlationId
+                        correlationId,
                     );
                     abortController.abort();
                 }
@@ -430,7 +435,7 @@ class DriverNERVAdapter extends EventEmitter {
                     reason: 'PRE_EXECUTION_ABORT',
                     message: 'AbortSignal was already aborted before task execution started',
                 },
-                correlationId
+                correlationId,
             );
 
             this.stats.tasksAborted++;
@@ -441,7 +446,7 @@ class DriverNERVAdapter extends EventEmitter {
             log(
                 'WARN',
                 `[DriverNERVAdapter] Task ${taskId} já possui driver ativo (duplicate dispatch)`,
-                correlationId
+                correlationId,
             );
 
             const active = this.activeDrivers.get(taskId);
@@ -465,7 +470,7 @@ class DriverNERVAdapter extends EventEmitter {
                     do_not_change_status: true,
                     activeCorrelationId,
                 },
-                correlationId
+                correlationId,
             );
 
             this.stats.tasksRejected++;
@@ -501,7 +506,7 @@ class DriverNERVAdapter extends EventEmitter {
                     suggestedDelayMs: timeoutMs,
                     count_attempt: false,
                 },
-                correlationId
+                correlationId,
             );
 
             this.stats.tasksRejected++;
@@ -531,7 +536,7 @@ class DriverNERVAdapter extends EventEmitter {
                     suggestedDelayMs: delay,
                     count_attempt: false,
                 },
-                correlationId
+                correlationId,
             );
 
             this.stats.tasksRejected++;
@@ -570,12 +575,12 @@ class DriverNERVAdapter extends EventEmitter {
                         taskId,
                         target,
                     },
-                    correlationId
+                    correlationId,
                 ).catch((/** @type {any} */ err) => {
                     log(
                         'WARN', // ✅ P1-4: Upgraded from DEBUG - heartbeat failures are important
                         `[DriverNERVAdapter] Heartbeat emit failed for ${taskId}: ${err?.message || String(err)}`,
-                        correlationId
+                        correlationId,
                     );
                 });
             }, ADAPTER_CONFIG.TASK_HEARTBEAT_INTERVAL_MS);
@@ -599,7 +604,7 @@ class DriverNERVAdapter extends EventEmitter {
             driver = await this._withTimeout(
                 driverFactory.acquireFromPool(target),
                 ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
-                'driverFactory.acquireFromPool'
+                'driverFactory.acquireFromPool',
             );
             activeEntry.driver = driver;
 
@@ -613,12 +618,12 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Cold Driver detected (no page). Allocating page manually.`,
-                    correlationId
+                    correlationId,
                 );
                 page = await this._withTimeout(
                     this.browserPool.allocate(target),
                     ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
-                    'browserPool.allocate'
+                    'browserPool.allocate',
                 );
             }
             activeEntry.page = page;
@@ -632,7 +637,7 @@ class DriverNERVAdapter extends EventEmitter {
             log(
                 'DEBUG',
                 `[DriverNERVAdapter] Resources acquired for task ${taskId} (driver=${driver.target})`,
-                correlationId
+                correlationId,
             );
 
             // Attach context
@@ -656,7 +661,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Driver state is '${driver.state}' (expected 'IDLE'). Forçando reset para IDLE antes de executar.`,
-                    correlationId
+                    correlationId,
                 );
                 if (typeof driver.setState === 'function') {
                     driver.setState('IDLE');
@@ -673,7 +678,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'DEBUG',
                     `[DriverNERVAdapter] Não foi possível obter URL da página para ${taskId}: ${pageUrlError?.message || String(pageUrlError)}`,
-                    correlationId
+                    correlationId,
                 );
                 pageUrl = null;
             }
@@ -711,7 +716,7 @@ class DriverNERVAdapter extends EventEmitter {
                                 ...(diag ? { diagnostic_storage: diag.storage, diagnosis_summary: diag.summary } : {}),
                             },
                         },
-                        correlationId
+                        correlationId,
                     );
 
                     this.stats.tasksRejected++;
@@ -733,7 +738,7 @@ class DriverNERVAdapter extends EventEmitter {
                         pageUrl,
                         activeDrivers: this.activeDrivers.size,
                     },
-                    correlationId
+                    correlationId,
                 );
             }
 
@@ -760,7 +765,7 @@ class DriverNERVAdapter extends EventEmitter {
             const result = await this._withTimeout(
                 driver.execute(prompt),
                 ADAPTER_CONFIG.EXECUTE_TASK_TIMEOUT_MS,
-                'driver.execute'
+                'driver.execute',
             );
             timings.execute = Date.now() - executeStart;
 
@@ -783,7 +788,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'ERROR',
                     `[DriverNERVAdapter] Failed to save response for ${taskId}: ${saveError?.message || String(saveError)}`,
-                    correlationId
+                    correlationId,
                 );
             }
 
@@ -802,7 +807,7 @@ class DriverNERVAdapter extends EventEmitter {
                         total: duration,
                     },
                 },
-                correlationId
+                correlationId,
             );
 
             this.stats.tasksExecuted++;
@@ -823,7 +828,7 @@ class DriverNERVAdapter extends EventEmitter {
                             reason: abortEntry.abortReason || 'USER_ABORT',
                             message: 'Task execution was aborted by AbortSignal',
                         },
-                        correlationId
+                        correlationId,
                     );
 
                     abortEntry.reported = true;
@@ -856,7 +861,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'ERROR',
                     `[DriverNERVAdapter] Task failed (${failure.reason_class}/${failure.reason}): ${failure.error}`,
-                    correlationId
+                    correlationId,
                 );
 
                 await this._emitBoth(
@@ -878,7 +883,7 @@ class DriverNERVAdapter extends EventEmitter {
                             ...(diag ? { diagnostic_storage: diag.storage, diagnosis_summary: diag.summary } : {}),
                         },
                     },
-                    correlationId
+                    correlationId,
                 );
 
                 this.stats.driversCrashed++;
@@ -904,7 +909,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Falha ao remover listener de abort interno para ${taskId}: ${removeAbortListenerError?.message || String(removeAbortListenerError)}`,
-                    correlationId
+                    correlationId,
                 );
             }
 
@@ -917,7 +922,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Falha ao remover listener de abort externo para ${taskId}: ${removeExternalAbortError?.message || String(removeExternalAbortError)}`,
-                    correlationId
+                    correlationId,
                 );
             }
 
@@ -965,7 +970,7 @@ class DriverNERVAdapter extends EventEmitter {
             log(
                 'WARN',
                 `[DriverNERVAdapter] Abort com reason falhou para ${taskId}: ${abortError?.message || String(abortError)}`,
-                correlationId
+                correlationId,
             );
             try {
                 active.abortController?.abort();
@@ -973,7 +978,7 @@ class DriverNERVAdapter extends EventEmitter {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Abort fallback também falhou para ${taskId}: ${fallbackAbortError?.message || String(fallbackAbortError)}`,
-                    correlationId
+                    correlationId,
                 );
             }
         }
@@ -985,7 +990,7 @@ class DriverNERVAdapter extends EventEmitter {
                 taskId,
                 reason,
             },
-            correlationId
+            correlationId,
         );
 
         this.stats.tasksAborted++;
@@ -1004,7 +1009,7 @@ class DriverNERVAdapter extends EventEmitter {
                 browserPoolHealth = await this._withTimeout(
                     this.browserPool.getHealth(),
                     5000,
-                    'browserPool.getHealth'
+                    'browserPool.getHealth',
                 );
             } else {
                 browserPoolHealth = { status: 'DEGRADED', reason: 'Pool not available' };
@@ -1057,7 +1062,7 @@ class DriverNERVAdapter extends EventEmitter {
         log(
             'DEBUG',
             `[DriverNERVAdapter] Health check: ${healthStatus}, ${this.activeDrivers.size} drivers ativos`,
-            correlationId
+            correlationId,
         );
 
         return health;
@@ -1120,12 +1125,12 @@ class DriverNERVAdapter extends EventEmitter {
                     stateTransition: data,
                     timestamp: new Date().toISOString(),
                 },
-                correlationId
+                correlationId,
             ).catch((/** @type {any} */ err) => {
                 log(
                     'WARN',
                     `[DriverNERVAdapter] Failed to emit state change for ${taskId}: ${err?.message}`,
-                    correlationId
+                    correlationId,
                 );
             });
         };
@@ -1142,7 +1147,7 @@ class DriverNERVAdapter extends EventEmitter {
                         data,
                         timestamp: new Date().toISOString(),
                     },
-                    correlationId
+                    correlationId,
                 );
 
                 this.stats.vitalsEmitted++;
@@ -1164,12 +1169,12 @@ class DriverNERVAdapter extends EventEmitter {
                     severity: data.severity,
                     details: data.message,
                 },
-                correlationId
+                correlationId,
             ).catch((/** @type {any} */ err) => {
                 log(
                     'ERROR',
                     `[DriverNERVAdapter] Failed to emit anomaly for ${taskId}: ${err?.message}`,
-                    correlationId
+                    correlationId,
                 );
             });
         };
@@ -1242,14 +1247,14 @@ class DriverNERVAdapter extends EventEmitter {
                     log(
                         'WARN',
                         `[DriverNERVAdapter] Falha ao emitir evento (tentativa ${attempt + 1}/${maxRetries}): ${lastError.message}`,
-                        correlationId
+                        correlationId,
                     );
-                    await new Promise(resolve => setTimeout(resolve, backoff));
+                    await new Promise((resolve) => setTimeout(resolve, backoff));
                 } else {
                     log(
                         'ERROR',
                         `[DriverNERVAdapter] Falha permanente ao emitir evento após ${maxRetries} tentativas: ${lastError.message}`,
-                        correlationId
+                        correlationId,
                     );
 
                     this.stats.eventsFailed++;
@@ -1295,8 +1300,7 @@ class DriverNERVAdapter extends EventEmitter {
     }
 
     /**
-     * ✅ P1-4: Now async to await all emissions before clearing buffer.
-     * Prevents data loss if emissions fail.
+     * ✅ P1-4: Now async to await all emissions before clearing buffer. Prevents data loss if emissions fail.
      */
     async _flushTelemetry() {
         // Reentrancy guard
@@ -1313,8 +1317,8 @@ class DriverNERVAdapter extends EventEmitter {
             // Emit all events and wait for completion
             const results = await Promise.allSettled(
                 batch.map(({ actionCode, payload, correlationId }) =>
-                    this._emitEvent(actionCode, payload, correlationId)
-                )
+                    this._emitEvent(actionCode, payload, correlationId),
+                ),
             );
 
             /** @type {any[]} */
@@ -1324,7 +1328,7 @@ class DriverNERVAdapter extends EventEmitter {
                     failedItems.push(batch[index]);
                     log(
                         'WARN',
-                        `[DriverNERVAdapter] Telemetry emission failed: ${result.reason?.message || String(result.reason)}`
+                        `[DriverNERVAdapter] Telemetry emission failed: ${result.reason?.message || String(result.reason)}`,
                     );
                 }
             });
@@ -1359,7 +1363,7 @@ class DriverNERVAdapter extends EventEmitter {
         log(
             'ERROR',
             `[DriverNERVAdapter] ${operation} failed: ${error.message} (phase=${phase}, taskId=${taskId || 'n/a'})`,
-            correlationId
+            correlationId,
         );
 
         const isTaskScoped = Boolean(taskId);
@@ -1379,7 +1383,7 @@ class DriverNERVAdapter extends EventEmitter {
                 phase,
                 timestamp: Date.now(),
             },
-            correlationId
+            correlationId,
         );
 
         this.stats.tasksRejected++;
@@ -1389,14 +1393,15 @@ class DriverNERVAdapter extends EventEmitter {
      * Captura artefatos de diagnóstico para falhas de execução.
      *
      * @param {{
-     *   taskId?: string,
-     *   correlationId?: string,
-     *   target?: string,
-     *   driver?: any,
-     *   page?: any,
-     *   phase?: string,
-     *   diagnosis?: any
+     *     taskId?: string;
+     *     correlationId?: string;
+     *     target?: string;
+     *     driver?: any;
+     *     page?: any;
+     *     phase?: string;
+     *     diagnosis?: any;
      * }} [context={}]
+     *   Default is `{}`
      */
     async _captureDiagnostics({
         taskId,
@@ -1439,7 +1444,7 @@ class DriverNERVAdapter extends EventEmitter {
             // Keep null;
         }
 
-        /** @type {Record<string, string|null>} */
+        /** @type {Record<string, string | null>} */
         const storage = {
             screenshot_file: null,
             html_file: null,
@@ -1525,13 +1530,14 @@ class DriverNERVAdapter extends EventEmitter {
      * Executa preflight mínimo antes do driver entrar no loop principal.
      *
      * @param {{
-     *   driver?: any,
-     *   page?: any,
-     *   task?: any,
-     *   taskId?: string,
-     *   target?: string,
-     *   signal?: AbortSignal | null
+     *     driver?: any;
+     *     page?: any;
+     *     task?: any;
+     *     taskId?: string;
+     *     target?: string;
+     *     signal?: AbortSignal | null;
      * }} [context={}]
+     *   Default is `{}`
      */
     async _runPreflight({ driver, page, task, taskId, target, signal } = {}) {
         /** @type {any} */
@@ -1779,18 +1785,18 @@ class DriverNERVAdapter extends EventEmitter {
             }, ms);
 
             Promise.resolve(promise).then(
-                value => {
+                (value) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
                     resolve(value);
                 },
-                err => {
+                (err) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
                     reject(err);
-                }
+                },
             );
         });
     }
@@ -1820,18 +1826,18 @@ class DriverNERVAdapter extends EventEmitter {
                           }, ms);
 
                           Promise.resolve(promise).then(
-                              value => {
+                              (value) => {
                                   if (settled) return;
                                   settled = true;
                                   clearTimeout(timer);
                                   resolve(value);
                               },
-                              err => {
+                              (err) => {
                                   if (settled) return;
                                   settled = true;
                                   clearTimeout(timer);
                                   reject(err);
-                              }
+                              },
                           );
                       });
 
@@ -2181,7 +2187,7 @@ class DriverNERVAdapter extends EventEmitter {
             'TEXTAREA_NOT_FOUND',
             'SEND_BUTTON_NOT_FOUND',
         ];
-        if (selectorSignals.some(s => message.includes(s))) {
+        if (selectorSignals.some((s) => message.includes(s))) {
             return {
                 reason: 'UI_NOT_FOUND',
                 reason_code: 'UI_NOT_FOUND',
@@ -2237,7 +2243,7 @@ class DriverNERVAdapter extends EventEmitter {
 
             log(
                 'WARN',
-                `[DriverNERVAdapter] U2: Circuit breaker OPEN for ${target} (${breaker.failures} failures >= ${breaker.threshold} threshold)`
+                `[DriverNERVAdapter] U2: Circuit breaker OPEN for ${target} (${breaker.failures} failures >= ${breaker.threshold} threshold)`,
             );
 
             this.emit(ADAPTER_EVENTS.CIRCUIT_BREAKER_OPEN, {
@@ -2260,7 +2266,7 @@ class DriverNERVAdapter extends EventEmitter {
 
         log(
             'INFO',
-            `[DriverNERVAdapter] Periodic health check started (${ADAPTER_CONFIG.HEALTH_CHECK_INTERVAL_MS}ms interval)`
+            `[DriverNERVAdapter] Periodic health check started (${ADAPTER_CONFIG.HEALTH_CHECK_INTERVAL_MS}ms interval)`,
         );
     }
 
@@ -2273,7 +2279,7 @@ class DriverNERVAdapter extends EventEmitter {
 
         log(
             'DEBUG',
-            `[DriverNERVAdapter] Telemetry flush interval started (${ADAPTER_CONFIG.TELEMETRY_FLUSH_INTERVAL_MS}ms)`
+            `[DriverNERVAdapter] Telemetry flush interval started (${ADAPTER_CONFIG.TELEMETRY_FLUSH_INTERVAL_MS}ms)`,
         );
     }
 
@@ -2291,12 +2297,12 @@ class DriverNERVAdapter extends EventEmitter {
 
         log(
             'INFO',
-            `[DriverNERVAdapter] Degraded mode warning started (${ADAPTER_CONFIG.DEGRADED_MODE_WARNING_INTERVAL_MS}ms interval)`
+            `[DriverNERVAdapter] Degraded mode warning started (${ADAPTER_CONFIG.DEGRADED_MODE_WARNING_INTERVAL_MS}ms interval)`,
         );
     }
 
     /**
-     * @param {{ timeout?: number }} [options={}]
+     * @param {{ timeout?: number }} [options={}] Default is `{}`
      */
     async shutdown(options = {}) {
         if (this._shutdownResult) {
@@ -2313,7 +2319,7 @@ class DriverNERVAdapter extends EventEmitter {
         this._shutdownPromise = (async () => {
             log(
                 'INFO',
-                `[DriverNERVAdapter] Iniciando shutdown (${this.activeDrivers.size} drivers ativos, timeout: ${timeout}ms)`
+                `[DriverNERVAdapter] Iniciando shutdown (${this.activeDrivers.size} drivers ativos, timeout: ${timeout}ms)`,
             );
 
             if (this.healthCheckInterval) {
@@ -2345,7 +2351,7 @@ class DriverNERVAdapter extends EventEmitter {
                 } catch (/** @type {any} */ err) {
                     log(
                         'WARN',
-                        `[DriverNERVAdapter] Final telemetry flush failed during shutdown: ${err?.message || String(err)}`
+                        `[DriverNERVAdapter] Final telemetry flush failed during shutdown: ${err?.message || String(err)}`,
                     );
                 }
             }
@@ -2357,7 +2363,7 @@ class DriverNERVAdapter extends EventEmitter {
                         await this._withTimeout(
                             this._finallyCleanup(taskId, entry.page, entry.driver, entry.listeners),
                             timeout,
-                            `shutdown_cleanup:${taskId}`
+                            `shutdown_cleanup:${taskId}`,
                         );
                         return { taskId, success: true };
                     } catch (/** @type {any} */ err) {
@@ -2369,7 +2375,7 @@ class DriverNERVAdapter extends EventEmitter {
 
             const results = await Promise.allSettled(shutdownPromises);
 
-            const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+            const successCount = results.filter((r) => r.status === 'fulfilled' && r.value.success).length;
             const failedCount = results.length - successCount;
             const duration = Date.now() - startTime;
 
@@ -2386,7 +2392,7 @@ class DriverNERVAdapter extends EventEmitter {
 
             log(
                 'INFO',
-                `[DriverNERVAdapter] Shutdown concluído (${successCount}/${results.length} success, ${duration}ms)`
+                `[DriverNERVAdapter] Shutdown concluído (${successCount}/${results.length} success, ${duration}ms)`,
             );
 
             return this._shutdownResult;
@@ -2434,21 +2440,20 @@ class DriverNERVAdapter extends EventEmitter {
 
 /**
  * @typedef {object} CreateConfig
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {any} _ Propriedades definidas via runtime.
  */
 /**
  * @typedef {object} CreateNerv
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * @typedef {object} CreateBrowserPool
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Factory function para criar instância do DriverNERVAdapter
  *
- * **Side-effects:** N/A
- * **Semântica:** Cria nova instância do DriverNERVAdapter conectada ao NERV e pool de browsers.
+ * **Side-effects:** N/A **Semântica:** Cria nova instância do DriverNERVAdapter conectada ao NERV e pool de browsers.
  * **Unidades:** N/A
  *
  * @param {CreateNerv} nerv - Instância do sistema NERV
@@ -2463,8 +2468,7 @@ export const create = (nerv, browserPool, config) => {
 /**
  * Classe do adapter NERV para drivers
  *
- * **Side-effects:** N/A
- * **Semântica:** Classe principal para adaptação entre sistema NERV e drivers de LLM.
+ * **Side-effects:** N/A **Semântica:** Classe principal para adaptação entre sistema NERV e drivers de LLM.
  * **Unidades:** N/A
  *
  * @type {function}
@@ -2474,8 +2478,7 @@ export { DriverNERVAdapter };
 /**
  * Configurações do adapter NERV
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações de timeouts, limites e intervalos para operação do adapter.
+ * **Side-effects:** N/A **Semântica:** Configurações de timeouts, limites e intervalos para operação do adapter.
  * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
  *
  * @type {Object<string, number>}
@@ -2485,9 +2488,7 @@ export { ADAPTER_CONFIG };
 /**
  * Eventos emitidos pelo adapter NERV
  *
- * **Side-effects:** N/A
- * **Semântica:** Enumeração de eventos para comunicação com sistemas externos.
- * **Unidades:** N/A
+ * **Side-effects:** N/A **Semântica:** Enumeração de eventos para comunicação com sistemas externos. **Unidades:** N/A
  *
  * @type {Object<string, string>}
  */

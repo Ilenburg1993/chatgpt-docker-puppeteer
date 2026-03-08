@@ -9,8 +9,8 @@
 ========================================================================== */
 
 /**
- * Valida se o conteúdo contém um JSON íntegro via análise de profundidade de pilha.
- * [HARDENING] Inclui verificação de sinal de aborto para interromper processamento longo.
+ * Valida se o conteúdo contém um JSON íntegro via análise de profundidade de pilha. [HARDENING] Inclui verificação de
+ * sinal de aborto para interromper processamento longo.
  *
  * @param {string} content - Conteúdo acumulado para validação.
  * @param {AbortSignal} [signal] - Sinal de cancelamento opcional.
@@ -67,7 +67,7 @@ function validateJSON(content, signal = undefined) {
  * @param {string} content - Conteúdo a ser testado.
  * @param {string} patternStr - String da expressão regular.
  * @param {AbortSignal} [signal] - Sinal de cancelamento.
- * @returns {{ ok: boolean, reason: string|null }}
+ * @returns {{ ok: boolean; reason: string | null }}
  */
 function validateRegex(content, patternStr, signal = undefined) {
     if (!patternStr) {
@@ -95,8 +95,9 @@ function validateRegex(content, patternStr, signal = undefined) {
 
 /**
  * Valida se o conteúdo respeita o formato Markdown (presença de blocos de código).
+ *
  * @param {string} content
- * @returns {{ ok: boolean, reason: string|null }}
+ * @returns {{ ok: boolean; reason: string | null }}
  */
 function validateMarkdownCode(content) {
     if (!content || !content.includes('```')) {
@@ -105,4 +106,4 @@ function validateMarkdownCode(content) {
     return { ok: true, reason: null };
 }
 
-export { validateJSON, validateRegex, validateMarkdownCode };
+export { validateJSON, validateMarkdownCode, validateRegex };

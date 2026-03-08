@@ -39,7 +39,7 @@ async function testChromeConnection() {
                     height: 1080,
                 },
                 ignoreHTTPSErrors: true,
-            })
+            }),
         );
 
         console.log('   ✅ Puppeteer conectado!');
@@ -133,7 +133,7 @@ async function testChromeConnection() {
             console.error('SOLUÇÃO:');
             console.error('');
             console.error('1. Windows Host - Iniciar Chrome:');
-            console.error('   "C:\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^');
+            console.error('   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^');
             console.error('     --remote-debugging-port=9225 ^');
             console.error('     --user-data-dir="C:\\chrome-automation-profile"');
             console.error('');

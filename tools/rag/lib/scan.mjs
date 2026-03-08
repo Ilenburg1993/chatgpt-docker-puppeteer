@@ -1,7 +1,7 @@
 // @ts-check
+import ignore from 'ignore';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import ignore from 'ignore';
 import { isProbablyBinary } from './text.mjs';
 
 // Allow .md files (tests and many projects rely on README/docs scanning)
@@ -124,7 +124,7 @@ function compileGlobs(/** @type {any} */ globs = []) {
     return globs
         .map((/** @type {any} */ g) => String(g || '').trim())
         .filter(Boolean)
-        .map((/** @type {any} */ g) => (/** @type {any} */ { raw: g, re: globToRegExp(g) }));
+        .map((/** @type {any} */ g) => /** @type {any} */ ({ raw: g, re: globToRegExp(g) }));
 }
 
 function matchesAny(/** @type {any} */ relPath, /** @type {any} */ compiledGlobs) {
@@ -141,7 +141,7 @@ function normalizeRelPathInput(/** @type {any} */ relPath) {
 
 function buildCompiledGlobs(/** @type {any} */ { profile = 'full', includeGlobs = [], excludeGlobs = [] } = {}) {
     const profileName = String(profile || 'full');
-    const profileGlobs = (/** @type {any} */ (RAG_SCAN_PROFILES))[profileName] ?? RAG_SCAN_PROFILES.full;
+    const profileGlobs = /** @type {any} */ (RAG_SCAN_PROFILES)[profileName] ?? RAG_SCAN_PROFILES.full;
     const compiledInclude = compileGlobs([...profileGlobs, ...(includeGlobs || [])]);
     const compiledExclude = compileGlobs(excludeGlobs || []);
     return {
@@ -167,7 +167,11 @@ export function isRagIndexableRelPath(/** @type {any} */ relPath, /** @type {any
     return true;
 }
 
-export async function loadWorkspaceFile(/** @type {any} */ rootDir, /** @type {any} */ relPath, /** @type {any} */ options = {}) {
+export async function loadWorkspaceFile(
+    /** @type {any} */ rootDir,
+    /** @type {any} */ relPath,
+    /** @type {any} */ options = {},
+) {
     const normalized = normalizeRelPathInput(relPath);
     if (!normalized) return null;
     if (!isRagIndexableRelPath(normalized, options)) return null;
@@ -200,13 +204,16 @@ export async function loadWorkspaceFile(/** @type {any} */ rootDir, /** @type {a
     }
 }
 
-export async function scanWorkspace(/** @type {any} */ rootDir, /** @type {any} */ {
+export async function scanWorkspace(
+    /** @type {any} */ rootDir,
+    /** @type {any} */ {
         profile = 'full',
         includeGlobs = [],
         excludeGlobs = [],
         maxFileBytes = 2_000_000,
         docsMode = process.env.RAG_DOCS_MODE || 'include',
-    } = {}) {
+    } = {},
+) {
     const root = path.resolve(rootDir);
     const ig = ignore();
     try {

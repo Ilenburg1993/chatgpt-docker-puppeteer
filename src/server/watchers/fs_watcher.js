@@ -1,9 +1,8 @@
 // @ts-check
-import fs from 'node:fs';
-import { promises as fsp } from 'node:fs';
+import { log } from '#core/logger';
 import * as io from '#infra/io';
 import { notify, notifyAgent } from '#server/engine/socket';
-import { log } from '#core/logger';
+import fs, { promises as fsp } from 'node:fs';
 
 /**
  * Instância ativa do watcher do SO.
@@ -23,9 +22,9 @@ let signaling = false;
 let debounceTimer = null;
 
 /**
- * Inicializa o sensor de filesystem da fila.
- * Monitora a pasta física definida na Fachada de IO.
-  * @returns {void}
+ * Inicializa o sensor de filesystem da fila. Monitora a pasta física definida na Fachada de IO.
+ *
+ * @returns {void}
  */
 function init() {
     if (fsWatcher) {
@@ -35,7 +34,7 @@ function init() {
     const queuePath = io.QUEUE_DIR;
 
     // Garantia de Infraestrutura: O sensor exige a existência física do alvo
-    (async () => {
+    void (async () => {
         try {
             await fsp.access(queuePath);
         } catch (/** @type {any} */ e) {
@@ -74,8 +73,7 @@ function init() {
 }
 
 /**
- * Propaga o sinal de mudança para a malha de comunicação.
- * NÃO executa lógica. Apenas sinaliza indícios.
+ * Propaga o sinal de mudança para a malha de comunicação. NÃO executa lógica. Apenas sinaliza indícios.
  */
 function _signalChange() {
     if (signaling) {
@@ -101,9 +99,9 @@ function _signalChange() {
 }
 
 /**
- * Encerramento limpo do sensor.
- * Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
-  * @returns {void}
+ * Encerramento limpo do sensor. Chamado pelo orquestrador de ciclo de vida (lifecycle.js).
+ *
+ * @returns {void}
  */
 function stop() {
     // B006: cancela debounce pendente para evitar _signalChange() após shutdown

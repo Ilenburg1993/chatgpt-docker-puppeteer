@@ -5,7 +5,7 @@ import path from 'node:path';
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'backups', 'tests', 'artifacts', 'coverage', 'dist']);
 
 /**
- * @import { ContractDefinitionV1 } from './load_registry.mjs'
+ * @import {ContractDefinitionV1} from "./load_registry.mjs"
  */
 
 /**
@@ -63,7 +63,8 @@ function resolveLineNumber(lineStarts, index) {
     while (low <= high) {
         const mid = Math.floor((low + high) / 2);
         const start = lineStarts[mid] ?? 0;
-        const next = mid + 1 < lineStarts.length ? (lineStarts[mid + 1] ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+        const next =
+            mid + 1 < lineStarts.length ? (lineStarts[mid + 1] ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
         if (index >= start && index < next) {
             return mid + 1;
         }
@@ -77,14 +78,14 @@ function resolveLineNumber(lineStarts, index) {
 }
 
 /**
- * @param {Array<[number, number]>} ranges
+ * @param {[number, number][]} ranges
  */
 function mergeRanges(ranges) {
     if (ranges.length <= 1) {
         return ranges;
     }
     const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
-    /** @type {Array<[number, number]>} */
+    /** @type {[number, number][]} */
     const merged = [];
     for (const current of sorted) {
         const prev = merged[merged.length - 1];
@@ -98,7 +99,7 @@ function mergeRanges(ranges) {
 }
 
 /**
- * @param {Array<[number, number]>} ranges
+ * @param {[number, number][]} ranges
  * @param {number} index
  */
 function isIndexInRanges(ranges, index) {
@@ -121,20 +122,21 @@ function isIndexInRanges(ranges, index) {
 }
 
 /**
- * Extracts lexical ranges for comments and string-like literals.
- * Template literal static parts are considered string-like; `${...}` expressions remain code.
+ * Extracts lexical ranges for comments and string-like literals. Template literal static parts are considered
+ * string-like; `${...}` expressions remain code.
+ *
  * @param {string} content
  */
 function buildIgnoredRanges(content) {
-    /** @type {Array<[number, number]>} */
+    /** @type {[number, number][]} */
     const commentRanges = [];
-    /** @type {Array<[number, number]>} */
+    /** @type {[number, number][]} */
     const stringRanges = [];
 
     let mode = 'code';
     let quote = '';
     let rangeStart = -1;
-    /** @type {Array<{ braceDepth: number }>} */
+    /** @type {{ braceDepth: number }[]} */
     const templateExprStack = [];
 
     for (let idx = 0; idx < content.length; ) {
@@ -279,7 +281,7 @@ function resolveAllowlistedFiles(contract, allowlists) {
     const allowlistId = contract.allowlist?.allowlist_id;
     const allowlistKey = contract.allowlist?.allowlist_key;
     const fromStore = allowlistId && allowlistKey ? allowlists?.[allowlistId]?.[allowlistKey] || [] : [];
-    return new Set([...explicit, ...fromStore].map(item => String(item).replace(/\\/g, '/')));
+    return new Set([...explicit, ...fromStore].map((item) => String(item).replace(/\\/g, '/')));
 }
 
 /**
@@ -298,14 +300,16 @@ export function evaluateStaticContracts(options) {
     const scanRoot = path.resolve(options.scanDir || path.join(rootDir, 'src'));
     const absoluteFiles = walk(scanRoot);
 
-    /** @type {Array<{
-     *  relFile: string,
-     *  content: string,
-     *  lines: string[],
-     *  lineStarts: number[],
-     *  commentRanges: Array<[number, number]>,
-     *  stringRanges: Array<[number, number]>,
-     * }>} */
+    /**
+     * @type {{
+     *     relFile: string;
+     *     content: string;
+     *     lines: string[];
+     *     lineStarts: number[];
+     *     commentRanges: [number, number][];
+     *     stringRanges: [number, number][];
+     * }[]}
+     */
     const fileMetas = [];
 
     for (const filePath of absoluteFiles) {
@@ -322,7 +326,7 @@ export function evaluateStaticContracts(options) {
         });
     }
 
-    /** @type {Array<Record<string, unknown>>} */
+    /** @type {Record<string, unknown>[]} */
     const findings = [];
     /** @type {Record<string, number>} */
     const hitsByContract = {};
@@ -392,7 +396,7 @@ export function evaluateStaticContracts(options) {
         findings,
         files_scanned: fileMetas.length,
         contracts_scanned: options.contracts.filter(
-            contract => contract.kind === 'static' && contract.status === 'active'
+            (contract) => contract.kind === 'static' && contract.status === 'active',
         ).length,
         hits_by_contract: hitsByContract,
     };

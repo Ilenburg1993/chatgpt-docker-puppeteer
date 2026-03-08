@@ -94,7 +94,8 @@ async function lspApplyCodeActionHandler(/** @type {any} */ params, /** @type {a
 
 /**
  * Função exportada: registerLspTools.
- * @param {*} registry
+ *
+ * @param {any} registry
  * @returns {Promise<void>}
  */
 export async function registerLspTools(/** @type {any} */ registry) {
@@ -112,7 +113,7 @@ export async function registerLspTools(/** @type {any} */ registry) {
                 required: ['filePath', 'line', 'character'],
             },
         },
-        lspDefinitionHandler
+        lspDefinitionHandler,
     );
 
     registry.register(
@@ -129,7 +130,7 @@ export async function registerLspTools(/** @type {any} */ registry) {
                 required: ['filePath', 'line', 'character'],
             },
         },
-        lspReferencesHandler
+        lspReferencesHandler,
     );
 
     registry.register(
@@ -146,7 +147,7 @@ export async function registerLspTools(/** @type {any} */ registry) {
                 required: ['filePath', 'line', 'character'],
             },
         },
-        lspHoverHandler
+        lspHoverHandler,
     );
 
     registry.register(
@@ -161,7 +162,7 @@ export async function registerLspTools(/** @type {any} */ registry) {
                 required: ['filePath'],
             },
         },
-        lspDocumentSymbolsHandler
+        lspDocumentSymbolsHandler,
     );
 
     registry.register(
@@ -177,7 +178,7 @@ export async function registerLspTools(/** @type {any} */ registry) {
                 required: ['query'],
             },
         },
-        lspWorkspaceSymbolsHandler
+        lspWorkspaceSymbolsHandler,
     );
 
     registry.register(
@@ -192,7 +193,7 @@ export async function registerLspTools(/** @type {any} */ registry) {
                 required: ['filePath'],
             },
         },
-        lspDiagnosticsHandler
+        lspDiagnosticsHandler,
     );
 
     registry.register(
@@ -212,7 +213,7 @@ export async function registerLspTools(/** @type {any} */ registry) {
                 required: ['filePath', 'line', 'character'],
             },
         },
-        lspCodeActionsHandler
+        lspCodeActionsHandler,
     );
 
     registry.register(
@@ -231,6 +232,6 @@ export async function registerLspTools(/** @type {any} */ registry) {
                 required: ['mode', 'action'],
             },
         },
-        lspApplyCodeActionHandler
+        lspApplyCodeActionHandler,
     );
 }

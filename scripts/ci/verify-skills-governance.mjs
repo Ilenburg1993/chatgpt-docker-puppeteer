@@ -29,7 +29,7 @@ const requiredCanonicalDocs = [
     'DOCUMENTAÇÃO/PLANOS/TYPING_CANON_LIFECYCLE.md',
 ];
 
-const requiredReferenceSkills = new Set([
+const _requiredReferenceSkills = new Set([
     '.github/skills/typing-node24-esm-tsserver',
     '.github/skills/schema-contract-governance',
 ]);
@@ -50,8 +50,8 @@ const requiredCanonAnchor = 'TYPING_JSDOC_CANON.md';
 function extractMarkdownLinks(filePath) {
     const text = fs.readFileSync(filePath, 'utf8');
     return Array.from(text.matchAll(/\[[^\]]+\]\(([^)]+)\)/g))
-        .map(match => String(match[1] || '').trim())
-        .filter(link => link && !link.startsWith('http://') && !link.startsWith('https://') && !link.startsWith('#'));
+        .map((match) => String(match[1] || '').trim())
+        .filter((link) => link && !link.startsWith('http://') && !link.startsWith('https://') && !link.startsWith('#'));
 }
 
 /**

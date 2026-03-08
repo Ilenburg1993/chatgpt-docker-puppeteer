@@ -1,7 +1,7 @@
 // @ts-check
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -79,7 +79,7 @@ function testFilesExist() {
     let passed = 0;
     let failed = 0;
 
-    files.forEach(file => {
+    files.forEach((file) => {
         const fullPath = path.join(ROOT, file.path);
         const exists = fs.existsSync(fullPath);
 
@@ -144,7 +144,7 @@ function testLauncherContent() {
         { pattern: /localhost:2998|localhost:3000|health.*endpoint/i, desc: 'Health endpoint reference' },
     ];
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         if (check.pattern.test(content)) {
             log('SUCCESS', `✓ ${check.desc}`);
             passed++;
@@ -178,7 +178,7 @@ function testQuickOpsScript() {
         const output = result.output;
         const commands = ['start', 'stop', 'restart', 'status', 'health', 'logs', 'backup'];
 
-        commands.forEach(cmd => {
+        commands.forEach((cmd) => {
             if (output.includes(cmd)) {
                 log('SUCCESS', `✓ quick-ops.sh includes command: ${cmd}`);
                 passed++;
@@ -263,7 +263,7 @@ function testDashboardHTML() {
         { pattern: /#1e1e1e|#2d2d2d|background.*#|dark.*theme/i, desc: 'Dark theme present' },
     ];
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         if (check.pattern.test(content)) {
             log('SUCCESS', `✓ ${check.desc}`);
             passed++;
@@ -310,7 +310,7 @@ function testDocumentation() {
         { pattern: /PM2-First/i, desc: 'PM2-First strategy mentioned' },
     ];
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         if (check.pattern.test(content)) {
             log('SUCCESS', `✓ ${check.desc}`);
             passed++;
@@ -363,7 +363,7 @@ function testRoadmapUpdated() {
         { pattern: /LAUNCHER\.md/i, desc: 'LAUNCHER.md mentioned' },
     ];
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         if (check.pattern.test(content)) {
             log('SUCCESS', `✓ ${check.desc}`);
             passed++;
@@ -398,7 +398,7 @@ function testIOIntegration() {
         { pattern: /queue\.tasks/i, desc: 'Returns queue.tasks' },
     ];
 
-    checks.forEach(check => {
+    checks.forEach((check) => {
         if (check.pattern.test(content)) {
             log('SUCCESS', `✓ ${check.desc}`);
             passed++;
@@ -481,7 +481,7 @@ async function runAllTests() {
 }
 
 // Run tests
-runAllTests().catch(error => {
+runAllTests().catch((error) => {
     log('ERROR', `Fatal error: ${error.message}`);
     console.error(error);
     process.exit(1);

@@ -29,7 +29,7 @@ if (cfg.persistDb) {
         store = createAuditAgentDbStore();
     } catch (/** @type {any} */ error) {
         console.warn(
-            `[audit-agent] db store unavailable (fallback in-memory): ${error instanceof Error ? error.message : String(error)}`
+            `[audit-agent] db store unavailable (fallback in-memory): ${error instanceof Error ? error.message : String(error)}`,
         );
     }
 }
@@ -39,7 +39,7 @@ try {
     contextBuilder = createAuditAgentContextBuilder();
 } catch (/** @type {any} */ error) {
     console.warn(
-        `[audit-agent] context builder unavailable (read-only probes disabled): ${error instanceof Error ? error.message : String(error)}`
+        `[audit-agent] context builder unavailable (read-only probes disabled): ${error instanceof Error ? error.message : String(error)}`,
     );
 }
 let triageClient = null;
@@ -48,7 +48,7 @@ try {
     triageClient = createAuditAgentTriageLlmClient();
 } catch (/** @type {any} */ error) {
     console.warn(
-        `[audit-agent] triage llm client unavailable (LLM triage disabled): ${error instanceof Error ? error.message : String(error)}`
+        `[audit-agent] triage llm client unavailable (LLM triage disabled): ${error instanceof Error ? error.message : String(error)}`,
     );
 }
 let patchAuthorClient = null;
@@ -57,7 +57,7 @@ try {
     patchAuthorClient = createAuditAgentPatchAuthorLlmClient();
 } catch (/** @type {any} */ error) {
     console.warn(
-        `[audit-agent] patch author llm client unavailable (LLM patch author disabled): ${error instanceof Error ? error.message : String(error)}`
+        `[audit-agent] patch author llm client unavailable (LLM patch author disabled): ${error instanceof Error ? error.message : String(error)}`,
     );
 }
 
@@ -85,7 +85,7 @@ const heartbeat = setInterval(
     () => {
         void runtime.tick();
     },
-    Math.max(1000, cfg.triggerDebounceMs)
+    Math.max(1000, cfg.triggerDebounceMs),
 );
 heartbeat.unref?.();
 

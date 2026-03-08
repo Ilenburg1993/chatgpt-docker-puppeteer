@@ -3,11 +3,12 @@ import { log } from '#core/logger';
 import { countTasksByStatus } from '#infra/db/task_repo';
 
 /**
- * @typedef {{ json: (payload: unknown) => unknown, status: (code: number) => MetricsResponseLike }} MetricsResponseLike
+ * @typedef {{ json: (payload: unknown) => unknown; status: (code: number) => MetricsResponseLike }} MetricsResponseLike
  */
 
 /**
  * GET /api/metrics - Métricas gerais do sistema
+ *
  * @param {unknown} req
  * @param {MetricsResponseLike} res
  * @returns {Promise<void>}
@@ -35,8 +36,9 @@ async function getMetrics(req, res) {
 /**
  * GET /api/metrics/tasks - Métricas de tasks por status
  *
- * Usa uma única query SQL com GROUP BY status para contar todas as tarefas
- * por status de forma eficiente (evita N+1 queries).
+ * Usa uma única query SQL com GROUP BY status para contar todas as tarefas por status de forma eficiente (evita N+1
+ * queries).
+ *
  * @param {unknown} req
  * @param {MetricsResponseLike} res
  * @returns {Promise<void>}

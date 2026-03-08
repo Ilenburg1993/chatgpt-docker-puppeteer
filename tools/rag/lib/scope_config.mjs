@@ -65,7 +65,7 @@ export function resolveRagScopeConfig(/** @type {any} */ input = {}) {
         docsMode === 'exclude' ? uniqueSorted([...excludeGlobsBase, ...DOC_GLOBS]) : uniqueSorted(excludeGlobsBase);
     const maxFileBytes = parsePositiveInt(
         input.maxFileBytes ?? process.env.RAG_INDEX_MAX_FILE_BYTES,
-        DEFAULT_MAX_FILE_BYTES
+        DEFAULT_MAX_FILE_BYTES,
     );
 
     const scope = {

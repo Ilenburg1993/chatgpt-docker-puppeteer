@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';
 
@@ -38,7 +38,7 @@ test('wave13: hot pool cleanup does not detach context and does not release page
             cleanupDriver: () => {
                 cleanupCalls++;
             },
-        }
+        },
     );
 
     const driver = {
@@ -82,7 +82,7 @@ test('wave13: cold pool cleanup keeps detach + BrowserPool page release', async 
             cleanupDriver: () => {
                 cleanupCalls++;
             },
-        }
+        },
     );
 
     const driver = {

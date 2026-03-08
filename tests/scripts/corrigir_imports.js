@@ -26,7 +26,7 @@ const correcoes = /** @type {Record<string, string>} */ ({
 
 /**
  * @param {string} caminhoArquivo
- * @returns {boolean|undefined}
+ * @returns {boolean | undefined}
  */
 function corrigirArquivo(caminhoArquivo) {
     const conteudo = fs.readFileSync(caminhoArquivo, 'utf-8');

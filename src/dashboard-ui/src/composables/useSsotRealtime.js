@@ -1,9 +1,9 @@
 // @ts-check
-import { onMounted, onUnmounted } from 'vue';
 import { useSocket } from '@/composables/useSocket';
-import { useTasksVNextStore } from '@/stores/tasks_vnext';
-import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useEventsVNextStore } from '@/stores/events_vnext';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import { onMounted, onUnmounted } from 'vue';
 
 const REALTIME_FLUSH_MS = 80;
 const MAX_SEEN_EVENT_IDS = 5000;
@@ -100,6 +100,7 @@ function _compactCommandStatuses(/** @type {any} */ items) {
 
 /**
  * Função exportada: useSsotRealtime.
+ *
  * @returns {void}
  */
 export function useSsotRealtime() {

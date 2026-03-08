@@ -1,11 +1,11 @@
 // @ts-check
 import os from 'node:os';
 
-function clamp(/** @type {any} */ value,  /** @type {any} */ min,  /** @type {any} */ max) {
+function clamp(/** @type {any} */ value, /** @type {any} */ min, /** @type {any} */ max) {
     return Math.min(max, Math.max(min, value));
 }
 
-function parseNumber(/** @type {any} */ value,  /** @type {any} */ fallback) {
+function parseNumber(/** @type {any} */ value, /** @type {any} */ fallback) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -47,8 +47,7 @@ function sumCpuTimes(/** @type {any} */ cpus) {
 }
 
 /**
- * Adaptive CPU-based throttler for RAG indexing.
- * Focuses on machine-wide stability while preserving throughput.
+ * Adaptive CPU-based throttler for RAG indexing. Focuses on machine-wide stability while preserving throughput.
  */
 export class AdaptiveThrottler {
     constructor(/** @type {any} */ options = {}) {
@@ -157,17 +156,17 @@ export class AdaptiveThrottler {
         this.lastLoggedAtMs = now;
         console.log(
             `[RAG][Adaptive] metric=${this.lastCpuSource} cpu=${avgCPU.toFixed(1)}% target=${this.targetCPU}% ` +
-                `delay ${oldDelay.toFixed(0)}ms -> ${this.currentDelay.toFixed(0)}ms (${action})`
+                `delay ${oldDelay.toFixed(0)}ms -> ${this.currentDelay.toFixed(0)}ms (${action})`,
         );
     }
 
     /**
-     * Adaptive throttle: samples CPU and adjusts delay dynamically.
-     * Returns { cpu, delay, action, metric } for diagnostics.
+     * Adaptive throttle: samples CPU and adjusts delay dynamically. Returns { cpu, delay, action, metric } for
+     * diagnostics.
      */
     async throttle() {
         if (!this.enabled) {
-            await new Promise(resolve => setTimeout(resolve, this.currentDelay));
+            await new Promise((resolve) => setTimeout(resolve, this.currentDelay));
             return { cpu: null, delay: this.currentDelay, action: 'disabled', metric: this.lastCpuSource };
         }
 
@@ -185,13 +184,13 @@ export class AdaptiveThrottler {
             this.consecutiveHighCPU++;
             this.currentDelay = Math.min(
                 Math.max(this.currentDelay * this.slowdownFactor, this.currentDelay + 20),
-                this.maxDelay
+                this.maxDelay,
             );
             action = 'slowdown';
         } else if (avgCPU <= lowThreshold && this.consecutiveHighCPU === 0) {
             this.currentDelay = Math.max(
                 Math.min(this.currentDelay * this.speedupFactor, this.currentDelay - 10),
-                this.minDelay
+                this.minDelay,
             );
             action = 'speedup';
         } else {
@@ -204,7 +203,7 @@ export class AdaptiveThrottler {
         this.currentDelay = clamp(this.currentDelay, this.minDelay, this.maxDelay);
         this.maybeLogAdjustment(action, avgCPU, oldDelay);
 
-        await new Promise(resolve => setTimeout(resolve, this.currentDelay));
+        await new Promise((resolve) => setTimeout(resolve, this.currentDelay));
         return { cpu: avgCPU, delay: this.currentDelay, action, metric: this.lastCpuSource };
     }
 
@@ -212,7 +211,10 @@ export class AdaptiveThrottler {
      * Get current stats for reporting.
      */
     getStats() {
-        const avgCPU = this.samples.length > 0 ? this.samples.reduce(/** @type {any} */ (a, b) => a + b, 0) / this.samples.length : 0;
+        const avgCPU =
+            this.samples.length > 0
+                ? this.samples.reduce(/** @type {any} */ (a, b) => a + b, 0) / this.samples.length
+                : 0;
 
         return {
             enabled: this.enabled,

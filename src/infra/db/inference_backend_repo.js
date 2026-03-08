@@ -65,7 +65,7 @@ function _setBackendEnabled(id, enabled) {
     db.prepare('UPDATE inference_backends SET enabled = ?, updated_at_ms = ? WHERE id = ?').run(
         enabled ? 1 : 0,
         _now(),
-        targetId
+        targetId,
     );
     return getInferenceBackendById(targetId);
 }
@@ -73,8 +73,9 @@ function _setBackendEnabled(id, enabled) {
 /** @typedef {any} UpsertInferenceBackendInput */
 /**
  * Função exportada: upsertInferenceBackend.
+ *
  * @param {any} [input]
- * @returns {InferenceBackend|null}
+ * @returns {InferenceBackend | null}
  */
 function upsertInferenceBackend(input = {}) {
     const db = getDb();
@@ -107,7 +108,7 @@ function upsertInferenceBackend(input = {}) {
             health_policy_json = excluded.health_policy_json,
             transport_policy_json = excluded.transport_policy_json,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         id,
         name,
@@ -125,8 +126,9 @@ function upsertInferenceBackend(input = {}) {
 
 /**
  * Função exportada: getInferenceBackendById.
+ *
  * @param {string} id Unique identifier.
- * @returns {InferenceBackend|null}
+ * @returns {InferenceBackend | null}
  */
 function getInferenceBackendById(id) {
     const db = getDb();
@@ -135,11 +137,12 @@ function getInferenceBackendById(id) {
 
 /**
  * @typedef {object} ListInferenceBackendsOptions
- * @property {*} [enabledOnly]
- * @property {*} [limit]
+ * @property {any} [enabledOnly]
+ * @property {any} [limit]
  */
 /**
  * Função exportada: listInferenceBackends.
+ *
  * @param {ListInferenceBackendsOptions} [options]
  * @returns {InferenceBackend[]}
  */
@@ -152,7 +155,7 @@ function listInferenceBackends({ enabledOnly = false, limit = 100 } = {}) {
             ${enabledOnly ? 'WHERE enabled = 1' : ''}
             ORDER BY updated_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all({ limit: Math.max(1, Math.min(Number(limit) || 100, 500)) });
     return rows.map(_rowToBackend).filter(Boolean);
@@ -160,9 +163,10 @@ function listInferenceBackends({ enabledOnly = false, limit = 100 } = {}) {
 
 /**
  * Função exportada: setInferenceBackendEnabled.
+ *
  * @param {string} id
  * @param {boolean} enabled
- * @returns {InferenceBackend|null}
+ * @returns {InferenceBackend | null}
  */
 function setInferenceBackendEnabled(id, enabled) {
     return _setBackendEnabled(id, Boolean(enabled));

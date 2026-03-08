@@ -1,7 +1,6 @@
 <script setup>
 import { Search } from 'lucide-vue-next';
 import { ref } from 'vue';
-import Badge from '../ui/Badge.vue';
 
 const props = defineProps({
     modelValue: {
@@ -39,17 +38,17 @@ const updateFilters = () => {
     emit('update:modelValue', localFilters.value);
 };
 
-const handleStatusChange = status => {
+const handleStatusChange = (status) => {
     localFilters.value.status = status;
     updateFilters();
 };
 
-const handlePriorityChange = priority => {
+const handlePriorityChange = (priority) => {
     localFilters.value.priority = priority;
     updateFilters();
 };
 
-const handleSearchInput = event => {
+const handleSearchInput = (event) => {
     localFilters.value.search = event.target.value;
     updateFilters();
 };

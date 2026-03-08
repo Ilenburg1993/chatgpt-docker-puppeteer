@@ -47,17 +47,10 @@ const DecisionKind = Object.freeze({
 class ExecutionEngine {
     /**
      * @param {object} params
-     * @param {any} params.taskRuntime
-     * Gerenciador de vida das tarefas.
-     *
-     * @param {any} params.observationStore
-     * Registro de EVENTs recebidos.
-     *
-     * @param {any} params.policyEngine
-     * Motor normativo consultivo.
-     *
-     * @param {any} params.telemetry
-     * Canal de telemetria.
+     * @param {any} params.taskRuntime Gerenciador de vida das tarefas.
+     * @param {any} params.observationStore Registro de EVENTs recebidos.
+     * @param {any} params.policyEngine Motor normativo consultivo.
+     * @param {any} params.telemetry Canal de telemetria.
      */
     constructor({ taskRuntime, observationStore, policyEngine, telemetry }) {
         if (!taskRuntime) {
@@ -92,14 +85,9 @@ class ExecutionEngine {
      * Chamado exclusivamente pelo KernelLoop a cada ciclo.
      *
      * @param {object} context
-     * @param {number} context.tickId
-     * Identificador do ciclo lógico.
-     *
-     * @param {number} context.at
-     * Timestamp do ciclo.
-     *
-     * @returns {Array<object>}
-     * Lista de propostas de decisão.
+     * @param {number} context.tickId Identificador do ciclo lógico.
+     * @param {number} context.at Timestamp do ciclo.
+     * @returns {object[]} Lista de propostas de decisão.
      */
     evaluate({ tickId, at }) {
         this.telemetry.info('execution_engine_evaluation_start', {
@@ -157,14 +145,9 @@ class ExecutionEngine {
     /**
      * Avalia uma tarefa específica.
      *
-     * @param {any} task
-     * Snapshot imutável da tarefa.
-     *
-     * @param {object} context
-     * Contexto do ciclo.
-     *
-     * @returns {Array<object>}
-     * Propostas geradas para esta tarefa.
+     * @param {any} task Snapshot imutável da tarefa.
+     * @param {object} context Contexto do ciclo.
+     * @returns {object[]} Propostas geradas para esta tarefa.
      */
     _evaluateTask(task, /** @type {any} */ { tickId, at }) {
         const proposals = /** @type {any[]} */ ([]);
@@ -247,9 +230,7 @@ class ExecutionEngine {
      * @param {any} params.task
      * @param {any[]} params.observations
      * @param {number} params.at
-     *
-     * @returns {any}
-     * Resultado da interpretação semântica.
+     * @returns {any} Resultado da interpretação semântica.
      */
     _interpretObservations({ task, observations, at }) {
         const result = {
@@ -305,6 +286,7 @@ class ExecutionEngine {
 
     /**
      * Sintetiza uma proposta de decisão a partir de:
+     *
      * - Avaliação normativa (PolicyEngine)
      * - Interpretação semântica (observações)
      * - Estado atual da tarefa
@@ -315,8 +297,7 @@ class ExecutionEngine {
      * @param {any} params.policyAssessment
      * @param {any} params.semanticDecisions
      * @param {number} params.at
-     * @returns {any}
-     * Proposta de decisão ou null se nenhuma ação necessária.
+     * @returns {any} Proposta de decisão ou null se nenhuma ação necessária.
      */
     _synthesizeProposal({ task, observations: _, policyAssessment, semanticDecisions, at }) {
         // Regra 1: Suspender tarefa se avaliação normativa crítica
@@ -369,4 +350,4 @@ class ExecutionEngine {
     }
 }
 
-export { ExecutionEngine, DecisionKind };
+export { DecisionKind, ExecutionEngine };

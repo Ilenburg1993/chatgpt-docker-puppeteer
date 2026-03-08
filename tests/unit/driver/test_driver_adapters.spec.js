@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Driver Adapters - Adaptadores de Plataforma', () => {
     describe('1. ChatGPT Adapter', () => {
@@ -30,7 +30,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
 
             const adapter = {
                 waitForLoad: async () => {
-                    await new Promise(resolve => {
+                    await new Promise((resolve) => {
                         setTimeout(resolve, 100);
                     });
                     carregado = true;
@@ -146,7 +146,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             let completo = false;
 
             const aguardar = async () => {
-                await new Promise(resolve => {
+                await new Promise((resolve) => {
                     setTimeout(resolve, 150);
                 });
                 completo = true;
@@ -257,7 +257,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
             let apareceu = false;
 
             const waitFor = async (/** @type {any} */ selector, /** @type {any} */ timeout) => {
-                await new Promise(resolve => {
+                await new Promise((resolve) => {
                     setTimeout(resolve, 100);
                 });
                 apareceu = true;
@@ -271,7 +271,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve falhar após timeout', async () => {
             const waitFor = async (/** @type {any} */ selector, /** @type {any} */ timeout) => {
                 const start = Date.now();
-                await new Promise(resolve => {
+                await new Promise((resolve) => {
                     setTimeout(resolve, timeout + 100);
                 });
                 const elapsed = Date.now() - start;

@@ -1,9 +1,9 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import * as logger from '#core/logger';
+import { ARTIFACTS_DIR, RESPONSE_DIR as LEGACY_RESPONSE_DIR } from '#infra/fs/paths';
+import { atomicWrite } from '#infra/io';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { ARTIFACTS_DIR, RESPONSE_DIR as LEGACY_RESPONSE_DIR } from '#infra/fs/paths';
-import * as logger from '#core/logger';
-import { atomicWrite } from '#infra/io';
 
 function _resolveArtifactsRoot() {
     const fromEnv = process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || null;
@@ -27,9 +27,10 @@ function _responseDir() {
  *
  * @param {string} taskId - Task ID
  * @param {SaveResponseV2ResponseData} responseData - Response V2 data
- * @param {{ attemptId?: string|null, writeLegacyLatest?: boolean }=} opts
+ * @param {{ attemptId?: string | null; writeLegacyLatest?: boolean }} [opts]
  * @param {SaveResponseV2Options} [opts]
- * @returns {Promise<any>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile, htmlFile} }
+ * @returns {Promise<any>} - { textFile, markdownFile, jsonFile, htmlFile, legacy?: {textFile, markdownFile, jsonFile,
+ *   htmlFile} }
  */
 async function saveResponseV2(taskId, responseData, opts = {}) {
     try {
@@ -65,10 +66,16 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
                 markdownSize: responseData.content.markdown.length,
                 htmlSize: responseData.content.html.length,
                 codeBlocks: responseData.content.json.codeBlocks?.length || 0,
-            })
+            }),
         );
 
-        /** @type {{ textFile: string, markdownFile: string, jsonFile: string, htmlFile: string, legacy?: { textFile: string, markdownFile: string, jsonFile: string, htmlFile: string } }} */
+        /** @type {{
+    textFile: string;
+    markdownFile: string;
+    jsonFile: string;
+    htmlFile: string;
+    legacy?: { textFile: string; markdownFile: string; jsonFile: string; htmlFile: string };
+}} */
         const out = {
             textFile: `${basePath}.txt`,
             markdownFile: `${basePath}.md`,
@@ -107,7 +114,7 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
                 taskId,
                 error: /** @type {any} */ (error).message,
                 stack: /** @type {any} */ (error).stack,
-            })
+            }),
         );
         throw new Error(`Falha ao salvar resposta V2: ${/** @type {any} */ (error).message}`); // eslint-disable-line preserve-caught-error
     }
@@ -119,9 +126,9 @@ async function saveResponseV2(taskId, responseData, opts = {}) {
  *
  * @param {string} taskId - Task ID
  * @param {string} format - Formato desejado ('text', 'markdown', 'json', 'html')
- * @param {{ attemptId?: string|null }=} opts
+ * @param {{ attemptId?: string | null }} [opts]
  * @param {LoadResponseV2Options} [opts]
- * @returns {Promise<string|object>} - Conteúdo da resposta
+ * @returns {Promise<string | object>} - Conteúdo da resposta
  */
 async function loadResponseV2(taskId, format, opts = {}) {
     format = format || 'text';
@@ -158,7 +165,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
                 /** @type {any} */ ({
                     taskId,
                     requestedFormat: format,
-                })
+                }),
             );
             return await loadResponseV2(taskId, 'text', opts);
         }
@@ -170,7 +177,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
                 taskId,
                 format,
                 filePath,
-            })
+            }),
         );
         return /** @type {any} */ (null);
     }
@@ -180,7 +187,7 @@ async function loadResponseV2(taskId, format, opts = {}) {
  * Lista formatos disponíveis para task
  *
  * @param {string} taskId - Task ID
- * @returns {Promise<Array<string>>} - Formatos disponíveis
+ * @returns {Promise<string[]>} - Formatos disponíveis
  */
 async function listAvailableFormats(taskId) {
     const basePath = path.join(_responseDir(), taskId, 'latest');
@@ -244,7 +251,7 @@ async function deleteResponseV2(taskId) {
             `[RESPONSE_STORE_V2] Resposta deletada para task ${taskId}`,
             /** @type {any} */ ({
                 filesDeleted: deletedCount,
-            })
+            }),
         );
     }
 
@@ -254,10 +261,10 @@ async function deleteResponseV2(taskId) {
 /**
  * Wraps HTML com template completo (renderizável)
  *
+ * @private
  * @param {string} htmlContent - HTML snippet
  * @param {string} taskId - Task ID
  * @returns {string} - HTML completo
- * @private
  */
 function wrapHTML(htmlContent, taskId) {
     return `<!DOCTYPE html>
@@ -339,4 +346,4 @@ function wrapHTML(htmlContent, taskId) {
 </html>`;
 }
 
-export { saveResponseV2, loadResponseV2, listAvailableFormats, responseExists, deleteResponseV2 };
+export { deleteResponseV2, listAvailableFormats, loadResponseV2, responseExists, saveResponseV2 };

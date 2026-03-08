@@ -1,7 +1,7 @@
 // @ts-check
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
@@ -49,7 +49,7 @@ if (!fs.existsSync(SOURCE_FILE)) {
 const existingHashes = new Set();
 console.log('🔍 Indexando fila atual para evitar duplicatas...');
 
-fs.readdirSync(QUEUE_DIR).forEach(f => {
+fs.readdirSync(QUEUE_DIR).forEach((f) => {
     if (!f.endsWith('.json')) {
         return;
     }
@@ -77,7 +77,7 @@ if (content.includes('')) {
     process.exit(1);
 }
 
-const lines = content.split(/\r?\n/).filter(l => l.trim());
+const lines = content.split(/\r?\n/).filter((l) => l.trim());
 
 console.log(`\n📦 PROCESSANDO LOTE: ${lines.length} itens`);
 

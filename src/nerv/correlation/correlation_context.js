@@ -27,7 +27,8 @@
 
 /**
  * Verifica se valor é string não vazia.
- * @param {*} value
+ *
+ * @param {any} value
  */
 function isNonEmptyString(value) {
     return typeof value === 'string' && value.length > 0;
@@ -35,7 +36,8 @@ function isNonEmptyString(value) {
 
 /**
  * Clona array de registros de forma segura.
- * @param {*} records
+ *
+ * @param {any} records
  */
 function cloneRecords(records) {
     return Array.isArray(records) ? records.slice() : [];
@@ -52,15 +54,14 @@ function cloneRecords(records) {
  */
 /**
  * @typedef {object} CreateCorrelationContextOptions
- * @property {*} [store]
- * @property {*} [telemetry]
+ * @property {any} [store]
+ * @property {any} [telemetry]
  */
 /**
  * Cria o contexto de leitura de correlações.
  *
- * **Side-effects:** Emite telemetria para operações de leitura.
- * **Semântica:** Camada de leitura/auditoria sobre correlações históricas.
- * **Unidades:** correlationId como string não vazia, histórico como array de registros.
+ * **Side-effects:** Emite telemetria para operações de leitura. **Semântica:** Camada de leitura/auditoria sobre
+ * correlações históricas. **Unidades:** correlationId como string não vazia, histórico como array de registros.
  *
  * @param {CreateCorrelationContextDeps} deps - Dependências do contexto
  * @returns {any} Contexto com métodos getHistory, getLatest, getStats
@@ -83,7 +84,7 @@ function createCorrelationContext({ store, telemetry }) {
      * Retorna o histórico completo de uma correlação.
      *
      * @param {string} correlationId
-     * @returns {Array<object>}
+     * @returns {object[]}
      */
     function getHistory(correlationId) {
         if (!isNonEmptyString(correlationId)) {
@@ -129,10 +130,9 @@ function createCorrelationContext({ store, telemetry }) {
     }
 
     /**
-     * Retorna lista de todas as correlações existentes.
-     * Uso exclusivo para auditoria/diagnóstico.
+     * Retorna lista de todas as correlações existentes. Uso exclusivo para auditoria/diagnóstico.
      *
-     * @returns {Array<string>}
+     * @returns {string[]}
      */
     function list() {
         const ids = store.list();

@@ -1,23 +1,23 @@
 // @ts-check
 /**
- * Query normalization and expansion for better cache hits and semantic matching
- * Improves cache hit rate by normalizing similar queries to the same form
+ * Query normalization and expansion for better cache hits and semantic matching Improves cache hit rate by normalizing
+ * similar queries to the same form
  */
 
 /**
- * Normalize query for better cache hits
- * Converts query to canonical form:
+ * Normalize query for better cache hits Converts query to canonical form:
+ *
  * - Lowercase
  * - Trim whitespace
  * - Collapse multiple spaces
  * - Remove special chars (keep alphanumeric + space + dot + dash)
  *
+ * @example
+ *     normalizeQuery('  CHROME_PROXY_PORT  ') === 'chrome_proxy_port';
+ *     normalizeQuery('kernel  loop   20Hz') === 'kernel loop 20hz';
+ *
  * @param {string} query - Raw query text
  * @returns {string} - Normalized query
- *
- * @example
- * normalizeQuery("  CHROME_PROXY_PORT  ") === "chrome_proxy_port"
- * normalizeQuery("kernel  loop   20Hz") === "kernel loop 20hz"
  */
 export function normalizeQuery(/** @type {any} */ query) {
     return query
@@ -28,14 +28,13 @@ export function normalizeQuery(/** @type {any} */ query) {
 }
 
 /**
- * Expand query with code-specific synonyms
- * Adds common variations and synonyms to improve semantic matching
+ * Expand query with code-specific synonyms Adds common variations and synonyms to improve semantic matching
+ *
+ * @example
+ *     expandQuery("function timeout") => "function func fn method timeout delay wait"
  *
  * @param {string} query - Normalized query
  * @returns {string} - Expanded query with synonyms
- *
- * @example
- * expandQuery("function timeout") => "function func fn method timeout delay wait"
  */
 export function expandQuery(/** @type {any} */ query) {
     // Code-specific synonyms mapping
@@ -69,17 +68,16 @@ export function expandQuery(/** @type {any} */ query) {
 }
 
 /**
- * Full query processing pipeline: normalize + optionally expand
- * Use this for end-to-end query preprocessing
+ * Full query processing pipeline: normalize + optionally expand Use this for end-to-end query preprocessing
+ *
+ * @example
+ *     processQuery('  Function TIMEOUT  ', { expand: true });
+ *     // => "function func fn method timeout delay wait timer"
  *
  * @param {string} query - Raw query text
  * @param {object} options - Processing options
  * @param {boolean} [options.expand] - Whether to expand with synonyms (default: false)
  * @returns {string} - Processed query
- *
- * @example
- * processQuery("  Function TIMEOUT  ", { expand: true })
- * // => "function func fn method timeout delay wait timer"
  */
 export function processQuery(/** @type {any} */ query, /** @type {any} */ options = {}) {
     const { expand = false } = options;

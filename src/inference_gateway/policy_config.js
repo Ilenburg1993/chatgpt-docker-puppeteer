@@ -6,36 +6,36 @@ import { normalizeInferenceClientTag } from './client_tags.js';
  * @typedef {object} InferencePolicyConfig
  * @property {number} [timeoutMs]
  * @property {number} [maxParallel]
- * @property {string[]|null} [allowedModels]
- * @property {string[]|null} [allowedBackends]
- * @property {number|null} [maxTokens]
- * @property {'degraded_continue'|'fail_closed'|null} [degradedBehavior]
+ * @property {string[] | null} [allowedModels]
+ * @property {string[] | null} [allowedBackends]
+ * @property {number | null} [maxTokens]
+ * @property {'degraded_continue' | 'fail_closed' | null} [degradedBehavior]
  */
 
 /**
  * @typedef {object} ResolveInferencePolicyInput
  * @property {unknown} [clientTag]
- * @property {Partial<InferencePolicyConfig>|null} [overrides]
- * @property {Partial<InferencePolicyConfig>|null} [clientPolicy]
- * @property {Partial<InferencePolicyConfig>|null} [profilePolicy]
- * @property {Partial<InferencePolicyConfig>|null} [globalPolicy]
- * @property {Partial<InferencePolicyConfig>|null} [envPolicy]
- * @property {Partial<InferencePolicyConfig>|null} [defaults]
+ * @property {Partial<InferencePolicyConfig> | null} [overrides]
+ * @property {Partial<InferencePolicyConfig> | null} [clientPolicy]
+ * @property {Partial<InferencePolicyConfig> | null} [profilePolicy]
+ * @property {Partial<InferencePolicyConfig> | null} [globalPolicy]
+ * @property {Partial<InferencePolicyConfig> | null} [envPolicy]
+ * @property {Partial<InferencePolicyConfig> | null} [defaults]
  */
 
 /**
- * @typedef {Required<Pick<InferencePolicyConfig,'timeoutMs'|'maxParallel'|'degradedBehavior'>> & {
- *   maxTokens: number|null,
- *   allowedModels: string[]|null,
- *   allowedBackends: string[]|null
+ * @typedef {Required<Pick<InferencePolicyConfig, 'timeoutMs' | 'maxParallel' | 'degradedBehavior'>> & {
+ *     maxTokens: number | null;
+ *     allowedModels: string[] | null;
+ *     allowedBackends: string[] | null;
  * }} EffectiveInferencePolicy
  */
 
 /**
  * @typedef {{
- *   clientTag: import('./client_tags.js').InferenceClientTag,
- *   effective: EffectiveInferencePolicy,
- *   sourcesApplied: string[]
+ *     clientTag: import('./client_tags.js').InferenceClientTag;
+ *     effective: EffectiveInferencePolicy;
+ *     sourcesApplied: string[];
  * }} ResolvedInferencePolicy
  */
 
@@ -48,7 +48,7 @@ function asPlainObject(value) {
 /** @param {any} value */
 function asStringArray(value) {
     if (!Array.isArray(value)) return null;
-    const items = value.map(item => String(item || '').trim()).filter(Boolean);
+    const items = value.map((item) => String(item || '').trim()).filter(Boolean);
     return items.length > 0 ? [...new Set(items)] : [];
 }
 
@@ -63,7 +63,7 @@ function asPositiveInt(value, fallback) {
 
 /**
  * @param {any} value
- * @param {number|null} [fallback]
+ * @param {number | null} [fallback]
  */
 function asNonNegativeIntOrNull(value, fallback = null) {
     if (value === null || value === undefined || value === '') return fallback;
@@ -110,7 +110,7 @@ function mergeLayer(target, layer) {
     if ('degradedBehavior' in src || 'degraded_behavior' in src) {
         target.degradedBehavior = normalizeDegradedBehavior(
             src.degradedBehavior ?? src.degraded_behavior,
-            target.degradedBehavior
+            target.degradedBehavior,
         );
     }
 
@@ -118,8 +118,8 @@ function mergeLayer(target, layer) {
 }
 
 /**
- * Resolve política efetiva de inferência por precedência.
- * Ordem (menor -> maior): defaults, env, global, profile, client, overrides.
+ * Resolve política efetiva de inferência por precedência. Ordem (menor -> maior): defaults, env, global, profile,
+ * client, overrides.
  *
  * @param {ResolveInferencePolicyInput} input
  * @returns {ResolvedInferencePolicy}
@@ -132,10 +132,10 @@ export function resolveInferencePolicy(input = {}) {
         maxTokens: /** @type {number | null} */ (null),
         allowedModels: /** @type {string[] | null} */ (null),
         allowedBackends: /** @type {string[] | null} */ (null),
-        degradedBehavior: /** @type {'degraded_continue'|'fail_closed'} */ ('degraded_continue'),
+        degradedBehavior: /** @type {'degraded_continue' | 'fail_closed'} */ ('degraded_continue'),
     };
 
-    /** @type {Array<[string, unknown]>} */
+    /** @type {[string, unknown][]} */
     const layers = [
         ['defaults', input.defaults],
         ['env', input.envPolicy],
@@ -161,20 +161,20 @@ export function resolveInferencePolicy(input = {}) {
 
 /**
  * @typedef {object} ValidateInferenceRouteEffective
- * @property {string[]|null} allowedModels
- * @property {string[]|null} allowedBackends
+ * @property {string[] | null} allowedModels
+ * @property {string[] | null} allowedBackends
  */
 /**
  * @typedef {object} ValidateInferenceRouteRequest
- * @property {string|null} [model]
- * @property {string|null} [backend]
+ * @property {string | null} [model]
+ * @property {string | null} [backend]
  */
 /**
  * Valida se uma policy efetiva permite usar backend/model específicos.
  *
  * @param {ValidateInferenceRouteEffective} effective
  * @param {ValidateInferenceRouteRequest} request
- * @returns {{ ok: boolean, reason?: string }}
+ * @returns {{ ok: boolean; reason?: string }}
  */
 export function validateInferenceRoute(effective, request) {
     const model = String(request?.model || '').trim();

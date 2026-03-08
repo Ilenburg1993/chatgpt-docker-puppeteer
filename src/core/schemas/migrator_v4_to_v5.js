@@ -4,6 +4,7 @@ import { TaskSchemaV5 } from './task_schema_v5.js';
 
 /**
  * Detecta se task é V4 baseado na versão.
+ *
  * @param {any} task - Task object
  * @returns {boolean} - true se V4, false caso contrário
  */
@@ -13,6 +14,7 @@ function isV4Task(task) {
 
 /**
  * Detecta se task é V5 baseado na versão.
+ *
  * @param {any} task - Task object
  * @returns {boolean} - true se V5, false caso contrário
  */
@@ -24,6 +26,7 @@ function isV5Task(task) {
  * Migra task individual de V4 para V5.
  *
  * Estratégia de migração:
+ *
  * - meta.version: 4.0 → 5.0
  * - meta.workflow_id: undefined (task standalone)
  * - meta.mission_id: undefined (task standalone)
@@ -54,7 +57,7 @@ function migrateTaskV4toV5(taskV4) {
         // Se não é V4, assume que é V4 sem versão explícita (legacy)
         if (!isV4Task(taskV4) && !taskV4.meta?.version) {
             logger.warn(
-                `Task ${taskV4.meta?.id || 'unknown'} sem versão explícita, assumindo V4 para migração conservadora`
+                `Task ${taskV4.meta?.id || 'unknown'} sem versão explícita, assumindo V4 para migração conservadora`,
             );
         }
 
@@ -226,6 +229,7 @@ function migrateTaskV4toV5(taskV4) {
 
 /**
  * Migra batch de tasks V4 para V5.
+ *
  * @param {any[]} tasksV4 - Array de tasks V4
  * @returns {any[]} - Array de tasks V5
  * @throws {Error} - Se alguma migração falhar
@@ -268,6 +272,7 @@ function migrateBatchV4toV5(tasksV4) {
 
 /**
  * Valida se task está em formato V5 válido.
+ *
  * @param {any} task - Task object
  * @returns {boolean} - true se válido, false caso contrário
  */
@@ -283,15 +288,15 @@ function validateV5Task(task) {
 }
 
 /**
- * Converte task V5 de volta para V4 (downgrade).
- * ATENÇÃO: Perde informações de missões/workflows/execution context/result V2!
+ * Converte task V5 de volta para V4 (downgrade). ATENÇÃO: Perde informações de missões/workflows/execution
+ * context/result V2!
  *
  * @param {any} taskV5 - Task V5 object
  * @returns {any} - Task V4 object
  */
 function downgradeV5toV4(taskV5) {
     logger.warn(
-        `Downgrade V5 → V4 para task ${taskV5.meta.id}. ATENÇÃO: Perda de dados de execution/mission/result V2!`
+        `Downgrade V5 → V4 para task ${taskV5.meta.id}. ATENÇÃO: Perda de dados de execution/mission/result V2!`,
     );
 
     const taskV4 = structuredClone(taskV5);
@@ -355,6 +360,7 @@ function downgradeV5toV4(taskV5) {
 
 /**
  * Migra automaticamente task, detectando versão.
+ *
  * @param {any} task - Task de qualquer versão
  * @returns {any} - Task V5
  */

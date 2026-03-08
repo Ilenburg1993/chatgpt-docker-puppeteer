@@ -1,10 +1,10 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
 
 import { ragHealth, ragIndex } from '../../../tools/rag/lib/facade.mjs';
 
@@ -88,7 +88,7 @@ describe('ragHealth availability + indexing progress logs', () => {
             console.log = (...args) => logs.push(args.join(' '));
             await ragIndex({ root: ws, paths: ragPaths, embeddingsProvider: embeddings, profile: 'full' });
 
-            const progressLine = logs.find(line => line.includes('[RAG] progress files='));
+            const progressLine = logs.find((line) => line.includes('[RAG] progress files='));
             assert.ok(progressLine, 'Expected progress line with percentages');
             assert.ok(progressLine.includes('remaining='));
             assert.ok(progressLine.includes('chunks~'));
@@ -99,10 +99,10 @@ describe('ragHealth availability + indexing progress logs', () => {
             assert.ok(Number(progressMatch[1]) >= 0 && Number(progressMatch[1]) <= 100);
             assert.ok(Number(progressMatch[2]) >= 0 && Number(progressMatch[2]) <= 100);
 
-            const oldBrokenPattern = logs.some(line => /Embedding chunk \d+\/\d+:/.test(line));
+            const oldBrokenPattern = logs.some((line) => /Embedding chunk \d+\/\d+:/.test(line));
             assert.strictEqual(oldBrokenPattern, false);
 
-            const fileChunkLines = logs.filter(line => line.includes('Embedding chunk file '));
+            const fileChunkLines = logs.filter((line) => line.includes('Embedding chunk file '));
             assert.ok(fileChunkLines.length > 0, 'Expected per-file chunk logs');
             for (const line of fileChunkLines) {
                 const match = line.match(/Embedding chunk file (\d+)\/(\d+)/);

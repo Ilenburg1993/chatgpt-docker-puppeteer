@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
-import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
+import './lib/env-bootstrap.mjs';
 import { ragExpand } from './lib/facade.mjs';
 
 const { values } = parseArgs({
@@ -18,7 +18,7 @@ const { values } = parseArgs({
 const chunkId = values['chunk-id'];
 if (!chunkId) {
     console.error(
-        'Usage: npm run rag:expand -- --chunk-id <chunk_id> [--mode lines|symbol] [--before-lines N] [--after-lines N] [--json]'
+        'Usage: npm run rag:expand -- --chunk-id <chunk_id> [--mode lines|symbol] [--before-lines N] [--after-lines N] [--json]',
     );
     process.exit(2);
 }
@@ -45,7 +45,7 @@ if (!result.ok) {
 
 console.log(`[RAG] chunk=${result.chunk_id} mode=${result.mode} path=${result.path}`);
 console.log(
-    `[RAG] range=${result.range.start_line}-${result.range.end_line} base=${result.base_range.start_line}-${result.base_range.end_line}`
+    `[RAG] range=${result.range.start_line}-${result.range.end_line} base=${result.base_range.start_line}-${result.base_range.end_line}`,
 );
 console.log(`\n\`\`\`${result.language || 'text'}`);
 process.stdout.write(result.text || '');

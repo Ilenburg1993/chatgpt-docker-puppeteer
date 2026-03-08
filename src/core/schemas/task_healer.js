@@ -1,10 +1,9 @@
 // @ts-check
-import { TaskSchema } from './task_schema.js';
 import { log } from '../logger.js';
+import { TaskSchema } from './task_schema.js';
 
 /**
- * HEAL_TASK: O Motor de Normalização e Cura.
- * Transforma qualquer input bruto em uma estrutura V4 perfeita.
+ * HEAL_TASK: O Motor de Normalização e Cura. Transforma qualquer input bruto em uma estrutura V4 perfeita.
  *
  * @param {any} raw - Objeto bruto vindo da fila, API ou scripts.
  * @returns {any} Tarefa validada e curada conforme o Schema V4.

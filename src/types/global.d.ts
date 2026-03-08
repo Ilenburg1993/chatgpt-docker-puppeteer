@@ -1,8 +1,8 @@
 /**
  * Global Type Extensions
  *
- * Extensões de tipos nativos do JavaScript/TypeScript.
- * Declarações globais que não pertencem a nenhum módulo específico.
+ * Extensões de tipos nativos do JavaScript/TypeScript. Declarações globais que não pertencem a nenhum módulo
+ * específico.
  */
 
 // ============================================================
@@ -27,16 +27,18 @@ interface Error {
     cause?: Error | unknown;
 
     /** Histórico de tentativas (recovery systems) */
-    history?: Array<{
-        attempt?: number;
-        error?: unknown;
-        errorClass?: string;
-        ts?: number;
-        timestamp?: number;
-        action?: string;
-        result?: string;
-        [key: string]: unknown;
-    }> | undefined;
+    history?:
+        | Array<{
+              attempt?: number;
+              error?: unknown;
+              errorClass?: string;
+              ts?: number;
+              timestamp?: number;
+              action?: string;
+              result?: string;
+              [key: string]: unknown;
+          }>
+        | undefined;
 
     /** Número de tentativas */
     attempts?: number | undefined;

@@ -21,7 +21,7 @@ function getFreePort() {
             }
 
             const { port } = address;
-            server.close(err => {
+            server.close((err) => {
                 if (err) {
                     reject(err);
                     return;

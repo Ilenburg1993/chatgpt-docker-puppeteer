@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
 
-import app from '../../../src/server/engine/app.js';
 import {
     clearRuntimeResources,
     getRuntimeReadinessSummary,
     setRuntimeResourceState,
 } from '../../../src/core/runtime_resource_registry.js';
+import app from '../../../src/server/engine/app.js';
 
 function listen(/** @type {any} */ server) {
     return /** @type {Promise<void>} */ (
@@ -23,7 +23,7 @@ function listen(/** @type {any} */ server) {
 
 function close(/** @type {any} */ server) {
     return /** @type {Promise<void>} */ (
-        new Promise(resolve => {
+        new Promise((resolve) => {
             server.close(() => resolve());
         })
     );
@@ -77,9 +77,9 @@ test('wave20b: /ready reporta status degraded com componentes opcionais indispon
         assert.ok(
             Array.isArray(payload.runtime_resources.degraded_components) &&
                 payload.runtime_resources.degraded_components.some(
-                    (/** @type {any} */ item) => item.id === 'mcp_upstreams'
+                    (/** @type {any} */ item) => item.id === 'mcp_upstreams',
                 ),
-            'degraded_components deve incluir mcp_upstreams'
+            'degraded_components deve incluir mcp_upstreams',
         );
     } finally {
         await close(server);

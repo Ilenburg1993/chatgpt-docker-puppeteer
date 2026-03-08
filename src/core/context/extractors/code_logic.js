@@ -7,6 +7,7 @@
 
 /**
  * Extrai todos os blocos de código de uma resposta.
+ *
  * @param {string} content - Texto bruto.
  * @returns {string} Blocos concatenados.
  */

@@ -27,6 +27,7 @@
 
 /**
  * Cria uma fila isolada.
+ *
  * @returns {any[]}
  */
 function createQueue() {
@@ -40,20 +41,19 @@ function createQueue() {
 /**
  * @typedef {object} CreateInboundQueueDeps
  * @property {any} telemetry
- * @property {number|null} maxSize
+ * @property {number | null} maxSize
  */
 /**
  * @typedef {object} CreateInboundQueueOptions
- * @property {*} [telemetry]
- * @property {*} [maxSize]
+ * @property {any} [telemetry]
+ * @property {any} [maxSize]
  */
 /**
  * Cria a fila técnica de entrada.
  *
- * @param {CreateInboundQueueDeps} deps
- * Interface de telemetria do NERV (observação técnica).
+ * @param {CreateInboundQueueDeps} deps Interface de telemetria do NERV (observação técnica).
  *
- * Limite máximo técnico da fila (opcional).
+ *   Limite máximo técnico da fila (opcional).
  * @returns {any}
  */
 function createInboundQueue({ telemetry, maxSize = null }) {
@@ -81,8 +81,7 @@ function createInboundQueue({ telemetry, maxSize = null }) {
     /**
      * Enfileira item na fila inbound.
      *
-     * @param {object} item
-     * Item opaco (frame ou estrutura técnica)
+     * @param {object} item Item opaco (frame ou estrutura técnica)
      * @returns {boolean} true se aceito, false se recusado por pressão
      */
     function enqueue(item) {

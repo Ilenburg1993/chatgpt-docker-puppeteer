@@ -1,10 +1,10 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
-import { ragIndex, ragReset, ragHybridSearch } from '../../../tools/rag/lib/facade.mjs';
+import path from 'node:path';
+import { describe, it } from 'node:test';
+import { ragHybridSearch, ragIndex, ragReset } from '../../../tools/rag/lib/facade.mjs';
 
 // Fake embeddings provider for testing
 class FakeEmbeddingsProvider {
@@ -75,7 +75,7 @@ describe('RAG Error Scenarios', () => {
                     assert.ok(err.message.includes('SCHEMA_VERSION_MISMATCH'));
                     assert.ok(err.message.includes('npm run rag:reset'));
                     return true;
-                }
+                },
             );
         } finally {
             await fs.rm(ws, { recursive: true, force: true });
@@ -117,7 +117,7 @@ describe('RAG Error Scenarios', () => {
                     assert.ok(err.message.includes('dim=8'));
                     assert.ok(err.message.includes('dim=16'));
                     return true;
-                }
+                },
             );
         } finally {
             await fs.rm(ws, { recursive: true, force: true });
@@ -192,7 +192,7 @@ describe('RAG Error Scenarios', () => {
                 (/** @type {any} */ err) => {
                     assert.ok(err.message.includes('--yes'));
                     return true;
-                }
+                },
             );
 
             // With yes flag - should succeed

@@ -1,11 +1,11 @@
 // @ts-check
-import { log } from '#core/logger';
 import * as hardware from '#core/hardware';
+import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
 
 /**
- * Ring Buffer para armazenamento eficiente de métricas históricas.
- * Mantém tamanho fixo, descartando valores antigos automaticamente.
+ * Ring Buffer para armazenamento eficiente de métricas históricas. Mantém tamanho fixo, descartando valores antigos
+ * automaticamente.
  */
 class RingBuffer {
     constructor(maxSize = 3600) {
@@ -34,7 +34,7 @@ class RingBuffer {
     }
 
     getRange(/** @type {any} */ fromTimestamp, /** @type {any} */ toTimestamp) {
-        return this.buffer.filter(item => item.timestamp >= fromTimestamp && item.timestamp <= toTimestamp);
+        return this.buffer.filter((item) => item.timestamp >= fromTimestamp && item.timestamp <= toTimestamp);
     }
 
     getAverage() {
@@ -45,12 +45,12 @@ class RingBuffer {
 
     getMax() {
         if (this.buffer.length === 0) return 0;
-        return Math.max(...this.buffer.map(item => item.value));
+        return Math.max(...this.buffer.map((item) => item.value));
     }
 
     getMin() {
         if (this.buffer.length === 0) return 0;
-        return Math.min(...this.buffer.map(item => item.value));
+        return Math.min(...this.buffer.map((item) => item.value));
     }
 
     clear() {
@@ -67,12 +67,14 @@ class RingBuffer {
  * TelemetryAggregator - Agregador Central de Telemetria
  *
  * Coleta e armazena métricas de múltiplas fontes:
+ *
  * - Hardware (CPU, Memory, Heap)
  * - NERV (latência, throughput, eventos)
  * - Queue (tamanho, hit rate)
  * - Event Loop (lag)
  *
  * Arquitetura:
+ *
  * - Singleton pattern para acesso global
  * - Coleta a 1Hz (1 amostra/segundo)
  * - Ring buffers de 3600 amostras (1 hora)
@@ -140,11 +142,11 @@ class TelemetryAggregator {
         this.startTime = Date.now();
 
         // Coleta inicial
-        this._collectAndBroadcast();
+        void this._collectAndBroadcast();
 
         // Inicia loop de coleta
         this.collectionInterval = setInterval(() => {
-            this._collectAndBroadcast();
+            void this._collectAndBroadcast();
         }, intervalMs);
 
         log('INFO', `[TelemetryAggregator] Iniciado (intervalo: ${intervalMs}ms)`);
@@ -204,9 +206,12 @@ class TelemetryAggregator {
             const db = getDb();
             queueMetrics = {
                 size:
-                    (/** @type {any} */ (db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE stage='READY' AND status='PENDING'").get()))?.c ||
-                    0,
-                running: (/** @type {any} */ (db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status='RUNNING'").get()))?.c || 0,
+                    /** @type {any} */ (
+                        db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE stage='READY' AND status='PENDING'").get()
+                    )?.c || 0,
+                running:
+                    /** @type {any} */ (db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status='RUNNING'").get())
+                        ?.c || 0,
             };
         } catch (/** @type {any} */ _) {
             // Best-effort: DB might not be available in some modes/tests
@@ -266,12 +271,11 @@ class TelemetryAggregator {
     }
 
     /**
-     * Mede latência do event loop.
-     * Usa setImmediate para medir tempo até próximo tick.
+     * Mede latência do event loop. Usa setImmediate para medir tempo até próximo tick.
      */
     async _measureEventLoopLag() {
         const start = Date.now();
-        await new Promise(resolve => setImmediate(resolve));
+        await new Promise((resolve) => setImmediate(resolve));
         return Date.now() - start;
     }
 
@@ -358,10 +362,10 @@ class TelemetryAggregator {
         if (!this.socketHub) return;
 
         try {
-            if (typeof (/** @type {any} */ (this.socketHub)).notify === 'function') {
-                (/** @type {any} */ (this.socketHub)).notify('telemetry:metrics', metrics);
-            } else if (typeof (/** @type {any} */ (this.socketHub)).emit === 'function') {
-                (/** @type {any} */ (this.socketHub)).emit('telemetry:metrics', metrics);
+            if (typeof (/** @type {any} */ (this.socketHub).notify) === 'function') {
+                /** @type {any} */ (this.socketHub).notify('telemetry:metrics', metrics);
+            } else if (typeof (/** @type {any} */ (this.socketHub).emit) === 'function') {
+                /** @type {any} */ (this.socketHub).emit('telemetry:metrics', metrics);
             }
         } catch (/** @type {any} */ err) {
             const _e = /** @type {any} */ (err);
@@ -376,8 +380,8 @@ class TelemetryAggregator {
         if (!this.socketHub) return;
 
         try {
-            if (typeof (/** @type {any} */ (this.socketHub)).notify === 'function') {
-                (/** @type {any} */ (this.socketHub)).notify('alert:triggered', alert);
+            if (typeof (/** @type {any} */ (this.socketHub).notify) === 'function') {
+                /** @type {any} */ (this.socketHub).notify('alert:triggered', alert);
             }
         } catch (/** @type {any} */ err) {
             const _e = /** @type {any} */ (err);
@@ -387,6 +391,7 @@ class TelemetryAggregator {
 
     /**
      * API: Retorna métricas atuais.
+     *
      * @returns {Promise<any>} Métricas coletadas
      */
     async getCurrent() {
@@ -410,7 +415,7 @@ class TelemetryAggregator {
             queue: this.queueSizeHistory,
         };
 
-        const buffer = (/** @type {Record<string, any>} */ (bufferMap))[metric];
+        const buffer = /** @type {Record<string, any>} */ (bufferMap)[metric];
         if (!buffer) {
             return { error: `Unknown metric: ${metric}` };
         }
@@ -519,5 +524,4 @@ class TelemetryAggregator {
 const telemetryAggregator = new TelemetryAggregator();
 
 export default telemetryAggregator;
-export { TelemetryAggregator };
-export { RingBuffer };
+export { RingBuffer, TelemetryAggregator };

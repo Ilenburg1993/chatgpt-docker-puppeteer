@@ -1,16 +1,17 @@
 // @ts-check
-import fs from 'node:fs';
-import path from 'node:path';
-import Database from 'better-sqlite3';
 import CONFIG from '#core/config';
 import { log } from '#core/logger';
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 import { MIGRATIONS } from './migrations.js';
 
-/** @type {import('better-sqlite3').Database|null} */
+/** @type {import('better-sqlite3').Database | null} */
 let singletonDb = null;
 
 /**
  * Função exportada: resolveDbPath.
+ *
  * @returns {string}
  */
 function resolveDbPath() {
@@ -53,7 +54,7 @@ function migrate(db) {
         db
             .prepare('SELECT version FROM schema_migrations ORDER BY version ASC')
             .all()
-            .map(/** @param {any} r */ r => Number(r.version))
+            .map(/** @param {any} r */ (r) => Number(r.version)),
     );
 
     for (const migration of MIGRATIONS) {
@@ -74,7 +75,7 @@ function migrate(db) {
             db.prepare('INSERT INTO schema_migrations (version, name, applied_at_ms) VALUES (?, ?, ?)').run(
                 migration.version,
                 migration.name,
-                Date.now()
+                Date.now(),
             );
         });
 
@@ -84,6 +85,7 @@ function migrate(db) {
 
 /**
  * Função exportada: getDb.
+ *
  * @returns {import('better-sqlite3').Database}
  */
 function getDb() {
@@ -98,7 +100,7 @@ function getDb() {
     } catch (/** @type {any} */ err) {
         log(
             'ERROR',
-            `[DB] Failed to create DB directory: ${dir} - ${/** @type {any} */ (err)?.message || String(err)}`
+            `[DB] Failed to create DB directory: ${dir} - ${/** @type {any} */ (err)?.message || String(err)}`,
         );
         throw err;
     }
@@ -116,6 +118,7 @@ function getDb() {
 
 /**
  * Função exportada: closeDb.
+ *
  * @returns {void}
  */
 function closeDb() {
@@ -148,4 +151,4 @@ function registerExitHandler() {
     });
 }
 
-export { getDb, closeDb, resolveDbPath };
+export { closeDb, getDb, resolveDbPath };

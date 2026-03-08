@@ -52,8 +52,9 @@ function _rowToRule(row) {
 
 /**
  * Função exportada: getAuditWatchRuleById.
+ *
  * @param {string} id Unique identifier.
- * @returns {AuditWatchRule|null}
+ * @returns {AuditWatchRule | null}
  */
 function getAuditWatchRuleById(id) {
     const db = getDb();
@@ -63,6 +64,7 @@ function getAuditWatchRuleById(id) {
 /** @typedef {any} ListAuditWatchRulesOptions */
 /**
  * Função exportada: listAuditWatchRules.
+ *
  * @param {ListAuditWatchRulesOptions} [options]
  * @returns {AuditWatchRule[]}
  */
@@ -75,7 +77,7 @@ function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
             ${enabledOnly ? 'WHERE enabled = 1' : ''}
             ORDER BY updated_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all({ limit: Math.max(1, Math.min(Number(limit) || 100, 500)) });
     return rows.map(_rowToRule).filter(Boolean);
@@ -84,13 +86,16 @@ function listAuditWatchRules({ enabledOnly = false, limit = 100 } = {}) {
 /** @typedef {any} UpsertAuditWatchRuleInput */
 /**
  * Função exportada: upsertAuditWatchRule.
+ *
  * @param {any} [input]
- * @returns {AuditWatchRule|null}
+ * @returns {AuditWatchRule | null}
  */
 function upsertAuditWatchRule(input = {}) {
     const db = getDb();
     const now = _now();
-    const existing = /** @type {any} */ (input.id ? db.prepare('SELECT * FROM audit_watch_rules WHERE id = ?').get(String(input.id)) : null);
+    const existing = /** @type {any} */ (
+        input.id ? db.prepare('SELECT * FROM audit_watch_rules WHERE id = ?').get(String(input.id)) : null
+    );
     const id = existing?.id || `awr-${uuidv4()}`;
     db.prepare(
         `
@@ -109,7 +114,7 @@ function upsertAuditWatchRule(input = {}) {
             cooldown_ms = excluded.cooldown_ms,
             action_policy_json = excluded.action_policy_json,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         id,
         enabled: input.enabled === false ? 0 : 1,

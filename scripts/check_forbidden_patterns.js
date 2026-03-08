@@ -21,7 +21,7 @@ const { values } = parseArgs({
  * @param {any[]} findings
  */
 function mapOutputFindings(findings) {
-    return findings.map(item => ({
+    return findings.map((item) => ({
         contract_id: item.contract_id || 'CONTRACT-UNKNOWN',
         domain: item.domain || 'unknown',
         file: item.file || null,
@@ -52,7 +52,7 @@ function parityReport(dslFindings, legacyFindings, comparableContractIds = undef
         legacyMap.set(item.contract_id, (legacyMap.get(item.contract_id) || 0) + 1);
     }
 
-    /** @type {Array<{ contract_id: string, dsl: number, legacy: number }>} */
+    /** @type {{ contract_id: string; dsl: number; legacy: number }[]} */
     const mismatches = [];
     const allKeys = comparableContractIds
         ? new Set([...comparableContractIds])
@@ -90,9 +90,9 @@ function main() {
     const parityEnabled = values['parity-mode'] === true;
 
     const registry = loadContractRegistry();
-    const activeDslContracts = registry.contracts.filter(item => item.kind === 'static' && item.status === 'active');
+    const activeDslContracts = registry.contracts.filter((item) => item.kind === 'static' && item.status === 'active');
     const legacyContracts = getLegacyStaticContracts();
-    const legacyContractIds = new Set(legacyContracts.map(item => String(item?.id || '').trim()).filter(Boolean));
+    const legacyContractIds = new Set(legacyContracts.map((item) => String(item?.id || '').trim()).filter(Boolean));
 
     let primaryContracts = legacyContracts;
     if (mode === 'strict' || mode === 'hybrid') {
@@ -164,7 +164,7 @@ function main() {
             console.error(`- [${f.contract_id}] ${f.file || 'n/a'}#L${f.line || 1}: ${f.evidence}`);
             console.error(`  -> ${f.message}`);
             console.error(
-                `  -> domain=${f.domain} severity=${f.severity} owner=${f.owner} enforcement=${f.enforcement}\n`
+                `  -> domain=${f.domain} severity=${f.severity} owner=${f.owner} enforcement=${f.enforcement}\n`,
             );
         }
         if (parity.enabled && parity.mismatches.length > 0) {

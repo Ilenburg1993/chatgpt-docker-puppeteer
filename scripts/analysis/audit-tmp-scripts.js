@@ -2,7 +2,6 @@
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync as _execSync } from 'node:child_process';
 
 const TMP_DIR = '/tmp';
 const _SCRIPTS_DIR = path.join(import.meta.dirname);
@@ -19,6 +18,7 @@ const PATTERNS = {
 
 /**
  * Função exportada: classifyScript.
+ *
  * @param {any} filename
  * @param {any} content
  * @returns {any}
@@ -95,13 +95,14 @@ function classifyScript(filename, content) {
 
 /**
  * Função exportada: auditTmpScripts.
+ *
  * @returns {any}
  */
 function auditTmpScripts() {
     console.log('🔍 AUDITING /tmp/ JAVASCRIPT FILES\n');
     console.log('='.repeat(80));
 
-    const files = fs.readdirSync(TMP_DIR).filter(f => f.endsWith('.js'));
+    const files = fs.readdirSync(TMP_DIR).filter((f) => f.endsWith('.js'));
 
     /** @type {any} */
     const results = {
@@ -112,7 +113,7 @@ function auditTmpScripts() {
         UNKNOWN: [],
     };
 
-    files.forEach(filename => {
+    files.forEach((filename) => {
         const filepath = path.join(TMP_DIR, filename);
         let content = '';
 
@@ -141,7 +142,7 @@ function auditTmpScripts() {
     // Print results
     console.log('\n📊 CLASSIFICATION RESULTS:\n');
 
-    Object.keys(results).forEach(category => {
+    Object.keys(results).forEach((category) => {
         const items = results[category];
         if (items.length === 0) {
             return;
@@ -172,9 +173,11 @@ function auditTmpScripts() {
     console.log('\n' + '='.repeat(80));
     console.log('\n📋 SUMMARY:\n');
 
-    const toMove = results.REUSABLE.filter(/** @param {any} r */ r => r.classification.action === 'MOVE');
-    const toDelete = results.IMMEDIATE.filter(/** @param {any} r */ r => r.classification.action === 'DELETE');
-    const toReview = [...results.DEV_TOOL, ...results.UNKNOWN].filter(/** @param {any} r */ r => r.classification.action !== 'IGNORE');
+    const toMove = results.REUSABLE.filter(/** @param {any} r */ (r) => r.classification.action === 'MOVE');
+    const toDelete = results.IMMEDIATE.filter(/** @param {any} r */ (r) => r.classification.action === 'DELETE');
+    const toReview = [...results.DEV_TOOL, ...results.UNKNOWN].filter(
+        /** @param {any} r */ (r) => r.classification.action !== 'IGNORE',
+    );
 
     console.log(`  ♻️  MOVE to scripts/: ${toMove.length} files`);
     console.log(`  🗑️  DELETE (fulfilled): ${toDelete.length} files`);

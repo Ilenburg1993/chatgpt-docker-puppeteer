@@ -23,15 +23,15 @@ export function printProgress(payload) {
         : '';
     const pendingText = remainingKeys ? ` pendentes=[${remainingKeys}]` : '';
     console.log(
-        `[audit][${payload.profile}] ${pct}% fase=${payload.phase} restantes=${remaining} eta=${etaSec}s${activeText}${pendingText} ${payload.message}`
+        `[audit][${payload.profile}] ${pct}% fase=${payload.phase} restantes=${remaining} eta=${etaSec}s${activeText}${pendingText} ${payload.message}`,
     );
 }
 
 /**
  * @typedef {object} PrintFinalReportOutputs
  * @property {string} jsonPath
- * @property {string|null} [masterPath]
- * @property {string|null} [snapshotPath]
+ * @property {string | null} [masterPath]
+ * @property {string | null} [snapshotPath]
  */
 /**
  * @param {import('../lib/schema.mjs').AuditRunV3} report

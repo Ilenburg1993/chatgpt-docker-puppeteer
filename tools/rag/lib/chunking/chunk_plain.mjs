@@ -2,7 +2,9 @@
 import { MAX_CHUNK_CHARS_CODE } from '../contract.mjs';
 import { estimateCharsForLines } from '../text.mjs';
 
-export function chunkPlain(/** @type {any} */ { lines, maxChunkChars = MAX_CHUNK_CHARS_CODE, minChunkChars = 200, linesPerBlock = 80 }) {
+export function chunkPlain(
+    /** @type {any} */ { lines, maxChunkChars = MAX_CHUNK_CHARS_CODE, minChunkChars = 200, linesPerBlock = 80 },
+) {
     if (!lines || lines.length === 0) return [];
 
     const ranges = [];

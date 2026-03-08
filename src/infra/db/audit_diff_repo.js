@@ -51,15 +51,16 @@ function _rowToAuditDiff(row) {
 
 /**
  * @typedef {object} InsertAuditDiffOptions
- * @property {*} [operationId]
- * @property {*} [entityType]
- * @property {*} [entityId]
- * @property {*} [before]
+ * @property {any} [operationId]
+ * @property {any} [entityType]
+ * @property {any} [entityId]
+ * @property {any} [before]
  */
 /**
  * Função exportada: insertAuditDiff.
+ *
  * @param {any} options
- * @returns {AuditDiff|null}
+ * @returns {AuditDiff | null}
  */
 function insertAuditDiff({ operationId, entityType, entityId, before = {}, after = {} }) {
     const db = getDb();
@@ -75,7 +76,7 @@ function insertAuditDiff({ operationId, entityType, entityId, before = {}, after
             @id, @operation_id, @entity_type, @entity_id,
             @before_json, @after_json, @created_at_ms
         )
-    `
+    `,
     ).run({
         id,
         operation_id: String(operationId || '').trim(),
@@ -91,8 +92,9 @@ function insertAuditDiff({ operationId, entityType, entityId, before = {}, after
 
 /**
  * Função exportada: getAuditDiffById.
+ *
  * @param {string} id Unique identifier.
- * @returns {AuditDiff|null}
+ * @returns {AuditDiff | null}
  */
 function getAuditDiffById(id) {
     const db = getDb();
@@ -102,7 +104,8 @@ function getAuditDiffById(id) {
 
 /**
  * Função exportada: listAuditDiffsByOperation.
- * @param {*} operationId
+ *
+ * @param {any} operationId
  * @returns {AuditDiff[]}
  */
 function listAuditDiffsByOperation(operationId) {
@@ -114,7 +117,7 @@ function listAuditDiffsByOperation(operationId) {
             FROM audit_diffs
             WHERE operation_id = ?
             ORDER BY created_at_ms ASC
-        `
+        `,
         )
         .all(String(operationId || '').trim());
 
@@ -123,8 +126,9 @@ function listAuditDiffsByOperation(operationId) {
 
 /**
  * Função exportada: listAuditDiffsByEntity.
- * @param {*} entityType
- * @param {*} entityId
+ *
+ * @param {any} entityType
+ * @param {any} entityId
  * @param {number} [limit]
  * @returns {AuditDiff[]}
  */
@@ -138,12 +142,12 @@ function listAuditDiffsByEntity(entityType, entityId, limit = 100) {
             WHERE entity_type = ? AND entity_id = ?
             ORDER BY created_at_ms DESC
             LIMIT ?
-        `
+        `,
         )
         .all(
             String(entityType || '').trim(),
             String(entityId || '').trim(),
-            Math.max(1, Math.min(Number(limit) || 100, 500))
+            Math.max(1, Math.min(Number(limit) || 100, 500)),
         );
 
     return rows.map(_rowToAuditDiff).filter(Boolean);

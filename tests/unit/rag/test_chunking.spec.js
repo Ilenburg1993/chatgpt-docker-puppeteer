@@ -2,9 +2,9 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { buildLineIndex, sliceByLines } from '../../../tools/rag/lib/text.mjs';
 import { chunkByType } from '../../../tools/rag/lib/chunking/chunk_dispatcher.mjs';
 import { buildChunkId, sha256HexForString } from '../../../tools/rag/lib/contract.mjs';
+import { buildLineIndex, sliceByLines } from '../../../tools/rag/lib/text.mjs';
 
 describe('RAG chunking determinism', () => {
     it('produces stable ranges and chunk_ids for markdown', () => {
@@ -122,7 +122,11 @@ describe('RAG chunking determinism', () => {
 
         const methodChunks = ranges.filter((/** @type {any} */ r) => String(r.symbol || '').startsWith('Service.'));
         assert.ok(methodChunks.length >= 2, 'Expected class to split into method chunks');
-        assert.ok(methodChunks.every((/** @type {any} */ r) => r.kind === 'class_method' || String(r.kind).startsWith('class_method')));
+        assert.ok(
+            methodChunks.every(
+                (/** @type {any} */ r) => r.kind === 'class_method' || String(r.kind).startsWith('class_method'),
+            ),
+        );
     });
 
     it('falls back to heuristic chunking when AST parse fails', () => {
@@ -135,7 +139,7 @@ describe('RAG chunking determinism', () => {
         assert.ok(ranges.length >= 1, 'Fallback should still return chunks');
         assert.ok(
             ranges.every((/** @type {any} */ r) => r.kind),
-            'Fallback chunks should have kind metadata'
+            'Fallback chunks should have kind metadata',
         );
     });
 

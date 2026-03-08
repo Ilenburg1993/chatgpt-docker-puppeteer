@@ -1,9 +1,9 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { COMMANDS, executeCommand, validateCommand } from '../../../src/server/domain/control_command_service.js';
+import test from 'node:test';
 import { RBAC_PERMISSIONS } from '../../../src/infra/db/rbac_repo.js';
+import { COMMANDS, executeCommand, validateCommand } from '../../../src/server/domain/control_command_service.js';
 
 function actor() {
     return {
@@ -122,7 +122,7 @@ test('executeCommand routing: DIAGNOSTIC_JOB_CREATE agora roteia para Audit Agen
                     dryRun: false,
                 });
             },
-            { code: 'DIAGNOSTIC_TO_AUDIT_AGENT_ROUTING_FAILED' }
+            { code: 'DIAGNOSTIC_TO_AUDIT_AGENT_ROUTING_FAILED' },
         );
     } finally {
         if (prevHost === undefined) delete process.env.AUDIT_AGENT_HOST;

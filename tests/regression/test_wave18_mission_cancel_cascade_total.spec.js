@@ -1,21 +1,21 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import * as schemas from '#core/schemas';
-import { cancelMissionCommand } from '#server/domain/mission_control_service';
 import { createMission, getMissionById, updateMission } from '#infra/db/mission_repo';
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { insertTask } from '#infra/db/task_repo';
+import { cancelMissionCommand } from '#server/domain/mission_control_service';
 
 function makeDbPath() {
     const dir = path.join(process.cwd(), 'tmp', 'test-dbs');
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave18-cascade-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave18-cascade-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
@@ -43,7 +43,7 @@ function makeTask(/** @type {any} */ id, /** @type {any} */ missionId, /** @type
     });
 }
 
-test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t => {
+test('wave18: cancelamento de missão cancela tasks ativas em cascata', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
 
@@ -83,7 +83,7 @@ test('wave18: cancelamento de missão cancela tasks ativas em cascata', async t 
                 missionId: mission.id,
                 reason: 'Teste de cancelamento em cascata',
                 actor: { id: 'tester', username: 'tester', role: 'owner' },
-            })
+            }),
         )
     );
 

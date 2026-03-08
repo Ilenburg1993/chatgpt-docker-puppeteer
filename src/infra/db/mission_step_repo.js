@@ -40,7 +40,8 @@ function _rowToStep(row) {
 
 /**
  * Função exportada: listMissionSteps.
- * @param {*} missionId
+ *
+ * @param {any} missionId
  * @returns {MissionStep[]}
  */
 function listMissionSteps(missionId) {
@@ -52,7 +53,7 @@ function listMissionSteps(missionId) {
             FROM mission_steps
             WHERE mission_id = ?
             ORDER BY step_index ASC, attempt_seq DESC
-        `
+        `,
         )
         .all(String(missionId || '').trim());
 
@@ -61,10 +62,11 @@ function listMissionSteps(missionId) {
 
 /**
  * Função exportada: getMissionStep.
- * @param {*} missionId
- * @param {*} stepId
- * @param {*} [attemptSeq]
- * @returns {MissionStep|null}
+ *
+ * @param {any} missionId
+ * @param {any} stepId
+ * @param {any} [attemptSeq]
+ * @returns {MissionStep | null}
  */
 function getMissionStep(missionId, stepId, attemptSeq = null) {
     const db = getDb();
@@ -82,7 +84,7 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
                 WHERE mission_id = ? AND step_id = ?
                 ORDER BY attempt_seq DESC
                 LIMIT 1
-            `
+            `,
                   )
                   .get(mission, step)
             : db
@@ -92,7 +94,7 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
                 FROM mission_steps
                 WHERE mission_id = ? AND step_id = ? AND attempt_seq = ?
                 LIMIT 1
-            `
+            `,
                   )
                   .get(mission, step, Number(attemptSeq) || 0);
 
@@ -101,9 +103,10 @@ function getMissionStep(missionId, stepId, attemptSeq = null) {
 
 /**
  * Função exportada: syncMissionStepsFromWorkflow.
- * @param {*} missionId
- * @param {*} workflow
- * @returns {MissionStep|null}
+ *
+ * @param {any} missionId
+ * @param {any} workflow
+ * @returns {MissionStep | null}
  */
 function syncMissionStepsFromWorkflow(missionId, workflow) {
     const db = getDb();
@@ -129,7 +132,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
                     WHERE mission_id = ? AND step_id = ?
                     ORDER BY attempt_seq DESC
                     LIMIT 1
-                `
+                `,
                     )
                     .get(mission, stepId)
             );
@@ -144,7 +147,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
                         @id, @mission_id, @step_id, @step_index, @title, @status,
                         NULL, NULL, @attempt_seq, 1, @updated_at_ms
                     )
-                `
+                `,
                 ).run({
                     id: `ms-${uuidv4()}`,
                     mission_id: mission,
@@ -165,7 +168,7 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
                     title = @title,
                     updated_at_ms = @updated_at_ms
                 WHERE id = @id
-            `
+            `,
             ).run({
                 id: existing.id,
                 step_index: index,
@@ -183,8 +186,9 @@ function syncMissionStepsFromWorkflow(missionId, workflow) {
 
 /**
  * Função exportada: markMissionStepStatus.
+ *
  * @param {any} [options]
- * @returns {MissionStep|null}
+ * @returns {MissionStep | null}
  */
 function markMissionStepStatus(options = {}) {
     const {
@@ -214,7 +218,7 @@ function markMissionStepStatus(options = {}) {
             version = version + 1,
             updated_at_ms = @updated_at_ms
         WHERE id = @id
-    `
+    `,
     ).run({
         id: existing.id,
         status: nextStatus,
@@ -229,8 +233,9 @@ function markMissionStepStatus(options = {}) {
 /** @typedef {any} CreateNextStepAttemptOptions */
 /**
  * Função exportada: createNextStepAttempt.
+ *
  * @param {any} [options]
- * @returns {MissionStep|null}
+ * @returns {MissionStep | null}
  */
 function createNextStepAttempt(options = {}) {
     const { missionId, stepId, title = '', stepIndex = 0 } = /** @type {any} */ (options);
@@ -252,7 +257,7 @@ function createNextStepAttempt(options = {}) {
             @id, @mission_id, @step_id, @step_index, @title, @status,
             NULL, @last_task_id, @attempt_seq, 1, @updated_at_ms
         )
-    `
+    `,
     ).run({
         id: `ms-${uuidv4()}`,
         mission_id: mission,
@@ -269,10 +274,10 @@ function createNextStepAttempt(options = {}) {
 }
 
 export {
-    STEP_STATUS,
     createNextStepAttempt,
     getMissionStep,
     listMissionSteps,
     markMissionStepStatus,
+    STEP_STATUS,
     syncMissionStepsFromWorkflow,
 };

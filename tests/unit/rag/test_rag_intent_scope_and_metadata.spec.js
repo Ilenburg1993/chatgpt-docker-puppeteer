@@ -1,10 +1,10 @@
 // @ts-check
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import { describe, it } from 'node:test';
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
 
 import { ragHybridSearch, ragIndex } from '../../../tools/rag/lib/facade.mjs';
 

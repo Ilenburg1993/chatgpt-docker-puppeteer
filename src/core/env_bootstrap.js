@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 /**
  * Environment bootstrap (idempotent):
+ *
  * - Loads .env first (defaults only)
  * - Then overlays .env.${NODE_ENV}, .env.local and .env.${NODE_ENV}.local
  * - Later files win when the same key is defined multiple times
@@ -21,7 +22,7 @@ function ensureEnvBootstrap() {
     }
 
     const nodeEnv = String(process.env.NODE_ENV || '').trim();
-    /** @type {Array<{path: string, override?: boolean}>} */
+    /** @type {{ path: string; override?: boolean }[]} */
     const loadOrder = [
         { path: '.env' },
         ...(nodeEnv ? [{ path: `.env.${nodeEnv}`, override: true }] : []),
@@ -51,4 +52,4 @@ function ensureEnvBootstrap() {
 
 ensureEnvBootstrap();
 
-export { ensureEnvBootstrap, BOOTSTRAP_FLAG };
+export { BOOTSTRAP_FLAG, ensureEnvBootstrap };

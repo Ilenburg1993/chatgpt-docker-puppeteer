@@ -21,7 +21,7 @@ export async function ensureDirs(/** @type {any} */ paths) {
     await fs.mkdir(paths.indexDir, { recursive: true });
 }
 
-export async function atomicWriteJson(/** @type {any} */ filePath,  /** @type {any} */ data) {
+export async function atomicWriteJson(/** @type {any} */ filePath, /** @type {any} */ data) {
     const dir = path.dirname(filePath);
     const tmpPath = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`);
     const json = JSON.stringify(data, null, 2);
@@ -42,7 +42,10 @@ function isProcessAlive(/** @type {any} */ pid) {
     }
 }
 
-export async function acquireIndexLock(/** @type {any} */ paths, /** @type {any} */ { staleAfterMs = 6 * 60 * 60 * 1000 } = {}) {
+export async function acquireIndexLock(
+    /** @type {any} */ paths,
+    /** @type {any} */ { staleAfterMs = 6 * 60 * 60 * 1000 } = {},
+) {
     const now = Date.now();
     try {
         const handle = await fs.open(paths.lockPath, 'wx');

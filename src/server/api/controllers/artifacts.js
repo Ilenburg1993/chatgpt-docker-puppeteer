@@ -1,10 +1,10 @@
 // @ts-check
-import express from 'express';
-import fs from 'node:fs';
 import { log } from '#core/logger';
 import { getArtifactById } from '#infra/db/artifact_repo';
-import { _resolveArtifactsRoot, _isUnderRoot, readText, stat as statArtifact } from '#infra/storage/artifact_store';
-import { ok, fail } from '../utils/api_envelope.js';
+import { _isUnderRoot, _resolveArtifactsRoot, readText, stat as statArtifact } from '#infra/storage/artifact_store';
+import express from 'express';
+import fs from 'node:fs';
+import { fail, ok } from '../utils/api_envelope.js';
 
 /** Constante/valor exportado: default. */
 const router = express.Router();
@@ -63,7 +63,7 @@ router.get('/:id/content', async (req, res) => {
         res.setHeader('Content-Disposition', `${safeDisposition}; filename="${safeFilename}"`);
 
         const stream = fs.createReadStream(uri);
-        stream.on('error', err => {
+        stream.on('error', (err) => {
             log('WARN', `[API_ARTIFACTS] stream error for ${artifactId}: ${err?.message || String(err)}`, req.id);
             if (!res.headersSent) {
                 res.status(500).end();
@@ -107,7 +107,7 @@ router.get('/:id/text', async (req, res) => {
                 text: truncated ? text.slice(0, maxChars) : text,
                 text_truncated: truncated,
             },
-            { max_chars: maxChars }
+            { max_chars: maxChars },
         );
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);

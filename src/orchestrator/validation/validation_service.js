@@ -1,12 +1,13 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as logger from '#core/logger';
-import { ActionCode, ActorRole } from '#shared/nerv/constants';
 import * as HighLevelNERV from '#nerv/adapters/high_level_adapter';
+import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 /**
  * ValidationService - Serviço de validação de outputs.
  *
  * Suporta múltiplos tipos de validadores:
+ *
  * - regex: Valida com regex pattern
  * - schema: Valida com Zod schema (JSON parsing)
  * - length: Valida min/max length
@@ -121,7 +122,7 @@ class ValidationService {
             logger.warn(
                 '[ValidationService] llm_judge não implementado — validação em modo bypass. ' +
                     'Retornando passed=true com score=null. ' +
-                    'Para habilitar validação real, implemente o driver LLM neste validador.'
+                    'Para habilitar validação real, implemente o driver LLM neste validador.',
             );
             return {
                 passed: true, // Não bloqueia o fluxo
@@ -148,7 +149,7 @@ class ValidationService {
      * Valida output usando múltiplos validadores.
      *
      * @param {string} output - Output do LLM
-     * @param {{ validators?: Array<any>, criteria?: any }} [options] - Opções de validação
+     * @param {{ validators?: any[]; criteria?: any }} [options] - Opções de validação
      * @returns {Promise<any>} - { passed, overall_score, validation_results, feedback, issues }
      */
     async validate(output, options = {}) {
@@ -233,6 +234,7 @@ class ValidationService {
         // Emite evento NERV
         if (this.nerv) {
             try {
+                // eslint-disable-next-line @typescript-eslint/await-thenable
                 await HighLevelNERV.sendEvent(this.nerv, ActorRole.OBSERVER, ActionCode.VALIDATION_COMPLETED, {
                     passed,
                     overall_score,
@@ -256,6 +258,7 @@ class ValidationService {
 
     /**
      * Registra validator customizado.
+     *
      * @param {string} name - Nome do validator
      * @param {function} validatorFn - Função do validator
      */

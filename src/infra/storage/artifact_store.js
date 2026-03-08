@@ -11,13 +11,12 @@ import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { getArtifactById, deleteArtifactById } from '#infra/db/artifact_repo';
+import { deleteArtifactById, getArtifactById } from '#infra/db/artifact_repo';
 import { ARTIFACTS_DIR } from '#infra/fs/paths';
 import { atomicWrite } from '#infra/io';
 
 /**
- * ✅ P1-22: Artifact size limits to prevent disk exhaustion
- * Configurable via environment variables
+ * ✅ P1-22: Artifact size limits to prevent disk exhaustion Configurable via environment variables
  */
 const MAX_TEXT_ARTIFACT_BYTES = Number(process.env.MAX_TEXT_ARTIFACT_BYTES) || 50 * 1024 * 1024; // 50 MB
 const MAX_BINARY_ARTIFACT_BYTES = Number(process.env.MAX_BINARY_ARTIFACT_BYTES) || 100 * 1024 * 1024; // 100 MB
@@ -29,12 +28,13 @@ const MAX_JSON_ARTIFACT_BYTES = Number(process.env.MAX_JSON_ARTIFACT_BYTES) || 1
  * @property {string} mime
  * @property {string} storageUri
  * @property {number} sizeBytes
- * @property {string|null} sha256
+ * @property {string | null} sha256
  */
 
 /**
- * Resolve the artifacts root directory (absolute).
- * Env precedence: MAESTRO_ARTIFACTS_DIR > ARTIFACTS_DIR > default constant.
+ * Resolve the artifacts root directory (absolute). Env precedence: MAESTRO_ARTIFACTS_DIR > ARTIFACTS_DIR > default
+ * constant.
+ *
  * @returns {string}
  */
 function _resolveArtifactsRoot() {
@@ -44,6 +44,7 @@ function _resolveArtifactsRoot() {
 
 /**
  * True iff filePath is inside rootDir (or equals rootDir), after resolution.
+ *
  * @param {string} rootDir
  * @param {string} filePath
  * @returns {boolean}
@@ -59,8 +60,7 @@ function _isUnderRoot(rootDir, filePath) {
 }
 
 /**
- * Strictly validates and normalizes a relative path (POSIX-style).
- * Rejects: empty, absolute, path traversal, NUL bytes.
+ * Strictly validates and normalizes a relative path (POSIX-style). Rejects: empty, absolute, path traversal, NUL bytes.
  *
  * Returns a forward-slash path suitable for joining with the artifacts root.
  *
@@ -112,6 +112,7 @@ function _sha256Bytes(buf) {
 
 /**
  * Internal: resolves a safe absolute path under the artifacts root.
+ *
  * @param {string} root
  * @param {string} rel
  * @returns {string}
@@ -128,6 +129,7 @@ function _toFullPath(root, rel) {
 
 /**
  * Internal: supports either sync or async repo implementations.
+ *
  * @param {string} artifactId
  * @returns {Promise<any>}
  */
@@ -137,12 +139,12 @@ async function _getArtifactRow(artifactId) {
 
 /**
  * @typedef {object} PutTextOptions
- * @property {*} [kind]
- * @property {*} [text]
- * @property {*} [relPath]
- * @property {*} [ext]
- * @property {*} [mime]
- * @property {*} [computeSha256]
+ * @property {any} [kind]
+ * @property {any} [text]
+ * @property {any} [relPath]
+ * @property {any} [ext]
+ * @property {any} [mime]
+ * @property {any} [computeSha256]
  */
 /**
  * Writes a text artifact file and returns storage pointers/metadata (no DB write).
@@ -163,9 +165,9 @@ async function putText({ kind, text, relPath, ext = 'txt', mime = 'text/plain', 
     // ✅ P1-22: Validate artifact size before writing to prevent disk exhaustion
     const sizeBytes = Buffer.byteLength(body, 'utf8');
     if (sizeBytes > MAX_TEXT_ARTIFACT_BYTES) {
-        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (
+        const error = /** @type {Error & { code?: string; sizeBytes?: number; maxBytes?: number }} */ (
             new Error(
-                `Text artifact size ${sizeBytes} bytes exceeds limit ${MAX_TEXT_ARTIFACT_BYTES} bytes (${(MAX_TEXT_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
+                `Text artifact size ${sizeBytes} bytes exceeds limit ${MAX_TEXT_ARTIFACT_BYTES} bytes (${(MAX_TEXT_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`,
             )
         );
         error.code = 'ARTIFACT_SIZE_LIMIT_EXCEEDED';
@@ -187,12 +189,12 @@ async function putText({ kind, text, relPath, ext = 'txt', mime = 'text/plain', 
 
 /**
  * @typedef {object} PutBufferOptions
- * @property {*} [kind]
- * @property {*} [buffer]
- * @property {*} [relPath]
- * @property {*} [ext]
- * @property {*} [mime]
- * @property {*} [computeSha256]
+ * @property {any} [kind]
+ * @property {any} [buffer]
+ * @property {any} [relPath]
+ * @property {any} [ext]
+ * @property {any} [mime]
+ * @property {any} [computeSha256]
  */
 /**
  * Writes a binary artifact file and returns storage pointers/metadata (no DB write).
@@ -231,9 +233,9 @@ async function putBuffer({
 
     // ✅ P1-22: Validate artifact size before writing to prevent disk exhaustion
     if (body.length > MAX_BINARY_ARTIFACT_BYTES) {
-        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (
+        const error = /** @type {Error & { code?: string; sizeBytes?: number; maxBytes?: number }} */ (
             new Error(
-                `Binary artifact size ${body.length} bytes exceeds limit ${MAX_BINARY_ARTIFACT_BYTES} bytes (${(MAX_BINARY_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
+                `Binary artifact size ${body.length} bytes exceeds limit ${MAX_BINARY_ARTIFACT_BYTES} bytes (${(MAX_BINARY_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`,
             )
         );
         error.code = 'ARTIFACT_SIZE_LIMIT_EXCEEDED';
@@ -255,12 +257,12 @@ async function putBuffer({
 
 /**
  * @typedef {object} PutJsonOptions
- * @property {*} [kind]
- * @property {*} [json]
- * @property {*} [relPath]
- * @property {*} [ext]
- * @property {*} [mime]
- * @property {*} [computeSha256]
+ * @property {any} [kind]
+ * @property {any} [json]
+ * @property {any} [relPath]
+ * @property {any} [ext]
+ * @property {any} [mime]
+ * @property {any} [computeSha256]
  */
 /**
  * Stores JSON data as an artifact (pretty-printed).
@@ -274,9 +276,9 @@ async function putJson({ kind, json, relPath, ext = 'json', mime = 'application/
     // ✅ P1-22: Validate JSON artifact size before writing (stricter limit than text)
     const sizeBytes = Buffer.byteLength(body, 'utf8');
     if (sizeBytes > MAX_JSON_ARTIFACT_BYTES) {
-        const error = /** @type {Error & {code?: string, sizeBytes?: number, maxBytes?: number}} */ (
+        const error = /** @type {Error & { code?: string; sizeBytes?: number; maxBytes?: number }} */ (
             new Error(
-                `JSON artifact size ${sizeBytes} bytes exceeds limit ${MAX_JSON_ARTIFACT_BYTES} bytes (${(MAX_JSON_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`
+                `JSON artifact size ${sizeBytes} bytes exceeds limit ${MAX_JSON_ARTIFACT_BYTES} bytes (${(MAX_JSON_ARTIFACT_BYTES / 1024 / 1024).toFixed(1)} MB)`,
             )
         );
         error.code = 'ARTIFACT_SIZE_LIMIT_EXCEEDED';
@@ -289,13 +291,13 @@ async function putJson({ kind, json, relPath, ext = 'json', mime = 'application/
 }
 
 /**
- * Resolves the on-disk URI for an artifact ID, but only if the URI is under the artifacts root.
- * Returns null if the artifact is unknown or points outside the allowed root.
+ * Resolves the on-disk URI for an artifact ID, but only if the URI is under the artifacts root. Returns null if the
+ * artifact is unknown or points outside the allowed root.
  *
  * Note: expects DB row field `storage_uri` (snake_case). If your repo returns camelCase, adjust here.
  *
  * @param {string} artifactId
- * @returns {Promise<string|null>}
+ * @returns {Promise<string | null>}
  */
 async function resolveUri(artifactId) {
     const row = await _getArtifactRow(artifactId);
@@ -310,8 +312,9 @@ async function resolveUri(artifactId) {
 
 /**
  * Reads a text artifact by id (utf8). Returns null if unavailable/outside root/missing from disk.
+ *
  * @param {string} artifactId
- * @returns {Promise<string|null>}
+ * @returns {Promise<string | null>}
  */
 async function readText(artifactId) {
     const uri = await resolveUri(artifactId);
@@ -327,8 +330,9 @@ async function readText(artifactId) {
 
 /**
  * Reads a binary artifact by id. Returns null if unavailable/outside root/missing from disk.
+ *
  * @param {string} artifactId
- * @returns {Promise<Buffer|null>}
+ * @returns {Promise<Buffer | null>}
  */
 async function readBuffer(artifactId) {
     const uri = await resolveUri(artifactId);
@@ -344,8 +348,9 @@ async function readBuffer(artifactId) {
 
 /**
  * Returns DB row + fsStat when available; flags unavailable when storage uri is missing or outside root.
+ *
  * @param {string} artifactId
- * @returns {Promise<unknown|null>}
+ * @returns {Promise<unknown | null>}
  */
 async function stat(artifactId) {
     const row = await _getArtifactRow(artifactId);
@@ -369,8 +374,9 @@ async function stat(artifactId) {
 }
 
 /**
- * Deletes an artifact: removes the file from disk (if present and under root) and the DB record.
- * Returns true if the DB record was deleted, false if not found.
+ * Deletes an artifact: removes the file from disk (if present and under root) and the DB record. Returns true if the DB
+ * record was deleted, false if not found.
+ *
  * @param {string} artifactId
  * @returns {Promise<boolean>}
  */
@@ -394,14 +400,14 @@ async function deleteArtifact(artifactId) {
 }
 
 export {
-    _resolveArtifactsRoot,
     _isUnderRoot,
-    putText,
+    _resolveArtifactsRoot,
+    deleteArtifact,
     putBuffer,
     putJson,
-    resolveUri,
-    readText,
+    putText,
     readBuffer,
+    readText,
+    resolveUri,
     stat,
-    deleteArtifact,
 };

@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { MissionManager } from '#missions/mission_manager';
@@ -12,12 +12,12 @@ function makeDbPath() {
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave17-owner-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave17-owner-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
 function makeMissionManager(
-    /** @type {{ missionState: any, kernelExecuteTask: any }} */ { missionState, kernelExecuteTask }
+    /** @type {{ missionState: any; kernelExecuteTask: any }} */ { missionState, kernelExecuteTask },
 ) {
     const stateRef = { value: JSON.parse(JSON.stringify(missionState)) };
     const stateManager = {
@@ -87,7 +87,7 @@ function makeMissionManager(
     });
 }
 
-test('wave17: MissionManager força SSOT quando legacy_direct não está em contingência', async t => {
+test('wave17: MissionManager força SSOT quando legacy_direct não está em contingência', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
     process.env.MISSION_STEP_DISPATCH_MODE = 'legacy_direct';

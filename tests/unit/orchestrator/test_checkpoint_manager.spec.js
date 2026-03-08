@@ -1,9 +1,9 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
 import { CheckpointManager } from '#orchestrator/checkpoint_manager';
-import path from 'node:path';
 import fs from 'fs/promises';
+import assert from 'node:assert';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 describe('CheckpointManager Unit Tests', () => {
     /** @type {any} */ let checkpointManager;
@@ -163,9 +163,9 @@ describe('CheckpointManager Unit Tests', () => {
             const missionState = { id: 'mission-123', status: 'RUNNING' };
 
             await checkpointManager.saveCheckpoint('mission-123', 1, missionState);
-            await new Promise(resolve => setTimeout(resolve, 10)); // Ensure timestamp difference
+            await new Promise((resolve) => setTimeout(resolve, 10)); // Ensure timestamp difference
             await checkpointManager.saveCheckpoint('mission-123', 2, missionState);
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
             await checkpointManager.saveCheckpoint('mission-123', 3, missionState);
 
             const checkpoints = await checkpointManager.listCheckpoints('mission-123');
@@ -255,7 +255,7 @@ describe('CheckpointManager Unit Tests', () => {
             // Save 6 checkpoints (keepLast=3)
             for (let i = 1; i <= 6; i++) {
                 await manager.saveCheckpoint('mission-456', i, missionState);
-                await new Promise(resolve => setTimeout(resolve, 10)); // Ensure timestamp order
+                await new Promise((resolve) => setTimeout(resolve, 10)); // Ensure timestamp order
             }
 
             const checkpoints = await manager.listCheckpoints('mission-456');
@@ -274,9 +274,9 @@ describe('CheckpointManager Unit Tests', () => {
             const missionState = { id: 'mission-456', status: 'RUNNING' };
 
             await manager.saveCheckpoint('mission-456', 1, missionState);
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
             await manager.saveCheckpoint('mission-456', 2, missionState);
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
             await manager.saveCheckpoint('mission-456', 3, missionState);
 
             const checkpoints = await manager.listCheckpoints('mission-456');

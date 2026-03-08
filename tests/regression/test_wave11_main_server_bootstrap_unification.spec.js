@@ -1,11 +1,11 @@
 // @ts-check
-import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test, { after } from 'node:test';
 
-import { __mainTestHooks, shutdown } from '#main';
 import { shutdown as shutdownDriverFactory } from '#driver/factory';
+import { __mainTestHooks, shutdown } from '#main';
 
 const ROOT = process.cwd();
 
@@ -25,12 +25,12 @@ test('wave11: integrated mode delegates to serverBootstrap with delegated author
     assert.match(
         content,
         /const\s+\{\s*serverBootstrap\s*\}\s*=\s*await\s+import\('\.\/server\/main\.js'\)/,
-        'main.js must import serverBootstrap for integrated mode'
+        'main.js must import serverBootstrap for integrated mode',
     );
     assert.match(
         content,
         /serverBootstrap\(\{\s*authority:\s*Authority\.SERVER_AUTHORITIES\.DELEGATED,\s*nerv\s*,?\s*\}\)/m,
-        'integrated mode must delegate with delegated authority and injected NERV'
+        'integrated mode must delegate with delegated authority and injected NERV',
     );
 });
 
@@ -40,7 +40,7 @@ test('wave11: integrated mode no longer starts server engine directly in main.js
     assert.doesNotMatch(
         content,
         /serverEngine\.start\(/,
-        'integrated mode must not call serverEngine.start directly from main.js'
+        'integrated mode must not call serverEngine.start directly from main.js',
     );
 });
 
@@ -50,12 +50,12 @@ test('wave11: authority resolution in main.js is centralized via core/authority 
     assert.match(
         content,
         /import\s+\*\s+as\s+Authority\s+from\s+'\.\/core\/authority\.js'/,
-        'main.js must import core authority module'
+        'main.js must import core authority module',
     );
     assert.match(
         content,
         /Authority\.resolveAuthority\(/,
-        'main.js resolveAuthority must delegate validation to core authority module'
+        'main.js resolveAuthority must delegate validation to core authority module',
     );
 });
 

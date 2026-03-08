@@ -21,7 +21,7 @@ const handleClose = () => {
     emit('update:open', false);
 };
 
-const getStatusVariant = status => {
+const getStatusVariant = (status) => {
     const variants = {
         RUNNING: 'info',
         PENDING: 'default',
@@ -33,13 +33,13 @@ const getStatusVariant = status => {
     return variants[status] || 'default';
 };
 
-const getPriorityVariant = priority => {
+const getPriorityVariant = (priority) => {
     if (priority >= 8) return 'error';
     if (priority >= 5) return 'warning';
     return 'default';
 };
 
-const formatDate = date => {
+const formatDate = (date) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleString();
 };

@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 import { isDomainMatch } from '#core/domain_matcher';
 
@@ -21,7 +21,7 @@ test('wave15: DriverReadinessGuard usa isDomainMatch e evita includes vulneráve
     assert.doesNotMatch(
         content,
         /currentUrl\.includes\s*\(\s*this\.driver\.config\.expectedDomain\s*\)/,
-        'guard não deve usar includes para match de domínio'
+        'guard não deve usar includes para match de domínio',
     );
     assert.match(content, /current URL is empty/, 'guard deve tratar URL vazia com falha explícita');
 });

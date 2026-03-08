@@ -1,9 +1,9 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
 import { scanWorkspace } from '../../../tools/rag/lib/scan.mjs';
 
 describe('RAG Workspace Scanning', () => {
@@ -20,10 +20,10 @@ describe('RAG Workspace Scanning', () => {
             const files = await scanWorkspace(tmpDir);
 
             assert.ok(files.length >= 3, 'Should find multiple files');
-            const paths = files.map(f => f.relPath);
-            assert.ok(paths.some(p => p.endsWith('.js')));
-            assert.ok(paths.some(p => p.endsWith('.md')));
-            assert.ok(paths.some(p => p.endsWith('.json')));
+            const paths = files.map((f) => f.relPath);
+            assert.ok(paths.some((p) => p.endsWith('.js')));
+            assert.ok(paths.some((p) => p.endsWith('.md')));
+            assert.ok(paths.some((p) => p.endsWith('.json')));
         } finally {
             await fs.rm(tmpDir, { recursive: true, force: true });
         }
@@ -39,11 +39,11 @@ describe('RAG Workspace Scanning', () => {
 
             const files = await scanWorkspace(tmpDir);
 
-            const paths = files.map(f => f.relPath);
-            assert.ok(!paths.some(p => p.includes('node_modules')), 'Should exclude node_modules');
+            const paths = files.map((f) => f.relPath);
+            assert.ok(!paths.some((p) => p.includes('node_modules')), 'Should exclude node_modules');
             assert.ok(
-                paths.some(p => p === 'valid.js'),
-                'Should include valid files'
+                paths.some((p) => p === 'valid.js'),
+                'Should include valid files',
             );
         } finally {
             await fs.rm(tmpDir, { recursive: true, force: true });
@@ -60,7 +60,7 @@ describe('RAG Workspace Scanning', () => {
 
             const files = await scanWorkspace(tmpDir);
 
-            const paths = files.map(f => f.relPath);
+            const paths = files.map((f) => f.relPath);
             assert.ok(!paths.includes('.env'), 'Should exclude .env');
             assert.ok(!paths.includes('.env.local'), 'Should exclude .env.local');
             assert.ok(paths.includes('.env.example'), 'Should allow .env.example');
@@ -80,7 +80,7 @@ describe('RAG Workspace Scanning', () => {
 
             const files = await scanWorkspace(tmpDir);
 
-            const paths = files.map(f => f.relPath);
+            const paths = files.map((f) => f.relPath);
             assert.ok(!paths.includes('ignored.txt'), 'Should respect .gitignore');
             assert.ok(!paths.includes('test.log'), 'Should respect .gitignore patterns');
             assert.ok(paths.includes('valid.js'), 'Should include valid files');
@@ -101,7 +101,7 @@ describe('RAG Workspace Scanning', () => {
 
             const files = await scanWorkspace(tmpDir, { maxFileBytes: 1000000 });
 
-            const paths = files.map(f => f.relPath);
+            const paths = files.map((f) => f.relPath);
             assert.ok(paths.includes('small.js'), 'Should include small file');
             assert.ok(!paths.includes('large.js'), 'Should exclude large file');
         } finally {
@@ -119,7 +119,7 @@ describe('RAG Workspace Scanning', () => {
 
             const files = await scanWorkspace(tmpDir);
 
-            const paths = files.map(f => f.relPath);
+            const paths = files.map((f) => f.relPath);
             // Should be sorted alphabetically
             assert.deepStrictEqual(paths, [...paths].sort());
         } finally {
@@ -137,7 +137,7 @@ describe('RAG Workspace Scanning', () => {
             await fs.writeFile(path.join(tmpDir, 'scripts', 'skip.mjs'), 'console.log(1)', 'utf8');
 
             const files = await scanWorkspace(tmpDir, { profile: 'core' });
-            const paths = files.map(f => f.relPath);
+            const paths = files.map((f) => f.relPath);
             assert.ok(paths.includes('src/ok.ts'));
             assert.ok(!paths.includes('scripts/skip.mjs'));
         } finally {
@@ -158,7 +158,7 @@ describe('RAG Workspace Scanning', () => {
                 includeGlobs: ['custom/**'],
                 excludeGlobs: ['custom/b.js'],
             });
-            const paths = files.map(f => f.relPath);
+            const paths = files.map((f) => f.relPath);
             assert.ok(paths.includes('custom/a.js'));
             assert.ok(!paths.includes('custom/b.js'));
         } finally {
@@ -174,7 +174,7 @@ describe('RAG Workspace Scanning', () => {
             await fs.writeFile(path.join(tmpDir, 'main.js'), 'export const x = 1;', 'utf8');
 
             const files = await scanWorkspace(tmpDir, { profile: 'full', docsMode: 'exclude' });
-            const paths = files.map(f => f.relPath);
+            const paths = files.map((f) => f.relPath);
             assert.ok(paths.includes('main.js'));
             assert.ok(!paths.includes('readme.md'));
         } finally {
@@ -191,7 +191,7 @@ describe('RAG Workspace Scanning', () => {
             await fs.writeFile(path.join(tmpDir, 'main.js'), 'export const x = 1;', 'utf8');
 
             const files = await scanWorkspace(tmpDir, { profile: 'full', docsMode: 'only' });
-            const paths = files.map(f => f.relPath);
+            const paths = files.map((f) => f.relPath);
             assert.ok(paths.includes('readme.md'));
             assert.ok(paths.includes('notes.mdx'));
             assert.ok(!paths.includes('main.js'));

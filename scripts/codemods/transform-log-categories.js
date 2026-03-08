@@ -73,7 +73,7 @@ module.exports = function (fileInfo, api) {
     });
 
     // Also replace standalone literal strings (for other use cases)
-    LOG_CATEGORIES.forEach(category => {
+    LOG_CATEGORIES.forEach((category) => {
         root.find(j.Literal, { value: category }).forEach((/** @type {any} */ path) => {
             // Skip if already handled by log() transformation above
             const parent = path.parent;
@@ -113,7 +113,7 @@ module.exports = function (fileInfo, api) {
         const importStatement = j.variableDeclaration('const', [
             j.variableDeclarator(
                 j.objectPattern([j.property('init', j.identifier('LOG_CATEGORIES'), j.identifier('LOG_CATEGORIES'))]),
-                j.callExpression(j.identifier('require'), [j.literal(importPath)])
+                j.callExpression(j.identifier('require'), [j.literal(importPath)]),
             ),
         ]);
 

@@ -1,13 +1,13 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 test('wave17: mission transitions usam serviço único (sem updateMission(status) em controller/runner)', async () => {
     const missionController = await fs.readFile(
         path.join(process.cwd(), 'src/server/api/controllers/missions.js'),
-        'utf8'
+        'utf8',
     );
     const missionRunner = await fs.readFile(path.join(process.cwd(), 'src/agent/mission_runner.js'), 'utf8');
 

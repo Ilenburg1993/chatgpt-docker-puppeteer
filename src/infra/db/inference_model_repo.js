@@ -66,7 +66,7 @@ function _setModelEnabled(id, enabled) {
     db.prepare('UPDATE inference_models SET enabled = ?, updated_at_ms = ? WHERE id = ?').run(
         enabled ? 1 : 0,
         _now(),
-        targetId
+        targetId,
     );
     return getInferenceModelById(targetId);
 }
@@ -74,8 +74,9 @@ function _setModelEnabled(id, enabled) {
 /** @typedef {any} UpsertInferenceModelInput */
 /**
  * Função exportada: upsertInferenceModel.
+ *
  * @param {any} [input]
- * @returns {InferenceModel|null}
+ * @returns {InferenceModel | null}
  */
 function upsertInferenceModel(input = {}) {
     const db = getDb();
@@ -112,7 +113,7 @@ function upsertInferenceModel(input = {}) {
             safety_profile_json = excluded.safety_profile_json,
             default_params_json = excluded.default_params_json,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         id,
         backend_id: backendId,
@@ -131,8 +132,9 @@ function upsertInferenceModel(input = {}) {
 
 /**
  * Função exportada: getInferenceModelById.
+ *
  * @param {string} id Unique identifier.
- * @returns {InferenceModel|null}
+ * @returns {InferenceModel | null}
  */
 function getInferenceModelById(id) {
     const db = getDb();
@@ -142,6 +144,7 @@ function getInferenceModelById(id) {
 /** @typedef {any} ListInferenceModelsOptions */
 /**
  * Função exportada: listInferenceModels.
+ *
  * @param {ListInferenceModelsOptions} [options]
  * @returns {InferenceModel[]}
  */
@@ -155,7 +158,7 @@ function listInferenceModels({ backendId = null, enabledOnly = false, limit = 20
               AND (@enabledOnly = 0 OR enabled = 1)
             ORDER BY updated_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all({
             backendId: backendId ? String(backendId) : null,
@@ -167,9 +170,10 @@ function listInferenceModels({ backendId = null, enabledOnly = false, limit = 20
 
 /**
  * Função exportada: setInferenceModelEnabled.
+ *
  * @param {string} id
  * @param {boolean} enabled
- * @returns {InferenceModel|null}
+ * @returns {InferenceModel | null}
  */
 function setInferenceModelEnabled(id, enabled) {
     return _setModelEnabled(id, Boolean(enabled));

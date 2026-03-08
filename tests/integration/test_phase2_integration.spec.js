@@ -1,13 +1,13 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it, before, after } from 'node:test';
-import { MissionManager, MISSION_STATUS } from '#missions/mission_manager';
-import { FeedbackProcessor, FEEDBACK_CATEGORY } from '#missions/feedback_processor';
+import { FEEDBACK_CATEGORY, FeedbackProcessor } from '#missions/feedback_processor';
+import { MISSION_STATUS, MissionManager } from '#missions/mission_manager';
 import { CheckpointManager } from '#orchestrator/checkpoint_manager';
 import { ContextManager } from '#orchestrator/context_manager';
 import { ActionCode } from '#shared/nerv/constants';
-import path from 'node:path';
 import fs from 'fs/promises';
+import assert from 'node:assert';
+import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
 describe('Phase 2 Integration Smoke Tests', () => {
     /** @type {any} */ let missionManager;

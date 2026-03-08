@@ -1,11 +1,11 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { COMMANDS, executeCommand, validateCommand } from '../../../src/server/domain/control_command_service.js';
-import { RBAC_PERMISSIONS } from '../../../src/infra/db/rbac_repo.js';
-import { createAuditAgentServer } from '../../../src/audit_agent/server.js';
+import test from 'node:test';
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
+import { createAuditAgentServer } from '../../../src/audit_agent/server.js';
+import { RBAC_PERMISSIONS } from '../../../src/infra/db/rbac_repo.js';
+import { COMMANDS, executeCommand, validateCommand } from '../../../src/server/domain/control_command_service.js';
 
 function actor() {
     return {
@@ -112,7 +112,7 @@ test('executeCommand proxies AUDIT_JOB_CREATE and AUDIT_JOB_RUN to local audit-a
         if (prevPort === undefined) delete process.env.AUDIT_AGENT_PORT;
         else process.env.AUDIT_AGENT_PORT = prevPort;
         await /** @type {Promise<void>} */ (
-            new Promise(resolve => {
+            new Promise((resolve) => {
                 server.close(() => resolve());
             })
         );
@@ -165,7 +165,7 @@ test('executeCommand proxies patch_suggest job and returns WAITING_APPROVAL afte
         if (prevPort === undefined) delete process.env.AUDIT_AGENT_PORT;
         else process.env.AUDIT_AGENT_PORT = prevPort;
         await /** @type {Promise<void>} */ (
-            new Promise(resolve => {
+            new Promise((resolve) => {
                 server.close(() => resolve());
             })
         );

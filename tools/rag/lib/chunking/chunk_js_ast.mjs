@@ -1,10 +1,10 @@
 // @ts-check
 import { parse } from '@babel/parser';
-// @ts-ignore — @babel/traverse não tem typings publicados
+// @ts-expect-error — @babel/traverse não tem typings publicados
 import traverseModule from '@babel/traverse';
-import { chunkPlain } from './chunk_plain.mjs';
-import { estimateCharsForLines } from '../text.mjs';
 import { RAG_CHUNK_MAX_CHARS, RAG_CHUNK_TARGET_CHARS } from '../contract.mjs';
+import { estimateCharsForLines } from '../text.mjs';
+import { chunkPlain } from './chunk_plain.mjs';
 
 const traverse = typeof traverseModule === 'function' ? traverseModule : /** @type {any} */ (traverseModule).default;
 
@@ -73,7 +73,7 @@ function firstNonEmptyLine(
     /** @type {any} */ lines,
     /** @type {any} */ startLine,
     /** @type {any} */ endLine,
-    /** @type {any} */ maxLookahead = 6
+    /** @type {any} */ maxLookahead = 6,
 ) {
     const startIdx = Math.max(0, startLine - 1);
     const endIdx = Math.min(lines.length - 1, endLine - 1, startIdx + maxLookahead);
@@ -88,7 +88,7 @@ function splitLargeUnit(
     /** @type {any} */ unit,
     /** @type {any} */ lines,
     /** @type {any} */ maxChunkChars,
-    /** @type {any} */ minChunkChars
+    /** @type {any} */ minChunkChars,
 ) {
     const startIdx = unit.startLine - 1;
     const endIdx = unit.endLine - 1;
@@ -112,7 +112,7 @@ function splitLargeUnit(
             imports: unit.imports,
             subchunkIndex: idx + 1,
             subchunkTotal: subRanges.length,
-        })
+        }),
     );
 }
 
@@ -133,7 +133,7 @@ function normalizeAndSplitUnits(/** @type {any} */ units, /** @type {any} */ lin
         /** @type {any} */ (a, b) =>
             a.startLine - b.startLine ||
             a.endLine - b.endLine ||
-            String(a.symbol || '').localeCompare(String(b.symbol || ''))
+            String(a.symbol || '').localeCompare(String(b.symbol || '')),
     );
 
     // Remove overlap conservatively.
@@ -270,7 +270,7 @@ function collectUnits(/** @type {any} */ ast, /** @type {any} */ lines, /** @typ
 }
 
 export function chunkJsAst(
-    /** @type {any} */ { relPath, lines, language = 'js', maxChunkChars = RAG_CHUNK_MAX_CHARS }
+    /** @type {any} */ { relPath, lines, language = 'js', maxChunkChars = RAG_CHUNK_MAX_CHARS },
 ) {
     const source = buildCodeFromLines(lines);
     const ast = parse(source, {
@@ -301,6 +301,6 @@ export function chunkJsAst(
                 imports: unit.imports || [],
                 subchunk_index: unit.subchunkIndex || null,
                 subchunk_total: unit.subchunkTotal || null,
-            })
+            }),
     );
 }

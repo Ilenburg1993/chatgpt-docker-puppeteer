@@ -1,15 +1,16 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
- * Browser and connection-related constants
- * Centralized definitions for browser pool, connection modes, and orchestration
+ * Browser and connection-related constants Centralized definitions for browser pool, connection modes, and
+ * orchestration
  *
  * Audit Level: 35 - Core Constants
+ *
  * @module constants/browser
  */
 
 /**
- * Connection mode types for browser orchestration
- * Defines how the system connects to and manages browser instances
+ * Connection mode types for browser orchestration Defines how the system connects to and manages browser instances
+ *
  * @readonly
  * @enum {string}
  */
@@ -34,8 +35,8 @@ const CONNECTION_MODES = {
 };
 
 /**
- * Browser pool states
- * Represents the current state of browser instances in the pool
+ * Browser pool states Represents the current state of browser instances in the pool
+ *
  * @readonly
  * @enum {string}
  */
@@ -55,12 +56,14 @@ const BROWSER_STATES = {
 
 /**
  * Array of all valid connection modes (for validation)
+ *
  * @type {ReadonlyArray<string>}
  */
 const CONNECTION_MODES_ARRAY = Object.values(CONNECTION_MODES);
 
 /**
  * Array of all valid browser states (for validation)
+ *
  * @type {ReadonlyArray<string>}
  */
 const BROWSER_STATES_ARRAY = Object.values(BROWSER_STATES);
@@ -75,4 +78,4 @@ Object.freeze(CONNECTION_MODES);
  */
 Object.freeze(BROWSER_STATES);
 
-export { CONNECTION_MODES, BROWSER_STATES, CONNECTION_MODES_ARRAY, BROWSER_STATES_ARRAY };
+export { BROWSER_STATES, BROWSER_STATES_ARRAY, CONNECTION_MODES, CONNECTION_MODES_ARRAY };

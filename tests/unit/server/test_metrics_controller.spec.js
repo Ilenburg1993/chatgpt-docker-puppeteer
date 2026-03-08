@@ -1,12 +1,12 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 /**
  * Testes unitários para o controller de métricas
  *
- * Cobre o contrato de resposta de GET /api/metrics e GET /api/metrics/tasks.
- * Utiliza mocks isolados, sem dependência de SQLite ou Express real.
+ * Cobre o contrato de resposta de GET /api/metrics e GET /api/metrics/tasks. Utiliza mocks isolados, sem dependência de
+ * SQLite ou Express real.
  */
 
 describe('Metrics Controller — /api/metrics', () => {
@@ -44,11 +44,11 @@ describe('Metrics Controller — /api/metrics', () => {
 
 describe('Metrics Controller — /api/metrics/tasks', () => {
     /**
-     * Simula countTasksByStatus() retornando resultado de GROUP BY SQL.
-     * A função real usa uma única query; aqui testamos o contrato de resposta.
+     * Simula countTasksByStatus() retornando resultado de GROUP BY SQL. A função real usa uma única query; aqui
+     * testamos o contrato de resposta.
      *
      * @param {Record<string, number>} mockCounts
-     * @returns {{ status: string, timestamp: number, metrics: { by_status: Record<string, number>, total: number } }}
+     * @returns {{ status: string; timestamp: number; metrics: { by_status: Record<string, number>; total: number } }}
      */
     function buildTaskMetricsResponse(mockCounts) {
         const total = Object.values(mockCounts).reduce((a, b) => a + b, 0);

@@ -39,9 +39,8 @@ const REQUIRED_ENV_VARS = {
 };
 
 /**
- * Classe responsável por validar a configuração do sistema.
- * Verifica a existência e integridade de arquivos de configuração,
- * variáveis de ambiente e diretórios necessários.
+ * Classe responsável por validar a configuração do sistema. Verifica a existência e integridade de arquivos de
+ * configuração, variáveis de ambiente e diretórios necessários.
  */
 class ConfigValidator {
     /**
@@ -56,7 +55,8 @@ class ConfigValidator {
 
     /**
      * Registra uma mensagem com o nível especificado.
-     * @param {'ERROR'|'WARN'|'INFO'} level - Nível da mensagem.
+     *
+     * @param {'ERROR' | 'WARN' | 'INFO'} level - Nível da mensagem.
      * @param {string} message - Mensagem a ser registrada.
      */
     log(level, message) {
@@ -70,6 +70,7 @@ class ConfigValidator {
 
     /**
      * Valida se um arquivo existe no sistema de arquivos.
+     *
      * @param {string} filepath - Caminho completo do arquivo a ser verificado.
      * @returns {boolean} Verdadeiro se o arquivo existe, falso caso contrário.
      */
@@ -83,8 +84,9 @@ class ConfigValidator {
 
     /**
      * Valida se um arquivo contém JSON válido.
+     *
      * @param {string} filepath - Caminho do arquivo JSON.
-     * @returns {any|null} Objeto JSON se válido, null se inválido.
+     * @returns {any | null} Objeto JSON se válido, null se inválido.
      */
     validateJSON(filepath) {
         try {
@@ -99,6 +101,7 @@ class ConfigValidator {
 
     /**
      * Valida um arquivo de configuração específico com base em sua especificação.
+     *
      * @param {string} filename - Nome do arquivo a ser validado.
      * @param {object} spec - Especificação de validação do arquivo.
      * @param {boolean} spec.required - Indica se o arquivo é obrigatório.
@@ -141,7 +144,7 @@ class ConfigValidator {
                     // Enum validation
                     if (!constraint.includes(data[key])) {
                         this.errors.push(
-                            `Invalid value for "${key}" in ${filename}. Expected one of: ${constraint.join(', ')}`
+                            `Invalid value for "${key}" in ${filename}. Expected one of: ${constraint.join(', ')}`,
                         );
                     }
                 } else if (typeof constraint === 'object') {
@@ -174,9 +177,9 @@ class ConfigValidator {
     }
 
     /**
-     * Valida as variáveis de ambiente necessárias para o ambiente atual.
-     * Verifica se as variáveis obrigatórias estão definidas e se têm valores válidos.
-     * Side-effects: Adiciona erros à lista de erros se variáveis estiverem ausentes ou inválidas.
+     * Valida as variáveis de ambiente necessárias para o ambiente atual. Verifica se as variáveis obrigatórias estão
+     * definidas e se têm valores válidos. Side-effects: Adiciona erros à lista de erros se variáveis estiverem ausentes
+     * ou inválidas.
      */
     validateEnvironment() {
         const env = process.env.NODE_ENV || 'development';
@@ -209,9 +212,8 @@ class ConfigValidator {
     }
 
     /**
-     * Valida os diretórios necessários para o funcionamento do sistema.
-     * Verifica se os diretórios existem e são graváveis.
-     * Side-effects: Adiciona avisos ou erros à lista conforme o resultado da validação.
+     * Valida os diretórios necessários para o funcionamento do sistema. Verifica se os diretórios existem e são
+     * graváveis. Side-effects: Adiciona avisos ou erros à lista conforme o resultado da validação.
      */
     validateDirectories() {
         const dirs = ['fila', 'respostas', 'logs', 'profile'];
@@ -236,9 +238,8 @@ class ConfigValidator {
     }
 
     /**
-     * Valida o ponto de entrada principal do aplicativo (index.js).
-     * Verifica se o arquivo existe e parece ser um script Node.js válido.
-     * Side-effects: Adiciona erros ou avisos à lista conforme o resultado da validação.
+     * Valida o ponto de entrada principal do aplicativo (index.js). Verifica se o arquivo existe e parece ser um script
+     * Node.js válido. Side-effects: Adiciona erros ou avisos à lista conforme o resultado da validação.
      */
     validateEntryPoint() {
         const entryPoint = 'index.js';
@@ -261,10 +262,10 @@ class ConfigValidator {
     }
 
     /**
-     * Executa a validação completa do sistema.
-     * Valida arquivos de configuração, variáveis de ambiente, diretórios e ponto de entrada.
-     * Imprime resultados e encerra o processo com código apropriado.
-     * Side-effects: Imprime resultados no console, pode encerrar o processo com exit(1) ou exit(0).
+     * Executa a validação completa do sistema. Valida arquivos de configuração, variáveis de ambiente, diretórios e
+     * ponto de entrada. Imprime resultados e encerra o processo com código apropriado. Side-effects: Imprime resultados
+     * no console, pode encerrar o processo com exit(1) ou exit(0).
+     *
      * @returns {Promise<void>} Promessa que resolve quando a validação é concluída.
      */
     async run() {
@@ -291,13 +292,13 @@ class ConfigValidator {
 
         if (this.warnings.length > 0) {
             console.log('⚠️  Warnings:');
-            this.warnings.forEach(w => this.log('WARN', w));
+            this.warnings.forEach((w) => this.log('WARN', w));
             console.log('');
         }
 
         if (this.errors.length > 0) {
             console.log('❌ Errors:');
-            this.errors.forEach(e => this.log('ERROR', e));
+            this.errors.forEach((e) => this.log('ERROR', e));
             console.log('');
             console.log(`\x1b[31m✗ Validation failed with ${this.errors.length} error(s)\x1b[0m\n`);
             process.exit(1);
@@ -314,12 +315,12 @@ class ConfigValidator {
 }
 
 /**
- * Função principal que executa a validação de configuração quando o script é chamado diretamente.
- * Side-effects: Cria e executa uma instância de ConfigValidator, pode encerrar o processo.
+ * Função principal que executa a validação de configuração quando o script é chamado diretamente. Side-effects: Cria e
+ * executa uma instância de ConfigValidator, pode encerrar o processo.
  */
 async function main() {
     const validator = new ConfigValidator();
-    await validator.run().catch(error => {
+    await validator.run().catch((error) => {
         console.error('Fatal error during validation:', error);
         process.exit(1);
     });

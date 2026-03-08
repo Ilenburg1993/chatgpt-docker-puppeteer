@@ -30,13 +30,12 @@
  */
 /**
  * @typedef {object} CreateBackpressureOptions
- * @property {*} [telemetry]
+ * @property {any} [telemetry]
  */
 /**
  * Cria um observador técnico de backpressure.
  *
- * @param {CreateBackpressureDeps} deps
- * Interface de telemetria do NERV.
+ * @param {CreateBackpressureDeps} deps Interface de telemetria do NERV.
  * @returns {any}
  */
 function createBackpressure({ telemetry }) {
@@ -47,7 +46,7 @@ function createBackpressure({ telemetry }) {
     /**
      * Emite sinal técnico de pressão.
      *
-     * @param {{buffer: string, size: number, limit: number|null}} info
+     * @param {{ buffer: string; size: number; limit: number | null }} info
      */
     function signal({ buffer, size, limit }) {
         telemetry.emit('nerv:buffer:pressure', {
@@ -59,7 +58,8 @@ function createBackpressure({ telemetry }) {
 
     /**
      * Emite sinal técnico de normalização (pressão aliviada).
-     * @param {{buffer: string, size: number}} info
+     *
+     * @param {{ buffer: string; size: number }} info
      */
     function relief({ buffer, size }) {
         telemetry.emit('nerv:buffer:relief', {

@@ -3,6 +3,7 @@
  * Ollama Tools for Tool Registry (v5.1 - Cloud-first non-embedding)
  *
  * Policy:
+ *
  * - ollama_generate: cloud-first by default (runtime=auto), local optional
  * - ollama_embed: local-only (cloud has no embeddings)
  * - ollama_models: explicit cloud/local inventory + policy metadata
@@ -58,9 +59,10 @@ async function ollamaGenerateHandler(/** @type {any} */ params, /** @type {any} 
     let validated;
     try {
         validated = OllamaGenerateSchema.parse(params);
-    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) {
+        const error = /** @type {any} */ (_raw_error);
         if (error instanceof z.ZodError) {
-            const issues = (/** @type {any} */ (error)).issues ?? [];
+            const issues = /** @type {any} */ (error).issues ?? [];
             const message =
                 Array.isArray(issues) && issues.length > 0
                     ? issues.map((/** @type {any} */ e) => `${e.path.join('.')}: ${e.message}`).join('; ')
@@ -100,7 +102,8 @@ async function ollamaGenerateHandler(/** @type {any} */ params, /** @type {any} 
         formatted += '\n';
 
         return formatted;
-    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) {
+        const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_generate error:', error);
         throw new Error(`Ollama generate failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -110,9 +113,10 @@ async function ollamaEmbedHandler(/** @type {any} */ params, /** @type {any} */ 
     let validated;
     try {
         validated = OllamaEmbedSchema.parse(params);
-    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) {
+        const error = /** @type {any} */ (_raw_error);
         if (error instanceof z.ZodError) {
-            const issues = (/** @type {any} */ (error)).issues ?? [];
+            const issues = /** @type {any} */ (error).issues ?? [];
             const message =
                 Array.isArray(issues) && issues.length > 0
                     ? issues.map((/** @type {any} */ e) => `${e.path.join('.')}: ${e.message}`).join('; ')
@@ -150,7 +154,8 @@ async function ollamaEmbedHandler(/** @type {any} */ params, /** @type {any} */ 
         formatted += `- Mean: ${(embedding.reduce((a, b) => a + b, 0) / embedding.length).toFixed(6)}\n`;
 
         return formatted;
-    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) {
+        const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_embed error:', error);
         throw new Error(`Ollama embed failed: ${error.message}`); // eslint-disable-line preserve-caught-error
     }
@@ -194,7 +199,8 @@ async function ollamaModelsHandler() {
         formatted += '- Local non-embedding remains available for fallback/specific objectives\n';
 
         return formatted;
-    } catch (/** @type {any} */ _raw_error) { const error = /** @type {any} */ (_raw_error);
+    } catch (/** @type {any} */ _raw_error) {
+        const error = /** @type {any} */ (_raw_error);
         console.error('[Ollama Tool] ollama_models error:', error);
         let formatted = '# Available Ollama Models\n\n';
         formatted += '**priority:** cloud-first-non-embedding\n\n';
@@ -207,7 +213,7 @@ async function ollamaModelsHandler() {
  * Register Ollama tools in the Tool Registry
  *
  * @param {any} registry
-  * @returns {Promise<void>}
+ * @returns {Promise<void>}
  */
 export async function registerOllamaTools(/** @type {any} */ registry) {
     console.error('[Ollama Tools] Registering tools...');
@@ -258,7 +264,7 @@ Embeddings remain local-only in a separate tool (ollama_embed).`,
                 required: ['prompt'],
             },
         },
-        ollamaGenerateHandler
+        ollamaGenerateHandler,
     );
 
     registry.register(
@@ -285,7 +291,7 @@ Important:
                 required: ['text'],
             },
         },
-        ollamaEmbedHandler
+        ollamaEmbedHandler,
     );
 
     registry.register(
@@ -302,7 +308,7 @@ Also reports runtime errors per backend when unavailable.`,
                 properties: {},
             },
         },
-        ollamaModelsHandler
+        ollamaModelsHandler,
     );
 
     console.error('[Ollama Tools] Registered 3 tools: ollama_generate, ollama_embed, ollama_models');

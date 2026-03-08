@@ -2,39 +2,36 @@
 /**
  * Schema Migration Framework for RAG System
  *
- * This module provides the infrastructure for migrating RAG manifests and data
- * between schema versions. It enables the system to evolve while preserving
- * existing indexed data.
+ * This module provides the infrastructure for migrating RAG manifests and data between schema versions. It enables the
+ * system to evolve while preserving existing indexed data.
  *
  * ## Usage
  *
  * When schema changes are needed:
+ *
  * 1. Define a migration function in the MIGRATIONS map below
  * 2. Update SCHEMA_VERSION in contract.mjs
  * 3. The system will automatically apply migrations on manifest load
  *
  * ## Migration Function Signature
  *
- * async function(manifest, paths, db) {
- *   // Modify manifest structure
- *   // Optionally migrate DB data
- *   // Return updated manifest
- * }
+ * async function(manifest, paths, db) { // Modify manifest structure // Optionally migrate DB data // Return updated
+ * manifest }
  *
  * @example
- * // To add a new field in v2:
- * '1->2': async (manifest) => {
- *   manifest.schema_version = 2;
- *   manifest.new_field = 'default_value';
- *   return manifest;
- * }
+ *     // To add a new field in v2:
+ *     '1->2': async (manifest) => {
+ *     manifest.schema_version = 2;
+ *     manifest.new_field = 'default_value';
+ *     return manifest;
+ *     }
  */
 
 /**
- * Registry of all schema migrations
- * Key format: 'fromVersion->toVersion'
+ * Registry of all schema migrations Key format: 'fromVersion->toVersion'
  *
  * Each migration receives:
+ *
  * - manifest: Current manifest object (will be mutated)
  * - paths: RAG paths object (for file operations if needed)
  * - db: LanceDB connection (null if DB not open yet)
@@ -44,10 +41,10 @@
 export const MIGRATIONS = /** @type {Record<string, Function>} */ (
     {
         /**
-         * Example migration from v1 to v2
-         * (Not active - just demonstrates the pattern)
+         * Example migration from v1 to v2 (Not active - just demonstrates the pattern)
          *
          * Hypothetical changes:
+         *
          * - Add 'tags_indexed' boolean to track if tags are in use
          * - Add 'last_query_at' timestamp
          * - Rename 'embedding.base_url_default' to 'embedding.default_base_url'
@@ -72,10 +69,10 @@ export const MIGRATIONS = /** @type {Record<string, Function>} */ (
         //   return manifest;
         // },
         /**
-         * Example migration from v2 to v3
-         * (Not active - demonstrates chaining)
+         * Example migration from v2 to v3 (Not active - demonstrates chaining)
          *
          * Hypothetical changes:
+         *
          * - Split 'files' map into separate metadata file
          * - Add compression flag
          */
@@ -107,13 +104,14 @@ export const MIGRATIONS = /** @type {Record<string, Function>} */ (
  * Apply migrations to bring manifest from current version to target version
  *
  * Supports both single-step and multi-step migrations:
+ *
  * - Direct: v1->v2 via MIGRATIONS['1->2']
  * - Chained: v1->v3 via MIGRATIONS['1->2'] then MIGRATIONS['2->3']
  *
  * @param {any} manifest - Current manifest object
  * @param {number} targetVersion - Desired schema version
  * @param {Object} paths - RAG paths object
- * @param {Object|null} db - LanceDB connection (optional)
+ * @param {Object | null} db - LanceDB connection (optional)
  * @returns {Promise<any>} Updated manifest
  * @throws {Error} If no migration path exists
  */
@@ -127,7 +125,7 @@ export async function migrateManifest(manifest, targetVersion, paths, db = null)
     if (currentVersion > targetVersion) {
         throw new Error(
             `DOWNGRADE_NOT_SUPPORTED: Cannot downgrade schema from v${currentVersion} to v${targetVersion}.\n` +
-                `Downgrades are not supported - please use 'npm run rag:reset -- --yes' and re-index.`
+                `Downgrades are not supported - please use 'npm run rag:reset -- --yes' and re-index.`,
         );
     }
 
@@ -147,7 +145,7 @@ export async function migrateManifest(manifest, targetVersion, paths, db = null)
                 `MIGRATION_NOT_FOUND: No migration defined for ${migrationKey}.\n` +
                     `This is a breaking schema change. You must reset the index:\n` +
                     `  npm run rag:reset -- --yes\n` +
-                    `  npm run rag:index\n`
+                    `  npm run rag:index\n`,
             );
         }
 
@@ -157,7 +155,7 @@ export async function migrateManifest(manifest, targetVersion, paths, db = null)
         // Verify migration updated the version
         if (updatedManifest.schema_version !== nextVersion) {
             throw new Error(
-                `MIGRATION_ERROR: Migration ${migrationKey} did not update schema_version to ${nextVersion}`
+                `MIGRATION_ERROR: Migration ${migrationKey} did not update schema_version to ${nextVersion}`,
             );
         }
 

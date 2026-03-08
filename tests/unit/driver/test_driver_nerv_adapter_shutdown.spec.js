@@ -1,8 +1,8 @@
 // @ts-check
-import test, { after } from 'node:test';
-import assert from 'node:assert/strict';
-import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';
 import { shutdown as shutdownDriverFactory } from '#driver/factory';
+import { DriverNERVAdapter } from '#driver/nerv_adapter/driver_nerv_adapter';
+import assert from 'node:assert/strict';
+import test, { after } from 'node:test';
 
 class MockNerv {
     constructor() {
@@ -27,7 +27,7 @@ test('DriverNERVAdapter.shutdown is idempotent under concurrent calls', async ()
     let cleanupCalls = 0;
     adapter._finallyCleanup = async () => {
         cleanupCalls++;
-        await new Promise(resolve => setTimeout(resolve, 30));
+        await new Promise((resolve) => setTimeout(resolve, 30));
     };
 
     adapter.activeDrivers.set('task-1', {

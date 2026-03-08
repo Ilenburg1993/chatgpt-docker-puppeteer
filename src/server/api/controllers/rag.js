@@ -2,10 +2,10 @@
 /**
  * RAG API Controller
  *
- * Expõe o sistema RAG via REST API para acesso de LLMs externas
- * (OpenCode, Claude, Copilot, Codex, etc.)
+ * Expõe o sistema RAG via REST API para acesso de LLMs externas (OpenCode, Claude, Copilot, Codex, etc.)
  *
  * Endpoints:
+ *
  * - POST /api/rag/ask - Busca semântica com formato Markdown
  * - POST /api/rag/query - Busca raw com resultados estruturados
  * - GET /api/rag/health - Health check do sistema RAG
@@ -13,6 +13,7 @@
  */
 
 import { log } from '#core/logger';
+import { asRecord } from '#types/guards';
 import {
     getRagCacheStats,
     ragAsk,
@@ -22,24 +23,23 @@ import {
     ragQuery,
 } from '../../../../tools/rag/lib/facade.mjs';
 import { resolveRagScopeConfig } from '../../../../tools/rag/lib/scope_config.mjs';
-import { asRecord } from '#types/guards';
 
 /** @typedef {any} HandleRagAskReq */
 /** @typedef {any} HandleRagAskRes */
 /**
  * Handler para POST /api/rag/ask - Busca semântica com output em Markdown.
  *
- * **Side-effects:** Consulta cache RAG, pode executar busca vetorial.
- * **Semântica:** Formata resultados como documento Markdown coeso para LLMs.
+ * **Side-effects:** Consulta cache RAG, pode executar busca vetorial. **Semântica:** Formata resultados como documento
+ * Markdown coeso para LLMs.
  *
  * @param {HandleRagAskReq} req - Request Express
  * @param {object} req
  * @param {object} req.body
  * @param {string} req.body.query - Query de busca obrigatória
- * @param {number} [req.body.topK=8] - Número máximo de chunks
+ * @param {number} [req.body.topK=8] - Número máximo de chunks. Default is `8`
  * @param {string} [req.body.pathPrefix] - Filtro por prefixo de caminho
- * @param {string|string[]} [req.body.ext] - Filtro por extensão de arquivo
- * @param {string|string[]} [req.body.tags] - Filtro por tags
+ * @param {string | string[]} [req.body.ext] - Filtro por extensão de arquivo
+ * @param {string | string[]} [req.body.tags] - Filtro por tags
  * @param {HandleRagAskRes} res - Response Express
  * @returns {Promise<void>}
  */
@@ -65,11 +65,11 @@ export async function handleRagAsk(req, res) {
         return res.json({
             success: true,
             markdown: result.markdown,
-            chunks: (/** @type {any} */ (result)).result.results.length,
+            chunks: /** @type {any} */ (result).result.results.length,
             metadata: {
                 query,
-                topK: (/** @type {any} */ (result)).result.topK,
-                dim: (/** @type {any} */ (result)).result.dim,
+                topK: /** @type {any} */ (result).result.topK,
+                dim: /** @type {any} */ (result).result.dim,
                 timestamp: Date.now(),
             },
         });
@@ -89,14 +89,14 @@ export async function handleRagAsk(req, res) {
 /**
  * Handler para POST /api/rag/query - Busca raw com resultados estruturados.
  *
- * **Side-effects:** Consulta cache RAG, pode executar busca vetorial.
- * **Semântica:** Retorna chunks estruturados sem formatação Markdown.
+ * **Side-effects:** Consulta cache RAG, pode executar busca vetorial. **Semântica:** Retorna chunks estruturados sem
+ * formatação Markdown.
  *
  * @param {HandleRagQueryReq} req - Request Express
  * @param {object} req
  * @param {object} req.body
  * @param {string} req.body.query - Query de busca obrigatória
- * @param {number} [req.body.topK=8] - Número máximo de resultados
+ * @param {number} [req.body.topK=8] - Número máximo de resultados. Default is `8`
  * @param {object} [req.body.filters] - Filtros adicionais de busca
  * @param {HandleRagQueryRes} res - Response Express
  * @returns {Promise<void>}
@@ -120,7 +120,7 @@ export async function handleRagQuery(req, res) {
 
         return res.json({
             success: true,
-            results: (/** @type {any} */ (result)).results.map((/** @type {any} */ r) => ({
+            results: /** @type {any} */ (result).results.map((/** @type {any} */ r) => ({
                 path: r.path,
                 score: r.score,
                 startLine: r.start_line,
@@ -135,14 +135,17 @@ export async function handleRagQuery(req, res) {
             })),
             metadata: {
                 query,
-                topK: (/** @type {any} */ (result)).topK,
-                dim: (/** @type {any} */ (result)).dim,
-                index_mode: (/** @type {any} */ (result)).index_mode || 'full',
-                index_freshness_ms: typeof (/** @type {any} */ (result)).index_freshness_ms === 'number' ? (/** @type {any} */ (result)).index_freshness_ms : null,
-                index_updated_at_iso: (/** @type {any} */ (result)).index_updated_at_iso || null,
-                last_index_scope: (/** @type {any} */ (result)).last_index_scope || null,
-                scope_hash: (/** @type {any} */ (result)).scope_hash || null,
-                query_at_iso: (/** @type {any} */ (result)).query_at_iso || null,
+                topK: /** @type {any} */ (result).topK,
+                dim: /** @type {any} */ (result).dim,
+                index_mode: /** @type {any} */ (result).index_mode || 'full',
+                index_freshness_ms:
+                    typeof (/** @type {any} */ (result).index_freshness_ms) === 'number'
+                        ? /** @type {any} */ (result).index_freshness_ms
+                        : null,
+                index_updated_at_iso: /** @type {any} */ (result).index_updated_at_iso || null,
+                last_index_scope: /** @type {any} */ (result).last_index_scope || null,
+                scope_hash: /** @type {any} */ (result).scope_hash || null,
+                query_at_iso: /** @type {any} */ (result).query_at_iso || null,
                 timestamp: Date.now(),
             },
         });
@@ -162,8 +165,8 @@ export async function handleRagQuery(req, res) {
 /**
  * Handler para GET /api/rag/health - Health check do sistema RAG.
  *
- * **Side-effects:** Verifica conectividade com Ollama e LanceDB.
- * **Semântica:** Status operacional completo do sistema RAG.
+ * **Side-effects:** Verifica conectividade com Ollama e LanceDB. **Semântica:** Status operacional completo do sistema
+ * RAG.
  *
  * @param {HandleRagHealthReq} req - Request Express
  * @param {HandleRagHealthRes} res - Response Express
@@ -173,7 +176,7 @@ export async function handleRagHealth(req, res) {
     try {
         const health = await ragHealth();
         return res.json({
-            ...(/** @type {any} */ (health)),
+            .../** @type {any} */ (health),
             timestamp: Date.now(),
         });
     } catch (/** @type {any} */ error) {
@@ -193,8 +196,8 @@ export async function handleRagHealth(req, res) {
 /**
  * Handler para POST /api/rag/index - Trigger reindexação em background.
  *
- * **Side-effects:** Inicia processo de indexação assíncrono (não bloqueante).
- * **Semântica:** Reindexa workspace completo para atualizar cache RAG.
+ * **Side-effects:** Inicia processo de indexação assíncrono (não bloqueante). **Semântica:** Reindexa workspace
+ * completo para atualizar cache RAG.
  *
  * @param {HandleRagIndexReq} req - Request Express
  * @param {object} req
@@ -239,7 +242,7 @@ export async function handleRagIndex(req, res) {
             .then(() => {
                 log.info('[RAG API] Background indexing completed successfully');
             })
-            .catch(err => {
+            .catch((err) => {
                 log.error('[RAG API] Background indexing failed:', err);
             });
 
@@ -265,8 +268,8 @@ export async function handleRagIndex(req, res) {
 /**
  * Handler para POST /api/rag/hybrid - Busca híbrida (Vetor + FTS + Reranking + MMR).
  *
- * **Side-effects:** Executa busca vetorial, full-text search e reranking.
- * **Semântica:** Combina múltiplas estratégias de busca para máxima relevância.
+ * **Side-effects:** Executa busca vetorial, full-text search e reranking. **Semântica:** Combina múltiplas estratégias
+ * de busca para máxima relevância.
  *
  * @param {HandleRagHybridSearchReq} req - Request Express
  * @param {object} req
@@ -344,7 +347,10 @@ export async function handleRagHybridSearch(req, res) {
                 mmr: result.mmr,
                 mmrLambda: result.mmrLambda,
                 index_mode: result.index_mode || 'full',
-                index_freshness_ms: typeof result.index_freshness_ms === 'number' ? (/** @type {any} */ (result)).index_freshness_ms : null,
+                index_freshness_ms:
+                    typeof result.index_freshness_ms === 'number'
+                        ? /** @type {any} */ (result).index_freshness_ms
+                        : null,
                 index_updated_at_iso: result.index_updated_at_iso || null,
                 last_index_scope: result.last_index_scope || null,
                 scope_hash: result.scope_hash || null,
@@ -368,8 +374,8 @@ export async function handleRagHybridSearch(req, res) {
 /**
  * Handler para GET /api/rag/stats - Estatísticas do cache de embeddings.
  *
- * **Side-effects:** Lê estatísticas do cache RAG.
- * **Semântica:** Métricas de performance e eficiência do sistema de cache.
+ * **Side-effects:** Lê estatísticas do cache RAG. **Semântica:** Métricas de performance e eficiência do sistema de
+ * cache.
  *
  * @param {HandleRagStatsReq} req - Request Express
  * @param {HandleRagStatsRes} res - Response Express

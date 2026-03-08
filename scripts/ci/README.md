@@ -8,13 +8,13 @@ workflows GitHub.
 
 ## Entradas principais
 
-| Arquivo                       | Descrição                                     |
-| ----------------------------- | --------------------------------------------- |
-| `check-node-version.mjs`      | Garante que Node.js >= 24 está em uso         |
-| `run-ci-suite.mjs`            | Executa a suíte completa de CI localmente     |
-| `validate-workflows.mjs`      | Valida estrutura dos workflows GitHub Actions |
-| `verify-github-workflows.mjs` | Verifica integridade e sintaxe dos workflows  |
-| `verify-skills-governance.mjs` | Verifica governanca das skills e do canon    |
+| Arquivo                        | Descrição                                     |
+| ------------------------------ | --------------------------------------------- |
+| `check-node-version.mjs`       | Garante que Node.js >= 24 está em uso         |
+| `run-ci-suite.mjs`             | Executa a suíte completa de CI localmente     |
+| `validate-workflows.mjs`       | Valida estrutura dos workflows GitHub Actions |
+| `verify-github-workflows.mjs`  | Verifica integridade e sintaxe dos workflows  |
+| `verify-skills-governance.mjs` | Verifica governanca das skills e do canon     |
 
 ## Regras de manutenção
 

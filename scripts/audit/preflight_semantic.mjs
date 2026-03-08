@@ -6,7 +6,7 @@ import { parseJsonFromMixedOutput, runCommand } from './lib/exec.mjs';
 /**
  * @typedef {object} SummarizeResultResult
  * @property {boolean} ok
- * @property {number|null} exitCode
+ * @property {number | null} exitCode
  * @property {string} stdout
  * @property {string} stderr
  */
@@ -102,7 +102,7 @@ async function main() {
         console.log('[SEMANTIC PREFLIGHT]');
         console.log(`ok=${report.ok}`);
         console.log(
-            `pm2=${components.pm2.ok} mcp=${components.mcp.ok} rag=${components.rag.ok} lsp=${components.lsp.ok}`
+            `pm2=${components.pm2.ok} mcp=${components.mcp.ok} rag=${components.rag.ok} lsp=${components.lsp.ok}`,
         );
         if (issues.length > 0) {
             console.log(`issues=${issues.join(' | ')}`);
@@ -115,7 +115,7 @@ async function main() {
     process.exit(0);
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error(`[semantic-preflight] fatal: ${error?.message || String(error)}`);
     process.exit(1);
 });

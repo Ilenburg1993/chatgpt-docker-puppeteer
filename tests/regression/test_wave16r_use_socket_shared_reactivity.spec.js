@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 test('wave16r: useSocket keeps shared module-level reactive state', async () => {
     const filePath = path.join(process.cwd(), 'src/dashboard-ui/src/composables/useSocket.js');

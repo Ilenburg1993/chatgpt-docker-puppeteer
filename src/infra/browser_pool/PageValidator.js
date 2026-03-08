@@ -1,9 +1,10 @@
 // @ts-check
-import { log } from '#core/logger';
 import { isDomainMatch } from '#core/domain_matcher';
+import { log } from '#core/logger';
 
 /**
  * Severity levels para validation issues.
+ *
  * @readonly
  * @enum {string}
  */
@@ -14,6 +15,7 @@ const SEVERITY = {
 
 /**
  * Issue types para categorização de problemas.
+ *
  * @readonly
  * @enum {string}
  */
@@ -27,10 +29,10 @@ const ISSUE_TYPES = {
 };
 
 /**
- * Expected domains por target.
- * Usado para validar que página está no domain correto.
+ * Expected domains por target. Usado para validar que página está no domain correto.
+ *
+ * @type {Object<string, string>}
  * @readonly
- * @type {Object.<string, string>}
  */
 const EXPECTED_DOMAINS = {
     chatgpt: 'chatgpt.com',
@@ -49,25 +51,26 @@ class PageValidator {
      * Valida health de página ANTES de allocation.
      *
      * Executa 4 checks críticos:
+     *
      * 1. Page alive (não null, não closed)
      * 2. Page connected (evaluate test)
      * 3. Target URL validation (domain match - optional)
      * 4. DOM readiness (document.readyState)
      *
+     * @example
+     *     const result = await PageValidator.validate(page, 'chatgpt');
+     *     if (!result.valid) {
+     *         throw new Error(`Page invalid: ${JSON.stringify(result.issues)}`);
+     *     }
+     *
+     * @property {boolean} valid - true se pode alocar, false se bloqueado
+     * @property {object[]} issues - Lista de problemas detectados
+     * @property {number} timestamp - Timestamp da validação
      * @param {any} page - Puppeteer Page instance
      * @param {string} [target] - Target name (chatgpt, gemini, etc) para domain validation
      * @returns {Promise<any>} Validation result
-     * @property {boolean} valid - true se pode alocar, false se bloqueado
-     * @property {Array<object>} issues - Lista de problemas detectados
-     * @property {number} timestamp - Timestamp da validação
-     *
-     * @example
-     * const result = await PageValidator.validate(page, 'chatgpt');
-     * if (!result.valid) {
-     *     throw new Error(`Page invalid: ${JSON.stringify(result.issues)}`);
-     * }
      */
-    static async validate(page, /** @type {string|null} */ target = null) {
+    static async validate(page, /** @type {string | null} */ target = null) {
         const startTime = Date.now();
         const issues = [];
 
@@ -101,7 +104,7 @@ class PageValidator {
             try {
                 await page.evaluate(() => document.readyState);
             } catch (/** @type {any} */ _rawErr) {
-            const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 issues.push({
                     type: ISSUE_TYPES.PAGE_DISCONNECTED,
                     severity: SEVERITY.FATAL,
@@ -148,7 +151,7 @@ class PageValidator {
                     });
                 }
             } catch (/** @type {any} */ _rawErr) {
-            const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 issues.push({
                     type: ISSUE_TYPES.EVALUATION_FAILED,
                     severity: SEVERITY.WARNING,
@@ -160,7 +163,7 @@ class PageValidator {
             // ============================================
             // RESULT
             // ============================================
-            const hasFatalIssues = issues.some(issue => issue.severity === SEVERITY.FATAL);
+            const hasFatalIssues = issues.some((issue) => issue.severity === SEVERITY.FATAL);
 
             return {
                 valid: !hasFatalIssues,
@@ -189,8 +192,7 @@ class PageValidator {
     }
 
     /**
-     * Quick validation (apenas checks críticos).
-     * Mais rápido que validate() full, usado para hot-path.
+     * Quick validation (apenas checks críticos). Mais rápido que validate() full, usado para hot-path.
      *
      * @param {any} page - Puppeteer Page
      * @returns {Promise<boolean>} true se válido, false se inválido
@@ -212,11 +214,11 @@ class PageValidator {
      * Retorna expected domain para target.
      *
      * @param {string} target - Target name
-     * @returns {string|null} Expected domain ou null se não mapeado
+     * @returns {string | null} Expected domain ou null se não mapeado
      */
     static getExpectedDomain(target) {
         return EXPECTED_DOMAINS[target] || null;
     }
 }
 
-export { PageValidator, SEVERITY, ISSUE_TYPES, EXPECTED_DOMAINS };
+export { EXPECTED_DOMAINS, ISSUE_TYPES, PageValidator, SEVERITY };

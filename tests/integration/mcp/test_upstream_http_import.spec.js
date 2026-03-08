@@ -1,14 +1,14 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import http from 'node:http';
 import { once } from 'node:events';
+import http from 'node:http';
+import test from 'node:test';
 
-import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 import { registerUpstreams, shutdownUpstreams } from '../../../src/integration/mcp/upstream-manager.mjs';
+import { ToolRegistry } from '../../../src/integration/tool-registry.mjs';
 
 /**
- * @returns {Promise<{ server: http.Server, url: string }>}
+ * @returns {Promise<{ server: http.Server; url: string }>}
  */
 function startFakeMcpHttpServer() {
     const server = http.createServer(async (req, res) => {
@@ -21,7 +21,7 @@ function startFakeMcpHttpServer() {
 
             let body = '';
             req.setEncoding('utf8');
-            req.on('data', chunk => (body += chunk));
+            req.on('data', (chunk) => (body += chunk));
             await once(req, 'end');
 
             const msg = JSON.parse(body);
@@ -105,6 +105,6 @@ test('imports tools from HTTP upstream and proxies calls', async () => {
         assert.equal(out?.content?.[0]?.text, 'Hello MCP');
     } finally {
         await shutdownUpstreams().catch(() => {});
-        await new Promise(r => server.close(() => r(null)));
+        await new Promise((r) => server.close(() => r(null)));
     }
 });

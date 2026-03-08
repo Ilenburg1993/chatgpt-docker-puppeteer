@@ -1,13 +1,13 @@
 // @ts-check
-import express from 'express';
 import { log } from '#core/logger';
-import { ok, fail } from '../utils/api_envelope.js';
-import { authenticate } from '../../middleware/auth.js';
-import { COMMANDS, executeCommand } from '#server/domain/control_command_service';
-import { getAuditJobById, listAuditJobs } from '#infra/db/audit_job_repo';
 import { listAuditFindingsByJobId } from '#infra/db/audit_finding_repo';
+import { getAuditJobById, listAuditJobs } from '#infra/db/audit_job_repo';
 import { getAuditPatchProposalById, listAuditPatchProposalsByJobId } from '#infra/db/audit_patch_repo';
 import { listAuditWatchRules } from '#infra/db/audit_watch_rule_repo';
+import { COMMANDS, executeCommand } from '#server/domain/control_command_service';
+import express from 'express';
+import { authenticate } from '../../middleware/auth.js';
+import { fail, ok } from '../utils/api_envelope.js';
 
 /** @type {ReturnType<typeof express.Router>} */
 const router = express.Router();
@@ -16,7 +16,12 @@ function _actorFromReq(/** @type {any} */ req) {
     return req.user || { id: req.ip || null, username: req.ip || null, role: 'admin', permissions: [] };
 }
 
-async function _runControl(/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ command, /** @type {Record<string, any>} */ payload = {}) {
+async function _runControl(
+    /** @type {any} */ req,
+    /** @type {any} */ res,
+    /** @type {any} */ command,
+    /** @type {Record<string, any>} */ payload = {},
+) {
     try {
         const result = await executeCommand({
             command,
@@ -111,14 +116,15 @@ function _enrichPatch(/** @type {any} */ patch) {
 
 /**
  * @typedef {object} FetchApplyReadinessActor
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
- * Avalia readiness de apply para um patch usando o control plane.
- * Retorna null se patch não for encontrado ou em caso de erro.
+ * Avalia readiness de apply para um patch usando o control plane. Retorna null se patch não for encontrado ou em caso
+ * de erro.
+ *
  * @param {string} patchId
  * @param {FetchApplyReadinessActor} actor
- * @returns {Promise<object|null>}
+ * @returns {Promise<object | null>}
  */
 async function _fetchApplyReadiness(patchId, actor) {
     try {
@@ -218,20 +224,21 @@ function getAuditAgentBaseUrl() {
 }
 
 /**
- * Get Diagnostic Agent base URL - now routes to Audit Agent
- * Diagnostic jobs are processed by Audit Agent at port 3098
+ * Get Diagnostic Agent base URL - now routes to Audit Agent Diagnostic jobs are processed by Audit Agent at port 3098
+ *
  * @returns {string}
  */
-/* eslint-disable no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 function getDiagnosticAgentBaseUrl() {
     // Diagnostic Agent was consolidated into Audit Agent
     // Route all diagnostic requests to Audit Agent
     return getAuditAgentBaseUrl();
 }
-/* eslint-enable no-unused-vars */
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 /**
  * Check if job kind is diagnostic
+ *
  * @param {string} kind
  * @returns {boolean}
  */
@@ -241,6 +248,7 @@ function _isDiagnosticKind(kind) {
 
 /**
  * Filter diagnostic jobs from list
+ *
  * @param {unknown[]} jobs
  * @returns {unknown[]}
  */
@@ -251,7 +259,7 @@ function _filterDiagnosticJobs(jobs) {
 async function safeFetchJson(/** @type {any} */ url, timeoutMs = 2000, init = undefined) {
     try {
         const res = await fetch(url, {
-            ...(/** @type {any} */ (init)),
+            .../** @type {any} */ (init),
             signal: AbortSignal.timeout(timeoutMs),
         });
         const text = await res.text();
@@ -317,7 +325,7 @@ router.get('/audit/runtime', authenticate, async (req, res) => {
                 metrics,
                 endpoints: { auditAgent: baseUrl },
             },
-            { readiness_status: runtimeSummary?.status || 'unknown' }
+            { readiness_status: runtimeSummary?.status || 'unknown' },
         );
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
@@ -419,7 +427,7 @@ router.get('/audit/jobs/:id/llm-triage', authenticate, async (req, res) => {
             source: result.source,
             audit_job_id: String(req.params.id || ''),
             present: true,
-        }
+        },
     );
 });
 
@@ -463,7 +471,7 @@ router.get('/audit/jobs/:id/llm-patch-author', authenticate, async (req, res) =>
             source: result.source,
             audit_job_id: String(req.params.id || ''),
             present: true,
-        }
+        },
     );
 });
 
@@ -486,7 +494,7 @@ router.get('/audit/jobs/:id/patches', authenticate, async (req, res) => {
     const actor = _actorFromReq(req);
     // Se include_readiness, buscar readiness para cada patch em paralelo
     const enriched = await Promise.all(
-        items.map(async patch => {
+        items.map(async (patch) => {
             const enrichedPatch = _enrichPatch(patch);
             if (includeReadiness && patch.id) {
                 const readiness = await _fetchApplyReadiness(String(patch.id), actor);
@@ -495,7 +503,7 @@ router.get('/audit/jobs/:id/patches', authenticate, async (req, res) => {
                 }
             }
             return enrichedPatch;
-        })
+        }),
     );
     const counts = enriched.reduce(
         (acc, item) => {
@@ -506,7 +514,7 @@ router.get('/audit/jobs/:id/patches', authenticate, async (req, res) => {
             acc.dry_run[state] = (acc.dry_run[state] || 0) + 1;
             return acc;
         },
-        { total: 0, by_status: {}, dry_run: {} }
+        { total: 0, by_status: {}, dry_run: {} },
     );
     return ok(res, req, enriched, {
         source: 'audit-patch-repo',
@@ -562,7 +570,7 @@ router.get('/audit/patches/:id/apply-readiness', authenticate, async (req, res) 
                 source: 'control-plane',
                 command: COMMANDS.AUDIT_PATCH_APPLY_VALIDATE,
                 operation_id: result.operation?.id || null,
-            }
+            },
         );
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
@@ -614,7 +622,7 @@ router.post('/audit/jobs', authenticate, async (req, res) => {
                 source: 'control-plane',
                 command: COMMANDS.AUDIT_JOB_CREATE,
                 operation_id: createResult.operation?.id || null,
-            }
+            },
         );
     }
 
@@ -635,7 +643,7 @@ router.post('/audit/jobs', authenticate, async (req, res) => {
             source: 'control-plane',
             command: `${COMMANDS.AUDIT_JOB_CREATE}+${COMMANDS.AUDIT_JOB_RUN}`,
             operation_id: runResult.operation?.id || createResult.operation?.id || null,
-        }
+        },
     );
 });
 
@@ -721,7 +729,7 @@ router.post('/audit/patches/:id/apply/validate', authenticate, async (req, res) 
             source: 'control-plane',
             command: COMMANDS.AUDIT_PATCH_APPLY_VALIDATE,
             operation_id: result.operation?.id || null,
-        }
+        },
     );
 });
 
@@ -770,9 +778,8 @@ const DIAGNOSTIC_JOB_KINDS = [
 ];
 
 /**
- * GET /audit/diagnostic/runtime
- * Check Diagnostic Agent availability (routed via Audit Agent)
- * Note: Diagnostic Agent was consolidated into Audit Agent
+ * GET /audit/diagnostic/runtime Check Diagnostic Agent availability (routed via Audit Agent) Note: Diagnostic Agent was
+ * consolidated into Audit Agent
  */
 router.get('/audit/diagnostic/runtime', authenticate, async (req, res) => {
     try {
@@ -802,7 +809,7 @@ router.get('/audit/diagnostic/runtime', authenticate, async (req, res) => {
                 },
                 routing: 'Diagnostic jobs now processed by Audit Agent',
             },
-            { source: 'audit-agent', routing_note: 'diagnostic consolidated into audit-agent' }
+            { source: 'audit-agent', routing_note: 'diagnostic consolidated into audit-agent' },
         );
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
@@ -815,8 +822,7 @@ router.get('/audit/diagnostic/runtime', authenticate, async (req, res) => {
 });
 
 /**
- * GET /audit/diagnostic/jobs
- * List diagnostic jobs (filtered from audit jobs)
+ * GET /audit/diagnostic/jobs List diagnostic jobs (filtered from audit jobs)
  */
 router.get('/audit/diagnostic/jobs', authenticate, async (req, res) => {
     try {
@@ -858,8 +864,7 @@ router.get('/audit/diagnostic/jobs', authenticate, async (req, res) => {
 });
 
 /**
- * GET /audit/diagnostic/jobs/:id
- * Get diagnostic job by ID
+ * GET /audit/diagnostic/jobs/:id Get diagnostic job by ID
  */
 router.get('/audit/diagnostic/jobs/:id', authenticate, async (req, res) => {
     const result = await _fetchAuditJobWithFallback(req.params.id);
@@ -885,8 +890,7 @@ router.get('/audit/diagnostic/jobs/:id', authenticate, async (req, res) => {
 });
 
 /**
- * GET /audit/diagnostic/jobs/:id/result
- * Get diagnostic result from job
+ * GET /audit/diagnostic/jobs/:id/result Get diagnostic result from job
  */
 router.get('/audit/diagnostic/jobs/:id/result', authenticate, async (req, res) => {
     const result = await _fetchAuditJobWithFallback(req.params.id);
@@ -914,8 +918,7 @@ router.get('/audit/diagnostic/jobs/:id/result', authenticate, async (req, res) =
 });
 
 /**
- * POST /audit/diagnostic/jobs
- * Create diagnostic job
+ * POST /audit/diagnostic/jobs Create diagnostic job
  */
 router.post('/audit/diagnostic/jobs', authenticate, async (req, res) => {
     const body = req.body || {};
@@ -949,13 +952,12 @@ router.post('/audit/diagnostic/jobs', authenticate, async (req, res) => {
             source: 'control-plane',
             command: COMMANDS.DIAGNOSTIC_JOB_CREATE,
             operation_id: createResult.operation?.id || null,
-        }
+        },
     );
 });
 
 /**
- * POST /audit/diagnostic/jobs/:id/run
- * Run (execute) diagnostic job
+ * POST /audit/diagnostic/jobs/:id/run Run (execute) diagnostic job
  */
 router.post('/audit/diagnostic/jobs/:id/run', authenticate, async (req, res) => {
     // First verify it's a diagnostic job
@@ -988,8 +990,7 @@ router.post('/audit/diagnostic/jobs/:id/run', authenticate, async (req, res) => 
 });
 
 /**
- * POST /audit/diagnostic/jobs/:id/cancel
- * Cancel diagnostic job
+ * POST /audit/diagnostic/jobs/:id/cancel Cancel diagnostic job
  */
 router.post('/audit/diagnostic/jobs/:id/cancel', authenticate, async (req, res) => {
     // First verify it's a diagnostic job
@@ -1022,8 +1023,7 @@ router.post('/audit/diagnostic/jobs/:id/cancel', authenticate, async (req, res) 
 });
 
 /**
- * POST /audit/diagnostic/jobs/:id/retry
- * Retry diagnostic job
+ * POST /audit/diagnostic/jobs/:id/retry Retry diagnostic job
  */
 router.post('/audit/diagnostic/jobs/:id/retry', authenticate, async (req, res) => {
     // First verify it's a diagnostic job

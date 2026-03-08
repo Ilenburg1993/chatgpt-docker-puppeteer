@@ -5,8 +5,8 @@ import { evaluateRuntimeSignals } from './evaluate_runtime.mjs';
 
 /**
  * @typedef {object} EvaluateChaosContractsOptions
- * @property {'quick'|'deep'|'nightly'} profile
- * @property {'off'|'light'|'full'} chaosProfile
+ * @property {'quick' | 'deep' | 'nightly'} profile
+ * @property {'off' | 'light' | 'full'} chaosProfile
  * @property {import('./load_registry.mjs').ContractDefinitionV1[]} contracts
  * @property {string} runDir
  * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
@@ -16,11 +16,17 @@ import { evaluateRuntimeSignals } from './evaluate_runtime.mjs';
  * @returns {Promise<any>}
  */
 export async function evaluateChaosContracts(options) {
-    /** @type {Array<{ signal: string, evidence: string, source_tool: string, file?: string|null, line?: number|null }>} */
+    /** @type {{
+    signal: string;
+    evidence: string;
+    source_tool: string;
+    file?: string | null;
+    line?: number | null;
+}[]} */
     const signals = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
 
     const eventsPath = path.join(options.runDir, 'chaos_events.jsonl');
@@ -104,7 +110,7 @@ export async function evaluateChaosContracts(options) {
             /** @type {any} */ ({
                 contracts: options.contracts,
                 signals,
-            })
+            }),
         )
     );
     summary.violations = findings.length;

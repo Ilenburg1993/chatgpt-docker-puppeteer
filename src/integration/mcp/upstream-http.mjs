@@ -3,6 +3,7 @@
  * Minimal MCP (Model Context Protocol) JSON-RPC 2.0 client over HTTP.
  *
  * This is intentionally lightweight:
+ *
  * - Works with plain JSON responses (no SSE required)
  * - Supports AbortSignal for cancellation/timeouts
  */
@@ -30,7 +31,7 @@ function normalizeHeaders(/** @type {any} */ extraHeaders) {
 export class MCPUpstreamError extends Error {
     /**
      * @param {string} message
-     * @param {{ code?: number|string, data?: unknown, status?: number }} [meta]
+     * @param {{ code?: number | string; data?: unknown; status?: number }} [meta]
      */
     constructor(message, { code, data, status } = {}) {
         super(message);
@@ -51,7 +52,7 @@ export class MCPUpstreamError extends Error {
  * @returns {any}
  */
 export function createMcpHttpClient(/** @type {any} */ config = {}) {
-    const { url, headers } = /** @type {{ url?: string, headers?: Headers | Record<string, string> }} */ (config);
+    const { url, headers } = /** @type {{ url?: string; headers?: Headers | Record<string, string> }} */ (config);
     if (!url || typeof url !== 'string') {
         throw new Error('createMcpHttpClient: url must be a non-empty string');
     }
@@ -59,7 +60,7 @@ export function createMcpHttpClient(/** @type {any} */ config = {}) {
     const baseHeaders = normalizeHeaders(headers);
 
     /**
-     * @param {{ method: string, params?: Record<string, unknown> | undefined, signal?: AbortSignal | undefined }} payload
+     * @param {{ method: string; params?: Record<string, unknown> | undefined; signal?: AbortSignal | undefined }} payload
      */
     async function request({ method, params, signal }) {
         const id = Math.random().toString(16).slice(2);
@@ -124,7 +125,7 @@ export function createMcpHttpClient(/** @type {any} */ config = {}) {
     return {
         /** @param {{ signal?: AbortSignal }} [payload] */
         listTools: ({ signal } = {}) => request({ method: 'tools/list', params: {}, signal }),
-        /** @param {{ name?: string, arguments?: Record<string, unknown>, signal?: AbortSignal }} [payload] */
+        /** @param {{ name?: string; arguments?: Record<string, unknown>; signal?: AbortSignal }} [payload] */
         callTool: ({ name, arguments: args = {}, signal } = {}) => {
             if (!name) {
                 throw new Error('tools/call requires name');
@@ -137,7 +138,7 @@ export function createMcpHttpClient(/** @type {any} */ config = {}) {
         },
         /** @param {{ signal?: AbortSignal }} [payload] */
         listResources: ({ signal } = {}) => request({ method: 'resources/list', params: {}, signal }),
-        /** @param {{ uri?: string, signal?: AbortSignal }} [payload] */
+        /** @param {{ uri?: string; signal?: AbortSignal }} [payload] */
         readResource: ({ uri, signal } = {}) => {
             if (!uri) {
                 throw new Error('resources/read requires uri');

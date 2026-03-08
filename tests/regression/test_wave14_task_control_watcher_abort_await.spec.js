@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 import { TaskControlWatcher } from '#agent/task_control_watcher';
 
@@ -60,18 +60,18 @@ test('wave14: source keeps awaited sendCommand and abort timeout/retry env knobs
     assert.match(
         content,
         /await\s+this\._withTimeout\(\s*sendCommand\(/s,
-        'TaskControlWatcher should await sendCommand via timeout wrapper'
+        'TaskControlWatcher should await sendCommand via timeout wrapper',
     );
 
     assert.match(
         content,
         /TASK_CONTROL_ABORT_TIMEOUT_MS/,
-        'watcher should read TASK_CONTROL_ABORT_TIMEOUT_MS env knob'
+        'watcher should read TASK_CONTROL_ABORT_TIMEOUT_MS env knob',
     );
 
     assert.match(
         content,
         /TASK_CONTROL_ABORT_MAX_RETRIES/,
-        'watcher should read TASK_CONTROL_ABORT_MAX_RETRIES env knob'
+        'watcher should read TASK_CONTROL_ABORT_MAX_RETRIES env knob',
     );
 });

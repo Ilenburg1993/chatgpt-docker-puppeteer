@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import {
     INFERENCE_CLIENT_TAGS,
     isInferenceClientTag,

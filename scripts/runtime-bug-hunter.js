@@ -4,6 +4,7 @@
  * Runtime Bug Hunter - Foco em Cenários Críticos
  *
  * Estratégia direcionada para detectar bugs de runtime específicos:
+ *
  * - Memory leaks em operações de longa duração
  * - Race conditions em operações concorrentes
  * - Unhandled rejections em promises
@@ -193,7 +194,7 @@ async function executeCriticalScenario(scenario) {
     const monitor = new RuntimeMonitor();
     monitor.start();
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn('node', [scenario.script, ...scenario.args], {
             cwd: ROOT_DIR,
             env: { ...process.env, ...scenario.env },
@@ -202,18 +203,17 @@ async function executeCriticalScenario(scenario) {
 
         let stdout = '';
         let stderr = '';
-        let timeoutId;
 
-        child.stdout.on('data', data => {
+        child.stdout.on('data', (data) => {
             stdout += data.toString();
         });
 
-        child.stderr.on('data', data => {
+        child.stderr.on('data', (data) => {
             stderr += data.toString();
             process.stderr.write(`[${scenario.name}] ${data}`);
         });
 
-        timeoutId = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
             console.log(`   ⏰ Timeout, encerrando processo...`);
             try {
                 child.kill('SIGTERM');
@@ -252,7 +252,7 @@ async function executeCriticalScenario(scenario) {
             resolve(result);
         });
 
-        child.on('error', error => {
+        child.on('error', (error) => {
             clearTimeout(timeoutId);
             monitor.stop();
             console.error(`   ❌ Erro crítico: ${error.message}`);
@@ -370,6 +370,7 @@ function analyzeRuntimeBugs(results) {
 
 /**
  * Função exportada: huntRuntimeBugs.
+ *
  * @returns {Promise<void>}
  */
 async function main() {
@@ -391,7 +392,7 @@ async function main() {
             results.push(result);
 
             // Pausa entre cenários para limpeza
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
         } catch (error) {
             const _ce = /** @type {any} */ (error);
             console.error(`❌ Erro crítico no cenário ${scenario.name}: ${_ce.message}`);
@@ -415,7 +416,7 @@ async function main() {
     console.log(`💾 Relatório salvo em: ${reportPath}`);
 
     // Resumo final
-    const successful = results.filter(r => r.success).length;
+    const successful = results.filter((r) => r.success).length;
     const failed = results.length - successful;
 
     console.log('\n🏁 RESUMO FINAL:');

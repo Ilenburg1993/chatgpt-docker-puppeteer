@@ -1,7 +1,7 @@
 // @ts-check
-import { startAgent, stopAgent, waitForCondition, removeRunLock, cleanTmp } from './helpers.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { cleanTmp, removeRunLock, startAgent, stopAgent, waitForCondition } from './helpers.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
@@ -16,7 +16,7 @@ const CORRUPT_DIR = path.join(QUEUE_DIR, 'corrupted');
 function injectRaw(filename, content) {
     fs.writeFileSync(
         path.join(QUEUE_DIR, filename),
-        typeof content === 'string' ? content : JSON.stringify(content, null, 2)
+        typeof content === 'string' ? content : JSON.stringify(content, null, 2),
     );
 }
 
@@ -27,7 +27,7 @@ async function runTest() {
 
     // Limpa quarentena anterior
     if (fs.existsSync(CORRUPT_DIR)) {
-        fs.readdirSync(CORRUPT_DIR).forEach(f => fs.unlinkSync(path.join(CORRUPT_DIR, f)));
+        fs.readdirSync(CORRUPT_DIR).forEach((f) => fs.unlinkSync(path.join(CORRUPT_DIR, f)));
     } else {
         fs.mkdirSync(CORRUPT_DIR, { recursive: true });
     }
@@ -70,12 +70,12 @@ async function runTest() {
     // 1. Check Quarentena (Sintaxe)
     const checkQuarantine = await waitForCondition(() => {
         const files = fs.readdirSync(CORRUPT_DIR);
-        return files.some(f => f.includes(ID_CORRUPT) && f.endsWith('.bad'));
+        return files.some((f) => f.includes(ID_CORRUPT) && f.endsWith('.bad'));
     }, 8000);
     console.log(
         checkQuarantine
             ? '  [PASS] Quarentena: Arquivo malformado isolado como .bad'
-            : '  [FAIL] Quarentena: Arquivo malformado não isolado'
+            : '  [FAIL] Quarentena: Arquivo malformado não isolado',
     );
 
     // 2. Check Adaptador Legado
@@ -91,7 +91,7 @@ async function runTest() {
     console.log(
         checkLegacy
             ? '  [PASS] Adaptador: Tarefa V2 convertida para V3'
-            : '  [FAIL] Adaptador: Tarefa V2 ignorada ou crashou'
+            : '  [FAIL] Adaptador: Tarefa V2 ignorada ou crashou',
     );
 
     // 3. Check Rejeição de Tipo
@@ -104,7 +104,7 @@ async function runTest() {
         }
     }, 8000);
     console.log(
-        checkType ? '  [PASS] Validação: Erro de tipo (Number) detectado' : '  [FAIL] Validação: Erro de tipo ignorado'
+        checkType ? '  [PASS] Validação: Erro de tipo (Number) detectado' : '  [FAIL] Validação: Erro de tipo ignorado',
     );
 
     // 4. Check Rejeição de Enum
@@ -117,7 +117,7 @@ async function runTest() {
         }
     }, 8000);
     console.log(
-        checkEnum ? '  [PASS] Validação: Erro de enum (Target) detectado' : '  [FAIL] Validação: Erro de enum ignorado'
+        checkEnum ? '  [PASS] Validação: Erro de enum (Target) detectado' : '  [FAIL] Validação: Erro de enum ignorado',
     );
 
     // --- CONCLUSÃO ---
@@ -134,7 +134,7 @@ async function runTest() {
     }
 }
 
-runTest().catch(e => {
+runTest().catch((e) => {
     console.error('Erro fatal no teste:', e);
     process.exit(1);
 });

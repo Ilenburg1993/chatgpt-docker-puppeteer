@@ -33,8 +33,8 @@ function _asArray(value) {
 }
 
 /**
- * @param {Record<string, any>|null|undefined} job
- * @param {Record<string, any>|null|undefined} contextPack
+ * @param {Record<string, any> | null | undefined} job
+ * @param {Record<string, any> | null | undefined} contextPack
  * @returns {any}
  */
 function _derivePatchDraftFromContext(job, contextPack) {
@@ -106,7 +106,7 @@ function _derivePatchDraftFromContext(job, contextPack) {
  */
 function assertKind(kind) {
     if (!isAuditJobKind(kind)) {
-        const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+        const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
             new Error(`audit job kind inválido: ${String(kind)}`)
         );
         err.statusCode = 422;
@@ -121,7 +121,7 @@ function assertKind(kind) {
  */
 function assertTriggerType(triggerType) {
     if (!isAuditJobTriggerType(triggerType)) {
-        const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+        const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
             new Error(`audit job trigger_type inválido: ${String(triggerType)}`)
         );
         err.statusCode = 422;
@@ -131,27 +131,42 @@ function assertTriggerType(triggerType) {
 }
 
 /**
- * Runtime de orquestração do Audit Agent.
- * Coordena fila de jobs, coleta de contexto, triagem e propostas de patch.
+ * Runtime de orquestração do Audit Agent. Coordena fila de jobs, coleta de contexto, triagem e propostas de patch.
  */
 export class AuditAgentRuntime {
     /**
      * @param {{
-     *   now?: ()=>number,
-     *   logger?: ((level:string, message:string, data?:unknown)=>void)|null,
-     *   maxConcurrentJobs?: number,
-     *   store?: {
-     *     saveJob?: (job:any)=>unknown,
-     *     onRunStart?: (job:any)=>unknown,
-     *     onRunFinish?: (job:any)=>unknown
-     *     saveFindings?: (jobId:string, findings:unknown[])=>unknown,
-     *     savePatchProposals?: (jobId:string, patches:unknown[])=>unknown,
-     *     listJobs?: (opts?:any)=>unknown[],
-     *   }|null
-     *   contextBuilder?: { collectQuickContext?: (job?:any)=>Promise<{context?:any, findings?:unknown[], patches?:unknown[]}> }|null
-     *   triageClient?: { runTriage?: (job:any, contextPack:any)=>Promise<Record<string, any>>, isEnabled?: ()=>boolean }|null
-     *   patchAuthorClient?: { runPatchAuthor?: (job:any, contextPack:any, llmTriage:any)=>Promise<Record<string, any>>, isEnabled?: ()=>boolean }|null
-     *   diagnosticClient?: { runDiagnostic?: (jobKind:string, params?:any)=>Promise<{success:boolean, data?:any, error?:string, durationMs?:number}>, isEnabled?: ()=>boolean }|null
+     *     now?: () => number;
+     *     logger?: ((level: string, message: string, data?: unknown) => void) | null;
+     *     maxConcurrentJobs?: number;
+     *     store?: {
+     *         saveJob?: (job: any) => unknown;
+     *         onRunStart?: (job: any) => unknown;
+     *         onRunFinish?: (job: any) => unknown;
+     *         saveFindings?: (jobId: string, findings: unknown[]) => unknown;
+     *         savePatchProposals?: (jobId: string, patches: unknown[]) => unknown;
+     *         listJobs?: (opts?: any) => unknown[];
+     *     } | null;
+     *     contextBuilder?: {
+     *         collectQuickContext?: (
+     *             job?: any,
+     *         ) => Promise<{ context?: any; findings?: unknown[]; patches?: unknown[] }>;
+     *     } | null;
+     *     triageClient?: {
+     *         runTriage?: (job: any, contextPack: any) => Promise<Record<string, any>>;
+     *         isEnabled?: () => boolean;
+     *     } | null;
+     *     patchAuthorClient?: {
+     *         runPatchAuthor?: (job: any, contextPack: any, llmTriage: any) => Promise<Record<string, any>>;
+     *         isEnabled?: () => boolean;
+     *     } | null;
+     *     diagnosticClient?: {
+     *         runDiagnostic?: (
+     *             jobKind: string,
+     *             params?: any,
+     *         ) => Promise<{ success: boolean; data?: any; error?: string; durationMs?: number }>;
+     *         isEnabled?: () => boolean;
+     *     } | null;
      * }} [options]
      */
     constructor(options = {}) {
@@ -159,7 +174,7 @@ export class AuditAgentRuntime {
         this.logger = options.logger || null;
         this.maxConcurrentJobs = Math.max(
             1,
-            Number(options.maxConcurrentJobs || process.env.AUDIT_AGENT_MAX_CONCURRENT_JOBS || 1)
+            Number(options.maxConcurrentJobs || process.env.AUDIT_AGENT_MAX_CONCURRENT_JOBS || 1),
         );
         this.store = options.store || null;
         this.contextBuilder = options.contextBuilder || null;
@@ -185,7 +200,7 @@ export class AuditAgentRuntime {
     }
 
     /**
-     * @param {Record<string, any>|null|undefined} job
+     * @param {Record<string, any> | null | undefined} job
      * @returns {void}
      */
     _persistJob(job) {
@@ -201,7 +216,7 @@ export class AuditAgentRuntime {
     }
 
     /**
-     * @param {Record<string, any>|null|undefined} job
+     * @param {Record<string, any> | null | undefined} job
      * @returns {void}
      */
     _persistRunStart(job) {
@@ -217,7 +232,7 @@ export class AuditAgentRuntime {
     }
 
     /**
-     * @param {Record<string, any>|null|undefined} job
+     * @param {Record<string, any> | null | undefined} job
      * @returns {void}
      */
     _persistRunFinish(job) {
@@ -294,7 +309,7 @@ export class AuditAgentRuntime {
     }
 
     /**
-     * @param {{ kind?: string, trigger_type?: string, scope?: unknown, priority?: number, created_by?: string }} input
+     * @param {{ kind?: string; trigger_type?: string; scope?: unknown; priority?: number; created_by?: string }} input
      */
     createJob(input = {}) {
         const kind = input.kind || AUDIT_JOB_KIND.QUICK_AUDIT;
@@ -328,19 +343,19 @@ export class AuditAgentRuntime {
     }
 
     /**
-     * @param {{ status?: string|null, limit?: number }} [opts]
+     * @param {{ status?: string | null; limit?: number }} [opts]
      * @returns {Record<string, any>[]}
      */
     listJobs({ status = null, limit = 100 } = {}) {
         const rows = [...this.jobs.values()]
-            .filter(job => !status || job.status === status)
+            .filter((job) => !status || job.status === status)
             .sort((a, b) => b.updated_at_ms - a.updated_at_ms || String(b.id).localeCompare(String(a.id)));
-        return rows.slice(0, Math.max(1, Math.min(Number(limit) || 100, 500))).map(job => ({ ...job }));
+        return rows.slice(0, Math.max(1, Math.min(Number(limit) || 100, 500))).map((job) => ({ ...job }));
     }
 
     /**
      * @param {string} id
-     * @returns {Record<string, any>|null}
+     * @returns {Record<string, any> | null}
      */
     getJob(id) {
         const job = this.jobs.get(String(id));
@@ -354,7 +369,7 @@ export class AuditAgentRuntime {
     queueJob(id) {
         const job = this.jobs.get(String(id));
         if (!job) {
-            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+            const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
                 new Error('audit job não encontrado')
             );
             err.statusCode = 404;
@@ -362,7 +377,7 @@ export class AuditAgentRuntime {
             throw err;
         }
         if ([AUDIT_JOB_STATUS.COMPLETED, AUDIT_JOB_STATUS.CANCELLED].includes(job.status)) {
-            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+            const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
                 new Error(`audit job em estado terminal: ${job.status}`)
             );
             err.statusCode = 409;
@@ -385,7 +400,7 @@ export class AuditAgentRuntime {
     cancelJob(id, reason = 'manual_cancel') {
         const job = this.jobs.get(String(id));
         if (!job) {
-            const err = /** @type {Error & { statusCode?: number, code?: string }} */ (
+            const err = /** @type {Error & { statusCode?: number; code?: string }} */ (
                 new Error('audit job não encontrado')
             );
             err.statusCode = 404;
@@ -412,7 +427,7 @@ export class AuditAgentRuntime {
 
     _nextQueuedJobs() {
         return [...this.jobs.values()]
-            .filter(job => job.status === AUDIT_JOB_STATUS.QUEUED)
+            .filter((job) => job.status === AUDIT_JOB_STATUS.QUEUED)
             .sort((a, b) => b.priority - a.priority || a.created_at_ms - b.created_at_ms);
     }
 
@@ -475,7 +490,7 @@ export class AuditAgentRuntime {
         }
 
         const patchLike = job.kind === AUDIT_JOB_KIND.PATCH_SUGGEST || job.kind === AUDIT_JOB_KIND.BUG_HUNT;
-        /** @type {Record<string, any>|null} */
+        /** @type {Record<string, any> | null} */
         let llmTriage = null;
         if (this.triageClient && typeof this.triageClient.runTriage === 'function') {
             const tsTriage = this.now();
@@ -492,7 +507,7 @@ export class AuditAgentRuntime {
                 };
             }
         }
-        /** @type {Record<string, any>|null} */
+        /** @type {Record<string, any> | null} */
         let llmPatchAuthor = null;
         if (patchLike && this.patchAuthorClient && typeof this.patchAuthorClient.runPatchAuthor === 'function') {
             const tsPatch = this.now();
@@ -520,7 +535,7 @@ export class AuditAgentRuntime {
             job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_VERIFY ||
             job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_REPORT;
 
-        /** @type {Record<string, any>|null} */
+        /** @type {Record<string, any> | null} */
         let diagnosticResult = null;
         if (isDiagnosticJob && this.diagnosticClient && typeof this.diagnosticClient.runDiagnostic === 'function') {
             const tsDiag = this.now();

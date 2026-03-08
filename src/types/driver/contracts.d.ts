@@ -1,8 +1,7 @@
 /**
  * Driver System - Type Contracts
  *
- * Contratos de tipos base para o sistema de drivers.
- * NÃO contém module augmentations - apenas interfaces e types.
+ * Contratos de tipos base para o sistema de drivers. NÃO contém module augmentations - apenas interfaces e types.
  */
 
 // ============================================================
@@ -97,8 +96,7 @@ export interface IDriverReadinessGuard {
 /**
  * Interface base que todos os drivers implementam.
  *
- * Propriedades opcionais (`?`) porque são criadas progressivamente
- * durante o constructor.
+ * Propriedades opcionais (`?`) porque são criadas progressivamente durante o constructor.
  */
 export interface IDriver {
     /** Página Puppeteer atual */

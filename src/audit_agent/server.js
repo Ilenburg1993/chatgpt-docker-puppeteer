@@ -6,7 +6,7 @@ import http from 'node:http';
  * @typedef {object} AuditAgentServerDependencies
  * @property {import('./runtime.js').AuditAgentRuntime} runtime
  */
-/** @typedef {Error & { statusCode?: number, code?: string }} AuditAgentServerError */
+/** @typedef {Error & { statusCode?: number; code?: string }} AuditAgentServerError */
 
 /**
  * @param {import('node:http').ServerResponse} res

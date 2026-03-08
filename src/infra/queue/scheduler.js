@@ -18,7 +18,7 @@ import { STATUS_VALUES } from '#core/constants/tasks';
  * Filtra e ordena as tarefas elegíveis para execução imediata.
  *
  * @param {any[]} allTasks - Snapshot estável da fila carregado em RAM.
- * @param {string|null} targetFilter - Nome da IA alvo (ex: 'chatgpt').
+ * @param {string | null} targetFilter - Nome da IA alvo (ex: 'chatgpt').
  * @returns {any[]} Lista de tarefas prontas para o motor de execução.
  */
 function getNextEligible(allTasks, targetFilter = null) {
@@ -40,7 +40,7 @@ function getNextEligible(allTasks, targetFilter = null) {
 
     // 3. FILTRAGEM DE ELEGIBILIDADE
 
-    const eligible = allTasks.filter(t => {
+    const eligible = allTasks.filter((t) => {
         // Validação de Integridade Mínima (Schema V4 Guard)
         if (!t?.state || !t?.meta || !t?.policy) {
             return false;

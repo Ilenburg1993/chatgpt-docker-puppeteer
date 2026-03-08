@@ -6,9 +6,9 @@ import { inferenceGateway } from './gateway.js';
 /**
  * @typedef {object} InferenceGatewayServerOptions
  * @property {typeof inferenceGateway} [gateway]
- * @property {(() => Promise<unknown>|unknown)|null} [reloadPolicies]
+ * @property {(() => Promise<unknown> | unknown) | null} [reloadPolicies]
  */
-/** @typedef {Error & { statusCode?: number, code?: string }} InferenceGatewayServerError */
+/** @typedef {Error & { statusCode?: number; code?: string }} InferenceGatewayServerError */
 
 /** @param {any} req */
 function readJsonBody(req) {
@@ -16,13 +16,13 @@ function readJsonBody(req) {
         let raw = '';
         req.on(
             'data',
-            /** @param {any} chunk */ chunk => {
+            /** @param {any} chunk */ (chunk) => {
                 raw += String(chunk);
                 if (raw.length > 2_000_000) {
                     reject(Object.assign(new Error('payload too large'), { statusCode: 413 }));
                     req.destroy();
                 }
-            }
+            },
         );
         req.on('end', () => {
             if (!raw.trim()) return resolve({});
@@ -48,9 +48,9 @@ function writeJson(res, statusCode, body) {
 }
 
 /**
- * Cria o servidor HTTP do Inference Gateway.
- * Expõe health, metrics, reload de policies e endpoints de inferência.
- * @param {InferenceGatewayServerOptions} [options={}]
+ * Cria o servidor HTTP do Inference Gateway. Expõe health, metrics, reload de policies e endpoints de inferência.
+ *
+ * @param {InferenceGatewayServerOptions} [options={}] Default is `{}`
  * @returns {http.Server}
  */
 export function createInferenceGatewayServer(options = {}) {

@@ -15,21 +15,21 @@ const CIRCUIT_STATES = {
 /**
  * @typedef {object} CreateHybridTransportConfig
  * @property {any} telemetry
- * @property {*} [mode]
+ * @property {any} [mode]
  * @property {any} [socketAdapter]
  */
 /**
  * @typedef {object} CreateHybridTransportOptions
- * @property {*} [mode]
- * @property {*} [socketAdapter]
- * @property {*} [telemetry]
+ * @property {any} [mode]
+ * @property {any} [socketAdapter]
+ * @property {any} [telemetry]
  */
 /**
  * Cria transporte híbrido com suporte local + remoto + circuit breaker.
  *
- * **Side-effects:** Inicializa EventEmitter local, conecta Socket.io se híbrido.
- * **Semântica:** Abstração unificada de transporte local/remoto via NERV com resiliência.
- * **Unidades:** mode segue CONNECTION_MODES, handlerId como contador incremental.
+ * **Side-effects:** Inicializa EventEmitter local, conecta Socket.io se híbrido. **Semântica:** Abstração unificada de
+ * transporte local/remoto via NERV com resiliência. **Unidades:** mode segue CONNECTION_MODES, handlerId como contador
+ * incremental.
  *
  * @param {CreateHybridTransportConfig} config - Configuração do transporte híbrido
  * @returns {any} Transporte híbrido com métodos send, onReceive, start, stop
@@ -60,6 +60,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
 
     /**
      * Atualiza estado do circuit breaker baseado em sucesso/falha.
+     *
      * @param {boolean} success
      */
     function updateCircuitBreaker(success) {
@@ -124,7 +125,7 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
                     localBus.emit('message', envelope);
 
                     // Notifica handlers registrados
-                    handlers.forEach(handler => {
+                    handlers.forEach((handler) => {
                         try {
                             handler(envelope);
                         } catch (/** @type {any} */ err) {

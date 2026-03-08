@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import { closeDb, getDb } from '#infra/db/sqlite';
 import { claimNextEligibleTask, insertTask, releaseTaskLock, updateTask } from '#infra/db/task_repo';
@@ -12,11 +12,11 @@ function makeDbPath() {
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave15-lock-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave15-lock-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
-test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando informado', async t => {
+test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando informado', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
     const db = getDb();
@@ -57,7 +57,7 @@ test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando inf
             policy: { dependencies: [] },
             result: {},
         },
-        { stage: 'READY', status: 'PENDING', actor: 'system' }
+        { stage: 'READY', status: 'PENDING', actor: 'system' },
     );
 
     const now = Date.now();
@@ -110,11 +110,11 @@ test('wave15: queue_worker/projector usam helper causal e evitam unlock cego', a
     assert.doesNotMatch(
         queueWorker,
         /releaseTaskLock\s*\(\s*\{\s*taskId\s*\}\s*\)/,
-        'QueueWorker não deve fazer unlock cego por taskId'
+        'QueueWorker não deve fazer unlock cego por taskId',
     );
     assert.doesNotMatch(
         projector,
         /releaseTaskLock\s*\(\s*\{\s*taskId\s*\}\s*\)/,
-        'TaskStateProjector não deve fazer unlock cego por taskId'
+        'TaskStateProjector não deve fazer unlock cego por taskId',
     );
 });

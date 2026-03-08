@@ -1,14 +1,14 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { getDb, closeDb } from '../../../src/infra/db/sqlite.js';
-import { upsertInferenceProfile } from '../../../src/infra/db/inference_profile_repo.js';
-import { upsertInferenceClientPolicy } from '../../../src/infra/db/inference_client_policy_repo.js';
-import { loadInferencePoliciesFromDb } from '../../../src/inference_gateway/persistence.js';
+import test from 'node:test';
 import { InferenceGateway } from '../../../src/inference_gateway/gateway.js';
+import { loadInferencePoliciesFromDb } from '../../../src/inference_gateway/persistence.js';
+import { upsertInferenceClientPolicy } from '../../../src/infra/db/inference_client_policy_repo.js';
+import { upsertInferenceProfile } from '../../../src/infra/db/inference_profile_repo.js';
+import { closeDb, getDb } from '../../../src/infra/db/sqlite.js';
 
 function withTempDb(/** @type {any} */ fn) {
     return async () => {
@@ -72,5 +72,5 @@ test(
         assert.deepEqual(resolved.effective.allowedBackends, ['ollama_local']);
         assert.equal(gateway.getPolicySummary().profileCount, 1);
         assert.equal(gateway.getPolicySummary().clientPolicyCount, 1);
-    })
+    }),
 );

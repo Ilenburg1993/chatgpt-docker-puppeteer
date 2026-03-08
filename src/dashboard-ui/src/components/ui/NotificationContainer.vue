@@ -33,8 +33,7 @@
 import { useNotifications } from '@/composables/useNotifications.js';
 
 /**
- * Componente de notificações para o dashboard
- * Exibe notificações em tempo real com animações e auto-remocão
+ * Componente de notificações para o dashboard Exibe notificações em tempo real com animações e auto-remocão
  *
  * @sideEffects - Renderiza notificações na tela, gerencia ciclo de vida das notificações
  */
@@ -42,10 +41,11 @@ const { notifications, removeNotification } = useNotifications();
 
 /**
  * Retorna classes CSS baseadas no tipo de notificação
- * @param {'success'|'error'|'warning'|'info'} type - Tipo da notificação
+ *
+ * @param {'success' | 'error' | 'warning' | 'info'} type - Tipo da notificação
  * @returns {string} Classes CSS para o tipo
  */
-const getNotificationClasses = type => {
+const getNotificationClasses = (type) => {
     const baseClasses = 'bg-white text-gray-800 border-gray-300';
 
     switch (type) {

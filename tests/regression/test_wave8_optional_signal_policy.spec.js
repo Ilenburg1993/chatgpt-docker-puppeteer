@@ -1,11 +1,11 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import test from 'node:test';
 
-import { __mainTestHooks } from '../../src/main.js';
 import { shutdown as shutdownDriverFactory } from '../../src/driver/factory.js';
+import { __mainTestHooks } from '../../src/main.js';
 
 function captureCounts(/** @type {any} */ events) {
     return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
@@ -24,7 +24,7 @@ async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ ma
         if (matcher.test(output)) {
             return output;
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw new Error(`Timeout waiting for output: ${String(matcher)}`);
 }
@@ -32,7 +32,7 @@ async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ ma
 async function waitForExitWithTimeout(
     /** @type {any} */ child,
     /** @type {any} */ timeoutMs,
-    /** @type {any} */ timeoutMessage
+    /** @type {any} */ timeoutMessage,
 ) {
     let timeoutId = null;
     try {
@@ -148,11 +148,11 @@ test(
         let stdout = '';
         let stderr = '';
 
-        child.stdout.on('data', chunk => {
+        child.stdout.on('data', (chunk) => {
             stdout += chunk.toString();
         });
 
-        child.stderr.on('data', chunk => {
+        child.stderr.on('data', (chunk) => {
             stderr += chunk.toString();
         });
 
@@ -168,5 +168,5 @@ test(
         const exitMarkers = stdout.match(/W8_SIGQUIT_EXIT:/g) || [];
         assert.equal(exitMarkers.length, 1, `SIGQUIT shutdown should trigger single exit, stdout=${stdout}`);
         assert.match(stdout, /W8_SIGQUIT_EXIT:0:1/, `expected SIGQUIT success marker, stdout=${stdout}`);
-    }
+    },
 );

@@ -1,5 +1,5 @@
 // @ts-check
-import { DEFAULT_OLLAMA_BASE_URL, DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_EMBED_MAX_CHARS } from '../contract.mjs';
+import { DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_EMBED_MAX_CHARS } from '../contract.mjs';
 
 function normalizeEmbeddingBaseUrl(/** @type {any} */ rawBaseUrl) {
     const raw = String(rawBaseUrl || '').trim();
@@ -64,28 +64,30 @@ function isTransientError(/** @type {any} */ error) {
 }
 
 function sleep(/** @type {any} */ ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Ollama Embeddings Provider (OpenAI-compatible API)
  *
- * IMPORTANT: Uses LOCAL Ollama endpoint only (http://host.docker.internal:11434).
- * Embeddings are NOT available on Ollama Cloud.
+ * IMPORTANT: Uses LOCAL Ollama endpoint only (http://host.docker.internal:11434). Embeddings are NOT available on
+ * Ollama Cloud.
  *
  * For text generation (coding/chat), use OllamaClient with:
+ *
  * - qwen3-coder-next (cloud, coding agents)
  * - qwen3-next (cloud, general chat)
  *
  * Architecture (v5.0):
+ *
  * - Cloud (https://ollama.com): Generation models (qwen3-coder-next, qwen3-next)
  * - Local (host.docker.internal:11434): Embeddings only (nomic-embed-text)
  *
  * @example
- * const provider = new OllamaEmbeddingsProvider({
- *   baseURL: 'http://host.docker.internal:11434/v1', // LOCAL only
- *   model: 'nomic-embed-text:latest'
- * });
+ *     const provider = new OllamaEmbeddingsProvider({
+ *         baseURL: 'http://host.docker.internal:11434/v1', // LOCAL only
+ *         model: 'nomic-embed-text:latest',
+ *     });
  */
 export class OllamaEmbeddingsProvider {
     /**
@@ -104,11 +106,11 @@ export class OllamaEmbeddingsProvider {
         this.timeoutMs = options.timeoutMs || 30_000;
         this.maxChars = parsePositiveInt(
             options.maxChars ?? process.env.OLLAMA_EMBED_MAX_CHARS,
-            DEFAULT_OLLAMA_EMBED_MAX_CHARS
+            DEFAULT_OLLAMA_EMBED_MAX_CHARS,
         );
         this.contextFastShrink = parseBoolean(
             options.contextFastShrink ?? process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK,
-            true
+            true,
         );
         this.runtimeSafeChars = null;
         this.contextOverflowCount = 0;
@@ -121,7 +123,7 @@ export class OllamaEmbeddingsProvider {
         const versionUrl = this.baseURL.replace(/\/v1\/?$/, '') + '/api/version';
         const version = await fetchJson(versionUrl, { timeoutMs: 1500 }).catch(() => /** @type {null} */ (null));
         const models = await fetchJson(`${this.baseURL}/models`, { timeoutMs: 2000 }).catch(
-            () => /** @type {null} */ (null)
+            () => /** @type {null} */ (null),
         );
         const modelIds = Array.isArray(models?.data)
             ? models.data.map((/** @type {any} */ m) => m.id).filter(Boolean)
@@ -161,7 +163,7 @@ export class OllamaEmbeddingsProvider {
                 if (hadContextOverflow) {
                     console.warn(
                         `[RAG] Context limit adapted input ${initialInputLength} → ${currentInput.length} chars ` +
-                            `(${contextOverflowsThisCall} reductions, runtime_safe_chars=${this.runtimeSafeChars})`
+                            `(${contextOverflowsThisCall} reductions, runtime_safe_chars=${this.runtimeSafeChars})`,
                     );
                 }
                 if (hadContextOverflow || this.embedCalls - this.lastStatsCall >= 100) {
@@ -234,7 +236,7 @@ export class OllamaEmbeddingsProvider {
         this.lastStatsCall = this.embedCalls;
         console.log(
             `[RAG] Embed context stats overflows=${this.contextOverflowCount} ` +
-                `max_ok_chars=${this.maxAcceptedChars} runtime_safe_chars=${this.runtimeSafeChars ?? 'n/a'}`
+                `max_ok_chars=${this.maxAcceptedChars} runtime_safe_chars=${this.runtimeSafeChars ?? 'n/a'}`,
         );
     }
 }

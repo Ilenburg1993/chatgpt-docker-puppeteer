@@ -8,13 +8,14 @@ function toArray(/** @type {any} */ value) {
 
 /**
  * Função exportada: hasPermission.
- * @param {*} user
- * @param {*} permission
+ *
+ * @param {any} user
+ * @param {any} permission
  * @returns {any}
  */
 function hasPermission(user, permission) {
     if (!user) return false;
-    const perms = new Set(toArray(user.permissions).map(p => String(p)));
+    const perms = new Set(toArray(user.permissions).map((p) => String(p)));
     if (perms.has(String(permission))) return true;
 
     const role = String(user.role || '').toLowerCase();
@@ -26,8 +27,9 @@ function hasPermission(user, permission) {
 
 /**
  * Função exportada: assertPermission.
- * @param {*} user
- * @param {*} permission
+ *
+ * @param {any} user
+ * @param {any} permission
  * @returns {void}
  */
 function assertPermission(user, permission) {
@@ -41,7 +43,8 @@ function assertPermission(user, permission) {
 
 /**
  * Função exportada: normalizeActor.
- * @param {*} user
+ *
+ * @param {any} user
  * @returns {any}
  */
 function normalizeActor(user) {
@@ -49,7 +52,7 @@ function normalizeActor(user) {
         id: user?.id ? String(user.id) : null,
         username: user?.username ? String(user.username) : null,
         role: user?.role ? String(user.role) : RBAC_ROLES.VIEWER,
-        permissions: toArray(user?.permissions).map(p => String(p)),
+        permissions: toArray(user?.permissions).map((p) => String(p)),
     };
 }
 

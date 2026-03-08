@@ -3,10 +3,12 @@
  * OpenAI ↔ Ollama Schema Transformer
  *
  * Pure functions for bidirectional schema translation between:
+ *
  * - OpenAI Chat Completions API format
  * - Ollama /api/generate format
  *
  * Philosophy:
+ *
  * - All functions are pure (no side-effects, no IO)
  * - Only data transformation - easy to test
  * - Validation happens early (fail-fast)
@@ -16,21 +18,21 @@
 
 /**
  * @typedef {any} ValidateOpenAIRequestBody
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Validates OpenAI Chat Completions request body
  *
- * @param {ValidateOpenAIRequestBody} body - Request body from client
- * @throws {Error} with openaiError property if validation fails
- * @returns {true} if validation passes
- *
  * @example
- * validateOpenAIRequest({ messages: [{ role: 'user', content: 'Hi' }] })
- * // Returns: true
+ *     validateOpenAIRequest({ messages: [{ role: 'user', content: 'Hi' }] });
+ *     // Returns: true
  *
- * validateOpenAIRequest({ messages: [] })
- * // Throws: Error with openaiError property
+ *     validateOpenAIRequest({ messages: [] });
+ *     // Throws: Error with openaiError property
+ *
+ * @param {ValidateOpenAIRequestBody} body - Request body from client
+ * @returns {true} if validation passes
+ * @throws {Error} with openaiError property if validation fails
  */
 export function validateOpenAIRequest(body) {
     // 1. Check messages array exists and is not empty
@@ -55,29 +57,29 @@ export function validateOpenAIRequest(body) {
 
 /**
  * @typedef {any} TranslateRequestToOllamaOpenaiReq
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Translates OpenAI Chat Completions request to Ollama /api/generate format
  *
+ * @example
+ *     translateRequestToOllama({
+ *         messages: [
+ *             { role: 'system', content: 'You are helpful' },
+ *             { role: 'user', content: 'Say hi' },
+ *         ],
+ *         model: 'qwen3-coder-next',
+ *         temperature: 0.7,
+ *     });
+ *     // Returns: {
+ *     //   model: 'qwen3-coder-next',
+ *     //   prompt: 'System: You are helpful\nUser: Say hi',
+ *     //   stream: false,
+ *     //   options: { temperature: 0.7, num_predict: 1000, top_p: 0.9 }
+ *     // }
+ *
  * @param {TranslateRequestToOllamaOpenaiReq} openaiReq - OpenAI request body
  * @returns {any} Ollama request body
- *
- * @example
- * translateRequestToOllama({
- *   messages: [
- *     { role: 'system', content: 'You are helpful' },
- *     { role: 'user', content: 'Say hi' }
- *   ],
- *   model: 'qwen3-coder-next',
- *   temperature: 0.7
- * })
- * // Returns: {
- * //   model: 'qwen3-coder-next',
- * //   prompt: 'System: You are helpful\nUser: Say hi',
- * //   stream: false,
- * //   options: { temperature: 0.7, num_predict: 1000, top_p: 0.9 }
- * // }
  */
 export function translateRequestToOllama(openaiReq) {
     const { messages, model, temperature, max_tokens, top_p } = openaiReq;
@@ -117,27 +119,27 @@ export function translateRequestToOllama(openaiReq) {
 /**
  * Translates Ollama /api/generate response to OpenAI Chat Completions format
  *
+ * @example
+ *     translateResponseToOpenAI(
+ *         { response: 'Hello!', model: 'qwen3-coder-next' },
+ *         { messages: [{ role: 'user', content: 'Hi' }] },
+ *     );
+ *     // Returns: {
+ *     //   id: 'chatcmpl-abc123',
+ *     //   object: 'chat.completion',
+ *     //   created: 1672531200,
+ *     //   model: 'qwen3-coder-next',
+ *     //   choices: [{
+ *     //     index: 0,
+ *     //     message: { role: 'assistant', content: 'Hello!' },
+ *     //     finish_reason: 'stop'
+ *     //   }],
+ *     //   usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 }
+ *     // }
+ *
  * @param {TranslateResponseToOpenAIOllamaResp} ollamaResp - Ollama response body
  * @param {TranslateResponseToOpenAIOriginalReq} originalReq - Original OpenAI request (for token estimation)
  * @returns {any} OpenAI Chat Completions response
- *
- * @example
- * translateResponseToOpenAI(
- *   { response: 'Hello!', model: 'qwen3-coder-next' },
- *   { messages: [{ role: 'user', content: 'Hi' }] }
- * )
- * // Returns: {
- * //   id: 'chatcmpl-abc123',
- * //   object: 'chat.completion',
- * //   created: 1672531200,
- * //   model: 'qwen3-coder-next',
- * //   choices: [{
- * //     index: 0,
- * //     message: { role: 'assistant', content: 'Hello!' },
- * //     finish_reason: 'stop'
- * //   }],
- * //   usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 }
- * // }
  */
 export function translateResponseToOpenAI(ollamaResp, originalReq) {
     const { response, model } = ollamaResp;
@@ -145,14 +147,15 @@ export function translateResponseToOpenAI(ollamaResp, originalReq) {
     // Estimate tokens using rough heuristic: words * 1.3
     // (Ollama doesn't return exact token counts)
     const promptWords = originalReq.messages.reduce((sum, msg) => {
-        const content = (/** @type {any} */ (msg)).content || '';
+        const content = /** @type {any} */ (msg).content || '';
         const words = content.split(/\s+/).filter((/** @type {any} */ w) => w.length > 0).length;
+        // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
         return sum + words;
     }, 0);
 
-    const completionWords = response.split(/\s+/).filter(w => w.length > 0).length;
+    const completionWords = response.split(/\s+/).filter((w) => w.length > 0).length;
 
-    const promptTokens = Math.ceil((/** @type {any} */ (promptWords)) * 1.3);
+    const promptTokens = Math.ceil(/** @type {any} */ (promptWords) * 1.3);
     const completionTokens = Math.ceil(completionWords * 1.3);
 
     return {
@@ -182,20 +185,20 @@ export function translateResponseToOpenAI(ollamaResp, originalReq) {
 /**
  * Builds OpenAI-compatible error response
  *
- * @param {string} message - Error message
- * @param {string} [type='invalid_request_error'] - Error type
- * @param {number} [code=400] - HTTP status code
- * @returns {any} OpenAI error object
- *
  * @example
- * buildOpenAIError('Missing model parameter', 'invalid_request_error', 400)
- * // Returns: {
- * //   error: {
- * //     message: 'Missing model parameter',
- * //     type: 'invalid_request_error',
- * //     code: 400
- * //   }
- * // }
+ *     buildOpenAIError('Missing model parameter', 'invalid_request_error', 400);
+ *     // Returns: {
+ *     //   error: {
+ *     //     message: 'Missing model parameter',
+ *     //     type: 'invalid_request_error',
+ *     //     code: 400
+ *     //   }
+ *     // }
+ *
+ * @param {string} message - Error message
+ * @param {string} [type='invalid_request_error'] - Error type. Default is `'invalid_request_error'`
+ * @param {number} [code=400] - HTTP status code. Default is `400`
+ * @returns {any} OpenAI error object
  */
 export function buildOpenAIError(message, type = 'invalid_request_error', code = 400) {
     return {
@@ -209,8 +212,9 @@ export function buildOpenAIError(message, type = 'invalid_request_error', code =
 
 /**
  * Helper: Creates validation error with OpenAI error format attached
+ *
  * @private
- * @param {*} message
+ * @param {any} message
  */
 function buildValidationError(message) {
     const err = new Error(message);

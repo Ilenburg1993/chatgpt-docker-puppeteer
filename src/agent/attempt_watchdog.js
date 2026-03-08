@@ -9,33 +9,36 @@ import { ActionCode, ActorRole } from '#shared/nerv/constants';
 
 /** @param {any} ms */
 function _sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Opções do construtor do AttemptWatchdog.
+ *
  * @typedef {object} AttemptWatchdogOptions
- * @property {object|null} [nerv] - Instância do sistema nerv para comunicação.
- * @property {number} [intervalMs=1500] - Intervalo entre ticks em ms.
- * @property {number} [dispatchedStuckMs=30000] - Timeout para estado DISPATCHED em ms.
- * @property {number} [acceptedStuckMs=120000] - Timeout para estado ACCEPTED em ms.
- * @property {number} [runningHeartbeatStuckMs=30000] - Timeout para heartbeats em RUNNING em ms.
- * @property {number} [rescheduleDelayMs=1000] - Delay para reagendamento em ms.
- * @property {number} [envEscalationWindowMs=900000] - Janela para escalação de ambiente em ms.
- * @property {number} [envEscalationThreshold=10] - Threshold para escalação de ambiente.
- * @property {number} [llmTimeoutEscalationWindowMs=1800000] - Janela para escalação de timeout LLM em ms.
- * @property {number} [llmTimeoutEscalationThreshold=10] - Threshold para escalação de timeout LLM.
- * @property {number} [maxBatch=25] - Máximo de tarefas por lote.
+ * @property {object | null} [nerv] - Instância do sistema nerv para comunicação.
+ * @property {number} [intervalMs=1500] - Intervalo entre ticks em ms. Default is `1500`
+ * @property {number} [dispatchedStuckMs=30000] - Timeout para estado DISPATCHED em ms. Default is `30000`
+ * @property {number} [acceptedStuckMs=120000] - Timeout para estado ACCEPTED em ms. Default is `120000`
+ * @property {number} [runningHeartbeatStuckMs=30000] - Timeout para heartbeats em RUNNING em ms. Default is `30000`
+ * @property {number} [rescheduleDelayMs=1000] - Delay para reagendamento em ms. Default is `1000`
+ * @property {number} [envEscalationWindowMs=900000] - Janela para escalação de ambiente em ms. Default is `900000`
+ * @property {number} [envEscalationThreshold=10] - Threshold para escalação de ambiente. Default is `10`
+ * @property {number} [llmTimeoutEscalationWindowMs=1800000] - Janela para escalação de timeout LLM em ms. Default is
+ *   `1800000`
+ * @property {number} [llmTimeoutEscalationThreshold=10] - Threshold para escalação de timeout LLM. Default is `10`
+ * @property {number} [maxBatch=25] - Máximo de tarefas por lote. Default is `25`
  */
 
 /**
- * Watchdog que monitora tentativas de tarefas e detecta timeouts ou falhas.
- * Responsável por escalar tarefas stuck e manter saúde do sistema.
+ * Watchdog que monitora tentativas de tarefas e detecta timeouts ou falhas. Responsável por escalar tarefas stuck e
+ * manter saúde do sistema.
  */
 class AttemptWatchdog {
     /**
      * Cria um watchdog para monitorar tentativas de tarefas.
-     * @param {AttemptWatchdogOptions} [options={}] - Opções de configuração.
+     *
+     * @param {AttemptWatchdogOptions} [options={}] - Opções de configuração. Default is `{}`
      */
     constructor({
         nerv = null,
@@ -69,6 +72,7 @@ class AttemptWatchdog {
 
     /**
      * Inicia o watchdog, começando a monitorar tentativas de tarefas.
+     *
      * @returns {void}
      * @sideEffects Inicia timer interno e executa tick imediatamente.
      */
@@ -82,6 +86,7 @@ class AttemptWatchdog {
 
     /**
      * Para o watchdog, cancelando o timer de monitoramento.
+     *
      * @returns {void}
      * @sideEffects Cancela timer interno.
      */
@@ -95,8 +100,9 @@ class AttemptWatchdog {
     }
 
     /**
-     * Executa um ciclo de monitoramento: detecta tentativas stuck e as escalona.
-     * Verifica timeouts para estados DISPATCHED, ACCEPTED e heartbeats em RUNNING.
+     * Executa um ciclo de monitoramento: detecta tentativas stuck e as escalona. Verifica timeouts para estados
+     * DISPATCHED, ACCEPTED e heartbeats em RUNNING.
+     *
      * @returns {Promise<void>}
      * @throws {Error} Erros são logados mas não relançados.
      * @sideEffects Modifica estado do banco (status, locks) e envia comandos via nerv.
@@ -133,7 +139,7 @@ class AttemptWatchdog {
                       AND (a.last_heartbeat_at_ms IS NULL AND a.created_at_ms <= @cutoff)
                     ORDER BY a.created_at_ms ASC
                     LIMIT @limit
-                `
+                `,
                     )
                     .all({ now, cutoff, limit: this.maxBatch })
             );
@@ -161,7 +167,7 @@ class AttemptWatchdog {
                       AND a.last_heartbeat_at_ms <= @acceptedCutoff
                     ORDER BY a.last_heartbeat_at_ms ASC
                     LIMIT @limit
-                `
+                `,
                     )
                     .all({ now, acceptedCutoff, limit: this.maxBatch })
             );
@@ -188,7 +194,7 @@ class AttemptWatchdog {
                       )
                     ORDER BY COALESCE(a.last_heartbeat_at_ms, a.created_at_ms) ASC
                     LIMIT @limit
-                `
+                `,
                     )
                     .all({ now, runningCutoff, limit: this.maxBatch })
             );
@@ -309,13 +315,14 @@ class AttemptWatchdog {
                 // Best-effort abort to stop runaway driver execution (if still alive).
                 try {
                     if (this.nerv) {
+                        // eslint-disable-next-line @typescript-eslint/await-thenable
                         await sendCommand(
                             this.nerv,
                             ActorRole.KERNEL,
                             ActionCode.DRIVER_ABORT,
                             { taskId, reason: 'WATCHDOG_HEARTBEAT_TIMEOUT' },
                             attemptId,
-                            ActorRole.DRIVER
+                            ActorRole.DRIVER,
                         );
                     }
                 } catch (/** @type {any} */ _rawErr) {
@@ -323,7 +330,7 @@ class AttemptWatchdog {
                     log(
                         'WARN',
                         `[AttemptWatchdog] Failed to emit DRIVER_ABORT for ${taskId}: ${err?.message || String(err)}`,
-                        attemptId
+                        attemptId,
                     );
                 }
 
@@ -405,7 +412,7 @@ class AttemptWatchdog {
                         HAVING COUNT(1) >= @threshold
                         ORDER BY last_ts DESC
                         LIMIT @limit
-                    `
+                    `,
                         )
                         .all({
                             now,
@@ -445,7 +452,7 @@ class AttemptWatchdog {
                         HAVING COUNT(1) >= @threshold
                         ORDER BY last_ts DESC
                         LIMIT @limit
-                    `
+                    `,
                         )
                         .all({
                             now,

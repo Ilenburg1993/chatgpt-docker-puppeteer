@@ -1,9 +1,9 @@
 // @ts-check
-import { COMMANDS, executeCommand, validateCommand } from '#server/domain/control_command_service';
-import { RBAC_PERMISSIONS, RBAC_ROLES, getRbacUserByUsername, upsertRbacUser } from '#infra/db/rbac_repo';
-import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_repo';
 import { getControlOperationById, listControlOperations } from '#infra/db/control_operation_repo';
 import { recordEvent } from '#infra/db/events_repo';
+import { RBAC_PERMISSIONS, RBAC_ROLES, getRbacUserByUsername, upsertRbacUser } from '#infra/db/rbac_repo';
+import { getUserPreferences, upsertUserPreferences } from '#infra/db/user_pref_repo';
+import { COMMANDS, executeCommand, validateCommand } from '#server/domain/control_command_service';
 import express from 'express';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/auth.js';
@@ -72,7 +72,7 @@ typedRouter.post(
                 request_id: req.id,
             });
         }
-    }
+    },
 );
 
 typedRouter.post(
@@ -92,47 +92,62 @@ typedRouter.post(
             validation,
             request_id: req.id,
         });
-    }
+    },
 );
 
-typedRouter.get('/commands/:id', authenticate, requirePermission(RBAC_PERMISSIONS.TASK_READ), (/** @type {any} */ req, /** @type {any} */ res) => {
-    const id = String(req.params.id || '').trim();
-    const operation = getControlOperationById(id);
-    if (!operation) {
-        return res.status(404).json({
-            success: false,
-            error: 'Operação não encontrada',
+typedRouter.get(
+    '/commands/:id',
+    authenticate,
+    requirePermission(RBAC_PERMISSIONS.TASK_READ),
+    (/** @type {any} */ req, /** @type {any} */ res) => {
+        const id = String(req.params.id || '').trim();
+        const operation = getControlOperationById(id);
+        if (!operation) {
+            return res.status(404).json({
+                success: false,
+                error: 'Operação não encontrada',
+                request_id: req.id,
+            });
+        }
+
+        return res.json({
+            success: true,
+            operation,
             request_id: req.id,
         });
-    }
+    },
+);
 
-    return res.json({
-        success: true,
-        operation,
-        request_id: req.id,
-    });
-});
+typedRouter.get(
+    '/commands',
+    authenticate,
+    requirePermission(RBAC_PERMISSIONS.TASK_READ),
+    (/** @type {any} */ req, /** @type {any} */ res) => {
+        const limit = Number(req.query.limit || 100) || 100;
+        const entityType = req.query.entity_type ? String(req.query.entity_type) : null;
+        const entityId = req.query.entity_id ? String(req.query.entity_id) : null;
 
-typedRouter.get('/commands', authenticate, requirePermission(RBAC_PERMISSIONS.TASK_READ), (/** @type {any} */ req, /** @type {any} */ res) => {
-    const limit = Number(req.query.limit || 100) || 100;
-    const entityType = req.query.entity_type ? String(req.query.entity_type) : null;
-    const entityId = req.query.entity_id ? String(req.query.entity_id) : null;
+        const items = listControlOperations({ limit, entityType, entityId });
+        return res.json({
+            success: true,
+            items,
+            total: items.length,
+            request_id: req.id,
+        });
+    },
+);
 
-    const items = listControlOperations({ limit, entityType, entityId });
-    return res.json({
-        success: true,
-        items,
-        total: items.length,
-        request_id: req.id,
-    });
-});
-
-typedRouter.get('/commands/catalog', authenticate, requirePermission(RBAC_PERMISSIONS.CONTROL_VALIDATE), (/** @type {any} */ _req, /** @type {any} */ res) => {
-    return res.json({
-        success: true,
-        commands: Object.values(COMMANDS),
-    });
-});
+typedRouter.get(
+    '/commands/catalog',
+    authenticate,
+    requirePermission(RBAC_PERMISSIONS.CONTROL_VALIDATE),
+    (/** @type {any} */ _req, /** @type {any} */ res) => {
+        return res.json({
+            success: true,
+            commands: Object.values(COMMANDS),
+        });
+    },
+);
 
 typedRouter.get('/preferences/me', authenticate, (/** @type {any} */ req, /** @type {any} */ res) => {
     const userId = req.user?.username || req.user?.id;
@@ -154,42 +169,52 @@ typedRouter.get('/preferences/me', authenticate, (/** @type {any} */ req, /** @t
     });
 });
 
-typedRouter.patch('/preferences/me', authenticate, schemaGuard(prefsPatchSchema), (/** @type {any} */ req, /** @type {any} */ res) => {
-    const userId = req.user?.username || req.user?.id;
-    const prefs = upsertUserPreferences(userId, req.body || {});
+typedRouter.patch(
+    '/preferences/me',
+    authenticate,
+    schemaGuard(prefsPatchSchema),
+    (/** @type {any} */ req, /** @type {any} */ res) => {
+        const userId = req.user?.username || req.user?.id;
+        const prefs = upsertUserPreferences(userId, req.body || {});
 
-    recordEvent({
-        entityType: 'user',
-        entityId: String(userId),
-        eventType: 'USER_PREFERENCES_UPDATED',
-        actorType: 'user',
-        actorId: userId,
-        payload: { fields: Object.keys(req.body || {}) },
-    });
+        recordEvent({
+            entityType: 'user',
+            entityId: String(userId),
+            eventType: 'USER_PREFERENCES_UPDATED',
+            actorType: 'user',
+            actorId: userId,
+            payload: { fields: Object.keys(req.body || {}) },
+        });
 
-    res.json({
-        success: true,
-        preferences: prefs,
-        request_id: req.id,
-    });
-});
-
-typedRouter.get('/rbac/users/:username', authenticate, requirePermission(RBAC_PERMISSIONS.RBAC_MANAGE), (/** @type {any} */ req, /** @type {any} */ res) => {
-    const user = getRbacUserByUsername(String(req.params.username));
-    if (!user) {
-        return res.status(404).json({
-            success: false,
-            error: 'Usuário RBAC não encontrado',
+        res.json({
+            success: true,
+            preferences: prefs,
             request_id: req.id,
         });
-    }
+    },
+);
 
-    return res.json({
-        success: true,
-        user,
-        request_id: req.id,
-    });
-});
+typedRouter.get(
+    '/rbac/users/:username',
+    authenticate,
+    requirePermission(RBAC_PERMISSIONS.RBAC_MANAGE),
+    (/** @type {any} */ req, /** @type {any} */ res) => {
+        const user = getRbacUserByUsername(String(req.params.username));
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'Usuário RBAC não encontrado',
+                request_id: req.id,
+            });
+        }
+
+        return res.json({
+            success: true,
+            user,
+            request_id: req.id,
+        });
+    },
+);
 
 typedRouter.put(
     '/rbac/users/:username',
@@ -218,7 +243,7 @@ typedRouter.put(
             user: updated,
             request_id: req.id,
         });
-    }
+    },
 );
 
 export default router;

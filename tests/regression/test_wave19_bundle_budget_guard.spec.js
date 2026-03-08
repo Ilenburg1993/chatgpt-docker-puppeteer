@@ -1,15 +1,15 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 test('wave19: vite build mantém split/lazy e guardrails de bundle', async () => {
     const viteConfig = await fs.readFile(path.join(process.cwd(), 'src/dashboard-ui/vite.config.js'), 'utf8');
     const taskDetail = await fs.readFile(path.join(process.cwd(), 'src/dashboard-ui/src/views/TaskDetail.vue'), 'utf8');
     const missionDetail = await fs.readFile(
         path.join(process.cwd(), 'src/dashboard-ui/src/views/MissionDetail.vue'),
-        'utf8'
+        'utf8',
     );
 
     assert.match(viteConfig, /chunkSizeWarningLimit:\s*1000/);
@@ -19,7 +19,7 @@ test('wave19: vite build mantém split/lazy e guardrails de bundle', async () =>
     assert.match(viteConfig, /cssCodeSplit:\s*true/);
 
     assert.match(taskDetail, /defineAsyncComponent/);
-    assert.match(taskDetail, /import\('\@\/components\/graphs\/VisGraph\.vue'\)/);
+    assert.match(taskDetail, /import\('@\/components\/graphs\/VisGraph\.vue'\)/);
     assert.match(missionDetail, /defineAsyncComponent/);
-    assert.match(missionDetail, /import\('\@\/components\/graphs\/VisGraph\.vue'\)/);
+    assert.match(missionDetail, /import\('@\/components\/graphs\/VisGraph\.vue'\)/);
 });

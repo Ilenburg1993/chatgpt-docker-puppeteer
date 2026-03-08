@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { collectRuntimeFindings } from '../../../scripts/audit/collectors/runtime.mjs';
 
 /**
@@ -99,16 +99,16 @@ test('runtime collector ignores noisy warning when rag health JSON is healthy', 
             profile: 'quick',
             contracts,
             exec: mockExec,
-        })
+        }),
     );
 
     assert.equal(result.telemetry.rag.ok, true);
     assert.equal(
-        result.findings.some(item => item.rule === 'runtime.rag_health.failed'),
-        false
+        result.findings.some((item) => item.rule === 'runtime.rag_health.failed'),
+        false,
     );
     assert.equal(
-        result.findings.some(item => item.rule === 'runtime.lsp_functional.failed'),
-        true
+        result.findings.some((item) => item.rule === 'runtime.lsp_functional.failed'),
+        true,
     );
 });

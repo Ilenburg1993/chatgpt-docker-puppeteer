@@ -45,7 +45,7 @@ module.exports = function (fileInfo, api) {
     let needsImport = false;
 
     // Replace string literals with constant references
-    STATUS_VALUES.forEach(value => {
+    STATUS_VALUES.forEach((value) => {
         root.find(j.Literal, { value: value }).forEach((/** @type {any} */ path) => {
             // Skip if already using constant (e.g., in constant definitions)
             const parent = path.parent;
@@ -81,7 +81,7 @@ module.exports = function (fileInfo, api) {
         const importStatement = j.variableDeclaration('const', [
             j.variableDeclarator(
                 j.objectPattern([j.property('init', j.identifier('STATUS_VALUES'), j.identifier('STATUS_VALUES'))]),
-                j.callExpression(j.identifier('require'), [j.literal(importPath)])
+                j.callExpression(j.identifier('require'), [j.literal(importPath)]),
             ),
         ]);
 

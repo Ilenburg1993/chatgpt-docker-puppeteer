@@ -1,4 +1,5 @@
 // @ts-check
+// Mock chrome page — todos os métodos são async para compatibilidade com a API Puppeteer
 import { v4 as uuidv4 } from 'uuid';
 
 function createMockPage() {
@@ -14,7 +15,7 @@ function createMockPage() {
         async goto(/** @type {any} */ url, _ = {}) {
             this._url = url;
             // pequeno delay simulado para aproximar comportamento real
-            await new Promise(resolve => setTimeout(resolve, 5));
+            await new Promise((resolve) => setTimeout(resolve, 5));
             return { ok: true };
         },
         async title() {
@@ -66,6 +67,7 @@ function createMockPage() {
 
 /**
  * Função exportada: createMockBrowser.
+ *
  * @returns {any}
  */
 function createMockBrowser() {

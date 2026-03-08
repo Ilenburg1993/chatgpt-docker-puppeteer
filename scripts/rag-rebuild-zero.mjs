@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // @ts-check
 import 'dotenv/config';
-import { parseArgs } from 'node:util';
 import { spawn } from 'node:child_process';
+import { parseArgs } from 'node:util';
 
 const EXIT = Object.freeze({
     OK: 0,
@@ -95,7 +95,7 @@ async function runCommand(label, cmd, args, { allowFailure = false } = {}) {
             env: process.env,
         });
         child.on('error', reject);
-        child.on('exit', code => {
+        child.on('exit', (code) => {
             if (code === 0 || allowFailure) {
                 resolve(code ?? 0);
                 return;
@@ -108,7 +108,7 @@ async function runCommand(label, cmd, args, { allowFailure = false } = {}) {
 /**
  * @param {string} url
  * @param {RequestInit} [init]
- * @returns {Promise<{ok: boolean, status: number, text: string, json: any}>}
+ * @returns {Promise<{ ok: boolean; status: number; text: string; json: any }>}
  */
 async function fetchJson(url, init) {
     const response = await fetch(url, init);
@@ -138,25 +138,25 @@ async function waitForHttp(url, timeoutMs = 90000, intervalMs = 2000) {
         } catch (error) {
             lastError = error;
         }
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new Error(`Timeout waiting for ${url}: ${lastError?.message || 'unknown error'}`);
 }
 
 async function isPm2FullyOnline() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn('npx', ['pm2', 'jlist'], {
             stdio: ['ignore', 'pipe', 'pipe'],
             env: process.env,
         });
 
         let stdout = '';
-        child.stdout.on('data', chunk => {
+        child.stdout.on('data', (chunk) => {
             stdout += String(chunk);
         });
 
         child.on('error', () => resolve(false));
-        child.on('exit', code => {
+        child.on('exit', (code) => {
             if (code !== 0) {
                 resolve(false);
                 return;
@@ -168,9 +168,9 @@ async function isPm2FullyOnline() {
                     parsed
                         .filter((/** @type {any} */ proc) => proc?.pm2_env?.status === 'online')
                         .map((/** @type {any} */ proc) => proc?.name)
-                        .filter(Boolean)
+                        .filter(Boolean),
                 );
-                resolve([...required].every(name => online.has(name)));
+                resolve([...required].every((name) => online.has(name)));
             } catch {
                 resolve(false);
             }

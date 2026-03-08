@@ -2,23 +2,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** @import { RawFinding } from '../normalize/findings.mjs' */
+/** @import {RawFinding} from "../normalize/findings.mjs" */
 
 /**
  * @param {string} rootDir
  * @returns {Promise<{
- *   findings: RawFinding[],
- *   errors: Array<{source:string,message:string}>,
- *   warnings: Array<{source:string,message:string}>,
- *   telemetry: { findings_by_kind: Record<string, number> }
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ *     telemetry: { findings_by_kind: Record<string, number> };
  * }>}
  */
 export async function collectArchitectureFindings(rootDir) {
     /** @type {RawFinding[]} */
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
     try {
@@ -79,13 +79,17 @@ export async function collectArchitectureFindings(rootDir) {
 
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeCoupling(rootDir) {
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
     const srcDir = path.join(rootDir, 'src');
     const files = await findJsFiles(srcDir);
@@ -127,13 +131,17 @@ async function analyzeCoupling(rootDir) {
  */
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeCircularDependencies(rootDir) {
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
     try {

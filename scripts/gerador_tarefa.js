@@ -1,8 +1,8 @@
 // @ts-check
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import crypto from 'node:crypto';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const QUEUE_DIR = path.join(ROOT, 'fila');
@@ -11,8 +11,9 @@ const TEMPLATE_DIR = path.join(ROOT, 'templates');
 // --- HELPERS DE INFRAESTRUTURA ---
 
 /**
- * Grava conteúdo em um arquivo de forma atômica, evitando corrupção parcial.
- * Side-effects: Cria arquivo temporário e renomeia para o destino final.
+ * Grava conteúdo em um arquivo de forma atômica, evitando corrupção parcial. Side-effects: Cria arquivo temporário e
+ * renomeia para o destino final.
+ *
  * @param {string} filepath - Caminho do arquivo de destino.
  * @param {string} content - Conteúdo a ser gravado.
  */
@@ -24,7 +25,8 @@ function atomicWrite(filepath, content) {
 
 /**
  * Gera um ID único para identificação de tarefas.
- * @param {string} [prefix='TASK-CLI'] - Prefixo para o ID gerado.
+ *
+ * @param {string} [prefix='TASK-CLI'] - Prefixo para o ID gerado. Default is `'TASK-CLI'`
  * @returns {string} ID único no formato "prefix-timestamp-salt".
  */
 function generateUniqueId(prefix = 'TASK-CLI') {
@@ -34,7 +36,7 @@ function generateUniqueId(prefix = 'TASK-CLI') {
 }
 
 // Garante infra
-[QUEUE_DIR, TEMPLATE_DIR].forEach(d => {
+[QUEUE_DIR, TEMPLATE_DIR].forEach((d) => {
     if (!fs.existsSync(d)) {
         fs.mkdirSync(d, { recursive: true });
     }
@@ -46,17 +48,18 @@ const _VALID_MODELS = ['gpt-5', 'gpt-4o', 'o1-preview', 'gemini-1.5-pro', 'claud
 
 /**
  * Parseia argumentos da linha de comando para opções de criação de tarefa.
- * @param {string[]} args - Array de argumentos da linha de comando.
- * @returns {any} Opções parseadas com valores padrão.
+ *
  * @property {number} prio - Prioridade da tarefa (0-100).
  * @property {string} model - Modelo de IA a ser utilizado.
  * @property {string} target - Plataforma alvo (chatgpt, gemini, etc).
  * @property {string} system - Mensagem do sistema/persona.
  * @property {string[]} tags - Tags para categorização.
  * @property {string[]} prompt - Parte do prompt que não são argumentos.
- * @property {string|null} template - Nome do template a ser usado.
- * @property {string|null} after - Data/agendamento para execução.
+ * @property {string | null} template - Nome do template a ser usado.
+ * @property {string | null} after - Data/agendamento para execução.
  * @property {boolean} interactive - Modo interativo ativado.
+ * @param {string[]} args - Array de argumentos da linha de comando.
+ * @returns {any} Opções parseadas com valores padrão.
  */
 function parseArgs(args) {
     const options = /** @type {any} */ ({
@@ -88,8 +91,8 @@ function parseArgs(args) {
         } else if (arg === '--tags') {
             options.tags = (args[++i] || '')
                 .split(',')
-                .map(t => t.trim())
-                .filter(t => t);
+                .map((t) => t.trim())
+                .filter((t) => t);
         } else if (arg.startsWith('--')) {
             /* ignora flags desconhecidas */
         } else {
@@ -100,10 +103,11 @@ function parseArgs(args) {
 }
 
 /**
- * Parseia uma string de agendamento para uma data ISO.
- * Suporta formatos como "10m" (10 minutos), "1h" (1 hora) ou datas ISO.
- * @param {string|null} input - String de agendamento ou null.
- * @returns {string|null} Data ISO se válida, null se inválida.
+ * Parseia uma string de agendamento para uma data ISO. Suporta formatos como "10m" (10 minutos), "1h" (1 hora) ou datas
+ * ISO.
+ *
+ * @param {string | null} input - String de agendamento ou null.
+ * @returns {string | null} Data ISO se válida, null se inválida.
  */
 function parseSchedule(input) {
     if (!input) {
@@ -129,8 +133,9 @@ function parseSchedule(input) {
  * @property {string[]} tags
  */
 /**
- * Cria uma nova tarefa e a salva no diretório de fila.
- * Side-effects: Cria arquivo JSON no diretório de fila, imprime informações no console.
+ * Cria uma nova tarefa e a salva no diretório de fila. Side-effects: Cria arquivo JSON no diretório de fila, imprime
+ * informações no console.
+ *
  * @param {CreateTaskOptions} opts - Opções da tarefa.
  * @param {string} promptText - Texto do prompt do usuário.
  */
@@ -183,15 +188,15 @@ function createTask(opts, promptText) {
 }
 
 /**
- * Executa o modo interativo (wizard) para criação de tarefas.
- * Solicita informações ao usuário e cria uma tarefa com base nas entradas.
- * Side-effects: Lê entrada do usuário via stdin, cria tarefa, pode encerrar o processo.
+ * Executa o modo interativo (wizard) para criação de tarefas. Solicita informações ao usuário e cria uma tarefa com
+ * base nas entradas. Side-effects: Lê entrada do usuário via stdin, cria tarefa, pode encerrar o processo.
+ *
  * @returns {Promise<void>} Promessa que resolve quando o wizard é concluído.
  */
 async function runInteractive() {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const ask = (/** @type {string} */ q) =>
-        new Promise(r => {
+        new Promise((r) => {
             rl.question(q, r);
         });
 
@@ -226,16 +231,16 @@ async function runInteractive() {
             after,
             tags: [],
         },
-        prompt
+        prompt,
     );
 
     rl.close();
 }
 
 /**
- * Função principal que executa o script de acordo com os argumentos fornecidos.
- * Pode rodar em modo interativo ou com argumentos da linha de comando.
- * Side-effects: Lê argumentos, pode ler templates, cria tarefas, pode encerrar o processo.
+ * Função principal que executa o script de acordo com os argumentos fornecidos. Pode rodar em modo interativo ou com
+ * argumentos da linha de comando. Side-effects: Lê argumentos, pode ler templates, cria tarefas, pode encerrar o
+ * processo.
  */
 function main() {
     const opts = parseArgs(process.argv.slice(2));
@@ -248,7 +253,7 @@ function main() {
         if (opts.template) {
             const tplPath = path.join(
                 TEMPLATE_DIR,
-                opts.template.endsWith('.txt') ? opts.template : `${opts.template}.txt`
+                opts.template.endsWith('.txt') ? opts.template : `${opts.template}.txt`,
             );
             if (fs.existsSync(tplPath)) {
                 const tplContent = fs.readFileSync(tplPath, 'utf-8');

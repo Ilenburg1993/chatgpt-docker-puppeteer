@@ -26,7 +26,8 @@
 
 /**
  * Converte inteiro para buffer de 4 bytes (big-endian).
- * @param {*} value
+ *
+ * @param {any} value
  */
 function intToBuffer(value) {
     const buf = Buffer.allocUnsafe(4);
@@ -36,7 +37,8 @@ function intToBuffer(value) {
 
 /**
  * Lê inteiro de buffer de 4 bytes (big-endian).
- * @param {*} buf
+ *
+ * @param {any} buf
  */
 function bufferToInt(buf) {
     return buf.readUInt32BE(0);
@@ -49,11 +51,10 @@ function bufferToInt(buf) {
 /**
  * Empacota um frame opaco adicionando prefixo de tamanho.
  *
- * **Side-effects:** Aloca novos buffers para header e concatenação.
- * **Semântica:** Adiciona delimitação física (4 bytes big-endian) para transporte.
- * **Unidades:** Tamanho em bytes como inteiro de 32 bits.
+ * **Side-effects:** Aloca novos buffers para header e concatenação. **Semântica:** Adiciona delimitação física (4 bytes
+ * big-endian) para transporte. **Unidades:** Tamanho em bytes como inteiro de 32 bits.
  *
- * @param {Buffer|Uint8Array} payload - Dados opacos a serem empacotados
+ * @param {Buffer | Uint8Array} payload - Dados opacos a serem empacotados
  * @returns {Buffer} Frame com header de tamanho + payload
  */
 function pack(payload) {
@@ -74,12 +75,13 @@ function pack(payload) {
 /**
  * Cria um unpacker para processar stream de frames delimitados por tamanho.
  *
- * **Side-effects:** Mantém estado interno (buffer acumulado, estado de parsing).
- * **Semântica:** Processa frames de forma incremental, emitindo frames completos via callback.
- * **Unidades:** Tamanho em bytes como inteiro de 32 bits big-endian.
+ * **Side-effects:** Mantém estado interno (buffer acumulado, estado de parsing). **Semântica:** Processa frames de
+ * forma incremental, emitindo frames completos via callback. **Unidades:** Tamanho em bytes como inteiro de 32 bits
+ * big-endian.
  *
+ * @property {function(Buffer|Uint8Array, function(Buffer): void): void} push - Processa chunk e invoca callback para
+ *   frames completos
  * @returns {any} Unpacker com método push
- * @property {function(Buffer|Uint8Array, function(Buffer): void): void} push - Processa chunk e invoca callback para frames completos
  */
 function createUnpacker() {
     let buffer = Buffer.alloc(0);
@@ -87,11 +89,11 @@ function createUnpacker() {
     /**
      * Processa chunk recebido do meio físico.
      *
-     * **Side-effects:** Modifica buffer interno, invoca callback para frames completos.
-     * **Semântica:** Reconstrói frames de forma incremental até ter dados suficientes.
-     * **Unidades:** Tamanho em bytes como inteiro de 32 bits big-endian.
+     * **Side-effects:** Modifica buffer interno, invoca callback para frames completos. **Semântica:** Reconstrói
+     * frames de forma incremental até ter dados suficientes. **Unidades:** Tamanho em bytes como inteiro de 32 bits
+     * big-endian.
      *
-     * @param {Buffer|Uint8Array} chunk - Dados recebidos do transporte
+     * @param {Buffer | Uint8Array} chunk - Dados recebidos do transporte
      * @param {function(Buffer): void} onFrame - Callback invocado para cada frame completo
      */
     function push(chunk, onFrame) {

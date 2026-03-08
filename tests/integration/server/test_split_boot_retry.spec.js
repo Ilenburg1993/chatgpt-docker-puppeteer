@@ -1,7 +1,7 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import test from 'node:test';
 
 import { __mainTestHooks } from '#main';
 
@@ -61,7 +61,7 @@ async function startHealthServer() {
         port: address.port,
         close: () =>
             /** @type {Promise<void>} */ (
-                new Promise(resolve => {
+                new Promise((resolve) => {
                     server.close(() => resolve());
                 })
             ),
@@ -99,7 +99,7 @@ test('split retry tolerates transient connect failures and succeeds before max a
         async () => {
             const socketHub = await __mainTestHooks.connectSplitExternalWithRetry(fakeSocketModule, 3008);
             assert.ok(socketHub, 'split helper should eventually return a socket hub');
-        }
+        },
     );
 
     assert.equal(attempts, 3, 'helper should stop retrying after first successful connection');
@@ -134,10 +134,10 @@ test('split retry can gate connection on /health when SPLIT_WAIT_HEALTH=true', a
             async () => {
                 const socketHub = await __mainTestHooks.connectSplitExternalWithRetry(
                     fakeSocketModule,
-                    healthServer.port
+                    healthServer.port,
                 );
                 assert.ok(socketHub, 'split helper should connect when health endpoint is available');
-            }
+            },
         );
 
         assert.equal(connectCalls, 1, 'connectExternal should be called after health gate passes');

@@ -26,8 +26,7 @@ import { log } from './logger.js';
  */
 
 /**
- * Gerenciador de identidade soberana do robô.
- * Mantém DNA persistente (robot_id) e identidade efêmera (instance_id).
+ * Gerenciador de identidade soberana do robô. Mantém DNA persistente (robot_id) e identidade efêmera (instance_id).
  * Side-effects: Lê/escreve identidade em armazenamento persistente, valida identidade.
  */
 class IdentityManager {
@@ -78,9 +77,9 @@ class IdentityManager {
     }
 
     /**
-     * Inicializa a identidade soberana.
-     * Tenta carregar o DNA existente ou realiza o "Nascimento" do robô.
-     * Side-effects: Lê identidade armazenada, gera nova se necessário, salva no armazenamento.
+     * Inicializa a identidade soberana. Tenta carregar o DNA existente ou realiza o "Nascimento" do robô. Side-effects:
+     * Lê identidade armazenada, gera nova se necessário, salva no armazenamento.
+     *
      * @returns {Promise<void>} Não retorna valor.
      * @throws {Error} Lança erro se falhar ao inicializar identidade.
      */
@@ -112,8 +111,8 @@ class IdentityManager {
     }
 
     /**
-     * Retorna o objeto de identidade completo e validado.
-     * Esta é a ÚNICA saída autorizada para o Handshake do IPC 2.0.
+     * Retorna o objeto de identidade completo e validado. Esta é a ÚNICA saída autorizada para o Handshake do IPC 2.0.
+     *
      * @returns {RobotIdentity} Identidade homologada conforme o Shared Kernel.
      * @throws {Error} Lança erro se identidade não foi inicializada.
      */
@@ -144,7 +143,8 @@ class IdentityManager {
      */
     /**
      * Retorna o ID persistente do robô.
-     * @returns {string|null} ID do robô ou null se não inicializado.
+     *
+     * @returns {string | null} ID do robô ou null se não inicializado.
      */
     getRobotId() {
         return this.robotId;
@@ -152,6 +152,7 @@ class IdentityManager {
 
     /**
      * Retorna o ID efêmero da instância atual.
+     *
      * @returns {string} ID da instância atual.
      */
     getInstanceId() {
@@ -160,8 +161,8 @@ class IdentityManager {
 }
 
 /**
- * Instância singleton do gerenciador de identidade.
- * Side-effects: Mantém estado de identidade em memória, persiste DNA.
+ * Instância singleton do gerenciador de identidade. Side-effects: Mantém estado de identidade em memória, persiste DNA.
+ *
  * @type {IdentityManager}
  */
 export default new IdentityManager();

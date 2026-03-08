@@ -38,12 +38,12 @@
 
 <script setup>
 // @ts-check
-import { ref, reactive } from 'vue';
-import Modal from '../ui/Modal.vue';
+import { useAuth } from '@/composables/useAuth.js';
+import { useNotifications } from '@/composables/useNotifications.js';
+import { reactive, ref } from 'vue';
 import Button from '../ui/Button.vue';
 import Input from '../ui/Input.vue';
-import { useNotifications } from '@/composables/useNotifications.js';
-import { useAuth } from '@/composables/useAuth.js';
+import Modal from '../ui/Modal.vue';
 
 /**
  * Props do componente LoginModal
@@ -113,6 +113,7 @@ const resetForm = () => {
 
 /**
  * Valida o formulário
+ *
  * @returns {boolean} True se válido
  */
 const validateForm = () => {

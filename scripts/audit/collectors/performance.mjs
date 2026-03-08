@@ -3,23 +3,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runCommand } from '../lib/exec.mjs';
 
-/** @import { RawFinding } from '../normalize/findings.mjs' */
+/** @import {RawFinding} from "../normalize/findings.mjs" */
 
 /**
  * @param {string} rootDir
  * @returns {Promise<{
- *   findings: RawFinding[],
- *   errors: Array<{source:string,message:string}>,
- *   warnings: Array<{source:string,message:string}>,
- *   telemetry: { score: number|null, categories: Record<string, number> }
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ *     telemetry: { score: number | null; categories: Record<string, number> };
  * }>}
  */
 export async function collectPerformanceFindings(rootDir) {
     /** @type {RawFinding[]} */
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
     try {
@@ -29,7 +29,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...complexityResult.errors);
         warnings.push(...complexityResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -44,7 +43,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...memoryResult.errors);
         warnings.push(...memoryResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -59,7 +57,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...queryResult.errors);
         warnings.push(...queryResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -74,7 +71,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...timeoutRaceResult.errors);
         warnings.push(...timeoutRaceResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -89,7 +85,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...ownershipResult.errors);
         warnings.push(...ownershipResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -104,7 +99,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...missionTransitionResult.errors);
         warnings.push(...missionTransitionResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -119,7 +113,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...lockCausalityResult.errors);
         warnings.push(...lockCausalityResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -134,7 +127,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...dashboardAuthResult.errors);
         warnings.push(...dashboardAuthResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -149,7 +141,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...dashboardImportResult.errors);
         warnings.push(...dashboardImportResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -164,7 +155,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...controlSingleEntrypointResult.errors);
         warnings.push(...controlSingleEntrypointResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -179,7 +169,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...pauseToEditResult.errors);
         warnings.push(...pauseToEditResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -194,7 +183,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...vnextCutoverResult.errors);
         warnings.push(...vnextCutoverResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -209,7 +197,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...reassignResult.errors);
         warnings.push(...reassignResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -223,7 +210,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...bootImportSafetyResult.errors);
         warnings.push(...bootImportSafetyResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -237,7 +223,6 @@ export async function collectPerformanceFindings(rootDir) {
         errors.push(...runtimeResourceShutdownResult.errors);
         warnings.push(...runtimeResourceShutdownResult.warnings);
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-collector',
@@ -292,7 +277,11 @@ export async function collectPerformanceFindings(rootDir) {
 
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeComplexity(rootDir) {
     /** @type {any[]} */
@@ -307,7 +296,7 @@ async function analyzeComplexity(rootDir) {
         const eslintResult = await runCommand(
             'npx',
             ['eslint', '--format', 'json', '--rule', 'complexity: [2, 10]', 'src/'],
-            /** @type {any} */ ({ cwd: rootDir })
+            /** @type {any} */ ({ cwd: rootDir }),
         );
 
         if (eslintResult.ok && eslintResult.stdout) {
@@ -347,7 +336,11 @@ async function analyzeComplexity(rootDir) {
 
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeMemoryLeaks(rootDir) {
     /** @type {any[]} */
@@ -388,7 +381,6 @@ async function analyzeMemoryLeaks(rootDir) {
             }
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-memory',
@@ -401,7 +393,11 @@ async function analyzeMemoryLeaks(rootDir) {
 
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeQueryPerformance(rootDir) {
     /** @type {any[]} */
@@ -445,7 +441,11 @@ async function analyzeQueryPerformance(rootDir) {
  * Detecta Promise.race com timeout baseado em setTimeout sem clearTimeout.
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzePromiseRaceTimeoutLeaks(rootDir) {
     /** @type {any[]} */
@@ -483,7 +483,6 @@ async function analyzePromiseRaceTimeoutLeaks(rootDir) {
             }
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-timeout-race',
@@ -498,7 +497,11 @@ async function analyzePromiseRaceTimeoutLeaks(rootDir) {
  * Detecta dispatch direto de task no Kernel fora do QueueWorker (SSOT owner).
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeKernelDispatchOwnership(rootDir) {
     /** @type {any[]} */
@@ -541,7 +544,6 @@ async function analyzeKernelDispatchOwnership(rootDir) {
             }
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-kernel-ownership',
@@ -556,7 +558,11 @@ async function analyzeKernelDispatchOwnership(rootDir) {
  * Detecta unlock sem causalidade de attempt em pontos críticos (queue/projector).
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeLockReleaseCausality(rootDir) {
     /** @type {any[]} */
@@ -596,7 +602,6 @@ async function analyzeLockReleaseCausality(rootDir) {
             }
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-lock-causality',
@@ -611,7 +616,11 @@ async function analyzeLockReleaseCausality(rootDir) {
  * Detecta mutação de status de missão fora do serviço de domínio único.
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeMissionTransitionBypass(rootDir) {
     /** @type {any[]} */
@@ -656,7 +665,6 @@ async function analyzeMissionTransitionBypass(rootDir) {
             }
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-mission-transition',
@@ -671,7 +679,11 @@ async function analyzeMissionTransitionBypass(rootDir) {
  * Detecta credenciais hardcoded na autenticação do dashboard.
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeDashboardAuthInsecure(rootDir) {
     /** @type {any[]} */
@@ -709,7 +721,6 @@ async function analyzeDashboardAuthInsecure(rootDir) {
             });
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-dashboard-auth',
@@ -724,7 +735,11 @@ async function analyzeDashboardAuthInsecure(rootDir) {
  * Detecta side-effect de timer em import de controller dashboard.
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeDashboardImportSideEffects(rootDir) {
     /** @type {any[]} */
@@ -762,7 +777,6 @@ async function analyzeDashboardImportSideEffects(rootDir) {
             });
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-dashboard-import',
@@ -777,7 +791,11 @@ async function analyzeDashboardImportSideEffects(rootDir) {
  * Detecta mutações diretas em controllers sem delegação via control_command_service.
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeControlSingleEntrypoint(rootDir) {
     /** @type {any[]} */
@@ -834,7 +852,6 @@ async function analyzeControlSingleEntrypoint(rootDir) {
             }
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-control-plane',
@@ -849,7 +866,11 @@ async function analyzeControlSingleEntrypoint(rootDir) {
  * Detecta ausência de guardas pause-to-edit nos serviços de controle.
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeControlPauseToEdit(rootDir) {
     /** @type {any[]} */
@@ -905,7 +926,6 @@ async function analyzeControlPauseToEdit(rootDir) {
             }
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-control-pause-edit',
@@ -920,7 +940,11 @@ async function analyzeControlPauseToEdit(rootDir) {
  * Detecta chamadas diretas de mutação /api/tasks e /api/missions em views/stores vNext.
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeDashboardVNextTaskMutationCutover(rootDir) {
     /** @type {any[]} */
@@ -981,7 +1005,6 @@ async function analyzeDashboardVNextTaskMutationCutover(rootDir) {
             }
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-dashboard-vnext-cutover',
@@ -996,7 +1019,11 @@ async function analyzeDashboardVNextTaskMutationCutover(rootDir) {
  * Detecta ausência de contratos mínimos para reassign mission e contexto task↔mission.
  *
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeTaskMissionReassignAndContext(rootDir) {
     /** @type {any[]} */
@@ -1041,7 +1068,6 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
             });
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-task-reassign',
@@ -1080,7 +1106,6 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
             });
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-task-mission-context',
@@ -1093,7 +1118,11 @@ async function analyzeTaskMissionReassignAndContext(rootDir) {
 
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeBootImportSafetyAndSignalOwnership(rootDir) {
     /** @type {any[]} */
@@ -1153,7 +1182,6 @@ async function analyzeBootImportSafetyAndSignalOwnership(rootDir) {
             });
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-runtime-bootstrap',
@@ -1166,7 +1194,11 @@ async function analyzeBootImportSafetyAndSignalOwnership(rootDir) {
 
 /**
  * @param {string} rootDir
- * @returns {Promise<{findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ * }>}
  */
 async function analyzeRuntimeResourceShutdownContracts(rootDir) {
     /** @type {any[]} */
@@ -1216,7 +1248,6 @@ async function analyzeRuntimeResourceShutdownContracts(rootDir) {
             });
         }
     } catch (_rawE) {
-
         const error = /** @type {any} */ (_rawE);
         errors.push({
             source: 'performance-runtime-resource-registry',
@@ -1246,7 +1277,7 @@ function findRegexMatchesWithLine(content, pattern) {
 
 /**
  * @param {string} content
- * @returns {Array<{line:number,evidence:string}>}
+ * @returns {{ line: number; evidence: string }[]}
  */
 function findPromiseRaceTimeoutWithoutCleanup(content) {
     /** @type {any[]} */
@@ -1281,8 +1312,8 @@ function findPromiseRaceTimeoutWithoutCleanup(content) {
 }
 
 /**
- * Retorna blocos de loop que parecem executar queries de dados/rede.
- * Ignora explicitamente padrões de DOM (`querySelector`, `document.*`, `window.*`).
+ * Retorna blocos de loop que parecem executar queries de dados/rede. Ignora explicitamente padrões de DOM
+ * (`querySelector`, `document.*`, `window.*`).
  *
  * @param {string} content
  * @returns {string[]}
@@ -1306,12 +1337,12 @@ function findPotentialNPlusOneLoops(content) {
 
     const matches = content.match(loopPattern) || [];
     for (const loopBlock of matches) {
-        const hasDataQuery = dataQueryPatterns.some(re => re.test(loopBlock));
+        const hasDataQuery = dataQueryPatterns.some((re) => re.test(loopBlock));
         if (!hasDataQuery) {
             continue;
         }
 
-        const hasOnlyDomSignals = domQueryPatterns.some(re => re.test(loopBlock));
+        const hasOnlyDomSignals = domQueryPatterns.some((re) => re.test(loopBlock));
         if (
             hasOnlyDomSignals &&
             !/\b(?:db|repo|repository|model|collection|client|prisma|sequelize|mongoose|knex)\b/i.test(loopBlock)

@@ -61,7 +61,7 @@ const totalPages = computed(() => {
     return Math.ceil(props.tasks.length / pageSize.value);
 });
 
-const sortBy = key => {
+const sortBy = (key) => {
     if (sortKey.value === key) {
         sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
     } else {
@@ -70,7 +70,7 @@ const sortBy = key => {
     }
 };
 
-const getStatusVariant = status => {
+const getStatusVariant = (status) => {
     const variants = {
         RUNNING: 'info',
         PENDING: 'default',
@@ -82,31 +82,31 @@ const getStatusVariant = status => {
     return variants[status] || 'default';
 };
 
-const getPriorityLabel = priority => {
+const getPriorityLabel = (priority) => {
     if (priority >= 8) return 'HIGH';
     if (priority >= 5) return 'MEDIUM';
     return 'LOW';
 };
 
-const getPriorityVariant = priority => {
+const getPriorityVariant = (priority) => {
     if (priority >= 8) return 'error';
     if (priority >= 5) return 'warning';
     return 'default';
 };
 
-const handleView = task => {
+const handleView = (task) => {
     emit('view', task);
 };
 
-const handleEdit = task => {
+const handleEdit = (task) => {
     emit('edit', task);
 };
 
-const handleDelete = task => {
+const handleDelete = (task) => {
     emit('delete', task);
 };
 
-const handleCancel = task => {
+const handleCancel = (task) => {
     emit('cancel', task);
 };
 </script>

@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import * as i18n from '#core/i18n';
-import { runSinglePassValidation } from './scan_engine.js';
 import { log } from '#core/logger';
+import { runSinglePassValidation } from './scan_engine.js';
 
 /**
  * @typedef {object} ValidateTaskResultTaskPayload
@@ -50,7 +50,7 @@ async function validateTaskResult(task, filePath, signal = undefined) {
 
         // 4. EXECUÇÃO DO MOTOR DE VARREDURA (SINGLE-PASS)
         // Delega a leitura eficiente e aplicação de regras ao scan_engine.
-        const result = /** @type {{ok: boolean, reason: string|null}} */ (
+        const result = /** @type {{ ok: boolean; reason: string | null }} */ (
             await runSinglePassValidation(task, filePath, systemErrorTerms, signal)
         );
 

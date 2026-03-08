@@ -19,7 +19,7 @@ test('collectSecurityFindings detecta superfície HTTP sem auth e ausência de h
             'export default app;',
             '',
         ].join('\n'),
-        'utf8'
+        'utf8',
     );
 
     const result = await collectSecurityFindings({
@@ -29,6 +29,6 @@ test('collectSecurityFindings detecta superfície HTTP sem auth e ausência de h
 
     assert.equal(result.errors.length, 0);
     assert.ok(result.telemetry.files_scanned >= 1);
-    assert.ok(result.findings.some(item => item.source_tool === 'security-http-surface'));
-    assert.ok(result.findings.some(item => item.source_tool === 'security-headers'));
+    assert.ok(result.findings.some((item) => item.source_tool === 'security-http-surface'));
+    assert.ok(result.findings.some((item) => item.source_tool === 'security-headers'));
 });

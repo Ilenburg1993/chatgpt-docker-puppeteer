@@ -1,9 +1,9 @@
 // @ts-check
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import assert from 'node:assert';
-import EventEmitter from 'node:events';
 import { createKernel } from '#kernel/kernel';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
+import assert from 'node:assert';
+import EventEmitter from 'node:events';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 // Mock NERV simple (compatível com nerv.onReceive + nerv.emitCommand/emitEvent)
 class MockNERV extends EventEmitter {
@@ -27,7 +27,7 @@ class MockNERV extends EventEmitter {
     }
 
     receive(/** @type {any} */ envelope) {
-        this.receiveHandlers.forEach(h => h(envelope));
+        this.receiveHandlers.forEach((h) => h(envelope));
     }
 
     emitCommand(/** @type {any} */ envelope) {
@@ -107,7 +107,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
             assert.strictEqual(
                 commands[0].payload.actionCode,
                 ActionCode.DRIVER_EXECUTE_TASK,
-                'Comando é DRIVER_EXECUTE_TASK'
+                'Comando é DRIVER_EXECUTE_TASK',
             );
             assert.strictEqual(commands[0].payload.task.meta.id, 'task-single-shot', 'Task ID correto');
 
@@ -164,13 +164,13 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
 
             // No novo modelo SSOT, o Kernel NÃO re-dispatcha retries.
             // Ele encerra/limpa runtime e deixa o worker/DB reagendar.
-            await new Promise(resolve => setTimeout(resolve, 25));
+            await new Promise((resolve) => setTimeout(resolve, 25));
 
             assert.strictEqual(nerv.emittedCommands.length, 1, 'Kernel não deve reenviar task no caminho de retry');
             assert.strictEqual(
                 kernel.getTask('task-retry-payload'),
                 null,
-                'runtime deve ser esquecido após retry solicitado'
+                'runtime deve ser esquecido após retry solicitado',
             );
 
             kernel.stop();
@@ -230,7 +230,7 @@ describe('Kernel Orchestration Integration (V2.0)', () => {
                 },
             });
 
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 100));
 
             kernel.stop();
         });

@@ -5,7 +5,7 @@ import { releaseTaskLock } from '#infra/db/task_repo';
 
 /**
  * @param {string} taskId
- * @returns {string|null}
+ * @returns {string | null}
  */
 function getCurrentAttemptIdForTask(taskId) {
     if (!taskId) return null;
@@ -23,16 +23,16 @@ function getCurrentAttemptIdForTask(taskId) {
 /**
  * @typedef {object} EvaluateAttemptInvariantsParams
  * @property {string} taskId
- * @property {string|null} attemptId
+ * @property {string | null} attemptId
  */
 /**
  * @typedef {object} EvaluateAttemptInvariantsOptions
- * @property {*} [taskId]
- * @property {*} [attemptId]
+ * @property {any} [taskId]
+ * @property {any} [attemptId]
  */
 /**
  * @param {EvaluateAttemptInvariantsParams} params
- * @returns {{ apply: boolean, currentAttemptId: string|null, reason: string }}
+ * @returns {{ apply: boolean; currentAttemptId: string | null; reason: string }}
  */
 function evaluateAttemptInvariants({ taskId, attemptId = null }) {
     if (!attemptId) {
@@ -54,22 +54,22 @@ function evaluateAttemptInvariants({ taskId, attemptId = null }) {
 /**
  * @typedef {object} EmitStaleAttemptIgnoredEventParams
  * @property {string} taskId
- * @property {string|null} attemptId
- * @property {string|null} currentAttemptId
- * @property {string|null} actionCode
- * @property {string|null} correlationId
- * @property {string|null} msgId
+ * @property {string | null} attemptId
+ * @property {string | null} currentAttemptId
+ * @property {string | null} actionCode
+ * @property {string | null} correlationId
+ * @property {string | null} msgId
  * @property {string} context
  */
 /**
  * @typedef {object} EmitStaleAttemptIgnoredEventOptions
- * @property {*} [taskId]
- * @property {*} [attemptId]
- * @property {*} [currentAttemptId]
- * @property {*} [actionCode]
- * @property {*} [correlationId]
- * @property {*} [msgId]
- * @property {*} [context]
+ * @property {any} [taskId]
+ * @property {any} [attemptId]
+ * @property {any} [currentAttemptId]
+ * @property {any} [actionCode]
+ * @property {any} [correlationId]
+ * @property {any} [msgId]
+ * @property {any} [context]
  */
 /**
  * @param {EmitStaleAttemptIgnoredEventParams} params
@@ -109,20 +109,20 @@ function emitStaleAttemptIgnoredEvent({
 /**
  * @typedef {object} ReleaseTaskLockForAttemptParams
  * @property {string} taskId
- * @property {string|null} attemptId
- * @property {string|null} [workerId]
- * @property {string|null} actionCode
- * @property {string|null} correlationId
+ * @property {string | null} attemptId
+ * @property {string | null} [workerId]
+ * @property {string | null} actionCode
+ * @property {string | null} correlationId
  * @property {string} context
  */
 /**
  * @typedef {object} ReleaseTaskLockForAttemptOptions
- * @property {*} [taskId]
- * @property {*} [attemptId]
- * @property {*} [workerId]
- * @property {*} [actionCode]
- * @property {*} [correlationId]
- * @property {*} [context]
+ * @property {any} [taskId]
+ * @property {any} [attemptId]
+ * @property {any} [workerId]
+ * @property {any} [actionCode]
+ * @property {any} [correlationId]
+ * @property {any} [context]
  */
 /**
  * @param {ReleaseTaskLockForAttemptParams} params

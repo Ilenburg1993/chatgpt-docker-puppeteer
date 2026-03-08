@@ -33,7 +33,8 @@ function now() {
 
 /**
  * Clona objeto simples (snapshot defensivo).
- * @param {*} obj
+ *
+ * @param {any} obj
  */
 function clone(obj) {
     return structuredClone(obj);
@@ -46,19 +47,18 @@ function clone(obj) {
 /**
  * @typedef {object} CreateHealthDeps
  * @property {any} telemetry
- * @property {*} [thresholds]
+ * @property {any} [thresholds]
  */
 /**
  * @typedef {object} CreateHealthOptions
- * @property {*} [telemetry]
- * @property {*} [thresholds]
+ * @property {any} [telemetry]
+ * @property {any} [thresholds]
  */
 /**
  * Cria o módulo de saúde técnica do NERV.
  *
- * **Side-effects:** Mantém estado observável, emite telemetria de health.
- * **Semântica:** Agregador de sinais técnicos de saúde operacional.
- * **Unidades:** Thresholds como inteiros (tamanhos de buffer), timestamp em ms.
+ * **Side-effects:** Mantém estado observável, emite telemetria de health. **Semântica:** Agregador de sinais técnicos
+ * de saúde operacional. **Unidades:** Thresholds como inteiros (tamanhos de buffer), timestamp em ms.
  *
  * @param {CreateHealthDeps} deps - Dependências do módulo
  * @param {object} deps
@@ -151,8 +151,7 @@ function createHealth({ telemetry, thresholds = {} }) {
   ========================================================= */
 
     /**
-     * Ingestão genérica de eventos técnicos.
-     * Não interpreta, apenas atualiza estado.
+     * Ingestão genérica de eventos técnicos. Não interpreta, apenas atualiza estado.
      *
      * @param {string} type
      * @param {any} [data]

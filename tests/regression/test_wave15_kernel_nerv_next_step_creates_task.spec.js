@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import test from 'node:test';
 
 import { buildWorkflowNextStepTask } from '#agent/workflow_next_step_builder';
 import { closeDb, getDb } from '#infra/db/sqlite';
@@ -14,11 +14,11 @@ function makeDbPath() {
     fs.mkdirSync(dir, { recursive: true });
     return path.join(
         dir,
-        `maestro-wave15-bridge-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`
+        `maestro-wave15-bridge-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`,
     );
 }
 
-test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicação', async t => {
+test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicação', async (t) => {
     const dbPath = makeDbPath();
     process.env.MAESTRO_DB_PATH = dbPath;
     const db = getDb();
@@ -99,7 +99,7 @@ test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicaç�
         `
         INSERT INTO missions (id, title, description, status, autonomy_mode, policy_json, context_json, created_at_ms, updated_at_ms)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
+    `,
     ).run('mission-wave15', 'mission-wave15', 'test', 'RUNNING', 'USER_ONLY', '{}', '{}', Date.now(), Date.now());
 
     insertTask(parentTask, { stage: 'ARCHIVED', status: 'DONE', actor: 'system', ifNotExists: true });
@@ -141,7 +141,7 @@ test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicaç�
         /** @type {any} */ (
             db
                 .prepare(
-                    "SELECT COUNT(1) AS c FROM events WHERE entity_id = ? AND event_type = 'TASK_ORCHESTRATION_NEXT_STEP_CREATED'"
+                    "SELECT COUNT(1) AS c FROM events WHERE entity_id = ? AND event_type = 'TASK_ORCHESTRATION_NEXT_STEP_CREATED'",
                 )
                 .get(parentTask.meta.id)
         )?.c || 0;

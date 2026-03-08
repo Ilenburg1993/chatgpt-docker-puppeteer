@@ -3,10 +3,11 @@
 /**
  * Runtime Debugger Suite - Node.js Inspect Coverage
  *
- * Executa debugging abrangente com Node inspect em todos os cenários possíveis
- * para identificar bugs de runtime não detectados por testes estáticos.
+ * Executa debugging abrangente com Node inspect em todos os cenários possíveis para identificar bugs de runtime não
+ * detectados por testes estáticos.
  *
  * Estratégia:
+ *
  * 1. Identificar todos os pontos de entrada (main, scripts, testes)
  * 2. Gerar cenários de execução com variações de configuração
  * 3. Executar cada cenário com Node inspect + profiling
@@ -178,7 +179,7 @@ async function executeScenario(entryPoint, config, scenario) {
     console.log(`   📝 ${scenario.description}`);
     console.log(`   ⏱️  Duração: ${scenario.duration}ms`);
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const env = mergeEnv(mergeEnv(process.env, entryPoint.env), config.env);
 
         // Configurar argumentos do Node.js
@@ -198,21 +199,20 @@ async function executeScenario(entryPoint, config, scenario) {
 
         let stdout = '';
         let stderr = '';
-        let timeoutId;
 
         // Coletar output
-        child.stdout.on('data', data => {
+        child.stdout.on('data', (data) => {
             stdout += data.toString();
             process.stdout.write(`[${scenarioId}] ${data}`);
         });
 
-        child.stderr.on('data', data => {
+        child.stderr.on('data', (data) => {
             stderr += data.toString();
             process.stderr.write(`[${scenarioId}] ${data}`);
         });
 
         // Timeout para encerrar o processo
-        timeoutId = setTimeout(() => {
+        const timeoutId = setTimeout(() => {
             console.log(`   ⏰ Timeout atingido, encerrando processo...`);
             try {
                 process.kill(/** @type {number} */ (child.pid), 'SIGTERM');
@@ -242,7 +242,7 @@ async function executeScenario(entryPoint, config, scenario) {
             resolve(result);
         });
 
-        child.on('error', error => {
+        child.on('error', (error) => {
             clearTimeout(timeoutId);
             console.error(`   ❌ Erro no cenário: ${error.message}`);
 
@@ -266,9 +266,9 @@ async function executeScenario(entryPoint, config, scenario) {
 function analyzeResults(results) {
     console.log('\n📊 ANÁLISE DE RESULTADOS\n');
 
-    const successful = results.filter(r => !r.error && r.exitCode === 0);
-    const failed = results.filter(r => r.error || r.exitCode !== 0);
-    const errors = results.filter(r => r.stderr && r.stderr.includes('Error'));
+    const successful = results.filter((r) => !r.error && r.exitCode === 0);
+    const failed = results.filter((r) => r.error || r.exitCode !== 0);
+    const errors = results.filter((r) => r.stderr && r.stderr.includes('Error'));
 
     console.log(`✅ Cenários bem-sucedidos: ${successful.length}`);
     console.log(`❌ Cenários com falha: ${failed.length}`);
@@ -276,16 +276,16 @@ function analyzeResults(results) {
 
     if (errors.length > 0) {
         console.log('\n🔍 ERROS DETECTADOS:');
-        errors.forEach(error => {
+        errors.forEach((error) => {
             console.log(
-                `   • ${error.scenarioId}: ${error.stderr.split('\n').find((/** @type {string} */ line) => line.includes('Error')) || 'Erro genérico'}`
+                `   • ${error.scenarioId}: ${error.stderr.split('\n').find((/** @type {string} */ line) => line.includes('Error')) || 'Erro genérico'}`,
             );
         });
     }
 
     // Analisar padrões de falha
     const errorPatterns = /** @type {Record<string, number>} */ ({});
-    results.forEach(result => {
+    results.forEach((result) => {
         if (result.stderr) {
             const lines = result.stderr.split('\n');
             lines.forEach((/** @type {string} */ line) => {
@@ -388,7 +388,7 @@ function generateHtmlReport(analysis) {
             ${result.error ? `<p class="error">Error: ${result.error}</p>` : ''}
             ${result.stderr ? `<pre class="error">${result.stderr.slice(0, 500)}...</pre>` : ''}
         </div>
-    `
+    `,
         )
         .join('')}
 </body>
@@ -401,6 +401,7 @@ function generateHtmlReport(analysis) {
 
 /**
  * Função exportada: runRuntimeDebugSuite.
+ *
  * @returns {Promise<void>}
  */
 async function main() {
@@ -426,7 +427,7 @@ async function main() {
                     results.push(result);
 
                     // Pequena pausa entre cenários para evitar interferência
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
                 } catch (error) {
                     const _ce = /** @type {any} */ (error);
                     console.error(`❌ Erro crítico no cenário: ${_ce.message}`);

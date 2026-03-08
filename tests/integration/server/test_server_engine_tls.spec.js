@@ -1,16 +1,16 @@
 // @ts-check
-import test from 'node:test';
+import * as serverEngine from '#server/engine/server';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import path from 'node:path';
-import * as serverEngine from '#server/engine/server';
+import test from 'node:test';
 
 async function getFreePort() {
     const server = net.createServer();
-    await /** @type {Promise<void>} */ (new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve())));
+    await /** @type {Promise<void>} */ (new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve())));
     const address = server.address();
     const port = /** @type {any} */ (address).port;
-    await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
+    await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     return port;
 }
 
@@ -46,7 +46,7 @@ test('server engine falls back to HTTP in dev when FORCE_HTTPS=true and certs ar
             SSL_KEY_PATH: path.join(process.cwd(), 'ssl', 'missing.key'),
             SSL_CERT_PATH: path.join(process.cwd(), 'ssl', 'missing.cert'),
         },
-        async () => serverEngine.start(port)
+        async () => serverEngine.start(port),
     );
 
     try {
@@ -65,7 +65,7 @@ test('server engine starts in HTTPS when FORCE_HTTPS=true and cert files exist',
             SSL_KEY_PATH: path.join(process.cwd(), 'ssl', 'key.pem'),
             SSL_CERT_PATH: path.join(process.cwd(), 'ssl', 'cert.pem'),
         },
-        async () => serverEngine.start(port)
+        async () => serverEngine.start(port),
     );
 
     try {

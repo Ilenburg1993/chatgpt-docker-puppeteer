@@ -1,7 +1,7 @@
 // @ts-check
-import { defineStore } from 'pinia';
-import { http, formatHttpError } from '@/lib/http';
+import { formatHttpError, http } from '@/lib/http';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import { defineStore } from 'pinia';
 
 function _normalizeUpper(/** @type {any} */ value) {
     return value ? String(value).toUpperCase().trim() : null;
@@ -73,14 +73,14 @@ async function _syncMissionAndTasksContext(/** @type {any} */ missionId) {
 
 /**
  * @typedef {object} ResolveIfVersionMission
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
- * Deriva o ifVersion do objeto de missão retornado pela API.
- * A API retorna `updated_at` como ISO string; convertemos para ms via Date.parse
- * para enviar ao control plane (que compara com updated_at_ms no DB).
+ * Deriva o ifVersion do objeto de missão retornado pela API. A API retorna `updated_at` como ISO string; convertemos
+ * para ms via Date.parse para enviar ao control plane (que compara com updated_at_ms no DB).
+ *
  * @param {ResolveIfVersionMission} mission
- * @returns {number|null}
+ * @returns {number | null}
  */
 function _resolveIfVersion(/** @type {any} */ mission) {
     if (!mission) return null;
@@ -118,7 +118,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
         selectedEvents: [],
     }),
     getters: {
-        getById: state => (/** @type {any} */ id) => state.byId.get(String(/** @type {any} */ id)) || null,
+        getById: (state) => (/** @type {any} */ id) => state.byId.get(String(/** @type {any} */ id)) || null,
     },
     actions: {
         reset() {
@@ -149,7 +149,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
             } catch (/** @type {any} */ _rawErr) {
-    const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loading = false;
@@ -174,7 +174,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
             } catch (/** @type {any} */ _rawErr) {
-    const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loadingMore = false;
@@ -210,7 +210,10 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             }
         },
 
-        async fetchMissionTasks(/** @type {any} */ missionId, { stage = null, status = null, limit = 200, cursor = null } = {}) {
+        async fetchMissionTasks(
+            /** @type {any} */ missionId,
+            { stage = null, status = null, limit = 200, cursor = null } = {},
+        ) {
             const params = /** @type {any} */ ({ limit });
             if (cursor) params.cursor = cursor;
             if (stage) params.stage = stage;
@@ -297,7 +300,10 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             await _syncMissionAndTasksContext(missionId);
             return result;
         },
-        async updatePolicy(/** @type {any} */ missionId, /** @type {any} */ { autonomy_mode, policy, reason = 'Atualização de policy/autonomia da missão' }) {
+        async updatePolicy(
+            /** @type {any} */ missionId,
+            /** @type {any} */ { autonomy_mode, policy, reason = 'Atualização de policy/autonomia da missão' },
+        ) {
             const mission = this.getById(missionId) || this.selected || null;
             // BUG-UI-1 fix: use _resolveIfVersion for correct optimistic locking
             const ifVersion = _resolveIfVersion(mission);
@@ -322,6 +328,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
 
         /**
          * Adiciona feedback textual a uma missão via REST (não passa pelo control plane).
+         *
          * @param {string} missionId
          * @param {string} feedback
          */
@@ -331,10 +338,10 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
         },
 
         /**
-         * Solicita sugestão de tasks via LLM (planner task).
-         * Requer missão RUNNING e autonomy_mode ≠ USER_ONLY.
+         * Solicita sugestão de tasks via LLM (planner task). Requer missão RUNNING e autonomy_mode ≠ USER_ONLY.
+         *
          * @param {string} missionId
-         * @param {{ max_proposals?: number, target?: string }} [payload]
+         * @param {{ max_proposals?: number; target?: string }} [payload]
          */
         async suggestTasks(missionId, payload = {}) {
             const res = await http.post(`/api/missions/${missionId}/suggest-tasks`, payload);
@@ -343,8 +350,9 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
 
         /**
          * Rejeita proposals (tasks em stage=PROPOSED) de uma missão.
+         *
          * @param {string} missionId
-         * @param {{ all?: boolean, task_ids?: string[] }} payload
+         * @param {{ all?: boolean; task_ids?: string[] }} payload
          */
         async rejectProposals(missionId, payload) {
             const res = await http.post(`/api/missions/${missionId}/proposals/reject`, payload);
@@ -354,6 +362,7 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
 
         /**
          * Aceita proposals como tasks READY via REST (não passa pelo control plane).
+         *
          * @param {string} missionId
          * @param {{ proposals: unknown[] }} payload
          */

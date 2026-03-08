@@ -28,8 +28,7 @@ const DEFAULT_DNA = {
 let cachedDna = null;
 
 /**
- * Cria backup do DNA atual antes de evolução.
- * Mantém últimas 10 versões em memory (hot backup).
+ * Cria backup do DNA atual antes de evolução. Mantém últimas 10 versões em memory (hot backup).
  *
  * @private
  * @param {any} dna - DNA atual a ser backupeado
@@ -64,8 +63,7 @@ function backupDna(/** @type {any} */ dna) {
 }
 
 /**
- * Recupera o DNA completo do sistema.
- * Implementa cache em RAM com fallback para disco e inicialização V4 Gold.
+ * Recupera o DNA completo do sistema. Implementa cache em RAM com fallback para disco e inicialização V4 Gold.
  *
  * @returns {Promise<any>} Objeto DNA validado.
  */
@@ -126,14 +124,14 @@ async function getDna() {
 
 /**
  * @typedef {object} SaveDnaDna
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Persiste a evolução do DNA, atualizando metadados e invalidando o cache.
  *
  * @param {any} dna - Novo objeto de DNA.
  * @param {string} author - Identificador da entidade que evoluiu o DNA (ex: 'SADI_V19').
-  * @returns {Promise<any>}
+ * @returns {Promise<any>}
  */
 async function saveDna(dna, author = 'system') {
     try {
@@ -162,7 +160,7 @@ async function saveDna(dna, author = 'system') {
 
         log(
             'INFO',
-            `[DNA_STORE] DNA Evoluído: v${validatedDna._meta.version} por ${author} (${validatedDna._meta.evolution_count} evoluções totais)`
+            `[DNA_STORE] DNA Evoluído: v${validatedDna._meta.version} por ${author} (${validatedDna._meta.evolution_count} evoluções totais)`,
         );
         return true;
     } catch (/** @type {any} */ e) {
@@ -198,9 +196,10 @@ async function getTargetRules(domain) {
 }
 
 /**
- * Invalida o cache em RAM.
- * Chamado pela fachada de IO quando sinais externos (Watchers) detectam mudanças manuais no disco.
-  * @returns {any}
+ * Invalida o cache em RAM. Chamado pela fachada de IO quando sinais externos (Watchers) detectam mudanças manuais no
+ * disco.
+ *
+ * @returns {any}
  */
 function invalidateCache() {
     cachedDna = null;
@@ -217,7 +216,7 @@ function invalidateCache() {
 async function rollbackDna(versionIndex = 0) {
     if (versionIndex < 0 || versionIndex >= DNA_HISTORY.length) {
         throw new Error(
-            `DNA_ROLLBACK_FAILED: Versão ${versionIndex} não existe no histórico (disponíveis: 0-${DNA_HISTORY.length - 1})`
+            `DNA_ROLLBACK_FAILED: Versão ${versionIndex} não existe no histórico (disponíveis: 0-${DNA_HISTORY.length - 1})`,
         );
     }
 
@@ -233,10 +232,10 @@ async function rollbackDna(versionIndex = 0) {
 /**
  * Retorna histórico de versões do DNA (somente metadados).
  *
- * @returns {Array<object>} - Array com {version, timestamp, evolution_count}
+ * @returns {object[]} - Array com {version, timestamp, evolution_count}
  */
 function getDnaHistory() {
-    return DNA_HISTORY.map(backup => ({
+    return DNA_HISTORY.map((backup) => ({
         version: backup.version,
         timestamp: backup.timestamp,
         evolution_count: backup.snapshot._meta?.evolution_count || 0,

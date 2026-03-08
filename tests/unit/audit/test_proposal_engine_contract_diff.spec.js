@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { buildProposalV3 } from '../../../scripts/audit/triage/proposal_engine_v3.mjs';
 
 test('proposal engine builds contract-aware diff for process.exit violations', () => {

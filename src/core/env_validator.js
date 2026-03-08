@@ -3,8 +3,9 @@ import { log } from '#core/logger';
 
 /**
  * Esquema de validação para variável de ambiente.
+ *
  * @typedef {object} EnvVariableSpec
- * @property {'FATAL'|'ERROR'|'WARN'} level - Nível de criticidade da variável.
+ * @property {'FATAL' | 'ERROR' | 'WARN'} level - Nível de criticidade da variável.
  * @property {(val: string) => boolean} validator - Função validadora para o valor.
  * @property {string} default - Valor padrão se não definido.
  * @property {string} message - Mensagem de erro para validação falhada.
@@ -12,36 +13,36 @@ import { log } from '#core/logger';
 
 /**
  * Resultado da validação de ambiente.
+ *
  * @typedef {object} ValidationResult
  * @property {boolean} valid - Se todas as validações passaram.
- * @property {Array<{key: string, level: string, message: string}>} errors - Lista de erros de validação.
- * @property {Array<{key: string, level: string, message: string}>} warnings - Lista de avisos de validação.
+ * @property {{ key: string; level: string; message: string }[]} errors - Lista de erros de validação.
+ * @property {{ key: string; level: string; message: string }[]} warnings - Lista de avisos de validação.
  * @property {Record<string, string>} env - Valores ENV resolvidos (com defaults aplicados).
  */
 
 /**
  * Opções para validação de ambiente.
+ *
  * @typedef {object} ValidationOptions
- * @property {boolean} [throwOnError=true] - Lançar erro se validação FATAL/ERROR falhar.
- * @property {boolean} [applyDefaults=true] - Aplicar valores padrão para variáveis faltantes.
- * @property {boolean} [verbose=false] - Logar todos os resultados de validação.
+ * @property {boolean} [throwOnError=true] - Lançar erro se validação FATAL/ERROR falhar. Default is `true`
+ * @property {boolean} [applyDefaults=true] - Aplicar valores padrão para variáveis faltantes. Default is `true`
+ * @property {boolean} [verbose=false] - Logar todos os resultados de validação. Default is `false`
  */
 
 /**
  * Environment Variable Validator
  *
- * Validates required environment variables at startup to fail-fast
- * instead of failing silently during runtime.
+ * Validates required environment variables at startup to fail-fast instead of failing silently during runtime.
  *
- * Usage:
- *   import { validateEnv } from '#core/env_validator';
- *   validateEnv(); // Throws if critical ENVs missing
+ * Usage: import { validateEnv } from '#core/env_validator'; validateEnv(); // Throws if critical ENVs missing
  */
 
 /**
  * ENV variable definitions with validation rules
  *
  * Criticality levels:
+ *
  * - FATAL: Process cannot start without this (hard requirement)
  * - ERROR: Feature will fail but process can start (soft requirement)
  * - WARN: Optional but recommended
@@ -76,19 +77,22 @@ const ENV_SCHEMA = {
     // [2] INFRASTRUCTURE VARIABLES (Connectivity)
     SERVER_PORT: {
         level: 'ERROR',
-        validator: (/** @type {any} */ val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0 && parseInt(val, 10) < 65536,
+        validator: (/** @type {any} */ val) =>
+            !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0 && parseInt(val, 10) < 65536,
         default: '3008',
         message: 'Must be a valid port number (1-65535)',
     },
     CHROME_PROXY_PORT: {
         level: 'ERROR',
-        validator: (/** @type {any} */ val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0 && parseInt(val, 10) < 65536,
+        validator: (/** @type {any} */ val) =>
+            !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0 && parseInt(val, 10) < 65536,
         default: '9224',
         message: 'Must be a valid port number (1-65535)',
     },
     CHROME_PORT: {
         level: 'ERROR',
-        validator: (/** @type {any} */ val) => !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0 && parseInt(val, 10) < 65536,
+        validator: (/** @type {any} */ val) =>
+            !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0 && parseInt(val, 10) < 65536,
         default: '9225',
         message: 'Must be a valid port number (1-65535)',
     },
@@ -222,7 +226,8 @@ const ENV_SCHEMA = {
     },
     RAG_THROTTLE_TARGET_CPU: {
         level: 'WARN',
-        validator: (/** @type {any} */ val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 20 && parseFloat(val) <= 95,
+        validator: (/** @type {any} */ val) =>
+            !isNaN(parseFloat(val)) && parseFloat(val) >= 20 && parseFloat(val) <= 95,
         default: '72',
         message: 'Must be a number between 20 and 95',
     },
@@ -457,7 +462,7 @@ const ENV_SCHEMA = {
             if (!raw) return true;
             try {
                 const parsed = JSON.parse(raw);
-                return Array.isArray(parsed) && parsed.every(x => typeof x === 'string');
+                return Array.isArray(parsed) && parsed.every((x) => typeof x === 'string');
             } catch {
                 return false;
             }
@@ -490,16 +495,16 @@ const ENV_SCHEMA = {
 /**
  * Validate environment variables against schema
  *
+ * @example
+ *     // At process startup
+ *     validateEnv({ throwOnError: true });
+ *
+ *     // For testing
+ *     const result = validateEnv({ throwOnError: false });
+ *     console.log(result.errors);
+ *
  * @param {ValidationOptions} options - Validation options
  * @returns {ValidationResult}
- *
- * @example
- * // At process startup
- * validateEnv({ throwOnError: true });
- *
- * // For testing
- * const result = validateEnv({ throwOnError: false });
- * console.log(result.errors);
  */
 export function validateEnv(options = {}) {
     const { throwOnError = true, applyDefaults = true, verbose = false } = options;
@@ -698,11 +703,11 @@ export function validateEnv(options = {}) {
 
     // Throw if configured and has fatal/error level issues
     if (throwOnError && hasErrors) {
-        const fatalErrors = errors.filter(e => e.level === 'FATAL' || e.level === 'ERROR');
+        const fatalErrors = errors.filter((e) => e.level === 'FATAL' || e.level === 'ERROR');
         if (fatalErrors.length > 0) {
             throw new Error(
                 `ENV validation failed with ${fatalErrors.length} critical error(s). ` +
-                    `Fix the issues above and restart the process.`
+                    `Fix the issues above and restart the process.`,
             );
         }
     }
@@ -718,11 +723,11 @@ export function validateEnv(options = {}) {
 /**
  * Get ENV variable with validation and default
  *
- * @param {string} key - ENV variable name
- * @returns {string|undefined} - ENV value or undefined if not in schema
- *
  * @example
- * const port = getEnv('SERVER_PORT'); // Returns validated value or default
+ *     const port = getEnv('SERVER_PORT'); // Returns validated value or default
+ *
+ * @param {string} key - ENV variable name
+ * @returns {string | undefined} - ENV value or undefined if not in schema
  */
 export function getEnv(key) {
     const spec = /** @type {any} */ (ENV_SCHEMA)[key];
@@ -742,13 +747,13 @@ export function getEnv(key) {
 /**
  * Check if ENV variable is set and valid
  *
+ * @example
+ *     if (hasEnv('DASHBOARD_PASSWORD')) {
+ *         // Password-protect dashboard
+ *     }
+ *
  * @param {string} key - ENV variable name
  * @returns {boolean}
- *
- * @example
- * if (hasEnv('DASHBOARD_PASSWORD')) {
- *   // Password-protect dashboard
- * }
  */
 export function hasEnv(key) {
     const value = process.env[key];

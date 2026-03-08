@@ -3,9 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ActionCode, ActorRole, MessageType, PROTOCOL_VERSION } from './constants.js';
 
 /**
- * --------------------------------------------------------------------------
- * INTERNAL GUARDS
- * --------------------------------------------------------------------------
+ * ## INTERNAL GUARDS
  */
 
 /**
@@ -28,7 +26,7 @@ function assertUUID(value, field) {
     assert(typeof value === 'string', `${field} must be a string`);
     assert(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value),
-        `${field} must be a valid UUID`
+        `${field} must be a valid UUID`,
     );
 }
 
@@ -37,23 +35,22 @@ function assertUUID(value, field) {
  * @property {import('./constants.js').ActorRole} actor - Papel do ator emissor
  * @property {import('./constants.js').MessageType} messageType - Tipo ontológico da mensagem
  * @property {import('./constants.js').ActionCode} actionCode - Código semântico da ação
- * @property {Record<string, unknown>} [payload={}] - Payload semântico da mensagem
- * @property {string|null} [correlationId=null] - ID de correlação
- * @property {import('./constants.js').ActorRole|null} [target=null] - Papel do ator alvo
+ * @property {Record<string, unknown>} [payload={}] - Payload semântico da mensagem. Default is `{}`
+ * @property {string | null} [correlationId=null] - ID de correlação. Default is `null`
+ * @property {import('./constants.js').ActorRole | null} [target=null] - Papel do ator alvo. Default is `null`
  */
 
 /**
  * @typedef {object} NERVEnvelope
- * @property {{ version: string, timestamp: number }} protocol
- * @property {{ actor: import('./constants.js').ActorRole, target: import('./constants.js').ActorRole|null }} identity
- * @property {{ msg_id: string, correlation_id: string }} causality
- * @property {{ message_type: import('./constants.js').MessageType, action_code: import('./constants.js').ActionCode }} type
+ * @property {{ version: string; timestamp: number }} protocol
+ * @property {{ actor: import('./constants.js').ActorRole; target: import('./constants.js').ActorRole | null }} identity
+ * @property {{ msg_id: string; correlation_id: string }} causality
+ * @property {{ message_type: import('./constants.js').MessageType; action_code: import('./constants.js').ActionCode }} type
  * @property {Record<string, unknown>} payload
  */
 
 /**
- * Cria envelope IPC imutável seguindo protocolo NERV.
- * Sem defaults que ocultem intenção. Nenhum campo é inferido.
+ * Cria envelope IPC imutável seguindo protocolo NERV. Sem defaults que ocultem intenção. Nenhum campo é inferido.
  *
  * @param {NERVEnvelopeParams} params - Parâmetros para criação do envelope
  * @returns {NERVEnvelope} Envelope NERV válido e imutável
@@ -105,7 +102,7 @@ function createEnvelope(params) {
      * ---------------------------------------------------------------------- */
     assert(
         typeof payload === 'object' && payload !== null && !Array.isArray(payload),
-        'Payload must be a plain object'
+        'Payload must be a plain object',
     );
 
     /* ------------------------------------------------------------------------
@@ -142,9 +139,8 @@ function createEnvelope(params) {
 }
 
 /**
- * --------------------------------------------------------------------------
- * DEEP FREEZE
- * --------------------------------------------------------------------------
+ * ## DEEP FREEZE
+ *
  * Ensures total immutability of the envelope.
  */
 /**
@@ -168,6 +164,7 @@ function deepFreeze(obj) {
 // and returns a canonical, validated envelope.
 /**
  * Normaliza envelopes NERV de diferentes formatos para o formato canônico
+ *
  * @param {Record<string, any>} envelope - Envelope a ser normalizado (canônico ou legado)
  * @returns {any} Envelope NERV canônico e validado
  * @throws {Error} Se o envelope não puder ser normalizado
@@ -222,6 +219,7 @@ function normalize(envelope) {
 
 /**
  * Valida envelope NERV (canônico ou achatado) lançando erro se inválido
+ *
  * @param {Record<string, any>} envelope - Envelope a ser validado
  * @returns {boolean} true se válido
  * @throws {Error} Se o envelope for inválido

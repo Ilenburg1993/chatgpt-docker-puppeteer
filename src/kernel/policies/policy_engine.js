@@ -1,6 +1,6 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { ActionCode, MessageType } from '#shared/nerv/constants';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
 
 /** Classe exportada: default. */
 class PolicyEngine {
@@ -16,9 +16,10 @@ class PolicyEngine {
     }
 
     /**
-     * O Método Principal de Julgamento.
-     * Chamado pelo Core a cada tick.
-     * * @param {any} state - Snapshot da memória de longo prazo (TaskStore).
+     * O Método Principal de Julgamento. Chamado pelo Core a cada tick.
+     *
+     * - @param {any} state - Snapshot da memória de longo prazo (TaskStore).
+     *
      * @param {unknown[]} observations - Lista de novos eventos (ObservationStore).
      * @returns {unknown[]} Lista de Propostas (Decisões).
      */
@@ -116,7 +117,9 @@ class PolicyEngine {
      */
     async _createRejectionEnvelope(originalObs, reason) {
         // Cria um envelope virtual para ser enviado pelo NERV
-        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => /** @type {any} */ (m).default ?? m);
+        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(
+            (m) => /** @type {any} */ (m).default ?? m,
+        );
         const { ActorRole } = await import('#shared/nerv/constants');
 
         return HighLevelNERV.makeEnvelope({
@@ -134,7 +137,9 @@ class PolicyEngine {
      * @param {any} reason
      */
     async _createTaskFailedEnvelope(task, reason) {
-        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(m => /** @type {any} */ (m).default ?? m);
+        const HighLevelNERV = await import('#nerv/adapters/high_level_adapter').then(
+            (m) => /** @type {any} */ (m).default ?? m,
+        );
         const { ActorRole } = await import('#shared/nerv/constants');
 
         return HighLevelNERV.makeEnvelope({

@@ -1,5 +1,6 @@
 /**
  * Type declarations for ChromeProxyService
+ *
  * @module chromeProxyService
  */
 

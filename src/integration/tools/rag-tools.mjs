@@ -2,16 +2,17 @@
 /**
  * RAG Tools for Tool Registry
  *
- * Wraps existing RAG v3.0 backend (tools/rag/lib/facade.mjs)
- * Implements tools for semantic code search and health checks
+ * Wraps existing RAG v3.0 backend (tools/rag/lib/facade.mjs) Implements tools for semantic code search and health
+ * checks
  *
  * Tools:
+ *
  * - rag_search: Hybrid/lexical semantic search (with degraded fallback)
  * - rag_health: RAG system health check (LanceDB, Ollama, cache)
  * - rag_expand: Context expansion by chunk_id (lines or symbol span)
  */
 
-import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../../tools/rag/lib/facade.mjs';
+import { getRagCacheStats, ragExpand, ragHealth, ragHybridSearch } from '../../../tools/rag/lib/facade.mjs';
 
 /**
  * @typedef {object} RagSearchHandlerParams
@@ -19,39 +20,40 @@ import { ragHybridSearch, ragHealth, ragExpand, getRagCacheStats } from '../../.
  * @property {number} topK
  * @property {string} pathPrefix
  * @property {string} ext
- * @property {'core'|'dev'|'full'} profile
- * @property {'hybrid'|'lexical-only'|'auto'} mode
- * @property {'code-first'|'docs-first'|'all'} intent_scope
+ * @property {'core' | 'dev' | 'full'} profile
+ * @property {'hybrid' | 'lexical-only' | 'auto'} mode
+ * @property {'code-first' | 'docs-first' | 'all'} intent_scope
  * @property {boolean} auto_expand
- * @property {'lines'|'symbol'} expand_mode
+ * @property {'lines' | 'symbol'} expand_mode
  * @property {number} expand_top_n
  * @property {boolean} includeDiagnostics
  */
 /**
  * @typedef {object} RagSearchHandlerOptions
- * @property {*} [query]
- * @property {*} [topK]
- * @property {*} [pathPrefix]
- * @property {*} [ext]
- * @property {*} [profile]
- * @property {*} [mode]
- * @property {*} [intent_scope]
- * @property {*} [auto_expand]
- * @property {*} [expand_mode]
- * @property {*} [expand_top_n]
- * @property {*} [includeDiagnostics]
+ * @property {any} [query]
+ * @property {any} [topK]
+ * @property {any} [pathPrefix]
+ * @property {any} [ext]
+ * @property {any} [profile]
+ * @property {any} [mode]
+ * @property {any} [intent_scope]
+ * @property {any} [auto_expand]
+ * @property {any} [expand_mode]
+ * @property {any} [expand_top_n]
+ * @property {any} [includeDiagnostics]
  */
 /**
  * rag_search tool: Hybrid semantic search
  *
  * Searches the chatgpt-docker-puppeteer codebase using:
+ *
  * - Vector search (semantic understanding)
  * - Full-text search (exact term matching)
  * - Multi-signal reranking (6 signals)
  * - MMR diversity (avoids redundant results)
  *
  * @param {RagSearchHandlerParams} params - Search parameters
- * @returns {Promise<{text:string,json?:any,flags:any}>} Structured tool result
+ * @returns {Promise<{ text: string; json?: any; flags: any }>} Structured tool result
  */
 async function ragSearchHandler({
     query,
@@ -91,7 +93,7 @@ async function ragSearchHandler({
                 rerank: true,
                 mmr: true,
                 mmrLambda: 0.7,
-            })
+            }),
         );
 
         console.error(`[RAG Tool] Found ${result.results.length} results`);
@@ -275,6 +277,7 @@ async function ragSearchHandler({
  * rag_health tool: RAG system health check
  *
  * Checks the health of all RAG components:
+ *
  * - LanceDB (vector database)
  * - Ollama (embedding model)
  * - Cache statistics
@@ -407,7 +410,7 @@ async function ragExpandHandler(/** @type {any} */ { chunk_id, before_lines, aft
 
 /**
  * @typedef {object} RegisterRagToolsRegistry
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Register RAG tools in the Tool Registry
@@ -504,7 +507,7 @@ Examples:
                 required: ['query'],
             },
         },
-        ragSearchHandler
+        ragSearchHandler,
     );
 
     // rag_health
@@ -517,7 +520,7 @@ Examples:
                 properties: {},
             },
         },
-        ragHealthHandler
+        ragHealthHandler,
     );
 
     registry.register(
@@ -551,7 +554,7 @@ Examples:
                 required: ['chunk_id'],
             },
         },
-        ragExpandHandler
+        ragExpandHandler,
     );
 
     console.error('[RAG Tools] Registered 3 tools: rag_search, rag_health, rag_expand');

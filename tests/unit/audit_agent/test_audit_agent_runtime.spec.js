@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { AuditAgentRuntime } from '../../../src/audit_agent/runtime.js';
 
 test('AuditAgentRuntime creates, queues and processes quick audit jobs to completed', async () => {
@@ -30,7 +30,7 @@ test('AuditAgentRuntime patch-like job ends in waiting approval', async () => {
 });
 
 test('AuditAgentRuntime passes job to contextBuilder.collectQuickContext', async () => {
-    /** @type {string|null} */
+    /** @type {string | null} */
     let seenJobId = null;
     /** @type {any} */
     let seenScope = null;

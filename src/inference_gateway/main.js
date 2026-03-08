@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // @ts-check
 
-import { createInferenceGatewayServer } from './server.js';
 import { inferenceGateway } from './gateway.js';
 import { loadInferencePoliciesFromDb } from './persistence.js';
+import { createInferenceGatewayServer } from './server.js';
 
 const enabled = String(process.env.INFERENCE_GATEWAY_ENABLED || 'false').toLowerCase() === 'true';
 if (!enabled) {

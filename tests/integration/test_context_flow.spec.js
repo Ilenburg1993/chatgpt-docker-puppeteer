@@ -1,11 +1,11 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it, before, after } from 'node:test';
-import { ContextManager, CHUNKING_STRATEGY } from '#orchestrator/context_manager';
 import { MissionManager } from '#missions/mission_manager';
 import { MissionStateManager } from '#missions/mission_state_manager';
-import path from 'node:path';
+import { CHUNKING_STRATEGY, ContextManager } from '#orchestrator/context_manager';
 import fs from 'fs/promises';
+import assert from 'node:assert';
+import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 
 describe('Context Flow Integration Tests', () => {
     /** @type {any} */ let contextManager;
@@ -98,12 +98,12 @@ describe('Context Flow Integration Tests', () => {
             await contextManager.addStepOutput(
                 testMissionId,
                 'step-1',
-                'Chapter outline: Introduction, Chapter 1, Chapter 2'
+                'Chapter outline: Introduction, Chapter 1, Chapter 2',
             );
             await contextManager.addStepOutput(
                 testMissionId,
                 'step-2',
-                'Chapter 1: This is the first chapter about Accumulation'
+                'Chapter 1: This is the first chapter about Accumulation',
             );
             await contextManager.addStepOutput(testMissionId, 'step-3', 'Chapter 2: This continues the topic');
 

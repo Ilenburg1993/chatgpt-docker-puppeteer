@@ -2,18 +2,19 @@
 import { normalizeContentClass, normalizeIntentScope } from '../content_class.mjs';
 
 /**
- * Multi-signal reranking for RAG search results
- * Combines 6 signals: semantic, lexical, recency, fileType, length, position
- * Improves precision @ top 3 from ~60% to >80%
+ * Multi-signal reranking for RAG search results Combines 6 signals: semantic, lexical, recency, fileType, length,
+ * position Improves precision @ top 3 from ~60% to >80%
  */
 
 /**
  * Rerank search results using multiple signals
+ *
  * @param {object[]} results - Search results from hybrid search
  * @param {string} query - Original query text
  * @param {object} options - Reranking options
- * @param {'code-first'|'docs-first'|'all'} [options.intentScope] - Ranking bias by content class
- * @param {any} [options.weights] - Weight for each signal (default: semantic=0.5, lexical=0.2, recency=0.1, fileType=0.1, length=0.05, position=0.05)
+ * @param {'code-first' | 'docs-first' | 'all'} [options.intentScope] - Ranking bias by content class
+ * @param {any} [options.weights] - Weight for each signal (default: semantic=0.5, lexical=0.2, recency=0.1,
+ *   fileType=0.1, length=0.05, position=0.05)
  * @returns {object[]} - Reranked results with rerank_score and rerank_signals
  */
 export function rerank(/** @type {any} */ results, /** @type {any} */ query, /** @type {any} */ options = {}) {
@@ -40,7 +41,7 @@ export function rerank(/** @type {any} */ results, /** @type {any} */ query, /**
         ...results.map((/** @type {any} */ r) => {
             const ts = r.indexed_at;
             return ts ? Number(ts) : 0;
-        })
+        }),
     );
 
     // Calculate rerank score for each result
@@ -118,8 +119,8 @@ export function rerank(/** @type {any} */ results, /** @type {any} */ query, /**
 }
 
 /**
- * Simple tokenizer for lexical matching
- * Splits on whitespace and filters tokens < 3 chars
+ * Simple tokenizer for lexical matching Splits on whitespace and filters tokens < 3 chars
+ *
  * @param {string} text - Text to tokenize
  * @returns {string[]} - Tokens
  */

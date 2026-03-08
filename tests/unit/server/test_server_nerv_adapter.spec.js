@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
+import { beforeEach, describe, it } from 'node:test';
 import sinon from 'sinon';
 
 describe('Server NERV Adapter - Integração Server-NERV', () => {
@@ -37,7 +37,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             const listeners = ['TASK_STATE_CHANGE', 'TASK_COMPLETED', 'TASK_FAILED', 'AGENT_STATUS_UPDATE'];
 
             // Simular registro
-            listeners.forEach(event => {
+            listeners.forEach((event) => {
                 mockNERV.on(event, () => {});
             });
 
@@ -134,7 +134,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 { type: 'ERROR', severity: 'ERROR' },
             ];
 
-            const filtered = events.filter(e => e.severity !== 'DEBUG');
+            const filtered = events.filter((e) => e.severity !== 'DEBUG');
 
             assert.strictEqual(filtered.length, 2);
         });
@@ -150,7 +150,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
                 /** @type {any} */ (acc)[evt.taskId] = /** @type {any} */ (acc)[evt.taskId] || [];
                 /** @type {any} */ (acc)[evt.taskId].push(evt);
                 return acc;
-            }, /** @type {Record<string,any[]>} */ ({}));
+            }, /** @type {Record<string, any[]>} */ ({}));
 
             assert.strictEqual(/** @type {any} */ (grouped)['task-001'].length, 2);
             assert.strictEqual(/** @type {any} */ (grouped)['task-002'].length, 1);
@@ -262,7 +262,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
             debounced();
             debounced();
 
-            await new Promise(resolve => {
+            await new Promise((resolve) => {
                 setTimeout(resolve, 100);
             });
 

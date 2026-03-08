@@ -1,16 +1,16 @@
 // @ts-check
 
-/** @typedef {typeof INFERENCE_CLIENT_TAGS[keyof typeof INFERENCE_CLIENT_TAGS]} InferenceClientTag */
+/** @typedef {(typeof INFERENCE_CLIENT_TAGS)[keyof typeof INFERENCE_CLIENT_TAGS]} InferenceClientTag */
 /**
  * @typedef {object} NormalizeInferenceClientTagOptions
- * @property {InferenceClientTag|null} [fallback]
+ * @property {InferenceClientTag | null} [fallback]
  * @property {boolean} [allowFallbackGeneric]
  */
-/** @typedef {Error & { code?: string, statusCode?: number }} InferenceClientTagError */
+/** @typedef {Error & { code?: string; statusCode?: number }} InferenceClientTagError */
 
 /**
- * Tags canônicas de consumidores de inferência.
- * A separação por tag evita mistura de políticas entre Audit Agent, RAG e ferramentas MCP.
+ * Tags canônicas de consumidores de inferência. A separação por tag evita mistura de políticas entre Audit Agent, RAG e
+ * ferramentas MCP.
  */
 export const INFERENCE_CLIENT_TAGS = Object.freeze({
     AUDIT_AGENT_TRIAGE: 'audit_agent_triage',

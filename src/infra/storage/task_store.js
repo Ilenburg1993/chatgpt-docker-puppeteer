@@ -49,8 +49,8 @@ async function saveTask(task) {
 /**
  * Lê uma tarefa específica do disco com auto-migration V4 → V5.
  *
- * MUDANÇA V5: Detecta versão e auto-migra V4 → V5 transparentemente.
- * Não reescreve o arquivo (migration lazy, apenas em memória).
+ * MUDANÇA V5: Detecta versão e auto-migra V4 → V5 transparentemente. Não reescreve o arquivo (migration lazy, apenas em
+ * memória).
  *
  * @param {string} id - ID da tarefa.
  * @returns {Promise<any>} Tarefa (V5 se era V4, V5 nativa se já era V5).
@@ -75,8 +75,9 @@ async function loadTask(id) {
 
 /**
  * Deleta uma tarefa específica do disco.
+ *
  * @param {string} id - ID da tarefa.
-  * @returns {Promise<any>}
+ * @returns {Promise<any>}
  */
 async function deleteTask(id) {
     const filepath = path.join(PATHS.QUEUE, `${id}.json`);
@@ -92,11 +93,12 @@ async function deleteTask(id) {
 
 /**
  * Retorna a lista de nomes de arquivos JSON presentes na fila.
+ *
  * @returns {string[]}
  */
 function listTaskFiles() {
     try {
-        return fs.readdirSync(PATHS.QUEUE).filter(f => f.endsWith('.json'));
+        return fs.readdirSync(PATHS.QUEUE).filter((f) => f.endsWith('.json'));
     } catch (/** @type {any} */ _) {
         const _ce = /** @type {any} */ (_);
         return [];
@@ -104,8 +106,8 @@ function listTaskFiles() {
 }
 
 /**
- * Limpeza Cirúrgica da Fila: Remove todas as tarefas, EXCETO as que estão em execução.
- * Garante a continuidade do trabalho do Maestro durante limpezas administrativas.
+ * Limpeza Cirúrgica da Fila: Remove todas as tarefas, EXCETO as que estão em execução. Garante a continuidade do
+ * trabalho do Maestro durante limpezas administrativas.
  *
  * @returns {Promise<any>} Relatório de limpeza { deleted: number, preserved: number }
  */

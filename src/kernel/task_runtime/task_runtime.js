@@ -38,8 +38,7 @@ const ALLOWED_TRANSITIONS = Object.freeze({
 class TaskRuntime extends EventEmitter {
     /**
      * @param {object} params
-     * @param {any} params.telemetry
-     * Canal de telemetria do Kernel.
+     * @param {any} params.telemetry Canal de telemetria do Kernel.
      */
     constructor({ telemetry }) {
         super();
@@ -51,8 +50,7 @@ class TaskRuntime extends EventEmitter {
         this.telemetry = telemetry;
 
         /**
-         * Armazenamento interno de tarefas.
-         * taskId -> estrutura da tarefa
+         * Armazenamento interno de tarefas. taskId -> estrutura da tarefa
          */
         this.tasks = new Map();
     }
@@ -65,14 +63,9 @@ class TaskRuntime extends EventEmitter {
      * Cria uma nova tarefa lógica.
      *
      * @param {object} params
-     * @param {string} params.taskId
-     * Identificador único da tarefa.
-     *
-     * @param {object} [params.metadata]
-     * Metadados iniciais (livre, não interpretado pelo TaskRuntime).
-     *
-     * @returns {any}
-     * Snapshot imutável da tarefa criada.
+     * @param {string} params.taskId Identificador único da tarefa.
+     * @param {object} [params.metadata] Metadados iniciais (livre, não interpretado pelo TaskRuntime).
+     * @returns {any} Snapshot imutável da tarefa criada.
      */
     createTask({ taskId, metadata = {} }) {
         if (!taskId || typeof taskId !== 'string') {
@@ -92,20 +85,17 @@ class TaskRuntime extends EventEmitter {
             updatedAt: now,
 
             /**
-             * Histórico interno da tarefa.
-             * Lista de eventos técnicos (não semânticos).
+             * Histórico interno da tarefa. Lista de eventos técnicos (não semânticos).
              */
             history: /** @type {any[]} */ ([]),
 
             /**
-             * [P2.2 FIX] Contador de ciclos sem progresso.
-             * Usado pelo PolicyEngine para detecção de estagnação.
+             * [P2.2 FIX] Contador de ciclos sem progresso. Usado pelo PolicyEngine para detecção de estagnação.
              */
             stalledCycleCount: 0,
 
             /**
-             * Metadados livres.
-             * Definidos externamente, nunca interpretados aqui.
+             * Metadados livres. Definidos externamente, nunca interpretados aqui.
              */
             metadata: { ...metadata },
         };
@@ -130,9 +120,8 @@ class TaskRuntime extends EventEmitter {
     }
 
     /**
-     * Remove completamente uma task do runtime (esquecimento).
-     * Útil para permitir re-execução pós-terminal quando o SSOT (DB)
-     * decide rearmar a mesma taskId.
+     * Remove completamente uma task do runtime (esquecimento). Útil para permitir re-execução pós-terminal quando o
+     * SSOT (DB) decide rearmar a mesma taskId.
      *
      * @param {string} taskId
      * @returns {boolean} true se removeu
@@ -158,14 +147,9 @@ class TaskRuntime extends EventEmitter {
      *
      * @param {object} params
      * @param {string} params.taskId
-     * @param {TaskStateValue} params.newState
-     * Estado alvo.
-     *
-     * @param {string} params.reason
-     * Descrição da decisão que motivou a transição.
-     *
-     * @returns {any}
-     * Snapshot atualizado da tarefa.
+     * @param {TaskStateValue} params.newState Estado alvo.
+     * @param {string} params.reason Descrição da decisão que motivou a transição.
+     * @returns {any} Snapshot atualizado da tarefa.
      */
     applyStateTransition({ taskId, newState, reason }) {
         const task = this._getTaskOrThrow(taskId);
@@ -228,13 +212,11 @@ class TaskRuntime extends EventEmitter {
   =========================== */
 
     /**
-     * Registra referência histórica a uma intenção (COMMAND emitido).
-     * NÃO cria expectativa semântica.
+     * Registra referência histórica a uma intenção (COMMAND emitido). NÃO cria expectativa semântica.
      *
      * @param {object} params
      * @param {string} params.taskId
-     * @param {any} params.intent
-     * Descrição da intenção registrada.
+     * @param {any} params.intent Descrição da intenção registrada.
      */
     recordIntentReference({ taskId, intent }) {
         const task = this._getTaskOrThrow(taskId);
@@ -252,13 +234,11 @@ class TaskRuntime extends EventEmitter {
     }
 
     /**
-     * Registra referência histórica a uma observação (EVENT considerado).
-     * NÃO interpreta o EVENT.
+     * Registra referência histórica a uma observação (EVENT considerado). NÃO interpreta o EVENT.
      *
      * @param {object} params
      * @param {string} params.taskId
-     * @param {any} params.observation
-     * Referência à observação.
+     * @param {any} params.observation Referência à observação.
      */
     recordObservationReference({ taskId, observation }) {
         const task = this._getTaskOrThrow(taskId);
@@ -280,8 +260,7 @@ class TaskRuntime extends EventEmitter {
      *
      * @param {object} params
      * @param {string} params.taskId
-     * @param {object} params.metadata
-     * Novos metadados (merge com existentes).
+     * @param {object} params.metadata Novos metadados (merge com existentes).
      */
     updateMetadata({ taskId, metadata }) {
         const task = this._getTaskOrThrow(taskId);
@@ -308,7 +287,7 @@ class TaskRuntime extends EventEmitter {
      * Retorna snapshot imutável de uma tarefa.
      *
      * @param {string} taskId
-     * @returns {object|null}
+     * @returns {object | null}
      */
     getTask(taskId) {
         const task = this.tasks.get(taskId);
@@ -324,17 +303,17 @@ class TaskRuntime extends EventEmitter {
      * @returns {any[]}
      */
     listTasks() {
-        return Array.from(this.tasks.values()).map(t => this._snapshot(t));
+        return Array.from(this.tasks.values()).map((t) => this._snapshot(t));
     }
 
     /**
      * Filtra tarefas por estado.
      *
      * @param {string} state
-     * @returns {Array<object>}
+     * @returns {object[]}
      */
     listTasksByState(state) {
-        return this.listTasks().filter(t => t.state === state);
+        return this.listTasks().filter((t) => t.state === state);
     }
 
     /**
@@ -365,6 +344,7 @@ class TaskRuntime extends EventEmitter {
 
     /**
      * Recupera tarefa ou lança erro.
+     *
      * @param {any} taskId
      * @returns {any}
      */
@@ -378,6 +358,7 @@ class TaskRuntime extends EventEmitter {
 
     /**
      * Verifica se transição é permitida.
+     *
      * @param {any} from
      * @param {any} to
      * @returns {boolean}
@@ -388,6 +369,7 @@ class TaskRuntime extends EventEmitter {
 
     /**
      * Registra entrada no histórico interno.
+     *
      * @param {any} task
      * @param {any} entry
      */
@@ -396,8 +378,8 @@ class TaskRuntime extends EventEmitter {
     }
 
     /**
-     * Produz snapshot imutável da tarefa.
-     * Protege contra mutação externa.
+     * Produz snapshot imutável da tarefa. Protege contra mutação externa.
+     *
      * @param {any} task
      * @returns {any}
      */

@@ -135,7 +135,9 @@ async function main() {
     }
 
     const missingCoreTools = REQUIRED_CORE_TOOLS.filter((/** @type {any} */ name) => !toolNames.includes(name));
-    const missingLspTools = LSP_ENABLED ? REQUIRED_LSP_TOOLS.filter((/** @type {any} */ name) => !toolNames.includes(name)) : [];
+    const missingLspTools = LSP_ENABLED
+        ? REQUIRED_LSP_TOOLS.filter((/** @type {any} */ name) => !toolNames.includes(name))
+        : [];
     const lspToolsPresent = !LSP_ENABLED || missingLspTools.length === 0;
 
     const ragProbe = await callTool(base, 3, 'rag_search', {
@@ -152,7 +154,7 @@ async function main() {
         const indexMode = ragStructured.data.index_mode;
         const freshness = ragStructured.data.index_freshness_ms;
         console.log(
-            `[MCP DIAG] rag_search backend=${backend} degraded=${degraded} index_mode=${indexMode || 'unknown'} freshness_ms=${typeof freshness === 'number' ? freshness : 'n/a'}`
+            `[MCP DIAG] rag_search backend=${backend} degraded=${degraded} index_mode=${indexMode || 'unknown'} freshness_ms=${typeof freshness === 'number' ? freshness : 'n/a'}`,
         );
     }
 
@@ -163,13 +165,13 @@ async function main() {
         'rag_expand',
         firstChunkId
             ? { chunk_id: firstChunkId, mode: 'lines', before_lines: 20, after_lines: 20 }
-            : { chunk_id: '__diag_missing_chunk__', mode: 'lines', before_lines: 5, after_lines: 5 }
+            : { chunk_id: '__diag_missing_chunk__', mode: 'lines', before_lines: 5, after_lines: 5 },
     );
     printResult('POST /api/mcp tools/call rag_expand', ragExpandProbe);
 
     let lspFunctionalOk = false;
     /** @type {any[]} */
-let lspFunctionalIssues = [];
+    let lspFunctionalIssues = [];
     if (LSP_ENABLED && lspToolsPresent) {
         const lspDiagnostics = await callTool(base, 5, 'lsp_diagnostics', { filePath, maxResults: 20 });
         const lspDefinition = await callTool(base, 6, 'lsp_definition', { filePath, line, character, maxResults: 20 });
@@ -250,7 +252,7 @@ let lspFunctionalIssues = [];
     console.log('[MCP DIAG] OK');
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error(`[MCP DIAG] Fatal: ${error?.message || String(error)}`);
     process.exit(1);
 });

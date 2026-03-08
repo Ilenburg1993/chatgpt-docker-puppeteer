@@ -1,13 +1,12 @@
 // @ts-check
 import {
-    writeTask,
+    readLatestGlobalLogTail,
     readTask,
+    removeRunLock,
     startAgent,
     stopAgent,
     waitForCondition,
-    removeRunLock,
-    readLatestGlobalLogTail,
-    sleep,
+    writeTask,
 } from './helpers.js';
 
 (async () => {

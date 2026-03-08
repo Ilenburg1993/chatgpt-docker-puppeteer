@@ -1,7 +1,7 @@
 // @ts-check
 import path from 'node:path';
-import { BLAST_RADIUS, FINDING_STATUS, FINDING_TYPES, SEVERITIES } from '../lib/schema.mjs';
 import { getMaxBugId, makeBugId, makeFingerprint } from '../lib/fingerprint.mjs';
+import { BLAST_RADIUS, FINDING_STATUS, FINDING_TYPES, SEVERITIES } from '../lib/schema.mjs';
 
 const DEFAULT_STATUS = /** @type {const} */ ('confirmado');
 const DEFAULT_TYPE = /** @type {const} */ ('bug');
@@ -9,36 +9,36 @@ const DEFAULT_TYPE = /** @type {const} */ ('bug');
 /**
  * @typedef {object} RawFinding
  * @property {string} source_tool
- * @property {string|null} [contract_id]
- * @property {string|null} [domain]
- * @property {string|null} [owner]
- * @property {'off'|'warn'|'p1'|'p0'|null} [enforcement_state]
- * @property {string|null} [file]
- * @property {number|null} [line]
+ * @property {string | null} [contract_id]
+ * @property {string | null} [domain]
+ * @property {string | null} [owner]
+ * @property {'off' | 'warn' | 'p1' | 'p0' | null} [enforcement_state]
+ * @property {string | null} [file]
+ * @property {number | null} [line]
  * @property {string} evidence
- * @property {string|null} [rule]
- * @property {string|null} [severity_hint]
- * @property {string|null} [status]
- * @property {string|null} [type]
- * @property {string|null} [impact]
- * @property {string|null} [root_cause]
- * @property {string|null} [suggested_patch]
- * @property {string|null} [test_strategy]
- * @property {string|null} [regression_risk]
+ * @property {string | null} [rule]
+ * @property {string | null} [severity_hint]
+ * @property {string | null} [status]
+ * @property {string | null} [type]
+ * @property {string | null} [impact]
+ * @property {string | null} [root_cause]
+ * @property {string | null} [suggested_patch]
+ * @property {string | null} [test_strategy]
+ * @property {string | null} [regression_risk]
  * @property {boolean} [partial]
  */
 
 /**
- * @param {string|null|undefined} severityHint
- * @param {string|null|undefined} sourceTool
- * @returns {'P0'|'P1'|'P2'|'P3'}
+ * @param {string | null | undefined} severityHint
+ * @param {string | null | undefined} sourceTool
+ * @returns {'P0' | 'P1' | 'P2' | 'P3'}
  */
 function mapSeverity(severityHint, sourceTool) {
     const hint = String(severityHint || '')
         .toUpperCase()
         .trim();
     if (SEVERITIES.includes(hint)) {
-        return /** @type {'P0'|'P1'|'P2'|'P3'} */ (hint);
+        return /** @type {'P0' | 'P1' | 'P2' | 'P3'} */ (hint);
     }
 
     if (String(sourceTool).includes('mcp:diagnose')) return 'P1';
@@ -54,25 +54,27 @@ function mapSeverity(severityHint, sourceTool) {
 }
 
 /**
- * @param {string|null|undefined} value
- * @returns {'novo'|'confirmado'|'patch-proposto'|'corrigido'|'validado'|'descartado'}
+ * @param {string | null | undefined} value
+ * @returns {'novo' | 'confirmado' | 'patch-proposto' | 'corrigido' | 'validado' | 'descartado'}
  */
 function mapStatus(value) {
     const normalized = String(value || '').trim();
     if (FINDING_STATUS.includes(normalized)) {
-        return /** @type {'novo'|'confirmado'|'patch-proposto'|'corrigido'|'validado'|'descartado'} */ (normalized);
+        return /** @type {'novo' | 'confirmado' | 'patch-proposto' | 'corrigido' | 'validado' | 'descartado'} */ (
+            normalized
+        );
     }
     return DEFAULT_STATUS;
 }
 
 /**
- * @param {string|null|undefined} value
- * @returns {'bug'|'gap'|'falha de contrato'|'incompletude'|'upgrade'}
+ * @param {string | null | undefined} value
+ * @returns {'bug' | 'gap' | 'falha de contrato' | 'incompletude' | 'upgrade'}
  */
 function mapType(value) {
     const normalized = String(value || '').trim();
     if (FINDING_TYPES.includes(normalized)) {
-        return /** @type {'bug'|'gap'|'falha de contrato'|'incompletude'|'upgrade'} */ (normalized);
+        return /** @type {'bug' | 'gap' | 'falha de contrato' | 'incompletude' | 'upgrade'} */ (normalized);
     }
     return DEFAULT_TYPE;
 }
@@ -128,7 +130,7 @@ export function normalizeFindings(rawFindings, options) {
 
         const severity = mapSeverity(raw.severity_hint, sourceTool);
         const type = mapType(raw.type);
-        const blastRadius = /** @type {'baixo'|'medio'|'alto'} */ (
+        const blastRadius = /** @type {'baixo' | 'medio' | 'alto'} */ (
             severity === 'P0' ? 'alto' : severity === 'P1' ? 'medio' : 'baixo'
         );
 

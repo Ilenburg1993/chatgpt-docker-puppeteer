@@ -18,7 +18,7 @@ function readPositiveInt(rawValue, fallback) {
  * @param {number} attempt
  * @param {number} baseDelayMs
  * @param {number} maxDelayMs
- * @param {number} [jitterRatio=0.2]
+ * @param {number} [jitterRatio=0.2] Default is `0.2`
  * @returns {number}
  */
 function computeExponentialBackoffDelay(attempt, baseDelayMs, maxDelayMs, jitterRatio = 0.2) {
@@ -35,7 +35,8 @@ function computeExponentialBackoffDelay(attempt, baseDelayMs, maxDelayMs, jitter
  * @property {number} baseDelayMs
  * @property {number} maxDelayMs
  * @property {number} [jitterRatio]
- * @property {((ctx: { attempt: number, maxAttempts: number, error: unknown, delayMs: number }) => void) | undefined} [onRetry]
+ * @property {((ctx: { attempt: number; maxAttempts: number; error: unknown; delayMs: number }) => void | Promise<void>)
+ *     | undefined} [onRetry]
  */
 /**
  * @template T
@@ -61,7 +62,7 @@ async function retryWithBackoff(operation, config) {
             if (typeof config?.onRetry === 'function') {
                 await config.onRetry({ attempt, maxAttempts, error, delayMs });
             }
-            await new Promise(resolve => setTimeout(resolve, delayMs));
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
     }
 

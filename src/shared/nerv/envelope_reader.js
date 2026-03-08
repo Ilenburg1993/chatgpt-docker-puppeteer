@@ -2,8 +2,9 @@
 
 /**
  * Extrai o tipo de mensagem de envelope NERV (suporta formatos canônico e legado)
+ *
  * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
- * @returns {import('./constants.js').MessageType|null} Tipo da mensagem ou null se não encontrado
+ * @returns {import('./constants.js').MessageType | null} Tipo da mensagem ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
 function getMessageType(envelope) {
@@ -14,8 +15,9 @@ function getMessageType(envelope) {
 
 /**
  * Extrai o código de ação de envelope NERV (suporta formatos canônico e legado)
+ *
  * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
- * @returns {string|null} Código da ação ou null se não encontrado
+ * @returns {string | null} Código da ação ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
 function getActionCode(envelope) {
@@ -30,8 +32,9 @@ function getActionCode(envelope) {
 
 /**
  * Extrai o ID de correlação de envelope NERV (suporta formatos canônico e legado)
+ *
  * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
- * @returns {string|null} ID de correlação ou null se não encontrado
+ * @returns {string | null} ID de correlação ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
 function getCorrelationId(envelope) {
@@ -46,8 +49,9 @@ function getCorrelationId(envelope) {
 
 /**
  * Extrai o ID da mensagem de envelope NERV (suporta formatos canônico e legado)
+ *
  * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
- * @returns {string|null} ID da mensagem ou null se não encontrado
+ * @returns {string | null} ID da mensagem ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
 function getMsgId(envelope) {
@@ -56,6 +60,7 @@ function getMsgId(envelope) {
 
 /**
  * Extrai o payload de envelope NERV
+ *
  * @param {Record<string, any>} envelope - Envelope NERV a ser analisado
  * @returns {any} Payload da mensagem (objeto vazio se não encontrado)
  * @sideEffects Nenhum - função pura
@@ -66,8 +71,9 @@ function getPayload(envelope) {
 
 /**
  * Extrai o ID da tarefa do payload de envelope NERV
+ *
  * @param {Record<string, any>} payload - Payload da mensagem a ser analisado
- * @returns {string|null} ID da tarefa ou null se não encontrado
+ * @returns {string | null} ID da tarefa ou null se não encontrado
  * @sideEffects Nenhum - função pura
  */
 function getTaskIdFromPayload(payload) {

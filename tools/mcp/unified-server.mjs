@@ -3,38 +3,27 @@
  * Unified MCP Server for chatgpt-docker-puppeteer (v5.0)
  *
  * Exposes multiple tools via Tool Registry to Claude Desktop:
+ *
  * - RAG search (local codebase)
  * - Ollama Cloud generation (qwen3-coder-next, qwen3-next)
  * - Ollama Local embeddings (nomic-embed-text)
  * - GitHub integration (via upstream MCP - optional)
  *
- * Usage:
- * node tools/mcp/unified-server.mjs
+ * Usage: node tools/mcp/unified-server.mjs
  *
- * Configure in Claude Desktop:
- * ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)
+ * Configure in Claude Desktop: ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)
  * %AppData%/Claude/claude_desktop_config.json (Windows)
  *
- * {
- *   "mcpServers": {
- *     "chatgpt-docker": {
- *       "command": "node",
- *       "args": ["/workspaces/chatgpt-docker-puppeteer/tools/mcp/unified-server.mjs"],
- *       "env": {
- *         "OLLAMA_CLOUD_ENABLED": "true",
- *         "OLLAMA_CLOUD_API_KEY": "your_key_here",
- *         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."
- *       }
- *     }
- *   }
- * }
+ * { "mcpServers": { "chatgpt-docker": { "command": "node", "args":
+ * ["/workspaces/chatgpt-docker-puppeteer/tools/mcp/unified-server.mjs"], "env": { "OLLAMA_CLOUD_ENABLED": "true",
+ * "OLLAMA_CLOUD_API_KEY": "your_key_here", "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..." } } } }
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Tool Registry (DRY Architecture)
-import { registry, initialize, normalizeToolResultPayload } from '../../src/integration/tool-registry.mjs';
+import { initialize, normalizeToolResultPayload, registry } from '../../src/integration/tool-registry.mjs';
 
 const server = new Server(
     {
@@ -46,7 +35,7 @@ const server = new Server(
             tools: {},
             resources: {},
         },
-    }
+    },
 );
 
 /** @type {Map<string, AbortController>} */
@@ -57,14 +46,14 @@ const activeRequests = new Map();
  */
 server.setRequestHandler(/** @type {any} */ ('tools/list'), async () => {
     const tools = registry.getAllMetadata();
-    console.error('[MCP] Listing tools:', tools.map(t => t.name).join(', '));
+    console.error('[MCP] Listing tools:', tools.map((t) => t.name).join(', '));
     return { tools };
 });
 
 /**
  * Execute tool by name via Tool Registry
  */
-server.setRequestHandler(/** @type {any} */ ('tools/call'), async request => {
+server.setRequestHandler(/** @type {any} */ ('tools/call'), async (request) => {
     const toolName = request.params.name;
     const args = request.params.arguments || {};
     const requestId =
@@ -149,7 +138,7 @@ if (typeof server.setNotificationHandler === 'function') {
                 }
                 return {};
             }
-        )
+        ),
     );
 }
 
@@ -172,7 +161,7 @@ server.setRequestHandler(/** @type {any} */ ('resources/list'), async () => {
 /**
  * Read resource content (optional - for future use)
  */
-server.setRequestHandler(/** @type {any} */ ('resources/read'), async request => {
+server.setRequestHandler(/** @type {any} */ ('resources/read'), async (request) => {
     const uri = request.params.uri;
 
     if (uri === 'rag://stats') {
@@ -198,7 +187,7 @@ server.setRequestHandler(/** @type {any} */ ('resources/read'), async request =>
                             },
                         },
                         null,
-                        2
+                        2,
                     ),
                 },
             ],
@@ -227,7 +216,7 @@ async function main() {
     console.error('[MCP] Server ready! Waiting for requests from Claude Desktop...');
 }
 
-main().catch(error => {
+main().catch((error) => {
     console.error('[MCP] Fatal error:', error);
     process.exit(1);
 });

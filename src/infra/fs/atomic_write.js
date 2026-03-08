@@ -1,16 +1,15 @@
 // @ts-check
-import { promises as fs } from 'node:fs';
-import fss from 'node:fs';
 import crypto from 'node:crypto';
+import fss, { promises as fs } from 'node:fs';
 import { sleep } from './fs_utils.js';
 
 /**
- * Atomically writes content to a file (write to temp → rename).
- * Handles cross-device (EXDEV) scenarios and retries on EPERM/EBUSY.
+ * Atomically writes content to a file (write to temp → rename). Handles cross-device (EXDEV) scenarios and retries on
+ * EPERM/EBUSY.
  *
  * @param {string} filepath - Target file path.
- * @param {string|Buffer|Uint8Array} content - Data to write.
- * @param {BufferEncoding} [encoding='utf-8'] - Encoding for string content (ignored for binary).
+ * @param {string | Buffer | Uint8Array} content - Data to write.
+ * @param {BufferEncoding} [encoding='utf-8'] - Encoding for string content (ignored for binary). Default is `'utf-8'`
  * @returns {Promise<true>}
  */
 async function atomicWrite(filepath, content, encoding) {

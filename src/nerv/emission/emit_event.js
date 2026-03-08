@@ -15,17 +15,16 @@ import { getCorrelationId } from '#shared/nerv/envelope_reader';
  */
 /**
  * @typedef {object} CreateEmitEventOptions
- * @property {*} [envelopes]
- * @property {*} [buffers]
- * @property {*} [correlation]
- * @property {*} [telemetry]
+ * @property {any} [envelopes]
+ * @property {any} [buffers]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
  */
 /**
  * Cria o emissor técnico de EVENTs.
  *
- * **Side-effects:** Registra emissão na correlação histórica.
- * **Semântica:** Emissor especializado para mensagens de evento NERV.
- * **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
+ * **Side-effects:** Registra emissão na correlação histórica. **Semântica:** Emissor especializado para mensagens de
+ * evento NERV. **Unidades:** Envelopes seguem typedef NERV, correlação por correlation_id.
  *
  * @param {CreateEmitEventDeps} deps - Dependências do emissor
  * @returns {any} Emissor com método emitEvent
@@ -43,8 +42,7 @@ function createEmitEvent({ envelopes, buffers, correlation, telemetry }) {
     /**
      * Emite um envelope EVENT.
      *
-     * @param {object} envelope
-     * Envelope estruturalmente válido.
+     * @param {object} envelope Envelope estruturalmente válido.
      */
     function emitEvent(envelope) {
         telemetry.emit('nerv:emission:attempt', {

@@ -1,6 +1,6 @@
 // @ts-check
 import { promises as fs } from 'node:fs';
-import { SCHEMA_VERSION, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_BASE_URL } from './contract.mjs';
+import { CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_BASE_URL, SCHEMA_VERSION } from './contract.mjs';
 
 export function createEmptyManifest() {
     const now = Date.now();
@@ -10,7 +10,11 @@ export function createEmptyManifest() {
         updated_at: now,
         fingerprint: { xxhash64: true, sha256: true },
         chunker_version: CHUNKER_VERSION,
-        embedding: { model: DEFAULT_EMBEDDING_MODEL, dim: /** @type {number | null} */ (null), base_url_default: DEFAULT_OLLAMA_BASE_URL },
+        embedding: {
+            model: DEFAULT_EMBEDDING_MODEL,
+            dim: /** @type {number | null} */ (null),
+            base_url_default: DEFAULT_OLLAMA_BASE_URL,
+        },
         last_scope: /** @type {string | null} */ (null),
         last_scope_hash: /** @type {string | null} */ (null),
         files: {},
@@ -27,7 +31,7 @@ export async function loadManifest(/** @type {any} */ paths) {
                     `but code expects v${SCHEMA_VERSION}.\n\n` +
                     `Solution: Reset the index (this will re-index all files):\n` +
                     `  npm run rag:reset -- --yes\n` +
-                    `  npm run rag:index\n`
+                    `  npm run rag:index\n`,
             );
         }
         if (!parsed.files || typeof parsed.files !== 'object') {

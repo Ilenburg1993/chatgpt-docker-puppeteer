@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // @ts-check
-import fs from 'node:fs';
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
 
 /**
  * Remove comentários do formato JSONC para converter para JSON válido.
+ *
  * @param {string} content - Conteúdo JSONC como string.
  * @returns {any} Objeto JSON resultante após remoção dos comentários.
  */
 function parseJSONC(content) {
-    const lines = content.split('\n').filter(line => {
+    const lines = content.split('\n').filter((line) => {
         const trimmed = line.trim();
         return !trimmed.startsWith('//');
     });
@@ -17,10 +18,9 @@ function parseJSONC(content) {
 }
 
 /**
- * Script principal para verificar o status das extensões do VS Code.
- * Lê o arquivo .vscode/extensions.json e compara com as extensões instaladas.
- * Exibe estatísticas e sai com código 1 se houver extensões faltando.
- * Side-effects: Lê arquivos do sistema, executa comando 'code', imprime resultados no console.
+ * Script principal para verificar o status das extensões do VS Code. Lê o arquivo .vscode/extensions.json e compara com
+ * as extensões instaladas. Exibe estatísticas e sai com código 1 se houver extensões faltando. Side-effects: Lê
+ * arquivos do sistema, executa comando 'code', imprime resultados no console.
  */
 function main() {
     try {
@@ -34,8 +34,8 @@ function main() {
             const output = execSync('code --list-extensions', { encoding: 'utf-8' });
             installed = output
                 .split('\n')
-                .filter(e => e.trim())
-                .map(e => e.toLowerCase());
+                .filter((e) => e.trim())
+                .map((e) => e.toLowerCase());
         } catch (_error) {
             console.log('⚠️  Aviso: Não foi possível obter lista de extensões instaladas');
             installed = [];
@@ -46,7 +46,7 @@ function main() {
 
         // Calcular estatísticas
         const installedCount = recommended.filter((/** @type {string} */ ext) =>
-            installed.includes(ext.toLowerCase())
+            installed.includes(ext.toLowerCase()),
         ).length;
 
         const missingCount = recommended.length - installedCount;

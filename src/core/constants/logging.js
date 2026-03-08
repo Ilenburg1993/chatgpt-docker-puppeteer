@@ -1,15 +1,15 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
- * Logging categories constants
- * Centralized definitions for logger categories throughout the application
+ * Logging categories constants Centralized definitions for logger categories throughout the application
  *
  * Audit Level: 35 - Core Constants
+ *
  * @module constants/logging
  */
 
 /**
- * Logger category identifiers
- * Used for categorizing log messages throughout the application
+ * Logger category identifiers Used for categorizing log messages throughout the application
+ *
  * @readonly
  * @enum {string}
  */
@@ -167,6 +167,7 @@ const LOG_CATEGORIES = {
 
 /**
  * Array of all valid log categories (for validation)
+ *
  * @type {ReadonlyArray<string>}
  */
 const LOG_CATEGORIES_ARRAY = Object.values(LOG_CATEGORIES);

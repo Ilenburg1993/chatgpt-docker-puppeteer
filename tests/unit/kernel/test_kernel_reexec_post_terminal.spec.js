@@ -1,7 +1,7 @@
 // @ts-check
-import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import EventEmitter from 'node:events';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { createKernel } from '#kernel/kernel';
 
@@ -22,7 +22,7 @@ class MockNERV extends EventEmitter {
     }
 
     receive(/** @type {any} */ envelope) {
-        this.receiveHandlers.forEach(h => h(envelope));
+        this.receiveHandlers.forEach((h) => h(envelope));
     }
 
     emitCommand(/** @type {any} */ envelope) {

@@ -67,30 +67,35 @@ function applyTextChanges(/** @type {any} */ originalText, /** @type {any} */ te
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * @typedef {{ languageService: ts.LanguageService, scriptVersions: Map<string, string>, fileNames: string[] }} LsCacheEntry
+ * @typedef {{ languageService: ts.LanguageService; scriptVersions: Map<string, string>; fileNames: string[] }} LsCacheEntry
  */
 
 /** @type {Map<string, LsCacheEntry>} */
 const _lsCache = new Map();
 
 /**
- * DocumentRegistry compartilhado em nível de módulo.
- * ts.DocumentRegistry mantém ASTs de source files parseados entre instâncias de
- * LanguageService. Ao compartilhá-lo, ASTs sobrevivem a invalidações do _lsCache
- * (provocadas por updateFile), tornando a primeira request pós-invalidação mais
- * rápida porque os arquivos não modificados não precisam ser re-parseados.
+ * DocumentRegistry compartilhado em nível de módulo. ts.DocumentRegistry mantém ASTs de source files parseados entre
+ * instâncias de LanguageService. Ao compartilhá-lo, ASTs sobrevivem a invalidações do _lsCache (provocadas por
+ * updateFile), tornando a primeira request pós-invalidação mais rápida porque os arquivos não modificados não precisam
+ * ser re-parseados.
+ *
  * @type {ts.DocumentRegistry}
  */
 const _documentRegistry = ts.createDocumentRegistry();
 
 /**
  * Dispose e remove o LanguageService em cache para um dado rootDir.
+ *
  * @param {string} rootDir - Caminho normalizado do root do projeto.
  */
 function _disposeCachedService(rootDir) {
     const entry = _lsCache.get(rootDir);
     if (entry) {
-        try { entry.languageService.dispose(); } catch { /* ignorar erros de dispose */ }
+        try {
+            entry.languageService.dispose();
+        } catch {
+            /* ignorar erros de dispose */
+        }
         _lsCache.delete(rootDir);
     }
 }
@@ -482,7 +487,7 @@ class TsserverDaemon {
             const end = lineCharToOffset(
                 source,
                 params.endLine || params.line,
-                params.endCharacter || params.character
+                params.endCharacter || params.character,
             );
             const diagnostics = [
                 ...languageService.getSyntacticDiagnostics(filePath),
@@ -514,7 +519,7 @@ class TsserverDaemon {
                         start: textChange.span.start,
                         length: textChange.span.length,
                         newText: textChange.newText,
-                    }))
+                    })),
                 ),
             }));
         } finally {
@@ -534,7 +539,7 @@ class TsserverDaemon {
         const totalBytes = edits.reduce(
             (/** @type {any} */ acc, /** @type {any} */ edit) =>
                 acc + Buffer.byteLength(String(edit.newText || ''), 'utf8'),
-            0
+            0,
         );
         if (totalBytes > MAX_PATCH_BYTES) {
             throw new Error(`LSP_PATCH_TOO_LARGE: ${totalBytes} > ${MAX_PATCH_BYTES}`);
@@ -611,6 +616,7 @@ class TsserverDaemon {
 
 /**
  * Returns the singleton wrapper around the local tsserver-backed language service.
+ *
  * @returns {import('./tsserver-contract.d.ts').TsserverDaemonFacade}
  */
 export function getTsserverDaemon() {
@@ -625,7 +631,8 @@ export function getTsserverDaemon() {
 
 /**
  * Starts the singleton daemon and applies the optional timeout override.
- * @param {TsserverDaemonStartOptions} [options={}]
+ *
+ * @param {TsserverDaemonStartOptions} [options={}] Default is `{}`
  * @returns {Promise<import('./tsserver-contract.d.ts').TsserverStartResult>}
  */
 export async function startTsserverDaemon(/** @type {any} */ options = {}) {
@@ -638,6 +645,7 @@ export async function startTsserverDaemon(/** @type {any} */ options = {}) {
 
 /**
  * Stops the singleton daemon and aborts the queued in-flight request, when present.
+ *
  * @returns {Promise<import('./tsserver-contract.d.ts').TsserverStopResult>}
  */
 export async function stopTsserverDaemon() {

@@ -1,8 +1,7 @@
 // @ts-check
-/** @import { Router } from 'express' */
+/** @import {Router} from "express" */
 import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
-import { executeCommand } from '#server/domain/control_command_service';
 import { recordEvent } from '#infra/db/events_repo';
 import {
     AUTONOMY_MODES,
@@ -16,6 +15,7 @@ import {
 import { getDb } from '#infra/db/sqlite';
 import { insertTask as persistTaskInsert, TASK_STAGES } from '#infra/db/task_repo';
 import { WorkflowGenerator } from '#missions/workflow_generator';
+import { executeCommand } from '#server/domain/control_command_service';
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -78,7 +78,7 @@ const proposalsAcceptSchema = z.object({
                 priority: z.number().optional(),
                 depends_on: z.array(z.string()).optional(),
                 tags: z.array(z.string()).optional(),
-            })
+            }),
         )
         .min(1)
         .max(200),
@@ -105,7 +105,7 @@ function _asTrimmedString(/** @type {any} */ value, fallback = '') {
 function _coerceAutonomyMode(/** @type {any} */ raw) {
     const value = _asUpper(raw);
     if (!value) return AUTONOMY_MODES.USER_ONLY;
-    return (/** @type {any} */ (AUTONOMY_MODES))[value] ? value : AUTONOMY_MODES.USER_ONLY;
+    return /** @type {any} */ (AUTONOMY_MODES)[value] ? value : AUTONOMY_MODES.USER_ONLY;
 }
 
 function _computeProgressView(/** @type {any} */ mission) {
@@ -137,10 +137,10 @@ function _computeProgressView(/** @type {any} */ mission) {
     };
 }
 
-function _pickAllowedTarget(options = /** @type {{requested?: unknown, allowedTargets?: unknown}} */ ({})) {
+function _pickAllowedTarget(options = /** @type {{ requested?: unknown; allowedTargets?: unknown }} */ ({})) {
     const { requested, allowedTargets = null } = options;
     const requestedNormalized = requested ? String(requested).toLowerCase().trim() : null;
-    const allowed = Array.isArray(allowedTargets) ? allowedTargets.map(t => String(t).toLowerCase().trim()) : null;
+    const allowed = Array.isArray(allowedTargets) ? allowedTargets.map((t) => String(t).toLowerCase().trim()) : null;
 
     if (requestedNormalized && allowed && allowed.includes(requestedNormalized)) {
         return requestedNormalized;
@@ -164,7 +164,12 @@ function _resolveIfVersion(/** @type {any} */ mission, /** @type {any} */ reques
     return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-async function _runMissionControlCommand(/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ command, /** @type {Record<string, any>} */ payload = {}) {
+async function _runMissionControlCommand(
+    /** @type {any} */ req,
+    /** @type {any} */ res,
+    /** @type {any} */ command,
+    /** @type {Record<string, any>} */ payload = {},
+) {
     try {
         const result = await executeCommand({
             command,
@@ -224,8 +229,7 @@ router.get('/templates/list', async (req, res) => {
 -------------------------------------------------------------------------- */
 
 /**
- * POST /api/missions
- * Cria nova missão (SSOT SQLite). Se `templateId` for fornecido, gera workflow.
+ * POST /api/missions Cria nova missão (SSOT SQLite). Se `templateId` for fornecido, gera workflow.
  */
 router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
     try {
@@ -278,12 +282,12 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
 
         recordEvent({
             entityType: 'mission',
-            entityId: (/** @type {any} */ (missionRecord)).id,
+            entityId: /** @type {any} */ (missionRecord).id,
             actorType: 'user',
             actorId: req.ip || null,
             eventType: 'MISSION_CREATED',
             payload: { request_id: req.id },
-            dedupKey: `req:${req.id}:mission:${(/** @type {any} */ (missionRecord)).id}:created`,
+            dedupKey: `req:${req.id}:mission:${/** @type {any} */ (missionRecord).id}:created`,
         });
 
         return res.status(201).json({
@@ -304,8 +308,7 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
 });
 
 /**
- * PATCH /api/missions/:id
- * Atualiza campos básicos (título/descrição/autonomia) para uso no dashboard.
+ * PATCH /api/missions/:id Atualiza campos básicos (título/descrição/autonomia) para uso no dashboard.
  */
 router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
     try {
@@ -427,7 +430,7 @@ router.get('/:id/progress', async (req, res) => {
                 FROM tasks
                 WHERE mission_id = ?
                 GROUP BY stage, status
-            `
+            `,
             )
             .all(missionId);
 
@@ -437,10 +440,11 @@ router.get('/:id/progress', async (req, res) => {
         const byStage = {};
         let totalTasks = 0;
         for (const r of countRows) {
-            const c = Number((/** @type {any} */ (r)).c) || 0;
+            const c = Number(/** @type {any} */ (r).c) || 0;
             totalTasks += c;
-            byStatus[String((/** @type {any} */ (r)).status)] = (byStatus[String((/** @type {any} */ (r)).status)] || 0) + c;
-            byStage[String((/** @type {any} */ (r)).stage)] = (byStage[String((/** @type {any} */ (r)).stage)] || 0) + c;
+            byStatus[String(/** @type {any} */ (r).status)] =
+                (byStatus[String(/** @type {any} */ (r).status)] || 0) + c;
+            byStage[String(/** @type {any} */ (r).stage)] = (byStage[String(/** @type {any} */ (r).stage)] || 0) + c;
         }
 
         const liveCounts = {
@@ -478,8 +482,7 @@ router.get('/:id/progress', async (req, res) => {
 -------------------------------------------------------------------------- */
 
 /**
- * POST /api/missions/:id/execute
- * Missão só entra em RUNNING via ação explícita do usuário.
+ * POST /api/missions/:id/execute Missão só entra em RUNNING via ação explícita do usuário.
  */
 router.post('/:id/execute', async (req, res) => {
     try {
@@ -566,8 +569,7 @@ router.post('/:id/resume', async (req, res) => {
 -------------------------------------------------------------------------- */
 
 /**
- * POST /api/missions/:id/policy
- * Ajusta autonomia/budget em runtime.
+ * POST /api/missions/:id/policy Ajusta autonomia/budget em runtime.
  */
 router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => {
     try {
@@ -578,7 +580,7 @@ router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => 
         }
 
         const autonomy_mode = _coerceAutonomyMode(
-            req.body?.autonomy_mode ?? req.body?.autonomyMode ?? mission.autonomy_mode
+            req.body?.autonomy_mode ?? req.body?.autonomyMode ?? mission.autonomy_mode,
         );
         const policy = req.body?.policy && typeof req.body.policy === 'object' ? req.body.policy : null;
         const control = await _runMissionControlCommand(req, res, 'MISSION_SET_POLICY', {
@@ -682,12 +684,12 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
 -------------------------------------------------------------------------- */
 
 /**
- * POST /api/missions/:id/suggest-tasks
- * Cria uma "planner task" que deve retornar JSON estrito de propostas.
+ * POST /api/missions/:id/suggest-tasks Cria uma "planner task" que deve retornar JSON estrito de propostas.
  *
  * Body (opcional):
- *  - max_proposals: number (default 5)
- *  - target: auto|chatgpt|gemini|claude|ollama
+ *
+ * - max_proposals: number (default 5)
+ * - target: auto|chatgpt|gemini|claude|ollama
  */
 router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, res) => {
     try {
@@ -855,11 +857,9 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
 });
 
 /**
- * POST /api/missions/:id/proposals/accept
- * Aplique propostas diretamente como tasks READY (execução automática).
+ * POST /api/missions/:id/proposals/accept Aplique propostas diretamente como tasks READY (execução automática).
  *
- * Body:
- *   { proposals: [ ...plannerContract.proposals... ] }
+ * Body: { proposals: [ ...plannerContract.proposals... ] }
  */
 router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (req, res) => {
     try {
@@ -920,7 +920,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                         : undefined,
                     correlation_id: `req-${req.id}-mission-${missionId}-proposal-${taskId}`.replace(
                         /[^a-zA-Z0-9._-]/g,
-                        '-'
+                        '-',
                     ),
                     tags: Array.isArray(proposal?.tags) ? proposal.tags.map((/** @type {any} */ t) => String(t)) : [],
                 },
@@ -932,7 +932,9 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                     },
                 },
                 policy: {
-                    dependencies: Array.isArray(proposal?.depends_on) ? proposal.depends_on.map((/** @type {any} */ d) => String(d)) : [],
+                    dependencies: Array.isArray(proposal?.depends_on)
+                        ? proposal.depends_on.map((/** @type {any} */ d) => String(d))
+                        : [],
                     execute_after: null,
                 },
                 mission: {
@@ -981,11 +983,11 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
 });
 
 /**
- * POST /api/missions/:id/proposals/reject
- * Rejeita proposals (tasks em stage=PROPOSED) de uma mission.
+ * POST /api/missions/:id/proposals/reject Rejeita proposals (tasks em stage=PROPOSED) de uma mission.
  *
  * Body:
- *  - { all: true } ou { task_ids: string[] }
+ *
+ * - { all: true } ou { task_ids: string[] }
  */
 router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (req, res) => {
     try {
@@ -1008,7 +1010,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
         if (all) {
             ids = db
                 .prepare(
-                    `SELECT id FROM tasks WHERE mission_id = @mission_id AND stage = 'PROPOSED' ORDER BY created_at_ms ASC LIMIT 2000`
+                    `SELECT id FROM tasks WHERE mission_id = @mission_id AND stage = 'PROPOSED' ORDER BY created_at_ms ASC LIMIT 2000`,
                 )
                 .all({ mission_id: missionId })
                 .map((/** @type {any} */ r) => String(r.id));
@@ -1027,7 +1029,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
             .map((/** @type {any} */ r) => String(r.id));
 
         const belongsSet = new Set(belongs);
-        const rejectedIds = ids.filter(id => belongsSet.has(id));
+        const rejectedIds = ids.filter((id) => belongsSet.has(id));
 
         if (rejectedIds.length === 0) {
             return res.json({ success: true, mission_id: missionId, rejected: 0, task_ids: [], request_id: req.id });
@@ -1044,7 +1046,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
                 WHERE id = @id
                   AND mission_id = @mission_id
                   AND stage = 'PROPOSED'
-            `
+            `,
             );
             for (const id of rejectedIds) {
                 stmt.run({ id, mission_id: missionId, now });
@@ -1097,8 +1099,7 @@ router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (
 -------------------------------------------------------------------------- */
 
 /**
- * DELETE /api/missions/:id
- * Cancelamento lógico (preserva SSOT e evita tasks órfãs).
+ * DELETE /api/missions/:id Cancelamento lógico (preserva SSOT e evita tasks órfãs).
  */
 router.delete('/:id', async (req, res) => {
     try {
@@ -1125,8 +1126,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
- * DELETE /api/missions/:id/purge
- * Remoção física (uso administrativo).
+ * DELETE /api/missions/:id/purge Remoção física (uso administrativo).
  */
 router.delete('/:id/purge', async (req, res) => {
     try {
@@ -1156,9 +1156,8 @@ router.delete('/:id/purge', async (req, res) => {
 /**
  * Controlador de API para missões
  *
- * **Side-effects:** Registra rotas Express para operações CRUD de missões.
- * **Semântica:** Gerencia ciclo de vida completo de missões, incluindo criação, listagem, atualização e exclusão.
- * **Unidades:** N/A
+ * **Side-effects:** Registra rotas Express para operações CRUD de missões. **Semântica:** Gerencia ciclo de vida
+ * completo de missões, incluindo criação, listagem, atualização e exclusão. **Unidades:** N/A
  *
  * @type {Router}
  */
@@ -1166,6 +1165,7 @@ export default router;
 
 /**
  * Função exportada: setMissionManager.
+ *
  * @param {unknown} _ - Parâmetro ignorado (interface legado)
  * @returns {void}
  */
@@ -1174,13 +1174,11 @@ function setMissionManager(_) {
 }
 
 /**
- * @deprecated Legacy hook (filesystem MissionManager injection).
- * Define gerenciador de missões (compatibilidade legado).
+ * @deprecated Legacy hook (filesystem MissionManager injection). Define gerenciador de missões (compatibilidade
+ *   legado).
  *
- * **Side-effects:** Log de aviso sobre depreciação.
- * **Semântica:** Interface legado mantida para compatibilidade, mas ignorada.
- * **Unidades:** N/A
- *
+ *   **Side-effects:** Log de aviso sobre depreciação. **Semântica:** Interface legado mantida para compatibilidade, mas
+ *   ignorada. **Unidades:** N/A
  * @param {object} _ - Parâmetro ignorado (interface legado)
  */
 export { setMissionManager };

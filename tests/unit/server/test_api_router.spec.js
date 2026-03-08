@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('API Router - Rotas e Controllers', () => {
     describe('1. Rotas de Tarefas (Tasks)', () => {
@@ -11,7 +11,7 @@ describe('API Router - Rotas e Controllers', () => {
                 { method: 'GET', path: '/api/tasks/:id' },
             ];
 
-            const getRoute = routes.find(r => r.method === 'GET' && r.path === '/api/tasks');
+            const getRoute = routes.find((r) => r.method === 'GET' && r.path === '/api/tasks');
 
             assert.ok(getRoute, 'Rota GET /api/tasks deve existir');
         });
@@ -19,7 +19,7 @@ describe('API Router - Rotas e Controllers', () => {
         it('deve ter rota POST /api/tasks', () => {
             const routes = [{ method: 'POST', path: '/api/tasks' }];
 
-            const postRoute = routes.find(r => r.method === 'POST');
+            const postRoute = routes.find((r) => r.method === 'POST');
 
             assert.ok(postRoute);
         });
@@ -379,7 +379,7 @@ describe('API Router - Rotas e Controllers', () => {
                 { method: 'GET', path: '/static/*' },
             ];
 
-            const staticRoute = routes.find(r => r.path === '/static/*');
+            const staticRoute = routes.find((r) => r.path === '/static/*');
 
             assert.ok(staticRoute);
         });

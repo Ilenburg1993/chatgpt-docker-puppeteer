@@ -2,7 +2,7 @@
 
 import { retryWithBackoff } from '#core/retry_policy';
 
-/** @typedef {'ready'|'degraded'|'not-ready'|'stopped'} OllamaHostState */
+/** @typedef {'ready' | 'degraded' | 'not-ready' | 'stopped'} OllamaHostState */
 /**
  * @typedef {object} OllamaHostSupervisorOptions
  * @property {string} [baseUrl]
@@ -18,7 +18,10 @@ import { retryWithBackoff } from '#core/retry_policy';
  * @property {typeof clearInterval} [clearIntervalFn]
  * @property {(level: string, message: string, data?: unknown) => void | null} [logger]
  * @property {(state: ReturnType<OllamaHostSupervisor['getState']>) => void | null} [onStateChange]
- * @property {{ upsert?: (payload: unknown) => unknown, setState?: (id: string, state: unknown, details?: unknown) => unknown } | null} [resourceHooks]
+ * @property {{
+ *     upsert?: (payload: unknown) => unknown;
+ *     setState?: (id: string, state: unknown, details?: unknown) => unknown;
+ * } | null} [resourceHooks]
  */
 
 /**
@@ -50,8 +53,8 @@ function buildVersionUrl(baseUrl) {
 }
 
 /**
- * Supervisor de saúde do host Ollama local.
- * Monitora disponibilidade, estado do circuit breaker e publica mudanças de estado.
+ * Supervisor de saúde do host Ollama local. Monitora disponibilidade, estado do circuit breaker e publica mudanças de
+ * estado.
  */
 export class OllamaHostSupervisor {
     /**
@@ -69,11 +72,11 @@ export class OllamaHostSupervisor {
         this.circuitEnabled = parseBool(options.circuitEnabled ?? process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED, true);
         this.circuitThreshold = parseIntPos(
             options.circuitThreshold ?? process.env.OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
-            5
+            5,
         );
         this.circuitTimeoutMs = parseIntPos(
             options.circuitTimeoutMs ?? process.env.OLLAMA_CIRCUIT_BREAKER_TIMEOUT,
-            60000
+            60000,
         );
         this.retryEnabled = parseBool(options.retryEnabled, true);
         this.now = options.now || (() => Date.now());
@@ -89,7 +92,14 @@ export class OllamaHostSupervisor {
         this._consecutiveFailures = 0;
         this._circuitOpenUntil = 0;
         this._state = /** @type {OllamaHostState} */ ('stopped');
-        /** @type {{ ok: boolean, version: string|null, statusCode: number|null, checkedAt: number, error: string|null, circuitOpen: boolean }} */
+        /** @type {{
+    ok: boolean;
+    version: string | null;
+    statusCode: number | null;
+    checkedAt: number;
+    error: string | null;
+    circuitOpen: boolean;
+}} */
         this._last = {
             ok: false,
             version: null,
@@ -277,6 +287,7 @@ export class OllamaHostSupervisor {
 
 /**
  * Cria uma instância do supervisor de host Ollama.
+ *
  * @param {OllamaHostSupervisorOptions} [options]
  * @returns {OllamaHostSupervisor}
  */

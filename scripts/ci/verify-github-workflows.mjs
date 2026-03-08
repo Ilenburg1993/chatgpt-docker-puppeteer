@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // @ts-check
+import yaml from 'js-yaml';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import yaml from 'js-yaml';
 
 const strict = process.argv.includes('--strict');
 const allowedDynamicWorkflows = new Set(['Dependabot Updates', 'Claude']);
@@ -22,7 +22,7 @@ const requiredTypingCommands = [
 
 /**
  * @param {string} url
- * @returns {{ owner: string, repo: string }}
+ * @returns {{ owner: string; repo: string }}
  */
 function parseOriginRemote(url) {
     const trimmed = String(url || '').trim();
@@ -45,18 +45,18 @@ function execText(command, args) {
 }
 
 /**
- * @returns {Array<{ file: string, name: string, path: string }>}
+ * @returns {{ file: string; name: string; path: string }[]}
  */
 function readLocalWorkflowNames() {
     const workflowsDir = path.resolve('.github/workflows');
     const files = fs
         .readdirSync(workflowsDir)
-        .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+        .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
         .sort();
 
-    return files.map(file => {
+    return files.map((file) => {
         const raw = fs.readFileSync(path.join(workflowsDir, file), 'utf8');
-        const parsed = /** @type {Record<string, unknown>|null} */ (yaml.load(raw));
+        const parsed = /** @type {Record<string, unknown> | null} */ (yaml.load(raw));
         return {
             file,
             name: String(parsed?.name || file),
@@ -68,7 +68,7 @@ function readLocalWorkflowNames() {
 /**
  * @param {string} owner
  * @param {string} repo
- * @returns {Array<Record<string, unknown>>}
+ * @returns {Record<string, unknown>[]}
  */
 function readRemoteWorkflows(owner, repo) {
     const payload = execText('gh', [
@@ -127,14 +127,14 @@ try {
     const local = readLocalWorkflowNames();
     const remote = readRemoteWorkflows(owner, repo);
 
-    const localByName = new Map(local.map(item => [item.name, item]));
-    const remoteVersioned = remote.filter(item => String(item.path || '').startsWith('.github/workflows/'));
-    const remoteDynamic = remote.filter(item => !String(item.path || '').startsWith('.github/workflows/'));
-    const remoteVersionedNames = new Set(remoteVersioned.map(item => String(item.name || '')));
+    const localByName = new Map(local.map((item) => [item.name, item]));
+    const remoteVersioned = remote.filter((item) => String(item.path || '').startsWith('.github/workflows/'));
+    const remoteDynamic = remote.filter((item) => !String(item.path || '').startsWith('.github/workflows/'));
+    const remoteVersionedNames = new Set(remoteVersioned.map((item) => String(item.name || '')));
 
-    const missingRemote = local.filter(item => !remoteVersionedNames.has(item.name));
-    const unexpectedRemoteVersioned = remoteVersioned.filter(item => !localByName.has(String(item.name || '')));
-    const unexpectedDynamic = remoteDynamic.filter(item => !allowedDynamicWorkflows.has(String(item.name || '')));
+    const missingRemote = local.filter((item) => !remoteVersionedNames.has(item.name));
+    const unexpectedRemoteVersioned = remoteVersioned.filter((item) => !localByName.has(String(item.name || '')));
+    const unexpectedDynamic = remoteDynamic.filter((item) => !allowedDynamicWorkflows.has(String(item.name || '')));
     const typingWorkflowIssues = validateTypingWorkflowContract();
 
     console.log(`[ci] Local versioned workflows: ${local.length}`);

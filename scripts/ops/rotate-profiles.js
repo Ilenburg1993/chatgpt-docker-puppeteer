@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // @ts-check
+import { log } from '#core/logger';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { log } from '#core/logger';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const PROFILE_DIR = path.join(ROOT, 'profile');
@@ -11,6 +11,7 @@ const MAX_BACKUPS_DAYS = 30; // Mantém backups por 30 dias
 
 /**
  * Rotaciona o profile persistente atual para backup
+ *
  * @returns {Promise<any>}
  */
 async function rotateProfile() {
@@ -64,6 +65,7 @@ async function rotateProfile() {
 
 /**
  * Remove backups antigos (>30 dias)
+ *
  * @returns {Promise<any>}
  */
 async function cleanOldBackups() {
@@ -79,7 +81,7 @@ async function cleanOldBackups() {
         }
 
         const entries = await fs.readdir(BACKUP_DIR, { withFileTypes: true });
-        const backups = entries.filter(e => e.isDirectory() && e.name.startsWith('profile_'));
+        const backups = entries.filter((e) => e.isDirectory() && e.name.startsWith('profile_'));
 
         const now = Date.now();
         const maxAge = MAX_BACKUPS_DAYS * 24 * 60 * 60 * 1000;
@@ -98,7 +100,7 @@ async function cleanOldBackups() {
 
                 log(
                     'INFO',
-                    `[ROTATE] Removendo backup antigo: ${backup.name} (${(age / 1000 / 60 / 60 / 24).toFixed(1)} dias)`
+                    `[ROTATE] Removendo backup antigo: ${backup.name} (${(age / 1000 / 60 / 60 / 24).toFixed(1)} dias)`,
                 );
                 await fs.rm(backupPath, { recursive: true, force: true });
                 cleaned++;
@@ -122,7 +124,8 @@ async function cleanOldBackups() {
 
 /**
  * Calcula tamanho total de um diretório (recursivo)
- * @param {*} dirPath
+ *
+ * @param {any} dirPath
  * @returns {Promise<number>}
  */
 async function getDirectorySize(dirPath) {
@@ -150,6 +153,7 @@ async function getDirectorySize(dirPath) {
 
 /**
  * Retorna estatísticas dos backups atuais
+ *
  * @returns {Promise<any>}
  */
 async function getBackupStats() {
@@ -160,7 +164,7 @@ async function getBackupStats() {
     }
 
     const entries = await fs.readdir(BACKUP_DIR, { withFileTypes: true });
-    const backups = entries.filter(e => e.isDirectory() && e.name.startsWith('profile_'));
+    const backups = entries.filter((e) => e.isDirectory() && e.name.startsWith('profile_'));
 
     let totalSize = 0;
     const backupDetails = [];
@@ -239,4 +243,4 @@ if (import.meta.filename === process.argv[1]) {
     main();
 }
 
-export { rotateProfile, cleanOldBackups, getBackupStats, getDirectorySize };
+export { cleanOldBackups, getBackupStats, getDirectorySize, rotateProfile };

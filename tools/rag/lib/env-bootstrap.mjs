@@ -1,8 +1,8 @@
 // @ts-check
+import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import dotenv from 'dotenv';
 
 const RAG_ENV_BOOTSTRAP_FLAG = '__RAG_ENV_BOOTSTRAPPED__';
 
@@ -12,8 +12,8 @@ function projectRootFromHere() {
 }
 
 /**
- * @param {{ rootDir?: string, useGlobalFlag?: boolean, quiet?: boolean }} [options]
- * @returns {{ root: string, loaded: string[] }}
+ * @param {{ rootDir?: string; useGlobalFlag?: boolean; quiet?: boolean }} [options]
+ * @returns {{ root: string; loaded: string[] }}
  */
 export function bootstrapRagEnv(options = {}) {
     const root = options.rootDir ? path.resolve(options.rootDir) : projectRootFromHere();

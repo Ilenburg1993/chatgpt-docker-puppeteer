@@ -3,6 +3,7 @@ import sinon from 'sinon';
 
 /**
  * Cria um logger mockado com todos os métodos
+ *
  * @returns {object} Logger mockado com spies do sinon
  */
 function criarLoggerMock() {
@@ -14,7 +15,7 @@ function criarLoggerMock() {
         debug: sinon.stub(),
 
         // Helpers para asserções
-        obterLogs: function (/** @type {string|undefined} */ nivel) {
+        obterLogs: function (/** @type {string | undefined} */ nivel) {
             const self = /** @type {Record<string, any>} */ (this);
             if (!nivel) {
                 return self.log.getCalls().map((/** @type {any} */ call) => call.args);
@@ -35,15 +36,15 @@ function criarLoggerMock() {
             const self = /** @type {Record<string, any>} */ (this);
             const chamadas = self[nivel].getCalls();
             return chamadas.some((/** @type {any} */ call) =>
-                call.args.some((/** @type {unknown} */ arg) => typeof arg === 'string' && arg.includes(mensagem))
+                call.args.some((/** @type {unknown} */ arg) => typeof arg === 'string' && arg.includes(mensagem)),
             );
         },
     };
 }
 
 /**
- * Cria um logger silencioso (noop)
- * Útil quando você não quer poluir a saída dos testes
+ * Cria um logger silencioso (noop) Útil quando você não quer poluir a saída dos testes
+ *
  * @returns {object}
  */
 function criarLoggerSilencioso() {

@@ -1,13 +1,12 @@
 // @ts-check
 import { log } from '#core/logger';
 import { ActionCode } from '#shared/nerv/constants';
-import { asRecord } from '#types/guards';
 import { getActionCode, getCorrelationId, getPayload, getTaskIdFromPayload } from '#shared/nerv/envelope_reader';
+import { asRecord } from '#types/guards';
 import EventEmitter from 'node:events';
 
 /**
- * Estados unificados para visualização no dashboard.
- * Combina estados do disco (Queue) com estados do Kernel.
+ * Estados unificados para visualização no dashboard. Combina estados do disco (Queue) com estados do Kernel.
  */
 const UnifiedStatus = Object.freeze({
     PENDING: 'PENDING', // Na fila, aguardando execução
@@ -23,24 +22,24 @@ const BROADCAST_DEBOUNCE_MS = 50;
 
 /**
  * @typedef {{
- *   status?: string,
- *   worker_id?: string|null,
- *   started_at?: number,
- *   updated_at?: number,
- *   progress_percent?: number,
- *   completed_at?: number,
- *   failed_at?: number,
- *   cancelled_at?: number,
- *   error?: string,
- *   reason_code?: string,
- *   retryable?: boolean,
- *   next_action?: string|null,
- *   queue_position?: number|null,
- *   queue_size?: number|null,
- *   active_drivers?: number|null,
- *   event_timestamp?: number,
- *   last_correlation_id?: string|null,
- *   [key: string]: unknown
+ *     status?: string;
+ *     worker_id?: string | null;
+ *     started_at?: number;
+ *     updated_at?: number;
+ *     progress_percent?: number;
+ *     completed_at?: number;
+ *     failed_at?: number;
+ *     cancelled_at?: number;
+ *     error?: string;
+ *     reason_code?: string;
+ *     retryable?: boolean;
+ *     next_action?: string | null;
+ *     queue_position?: number | null;
+ *     queue_size?: number | null;
+ *     active_drivers?: number | null;
+ *     event_timestamp?: number;
+ *     last_correlation_id?: string | null;
+ *     [key: string]: unknown;
  * }} KernelRuntimeState
  */
 
@@ -48,10 +47,12 @@ const BROADCAST_DEBOUNCE_MS = 50;
  * TaskSyncBridge - Ponte de Sincronização de Tasks
  *
  * Unifica duas fontes de verdade:
+ *
  * 1. Queue Cache (disco): Tarefas persistidas em arquivos JSON
  * 2. Kernel Runtime (memória): Estado de execução em tempo real
  *
  * Arquitetura:
+ *
  * - Singleton pattern para acesso global
  * - Event-driven para updates em tempo real
  * - Cache local para performance
@@ -61,8 +62,7 @@ class TaskSyncBridge extends EventEmitter {
         super();
 
         /**
-         * Cache de estado runtime do Kernel.
-         * Map: taskId → { status, worker_id, started_at, progress, ... }
+         * Cache de estado runtime do Kernel. Map: taskId → { status, worker_id, started_at, progress, ... }
          */
         /** @type {Map<string, KernelRuntimeState>} */
         this.kernelStateCache = new Map();
@@ -89,7 +89,8 @@ class TaskSyncBridge extends EventEmitter {
 
         /**
          * Unsubscribers NERV (para cleanup/robustez em testes).
-         * @type {Array<function>}
+         *
+         * @type {function[]}
          */
         this._nervUnsubscribers = [];
 
@@ -108,13 +109,12 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Inicializa o bridge com dependências.
-     * Deve ser chamado após boot do sistema.
+     * Inicializa o bridge com dependências. Deve ser chamado após boot do sistema.
      *
      * @param {object} [options]
      * @param {object} [options.socketHub] - Socket.io Hub para notificações
      * @param {object} [options.nervClient] - Cliente NERV para eventos
-     * @param {boolean} [options.force=false] - Força reinicialização se já inicializado
+     * @param {boolean} [options.force=false] - Força reinicialização se já inicializado. Default is `false`
      */
     initialize(options = {}) {
         const { socketHub, nervClient, force = false } = options;
@@ -131,7 +131,7 @@ class TaskSyncBridge extends EventEmitter {
                 const _e = /** @type {any} */ (clearError);
                 log(
                     'WARN',
-                    `[TaskSyncBridge] Falha em clearAll durante force initialize: ${_e?.message || String(_e)}`
+                    `[TaskSyncBridge] Falha em clearAll durante force initialize: ${_e?.message || String(_e)}`,
                 );
             }
             this._initialized = false;
@@ -150,8 +150,7 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Getter lazy para Queue Cache.
-     * Evita dependência circular no boot.
+     * Getter lazy para Queue Cache. Evita dependência circular no boot.
      */
     async getQueueCache() {
         if (!this._queueCache) {
@@ -167,8 +166,7 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Getter lazy para IO facade.
-     * Usado para persistir snapshots runtime no estado de task em disco.
+     * Getter lazy para IO facade. Usado para persistir snapshots runtime no estado de task em disco.
      */
     async getIo() {
         if (!this._io) {
@@ -185,8 +183,14 @@ class TaskSyncBridge extends EventEmitter {
 
     /**
      * Extrai contexto normalizado de envelope NERV.
+     *
      * @param {any} envelope
-     * @returns {{payload: Record<string, unknown>, taskId: string|null, correlationId: string|null, eventTimestamp: number}}
+     * @returns {{
+     *     payload: Record<string, unknown>;
+     *     taskId: string | null;
+     *     correlationId: string | null;
+     *     eventTimestamp: number;
+     * }}
      */
     _extractEnvelopeContext(envelope) {
         const payload = /** @type {Record<string, unknown>} */ (getPayload(envelope));
@@ -204,13 +208,12 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Configura listeners para eventos NERV relevantes.
-     * Atualiza cache local e notifica dashboards.
+     * Configura listeners para eventos NERV relevantes. Atualiza cache local e notifica dashboards.
      */
     _setupNervListeners() {
         const nerv = this._nervClient;
 
-        if (!nerv || typeof (/** @type {any} */ (nerv)).onReceive !== 'function') {
+        if (!nerv || typeof (/** @type {any} */ (nerv).onReceive) !== 'function') {
             log('WARN', '[TaskSyncBridge] NERV client inválido (onReceive ausente), realtime desativado');
             return;
         }
@@ -223,15 +226,15 @@ class TaskSyncBridge extends EventEmitter {
                     const _e = /** @type {any} */ (handlerError);
                     log(
                         'ERROR',
-                        `[TaskSyncBridge] Handler NERV falhou para ${actionCode}: ${_e?.message || String(_e)}`
+                        `[TaskSyncBridge] Handler NERV falhou para ${actionCode}: ${_e?.message || String(_e)}`,
                     );
                 }
             };
 
             // Prefer onEvent; fallback para onReceive.
-            if (typeof (/** @type {any} */ (nerv)).onEvent === 'function') {
+            if (typeof (/** @type {any} */ (nerv).onEvent) === 'function') {
                 try {
-                    const unsub = (/** @type {any} */ (nerv)).onEvent(actionCode, wrappedHandler);
+                    const unsub = /** @type {any} */ (nerv).onEvent(actionCode, wrappedHandler);
                     if (typeof unsub === 'function') {
                         this._nervUnsubscribers.push(unsub);
                     }
@@ -240,12 +243,12 @@ class TaskSyncBridge extends EventEmitter {
                     const _e = /** @type {any} */ (onEventError);
                     log(
                         'DEBUG',
-                        `[TaskSyncBridge] onEvent indisponível para ${actionCode}, usando onReceive fallback: ${_e?.message || String(_e)}`
+                        `[TaskSyncBridge] onEvent indisponível para ${actionCode}, usando onReceive fallback: ${_e?.message || String(_e)}`,
                     );
                 }
             }
 
-            const unsub = (/** @type {any} */ (nerv)).onReceive((/** @type {any} */ envelope) => {
+            const unsub = /** @type {any} */ (nerv).onReceive((/** @type {any} */ envelope) => {
                 const envelopeActionCode = getActionCode(envelope);
 
                 if (envelopeActionCode !== actionCode) {
@@ -426,7 +429,7 @@ class TaskSyncBridge extends EventEmitter {
         ) {
             log(
                 'DEBUG',
-                `[TaskSyncBridge] Evento stale ignorado para ${taskId} (incoming=${incomingEventTimestamp}, current=${existingEventTimestamp})`
+                `[TaskSyncBridge] Evento stale ignorado para ${taskId} (incoming=${incomingEventTimestamp}, current=${existingEventTimestamp})`,
             );
             return;
         }
@@ -449,8 +452,8 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Persiste runtime_state no registro de task em disco (best-effort).
-     * Não lança exceção para não quebrar fluxo realtime.
+     * Persiste runtime_state no registro de task em disco (best-effort). Não lança exceção para não quebrar fluxo
+     * realtime.
      *
      * @param {string} taskId
      * @param {object} runtimeState
@@ -463,7 +466,7 @@ class TaskSyncBridge extends EventEmitter {
             }
 
             const queue = await io.getQueue();
-            const task = queue.find(t => {
+            const task = queue.find((t) => {
                 const taskView = asRecord(t);
                 const taskMeta = asRecord(taskView.meta);
                 return taskMeta.id === taskId || taskView.id === taskId;
@@ -483,7 +486,11 @@ class TaskSyncBridge extends EventEmitter {
                 },
                 state: {
                     ...taskState,
-                    status: (/** @type {any} */ (runtimeState)).status || (/** @type {any} */ (taskState)).status || (/** @type {any} */ (taskView)).status || UnifiedStatus.PENDING,
+                    status:
+                        /** @type {any} */ (runtimeState).status ||
+                        /** @type {any} */ (taskState).status ||
+                        /** @type {any} */ (taskView).status ||
+                        UnifiedStatus.PENDING,
                     updated_at: Date.now(),
                 },
             };
@@ -496,8 +503,7 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Agenda broadcast para dashboards com debounce configurável.
-     * Evita flood de mensagens em updates rápidos.
+     * Agenda broadcast para dashboards com debounce configurável. Evita flood de mensagens em updates rápidos.
      */
     _scheduleBroadcast(/** @type {any} */ taskId, /** @type {any} */ state) {
         this._pendingBroadcasts.set(taskId, state);
@@ -522,10 +528,10 @@ class TaskSyncBridge extends EventEmitter {
         // Broadcast cada task atualizada
         for (const [taskId, state] of this._pendingBroadcasts) {
             try {
-                if (typeof (/** @type {any} */ (this.socketHub)).broadcastTaskUpdate === 'function') {
-                    (/** @type {any} */ (this.socketHub)).broadcastTaskUpdate(taskId, state);
-                } else if (typeof (/** @type {any} */ (this.socketHub)).notify === 'function') {
-                    (/** @type {any} */ (this.socketHub)).notify('task:updated', { taskId, state });
+                if (typeof (/** @type {any} */ (this.socketHub).broadcastTaskUpdate) === 'function') {
+                    /** @type {any} */ (this.socketHub).broadcastTaskUpdate(taskId, state);
+                } else if (typeof (/** @type {any} */ (this.socketHub).notify) === 'function') {
+                    /** @type {any} */ (this.socketHub).notify('task:updated', { taskId, state });
                 }
             } catch (/** @type {any} */ err) {
                 const _e = /** @type {any} */ (err);
@@ -537,8 +543,7 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Retorna lista unificada de todas as tasks.
-     * Combina dados do disco com estado do kernel.
+     * Retorna lista unificada de todas as tasks. Combina dados do disco com estado do kernel.
      *
      * @returns {Promise<unknown[]>} Lista de tasks unificadas
      */
@@ -555,7 +560,7 @@ class TaskSyncBridge extends EventEmitter {
      * Retorna uma task unificada por ID.
      *
      * @param {string} taskId - ID da task
-     * @returns {Promise<object|null>} Task unificada ou null
+     * @returns {Promise<object | null>} Task unificada ou null
      */
     async getUnifiedTask(taskId) {
         if (!taskId) return null;
@@ -605,8 +610,7 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Computa o status unificado baseado nas duas fontes.
-     * Kernel state tem precedência para tasks ativas.
+     * Computa o status unificado baseado nas duas fontes. Kernel state tem precedência para tasks ativas.
      */
     _computeUnifiedStatus(/** @type {any} */ diskTask, /** @type {any} */ kernelState) {
         // Se tem estado no kernel, ele prevalece
@@ -632,7 +636,7 @@ class TaskSyncBridge extends EventEmitter {
             SUSPENDED: UnifiedStatus.PAUSED,
         };
 
-        return (/** @type {any} */ (statusMap))[diskStatus] || UnifiedStatus.PENDING;
+        return /** @type {any} */ (statusMap)[diskStatus] || UnifiedStatus.PENDING;
     }
 
     /**
@@ -649,8 +653,7 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Limpa estado de uma task do cache.
-     * Usado quando task é removida do sistema.
+     * Limpa estado de uma task do cache. Usado quando task é removida do sistema.
      */
     clearTaskState(/** @type {any} */ taskId) {
         if (this.kernelStateCache.has(taskId)) {
@@ -660,8 +663,7 @@ class TaskSyncBridge extends EventEmitter {
     }
 
     /**
-     * Limpa todo o cache de estado do kernel.
-     * Usado em shutdown ou reset.
+     * Limpa todo o cache de estado do kernel. Usado em shutdown ou reset.
      */
     clearAll() {
         // Cleanup listeners NERV (se presentes)
@@ -671,18 +673,12 @@ class TaskSyncBridge extends EventEmitter {
                     unsub();
                 } catch (/** @type {any} */ unsubscribeError) {
                     const _e = /** @type {any} */ (unsubscribeError);
-                    log(
-                        'WARN',
-                        `[TaskSyncBridge] Falha ao executar unsubscribe NERV: ${_e?.message || String(_e)}`
-                    );
+                    log('WARN', `[TaskSyncBridge] Falha ao executar unsubscribe NERV: ${_e?.message || String(_e)}`);
                 }
             }
         } catch (/** @type {any} */ unsubscribeBatchError) {
             const _e = /** @type {any} */ (unsubscribeBatchError);
-            log(
-                'WARN',
-                `[TaskSyncBridge] Falha ao limpar subscribers NERV: ${_e?.message || String(_e)}`
-            );
+            log('WARN', `[TaskSyncBridge] Falha ao limpar subscribers NERV: ${_e?.message || String(_e)}`);
         }
         this._nervUnsubscribers = [];
 

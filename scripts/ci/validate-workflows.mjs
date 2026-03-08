@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // @ts-check
+import yaml from 'js-yaml';
 import fs from 'node:fs';
 import path from 'node:path';
-import yaml from 'js-yaml';
 
 const workflowsDir = path.resolve('.github/workflows');
 if (!fs.existsSync(workflowsDir)) {
@@ -48,7 +48,7 @@ const requiredPinnedActionRefs = new Map([
 ]);
 const seenWorkflowNames = new Set();
 
-const files = fs.readdirSync(workflowsDir).filter(file => file.endsWith('.yml') || file.endsWith('.yaml'));
+const files = fs.readdirSync(workflowsDir).filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'));
 
 if (files.length === 0) {
     console.error('[ci] No workflow files found.');
@@ -133,7 +133,7 @@ for (const file of files) {
                 }
                 if (typeof stepObj.with['retention-days'] !== 'number') {
                     throw new Error(
-                        `[ci] Upload artifact step missing numeric 'retention-days' in ${file} job '${jobName}'`
+                        `[ci] Upload artifact step missing numeric 'retention-days' in ${file} job '${jobName}'`,
                     );
                 }
             }
@@ -143,7 +143,7 @@ for (const file of files) {
                 const expectedRef = requiredPinnedActionRefs.get(actionRef);
                 if (expectedRef && ref !== expectedRef) {
                     throw new Error(
-                        `[ci] Action ${actionRef} must be pinned to ${expectedRef} in ${file} job '${jobName}'`
+                        `[ci] Action ${actionRef} must be pinned to ${expectedRef} in ${file} job '${jobName}'`,
                     );
                 }
             }
@@ -186,7 +186,7 @@ for (const [index, update] of depConfig.updates.entries()) {
     }
     if (typeof update.schedule.time === 'string' && update.schedule.time.endsWith(':00')) {
         throw new Error(
-            `[ci] updates[${index}] schedule.time must avoid the top of the hour in .github/dependabot.yml`
+            `[ci] updates[${index}] schedule.time must avoid the top of the hour in .github/dependabot.yml`,
         );
     }
     if (!Array.isArray(update.labels) || update.labels.length === 0) {
@@ -197,7 +197,7 @@ for (const [index, update] of depConfig.updates.entries()) {
     }
     if (!update['pull-request-branch-name'] || !update['pull-request-branch-name'].separator) {
         throw new Error(
-            `[ci] updates[${index}] missing 'pull-request-branch-name.separator' in .github/dependabot.yml`
+            `[ci] updates[${index}] missing 'pull-request-branch-name.separator' in .github/dependabot.yml`,
         );
     }
 }
@@ -217,5 +217,5 @@ for (const relativePath of requiredCiScripts) {
 }
 
 console.log(
-    `[ci] Workflow validation OK (${files.length} workflow files, dependabot config, .github docs and CI workflow scripts present)`
+    `[ci] Workflow validation OK (${files.length} workflow files, dependabot config, .github docs and CI workflow scripts present)`,
 );

@@ -1,14 +1,14 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import test from 'node:test';
 
 test('wave18t: bulk reassign com preview e validação no fluxo de tasks', async () => {
     const tasksView = await fs.readFile(path.join(process.cwd(), 'src/dashboard-ui/src/views/TasksView.vue'), 'utf8');
     const tasksStore = await fs.readFile(
         path.join(process.cwd(), 'src/dashboard-ui/src/stores/tasks_vnext.js'),
-        'utf8'
+        'utf8',
     );
 
     assert.match(tasksView, /reassign_mission/);

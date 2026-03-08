@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
-import './lib/env-bootstrap.mjs';
 import { parseArgs } from 'node:util';
+import './lib/env-bootstrap.mjs';
 import { ragHybridSearch } from './lib/facade.mjs';
 
 const { positionals, values } = parseArgs({
@@ -69,7 +69,7 @@ if (values.json) {
     console.log(`Features: Vector + FTS${result.rerank ? ' + Rerank' : ''}${result.mmr ? ' + MMR' : ''}`);
     if (result.mmr) {
         console.log(
-            `MMR lambda: ${result.mmrLambda} (${(result.mmrLambda * 100).toFixed(0)}% relevance, ${((1 - result.mmrLambda) * 100).toFixed(0)}% diversity)`
+            `MMR lambda: ${result.mmrLambda} (${(result.mmrLambda * 100).toFixed(0)}% relevance, ${((1 - result.mmrLambda) * 100).toFixed(0)}% diversity)`,
         );
     }
     console.log(`Found ${result.results.length} results:\n`);
@@ -82,7 +82,7 @@ if (values.json) {
             console.log(`    Rerank Score: ${r.rerank_score.toFixed(4)}`);
             if (r.rerank_signals) {
                 console.log(
-                    `    Signals: sem=${r.rerank_signals.semantic} lex=${r.rerank_signals.lexical} rec=${r.rerank_signals.recency} type=${r.rerank_signals.fileType} len=${r.rerank_signals.length} pos=${r.rerank_signals.position}`
+                    `    Signals: sem=${r.rerank_signals.semantic} lex=${r.rerank_signals.lexical} rec=${r.rerank_signals.recency} type=${r.rerank_signals.fileType} len=${r.rerank_signals.length} pos=${r.rerank_signals.position}`,
                 );
             }
         } else {

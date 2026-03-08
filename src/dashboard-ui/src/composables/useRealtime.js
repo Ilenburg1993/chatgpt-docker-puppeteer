@@ -3,6 +3,7 @@
  * Composable: useRealtime
  *
  * Integra Socket.io com Pinia stores para updates em tempo real.
+ *
  * - Escuta eventos de telemetria
  * - Escuta updates de tasks
  * - Escuta alertas
@@ -17,14 +18,15 @@ import { useSocket } from './useSocket';
 
 /**
  * @typedef {object} UseRealtimeOptions
- * @property {*} [_] Propriedades definidas em runtime.
+ * @property {any} [_] Propriedades definidas em runtime.
  * @property {boolean} [reloadOnReconnect]
  * @property {Function} [loadInitialData]
  */
 /**
  * Composable para integração real-time com stores
+ *
  * @param {UseRealtimeOptions} [options]
-  * @returns {any}
+ * @returns {any}
  */
 export function useRealtime(options = {}) {
     const { subscribe, unsubscribe, isConnected } = /** @type {any} */ (useSocket());
@@ -85,7 +87,7 @@ export function useRealtime(options = {}) {
     };
 
     // Watch connection status
-    watch(isConnected, connected => {
+    watch(isConnected, (connected) => {
         telemetryStore.setConnected(connected);
 
         if (connected) {
@@ -102,7 +104,7 @@ export function useRealtime(options = {}) {
         setupListeners();
 
         // Carrega dados iniciais
-        if ((/** @type {any} */ (options)).loadInitialData !== false) {
+        if (/** @type {any} */ (options).loadInitialData !== false) {
             taskStore.fetchTasks();
             telemetryStore.fetchCurrent();
             systemStore.fetchHealth();

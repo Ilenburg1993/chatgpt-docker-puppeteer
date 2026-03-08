@@ -11,7 +11,7 @@ const REPORT_PATH = path.join(REPORT_DIR, 'fix-bindings-report.json');
 const EXT = new Set(['.js', '.ts', '.cjs', '.mjs', '.jsx', '.tsx']);
 const IGNORES = new Set(['node_modules', '.git', 'dist', 'build', 'coverage']);
 
-let edits = /** @type {any[]} */ ([]);
+const edits = /** @type {any[]} */ ([]);
 
 /**
  * @param {string} dir
@@ -50,7 +50,7 @@ function processFile(file) {
     const changesHere = /** @type {any[]} */ ([]);
 
     // 1) Replace host literals used directly as listen args: server.listen(PORT, '127.0.0.1', ...)
-    const listenArgRegex = /(\.listen\s*\(\s*[^\)]*?)(['\"])(127\.0\.0\.1|localhost)\2([^\)]*?\))/gs;
+    const listenArgRegex = /(\.listen\s*\(\s*[^)]*?)(['"])(127\.0\.0\.1|localhost)\2([^)]*?\))/gs;
     content = content.replace(listenArgRegex, (m, before, quote, host, after) => {
         changesHere.push({ type: 'listen-arg', host, snippet: m.trim() });
         changed = true;
@@ -58,7 +58,7 @@ function processFile(file) {
     });
 
     // 2) Replace host property in option objects: { host: '127.0.0.1' }
-    const hostPropRegex = /(\bhost\s*:\s*)(['\"])(127\.0\.0\.1|localhost)\2/g;
+    const hostPropRegex = /(\bhost\s*:\s*)(['"])(127\.0\.0\.1|localhost)\2/g;
     content = content.replace(hostPropRegex, (m, prefix, quote, host) => {
         changesHere.push({ type: 'host-prop', host, snippet: m.trim() });
         changed = true;
@@ -74,13 +74,13 @@ function processFile(file) {
                 changesHere.push({ type: 'hosts-array', host: h, snippet: mm });
                 changed = true;
                 return `${q}0.0.0.0${q}`;
-            }
+            },
         );
         return `${start}${replaced}${end}`;
     });
 
     // 4) Replace host:port string occurrences e.g. '127.0.0.1:9224' or "localhost:3000"
-    const hostPortStringRegex = /(['\"])(127\.0\.0\.1|localhost)(:\d+)?\1/g;
+    const hostPortStringRegex = /(['"])(127\.0\.0\.1|localhost)(:\d+)?\1/g;
     content = content.replace(hostPortStringRegex, (m, quote, host, port = '') => {
         changesHere.push({ type: 'host-port-string', host, port: port || '', snippet: m });
         changed = true;
@@ -128,7 +128,7 @@ const report = {
     timestamp: new Date().toISOString(),
     root: ROOT,
     apply: !!APPLY,
-    changed_files: edits.map(e => ({ file: path.relative(process.cwd(), e.file), changes: e.changes })),
+    changed_files: edits.map((e) => ({ file: path.relative(process.cwd(), e.file), changes: e.changes })),
 };
 
 try {

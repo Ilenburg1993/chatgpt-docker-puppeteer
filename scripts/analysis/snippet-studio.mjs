@@ -134,7 +134,7 @@ switch (command) {
                 minScore: Number.parseFloat(String(values['min-score'] || '0.55')) || 0.55,
                 insertMissing: Boolean(values['insert-missing']),
             }),
-            format
+            format,
         );
         break;
     case 'scaffold':
@@ -260,10 +260,12 @@ function generateLearningReport({
     const catalog = JSON.parse(fs.readFileSync(snippetFile, 'utf8'));
     const repo = analyzeRepositorySignals(roots, { minBlockOccurrences });
     const catalogPrefixes = new Set(
-        Object.values(catalog).flatMap(snippet => (Array.isArray(snippet.prefix) ? snippet.prefix : [snippet.prefix]))
+        Object.values(catalog).flatMap((snippet) =>
+            Array.isArray(snippet.prefix) ? snippet.prefix : [snippet.prefix],
+        ),
     );
-    const normalizedSnippetBodies = Object.values(catalog).map(snippet =>
-        normalizeBlockLines(Array.isArray(snippet.body) ? snippet.body : [String(snippet.body || '')]).join('\n')
+    const normalizedSnippetBodies = Object.values(catalog).map((snippet) =>
+        normalizeBlockLines(Array.isArray(snippet.body) ? snippet.body : [String(snippet.body || '')]).join('\n'),
     );
 
     const candidates = [];
@@ -275,15 +277,15 @@ function generateLearningReport({
 
         const importHits = (candidate.imports || []).reduce(
             (sum, specifier) => sum + (repo.importCounts[specifier] || 0),
-            0
+            0,
         );
         const patternHits = (candidate.patterns || []).reduce(
             (sum, patternName) => sum + (repo.patternCounts[patternName] || 0),
-            0
+            0,
         );
         const sequenceHits = (candidate.sequences || []).reduce(
             (sum, sequenceName) => sum + (repo.sequenceCounts[sequenceName] || 0),
-            0
+            0,
         );
         const hitCount = importHits + sequenceHits;
         if (hitCount < candidate.minHits) {
@@ -314,15 +316,15 @@ function generateLearningReport({
             hit_count: hitCount,
             confidence_score: Number(confidence.toFixed(3)),
             reason: candidate.reason,
-            based_on_imports: (candidate.imports || []).map(specifier => ({
+            based_on_imports: (candidate.imports || []).map((specifier) => ({
                 specifier,
                 hits: repo.importCounts[specifier] || 0,
             })),
-            based_on_patterns: (candidate.patterns || []).map(patternName => ({
+            based_on_patterns: (candidate.patterns || []).map((patternName) => ({
                 pattern: patternName,
                 hits: repo.patternCounts[patternName] || 0,
             })),
-            based_on_sequences: (candidate.sequences || []).map(sequenceName => ({
+            based_on_sequences: (candidate.sequences || []).map((sequenceName) => ({
                 sequence: sequenceName,
                 hits: repo.sequenceCounts[sequenceName] || 0,
             })),
@@ -338,11 +340,11 @@ function generateLearningReport({
 
     candidates.sort(
         (a, b) =>
-            b.confidence_score - a.confidence_score || b.hit_count - a.hit_count || a.prefix.localeCompare(b.prefix)
+            b.confidence_score - a.confidence_score || b.hit_count - a.hit_count || a.prefix.localeCompare(b.prefix),
     );
     lowConfidenceCandidates.sort(
         (a, b) =>
-            b.confidence_score - a.confidence_score || b.hit_count - a.hit_count || a.prefix.localeCompare(b.prefix)
+            b.confidence_score - a.confidence_score || b.hit_count - a.hit_count || a.prefix.localeCompare(b.prefix),
     );
     const limitedCandidates = candidates.slice(0, Math.max(1, maxCandidates));
     const insertedCandidates = [];
@@ -362,7 +364,7 @@ function generateLearningReport({
 
     const topRepeatedBlocks = repo.repeatedBlocks.slice(0, Math.max(1, maxBlocks));
     const uncoveredRepeatedBlocks = topRepeatedBlocks.filter(
-        block => !normalizedSnippetBodies.some(body => body.includes(block.signature))
+        (block) => !normalizedSnippetBodies.some((body) => body.includes(block.signature)),
     );
     const blockOpportunities = suggestBlockOpportunities(uncoveredRepeatedBlocks, catalogPrefixes, maxCandidates);
 
@@ -641,7 +643,7 @@ function getTemplateDefaults(template) {
 function parseCsvList(value) {
     const items = String(value || '')
         .split(',')
-        .map(item => item.trim())
+        .map((item) => item.trim())
         .filter(Boolean);
     return items;
 }
@@ -687,7 +689,7 @@ function buildSnippetDefinition(options) {
 
 /**
  * @typedef {object} AnalyzeRepositorySignalsOptions
- * @property {*} [minBlockOccurrences]
+ * @property {any} [minBlockOccurrences]
  */
 /**
  * @param {string[]} roots
@@ -764,9 +766,9 @@ function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
         patternCounts,
         sequenceCounts,
         repeatedBlocks: [...repeatedBlockMap.values()]
-            .filter(item => item.hits >= minBlockOccurrences)
+            .filter((item) => item.hits >= minBlockOccurrences)
             .sort(
-                (a, b) => b.hits - a.hits || b.files.length - a.files.length || a.signature.localeCompare(b.signature)
+                (a, b) => b.hits - a.hits || b.files.length - a.files.length || a.signature.localeCompare(b.signature),
             ),
     };
 }
@@ -774,14 +776,14 @@ function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
 /**
  * @param {string} text
  * @param {string} file
- * @param {Map<string, {signature: string, hits: number, files: string[], example: string[]}>} repeatedBlockMap
- * @param {*} repeatedBlockMap
+ * @param {Map<string, { signature: string; hits: number; files: string[]; example: string[] }>} repeatedBlockMap
+ * @param {any} repeatedBlockMap
  */
 function collectRepeatedBlockWindows(text, file, repeatedBlockMap) {
     const lines = text
         .split('\n')
-        .map(line => line.trim())
-        .filter(line => isMeaningfulLearningLine(line));
+        .map((line) => line.trim())
+        .filter((line) => isMeaningfulLearningLine(line));
 
     for (let index = 0; index <= lines.length - 3; index++) {
         const window = lines.slice(index, index + 3);
@@ -824,7 +826,7 @@ function isMeaningfulLearningLine(line) {
  * @param {string[]} lines
  */
 function normalizeBlockLines(lines) {
-    return lines.map(line =>
+    return lines.map((line) =>
         line
             .trim()
             .replace(/(["'`])(?:\\.|(?!\1).)*\1/g, '<str>')
@@ -832,7 +834,7 @@ function normalizeBlockLines(lines) {
             .replace(/\b(const|let|var)\s+[A-Za-z_$][\w$]*\s*=/g, '$1 <id> =')
             .replace(/\basync function\s+[A-Za-z_$][\w$]*\s*\(/g, 'async function <fn>(')
             .replace(/\bfunction\s+[A-Za-z_$][\w$]*\s*\(/g, 'function <fn>(')
-            .replace(/\s+/g, ' ')
+            .replace(/\s+/g, ' '),
     );
 }
 
@@ -880,10 +882,10 @@ function scoreLearningCandidate({ candidate, importHits, patternHits, sequenceHi
 }
 
 /**
- * @param {{ signature: string, hits: number, files: string[], example: string[] }[]} blocks
+ * @param {{ signature: string; hits: number; files: string[]; example: string[] }[]} blocks
+ * @param {any} blocks
  * @param {Set<string>} catalogPrefixes
  * @param {number} maxCandidates
- * @param {*} blocks
  */
 function suggestBlockOpportunities(blocks, catalogPrefixes, maxCandidates) {
     /** @type {any[]} */
@@ -891,7 +893,7 @@ function suggestBlockOpportunities(blocks, catalogPrefixes, maxCandidates) {
 
     for (const block of blocks) {
         const exampleText = block.example.join('\n');
-        /** @type {{ prefix: string, template: string, reason: string } | null} */
+        /** @type {{ prefix: string; template: string; reason: string } | null} */
         let suggestion = null;
 
         if (
@@ -947,7 +949,7 @@ function suggestBlockOpportunities(blocks, catalogPrefixes, maxCandidates) {
         if (
             !suggestion ||
             catalogPrefixes.has(suggestion.prefix) ||
-            opportunities.some(item => item.prefix === suggestion.prefix)
+            opportunities.some((item) => item.prefix === suggestion.prefix)
         ) {
             continue;
         }

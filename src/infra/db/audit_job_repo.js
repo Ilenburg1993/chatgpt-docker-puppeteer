@@ -39,25 +39,25 @@ function _parseJson(raw, fallback = null) {
  * @property {string} kind
  * @property {number} priority
  * @property {string} trigger_type
- * @property {string|null} trigger_ref
+ * @property {string | null} trigger_ref
  * @property {Record<string, any>} scope_json
  * @property {Record<string, any>} policy_json
- * @property {string|null} mission_id
- * @property {string|null} current_step
- * @property {string|null} created_by
- * @property {string|null} assigned_to
+ * @property {string | null} mission_id
+ * @property {string | null} current_step
+ * @property {string | null} created_by
+ * @property {string | null} assigned_to
  * @property {number} attempt_seq
  * @property {any} result_json
  * @property {any} error_json
  * @property {number} created_at_ms
  * @property {number} updated_at_ms
- * @property {number|null} started_at_ms
- * @property {number|null} completed_at_ms
+ * @property {number | null} started_at_ms
+ * @property {number | null} completed_at_ms
  */
 
 /**
- * @param {Record<string, any>|null|undefined} row
- * @returns {AuditJob|null}
+ * @param {Record<string, any> | null | undefined} row
+ * @returns {AuditJob | null}
  */
 function _rowToAuditJob(row) {
     if (!row) return null;
@@ -105,13 +105,14 @@ function _rowToAuditJob(row) {
  * @property {any} [error_json]
  * @property {number} [created_at_ms]
  * @property {number} [updated_at_ms]
- * @property {number|null} [started_at_ms]
- * @property {number|null} [completed_at_ms]
+ * @property {number | null} [started_at_ms]
+ * @property {number | null} [completed_at_ms]
  */
 /**
  * Função exportada: createAuditJob.
+ *
  * @param {CreateAuditJobInput} [input]
- * @returns {AuditJob|null}
+ * @returns {AuditJob | null}
  */
 function createAuditJob(input = /** @type {CreateAuditJobInput} */ ({})) {
     const db = getDb();
@@ -129,7 +130,7 @@ function createAuditJob(input = /** @type {CreateAuditJobInput} */ ({})) {
             @created_by, @assigned_to, @attempt_seq, @result_json, @error_json,
             @created_at_ms, @updated_at_ms, @started_at_ms, @completed_at_ms
         )
-    `
+    `,
     ).run({
         id: String(input.id || '').trim(),
         status: String(input.status || 'PENDING')
@@ -158,12 +159,13 @@ function createAuditJob(input = /** @type {CreateAuditJobInput} */ ({})) {
 
 /**
  * Função exportada: getAuditJobById.
+ *
  * @param {string} id Unique identifier.
- * @returns {AuditJob|null}
+ * @returns {AuditJob | null}
  */
 function getAuditJobById(id) {
     const db = getDb();
-    const row = /** @type {Record<string, any>|null} */ (
+    const row = /** @type {Record<string, any> | null} */ (
         db.prepare('SELECT * FROM audit_jobs WHERE id = ?').get(String(id || '').trim())
     );
     return _rowToAuditJob(row);
@@ -171,11 +173,12 @@ function getAuditJobById(id) {
 
 /**
  * @typedef {object} ListAuditJobsOptions
- * @property {*} [status]
- * @property {*} [limit]
+ * @property {any} [status]
+ * @property {any} [limit]
  */
 /**
  * Função exportada: listAuditJobs.
+ *
  * @param {ListAuditJobsOptions} [options]
  * @returns {AuditJob[]}
  */
@@ -189,7 +192,7 @@ function listAuditJobs({ status = null, limit = 100 } = {}) {
             ${status ? 'WHERE status = @status' : ''}
             ORDER BY updated_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all({
             status: status ? String(status) : null,
@@ -213,14 +216,15 @@ function listAuditJobs({ status = null, limit = 100 } = {}) {
  * @property {number} [attempt_seq]
  * @property {any} [result_json]
  * @property {any} [error_json]
- * @property {number|null} [started_at_ms]
- * @property {number|null} [completed_at_ms]
+ * @property {number | null} [started_at_ms]
+ * @property {number | null} [completed_at_ms]
  */
 /**
  * Função exportada: updateAuditJob.
+ *
  * @param {string} id
  * @param {UpdateAuditJobUpdates} [updates]
- * @returns {AuditJob|null}
+ * @returns {AuditJob | null}
  */
 function updateAuditJob(id, updates = {}) {
     const existing = getAuditJobById(id);
@@ -245,7 +249,7 @@ function updateAuditJob(id, updates = {}) {
             started_at_ms = @started_at_ms,
             completed_at_ms = @completed_at_ms
         WHERE id = @id
-    `
+    `,
     ).run({
         id: existing.id,
         status: updates.status ? String(updates.status).trim().toUpperCase() : existing.status,
@@ -314,8 +318,9 @@ function updateAuditJob(id, updates = {}) {
 
 /**
  * Função exportada: upsertAuditJobSnapshot.
- * @param {*} job
- * @returns {AuditJob|null}
+ *
+ * @param {any} job
+ * @returns {AuditJob | null}
  */
 function upsertAuditJobSnapshot(job) {
     const existing = getAuditJobById(job?.id);

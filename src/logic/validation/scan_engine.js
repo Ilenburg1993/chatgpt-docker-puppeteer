@@ -1,20 +1,19 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import fs from 'node:fs';
-import { promises as fsp } from 'node:fs';
-import readline from 'node:readline';
 import { MAX_JSON_SIZE } from '#infra/fs/fs_utils';
+import fs, { promises as fsp } from 'node:fs';
+import readline from 'node:readline';
+import { validateJSON, validateMarkdownCode, validateRegex } from './rules/format_rules.js';
 import { checkPhysicalIntegrity } from './rules/physical_rules.js';
-import { evaluateLine, compileForbiddenList } from './rules/semantic_rules.js';
-import { validateJSON, validateRegex, validateMarkdownCode } from './rules/format_rules.js';
+import { compileForbiddenList, evaluateLine } from './rules/semantic_rules.js';
 
 /**
  * Executa a auditoria completa em uma única passagem de leitura.
  *
  * @param {object} task - Objeto da tarefa (Schema V4).
  * @param {string} filePath - Caminho do arquivo em disco.
- * @param {Array<string>} systemErrorTerms - Termos de erro globais (i18n).
+ * @param {string[]} systemErrorTerms - Termos de erro globais (i18n).
  * @param {AbortSignal | undefined} [signal] - Sinal para interrupção imediata.
- * @returns {Promise<{ok: boolean, reason: string|null}>}
+ * @returns {Promise<{ ok: boolean; reason: string | null }>}
  */
 
 async function runSinglePassValidation(task, filePath, systemErrorTerms = [], signal = undefined) {
@@ -24,7 +23,9 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
     try {
         // 1. AUDITORIA FÍSICA (Metadados Assíncronos)
         const stats = await fsp.stat(filePath);
-        const physicalCheck = /** @type {{ ok: boolean, reason: string|null }} */ (checkPhysicalIntegrity(task, stats));
+        const physicalCheck = /** @type {{ ok: boolean; reason: string | null }} */ (
+            checkPhysicalIntegrity(task, stats)
+        );
         if (!physicalCheck.ok) {
             return physicalCheck;
         }
@@ -83,7 +84,7 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
 
         // Validação JSON (Propaga sinal de aborto para o parser)
         if (formatRequired === 'json') {
-            const jsonCheck = /** @type {{ok: boolean, reason: string|null}} */ (validateJSON(fullContent, signal));
+            const jsonCheck = /** @type {{ ok: boolean; reason: string | null }} */ (validateJSON(fullContent, signal));
             if (!jsonCheck.ok) {
                 return jsonCheck;
             }

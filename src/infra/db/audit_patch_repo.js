@@ -38,21 +38,21 @@ function _parseJson(raw, fallback = {}) {
  * @property {string} status
  * @property {string} patch_unified_diff
  * @property {Record<string, any>} patch_summary_json
- * @property {number|null} risk_score
+ * @property {number | null} risk_score
  * @property {any} dry_run_result_json
  * @property {boolean} approval_required
- * @property {string|null} approved_by
- * @property {number|null} approved_at_ms
- * @property {string|null} applied_by
- * @property {number|null} applied_at_ms
- * @property {string|null} rollback_patch
+ * @property {string | null} approved_by
+ * @property {number | null} approved_at_ms
+ * @property {string | null} applied_by
+ * @property {number | null} applied_at_ms
+ * @property {string | null} rollback_patch
  * @property {number} created_at_ms
  * @property {number} updated_at_ms
  */
 
 /**
- * @param {Record<string, any>|null|undefined} row
- * @returns {AuditPatch|null}
+ * @param {Record<string, any> | null | undefined} row
+ * @returns {AuditPatch | null}
  */
 function _rowToPatch(row) {
     if (!row) return null;
@@ -78,12 +78,12 @@ function _rowToPatch(row) {
 /**
  * @param {string} id
  * @param {Record<string, any>} [fields]
- * @returns {AuditPatch|null}
+ * @returns {AuditPatch | null}
  */
 function _updatePatch(id, fields = {}) {
     const db = getDb();
     const now = _now();
-    const existing = /** @type {Record<string, any>|null} */ (
+    const existing = /** @type {Record<string, any> | null} */ (
         db.prepare('SELECT * FROM audit_patch_proposals WHERE id = ?').get(String(id || '').trim())
     );
     if (!existing) return null;
@@ -104,14 +104,14 @@ function _updatePatch(id, fields = {}) {
             rollback_patch = @rollback_patch,
             updated_at_ms = @updated_at_ms
         WHERE id = @id
-    `
+    `,
     ).run({
         id: existing.id,
         status: String(fields.status ?? existing.status ?? 'draft'),
         patch_unified_diff: String(fields.patch_unified_diff ?? existing.patch_unified_diff ?? ''),
         patch_summary_json: _safeJsonString(
             fields.patch_summary_json ?? fields.patch_summary ?? _parseJson(existing.patch_summary_json, {}),
-            '{}'
+            '{}',
         ),
         risk_score: fields.risk_score == null ? existing.risk_score : Number(fields.risk_score),
         dry_run_result_json:
@@ -138,19 +138,20 @@ function _updatePatch(id, fields = {}) {
  * @property {string} [patch_unified_diff]
  * @property {Record<string, any>} [patch_summary_json]
  * @property {Record<string, any>} [patch_summary]
- * @property {number|null} [risk_score]
+ * @property {number | null} [risk_score]
  * @property {any} [dry_run_result_json]
  * @property {boolean} [approval_required]
  * @property {string} [approved_by]
- * @property {number|null} [approved_at_ms]
+ * @property {number | null} [approved_at_ms]
  * @property {string} [applied_by]
- * @property {number|null} [applied_at_ms]
+ * @property {number | null} [applied_at_ms]
  * @property {string | undefined} [rollback_patch]
  */
 /**
  * Função exportada: createAuditPatchProposal.
+ *
  * @param {CreateAuditPatchProposalInput} input Input data for the AuditPatch record.
- * @returns {AuditPatch|null}
+ * @returns {AuditPatch | null}
  */
 function createAuditPatchProposal(input = /** @type {CreateAuditPatchProposalInput} */ ({})) {
     const db = getDb();
@@ -167,7 +168,7 @@ function createAuditPatchProposal(input = /** @type {CreateAuditPatchProposalInp
             @approval_required, @approved_by, @approved_at_ms, @applied_by, @applied_at_ms, @rollback_patch,
             @created_at_ms, @updated_at_ms
         )
-    `
+    `,
     ).run({
         id,
         job_id: String(input.job_id || '').trim(),
@@ -191,15 +192,16 @@ function createAuditPatchProposal(input = /** @type {CreateAuditPatchProposalInp
 
 /**
  * Função exportada: getAuditPatchProposalById.
+ *
  * @param {string} id Unique identifier.
- * @returns {AuditPatch|null}
+ * @returns {AuditPatch | null}
  */
 function getAuditPatchProposalById(id) {
     const db = getDb();
     return _rowToPatch(
-        /** @type {Record<string, any>|null} */ (
+        /** @type {Record<string, any> | null} */ (
             db.prepare('SELECT * FROM audit_patch_proposals WHERE id = ?').get(String(id || '').trim())
-        )
+        ),
     );
 }
 
@@ -209,6 +211,7 @@ function getAuditPatchProposalById(id) {
  */
 /**
  * Função exportada: listAuditPatchProposalsByJobId.
+ *
  * @param {string} jobId
  * @param {ListAuditPatchProposalsByJobIdOptions} [options]
  * @returns {AuditPatch[]}
@@ -222,7 +225,7 @@ function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
             WHERE job_id = ?
             ORDER BY created_at_ms DESC
             LIMIT ?
-        `
+        `,
         )
         .all(String(jobId || '').trim(), Math.max(1, Math.min(Number(limit) || 50, 500)));
     return /** @type {AuditPatch[]} */ (/** @type {Record<string, any>[]} */ (rows).map(_rowToPatch).filter(Boolean));
@@ -234,20 +237,21 @@ function listAuditPatchProposalsByJobId(jobId, { limit = 50 } = {}) {
  * @property {string} [patch_unified_diff]
  * @property {Record<string, any>} [patch_summary_json]
  * @property {Record<string, any>} [patch_summary]
- * @property {number|null} [risk_score]
+ * @property {number | null} [risk_score]
  * @property {any} [dry_run_result_json]
  * @property {boolean} [approval_required]
- * @property {string|null} [approved_by]
- * @property {number|null} [approved_at_ms]
- * @property {string|null} [applied_by]
- * @property {number|null} [applied_at_ms]
- * @property {string|null} [rollback_patch]
+ * @property {string | null} [approved_by]
+ * @property {number | null} [approved_at_ms]
+ * @property {string | null} [applied_by]
+ * @property {number | null} [applied_at_ms]
+ * @property {string | null} [rollback_patch]
  */
 /**
  * Função exportada: updateAuditPatchProposal.
+ *
  * @param {string} id
  * @param {UpdateAuditPatchProposalFields} [fields]
- * @returns {AuditPatch|null}
+ * @returns {AuditPatch | null}
  */
 function updateAuditPatchProposal(id, fields = {}) {
     return _updatePatch(id, fields);

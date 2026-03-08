@@ -1,8 +1,8 @@
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { DataSet } from 'vis-data';
 import { Network } from 'vis-network';
 import 'vis-network/styles/vis-network.min.css';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
     nodes: { type: Array, default: () => [] },
@@ -76,7 +76,7 @@ watch(
         edgesDs.add(props.edges || []);
         network.fit({ animation: { duration: 250 } });
     },
-    { deep: true }
+    { deep: true },
 );
 </script>
 

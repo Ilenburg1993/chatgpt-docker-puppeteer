@@ -2,9 +2,9 @@
 // @ts-check
 
 /**
- * @fileoverview Proxy de compatibilidade para run-tests.js
- * @deprecated Este script foi movido para scripts/build/run-tests.js
- * Este arquivo é um proxy temporário para manter compatibilidade.
+ * @file Proxy de compatibilidade para run-tests.js
+ * @deprecated Este script foi movido para scripts/build/run-tests.js Este arquivo é um proxy temporário para manter
+ *   compatibilidade.
  */
 
 console.warn('⚠️  DEPRECATED: Este script foi movido para scripts/build/run-tests.js');

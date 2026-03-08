@@ -48,10 +48,10 @@ import { log } from '#core/logger';
  * @property {object} [browserPool] - Instância do Browser Pool
  */
 
-/** @type {TelemetrySnapshot|null} */
+/** @type {TelemetrySnapshot | null} */
 /** @type {any} */ let currentSnapshot = null;
 
-/** @type {NodeJS.Timeout|null} */
+/** @type {NodeJS.Timeout | null} */
 /** @type {any} */ let snapshotInterval = null;
 
 /** @type {boolean} */
@@ -59,6 +59,7 @@ let isRunning = false;
 
 /**
  * Coleta métricas de sistema
+ *
  * @returns {Promise<any>}
  */
 async function collectSystemMetrics() {
@@ -80,10 +81,11 @@ async function collectSystemMetrics() {
 
 /**
  * @typedef {object} CollectNervMetricsNerv
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Coleta métricas do NERV
+ *
  * @param {CollectNervMetricsNerv} [nerv] - Instância do NERV
  * @returns {Promise<any>}
  */
@@ -108,6 +110,7 @@ async function collectNervMetrics(/** @type {any} */ nerv) {
 
 /**
  * Coleta métricas do PM2
+ *
  * @returns {Promise<any>}
  */
 async function collectPm2Metrics() {
@@ -121,10 +124,11 @@ async function collectPm2Metrics() {
 
 /**
  * @typedef {object} CollectKernelMetricsKernel
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Coleta métricas do Kernel
+ *
  * @param {CollectKernelMetricsKernel} [kernel] - Instância do Kernel
  * @returns {Promise<any>}
  */
@@ -151,10 +155,11 @@ async function collectKernelMetrics(/** @type {any} */ kernel) {
 
 /**
  * @typedef {object} CollectBrowserMetricsBrowserPool
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Coleta métricas do Browser Pool
+ *
  * @param {CollectBrowserMetricsBrowserPool} [browserPool] - Instância do Browser Pool
  * @returns {Promise<any>}
  */
@@ -181,7 +186,8 @@ async function collectBrowserMetrics(/** @type {any} */ browserPool) {
 
 /**
  * Coleta snapshot completo de telemetria
- * @param {TelemetryCollectorContext} [context={}] - Contexto com instâncias dos subsistemas
+ *
+ * @param {TelemetryCollectorContext} [context={}] - Contexto com instâncias dos subsistemas. Default is `{}`
  * @returns {Promise<TelemetrySnapshot>}
  */
 async function collectSnapshot(/** @type {any} */ context = {}) {
@@ -210,8 +216,9 @@ async function collectSnapshot(/** @type {any} */ context = {}) {
 
 /**
  * Inicia o coletor de snapshots em background
+ *
  * @param {number} intervalMs - Intervalo entre coletas (ms)
- * @param {TelemetryCollectorContext} [context={}] - Contexto com instâncias dos subsistemas
+ * @param {TelemetryCollectorContext} [context={}] - Contexto com instâncias dos subsistemas. Default is `{}`
  * @returns {Promise<void>}
  */
 export async function start(/** @type {any} */ intervalMs = 60000, /** @type {any} */ context = {}) {
@@ -248,6 +255,7 @@ export async function start(/** @type {any} */ intervalMs = 60000, /** @type {an
 
 /**
  * Para o coletor de snapshots
+ *
  * @returns {Promise<void>}
  */
 export async function stop() {
@@ -270,7 +278,8 @@ export async function stop() {
 
 /**
  * Retorna o snapshot atual (thread-safe)
- * @returns {TelemetrySnapshot|null}
+ *
+ * @returns {TelemetrySnapshot | null}
  */
 export function get() {
     return currentSnapshot;
@@ -278,6 +287,7 @@ export function get() {
 
 /**
  * Verifica se o coletor está rodando
+ *
  * @returns {boolean}
  */
 export function isActive() {

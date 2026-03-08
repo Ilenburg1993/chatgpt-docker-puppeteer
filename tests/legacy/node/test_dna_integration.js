@@ -37,9 +37,10 @@ async function cleanupTestDna() {
 
 /**
  * Verifica se selector está no DNA
- * @param {*} domain
- * @param {*} intent
- * @param {*} selector
+ *
+ * @param {any} domain
+ * @param {any} intent
+ * @param {any} selector
  */
 async function isSelectorInDna(domain, intent, selector) {
     const dna = await io.getDna();
@@ -76,8 +77,7 @@ let testsPassed = 0;
 let testsFailed = 0;
 
 /**
- * Test 1: SADI Auto-Evolution (Acceptance)
- * Valida que evolveWithSadiProtocol() aceita selector com confidence >= 75
+ * Test 1: SADI Auto-Evolution (Acceptance) Valida que evolveWithSadiProtocol() aceita selector com confidence >= 75
  */
 async function test1_SadiAutoEvolutionAcceptance() {
     testsRun++;
@@ -89,7 +89,7 @@ async function test1_SadiAutoEvolutionAcceptance() {
         const result = await io.evolveWithSadiProtocol(
             TEST_CONFIG.TEST_PROTOCOL,
             TEST_CONFIG.TEST_DOMAIN,
-            TEST_CONFIG.TEST_INTENT
+            TEST_CONFIG.TEST_INTENT,
         );
 
         if (!result.accepted) {
@@ -100,7 +100,7 @@ async function test1_SadiAutoEvolutionAcceptance() {
         const isInDna = await isSelectorInDna(
             TEST_CONFIG.TEST_DOMAIN,
             TEST_CONFIG.TEST_INTENT,
-            TEST_CONFIG.TEST_PROTOCOL.selector
+            TEST_CONFIG.TEST_PROTOCOL.selector,
         );
 
         if (!isInDna) {
@@ -119,8 +119,8 @@ async function test1_SadiAutoEvolutionAcceptance() {
 }
 
 /**
- * Test 2: SADI Auto-Evolution (Rejection - Low Confidence)
- * Valida que evolveWithSadiProtocol() rejeita selector com confidence < 75
+ * Test 2: SADI Auto-Evolution (Rejection - Low Confidence) Valida que evolveWithSadiProtocol() rejeita selector com
+ * confidence < 75
  */
 async function test2_SadiAutoEvolutionRejection() {
     testsRun++;
@@ -136,7 +136,7 @@ async function test2_SadiAutoEvolutionRejection() {
         const result = await io.evolveWithSadiProtocol(
             lowConfidenceProtocol,
             TEST_CONFIG.TEST_DOMAIN,
-            'test_low_confidence'
+            'test_low_confidence',
         );
 
         if (result.accepted) {
@@ -158,8 +158,7 @@ async function test2_SadiAutoEvolutionRejection() {
 }
 
 /**
- * Test 3: DNA Backup System
- * Valida que backup é criado automaticamente após evolução
+ * Test 3: DNA Backup System Valida que backup é criado automaticamente após evolução
  */
 async function test3_DnaBackupSystem() {
     testsRun++;
@@ -196,8 +195,7 @@ async function test3_DnaBackupSystem() {
 }
 
 /**
- * Test 4: DNA Rollback Mechanism
- * Valida que rollback restaura versão anterior
+ * Test 4: DNA Rollback Mechanism Valida que rollback restaura versão anterior
  */
 async function test4_DnaRollback() {
     testsRun++;
@@ -241,8 +239,7 @@ async function test4_DnaRollback() {
 }
 
 /**
- * Test 5: Evolution Stats Tracking
- * Valida que evolution stats são rastreadas corretamente
+ * Test 5: Evolution Stats Tracking Valida que evolution stats são rastreadas corretamente
  */
 async function test5_EvolutionStatsTracking() {
     testsRun++;
@@ -279,8 +276,7 @@ async function test5_EvolutionStatsTracking() {
 }
 
 /**
- * Test 6: Rate Limiting
- * Valida que rate limiting funciona (5 evolutions/domain/session)
+ * Test 6: Rate Limiting Valida que rate limiting funciona (5 evolutions/domain/session)
  */
 async function test6_RateLimiting() {
     testsRun++;
@@ -337,8 +333,7 @@ async function test6_RateLimiting() {
 }
 
 /**
- * Test 7: Duplicate Detection
- * Valida que duplicate detection funciona
+ * Test 7: Duplicate Detection Valida que duplicate detection funciona
  */
 async function test7_DuplicateDetection() {
     testsRun++;

@@ -54,7 +54,7 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
     it('uses OLLAMA_EMBED_MAX_CHARS and truncates when input exceeds configured limit', async () => {
         const prevMax = process.env.OLLAMA_EMBED_MAX_CHARS;
         const prevFetch = global.fetch;
-        let receivedInputLength = 0;
+        const receivedInputLength = 0;
         try {
             process.env.OLLAMA_EMBED_MAX_CHARS = '50';
             /** @type {any} */ (global).fetch = async (/** @type {any} */ _url, /** @type {any} */ options = {}) => {
@@ -127,9 +127,9 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
             const vector = await provider.embed('x'.repeat(6000));
             assert.deepStrictEqual(vector, [0.1, 0.2, 0.3]);
             assert.deepStrictEqual(
-                attempts.filter(size => size > 2000),
+                attempts.filter((size) => size > 2000),
                 [6000, 4200, 2940, 2058],
-                'context overflow must shrink immediately without retrying same size'
+                'context overflow must shrink immediately without retrying same size',
             );
             assert.strictEqual(provider.runtimeSafeChars, 1440);
 

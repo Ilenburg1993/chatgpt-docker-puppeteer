@@ -41,7 +41,7 @@ const RBAC_PERMISSIONS = Object.freeze({
 /** Constante/valor exportado: ROLE_PERMISSION_MATRIX. */
 const ROLE_PERMISSION_MATRIX = Object.freeze({
     [RBAC_ROLES.OWNER]: Object.values(RBAC_PERMISSIONS),
-    [RBAC_ROLES.ADMIN]: Object.values(RBAC_PERMISSIONS).filter(p => p !== RBAC_PERMISSIONS.RBAC_MANAGE),
+    [RBAC_ROLES.ADMIN]: Object.values(RBAC_PERMISSIONS).filter((p) => p !== RBAC_PERMISSIONS.RBAC_MANAGE),
     [RBAC_ROLES.OPERATOR]: [
         RBAC_PERMISSIONS.MISSION_READ,
         RBAC_PERMISSIONS.MISSION_EXECUTE,
@@ -90,6 +90,7 @@ function _normalizeUsername(username) {
 
 /**
  * Função exportada: ensureBaseRbacData.
+ *
  * @returns {void}
  */
 function ensureBaseRbacData() {
@@ -100,7 +101,7 @@ function ensureBaseRbacData() {
                 `
                 INSERT OR IGNORE INTO rbac_roles (id, role_name, description)
                 VALUES (@id, @role_name, @description)
-            `
+            `,
             ).run({
                 id: `role-${roleName}`,
                 role_name: roleName,
@@ -113,7 +114,7 @@ function ensureBaseRbacData() {
                 `
                 INSERT OR IGNORE INTO rbac_permissions (id, permission, description)
                 VALUES (@id, @permission, @description)
-            `
+            `,
             ).run({
                 id: `perm-${permission.replace(/[^a-zA-Z0-9]+/g, '-')}`,
                 permission,
@@ -125,13 +126,15 @@ function ensureBaseRbacData() {
             const role = /** @type {any} */ (db.prepare('SELECT id FROM rbac_roles WHERE role_name = ?').get(roleName));
             if (!role) continue;
             for (const permission of permissions) {
-                const perm = /** @type {any} */ (db.prepare('SELECT id FROM rbac_permissions WHERE permission = ?').get(permission));
+                const perm = /** @type {any} */ (
+                    db.prepare('SELECT id FROM rbac_permissions WHERE permission = ?').get(permission)
+                );
                 if (!perm) continue;
                 db.prepare(
                     `
                     INSERT OR IGNORE INTO rbac_role_permission (role_id, permission_id)
                     VALUES (?, ?)
-                `
+                `,
                 ).run(role.id, perm.id);
             }
         }
@@ -144,7 +147,7 @@ function ensureBaseRbacData() {
 /** @typedef {any} UpsertRbacUserOptions */
 /**
  * @param {any} params
-  * @returns {any}
+ * @returns {any}
  */
 function upsertRbacUser(params = {}) {
     const { username, password, role = RBAC_ROLES.VIEWER, active = true } = /** @type {any} */ (params);
@@ -170,7 +173,7 @@ function upsertRbacUser(params = {}) {
             password_hash = excluded.password_hash,
             active = excluded.active,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         id: userId,
         username: name,
@@ -198,9 +201,10 @@ function getRbacUserByUsername(username) {
     const name = _normalizeUsername(username);
     if (!name) return null;
 
-    const row = /** @type {any} */ (db
-        .prepare(
-            `
+    const row = /** @type {any} */ (
+        db
+            .prepare(
+                `
             SELECT u.*,
                    GROUP_CONCAT(DISTINCT r.role_name) AS role_names,
                    GROUP_CONCAT(DISTINCT p.permission) AS permissions
@@ -211,9 +215,10 @@ function getRbacUserByUsername(username) {
             LEFT JOIN rbac_permissions p ON p.id = rp.permission_id
             WHERE u.username = ?
             GROUP BY u.id
-        `
-        )
-        .get(name));
+        `,
+            )
+            .get(name)
+    );
 
     if (!row) return null;
 
@@ -234,8 +239,9 @@ function getRbacUserByUsername(username) {
 
 /**
  * Função exportada: verifyRbacCredentials.
- * @param {*} username
- * @param {*} password
+ *
+ * @param {any} username
+ * @param {any} password
  * @returns {any}
  */
 function verifyRbacCredentials(username, password) {
@@ -259,6 +265,7 @@ function verifyRbacCredentials(username, password) {
 
 /**
  * Função exportada: bootstrapRbacFromEnv.
+ *
  * @returns {void}
  */
 function bootstrapRbacFromEnv() {
@@ -289,12 +296,12 @@ function bootstrapRbacFromEnv() {
 }
 
 export {
-    RBAC_PERMISSIONS,
-    RBAC_ROLES,
-    ROLE_PERMISSION_MATRIX,
     bootstrapRbacFromEnv,
     ensureBaseRbacData,
     getRbacUserByUsername,
+    RBAC_PERMISSIONS,
+    RBAC_ROLES,
+    ROLE_PERMISSION_MATRIX,
     upsertRbacUser,
     verifyRbacCredentials,
 };

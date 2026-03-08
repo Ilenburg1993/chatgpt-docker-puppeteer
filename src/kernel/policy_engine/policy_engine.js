@@ -62,11 +62,8 @@ const PolicyAlertType = Object.freeze({
 class PolicyEngine {
     /**
      * @param {object} params
-     * @param {any} params.telemetry
-     * Canal de telemetria do Kernel.
-     *
-     * @param {any} [params.limits]
-     * Limites técnicos/configuracionais.
+     * @param {any} params.telemetry Canal de telemetria do Kernel.
+     * @param {any} [params.limits] Limites técnicos/configuracionais.
      */
     constructor({ telemetry, limits = {} }) {
         if (!telemetry || typeof telemetry.emit !== 'function') {
@@ -96,17 +93,10 @@ class PolicyEngine {
      * Avalia normativamente uma tarefa no contexto atual.
      *
      * @param {object} params
-     * @param {any} params.task
-     * Snapshot imutável da tarefa.
-     *
-     * @param {any[]} params.observations
-     * Lista de observações correlacionadas.
-     *
-     * @param {number} params.at
-     * Timestamp do ciclo lógico.
-     *
-     * @returns {any}
-     * Avaliação normativa consultiva.
+     * @param {any} params.task Snapshot imutável da tarefa.
+     * @param {any[]} params.observations Lista de observações correlacionadas.
+     * @param {number} params.at Timestamp do ciclo lógico.
+     * @returns {any} Avaliação normativa consultiva.
      */
     assess({ task, observations, at }) {
         const alerts = /** @type {any[]} */ ([]);
@@ -155,6 +145,7 @@ class PolicyEngine {
 
     /**
      * Avalia pressão por volume de observações.
+     *
      * @param {any} task
      * @param {any[]} observations
      * @param {any[]} alerts
@@ -168,13 +159,14 @@ class PolicyEngine {
                     value: observations.length,
                     limit: this.limits.maxObservationsPerTask,
                     severity: 'HIGH',
-                })
+                }),
             );
         }
     }
 
     /**
      * Avalia idade lógica da tarefa.
+     *
      * @param {any} task
      * @param {any} at
      * @param {any[]} alerts
@@ -191,7 +183,7 @@ class PolicyEngine {
                         value: ageMs,
                         limit: this.limits.maxTaskAgeMs,
                         severity: 'CRITICAL',
-                    })
+                    }),
                 );
             }
         }
@@ -199,6 +191,7 @@ class PolicyEngine {
 
     /**
      * Avalia gaps temporais entre observações.
+     *
      * @param {any} task
      * @param {any[]} observations
      * @param {any} at
@@ -227,13 +220,14 @@ class PolicyEngine {
                     value: gapMs,
                     limit: this.limits.maxObservationGapMs,
                     severity: 'MEDIUM',
-                })
+                }),
             );
         }
     }
 
     /**
      * Avalia taxa de duplicação de observações.
+     *
      * @param {any[]} observations
      * @param {any[]} alerts
      */
@@ -263,13 +257,14 @@ class PolicyEngine {
                     value: duplicateRatio,
                     limit: this.limits.maxDuplicateRatio,
                     severity: 'MEDIUM',
-                })
+                }),
             );
         }
     }
 
     /**
      * Avalia risco configuracional.
+     *
      * @param {any} task
      * @param {any[]} observations
      * @param {any} at
@@ -284,7 +279,7 @@ class PolicyEngine {
                     message: 'Tarefa suspensa com observações acumuladas',
                     value: observations.length,
                     severity: 'LOW',
-                })
+                }),
             );
         }
 
@@ -298,14 +293,14 @@ class PolicyEngine {
                     message: 'Tarefa criada mas não ativada após tempo limite',
                     value: ageMs,
                     severity: 'MEDIUM',
-                })
+                }),
             );
         }
     }
 
     /**
-     * Avalia estagnação lógica.
-     * [P2.1 CORREÇÃO] Adiciona contexto semântico para reduzir falsos positivos
+     * Avalia estagnação lógica. [P2.1 CORREÇÃO] Adiciona contexto semântico para reduzir falsos positivos
+     *
      * @param {any} task
      * @param {any[]} observations
      * @param {any} at
@@ -332,7 +327,7 @@ class PolicyEngine {
                         message: 'Tarefa ativa sem progresso recente',
                         value: stalledMs,
                         severity: 'HIGH',
-                    })
+                    }),
                 );
             }
         }
@@ -346,7 +341,7 @@ class PolicyEngine {
                         message: 'Tarefa excedeu máximo de ciclos sem progresso',
                         value: task.stalledCycleCount,
                         severity: 'CRITICAL',
-                    })
+                    }),
                 );
             }
         }
@@ -367,7 +362,7 @@ class PolicyEngine {
             return PolicyLevel.LOW;
         }
 
-        const severities = alerts.map(a => a.severity);
+        const severities = alerts.map((a) => a.severity);
 
         // Se há algum CRITICAL, nível é CRITICAL
         if (severities.includes('CRITICAL')) {
@@ -380,7 +375,7 @@ class PolicyEngine {
         }
 
         // Se há mais de 3 MEDIUM, nível é HIGH
-        const mediumCount = severities.filter(s => s === 'MEDIUM').length;
+        const mediumCount = severities.filter((s) => s === 'MEDIUM').length;
         if (mediumCount >= 3) {
             return PolicyLevel.HIGH;
         }
@@ -422,4 +417,4 @@ class PolicyEngine {
     }
 }
 
-export { PolicyEngine, PolicyLevel, PolicyAlertType };
+export { PolicyAlertType, PolicyEngine, PolicyLevel };

@@ -10,7 +10,7 @@ import path from 'node:path';
  */
 /**
  * @param {PruneAuditRunsOptions} options
-  * @returns {object}
+ * @returns {object}
  */
 export function pruneAuditRuns(options) {
     const runsRoot = String(options.runsRoot || '').trim();
@@ -23,8 +23,8 @@ export function pruneAuditRuns(options) {
 
     const entries = fs
         .readdirSync(runsRoot, { withFileTypes: true })
-        .filter(entry => entry.isDirectory())
-        .map(entry => {
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => {
             const full = path.join(runsRoot, entry.name);
             const stat = fs.statSync(full);
             return {
@@ -35,7 +35,7 @@ export function pruneAuditRuns(options) {
         })
         .sort((a, b) => b.mtime_ms - a.mtime_ms);
 
-    const keep = entries.slice(0, maxRuns).map(item => item.run_id);
+    const keep = entries.slice(0, maxRuns).map((item) => item.run_id);
     if (keepRunId && !keep.includes(keepRunId)) {
         keep.push(keepRunId);
     }

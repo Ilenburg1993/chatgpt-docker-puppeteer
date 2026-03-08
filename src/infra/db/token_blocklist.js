@@ -1,25 +1,24 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { getDb } from './sqlite.js';
 import { log } from '#core/logger';
+import { getDb } from './sqlite.js';
 
 /**
- * @fileoverview Blocklist de tokens JWT revogados.
- *
- * Implementa invalidação de tokens JWT após logout, prevenindo re-uso
- * de tokens roubados dentro do período de expiração.
- *
- * A tabela `revoked_tokens` é limpa automaticamente via `cleanExpired()`,
- * que deve ser chamado periodicamente (ex: a cada hora via AgentLoop ou cron).
- *
  * @module infra/db/token_blocklist
+ * @file Blocklist de tokens JWT revogados.
+ *
+ *   Implementa invalidação de tokens JWT após logout, prevenindo re-uso de tokens roubados dentro do período de
+ *   expiração.
+ *
+ *   A tabela `revoked_tokens` é limpa automaticamente via `cleanExpired()`, que deve ser chamado periodicamente (ex: a
+ *   cada hora via AgentLoop ou cron).
  */
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hora
 let _cleanupTimer = /** @type {any} */ (null);
 
 /**
- * Garante que a tabela de tokens revogados existe no banco de dados.
- * Idempotente — seguro para chamar múltiplas vezes.
+ * Garante que a tabela de tokens revogados existe no banco de dados. Idempotente — seguro para chamar múltiplas vezes.
+ *
  * @returns {void}
  */
 export function ensureTokenBlocklistTable() {
@@ -81,6 +80,7 @@ export function isTokenRevoked(jti) {
 
 /**
  * Remove tokens expirados da blocklist para manter o banco enxuto.
+ *
  * @returns {number} Número de registros removidos.
  */
 export function cleanExpiredTokens() {
@@ -100,8 +100,9 @@ export function cleanExpiredTokens() {
 }
 
 /**
- * Inicia limpeza periódica automática de tokens expirados.
- * Seguro para chamar múltiplas vezes — só registra um timer por vez.
+ * Inicia limpeza periódica automática de tokens expirados. Seguro para chamar múltiplas vezes — só registra um timer
+ * por vez.
+ *
  * @returns {void}
  */
 export function startPeriodicCleanup() {
@@ -116,6 +117,7 @@ export function startPeriodicCleanup() {
 
 /**
  * Para a limpeza periódica (usado em testes e shutdown).
+ *
  * @returns {void}
  */
 export function stopPeriodicCleanup() {
@@ -127,6 +129,7 @@ export function stopPeriodicCleanup() {
 
 /**
  * Exposto para testes/regressão de import-safety.
+ *
  * @returns {boolean}
  */
 export function isPeriodicCleanupRunning() {

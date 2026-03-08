@@ -1,7 +1,7 @@
 // @ts-check
+import { execa } from 'execa';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execa } from 'execa';
 
 if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
     delete process.env.NO_COLOR;
@@ -63,4 +63,4 @@ async function main() {
     ok('`.env.local` is not tracked');
 }
 
-main().catch(err => fail(err?.message || String(err)));
+main().catch((err) => fail(err?.message || String(err)));

@@ -3,9 +3,8 @@
 /**
  * Development Runtime Monitor
  *
- * Monitora a aplicação em desenvolvimento em busca de bugs de runtime
- * Executa automaticamente durante desenvolvimento para detectar problemas
- * em tempo real.
+ * Monitora a aplicação em desenvolvimento em busca de bugs de runtime Executa automaticamente durante desenvolvimento
+ * para detectar problemas em tempo real.
  */
 
 import { spawn } from 'node:child_process';
@@ -93,12 +92,12 @@ class DevelopmentMonitor {
             stdio: ['pipe', 'pipe', 'pipe'],
         });
 
-        this.childProcess.stdout.on('data', data => {
+        this.childProcess.stdout.on('data', (data) => {
             const output = data.toString();
             process.stdout.write(`[APP] ${output}`);
         });
 
-        this.childProcess.stderr.on('data', data => {
+        this.childProcess.stderr.on('data', (data) => {
             const error = data.toString();
 
             // Classificar erros vs warnings
@@ -130,7 +129,7 @@ class DevelopmentMonitor {
             }
         });
 
-        this.childProcess.on('error', error => {
+        this.childProcess.on('error', (error) => {
             console.error(`💥 Erro crítico na aplicação: ${error.message}`);
             this.errors.push({
                 timestamp: Date.now(),
@@ -147,7 +146,7 @@ class DevelopmentMonitor {
             this.childProcess.kill('SIGTERM');
 
             // Aguardar 2 segundos para graceful shutdown
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
         }
 
         this.restartCount++;
@@ -177,7 +176,7 @@ class DevelopmentMonitor {
     analyzeMemory() {
         if (this.memoryPeaks.length === 0) return null;
 
-        const peaks = this.memoryPeaks.map(p => p.heapUsed);
+        const peaks = this.memoryPeaks.map((p) => p.heapUsed);
         const maxPeak = Math.max(...peaks);
         const avgPeak = peaks.reduce((sum, p) => sum + p, 0) / peaks.length;
 
@@ -221,7 +220,7 @@ class DevelopmentMonitor {
             console.log('\n🚨 ÚLTIMOS ERROS:');
             report.recentErrors.forEach((error, idx) => {
                 console.log(
-                    `   ${idx + 1}. ${new Date(error.timestamp).toLocaleTimeString()}: ${error.message.slice(0, 80)}...`
+                    `   ${idx + 1}. ${new Date(error.timestamp).toLocaleTimeString()}: ${error.message.slice(0, 80)}...`,
                 );
             });
         }

@@ -5,7 +5,7 @@ import { describe, it } from 'node:test';
 import { RagWatchBatcher } from '../../../tools/rag/watch.mjs';
 
 function sleep(/** @type {number} */ ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 describe('RagWatchBatcher', () => {

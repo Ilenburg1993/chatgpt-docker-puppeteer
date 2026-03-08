@@ -1,25 +1,25 @@
 // @ts-check
 
-import { listInferenceProfiles } from '../infra/db/inference_profile_repo.js';
 import { listInferenceClientPolicies } from '../infra/db/inference_client_policy_repo.js';
+import { listInferenceProfiles } from '../infra/db/inference_profile_repo.js';
 
 /**
  * @typedef {object} InferencePolicyLayer
- * @property {number|null} [timeout_ms]
- * @property {number|null} [max_parallel]
- * @property {number|null} [max_tokens]
- * @property {string[]|null} [allowed_models]
- * @property {string[]|null} [allowed_backends]
- * @property {string|null} [degraded_behavior]
+ * @property {number | null} [timeout_ms]
+ * @property {number | null} [max_parallel]
+ * @property {number | null} [max_tokens]
+ * @property {string[] | null} [allowed_models]
+ * @property {string[] | null} [allowed_backends]
+ * @property {string | null} [degraded_behavior]
  * @property {string} [profile_id]
- * @property {string|null} [profile_name]
+ * @property {string | null} [profile_name]
  */
 
 /**
  * @typedef {object} InferencePolicyPersistenceSnapshot
  * @property {Record<string, InferencePolicyLayer>} profilePolicies
  * @property {Record<string, InferencePolicyLayer>} clientPolicies
- * @property {{ profileCount:number, clientPolicyCount:number }} meta
+ * @property {{ profileCount: number; clientPolicyCount: number }} meta
  */
 
 /**
@@ -32,10 +32,11 @@ function asPlainObject(value, fallback = {}) {
 
 /**
  * @typedef {object} ProfileToPolicyLayerProfile
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Converte profile persistido para layer compatível com `resolveInferencePolicy`.
+ *
  * @param {any} profile
  */
 function profileToPolicyLayer(profile) {
@@ -55,10 +56,11 @@ function profileToPolicyLayer(profile) {
 
 /**
  * @typedef {object} ClientPolicyToLayerPolicy
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Converte policy de cliente persistida para layer compatível com `resolveInferencePolicy`.
+ *
  * @param {any} policy
  * @returns {InferencePolicyLayer}
  */
@@ -75,6 +77,7 @@ function clientPolicyToLayer(policy) {
 
 /**
  * Carrega profiles/policies persistidos do SQLite.
+ *
  * @returns {InferencePolicyPersistenceSnapshot}
  */
 export function loadInferencePoliciesFromDb() {

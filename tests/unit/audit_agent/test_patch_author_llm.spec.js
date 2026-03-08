@@ -1,7 +1,7 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import test from 'node:test';
 import { createAuditAgentPatchAuthorLlmClient } from '../../../src/audit_agent/patch_author_llm.js';
 
 async function listen(/** @type {any} */ server) {
@@ -14,8 +14,8 @@ async function listen(/** @type {any} */ server) {
     return { host: addr.address, port: addr.port };
 }
 
-function withEnv(/** @type {Record<string,any>} */ pairs, /** @type {() => any} */ fn) {
-    const prev = /** @type {Record<string,string|undefined>} */ ({});
+function withEnv(/** @type {Record<string, any>} */ pairs, /** @type {() => any} */ fn) {
+    const prev = /** @type {Record<string, string | undefined>} */ ({});
     for (const [k, v] of Object.entries(pairs)) {
         prev[k] = process.env[k];
         if (v === undefined || v === null) delete process.env[k];
@@ -57,7 +57,7 @@ test('patch_author_llm performs preflight and returns normalized proposal', asyn
                             '{"summary":"ajustar guard","risk_level":"low","candidate_files":["src/audit_agent/runtime.js"],"proposed_changes":["adicionar check"]}',
                     },
                     ts: 200,
-                })
+                }),
             );
             return;
         }
@@ -78,7 +78,7 @@ test('patch_author_llm performs preflight and returns normalized proposal', asyn
                 const out = await client.runPatchAuthor(
                     { kind: 'patch_suggest', scope_json: { filePath: 'src/audit_agent/runtime.js' } },
                     { context: { mcp_tools: {} }, findings: [] },
-                    { parsed: { summary: 'triage ok', risk_level: 'medium' } }
+                    { parsed: { summary: 'triage ok', risk_level: 'medium' } },
                 );
                 assert.equal(out.ok, true);
                 assert.equal(out.patch_proposal?.approval_required, true);
@@ -86,10 +86,10 @@ test('patch_author_llm performs preflight and returns normalized proposal', asyn
                 assert.equal(out.patch_proposal?.patch_summary?.source, 'audit-agent-patch-llm');
                 assert.deepEqual(out.patch_proposal?.patch_summary?.candidate_files, ['src/audit_agent/runtime.js']);
                 assert.equal(out.validation?.shape_valid, true);
-            }
+            },
         );
     } finally {
-        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });
 
@@ -124,16 +124,16 @@ test('patch_author_llm tolerates non-JSON model response and emits fallback vali
                 const out = await client.runPatchAuthor(
                     { kind: 'patch_suggest', scope_json: {} },
                     { context: {}, findings: [] },
-                    null
+                    null,
                 );
                 assert.equal(out.ok, true);
                 assert.equal(out.validation?.strict_shape_ok, false);
                 assert.equal(out.patch_proposal?.patch_summary?.validation?.strict_shape_ok, false);
                 assert.equal(Array.isArray(out.patch_proposal?.patch_summary?.candidate_files), true);
-            }
+            },
         );
     } finally {
-        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });
 
@@ -169,15 +169,15 @@ test('patch_author_llm fails when strict JSON mode is required and response shap
                 const out = await client.runPatchAuthor(
                     { kind: 'patch_suggest', scope_json: {} },
                     { context: {}, findings: [] },
-                    null
+                    null,
                 );
                 assert.equal(out.ok, false);
                 assert.equal(out.error, 'patch_author_invalid_json_shape');
                 assert.equal(out.details?.strict?.ok, false);
                 assert.equal(Array.isArray(out.details?.strict?.errors), true);
-            }
+            },
         );
     } finally {
-        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });

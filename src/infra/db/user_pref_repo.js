@@ -50,7 +50,8 @@ function _rowToPrefs(row) {
 
 /**
  * Função exportada: getUserPreferences.
- * @param {*} userId
+ *
+ * @param {any} userId
  * @returns {any}
  */
 function getUserPreferences(userId) {
@@ -62,7 +63,8 @@ function getUserPreferences(userId) {
 /** @typedef {any} UpsertUserPreferencesUpdates */
 /**
  * Função exportada: upsertUserPreferences.
- * @param {*} userId
+ *
+ * @param {any} userId
  * @param {any} [patch]
  * @returns {any}
  */
@@ -113,7 +115,7 @@ function upsertUserPreferences(userId, patch = {}) {
             shortcuts_json = excluded.shortcuts_json,
             alerts_json = excluded.alerts_json,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         user_id: id,
         layout_json: _safeJsonString(next.layout),

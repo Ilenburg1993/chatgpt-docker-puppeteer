@@ -27,7 +27,7 @@ const props = defineProps({
     size: {
         type: String,
         default: 'md',
-        validator: v => ['sm', 'md', 'lg', 'xl'].includes(v),
+        validator: (v) => ['sm', 'md', 'lg', 'xl'].includes(v),
     },
 });
 
@@ -40,7 +40,7 @@ const sizeClasses = {
     xl: 'max-w-4xl',
 };
 
-const handleOpenChange = open => {
+const handleOpenChange = (open) => {
     emit('update:open', open);
 };
 </script>
@@ -61,7 +61,7 @@ const handleOpenChange = open => {
                         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
                         'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]',
                         'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
-                        sizeClasses[size]
+                        sizeClasses[size],
                     )
                 "
             >

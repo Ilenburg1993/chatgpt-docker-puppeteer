@@ -19,7 +19,7 @@ test('wave20b: import de src/server/main.js com env PM2 simulada não dispara bo
             },
             encoding: 'utf8',
             timeout: 3000,
-        }
+        },
     );
 
     assert.equal(result.status, 0, `import deve sair 0. stderr=${result.stderr || ''}`);

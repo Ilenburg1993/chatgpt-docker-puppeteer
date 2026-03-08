@@ -48,7 +48,7 @@ function assertLess(actual, threshold, message) {
 }
 
 async function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /* --------------------------------------------------------------------------
@@ -274,7 +274,7 @@ async function runTests() {
 }
 
 // Run
-runTests().catch(e => {
+runTests().catch((e) => {
     console.error('Fatal error:', e);
     process.exit(1);
 });

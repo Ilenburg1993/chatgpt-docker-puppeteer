@@ -1,7 +1,7 @@
 // @ts-check
-import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { performance } from 'node:perf_hooks';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 describe('human.js v2.0 - Unit Tests', () => {
     /** @type {any} */ let mockDriver;
@@ -66,13 +66,13 @@ describe('human.js v2.0 - Unit Tests', () => {
                 assert.ok(result2 >= 4 && result2 <= 16, `result2=${result2} fora da faixa esperada`);
             });
 
-            it('deve invalidar cache após TTL (100ms)', async t => {
+            it('deve invalidar cache após TTL (100ms)', async (t) => {
                 const { gaussian } = humanModule;
 
                 const result1 = gaussian(10, 2);
 
                 // Aguardar TTL expirar (100ms)
-                await new Promise(r => setTimeout(r, 150));
+                await new Promise((r) => setTimeout(r, 150));
 
                 const result2 = gaussian(10, 2);
 
@@ -213,7 +213,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanClick(mockDriver, '#button');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const startEvents = calls.filter(c => c.arguments[0] === 'CLICK_START');
+                const startEvents = calls.filter((c) => c.arguments[0] === 'CLICK_START');
 
                 assert.ok(startEvents.length > 0, 'CLICK_START event não emitido');
             });
@@ -224,7 +224,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanClick(mockDriver, '#button');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const completeEvents = calls.filter(c => c.arguments[0] === 'CLICK_COMPLETE');
+                const completeEvents = calls.filter((c) => c.arguments[0] === 'CLICK_COMPLETE');
 
                 assert.ok(completeEvents.length > 0, 'CLICK_COMPLETE event não emitido');
             });
@@ -235,7 +235,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanType(mockDriver, '#input', 'test');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const startEvents = calls.filter(c => c.arguments[0] === 'TYPE_START');
+                const startEvents = calls.filter((c) => c.arguments[0] === 'TYPE_START');
 
                 assert.ok(startEvents.length > 0, 'TYPE_START event não emitido');
             });
@@ -246,7 +246,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanType(mockDriver, '#input', 'test long text for progress tracking');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const progressEvents = calls.filter(c => c.arguments[0] === 'TYPE_PROGRESS');
+                const progressEvents = calls.filter((c) => c.arguments[0] === 'TYPE_PROGRESS');
 
                 // Para texto longo, deve emitir pelo menos 1 progress event
                 assert.ok(progressEvents.length > 0, 'TYPE_PROGRESS event não emitido');
@@ -258,7 +258,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanType(mockDriver, '#input', 'test');
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const completeEvents = calls.filter(c => c.arguments[0] === 'TYPE_COMPLETE');
+                const completeEvents = calls.filter((c) => c.arguments[0] === 'TYPE_COMPLETE');
 
                 assert.ok(completeEvents.length > 0, 'TYPE_COMPLETE event não emitido');
             });
@@ -276,7 +276,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 });
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const errorEvents = calls.filter(c => c.arguments[0] === 'CLICK_ERROR');
+                const errorEvents = calls.filter((c) => c.arguments[0] === 'CLICK_ERROR');
 
                 assert.ok(errorEvents.length > 0, 'CLICK_ERROR event não emitido');
             });
@@ -358,7 +358,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 await humanClick(mockDriver, '#button', { signal: controller.signal });
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const abortEvents = calls.filter(c => c.arguments[0] === 'CLICK_ABORTED');
+                const abortEvents = calls.filter((c) => c.arguments[0] === 'CLICK_ABORTED');
 
                 assert.ok(abortEvents.length > 0, 'CLICK_ABORTED event não emitido');
             });
@@ -392,7 +392,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                     assert.strictEqual(
                         randomCalls,
                         callsAfterFirst,
-                        `Cache hit não deveria chamar Math.random (calls=${randomCalls} vs ${callsAfterFirst})`
+                        `Cache hit não deveria chamar Math.random (calls=${randomCalls} vs ${callsAfterFirst})`,
                     );
                 } finally {
                     Math.random = originalRandom;
@@ -451,7 +451,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 });
 
                 /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-                const errorEvents = calls.filter(c => c.arguments[0] === 'TYPE_ERROR');
+                const errorEvents = calls.filter((c) => c.arguments[0] === 'TYPE_ERROR');
 
                 assert.ok(errorEvents.length > 0, 'TYPE_ERROR event não emitido');
             });
@@ -476,9 +476,9 @@ describe('human.js v2.0 - Unit Tests', () => {
             // Verificar eventos emitidos
             /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
 
-            assert.ok(calls.filter(c => c.arguments[0] === 'CLICK_START').length >= 3);
-            assert.ok(calls.filter(c => c.arguments[0] === 'TYPE_START').length >= 2);
-            assert.ok(calls.filter(c => c.arguments[0] === 'TYPE_COMPLETE').length >= 2);
+            assert.ok(calls.filter((c) => c.arguments[0] === 'CLICK_START').length >= 3);
+            assert.ok(calls.filter((c) => c.arguments[0] === 'TYPE_START').length >= 2);
+            assert.ok(calls.filter((c) => c.arguments[0] === 'TYPE_COMPLETE').length >= 2);
         });
 
         it('deve lidar com abort em meio ao fluxo', async () => {
@@ -541,7 +541,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
             // Verificar telemetria
             /** @type {any[]} */ const calls = mockDriver._emitVital.mock.calls;
-            const progressEvents = calls.filter(c => c.arguments[0] === 'TYPE_PROGRESS');
+            const progressEvents = calls.filter((c) => c.arguments[0] === 'TYPE_PROGRESS');
 
             // Para 1000 chars, deve emitir múltiplos progressos
             assert.ok(progressEvents.length > 0, 'Deve emitir progress events para texto longo');
@@ -574,7 +574,7 @@ describe('human.js v2.0 - Unit Tests', () => {
         it('gaussian cache deve manter valor estável dentro do TTL', async () => {
             // Reimport (Node ESM cacheia módulos; então use params únicos para isolar estado)
             const freshHuman = await import('#shared/biomechanics/human').then(
-                (/** @type {any} */ m) => m.default ?? m
+                (/** @type {any} */ m) => m.default ?? m,
             );
 
             const params = [1234.5, 6.7];
@@ -589,7 +589,7 @@ describe('human.js v2.0 - Unit Tests', () => {
 
             // Após expirar, é esperado que eventualmente retorne um valor diferente (cache miss)
             // Evitamos flakiness: damos folga e tentamos algumas vezes.
-            await new Promise(r => setTimeout(r, Math.max(1, ttlMs + 50)));
+            await new Promise((r) => setTimeout(r, Math.max(1, ttlMs + 50)));
 
             let changed = false;
             for (let i = 0; i < 25; i++) {

@@ -33,7 +33,7 @@ function _parseJson(raw, fallback) {
 
 /**
  * @param {any} row
- * @returns {InferenceProfile|null}
+ * @returns {InferenceProfile | null}
  */
 function _rowToProfile(row) {
     if (!row) return null;
@@ -60,8 +60,8 @@ function _rowToProfile(row) {
  * @property {string} name
  * @property {string} purpose
  * @property {boolean} enabled
- * @property {string|null} preferred_backend_id
- * @property {string|null} preferred_model_id
+ * @property {string | null} preferred_backend_id
+ * @property {string | null} preferred_model_id
  * @property {any[]} fallback_chain_json
  * @property {object} generation_params_json
  * @property {object} budget_policy_json
@@ -75,8 +75,8 @@ function _rowToProfile(row) {
  * @property {string} [name]
  * @property {string} [purpose]
  * @property {boolean} [enabled]
- * @property {string|null} [preferred_backend_id]
- * @property {string|null} [preferred_model_id]
+ * @property {string | null} [preferred_backend_id]
+ * @property {string | null} [preferred_model_id]
  * @property {any} [fallback_chain_json]
  * @property {any} [fallback_chain]
  * @property {any} [generation_params_json]
@@ -88,8 +88,9 @@ function _rowToProfile(row) {
  */
 /**
  * Função exportada: upsertInferenceProfile.
+ *
  * @param {UpsertInferenceProfileInput} [input]
- * @returns {InferenceProfile|null}
+ * @returns {InferenceProfile | null}
  */
 function upsertInferenceProfile(input = {}) {
     const db = getDb();
@@ -126,7 +127,7 @@ function upsertInferenceProfile(input = {}) {
             budget_policy_json = excluded.budget_policy_json,
             validation_policy_json = excluded.validation_policy_json,
             updated_at_ms = excluded.updated_at_ms
-    `
+    `,
     ).run({
         id,
         name,
@@ -146,8 +147,9 @@ function upsertInferenceProfile(input = {}) {
 
 /**
  * Função exportada: getInferenceProfileById.
+ *
  * @param {string} id Unique identifier.
- * @returns {InferenceProfile|null}
+ * @returns {InferenceProfile | null}
  */
 function getInferenceProfileById(id) {
     const db = getDb();
@@ -156,11 +158,12 @@ function getInferenceProfileById(id) {
 
 /**
  * @typedef {object} ListInferenceProfilesOptions
- * @property {*} [enabledOnly]
- * @property {*} [limit]
+ * @property {any} [enabledOnly]
+ * @property {any} [limit]
  */
 /**
  * Função exportada: listInferenceProfiles.
+ *
  * @param {ListInferenceProfilesOptions} [options]
  * @returns {InferenceProfile[]}
  */
@@ -173,12 +176,12 @@ function listInferenceProfiles({ enabledOnly = false, limit = 100 } = {}) {
             ${enabledOnly ? 'WHERE enabled = 1' : ''}
             ORDER BY updated_at_ms DESC
             LIMIT @limit
-        `
+        `,
         )
         .all({ limit: Math.max(1, Math.min(Number(limit) || 100, 500)) });
     return rows
         .map(_rowToProfile)
-        .filter(/** @param {InferenceProfile|null} x @returns {x is InferenceProfile} */ x => x != null);
+        .filter(/** @param {InferenceProfile | null} x @returns {x is InferenceProfile} */ (x) => x != null);
 }
 
 export { getInferenceProfileById, listInferenceProfiles, upsertInferenceProfile };

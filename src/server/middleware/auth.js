@@ -1,20 +1,24 @@
 // @ts-check
-/** @import { NextFunction, Request, Response } from 'express' */
-/** @import { VerifyOptions } from 'jsonwebtoken' */
-import jwt from 'jsonwebtoken';
-import { log } from '#core/logger';
+/** @import {
+  NextFunction,
+  Request,
+  Response
+} from "express" */
+/** @import {VerifyOptions} from "jsonwebtoken" */
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
+import { log } from '#core/logger';
 import { getRbacUserByUsername } from '#infra/db/rbac_repo';
 import { isTokenRevoked } from '#infra/db/token_blocklist';
+import jwt from 'jsonwebtoken';
 
 /**
- * Middleware de autenticação JWT para proteger rotas do dashboard
- * Verifica se o token JWT é válido e adiciona informações do usuário à requisição
+ * Middleware de autenticação JWT para proteger rotas do dashboard Verifica se o token JWT é válido e adiciona
+ * informações do usuário à requisição
  *
  * @param {Request} req - Requisição Express
  * @param {Response} res - Resposta Express
  * @param {NextFunction} next - Próxima função middleware
- * @returns {Response|void}
+ * @returns {Response | void}
  * @sideEffects - Pode enviar resposta de erro 401 se autenticação falhar
  */
 export function authenticate(req, res, next) {
@@ -33,7 +37,7 @@ export function authenticate(req, res, next) {
 
     try {
         // Verificar token JWT usando secret centralizado e validado
-        const decoded = /** @type {{[k:string]: unknown}} */ (
+        const decoded = /** @type {{ [k: string]: unknown }} */ (
             jwt.verify(token, getJwtSecret(), /** @type {VerifyOptions} */ (JWT_VERIFY_OPTIONS))
         );
 
@@ -51,7 +55,7 @@ export function authenticate(req, res, next) {
         const tokenUsername = decoded.username ? String(decoded.username) : '';
         const rbacUser = tokenUsername ? getRbacUserByUsername(tokenUsername) : null;
         const permissions = Array.isArray(decoded.permissions)
-            ? decoded.permissions.map(p => String(p))
+            ? decoded.permissions.map((p) => String(p))
             : Array.isArray(rbacUser?.permissions)
               ? rbacUser.permissions
               : [];
@@ -96,8 +100,8 @@ export function authenticate(req, res, next) {
 }
 
 /**
- * Middleware opcional de autenticação - permite acesso público mas adiciona user se token válido
- * Útil para funcionalidades públicas que podem ser aprimoradas com autenticação
+ * Middleware opcional de autenticação - permite acesso público mas adiciona user se token válido Útil para
+ * funcionalidades públicas que podem ser aprimoradas com autenticação
  *
  * @param {Request} req - Requisição Express
  * @param {Response} res - Resposta Express
@@ -112,12 +116,8 @@ export function optionalAuthenticate(req, res, next) {
         const token = authHeader.substring(7);
 
         try {
-            const decoded = /** @type {{[k:string]: unknown}} */ (
-                jwt.verify(
-                    token,
-                    getJwtSecret(),
-                    /** @type {VerifyOptions} */ (JWT_VERIFY_OPTIONS)
-                )
+            const decoded = /** @type {{ [k: string]: unknown }} */ (
+                jwt.verify(token, getJwtSecret(), /** @type {VerifyOptions} */ (JWT_VERIFY_OPTIONS))
             );
             const jti = decoded.jti;
             if (jti && isTokenRevoked(String(jti))) {
@@ -127,7 +127,7 @@ export function optionalAuthenticate(req, res, next) {
             const tokenUsername = decoded.username ? String(decoded.username) : '';
             const rbacUser = tokenUsername ? getRbacUserByUsername(tokenUsername) : null;
             const permissions = Array.isArray(decoded.permissions)
-                ? decoded.permissions.map(p => String(p))
+                ? decoded.permissions.map((p) => String(p))
                 : Array.isArray(rbacUser?.permissions)
                   ? rbacUser.permissions
                   : [];
@@ -159,10 +159,9 @@ export function optionalAuthenticate(req, res, next) {
 }
 
 /**
- * Middleware para verificar se usuário tem role específico
- * Deve ser usado após authenticate()
+ * Middleware para verificar se usuário tem role específico Deve ser usado após authenticate()
  *
- * @param {string|string[]} requiredRoles - Role(s) necessária(s)
+ * @param {string | string[]} requiredRoles - Role(s) necessária(s)
  * @returns {function} Middleware function
  * @sideEffects - Pode enviar resposta de erro 403 se autorização falhar
  */
@@ -182,7 +181,7 @@ export function requireRole(requiredRoles) {
             log(
                 'WARN',
                 `[AUTH] Insufficient permissions. User: ${req.user.username}, Required: ${roles.join(',')}, Has: ${req.user.role}`,
-                req.id
+                req.id,
             );
             return res.status(403).json({
                 success: false,

@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import PeriodicHealthMonitor, { MONITOR_EVENTS } from '#infra/browser_pool/PeriodicHealthMonitor';
 
@@ -26,15 +26,15 @@ test('wave13: monitor emits start/stop events with declared contract', async () 
     let started = false;
     let stopped = false;
 
-    monitor.once(MONITOR_EVENTS.MONITOR_STARTED, payload => {
+    monitor.once(MONITOR_EVENTS.MONITOR_STARTED, (payload) => {
         started = Boolean(payload && payload.timestamp);
     });
-    monitor.once(MONITOR_EVENTS.MONITOR_STOPPED, payload => {
+    monitor.once(MONITOR_EVENTS.MONITOR_STOPPED, (payload) => {
         stopped = Boolean(payload && payload.timestamp);
     });
 
     monitor.start(50);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
     monitor.stop();
 
     assert.equal(started, true, 'monitor should emit MONITOR_STARTED');

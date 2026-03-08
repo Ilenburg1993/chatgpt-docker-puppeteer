@@ -1,6 +1,6 @@
 // @ts-check
+import { formatHttpError, http } from '@/lib/http';
 import { defineStore } from 'pinia';
-import { http, formatHttpError } from '@/lib/http';
 
 /** Constante/valor exportado: useEventsVNextStore. */
 export const useEventsVNextStore = defineStore('events_vnext', {
@@ -82,12 +82,12 @@ export const useEventsVNextStore = defineStore('events_vnext', {
 
                 const res = await http.get('/api/dashboard/events', { params });
                 this.items = res.data?.data?.items || [];
-                this.seenIds = new Set(this.items.map(item => String(item?.id || '')).filter(Boolean));
+                this.seenIds = new Set(this.items.map((item) => String(item?.id || '')).filter(Boolean));
                 const meta = res.data?.meta || {};
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
             } catch (/** @type {any} */ _rawErr) {
-    const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loading = false;
@@ -115,7 +115,7 @@ export const useEventsVNextStore = defineStore('events_vnext', {
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
             } catch (/** @type {any} */ _rawErr) {
-    const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loading = false;

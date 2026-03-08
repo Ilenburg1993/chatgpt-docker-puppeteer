@@ -28,7 +28,12 @@ export function buildLineIndex(/** @type {any} */ buf) {
     return { lineStarts, lines };
 }
 
-export function sliceByLines(/** @type {any} */ buf,  /** @type {any} */ lineStarts,  /** @type {any} */ startLine1,  /** @type {any} */ endLine1Inclusive) {
+export function sliceByLines(
+    /** @type {any} */ buf,
+    /** @type {any} */ lineStarts,
+    /** @type {any} */ startLine1,
+    /** @type {any} */ endLine1Inclusive,
+) {
     const startIdx = Math.max(1, startLine1) - 1;
     const endIdx = Math.max(startIdx, endLine1Inclusive) - 1;
     const startByte = lineStarts[startIdx] ?? 0;
@@ -37,7 +42,11 @@ export function sliceByLines(/** @type {any} */ buf,  /** @type {any} */ lineSta
     return { startByte, endByte, text };
 }
 
-export function estimateCharsForLines(/** @type {any} */ lines, /** @type {any} */ startIdx0, /** @type {any} */ endIdx0Inclusive) {
+export function estimateCharsForLines(
+    /** @type {any} */ lines,
+    /** @type {any} */ startIdx0,
+    /** @type {any} */ endIdx0Inclusive,
+) {
     let len = 0;
     for (let i = startIdx0; i <= endIdx0Inclusive && i < lines.length; i++) {
         len += lines[i].length + 1;

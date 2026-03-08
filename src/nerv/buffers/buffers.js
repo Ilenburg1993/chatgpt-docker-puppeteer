@@ -1,7 +1,7 @@
 // @ts-check
-import createOutboundQueue from './outbound_queue.js';
-import createInboundQueue from './inbound_queue.js';
 import createBackpressure from './backpressure.js';
+import createInboundQueue from './inbound_queue.js';
+import createOutboundQueue from './outbound_queue.js';
 
 /* ===========================
    Fábrica do subsistema buffers
@@ -10,23 +10,24 @@ import createBackpressure from './backpressure.js';
 /**
  * @typedef {object} CreateBuffersDeps
  * @property {any} telemetry
- * @property {*} [limits]
+ * @property {any} [limits]
  */
 /**
  * @typedef {object} CreateBuffersOptions
- * @property {*} [telemetry]
- * @property {*} [limits]
+ * @property {any} [telemetry]
+ * @property {any} [limits]
  */
 /**
  * Cria o subsistema de buffers do NERV.
  *
- * @param {CreateBuffersDeps} deps
- * Interface de telemetria do NERV.
+ * @param {CreateBuffersDeps} deps Interface de telemetria do NERV.
  *
- * Limites técnicos opcionais:
- * - outbound: Limite de fila outbound
- * - inbound: Limite de fila inbound
- * - blockOnPressure: Se true, bloqueia quando buffer cheio (default: false)
+ *   Limites técnicos opcionais:
+ *
+ *   - outbound: Limite de fila outbound
+ *   - inbound: Limite de fila inbound
+ *   - blockOnPressure: Se true, bloqueia quando buffer cheio (default: false)
+ *
  * @returns {any}
  */
 function createBuffers({ telemetry, limits = {} }) {

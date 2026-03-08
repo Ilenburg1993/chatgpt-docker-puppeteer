@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { evaluateStaticContracts } from '../contracts/evaluate_static.mjs';
 
-/** @import { RawFinding } from '../normalize/findings.mjs' */
+/** @import {RawFinding} from "../normalize/findings.mjs" */
 
 /**
  * @param {string} value
@@ -46,24 +46,24 @@ function collectJsFiles(currentDir, files) {
 /**
  * @param {CollectSecurityFindingsOptions} options
  * @returns {Promise<{
- *   findings: RawFinding[],
- *   errors: Array<{source:string,message:string}>,
- *   warnings: Array<{source:string,message:string}>,
- *   telemetry: {
- *     contracts_scanned: number,
- *     files_scanned: number,
- *     checks: string[],
- *     findings_by_kind: Record<string, number>,
- *   },
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ *     telemetry: {
+ *         contracts_scanned: number;
+ *         files_scanned: number;
+ *         checks: string[];
+ *         findings_by_kind: Record<string, number>;
+ *     };
  * }>}
  */
 export async function collectSecurityFindings(options) {
     const rootDir = path.resolve(options.rootDir);
     /** @type {RawFinding[]} */
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
     const securityContracts = /** @type {any[]} */ (
@@ -78,7 +78,7 @@ export async function collectSecurityFindings(options) {
                 rootDir,
                 scanDir: path.join(rootDir, 'src'),
                 contracts: securityContracts,
-            })
+            }),
         )
     );
     for (const item of contractEval.findings) {
@@ -87,7 +87,7 @@ export async function collectSecurityFindings(options) {
                 ...item,
                 source_tool: item.source_tool || 'security-contracts',
                 domain: item.domain || 'security',
-            })
+            }),
         );
     }
 

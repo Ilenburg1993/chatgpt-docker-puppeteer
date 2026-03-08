@@ -17,17 +17,21 @@ import systemController from './controllers/system.js';
 import tasksController from './controllers/tasks.js';
 
 /**
- * @typedef {{ use: (...args: unknown[]) => unknown, get: (...args: unknown[]) => unknown, post: (...args: unknown[]) => unknown, locals: Record<string, unknown> }} ExpressAppLike
+ * @typedef {{
+ *     use: (...args: unknown[]) => unknown;
+ *     get: (...args: unknown[]) => unknown;
+ *     post: (...args: unknown[]) => unknown;
+ *     locals: Record<string, unknown>;
+ * }} ExpressAppLike
  */
 
 /**
- * Aplica a malha de rotas à instância do Express.
- * Define a topologia lógica da API e injeta os escudos de integridade.
+ * Aplica a malha de rotas à instância do Express. Define a topologia lógica da API e injeta os escudos de integridade.
  *
  * @param {ExpressAppLike} app - Instância do Express vinda de engine/app.js
+ * @returns {Promise<void>}
  * @throws {Error} - Se algum controller falhar ao inicializar
  * @sideEffects - Registra rotas HTTP, middlewares, handlers de erro
- * @returns {Promise<void>}
  */
 async function applyRoutes(app) {
     log('INFO', '[GATEWAY] Selando malha de rotas V700 (Consolidação Total)...');
@@ -104,9 +108,8 @@ async function applyRoutes(app) {
     -------------------------------------------------------------------------- */
 
     /**
-     * DOMÍNIO DE MISSÃO (Tarefas, Fila e Artefatos)
-     * Namespace: /api/tasks, /api/queue, /api/results
-     * Responsável pelo ciclo de vida das intenções de execução e download de .txt.
+     * DOMÍNIO DE MISSÃO (Tarefas, Fila e Artefatos) Namespace: /api/tasks, /api/queue, /api/results Responsável pelo
+     * ciclo de vida das intenções de execução e download de .txt.
      */
     app.use('/api/tasks', apiLimiter, tasksController);
     app.use('/api/queue', apiLimiter, tasksController); // Alias para operações bulk de fila
@@ -114,50 +117,41 @@ async function applyRoutes(app) {
     app.use('/api/artifacts', apiLimiter, artifactsController);
 
     /**
-     * DOMÍNIO DE SISTEMA E OBSERVABILIDADE (Agentes e Infraestrutura)
-     * Namespace: /api/system
-     * Responsável pelo inventário IPC 2.0 (/agents), saúde (Doctor) e processos.
+     * DOMÍNIO DE SISTEMA E OBSERVABILIDADE (Agentes e Infraestrutura) Namespace: /api/system Responsável pelo
+     * inventário IPC 2.0 (/agents), saúde (Doctor) e processos.
      */
     app.use('/api/system', apiLimiter, systemController);
 
     /**
-     * DOMÍNIO DE INTELIGÊNCIA E CONFIGURAÇÃO (DNA e Parâmetros)
-     * Namespace: /api/config
-     * Responsável pela evolução do genoma (SADI) e controle do config.json.
+     * DOMÍNIO DE INTELIGÊNCIA E CONFIGURAÇÃO (DNA e Parâmetros) Namespace: /api/config Responsável pela evolução do
+     * genoma (SADI) e controle do config.json.
      */
     // Protege todas as rotas de configuração contra mutações quando em modo delegated
     app.use('/api/config', apiLimiter, denyIfDelegated, dnaController);
 
     /**
-     * DOMÍNIO DE MISSÕES (Mission Orchestration Platform V2.0)
-     * Namespace: /api/missions
-     * Responsável por orquestração de missões multi-step com workflows dinâmicos.
-     * Inclui: MissionManager, WorkflowGenerator, templates, execution control.
+     * DOMÍNIO DE MISSÕES (Mission Orchestration Platform V2.0) Namespace: /api/missions Responsável por orquestração de
+     * missões multi-step com workflows dinâmicos. Inclui: MissionManager, WorkflowGenerator, templates, execution
+     * control.
      */
     app.use('/api/missions', apiLimiter, missionsController);
 
     /**
-     * DOMÍNIO CONTROL PLANE (SSOT mutações)
-     * Namespace: /api/control
-     * Responsável por comando único de mutações auditáveis de missão/task.
+     * DOMÍNIO CONTROL PLANE (SSOT mutações) Namespace: /api/control Responsável por comando único de mutações
+     * auditáveis de missão/task.
      */
     app.use('/api/control', apiLimiter, controlController);
 
     /**
-     * DOMÍNIO DO DASHBOARD V2 (Mission Control Enterprise)
-     * Namespace: /api/dashboard
-     * Responsável por APIs estendidas de tasks, telemetria, alertas e health.
-     * Inclui: TaskSyncBridge, TelemetryAggregator, Sistema de Alertas.
+     * DOMÍNIO DO DASHBOARD V2 (Mission Control Enterprise) Namespace: /api/dashboard Responsável por APIs estendidas de
+     * tasks, telemetria, alertas e health. Inclui: TaskSyncBridge, TelemetryAggregator, Sistema de Alertas.
      */
     app.use('/api/dashboard', apiLimiter, dashboardController);
 
     /**
-     * DOMÍNIO RAG (Retrieval-Augmented Generation)
-     * Namespace: /api/rag
-     * Responsável por busca semântica no codebase via LanceDB + Ollama.
-     * Permite que LLMs externas (OpenCode, Claude, Copilot) acessem o código.
-     * Inclui: Semantic search, hybrid search (vector + FTS + reranking + MMR),
-     * health check, indexing trigger, cache statistics.
+     * DOMÍNIO RAG (Retrieval-Augmented Generation) Namespace: /api/rag Responsável por busca semântica no codebase via
+     * LanceDB + Ollama. Permite que LLMs externas (OpenCode, Claude, Copilot) acessem o código. Inclui: Semantic
+     * search, hybrid search (vector + FTS + reranking + MMR), health check, indexing trigger, cache statistics.
      */
     app.post('/api/rag/ask', apiLimiter, ragController.handleRagAsk);
     app.post('/api/rag/query', apiLimiter, ragController.handleRagQuery);
@@ -167,15 +161,16 @@ async function applyRoutes(app) {
     app.post('/api/rag/index', apiLimiter, ragController.handleRagIndex);
 
     /**
-     * MCP INTEGRATION (Model Context Protocol - Multi-LLM Tool Server)
-     * Namespace: /api/mcp
-     * Expõe Tool Registry via MCP Streamable HTTP para todas as LLMs:
+     * MCP INTEGRATION (Model Context Protocol - Multi-LLM Tool Server) Namespace: /api/mcp Expõe Tool Registry via MCP
+     * Streamable HTTP para todas as LLMs:
+     *
      * - Claude Desktop
      * - GitHub Copilot
      * - OpenCode CLI
      * - Cursor/Codex (via HTTP fallback)
      *
      * Tools disponíveis:
+     *
      * - rag_search: Hybrid semantic search (Vector + FTS + Reranking + MMR)
      * - rag_health: RAG system health check
      * - rag_expand: Expand chunk context by chunk_id

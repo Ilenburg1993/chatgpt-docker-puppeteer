@@ -1,7 +1,7 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import test from 'node:test';
 import { createAuditAgentTriageLlmClient } from '../../../src/audit_agent/triage_llm.js';
 
 async function listen(/** @type {any} */ server) {
@@ -14,8 +14,8 @@ async function listen(/** @type {any} */ server) {
     return { host: addr.address, port: addr.port };
 }
 
-function withEnv(/** @type {Record<string,any>} */ pairs, /** @type {() => any} */ fn) {
-    const prev = /** @type {Record<string,string|undefined>} */ ({});
+function withEnv(/** @type {Record<string, any>} */ pairs, /** @type {() => any} */ fn) {
+    const prev = /** @type {Record<string, string | undefined>} */ ({});
     for (const [k, v] of Object.entries(pairs)) {
         prev[k] = process.env[k];
         if (v === undefined || v === null) delete process.env[k];
@@ -59,7 +59,7 @@ test('triage_llm performs preflight then generate via inference gateway', async 
                     policy: { maxParallel: 1 },
                     result: { response: '{"summary":"triaged","risk_level":"medium","next_actions":["run tests"]}' },
                     ts: 222,
-                })
+                }),
             );
             return;
         }
@@ -79,16 +79,16 @@ test('triage_llm performs preflight then generate via inference gateway', async 
                 const client = createAuditAgentTriageLlmClient();
                 const out = await client.runTriage(
                     { kind: 'quick_audit', scope_json: { filePath: 'src/main.js' } },
-                    { context: { mcp_tools: {}, runtime: {} }, findings: [] }
+                    { context: { mcp_tools: {}, runtime: {} }, findings: [] },
                 );
                 assert.equal(out.ok, true);
                 assert.deepEqual(hits, ['preflight', 'generate']);
                 assert.equal(out.parsed?.summary, 'triaged');
                 assert.equal(out.preflight?.ok, true);
-            }
+            },
         );
     } finally {
-        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });
 
@@ -117,14 +117,14 @@ test('triage_llm skips with explicit reason when preflight rejects route', async
                 const client = createAuditAgentTriageLlmClient();
                 const out = await client.runTriage(
                     { kind: 'quick_audit', scope_json: {} },
-                    { context: {}, findings: [] }
+                    { context: {}, findings: [] },
                 );
                 assert.equal(out.ok, false);
                 assert.equal(out.skipped, true);
                 assert.equal(out.error, 'inference_gateway_preflight_failed');
-            }
+            },
         );
     } finally {
-        await /** @type {Promise<void>} */ (new Promise(resolve => server.close(() => resolve())));
+        await /** @type {Promise<void>} */ (new Promise((resolve) => server.close(() => resolve())));
     }
 });

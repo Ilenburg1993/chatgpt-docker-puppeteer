@@ -1,17 +1,16 @@
 // @ts-check
-import { promises as fs } from 'node:fs';
-import fss from 'node:fs';
+import fss, { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { cleanText, sleep } from '../fs/fs_utils.js';
 import * as PATHS from '../fs/paths.js';
-import { sleep, cleanText } from '../fs/fs_utils.js';
 
 /**
- * Lê o conteúdo de uma resposta anterior com blindagem de memória e I/O.
- * Utiliza loop iterativo para garantir estabilidade da pilha em retries.
+ * Lê o conteúdo de uma resposta anterior com blindagem de memória e I/O. Utiliza loop iterativo para garantir
+ * estabilidade da pilha em retries.
  *
  * @param {string} taskId - ID da tarefa alvo.
  * @param {any} signal - Sinal para interromper leitura longa.
- * @returns {Promise<string|null>} Conteúdo limpo ou null se não localizado.
+ * @returns {Promise<string | null>} Conteúdo limpo ou null se não localizado.
  */
 async function loadResponse(taskId, signal = null) {
     const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
@@ -66,8 +65,9 @@ async function loadResponse(taskId, signal = null) {
 
 /**
  * Deleta um arquivo de resposta de forma assíncrona.
+ *
  * @param {string} taskId - ID da tarefa cujo resultado deve ser removido.
-  * @returns {Promise<void>}
+ * @returns {Promise<void>}
  */
 async function deleteResponse(taskId) {
     const filename = `${taskId.replace(/[^a-zA-Z0-9._-]/g, '_')}.txt`;
@@ -83,4 +83,4 @@ async function deleteResponse(taskId) {
     }
 }
 
-export { loadResponse, deleteResponse };
+export { deleteResponse, loadResponse };

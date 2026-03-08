@@ -33,10 +33,10 @@ function now() {
 }
 
 /**
- * Garante execução segura de handlers de telemetria.
- * Qualquer erro é isolado e ignorado.
+ * Garante execução segura de handlers de telemetria. Qualquer erro é isolado e ignorado.
+ *
  * @param {Function} handler
- * @param {*} payload
+ * @param {any} payload
  */
 function safeCall(handler, payload) {
     try {
@@ -59,10 +59,11 @@ function safeCall(handler, payload) {
 /**
  * Cria o sistema de telemetria do NERV.
  *
- * @param {CreateIPCTelemetryConfig} config
- * Configuração estritamente técnica (opcional):
- * - enabled: boolean
-  * @returns {any}
+ * @param {CreateIPCTelemetryConfig} config Configuração estritamente técnica (opcional):
+ *
+ *   - enabled: boolean
+ *
+ * @returns {any}
  */
 function createIPCTelemetry(config = {}) {
     const enabled = config.enabled !== false;
@@ -86,6 +87,7 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Incrementa contador técnico.
+     *
      * @param {string} name
      * @param {number} [value]
      */
@@ -95,6 +97,7 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Atualiza gauge técnico.
+     *
      * @param {string} name
      * @param {any} value
      */
@@ -104,6 +107,7 @@ function createIPCTelemetry(config = {}) {
 
     /**
      * Registra timestamp técnico.
+     *
      * @param {string} name
      */
     function mark(name) {
@@ -117,11 +121,8 @@ function createIPCTelemetry(config = {}) {
     /**
      * Emite um evento técnico de telemetria.
      *
-     * @param {string} type
-     * Nome do evento técnico (ex.: nerv:envelope:sent)
-     *
-     * @param {any} [meta]
-     * Metadados técnicos opcionais (nunca semânticos)
+     * @param {string} type Nome do evento técnico (ex.: nerv:envelope:sent)
+     * @param {any} [meta] Metadados técnicos opcionais (nunca semânticos)
      */
     function emit(type, meta = undefined) {
         if (!enabled) {
@@ -167,8 +168,7 @@ function createIPCTelemetry(config = {}) {
     }
 
     /**
-     * Retorna snapshot das métricas atuais.
-     * Leitura pura, sem efeitos colaterais.
+     * Retorna snapshot das métricas atuais. Leitura pura, sem efeitos colaterais.
      */
     function stats() {
         return {
@@ -179,8 +179,7 @@ function createIPCTelemetry(config = {}) {
     }
 
     /**
-     * Reseta métricas internas.
-     * Uso permitido apenas para testes.
+     * Reseta métricas internas. Uso permitido apenas para testes.
      */
     function reset() {
         metrics.counters = Object.create(null);

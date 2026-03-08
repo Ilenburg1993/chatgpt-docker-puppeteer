@@ -9,7 +9,8 @@ const TMP_DIRS = [path.join(import.meta.dirname, 'tmp')];
 
 /**
  * Cleanup principal
-  * @returns {Promise<void>}
+ *
+ * @returns {Promise<void>}
  */
 async function teardown() {
     console.log('\n[TEST TEARDOWN] Iniciando cleanup global...');
@@ -49,9 +50,9 @@ async function teardown() {
 }
 
 // Executar teardown
-teardown().catch(error => {
+teardown().catch((error) => {
     console.error('[TEST TEARDOWN] ❌ Erro crítico no teardown:', error);
     process.exit(1);
 });
 
-export { teardown, TMP_DIRS };
+export { TMP_DIRS, teardown };

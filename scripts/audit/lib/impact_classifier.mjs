@@ -7,9 +7,9 @@ import {
     summarizeChangeImpact,
 } from './quality_targets.mjs';
 
-/** @typedef {'quick'|'deep'|'nightly'} Profile */
-/** @typedef {'smart'|'full'|'changed'|'off'} QualityMode */
-/** @typedef {'skip'|'changed-only'|'full'} StepMode */
+/** @typedef {'quick' | 'deep' | 'nightly'} Profile */
+/** @typedef {'smart' | 'full' | 'changed' | 'off'} QualityMode */
+/** @typedef {'skip' | 'changed-only' | 'full'} StepMode */
 
 /**
  * @typedef {object} StepStep
@@ -34,7 +34,7 @@ function step(step) {
  */
 /**
  * @param {BuildQualityExecutionPlanOptions} options
-  * @returns {any}
+ * @returns {any}
  */
 export function buildQualityExecutionPlan(options) {
     const profile = options.profile;
@@ -45,9 +45,9 @@ export function buildQualityExecutionPlan(options) {
     /** @type {any[]} */
     const fallbacks = [];
 
-    /** @type {'changed-only'|'full'|'off'|'smart'} */
+    /** @type {'changed-only' | 'full' | 'off' | 'smart'} */
     let strategy = qualityMode === 'changed' ? 'changed-only' : qualityMode;
-    /** @type {'low'|'medium'|'high'} */
+    /** @type {'low' | 'medium' | 'high'} */
     let risk = 'low';
 
     if (qualityMode === 'off') {
@@ -164,7 +164,10 @@ export function buildQualityExecutionPlan(options) {
         steps: {
             node_check: step({ mode: nodeCheckMode, files: jsFiles }),
             entrypoint_import_smoke: step({ mode: entrypointSmokeMode, targets: smokeTargets }),
-            lint: step({ mode: lintMode, files: impact.changed.filter((/** @type {string} */ f) => /\.(js|mjs|cjs|vue|json)$/.test(f)) }),
+            lint: step({
+                mode: lintMode,
+                files: impact.changed.filter((/** @type {string} */ f) => /\.(js|mjs|cjs|vue|json)$/.test(f)),
+            }),
             typecheck_node: step({ mode: typecheckNodeMode }),
             typecheck_browser: step({ mode: typecheckBrowserMode }),
             prettier_check: step({ mode: prettierMode, files: prettierFiles }),

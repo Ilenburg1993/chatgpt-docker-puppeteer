@@ -1,13 +1,13 @@
 // @ts-check
-import express from 'express';
-import fs from 'node:fs';
-import path from 'node:path';
-import * as io from '#infra/io';
+import { log } from '#core/logger';
 import { getArtifactById } from '#infra/db/artifact_repo';
 import { getAttemptById } from '#infra/db/task_attempt_repo';
 import { getTaskById } from '#infra/db/task_repo';
-import { _resolveArtifactsRoot, _isUnderRoot } from '#infra/storage/artifact_store';
-import { log } from '#core/logger';
+import * as io from '#infra/io';
+import { _isUnderRoot, _resolveArtifactsRoot } from '#infra/storage/artifact_store';
+import express from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /** Constante/valor exportado: default. */
 const router = express.Router();
@@ -36,13 +36,13 @@ function _contentTypeForExt(/** @type {any} */ ext) {
 }
 
 /**
- * GET /api/results/:id
- * Streams the latest (or selected attempt) result content without exposing file paths.
+ * GET /api/results/:id Streams the latest (or selected attempt) result content without exposing file paths.
  *
  * Query:
- *  - attempt?: correlationId
- *  - format?: text|markdown|md|json|html
- *  - disposition?: inline|attachment
+ *
+ * - attempt?: correlationId
+ * - format?: text|markdown|md|json|html
+ * - disposition?: inline|attachment
  */
 router.get('/:id', async (req, res) => {
     const requestId = req.id;
@@ -59,12 +59,12 @@ router.get('/:id', async (req, res) => {
             json: '.json',
             html: '.html',
         };
-        const ext = (/** @type {Record<string, string>} */ (extByFormat))[format] || '.txt';
+        const ext = /** @type {Record<string, string>} */ (extByFormat)[format] || '.txt';
 
         const artifactsRoot = _resolveArtifactsRoot();
         const legacyRoot = io.RESPONSE_DIR;
 
-        /** @type {string|null} */
+        /** @type {string | null} */
         let filePath = null;
 
         // Attempt-scoped resolution (preferred)
@@ -93,7 +93,7 @@ router.get('/:id', async (req, res) => {
         } else {
             // Latest attempt resolution from SSOT task row (best-effort)
             const task = getTaskById(taskId);
-            const storage = (/** @type {any} */ (task))?.result_db?.storage || null;
+            const storage = /** @type {any} */ (task)?.result_db?.storage || null;
             if (storage) {
                 const candidate =
                     ext === '.txt'
@@ -140,11 +140,11 @@ router.get('/:id', async (req, res) => {
         res.setHeader('Content-Type', _contentTypeForExt(ext));
         res.setHeader(
             'Content-Disposition',
-            `${safeDisposition}; filename="${taskId}${attemptId ? `-${attemptId}` : ''}${ext}"`
+            `${safeDisposition}; filename="${taskId}${attemptId ? `-${attemptId}` : ''}${ext}"`,
         );
 
         const stream = fs.createReadStream(filePath);
-        stream.on('error', err => {
+        stream.on('error', (err) => {
             log('ERROR', `[API_RESULTS] stream error for ${taskId}: ${err?.message || String(err)}`, requestId);
             if (!res.headersSent) {
                 return res.status(500).json({
@@ -161,7 +161,9 @@ router.get('/:id', async (req, res) => {
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[API_RESULTS] download failed: ${_e?.message || String(_e)}`, requestId);
-        return res.status(500).json({ success: false, error: 'Falha no download do resultado.', request_id: requestId });
+        return res
+            .status(500)
+            .json({ success: false, error: 'Falha no download do resultado.', request_id: requestId });
     }
 });
 

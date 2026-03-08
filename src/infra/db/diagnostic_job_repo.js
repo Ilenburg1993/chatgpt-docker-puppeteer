@@ -5,10 +5,11 @@
 /**
  * Diagnostic Agent Job Repository
  *
- * Repositório para persistência de jobs do Diagnostic Agent.
- * Fornece operações CRUD para diagnostic_jobs e diagnostic_reports.
+ * Repositório para persistência de jobs do Diagnostic Agent. Fornece operações CRUD para diagnostic_jobs e
+ * diagnostic_reports.
  *
  * Tabelas:
+ *
  * - diagnostic_jobs: Jobs de diagnóstico
  * - diagnostic_reports: Relatórios gerados
  */
@@ -17,6 +18,7 @@ import { getDb } from '#infra/db/sqlite.js';
 
 /**
  * Gera timestamp atual em ms
+ *
  * @returns {number}
  */
 function _now() {
@@ -26,6 +28,7 @@ function _now() {
 /** @typedef {any} RowToJobRow */
 /**
  * Converte row para DiagnosticJob
+ *
  * @param {RowToJobRow} row
  * @returns {any}
  */
@@ -57,6 +60,7 @@ function _rowToJob(row) {
 /** @typedef {any} RowToReportRow */
 /**
  * Converte row para DiagnosticReport
+ *
  * @param {RowToReportRow} row
  * @returns {any}
  */
@@ -83,6 +87,7 @@ function _rowToReport(row) {
 /** @typedef {any} CreateDiagnosticJobInput */
 /**
  * Cria um novo job de diagnóstico
+ *
  * @param {CreateDiagnosticJobInput} input
  * @returns {any}
  */
@@ -106,7 +111,7 @@ export function createDiagnosticJob(input) {
             @result_json, @error_json,
             @created_at_ms, @updated_at_ms, @started_at_ms, @completed_at_ms
         )
-    `
+    `,
     ).run({
         id,
         status: String(input.status || 'PENDING')
@@ -136,6 +141,7 @@ export function createDiagnosticJob(input) {
 
 /**
  * Obtém um job de diagnóstico pelo ID
+ *
  * @param {string} id
  * @returns {any}
  */
@@ -148,6 +154,7 @@ export function getDiagnosticJobById(id) {
 /** @typedef {any} ListDiagnosticJobsFilters */
 /**
  * Lista jobs de diagnóstico com filtros opcionais
+ *
  * @param {ListDiagnosticJobsFilters} [filters]
  * @returns {any[]}
  */
@@ -186,7 +193,7 @@ export function listDiagnosticJobs(filters = {}) {
         ${whereClause}
         ORDER BY updated_at_ms DESC
         LIMIT @limit OFFSET @offset
-    `
+    `,
         )
         .all(params);
 
@@ -196,6 +203,7 @@ export function listDiagnosticJobs(filters = {}) {
 /** @typedef {any} UpdateDiagnosticJobUpdates */
 /**
  * Atualiza um job de diagnóstico
+ *
  * @param {string} id
  * @param {UpdateDiagnosticJobUpdates} updates
  * @returns {any}
@@ -264,7 +272,7 @@ export function updateDiagnosticJob(id, updates = {}) {
         UPDATE diagnostic_jobs SET
             ${fields.join(', ')}
         WHERE id = @id
-    `
+    `,
     ).run(params);
 
     return getDiagnosticJobById(id);
@@ -273,6 +281,7 @@ export function updateDiagnosticJob(id, updates = {}) {
 /** @typedef {any} CreateDiagnosticReportInput */
 /**
  * Cria um novo relatório de diagnóstico
+ *
  * @param {CreateDiagnosticReportInput} input
  * @returns {any}
  */
@@ -294,7 +303,7 @@ export function createDiagnosticReport(input) {
             @llm_model_used, @llm_prompt_tokens, @llm_completion_tokens, @duration_ms,
             @created_at_ms
         )
-    `
+    `,
     ).run({
         id,
         job_id: String(input.jobId || ''),
@@ -317,6 +326,7 @@ export function createDiagnosticReport(input) {
 
 /**
  * Obtém um relatório pelo ID
+ *
  * @param {string} id
  * @returns {any}
  */
@@ -328,6 +338,7 @@ export function getDiagnosticReportById(id) {
 
 /**
  * Lista relatórios por job
+ *
  * @param {string} jobId
  * @returns {any[]}
  */
@@ -340,7 +351,7 @@ export function listDiagnosticReportsByJob(jobId) {
         FROM diagnostic_reports
         WHERE job_id = ?
         ORDER BY created_at_ms DESC
-    `
+    `,
         )
         .all(String(jobId || '').trim());
 

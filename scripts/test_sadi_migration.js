@@ -11,7 +11,7 @@ try {
     // Test 2: prerequisite_validator loads
     console.log('\n2. Loading prerequisite_validator...');
     const _validator = await import('#core/validators/prerequisite_validator').then(
-        (/** @type {any} */ m) => m.default ?? m
+        (/** @type {any} */ m) => m.default ?? m,
     );
     console.log('   ✅ prerequisite_validator loaded');
 

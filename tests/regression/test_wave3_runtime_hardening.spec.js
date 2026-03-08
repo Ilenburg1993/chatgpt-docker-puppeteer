@@ -1,10 +1,10 @@
 // @ts-check
-import test from 'node:test';
+import { shutdown as shutdownDriverFactory } from '#driver/factory';
+import { __mainTestHooks } from '#main';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { __mainTestHooks } from '#main';
-import { shutdown as shutdownDriverFactory } from '#driver/factory';
+import test from 'node:test';
 
 const ROOT = process.cwd();
 
@@ -18,7 +18,7 @@ test('wave3: driver factory warm creation awaits concrete driver instance', asyn
     assert.match(
         content,
         /const\s+driver\s*=\s*await\s+this\.createDriver\(/,
-        '_createWarmDriver must await createDriver before storing in pool'
+        '_createWarmDriver must await createDriver before storing in pool',
     );
 });
 
@@ -28,11 +28,11 @@ test('wave3: adaptive state schema accepts string record keys', async () => {
     assert.match(
         content,
         /targets:\s*z\.record\(z\.string\(\),\s*TargetProfileSchema\)/,
-        'adaptive schema must accept string keys for targets like tool:rag_search'
+        'adaptive schema must accept string keys for targets like tool:rag_search',
     );
 });
 
-test('wave3: concurrent signals reuse the same shutdown promise and exit once', async t => {
+test('wave3: concurrent signals reuse the same shutdown promise and exit once', async (t) => {
     const originalExit = process.exit;
     const exitCodes = /** @type {any[]} */ ([]);
 

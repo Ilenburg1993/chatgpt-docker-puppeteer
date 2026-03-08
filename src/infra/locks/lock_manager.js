@@ -1,8 +1,8 @@
 // @ts-check
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import * as PATHS from '../fs/paths.js';
 import { safeReadJSON } from '../fs/fs_core.js';
+import * as PATHS from '../fs/paths.js';
 import { isProcessAlive } from './process_guard.js';
 
 const RUN_LOCK_PREFIX = 'RUNNING_';
@@ -14,7 +14,8 @@ const MAX_ORPHAN_RECOVERY_ATTEMPTS = 3;
 
 /**
  * Gera o caminho absoluto para o arquivo de trava de um alvo.
- * @param {*} target
+ *
+ * @param {any} target
  */
 function getLockPath(target) {
     const safeTarget = (target || 'global').toLowerCase();
@@ -28,12 +29,11 @@ function getLockPath(target) {
 /**
  * Tenta adquirir o lock exclusivo para um alvo específico.
  *
- * [V800] Implementa Two-Phase Commit para atomicidade total:
- * Fase 1: Criar arquivo temporário (PID-único)
- * Fase 2: Hard link para lock final (operação atômica que falha se existir)
+ * [V800] Implementa Two-Phase Commit para atomicidade total: Fase 1: Criar arquivo temporário (PID-único) Fase 2: Hard
+ * link para lock final (operação atômica que falha se existir)
  *
- * NOTA: fs.rename() sobrescreve arquivo existente em muitos OS.
- *       fs.link() falha com EEXIST se destino já existir (comportamento desejado).
+ * NOTA: fs.rename() sobrescreve arquivo existente em muitos OS. fs.link() falha com EEXIST se destino já existir
+ * (comportamento desejado).
  *
  * @param {string} taskId - ID da tarefa que solicita o lock.
  * @param {string} target - Nome do alvo (ex: 'chatgpt').
@@ -67,7 +67,7 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
             await fs.unlink(tempLockFile).catch(() => {});
 
             // Se erro não for EEXIST, algo grave no I/O
-            if ((/** @type {any} */ (linkErr)).code !== 'EEXIST' && (/** @type {any} */ (linkErr)).code !== 'EPERM') {
+            if (/** @type {any} */ (linkErr).code !== 'EEXIST' && /** @type {any} */ (linkErr).code !== 'EPERM') {
                 return false;
             }
 
@@ -100,14 +100,14 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
                 await fs.writeFile(recoveryLockFile, JSON.stringify({ pid: process.pid, recoveryId }));
 
                 // [FASE 2] Aguarda 100ms para dar chance de outros processos detectarem
-                await new Promise(resolve => {
+                await new Promise((resolve) => {
                     setTimeout(resolve, 100);
                 });
 
                 // [FASE 3] Verifica se somos únicos no recovery
                 const lockDir = path.dirname(lockFile);
                 const files = await fs.readdir(lockDir);
-                const recoveryFiles = files.filter(f => f.includes('.recovery.'));
+                const recoveryFiles = files.filter((f) => f.includes('.recovery.'));
 
                 if (recoveryFiles.length > 1) {
                     // Outro processo também detectou - aborta para evitar race
@@ -151,8 +151,8 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
  * Libera a trava de um alvo, garantindo que apenas o dono possa removê-la.
  *
  * @param {string} target - Nome do alvo.
- * @param {string|null} taskId - ID da tarefa (null para liberação administrativa).
-  * @returns {Promise<void>}
+ * @param {string | null} taskId - ID da tarefa (null para liberação administrativa).
+ * @returns {Promise<void>}
  */
 async function releaseLock(target = 'global', taskId = null) {
     const lockFile = getLockPath(target);

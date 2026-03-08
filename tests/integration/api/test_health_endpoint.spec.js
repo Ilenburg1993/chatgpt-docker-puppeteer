@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 // @ts-check
-import http from 'node:http';
 
 console.log('\n=== TEST: Health Endpoint Validation ===');
 
@@ -19,7 +18,7 @@ try {
     console.log('✓ doctor.js exports validated');
 
     // Check router.js includes health endpoint
-    const fs = await import('node:fs').then(m => m.default ?? m);
+    const fs = await import('node:fs').then((m) => m.default ?? m);
     const routerContent = fs.readFileSync('./src/server/api/router.js', 'utf-8');
     if (!routerContent.includes('GET /api/health')) {
         throw new Error('/api/health endpoint not found in router.js');

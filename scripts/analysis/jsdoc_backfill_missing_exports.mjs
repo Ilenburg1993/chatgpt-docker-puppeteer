@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-/** @typedef {{ export_name:string, kind:string, has_jsdoc:boolean, line:number }} MissingExport */
+/** @typedef {{ export_name: string; kind: string; has_jsdoc: boolean; line: number }} MissingExport */
 
 const { values } = parseArgs({
     options: {
@@ -25,7 +25,7 @@ const { values } = parseArgs({
 function splitCsv(text) {
     return String(text || '')
         .split(',')
-        .map(item => item.trim())
+        .map((item) => item.trim())
         .filter(Boolean);
 }
 
@@ -36,8 +36,8 @@ function splitCsv(text) {
  */
 function allowFile(file, includes, excludes) {
     const normalized = String(file || '').replace(/\\/g, '/');
-    if (includes.length > 0 && !includes.some(prefix => normalized.startsWith(prefix))) return false;
-    if (excludes.some(prefix => normalized.startsWith(prefix))) return false;
+    if (includes.length > 0 && !includes.some((prefix) => normalized.startsWith(prefix))) return false;
+    if (excludes.some((prefix) => normalized.startsWith(prefix))) return false;
     return true;
 }
 
@@ -47,7 +47,7 @@ function allowFile(file, includes, excludes) {
  * @returns {string[]}
  */
 function buildCommentLines(indent, exportsAtLine) {
-    const kinds = new Set(exportsAtLine.map(item => item.kind));
+    const kinds = new Set(exportsAtLine.map((item) => item.kind));
 
     let text = 'Export público do módulo.';
     if (exportsAtLine.length > 1) {
@@ -92,7 +92,7 @@ function hasNearbyJsDoc(lines, lineIndexZeroBased) {
 /**
  * @param {string} filePath
  * @param {MissingExport[]} missingExports
- * @returns {{ changed:boolean, insertions:number, content:string }}
+ * @returns {{ changed: boolean; insertions: number; content: string }}
  */
 function patchFile(filePath, missingExports) {
     const original = fs.readFileSync(filePath, 'utf8');
@@ -133,17 +133,17 @@ const includePrefixes = splitCsv(String(values.include || ''));
 const excludePrefixes = splitCsv(String(values.exclude || ''));
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-/** @type {Array<{file:string, exported_symbols:MissingExport[]}>} */
+/** @type {{ file: string; exported_symbols: MissingExport[] }[]} */
 const fileEntries = Array.isArray(report.files) ? report.files : [];
 
-/** @type {Array<{file:string, missing:MissingExport[]}>} */
+/** @type {{ file: string; missing: MissingExport[] }[]} */
 const targets = [];
 for (const entry of fileEntries) {
     const file = String(entry.file || '');
     if (!file || !fs.existsSync(file)) continue;
     if (!allowFile(file, includePrefixes, excludePrefixes)) continue;
     const missing = (entry.exported_symbols || []).filter(
-        item => item && !item.has_jsdoc && Number.isInteger(item.line)
+        (item) => item && !item.has_jsdoc && Number.isInteger(item.line),
     );
     if (missing.length === 0) continue;
     targets.push({ file, missing });
@@ -154,7 +154,7 @@ const selected = limit > 0 ? targets.slice(0, limit) : targets;
 
 let filesChanged = 0;
 let insertionsTotal = 0;
-/** @type {Array<{file:string, missing:number, insertions:number, changed:boolean}>} */
+/** @type {{ file: string; missing: number; insertions: number; changed: boolean }[]} */
 const summary = [];
 
 for (const item of selected) {

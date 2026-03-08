@@ -1,11 +1,11 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createAuditLogger } from '../../../scripts/audit/lib/logger.mjs';
+import test from 'node:test';
 import { AUDIT_EVENT_TYPES } from '../../../scripts/audit/lib/event_types.mjs';
+import { createAuditLogger } from '../../../scripts/audit/lib/logger.mjs';
 
 test('audit logger emits monotonic seq and validates payload shape', () => {
     const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-logger-'));
@@ -16,7 +16,7 @@ test('audit logger emits monotonic seq and validates payload shape', () => {
                 runDir,
                 logFormat: 'jsonl',
                 enableConsole: false,
-            })
+            }),
         )
     );
 
@@ -37,7 +37,7 @@ test('audit logger emits monotonic seq and validates payload shape', () => {
         .readFileSync(eventsPath, 'utf8')
         .trim()
         .split('\n')
-        .map(line => JSON.parse(line));
+        .map((line) => JSON.parse(line));
     assert.equal(lines.length, 2);
     assert.equal(lines[0].seq, 1);
     assert.equal(lines[1].seq, 2);

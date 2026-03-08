@@ -1,6 +1,6 @@
 // @ts-check
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { describe, it } from 'node:test';
 
 describe('Driver Factory - Fábrica de Drivers', () => {
     describe('1. Registro de Drivers', () => {
@@ -166,7 +166,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                 { id: 'driver-3', busy: true },
             ];
 
-            const available = /** @type {any} */ (pool.find(d => !d.busy));
+            const available = /** @type {any} */ (pool.find((d) => !d.busy));
 
             assert.strictEqual(available.id, 'driver-2');
         });
@@ -177,7 +177,7 @@ describe('Driver Factory - Fábrica de Drivers', () => {
                 { id: 'driver-2', busy: true },
             ];
 
-            const available = pool.find(d => !d.busy);
+            const available = pool.find((d) => !d.busy);
 
             assert.strictEqual(available, undefined);
         });
@@ -258,12 +258,12 @@ describe('Driver Factory - Fábrica de Drivers', () => {
         it('deve remover driver do pool', () => {
             const pool = [{ id: 'driver-1' }, { id: 'driver-2' }, { id: 'driver-3' }];
 
-            const filtered = pool.filter(d => d.id !== 'driver-2');
+            const filtered = pool.filter((d) => d.id !== 'driver-2');
 
             assert.strictEqual(filtered.length, 2);
             assert.strictEqual(
-                filtered.find(d => d.id === 'driver-2'),
-                undefined
+                filtered.find((d) => d.id === 'driver-2'),
+                undefined,
             );
         });
     });

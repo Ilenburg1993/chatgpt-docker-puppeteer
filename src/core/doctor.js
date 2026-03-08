@@ -62,7 +62,7 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
 /**
  * @typedef {object} NetworkProbe
  * @property {boolean} ok - Se a conexão foi bem-sucedida.
- * @property {string|number} status - Status da resposta ou 'OFFLINE'/'TIMEOUT'.
+ * @property {string | number} status - Status da resposta ou 'OFFLINE'/'TIMEOUT'.
  * @property {number} ms - Tempo de resposta em ms.
  */
 
@@ -94,9 +94,10 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
  * @property {NetworkProbe[]} telemetry.network - Resultados de rede.
  * @property {StorageSLA} telemetry.storage - Dados de armazenamento.
  * @property {DNASanity} telemetry.dna - Status do DNA.
- * @property {ChromeConnectionStatus & {proxyReport: unknown}} telemetry.chrome - Status do Chrome + relatório proxy.
+ * @property {ChromeConnectionStatus & { proxyReport: unknown }} telemetry.chrome - Status do Chrome + relatório proxy.
  * @property {QueueStats} telemetry.queue - Estatísticas da fila.
- * @property {HardwareMetrics & {event_loop_lag_ms: number, uptime_seconds: number}} telemetry.system - Métricas do sistema.
+ * @property {HardwareMetrics & { event_loop_lag_ms: number; uptime_seconds: number }} telemetry.system - Métricas do
+ *   sistema.
  * @property {object} recovery_manifest - Manifesto de recuperação.
  * @property {string[]} recovery_manifest.detected_issues - Problemas detectados.
  * @property {RecoveryStep[]} recovery_manifest.suggested_steps - Passos sugeridos.
@@ -105,6 +106,7 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
 
 /**
  * Verifica conectividade com Chrome Remote Debugging.
+ *
  * @returns {Promise<ChromeConnectionStatus>} Status da conexão com Chrome, incluindo versão e latência se conectado.
  * @throws {Error} Nunca lança erro - sempre retorna objeto de status.
  */
@@ -128,11 +130,11 @@ async function probeChromeConnection() {
         }
 
         // Tenta buscar informações detalhadas do Chrome
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
             const client = httpEndpoint.startsWith('https') ? https : http;
-            const req = client.get(versionUrl, res => {
+            const req = client.get(versionUrl, (res) => {
                 let data = '';
-                res.on('data', chunk => (data += chunk));
+                res.on('data', (chunk) => (data += chunk));
                 res.on('end', () => {
                     try {
                         const info = JSON.parse(data);
@@ -155,7 +157,7 @@ async function probeChromeConnection() {
                     }
                 });
             });
-            req.on('error', err => {
+            req.on('error', (err) => {
                 resolve({
                     connected: false,
                     endpoint: httpEndpoint,
@@ -187,7 +189,9 @@ async function probeChromeConnection() {
 // --- GESTÃO DE TENDÊNCIAS (PERSISTÊNCIA DE BASELINE) ---
 /**
  * Carrega tendências de métricas de saúde do arquivo de persistência.
- * @returns {Promise<Trends>} Objeto com arrays de tendências para RAM, CPU e I/O. Retorna arrays vazios se arquivo não existir ou houver erro.
+ *
+ * @returns {Promise<Trends>} Objeto com arrays de tendências para RAM, CPU e I/O. Retorna arrays vazios se arquivo não
+ *   existir ou houver erro.
  * @throws {Error} Nunca lança erro - sempre retorna objeto com arrays vazios em caso de falha.
  */
 async function getTrends() {
@@ -223,8 +227,8 @@ async function saveTrends(/** @type {any} */ trends) {
 ========================================================================== */
 
 /**
- * Coleta métricas instantâneas de Hardware.
- * Absorvido do server.js para centralização de soberania de dados.
+ * Coleta métricas instantâneas de Hardware. Absorvido do server.js para centralização de soberania de dados.
+ *
  * @returns {HardwareMetrics} Métricas padronizadas para o Dashboard/Telemetria.
  */
 function getHardwareMetrics() {
@@ -251,15 +255,16 @@ function getHardwareMetrics() {
 
 /**
  * Triangulação de Rede via Handshake HTTP.
+ *
  * @param {string} url - URL a ser testada para conectividade.
  * @returns {Promise<NetworkProbe>} Resultado do teste de conectividade com status, latência e sucesso.
  * @throws {Error} Nunca lança erro - sempre resolve a Promise.
  */
 async function probeConnectivity(url) {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const t0 = Date.now();
         const client = url.startsWith('https') ? https : http;
-        const req = client.request(url, { method: 'HEAD', timeout: 5000 }, res => {
+        const req = client.request(url, { method: 'HEAD', timeout: 5000 }, (res) => {
             resolve({
                 ok: /** @type {any} */ (res).statusCode < 400,
                 status: /** @type {any} */ (res).statusCode,
@@ -277,7 +282,9 @@ async function probeConnectivity(url) {
 
 /**
  * Auditoria de I/O e Espaço em Disco (SLA de Hardware).
- * @returns {Promise<StorageSLA>} Métricas de armazenamento incluindo latência de I/O, sucesso de escrita e informações do disco.
+ *
+ * @returns {Promise<StorageSLA>} Métricas de armazenamento incluindo latência de I/O, sucesso de escrita e informações
+ *   do disco.
  * @throws {Error} Nunca lança erro - sempre resolve a Promise.
  */
 async function checkStorageSLA() {
@@ -297,7 +304,7 @@ async function checkStorageSLA() {
         writeOk = false;
     }
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const cmd = process.platform === 'win32' ? 'dir' : 'df -h .';
         exec(cmd, (err, stdout) => {
             resolve({
@@ -311,6 +318,7 @@ async function checkStorageSLA() {
 
 /**
  * Validação de Integridade do DNA.
+ *
  * @returns {Promise<DNASanity>} Status da validação do arquivo dynamic_rules.json.
  * @throws {Error} Nunca lança erro - sempre retorna objeto de status.
  */
@@ -333,25 +341,27 @@ async function validateDNASanity() {
 ========================================================================== */
 
 /**
- * Executa verificação completa de saúde do sistema.
- * Coleta métricas de rede, armazenamento, DNA, Chrome e sistema, gera relatório de saúde e manifesto de recuperação.
- * @returns {Promise<FullCheckResult>} Relatório completo de diagnóstico com telemetria, saúde e sugestões de recuperação.
+ * Executa verificação completa de saúde do sistema. Coleta métricas de rede, armazenamento, DNA, Chrome e sistema, gera
+ * relatório de saúde e manifesto de recuperação.
+ *
+ * @returns {Promise<FullCheckResult>} Relatório completo de diagnóstico com telemetria, saúde e sugestões de
+ *   recuperação.
  * @throws {Error} Nunca lança erro - opera em modo fail-safe e sempre retorna resultado.
  */
 async function runFullCheck() {
     const t0 = Date.now();
     const trends = await getTrends();
-    const io = await import('#infra/io').then(m => /** @type {any} */ (m).default ?? m); // Carrega dinamicamente para evitar ciclos
+    const io = await import('#infra/io').then((m) => /** @type {any} */ (m).default ?? m); // Carrega dinamicamente para evitar ciclos
 
     const targets = [
         'https://www.google.com',
         ...(CONFIG.allowedDomains || []).map((/** @type {string} */ d) => `https://${d}`),
     ];
     const [networkResults, storage, dna, lag, chrome] = await Promise.all([
-        Promise.all(targets.map(url => probeConnectivity(url))),
+        Promise.all(targets.map((url) => probeConnectivity(url))),
         checkStorageSLA(),
         validateDNASanity(),
-        new Promise(r => {
+        new Promise((r) => {
             const s = Date.now();
             setImmediate(() => r(Date.now() - s));
         }),
@@ -372,8 +382,8 @@ async function runFullCheck() {
     try {
         const tasks = /** @type {any[]} */ (await io.loadAllTasks());
         queueStats = {
-            pending: tasks.filter(t => t.status === STATUS_VALUES.PENDING).length,
-            running: tasks.filter(t => t.status === STATUS_VALUES.RUNNING).length,
+            pending: tasks.filter((t) => t.status === STATUS_VALUES.PENDING).length,
+            running: tasks.filter((t) => t.status === STATUS_VALUES.RUNNING).length,
             total: tasks.length,
         };
     } catch {
@@ -396,7 +406,7 @@ async function runFullCheck() {
         manifest.push({ op: 'START_CHROME', target: 'chrome_debugging', impact: 'critical' });
     }
 
-    if (networkResults.some(n => !n.ok)) {
+    if (networkResults.some((n) => !n.ok)) {
         issues.push('Conectividade instável com provedores de IA.');
         manifest.push({ op: 'NETWORK_RETRY', target: 'adapter', impact: 'low' });
     }
@@ -425,7 +435,7 @@ async function runFullCheck() {
             status: issues.length === 0 ? STATUS_VALUES.HEALTHY : issues.length > 2 ? 'CRITICAL' : 'DEGRADED',
         },
         telemetry: {
-            network: targets.map((url, i) => ({ url, ...(/** @type {NetworkProbe} */ (networkResults[i])) })),
+            network: targets.map((url, i) => ({ url, .../** @type {NetworkProbe} */ (networkResults[i]) })),
             storage: storage,
             dna: dna,
             chrome: Object.assign({}, chrome, { proxyReport }),

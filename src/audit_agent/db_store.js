@@ -1,7 +1,7 @@
 // @ts-check
+import { upsertAuditFinding } from '#infra/db/audit_finding_repo';
 import { createAuditJob, getAuditJobById, listAuditJobs, upsertAuditJobSnapshot } from '#infra/db/audit_job_repo';
 import { createAuditJobRun, updateAuditJobRun } from '#infra/db/audit_job_run_repo';
-import { upsertAuditFinding } from '#infra/db/audit_finding_repo';
 import { createAuditPatchProposal } from '#infra/db/audit_patch_repo';
 
 /**
@@ -16,8 +16,9 @@ import { createAuditPatchProposal } from '#infra/db/audit_patch_repo';
  */
 
 /**
- * Store persistente (SQLite) para snapshots de jobs e runs do Audit Agent.
- * É um sink incremental: o runtime em memória continua sendo fonte de execução na V0.
+ * Store persistente (SQLite) para snapshots de jobs e runs do Audit Agent. É um sink incremental: o runtime em memória
+ * continua sendo fonte de execução na V0.
+ *
  * @returns {AuditAgentDbStore}
  */
 export function createAuditAgentDbStore() {
@@ -72,7 +73,7 @@ export function createAuditAgentDbStore() {
         },
         /**
          * @param {string} jobId
-         * @param {Record<string, unknown>[]} [findings=[]]
+         * @param {Record<string, unknown>[]} [findings=[]] Default is `[]`
          */
         saveFindings(jobId, findings = []) {
             const rows = [];
@@ -89,7 +90,7 @@ export function createAuditAgentDbStore() {
                             dedup_key: item.dedup_key ? String(item.dedup_key) : undefined,
                             status: String(item.status || 'open'),
                             evidence: item.evidence || item.evidence_json || {},
-                        })
+                        }),
                     );
                 } catch {
                     // best effort per finding
@@ -99,7 +100,7 @@ export function createAuditAgentDbStore() {
         },
         /**
          * @param {string} jobId
-         * @param {Record<string, unknown>[]} [patches=[]]
+         * @param {Record<string, unknown>[]} [patches=[]] Default is `[]`
          */
         savePatchProposals(jobId, patches = []) {
             const rows = [];
@@ -115,7 +116,7 @@ export function createAuditAgentDbStore() {
                             dry_run_result_json: p.dry_run_result_json ?? null,
                             approval_required: p.approval_required !== false,
                             rollback_patch: p.rollback_patch ? String(p.rollback_patch) : undefined,
-                        })
+                        }),
                     );
                 } catch {
                     // best effort per patch

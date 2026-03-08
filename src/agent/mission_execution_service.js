@@ -7,12 +7,12 @@ import { asRecord } from '#types/guards';
 
 /**
  * @typedef {{
- *  ok: boolean,
- *  mission?: any,
- *  statusCode?: number,
- *  code?: string,
- *  error?: string,
- *  details?: unknown,
+ *     ok: boolean;
+ *     mission?: any;
+ *     statusCode?: number;
+ *     code?: string;
+ *     error?: string;
+ *     details?: unknown;
  * }} MissionTransitionResult
  */
 
@@ -34,11 +34,11 @@ function _ensureMission(missionId) {
     return { ok: true, mission, missionId: id };
 }
 
-/** @param {{ mission: any, toStatus: any, allowedFrom: any }} arg0 @returns {any} */
+/** @param {{ mission: any; toStatus: any; allowedFrom: any }} arg0 @returns {any} */
 function _transitionConflict({ mission, toStatus, allowedFrom }) {
     const from = String(mission?.status || '').toUpperCase();
     const to = String(toStatus || '').toUpperCase();
-    const allowed = new Set((Array.isArray(allowedFrom) ? allowedFrom : []).map(v => String(v).toUpperCase()));
+    const allowed = new Set((Array.isArray(allowedFrom) ? allowedFrom : []).map((v) => String(v).toUpperCase()));
 
     if (from === to) {
         return {
@@ -75,7 +75,7 @@ function _mergeMissionContext(baseContext, patchContext, { failureReason = null 
 }
 
 /**
- * @param {{ missionId: any, eventType: any, actorType?: any, actorId?: any, payload?: any, dedupKey?: any }} arg0
+ * @param {{ missionId: any; eventType: any; actorType?: any; actorId?: any; payload?: any; dedupKey?: any }} arg0
  */
 function _recordMissionEvent({
     missionId,
@@ -148,18 +148,18 @@ function _applyTaskMutation(taskMutation, nowMs) {
  * @property {string} missionId
  * @property {string} toStatus
  * @property {string[]} allowedFrom
- * @property {number|null} [startedAtMs]
- * @property {number|null} [completedAtMs]
+ * @property {number | null} [startedAtMs]
+ * @property {number | null} [completedAtMs]
  * @property {Record<string, any>} [contextPatch]
- * @property {string|null} [failureReason]
- * @property {{ currentTaskId?: string|null }} [expectedProgress]
+ * @property {string | null} [failureReason]
+ * @property {{ currentTaskId?: string | null }} [expectedProgress]
  * @property {number} [currentStepIndex]
  * @property {any} [actorType]
  * @property {any} [actorId]
  * @property {string} eventType
- * @property {string|null} [dedupKey]
+ * @property {string | null} [dedupKey]
  * @property {Record<string, any>} [payload]
- * @property {((db: any, nowMs: number) => void)|null} [taskMutation]
+ * @property {((db: any, nowMs: number) => void) | null} [taskMutation]
  */
 /**
  * @param {TransitionMissionParams} params
@@ -249,12 +249,12 @@ function transitionMission(params) {
  * @property {string} missionId
  * @property {Record<string, any>} [progress]
  * @property {Record<string, any>} [contextPatch]
- * @property {{ currentTaskId?: string|null }} [expectedProgress]
+ * @property {{ currentTaskId?: string | null }} [expectedProgress]
  * @property {number} [currentStepIndex]
  * @property {string} actorType
- * @property {string|null} actorId
+ * @property {string | null} actorId
  * @property {string} eventType
- * @property {string|null} [dedupKey]
+ * @property {string | null} [dedupKey]
  * @property {Record<string, any>} [payload]
  */
 /**
@@ -347,14 +347,15 @@ function updateMissionProgressState(params) {
 
 /**
  * @typedef {object} ExecuteMissionTransitionOptions
- * @property {*} [missionId]
- * @property {*} [actorType]
- * @property {*} [actorId]
- * @property {*} [dedupKey]
- * @property {*} [payload]
+ * @property {any} [missionId]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
  */
 /**
  * Função exportada: executeMissionTransition.
+ *
  * @param {ExecuteMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
@@ -376,14 +377,15 @@ function executeMissionTransition({ missionId, actorType = 'user', actorId = nul
 
 /**
  * @typedef {object} PauseMissionTransitionOptions
- * @property {*} [missionId]
- * @property {*} [actorType]
- * @property {*} [actorId]
- * @property {*} [dedupKey]
- * @property {*} [payload]
+ * @property {any} [missionId]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
  */
 /**
  * Função exportada: pauseMissionTransition.
+ *
  * @param {PauseMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
@@ -407,7 +409,7 @@ function pauseMissionTransition({ missionId, actorType = 'user', actorId = null,
                 WHERE mission_id = @mission_id
                   AND stage = 'READY'
                   AND status IN ('PENDING', 'RUNNING')
-            `
+            `,
             ).run({ now, mission_id: missionId });
         },
     });
@@ -415,14 +417,15 @@ function pauseMissionTransition({ missionId, actorType = 'user', actorId = null,
 
 /**
  * @typedef {object} ResumeMissionTransitionOptions
- * @property {*} [missionId]
- * @property {*} [actorType]
- * @property {*} [actorId]
- * @property {*} [dedupKey]
- * @property {*} [payload]
+ * @property {any} [missionId]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
  */
 /**
  * Função exportada: resumeMissionTransition.
+ *
  * @param {ResumeMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
@@ -449,7 +452,7 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
                 WHERE mission_id = @mission_id
                   AND stage = 'READY'
                   AND status = 'PAUSED'
-            `
+            `,
             ).run({ now: ts, mission_id: missionId });
         },
     });
@@ -457,14 +460,15 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
 
 /**
  * @typedef {object} CancelMissionTransitionOptions
- * @property {*} [missionId]
- * @property {*} [actorType]
- * @property {*} [actorId]
- * @property {*} [dedupKey]
- * @property {*} [payload]
+ * @property {any} [missionId]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
  */
 /**
  * Função exportada: cancelMissionTransition.
+ *
  * @param {CancelMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
@@ -489,7 +493,7 @@ function cancelMissionTransition({ missionId, actorType = 'user', actorId = null
                     last_error = COALESCE(last_error, 'MISSION_CANCELLED')
                 WHERE mission_id = @mission_id
                   AND status IN ('PENDING', 'RUNNING', 'PAUSED', 'FAILED')
-            `
+            `,
             ).run({ now, mission_id: missionId });
         },
     });
@@ -497,17 +501,18 @@ function cancelMissionTransition({ missionId, actorType = 'user', actorId = null
 
 /**
  * @typedef {object} FailMissionTransitionOptions
- * @property {*} [missionId]
- * @property {*} [failureReason]
- * @property {*} [contextPatch]
- * @property {*} [expectedProgress]
- * @property {*} [actorType]
- * @property {*} [actorId]
- * @property {*} [dedupKey]
- * @property {*} [payload]
+ * @property {any} [missionId]
+ * @property {any} [failureReason]
+ * @property {any} [contextPatch]
+ * @property {any} [expectedProgress]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
  */
 /**
  * Função exportada: failMissionTransition.
+ *
  * @param {FailMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
@@ -539,16 +544,17 @@ function failMissionTransition({
 
 /**
  * @typedef {object} CompleteMissionTransitionOptions
- * @property {*} [missionId]
- * @property {*} [contextPatch]
- * @property {*} [expectedProgress]
- * @property {*} [actorType]
- * @property {*} [actorId]
- * @property {*} [dedupKey]
- * @property {*} [payload]
+ * @property {any} [missionId]
+ * @property {any} [contextPatch]
+ * @property {any} [expectedProgress]
+ * @property {any} [actorType]
+ * @property {any} [actorId]
+ * @property {any} [dedupKey]
+ * @property {any} [payload]
  */
 /**
  * Função exportada: completeMissionTransition.
+ *
  * @param {CompleteMissionTransitionOptions} options
  * @returns {MissionTransitionResult}
  */
@@ -578,11 +584,11 @@ function completeMissionTransition({
 
 /** Reexport público: MISSION_STATUS. */
 export {
-    MISSION_STATUS,
     cancelMissionTransition,
     completeMissionTransition,
     executeMissionTransition,
     failMissionTransition,
+    MISSION_STATUS,
     pauseMissionTransition,
     resumeMissionTransition,
     transitionMission,

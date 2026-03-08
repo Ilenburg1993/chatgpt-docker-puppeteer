@@ -1,9 +1,10 @@
 // @ts-check
-import { CONTROL, safeReadJSON } from './fs_core.js';
 import { STATUS_VALUES } from '#core/constants/tasks';
+import { CONTROL, safeReadJSON } from './fs_core.js';
 
 /**
  * Função exportada: checkControlPause.
+ *
  * @returns {Promise<any>}
  */
 async function checkControlPause() {

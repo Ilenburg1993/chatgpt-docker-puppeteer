@@ -1,21 +1,21 @@
 // @ts-check
-import { buildSuggestedDiff } from './diff_builder.mjs';
 import { scoreConfidence } from './confidence_model.mjs';
+import { buildSuggestedDiff } from './diff_builder.mjs';
 import { buildTestPlan } from './test_planner.mjs';
 
 /**
  * @typedef {object} BuildProposalV3Options
- * @property {Array<any>} [rankedCauses]
+ * @property {any[]} [rankedCauses]
  * @property {number | undefined} [score]
  * @property {boolean | undefined} [proposeDiffs]
- * @property {'basic'|'standard'|'deep' | undefined} [depth]
+ * @property {'basic' | 'standard' | 'deep' | undefined} [depth]
  * @property {any} [contextPack]
  */
 /** @typedef {any} BuildProposalV3Finding */
 /**
  * @param {BuildProposalV3Finding} finding
  * @param {BuildProposalV3Options} [options]
-  * @returns {any}
+ * @returns {any}
  */
 export function buildProposalV3(finding, options = {}) {
     const depth = options.depth || 'standard';
@@ -23,7 +23,7 @@ export function buildProposalV3(finding, options = {}) {
     const topCause = ranked[0]?.cause || finding.root_cause || 'Causa provável não consolidada.';
     const codeContextUsed = Boolean(options.contextPack?.code_context_used);
     const ragScope = options.contextPack?.rag?.meta?.scope || options.contextPack?.rag?.scope || null;
-    const lspQuality = /** @type {'high'|'medium'|'low'} */ (
+    const lspQuality = /** @type {'high' | 'medium' | 'low'} */ (
         options.contextPack?.lsp ? 'high' : finding.source_tool.includes('lsp') ? 'medium' : 'low'
     );
     const confidence = scoreConfidence(finding, {
@@ -52,7 +52,7 @@ export function buildProposalV3(finding, options = {}) {
     }
     if (finding.contract_id === 'CONTRACT-STATIC-PROCESS-EXIT') {
         validationCommands.push(
-            'npm run test:regression -- tests/regression/test_wave11_main_server_bootstrap_unification.spec.js'
+            'npm run test:regression -- tests/regression/test_wave11_main_server_bootstrap_unification.spec.js',
         );
     }
     if (finding.contract_id === 'CONTRACT-STATIC-HARDCODED-PORTS') {
@@ -94,7 +94,7 @@ export function buildProposalV3(finding, options = {}) {
         confidence_score: confidence,
         proposal,
         root_cause: finding.root_cause || topCause,
-        root_cause_candidates: ranked.map(item => ({
+        root_cause_candidates: ranked.map((item) => ({
             cause: item.cause,
             score: Number(Number(item.score || 0).toFixed(2)),
         })),

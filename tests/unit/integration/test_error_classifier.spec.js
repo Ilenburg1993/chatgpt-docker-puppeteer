@@ -1,16 +1,16 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import {
-    getSmallerModel,
     classifyError,
-    RetryStrategy,
     ErrorClass,
+    getSmallerModel,
+    RetryStrategy,
 } from '../../../src/integration/error-classifier.mjs';
 
 // helper to build a fake error object
-function makeError(/** @type {string} */ msg, /** @type {string|undefined} */ name = undefined) {
+function makeError(/** @type {string} */ msg, /** @type {string | undefined} */ name = undefined) {
     const err = new Error(msg);
     if (name) err.name = name;
     return err;

@@ -12,8 +12,7 @@ class IPCBuffer {
     }
 
     /**
-     * Adiciona um envelope à fila de espera.
-     * Implementa política de descarte FIFO se o limite for atingido.
+     * Adiciona um envelope à fila de espera. Implementa política de descarte FIFO se o limite for atingido.
      *
      * @param {object} envelope - O Envelope V2 validado.
      */
@@ -28,8 +27,7 @@ class IPCBuffer {
     }
 
     /**
-     * Extrai todas as mensagens acumuladas para transmissão.
-     * Limpa a fila atômicamente após a leitura.
+     * Extrai todas as mensagens acumuladas para transmissão. Limpa a fila atômicamente após a leitura.
      *
      * @returns {unknown[]} Lista de envelopes em ordem cronológica.
      */

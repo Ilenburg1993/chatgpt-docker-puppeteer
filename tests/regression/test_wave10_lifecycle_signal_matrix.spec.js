@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import {
     __lifecycleTestHooks,
@@ -86,12 +86,12 @@ test('wave10: lifecycle signal matrix is registered once with platform policy', 
     assert.equal(
         afterSetup.uncaughtException,
         before.uncaughtException + 1,
-        'uncaughtException should be registered once'
+        'uncaughtException should be registered once',
     );
     assert.equal(
         afterSetup.unhandledRejection,
         before.unhandledRejection + 1,
-        'unhandledRejection should be registered once'
+        'unhandledRejection should be registered once',
     );
 });
 
@@ -139,7 +139,7 @@ test('wave10: optional subprocess handlers do not arm shutdown state', () => {
     assert.equal(
         __lifecycleTestHooks.isShuttingDown(),
         false,
-        'SIGPIPE/SIGCHLD should not move lifecycle to shuttingDown state'
+        'SIGPIPE/SIGCHLD should not move lifecycle to shuttingDown state',
     );
     assert.equal(__lifecycleTestHooks.isSignalsListening(), true, 'signal listening should remain active');
 });

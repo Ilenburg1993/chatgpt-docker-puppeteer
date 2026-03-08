@@ -52,9 +52,9 @@ function _buildTriagePrompt(job, contextPack) {
         `lsp_document_symbols=${JSON.stringify(mcpTools.lsp_document_symbols || null)}`,
         `rag_search=${JSON.stringify(mcpTools.rag_search || null)}`,
         `rag_expand=${JSON.stringify(mcpTools.rag_expand || null)}`,
-        `existing_findings=${JSON.stringify(findings.slice(0, 8).map(/** @param {Record<string, any>} f */ f => ({ title: f?.title, severity: f?.severity, category: f?.category })))}`.slice(
+        `existing_findings=${JSON.stringify(findings.slice(0, 8).map(/** @param {Record<string, any>} f */ (f) => ({ title: f?.title, severity: f?.severity, category: f?.category })))}`.slice(
             0,
-            4000
+            4000,
         ),
         'Responda em JSON com {summary:string, risk_level:"low|medium|high", next_actions:string[]}',
     ];
@@ -87,7 +87,7 @@ function _parseJsonMaybe(text) {
  * @param {string} url
  * @param {unknown} body
  * @param {number} timeoutMs
- * @returns {Promise<{ok: boolean, status: number, text: string, json: unknown}>}
+ * @returns {Promise<{ ok: boolean; status: number; text: string; json: unknown }>}
  */
 async function _postJson(url, body, timeoutMs) {
     const res = await fetch(url, {
@@ -102,11 +102,12 @@ async function _postJson(url, body, timeoutMs) {
 }
 
 /**
- * Cria o cliente de triagem LLM do Audit Agent.
- * O cliente consulta o Inference Gateway e retorna resumo/risco em modo read-only.
+ * Cria o cliente de triagem LLM do Audit Agent. O cliente consulta o Inference Gateway e retorna resumo/risco em modo
+ * read-only.
+ *
  * @returns {{
- *   isEnabled: () => boolean,
- *   runTriage: (job: unknown, contextPack: unknown) => Promise<any>
+ *     isEnabled: () => boolean;
+ *     runTriage: (job: unknown, contextPack: unknown) => Promise<any>;
  * }}
  */
 export function createAuditAgentTriageLlmClient() {
@@ -132,7 +133,7 @@ export function createAuditAgentTriageLlmClient() {
             const preflight = await _postJson(
                 `${baseUrl}/v1/validate/generate`,
                 basePayload,
-                Math.min(timeoutMs, 10_000)
+                Math.min(timeoutMs, 10_000),
             );
             if (!preflight.ok || !_asRecord(preflight.json).ok) {
                 return {
@@ -150,7 +151,7 @@ export function createAuditAgentTriageLlmClient() {
                     prompt,
                     maxTokens: Number(process.env.AUDIT_AGENT_TRIAGE_MAX_TOKENS || 300) || 300,
                 },
-                timeoutMs
+                timeoutMs,
             );
             const json = _asRecord(out.json);
             if (!out.ok || !json.ok) {

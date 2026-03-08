@@ -1,11 +1,11 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import test from 'node:test';
 
-import { __mainTestHooks } from '../../src/main.js';
 import { shutdown as shutdownDriverFactory } from '../../src/driver/factory.js';
+import { __mainTestHooks } from '../../src/main.js';
 
 function captureCounts(/** @type {any} */ events) {
     return Object.fromEntries(events.map((/** @type {any} */ event) => [event, process.listenerCount(event)]));
@@ -24,7 +24,7 @@ async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ ma
         if (matcher.test(output)) {
             return output;
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw new Error(`Timeout waiting for output: ${String(matcher)}`);
 }
@@ -32,7 +32,7 @@ async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ ma
 async function waitForExitWithTimeout(
     /** @type {any} */ child,
     /** @type {any} */ timeoutMs,
-    /** @type {any} */ timeoutMessage
+    /** @type {any} */ timeoutMessage,
 ) {
     let timeoutId = null;
     try {
@@ -91,7 +91,7 @@ test('wave9: SIGPIPE/SIGCHLD optional policy is explicit, non-shutdown, and clea
             assert.equal(
                 __mainTestHooks.getShutdownPromise(),
                 null,
-                'optional subprocess signals must not trigger shutdown promise'
+                'optional subprocess signals must not trigger shutdown promise',
             );
         }
     } finally {
@@ -154,11 +154,11 @@ test(
         let stdout = '';
         let stderr = '';
 
-        child.stdout.on('data', chunk => {
+        child.stdout.on('data', (chunk) => {
             stdout += chunk.toString();
         });
 
-        child.stderr.on('data', chunk => {
+        child.stderr.on('data', (chunk) => {
             stderr += chunk.toString();
         });
 
@@ -171,7 +171,7 @@ test(
         assert.match(
             stdout,
             /W9_NO_SHUTDOWN_AFTER_SIGPIPE/,
-            `SIGPIPE should not create shutdown promise, stdout=${stdout}, stderr=${stderr}`
+            `SIGPIPE should not create shutdown promise, stdout=${stdout}, stderr=${stderr}`,
         );
 
         const [code, signal] = await waitForExitWithTimeout(child, 20000, 'Timeout waiting child exit (wave9 SIGPIPE)');
@@ -182,5 +182,5 @@ test(
         const exitMarkers = stdout.match(/W9_EXIT:/g) || [];
         assert.equal(exitMarkers.length, 1, `SIGTERM should trigger single canonical exit, stdout=${stdout}`);
         assert.match(stdout, /W9_EXIT:0:1/, `expected success exit marker, stdout=${stdout}`);
-    }
+    },
 );

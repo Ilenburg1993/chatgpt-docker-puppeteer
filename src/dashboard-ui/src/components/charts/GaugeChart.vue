@@ -10,8 +10,8 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { Chart, DoughnutController, ArcElement, Tooltip } from 'chart.js';
+import { ArcElement, Chart, DoughnutController, Tooltip } from 'chart.js';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 // Register Chart.js components
 Chart.register(DoughnutController, ArcElement, Tooltip);
@@ -126,7 +126,7 @@ export default {
             () => props.value,
             () => {
                 updateChart();
-            }
+            },
         );
 
         onMounted(() => {

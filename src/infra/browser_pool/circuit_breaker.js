@@ -27,7 +27,7 @@ const CircuitState = Object.freeze({
 // Gerenciador inteligente de falhas do Chrome.
 /** Classe exportada: CircuitBreakerManager. */
 class CircuitBreakerManager {
-    /** @param {{ poolSize?: number, nerv?: any }} opts */
+    /** @param {{ poolSize?: number; nerv?: any }} opts */
     constructor({ poolSize = 3, nerv = null }) {
         this.poolSize = poolSize;
         /** @type {any} */
@@ -161,7 +161,7 @@ class CircuitBreakerManager {
         log('WARN', `[CircuitBreaker] Falha registrada: ${instanceId} - Causa: ${cause} - Estado: ${this.state}`);
         log(
             'DEBUG',
-            `[CircuitBreaker] Política: pause=${policy.shouldPause}, autoRestart=${policy.autoRestart}, polling=${policy.pollingInterval}ms`
+            `[CircuitBreaker] Política: pause=${policy.shouldPause}, autoRestart=${policy.autoRestart}, polling=${policy.pollingInterval}ms`,
         );
 
         return {
@@ -224,15 +224,14 @@ class CircuitBreakerManager {
     }
 
     /**
-     * Verifica se falhas foram simultâneas (< 5s diferença).
-     * Indica fechamento manual do Chrome.
+     * Verifica se falhas foram simultâneas (< 5s diferença). Indica fechamento manual do Chrome.
      */
     _isSimultaneousFailure() {
         if (this.instanceFailures.size < 2) {
             return false;
         }
 
-        const timestamps = Array.from(this.instanceFailures.values()).map(f => f.timestamp);
+        const timestamps = Array.from(this.instanceFailures.values()).map((f) => f.timestamp);
         const minTime = Math.min(...timestamps);
         const maxTime = Math.max(...timestamps);
 
@@ -240,8 +239,7 @@ class CircuitBreakerManager {
     }
 
     /**
-     * Conta instâncias saudáveis.
-     * (Assume que instâncias NÃO em instanceFailures estão OK)
+     * Conta instâncias saudáveis. (Assume que instâncias NÃO em instanceFailures estão OK)
      */
     _getHealthyCount() {
         return this.poolSize - this.instanceFailures.size;
@@ -269,7 +267,7 @@ class CircuitBreakerManager {
 
         log(
             'INFO',
-            `[CircuitBreaker] Recovery: ${instanceId} - Estado: ${this.state} (${healthyCount}/${this.poolSize})`
+            `[CircuitBreaker] Recovery: ${instanceId} - Estado: ${this.state} (${healthyCount}/${this.poolSize})`,
         );
     }
 
@@ -306,7 +304,7 @@ class CircuitBreakerManager {
         if (this.recoveryAttempts >= policy.maxRetries) {
             log(
                 'WARN',
-                `[CircuitBreaker] Max recovery attempts (${policy.maxRetries}) atingido para ${this.lastCause}`
+                `[CircuitBreaker] Max recovery attempts (${policy.maxRetries}) atingido para ${this.lastCause}`,
             );
             return false;
         }
@@ -451,4 +449,4 @@ class CircuitBreakerManager {
     }
 }
 
-export { CircuitBreakerManager, FailureCause, CircuitState };
+export { CircuitBreakerManager, CircuitState, FailureCause };

@@ -1,41 +1,41 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
- * @fileoverview Resilient Lock Manager with automatic cleanup on process termination.
- * Guarantees lock release even when process crashes, preventing deadlocks.
- *
- * Created to address P0 bug in task_orchestration_worker.js where lock extension
- * intervals were not cleaned up on process crash, leaving tasks locked indefinitely.
- *
  * @module infra/locks/resilient_lock
+ * @file Resilient Lock Manager with automatic cleanup on process termination. Guarantees lock release even when process
+ *   crashes, preventing deadlocks.
+ *
+ *   Created to address P0 bug in task_orchestration_worker.js where lock extension intervals were not cleaned up on
+ *   process crash, leaving tasks locked indefinitely.
  */
 
 import { log } from '#core/logger';
 
 /**
- * Manages locks with automatic cleanup on process exit.
- * Ensures locks are released even in crash scenarios by registering
- * process termination handlers.
- *
- * @class ResilientLockManager
+ * Manages locks with automatic cleanup on process exit. Ensures locks are released even in crash scenarios by
+ * registering process termination handlers.
  *
  * @example
- * const lockAcquired = await resilientLock.acquire(
- *   `task:${taskId}`,
- *   async () => acquireTaskLock(taskId),
- *   async () => releaseTaskLock(taskId),
- *   { taskId, workerId }
- * );
+ *     const lockAcquired = await resilientLock.acquire(
+ *         `task:${taskId}`,
+ *         async () => acquireTaskLock(taskId),
+ *         async () => releaseTaskLock(taskId),
+ *         { taskId, workerId },
+ *     );
+ *
+ * @class ResilientLockManager
  */
 class ResilientLockManager {
     constructor() {
         /**
          * Active locks map: lockKey -> { release, metadata }
+         *
          * @private
          */
         this.activeLocks = new Map();
 
         /**
          * Flag to prevent duplicate cleanup handler registration
+         *
          * @private
          */
         this._cleanupHandlersRegistered = false;
@@ -53,6 +53,7 @@ class ResilientLockManager {
 
         /**
          * Stats for monitoring
+         *
          * @private
          */
         this._stats = {
@@ -65,11 +66,10 @@ class ResilientLockManager {
     }
 
     /**
-     * Registers process termination handlers for automatic cleanup.
-     * Only registers once, subsequent calls are no-op.
+     * Registers process termination handlers for automatic cleanup. Only registers once, subsequent calls are no-op.
      *
-     * ✅ P0 FIX (2026-02-16): Removed intrusive process.exit calls.
-     * This library should clean up resources but NOT control process lifecycle.
+     * ✅ P0 FIX (2026-02-16): Removed intrusive process.exit calls. This library should clean up resources but NOT
+     * control process lifecycle.
      *
      * @private
      */
@@ -83,7 +83,7 @@ class ResilientLockManager {
             if (lockCount > 0) {
                 console.log(`[ResilientLock] ${signal} received. Releasing ${lockCount} active locks...`);
                 await this.releaseAll().catch((/** @type {any} */ err) =>
-                    console.error(`[ResilientLock] Cleanup error: ${err.message}`)
+                    console.error(`[ResilientLock] Cleanup error: ${err.message}`),
                 );
             }
         };
@@ -161,19 +161,19 @@ class ResilientLockManager {
     /**
      * Acquires a lock and registers it for automatic cleanup.
      *
+     * @example
+     *     const acquired = await resilientLock.acquire(
+     *         `task:${taskId}`,
+     *         () => db.acquireLock(taskId),
+     *         () => db.releaseLock(taskId),
+     *         { taskId: 'task-123', workerId: 'worker-1' },
+     *     );
+     *
      * @param {string} lockKey - Unique identifier for the lock
      * @param {function} acquireFn - Async function to acquire the lock, returns Promise<boolean>
      * @param {function} releaseFn - Async function to release the lock, returns Promise<void>
-     * @param {object} [metadata={}] - Optional metadata for debugging (e.g., taskId, workerId)
+     * @param {object} [metadata={}] - Optional metadata for debugging (e.g., taskId, workerId). Default is `{}`
      * @returns {Promise<boolean>} True if lock was acquired successfully
-     *
-     * @example
-     * const acquired = await resilientLock.acquire(
-     *   `task:${taskId}`,
-     *   () => db.acquireLock(taskId),
-     *   () => db.releaseLock(taskId),
-     *   { taskId: 'task-123', workerId: 'worker-1' }
-     * );
      */
     async acquire(lockKey, acquireFn, releaseFn, metadata = {}) {
         // Ensure cleanup handlers are registered
@@ -214,7 +214,7 @@ class ResilientLockManager {
             log(
                 'DEBUG',
                 `[ResilientLock] Acquired ${lockKey} (${this.activeLocks.size} active)`,
-                /** @type {any} */ (metadata)
+                /** @type {any} */ (metadata),
             );
             return true;
         } catch (/** @type {any} */ err) {
@@ -228,11 +228,11 @@ class ResilientLockManager {
     /**
      * Releases a specific lock.
      *
+     * @example
+     *     await resilientLock.release(`task:${taskId}`);
+     *
      * @param {string} lockKey - Identifier of the lock to release
      * @returns {Promise<boolean>} True if lock was released successfully
-     *
-     * @example
-     * await resilientLock.release(`task:${taskId}`);
      */
     async release(lockKey) {
         const lock = this.activeLocks.get(lockKey);
@@ -254,7 +254,7 @@ class ResilientLockManager {
             log(
                 'DEBUG',
                 `[ResilientLock] Released ${lockKey} (${this.activeLocks.size} active)`,
-                /** @type {any} */ (lock.metadata)
+                /** @type {any} */ (lock.metadata),
             );
             return true;
         } catch (/** @type {any} */ err) {
@@ -263,7 +263,7 @@ class ResilientLockManager {
             log(
                 'WARN',
                 `[ResilientLock] Failed to release ${lockKey}: ${_err2.message}`,
-                /** @type {any} */ (lock.metadata)
+                /** @type {any} */ (lock.metadata),
             );
 
             // Remove from map anyway to prevent memory leak
@@ -276,15 +276,15 @@ class ResilientLockManager {
     }
 
     /**
-     * Releases all active locks.
-     * Called automatically on process exit.
-     *
-     * @param {number} [timeoutMs=5000] - Timeout per release attempt (not total) to prevent indefinite hang.
-     * @returns {Promise<{total: number, released: number, failed: number}>} Release statistics
+     * Releases all active locks. Called automatically on process exit.
      *
      * @example
-     * const stats = await resilientLock.releaseAll();
-     * console.log(`Released ${stats.released}/${stats.total} locks`);
+     *     const stats = await resilientLock.releaseAll();
+     *     console.log(`Released ${stats.released}/${stats.total} locks`);
+     *
+     * @param {number} [timeoutMs=5000] - Timeout per release attempt (not total) to prevent indefinite hang. Default is
+     *   `5000`
+     * @returns {Promise<{ total: number; released: number; failed: number }>} Release statistics
      */
     async releaseAll(timeoutMs = 5000) {
         const lockKeys = Array.from(this.activeLocks.keys());
@@ -299,12 +299,12 @@ class ResilientLockManager {
 
         log('INFO', `[ResilientLock] Releasing ${total} active locks (timeout: ${timeoutMs}ms)...`);
 
-        const promises = lockKeys.map(async lockKey => {
+        const promises = lockKeys.map(async (lockKey) => {
             try {
                 // Wrap release in timeout
                 const releasePromise = this.release(lockKey);
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
+                    setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs),
                 );
 
                 const success = await Promise.race([releasePromise, timeoutPromise]);
@@ -337,17 +337,16 @@ class ResilientLockManager {
     }
 
     /**
-     * Lists all active locks with their metadata.
-     * Useful for debugging and monitoring.
-     *
-     * @returns {Array<object>} Array of active lock information
+     * Lists all active locks with their metadata. Useful for debugging and monitoring.
      *
      * @example
-     * const activeLocks = resilientLock.listActiveLocks();
-     * console.log(`Active locks: ${activeLocks.length}`);
-     * activeLocks.forEach(lock => {
-     *   console.log(`- ${lock.key}: held for ${Date.now() - lock.acquiredAt}ms`);
-     * });
+     *     const activeLocks = resilientLock.listActiveLocks();
+     *     console.log(`Active locks: ${activeLocks.length}`);
+     *     activeLocks.forEach((lock) => {
+     *         console.log(`- ${lock.key}: held for ${Date.now() - lock.acquiredAt}ms`);
+     *     });
+     *
+     * @returns {object[]} Array of active lock information
      */
     listActiveLocks() {
         return Array.from(this.activeLocks.entries()).map(([key, lock]) => ({
@@ -360,11 +359,11 @@ class ResilientLockManager {
     /**
      * Gets statistics about lock operations.
      *
-     * @returns {any} Lock statistics
-     *
      * @example
-     * const stats = resilientLock.getStats();
-     * console.log(`Acquired: ${stats.totalAcquired}, Released: ${stats.totalReleased}`);
+     *     const stats = resilientLock.getStats();
+     *     console.log(`Acquired: ${stats.totalAcquired}, Released: ${stats.totalReleased}`);
+     *
+     * @returns {any} Lock statistics
      */
     getStats() {
         return {
@@ -376,13 +375,13 @@ class ResilientLockManager {
     /**
      * Checks if a specific lock is currently held.
      *
+     * @example
+     *     if (resilientLock.hasLock(`task:${taskId}`)) {
+     *         console.log('Task is currently locked');
+     *     }
+     *
      * @param {string} lockKey - Lock identifier to check
      * @returns {boolean} True if lock is active
-     *
-     * @example
-     * if (resilientLock.hasLock(`task:${taskId}`)) {
-     *   console.log('Task is currently locked');
-     * }
      */
     hasLock(lockKey) {
         return this.activeLocks.has(lockKey);
@@ -391,14 +390,14 @@ class ResilientLockManager {
     /**
      * Gets metadata for a specific lock.
      *
-     * @param {string} lockKey - Lock identifier
-     * @returns {object|null} Lock metadata or null if not found
-     *
      * @example
-     * const metadata = resilientLock.getLockMetadata(`task:${taskId}`);
-     * if (metadata) {
-     *   console.log(`Lock acquired at: ${new Date(metadata.acquiredAt)}`);
-     * }
+     *     const metadata = resilientLock.getLockMetadata(`task:${taskId}`);
+     *     if (metadata) {
+     *         console.log(`Lock acquired at: ${new Date(metadata.acquiredAt)}`);
+     *     }
+     *
+     * @param {string} lockKey - Lock identifier
+     * @returns {object | null} Lock metadata or null if not found
      */
     getLockMetadata(lockKey) {
         const lock = this.activeLocks.get(lockKey);
@@ -406,18 +405,14 @@ class ResilientLockManager {
     }
 
     /**
-     * Extends a lock's TTL by re-acquiring it.
-     * Useful for long-running operations that need periodic lock refresh.
+     * Extends a lock's TTL by re-acquiring it. Useful for long-running operations that need periodic lock refresh.
+     *
+     * @example
+     *     const extended = await resilientLock.extend(`task:${taskId}`, () => db.extendLock(taskId, 60000));
      *
      * @param {string} lockKey - Lock identifier
      * @param {function} extendFn - Function to extend the lock, returns Promise<boolean>
      * @returns {Promise<boolean>} True if lock was extended successfully
-     *
-     * @example
-     * const extended = await resilientLock.extend(
-     *   `task:${taskId}`,
-     *   () => db.extendLock(taskId, 60000)
-     * );
      */
     async extend(lockKey, extendFn) {
         const lock = this.activeLocks.get(lockKey);
@@ -442,7 +437,7 @@ class ResilientLockManager {
             log(
                 'ERROR',
                 `[ResilientLock] Failed to extend ${lockKey}: ${_err4.message}`,
-                /** @type {any} */ (lock.metadata)
+                /** @type {any} */ (lock.metadata),
             );
             return false;
         }
@@ -450,14 +445,14 @@ class ResilientLockManager {
 }
 
 /**
- * Singleton instance of ResilientLockManager.
- * Use this for all lock management operations.
+ * Singleton instance of ResilientLockManager. Use this for all lock management operations.
+ *
+ * @example
+ *     import { resilientLock } from '#infra/locks/resilient_lock';
+ *
+ *     await resilientLock.acquire('my-lock', acquireFn, releaseFn);
  *
  * @type {ResilientLockManager}
- * @example
- * import { resilientLock } from '#infra/locks/resilient_lock';
- *
- * await resilientLock.acquire('my-lock', acquireFn, releaseFn);
  */
 export const resilientLock = new ResilientLockManager();
 

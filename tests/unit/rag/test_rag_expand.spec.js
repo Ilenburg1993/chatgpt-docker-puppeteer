@@ -1,12 +1,12 @@
 // @ts-check
 import assert from 'node:assert';
-import { describe, it } from 'node:test';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
 
-import { ragIndex, ragQuery, ragExpand } from '../../../tools/rag/lib/facade.mjs';
+import { ragExpand, ragIndex, ragQuery } from '../../../tools/rag/lib/facade.mjs';
 
 class FakeEmbeddingsProvider {
     constructor(dim = 8) {
@@ -85,7 +85,7 @@ describe('ragExpand', () => {
                     'export const value = 42;',
                     '',
                 ].join('\n'),
-                'utf8'
+                'utf8',
             );
 
             await ragIndex({
@@ -147,7 +147,7 @@ describe('ragExpand', () => {
             await fs.writeFile(
                 path.join(ws, 'src', 'big.ts'),
                 ['export function heavySymbol() {', body, '  return line_1 + line_699;', '}', ''].join('\n'),
-                'utf8'
+                'utf8',
             );
 
             await ragIndex({

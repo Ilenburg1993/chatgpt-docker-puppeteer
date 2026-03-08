@@ -5,8 +5,8 @@ import { TIMESTAMP_SCHEMA } from './shared_types.js';
 const z = _zImport;
 
 /**
- * SelectorProtocolSchema: O formato de saída do SADI V10+.
- * Define como o robô deve localizar e interagir com um elemento.
+ * SelectorProtocolSchema: O formato de saída do SADI V10+. Define como o robô deve localizar e interagir com um
+ * elemento.
  */
 const SelectorProtocolSchema = z.object({
     selector: z.string().min(1),
@@ -32,7 +32,7 @@ const DomainRulesSchema = z
                 z.union([
                     z.array(z.string()), // Legado: Lista de seletores em string
                     SelectorProtocolSchema, // Moderno: Protocolo estruturado SADI V10+
-                ])
+                ]),
             )
             .default({}),
 
@@ -77,9 +77,9 @@ const DnaSchema = z
             /** @type {unknown} */ ({
                 input_box: ['textarea', "div[contenteditable='true']", "[role='textbox']"],
                 send_button: ["button[type='submit']", "[data-testid='send-button']", "[aria-label*='Send']"],
-            })
+            }),
         ),
     })
     .passthrough();
 
-export { DnaSchema, SelectorProtocolSchema, DomainRulesSchema };
+export { DnaSchema, DomainRulesSchema, SelectorProtocolSchema };

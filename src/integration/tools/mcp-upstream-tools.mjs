@@ -1,9 +1,10 @@
 // @ts-check
 /**
- * Optional: Import tools from an upstream MCP server (HTTP JSON-RPC) and register
- * them into the local Tool Registry with a namespace/prefix.
+ * Optional: Import tools from an upstream MCP server (HTTP JSON-RPC) and register them into the local Tool Registry
+ * with a namespace/prefix.
  *
  * ENV:
+ *
  * - MCP_UPSTREAM_ENABLED=true
  * - MCP_UPSTREAM_URL=http://localhost:3008/api/mcp
  * - MCP_UPSTREAM_ALIAS=core (optional; default: upstream)
@@ -39,11 +40,12 @@ function sanitizeToolMetadata(/** @type {any} */ tool) {
 
 /**
  * @typedef {object} RegisterUpstreamMcpToolsOptions
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Função exportada: registerUpstreamMcpTools.
- * @param {*} registry
+ *
+ * @param {any} registry
  * @param {RegisterUpstreamMcpToolsOptions} [options]
  * @returns {Promise<any>}
  */
@@ -89,13 +91,13 @@ export async function registerUpstreamMcpTools(/** @type {any} */ registry, /** 
                 const result = await client.callTool({
                     name: upstreamName,
                     arguments: params,
-                    signal: (/** @type {any} */ (execOptions)).signal,
+                    signal: /** @type {any} */ (execOptions).signal,
                 });
 
                 // Pass through MCP tool result shape when available.
                 // MCP handler will preserve it (instead of re-wrapping into text).
                 return result;
-            }
+            },
         );
 
         registered += 1;

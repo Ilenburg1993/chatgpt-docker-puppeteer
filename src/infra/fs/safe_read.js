@@ -1,13 +1,13 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { promises as fs } from 'node:fs';
-import fss from 'node:fs';
+import fss, { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { CORRUPT, MAX_JSON_SIZE, sleep } from './fs_utils.js';
 
 /**
- * Lê um JSON do disco com proteção contra corrupção e travamentos de arquivo.
- * Utiliza loop iterativo em vez de recursão para prevenir Stack Overflow.
- * @param {*} filepath
+ * Lê um JSON do disco com proteção contra corrupção e travamentos de arquivo. Utiliza loop iterativo em vez de recursão
+ * para prevenir Stack Overflow.
+ *
+ * @param {any} filepath
  * @returns {Promise<unknown>}
  */
 async function safeReadJSON(filepath) {
@@ -61,7 +61,7 @@ async function safeReadJSON(filepath) {
                 console.error(`[FS] ✅ Quarantine successful: ${fileName} → ${path.basename(badFile)}`);
             } catch (/** @type {any} */ renameErr) {
                 console.error(
-                    `[FS] ❌ Quarantine failed: ${/** @type {any} */ (renameErr).message} - attempting deletion`
+                    `[FS] ❌ Quarantine failed: ${/** @type {any} */ (renameErr).message} - attempting deletion`,
                 );
                 // Fallback: Se não puder mover, tenta deletar para não travar o sistema
                 try {
@@ -69,7 +69,7 @@ async function safeReadJSON(filepath) {
                     console.error(`[FS] ✅ Deleted corrupted file: ${fileName}`);
                 } catch (/** @type {any} */ unlinkErr) {
                     console.error(
-                        `[FS] ❌ Cannot delete corrupted file: ${fileName} - ${/** @type {any} */ (unlinkErr).message}`
+                        `[FS] ❌ Cannot delete corrupted file: ${fileName} - ${/** @type {any} */ (unlinkErr).message}`,
                     );
                 }
             }

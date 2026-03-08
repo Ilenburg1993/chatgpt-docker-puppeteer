@@ -4,9 +4,8 @@ import path from 'node:path';
 import * as PATHS from './paths.js';
 
 /**
- * REGEX UNIVERSAL DE LIMPEZA (ASCII 0-31 + 127/DEL)
- * Protege o sistema de arquivos e o Puppeteer contra caracteres de controle
- * que podem causar quebras de protocolo ou falhas de injeção.
+ * REGEX UNIVERSAL DE LIMPEZA (ASCII 0-31 + 127/DEL) Protege o sistema de arquivos e o Puppeteer contra caracteres de
+ * controle que podem causar quebras de protocolo ou falhas de injeção.
  */
 // eslint-disable-next-line no-control-regex -- required to strip control chars
 const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
@@ -16,8 +15,8 @@ const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 ========================================================================== */
 
 /**
- * Garante a existência da infraestrutura física de pastas no boot.
- * Utiliza a autoridade de caminhos do paths.js.
+ * Garante a existência da infraestrutura física de pastas no boot. Utiliza a autoridade de caminhos do paths.js.
+ *
  * @returns {void}
  */
 function ensureInfrastructure() {
@@ -30,7 +29,7 @@ function ensureInfrastructure() {
             } catch (/** @type {any} */ err) {
                 // Falha na criação de pastas é um erro fatal de boot
                 console.error(
-                    `[FS_UTILS] Falha crítica ao criar diretório ${dir}: ${/** @type {any} */ (err).message}`
+                    `[FS_UTILS] Falha crítica ao criar diretório ${dir}: ${/** @type {any} */ (err).message}`,
                 );
                 throw err;
             }
@@ -40,6 +39,7 @@ function ensureInfrastructure() {
 
 /**
  * Sanitiza nomes de arquivos para evitar Path Traversal e caracteres ilegais.
+ *
  * @param {string} name - Nome sugerido para o arquivo.
  * @returns {string} Nome higienizado e seguro.
  */
@@ -53,6 +53,7 @@ function sanitizeFilename(name) {
 
 /**
  * Limpa uma string removendo caracteres de controle invisíveis.
+ *
  * @param {string} text - Texto bruto vindo da IA ou do Dashboard.
  * @returns {string} Texto limpo.
  */
@@ -65,15 +66,17 @@ function cleanText(text) {
 
 /**
  * Pausa assíncrona baseada em Promises para backoffs e sincronia biomecânica.
+ *
  * @param {number} ms - Milissegundos de espera.
  */
-const sleep = ms =>
-    new Promise(r => {
+const sleep = (ms) =>
+    new Promise((r) => {
         setTimeout(r, ms);
     });
 
 /**
  * [P8.7] SECURITY: Valida se path está dentro do workspace (previne path traversal)
+ *
  * @param {string} filePath - Path a validar
  * @returns {boolean} True se path é seguro
  */
@@ -96,4 +99,4 @@ function isPathSafe(filePath) {
 }
 
 export * from './paths.js';
-export { CONTROL_CHARS_REGEX, ensureInfrastructure, sanitizeFilename, cleanText, sleep, isPathSafe };
+export { CONTROL_CHARS_REGEX, cleanText, ensureInfrastructure, isPathSafe, sanitizeFilename, sleep };

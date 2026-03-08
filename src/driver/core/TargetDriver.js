@@ -1,10 +1,10 @@
-/** @import { Page } from 'puppeteer-core' */
+/** @import {Page} from "puppeteer-core" */
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import EventEmitter from 'node:events';
-import { STATUS_VALUES } from '#core/constants/tasks';
 import { DRIVER_NAMES } from '#core/constants';
+import { STATUS_VALUES } from '#core/constants/tasks';
 import { isDomainMatch } from '#core/domain_matcher';
 import { log } from '#core/logger';
+import EventEmitter from 'node:events';
 
 /* ==========================================================================
    CONFIGURAÇÃO (v2.0 - ZERO MAGIC NUMBERS)
@@ -102,22 +102,13 @@ const CAPABILITIES_SCHEMA = Object.freeze([
 ]);
 
 /**
- * Classe abstrata base para todos os drivers de LLM.
- * Define contrato de execução, gerencia estados validados e emite telemetria.
+ * Classe abstrata base para todos os drivers de LLM. Define contrato de execução, gerencia estados validados e emite
+ * telemetria.
  *
- * ✅ v3.0: Pool-ready architecture (attach/detach context)
- * ✅ v2.0: State transition matrix, AbortSignal integration, capabilities validation
+ * ✅ v3.0: Pool-ready architecture (attach/detach context) ✅ v2.0: State transition matrix, AbortSignal integration,
+ * capabilities validation
  *
  * @abstract
- * @extends EventEmitter
- *
- * @property {Page|null} page - Puppeteer page instance (null se UNATTACHED)
- * @property {object} config - Driver configuration (immutable)
- * @property {AbortSignal|null} signal - Cancellation signal (null se UNATTACHED)
- * @property {string} name - Driver name
- * @property {boolean} destroyed - Destruction flag
- * @property {string} correlationId - Correlation ID for tracing
- *
  * @fires TargetDriver#STATE_CHANGE - State transitions
  * @fires TargetDriver#STATE_ENTERED - Entering new state
  * @fires TargetDriver#STATE_EXITING - Exiting current state
@@ -130,6 +121,13 @@ const CAPABILITIES_SCHEMA = Object.freeze([
  * @fires TargetDriver#ABORT_SIGNAL_RECEIVED - AbortSignal triggered
  * @fires TargetDriver#CONTEXT_ATTACHED - Context attached (page + signal)
  * @fires TargetDriver#CONTEXT_DETACHED - Context detached
+ * @extends EventEmitter
+ * @property {Page | null} page - Puppeteer page instance (null se UNATTACHED)
+ * @property {object} config - Driver configuration (immutable)
+ * @property {AbortSignal | null} signal - Cancellation signal (null se UNATTACHED)
+ * @property {string} name - Driver name
+ * @property {boolean} destroyed - Destruction flag
+ * @property {string} correlationId - Correlation ID for tracing
  */
 class TargetDriver extends EventEmitter {
     /** @type {any} */
@@ -138,7 +136,7 @@ class TargetDriver extends EventEmitter {
     /** @type {string} */
     name;
 
-    /** @type {number|undefined} */
+    /** @type {number | undefined} */
     _createdAt;
 
     /** @type {string} */
@@ -148,13 +146,13 @@ class TargetDriver extends EventEmitter {
      * Construtor do TargetDriver - Classe abstrata base.
      *
      * ✅ v3.0: BREAKING CHANGE - Constructor agora recebe APENAS config
+     *
      * - page e signal são null inicialmente (estado UNATTACHED)
      * - Use attachContext(page, signal) para injetar context antes de executar
      *
      * @param {object} config - Configuração do driver (clonada para imutabilidade)
      * @param {string} config.target - Target específico (chatgpt, gemini, etc)
      * @param {number} [config.timeout] - Timeout em milissegundos
-     *
      * @throws {Error} Se tentar instanciar TargetDriver diretamente
      * @throws {Error} Se config não fornecido
      */
@@ -172,7 +170,7 @@ class TargetDriver extends EventEmitter {
         }
 
         // ✅ v3.0: page e signal são NULL inicialmente (estado UNATTACHED)
-        /** @type {Page|null} */
+        /** @type {Page | null} */
         this.page = null;
         this.signal = null;
 
@@ -225,8 +223,7 @@ class TargetDriver extends EventEmitter {
   ========================================================================== */
 
     /**
-     * Configura listener para AbortSignal.
-     * ✅ v3.0: Chamado por attachContext() (não mais no constructor)
+     * Configura listener para AbortSignal. ✅ v3.0: Chamado por attachContext() (não mais no constructor)
      *
      * @private
      */
@@ -240,8 +237,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Remove listener de AbortSignal.
-     * ✅ v3.0: Chamado por detachContext()
+     * Remove listener de AbortSignal. ✅ v3.0: Chamado por detachContext()
      *
      * @private
      */
@@ -253,9 +249,8 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Configura listeners para page lifecycle events.
-     * ✅ P0-8: Previne resource leaks e adiciona telemetria para page crashes.
-     * Segue padrão de PageLifecycleMonitor.js.
+     * Configura listeners para page lifecycle events. ✅ P0-8: Previne resource leaks e adiciona telemetria para page
+     * crashes. Segue padrão de PageLifecycleMonitor.js.
      *
      * @private
      */
@@ -336,7 +331,7 @@ class TargetDriver extends EventEmitter {
             log(
                 'DEBUG',
                 `[${this.name}] Page lifecycle handlers attached (${this._pageEventListeners.length})`,
-                this.correlationId
+                this.correlationId,
             );
         } catch (/** @type {any} */ _rawErr) {
             const err = /** @type {any} */ (_rawErr);
@@ -345,8 +340,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Remove listeners de page lifecycle events.
-     * ✅ P0-8: Previne memory leaks.
+     * Remove listeners de page lifecycle events. ✅ P0-8: Previne memory leaks.
      *
      * @private
      */
@@ -368,8 +362,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Handler para AbortSignal disparado.
-     * ✅ v2.0: Reseta estado para IDLE automaticamente
+     * Handler para AbortSignal disparado. ✅ v2.0: Reseta estado para IDLE automaticamente
      *
      * @private
      */
@@ -397,13 +390,12 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Valida se transição de estado é permitida.
-     * ✅ v2.0: State transition matrix
+     * Valida se transição de estado é permitida. ✅ v2.0: State transition matrix
      *
+     * @private
      * @param {string} from - Estado atual
      * @param {string} to - Estado desejado
      * @throws {Error} Se transição não for válida
-     * @private
      */
     _validateTransition(from, to) {
         const validTargets = STATE_TRANSITIONS[from] || [];
@@ -411,30 +403,29 @@ class TargetDriver extends EventEmitter {
         if (!validTargets.includes(to)) {
             throw new Error(
                 `[${this.name}] Invalid state transition: ${from} → ${to}. ` +
-                    `Valid transitions from ${from}: ${validTargets.join(', ')}`
+                    `Valid transitions from ${from}: ${validTargets.join(', ')}`,
             );
         }
     }
 
     /**
-     * Valida schema de capabilities.
-     * ✅ v2.0: Type safety para capabilities
+     * Valida schema de capabilities. ✅ v2.0: Type safety para capabilities
      *
+     * @private
      * @param {object} caps - Capabilities a validar
      * @throws {Error} Se capability desconhecida ou tipo inválido
-     * @private
      */
     _validateCapabilities(caps) {
         for (const key of Object.keys(caps)) {
             if (!CAPABILITIES_SCHEMA.includes(key)) {
                 throw new Error(
                     `[${this.name}] Unknown capability: "${key}". ` +
-                        `Valid capabilities: ${CAPABILITIES_SCHEMA.join(', ')}`
+                        `Valid capabilities: ${CAPABILITIES_SCHEMA.join(', ')}`,
                 );
             }
             if (typeof (/** @type {any} */ (caps)[key]) !== 'boolean') {
                 throw new Error(
-                    `[${this.name}] Capability "${key}" must be boolean, got ${typeof (/** @type {any} */ (caps)[key])}`
+                    `[${this.name}] Capability "${key}" must be boolean, got ${typeof (/** @type {any} */ (caps)[key])}`,
                 );
             }
         }
@@ -447,34 +438,35 @@ class TargetDriver extends EventEmitter {
     /**
      * Attach context (page + signal) ao driver ANTES de executar task.
      *
-     * ✅ v3.0: Pool-ready - Driver pode ser reutilizado entre tasks
-     * ✅ v3.1: Hot-Swap - Permite reanexar signal se página for a mesma (Hot Pool)
+     * ✅ v3.0: Pool-ready - Driver pode ser reutilizado entre tasks ✅ v3.1: Hot-Swap - Permite reanexar signal se página
+     * for a mesma (Hot Pool)
      *
      * PRÉ-CONDIÇÕES:
+     *
      * - Driver em estado UNATTACHED OU (IDLE e mesma página)
      * - Driver não destruído
      * - Page válida (não null, não closed)
      * - Signal válido (AbortSignal instance)
      *
      * PÓS-CONDIÇÕES:
+     *
      * - Driver em estado IDLE (ready para execute)
      * - Page attached
      * - Signal attached + listener configurado
      * - Evento CONTEXT_ATTACHED emitido
      *
+     * @example
+     *     const driver = factory.acquireFromPool('chatgpt');
+     *     driver.attachContext(page, abortSignal, 'task-123');
+     *     const response = await driver.execute(prompt);
+     *
      * @param {Page} page - Puppeteer page instance
      * @param {AbortSignal} signal - Cancellation signal
      * @param {string} [correlationId] - Correlation ID para tracing
-     *
      * @returns {void}
      * @throws {Error} Se driver não está UNATTACHED, está destruído, ou parâmetros inválidos
-     *
-     * @example
-     * const driver = factory.acquireFromPool('chatgpt');
-     * driver.attachContext(page, abortSignal, 'task-123');
-     * const response = await driver.execute(prompt);
      */
-    attachContext(page, signal, /** @type {string|null} */ correlationId = null) {
+    attachContext(page, signal, /** @type {string | null} */ correlationId = null) {
         // Validações
         if (this.destroyed) {
             throw new Error(`[${this.name}] Cannot attach context: driver destroyed`);
@@ -486,7 +478,7 @@ class TargetDriver extends EventEmitter {
         if (this._state !== STATES.UNATTACHED && !isHotSwap) {
             throw new Error(
                 `[${this.name}] Cannot attach context: driver not UNATTACHED (current: ${this._state}). ` +
-                    `Call detachContext() first.`
+                    `Call detachContext() first.`,
             );
         }
 
@@ -513,7 +505,7 @@ class TargetDriver extends EventEmitter {
                 !isDomainMatch(currentUrl, /** @type {any} */ (this.config).expectedDomain)
             ) {
                 throw new Error(
-                    `[${this.name}] Domain mismatch: expected ${this.config.expectedDomain}, got ${currentUrl}`
+                    `[${this.name}] Domain mismatch: expected ${this.config.expectedDomain}, got ${currentUrl}`,
                 );
             }
         }
@@ -553,43 +545,45 @@ class TargetDriver extends EventEmitter {
         log(
             'DEBUG',
             `[${this.name}] Context attached (${isHotSwap ? 'HOT' : 'COLD'}): ${correlationId || 'no-correlation'}`,
-            this.correlationId
+            this.correlationId,
         );
     }
 
     /**
      * Detach context (page + signal) do driver APÓS executar task.
      *
-     * ✅ v3.0 (C2): Pool-ready - Driver volta para estado UNATTACHED (disponível para reuse).
-     * ✅ C2: Idempotência - Pode ser chamado múltiplas vezes sem erro (force flag).
+     * ✅ v3.0 (C2): Pool-ready - Driver volta para estado UNATTACHED (disponível para reuse). ✅ C2: Idempotência - Pode
+     * ser chamado múltiplas vezes sem erro (force flag).
      *
      * PRÉ-CONDIÇÕES:
+     *
      * - Driver não destruído (throw se destroyed=true)
      * - Driver em estado IDLE (recomendado, warning se não)
      *
      * PÓS-CONDIÇÕES:
+     *
      * - Driver em estado UNATTACHED (ready para novo attach)
      * - Page = null
      * - Signal = null + listener removido
      * - correlationId = null
      * - Evento CONTEXT_DETACHED emitido
      *
+     * @example
+     *     const response = await driver.execute(prompt);
+     *     driver.detachContext(); // Normal detach (IDLE required)
+     *
+     *     // C2: Force detach (finally block - garantir release)
+     *     try {
+     *         await driver.execute(prompt);
+     *     } finally {
+     *         driver.detachContext({ force: true }); // Sempre detach (mesmo se erro)
+     *     }
+     *
      * @param {object} [options] - Opções de detach
-     * @param {boolean} [options.force=false] - Se true, ignora validação de estado (não throw)
+     * @param {boolean} [options.force=false] - Se true, ignora validação de estado (não throw). Default is `false`
      * @returns {void}
      * @throws {Error} Se driver destruído (sempre)
      * @throws {Error} Se driver não está IDLE E force=false
-     *
-     * @example
-     * const response = await driver.execute(prompt);
-     * driver.detachContext();  // Normal detach (IDLE required)
-     *
-     * // C2: Force detach (finally block - garantir release)
-     * try {
-     *   await driver.execute(prompt);
-     * } finally {
-     *   driver.detachContext({ force: true });  // Sempre detach (mesmo se erro)
-     * }
      */
     detachContext(options = {}) {
         const { force = false } = options;
@@ -609,7 +603,7 @@ class TargetDriver extends EventEmitter {
         if (!force && this._state !== STATES.IDLE) {
             throw new Error(
                 `[${this.name}] Cannot detach context: driver not IDLE (current: ${this._state}). ` +
-                    `Call detachContext({ force: true }) to override.`
+                    `Call detachContext({ force: true }) to override.`,
             );
         }
 
@@ -619,7 +613,7 @@ class TargetDriver extends EventEmitter {
                 'WARN',
                 `[${this.name}] FORCED detach: driver not IDLE (current: ${this._state}). ` +
                     `This may indicate incomplete task execution or error recovery.`,
-                this.correlationId
+                this.correlationId,
             );
         }
 
@@ -646,7 +640,7 @@ class TargetDriver extends EventEmitter {
             log(
                 'WARN',
                 `[${this.name}] setState(UNATTACHED) failed: ${stateError.message}. ` + `Forcing state transition.`,
-                oldCorrelationId
+                oldCorrelationId,
             );
             this._state = STATES.UNATTACHED;
             this.stateUpdated = Date.now();
@@ -667,12 +661,12 @@ class TargetDriver extends EventEmitter {
      *
      * ✅ v3.0: Pool-ready - Validação de pré-condições
      *
-     * @returns {boolean} True se context attached e driver ready
-     *
      * @example
-     * if (!driver.isContextAttached()) {
-     *   throw new Error('Driver not ready: attach context first');
-     * }
+     *     if (!driver.isContextAttached()) {
+     *         throw new Error('Driver not ready: attach context first');
+     *     }
+     *
+     * @returns {boolean} True se context attached e driver ready
      */
     isContextAttached() {
         return this.page !== null && this.signal !== null && this._state !== STATES.UNATTACHED;
@@ -684,6 +678,7 @@ class TargetDriver extends EventEmitter {
 
     /**
      * Getter para estado atual.
+     *
      * @returns {string} Estado atual
      */
     get state() {
@@ -691,8 +686,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Altera o estado interno e emite telemetria de transição.
-     * ✅ v2.0: Valida transição via state transition matrix
+     * Altera o estado interno e emite telemetria de transição. ✅ v2.0: Valida transição via state transition matrix
      *
      * @param {string} newState - Membro da constante STATES
      * @throws {Error} Se estado inválido ou transição não permitida
@@ -756,8 +750,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Retorna histórico de transições de estado.
-     * ✅ v2.0: State history tracking
+     * Retorna histórico de transições de estado. ✅ v2.0: State history tracking
      *
      * @returns {unknown[]} Últimas transições (max 20)
      */
@@ -766,8 +759,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Atualiza o mapa de capacidades técnicas do robô e notifica o sistema.
-     * ✅ v2.0: Valida schema de capabilities
+     * Atualiza o mapa de capacidades técnicas do robô e notifica o sistema. ✅ v2.0: Valida schema de capabilities
      *
      * @param {object} newCaps - Objeto com as novas capacidades
      * @throws {Error} Se capability inválida
@@ -787,6 +779,7 @@ class TargetDriver extends EventEmitter {
 
     /**
      * Retorna cópia das capabilities atuais.
+     *
      * @returns {any} Capabilities
      */
     getCapabilities() {
@@ -798,8 +791,7 @@ class TargetDriver extends EventEmitter {
   ========================================================================== */
 
     /**
-     * Retorna um snapshot da saúde operacional do driver.
-     * ✅ v2.0: Expandido com performance metrics
+     * Retorna um snapshot da saúde operacional do driver. ✅ v2.0: Expandido com performance metrics
      *
      * Usado pelo Supervisor para detecção de Drifts.
      *
@@ -840,8 +832,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Retorna estatísticas de erros.
-     * ✅ v2.0: Error tracking
+     * Retorna estatísticas de erros. ✅ v2.0: Error tracking
      *
      * @returns {any} Error stats
      */
@@ -858,7 +849,8 @@ class TargetDriver extends EventEmitter {
 
     /**
      * Otimiza a página para performance.
-     * @returns {Promise<boolean|void>}
+     *
+     * @returns {Promise<boolean | void>}
      */
     async optimizePage() {
         return Promise.resolve();
@@ -872,35 +864,39 @@ class TargetDriver extends EventEmitter {
 
     /**
      * Valida se página está pronta para execução.
+     *
      * @abstract
-     * @returns {Promise<boolean|void>}
+     * @returns {Promise<boolean | void>}
      * @throws {Error} Sempre - deve ser implementado
      */
     async validatePage() {
         throw new Error(
             `[${this.constructor.name}] Método abstrato 'validatePage' não implementado. ` +
-                `Classe ${this.constructor.name} deve implementar este método.`
+                `Classe ${this.constructor.name} deve implementar este método.`,
         );
     }
 
     /**
      * ✅ P0 BUG #3 FIX: Método abstrato execute() declarado explicitamente
      *
-     * Executa uma tarefa (1 prompt → 1 resposta).
-     * Este é o método CORE de todo driver - representa 1 interação completa com LLM.
+     * Executa uma tarefa (1 prompt → 1 resposta). Este é o método CORE de todo driver - representa 1 interação completa
+     * com LLM.
      *
      * ✅ v3.0: VALIDAÇÃO - Requer context attached (page + signal)
      *
      * CONTRATO:
+     *
      * - Input: prompt (string) - O texto a ser enviado para o LLM
      * - Output: response (string) - A resposta completa do LLM
      * - Timing: 2-5min (depende da complexidade do prompt)
      *
      * ESTADO:
+     *
      * - IDLE → PREPARING → TYPING → WAITING → IDLE (sucesso)
      * - Qualquer estado → IDLE (abort via AbortSignal)
      *
      * PRÉ-CONDIÇÕES (v3.0):
+     *
      * - Context attached (page não null, signal não null)
      * - Page não está closed (validatePage passou)
      * - Interface ready (validateLLMInterface passou)
@@ -908,55 +904,59 @@ class TargetDriver extends EventEmitter {
      * - Estado inicial: IDLE
      *
      * INTEGRAÇÃO:
+     *
      * - DNA: Usa selectors de dynamic_rules.json (this.dnaRules)
      * - BiomechanicsEngine: Typing biomimético, click submit
      * - AbortSignal: Checked a cada ciclo de perception loop
      * - Telemetria: Emite STATE_CHANGE, VITAL, progress events
      *
      * GARANTIAS ONTOLÓGICAS (v3.0):
+     *
      * - Driver pode executar N tasks sequencialmente (reuse)
      * - Driver é agnóstico de task (só executa quando context attached)
+     *
+     * @example
+     *     // ChatGPTDriver.execute() implementation:
+     *     async execute(prompt) {
+     *     // ✅ v3.0: Validar context attached
+     *     if (!this.isContextAttached()) {
+     *     throw new Error('Context not attached');
+     *     }
+     *
+     *     this.setState('PREPARING');
+     *     await this.prepareContext();
+     *     this.setState('TYPING');
+     *     await this.sendPrompt(prompt);
+     *     this.setState('WAITING');
+     *     const response = await this.waitForResponse();
+     *     this.setState('IDLE');
+     *     return response;
+     *     }
      *
      * @abstract
      * @param {string} _prompt - Prompt a ser enviado para o LLM
      * @returns {Promise<string>} Resposta completa do LLM
      * @throws {Error} Se context não attached ou método não implementado
-     *
-     * @example
-     * // ChatGPTDriver.execute() implementation:
-     * async execute(prompt) {
-     *   // ✅ v3.0: Validar context attached
-     *   if (!this.isContextAttached()) {
-     *     throw new Error('Context not attached');
-     *   }
-     *
-     *   this.setState('PREPARING');
-     *   await this.prepareContext();
-     *   this.setState('TYPING');
-     *   await this.sendPrompt(prompt);
-     *   this.setState('WAITING');
-     *   const response = await this.waitForResponse();
-     *   this.setState('IDLE');
-     *   return response;
-     * }
      */
     async execute(_prompt) {
         // ✅ v3.0: Validação de context attached
         if (!this.isContextAttached()) {
             throw new Error(
                 `[${this.constructor.name}] CONTEXT_NOT_ATTACHED: Cannot execute without context. ` +
-                    `Call attachContext(page, signal) before execute().`
+                    `Call attachContext(page, signal) before execute().`,
             );
         }
 
         throw new Error(
             `[${this.constructor.name}] ABSTRACT_METHOD_NOT_IMPLEMENTED: 'execute' não implementado. ` +
                 `Classe ${this.constructor.name} DEVE implementar execute(prompt) para ser funcional. ` +
-                `Veja contrato completo no JSDoc de TargetDriver.execute().`
+                `Veja contrato completo no JSDoc de TargetDriver.execute().`,
         );
     }
 
-    /**     * Prepara contexto para execução.
+    /**
+     * * Prepara contexto para execução.
+     *
      * @abstract
      * @param {object} _taskSpec - Especificação da task
      * @returns {Promise<void>}
@@ -965,15 +965,16 @@ class TargetDriver extends EventEmitter {
     async prepareContext(_taskSpec) {
         throw new Error(
             `[${this.constructor.name}] Método abstrato 'prepareContext' não implementado. ` +
-                `Classe ${this.constructor.name} deve implementar este método.`
+                `Classe ${this.constructor.name} deve implementar este método.`,
         );
     }
 
     /**
      * Envia prompt para LLM.
+     *
      * @abstract
      * @param {string} _text - Texto do prompt
-     * @param {string|object} [_taskId] - ID da task ou objeto de opções
+     * @param {string | object} [_taskId] - ID da task ou objeto de opções
      * @param {AbortSignal} [_signal] - Sinal de cancelamento
      * @returns {Promise<void>}
      * @throws {Error} Sempre - deve ser implementado
@@ -981,12 +982,13 @@ class TargetDriver extends EventEmitter {
     async sendPrompt(_text, _taskId, _signal) {
         throw new Error(
             `[${this.constructor.name}] Método abstrato 'sendPrompt' não implementado. ` +
-                `Classe ${this.constructor.name} deve implementar este método.`
+                `Classe ${this.constructor.name} deve implementar este método.`,
         );
     }
 
     /**
      * Aguarda conclusão da resposta.
+     *
      * @abstract
      * @param {object} _startSnapshot - Snapshot inicial
      * @param {AbortSignal} _signal - Sinal de cancelamento
@@ -996,12 +998,13 @@ class TargetDriver extends EventEmitter {
     async waitForCompletion(_startSnapshot, _signal) {
         throw new Error(
             `[${this.constructor.name}] Método abstrato 'waitForCompletion' não implementado. ` +
-                `Classe ${this.constructor.name} deve implementar este método.`
+                `Classe ${this.constructor.name} deve implementar este método.`,
         );
     }
 
     /**
      * Captura estado atual da interface.
+     *
      * @abstract
      * @returns {Promise<any>}
      * @throws {Error} Sempre - deve ser implementado
@@ -1009,25 +1012,27 @@ class TargetDriver extends EventEmitter {
     async captureState() {
         throw new Error(
             `[${this.constructor.name}] Método abstrato 'captureState' não implementado. ` +
-                `Classe ${this.constructor.name} deve implementar este método.`
+                `Classe ${this.constructor.name} deve implementar este método.`,
         );
     }
 
     /**
      * Para geração em andamento.
+     *
      * @abstract
-     * @returns {Promise<boolean|void>}
+     * @returns {Promise<boolean | void>}
      * @throws {Error} Sempre - deve ser implementado
      */
     async stopGeneration() {
         throw new Error(
             `[${this.constructor.name}] Método abstrato 'stopGeneration' não implementado. ` +
-                `Classe ${this.constructor.name} deve implementar este método.`
+                `Classe ${this.constructor.name} deve implementar este método.`,
         );
     }
 
     /**
      * Commit de aprendizado (opcional).
+     *
      * @returns {Promise<void>}
      */
     async commitLearning() {
@@ -1035,8 +1040,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Sobrescrita de segurança para emissão de eventos.
-     * ✅ v2.0: Bloqueia emissões após destruição e registra erros
+     * Sobrescrita de segurança para emissão de eventos. ✅ v2.0: Bloqueia emissões após destruição e registra erros
      *
      * Bloqueia emissões após a destruição da instância.
      *
@@ -1062,8 +1066,7 @@ class TargetDriver extends EventEmitter {
     }
 
     /**
-     * Destruição profunda da instância e sinalização para a Factory.
-     * ✅ v3.0: Garante detach de context antes de destroy
+     * Destruição profunda da instância e sinalização para a Factory. ✅ v3.0: Garante detach de context antes de destroy
      *
      * Garante que o robô seja removido do cache e a memória seja liberada.
      *
@@ -1106,7 +1109,7 @@ class TargetDriver extends EventEmitter {
             log(
                 'DEBUG',
                 `[${this.name}] Driver destruído. Referências de memória limpas. Errors: ${this._errorCount}`,
-                this.correlationId
+                this.correlationId,
             );
         } catch (/** @type {any} */ _e) {
             // Ignore logging errors during cleanup
@@ -1150,8 +1153,7 @@ export default TargetDriver;
 /**
  * Configuração padrão do TargetDriver
  *
- * **Side-effects:** N/A
- * **Semântica:** Configurações de timeouts, capacidades padrão e limites para operação do driver.
+ * **Side-effects:** N/A **Semântica:** Configurações de timeouts, capacidades padrão e limites para operação do driver.
  * **Unidades:** Milissegundos para timeouts, números inteiros para contadores.
  *
  * @type {Object<string, any>}
@@ -1161,8 +1163,7 @@ export { TARGETDRIVER_CONFIG };
 /**
  * Matriz de transições de estado válidas
  *
- * **Side-effects:** N/A
- * **Semântica:** Define transições permitidas entre estados da máquina de estados do driver.
+ * **Side-effects:** N/A **Semântica:** Define transições permitidas entre estados da máquina de estados do driver.
  * **Unidades:** N/A
  *
  * @type {Object<string, string[]>}
@@ -1172,9 +1173,7 @@ export { STATE_TRANSITIONS };
 /**
  * Esquema de validação de capacidades do driver
  *
- * **Side-effects:** N/A
- * **Semântica:** Lista de capacidades suportadas pelos drivers de LLM.
- * **Unidades:** N/A
+ * **Side-effects:** N/A **Semântica:** Lista de capacidades suportadas pelos drivers de LLM. **Unidades:** N/A
  *
  * @type {string[]}
  */

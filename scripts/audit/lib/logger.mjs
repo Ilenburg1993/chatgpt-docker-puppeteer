@@ -14,8 +14,8 @@ function sanitizePathToken(value) {
  * @typedef {object} CreateAuditLoggerOptions
  * @property {string} runId
  * @property {string} runDir
- * @property {'info'|'debug'} logLevel
- * @property {'jsonl'|'console'} logFormat
+ * @property {'info' | 'debug'} logLevel
+ * @property {'jsonl' | 'console'} logFormat
  * @property {boolean} enableConsole
  */
 /**
@@ -83,7 +83,15 @@ export function createAuditLogger(options) {
     }
 
     /**
-     * @param {{ phase: string, stepId: string, command: string, args: string[], stdout: string, stderr: string, result: any }} input
+     * @param {{
+     *     phase: string;
+     *     stepId: string;
+     *     command: string;
+     *     args: string[];
+     *     stdout: string;
+     *     stderr: string;
+     *     result: any;
+     * }} input
      */
     function writeStepArtifacts(input) {
         const safeStep = sanitizePathToken(input.stepId);
@@ -115,9 +123,9 @@ export function createAuditLogger(options) {
                     at: new Date().toISOString(),
                 },
                 null,
-                2
+                2,
             )}\n`,
-            'utf8'
+            'utf8',
         );
 
         return {

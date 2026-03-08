@@ -1,6 +1,6 @@
 // @ts-check
-import * as schemas from '#core/schemas';
 import { log } from '#core/logger';
+import * as schemas from '#core/schemas';
 import { recordEvent } from '#infra/db/events_repo';
 import { getMissionById } from '#infra/db/mission_repo';
 import { getDb } from '#infra/db/sqlite';
@@ -14,7 +14,12 @@ function _now() {
     return Date.now();
 }
 
-function _error(/** @type {any} */ statusCode, /** @type {any} */ code, /** @type {any} */ message, /** @type {any} */ details = undefined) {
+function _error(
+    /** @type {any} */ statusCode,
+    /** @type {any} */ code,
+    /** @type {any} */ message,
+    /** @type {any} */ details = undefined,
+) {
     const err = new Error(message || code);
     err.statusCode = Number(statusCode) || 500;
     err.code = String(code || 'TASK_CONTROL_ERROR');
@@ -68,7 +73,7 @@ function _assertPauseToEditTask(/** @type {any} */ row) {
                 status,
                 stage: row.stage,
                 attempts: Number(row.attempts || 0),
-            }
+            },
         );
     }
 }
@@ -163,7 +168,7 @@ function _recordMissionEvent(/** @type {any} */ { missionId, actor, eventType, r
         const _e = /** @type {any} */ (err);
         log(
             'WARN',
-            `[TaskControl] Falha ao registrar evento ${eventType} na mission ${missionId}: ${_e?.message || String(_e)}`
+            `[TaskControl] Falha ao registrar evento ${eventType} na mission ${missionId}: ${_e?.message || String(_e)}`,
         );
     }
 }
@@ -224,7 +229,7 @@ function _assertTaskMissionReassignEligibility(/** @type {any} */ row) {
             stage: String(row.stage || '').toUpperCase(),
             attempts: Number(row.attempts || 0),
             started_at_ms: row.started_at_ms ?? null,
-        }
+        },
     );
 }
 
@@ -258,7 +263,7 @@ function _isTaskBoundToMissionStep(/** @type {any} */ db, /** @type {any} */ row
             FROM mission_steps
             WHERE current_task_id = @task_id OR last_task_id = @task_id
             LIMIT 1
-        `
+        `,
         )
         .get({ task_id: row.id });
     return Boolean(binding);
@@ -266,15 +271,16 @@ function _isTaskBoundToMissionStep(/** @type {any} */ db, /** @type {any} */ row
 
 /**
  * @typedef {object} CreateTaskCommandOptions
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string} [reason] - Motivo do comando.
- * @property {object} [payload={}] - Dados adicionais da tarefa.
- * @property {boolean} [ifNotExists=false] - Criar somente se ainda não existir.
+ * @property {object} [payload={}] - Dados adicionais da tarefa. Default is `{}`
+ * @property {boolean} [ifNotExists=false] - Criar somente se ainda não existir. Default is `false`
  */
 /**
  * Cria um novo comando de task no sistema.
+ *
  * @param {CreateTaskCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = false }) {
     const actorView = asRecord(actor);
@@ -282,12 +288,14 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
     const task = _buildTaskV5FromPayload(payloadView);
     const stage = String(payloadView.stage || TASK_STAGES.READY).toUpperCase();
     const status = String(payloadView.status || 'PENDING').toUpperCase();
-    const created = /** @type {any} */ (insertTask(task, {
-        stage,
-        status,
-        actor: String(actorView.username || actorView.id || 'user'),
-        ifNotExists,
-    }));
+    const created = /** @type {any} */ (
+        insertTask(task, {
+            stage,
+            status,
+            actor: String(actorView.username || actorView.id || 'user'),
+            ifNotExists,
+        })
+    );
 
     _recordTaskEvent({
         taskId: created?.meta?.id || task.meta.id,
@@ -311,15 +319,16 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
 /**
  * @typedef {object} PatchTaskCommandOptions
  * @property {string} taskId - ID da task a alterar.
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string | undefined} [reason] - Motivo da alteração.
- * @property {string|null} [ifVersion=null] - Guard de versão otimista.
- * @property {object} [patch={}] - Campos a alterar.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
+ * @property {object} [patch={}] - Campos a alterar. Default is `{}`
  */
 /**
  * Aplica um patch parcial a uma task existente.
+ *
  * @param {PatchTaskCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const patchView = asRecord(patch);
@@ -331,7 +340,7 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
         throw _error(
             422,
             'TASK_MISSION_REASSIGN_USE_COMMAND',
-            'Use TASK_REASSIGN_MISSION para alterar vínculo de missão/workflow/parent da task'
+            'Use TASK_REASSIGN_MISSION para alterar vínculo de missão/workflow/parent da task',
         );
     }
 
@@ -417,15 +426,16 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
 /**
  * @typedef {object} ReassignTaskMissionCommandOptions
  * @property {string} taskId - ID da task.
- * @property {string|null} missionId - ID da missão destino (null para desassociar).
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {string | null} missionId - ID da missão destino (null para desassociar).
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string | undefined} [reason] - Motivo da reassociação.
- * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
  */
 /**
  * Reassocia uma task a outra missão.
+ *
  * @param {ReassignTaskMissionCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifVersion = null }) {
     const destinationMissionId = missionId === null || missionId === undefined ? '' : String(missionId).trim();
@@ -458,7 +468,7 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
             423,
             'TASK_REASSIGN_BLOCKED_BY_MISSION_STEP',
             'Task vinculada a step de missão ativa não pode ser reatribuída',
-            { task_id: taskId }
+            { task_id: taskId },
         );
     }
 
@@ -528,14 +538,15 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
 /**
  * @typedef {object} PauseTaskCommandOptions
  * @property {string} taskId - ID da task a pausar.
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string | undefined} [reason] - Motivo da pausa.
- * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
  */
 /**
  * Pausa a execução de uma task.
+ *
  * @param {PauseTaskCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -569,14 +580,15 @@ function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 /**
  * @typedef {object} ResumeTaskCommandOptions
  * @property {string} taskId - ID da task a retomar.
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string | undefined} [reason] - Motivo da retomada.
- * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
  */
 /**
  * Retoma a execução de uma task pausada.
+ *
  * @param {ResumeTaskCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -621,14 +633,15 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 /**
  * @typedef {object} CancelTaskCommandOptions
  * @property {string} taskId - ID da task a cancelar.
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string | undefined} [reason] - Motivo do cancelamento.
- * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
  */
 /**
  * Cancela uma task ativa.
+ *
  * @param {CancelTaskCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -667,14 +680,15 @@ function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 /**
  * @typedef {object} RetryTaskCommandOptions
  * @property {string} taskId - ID da task a retentar.
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string | undefined} [reason] - Motivo da retentativa.
- * @property {string|null} [ifVersion=null] - Guard de versão otimista.
+ * @property {string | null} [ifVersion=null] - Guard de versão otimista. Default is `null`
  */
 /**
  * Retenta uma task falha ou cancelada.
+ *
  * @param {RetryTaskCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -717,13 +731,14 @@ function retryTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
 /**
  * @typedef {object} PurgeTaskCommandOptions
  * @property {string} taskId - ID da task a purgar.
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string} [reason] - Motivo da purga.
  */
 /**
  * Remove permanentemente uma task do sistema.
+ *
  * @param {PurgeTaskCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function purgeTaskCommand({ taskId, actor = {}, reason }) {
     const before = getTaskById(taskId);
@@ -747,19 +762,20 @@ function purgeTaskCommand({ taskId, actor = {}, reason }) {
 
 /**
  * @typedef {object} BulkTaskActionCommandOptions
- * @property {string[]} [ids=[]] - Lista de IDs de tasks.
+ * @property {string[]} [ids=[]] - Lista de IDs de tasks. Default is `[]`
  * @property {string} action - Ação a executar (ex: cancel, pause, retry).
- * @property {object} [params={}] - Parâmetros adicionais da ação.
- * @property {object} [actor={}] - Identidade do autor da operação.
+ * @property {object} [params={}] - Parâmetros adicionais da ação. Default is `{}`
+ * @property {object} [actor={}] - Identidade do autor da operação. Default is `{}`
  * @property {string} [reason] - Motivo da ação em massa.
  */
 /**
  * Executa uma ação em lote sobre múltiplas tasks.
+ *
  * @param {BulkTaskActionCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reason }) {
-    const normalized = Array.isArray(ids) ? ids.map(id => String(id)).filter(Boolean) : [];
+    const normalized = Array.isArray(ids) ? ids.map((id) => String(id)).filter(Boolean) : [];
     const paramsView = asRecord(params);
     if (normalized.length === 0) {
         throw _error(400, 'TASK_BULK_IDS_REQUIRED', 'ids vazio');

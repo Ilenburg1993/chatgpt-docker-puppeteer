@@ -32,21 +32,21 @@ function _ensureArray(value) {
  */
 /**
  * @typedef {object} BuildWorkflowNextStepTaskOptions
- * @property {*} [parentTask]
- * @property {*} [parentTaskId]
- * @property {*} [attemptId]
- * @property {*} [nextStep]
+ * @property {any} [parentTask]
+ * @property {any} [parentTaskId]
+ * @property {any} [attemptId]
+ * @property {any} [nextStep]
  */
 /**
  * Cria task filha determinística para o próximo step de workflow.
  *
  * @param {BuildWorkflowNextStepTaskParams} params
  * @returns {{
- *   childTask: Record<string, unknown>,
- *   childId: string,
- *   nextStepId: string,
- *   nextStepIndex: number,
- *   workflowId: string
+ *     childTask: Record<string, unknown>;
+ *     childId: string;
+ *     nextStepId: string;
+ *     nextStepIndex: number;
+ *     workflowId: string;
  * }}
  */
 function buildWorkflowNextStepTask({
@@ -86,7 +86,7 @@ function buildWorkflowNextStepTask({
         `Execute workflow step ${safeStepIndex + 1}`;
 
     const completed = _ensureArray(completedStepIds);
-    const inputs = completed.map(stepId => ({
+    const inputs = completed.map((stepId) => ({
         type: 'task_result',
         task_id: accumulatedContext?.[stepId]?.task_id || parentTaskId,
         attempt: 'latest',
@@ -94,7 +94,7 @@ function buildWorkflowNextStepTask({
         label: `workflow_step_output:${String(stepId)}`,
     }));
 
-    const existingTags = _ensureArray(parentTask?.meta?.tags).map(tag => String(tag));
+    const existingTags = _ensureArray(parentTask?.meta?.tags).map((tag) => String(tag));
     const tags = Array.from(new Set([...existingTags, 'workflow_step']));
 
     const childTask = {

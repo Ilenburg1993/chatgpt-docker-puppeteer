@@ -14,40 +14,40 @@ const TASK_STAGES = Object.freeze({
 
 /**
  * @typedef {{
- *   id: string,
- *   mission_id: string|null,
- *   parent_id?: string|null,
- *   workflow_id?: string|null,
- *   stage: string,
- *   status: string,
- *   priority: number,
- *   target: string,
- *   model: string|null,
- *   execute_after_ms: number|null,
- *   attempts: number,
- *   last_error: string|null,
- *   last_correlation_id: string|null,
- *   locked_by: string|null,
- *   locked_at_ms: number|null,
- *   lock_expires_at_ms: number|null,
- *   spec_user_message: string,
- *   spec_system_message: string,
- *   task_json: string,
- *   result_json: string|null,
- *   prompt_template_artifact_id?: string|null,
- *   latest_attempt_id?: string|null,
- *   latest_rendered_prompt_artifact_id?: string|null,
- *   latest_response_v2_json_artifact_id?: string|null,
- *   created_at_ms: number,
- *   updated_at_ms: number,
- *   started_at_ms: number|null,
- *   completed_at_ms: number|null,
- *   paused_at_ms: number|null,
- *   cancelled_at_ms: number|null,
- *   failed_at_ms: number|null,
- *   blocked_reason?: string|null,
- *   blocked_at_ms?: number|null,
- *   blocked_details_json?: string|null,
+ *     id: string;
+ *     mission_id: string | null;
+ *     parent_id?: string | null;
+ *     workflow_id?: string | null;
+ *     stage: string;
+ *     status: string;
+ *     priority: number;
+ *     target: string;
+ *     model: string | null;
+ *     execute_after_ms: number | null;
+ *     attempts: number;
+ *     last_error: string | null;
+ *     last_correlation_id: string | null;
+ *     locked_by: string | null;
+ *     locked_at_ms: number | null;
+ *     lock_expires_at_ms: number | null;
+ *     spec_user_message: string;
+ *     spec_system_message: string;
+ *     task_json: string;
+ *     result_json: string | null;
+ *     prompt_template_artifact_id?: string | null;
+ *     latest_attempt_id?: string | null;
+ *     latest_rendered_prompt_artifact_id?: string | null;
+ *     latest_response_v2_json_artifact_id?: string | null;
+ *     created_at_ms: number;
+ *     updated_at_ms: number;
+ *     started_at_ms: number | null;
+ *     completed_at_ms: number | null;
+ *     paused_at_ms: number | null;
+ *     cancelled_at_ms: number | null;
+ *     failed_at_ms: number | null;
+ *     blocked_reason?: string | null;
+ *     blocked_at_ms?: number | null;
+ *     blocked_details_json?: string | null;
  * }} TaskRow
  */
 
@@ -132,8 +132,8 @@ function _rowToTask(row) {
             task.state.blocked_details = JSON.parse(row.blocked_details_json);
         } catch (/** @type {any} */ err) {
             log.warn(
-                { taskId: task.id, field: 'blocked_details_json', error: (/** @type {any} */ (err))?.message },
-                '[task_repo] Fallback to raw string for malformed JSON'
+                { taskId: task.id, field: 'blocked_details_json', error: /** @type {any} */ (err)?.message },
+                '[task_repo] Fallback to raw string for malformed JSON',
             );
             task.state.blocked_details = row.blocked_details_json;
         }
@@ -145,8 +145,8 @@ function _rowToTask(row) {
             task.result_db = JSON.parse(row.result_json);
         } catch (/** @type {any} */ err) {
             log.warn(
-                { taskId: task.id, field: 'result_json', error: (/** @type {any} */ (err))?.message },
-                '[task_repo] Fallback to raw string for malformed JSON'
+                { taskId: task.id, field: 'result_json', error: /** @type {any} */ (err)?.message },
+                '[task_repo] Fallback to raw string for malformed JSON',
             );
             task.result_db = row.result_json;
         }
@@ -157,8 +157,9 @@ function _rowToTask(row) {
 
 /**
  * Função exportada: getTaskById.
+ *
  * @param {string} taskId Task identifier.
- * @returns {TaskRow|null}
+ * @returns {TaskRow | null}
  */
 function getTaskById(taskId) {
     const db = getDb();
@@ -168,21 +169,22 @@ function getTaskById(taskId) {
 
 /**
  * @typedef {object} ListTasksOptions
- * @property {string|null} status
- * @property {string|null} stage
- * @property {string|null} missionId
+ * @property {string | null} status
+ * @property {string | null} stage
+ * @property {string | null} missionId
  * @property {number} limit
  * @property {number} offset
  */
 /**
- * Lista tasks com suporte a filtros, paginação e limite seguro.
- * PERF-01 FIX: Adicionado parâmetro `offset` para paginação e limitado
- * o máximo retornável a 500 por chamada (vs 20.000 anterior).
+ * Lista tasks com suporte a filtros, paginação e limite seguro. PERF-01 FIX: Adicionado parâmetro `offset` para
+ * paginação e limitado o máximo retornável a 500 por chamada (vs 20.000 anterior).
  *
  * @param {any} [opts]
-  * @returns {TaskRow[]}
+ * @returns {TaskRow[]}
  */
-function listTasks({ status = null, stage = null, missionId = null, limit = 100, offset = 0 } = /** @type {any} */ ({})) {
+function listTasks(
+    { status = null, stage = null, missionId = null, limit = 100, offset = 0 } = /** @type {any} */ ({}),
+) {
     const db = getDb();
     const where = [];
     /** @type {Record<string, unknown>} */
@@ -211,17 +213,18 @@ function listTasks({ status = null, stage = null, missionId = null, limit = 100,
     params.limit = Math.max(1, Math.min(Number(limit) || 100, 500));
     params.offset = Math.max(0, Number(offset) || 0);
     const rows = db.prepare(sql).all(params);
-    return rows.map(r => _rowToTask(/** @type {TaskRow} */ (r)));
+    return rows.map((r) => _rowToTask(/** @type {TaskRow} */ (r)));
 }
 
 /**
  * @typedef {object} CountTasksOptions
- * @property {string|null} status
- * @property {string|null} stage
- * @property {string|null} missionId
+ * @property {string | null} status
+ * @property {string | null} stage
+ * @property {string | null} missionId
  */
 /**
  * Conta o total de tasks com filtros (para paginação).
+ *
  * @param {any} [opts]
  * @returns {number}
  */
@@ -250,8 +253,8 @@ function countTasks({ status = null, stage = null, missionId = null } = /** @typ
 }
 
 /**
- * Conta tarefas agrupadas por status numa única query SQL (GROUP BY).
- * Mais eficiente que chamar countTasks() 8 vezes em paralelo.
+ * Conta tarefas agrupadas por status numa única query SQL (GROUP BY). Mais eficiente que chamar countTasks() 8 vezes em
+ * paralelo.
  *
  * @returns {Record<string, number>} Mapa de status → contagem
  */
@@ -261,7 +264,7 @@ function countTasksByStatus() {
     /** @type {Record<string, number>} */
     const result = {};
     for (const row of rows) {
-        const r = /** @type {{ status: string, n: number }} */ (row);
+        const r = /** @type {{ status: string; n: number }} */ (row);
         result[r.status] = r.n;
     }
     return result;
@@ -269,8 +272,9 @@ function countTasksByStatus() {
 
 /**
  * Função exportada: getTaskDependencies.
- * @param {*} taskId
- * @returns {TaskRow|null}
+ *
+ * @param {any} taskId
+ * @returns {TaskRow | null}
  */
 function getTaskDependencies(taskId) {
     const db = getDb();
@@ -282,23 +286,24 @@ function getTaskDependencies(taskId) {
             JOIN tasks t ON t.id = d.depends_on_task_id
             WHERE d.task_id = ?
             ORDER BY t.created_at_ms ASC
-        `
+        `,
         )
         .all(taskId);
-    return /** @type {any} */ (rows.map(r => _rowToTask(/** @type {TaskRow} */ (r))));
+    return /** @type {any} */ (rows.map((r) => _rowToTask(/** @type {TaskRow} */ (r))));
 }
 
 /**
- * @typedef {*} InsertTaskRawTask
+ * @typedef {any} InsertTaskRawTask
  */
 /**
- * @typedef {*} InsertTaskOptions
+ * @typedef {any} InsertTaskOptions
  */
 /**
  * Inserts a task into the database.
+ *
  * @param {InsertTaskRawTask} rawTask - The raw task object
- * @param {InsertTaskOptions} [options={}] - Options
-  * @returns {TaskRow|null}
+ * @param {InsertTaskOptions} [options={}] - Options. Default is `{}`
+ * @returns {TaskRow | null}
  */
 function insertTask(
     rawTask,
@@ -308,7 +313,7 @@ function insertTask(
         actor = 'system',
         ifNotExists = false,
         promptTemplateArtifactId = null,
-    } = {}
+    } = {},
 ) {
     const db = getDb();
     const now = _now();
@@ -367,7 +372,7 @@ function insertTask(
                 @started_at_ms, @completed_at_ms, NULL, NULL, NULL,
                 NULL, NULL, NULL
             )
-        `
+        `,
         ).run({
             id,
             mission_id: missionId,
@@ -393,7 +398,7 @@ function insertTask(
         });
 
         // If task already existed and we chose IGNORE, skip side effects.
-        const inserted = (/** @type {any} */ (db.prepare('SELECT changes() AS c').get()))?.c || 0;
+        const inserted = /** @type {any} */ (db.prepare('SELECT changes() AS c').get())?.c || 0;
         if (!inserted) {
             return;
         }
@@ -401,7 +406,7 @@ function insertTask(
         const deps = Array.isArray(task?.policy?.dependencies) ? task.policy.dependencies : [];
         if (deps.length > 0) {
             const stmt = db.prepare(
-                'INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_task_id) VALUES (?, ?)'
+                'INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_task_id) VALUES (?, ?)',
             );
             for (const depId of deps) {
                 if (typeof depId === 'string' && depId.trim()) {
@@ -417,7 +422,7 @@ function insertTask(
                 `
                 INSERT OR IGNORE INTO events (entity_type, entity_id, ts_ms, actor_type, actor_id, event_type, payload_json, dedup_key)
                 VALUES ('task', @id, @ts, @actor_type, NULL, 'TASK_CREATED', @payload, @dedup_key)
-            `
+            `,
             ).run({
                 id,
                 ts: now,
@@ -435,15 +440,15 @@ function insertTask(
 }
 
 /**
- * @typedef {*} UpdateTaskUpdates
+ * @typedef {any} UpdateTaskUpdates
  */
 /**
- * Updates a task with optimistic locking (retries up to 3 times on version conflict).
- * FIXED (P0-2.6): Agora throws em conflito permanente ao invés de retornar null
+ * Updates a task with optimistic locking (retries up to 3 times on version conflict). FIXED (P0-2.6): Agora throws em
+ * conflito permanente ao invés de retornar null
  *
  * @param {string} taskId
  * @param {UpdateTaskUpdates} updates
- * @param {number} [_retryCount=0] - Internal retry counter
+ * @param {number} [_retryCount=0] - Internal retry counter. Default is `0`
  * @returns {any} - Task atualizado (nunca null em conflito)
  * @throws {Error} OptimisticLockError se max retries excedido
  */
@@ -483,7 +488,7 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
     let nextTarget = row.target;
     let nextModel = row.model;
     let nextExecuteAfterMs = row.execute_after_ms;
-    /** @type {string[]|null} */
+    /** @type {string[] | null} */
     let nextDeps = null;
 
     if (updates.task) {
@@ -664,7 +669,7 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
                 blocked_at_ms = @blocked_at_ms,
                 blocked_details_json = @blocked_details_json
             WHERE id = @id AND updated_at_ms = @expected_version
-        `
+        `,
             )
             .run({
                 id: taskId,
@@ -710,7 +715,7 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
             db.prepare('DELETE FROM task_dependencies WHERE task_id = ?').run(taskId);
             if (nextDeps.length > 0) {
                 const stmt = db.prepare(
-                    'INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_task_id) VALUES (?, ?)'
+                    'INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_task_id) VALUES (?, ?)',
                 );
                 for (const depId of nextDeps) {
                     stmt.run(taskId, depId);
@@ -733,7 +738,7 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
 
         // Max retries exceeded - throw ao invés de retornar null
         const error = new Error(
-            `Task ${taskId} update failed: version conflict after ${MAX_RETRIES + 1} attempts (OptimisticLockError)`
+            `Task ${taskId} update failed: version conflict after ${MAX_RETRIES + 1} attempts (OptimisticLockError)`,
         );
         error.name = 'OptimisticLockError';
 
@@ -745,8 +750,9 @@ function updateTask(taskId, updates = {}, _retryCount = 0) {
 
 /**
  * Função exportada: setTaskStage.
- * @param {*} taskId
- * @param {*} stage
+ *
+ * @param {any} taskId
+ * @param {any} stage
  * @returns {any}
  */
 function setTaskStage(taskId, stage) {
@@ -754,12 +760,13 @@ function setTaskStage(taskId, stage) {
 }
 
 /**
- * @typedef {*} SetTaskStatusExtra
+ * @typedef {any} SetTaskStatusExtra
  */
 /**
  * Função exportada: setTaskStatus.
- * @param {*} taskId
- * @param {*} status
+ *
+ * @param {any} taskId
+ * @param {any} status
  * @param {SetTaskStatusExtra} [extra]
  * @returns {any}
  */
@@ -768,15 +775,16 @@ function setTaskStatus(taskId, status, extra = {}) {
 }
 
 /**
- * @typedef {*} ClaimNextEligibleTaskParams
+ * @typedef {any} ClaimNextEligibleTaskParams
  */
 /**
- * @typedef {*} ClaimNextEligibleTaskOptions
+ * @typedef {any} ClaimNextEligibleTaskOptions
  */
 /**
  * Atomically claims next eligible task (READY + PENDING).
+ *
  * @param {ClaimNextEligibleTaskParams} params - Parameters
- * @returns {object|null} { task, row } or null
+ * @returns {object | null} { task, row } or null
  */
 function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) {
     if (!workerId) {
@@ -826,7 +834,7 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
                     WHERE d.task_id = tasks.id
                       AND (parent.id IS NULL OR parent.status != 'DONE')
                   )
-            `
+            `,
             )
             .run({
                 workerId,
@@ -864,15 +872,16 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
  */
 /**
  * Releases the lock on a task.
+ *
  * @param {ReleaseTaskLockParams} params - Parameters
  * @returns {any}
  */
 function releaseTaskLock(
-    /** @type {{ taskId: string, workerId?: string | undefined, expectedAttemptId?: string | undefined }} */ {
+    /** @type {{ taskId: string; workerId?: string | undefined; expectedAttemptId?: string | undefined }} */ {
         taskId,
         workerId,
         expectedAttemptId,
-    }
+    },
 ) {
     const db = getDb();
     const now = _now();
@@ -891,7 +900,7 @@ function releaseTaskLock(
                 latest_attempt_id = @expectedAttemptId OR
                 last_correlation_id = @expectedAttemptId
               )
-        `
+        `,
         )
         .run({ id: taskId, workerId: workerId || null, expectedAttemptId: expectedAttemptId || null, now });
     return res.changes || 0;
@@ -904,16 +913,17 @@ function releaseTaskLock(
  */
 /**
  * Extends the lock on a task.
+ *
  * @param {ExtendTaskLockParams} params - Parameters
  * @returns {any}
  */
 function extendTaskLock(
-    /** @type {{ taskId: string, workerId: string, nowMs?: number, lockTtlMs?: number }} */ {
+    /** @type {{ taskId: string; workerId: string; nowMs?: number; lockTtlMs?: number }} */ {
         taskId,
         workerId,
         nowMs = _now(),
         lockTtlMs = 60000,
-    }
+    },
 ) {
     const db = getDb();
     const res = db
@@ -925,7 +935,7 @@ function extendTaskLock(
             WHERE id = @id
               AND lock_expires_at_ms IS NOT NULL
               AND (@workerId IS NULL OR locked_by = @workerId)
-        `
+        `,
         )
         .run({
             id: taskId,
@@ -938,6 +948,7 @@ function extendTaskLock(
 
 /**
  * Função exportada: retryFailedTasks.
+ *
  * @returns {any}
  */
 function retryFailedTasks() {
@@ -952,7 +963,7 @@ function retryFailedTasks() {
                 failed_at_ms = NULL,
                 updated_at_ms = @now
             WHERE status = 'FAILED'
-        `
+        `,
         )
         .run({ now });
     return res.changes || 0;
@@ -960,8 +971,9 @@ function retryFailedTasks() {
 
 /**
  * Função exportada: incrementTaskAttempts.
- * @param {*} taskId
- * @param {*} [delta]
+ *
+ * @param {any} taskId
+ * @param {any} [delta]
  * @returns {any}
  */
 function incrementTaskAttempts(taskId, delta = 1) {
@@ -975,7 +987,7 @@ function incrementTaskAttempts(taskId, delta = 1) {
             SET attempts = MAX(0, attempts + @delta),
                 updated_at_ms = @now
             WHERE id = @id
-        `
+        `,
         )
         .run({ id: taskId, delta: d, now });
     return res.changes || 0;
@@ -983,19 +995,21 @@ function incrementTaskAttempts(taskId, delta = 1) {
 
 /**
  * Função exportada: clearQueuePreserveRunning.
+ *
  * @returns {any}
  */
 function clearQueuePreserveRunning() {
     const db = getDb();
     const _runResult = db.prepare("SELECT COUNT(1) AS c FROM tasks WHERE status = 'RUNNING'").get();
-    const running = (/** @type {any} */ (_runResult))?.c || 0;
+    const running = /** @type {any} */ (_runResult)?.c || 0;
     const res = db.prepare("DELETE FROM tasks WHERE status != 'RUNNING'").run();
     return { deleted: res.changes || 0, preserved: running };
 }
 
 /**
  * Função exportada: purgeTask.
- * @param {*} taskId
+ *
+ * @param {any} taskId
  * @returns {any}
  */
 function purgeTask(taskId) {

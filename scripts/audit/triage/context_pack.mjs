@@ -6,8 +6,8 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 const DEFAULT_MASTER = path.join(ROOT, 'DOCUMENTAÇÃO', 'BUGS', 'BUG_AUDIT_MASTER.md');
 
 /**
- * @param {string|null} filePath
- * @param {number|null} line
+ * @param {string | null} filePath
+ * @param {number | null} line
  * @param {number} radius
  */
 function readLocalCodeContext(filePath, line, radius = 6) {
@@ -35,7 +35,7 @@ function readLocalCodeContext(filePath, line, radius = 6) {
 
 /**
  * @param {string} masterPath
- * @param {string|null} contractId
+ * @param {string | null} contractId
  * @returns {string[]}
  */
 function readMasterHistoryHints(masterPath, contractId) {

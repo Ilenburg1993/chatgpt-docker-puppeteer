@@ -15,7 +15,7 @@ function normalizePath(/** @type {any} */ value) {
  * Lê flag booleana de environment com parsing resiliente.
  *
  * @param {unknown} value
- * @param {boolean} [fallback=false]
+ * @param {boolean} [fallback=false] Default is `false`
  * @returns {boolean}
  */
 function parseEnvFlag(value, fallback = false) {
@@ -40,7 +40,7 @@ function resolveEntrypointFile(/** @type {any} */ importMetaUrl) {
  * Detecta execução direta do arquivo atual (entrypoint real via CLI/Node).
  *
  * @param {string} importMetaUrl
- * @param {string|null|undefined} [argvFile=process.argv[1]]
+ * @param {string | null | undefined} [argvFile=process.argv[1]] Default is `process.argv[1]`
  * @returns {boolean}
  */
 function isDirectEntryExecution(importMetaUrl, argvFile = process.argv[1]) {
@@ -54,7 +54,7 @@ function isDirectEntryExecution(importMetaUrl, argvFile = process.argv[1]) {
  * Detecta quando o PM2 está executando exatamente este arquivo como script principal.
  *
  * @param {string} importMetaUrl
- * @param {NodeJS.ProcessEnv} [env=process.env]
+ * @param {NodeJS.ProcessEnv} [env=process.env] Default is `process.env`
  * @returns {boolean}
  */
 function isPm2ExecPathMatch(importMetaUrl, env = process.env) {
@@ -69,7 +69,7 @@ function isPm2ExecPathMatch(importMetaUrl, env = process.env) {
  * @typedef {object} ShouldAutobootEntrypointOptions
  * @property {string} importMetaUrl
  * @property {NodeJS.ProcessEnv} env
- * @property {string|null} explicitAutostartEnv
+ * @property {string | null} explicitAutostartEnv
  * @property {boolean} allowPm2ExecPathMatch
  */
 /**

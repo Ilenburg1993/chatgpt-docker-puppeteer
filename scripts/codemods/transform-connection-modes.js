@@ -87,7 +87,7 @@ module.exports = function (fileInfo, api) {
                 j.objectPattern([
                     j.property('init', j.identifier('CONNECTION_MODES'), j.identifier('CONNECTION_MODES')),
                 ]),
-                j.callExpression(j.identifier('require'), [j.literal(importPath)])
+                j.callExpression(j.identifier('require'), [j.literal(importPath)]),
             ),
         ]);
 

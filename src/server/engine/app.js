@@ -1,6 +1,6 @@
 // @ts-check
-import * as hardware from '#core/hardware';
 import CONFIG from '#core/config';
+import * as hardware from '#core/hardware';
 import { log } from '#core/logger';
 import { getRuntimeReadinessSummary } from '#core/runtime_resource_registry';
 import { LOG_DIR, ROOT } from '#infra/fs/fs_utils';
@@ -65,7 +65,7 @@ if (process.env.NODE_ENV === 'production') {
 /* --------------------------------------------------------------------------
    1. TRACEABILITY ABSOLUTA
 -------------------------------------------------------------------------- */
-(/** @type {any} */ (app)).use(requestId);
+/** @type {any} */ (app).use(requestId);
 
 /* --------------------------------------------------------------------------
    1.1 RESPONSE TIMING (OBSERVABILIDADE)
@@ -117,7 +117,7 @@ app.use(
             process.env.NODE_ENV === 'production'
                 ? { maxAge: 31536000, includeSubDomains: true, preload: true }
                 : false,
-    })
+    }),
 );
 
 /* --------------------------------------------------------------------------
@@ -146,18 +146,18 @@ function updateCorsOrigins() {
     // Add default/local origins
     const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env.DASHBOARD_ORIGIN];
 
-    defaults.filter(Boolean).forEach(o => corsOrigins.add(o));
+    defaults.filter(Boolean).forEach((o) => corsOrigins.add(o));
 
     // Add from CONFIG
     const configOrigins = CONFIG.ALLOWED_ORIGINS;
     if (Array.isArray(configOrigins)) {
-        configOrigins.forEach(o => corsOrigins.add(o));
+        configOrigins.forEach((o) => corsOrigins.add(o));
     } else if (typeof configOrigins === 'string') {
         configOrigins
             .split(',')
-            .map(s => s.trim())
+            .map((s) => s.trim())
             .filter(Boolean)
-            .forEach(o => corsOrigins.add(o));
+            .forEach((o) => corsOrigins.add(o));
     }
 
     log('INFO', `[SERVER] CORS origins updated: ${corsOrigins.size} allowed origins`);
@@ -189,7 +189,7 @@ app.use(
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
         maxAge: 600,
-    })
+    }),
 );
 
 /* --------------------------------------------------------------------------
@@ -197,11 +197,11 @@ app.use(
 -------------------------------------------------------------------------- */
 
 /**
- * Rate limiter para endpoints da API.
- * SEC-04 FIX: Removido skip total em desenvolvimento. Usa limite maior em não-produção
- * para facilitar testes sem desabilitar completamente a proteção.
+ * Rate limiter para endpoints da API. SEC-04 FIX: Removido skip total em desenvolvimento. Usa limite maior em
+ * não-produção para facilitar testes sem desabilitar completamente a proteção.
  *
  * Limites:
+ *
  * - produção: 100 req/min por IP
  * - desenvolvimento/staging: 2000 req/min por IP (mais permissivo para dev workflow)
  *
@@ -215,7 +215,7 @@ const apiLimiter = rateLimit({
             : parseInt(process.env.RATE_LIMIT_MAX_DEV || '2000', 10),
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: req => ipKeyGenerator(req.ip || ''),
+    keyGenerator: (req) => ipKeyGenerator(req.ip || ''),
     message: {
         success: false,
         error: 'Muitas requisições. Tente novamente em breve.',
@@ -304,7 +304,7 @@ app.use(
                 }
             }
         },
-    })
+    }),
 );
 
 // Serve non-asset dashboard files (index.html, icons, etc.) without aggressive caching.
@@ -320,7 +320,7 @@ app.use(
                 res.setHeader('Cache-Control', 'no-cache');
             }
         },
-    })
+    }),
 );
 
 app.get(/^\/dashboard($|\/.*)/, (req, res) => {
@@ -383,13 +383,15 @@ app.get('/ready', (req, res) => {
                 if (mcp && Array.isArray(mcp.upstreams)) {
                     const requiredUpstreams = mcp.upstreams.filter((/** @type {any} */ u) => u?.required);
                     runtime.mcp_upstreams =
-                        requiredUpstreams.length === 0 ? true : requiredUpstreams.every((/** @type {any} */ u) => !u?.enabled || u?.ready);
+                        requiredUpstreams.length === 0
+                            ? true
+                            : requiredUpstreams.every((/** @type {any} */ u) => !u?.enabled || u?.ready);
                 }
             } catch (/** @type {any} */ e) {
                 // ignore
             }
 
-            const allReady = requiredKeys.length > 0 ? requiredKeys.every(k => runtime[k] === true) : true;
+            const allReady = requiredKeys.length > 0 ? requiredKeys.every((k) => runtime[k] === true) : true;
 
             status = allReady ? 'ready' : 'not-ready';
         }
@@ -402,7 +404,7 @@ app.get('/ready', (req, res) => {
 
         const payload = Object.assign(
             { status, ts: Date.now(), runtime, runtime_resources: runtimeResources, mcp, rag: readRagReadiness() },
-            hardwareMetrics || {}
+            hardwareMetrics || {},
         );
         res.json(payload);
     } catch (/** @type {any} */ err) {

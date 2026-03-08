@@ -1,6 +1,6 @@
 // @ts-check
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { collectQualityFindings } from '../../../scripts/audit/collectors/quality.mjs';
 
 test('quality collector smart plan resolves docs-only run with selective execution and telemetry', async () => {
@@ -17,7 +17,7 @@ test('quality collector smart plan resolves docs-only run with selective executi
                 calledSteps.push(stepId);
                 return { ok: true, exitCode: 0, stdout: '', stderr: '' };
             },
-        })
+        }),
     );
 
     assert.deepEqual(result.errors, []);

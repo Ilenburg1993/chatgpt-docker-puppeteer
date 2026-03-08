@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // @ts-check
-import './lib/env-bootstrap.mjs';
-import path from 'node:path';
 import { promises as fs, watch as fsWatch } from 'node:fs';
-import { parseArgs } from 'node:util';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+import './lib/env-bootstrap.mjs';
 import { ragIndexChanged } from './lib/facade.mjs';
 
 const DEFAULT_DEBOUNCE_MS = Number(process.env.RAG_WATCH_DEBOUNCE_MS || 3000);
@@ -41,12 +41,12 @@ function shouldSkipDir(relDir) {
     const normalized = toPosix(relDir);
     if (!normalized) return false;
     const parts = normalized.split('/').filter(Boolean);
-    return parts.some(p => SKIP_DIRS.has(p));
+    return parts.some((p) => SKIP_DIRS.has(p));
 }
 
 export class RagWatchBatcher {
     /**
-     * @param {{ debounceMs?: number, batchMax?: number, onBatch: Function }} opts
+     * @param {{ debounceMs?: number; batchMax?: number; onBatch: Function }} opts
      */
     constructor({ debounceMs, batchMax, onBatch }) {
         this.debounceMs = Math.max(250, Number(debounceMs || DEFAULT_DEBOUNCE_MS));
@@ -110,7 +110,7 @@ async function watchTree(rootAbs, onFsEvent, watchers, relDir = '') {
     }
 
     try {
-        const watcher = fsWatch(absDir, (/** @type {string} */ eventType, /** @type {string|null} */ filename) => {
+        const watcher = fsWatch(absDir, (/** @type {string} */ eventType, /** @type {string | null} */ filename) => {
             const file = filename ? String(filename) : '';
             const relPath = toPosix(relDir ? path.posix.join(relDir, file) : file);
             onFsEvent({ eventType, relPath, relDir });
@@ -199,7 +199,7 @@ async function main() {
             console.log(
                 `[RAG Watch] batch=${batch.length} changed=${report.changed_files} ` +
                     `deleted=${report.deleted_files} skipped=${report.skipped_files} chunks=${report.inserted_chunks} ` +
-                    `mode=incremental took=${tookMs}ms`
+                    `mode=incremental took=${tookMs}ms`,
             );
         },
     });
@@ -252,7 +252,7 @@ async function main() {
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
-    main().catch(error => {
+    main().catch((error) => {
         console.error('[RAG Watch] fatal:', error?.message || error);
         process.exit(1);
     });

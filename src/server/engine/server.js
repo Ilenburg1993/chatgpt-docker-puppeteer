@@ -1,6 +1,6 @@
 // @ts-check
-/** @import { Server } from 'http' */
-/** @import { ServerOptions } from 'https' */
+/** @import {Server} from "http" */
+/** @import {ServerOptions} from "https" */
 import { log } from '#core/logger';
 import { SSL_OP_NO_TLSv1, SSL_OP_NO_TLSv1_1 } from 'node:constants';
 import fs from 'node:fs';
@@ -9,7 +9,7 @@ import https from 'node:https';
 import path from 'node:path';
 import app from './app.js';
 
-/** @type {Server|import('https').Server|null} */
+/** @type {Server | import('https').Server | null} */
 let httpServer = null;
 
 /* ---------------------------------------------------------------------------
@@ -17,15 +17,12 @@ let httpServer = null;
 --------------------------------------------------------------------------- */
 
 /**
- * Host de bind.
- * Default seguro para container: 0.0.0.0
- * Pode ser sobrescrito via ENV em cenários especiais.
+ * Host de bind. Default seguro para container: 0.0.0.0 Pode ser sobrescrito via ENV em cenários especiais.
  */
 const HOST = process.env.HOST || '0.0.0.0';
 
 /**
- * Limite máximo de escalonamento de porta.
- * Evita subir fora da faixa forwardada do devcontainer.
+ * Limite máximo de escalonamento de porta. Evita subir fora da faixa forwardada do devcontainer.
  */
 const MAX_PORT_OFFSET = Number.parseInt(process.env.PORT_HUNT_LIMIT || '5', 10);
 
@@ -34,10 +31,9 @@ const MAX_PORT_OFFSET = Number.parseInt(process.env.PORT_HUNT_LIMIT || '5', 10);
 --------------------------------------------------------------------------- */
 
 /**
- * Obtém opções SSL/TLS para servidor HTTPS.
- * Suporta certificados auto-assinados para desenvolvimento.
+ * Obtém opções SSL/TLS para servidor HTTPS. Suporta certificados auto-assinados para desenvolvimento.
  *
- * @returns {ServerOptions|null} - Opções SSL ou null se HTTP
+ * @returns {ServerOptions | null} - Opções SSL ou null se HTTP
  * @throws {Error} - Se certificados obrigatórios estiverem ausentes
  */
 function getSSLOptions() {
@@ -88,16 +84,13 @@ function getSSLOptions() {
 /**
  * Inicia servidor HTTP/HTTPS com bind explícito e port hunting controlado.
  *
- * Regras:
- *   — tenta porta base
- *   — se ocupada → porta+1
- *   — limitado por MAX_PORT_OFFSET
- *   — falha determinística se faixa esgotar
- *   — HTTPS forçado em produção
+ * Regras: — tenta porta base — se ocupada → porta+1 — limitado por MAX_PORT_OFFSET — falha determinística se faixa
+ * esgotar — HTTPS forçado em produção
  *
  * @param {number} port - Porta base para bind
- * @param {number} [attempt=0] - Tentativa interna (port hunting)
- * @returns {Promise<{server: import('http').Server|import('https').Server, port: number, protocol: string}>} - Servidor, porta efetiva e protocolo
+ * @param {number} [attempt=0] - Tentativa interna (port hunting). Default is `0`
+ * @returns {Promise<{ server: import('http').Server | import('https').Server; port: number; protocol: string }>} -
+ *   Servidor, porta efetiva e protocolo
  * @throws {Error} - Se nenhuma porta estiver disponível na faixa
  * @sideEffects - Inicia servidor HTTP/HTTPS, registra listeners, log de inicialização
  */
@@ -133,19 +126,19 @@ function start(port, attempt = 0) {
             resolve({ server: /** @type {any} */ (httpServer), port, protocol });
         });
 
-        httpServer.on('error', err => {
+        httpServer.on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
                 const nextPort = port + 1;
 
                 log('WARN', `[ENGINE] Porta ${port} ocupada → ${nextPort} (${attempt + 1}/${MAX_PORT_OFFSET})`);
 
                 try {
-                    (/** @type {any} */ (httpServer)).close();
+                    /** @type {any} */ (httpServer).close();
                 } catch (/** @type {any} */ errClose) {
                     const _e = /** @type {any} */ (errClose);
                     log(
                         'DEBUG',
-                        `[ENGINE] httpServer.close() failed: ${errClose && _e.message ? _e.message : String(_e)}`
+                        `[ENGINE] httpServer.close() failed: ${errClose && _e.message ? _e.message : String(_e)}`,
                     );
                 }
                 httpServer = null;
@@ -165,10 +158,9 @@ function start(port, attempt = 0) {
 --------------------------------------------------------------------------- */
 
 /**
- * Encerra servidor HTTP e libera porta.
- * Operação idempotente com timeout para force-close.
+ * Encerra servidor HTTP e libera porta. Operação idempotente com timeout para force-close.
  *
- * @param {number} [gracefulTimeout=30000] - Timeout em ms para esperar conexões fecharem
+ * @param {number} [gracefulTimeout=30000] - Timeout em ms para esperar conexões fecharem. Default is `30000`
  * @returns {Promise<void>}
  * @throws {Error} - Se shutdown falhar após timeout
  * @sideEffects - Fecha servidor HTTP, notifica Socket.IO, limpa estado global
@@ -201,8 +193,8 @@ async function stop(gracefulTimeout = 30000) {
             log('WARN', `[ENGINE] Forçando shutdown após ${gracefulTimeout}ms...`);
 
             // Force close all active connections (Node.js 18.2+)
-            if (typeof (/** @type {any} */ (httpServer)).closeAllConnections === 'function') {
-                (/** @type {any} */ (httpServer)).closeAllConnections();
+            if (typeof (/** @type {any} */ (httpServer).closeAllConnections) === 'function') {
+                /** @type {any} */ (httpServer).closeAllConnections();
                 log('INFO', '[ENGINE] Todas conexões forçadamente fechadas.');
             } else {
                 log('WARN', '[ENGINE] closeAllConnections() não disponível (Node.js < 18.2)');
@@ -214,7 +206,7 @@ async function stop(gracefulTimeout = 30000) {
         }, gracefulTimeout);
 
         // Graceful close
-        httpServer.close(err => {
+        httpServer.close((err) => {
             clearTimeout(forceTimeout);
 
             if (err) {
@@ -235,10 +227,9 @@ async function stop(gracefulTimeout = 30000) {
 --------------------------------------------------------------------------- */
 
 /**
- * Retorna instância HTTP/HTTPS bruta para camadas de transporte.
- * Somente leitura — não alterar lifecycle externamente.
+ * Retorna instância HTTP/HTTPS bruta para camadas de transporte. Somente leitura — não alterar lifecycle externamente.
  *
- * @returns {Server|import('https').Server|null} - Instância HTTP/HTTPS ou null se não inicializado
+ * @returns {Server | import('https').Server | null} - Instância HTTP/HTTPS ou null se não inicializado
  */
 function getRawServer() {
     return httpServer;

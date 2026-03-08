@@ -6,10 +6,10 @@ import {
     RAG_CHUNK_MAX_CHARS,
     RAG_CHUNK_TARGET_CHARS,
 } from '../contract.mjs';
-import { chunkMarkdown } from './chunk_md.mjs';
 import { chunkCode } from './chunk_code.mjs';
-import { chunkPlain } from './chunk_plain.mjs';
 import { chunkJsAst } from './chunk_js_ast.mjs';
+import { chunkMarkdown } from './chunk_md.mjs';
+import { chunkPlain } from './chunk_plain.mjs';
 
 function isDockerfile(/** @type {any} */ relPath) {
     const base = path.posix.basename(relPath);
@@ -59,19 +59,21 @@ function isAstChunkingEnabled() {
     return String(process.env.RAG_AST_CHUNK_ENABLED || 'true') !== 'false';
 }
 
-function buildHeaderText(/** @type {any} */ {
-    relPath,
-    language,
-    kind,
-    symbol,
-    exported,
-    tags,
-    imports,
-    anchor,
-    jsdoc,
-    subchunkIndex,
-    subchunkTotal,
-}) {
+function buildHeaderText(
+    /** @type {any} */ {
+        relPath,
+        language,
+        kind,
+        symbol,
+        exported,
+        tags,
+        imports,
+        anchor,
+        jsdoc,
+        subchunkIndex,
+        subchunkTotal,
+    },
+) {
     const lines = [];
     lines.push(`path: ${relPath}`);
     lines.push(`language: ${language || 'unknown'}`);

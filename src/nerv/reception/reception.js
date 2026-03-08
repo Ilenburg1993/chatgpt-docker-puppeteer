@@ -13,16 +13,16 @@ import createReceive from './receive.js';
  */
 /**
  * @typedef {object} CreateReceptionOptions
- * @property {*} [envelopes]
- * @property {*} [correlation]
- * @property {*} [telemetry]
+ * @property {any} [envelopes]
+ * @property {any} [correlation]
+ * @property {any} [telemetry]
  */
 /**
  * Cria o módulo de recepção do NERV.
  *
- * **Side-effects:** Inicializa receptor de mensagens e correlação histórica.
- * **Semântica:** Composição de subsistemas de recepção para comunicação neural.
- * **Unidades:** Dependências seguem contratos NERV (envelopes, correlation, telemetry).
+ * **Side-effects:** Inicializa receptor de mensagens e correlação histórica. **Semântica:** Composição de subsistemas
+ * de recepção para comunicação neural. **Unidades:** Dependências seguem contratos NERV (envelopes, correlation,
+ * telemetry).
  *
  * @param {CreateReceptionDeps} deps - Dependências do módulo
  * @returns {any} Módulo de recepção com método onMessage
@@ -51,8 +51,7 @@ function createReception({ envelopes, correlation, telemetry }) {
 
     return Object.freeze({
         /**
-         * Recebe um frame inbound já desserializado.
-         * Ato puramente factual.
+         * Recebe um frame inbound já desserializado. Ato puramente factual.
          */
         receive: receiver.receive,
 

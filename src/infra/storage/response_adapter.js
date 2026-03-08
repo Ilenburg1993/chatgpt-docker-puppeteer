@@ -1,9 +1,9 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { saveResponseV2, loadResponseV2 } from './response_store_v2.js';
 import * as logger from '#core/logger';
+import { ROOT } from '#infra/fs/paths';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { ROOT } from '#infra/fs/paths';
+import { loadResponseV2, saveResponseV2 } from './response_store_v2.js';
 
 const RESPONSE_DIR = path.join(ROOT, 'respostas');
 
@@ -12,9 +12,9 @@ const RESPONSE_DIR = path.join(ROOT, 'respostas');
  * Salva response (detecta V1 ou V2 automaticamente)
  *
  * @param {string} taskId - Task ID
- * @param {string|object} response - Response V1 (string) ou V2 (object)
+ * @param {string | object} response - Response V1 (string) ou V2 (object)
  * @param {SaveResponseTask} task - Task object (para preencher result)
- * @param {string=} attemptId - attempt/correlation id (opcional)
+ * @param {string} [attemptId] - attempt/correlation id (opcional)
  * @returns {Promise<any>} - { storage, format }
  */
 async function saveResponse(taskId, response, task, attemptId) {
@@ -32,7 +32,7 @@ async function saveResponse(taskId, response, task, attemptId) {
                 /** @type {any} */ ({
                     taskId,
                     responseLength: typeof response === 'string' ? response.length : 0,
-                })
+                }),
             );
 
             const responseV2 = convertV1toV2(/** @type {any} */ (response), task);
@@ -45,7 +45,7 @@ async function saveResponse(taskId, response, task, attemptId) {
                 taskId,
                 error: /** @type {any} */ (error).message,
                 stack: /** @type {any} */ (error).stack,
-            })
+            }),
         );
         throw error;
     }
@@ -56,12 +56,12 @@ async function saveResponse(taskId, response, task, attemptId) {
 /**
  * Salva response V2 e preenche task.result
  *
+ * @private
  * @param {string} taskId - Task ID
  * @param {SaveResponseV2FormatResponseV2} responseV2 - Response V2 object
  * @param {SaveResponseV2FormatTask} task - Task object
- * @param {string=} attemptId - attempt/correlation id (opcional)
+ * @param {string} [attemptId] - attempt/correlation id (opcional)
  * @returns {Promise<any>} - { storage, format }
- * @private
  */
 async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
     // Salvar em 4 formatos
@@ -104,7 +104,7 @@ async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
                 markdown: responseV2.content?.markdown?.length || 0,
                 html: responseV2.content?.html?.length || 0,
             },
-        })
+        }),
     );
 
     return { storage, format: 'v2' };
@@ -114,9 +114,9 @@ async function saveResponseV2Format(taskId, responseV2, task, attemptId) {
 /**
  * Detecta se response é V2 (object) ou V1 (string)
  *
+ * @private
  * @param {IsResponseV2Response} response - Response para verificar
  * @returns {boolean} - true se V2, false se V1
- * @private
  */
 function isResponseV2(response) {
     if (!response) return false;
@@ -134,10 +134,10 @@ function isResponseV2(response) {
 /**
  * Converte response V1 (string) para V2 (object)
  *
+ * @private
  * @param {string} responseText - Response V1 (texto plano)
  * @param {ConvertV1toV2Task} task - Task object (para metadata)
  * @returns {any} - Response V2
- * @private
  */
 function convertV1toV2(responseText, task) {
     const text = typeof responseText === 'string' ? responseText : String(responseText || '');
@@ -178,12 +178,11 @@ function convertV1toV2(responseText, task) {
 }
 
 /**
- * Carrega response (backward compatible)
- * Tenta V2 primeiro, fallback para V1
+ * Carrega response (backward compatible) Tenta V2 primeiro, fallback para V1
  *
  * @param {string} taskId - Task ID
  * @param {string} format - Formato desejado ('text', 'markdown', 'json', 'html')
- * @returns {Promise<string|object|null>} - Response content
+ * @returns {Promise<string | object | null>} - Response content
  */
 async function loadResponse(taskId, format) {
     format = format || 'text';
@@ -212,7 +211,7 @@ async function loadResponse(taskId, format) {
                     /** @type {any} */ ({
                         taskId,
                         format,
-                    })
+                    }),
                 );
                 return null;
             }
@@ -225,9 +224,9 @@ async function loadResponse(taskId, format) {
 /**
  * Escape HTML (utility)
  *
+ * @private
  * @param {string} text - Texto para escapar
  * @returns {string} - Texto escapado
- * @private
  */
 function escapeHtml(text) {
     return text
@@ -238,4 +237,4 @@ function escapeHtml(text) {
         .replace(/'/g, '&#039;');
 }
 
-export { saveResponse, loadResponse, isResponseV2, convertV1toV2 };
+export { convertV1toV2, isResponseV2, loadResponse, saveResponse };

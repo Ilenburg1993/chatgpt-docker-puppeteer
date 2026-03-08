@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
-/** @import { Page as PuppeteerPage } from 'puppeteer-core' */
+/** @import {Page as PuppeteerPage} from "puppeteer-core" */
 
 /**
  * Resultados de validação de pré-requisitos.
@@ -51,7 +51,7 @@ async function validateLLMPage(page) {
     // URLs inválidas
     const invalidUrls = ['about:blank', 'chrome://', 'chrome-extension://', 'data:', 'file://'];
 
-    if (invalidUrls.some(prefix => url.startsWith(prefix))) {
+    if (invalidUrls.some((prefix) => url.startsWith(prefix))) {
         return ValidationResult.fail('INVALID_URL', {
             message: 'Página não está em URL utilizável',
             url,
@@ -62,7 +62,7 @@ async function validateLLMPage(page) {
     // URLs de LLMs suportadas
     const supportedDomains = ['chatgpt.com', 'openai.com', 'gemini.google.com', 'claude.ai', 'anthropic.com'];
 
-    const isSupported = supportedDomains.some(domain => url.includes(domain));
+    const isSupported = supportedDomains.some((domain) => url.includes(domain));
 
     if (!isSupported) {
         return ValidationResult.fail('UNSUPPORTED_LLM', {
@@ -76,8 +76,7 @@ async function validateLLMPage(page) {
 }
 
 /**
- * Valida se interface LLM está carregada e utilizável.
- * Usa SADI (Sensory Analysis Deep Intelligence) via analyzer.js.
+ * Valida se interface LLM está carregada e utilizável. Usa SADI (Sensory Analysis Deep Intelligence) via analyzer.js.
  *
  * @param {PuppeteerPage} page - Puppeteer Page
  * @returns {Promise<any>} ValidationResult
@@ -205,7 +204,7 @@ function validateBrowserPool(browserPool) {
 
 /**
  * @typedef {object} ValidateBrowserConnectionBrowser
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Valida se browser instance está conectada e utilizável.
@@ -236,8 +235,7 @@ function validateBrowserConnection(browser) {
  * @property {PuppeteerPage} page
  */
 /**
- * Valida pré-requisitos para execução de Driver.
- * Verifica: Browser Pool, Circuit Breaker, Página, Interface LLM.
+ * Valida pré-requisitos para execução de Driver. Verifica: Browser Pool, Circuit Breaker, Página, Interface LLM.
  *
  * @param {ValidateDriverExecutionOptions} options
  * @returns {Promise<any>} ValidationResult
@@ -312,11 +310,11 @@ function validateKernelExecution({ executionEngine, nervBridge, telemetry }) {
  * API pública de validação de pré-requisitos para browser pool, drivers e kernel.
  */
 export {
-    ValidationResult,
-    validateLLMPage,
-    validateLLMInterface,
-    validateBrowserPool,
     validateBrowserConnection,
+    validateBrowserPool,
     validateDriverExecution,
     validateKernelExecution,
+    validateLLMInterface,
+    validateLLMPage,
+    ValidationResult,
 };

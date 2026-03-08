@@ -153,11 +153,11 @@
 </template>
 
 <script>
-import { useRealtime } from '@/composables/useRealtime';
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
 import Modal from '@/components/ui/Modal.vue';
+import { useRealtime } from '@/composables/useRealtime';
 import { useTaskStore } from '@/stores/tasks';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -192,14 +192,14 @@ export default {
 
         const hasActiveFilters = computed(() => statusFilter.value || searchFilter.value);
 
-        const failedCount = computed(() => tasks.value.filter(t => t.unified_status === 'FAILED').length);
+        const failedCount = computed(() => tasks.value.filter((t) => t.unified_status === 'FAILED').length);
 
         const confirmOpen = ref(false);
         const confirmTitle = ref('');
         const confirmDescription = ref('');
         const confirmVariant = ref('primary');
         const confirmLoading = ref(false);
-        /** @type {import('vue').Ref<null|(() => Promise<void>)>} */
+        /** @type {import('vue').Ref<null | (() => Promise<void>)>} */
         const confirmAction = ref(null);
 
         const showNotice = (type, message) => {
@@ -264,12 +264,12 @@ export default {
             taskStore.clearError();
         };
 
-        const viewTask = task => {
+        const viewTask = (task) => {
             const taskId = task.meta?.id || task.id;
             router.push(`/tasks/${taskId}`);
         };
 
-        const retryTask = async task => {
+        const retryTask = async (task) => {
             try {
                 showNotice('info', 'Retry is not implemented yet.');
             } catch (err) {
@@ -277,7 +277,7 @@ export default {
             }
         };
 
-        const confirmDelete = task => {
+        const confirmDelete = (task) => {
             const taskId = task.meta?.id || task.id;
             openConfirm({
                 title: 'Delete task',
@@ -311,7 +311,7 @@ export default {
             });
         };
 
-        const getBadgeVariant = status => {
+        const getBadgeVariant = (status) => {
             const variants = {
                 RUNNING: 'warning',
                 PENDING: 'info',
@@ -329,7 +329,7 @@ export default {
             return prompt.substring(0, maxLength) + '...';
         };
 
-        const formatDate = dateStr => {
+        const formatDate = (dateStr) => {
             if (!dateStr) return '';
             const date = new Date(dateStr);
             return date.toLocaleString();

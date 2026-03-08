@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 /**
  * @typedef {object} MissionPlannerProcessorOptions
- * @property {number} [intervalMs=1500] - Intervalo em ms entre ticks do processador.
+ * @property {number} [intervalMs=1500] - Intervalo em ms entre ticks do processador. Default is `1500`
  */
 
 /**
@@ -30,14 +30,14 @@ import { v4 as uuidv4 } from 'uuid';
  * @property {unknown} context - Contexto da missão.
  * @property {string} created_at - Data de criação.
  * @property {string} updated_at - Data de atualização.
- * @property {string|null} started_at - Data de início.
- * @property {string|null} completed_at - Data de conclusão.
+ * @property {string | null} started_at - Data de início.
+ * @property {string | null} completed_at - Data de conclusão.
  */
 
 /**
  * @typedef {object} ShouldAutoApproveOptions
  * @property {Mission} [mission] - Missão associada.
- * @property {string[]} [proposalTags=[]] - Tags da proposta.
+ * @property {string[]} [proposalTags=[]] - Tags da proposta. Default is `[]`
  */
 
 /**
@@ -59,15 +59,17 @@ import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Função utilitária para pausar execução por ms milissegundos.
+ *
  * @param {number} ms - Milissegundos para aguardar.
  * @returns {Promise<void>}
  */
 function _sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Extrai JSON de uma string de texto, tentando múltiplas estratégias.
+ *
  * @param {string} text - Texto contendo JSON.
  * @returns {Record<string, unknown> | null} - Objeto JSON extraído ou null se falhar.
  */
@@ -109,12 +111,13 @@ function _extractJson(text) {
 
 /**
  * Seleciona o target apropriado baseado na solicitação e targets permitidos.
- * @param {PickTargetOptions} [options={}] - Opções para seleção de target.
+ *
+ * @param {PickTargetOptions} [options={}] - Opções para seleção de target. Default is `{}`
  * @returns {string} - Target selecionado.
  */
 function _pickTarget({ requested, allowedTargets } = {}) {
     const req = requested ? String(requested).toLowerCase().trim() : null;
-    const allowed = Array.isArray(allowedTargets) ? allowedTargets.map(t => String(t).toLowerCase().trim()) : null;
+    const allowed = Array.isArray(allowedTargets) ? allowedTargets.map((t) => String(t).toLowerCase().trim()) : null;
 
     if (req && allowed && allowed.includes(req)) return req;
     if (req && !allowed) return req;
@@ -124,6 +127,7 @@ function _pickTarget({ requested, allowedTargets } = {}) {
 
 /**
  * Verifica se uma proposta deve ser auto-aprovada baseado na missão e tags.
+ *
  * @param {ShouldAutoApproveOptions} options - Opções para verificação.
  * @returns {boolean} - True se deve auto-aprovar.
  */
@@ -155,7 +159,8 @@ function _shouldAutoApprove({ mission, proposalTags = [] } = {}) {
 class MissionPlannerProcessor {
     /**
      * Cria uma instância do MissionPlannerProcessor.
-     * @param {MissionPlannerProcessorOptions} [options={}] - Opções de configuração.
+     *
+     * @param {MissionPlannerProcessorOptions} [options={}] - Opções de configuração. Default is `{}`
      */
     constructor({ intervalMs = 1500 } = {}) {
         this.intervalMs = Math.max(250, Number(intervalMs) || 1500);
@@ -165,8 +170,8 @@ class MissionPlannerProcessor {
     }
 
     /**
-     * Inicia o processador, configurando um timer para executar ticks periodicamente.
-     * Side-effects: Inicia timer, registra log.
+     * Inicia o processador, configurando um timer para executar ticks periodicamente. Side-effects: Inicia timer,
+     * registra log.
      */
     start() {
         if (this._timer) return;
@@ -177,8 +182,7 @@ class MissionPlannerProcessor {
     }
 
     /**
-     * Para o processador, limpando o timer.
-     * Side-effects: Para timer, registra log.
+     * Para o processador, limpando o timer. Side-effects: Para timer, registra log.
      */
     stop() {
         this._stopped = true;
@@ -190,8 +194,9 @@ class MissionPlannerProcessor {
     }
 
     /**
-     * Executa um tick do processador, processando tarefas do mission planner.
-     * Side-effects: Lê do banco, registra eventos, processa resultados.
+     * Executa um tick do processador, processando tarefas do mission planner. Side-effects: Lê do banco, registra
+     * eventos, processa resultados.
+     *
      * @returns {Promise<void>}
      */
     async tick() {
@@ -212,7 +217,7 @@ class MissionPlannerProcessor {
                       AND status = 'DONE'
                     ORDER BY updated_at_ms DESC
                     LIMIT 50
-                `
+                `,
                     )
                     .all()
             );
@@ -258,8 +263,9 @@ class MissionPlannerProcessor {
     }
 
     /**
-     * Processa o resultado de uma tarefa do mission planner, extraindo propostas e criando novas tarefas.
-     * Side-effects: Lê arquivos, registra eventos, insere tarefas no banco.
+     * Processa o resultado de uma tarefa do mission planner, extraindo propostas e criando novas tarefas. Side-effects:
+     * Lê arquivos, registra eventos, insere tarefas no banco.
+     *
      * @param {ProcessPlannerResultOptions} options - Opções com IDs da missão e tarefa.
      * @returns {Promise<void>}
      */

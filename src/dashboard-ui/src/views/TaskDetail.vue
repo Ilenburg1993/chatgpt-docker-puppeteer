@@ -1,15 +1,14 @@
 <script setup>
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import Button from '@/components/ui/Button.vue';
 import Badge from '@/components/ui/Badge.vue';
+import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Input from '@/components/ui/Input.vue';
-import { useTasksVNextStore } from '@/stores/tasks_vnext';
-import { useMissionsVNextStore } from '@/stores/missions_vnext';
-import { http } from '@/lib/http';
-import { formatHttpError } from '@/lib/http';
 import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
+import { formatHttpError, http } from '@/lib/http';
+import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 const VisGraph = defineAsyncComponent(() => import('@/components/graphs/VisGraph.vue'));
 
@@ -87,7 +86,7 @@ function resolveReason(defaultReason, errorMessage) {
     if (typed) return typed;
     if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
         const prompted = String(
-            window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || ''
+            window.prompt('Informe o motivo operacional para esta ação:', defaultReason) || '',
         ).trim();
         if (prompted) {
             commandReason.value = prompted;
@@ -157,7 +156,7 @@ async function saveBasics() {
 async function saveDependencies() {
     const reason = resolveReason(
         'Atualização de dependências da task',
-        'Motivo obrigatório para atualizar dependências.'
+        'Motivo obrigatório para atualizar dependências.',
     );
     if (!confirmTwoStepAction({ actionLabel: `TASK_PATCH.dependencies (${taskId.value})`, reason })) {
         return;
@@ -192,7 +191,7 @@ async function saveJsonAdvanced() {
 async function action(actionName) {
     const reason = resolveReason(
         `Ação ${String(actionName).toUpperCase()} na task`,
-        'Motivo obrigatório para comando de task.'
+        'Motivo obrigatório para comando de task.',
     );
     if (
         !confirmTwoStepAction({
@@ -213,7 +212,7 @@ async function reassignMission() {
     }
     const reason = resolveReason(
         'Reatribuição manual da task para outra missão',
-        'Motivo obrigatório para reatribuição de missão.'
+        'Motivo obrigatório para reatribuição de missão.',
     );
     if (
         !confirmTwoStepAction({
@@ -241,7 +240,7 @@ const depsGraphNodes = computed(() => {
 const depsGraphEdges = computed(() => {
     const t = task.value;
     if (!t?.meta?.id) return [];
-    return dependencies.value.map(d => ({ from: d.id, to: t.meta.id }));
+    return dependencies.value.map((d) => ({ from: d.id, to: t.meta.id }));
 });
 
 onMounted(async () => {

@@ -1,11 +1,11 @@
 // @ts-check
-import { ActionCode } from '#shared/nerv/constants';
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
+import { ActionCode } from '#shared/nerv/constants';
 
 /**
- * Tabela de Políticas de Remediação (The Remediation Matrix).
- * Define a manobra tática para cada patologia detectada na interface.
+ * Tabela de Políticas de Remediação (The Remediation Matrix). Define a manobra tática para cada patologia detectada na
+ * interface.
  */
 const RemediationPolicy = Object.freeze({
     // --- 1. COLAPSOS DE INFRAESTRUTURA FÍSICA ---
@@ -94,7 +94,7 @@ class RemediationEngine {
      * Avalia um diagnóstico técnico e prescreve a manobra de autocura.
      *
      * @param {any} diagnosis - Payload do evento STALL_DETECTED vindo do Driver.
-     * @returns {object|null} Prescrição técnica ou null se não houver ação necessária.
+     * @returns {object | null} Prescrição técnica ou null se não houver ação necessária.
      */
     evaluate(diagnosis) {
         if (!diagnosis || !diagnosis.type || diagnosis.type === STATUS_VALUES.HEALTHY) {
@@ -102,7 +102,7 @@ class RemediationEngine {
         }
 
         const type = diagnosis.type;
-        const policy = (/** @type {Record<string, any>} */ (RemediationPolicy))[type];
+        const policy = /** @type {Record<string, any>} */ (RemediationPolicy)[type];
 
         if (!policy) {
             log('DEBUG', `[REMEDIATION] Sem política de autocura para o sintoma: ${type}`);
@@ -112,9 +112,8 @@ class RemediationEngine {
         log('INFO', `[REMEDIATION] Sintoma "${type}" reconhecido. Prescrevendo: ${policy.action}`);
 
         /**
-         * Objeto de Prescrição:
-         * Retornamos apenas os parâmetros lógicos. A execução via SocketHub
-         * é responsabilidade exclusiva do Reconciliador.
+         * Objeto de Prescrição: Retornamos apenas os parâmetros lógicos. A execução via SocketHub é responsabilidade
+         * exclusiva do Reconciliador.
          */
         return {
             command: policy.action,

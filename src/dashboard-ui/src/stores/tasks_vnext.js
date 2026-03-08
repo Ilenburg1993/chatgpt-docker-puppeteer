@@ -1,7 +1,6 @@
 // @ts-check
+import { formatHttpError, http } from '@/lib/http';
 import { defineStore } from 'pinia';
-import { http } from '@/lib/http';
-import { formatHttpError } from '@/lib/http';
 
 function _normalizeUpper(/** @type {any} */ value) {
     return value ? String(value).toUpperCase().trim() : null;
@@ -91,11 +90,12 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
         },
     }),
     getters: {
-        getById: state => (/** @type {any} */ id) => state.byId.get(String(/** @type {any} */ id)) || null,
-        getTaskIdsByMissionId: state => (/** @type {any} */ missionId) => state.taskIdsByMissionId.get(String(missionId || '')) || [],
-        getTasksByMissionId: state => (/** @type {any} */ missionId) => {
+        getById: (state) => (/** @type {any} */ id) => state.byId.get(String(/** @type {any} */ id)) || null,
+        getTaskIdsByMissionId: (state) => (/** @type {any} */ missionId) =>
+            state.taskIdsByMissionId.get(String(missionId || '')) || [],
+        getTasksByMissionId: (state) => (/** @type {any} */ missionId) => {
             const ids = state.taskIdsByMissionId.get(String(missionId || '')) || [];
-            return ids.map(id => state.byId.get(id)).filter(Boolean);
+            return ids.map((id) => state.byId.get(id)).filter(Boolean);
         },
     },
     actions: {
@@ -143,7 +143,7 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
             } catch (/** @type {any} */ _rawErr) {
-    const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loading = false;
@@ -170,7 +170,7 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
                 this.cursor = meta.next_cursor || null;
                 this.hasMore = Boolean(meta.has_more);
             } catch (/** @type {any} */ _rawErr) {
-    const err = /** @type {any} */ (_rawErr);
+                const err = /** @type {any} */ (_rawErr);
                 this.error = formatHttpError(err).message;
             } finally {
                 this.loadingMore = false;
@@ -194,7 +194,12 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             });
         },
 
-        async patchTask(/** @type {any} */ taskId, /** @type {any} */ patch, reason = 'Edição de task via control plane', ifVersion = null) {
+        async patchTask(
+            /** @type {any} */ taskId,
+            /** @type {any} */ patch,
+            reason = 'Edição de task via control plane',
+            ifVersion = null,
+        ) {
             const current = this.getById(taskId);
             const version = ifVersion ?? current?.timestamps?.updated_at_ms ?? current?.updated_at_ms ?? null;
             if (version === null || version === undefined) {
@@ -208,7 +213,12 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             });
         },
 
-        async reassignTaskMission(/** @type {any} */ taskId, /** @type {any} */ missionId, reason = 'Reatribuição de missão da task', ifVersion = null) {
+        async reassignTaskMission(
+            /** @type {any} */ taskId,
+            /** @type {any} */ missionId,
+            reason = 'Reatribuição de missão da task',
+            ifVersion = null,
+        ) {
             const current = this.getById(taskId);
             const version = ifVersion ?? current?.timestamps?.updated_at_ms ?? current?.updated_at_ms ?? null;
             if (version === null || version === undefined) {
@@ -222,12 +232,17 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             });
         },
 
-        async setDependencies(/** @type {any} */ taskId, /** @type {any} */ dependencies, reason = 'Atualização de dependências da task', ifVersion = null) {
+        async setDependencies(
+            /** @type {any} */ taskId,
+            /** @type {any} */ dependencies,
+            reason = 'Atualização de dependências da task',
+            ifVersion = null,
+        ) {
             return this.patchTask(
                 taskId,
                 { dependencies: Array.isArray(dependencies) ? dependencies : [] },
                 reason,
-                ifVersion
+                ifVersion,
             );
         },
 
@@ -243,7 +258,7 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
                 task_id: String(taskId),
                 reason: reason || `Ação ${normalizedAction} na task`,
             };
-            if (ifVersion !== null && ifVersion !== undefined) (/** @type {any} */ (payload)).if_version = ifVersion;
+            if (ifVersion !== null && ifVersion !== undefined) /** @type {any} */ (payload).if_version = ifVersion;
             return _dispatchControlCommand(command, payload);
         },
 

@@ -1,8 +1,8 @@
 // @ts-check
-import test from 'node:test';
+import * as socketEngine from '#server/engine/socket';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import * as socketEngine from '#server/engine/socket';
+import test from 'node:test';
 
 function listenRandomPort(/** @type {any} */ server) {
     return new Promise((resolve, reject) => {
@@ -16,7 +16,7 @@ function listenRandomPort(/** @type {any} */ server) {
 
 function closeServer(/** @type {any} */ server) {
     return /** @type {Promise<void>} */ (
-        new Promise(resolve => {
+        new Promise((resolve) => {
             server.close(() => resolve());
         })
     );
@@ -28,7 +28,7 @@ async function waitFor(/** @type {any} */ predicate, timeoutMs = 10000, interval
         if (await predicate()) {
             return;
         }
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new Error(`Timeout waiting for condition (${timeoutMs}ms)`);
 }
@@ -41,12 +41,12 @@ async function findAgentSocket(/** @type {any} */ io, timeoutMs = 10000) {
         if (agentSocket) {
             return agentSocket;
         }
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
     }
     throw new Error('Agent socket not found');
 }
 
-test('split mode survives reconnect storm (3 forced transport drops)', async t => {
+test('split mode survives reconnect storm (3 forced transport drops)', async (t) => {
     const httpServer = http.createServer((_, res) => {
         res.statusCode = 200;
         res.end('ok');
@@ -91,11 +91,11 @@ test('split mode survives reconnect storm (3 forced transport drops)', async t =
         await waitFor(() => reconnectConnectEvents >= i + 1 && adapter.connected() === true, 10000);
 
         // jitter/backoff window entre quedas
-        await new Promise(resolve => setTimeout(resolve, 350));
+        await new Promise((resolve) => setTimeout(resolve, 350));
     }
 
     // Após múltiplas quedas, conexão ainda deve ficar estável além do timeout de handshake.
-    await new Promise(resolve => setTimeout(resolve, 5500));
+    await new Promise((resolve) => setTimeout(resolve, 5500));
     assert.equal(adapter.connected(), true, 'connection should remain alive after reconnect storm');
 
     const registry = socketEngine.getRegistry();

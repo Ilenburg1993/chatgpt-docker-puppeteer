@@ -7,7 +7,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 /**
  * @param {string} filePath
  * @param {number} line
- * @returns {string|null}
+ * @returns {string | null}
  */
 function readTargetLine(filePath, line) {
     const full = path.resolve(ROOT, filePath);
@@ -71,7 +71,7 @@ function buildContractAwareReplacement(finding, oldLine, fallback) {
 /**
  * @param {BuildSuggestedDiffFinding} finding
  * @param {BuildSuggestedDiffContext} [context]
-  * @returns {any}
+ * @returns {any}
  */
 export function buildSuggestedDiff(finding, context = {}) {
     if (!finding?.file) {

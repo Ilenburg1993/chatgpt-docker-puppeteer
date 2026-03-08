@@ -1,10 +1,8 @@
 // @ts-check
-import { execFileSync } from 'node:child_process';
-import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { log } from '#core/logger';
 import { insertAuditDiff } from '#infra/db/audit_diff_repo';
+import { getAuditPatchProposalById, updateAuditPatchProposal } from '#infra/db/audit_patch_repo';
+import { getAuditWatchRuleById, upsertAuditWatchRule } from '#infra/db/audit_watch_rule_repo';
 import {
     CONTROL_OPERATION_STATUS,
     createControlOperation,
@@ -13,17 +11,21 @@ import {
     updateControlOperation,
 } from '#infra/db/control_operation_repo';
 import { recordEvent } from '#infra/db/events_repo';
-import { RBAC_PERMISSIONS } from '#infra/db/rbac_repo';
-import { getAuditPatchProposalById, updateAuditPatchProposal } from '#infra/db/audit_patch_repo';
-import { getAuditWatchRuleById, upsertAuditWatchRule } from '#infra/db/audit_watch_rule_repo';
-import { upsertInferenceProfile } from '#infra/db/inference_profile_repo';
 import {
     getInferenceBackendById,
     setInferenceBackendEnabled,
     upsertInferenceBackend,
 } from '#infra/db/inference_backend_repo';
-import { getInferenceModelById, setInferenceModelEnabled, upsertInferenceModel } from '#infra/db/inference_model_repo';
 import { getInferenceClientPolicyByTag, upsertInferenceClientPolicy } from '#infra/db/inference_client_policy_repo';
+import { getInferenceModelById, setInferenceModelEnabled, upsertInferenceModel } from '#infra/db/inference_model_repo';
+import { upsertInferenceProfile } from '#infra/db/inference_profile_repo';
+import { RBAC_PERMISSIONS } from '#infra/db/rbac_repo';
+import { execFileSync } from 'node:child_process';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { normalizeInferenceClientTag } from '../../inference_gateway/client_tags.js';
+import { resolveInferencePolicy, validateInferenceRoute } from '../../inference_gateway/policy_config.js';
 import {
     cancelMissionCommand,
     createMissionCommand,
@@ -34,6 +36,7 @@ import {
     resumeMissionCommand,
     setMissionPolicyCommand,
 } from './mission_control_service.js';
+import { assertPermission, normalizeActor } from './rbac_policy.js';
 import {
     bulkTaskActionCommand,
     cancelTaskCommand,
@@ -45,9 +48,6 @@ import {
     resumeTaskCommand,
     retryTaskCommand,
 } from './task_control_service.js';
-import { assertPermission, normalizeActor } from './rbac_policy.js';
-import { normalizeInferenceClientTag } from '../../inference_gateway/client_tags.js';
-import { resolveInferencePolicy, validateInferenceRoute } from '../../inference_gateway/policy_config.js';
 
 /** Constante/valor exportado: COMMANDS. */
 const COMMANDS = Object.freeze({
@@ -180,7 +180,7 @@ function _csvEnv(/** @type {any} */ name) {
     if (!raw) return [];
     return raw
         .split(',')
-        .map(v => v.trim())
+        .map((v) => v.trim())
         .filter(Boolean);
 }
 
@@ -204,7 +204,7 @@ function _safeGitWorktreeStatus() {
         const out = String(execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }) || '');
         const lines = out
             .split(/\r?\n/)
-            .map(v => v.trimEnd())
+            .map((v) => v.trimEnd())
             .filter(Boolean);
         return {
             ok: true,
@@ -241,7 +241,7 @@ function _validateAuditPatchApplyGuards(/** @type {any} */ patch) {
     const pathViolations =
         allowedPrefixes.length === 0
             ? []
-            : candidateFiles.filter(file => !allowedPrefixes.some(prefix => String(file).startsWith(prefix)));
+            : candidateFiles.filter((file) => !allowedPrefixes.some((prefix) => String(file).startsWith(prefix)));
     const worktree = _safeGitWorktreeStatus();
     const requireClean = _boolEnv('AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE', false);
     const worktreeOk = requireClean ? worktree.ok && worktree.clean : true;
@@ -375,7 +375,7 @@ function _asEntity(/** @type {any} */ command, /** @type {any} */ payload = {}) 
                     payload.alias ||
                     payload.name ||
                     payload.id ||
-                    ''
+                    '',
             ),
         };
     }
@@ -405,13 +405,11 @@ function _getInferenceGatewayBaseUrl() {
     return `http://${host}:${port}`;
 }
 
-/* eslint-disable no-unused-vars */
 function _getDiagnosticAgentBaseUrl() {
     const host = process.env.DIAGNOSTIC_AGENT_HOST || '127.0.0.1';
     const port = Number(process.env.DIAGNOSTIC_AGENT_PORT || 3097);
     return `http://${host}:${port}`;
 }
-/* eslint-enable no-unused-vars */
 
 async function _fetchJson(/** @type {any} */ url, init = {}, timeoutMs = 5000) {
     const res = await fetch(url, {
@@ -436,17 +434,18 @@ async function _postJson(/** @type {any} */ url, /** @type {any} */ body, timeou
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(body || {}),
         },
-        timeoutMs
+        timeoutMs,
     );
 }
 
 /**
  * @typedef {object} DispatchDiagnosticCommandPayload
- * @property {*} _ Propriedades definidas via runtime.
+ * @property {any} _ Propriedades definidas via runtime.
  */
 /**
- * Envia comandos DIAGNOSTIC_* para o Audit Agent (diagnóstico integrado ao Audit Agent).
- * O Diagnostic Agent standalone foi removido; DIAGNOSTIC_* agora roteia para Audit Agent.
+ * Envia comandos DIAGNOSTIC_* para o Audit Agent (diagnóstico integrado ao Audit Agent). O Diagnostic Agent standalone
+ * foi removido; DIAGNOSTIC_* agora roteia para Audit Agent.
+ *
  * @param {string} command - Comando a executar
  * @param {any} payload - Payload do comando
  * @returns {Promise<any>} Resultado da operação
@@ -515,7 +514,7 @@ async function _dispatchDiagnosticCommand(command, payload) {
                 const upstream = await _postJson(
                     `${baseUrl}/jobs/${encodeURIComponent(jobId)}/cancel`,
                     { reason: payload.reason || 'control_command_cancel' },
-                    4000
+                    4000,
                 );
                 if (!upstream.ok) {
                     const err = new Error('Falha ao cancelar diagnostic job');
@@ -617,7 +616,7 @@ async function _dispatchAuditCommand(/** @type {any} */ command, /** @type {any}
                 const upstream = await _postJson(
                     `${baseUrl}/jobs/${encodeURIComponent(jobId)}/cancel`,
                     { reason: payload.reason || 'control_command_cancel' },
-                    4000
+                    4000,
                 );
                 if (!upstream.ok) {
                     const err = new Error('Falha ao cancelar audit job');
@@ -658,7 +657,7 @@ async function _dispatchAuditCommand(/** @type {any} */ command, /** @type {any}
 async function _dispatchAuditPatchCommand(
     /** @type {any} */ command,
     /** @type {any} */ payload,
-    /** @type {any} */ actor
+    /** @type {any} */ actor,
 ) {
     const patchId = String(payload.patch_id || payload.id || '').trim();
     if (!patchId) {
@@ -807,13 +806,14 @@ async function _dispatchAuditPatchCommand(
 
 /**
  * @typedef {object} ExecuteAuditPatchApplyBefore
- * @property {*} _ Propriedades definidas em runtime.
+ * @property {any} _ Propriedades definidas em runtime.
  */
 /**
  * Executa a aplicação real do patch com rollback em caso de falha.
+ *
  * @param {string} patchId - ID do patch
  * @param {any} before - Estado atual do patch
- * @param {string|null} actorId - ID do usuário que executou
+ * @param {string | null} actorId - ID do usuário que executou
  * @returns {any} Resultado da operação
  */
 function _executeAuditPatchApply(patchId, before, actorId) {
@@ -885,7 +885,6 @@ function _executeAuditPatchApply(patchId, before, actorId) {
         // 4. Aplicar o patch
         let stderrOutput = '';
         try {
-            // eslint-disable-next-line no-unused-vars
             const _applyResult = execFileSync('git', ['apply', '--3way', patchFile], {
                 encoding: 'utf8',
                 stdio: ['pipe', 'pipe', 'pipe'],
@@ -968,10 +967,11 @@ function _executeAuditPatchApply(patchId, before, actorId) {
 }
 
 /**
- * Cria um diff de rollback a partir do estado anterior dos arquivos.
- * Gera um diff reverso que pode ser aplicado para restaurar o estado anterior.
- * @param {{file: string, content: string}[]} beforeState - Estado anterior dos arquivos
- * @param {*} beforeState
+ * Cria um diff de rollback a partir do estado anterior dos arquivos. Gera um diff reverso que pode ser aplicado para
+ * restaurar o estado anterior.
+ *
+ * @param {{ file: string; content: string }[]} beforeState - Estado anterior dos arquivos
+ * @param {any} beforeState
  * @returns {string} Diff reverso no formato unificado
  */
 function _createRollbackDiff(beforeState) {
@@ -1141,7 +1141,7 @@ async function _dispatchInferenceCommand(/** @type {any} */ command, /** @type {
         }
         const after = setInferenceBackendEnabled(
             backendId,
-            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled)
+            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled),
         );
         const reload = await _refreshInferenceGatewayPolicies();
         return {
@@ -1162,7 +1162,7 @@ async function _dispatchInferenceCommand(/** @type {any} */ command, /** @type {
         }
         const after = setInferenceModelEnabled(
             modelId,
-            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled)
+            payload.enabled === undefined ? !before.enabled : Boolean(payload.enabled),
         );
         const reload = await _refreshInferenceGatewayPolicies();
         return {
@@ -1201,21 +1201,23 @@ async function _dispatchInferenceCommand(/** @type {any} */ command, /** @type {
     if (command === COMMANDS.INFERENCE_CLIENT_POLICY_UPSERT) {
         const clientTag = String(payload.client_tag || payload.clientTag || '').trim();
         const before = clientTag ? getInferenceClientPolicyByTag(clientTag) : null;
-        const policy = upsertInferenceClientPolicy(/** @type {any} */ ({
-            id: payload.id || null,
-            client_tag: clientTag,
-            enabled: payload.enabled,
-            profile_id: payload.profile_id,
-            allowed_backends_json: payload.allowed_backends_json ?? payload.allowed_backends,
-            allowed_models_json: payload.allowed_models_json ?? payload.allowed_models,
-            max_parallel: payload.max_parallel ?? payload.maxParallel,
-            rate_limit_json: payload.rate_limit_json ?? payload.rate_limit,
-            timeout_ms: payload.timeout_ms ?? payload.timeoutMs,
-            token_budget_json: payload.token_budget_json ?? payload.token_budget,
-            priority: payload.priority,
-            degraded_behavior_json: payload.degraded_behavior_json ?? payload.degraded_behavior,
-            approval_policy_json: payload.approval_policy_json ?? payload.approval_policy,
-        }));
+        const policy = upsertInferenceClientPolicy(
+            /** @type {any} */ ({
+                id: payload.id || null,
+                client_tag: clientTag,
+                enabled: payload.enabled,
+                profile_id: payload.profile_id,
+                allowed_backends_json: payload.allowed_backends_json ?? payload.allowed_backends,
+                allowed_models_json: payload.allowed_models_json ?? payload.allowed_models,
+                max_parallel: payload.max_parallel ?? payload.maxParallel,
+                rate_limit_json: payload.rate_limit_json ?? payload.rate_limit,
+                timeout_ms: payload.timeout_ms ?? payload.timeoutMs,
+                token_budget_json: payload.token_budget_json ?? payload.token_budget,
+                priority: payload.priority,
+                degraded_behavior_json: payload.degraded_behavior_json ?? payload.degraded_behavior,
+                approval_policy_json: payload.approval_policy_json ?? payload.approval_policy,
+            }),
+        );
         const reload = await _refreshInferenceGatewayPolicies();
         return {
             before,
@@ -1262,7 +1264,7 @@ async function _dispatchInferenceCommand(/** @type {any} */ command, /** @type {
             const upstream = await _postJson(
                 `${_getInferenceGatewayBaseUrl()}/v1/models`,
                 { clientTag: resolved.clientTag },
-                3000
+                3000,
             );
             modelsProbe = {
                 ok: upstream.ok,
@@ -1507,12 +1509,13 @@ function _dispatch(/** @type {any} */ command, /** @type {any} */ payload, /** @
 
 /**
  * @typedef {object} ValidateCommandOptions
- * @property {*} [command]
- * @property {*} [payload]
- * @property {*} [actor]
+ * @property {any} [command]
+ * @property {any} [payload]
+ * @property {any} [actor]
  */
 /**
  * Função exportada: validateCommand.
+ *
  * @param {ValidateCommandOptions} [options]
  * @returns {any}
  */
@@ -1530,7 +1533,7 @@ function validateCommand({ command, payload = {}, actor = null } = {}) {
         }
 
         const actorNormalized = normalizeActor(actor || {});
-        const permission = (/** @type {any} */ (COMMAND_PERMISSION))[normalized];
+        const permission = /** @type {any} */ (COMMAND_PERMISSION)[normalized];
         assertPermission(actorNormalized, permission);
 
         _assertBaseCommandGuards(normalized, payload);
@@ -1564,13 +1567,14 @@ function validateCommand({ command, payload = {}, actor = null } = {}) {
 
 /**
  * @typedef {object} ExecuteCommandOptions
- * @property {*} [command]
- * @property {*} [payload]
- * @property {*} [actor]
+ * @property {any} [command]
+ * @property {any} [payload]
+ * @property {any} [actor]
  * @property {boolean} [dryRun]
  */
 /**
  * Função exportada: executeCommand.
+ *
  * @param {ExecuteCommandOptions} [options]
  * @returns {Promise<any>}
  */
@@ -1578,7 +1582,7 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
     const normalized = _normalizeCommand(command);
 
     const actorNormalized = normalizeActor(actor || {});
-    const permission = (/** @type {any} */ (COMMAND_PERMISSION))[normalized];
+    const permission = /** @type {any} */ (COMMAND_PERMISSION)[normalized];
     if (!permission) {
         const err = new Error(`Comando não suportado: ${normalized}`);
         err.statusCode = 422;
@@ -1647,6 +1651,7 @@ async function executeCommand({ command, payload = {}, actor = null, dryRun = fa
     });
 
     try {
+        // eslint-disable-next-line @typescript-eslint/await-thenable
         const result = /** @type {any} */ (await _dispatch(normalized, payload, actorNormalized));
         const finalEntityId = entity.entityId || result?.after?.meta?.id || result?.after?.id || 'task:new';
 

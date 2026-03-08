@@ -114,7 +114,7 @@ const controlRegexFixes = [
 // ============================================================================
 /**
  * @param {string} filePath
- * @param {string|RegExp} pattern
+ * @param {string | RegExp} pattern
  * @param {string} replacement
  * @returns {boolean}
  */

@@ -1,8 +1,8 @@
 // @ts-check
 import { log } from '#core/logger';
 import { recordEvent } from '#infra/db/events_repo';
-import { STEP_STATUS, syncMissionStepsFromWorkflow } from '#infra/db/mission_step_repo';
 import { AUTONOMY_MODES, createMission } from '#infra/db/mission_repo';
+import { STEP_STATUS, syncMissionStepsFromWorkflow } from '#infra/db/mission_step_repo';
 import { getDb } from '#infra/db/sqlite';
 import { asRecord } from '#types/guards';
 
@@ -42,11 +42,16 @@ function _safeJsonString(/** @type {any} */ value, fallback = '{}') {
     }
 }
 
-function _error(/** @type {any} */ statusCode, /** @type {any} */ code, /** @type {any} */ message, /** @type {any} */ details = null) {
+function _error(
+    /** @type {any} */ statusCode,
+    /** @type {any} */ code,
+    /** @type {any} */ message,
+    /** @type {any} */ details = null,
+) {
     const err = new Error(message || code);
     err.statusCode = Number(statusCode) || 500;
     err.code = String(code || 'MISSION_CONTROL_ERROR');
-    (/** @type {any} */ (err)).details = details;
+    /** @type {any} */ (err).details = details;
     return err;
 }
 
@@ -115,13 +120,17 @@ function _updateMissionTx(/** @type {any} */ db, /** @type {any} */ row, /** @ty
             completed_at_ms = @completed_at_ms,
             updated_at_ms = @updated_at_ms
         WHERE id = @id
-    `
+    `,
     ).run(next);
 
     return db.prepare('SELECT * FROM missions WHERE id = ?').get(row.id);
 }
 
-function _assertAllowedTransition(/** @type {any} */ fromStatus, /** @type {any} */ allowedFrom, /** @type {any} */ toStatus) {
+function _assertAllowedTransition(
+    /** @type {any} */ fromStatus,
+    /** @type {any} */ allowedFrom,
+    /** @type {any} */ toStatus,
+) {
     const from = String(fromStatus || '').toUpperCase();
     if (from === String(toStatus || '').toUpperCase()) {
         throw _error(409, 'MISSION_TRANSITION_NOOP', `Missão já está em ${toStatus}`);
@@ -157,7 +166,7 @@ function _setActiveStepsStatusTx(/** @type {any} */ db, /** @type {any} */ missi
             version = version + 1
         WHERE mission_id = @mission_id
           AND status IN ('PENDING', 'RUNNING', 'PAUSED')
-    `
+    `,
     ).run({
         mission_id: missionId,
         status,
@@ -174,7 +183,7 @@ function _cancelMissionTasksCascadeTx(/** @type {any} */ db, /** @type {any} */ 
             FROM tasks
             WHERE mission_id = ?
               AND status IN ('PENDING', 'RUNNING', 'PAUSED', 'BLOCKED')
-        `
+        `,
         )
         .all(missionId);
 
@@ -193,7 +202,7 @@ function _cancelMissionTasksCascadeTx(/** @type {any} */ db, /** @type {any} */ 
             updated_at_ms = @now,
             last_error = 'MISSION_CANCELLED_CASCADE'
         WHERE id = @id
-    `
+    `,
     );
 
     for (const taskId of affectedTaskIds) {
@@ -204,11 +213,10 @@ function _cancelMissionTasksCascadeTx(/** @type {any} */ db, /** @type {any} */ 
 }
 
 /**
- * Cascades mission pause to PENDING tasks: marks them PAUSED so the queue
- * worker won't pick them up AND the UI shows a consistent state.
- * RUNNING tasks are intentionally left running — the SQL gate in
- * claimNextEligibleTask (mission_id IS NULL OR m.status = 'RUNNING') already
- * prevents new tasks from being dispatched while the mission is PAUSED.
+ * Cascades mission pause to PENDING tasks: marks them PAUSED so the queue worker won't pick them up AND the UI shows a
+ * consistent state. RUNNING tasks are intentionally left running — the SQL gate in claimNextEligibleTask (mission_id IS
+ * NULL OR m.status = 'RUNNING') already prevents new tasks from being dispatched while the mission is PAUSED.
+ *
  * @param {import('better-sqlite3').Database} db
  * @param {string} missionId
  * @returns {string[]} affected task IDs
@@ -229,23 +237,22 @@ function _pauseMissionPendingTasksTx(db, missionId) {
         WHERE mission_id = @mission_id
           AND status = 'PENDING'
           AND stage = 'READY'
-    `
+    `,
     ).run({ mission_id: missionId, now });
 
     const paused = db
         .prepare(
-            `SELECT id FROM tasks WHERE mission_id = ? AND status = 'PAUSED' AND last_error = 'MISSION_PAUSED_CASCADE'`
+            `SELECT id FROM tasks WHERE mission_id = ? AND status = 'PAUSED' AND last_error = 'MISSION_PAUSED_CASCADE'`,
         )
         .all(missionId);
     return paused.map((/** @type {any} */ r) => String(r.id));
 }
 
 /**
- * Reverses _pauseMissionPendingTasksTx: restores tasks that were paused
- * specifically due to the mission cascade back to PENDING so they're
- * eligible for dispatch again.
- * Tasks explicitly paused by the user (last_error != 'MISSION_PAUSED_CASCADE')
- * are intentionally left PAUSED to honour the user's intent.
+ * Reverses _pauseMissionPendingTasksTx: restores tasks that were paused specifically due to the mission cascade back to
+ * PENDING so they're eligible for dispatch again. Tasks explicitly paused by the user (last_error !=
+ * 'MISSION_PAUSED_CASCADE') are intentionally left PAUSED to honour the user's intent.
+ *
  * @param {import('better-sqlite3').Database} db
  * @param {string} missionId
  * @returns {string[]} affected task IDs
@@ -263,7 +270,7 @@ function _resumeMissionCascadedTasksTx(db, missionId) {
           AND status = 'PAUSED'
           AND last_error = 'MISSION_PAUSED_CASCADE'
           AND stage = 'READY'
-    `
+    `,
     ).run({ mission_id: missionId, now });
 
     const resumed = db
@@ -273,22 +280,15 @@ function _resumeMissionCascadedTasksTx(db, missionId) {
                AND status = 'PENDING'
                AND stage = 'READY'
                AND paused_at_ms IS NULL
-               AND updated_at_ms >= @since`
+               AND updated_at_ms >= @since`,
         )
         .all({ mission_id: missionId, since: now - 5000 });
     return resumed.map((/** @type {any} */ r) => String(r.id));
 }
 
-function _recordMissionEvents(/** @type {any} */ {
-    missionId,
-    actorId,
-    actorType = 'user',
-    operation,
-    before,
-    after,
-    reason,
-    metadata = {},
-}) {
+function _recordMissionEvents(
+    /** @type {any} */ { missionId, actorId, actorType = 'user', operation, before, after, reason, metadata = {} },
+) {
     try {
         recordEvent({
             entityType: 'mission',
@@ -313,8 +313,9 @@ function _recordMissionEvents(/** @type {any} */ {
 /** @typedef {any} CreateMissionCommandOptions */
 /**
  * Função exportada: createMissionCommand.
+ *
  * @param {CreateMissionCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function createMissionCommand(/** @type {any} */ { actor = {}, reason, payload = {} }) {
     const actorView = asRecord(actor);
@@ -344,7 +345,7 @@ function createMissionCommand(/** @type {any} */ { actor = {}, reason, payload =
     });
 
     const db = getDb();
-    const row = _readMissionRowTx(db, (/** @type {any} */ (created)).id);
+    const row = _readMissionRowTx(db, /** @type {any} */ (created).id);
     const after = _rowToMission(row);
     _syncMissionStepsForMission(after);
 
@@ -373,10 +374,13 @@ function createMissionCommand(/** @type {any} */ { actor = {}, reason, payload =
 /** @typedef {any} ExecuteMissionCommandOptions */
 /**
  * Função exportada: executeMissionCommand.
+ *
  * @param {ExecuteMissionCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
-function executeMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' }) {
+function executeMissionCommand(
+    /** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, command = 'MISSION_EXECUTE' },
+) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -413,8 +417,9 @@ function executeMissionCommand(/** @type {any} */ { missionId, actor = {}, reaso
 /** @typedef {any} PauseMissionCommandOptions */
 /**
  * Função exportada: pauseMissionCommand.
+ *
  * @param {PauseMissionCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function pauseMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
@@ -457,8 +462,9 @@ function pauseMissionCommand(/** @type {any} */ { missionId, actor = {}, reason,
 /** @typedef {any} ResumeMissionCommandOptions */
 /**
  * Função exportada: resumeMissionCommand.
+ *
  * @param {ResumeMissionCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function resumeMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null }) {
     const actorView = asRecord(actor);
@@ -501,8 +507,9 @@ function resumeMissionCommand(/** @type {any} */ { missionId, actor = {}, reason
 /** @typedef {any} CancelMissionCommandOptions */
 /**
  * Função exportada: cancelMissionCommand.
+ *
  * @param {CancelMissionCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function cancelMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null }) {
     const db = getDb();
@@ -571,8 +578,9 @@ function cancelMissionCommand(/** @type {any} */ { missionId, actor = {}, reason
 /** @typedef {any} PatchMissionCommandOptions */
 /**
  * Função exportada: patchMissionCommand.
+ *
  * @param {PatchMissionCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
 function patchMissionCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, patch = {} }) {
     const actorView = asRecord(actor);
@@ -614,17 +622,13 @@ function patchMissionCommand(/** @type {any} */ { missionId, actor = {}, reason,
 /** @typedef {any} SetMissionPolicyCommandOptions */
 /**
  * Função exportada: setMissionPolicyCommand.
+ *
  * @param {SetMissionPolicyCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
-function setMissionPolicyCommand(/** @type {any} */ {
-    missionId,
-    actor = {},
-    reason,
-    ifVersion = null,
-    policy = null,
-    autonomyMode = null,
-}) {
+function setMissionPolicyCommand(
+    /** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, policy = null, autonomyMode = null },
+) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -640,7 +644,7 @@ function setMissionPolicyCommand(/** @type {any} */ {
                 'Policy da missão pode ser alterada apenas em READY ou PAUSED',
                 {
                     status: row.status,
-                }
+                },
             );
         }
 
@@ -670,10 +674,13 @@ function setMissionPolicyCommand(/** @type {any} */ {
 /** @typedef {any} ReorderMissionStepsCommandOptions */
 /**
  * Função exportada: reorderMissionStepsCommand.
+ *
  * @param {ReorderMissionStepsCommandOptions} options
- * @returns {Promise<object>|object|null}
+ * @returns {Promise<object> | object | null}
  */
-function reorderMissionStepsCommand(/** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, stepOrder = [] }) {
+function reorderMissionStepsCommand(
+    /** @type {any} */ { missionId, actor = {}, reason, ifVersion = null, stepOrder = [] },
+) {
     const actorView = asRecord(actor);
     const db = getDb();
 
@@ -695,7 +702,7 @@ function reorderMissionStepsCommand(/** @type {any} */ { missionId, actor = {}, 
             throw _error(422, 'MISSION_WORKFLOW_MISSING', 'Missão não possui workflow com steps');
         }
 
-        const order = Array.isArray(stepOrder) ? stepOrder.map(id => String(id)) : [];
+        const order = Array.isArray(stepOrder) ? stepOrder.map((id) => String(id)) : [];
         const byId = new Map(currentSteps.map((/** @type {any} */ step) => [String(step?.id || ''), step]));
         const reordered = [];
 
@@ -724,7 +731,7 @@ function reorderMissionStepsCommand(/** @type {any} */ { missionId, actor = {}, 
             before: _rowToMission(row),
             after: _rowToMission(updatedRow),
             metadata: {
-                step_order: reordered.map(step => String(step?.id || '')),
+                step_order: reordered.map((step) => String(step?.id || '')),
             },
         };
     })();
@@ -746,10 +753,10 @@ function reorderMissionStepsCommand(/** @type {any} */ { missionId, actor = {}, 
 }
 
 export {
-    createMissionCommand,
-    MISSION_STATUS,
     cancelMissionCommand,
+    createMissionCommand,
     executeMissionCommand,
+    MISSION_STATUS,
     patchMissionCommand,
     pauseMissionCommand,
     reorderMissionStepsCommand,

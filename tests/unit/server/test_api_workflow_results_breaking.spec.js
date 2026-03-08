@@ -1,17 +1,17 @@
 // @ts-check
-import { describe, it, before, after, beforeEach } from 'node:test';
-import assert from 'node:assert';
 import express from 'express';
-import request from 'supertest';
+import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { after, before, beforeEach, describe, it } from 'node:test';
+import request from 'supertest';
 
-import dashboardController from '#server/api/controllers/dashboard';
-import tasksController from '#server/api/controllers/tasks';
-import resultsController from '#server/api/controllers/results';
 import * as schemas from '#core/schemas';
-import { getDb, closeDb } from '#infra/db/sqlite';
+import { closeDb, getDb } from '#infra/db/sqlite';
 import { insertTask, updateTask } from '#infra/db/task_repo';
+import dashboardController from '#server/api/controllers/dashboard';
+import resultsController from '#server/api/controllers/results';
+import tasksController from '#server/api/controllers/tasks';
 
 function makeTmpDir(/** @type {string} */ name) {
     const dir = path.join(process.cwd(), 'tmp', name);
@@ -27,7 +27,7 @@ function makeDbPath() {
 function makeArtifactsDir() {
     const dir = path.join(
         makeTmpDir('test-artifacts'),
-        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     );
     fs.mkdirSync(dir, { recursive: true });
     return dir;
@@ -141,7 +141,7 @@ describe('Server API - workflow empty + results controller + breaking /api/tasks
         const rows = db.prepare('SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?').all('task-child');
         assert.deepStrictEqual(
             rows.map((/** @type {any} */ r) => r.depends_on_task_id),
-            ['task-parent']
+            ['task-parent'],
         );
     });
 });

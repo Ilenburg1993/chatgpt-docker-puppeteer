@@ -21,7 +21,7 @@ function getAllJsFiles(dir) {
     /** @param {string} d */
     function walk(d) {
         const entries = fs.readdirSync(d, { withFileTypes: true });
-        entries.forEach(entry => {
+        entries.forEach((entry) => {
             const fullPath = path.join(d, entry.name);
             // Skip dist/build artifacts when recursing
             if (
@@ -132,7 +132,7 @@ const patterns = {
 // PROCESSAMENTO
 // ============================================
 
-files.forEach(file => {
+files.forEach((file) => {
     const relativePath = path.relative(ROOT, file);
     let content = '';
     try {
@@ -290,9 +290,9 @@ function printCategory(title, data, minOccurrences = 1) {
         console.log(`   ${value.padEnd(30)} → ${locations.length} uso(s)`);
         if (locations.length <= 3) {
             locations.forEach(
-                /** @param {any} loc */ loc => {
+                /** @param {any} loc */ (loc) => {
                     console.log(`      ${loc.file}:${loc.line}`);
-                }
+                },
             );
         } else {
             console.log(`      ${locations[0].file}:${locations[0].line}`);
@@ -391,7 +391,7 @@ recommendations.forEach((rec, i) => {
     console.log(`\n${i + 1}. ${rec.file}`);
     console.log(`   Exports: ${rec.exports.join(', ')}`);
     console.log(`   Valores (${rec.values.length}):`);
-    rec.values.sort().forEach(v => console.log(`      - ${v}`));
+    rec.values.sort().forEach((v) => console.log(`      - ${v}`));
 });
 
 console.log(`\n${'='.repeat(100)}`);

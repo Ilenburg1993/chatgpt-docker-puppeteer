@@ -1,12 +1,12 @@
 // @ts-check
 import { runCommand } from '../lib/exec.mjs';
 
-/** @import { RawFinding } from '../normalize/findings.mjs' */
+/** @import {RawFinding} from "../normalize/findings.mjs" */
 
 /**
  * @param {string} sourceTool
  * @param {string} evidence
- * @param {string|null} contractId
+ * @param {string | null} contractId
  * @returns {RawFinding}
  */
 function testFailureFinding(sourceTool, evidence, contractId) {
@@ -32,24 +32,36 @@ function testFailureFinding(sourceTool, evidence, contractId) {
 
 /**
  * @typedef {object} CollectTestFindingsOptions
- * @property {'quick'|'deep'|'nightly'} profile
+ * @property {'quick' | 'deep' | 'nightly'} profile
  * @property {(stepId: any, command: any, args: any, opts: any) => Promise<any>} exec
  */
 /**
  * @param {CollectTestFindingsOptions} options
- * @returns {Promise<{ findings: RawFinding[], errors: Array<{source:string,message:string}>, warnings: Array<{source:string,message:string}>, telemetry: Record<string,any>}>}
+ * @returns {Promise<{
+ *     findings: RawFinding[];
+ *     errors: { source: string; message: string }[];
+ *     warnings: { source: string; message: string }[];
+ *     telemetry: Record<string, any>;
+ * }>}
  */
 export async function collectTestFindings(options) {
     /** @type {RawFinding[]} */
     const findings = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const errors = [];
-    /** @type {Array<{source:string,message:string}>} */
+    /** @type {{ source: string; message: string }[]} */
     const warnings = [];
 
     const exec = options.exec || (async (_stepId, command, args, runOpts) => runCommand(command, args, runOpts));
 
-    /** @type {Array<{stepId:string,name:string,command:'node'|'npm',args:string[],timeoutMs:number,contractId:string|null}>} */
+    /** @type {{
+    stepId: string;
+    name: string;
+    command: 'node' | 'npm';
+    args: string[];
+    timeoutMs: number;
+    contractId: string | null;
+}[]} */
     const plan = [];
 
     if (options.profile === 'quick') {
@@ -117,7 +129,7 @@ export async function collectTestFindings(options) {
         warnings,
         telemetry: {
             profile: options.profile,
-            executed: plan.map(step => step.name),
+            executed: plan.map((step) => step.name),
             tests_ok: errors.length === 0,
         },
     };

@@ -11,7 +11,7 @@ export const AUDIT_JOB_STATUS = Object.freeze({
     CANCELLED: 'CANCELLED',
 });
 
-/** @typedef {typeof AUDIT_JOB_STATUS[keyof typeof AUDIT_JOB_STATUS]} AuditJobStatus */
+/** @typedef {(typeof AUDIT_JOB_STATUS)[keyof typeof AUDIT_JOB_STATUS]} AuditJobStatus */
 
 /** Tipos de trigger para criação/execução de audit jobs. */
 export const AUDIT_JOB_TRIGGER_TYPE = Object.freeze({
@@ -23,7 +23,7 @@ export const AUDIT_JOB_TRIGGER_TYPE = Object.freeze({
     API: 'api',
 });
 
-/** @typedef {typeof AUDIT_JOB_TRIGGER_TYPE[keyof typeof AUDIT_JOB_TRIGGER_TYPE]} AuditJobTriggerType */
+/** @typedef {(typeof AUDIT_JOB_TRIGGER_TYPE)[keyof typeof AUDIT_JOB_TRIGGER_TYPE]} AuditJobTriggerType */
 
 /** Kinds iniciais de jobs da V1. */
 export const AUDIT_JOB_KIND = Object.freeze({
@@ -41,7 +41,7 @@ export const AUDIT_JOB_KIND = Object.freeze({
     DIAGNOSTIC_REPORT: 'diagnostic_report',
 });
 
-/** @typedef {typeof AUDIT_JOB_KIND[keyof typeof AUDIT_JOB_KIND]} AuditJobKind */
+/** @typedef {(typeof AUDIT_JOB_KIND)[keyof typeof AUDIT_JOB_KIND]} AuditJobKind */
 
 /**
  * @param {unknown} value
