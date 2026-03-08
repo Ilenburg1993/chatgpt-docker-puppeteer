@@ -387,20 +387,20 @@ GET /api/health
 ### Tasks
 
 ```bash
-GET /api/tasks          # Listar todas as tasks
-GET /api/tasks/:id      # Detalhes de uma task
-POST /api/tasks         # Criar task
-PATCH /api/tasks/:id    # Atualizar task
-DELETE /api/tasks/:id   # Deletar task
+GET /api/tasks        # Listar todas as tasks
+GET /api/tasks/:id    # Detalhes de uma task
+POST /api/tasks       # Criar task
+PATCH /api/tasks/:id  # Atualizar task
+DELETE /api/tasks/:id # Deletar task
 ```
 
 ### Missions
 
 ```bash
-GET /api/missions       # Listar missions
-GET /api/missions/:id   # Detalhes de uma mission
-POST /api/missions      # Criar mission
-PATCH /api/missions/:id # Atualizar mission
+GET /api/missions        # Listar missions
+GET /api/missions/:id    # Detalhes de uma mission
+POST /api/missions       # Criar mission
+PATCH /api/missions/:id  # Atualizar mission
 DELETE /api/missions/:id # Deletar mission
 ```
 
@@ -411,7 +411,7 @@ DELETE /api/missions/:id # Deletar mission
 import io from 'socket.io-client';
 const socket = io('http://localhost:3008');
 
-socket.on('task:updated', task => {
+socket.on('task:updated', (task) => {
   console.log('Task updated:', task);
 });
 ```

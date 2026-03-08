@@ -21,11 +21,11 @@
 
 ```bash
 ┌────┬──────────────────┬─────────┬────────┬─────────┬──────────┐
-│ id │ name             │ mode    │ status │ cpu     │ memory   │
+│ id │ name │ mode │ status │ cpu │ memory │
 ├────┼──────────────────┼─────────┼────────┼─────────┼──────────┤
-│ 0  │ agente-gpt       │ fork    │ online │ 0%      │ 47.4mb   │
-│ 1  │ dashboard-web    │ fork    │ online │ 0%      │ 46.6mb   │
-│ 2  │ chrome-proxy     │ cluster │ online │ 0%      │ 48.6mb   │
+│ 0 │ agente-gpt │ fork │ online │ 0% │ 47.4mb │
+│ 1 │ dashboard-web │ fork │ online │ 0% │ 46.6mb │
+│ 2 │ chrome-proxy │ cluster │ online │ 0% │ 48.6mb │
 └────┴──────────────────┴─────────┴────────┴─────────┴──────────┘
 ```
 

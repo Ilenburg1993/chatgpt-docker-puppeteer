@@ -2,8 +2,8 @@
 
 > **Autora**: GitHub Copilot (Claude Sonnet 4.6) | **Data**: 7 de março de 2026
 >
-> **Escopo**: nova auditoria completa do sistema de tipagem TypeScript/JSDoc/TSServer,
-> identificando o estado pós-Fase D, falhas remanescentes e propondo a Fase E.
+> **Escopo**: nova auditoria completa do sistema de tipagem TypeScript/JSDoc/TSServer, identificando
+> o estado pós-Fase D, falhas remanescentes e propondo a Fase E.
 >
 > **Auditoria anterior**: [`AUDITORIA-2026-03-06.md`](./AUDITORIA-2026-03-06.md) — Fases 0–C
 >
@@ -22,27 +22,27 @@ com `strict: true` ativado globalmente e **0 erros em todos os targets de typech
 | ----------------------------------- | ------------------- | ---------------- | ----- |
 | TypeScript                          | 5.9.3               | **5.9.3**        | —     |
 | Node.js                             | v24.13.0            | **v24.13.0**     | —     |
-| `strict: true` em tsconfig.base     | ❌                   | ✅                | +1    |
-| `typecheck:node`                    | 0 ✅                 | **0** ✅          | —     |
-| `typecheck:tools`                   | 0 ✅                 | **0** ✅          | —     |
-| `typecheck:browser`                 | 0 ✅                 | **0** ✅          | —     |
-| `typecheck:tests`                   | 15 ⚠️                | **0** ✅          | −15   |
-| `typecheck:isolated`                | 0 ✅                 | **0** ✅          | —     |
-| `typecheck:dashboard`               | ✅                   | **0** ✅          | —     |
-| `typecheck:repo` (completo)         | parcial             | **0** ✅          | ✅     |
-| `typecheck:strict:all` (41 lanes)   | 0 ✅                 | **0** ✅          | —     |
+| `strict: true` em tsconfig.base     | ❌                  | ✅               | +1    |
+| `typecheck:node`                    | 0 ✅                | **0** ✅         | —     |
+| `typecheck:tools`                   | 0 ✅                | **0** ✅         | —     |
+| `typecheck:browser`                 | 0 ✅                | **0** ✅         | —     |
+| `typecheck:tests`                   | 15 ⚠️               | **0** ✅         | −15   |
+| `typecheck:isolated`                | 0 ✅                | **0** ✅         | —     |
+| `typecheck:dashboard`               | ✅                  | **0** ✅         | —     |
+| `typecheck:repo` (completo)         | parcial             | **0** ✅         | ✅    |
+| `typecheck:strict:all` (41 lanes)   | 0 ✅                | **0** ✅         | —     |
 | `@ts-check` cobertura geral         | 99.4%               | **99.4%**        | —     |
 | `@ts-check` src/ (produção)         | 100%                | **100%**         | —     |
 | `@ts-check` scripts/                | 100%                | **100%**         | —     |
 | `@ts-check` tests/                  | 98.1%               | **98.1%**        | —     |
-| `@ts-ignore` em produção (src/)     | 0 ✅                 | **0** ✅          | —     |
-| `@ts-nocheck` em produção (src/)    | 0 ✅                 | **0** ✅          | —     |
+| `@ts-ignore` em produção (src/)     | 0 ✅                | **0** ✅         | —     |
+| `@ts-nocheck` em produção (src/)    | 0 ✅                | **0** ✅         | —     |
 | JSDoc cobertura exports             | 100%                | **100%**         | —     |
-| `functions_missing_options_typedef` | 43                  | **52** ⚠️         | +9    |
-| `unsafe_generic_tags_total` (JSDoc) | 404                 | **511** ⚠️        | +107  |
+| `functions_missing_options_typedef` | 43                  | **52** ⚠️        | +9    |
+| `unsafe_generic_tags_total` (JSDoc) | 404                 | **511** ⚠️       | +107  |
 | `@type{any}` em src/ (grep total)   | 1.809¹              | **3.276**²       | —     |
-| `@ts-expect-error` real             | 0 ✅                 | **0** ✅          | —     |
-| Lanes strict com 0 erros            | 39/39               | **41/41** ✅      | —     |
+| `@ts-expect-error` real             | 0 ✅                | **0** ✅         | —     |
+| Lanes strict com 0 erros            | 39/39               | **41/41** ✅     | —     |
 
 > ¹ Metodologia da auditoria de 6/3: grep em subset público; ² Metodologia atual: rg completo em
 > `src/**/*.js`. A diferença reflete metodologias distintas, não regressão real.
@@ -126,8 +126,8 @@ pelos arquivos com mais ocorrências (`mission_control_service.js`, `task_repo.j
 ### 2.4 `unsafe_generic_tags_total` — 511 no JSDoc engine
 
 O motor JSDoc contabiliza 511 tags `@type {any}` em posições de contrato público (parâmetros,
-retornos, propriedades exportadas). Este número cresceu de ~404 em 6/3/2026 porque novos
-arquivos foram adicionados ao escopo.
+retornos, propriedades exportadas). Este número cresceu de ~404 em 6/3/2026 porque novos arquivos
+foram adicionados ao escopo.
 
 **Top ofensores via JSDoc engine** (>10 por arquivo):
 
@@ -146,9 +146,9 @@ arquivos foram adicionados ao escopo.
 
 ### 2.5 `@type{any}` via rg — 3.276 em src/ (cast interno + público)
 
-O `rg "@type\s*\{any\}"` captura **todas** as ocorrências de `@type {any}`, incluindo casts
-internos no corpo de funções (padrão `/** @type {any} */ (obj)[key]`). Estes são casts defensivos
-necessários até a introdução de `noUncheckedIndexedAccess`.
+O `rg "@type\s*\{any\}"` captura **todas** as ocorrências de `@type {any}`, incluindo casts internos
+no corpo de funções (padrão `/** @type {any} */ (obj)[key]`). Estes são casts defensivos necessários
+até a introdução de `noUncheckedIndexedAccess`.
 
 **Top 25 arquivos por ocorrências totais:**
 
@@ -184,8 +184,8 @@ necessários até a introdução de `noUncheckedIndexedAccess`.
 | **TOTAL scripts/ (.mjs)**                          |      **123** |
 
 **Análise**: ~60% dos casts em `src/main.js` e `src/server/` são padrão de indexação dinâmica
-necessários enquanto `noUncheckedIndexedAccess` não for ativado. Os ~40% restantes são candidatos
-à substituição por typedefs adequados.
+necessários enquanto `noUncheckedIndexedAccess` não for ativado. Os ~40% restantes são candidatos à
+substituição por typedefs adequados.
 
 ### 2.6 `@typedef {import()}` legado — 4 ocorrências (migração para `@import`)
 
@@ -203,8 +203,8 @@ possui 4 usos do padrão legado `@typedef {import(...)...}` em src/:
 
 ### 2.7 `CONFIGURACOES-TSCONFIG.md` — documentação desatualizada
 
-Este documento ainda indica `strict: false` e outras flags pré-Fase D. As informações são
-incorretas e devem ser atualizadas urgentemente para refletir o estado atual.
+Este documento ainda indica `strict: false` e outras flags pré-Fase D. As informações são incorretas
+e devem ser atualizadas urgentemente para refletir o estado atual.
 
 ---
 
@@ -218,61 +218,61 @@ incorretas e devem ser atualizadas urgentemente para refletir o estado atual.
 | Node.js                             | **24.13.0** |
 | `allowJs`                           | `true`      |
 | `checkJs`                           | `true`      |
-| `strict`                            | `true` ✅    |
-| `useUnknownInCatchVariables`        | `true` ✅    |
-| `strictNullChecks`                  | `true` ✅    |
-| `noImplicitAny` (via strict)        | `true` ✅    |
-| `strictFunctionTypes` (via strict)  | `true` ✅    |
-| `strictBindCallApply` (via strict)  | `true` ✅    |
-| `strictPropertyInitialization`      | `true` ✅    |
-| `noImplicitThis` (via strict)       | `true` ✅    |
-| `alwaysStrict` (via strict)         | `true` ✅    |
+| `strict`                            | `true` ✅   |
+| `useUnknownInCatchVariables`        | `true` ✅   |
+| `strictNullChecks`                  | `true` ✅   |
+| `noImplicitAny` (via strict)        | `true` ✅   |
+| `strictFunctionTypes` (via strict)  | `true` ✅   |
+| `strictBindCallApply` (via strict)  | `true` ✅   |
+| `strictPropertyInitialization`      | `true` ✅   |
+| `noImplicitThis` (via strict)       | `true` ✅   |
+| `alwaysStrict` (via strict)         | `true` ✅   |
 | `skipLibCheck`                      | `true`      |
-| `verbatimModuleSyntax`              | `true` ✅    |
-| `isolatedDeclarations` (src/types/) | `true` ✅    |
-| `noUncheckedIndexedAccess`          | ❌ (Fase F)  |
-| `exactOptionalPropertyTypes`        | ❌ (N/A)     |
+| `verbatimModuleSyntax`              | `true` ✅   |
+| `isolatedDeclarations` (src/types/) | `true` ✅   |
+| `noUncheckedIndexedAccess`          | ❌ (Fase F) |
+| `exactOptionalPropertyTypes`        | ❌ (N/A)    |
 
 ### 3.2 Typecheck por target
 
 | Target                   | Erros | Status |
 | ------------------------ | ----: | ------ |
-| `typecheck:node`         |     0 | ✅      |
-| `typecheck:tools`        |     0 | ✅      |
-| `typecheck:browser`      |     0 | ✅      |
-| `typecheck:tests`        |     0 | ✅      |
-| `typecheck:isolated`     |     0 | ✅      |
-| `typecheck:dashboard`    |     0 | ✅      |
-| `typecheck:repo`         |     0 | ✅      |
-| `typecheck:strict:all`   |     0 | ✅      |
-| `typecheck:declarations` |     0 | ✅      |
-| **TOTAL**                |     0 | ✅ 🎉    |
+| `typecheck:node`         |     0 | ✅     |
+| `typecheck:tools`        |     0 | ✅     |
+| `typecheck:browser`      |     0 | ✅     |
+| `typecheck:tests`        |     0 | ✅     |
+| `typecheck:isolated`     |     0 | ✅     |
+| `typecheck:dashboard`    |     0 | ✅     |
+| `typecheck:repo`         |     0 | ✅     |
+| `typecheck:strict:all`   |     0 | ✅     |
+| `typecheck:declarations` |     0 | ✅     |
+| **TOTAL**                |     0 | ✅ 🎉  |
 
 ### 3.3 JSDoc e qualidade
 
-| Métrica                             | Valor     | Meta Fase E |
-| ----------------------------------- | --------- | ----------- |
-| Cobertura exports (100% targets)    | **100%**  | manter      |
+| Métrica                             | Valor      | Meta Fase E |
+| ----------------------------------- | ---------- | ----------- |
+| Cobertura exports (100% targets)    | **100%**   | manter      |
 | `functions_missing_returns_tag`     | **0** ✅   | 0           |
 | `functions_missing_param_tags`      | **0** ✅   | 0           |
 | `functions_missing_options_typedef` | **52** ⚠️  | ≤ 10        |
 | `unsafe_generic_tags_total`         | **511** ⚠️ | ≤ 300       |
-| `@ts-check` src/ (299 arquivos)     | **100%**  | 100%        |
-| `@ts-check` scripts/ (126 arquivos) | **100%**  | 100%        |
-| `@ts-check` tests/ (215 rastreados) | **98.1%** | 100%        |
+| `@ts-check` src/ (299 arquivos)     | **100%**   | 100%        |
+| `@ts-check` scripts/ (126 arquivos) | **100%**   | 100%        |
+| `@ts-check` tests/ (215 rastreados) | **98.1%**  | 100%        |
 | `@ts-ignore` em src/                | **0** ✅   | 0           |
 | `@ts-nocheck` em src/               | **0** ✅   | 0           |
 | `@ts-expect-error` real             | **0** ✅   | 0           |
-| `@import` moderno em uso            | **19**    | crescer     |
-| `@typedef {import()}` legado        | **4**     | 0           |
+| `@import` moderno em uso            | **19**     | crescer     |
+| `@typedef {import()}` legado        | **4**      | 0           |
 
 ### 3.4 Sistema de lanes strict
 
-| Métrica                     | Valor    |
-| --------------------------- | -------- |
-| Total de lanes              | **41**   |
+| Métrica                     | Valor     |
+| --------------------------- | --------- |
+| Total de lanes              | **41**    |
 | Lanes com 0 erros           | **41** ✅ |
-| Arquivos cobertos por lanes | **640+** |
+| Arquivos cobertos por lanes | **640+**  |
 | `tests/supertest.d.ts` gap  | ⚠️ 1 arq. |
 
 ---
@@ -321,8 +321,8 @@ incorretas e devem ser atualizadas urgentemente para refletir o estado atual.
 
 ### Fase E.1 — Migração `@import` (4 ocorrências legadas)
 
-Migrar `@typedef {import()}` para `/** @import { Type } from 'module' */` nos 4 arquivos com
-padrão legado. Esta é a forma recomendada pelo TS 5.5+ e já adotada em 19 outros arquivos.
+Migrar `@typedef {import()}` para `/** @import { Type } from 'module' */` nos 4 arquivos com padrão
+legado. Esta é a forma recomendada pelo TS 5.5+ e já adotada em 19 outros arquivos.
 
 ### Fase E.2 — Redução de `options typedef` (52 funções em 23 arquivos)
 
@@ -337,8 +337,8 @@ typedef. Prioridade por volume de ocorrências:
 
 ### Fase E.3 — Redução de `unsafe_generic_tags` (511 → meta ≤ 300)
 
-Substituir `@type {any}` em posições públicas por typedefs concretos. Foco nos top arquivos do
-JSDoc engine (io.js, main.js, inference_client_policy_repo.js, audit_job_repo.js, rag.js).
+Substituir `@type {any}` em posições públicas por typedefs concretos. Foco nos top arquivos do JSDoc
+engine (io.js, main.js, inference_client_policy_repo.js, audit_job_repo.js, rag.js).
 
 ### Fase E.4 — `isolatedDeclarations` expansão
 
@@ -371,12 +371,12 @@ Comandos utilizados para coleta de dados:
 
 ```bash
 # Typecheck completo
-npm run typecheck:repo      # → 0 erros (todos os targets)
-npm run typecheck:strict    # → 0 erros (41 lanes)
+npm run typecheck:repo   # → 0 erros (todos os targets)
+npm run typecheck:strict # → 0 erros (41 lanes)
 
 # JSDoc coverage
-npm run jsdoc:coverage      # coverage_pct: 100%, missing_options_typedef: 52
-npm run analyze:typing      # @ts-check 636/640 (99.4%), unsafe_generic: 511
+npm run jsdoc:coverage # coverage_pct: 100%, missing_options_typedef: 52
+npm run analyze:typing # @ts-check 636/640 (99.4%), unsafe_generic: 511
 
 # Gaps de @ts-check
 npm run analyze:typing:gaps # 18 MISSING_TS_CHECK, 1 UNCOVERED_STRICT
@@ -388,4 +388,4 @@ rg "@type\s*\{any\}" src/ --count-matches | awk '{sum+=$2} END {print sum}'
 
 ---
 
-*Auditoria gerada em 7 de março de 2026 — GitHub Copilot (Claude Sonnet 4.6)*
+_Auditoria gerada em 7 de março de 2026 — GitHub Copilot (Claude Sonnet 4.6)_

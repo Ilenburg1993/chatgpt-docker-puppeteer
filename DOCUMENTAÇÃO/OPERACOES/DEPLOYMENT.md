@@ -23,31 +23,31 @@ FROM node:20-slim
 
 # Install Chromium dependencies
 RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libatspi2.0-0 \
-    libcairo2 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libpango-1.0-0 \
-    libx11-6 \
-    libxcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
+  chromium \
+  fonts-liberation \
+  libasound2 \
+  libatk-bridge2.0-0 \
+  libatk1.0-0 \
+  libatspi2.0-0 \
+  libcairo2 \
+  libcups2 \
+  libdbus-1-3 \
+  libdrm2 \
+  libgbm1 \
+  libglib2.0-0 \
+  libgtk-3-0 \
+  libnspr4 \
+  libnss3 \
+  libpango-1.0-0 \
+  libx11-6 \
+  libxcb1 \
+  libxcomposite1 \
+  libxdamage1 \
+  libxext6 \
+  libxfixes3 \
+  libxrandr2 \
+  xdg-utils \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -186,7 +186,7 @@ docker inspect --format='{{.State.Health.Status}}' agente-gpt-prod
 npm install -g pm2
 
 # Verify
-pm2 --version  # 5.3.0
+pm2 --version # 5.3.0
 ```
 
 ---
@@ -473,7 +473,7 @@ async function acquireDistributedLock(taskId) {
     lockValue,
     'NX', // Only if not exists
     'EX', // Expiry
-    60 // 60 seconds
+    60, // 60 seconds
   );
 
   return result === 'OK';
@@ -506,21 +506,21 @@ pm2 flush
 # health-check.sh
 
 URL="http://localhost:3008/api/health"
-THRESHOLD_RESPONSE_TIME=2000  # 2s
+THRESHOLD_RESPONSE_TIME=2000 # 2s
 
 RESPONSE=$(curl -s -w "\n%{http_code}\n%{time_total}" "$URL")
 STATUS_CODE=$(echo "$RESPONSE" | tail -2 | head -1)
 RESPONSE_TIME=$(echo "$RESPONSE" | tail -1 | awk '{print int($1*1000)}')
 
 if [ "$STATUS_CODE" -ne 200 ]; then
-    echo "UNHEALTHY: Status $STATUS_CODE"
-    exit 1
+  echo "UNHEALTHY: Status $STATUS_CODE"
+  exit 1
 elif [ "$RESPONSE_TIME" -gt "$THRESHOLD_RESPONSE_TIME" ]; then
-    echo "DEGRADED: Response time ${RESPONSE_TIME}ms"
-    exit 2
+  echo "DEGRADED: Response time ${RESPONSE_TIME}ms"
+  exit 2
 else
-    echo "HEALTHY: ${RESPONSE_TIME}ms"
-    exit 0
+  echo "HEALTHY: ${RESPONSE_TIME}ms"
+  exit 0
 fi
 ```
 
@@ -539,7 +539,7 @@ fi
 # alert-on-failure.sh
 
 if ! /usr/local/bin/health-check.sh; then
-    echo "Agente GPT is DOWN!" | mail -s "ALERT: Agente GPT Down" admin@example.com
+  echo "Agente GPT is DOWN!" | mail -s "ALERT: Agente GPT Down" admin@example.com
 fi
 ```
 
@@ -591,8 +591,8 @@ find /backups -name "agente-*.tar.gz" -mtime +7 -delete
 BACKUP_FILE=$1
 
 if [ -z "$BACKUP_FILE" ]; then
-    echo "Usage: restore.sh <backup.tar.gz>"
-    exit 1
+  echo "Usage: restore.sh <backup.tar.gz>"
+  exit 1
 fi
 
 # Stop service
@@ -726,7 +726,7 @@ pm2 logs agente-gpt --err --lines 100
 **Solução**:
 
 ```bash
-pm2 reset agente-gpt  # Reset restart counter
+pm2 reset agente-gpt # Reset restart counter
 ```
 
 ---

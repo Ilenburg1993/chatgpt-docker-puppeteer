@@ -301,11 +301,11 @@ ROI: Imediato
 ```bash
 # Gerar .d.ts para exports principais
 src/
-  core/constants/tasks.d.ts
-  shared/nerv/constants.d.ts
-  infra/io.d.ts
-  kernel/kernel.d.ts
-  driver/DriverFactory.d.ts
+core/constants/tasks.d.ts
+shared/nerv/constants.d.ts
+infra/io.d.ts
+kernel/kernel.d.ts
+driver/DriverFactory.d.ts
 ```
 
 **Esforço**: 20-25 horas **Resultado**: Autocomplete perfeito para APIs públicas

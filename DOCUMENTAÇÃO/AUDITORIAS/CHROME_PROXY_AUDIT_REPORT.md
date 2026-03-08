@@ -160,7 +160,7 @@ const limiter = rateLimit({
   message: 'Too many requests',
   standardHeaders: true,
   legacyHeaders: false,
-  skip: req => req.url === '/health', // Exceção para health checks
+  skip: (req) => req.url === '/health', // Exceção para health checks
 });
 
 this.app.use(limiter);
@@ -187,7 +187,7 @@ this._idleTimeoutMs = parseInt(process.env.WS_IDLE_TIMEOUT_MS || '60000', 10);
 // Timeout mais generoso para LLM automation
 this._idleTimeoutMs = parseInt(
   process.env.WS_IDLE_TIMEOUT_MS || '300000', // 5 minutos
-  10
+  10,
 );
 
 // Adicionar ping/pong para keep-alive
@@ -380,7 +380,7 @@ this.app.use(
       return compression.filter(req, res);
     },
     threshold: 512, // Comprimir apenas > 512 bytes
-  })
+  }),
 );
 ```
 
@@ -744,7 +744,7 @@ describe('ChromeProxyService E2E', () => {
 
   it('should upgrade to WebSocket', async () => {
     const ws = new WebSocket('ws://localhost:9224/devtools/browser/abc-123');
-    await new Promise(resolve => ws.on('open', resolve));
+    await new Promise((resolve) => ws.on('open', resolve));
     expect(ws.readyState).toBe(WebSocket.OPEN);
   });
 

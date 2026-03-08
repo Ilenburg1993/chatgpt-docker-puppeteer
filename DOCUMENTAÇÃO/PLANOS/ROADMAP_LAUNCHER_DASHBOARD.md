@@ -374,8 +374,8 @@ if (require.main === module || process.env.EXPORT_CHROME_CONFIG === 'true') {
         userDataDir: DEFAULTS.userDataDir,
       },
       null,
-      2
-    )
+      2,
+    ),
   );
   console.log(`Chrome config exported to ${outputPath}`);
 }
@@ -402,7 +402,7 @@ router.get('/health', (req, res) => {
     nerv: getNERVBusHealth(), // A implementar
   };
 
-  const allOk = Object.values(health).every(v => v === 'ok' || v.status === 'ok');
+  const allOk = Object.values(health).every((v) => v === 'ok' || v.status === 'ok');
   res.status(allOk ? 200 : 503).json(health);
 });
 
@@ -602,7 +602,7 @@ module.exports = router;
 
 ```javascript
 // Real-time updates via Socket.io
-io.on('connection', socket => {
+io.on('connection', (socket) => {
   // Envia atualizações quando tarefas mudam de estado
   socket.on('subscribe:tasks', () => {
     socket.join('tasks');

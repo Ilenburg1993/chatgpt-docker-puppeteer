@@ -259,13 +259,13 @@ assert(adapterContent.includes('this.nerv'), 'DriverNERVAdapter deve ter referê
 // Deve usar nerv.onReceive() para comandos
 assert(
   adapterContent.includes('nerv.onReceive'),
-  'Deve usar nerv.onReceive() para escutar comandos'
+  'Deve usar nerv.onReceive() para escutar comandos',
 );
 
 // Deve usar nerv.emitEvent() para telemetria
 assert(
   adapterContent.includes('nerv.emitEvent'),
-  'Deve usar nerv.emitEvent() para enviar telemetria'
+  'Deve usar nerv.emitEvent() para enviar telemetria',
 );
 
 // NÃO deve emitir eventos direto para KERNEL/SERVER
@@ -300,12 +300,12 @@ assert(adapterContent.includes("driver.on('progress'"), 'Deve escutar progress d
 // Usa ActionCodes corretos
 assert(
   adapterContent.includes('ActionCode.DRIVER_STATE_CHANGE'),
-  'Deve usar ActionCode.DRIVER_STATE_CHANGE'
+  'Deve usar ActionCode.DRIVER_STATE_CHANGE',
 );
 
 assert(
   adapterContent.includes('ActionCode.DRIVER_PROGRESS'),
-  'Deve usar ActionCode.DRIVER_PROGRESS'
+  'Deve usar ActionCode.DRIVER_PROGRESS',
 );
 
 // Emite via NERV
@@ -339,7 +339,7 @@ assert(adapterContent.includes('_setupListeners'), 'Deve ter método _setupListe
 // Escuta via NERV
 assert(
   adapterContent.includes('this.nerv.onReceive'),
-  'Deve escutar comandos via nerv.onReceive()'
+  'Deve escutar comandos via nerv.onReceive()',
 );
 
 // Processa comandos corretos
@@ -375,19 +375,19 @@ const lifecycleContent = fs.readFileSync('src/driver/lifecycle/DriverLifecycleMa
 // Não deve importar KERNEL (exceto logger)
 const kernelImports = lifecycleContent.match(/require\(['"].*kernel/gi) || [];
 const allowedImports = kernelImports.filter(
-  imp => imp.includes('logger') || imp.includes('telemetry')
+  (imp) => imp.includes('logger') || imp.includes('telemetry'),
 );
 
 assert.strictEqual(
   kernelImports.length,
   allowedImports.length,
-  'LifecycleManager só pode importar logger/telemetry do KERNEL'
+  'LifecycleManager só pode importar logger/telemetry do KERNEL',
 );
 
 // Não deve importar SERVER
 assert(
   !lifecycleContent.match(/require\(['"].*server/i),
-  'LifecycleManager NÃO deve importar SERVER'
+  'LifecycleManager NÃO deve importar SERVER',
 );
 
 // Deve usar AbortController (soberania)
@@ -425,7 +425,7 @@ for (const file of allDriverFiles) {
   const todoMatches = content.match(/\/\/\s*TODO[:\s]+(.*)/gi) || [];
 
   totalTodos += todoMatches.length;
-  foundTodos.push(...todoMatches.map(todo => ({ file, todo })));
+  foundTodos.push(...todoMatches.map((todo) => ({ file, todo })));
 }
 
 console.log(`   ⚠️ Encontrados ${totalTodos} TODOs técnicos`);
@@ -557,9 +557,9 @@ this.nerv.onReceive(
     actionCode: ActionCode.DRIVER_EXECUTE,
     actorRole: ActorRole.DRIVER,
   },
-  envelope => {
+  (envelope) => {
     this._handleDriverCommand(envelope);
-  }
+  },
 );
 ```
 

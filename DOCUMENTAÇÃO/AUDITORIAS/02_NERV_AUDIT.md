@@ -455,14 +455,14 @@ send(envelope) {
 **Fluxo de Recepção**:
 
 ```javascript
-socketAdapter.onReceive(frame => {
+socketAdapter.onReceive((frame) => {
   envelope = JSON.parse(frame);
 
   // Emite no bus local
   localBus.emit('message', envelope);
 
   // Notifica handlers registrados
-  handlers.forEach(h => h(envelope));
+  handlers.forEach((h) => h(envelope));
 });
 ```
 
@@ -1055,7 +1055,7 @@ nerv.emit(
     messageType: MessageType.EVENT,
     actionCode: 'FORENSICS_DUMP_CREATED', // Adicionar ao ActionCode
     payload: { dumpId, taskId, path: dumpPath },
-  })
+  }),
 );
 ```
 
@@ -1083,7 +1083,7 @@ nerv.emit(
     actionCode: 'INFRA_EMERGENCY', // Adicionar ao ActionCode
     payload: { type, pid, action, severity: 'CRITICAL' },
     correlationId: correlationId,
-  })
+  }),
 );
 ```
 

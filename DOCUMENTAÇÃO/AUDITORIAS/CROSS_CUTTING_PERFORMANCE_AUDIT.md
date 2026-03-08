@@ -147,7 +147,8 @@ destruída. Sem memory leak.
   ```javascript
   // Em _selectInstance()
   const healthyInstances = this.pool.filter(
-    entry => entry.health.status === STATUS_VALUES.HEALTHY && entry.health.consecutiveFailures === 0 // Circuit breaker
+    (entry) =>
+      entry.health.status === STATUS_VALUES.HEALTHY && entry.health.consecutiveFailures === 0, // Circuit breaker
   );
   ```
 - **Estimativa**: 20 min
@@ -713,7 +714,7 @@ não bloqueia event loop em runtime).
     currentScanPromise = (async () => {
       try {
         const files = listTaskFiles();
-        const results = await Promise.all(files.map(file => limit(() => loadTask(file))));
+        const results = await Promise.all(files.map((file) => limit(() => loadTask(file))));
         globalQueueCache = results.filter(Boolean);
         lastFullScan = Date.now();
         isCacheDirty = false;
@@ -888,11 +889,11 @@ await page.setUserAgent(randomUA);
 ```javascript
 const delay = Math.min(
   this.config.retryDelayMs * Math.pow(1.5, this.retryCount - 1),
-  this.config.maxRetryDelayMs
+  this.config.maxRetryDelayMs,
 );
 
 log('WARN', `[ORCH] Retry ${this.retryCount}/${this.config.maxConnectionAttempts} em ${delay}ms`);
-await new Promise(r => setTimeout(r, delay));
+await new Promise((r) => setTimeout(r, delay));
 ```
 
 **Análise**: ✅ Backoff 1.5x previne thundering herd. Delays:
@@ -1104,7 +1105,7 @@ class PerformanceMetrics {
 
   _recentTasks(windowMs) {
     const now = Date.now();
-    return this.taskCompletionTimes.filter(t => now - t < windowMs).length;
+    return this.taskCompletionTimes.filter((t) => now - t < windowMs).length;
   }
 
   _throughput() {

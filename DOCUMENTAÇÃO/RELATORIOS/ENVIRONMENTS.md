@@ -40,10 +40,10 @@ npm run check:env
 
 ```bash
 # Na raiz (desenvolvimento)
-pwd  # Deve mostrar: /workspaces/chatgpt-docker-puppeteer
+pwd # Deve mostrar: /workspaces/chatgpt-docker-puppeteer
 
 # Na dist (produção)
-pwd  # Deve mostrar: /workspaces/chatgpt-docker-puppeteer/dist
+pwd # Deve mostrar: /workspaces/chatgpt-docker-puppeteer/dist
 ```
 
 ## 🚀 Comandos por Ambiente
@@ -51,18 +51,18 @@ pwd  # Deve mostrar: /workspaces/chatgpt-docker-puppeteer/dist
 ### Desenvolvimento (raiz):
 
 ```bash
-npm start              # Executar desenvolvimento
-npm run dev           # Com hot-reload
-npm run build         # Criar dist/
-npm run test          # Testes
+npm start     # Executar desenvolvimento
+npm run dev   # Com hot-reload
+npm run build # Criar dist/
+npm run test  # Testes
 ```
 
 ### Produção (dist/):
 
 ```bash
 cd dist
-node start.js                    # Executar
-npx pm2 start ecosystem.config.cjs  # PM2
+node start.js                      # Executar
+npx pm2 start ecosystem.config.cjs # PM2
 ```
 
 ## ⚠️ Sinais de Alerta
@@ -109,8 +109,8 @@ npm run build && npm run check:env
 ### Limpeza se necessário:
 
 ```bash
-rm -rf dist/          # Remove build
-npm run build        # Recria
+rm -rf dist/  # Remove build
+npm run build # Recria
 ```
 
 ## 🎯 Checklist Antes do Commit

@@ -308,7 +308,7 @@ await stabilizer.waitForStability(this.driver.page, opts.stabilityTimeout);
 await stabilizer.waitForStability(
   this.driver.page,
   opts.stabilityTimeout,
-  this.driver.handles // ✅ Pass handles for registration
+  this.driver.handles, // ✅ Pass handles for registration
 );
 ```
 

@@ -192,7 +192,7 @@ nerv.emit(
     action,
     severity: 'CRITICAL',
   },
-  { correlationId }
+  { correlationId },
 );
 ```
 

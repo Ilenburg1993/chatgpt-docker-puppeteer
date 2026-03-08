@@ -567,7 +567,7 @@ if (this.activeDrivers.size >= ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS) {
         reason: 'QUEUE_FULL',
         suggestion: 'Aguarde tasks ativas completarem ou aumente MAX_QUEUE_SIZE',
       },
-      correlationId
+      correlationId,
     );
 
     this.stats.tasksRejected++;
@@ -581,7 +581,7 @@ if (this.activeDrivers.size >= ADAPTER_CONFIG.MAX_ACTIVE_DRIVERS) {
   log(
     'INFO',
     `[DriverNERVAdapter] Task ${taskId} enfileirada (${this.taskQueue.length} in queue)`,
-    correlationId
+    correlationId,
   );
 
   this.emit(ADAPTER_EVENTS.TASK_QUEUED, {
@@ -1014,15 +1014,15 @@ const { DriverNERVAdapter, ADAPTER_EVENTS } = require('./driver/nerv_adapter/dri
 const adapter = new DriverNERVAdapter(nerv, browserPool, config);
 
 // Escutar eventos locais
-adapter.on(ADAPTER_EVENTS.TASK_STARTED, data => {
+adapter.on(ADAPTER_EVENTS.TASK_STARTED, (data) => {
   console.log(`Task ${data.taskId} started (${data.activeDrivers} active)`);
 });
 
-adapter.on(ADAPTER_EVENTS.TASK_COMPLETED, data => {
+adapter.on(ADAPTER_EVENTS.TASK_COMPLETED, (data) => {
   console.log(`Task ${data.taskId} completed in ${data.result.duration}ms`);
 });
 
-adapter.on(ADAPTER_EVENTS.CIRCUIT_BREAKER_OPEN, data => {
+adapter.on(ADAPTER_EVENTS.CIRCUIT_BREAKER_OPEN, (data) => {
   console.warn(`Circuit breaker OPEN (${data.failures}/${data.threshold} failures)`);
 });
 ```
@@ -1102,11 +1102,11 @@ console.log(stats);
 
 ```bash
 # .env
-ADAPTER_EXECUTE_TIMEOUT=600000          # 10min
-ADAPTER_MAX_DRIVERS=20                  # 20 drivers
-ADAPTER_MAX_QUEUE=200                   # 200 tasks queue
-ADAPTER_CIRCUIT_THRESHOLD=10            # 10 failures
-ADAPTER_HEALTH_INTERVAL=30000           # 30s health check
+ADAPTER_EXECUTE_TIMEOUT=600000 # 10min
+ADAPTER_MAX_DRIVERS=20         # 20 drivers
+ADAPTER_MAX_QUEUE=200          # 200 tasks queue
+ADAPTER_CIRCUIT_THRESHOLD=10   # 10 failures
+ADAPTER_HEALTH_INTERVAL=30000  # 30s health check
 ```
 
 ---

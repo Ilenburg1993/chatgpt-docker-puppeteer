@@ -504,10 +504,10 @@ sequenceDiagram
 
 ```bash
 # Script para validar links internos
-find DOCUMENTAÇÃO -name "*.md" -exec grep -H "\[.*\](.*\.md)" {} \; | \
-while read line; do
+find DOCUMENTAÇÃO -name "*.md" -exec grep -H "\[.*\](.*\.md)" {} \; \
+  | while read line; do
     # Extract link and validate file exists
-done
+  done
 ```
 
 ### Checklist de Qualidade

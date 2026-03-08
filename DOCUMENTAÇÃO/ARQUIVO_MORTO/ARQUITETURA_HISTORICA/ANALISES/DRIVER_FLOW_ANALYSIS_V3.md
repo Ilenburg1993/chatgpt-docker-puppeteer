@@ -449,7 +449,7 @@ while (true) {
   }
 
   // 8. Sleep (polling interval)
-  await new Promise(r => setTimeout(r, PERCEPTION_INTERVAL_MS));
+  await new Promise((r) => setTimeout(r, PERCEPTION_INTERVAL_MS));
 }
 ```
 
@@ -634,7 +634,7 @@ this._emitBoth(
       duration: Date.now() - startTime,
     },
   },
-  correlationId
+  correlationId,
 );
 
 this.stats.tasksExecuted++;
@@ -653,7 +653,7 @@ this._emitBoth(
     errorType: error.constructor.name,
     isTimeout: error.name === 'TimeoutError',
   },
-  correlationId
+  correlationId,
 );
 
 this.stats.driversCrashed++;
@@ -671,7 +671,7 @@ if (wasAborted) {
     ADAPTER_EVENTS.TASK_ABORTED,
     ActionCode.DRIVER_TASK_ABORTED,
     { taskId, reason: entry.abortReason },
-    correlationId
+    correlationId,
   );
   this.stats.tasksAborted++;
   // NÃO incrementa driversCrashed (não é falha técnica)

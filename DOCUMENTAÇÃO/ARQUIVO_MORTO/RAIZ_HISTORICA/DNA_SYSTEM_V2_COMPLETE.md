@@ -207,7 +207,7 @@ const result = await io.evolveWithSadiProtocol(
     shadowRoot: false,
   },
   'chatgpt.com',
-  'send-message'
+  'send-message',
 );
 
 if (result.accepted) {
@@ -240,7 +240,7 @@ if (discovered && discovered.confidence >= 75) {
       shadowRoot: discovered.isShadowRoot,
     },
     this.domain,
-    intent
+    intent,
   );
 
   if (result.accepted) {

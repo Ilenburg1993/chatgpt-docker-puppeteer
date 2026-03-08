@@ -86,14 +86,14 @@ class Kernel {
 class Driver {
   constructor() {
     // Driver escuta eventos, não conhece quem emite
-    nerv.on('TASK_ALLOCATED', data => this.handleTask(data));
+    nerv.on('TASK_ALLOCATED', (data) => this.handleTask(data));
   }
 }
 
 class Server {
   constructor() {
     // Server escuta eventos independentemente
-    nerv.on('TASK_COMPLETED', data => this.broadcast(data));
+    nerv.on('TASK_COMPLETED', (data) => this.broadcast(data));
   }
 }
 ```

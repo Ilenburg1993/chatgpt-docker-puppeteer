@@ -118,13 +118,13 @@ Análise de variáveis não tipadas.
 
 ```bash
 # 1. Contar erros totais da lane que vai trabalhar
-npm run typecheck:strict:<LANE> 2>&1 | grep -c "error TS"
+npm run typecheck:strict: < LANE > 2 >&1 | grep -c "error TS"
 
 # 2. Ver quais tipos de erros existem na lane
-npm run typecheck:strict:<LANE> 2>&1 | grep -oP "error TS\d+" | sort | uniq -c | sort -rn
+npm run typecheck:strict: < LANE > 2 >&1 | grep -oP "error TS\d+" | sort | uniq -c | sort -rn
 
 # 3. Ver onde os TS2339 acontecem (falta de typedef)
-npm run typecheck:strict:<LANE> 2>&1 | grep "TS2339"
+npm run typecheck:strict: < LANE > 2 >&1 | grep "TS2339"
 
 # 4. Ver TS8032 em todo o projeto (JSDoc malformado)
 npm run typecheck:node 2>&1 | grep "TS8032"

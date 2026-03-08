@@ -302,7 +302,7 @@ quality validation.
 
 3. **Event Stream** (Socket.io):
    ```javascript
-   socket.on('DRIVER_TASK_COMPLETED', data => {
+   socket.on('DRIVER_TASK_COMPLETED', (data) => {
      // data.taskId: string
      // data.result: ResponseV2 object
      // data.timings: { execute, total, ... }

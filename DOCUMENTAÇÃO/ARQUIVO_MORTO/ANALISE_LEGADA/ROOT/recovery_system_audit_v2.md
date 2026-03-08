@@ -265,7 +265,7 @@ for (let retry = 0; retry < RECOVERY_CONFIG.MAX_TIER_RETRIES; retry++) {
   } catch (reloadErr) {
     if (retry < RECOVERY_CONFIG.MAX_TIER_RETRIES - 1) {
       log('WARN', `[RECOVERY] Reload failed (retry ${retry + 1}): ${reloadErr.message}`);
-      await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
+      await new Promise((r) => setTimeout(r, 1000 * (retry + 1))); // Backoff
     } else {
       throw reloadErr; // Max retries
     }
@@ -506,7 +506,7 @@ for (let retry = 0; retry < maxRetries; retry++) {
   } catch (tierErr) {
     if (retry < maxRetries - 1) {
       log('WARN', `[RECOVERY] Tier ${attempt} failed (retry ${retry + 1}/${maxRetries})`);
-      await new Promise(r => setTimeout(r, 1000 * (retry + 1))); // Backoff
+      await new Promise((r) => setTimeout(r, 1000 * (retry + 1))); // Backoff
     } else {
       throw tierErr; // Max retries
     }
@@ -712,7 +712,7 @@ module.exports = {
   RecoverySystem,
   RECOVERY_CONFIG,
   RECOVERY_EVENTS,
-  create: driver => new RecoverySystem(driver),
+  create: (driver) => new RecoverySystem(driver),
 };
 ```
 

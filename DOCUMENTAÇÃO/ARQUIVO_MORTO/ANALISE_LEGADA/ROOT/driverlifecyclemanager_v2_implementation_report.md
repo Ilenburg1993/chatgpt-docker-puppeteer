@@ -46,7 +46,7 @@ this.driver = driverFactory.getDriver(
   this.task.spec.target,
   this.page,
   this.config,
-  this.abortController.signal
+  this.abortController.signal,
 );
 
 // Linha 57-59 - ❌ Nenhuma validação
@@ -63,7 +63,7 @@ this.driver = driverFactory.getDriver(
   this.task.spec.target,
   this.page,
   this.config,
-  this.abortController.signal
+  this.abortController.signal,
 );
 
 // ✅ Validação de driver
@@ -258,7 +258,7 @@ if (typeof this.driver.removeListener === 'function') {
 
 ```javascript
 // Linha 100-102 - ❌ Nenhum timeout
-await this.driver.destroy().catch(err => {
+await this.driver.destroy().catch((err) => {
   log('WARN', `[LIFECYCLE] Erro no descarte do driver: ${err.message}`, this.correlationId);
 });
 ```
@@ -268,18 +268,18 @@ await this.driver.destroy().catch(err => {
 ```javascript
 // Linhas ~245-260
 // ✅ Timeout de 5s
-const destroyPromise = this.driver.destroy().catch(err => {
+const destroyPromise = this.driver.destroy().catch((err) => {
   log('WARN', `[LIFECYCLE] Erro no descarte do driver: ${err.message}`, this.correlationId);
 });
 
 const timeoutPromise = new Promise((_, reject) => {
   setTimeout(
     () => reject(new Error('Driver destroy timeout')),
-    LIFECYCLE_CONFIG.DESTROY_TIMEOUT_MS
+    LIFECYCLE_CONFIG.DESTROY_TIMEOUT_MS,
   );
 });
 
-await Promise.race([destroyPromise, timeoutPromise]).catch(err => {
+await Promise.race([destroyPromise, timeoutPromise]).catch((err) => {
   log('ERROR', `[LIFECYCLE] Destroy timeout ou erro: ${err.message}`, this.correlationId);
 });
 ```
@@ -626,15 +626,15 @@ const DriverLifecycleManager = require('./driver/DriverLifecycleManager');
 const manager = new DriverLifecycleManager(page, task, config);
 
 // Escutar eventos de lifecycle
-manager.on('lifecycle:acquired', data => {
+manager.on('lifecycle:acquired', (data) => {
   console.log(`Driver ${data.driverName} adquirido em ${data.acquireTime}ms`);
 });
 
-manager.on('lifecycle:state_change', data => {
+manager.on('lifecycle:state_change', (data) => {
   console.log(`Estado: ${data.from} → ${data.to}`);
 });
 
-manager.on('lifecycle:error', data => {
+manager.on('lifecycle:error', (data) => {
   console.error(`Erro em ${data.operation}: ${data.error}`);
 });
 

@@ -194,7 +194,7 @@ const cleanup = () => {
 try {
   unsub =
     typeof nerv.onEvent === 'function'
-      ? nerv.onEvent(envelope => {
+      ? nerv.onEvent((envelope) => {
           try {
             if (
               !envelope ||
@@ -281,7 +281,7 @@ await sendEvent(
     mode: 'inline',
   },
   null,
-  null
+  null,
 );
 
 // src/main.js:991
@@ -291,7 +291,7 @@ await sendEvent(
   ActionCode.INFRA_SHUTDOWN,
   { component: 'ChromeProxyService', timestamp: Date.now() },
   null,
-  null
+  null,
 );
 ```
 
@@ -343,7 +343,7 @@ try {
   log('WARN', `[BOOT] NERV SERVER_READY falhou, tentando novamente...`);
 
   try {
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Espera 2s
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // Espera 2s
     await HighLevelNERV.sendEvent(nerv, ActorRole.SERVER, ActionCode.SERVER_READY, payload);
     log('INFO', '[BOOT] NERV SERVER_READY publicado (retry bem-sucedido)');
   } catch (retryErr) {
@@ -547,7 +547,7 @@ try {
 
     // Timeout watchdog
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('SSOT init timeout após 30s')), SSOT_INIT_TIMEOUT)
+      setTimeout(() => reject(new Error('SSOT init timeout após 30s')), SSOT_INIT_TIMEOUT),
     ),
   ]);
 

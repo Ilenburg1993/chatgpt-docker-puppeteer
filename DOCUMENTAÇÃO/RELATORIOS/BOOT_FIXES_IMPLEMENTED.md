@@ -116,14 +116,13 @@ if (proxyAlreadyRunning) {
 
 ```javascript
 /**
- * Verifica se uma porta está em uso.
- * Retorna true se porta ocupada, false se disponível.
+ * Verifica se uma porta está em uso. Retorna true se porta ocupada, false se disponível.
  */
 async function checkPortInUse(port) {
   const net = require('net');
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const server = net.createServer();
-    server.once('error', err => {
+    server.once('error', (err) => {
       if (err.code === 'EADDRINUSE') {
         resolve(true); // Porta em uso
       } else {

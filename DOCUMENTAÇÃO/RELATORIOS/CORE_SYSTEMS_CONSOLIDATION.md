@@ -193,7 +193,7 @@ const browserPoolResult = await initializeBrowserPoolResilient(
     allowDegradedMode: true,
     autoRetry: true,
     maxAutoRetries: 2,
-  }
+  },
 );
 
 const browserPool = browserPoolResult.browserPool;
@@ -472,7 +472,7 @@ for (let attempt = 1; attempt <= maxConnectionAttempts; attempt++) {
     return this.browser;
   } catch (err) {
     const backoffDelay = retryDelayMs * Math.pow(2, attempt - 1);
-    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+    await new Promise((resolve) => setTimeout(resolve, backoffDelay));
   }
 }
 
@@ -1159,7 +1159,7 @@ async executeTask(task) {
 ```bash
 # 1. Boot normal (modo full)
 make start
-make health-core  # Valida boot completo
+make health-core # Valida boot completo
 
 # 2. Boot em modo degradado (Chrome não disponível)
 # Simular: Parar Chrome no Windows
@@ -1174,8 +1174,8 @@ make start
 
 ```bash
 # 1. Health check do Chrome
-curl http://localhost:9225/json/version  # Windows
-curl http://localhost:9224/json/version  # Container (via proxy)
+curl http://localhost:9225/json/version # Windows
+curl http://localhost:9224/json/version # Container (via proxy)
 
 # 2. Validar pool initialization
 node -e "
@@ -1226,10 +1226,10 @@ await lifecycle.acquire();
 
 ```bash
 # Makefile targets
-make health              # 4 endpoints + PM2 status
-make health-core         # Core endpoint only
-make test-unit           # Pre-commit tests
-make test-integration    # Full integration tests
+make health           # 4 endpoints + PM2 status
+make health-core      # Core endpoint only
+make test-unit        # Pre-commit tests
+make test-integration # Full integration tests
 ```
 
 ---
@@ -1250,15 +1250,15 @@ make test-integration    # Full integration tests
 
 ```bash
 # 1. Chrome está rodando no Windows?
-curl http://localhost:9225/json/version  # (executar no Windows)
+curl http://localhost:9225/json/version # (executar no Windows)
 
 # 2. Proxy está rodando?
-curl http://localhost:9224/json/version  # (executar no container)
+curl http://localhost:9224/json/version # (executar no container)
 pm2 list | grep chrome-proxy
 
 # 3. Portas corretas?
-lsof -i :9224  # Container
-lsof -i :9225  # Windows (PowerShell: Get-NetTCPConnection -LocalPort 9225)
+lsof -i :9224 # Container
+lsof -i :9225 # Windows (PowerShell: Get-NetTCPConnection -LocalPort 9225)
 ```
 
 **Soluções**:
@@ -1268,7 +1268,7 @@ lsof -i :9225  # Windows (PowerShell: Get-NetTCPConnection -LocalPort 9225)
 START-CHROME-SIMPLE.bat
 
 # B. Iniciar Proxy (se PM2 não gerenciou)
-make start  # Inicia PM2 com proxy
+make start # Inicia PM2 com proxy
 
 # C. Modo degradado (temporário)
 export ALLOW_DEGRADED_MODE=true

@@ -13,17 +13,17 @@
 
 ## Estado geral — 7 de março de 2026 🎉 FASES 0–D COMPLETAS
 
-| Indicador                          | Início do roadmap | Agora (7 mar 2026)     |
-| ---------------------------------- | ----------------- | ---------------------- |
+| Indicador                          | Início do roadmap | Agora (7 mar 2026)      |
+| ---------------------------------- | ----------------- | ----------------------- |
 | Arquivos com `// @ts-check`        | **670**           | **721** ✅ (+51 src/)   |
 | `@ts-ignore` em código real        | desconhecido      | **0** ✅                |
-| `@ts-nocheck` em código real       | **0** ✅           | **0** ✅                |
+| `@ts-nocheck` em código real       | **0** ✅          | **0** ✅                |
 | Erros `typecheck:node` (base)      | ~2.170            | **0** ✅                |
 | Erros `typecheck:tools`            | ~2                | **0** ✅                |
 | Erros `typecheck:browser`          | ~285              | **0** ✅                |
 | Erros `typecheck:tests`            | 15                | **0** ✅                |
 | Erros `typecheck:isolated`         | N/A               | **0** ✅ (novo)         |
-| Erros `typecheck:strict:all`       | ~7.414            | **0** ✅ 🎉              |
+| Erros `typecheck:strict:all`       | ~7.414            | **0** ✅ 🎉             |
 | Lanes strict com 0 erros           | 11 de 39          | **39 de 39** ✅         |
 | `strict: true` em tsconfig.base    | não               | **sim** ✅              |
 | `useUnknownInCatchVariables`       | não               | **sim** ✅              |
@@ -32,7 +32,7 @@
 | `isolatedDeclarations` (src/types) | não               | **sim** ✅              |
 | Schema tsserver-tool-contract      | v1.0.0            | **v1.1.0** ✅           |
 | JSDoc cobertura exports            | ~70%              | **100%** (1115/1115) ✅ |
-| Tags unsafe restantes (`@any`)     | ~404              | ~404 (manter monit.)   |
+| Tags unsafe restantes (`@any`)     | ~404              | ~404 (manter monit.)    |
 
 **Fases 0–D concluídas em 7 de março de 2026**: `strict: true` ativado globalmente em
 `tsconfig.base.json`, todos os targets em 0, `isolatedDeclarations` ativo para `src/types/`.
@@ -44,13 +44,15 @@
 - `src/server/engine/app.js` + `schema_guard.js` — TS7030: explicit `return` before `next()` ✅
 - `src/types/global.d.ts` — Express.Request augmented: `id: string`, `user?: Record<string, any>` ✅
 - `src/types/core/augmentations.d.ts` — identity_manager: `initialize`, `robotId`, `instanceId` ✅
-- `src/types/infra/augmentations.d.ts` — io: `ROOT`, `RESPONSE_DIR`; ConnectionOrchestrator: constructor+connect; BrowserPoolManager: `removePageFromPool(taskId, page?)` ✅
+- `src/types/infra/augmentations.d.ts` — io: `ROOT`, `RESPONSE_DIR`; ConnectionOrchestrator:
+  constructor+connect; BrowserPoolManager: `removePageFromPool(taskId, page?)` ✅
 - `src/types/server/augmentations.d.ts` — `getIO()` retorna tipo com `fetchSockets()` ✅
 - `tsconfig.tests.json` + 7 strict test lanes — incluem `src/types/**/*.d.ts` ✅
 - `tests/fixtures/mcp/stdio-server.mjs` — TS2769: cast `@type {any}` em McpServer ✅
 - `tests/manual/test_browser_pool.js` — `@type {any}` cast em BrowserPoolManager ✅
 - `tests/manual/test_connection_orchestrator.js` — `@type {any}` cast em ConnectionOrchestrator ✅
-- `tests/regression/test_wave14_hot_pool_monitor_taskid_rebind.spec.js` — `@type {any[]}` cast em `manager.pool` ✅
+- `tests/regression/test_wave14_hot_pool_monitor_taskid_rebind.spec.js` — `@type {any[]}` cast em
+  `manager.pool` ✅
 
 **Fases 0–C concluídas em 6 de março de 2026**: todas as 39 lanes strict zeradas.
 
@@ -124,11 +126,13 @@ Arquivos com mais ocorrências (prioridade):
 | `src/infra/io.js`                     |          31 |
 | Demais ~280 arquivos                  |      ~2.962 |
 
-**Estratégia**: substituir em blocos por módulo, do menor para o maior. Manter `typecheck:strict:all = 0` a cada commit.
+**Estratégia**: substituir em blocos por módulo, do menor para o maior. Manter
+`typecheck:strict:all = 0` a cada commit.
 
 ### E.4 — Expansão de `isolatedDeclarations`
 
 Expandir `tsconfig.isolated-declarations.json` para além de `src/types/`:
+
 - `src/core/` — APIs públicas estáveis
 - `src/nerv/` — interface de eventos
 - `src/kernel/` — API de execução
@@ -161,8 +165,8 @@ Expandir `tsconfig.isolated-declarations.json` para além de `src/types/`:
 
 ## Baseline por lane strict
 
-| Lane                    | Erros | Fase    | Status               |
-| ----------------------- | ----: | ------- | -------------------- |
+| Lane                    | Erros | Fase     | Status               |
+| ----------------------- | ----: | -------- | -------------------- |
 | `src.types`             |     0 | ✅ verde | Manter               |
 | `agents`                |     0 | ✅ verde | Manter               |
 | `scripts.ci`            |     0 | ✅ verde | Manter               |
@@ -216,12 +220,12 @@ Objectivo: zerar 6 lanes com correções JSDoc reais.
 
 | Lane                    | Erros | Prioridade | Foco principal                                           | Status |
 | ----------------------- | ----: | :--------: | -------------------------------------------------------- | ------ |
-| `src.logic`             |     2 |     1      | Corrigir 2 erros diretos                                 | ✅ 0    |
-| `scripts.analysis`      |   181 |     2      | Typedefs para nós de AST, variáveis de análise           | ✅ 0    |
-| `src.inference_gateway` |   191 |     3      | OllamaResponse, PolicyConfig, ProfileRecord, \*\_repo.js | ✅ 0    |
-| `src.dashboard-ui`      |   285 |     4      | State de stores Pinia, ref()/computed() composables      | ✅ 0    |
-| `tests.manual`          |   300 |     5      | `/** @type {any} */` em asserções onde tipo irrelevante  | ✅ 0    |
-| `src.audit_agent`       |   358 |     6      | AuditJob, AuditFinding, AuditPatch, JobRun typedefs      | ✅ 0    |
+| `src.logic`             |     2 |     1      | Corrigir 2 erros diretos                                 | ✅ 0   |
+| `scripts.analysis`      |   181 |     2      | Typedefs para nós de AST, variáveis de análise           | ✅ 0   |
+| `src.inference_gateway` |   191 |     3      | OllamaResponse, PolicyConfig, ProfileRecord, \*\_repo.js | ✅ 0   |
+| `src.dashboard-ui`      |   285 |     4      | State de stores Pinia, ref()/computed() composables      | ✅ 0   |
+| `tests.manual`          |   300 |     5      | `/** @type {any} */` em asserções onde tipo irrelevante  | ✅ 0   |
+| `src.audit_agent`       |   358 |     6      | AuditJob, AuditFinding, AuditPatch, JobRun typedefs      | ✅ 0   |
 
 **Gate por lane**: `npm run typecheck:strict:<LANE>` → 0 erros
 
@@ -309,11 +313,11 @@ Ativar flags progressivamente em `tsconfig.base.json`:
 
 | Etapa | Flag                         | Erros estimados | Padrão de correção                   | Status |
 | ----- | ---------------------------- | --------------: | ------------------------------------ | ------ |
-| D.0   | `typecheck:tests` → 0        |              15 | Fix union types + spread params      | ✅      |
-| D.1   | `useUnknownInCatchVariables` |             602 | `const e = /** @type {any} */ (err)` | ✅      |
-| D.2   | `noImplicitAny`              |           1.675 | `@param` em todos os callbacks       | ✅      |
-| D.3   | `strictNullChecks`           |             245 | `?.`, `?? default`, null guards      | ✅      |
-| D.4   | `strict: true`               |  (consolidação) | Todos os anteriores                  | ✅      |
+| D.0   | `typecheck:tests` → 0        |              15 | Fix union types + spread params      | ✅     |
+| D.1   | `useUnknownInCatchVariables` |             602 | `const e = /** @type {any} */ (err)` | ✅     |
+| D.2   | `noImplicitAny`              |           1.675 | `@param` em todos os callbacks       | ✅     |
+| D.3   | `strictNullChecks`           |             245 | `?.`, `?? default`, null guards      | ✅     |
+| D.4   | `strict: true`               |  (consolidação) | Todos os anteriores                  | ✅     |
 
 **Flags NÃO recomendadas**: `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`.
 
@@ -376,8 +380,8 @@ merge.
 
 ## Histórico de esforço
 
-| Fase   | Erros eliminados | Lanes zeradas | Status            |
-| ------ | ---------------: | :-----------: | ----------------- |
+| Fase   | Erros eliminados | Lanes zeradas | Status             |
+| ------ | ---------------: | :-----------: | ------------------ |
 | Fase 0 |              214 |       —       | ✅ Concluída       |
 | Fase A |            1.134 |       6       | ✅ Concluída       |
 | Fase B |            7.331 |      12       | ✅ Concluída       |
@@ -390,8 +394,8 @@ merge.
 
 **Total eliminado**: ~15.402 erros TypeScript (Fases 0–C) em 39 lanes. **Fase D concluída em
 7/3/2026**: `strict: true` ativado globalmente, todos os targets em 0. **Next action**: Fase E →
-Fase F → Fase G. Ver [`AUDITORIA-2026-03-07.md`](./AUDITORIA-2026-03-07.md) para métricas
-completas da Fase D.
+Fase F → Fase G. Ver [`AUDITORIA-2026-03-07.md`](./AUDITORIA-2026-03-07.md) para métricas completas
+da Fase D.
 
 ---
 
@@ -442,16 +446,16 @@ Criar um config dedicado que emite `.d.ts` para **todo `src/`**:
 
 ```json
 {
-    "extends": "./tsconfig.node.json",
-    "compilerOptions": {
-        "noEmit": false,
-        "declaration": true,
-        "emitDeclarationOnly": true,
-        "declarationMap": true,
-        "outDir": "./tmp/types-all"
-    },
-    "include": ["src/**/*.js", "src/types/**/*.d.ts"],
-    "exclude": ["src/dashboard-ui/**"]
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": true,
+    "outDir": "./tmp/types-all"
+  },
+  "include": ["src/**/*.js", "src/types/**/*.d.ts"],
+  "exclude": ["src/dashboard-ui/**"]
 }
 ```
 
@@ -464,9 +468,9 @@ Criar um config dedicado que emite `.d.ts` para **todo `src/`**:
 - Isola a emissão em `tmp/` — não polui o source.
 - `declarationMap: true` → `.d.ts.map` para navegação "go to definition" em consumers.
 
-**Pré-condição importante**: para emitir `.d.ts` de um arquivo `.js`, TypeScript requer que os
-tipos de **retorno de funções exportadas** sejam inferíveis sem contexto externo. Arquivos com
-retornos complexos (`Promise<inferred>`) podem gerar erros de declaração.
+**Pré-condição importante**: para emitir `.d.ts` de um arquivo `.js`, TypeScript requer que os tipos
+de **retorno de funções exportadas** sejam inferíveis sem contexto externo. Arquivos com retornos
+complexos (`Promise<inferred>`) podem gerar erros de declaração.
 
 ### Checklist Fase F
 
@@ -485,20 +489,21 @@ retornos complexos (`Promise<inferred>`) podem gerar erros de declaração.
 > **Planejado em**: 7 de março de 2026. **Erros medidos** com `typecheck:node` atual como baseline.
 
 Flags que **não entraram no `strict: true`** padrão do TypeScript, mas que adicionam verificações
-relevantes. Diferente das Fases 0–D, estas podem ser ativadas pontualmente por `.d.ts` tipo
-override ou lane por lane.
+relevantes. Diferente das Fases 0–D, estas podem ser ativadas pontualmente por `.d.ts` tipo override
+ou lane por lane.
 
 | Etapa | Flag                                 | Erros medidos | Padrão de correção                                                | Status |
 | ----- | ------------------------------------ | ------------: | ----------------------------------------------------------------- | ------ |
-| G.1   | `noUncheckedIndexedAccess`           |            45 | `arr[i]!` ou guard `if (v !== undefined)`                         | ✅      |
-| G.2   | `exactOptionalPropertyTypes`         |            31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | ✅      |
+| G.1   | `noUncheckedIndexedAccess`           |            45 | `arr[i]!` ou guard `if (v !== undefined)`                         | ✅     |
+| G.2   | `exactOptionalPropertyTypes`         |            31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | ✅     |
 | G.3   | `noPropertyAccessFromIndexSignature` |            ≈0 | Trocar `.prop` por `["prop"]` em `Record<K,V>`                    | [ ]    |
 | G.4   | `allowUnreachableCode: false`        |            ≈0 | Remover código morto após `return`/`throw`                        | [ ]    |
 | G.5   | `allowUnusedLabels: false`           |            ≈0 | Remover labels JS não-utilizados                                  | [ ]    |
 
 ### G.1 — `noUncheckedIndexedAccess` (45 erros) ✅ CONCLUÍDA
 
-> **Status**: ativada em `tsconfig.base.json`. 0 erros em todos os 40+ lanes strict. Commit: `3a7867e4`.
+> **Status**: ativada em `tsconfig.base.json`. 0 erros em todos os 40+ lanes strict. Commit:
+> `3a7867e4`.
 
 **O que faz**: acesso a array/objeto por índice (`arr[0]`, `obj[key]`) retorna `T | undefined` em
 vez de `T`. Força verificação de limite de array.
@@ -511,14 +516,15 @@ vez de `T`. Força verificação de limite de array.
 2. Guard explícito: `const v = arr[i]; if (v === undefined) return;`
 3. Coalescência: `arr[0] ?? defaultValue`
 
-**Critério de ativação**: após concluir E.2 (redução de unsafe tags). Ativar em `tsconfig.base.json`.
+**Critério de ativação**: após concluir E.2 (redução de unsafe tags). Ativar em
+`tsconfig.base.json`.
 
 ### G.2 — `exactOptionalPropertyTypes` (31 erros) ✅ CONCLUÍDA
 
 > **Status**: ativada em `tsconfig.base.json`. 0 erros em todos os lanes strict. Commit: `3a7867e4`.
 
-**O que faz**: `{ a?: string }` significa apenas `{a: string}` ou `{}` — nunca `{a: undefined}`.
-Sem essa flag, TypeScript aceita `{a: undefined}` como satisfazendo `{a?: string}`.
+**O que faz**: `{ a?: string }` significa apenas `{a: string}` ou `{}` — nunca `{a: undefined}`. Sem
+essa flag, TypeScript aceita `{a: undefined}` como satisfazendo `{a?: string}`.
 
 **Padrão de erro**: `TS2379: Argument not assignable ... with exactOptionalPropertyTypes: true`
 
@@ -526,7 +532,8 @@ Sem essa flag, TypeScript aceita `{a: undefined}` como satisfazendo `{a?: string
 
 1. Nos typedefs JSDoc: `@property {string | undefined} [prop]` para propriedades que podem ser
    `undefined` explicitamente
-2. Nas chamadas: remover propriedades `undefined` do literal antes de passar: `Object.fromEntries(...filter)`
+2. Nas chamadas: remover propriedades `undefined` do literal antes de passar:
+   `Object.fromEntries(...filter)`
 3. Usar `Partial<T>` quando aplicável
 
 **Critério de ativação**: independente — pode ativar agora (apenas 31 erros).
@@ -578,13 +585,11 @@ incremental por subsistema:
 ```json
 // tsconfig.json (raiz)
 {
-    "references": [
-        { "path": "./tsconfig.node.json" },
-        { "path": "./tsconfig.declarations.json" }
-    ]
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.declarations.json" }]
 }
 ```
 
-**Benefício**: `tsc --build` faz build incremental por projeto — rebuild parcial quando apenas `src/kernel/` muda.
+**Benefício**: `tsc --build` faz build incremental por projeto — rebuild parcial quando apenas
+`src/kernel/` muda.
 
 **Pré-condição**: `emitDeclarationOnly: true` deve estar estável em todas as configs participantes.

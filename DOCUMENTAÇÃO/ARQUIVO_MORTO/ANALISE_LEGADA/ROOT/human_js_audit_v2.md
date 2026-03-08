@@ -172,14 +172,14 @@ state (e.g., React re-render).
 ```javascript
 if (i % 25 === 0) {
   const focusOk = await ctx
-    .evaluate(sel => {
+    .evaluate((sel) => {
       // ... check focus ...
     }, selector)
     .catch(() => false);
 
   if (!focusOk) {
     await ctx.focus(selector).catch(() => {}); // Race: focus may have changed again
-    await new Promise(r => {
+    await new Promise((r) => {
       setTimeout(r, 200);
     });
   }
@@ -193,14 +193,14 @@ if (i % 25 === 0) {
   let focusOk = false;
   for (let retry = 0; retry < 3 && !focusOk; retry++) {
     focusOk = await ctx
-      .evaluate(sel => {
+      .evaluate((sel) => {
         // ... check focus ...
       }, selector)
       .catch(() => false);
 
     if (!focusOk) {
       await ctx.focus(selector).catch(() => {});
-      await new Promise(r => {
+      await new Promise((r) => {
         setTimeout(r, 100 * (retry + 1));
       });
     }
@@ -223,7 +223,7 @@ successful.
 
 ```javascript
 await page.keyboard.type(typo || ' ');
-await new Promise(r => {
+await new Promise((r) => {
   setTimeout(r, 300 + currentLag * 0.5);
 });
 await page.keyboard.press('Backspace'); // No verification
@@ -234,17 +234,17 @@ await page.keyboard.press('Backspace'); // No verification
 ```javascript
 // Option 1: Verify backspace effect
 await page.keyboard.type(typo || ' ');
-await new Promise(r => {
+await new Promise((r) => {
   setTimeout(r, 300 + currentLag * 0.5);
 });
 const beforeLength = await ctx.evaluate(
-  sel => document.querySelector(sel)?.value?.length || 0,
-  selector
+  (sel) => document.querySelector(sel)?.value?.length || 0,
+  selector,
 );
 await page.keyboard.press('Backspace');
 const afterLength = await ctx.evaluate(
-  sel => document.querySelector(sel)?.value?.length || 0,
-  selector
+  (sel) => document.querySelector(sel)?.value?.length || 0,
+  selector,
 );
 if (beforeLength - afterLength !== 1) {
   _log('WARN', '[HUMAN] Backspace verification failed (field may have lost focus)');
@@ -497,7 +497,7 @@ const LAYOUTS = {
 **Current**: Single attempt to find element:
 
 ```javascript
-const rect = await ctx.evaluate(sel => {
+const rect = await ctx.evaluate((sel) => {
   const el = document.querySelector(sel);
   if (!el) return null;
   // ...
@@ -513,7 +513,7 @@ if (!rect) {
 ```javascript
 async function getElementRect(ctx, selector, retries = 3, delayMs = 500) {
   for (let i = 0; i < retries; i++) {
-    const rect = await ctx.evaluate(sel => {
+    const rect = await ctx.evaluate((sel) => {
       const el = document.querySelector(sel);
       if (!el) return null;
       const r = el.getBoundingClientRect();
@@ -523,7 +523,7 @@ async function getElementRect(ctx, selector, retries = 3, delayMs = 500) {
     if (rect) return rect;
 
     if (i < retries - 1) {
-      await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+      await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
     }
   }
   throw new Error('ELEMENT_NOT_VISIBLE');
@@ -681,11 +681,11 @@ async function detectKeyboardLayout(page) {
 
 ```javascript
 await page.keyboard.down('Shift');
-await new Promise(r => {
+await new Promise((r) => {
   setTimeout(r, 30 + Math.random() * 30);
 });
 await page.keyboard.type(char);
-await new Promise(r => {
+await new Promise((r) => {
   setTimeout(r, 20 + Math.random() * 20);
 });
 await page.keyboard.up('Shift');
@@ -696,14 +696,14 @@ await page.keyboard.up('Shift');
 ```javascript
 const shiftDownDelay = Math.max(10, gaussianRandom(40, 15)); // μ=40ms, σ=15ms
 await page.keyboard.down('Shift');
-await new Promise(r => {
+await new Promise((r) => {
   setTimeout(r, shiftDownDelay);
 });
 
 await page.keyboard.type(char);
 
 const shiftUpDelay = Math.max(10, gaussianRandom(30, 10)); // μ=30ms, σ=10ms
-await new Promise(r => {
+await new Promise((r) => {
   setTimeout(r, shiftUpDelay);
 });
 await page.keyboard.up('Shift');

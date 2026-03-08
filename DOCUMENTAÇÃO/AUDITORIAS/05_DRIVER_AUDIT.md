@@ -229,7 +229,7 @@ const SVG_SIGNATURES = [
   'M22 2L11 13', // Stop square
   'M15.854 11.854', // Gemini send
   'M21 2L3 10l8 3 3 8z', // Alternative send
-].map(sig => sig.replace(/[\s,]/g, '').slice(0, 20));
+].map((sig) => sig.replace(/[\s,]/g, '').slice(0, 20));
 ```
 
 **Algoritmo SADI**:
@@ -333,7 +333,7 @@ Remove raciocínio interno da OpenAI:
 
 ```javascript
 const thoughts = clone.querySelectorAll('[data-testid*="thought"]');
-thoughts.forEach(t => t.remove());
+thoughts.forEach((t) => t.remove());
 ```
 
 Garante respostas limpas sem "ruído" de pensamento.

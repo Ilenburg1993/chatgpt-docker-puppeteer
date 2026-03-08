@@ -357,7 +357,7 @@ class DriverNERVAdapter {
     this.drivers = new Map();
 
     // Adapter: Escutar NERV e chamar Driver
-    nerv.on('TASK_ALLOCATED', envelope => {
+    nerv.on('TASK_ALLOCATED', (envelope) => {
       this.handleAllocation(envelope.payload);
     });
   }
@@ -426,9 +426,9 @@ class FileWatcher {
 
     // Observer: Registrar callbacks para eventos
     this.watcher
-      .on('add', filePath => this.handleAdd(filePath))
-      .on('change', filePath => this.handleChange(filePath))
-      .on('unlink', filePath => this.handleRemove(filePath));
+      .on('add', (filePath) => this.handleAdd(filePath))
+      .on('change', (filePath) => this.handleChange(filePath))
+      .on('unlink', (filePath) => this.handleRemove(filePath));
   }
 
   handleAdd(filePath) {
@@ -525,7 +525,7 @@ class PoolManager {
   _selectInstance(target) {
     // P9.2: Circuit Breaker - filtrar apenas HEALTHY
     const healthy = this.pool.filter(
-      entry => entry.health.status === 'HEALTHY' && entry.health.consecutiveFailures === 0
+      (entry) => entry.health.status === 'HEALTHY' && entry.health.consecutiveFailures === 0,
     );
 
     if (healthy.length === 0) {
@@ -544,7 +544,7 @@ class PoolManager {
       log('WARN', `[POOL] Circuit breaker triggered for instance ${instance.id}`);
 
       instance.health.status = 'CRASHED';
-      this.pool = this.pool.filter(e => e !== instance);
+      this.pool = this.pool.filter((e) => e !== instance);
 
       // Tentar recuperar
       await instance.browser.close();
@@ -790,10 +790,10 @@ function executeTask(taskId, callback) {
     allocatePage(task.target, (err, page) => {
       if (err) return callback(err);
 
-      navigate(page, task.url, err => {
+      navigate(page, task.url, (err) => {
         if (err) return callback(err);
 
-        type(page, task.prompt, err => {
+        type(page, task.prompt, (err) => {
           if (err) return callback(err);
 
           collectResponse(page, (err, response) => {
@@ -849,7 +849,7 @@ async function scanQueue() {
   // P9.7: p-limit controla concorrência (10 simultâneos)
   const limit = pLimit(10);
 
-  const tasks = await Promise.all(files.map(file => limit(() => loadTask(file))));
+  const tasks = await Promise.all(files.map((file) => limit(() => loadTask(file))));
 
   return tasks.filter(Boolean);
 }
@@ -898,13 +898,13 @@ function debounce(fn, delayMs) {
   };
 }
 
-const debouncedInvalidate = debounce(action => {
+const debouncedInvalidate = debounce((action) => {
   cache.markDirty();
   nerv.emit('QUEUE_CHANGE', { action });
 }, 100);
 
 // Uso
-watcher.on('add', filePath => {
+watcher.on('add', (filePath) => {
   debouncedInvalidate(() => handleAdd(filePath));
 });
 ```

@@ -58,9 +58,9 @@ V5 + Response Adapter V2.0
 
 ```bash
 # Full Test Suite (5s)
-node tests/test_schema_v5.js && \
-node tests/test_task_core_validation.js && \
-node -r module-alias/register tests/test_response_adapter.js
+node tests/test_schema_v5.js \
+  && node tests/test_task_core_validation.js \
+  && node -r module-alias/register tests/test_response_adapter.js
 ```
 
 ---

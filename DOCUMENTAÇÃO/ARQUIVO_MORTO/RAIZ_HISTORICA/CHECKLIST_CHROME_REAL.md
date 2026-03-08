@@ -69,8 +69,8 @@ Invoke-RestMethod -Uri http://localhost:9225/json/list
 Linux / WSL / container (curl):
 
 ```bash
-curl -sS http://<WINDOWS_HOST_IP>:9225/json/version | jq .
-curl -sS http://<WINDOWS_HOST_IP>:9225/json/list | jq .
+curl -sS http:// < WINDOWS_HOST_IP > :9225/json/version | jq .
+curl -sS http:// < WINDOWS_HOST_IP > :9225/json/list | jq .
 ```
 
 5. Iniciar o Chrome Proxy Service (exemplo rodando no container Linux/servidor)
@@ -80,14 +80,14 @@ curl -sS http://<WINDOWS_HOST_IP>:9225/json/list | jq .
 ```bash
 # rodar no host/container que executa o proxy
 # CHROME_PORT refere-se à porta do Chrome no host (9225); CHROME_PROXY_PORT é o endpoint público/container-facing (9224)
-CHROME_HOST=<WINDOWS_HOST_IP> CHROME_PORT=9225 CHROME_PROXY_PORT=9224 PUBLIC_IP=<IP_ACESSIVEL_PELA_REDE> node scripts/chrome-proxy-service.js
+CHROME_HOST= CHROME_PROXY_PORT=9224 PUBLIC_IP= < WINDOWS_HOST_IP > CHROME_PORT=9225 < IP_ACESSIVEL_PELA_REDE > node scripts/chrome-proxy-service.js
 ```
 
 6. Validar através do proxy
 
 ```bash
-curl -sS http://<PROXY_HOST>:9224/json/version | jq .
-curl -sS http://<PROXY_HOST>:9224/json/list | jq .
+curl -sS http:// < PROXY_HOST > :9224/json/version | jq .
+curl -sS http:// < PROXY_HOST > :9224/json/list | jq .
 # verifique que webSocketDebuggerUrl aponta para ws://<PROXY_HOST>:9224/...
 ```
 

@@ -199,14 +199,14 @@ if (!isProcessAlive(currentLock.pid)) {
     await fs.writeFile(recoveryLockFile, JSON.stringify({ pid: process.pid, recoveryId }));
 
     // [FASE 2] Aguarda 100ms para dar chance de outros processos detectarem
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       setTimeout(resolve, 100);
     });
 
     // [FASE 3] Verifica se somos únicos no recovery
     const lockDir = require('path').dirname(lockFile);
     const files = await fs.readdir(lockDir);
-    const recoveryFiles = files.filter(f => f.includes('.recovery.'));
+    const recoveryFiles = files.filter((f) => f.includes('.recovery.'));
 
     if (recoveryFiles.length > 1) {
       // Outro processo também detectou - aborta para evitar race

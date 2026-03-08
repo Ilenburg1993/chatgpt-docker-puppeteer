@@ -237,7 +237,7 @@ scripts/package_skill.py <path/to/skill-folder>
 Optional output directory specification:
 
 ```bash
-scripts/package_skill.py <path/to/skill-folder> ./dist
+scripts/package_skill.py < path/to/skill-folder > ./dist
 ```
 
 The packaging script will:

@@ -164,8 +164,8 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN npm ci --only=production --ignore-scripts && \
-    npm cache clean --force
+RUN npm ci --only=production --ignore-scripts \
+ && npm cache clean --force
 ```
 
 **Análise**:
@@ -183,17 +183,17 @@ RUN npm ci --only=production --ignore-scripts && \
 FROM node:20-alpine
 
 RUN apk add --no-cache \
-    ca-certificates \
-    curl \
-    dumb-init \
-    && rm -rf /var/cache/apk/*
+  ca-certificates \
+  curl \
+  dumb-init \
+  && rm -rf /var/cache/apk/*
 
 WORKDIR /app
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    NODE_ENV=production \
-    TZ=UTC \
-    CHROME_REMOTE_DEBUGGING_PORT=9224
+  NODE_ENV=production \
+  TZ=UTC \
+  CHROME_REMOTE_DEBUGGING_PORT=9224
 
 COPY --from=deps /app/node_modules ./node_modules
 
@@ -205,9 +205,9 @@ COPY scripts/ ./scripts/
 COPY public/ ./public/
 COPY src/ ./src/
 
-RUN mkdir -p fila respostas logs profile && \
-    chown -R node:node /app && \
-    chmod +x scripts/healthcheck.js
+RUN mkdir -p fila respostas logs profile \
+  && chown -R node:node /app \
+  && chmod +x scripts/healthcheck.js
 
 USER node
 
@@ -216,7 +216,7 @@ VOLUME ["/app/fila", "/app/respostas", "/app/logs", "/app/profile"]
 EXPOSE 3008
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node scripts/healthcheck.js
+  CMD node scripts/healthcheck.js
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
@@ -918,7 +918,7 @@ Container para limpo
 
 ```bash
 docker-compose up -d
-docker-compose stop  # SIGTERM
+docker-compose stop # SIGTERM
 # Logs devem mostrar: "[LIFECYCLE] Encerrado com sucesso"
 ```
 
@@ -1265,7 +1265,7 @@ const options = {
   timeout: 5000,
 };
 
-const req = http.request(options, res => {
+const req = http.request(options, (res) => {
   if (res.statusCode === 200) {
     process.exit(0);
   } else {
@@ -1293,7 +1293,7 @@ req.end();
 
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node scripts/healthcheck.js
+ CMD node scripts/healthcheck.js
 ```
 
 **Análise**:
@@ -1569,8 +1569,6 @@ ENV TZ=UTC
 # ENV TZ=UTC  ← Remover
 
 # docker-compose*.yml (manter)
-environment:
-  - TZ=${TZ:-America/Sao_Paulo}
 ```
 
 **Tempo**: 2 minutos
@@ -1585,9 +1583,8 @@ environment:
 
 ```dockerfile
 RUN apk add --no-cache \
-    ca-certificates \
-    curl \           # ← Instalado mas não usado
-    dumb-init
+ ca-certificates \
+ curl \  # ← Instalado mas não usado
 ```
 
 **Análise**:
@@ -1601,9 +1598,9 @@ RUN apk add --no-cache \
 
 ```dockerfile
 RUN apk add --no-cache \
-    ca-certificates \
-    dumb-init \
-    && rm -rf /var/cache/apk/*
+ ca-certificates \
+ dumb-init \
+ && rm -rf /var/cache/apk/*
 ```
 
 **Tempo**: 1 minuto
@@ -1637,8 +1634,6 @@ RUN apk add --no-cache \
 HEALTHCHECK ... CMD node scripts/healthcheck.js
 
 # docker-compose.yml
-healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:3008/api/health"]
 ```
 
 **Impacto**: 🟡 Médio
@@ -1728,8 +1723,14 @@ set -euo pipefail
 echo "[DEVCONTAINER] Setup iniciado..."
 
 # Verificar dependências
-command -v node >/dev/null || { echo "Node.js não encontrado"; exit 1; }
-command -v npm >/dev/null || { echo "npm não encontrado"; exit 1; }
+command -v node > /dev/null || {
+  echo "Node.js não encontrado"
+  exit 1
+}
+command -v npm > /dev/null || {
+  echo "npm não encontrado"
+  exit 1
+}
 
 # Info
 node --version
@@ -1894,7 +1895,7 @@ router.get('/api/health', async (req, res) => {
     // Check Chrome (opcional, pode ser lento)
     checks.chrome = await orchestrator.testConnection();
 
-    const allHealthy = Object.values(checks).every(v => v);
+    const allHealthy = Object.values(checks).every((v) => v);
 
     res.status(allHealthy ? 200 : 503).json({
       status: allHealthy ? 'healthy' : 'degraded',
@@ -2074,8 +2075,8 @@ const assert = require('node:assert');
 const http = require('http');
 
 describe('Docker Health Checks', () => {
-  it('should respond to /api/health', done => {
-    http.get('http://localhost:3008/api/health', res => {
+  it('should respond to /api/health', (done) => {
+    http.get('http://localhost:3008/api/health', (res) => {
       assert.strictEqual(res.statusCode, 200);
       done();
     });

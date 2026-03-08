@@ -44,6 +44,7 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 ```javascript
 /**
  * Valida um payload de tarefa.
+ *
  * @param {Object} payload - Payload a validar
  * @returns {Promise<boolean>} true se válido
  * @throws {ValidationError} se inválido

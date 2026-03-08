@@ -23,6 +23,7 @@ src/core/
 ```javascript
 /**
  * Estados válidos de uma tarefa
+ *
  * @readonly
  * @enum {string}
  */
@@ -36,16 +37,18 @@ const TASK_STATES = Object.freeze({
 
 /**
  * Array de valores para validação Zod
+ *
  * @type {ReadonlyArray<string>}
  */
 const TASK_STATES_VALUES = Object.freeze(Object.values(TASK_STATES));
 
 /**
  * Helper para validar estado
+ *
  * @param {string} state
  * @returns {boolean}
  */
-const isValidTaskState = state => TASK_STATES_VALUES.includes(state);
+const isValidTaskState = (state) => TASK_STATES_VALUES.includes(state);
 
 module.exports = {
   TASK_STATES,

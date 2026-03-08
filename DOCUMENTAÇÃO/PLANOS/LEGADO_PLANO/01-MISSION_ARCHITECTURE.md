@@ -361,7 +361,7 @@ async function executeStep(step, missionState) {
 
     case 'spawn_subtasks':
       // Gera N tasks em paralelo
-      const subtasks = step.subtasks.map(subtask => executeSingleTask(subtask, missionState));
+      const subtasks = step.subtasks.map((subtask) => executeSingleTask(subtask, missionState));
       return await Promise.all(subtasks);
   }
 }

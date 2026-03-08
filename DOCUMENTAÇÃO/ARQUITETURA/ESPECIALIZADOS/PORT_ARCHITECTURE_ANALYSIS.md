@@ -593,7 +593,7 @@ pm2 stop all
 pm2 restart all
 
 # Dashboard PM2 (opcional, porta 9615)
-pm2 web  # NÃO ativo por padrão
+pm2 web # NÃO ativo por padrão
 ```
 
 ### PM2 Web Dashboard (9615)
@@ -685,11 +685,11 @@ curl http://localhost:3008/api/missions
 const socket = io('http://localhost:3008');
 
 // Escutar eventos
-socket.on('task:created', data => {
+socket.on('task:created', (data) => {
   console.log('Nova task:', data);
 });
 
-socket.on('mission:progress', data => {
+socket.on('mission:progress', (data) => {
   console.log('Progresso:', data);
 });
 ```

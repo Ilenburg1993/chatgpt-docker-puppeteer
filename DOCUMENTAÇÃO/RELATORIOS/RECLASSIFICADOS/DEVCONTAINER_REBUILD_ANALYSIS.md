@@ -205,20 +205,20 @@ Analysis**
 # =============================================================================
 
 readonly REQUIRED_ENV_VARS=(
-    "NODE_ENV"
-    "SERVER_PORT"
-    "CHROME_HOST"
-    "CHROME_PORT"
+  "NODE_ENV"
+  "SERVER_PORT"
+  "CHROME_HOST"
+  "CHROME_PORT"
 )
 
 log "Validando variáveis de ambiente obrigatórias..."
 
 for var in "${REQUIRED_ENV_VARS[@]}"; do
-    if [[ -z "${!var:-}" ]]; then
-        error "Variável obrigatória ausente: ${var}"
-        error "→ Verifique arquivo .env ou devcontainer.json"
-        exit 1
-    fi
+  if [[ -z "${!var:-}" ]]; then
+    error "Variável obrigatória ausente: ${var}"
+    error "→ Verifique arquivo .env ou devcontainer.json"
+    exit 1
+  fi
 done
 ```
 
@@ -227,10 +227,10 @@ done
 ```bash
 # PROPOSTA: Carregar .env se existir
 if [[ -f "${PROJECT_ROOT}/.env" ]]; then
-    log "Carregando variáveis de ambiente de .env..."
-    set -a
-    source "${PROJECT_ROOT}/.env"
-    set +a
+  log "Carregando variáveis de ambiente de .env..."
+  set -a
+  source "${PROJECT_ROOT}/.env"
+  set +a
 fi
 ```
 
@@ -238,7 +238,7 @@ fi
 
 ```bash
 # PROPOSTA: Adicionar ao manifesto (Section 10)
-cat >> "${STATE_SWAP}" <<EOF
+cat >> "${STATE_SWAP}" << EOF
 
 # ---------------------------------------------------------------------------
 # Environment Configuration (SNAPSHOT)
@@ -258,19 +258,19 @@ EOF
 log "Validando dependências NPM críticas..."
 
 CRITICAL_NPM_PACKAGES=(
-    "compression"
-    "express-rate-limit"
-    "helmet"
-    "prom-client"
+  "compression"
+  "express-rate-limit"
+  "helmet"
+  "prom-client"
 )
 
 if [[ -f "${PROJECT_ROOT}/package.json" ]]; then
-    for pkg in "${CRITICAL_NPM_PACKAGES[@]}"; do
-        if ! grep -q "\"${pkg}\"" "${PROJECT_ROOT}/package.json"; then
-            warn "Dependência crítica ausente em package.json: ${pkg}"
-            warn "→ Chrome Proxy v2.0 pode não funcionar corretamente"
-        fi
-    done
+  for pkg in "${CRITICAL_NPM_PACKAGES[@]}"; do
+    if ! grep -q "\"${pkg}\"" "${PROJECT_ROOT}/package.json"; then
+      warn "Dependência crítica ausente em package.json: ${pkg}"
+      warn "→ Chrome Proxy v2.0 pode não funcionar corretamente"
+    fi
+  done
 fi
 ```
 
@@ -299,23 +299,23 @@ fi
 info "Configuração de ambiente:"
 
 if [ -f ".env" ]; then
-    ok "Arquivo .env detectado"
+  ok "Arquivo .env detectado"
 
-    # Validar vars críticas
-    CRITICAL_VARS="NODE_ENV SERVER_PORT CHROME_HOST"
-    for var in $CRITICAL_VARS; do
-        if grep -q "^${var}=" .env 2>/dev/null; then
-            printf "  • %-22s %s\n" "${var}:" "$(grep "^${var}=" .env | cut -d= -f2)"
-        else
-            warn "  • ${var}: NÃO DEFINIDO"
-        fi
-    done
+  # Validar vars críticas
+  CRITICAL_VARS="NODE_ENV SERVER_PORT CHROME_HOST"
+  for var in $CRITICAL_VARS; do
+    if grep -q "^${var}=" .env 2> /dev/null; then
+      printf "  • %-22s %s\n" "${var}:" "$(grep "^${var}=" .env | cut -d= -f2)"
+    else
+      warn "  • ${var}: NÃO DEFINIDO"
+    fi
+  done
 elif [ -f ".env.example" ]; then
-    warn "Arquivo .env ausente"
-    info "→ Template disponível: .env.example"
-    info "→ Copie e configure: cp .env.example .env"
+  warn "Arquivo .env ausente"
+  info "→ Template disponível: .env.example"
+  info "→ Copie e configure: cp .env.example .env"
 else
-    warn "Sistema ENV não configurado"
+  warn "Sistema ENV não configurado"
 fi
 
 echo ""
@@ -327,28 +327,28 @@ echo ""
 # PROPOSTA: Nova Phase 8 - Quick Start Guide (First Attach Only)
 
 if [ "${IS_FIRST_ATTACH}" = true ]; then
-    echo ""
-    printf "%b\n" "${GREEN}════════════════════════════════════════${NC}"
-    printf "%b\n" "${GREEN}🚀 QUICK START GUIDE${NC}"
-    printf "%b\n" "${GREEN}════════════════════════════════════════${NC}"
-    echo ""
-    echo "1. Configurar ambiente:"
-    echo "   cp .env.development .env"
-    echo ""
-    echo "2. Iniciar Chrome (Windows):"
-    echo "   START-CHROME-SIMPLE.bat"
-    echo ""
-    echo "3. Iniciar sistema:"
-    echo "   make start"
-    echo ""
-    echo "4. Validar saúde:"
-    echo "   make health"
-    echo ""
-    echo "5. Abrir Dashboard:"
-    echo "   http://localhost:3008"
-    echo ""
-    printf "%b\n" "${GREEN}════════════════════════════════════════${NC}"
-    echo ""
+  echo ""
+  printf "%b\n" "${GREEN}════════════════════════════════════════${NC}"
+  printf "%b\n" "${GREEN}🚀 QUICK START GUIDE${NC}"
+  printf "%b\n" "${GREEN}════════════════════════════════════════${NC}"
+  echo ""
+  echo "1. Configurar ambiente:"
+  echo "   cp .env.development .env"
+  echo ""
+  echo "2. Iniciar Chrome (Windows):"
+  echo "   START-CHROME-SIMPLE.bat"
+  echo ""
+  echo "3. Iniciar sistema:"
+  echo "   make start"
+  echo ""
+  echo "4. Validar saúde:"
+  echo "   make health"
+  echo ""
+  echo "5. Abrir Dashboard:"
+  echo "   http://localhost:3008"
+  echo ""
+  printf "%b\n" "${GREEN}════════════════════════════════════════${NC}"
+  echo ""
 fi
 ```
 
@@ -420,7 +420,7 @@ fi
 
 ```bash
 # Após rebuild
-docker exec -it <container> bash -c 'echo $NODE_ENV'
+docker exec -it -c 'echo $NODE_ENV' < container > bash
 # Deve retornar: development
 ```
 
@@ -454,9 +454,9 @@ ENABLE_STATE_FILE=true
 
 # post-create.sh (linha ~165)
 if [[ "${ENABLE_STATE_FILE:-true}" != "true" ]]; then
-    SKIP_STATE_FILE=true
+  SKIP_STATE_FILE=true
 else
-    SKIP_STATE_FILE=false
+  SKIP_STATE_FILE=false
 fi
 ```
 
@@ -485,13 +485,13 @@ fi
 # Ambientes: .env.development, .env.production, .env.test
 
 ENV NODE_ENV=development \
-    SERVER_PORT=3008 \
-    CHROME_HOST=host.docker.internal \
-    CHROME_PORT=9225 \
-    CHROME_PROXY_PORT=9224 \
-    BROWSER_MODE=wsEndpoint \
-    LOG_LEVEL=info \
-    ENABLE_STATE_FILE=true
+ SERVER_PORT=3008 \
+ CHROME_HOST=host.docker.internal \
+ CHROME_PORT=9225 \
+ CHROME_PROXY_PORT=9224 \
+ BROWSER_MODE=wsEndpoint \
+ LOG_LEVEL=info \
+ ENABLE_STATE_FILE=true
 ```
 
 ---
@@ -514,36 +514,36 @@ ENV NODE_ENV=development \
 set -euo pipefail
 
 REQUIRED_VARS=(
-    "NODE_ENV:development|production|test"
-    "SERVER_PORT:3000-65535"
-    "CHROME_HOST:.+"
-    "CHROME_PORT:1024-65535"
+  "NODE_ENV:development|production|test"
+  "SERVER_PORT:3000-65535"
+  "CHROME_HOST:.+"
+  "CHROME_PORT:1024-65535"
 )
 
 ERRORS=0
 
 for entry in "${REQUIRED_VARS[@]}"; do
-    var="${entry%%:*}"
-    pattern="${entry#*:}"
+  var="${entry%%:*}"
+  pattern="${entry#*:}"
 
-    value="${!var:-}"
+  value="${!var:-}"
 
-    if [[ -z "${value}" ]]; then
-        echo "❌ ${var}: AUSENTE"
-        ((ERRORS++))
-    elif [[ ! "${value}" =~ ${pattern} ]]; then
-        echo "⚠️  ${var}: INVÁLIDO (${value})"
-        ((ERRORS++))
-    else
-        echo "✅ ${var}: ${value}"
-    fi
+  if [[ -z "${value}" ]]; then
+    echo "❌ ${var}: AUSENTE"
+    ((ERRORS++))
+  elif [[ ! "${value}" =~ ${pattern} ]]; then
+    echo "⚠️  ${var}: INVÁLIDO (${value})"
+    ((ERRORS++))
+  else
+    echo "✅ ${var}: ${value}"
+  fi
 done
 
 if [[ $ERRORS -gt 0 ]]; then
-    echo ""
-    echo "💥 Validação falhou com ${ERRORS} erro(s)"
-    echo "→ Verifique arquivo .env ou devcontainer.json"
-    exit 1
+  echo ""
+  echo "💥 Validação falhou com ${ERRORS} erro(s)"
+  echo "→ Verifique arquivo .env ou devcontainer.json"
+  exit 1
 fi
 
 echo ""
@@ -579,9 +579,9 @@ exit 0
 ```bash
 # Adicionar ao .bashrc ou profile.d
 if [ -f "/workspaces/${PROJECT_NAME}/.env" ]; then
-    set -a
-    source "/workspaces/${PROJECT_NAME}/.env"
-    set +a
+  set -a
+  source "/workspaces/${PROJECT_NAME}/.env"
+  set +a
 fi
 ```
 
@@ -721,13 +721,13 @@ fi
 
 ```bash
 # 1. Verificar ENV carregadas
-docker exec -it <container> bash -c 'env | grep -E "NODE_ENV|SERVER_PORT|CHROME_HOST"'
+docker exec -it -c 'env | grep -E "NODE_ENV|SERVER_PORT|CHROME_HOST"' < container > bash
 
 # 2. Verificar arquivo .env montado
-docker exec -it <container> bash -c 'ls -la /workspaces/*/'.env' && cat /workspaces/*/.env | head -20'
+docker exec -it -c 'ls -la /workspaces/*/'.env' && cat /workspaces/*/.env | head -20' < container > bash
 
 # 3. Verificar State Manifesto
-docker exec -it <container> bash -c 'cat .devcontainer/state/manifest.env'
+docker exec -it -c 'cat .devcontainer/state/manifest.env' < container > bash
 
 # 4. Health check completo
 make health

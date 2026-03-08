@@ -225,7 +225,7 @@ const driverFactory = require('../../driver/factory');
 
 ```javascript
 // Deveria:
-driver.on('response:chunk', chunk => {
+driver.on('response:chunk', (chunk) => {
   nerv.emit('TASK_PROGRESS', { chunk });
 });
 
@@ -237,7 +237,7 @@ driver.on('response:chunk', chunk => {
 
 ```javascript
 // Deveria:
-kernel.on('TASK_ABORT', taskId => {
+kernel.on('TASK_ABORT', (taskId) => {
   driver.abort(taskId);
 });
 
@@ -653,7 +653,7 @@ class DriverLifecycleManager {
     const result = await driver.execute(task);
 
     // Emite progresso
-    driver.on('chunk', chunk => {
+    driver.on('chunk', (chunk) => {
       this.nerv.emit('TASK_PROGRESS', { taskId, chunk });
     });
 

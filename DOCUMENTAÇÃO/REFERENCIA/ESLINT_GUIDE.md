@@ -20,21 +20,21 @@ package.json              → Scripts npm
 ### Lint Básico
 
 ```bash
-npm run lint              # Verifica todo o projeto
-npm run lint:src          # Verifica apenas src/
-npm run lint:tests        # Verifica apenas tests/
+npm run lint       # Verifica todo o projeto
+npm run lint:src   # Verifica apenas src/
+npm run lint:tests # Verifica apenas tests/
 ```
 
 ### Auto-Fix
 
 ```bash
-npm run lint:fix          # Corrige problemas automaticamente
+npm run lint:fix # Corrige problemas automaticamente
 ```
 
 ### Relatórios
 
 ```bash
-npm run lint:report       # Gera relatório em logs/eslint-report.txt
+npm run lint:report # Gera relatório em logs/eslint-report.txt
 ```
 
 ### VS Code (Auto-fix ao salvar)

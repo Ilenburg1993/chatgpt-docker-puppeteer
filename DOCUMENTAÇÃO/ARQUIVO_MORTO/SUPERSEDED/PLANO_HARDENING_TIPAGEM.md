@@ -1,7 +1,7 @@
 # Plano de Hardening de Tipagem - Remoção de `any`
 
-> Status de governanca: este plano e historico/operacional. O canon vigente de tipagem e JSDoc
-> vive em `DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`.
+> Status de governanca: este plano e historico/operacional. O canon vigente de tipagem e JSDoc vive
+> em `DOCUMENTAÇÃO/REFERENCIA/TYPING_JSDOC_CANON.md`.
 
 **Data:** 16 de fevereiro de 2026 **Autor:** GitHub Copilot **Status:** Planejamento **Alvo:**
 Diversos arquivos em `src/` com casts para `any`.

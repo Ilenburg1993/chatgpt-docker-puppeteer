@@ -56,6 +56,7 @@ O gate deve falhar se ocorrer:
 
 ## Rollback Parcial por Lane
 
-- Reverter apenas a lane afetada (`tsconfig.strict.*.json`) se um hardening pontual bloquear o resto.
+- Reverter apenas a lane afetada (`tsconfig.strict.*.json`) se um hardening pontual bloquear o
+  resto.
 - Manter schemas e scripts comuns em separado para não desfazer governança transversal.
 - Não desfazer a cobertura de `@ts-check`; tratar a regressão no módulo causador.

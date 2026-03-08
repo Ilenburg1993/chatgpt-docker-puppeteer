@@ -26,7 +26,7 @@ setTimeout(async () => {
 
 // CORREÇÃO:
 setTimeout(() => {
-  fn().catch(err => log('ERROR', err.message));
+  fn().catch((err) => log('ERROR', err.message));
 }, delay);
 ```
 

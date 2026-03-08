@@ -188,7 +188,7 @@ async function _readAttemptOutputText({
         log(
           'DEBUG',
           `[_readAttemptOutputText] Found output after ${retryCount} retries`,
-          String(taskId)
+          String(taskId),
         );
       }
       return text;
@@ -204,7 +204,7 @@ async function _readAttemptOutputText({
   log(
     'WARN',
     `[_readAttemptOutputText] No output found after ${maxRetries} retries`,
-    String(taskId)
+    String(taskId),
   );
   return '';
 }
@@ -651,13 +651,13 @@ try {
 ```javascript
 // ANTES
 nervBridge = {
-  beforeTaskExecution: task => task, // ❌ Sync function
+  beforeTaskExecution: (task) => task, // ❌ Sync function
   // ...
 };
 
 // DEPOIS
 nervBridge = {
-  beforeTaskExecution: async task => task, // ✅ Async function
+  beforeTaskExecution: async (task) => task, // ✅ Async function
   // ...
 };
 ```
@@ -667,13 +667,13 @@ nervBridge = {
 ```javascript
 // ANTES
 nervBridge = {
-  beforeTaskExecution: task => task, // ❌ Sync function
+  beforeTaskExecution: (task) => task, // ❌ Sync function
   // ...
 };
 
 // DEPOIS
 nervBridge = {
-  beforeTaskExecution: async task => task, // ✅ Async function
+  beforeTaskExecution: async (task) => task, // ✅ Async function
   // ...
 };
 ```

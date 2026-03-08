@@ -457,21 +457,12 @@ captureState, stopGeneration) - commitLearning não é abstrato
 ```javascript
 // Linhas 120-145
 /**
- * Classe abstrata base para todos os drivers de LLM.
- * Define contrato de execução, gerencia estados validados e emite telemetria.
+ * Classe abstrata base para todos os drivers de LLM. Define contrato de execução, gerencia estados validados e emite
+ * telemetria.
  *
  * ✅ v2.0: State transition matrix, AbortSignal integration, capabilities validation
  *
  * @abstract
- * @extends EventEmitter
- *
- * @property {object} page - Puppeteer page instance
- * @property {object} config - Task configuration
- * @property {AbortSignal} signal - Cancellation signal
- * @property {string} name - Driver name
- * @property {boolean} destroyed - Destruction flag
- * @property {string} correlationId - Correlation ID for tracing
- *
  * @fires TargetDriver#STATE_CHANGE - State transitions
  * @fires TargetDriver#STATE_ENTERED - Entering new state
  * @fires TargetDriver#STATE_EXITING - Exiting current state
@@ -482,6 +473,13 @@ captureState, stopGeneration) - commitLearning não é abstrato
  * @fires TargetDriver#WARNING - Non-fatal warnings
  * @fires TargetDriver#DEBUG - Debug information
  * @fires TargetDriver#ABORT_SIGNAL_RECEIVED - AbortSignal triggered
+ * @extends EventEmitter
+ * @property {object} page - Puppeteer page instance
+ * @property {object} config - Task configuration
+ * @property {AbortSignal} signal - Cancellation signal
+ * @property {string} name - Driver name
+ * @property {boolean} destroyed - Destruction flag
+ * @property {string} correlationId - Correlation ID for tracing
  */
 ```
 

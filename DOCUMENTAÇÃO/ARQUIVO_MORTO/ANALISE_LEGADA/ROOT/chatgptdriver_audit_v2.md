@@ -236,7 +236,7 @@ if (forceReset || wrongModel || (isConversation && !taskSpec.config?.require_his
     log(
       'ERROR',
       `[${this.name}] prepareContext navigation failed: ${err.message}`,
-      this.correlationId
+      this.correlationId,
     );
     throw err; // Propaga para BaseDriver.executeTask
   }
@@ -631,7 +631,7 @@ if (extractionResult.pruned > 0) {
   log(
     'DEBUG',
     `[${this.name}] Pruned ${extractionResult.pruned} thought blocks (${ratio}% text retained)`,
-    this.correlationId
+    this.correlationId,
   );
 }
 ```
@@ -869,7 +869,7 @@ if (stableCycles >= this.stableCyclesTarget && currentText.length > 0) {
     log(
       'WARN',
       `[${this.name}] Empty response after ${stableCycles} stable cycles`,
-      this.correlationId
+      this.correlationId,
     );
     throw new Error('EMPTY_RESPONSE');
   }
@@ -880,7 +880,7 @@ if (stableCycles >= this.stableCyclesTarget && currentText.length > 0) {
     log(
       'WARN',
       `[${this.name}] Response too short (${currentText.length} chars, min ${MIN_RESPONSE_LENGTH})`,
-      this.correlationId
+      this.correlationId,
     );
     throw new Error('RESPONSE_TOO_SHORT');
   }
@@ -948,7 +948,7 @@ const thoughts = clone.querySelectorAll(
 
   // UI metadata
   'details', // Collapsible sections (thinking process)
-  '.sr-only' // Screen reader only elements
+  '.sr-only', // Screen reader only elements
 );
 ```
 

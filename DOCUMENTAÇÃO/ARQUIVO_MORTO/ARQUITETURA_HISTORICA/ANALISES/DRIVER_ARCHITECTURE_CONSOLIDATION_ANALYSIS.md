@@ -270,6 +270,7 @@ class TargetDriver extends EventEmitter {
 
   /**
    * Attach context (page + signal) antes de executar task
+   *
    * @param {Page} page - Puppeteer page
    * @param {AbortSignal} signal - AbortSignal da task
    */
@@ -297,6 +298,7 @@ class TargetDriver extends EventEmitter {
 
   /**
    * Executa task (assume context attached)
+   *
    * @param {object} task - Task object
    * @returns {object} Response
    */
@@ -340,6 +342,7 @@ class DriverFactory {
 
   /**
    * Cria driver SEM context (IDLE)
+   *
    * @param {string} target - Target name (chatgpt, gemini)
    * @param {object} config - Driver config
    * @returns {TargetDriver} Driver IDLE
@@ -361,6 +364,7 @@ class DriverFactory {
 
   /**
    * Acquire driver do pool (ou cria novo)
+   *
    * @param {string} target - Target name
    * @returns {TargetDriver} Driver IDLE
    */
@@ -382,6 +386,7 @@ class DriverFactory {
 
   /**
    * Release driver de volta ao pool
+   *
    * @param {TargetDriver} driver - Driver para liberar
    */
   releaseToPool(driver) {

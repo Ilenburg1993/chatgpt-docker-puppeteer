@@ -41,10 +41,7 @@ bundled Chromium).
 **Layer ordering optimized by change frequency:**
 
 ```dockerfile
-1. Base image & system packages (rarely change)
-2. Dependencies (package.json/package-lock.json) (occasional changes)
-3. Config files (config.json, ecosystem.config.js) (moderate changes)
-4. Application code (src/, scripts/, public/) (frequent changes)
+
 ```
 
 **Benefits:**
@@ -68,10 +65,10 @@ RUN rm -rf /var/lib/apt/lists/*
 
 ```dockerfile
 RUN apk add --no-cache \
-    ca-certificates \
-    curl \
-    dumb-init \
-    && rm -rf /var/cache/apk/*
+ ca-certificates \
+ curl \
+ dumb-init \
+ && rm -rf /var/cache/apk/*
 ```
 
 **Impact:** 4 layers → 1 layer, better caching, smaller image
@@ -187,8 +184,7 @@ No changes required to `docker-compose.yml`:
 3. **Layer caching in CI**: Use BuildKit cache mounts
 
    ```dockerfile
-   RUN --mount=type=cache,target=/root/.npm \
-       npm ci --only=production
+   RUN --mount=type=cache,target=/root/.npm npm ci --only=production
    ```
 
 4. **Dependency analysis**: Consider removing unused dependencies

@@ -296,7 +296,7 @@ ports: [
         } catch (e) {
           return CONFIG.CHROME_PROXY_PORT || 9224;
         }
-      })()
+      })(),
   ),
   // ...
 ];
@@ -423,7 +423,7 @@ function getChromeInstructions(errorMessage) {
       '  Terminal 2 - Inicie o Chrome Proxy Service:',
       '    node scripts/chrome-proxy-service.js',
       '',
-      '  ⚠️ O proxy é OBRIGATÓRIO para conexão Docker ↔ Windows'
+      '  ⚠️ O proxy é OBRIGATÓRIO para conexão Docker ↔ Windows',
     );
   }
 

@@ -121,19 +121,19 @@ $ node scripts/test_sadi_migration.js
 Testing SADI migration...
 
 1. Loading SADI analyzer...
-   ✅ SADI module loaded
-   Exports: findChatInputSelector, findSendButtonSelector,
-            findResponseArea, validateCandidateInteractivity,
-            findFrameByPath
+✅ SADI module loaded
+Exports: findChatInputSelector, findSendButtonSelector,
+findResponseArea, validateCandidateInteractivity,
+findFrameByPath
 
 2. Loading prerequisite_validator...
-   ✅ prerequisite_validator loaded
+✅ prerequisite_validator loaded
 
 3. Loading input_resolver...
-   ✅ input_resolver loaded
+✅ input_resolver loaded
 
 4. Loading biomechanics_engine...
-   ✅ biomechanics_engine loaded
+✅ biomechanics_engine loaded
 
 ✅ SUCCESS: All modules load correctly after SADI migration!
 ```
@@ -287,7 +287,7 @@ if (inputProtocol) {
    ```bash
    # Move analyzer de volta
    mv src/shared/sadi/analyzer.js src/driver/modules/analyzer.js
-
+   
    # Reverte imports (4 arquivos)
    # prerequisite_validator.js: @shared/sadi/analyzer → @driver/modules/analyzer
    # biomechanics_engine.js: @shared/sadi/analyzer → ./analyzer

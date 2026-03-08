@@ -58,8 +58,7 @@ let signaling = false;
 let debounceTimer = null; // ✅ Declarado explicitamente
 
 /**
- * Inicializa o sensor de filesystem da fila.
- * Monitora a pasta física definida na Fachada de IO.
+ * Inicializa o sensor de filesystem da fila. Monitora a pasta física definida na Fachada de IO.
  */
 function init() {
   // ... (resto permanece igual)
@@ -217,8 +216,7 @@ npm install express-rate-limit --save
 const rateLimit = require('express-rate-limit');
 
 /**
- * Rate Limiter para proteção contra flood/DoS.
- * Limita cada IP a 100 requests por minuto na API.
+ * Rate Limiter para proteção contra flood/DoS. Limita cada IP a 100 requests por minuto na API.
  */
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minuto

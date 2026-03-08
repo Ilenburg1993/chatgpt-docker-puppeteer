@@ -33,7 +33,7 @@ TypeScript: Restart TS Server
 Execute o diagnóstico novamente após reload:
 
 ```bash
-node diagnostic-full.mjs 2>/dev/null | head -50
+node diagnostic-full.mjs 2> /dev/null | head -50
 ```
 
 **Expectativa:** Redução de ~100-120 erros (de 173 → ~50-60)

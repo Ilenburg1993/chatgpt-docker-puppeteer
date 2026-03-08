@@ -427,17 +427,17 @@ src/main.js (boot sequence - 200 LOC)
    ```bash
    # Chrome Remote Debugging
    CHROME_WS_ENDPOINT=ws://localhost:9224
-
+   
    # Server
    PORT=3008
    NODE_ENV=development
-
+   
    # Logs
    LOG_LEVEL=info
-
+   
    # PM2
    DAEMON_MODE=false
-
+   
    # Docker
    TZ=America/Sao_Paulo
    ```
@@ -465,15 +465,15 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ecosystem.config.js config.json dynamic_rules.json ./
 COPY scripts/ public/ src/ ./
 
-RUN mkdir -p fila respostas logs profile && \
-    chown -R node:node /app
+RUN mkdir -p fila respostas logs profile \
+  && chown -R node:node /app
 USER node
 
 VOLUME ["/app/fila", "/app/respostas", "/app/logs", "/app/profile"]
 EXPOSE 3008
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node scripts/healthcheck.js
+  CMD node scripts/healthcheck.js
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["npx", "pm2-runtime", "start", "ecosystem.config.js"]
@@ -608,14 +608,14 @@ services:
 **Scripts Mais Usados** (inferidos):
 
 ```bash
-npm start              # Produção
-npm run dev            # Desenvolvimento (nodemon)
-npm run daemon:start   # PM2 daemon
-npm test               # Testes
-npm run lint:fix       # Fix ESLint
-npm run queue:status   # Monitor fila
-npm run diagnose       # Diagnosticar problemas
-npm run clean          # Limpeza
+npm start            # Produção
+npm run dev          # Desenvolvimento (nodemon)
+npm run daemon:start # PM2 daemon
+npm test             # Testes
+npm run lint:fix     # Fix ESLint
+npm run queue:status # Monitor fila
+npm run diagnose     # Diagnosticar problemas
+npm run clean        # Limpeza
 ```
 
 ---
@@ -995,7 +995,7 @@ cd chatgpt-docker-puppeteer
 
 # 2. Configure
 cp .env.example .env
-nano .env  # Ajuste CHROME_WS_ENDPOINT se necessário
+nano .env # Ajuste CHROME_WS_ENDPOINT se necessário
 
 # 3. Instale deps
 npm install

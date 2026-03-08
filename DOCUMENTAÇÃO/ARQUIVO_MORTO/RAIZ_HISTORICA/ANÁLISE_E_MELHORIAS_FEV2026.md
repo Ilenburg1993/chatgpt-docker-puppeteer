@@ -403,7 +403,7 @@
 ### 1. Remover Commit de Teste (1 min)
 
 ```bash
-git log --oneline -3  # Confirmar que 2e906a5 é o teste
+git log --oneline -3 # Confirmar que 2e906a5 é o teste
 git reset --hard HEAD~1
 git push origin main --force-with-lease
 ```

@@ -65,11 +65,11 @@ readonly SCRIPT_VERSION="5.2.0"
 
 ```bash
 readonly CRITICAL_ENV_VARS=(
-    "NODE_ENV"
-    "SERVER_PORT"
-    "BROWSER_MODE"
-    "LOG_LEVEL"
-    "ENABLE_STATE_FILE"
+  "NODE_ENV"
+  "SERVER_PORT"
+  "BROWSER_MODE"
+  "LOG_LEVEL"
+  "ENABLE_STATE_FILE"
 )
 ```
 
@@ -81,15 +81,15 @@ readonly CRITICAL_ENV_VARS=(
 
 ```bash
 readonly CRITICAL_ENV_VARS=(
-    "NODE_ENV"
-    "SERVER_PORT"
-    "BROWSER_MODE"
-    "LOG_LEVEL"
-    "ENABLE_STATE_FILE"
-    # Chrome Proxy Architecture (v5.2)
-    "CHROME_PROXY_PORT"   # Container proxy (default: 9224)
-    "CHROME_PORT"         # Windows host Chrome (default: 9225)
-    "CHROME_HOST"         # Host address (default: host.docker.internal)
+  "NODE_ENV"
+  "SERVER_PORT"
+  "BROWSER_MODE"
+  "LOG_LEVEL"
+  "ENABLE_STATE_FILE"
+  # Chrome Proxy Architecture (v5.2)
+  "CHROME_PROXY_PORT" # Container proxy (default: 9224)
+  "CHROME_PORT"       # Windows host Chrome (default: 9225)
+  "CHROME_HOST"       # Host address (default: host.docker.internal)
 )
 ```
 
@@ -120,13 +120,13 @@ BOOT_DURATION=$((BOOT_END_TIME - BOOT_START_TIME))
 # Validação de conectividade Chrome proxy (se esperado)
 CHROME_PROXY_OK=false
 if [[ "${BROWSER_MODE:-}" == "wsEndpoint" ]]; then
-    CHROME_ENDPOINT="${CHROME_HOST:-host.docker.internal}:${CHROME_PORT:-9225}"
-    if timeout 3 bash -c "cat < /dev/null > /dev/tcp/${CHROME_HOST:-host.docker.internal}/${CHROME_PORT:-9225}" 2>/dev/null; then
-        log "✅ Chrome proxy: Conectividade com ${CHROME_ENDPOINT} OK"
-        CHROME_PROXY_OK=true
-    else
-        warn "⚠️  Chrome proxy: ${CHROME_ENDPOINT} não acessível (esperado se Chrome não iniciado)"
-    fi
+  CHROME_ENDPOINT="${CHROME_HOST:-host.docker.internal}:${CHROME_PORT:-9225}"
+  if timeout 3 bash -c "cat < /dev/null > /dev/tcp/${CHROME_HOST:-host.docker.internal}/${CHROME_PORT:-9225}" 2> /dev/null; then
+    log "✅ Chrome proxy: Conectividade com ${CHROME_ENDPOINT} OK"
+    CHROME_PROXY_OK=true
+  else
+    warn "⚠️  Chrome proxy: ${CHROME_ENDPOINT} não acessível (esperado se Chrome não iniciado)"
+  fi
 fi
 
 # Success banner
@@ -238,10 +238,10 @@ log "Simbiose inicializada"
 
 ```bash
 readonly VOLUME_DIRS=(
-    "${HOME_DIR}/.cache"
-    "${HOME_DIR}/.npm"
-    "/home/node/.pm2"  # ← Hardcoded!
-    # ...
+  "${HOME_DIR}/.cache"
+  "${HOME_DIR}/.npm"
+  "/home/node/.pm2" # ← Hardcoded!
+  # ...
 )
 ```
 
@@ -253,17 +253,17 @@ readonly VOLUME_DIRS=(
 
 ```bash
 readonly VOLUME_DIRS=(
-    "${HOME_DIR}/.cache"
-    "${HOME_DIR}/.npm"
-    "${HOME_DIR}/.pm2"  # ✅ Dinâmico
-    "${HOME_DIR}/.npm-global"
-    "${HOME_DIR}/.config"
-    "${HOME_DIR}/.local/share"
-    "${HOME_DIR}/.local/state"
-    "${HOME_DIR}/.claude"
-    "${HOME_DIR}/.gnupg"
-    "${HOME_DIR}/.vscode-server"
-    "/home/${CURRENT_USER}-history"  # ✅ Explicitamente fora de HOME
+  "${HOME_DIR}/.cache"
+  "${HOME_DIR}/.npm"
+  "${HOME_DIR}/.pm2" # ✅ Dinâmico
+  "${HOME_DIR}/.npm-global"
+  "${HOME_DIR}/.config"
+  "${HOME_DIR}/.local/share"
+  "${HOME_DIR}/.local/state"
+  "${HOME_DIR}/.claude"
+  "${HOME_DIR}/.gnupg"
+  "${HOME_DIR}/.vscode-server"
+  "/home/${CURRENT_USER}-history" # ✅ Explicitamente fora de HOME
 )
 ```
 
@@ -326,19 +326,19 @@ echo ""
 
 # Check proxy (container)
 CHROME_PROXY_STATUS="desconhecido"
-if timeout 2 curl -sf http://localhost:9224/json/version >/dev/null 2>&1; then
-    CHROME_PROXY_STATUS="✅ respondendo"
+if timeout 2 curl -sf http://localhost:9224/json/version > /dev/null 2>&1; then
+  CHROME_PROXY_STATUS="✅ respondendo"
 else
-    CHROME_PROXY_STATUS="❌ não acessível"
+  CHROME_PROXY_STATUS="❌ não acessível"
 fi
 
 echo "  Proxy (container:9224): ${CHROME_PROXY_STATUS}"
 
 # Check Chrome host (se proxy OK)
 if [[ "${CHROME_PROXY_STATUS}" == *"✅"* ]]; then
-    CHROME_HOST_STATUS="❓ não verificado (requer proxy)"
-    # Proxy valida isso, não verificamos diretamente
-    echo "  Chrome (host:9225):      ${CHROME_HOST_STATUS}"
+  CHROME_HOST_STATUS="❓ não verificado (requer proxy)"
+  # Proxy valida isso, não verificamos diretamente
+  echo "  Chrome (host:9225):      ${CHROME_HOST_STATUS}"
 fi
 ```
 
@@ -364,23 +364,23 @@ fi
 info "Volumes persistentes (status):"
 
 VOLUMES_TO_CHECK=(
-    "${HOME}/.cache:Cache (Puppeteer, npm, etc)"
-    "${HOME}/.npm:npm packages"
-    "${HOME}/.pm2:PM2 runtime state"
-    "${HOME}/.config:User configuration"
-    "${HOME}/.vscode-server:VS Code Server"
-    "/home/${USER}-history:Shell history"
+  "${HOME}/.cache:Cache (Puppeteer, npm, etc)"
+  "${HOME}/.npm:npm packages"
+  "${HOME}/.pm2:PM2 runtime state"
+  "${HOME}/.config:User configuration"
+  "${HOME}/.vscode-server:VS Code Server"
+  "/home/${USER}-history:Shell history"
 )
 
 for vol_entry in "${VOLUMES_TO_CHECK[@]}"; do
-    IFS=':' read -r vol_path vol_desc <<< "${vol_entry}"
+  IFS=':' read -r vol_path vol_desc <<< "${vol_entry}"
 
-    if [ -d "${vol_path}" ]; then
-        vol_size="$(du -sh "${vol_path}" 2>/dev/null | cut -f1 || echo '?')"
-        printf "  ✅ %-30s %10s\n" "${vol_desc}" "${vol_size}"
-    else
-        printf "  ❌ %-30s %10s\n" "${vol_desc}" "(ausente)"
-    fi
+  if [ -d "${vol_path}" ]; then
+    vol_size="$(du -sh "${vol_path}" 2> /dev/null | cut -f1 || echo '?')"
+    printf "  ✅ %-30s %10s\n" "${vol_desc}" "${vol_size}"
+  else
+    printf "  ❌ %-30s %10s\n" "${vol_desc}" "(ausente)"
+  fi
 done
 
 echo ""
@@ -405,7 +405,7 @@ PM2_TIMEOUT_SECONDS=2
 **Solução**:
 
 ```bash
-PM2_TIMEOUT_SECONDS=5  # Aumentado para acomodar sistemas lentos
+PM2_TIMEOUT_SECONDS=5 # Aumentado para acomodar sistemas lentos
 ```
 
 **Impacto**: 🔧 Redução de false negatives **Esforço**: 🟢 1 min
@@ -464,18 +464,18 @@ if timeout "${PM2_TIMEOUT_SECONDS}" pm2 jlist >/dev/null 2>&1; then
 
 info "Espaço em disco:"
 
-DISK_USAGE="$(df -h / 2>/dev/null | awk 'NR==2 {print $5}' || echo '?%')"
-DISK_AVAIL="$(df -h / 2>/dev/null | awk 'NR==2 {print $4}' || echo '?')"
+DISK_USAGE="$(df -h / 2> /dev/null | awk 'NR==2 {print $5}' || echo '?%')"
+DISK_AVAIL="$(df -h / 2> /dev/null | awk 'NR==2 {print $4}' || echo '?')"
 
 DISK_USAGE_NUM="${DISK_USAGE%\%}"
 
 if [ "${DISK_USAGE_NUM}" -gt 90 ]; then
-    warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — CRÍTICO!"
-    warn "→ Considere: make clean (limpa logs/cache)"
+  warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — CRÍTICO!"
+  warn "→ Considere: make clean (limpa logs/cache)"
 elif [ "${DISK_USAGE_NUM}" -gt 80 ]; then
-    warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — ALTO"
+  warn "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível) — ALTO"
 else
-    ok "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível)"
+  ok "Uso de disco: ${DISK_USAGE} (${DISK_AVAIL} disponível)"
 fi
 
 echo ""
@@ -525,7 +525,7 @@ header:
 
 ```bash
 if [ "${IS_FIRST_ATTACH}" = true ]; then
-    # Quick start guide (300+ linhas)
+  # Quick start guide (300+ linhas)
 fi
 ```
 
@@ -538,14 +538,14 @@ fi
 ```bash
 # Quick Start (sempre, mas resumido após primeiro attach)
 if [ "${IS_FIRST_ATTACH}" = true ]; then
-    # Versão completa (5 passos detalhados)
+  # Versão completa (5 passos detalhados)
 else
-    # Versão resumida (3 comandos essenciais)
-    info "Quick tips:"
-    echo "  • Iniciar: make start"
-    echo "  • Logs: make logs-follow"
-    echo "  • Docs: ARCHITECTURE.md"
-    echo ""
+  # Versão resumida (3 comandos essenciais)
+  info "Quick tips:"
+  echo "  • Iniciar: make start"
+  echo "  • Logs: make logs-follow"
+  echo "  • Docs: ARCHITECTURE.md"
+  echo ""
 fi
 ```
 
@@ -606,10 +606,10 @@ readonly BOOT_START_TIME="$(date +%s)"
 
 # Checkpoints intermediários
 checkpoint() {
-    local phase_name="$1"
-    local now="$(date +%s)"
-    local duration=$((now - BOOT_START_TIME))
-    log "⏱️  Checkpoint: ${phase_name} (${duration}s desde início)"
+  local phase_name="$1"
+  local now="$(date +%s)"
+  local duration=$((now - BOOT_START_TIME))
+  log "⏱️  Checkpoint: ${phase_name} (${duration}s desde início)"
 }
 
 # Usar em cada seção:
@@ -632,20 +632,20 @@ checkpoint "Volumes audit"
 ```bash
 # Executar diagnósticos em paralelo (onde possível)
 (
-    # PM2 check (background)
-    PM2_STATUS="$(timeout 5 pm2 jlist 2>/dev/null)" &
-    PM2_PID=$!
+  # PM2 check (background)
+  PM2_STATUS="$(timeout 5 pm2 jlist 2> /dev/null)" &
+  PM2_PID=$!
 
-    # Chrome check (background)
-    CHROME_STATUS="$(timeout 2 curl -sf http://localhost:9224/json/version 2>/dev/null)" &
-    CHROME_PID=$!
+  # Chrome check (background)
+  CHROME_STATUS="$(timeout 2 curl -sf http://localhost:9224/json/version 2> /dev/null)" &
+  CHROME_PID=$!
 
-    # Disk check (background)
-    DISK_INFO="$(df -h / 2>/dev/null)" &
-    DISK_PID=$!
+  # Disk check (background)
+  DISK_INFO="$(df -h / 2> /dev/null)" &
+  DISK_PID=$!
 
-    # Wait all
-    wait $PM2_PID $CHROME_PID $DISK_PID
+  # Wait all
+  wait $PM2_PID $CHROME_PID $DISK_PID
 )
 
 # Processar resultados

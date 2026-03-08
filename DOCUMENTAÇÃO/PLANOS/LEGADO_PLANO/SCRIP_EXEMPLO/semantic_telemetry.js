@@ -13,7 +13,7 @@ class SemanticTelemetry {
 
     _setupListeners() {
         // Quality events
-        this.nerv.on('QUALITY_ASSESSED', envelope => {
+        this.nerv.on('QUALITY_ASSESSED', (envelope) => {
             const { task_id, overall_score, criteria_scores } = envelope.payload;
 
             const metrics = this._getOrCreateMetrics(task_id);
@@ -25,7 +25,7 @@ class SemanticTelemetry {
         });
 
         // Iteration events
-        this.nerv.on('ITERATION_COMPLETED', envelope => {
+        this.nerv.on('ITERATION_COMPLETED', (envelope) => {
             const { task_id, iteration, quality_score } = envelope.payload;
 
             const metrics = this._getOrCreateMetrics(task_id);
@@ -39,7 +39,7 @@ class SemanticTelemetry {
         });
 
         // Cost events
-        this.nerv.on('TOKEN_USAGE_RECORDED', envelope => {
+        this.nerv.on('TOKEN_USAGE_RECORDED', (envelope) => {
             const { task_id, input_tokens, output_tokens, cost_usd, model } = envelope.payload;
 
             const metrics = this._getOrCreateMetrics(task_id);
@@ -52,7 +52,7 @@ class SemanticTelemetry {
         });
 
         // Progress events
-        this.nerv.on('PROGRESS_MILESTONE', envelope => {
+        this.nerv.on('PROGRESS_MILESTONE', (envelope) => {
             const { task_id, milestone, progress_percent } = envelope.payload;
 
             const metrics = this._getOrCreateMetrics(task_id);
@@ -91,12 +91,12 @@ class SemanticTelemetry {
 
         return {
             total_tasks: allMetrics.length,
-            avg_quality_score: this._average(allMetrics.map(m => m.quality?.overall_score).filter(Boolean)),
-            avg_iterations: this._average(allMetrics.map(m => m.iterations?.length).filter(Boolean)),
+            avg_quality_score: this._average(allMetrics.map((m) => m.quality?.overall_score).filter(Boolean)),
+            avg_iterations: this._average(allMetrics.map((m) => m.iterations?.length).filter(Boolean)),
             total_cost_usd: allMetrics.reduce((sum, m) => sum + (m.cost?.total_cost_usd || 0), 0),
             total_tokens: allMetrics.reduce(
                 (sum, m) => sum + (m.cost?.input_tokens || 0) + (m.cost?.output_tokens || 0),
-                0
+                0,
             ),
         };
     }

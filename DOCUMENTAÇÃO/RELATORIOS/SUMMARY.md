@@ -51,25 +51,25 @@ Análise crítica detalhada:
 #### Diagramação
 
 ```bash
-✅ mermaid              # Diagramas como código
-✅ graphviz-cli         # Grafos de dependências
-✅ madge                # Análise de dependências circulares
+✅ mermaid      # Diagramas como código
+✅ graphviz-cli # Grafos de dependências
+✅ madge        # Análise de dependências circulares
 ```
 
 #### Scripts Criados
 
 ```bash
-✅ scripts/setup.sh     # Setup automatizado completo
-✅ scripts/doctor.sh    # Diagnóstico profundo do sistema
+✅ scripts/setup.sh  # Setup automatizado completo
+✅ scripts/doctor.sh # Diagnóstico profundo do sistema
 ```
 
 #### Novos Comandos NPM
 
 ```bash
-bash scripts/setup/setup.sh    # Setup inicial do ambiente
-bash scripts/health/doctor.sh  # Diagnóstico completo
-npm run analyze:deps    # Detectar dependências circulares
-npm run analyze:deps:graph # Gerar grafo visual (SVG)
+bash scripts/setup/setup.sh   # Setup inicial do ambiente
+bash scripts/health/doctor.sh # Diagnóstico completo
+npm run analyze:deps          # Detectar dependências circulares
+npm run analyze:deps:graph    # Gerar grafo visual (SVG)
 ```
 
 ---
@@ -360,12 +360,12 @@ DONE:
 ### Scripts
 
 ```bash
-bash scripts/setup/setup.sh    # Setup inicial
-bash scripts/health/doctor.sh  # Diagnóstico
-npm run dev            # Desenvolvimento
-npm run test           # Testes
-npm run analyze:deps   # Análise de dependências
-npm run queue:status   # Status da fila
+bash scripts/setup/setup.sh   # Setup inicial
+bash scripts/health/doctor.sh # Diagnóstico
+npm run dev                   # Desenvolvimento
+npm run test                  # Testes
+npm run analyze:deps          # Análise de dependências
+npm run queue:status          # Status da fila
 ```
 
 ---

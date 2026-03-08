@@ -1,8 +1,8 @@
 # Hub Oficial — Tipagem e JSDoc
 
 > **Última revisão**: 7 de março de 2026 **Status**: Canônico — este diretório é o ponto de entrada
-> único para tipagem e JSDoc neste repositório. **Estado atual**: Fases 0–D concluídas. `strict: true`
-> ativo globalmente. 41 lanes com 0 erros. `typecheck:repo` = 0 erros.
+> único para tipagem e JSDoc neste repositório. **Estado atual**: Fases 0–D concluídas.
+> `strict: true` ativo globalmente. 41 lanes com 0 erros. `typecheck:repo` = 0 erros.
 
 ---
 
@@ -20,15 +20,15 @@ trabalhar com tipagem e JSDoc neste repositório:
 
 ## Documentos deste hub
 
-| Arquivo                       | Papel                                                                 |
-| ----------------------------- | --------------------------------------------------------------------- |
-| `PADROES.md`                  | Padrões JSDoc e tipagem TS — o "como fazer" obrigatório               |
-| `ROADMAP.md`                  | Roadmap de execução ativo (fases, erros, checklist)                   |
-| `SCRIPTS-E-AUTOMACAO.md`      | Scripts de análise, comandos npm, automações disponíveis              |
-| `CONFIGURACOES-TSCONFIG.md`   | Arquivos tsconfig, 41 lanes strict, flags e suas implicações          |
+| Arquivo                       | Papel                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `PADROES.md`                  | Padrões JSDoc e tipagem TS — o "como fazer" obrigatório                |
+| `ROADMAP.md`                  | Roadmap de execução ativo (fases, erros, checklist)                    |
+| `SCRIPTS-E-AUTOMACAO.md`      | Scripts de análise, comandos npm, automações disponíveis               |
+| `CONFIGURACOES-TSCONFIG.md`   | Arquivos tsconfig, 41 lanes strict, flags e suas implicações           |
 | `SISTEMA-TIPAGEM-COMPLETO.md` | 📖 Guia completo do sistema — arquitetura, fluxo, todos os componentes |
 | `AUDITORIA-2026-03-07.md`     | Auditoria completa do sistema (7 mar 2026) — Fases 0–D ✅ — **Atual**  |
-| `AUDITORIA-2026-03-06.md`     | Auditoria anterior (6 mar 2026) — histórico                           |
+| `AUDITORIA-2026-03-06.md`     | Auditoria anterior (6 mar 2026) — histórico                            |
 
 ---
 
@@ -68,23 +68,23 @@ Skills de apoio (carregar antes de executar):
 | TypeScript                          | **5.9.3**                                   |
 | Node.js                             | **v24.13.0**                                |
 | Arquivos com `// @ts-check`         | **721** (src/ + tests/ + scripts/ + tools/) |
-| `@ts-nocheck` em código real        | **0** ✅                                     |
-| `@ts-ignore` em código real         | **0** ✅                                     |
-| Erros `typecheck:node`              | **0** ✅                                     |
-| Erros `typecheck:tools`             | **0** ✅                                     |
-| Erros `typecheck:browser`           | **0** ✅                                     |
-| Erros `typecheck:tests`             | **0** ✅                                     |
-| Erros `typecheck:isolated`          | **0** ✅                                     |
-| Erros `typecheck:strict:all`        | **0** ✅ (41/41 lanes)                       |
-| `strict: true` em tsconfig.base     | **sim** ✅ (Fase D concluída)                |
+| `@ts-nocheck` em código real        | **0** ✅                                    |
+| `@ts-ignore` em código real         | **0** ✅                                    |
+| Erros `typecheck:node`              | **0** ✅                                    |
+| Erros `typecheck:tools`             | **0** ✅                                    |
+| Erros `typecheck:browser`           | **0** ✅                                    |
+| Erros `typecheck:tests`             | **0** ✅                                    |
+| Erros `typecheck:isolated`          | **0** ✅                                    |
+| Erros `typecheck:strict:all`        | **0** ✅ (41/41 lanes)                      |
+| `strict: true` em tsconfig.base     | **sim** ✅ (Fase D concluída)               |
 | JSDoc cobertura de exports          | **100%** (1.115/1.115)                      |
 | `unsafe_generic_tags` (JSDoc)       | **511** — reduzir em Fase E                 |
 | `functions_missing_options_typedef` | **52** — corrigir em Fase E                 |
 | `@type {any}` em src/               | **~3.276** — reduzir em Fase E              |
-| Fase 0 (JSDoc estrutural)           | ✅ Concluída                                 |
-| Grupos 1–2 (30 lanes)               | ✅ Concluídas                                |
-| Fase D (strict base + tests)        | ✅ Concluída (7/3/2026)                      |
-| Fase E (any reduction + @import)    | ⬜ Próxima fase                              |
+| Fase 0 (JSDoc estrutural)           | ✅ Concluída                                |
+| Grupos 1–2 (30 lanes)               | ✅ Concluídas                               |
+| Fase D (strict base + tests)        | ✅ Concluída (7/3/2026)                     |
+| Fase E (any reduction + @import)    | ⬜ Próxima fase                             |
 
 Ver `ROADMAP.md` para detalhe completo por lane e `AUDITORIA-2026-03-07.md` para análise profunda.
 Ver `SISTEMA-TIPAGEM-COMPLETO.md` para a visão arquitetural completa do sistema.

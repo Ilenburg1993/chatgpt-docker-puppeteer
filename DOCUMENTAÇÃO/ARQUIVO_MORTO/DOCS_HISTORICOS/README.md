@@ -118,7 +118,7 @@ troubleshooting, see:
 1. **Server running:** Ensure Express server is running on port 3008
 
    ```bash
-   pm2 status  # Check if dashboard-web is running
+   pm2 status # Check if dashboard-web is running
    # OR start manually:
    npm run dev:server
    ```
@@ -127,7 +127,7 @@ troubleshooting, see:
 
    ```bash
    # On Windows host (outside container):
-   ollama list  # Verify models are available
+   ollama list # Verify models are available
    ```
 
 3. **MCP enabled:** Check environment variable

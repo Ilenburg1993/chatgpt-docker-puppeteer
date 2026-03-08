@@ -175,7 +175,7 @@ bloqueios).
 
 ```javascript
 // Extração com Poda de Pensamento (NASA Standard Pruning)
-const extractionResult = await ctx.evaluate(proto => {
+const extractionResult = await ctx.evaluate((proto) => {
   const msgs = Array.from(document.querySelectorAll(proto.selector));
   const targetMsg = msgs[msgs.length - 1]; // Última mensagem
 
@@ -196,11 +196,11 @@ const extractionResult = await ctx.evaluate(proto => {
 
     // UI metadata
     'details', // Collapsible sections
-    '.sr-only' // Screen reader only
+    '.sr-only', // Screen reader only
   );
 
   const count = thoughts.length;
-  thoughts.forEach(t => t.remove());
+  thoughts.forEach((t) => t.remove());
 
   return {
     text: clone.innerText.trim(),
@@ -385,23 +385,23 @@ async function findResponseArea(page) {
 
       // 1. Busca todos os containers
       const containers = SADI.query('div, article, section, pre').filter(
-        c => c.innerText.length > 5
+        (c) => c.innerText.length > 5,
       );
 
       // 2. Snapshot inicial (tamanho de cada container)
-      const snapshot = containers.map(c => ({
+      const snapshot = containers.map((c) => ({
         el: c,
         len: c.innerText.length,
       }));
 
       // 3. Aguarda crescimento (400ms)
-      return new Promise(resolve => {
+      return new Promise((resolve) => {
         setTimeout(() => {
           let best = null,
             maxDelta = 0;
 
           // 4. Compara tamanhos (crescimento)
-          snapshot.forEach(snap => {
+          snapshot.forEach((snap) => {
             if (!snap.el.isConnected) return;
 
             const currentLen = snap.el.innerText.length;
@@ -417,7 +417,7 @@ async function findResponseArea(page) {
           const final =
             best ||
             containers
-              .filter(c => c.isConnected)
+              .filter((c) => c.isConnected)
               .sort((a, b) => b.innerText.length - a.innerText.length)[0];
 
           resolve(
@@ -429,14 +429,14 @@ async function findResponseArea(page) {
                   detection_time_ms: Date.now() - startTs,
                   content_length: final.innerText.length,
                 }
-              : null
+              : null,
           );
         }, config.RESPONSE_GROWTH_DELAY); // 400ms
       });
     },
     sadiLogic,
     SADI_CONFIG,
-    Date.now()
+    Date.now(),
   );
 
   return result;

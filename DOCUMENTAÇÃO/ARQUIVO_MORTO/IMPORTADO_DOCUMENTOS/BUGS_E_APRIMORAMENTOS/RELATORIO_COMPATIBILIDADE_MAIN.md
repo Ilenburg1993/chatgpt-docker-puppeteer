@@ -56,7 +56,9 @@ raiz, enganando balanceadores de carga. **Correção Proposta:**
 ```javascript
 // src/server/api/controllers/health.js
 export function readiness(req, res) {
-  const missing = req.app.locals.requiredReadiness.filter(k => !req.app.locals.runtimeReadiness[k]);
+  const missing = req.app.locals.requiredReadiness.filter(
+    (k) => !req.app.locals.runtimeReadiness[k],
+  );
   if (missing.length > 0) return res.status(503).json({ status: 'not_ready', missing });
   res.status(200).json({ status: 'ready' });
 }

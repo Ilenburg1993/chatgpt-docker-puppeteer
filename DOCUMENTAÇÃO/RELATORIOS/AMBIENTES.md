@@ -18,7 +18,7 @@ npm run check:env
 ### Ou manualmente:
 
 ```bash
-pwd  # Mostra onde você está
+pwd # Mostra onde você está
 ```
 
 ## 📋 Regras Essenciais
@@ -123,7 +123,7 @@ Antes de iniciar em produção, o sistema verifica:
 - Ambiente configurado corretamente
 
 ```bash
-npm run check:pre-flight  # Executa validações
+npm run check:pre-flight # Executa validações
 ```
 
 ### ✅ Indicadores Visuais no Terminal

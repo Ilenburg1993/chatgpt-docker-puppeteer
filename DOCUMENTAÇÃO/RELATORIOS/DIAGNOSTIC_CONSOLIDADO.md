@@ -886,15 +886,15 @@ if (CONFIG.USE_KERNEL) {
 function initSocketEngine(io, nerv) {
   // Conecta servidor ao NERV em vez de ipc_client
 
-  nerv.on('TASK_STARTED', data => {
+  nerv.on('TASK_STARTED', (data) => {
     io.emit('task_started', data);
   });
 
-  nerv.on('TASK_COMPLETED', data => {
+  nerv.on('TASK_COMPLETED', (data) => {
     io.emit('task_completed', data);
   });
 
-  io.on('connection', clientSocket => {
+  io.on('connection', (clientSocket) => {
     clientSocket.on('ENGINE_PAUSE', () => {
       nerv.send('KERNEL_PAUSE', {});
     });
@@ -923,9 +923,9 @@ function initSocketEngine(io, nerv) {
 # Após 1 semana em produção com feature flags ativas:
 
 # 1. Remover legacy
-rm src/core/execution_engine.js       # 401 LOC removidas
-rm src/infra/ipc_client.js            # 295 LOC removidas
-rm src/infra/ipc/buffer.js            # ~100 LOC removidas
+rm src/core/execution_engine.js # 401 LOC removidas
+rm src/infra/ipc_client.js      # 295 LOC removidas
+rm src/infra/ipc/buffer.js      # ~100 LOC removidas
 
 # 2. Remover feature flags
 # config.js - Remove USE_KERNEL e USE_NERV_IPC
@@ -1063,7 +1063,7 @@ $ echo "scale=2; 15 / 137 * 100" | bc
 → 10.9% de arquivos têm testes
 
 # Coverage real (estimativa por LOC)
-→ <5% de cobertura de linhas
+→ < 5% de cobertura de linhas
 ```
 
 **Detalhamento**:
@@ -1291,7 +1291,7 @@ Overhead: 7-15 segundos por task
 const content = fs.readFileSync(responsePath); // Blocking!
 for (let line of content.split('\n')) {
   // Blocking!
-  if (forbiddenTerms.some(t => line.includes(t))) {
+  if (forbiddenTerms.some((t) => line.includes(t))) {
     // Regex checks
   }
 }
@@ -1351,7 +1351,7 @@ Dependências com vulnerabilidades conhecidas
 
 ```javascript
 // server/engine/socket.js
-io.on('connection', socket => {
+io.on('connection', (socket) => {
   // SEM verificação de token/auth
   socket.on('ENGINE_PAUSE', () => engine.pause());
 });
@@ -1429,14 +1429,14 @@ eslint                   ✅ Linting (já estava)
 
 ```bash
 npm install --save-dev \
-  jest \                      # Framework de testes
-  @jest/globals \             # Jest globals
-  c8 \                        # Coverage (melhor que nyc)
-  supertest \                 # API testing
-  @faker-js/faker \           # Mock data
-  sinon \                     # Mocks/stubs avançados
-  testcontainers \            # Docker para testes (opcional)
-  playwright                  # E2E testing (alternativa)
+  jest \           # Framework de testes
+@jest/globals \    # Jest globals
+c8 \               # Coverage (melhor que nyc)
+supertest \        # API testing
+@faker-js/faker \  # Mock data
+sinon \            # Mocks/stubs avançados
+testcontainers \   # Docker para testes (opcional)
+playwright         # E2E testing (alternativa)
 ```
 
 **Prioridade**: MÁXIMA (Semana 1)
@@ -1445,12 +1445,12 @@ npm install --save-dev \
 
 ```bash
 npm install \
-  pino \                      # Structured logging
-  pino-pretty \               # Log formatting
-  prom-client \               # Prometheus metrics
-  express-prom-bundle \       # Auto-metrics Express
-  @opentelemetry/api \        # Distributed tracing (opcional)
-  @opentelemetry/sdk-node     # OpenTelemetry SDK (opcional)
+  pino \                # Structured logging
+pino-pretty \           # Log formatting
+prom-client \           # Prometheus metrics
+express-prom-bundle \   # Auto-metrics Express
+@opentelemetry/api \    # Distributed tracing (opcional)
+@opentelemetry/sdk-node # OpenTelemetry SDK (opcional)
 ```
 
 **Prioridade**: ALTA (Semana 1)
@@ -1459,11 +1459,11 @@ npm install \
 
 ```bash
 npm install \
-  generic-pool \              # Connection pooling
-  ioredis \                   # Redis client (Fase 3)
-  bull \                      # Queue com Redis (Fase 3)
-  clinic \                    # Performance profiling (dev)
-  autocannon                  # Load testing (dev)
+  generic-pool \  # Connection pooling
+ioredis \         # Redis client (Fase 3)
+bull \            # Queue com Redis (Fase 3)
+clinic \          # Performance profiling (dev)
+autocannon        # Load testing (dev)
 ```
 
 **Prioridade**: MÉDIA (Semana 2-3)
@@ -1472,12 +1472,12 @@ npm install \
 
 ```bash
 npm install \
-  helmet \                    # Security headers
-  express-rate-limit \        # Rate limiting
-  jsonwebtoken \              # JWT auth
-  bcrypt \                    # Password hashing (se necessário)
-  dotenv-vault \              # Secrets management
-  snyk                        # Vulnerability scanning (dev)
+  helmet \            # Security headers
+express-rate-limit \  # Rate limiting
+jsonwebtoken \        # JWT auth
+bcrypt \              # Password hashing (se necessário)
+dotenv-vault \        # Secrets management
+snyk                  # Vulnerability scanning (dev)
 ```
 
 **Prioridade**: MÉDIA-ALTA (Fase 4)
@@ -1486,12 +1486,12 @@ npm install \
 
 ```bash
 npm install --save-dev \
-  husky \                     # Git hooks
-  lint-staged \               # Pre-commit linting
-  commitizen \                # Conventional commits
-  standard-version \          # Changelog automation
-  typedoc \                   # API docs (se usar TS)
-  jsdoc                       # API docs (JS)
+  husky \           # Git hooks
+lint-staged \       # Pre-commit linting
+commitizen \        # Conventional commits
+standard-version \  # Changelog automation
+typedoc \           # API docs (se usar TS)
+jsdoc               # API docs (JS)
 ```
 
 **Prioridade**: BAIXA (pós-v1.0)

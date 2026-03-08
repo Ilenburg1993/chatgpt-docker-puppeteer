@@ -166,9 +166,9 @@ Documentar explicitamente a semântica do contador e verificar o operador corret
 ### Padrão
 
 ```javascript
-const items = results.map(item => processItem(item)); // processItem pode retornar null
+const items = results.map((item) => processItem(item)); // processItem pode retornar null
 // caller usa items sem verificar nulls
-items.forEach(item => item.save()); // TypeError: Cannot read property 'save' of null
+items.forEach((item) => item.save()); // TypeError: Cannot read property 'save' of null
 ```
 
 ### Fix canônico

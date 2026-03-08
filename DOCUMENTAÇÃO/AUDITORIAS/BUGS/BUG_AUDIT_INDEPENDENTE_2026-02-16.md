@@ -157,8 +157,8 @@ for (const item of items) {
 }
 
 // DEPOIS (Batch Otimizado)
-const results = await page.evaluate(items => {
-  return items.map(item => getData(item)); // Uma query para todos
+const results = await page.evaluate((items) => {
+  return items.map((item) => getData(item)); // Uma query para todos
 }, items);
 ```
 

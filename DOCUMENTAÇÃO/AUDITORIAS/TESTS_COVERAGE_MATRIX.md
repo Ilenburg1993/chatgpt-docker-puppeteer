@@ -454,9 +454,7 @@ TOTAL                  - 5 semanas    - 49 suites | 349 tests | 220h
 
 ```javascript
 /**
- * Teste Unitário: [Nome do Módulo]
- * Arquivo: tests/unit/[categoria]/test_[modulo]_unit.js
- * Cobertura: [Módulo Path]
+ * Teste Unitário: [Nome do Módulo] Arquivo: tests/unit/[categoria]/test_[modulo]_unit.js Cobertura: [Módulo Path]
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');

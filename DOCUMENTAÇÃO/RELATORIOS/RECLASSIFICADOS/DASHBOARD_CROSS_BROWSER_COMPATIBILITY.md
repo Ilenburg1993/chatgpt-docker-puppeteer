@@ -259,8 +259,8 @@ const socket = io();
 socket.on('connect', () => (els.connStatus.style.display = 'none'));
 socket.on('disconnect', () => (els.connStatus.style.display = 'block'));
 
-socket.on('task:update', task => {
-  const idx = currentTasks.findIndex(t => t.meta.id === task.meta.id);
+socket.on('task:update', (task) => {
+  const idx = currentTasks.findIndex((t) => t.meta.id === task.meta.id);
   if (idx >= 0) currentTasks[idx] = task;
   else currentTasks.push(task);
   renderTasks();

@@ -152,9 +152,9 @@ can exceed timeout **Mitigation Options:**
 ### Environment Variables
 
 ```bash
-MCP_ENABLED=true                 # Enable MCP handler
-MCP_TOOL_TIMEOUT=90000           # Tool execution timeout (90s)
-SERVER_PORT=3008                 # Server listen port
+MCP_ENABLED=true       # Enable MCP handler
+MCP_TOOL_TIMEOUT=90000 # Tool execution timeout (90s)
+SERVER_PORT=3008       # Server listen port
 ```
 
 ---
@@ -185,7 +185,7 @@ SERVER_PORT=3008                 # Server listen port
 1. **Increase Ollama timeout for heavy workloads:**
 
    ```bash
-   MCP_TOOL_TIMEOUT=180000  # 3 minutes
+   MCP_TOOL_TIMEOUT=180000 # 3 minutes
    ```
 
 2. **Monitor PM2 processes:**

@@ -176,11 +176,11 @@ Ou criar manualmente:
     <div id="results"></div>
     <script>
       fetch('http://172.17.0.2:5173/dashboard/')
-        .then(r => r.text())
-        .then(html => {
+        .then((r) => r.text())
+        .then((html) => {
           document.getElementById('results').innerHTML = html ? '✅ PASS' : '❌ FAIL';
         })
-        .catch(e => {
+        .catch((e) => {
           document.getElementById('results').innerHTML = '❌ ERROR: ' + e.message;
         });
     </script>

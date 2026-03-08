@@ -386,19 +386,19 @@ ENABLE_AUDIT_AGENT_PM2_PROCESSES=false
 
 ```bash
 # Audit Runner
-npm run audit:quick          # Auditoria rápida com smart-hybrid
-npm run audit:deep           # Auditoria profunda
-npm run audit:nightly        # Auditoria noturna completa
-npm run audit:quality        # Fase de qualidade only
-npm run audit:deep:jsdoc     # Validação JSDoc full
+npm run audit:quick      # Auditoria rápida com smart-hybrid
+npm run audit:deep       # Auditoria profunda
+npm run audit:nightly    # Auditoria noturna completa
+npm run audit:quality    # Fase de qualidade only
+npm run audit:deep:jsdoc # Validação JSDoc full
 
 # Testes
-npm run test:unit:audit-agent       # Testes do Audit Agent
-npm run test:unit:audit-quality      # Testes de quality gates
+npm run test:unit:audit-agent   # Testes do Audit Agent
+npm run test:unit:audit-quality # Testes de quality gates
 
 # Operacionais
-npm run daemon:start:audit-agent     # Inicia processos Audit Agent
-npm run daemon:restart:audit-agent   # Reinicia processos
+npm run daemon:start:audit-agent   # Inicia processos Audit Agent
+npm run daemon:restart:audit-agent # Reinicia processos
 ```
 
 ---

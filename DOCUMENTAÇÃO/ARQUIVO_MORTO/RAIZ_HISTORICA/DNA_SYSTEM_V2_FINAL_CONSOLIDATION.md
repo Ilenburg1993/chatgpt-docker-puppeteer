@@ -47,7 +47,7 @@ if (result.confidence >= 75 && result.protocol) {
         shadowRoot: result.protocol.isShadowRoot || false,
       },
       domain,
-      'input_box'
+      'input_box',
     );
 
     if (evolutionResult.accepted) {
@@ -621,7 +621,7 @@ node -r module-alias/register tests/test_dna_system.js
 node -r module-alias/register tests/test_dna_integration.js
 
 # Both
-make test-dna  # (if added to Makefile)
+make test-dna # (if added to Makefile)
 ```
 
 ### Check API Endpoints

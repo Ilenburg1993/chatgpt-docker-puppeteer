@@ -271,7 +271,7 @@ class MissionExecutor {
     const executionOrder = this.topologicalSort(stepGraph);
 
     for (const stepId of executionOrder) {
-      const step = workflow.steps.find(s => s.id === stepId);
+      const step = workflow.steps.find((s) => s.id === stepId);
 
       // Check if user paused
       if (await this.checkPaused(mission.id)) {
@@ -318,7 +318,7 @@ class MissionExecutor {
   buildDependencyGraph(steps) {
     const graph = new Map();
 
-    steps.forEach(step => {
+    steps.forEach((step) => {
       graph.set(step.id, {
         step,
         dependencies: step.dependencies || [],
@@ -327,8 +327,8 @@ class MissionExecutor {
     });
 
     // Build reverse edges (dependents)
-    steps.forEach(step => {
-      (step.dependencies || []).forEach(depId => {
+    steps.forEach((step) => {
+      (step.dependencies || []).forEach((depId) => {
         if (graph.has(depId)) {
           graph.get(depId).dependents.push(step.id);
         }
@@ -357,7 +357,7 @@ class MissionExecutor {
       result.push(current);
 
       const currentNode = graph.get(current);
-      currentNode.dependents.forEach(dependent => {
+      currentNode.dependents.forEach((dependent) => {
         inDegree.set(dependent, inDegree.get(dependent) - 1);
         if (inDegree.get(dependent) === 0) {
           queue.push(dependent);
@@ -684,7 +684,7 @@ class ContextManager {
     const relevantContext = {};
 
     if (stepConfig.dependencies) {
-      stepConfig.dependencies.forEach(depId => {
+      stepConfig.dependencies.forEach((depId) => {
         if (context.accumulated_results[depId]) {
           relevantContext[depId] = context.accumulated_results[depId];
         }
@@ -693,7 +693,7 @@ class ContextManager {
 
     // Add user feedback if applicable
     const relevantFeedback = context.user_feedback.filter(
-      f => !stepConfig.dependencies || stepConfig.dependencies.includes(f.step_id)
+      (f) => !stepConfig.dependencies || stepConfig.dependencies.includes(f.step_id),
     );
 
     return {
@@ -819,7 +819,7 @@ class MemoryStore {
 
     const facts = JSON.parse(result.output);
 
-    return facts.filter(f => f.confidence > 0.7); // Only high-confidence facts
+    return facts.filter((f) => f.confidence > 0.7); // Only high-confidence facts
   }
 }
 ```

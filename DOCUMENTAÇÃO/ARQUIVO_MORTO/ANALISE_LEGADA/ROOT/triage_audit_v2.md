@@ -755,7 +755,7 @@ const triage = create(page, 'en');
 const triage = new Triage(page, 'en');
 
 // Listen to events
-triage.on('triage:pattern_detected', data => {
+triage.on('triage:pattern_detected', (data) => {
   console.log('Pattern:', data.pattern);
 });
 

@@ -125,7 +125,7 @@ this._attachHealthMonitorEvents();
 this.healthMonitor.start(this.config.healthCheckInterval); // 30s
 
 // pool_manager.js _attachHealthMonitorEvents()
-this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async data => {
+this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async (data) => {
   if (!this.reconnectionInProgress) {
     await this._attemptReconnection(); // ← P2-U2
   }

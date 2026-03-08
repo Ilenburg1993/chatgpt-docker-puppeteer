@@ -361,8 +361,8 @@ describe('Error Emission Complete', () => {
       spy.calledWith(
         ADAPTER_EVENTS.ERROR,
         ActionCode.DRIVER_ERROR,
-        sinon.match({ phase: 'allocate' })
-      )
+        sinon.match({ phase: 'allocate' }),
+      ),
     ).to.be.true;
   });
 
@@ -431,12 +431,14 @@ Throughput: 10 tasks/min → 13 tasks/min (+30%)
  * DriverPoolManager - Gerencia pool de drivers reutilizáveis
  *
  * RESPONSABILIDADE ONTOLÓGICA:
+ *
  * - Criar/destruir drivers (warm instances)
  * - Alocar/liberar drivers para tasks (attach/detach page)
  * - Health checks de drivers (validade, estado IDLE)
  * - Auto-scaling pool (se necessário)
  *
  * NÃO FAZ:
+ *
  * - Executar tasks (Driver faz)
  * - Gerenciar browsers (BrowserPool faz)
  * - Decidir workflows (MissionManager faz)
@@ -514,7 +516,7 @@ class DriverPoolManager extends EventEmitter {
 
     log(
       'INFO',
-      `[DriverPool] Initialized: ${this._getTotalDrivers()} drivers across ${this.config.TARGETS.length} targets`
+      `[DriverPool] Initialized: ${this._getTotalDrivers()} drivers across ${this.config.TARGETS.length} targets`,
     );
   }
 
@@ -546,7 +548,7 @@ class DriverPoolManager extends EventEmitter {
     }
 
     // 1. Busca driver disponível no pool
-    let entry = pool.find(e => !e.busy && e.driver.state === 'IDLE');
+    let entry = pool.find((e) => !e.busy && e.driver.state === 'IDLE');
 
     if (entry) {
       // Pool HIT - reusa driver existente
@@ -575,11 +577,11 @@ class DriverPoolManager extends EventEmitter {
         // Pool exhausted - aguardar release OU criar temporário
         log(
           'WARN',
-          `[DriverPool] Pool exhausted for ${target} (max: ${this.config.MAX_POOL_SIZE})`
+          `[DriverPool] Pool exhausted for ${target} (max: ${this.config.MAX_POOL_SIZE})`,
         );
 
         throw new Error(
-          `POOL_EXHAUSTED: All ${this.config.MAX_POOL_SIZE} drivers for ${target} are busy`
+          `POOL_EXHAUSTED: All ${this.config.MAX_POOL_SIZE} drivers for ${target} are busy`,
         );
       }
     }
@@ -616,7 +618,7 @@ class DriverPoolManager extends EventEmitter {
     let pool = null;
 
     for (const [target, targetPool] of this.pools.entries()) {
-      entry = targetPool.find(e => e.driver === driver);
+      entry = targetPool.find((e) => e.driver === driver);
       if (entry) {
         pool = targetPool;
         break;
@@ -723,8 +725,8 @@ class DriverPoolManager extends EventEmitter {
       pools: Array.from(this.pools.entries()).map(([target, pool]) => ({
         target,
         total: pool.length,
-        busy: pool.filter(e => e.busy).length,
-        idle: pool.filter(e => !e.busy).length,
+        busy: pool.filter((e) => e.busy).length,
+        idle: pool.filter((e) => !e.busy).length,
       })),
     };
   }

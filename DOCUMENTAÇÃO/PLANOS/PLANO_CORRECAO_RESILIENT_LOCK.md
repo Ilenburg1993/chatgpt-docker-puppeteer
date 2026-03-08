@@ -14,7 +14,7 @@ liberar locks.
 
 ```javascript
 // CÓDIGO ATUAL (Problemático)
-this._cleanupHandlers.uncaughtException = async err => {
+this._cleanupHandlers.uncaughtException = async (err) => {
   console.error('[ResilientLock] Uncaught exception...', err);
   await this.releaseAll();
   process.exit(1); // <--- DERRUBA O SERVIDOR

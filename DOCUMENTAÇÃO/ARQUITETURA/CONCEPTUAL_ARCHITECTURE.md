@@ -982,14 +982,14 @@ class BrowserPoolManager {
 class BrowserPoolManager {
   _bridgeCircuitBreakerAndMonitor() {
     // Monitor detecta recovery → notifica CB
-    this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, data => {
+    this.healthMonitor.on(MONITOR_EVENTS.STATUS_CHANGED, (data) => {
       if (data.newStatus === HEALTH_STATUS.HEALTHY) {
         this.circuitBreaker.registerRecovery(poolEntryId);
       }
     });
 
     // Monitor detecta problema → notifica CB
-    this.healthMonitor.on(MONITOR_EVENTS.CRITICAL_ISSUE, results => {
+    this.healthMonitor.on(MONITOR_EVENTS.CRITICAL_ISSUE, (results) => {
       const error = new Error('Connection lost');
       this.circuitBreaker.registerFailure(poolEntryId, error);
     });

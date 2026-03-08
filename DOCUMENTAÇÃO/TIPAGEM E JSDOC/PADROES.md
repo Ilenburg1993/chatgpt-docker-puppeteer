@@ -31,9 +31,9 @@ Todo arquivo `.js` ou `.mjs` deve ter na primeira linha (ou logo após shebang):
 > **Exceção documentada — `tests/legacy/`**: arquivos em `tests/legacy/node/*.js` são código em
 > **quarentena** — testes de integração obsoletos não executados na suíte principal. Estes 14
 > arquivos mantêm `// @ts-nocheck` temporariamente, identificado com o marcador:
-> `// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)`
-> Qualquer arquivo fora de `tests/legacy/` que usar `@ts-nocheck` deve ser considerado um bug de
-> tipagem e corrigido imediatamente.
+> `// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)` Qualquer arquivo fora de
+> `tests/legacy/` que usar `@ts-nocheck` deve ser considerado um bug de tipagem e corrigido
+> imediatamente.
 
 ### 2.2 Funções públicas sempre tipadas
 
@@ -44,6 +44,7 @@ Toda função exportada (pública) deve ter JSDoc completo:
 
 /**
  * Processa uma tarefa da fila.
+ *
  * @param {TaskRecord} task - A tarefa a processar.
  * @param {ProcessOptions} [options] - Opções opcionais.
  * @returns {Promise<TaskResult>} Resultado do processamento.
@@ -65,8 +66,8 @@ Nunca use `{object}` genérico para parâmetros de opções conhecidos:
 // ✅ CORRETO — usar typedef nomeado
 /**
  * @typedef {object} ProcessOptions
- * @property {number} [timeout=5000] - Timeout em ms.
- * @property {boolean} [retry=false] - Tentar novamente em falha.
+ * @property {number} [timeout=5000] - Timeout em ms. Default is `5000`
+ * @property {boolean} [retry=false] - Tentar novamente em falha. Default is `false`
  */
 ```
 
@@ -119,11 +120,11 @@ Causa: objeto sem shape tipado. Corrija com typedef:
 /**
  * @typedef {object} TaskRecord
  * @property {string} id
- * @property {'pending'|'running'|'done'|'error'} status
+ * @property {'pending' | 'running' | 'done' | 'error'} status
  * @property {number} createdAt
  */
 
-/** @returns {Promise<TaskRecord|null>} */
+/** @returns {Promise<TaskRecord | null>} */
 async function getTask(id) {
   const row = await db.get('SELECT * FROM tasks WHERE id = ?', id);
   return row ?? null;
@@ -156,15 +157,15 @@ Em callbacks de array, eventos, etc.:
 
 ```js
 // ❌ Sem tipo — TS7006
-items.forEach(item => item.name);
+items.forEach((item) => item.name);
 
 // ✅ Com @param inline
-items.forEach(/** @param {TaskRecord} item */ item => item.name);
+items.forEach(/** @param {TaskRecord} item */ (item) => item.name);
 
 // Ou com typedef prévio + tipagem da variável
 /** @type {TaskRecord[]} */
 const items = getItems();
-items.forEach(item => item.name); // item inferido como TaskRecord
+items.forEach((item) => item.name); // item inferido como TaskRecord
 ```
 
 ### TS8032 — Sub-param JSDoc sem parent
@@ -187,7 +188,7 @@ items.forEach(item => item.name); // item inferido como TaskRecord
 ```js
 /**
  * @param {object} opts
- * @param {string} opts.id     ← deve vir logo após opts
+ * @param {string} opts.id ← deve vir logo após opts
  * @param {boolean} opts.force ← e outro sub-param
  * @returns {void}
  */
@@ -224,13 +225,16 @@ Se nenhuma das condições for verdadeira, mantenha o typedef local no arquivo q
 
 ```js
 // @ts-check
-/** @import { TaskRecord } from '#types/tasks.js' */
+/** @import {TaskRecord} from "#types/tasks.js" */
 
 // Pode importar múltiplos tipos:
-/** @import { TaskRecord, TaskStatus } from '#types/tasks.js' */
+/** @import {
+  TaskRecord,
+  TaskStatus
+} from "#types/tasks.js" */
 
 // Import apenas de namespace:
-/** @import * as Types from '#types/index.js' */
+/** @import * from "#types/index.js" */
 ```
 
 **Sintaxe legada (evitar em código novo):**
@@ -241,6 +245,7 @@ Se nenhuma das condições for verdadeira, mantenha o typedef local no arquivo q
 ```
 
 **Por que preferir `@import`:**
+
 - Não cria bindings na estrutura de dados JSDoc (o typedef cria)
 - Mais próxima da sintaxe `import type` do TypeScript
 - Suportada nativamente pelo TypeScript desde 5.5
@@ -262,6 +267,7 @@ Use `@template` apenas quando a API é genuinamente genérica:
 ```js
 /**
  * Filtra itens por predicado.
+ *
  * @template T
  * @param {T[]} items
  * @param {(item: T) => boolean} predicate

@@ -29,8 +29,8 @@
 
 ## 1. Visão geral do sistema
 
-Este repositório é uma **aplicação Node.js 24+ puramente ESM**, escrita em JavaScript com
-**JSDoc como linguagem de tipagem**. O TypeScript é usado apenas como verificador estático
+Este repositório é uma **aplicação Node.js 24+ puramente ESM**, escrita em JavaScript com **JSDoc
+como linguagem de tipagem**. O TypeScript é usado apenas como verificador estático
 (`allowJs + checkJs`), sem transpilar código.
 
 ### Filosofia central
@@ -48,7 +48,8 @@ LSP / IntelliSense                  →  tsserver local wrapper
 1. **JS-first**: nunca converter `.js` de produção para `.ts`. JSDoc é o contrato público.
 2. **Verificação sem emissão**: `noEmit: true` em todas as configs base. TypeScript não gera código.
 3. **Strict global**: `strict: true` em `tsconfig.base.json` — todas as verificações strict ativas.
-4. **Lanes isoladas**: cada domínio do código tem sua própria config strict para isolamento de erros.
+4. **Lanes isoladas**: cada domínio do código tem sua própria config strict para isolamento de
+   erros.
 5. **Cobertura 100%**: toda exportação pública deve ter JSDoc completo com tipos explícitos.
 6. **Sem @ts-nocheck**: proibido. Sem @ts-ignore em src/.
 
@@ -105,31 +106,31 @@ tsconfig.base.json                     ← BASE: flags globais, allowJs, strict
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
     // Verificação de JS
-    "allowJs": true,                    // aceita .js como entrada
-    "checkJs": true,                    // aplica verificação TypeScript a .js
-    "noEmit": true,                     // não gera arquivos — só valida
-    "incremental": true,                // cache incremental para velocidade
+    "allowJs": true, // aceita .js como entrada
+    "checkJs": true, // aplica verificação TypeScript a .js
+    "noEmit": true, // não gera arquivos — só valida
+    "incremental": true, // cache incremental para velocidade
 
     // Target
-    "target": "ES2024",                 // alinhado ao Node.js 24
-    "verbatimModuleSyntax": true,       // preserva import/export como escrito (ESM puro)
-    "resolvePackageJsonExports": true,  // respeita campo exports de packages
-    "resolvePackageJsonImports": true,  // respeita imports internos (#alias)
-    "downlevelIteration": true,         // iteradores compatíveis
+    "target": "ES2024", // alinhado ao Node.js 24
+    "verbatimModuleSyntax": true, // preserva import/export como escrito (ESM puro)
+    "resolvePackageJsonExports": true, // respeita campo exports de packages
+    "resolvePackageJsonImports": true, // respeita imports internos (#alias)
+    "downlevelIteration": true, // iteradores compatíveis
 
     // Strict — TODOS ATIVOS desde Fase D (7 mar 2026)
-    "strict": true,                     // ativa conjunto completo de strict flags
+    "strict": true, // ativa conjunto completo de strict flags
     "useUnknownInCatchVariables": true, // catch (e) → e: unknown (não any)
-    "strictNullChecks": true,           // explicitado (já incluído em strict:true)
+    "strictNullChecks": true, // explicitado (já incluído em strict:true)
 
     // Biblioteca e resolução
-    "skipLibCheck": true,               // não verifica node_modules/*.d.ts
-    "maxNodeModuleJsDepth": 0,          // não infere tipos de JS em node_modules
+    "skipLibCheck": true, // não verifica node_modules/*.d.ts
+    "maxNodeModuleJsDepth": 0, // não infere tipos de JS em node_modules
 
     // Aliases de módulo (paths)
     "baseUrl": ".",
-    "paths": { "#core/*": ["src/core/*"], /* ... ver seção 8 */ }
-  }
+    "paths": { "#core/*": ["src/core/*"] /* ... ver seção 8 */ },
+  },
 }
 ```
 
@@ -229,20 +230,21 @@ Cada arquivo em `config/typing/strict/tsconfig.strict.<nome>.json` segue o padr�
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,                  // obrigatório para referências
-    "noImplicitReturns": true,          // funções devem retornar em todos os caminhos
+    "composite": true, // obrigatório para referências
+    "noImplicitReturns": true, // funções devem retornar em todos os caminhos
     "noFallthroughCasesInSwitch": true, // switch sem break explícito gera erro
     "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.<nome>.tsbuildinfo",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2024"],
-    "types": ["node"]
+    "types": ["node"],
   },
-  "include": ["<diretório-específico>/**/*", "src/types/**/*.d.ts"]
+  "include": ["<diretório-específico>/**/*", "src/types/**/*.d.ts"],
 }
 ```
 
 As lanes adicionam duas flags extras além do `strict: true` herdado:
+
 - `noImplicitReturns`: funções com retorno não-nulo devem retornar em todos os caminhos
 - `noFallthroughCasesInSwitch`: evita fallthrough acidental em switch
 
@@ -250,47 +252,47 @@ As lanes adicionam duas flags extras além do `strict: true` herdado:
 
 | Lane                    | Diretório                | Status |
 | ----------------------- | ------------------------ | ------ |
-| `public`                | raiz (index.js)          | ✅ 0    |
-| `configs`               | `config/`                | ✅ 0    |
-| `agents`                | `agents/`                | ✅ 0    |
-| `tools.workspace`       | `tools/`                 | ✅ 0    |
-| `src.root`              | `src/*.js`               | ✅ 0    |
-| `src.types`             | `src/types/`             | ✅ 0    |
-| `src.core`              | `src/core/`              | ✅ 0    |
-| `src.nerv`              | `src/nerv/`              | ✅ 0    |
-| `src.kernel`            | `src/kernel/`            | ✅ 0    |
-| `src.agent`             | `src/agent/`             | ✅ 0    |
-| `src.driver`            | `src/driver/`            | ✅ 0    |
-| `src.infra`             | `src/infra/`             | ✅ 0    |
-| `src.server`            | `src/server/`            | ✅ 0    |
-| `src.orchestrator`      | `src/orchestrator/`      | ✅ 0    |
-| `src.missions`          | `src/missions/`          | ✅ 0    |
-| `src.logic`             | `src/logic/`             | ✅ 0    |
-| `src.shared`            | `src/shared/`            | ✅ 0    |
-| `src.validation`        | `src/validation/`        | ✅ 0    |
-| `src.audit_agent`       | `src/audit_agent/`       | ✅ 0    |
-| `src.inference_gateway` | `src/inference_gateway/` | ✅ 0    |
-| `src.integration`       | `src/integration/`       | ✅ 0    |
-| `src.dashboard-ui`      | `src/dashboard-ui/`      | ✅ 0    |
-| `scripts.root`          | `scripts/*.{mjs,cjs}`    | ✅ 0    |
-| `scripts.analysis`      | `scripts/analysis/`      | ✅ 0    |
-| `scripts.audit`         | `scripts/audit/`         | ✅ 0    |
-| `scripts.build`         | `scripts/build/`         | ✅ 0    |
-| `scripts.ci`            | `scripts/ci/`            | ✅ 0    |
-| `scripts.env`           | `scripts/env/`           | ✅ 0    |
-| `scripts.health`        | `scripts/health/`        | ✅ 0    |
-| `scripts.legacy`        | `scripts/legacy/`        | ✅ 0    |
-| `scripts.ops`           | `scripts/ops/`           | ✅ 0    |
-| `scripts.setup`         | `scripts/setup/`         | ✅ 0    |
-| `tests.unit`            | `tests/unit/`            | ✅ 0    |
-| `tests.integration`     | `tests/integration/`     | ✅ 0    |
-| `tests.regression`      | `tests/regression/`      | ✅ 0    |
-| `tests.e2e`             | `tests/e2e/`             | ✅ 0    |
-| `tests.helpers`         | `tests/helpers/`         | ✅ 0    |
-| `tests.fixtures`        | `tests/fixtures/`        | ✅ 0    |
-| `tests.mocks`           | `tests/mocks/`           | ✅ 0    |
-| `tests.manual`          | `tests/manual/`          | ✅ 0    |
-| `tests.legacy`          | `tests/legacy/`          | ✅ 0    |
+| `public`                | raiz (index.js)          | ✅ 0   |
+| `configs`               | `config/`                | ✅ 0   |
+| `agents`                | `agents/`                | ✅ 0   |
+| `tools.workspace`       | `tools/`                 | ✅ 0   |
+| `src.root`              | `src/*.js`               | ✅ 0   |
+| `src.types`             | `src/types/`             | ✅ 0   |
+| `src.core`              | `src/core/`              | ✅ 0   |
+| `src.nerv`              | `src/nerv/`              | ✅ 0   |
+| `src.kernel`            | `src/kernel/`            | ✅ 0   |
+| `src.agent`             | `src/agent/`             | ✅ 0   |
+| `src.driver`            | `src/driver/`            | ✅ 0   |
+| `src.infra`             | `src/infra/`             | ✅ 0   |
+| `src.server`            | `src/server/`            | ✅ 0   |
+| `src.orchestrator`      | `src/orchestrator/`      | ✅ 0   |
+| `src.missions`          | `src/missions/`          | ✅ 0   |
+| `src.logic`             | `src/logic/`             | ✅ 0   |
+| `src.shared`            | `src/shared/`            | ✅ 0   |
+| `src.validation`        | `src/validation/`        | ✅ 0   |
+| `src.audit_agent`       | `src/audit_agent/`       | ✅ 0   |
+| `src.inference_gateway` | `src/inference_gateway/` | ✅ 0   |
+| `src.integration`       | `src/integration/`       | ✅ 0   |
+| `src.dashboard-ui`      | `src/dashboard-ui/`      | ✅ 0   |
+| `scripts.root`          | `scripts/*.{mjs,cjs}`    | ✅ 0   |
+| `scripts.analysis`      | `scripts/analysis/`      | ✅ 0   |
+| `scripts.audit`         | `scripts/audit/`         | ✅ 0   |
+| `scripts.build`         | `scripts/build/`         | ✅ 0   |
+| `scripts.ci`            | `scripts/ci/`            | ✅ 0   |
+| `scripts.env`           | `scripts/env/`           | ✅ 0   |
+| `scripts.health`        | `scripts/health/`        | ✅ 0   |
+| `scripts.legacy`        | `scripts/legacy/`        | ✅ 0   |
+| `scripts.ops`           | `scripts/ops/`           | ✅ 0   |
+| `scripts.setup`         | `scripts/setup/`         | ✅ 0   |
+| `tests.unit`            | `tests/unit/`            | ✅ 0   |
+| `tests.integration`     | `tests/integration/`     | ✅ 0   |
+| `tests.regression`      | `tests/regression/`      | ✅ 0   |
+| `tests.e2e`             | `tests/e2e/`             | ✅ 0   |
+| `tests.helpers`         | `tests/helpers/`         | ✅ 0   |
+| `tests.fixtures`        | `tests/fixtures/`        | ✅ 0   |
+| `tests.mocks`           | `tests/mocks/`           | ✅ 0   |
+| `tests.manual`          | `tests/manual/`          | ✅ 0   |
+| `tests.legacy`          | `tests/legacy/`          | ✅ 0   |
 
 ### 4.3 Como rodar uma lane individualmente
 
@@ -302,15 +304,16 @@ npm run typecheck:strict:src.kernel
 npm run typecheck:strict:all
 
 # Atalhos de domínio
-npm run typecheck:strict:core     # → src.core
-npm run typecheck:strict:infra    # → src.infra
-npm run typecheck:strict:tests    # → todas as lanes de tests.*
+npm run typecheck:strict:core  # → src.core
+npm run typecheck:strict:infra # → src.infra
+npm run typecheck:strict:tests # → todas as lanes de tests.*
 ```
 
 ### 4.4 Como adicionar uma nova lane
 
 1. Criar `config/typing/strict/tsconfig.strict.<nome>.json` seguindo o template da seção 4.1
-2. Adicionar no `tsconfig.strict.json`: `{ "path": "./config/typing/strict/tsconfig.strict.<nome>.json" }`
+2. Adicionar no `tsconfig.strict.json`:
+   `{ "path": "./config/typing/strict/tsconfig.strict.<nome>.json" }`
 3. Adicionar script npm em `package.json`:
    ```json
    "typecheck:strict:<nome>": "tsc -p config/typing/strict/tsconfig.strict.<nome>.json"
@@ -406,12 +409,14 @@ export function execute(options) { ... }
 ### 6.3 Importação de tipos externos
 
 **Padrão moderno** (use para novos usos):
+
 ```js
-/** @import { Page } from 'puppeteer-core' */
-/** @import { Database } from 'better-sqlite3' */
+/** @import {Page} from "puppeteer-core" */
+/** @import {Database} from "better-sqlite3" */
 ```
 
 **Padrão legado** (não usar em código novo):
+
 ```js
 // EVITAR — usar @import acima
 /** @typedef {import('puppeteer-core').Page} Page */
@@ -420,19 +425,22 @@ export function execute(options) { ... }
 ### 6.4 Casts de tipo
 
 Para forçar um tipo específico:
+
 ```js
 const typed = /** @type {MyType} */ (value);
 ```
 
 Para acesso dinâmico a chave (use com moderação):
+
 ```js
-const val = /** @type {any} */ (obj)[dynamicKey];  // cast interno — aceitável
+const val = /** @type {any} */ (obj)[dynamicKey]; // cast interno — aceitável
 ```
 
 **Proibido em posições públicas** (`@param`, `@returns`, `@type` de propriedade exportada):
+
 ```js
 // PROIBIDO em API pública
-/** @param {any} options */  // use um typedef específico
+/** @param {any} options */ // use um typedef específico
 ```
 
 ### 6.5 Tags TS avançadas em JSDoc
@@ -447,17 +455,17 @@ const val = /** @type {any} */ (obj)[dynamicKey];  // cast interno — aceitáve
 
 ### 6.6 Métricas de cobertura atual (7 mar 2026)
 
-| Métrica                             | Atual     | Meta    |
-| ----------------------------------- | --------- | ------- |
-| `coverage_pct` (exports)            | **100%**  | 100%    |
+| Métrica                             | Atual      | Meta    |
+| ----------------------------------- | ---------- | ------- |
+| `coverage_pct` (exports)            | **100%**   | 100%    |
 | `functions_missing_returns_tag`     | **0** ✅   | 0       |
 | `functions_missing_param_tags`      | **0** ✅   | 0       |
 | `functions_missing_options_typedef` | **52** ⚠️  | ≤ 10    |
 | `unsafe_generic_tags_total`         | **511** ⚠️ | ≤ 300   |
-| `@ts-check` src/                    | **100%**  | 100%    |
-| `@ts-check` scripts/                | **100%**  | 100%    |
-| `@ts-check` tests/                  | **98.1%** | 100%    |
-| `@type{any}` em src/ (total rg)     | **3.276** | reduzir |
+| `@ts-check` src/                    | **100%**   | 100%    |
+| `@ts-check` scripts/                | **100%**   | 100%    |
+| `@ts-check` tests/                  | **98.1%**  | 100%    |
+| `@type{any}` em src/ (total rg)     | **3.276**  | reduzir |
 
 ### 6.7 Como rodar auditoria JSDoc
 
@@ -573,7 +581,7 @@ rm -rf /home/node/.cache/typescript/
 
 ```js
 // Preferir aliases a caminhos relativos profundos
-import { createKernel } from '#kernel/kernel.js';       // ✅ correto
+import { createKernel } from '#kernel/kernel.js'; // ✅ correto
 import { createKernel } from '../../../kernel/kernel.js'; // ❌ evitar
 ```
 
@@ -697,6 +705,7 @@ Os workflows CI verificam:
 proporcional. O TypeScript 5.x suporta verificação completa de JS via `allowJs + checkJs + JSDoc`.
 
 **Consequências**:
+
 - Todos os tipos públicos via JSDoc (não `.ts`)
 - Declarações públicas via `src/types/**/*.d.ts` (mantidas em TypeScript puro)
 - `strict: true` aplicado via lanes e tsconfig.base
@@ -712,16 +721,16 @@ com granularidade. Uma única config estrita tornaria o pipeline de CI lento e d
 
 **Decisão**: não ativar `noUncheckedIndexedAccess` nas Fases 0–E.
 
-**Razão**: geraria ~400 erros legítimos em código válido que usa indexação dinâmica de objetos.
-São necessários typedefs específicos para objetos dicionário antes de ativar esta flag.
+**Razão**: geraria ~400 erros legítimos em código válido que usa indexação dinâmica de objetos. São
+necessários typedefs específicos para objetos dicionário antes de ativar esta flag.
 
 ### ADR-004: `@import` em vez de `@typedef {import()}` (TS 5.5+)
 
 **Decisão**: adotar `/** @import { Type } from 'module' */` para novos usos.
 
-**Razão**: `@import` é o padrão moderno, TypeScript 5.5+ suporta nativamente, menos verboso
-e alinhado com o futuro da linguagem. Os 4 usos legados de `@typedef {import()}` devem ser
-migrados como parte da Fase E.
+**Razão**: `@import` é o padrão moderno, TypeScript 5.5+ suporta nativamente, menos verboso e
+alinhado com o futuro da linguagem. Os 4 usos legados de `@typedef {import()}` devem ser migrados
+como parte da Fase E.
 
 ### ADR-005: `isolatedDeclarations` apenas para `src/types/` (por ora)
 
@@ -729,8 +738,8 @@ migrados como parte da Fase E.
 `src/integration/lsp/tsserver-contract.d.ts`.
 
 **Razões**: `isolatedDeclarations` exige que tipos sejam completamente autoexplicativos sem
-processar outras implementações. Aplicar a todo `src/` requereria tipagem explícita de retorno
-em centenas de funções. Fase E.4 avaliará expansão gradual.
+processar outras implementações. Aplicar a todo `src/` requereria tipagem explícita de retorno em
+centenas de funções. Fase E.4 avaliará expansão gradual.
 
 ---
 
@@ -748,8 +757,8 @@ em centenas de funções. Fase E.4 avaliará expansão gradual.
 
 ### Fase E — em andamento (desde 7 mar 2026)
 
-| Etapa | Descrição                                           | Status     |
-| ----- | --------------------------------------------------- | ---------- |
+| Etapa | Descrição                                           | Status      |
+| ----- | --------------------------------------------------- | ----------- |
 | E.0   | @ts-check nos 18 arquivos em gap                    | 🔄 iniciada |
 | E.1   | Migração `@typedef {import()}` → `@import` (4 arq.) | ⏳ pendente |
 | E.2   | Typedefs para 52 funções options sem typedef        | 🔄 iniciada |
@@ -774,12 +783,12 @@ em centenas de funções. Fase E.4 avaliará expansão gradual.
 // @ts-check
 'use strict'; // ou ESM: não adicione 'use strict' em módulos ESM
 
-/** @import { SomeDependency } from '#core/some.js' */
+/** @import {SomeDependency} from "#core/some.js" */
 
 /**
  * @typedef {object} MyModuleOptions
  * @property {string} id - Identificador
- * @property {number} [timeout=30000] - Timeout em ms
+ * @property {number} [timeout=30000] - Timeout em ms. Default is `30000`
  */
 
 /**
@@ -789,7 +798,7 @@ em centenas de funções. Fase E.4 avaliará expansão gradual.
  * @returns {Promise<void>}
  */
 export async function doSomething(options) {
-    // implementação
+  // implementação
 }
 ```
 
@@ -797,11 +806,11 @@ export async function doSomething(options) {
 
 ```js
 try {
-    // ...
+  // ...
 } catch (err) {
-    // err é unknown (strict: true + useUnknownInCatchVariables)
-    const e = /** @type {any} */ (err);
-    logger.error('mensagem', { error: e.message ?? String(e) });
+  // err é unknown (strict: true + useUnknownInCatchVariables)
+  const e = /** @type {any} */ (err);
+  logger.error('mensagem', { error: e.message ?? String(e) });
 }
 ```
 
@@ -849,7 +858,7 @@ export async function runTask() { ... }
 npm run typecheck:node
 
 # 2. Lane do domínio que você tocou
-npm run typecheck:strict:src.kernel  # ou o domínio relevante
+npm run typecheck:strict:src.kernel # ou o domínio relevante
 
 # 3. Se tocou tests/
 npm run typecheck:tests
@@ -863,5 +872,5 @@ npm run jsdoc:coverage
 
 ---
 
-*Documento criado em 7 de março de 2026 | GitHub Copilot (Claude Sonnet 4.6)*
-*Próxima revisão recomendada: após conclusão da Fase E*
+_Documento criado em 7 de março de 2026 | GitHub Copilot (Claude Sonnet 4.6)_ _Próxima revisão
+recomendada: após conclusão da Fase E_

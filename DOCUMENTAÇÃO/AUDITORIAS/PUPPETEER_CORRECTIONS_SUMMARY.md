@@ -163,7 +163,7 @@ localStorage, history).
 ```bash
 # Profile pode crescer muito com tempo:
 $ du -sh profile/
-450M    profile/
+450M profile/
 # Cache: 300MB, Cookies: 50MB, localStorage: 20MB, etc.
 ```
 

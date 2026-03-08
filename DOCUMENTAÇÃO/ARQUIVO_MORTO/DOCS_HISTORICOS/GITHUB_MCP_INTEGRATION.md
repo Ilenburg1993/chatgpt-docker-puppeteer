@@ -264,8 +264,8 @@ Você pode integrar **outros MCPs** (HTTP ou stdio) além do GitHub:
 
 ```bash
 MCP_UPSTREAMS_JSON=[
-  {"alias":"core","transport":"http","url":"http://localhost:4000/api/mcp","toolPrefix":"mcp_core__"},
-  {"alias":"github","transport":"stdio","command":"npx","args":["-y","@modelcontextprotocol/server-github"],"envFrom":["GITHUB_PERSONAL_ACCESS_TOKEN"],"toolPrefix":"mcp_github__"}
+{"alias":"core","transport":"http","url":"http://localhost:4000/api/mcp","toolPrefix":"mcp_core__"},
+{"alias":"github","transport":"stdio","command":"npx","args":["-y","@modelcontextprotocol/server-github"],"envFrom":["GITHUB_PERSONAL_ACCESS_TOKEN"],"toolPrefix":"mcp_github__"}
 ]
 ```
 

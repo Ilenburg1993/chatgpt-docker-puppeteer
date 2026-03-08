@@ -338,7 +338,7 @@ extensibilidade.
    gpt-agent task create --interactive
    gpt-agent task list [--status pending]
    gpt-agent logs [--follow] [--task-id]
-   gpt-agent doctor  # Diagnostics
+   gpt-agent doctor # Diagnostics
    ```
 
 3. **Melhorar error messages**:

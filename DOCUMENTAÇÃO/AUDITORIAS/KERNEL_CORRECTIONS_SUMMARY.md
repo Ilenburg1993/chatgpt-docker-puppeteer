@@ -122,8 +122,7 @@ const task = {
   history: [],
 
   /**
-   * [P2.2 FIX] Contador de ciclos sem progresso.
-   * Usado pelo PolicyEngine para detecção de estagnação.
+   * [P2.2 FIX] Contador de ciclos sem progresso. Usado pelo PolicyEngine para detecção de estagnação.
    */
   stalledCycleCount: 0,
 
@@ -143,7 +142,7 @@ if (task.state === 'ACTIVE' && task.stalledCycleCount !== undefined) {
         message: 'Tarefa excedeu máximo de ciclos sem progresso',
         value: task.stalledCycleCount,
         severity: 'CRITICAL',
-      })
+      }),
     );
   }
 }
@@ -191,7 +190,7 @@ class TaskStore {
   constructor() {
     // [P3.1 DEPRECATION WARNING]
     console.warn(
-      '[DEPRECATED] TaskStore is deprecated. Use TaskRuntime (src/kernel/task_runtime/) instead.'
+      '[DEPRECATED] TaskStore is deprecated. Use TaskRuntime (src/kernel/task_runtime/) instead.',
     );
     console.warn('[DEPRECATED] This class will be removed in a future version.');
 
@@ -224,7 +223,7 @@ class ObservationStore {
   constructor(config = {}) {
     // [P3.1 DEPRECATION WARNING]
     console.warn(
-      '[DEPRECATED] ObservationStore (state/) is deprecated. Use ObservationStore (src/kernel/observation_store/) instead.'
+      '[DEPRECATED] ObservationStore (state/) is deprecated. Use ObservationStore (src/kernel/observation_store/) instead.',
     );
     console.warn('[DEPRECATED] This class will be removed in a future version.');
 
@@ -405,11 +404,11 @@ constructor({ nerv = null, source = 'kernel', retention = 5000, enabled = true }
 
 ```bash
 npx eslint src/kernel/policy_engine/policy_engine.js \
-             src/kernel/task_runtime/task_runtime.js \
-             src/kernel/kernel_loop/kernel_loop.js \
-             src/kernel/telemetry/kernel_telemetry.js \
-             src/kernel/state/task_store.js \
-             src/kernel/state/observation_store.js
+  src/kernel/task_runtime/task_runtime.js \
+  src/kernel/kernel_loop/kernel_loop.js \
+  src/kernel/telemetry/kernel_telemetry.js \
+  src/kernel/state/task_store.js \
+  src/kernel/state/observation_store.js
 ```
 
 **Resultado**: ✅ **Zero erros, zero warnings**

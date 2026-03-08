@@ -116,7 +116,7 @@ const limiter = rateLimit({
   message: 'Too many requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
-  skip: req => req.url === '/health' || req.url === '/healthz',
+  skip: (req) => req.url === '/health' || req.url === '/healthz',
 });
 this.app.use(limiter);
 ```
@@ -566,7 +566,7 @@ this.app.use(
       return compression.filter(req, res);
     },
     threshold: 512, // Compress apenas > 512 bytes
-  })
+  }),
 );
 ```
 
@@ -821,7 +821,7 @@ pm2 restart chrome-proxy
 ```bash
 pm2 restart chrome-proxy
 # ou
-pm2 reload chrome-proxy  # Zero-downtime
+pm2 reload chrome-proxy # Zero-downtime
 ```
 
 **Validação pós-deploy**:

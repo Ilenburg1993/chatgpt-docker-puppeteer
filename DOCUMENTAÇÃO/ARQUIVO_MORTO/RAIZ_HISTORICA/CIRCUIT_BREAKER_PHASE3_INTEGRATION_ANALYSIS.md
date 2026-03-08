@@ -129,7 +129,7 @@ async _attemptReconnection() {
 
 ```javascript
 // pool_manager.js
-this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async data => {
+this.healthMonitor.on(MONITOR_EVENTS.RECOVERY_NEEDED, async (data) => {
   await this._attemptReconnection(); // ✅ Trigger reconexão
   // ❌ Não atualiza CircuitBreaker state
 });

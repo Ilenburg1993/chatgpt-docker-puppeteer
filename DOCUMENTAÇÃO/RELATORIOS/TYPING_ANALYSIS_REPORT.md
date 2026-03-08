@@ -59,6 +59,7 @@ Verificar arquivos em:
 
 /**
  * Configuration object for browser pool
+ *
  * @typedef {Object} BrowserPoolConfig
  * @property {number} maxSize - Maximum number of browsers
  * @property {number} minSize - Minimum number of browsers
@@ -67,24 +68,27 @@ Verificar arquivos em:
 
 /**
  * Task execution result
+ *
  * @typedef {Object} TaskResult
  * @property {string} taskId - Unique task identifier
- * @property {'SUCCESS'|'FAILED'|'CANCELLED'} status - Task status
+ * @property {'SUCCESS' | 'FAILED' | 'CANCELLED'} status - Task status
  * @property {unknown} data - Task result data
  * @property {string} [error] - Error message if failed
  */
 
 /**
  * Driver state representation
+ *
  * @typedef {Object} DriverState
  * @property {string} driverId - Driver identifier
- * @property {'IDLE'|'BUSY'|'ERROR'} state - Current state
+ * @property {'IDLE' | 'BUSY' | 'ERROR'} state - Current state
  * @property {string} [currentDomain] - Current domain context
  * @property {number} createdAt - Creation timestamp
  */
 
 /**
  * Connection metadata
+ *
  * @typedef {Object} ConnectionInfo
  * @property {string} id - Connection identifier
  * @property {string} mode - Connection mode
@@ -94,16 +98,17 @@ Verificar arquivos em:
 
 // === ENUM TYPES ===
 
-/** @typedef {'INITIALIZATION'|'UNKNOWN_CONTEXT'|'MAIN_PAGE'|'IFRAME'|'POPUP'} DriverDomain */
+/** @typedef {'INITIALIZATION' | 'UNKNOWN_CONTEXT' | 'MAIN_PAGE' | 'IFRAME' | 'POPUP'} DriverDomain */
 
-/** @typedef {'PENDING'|'RUNNING'|'SUCCESS'|'FAILED'|'CANCELLED'} TaskStatus */
+/** @typedef {'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED'} TaskStatus */
 
-/** @typedef {'CONTROL'|'META'|'SHIFT'|'ALT'} ModifierKey */
+/** @typedef {'CONTROL' | 'META' | 'SHIFT' | 'ALT'} ModifierKey */
 
 // === GENERIC TYPES ===
 
 /**
  * Result wrapper for operations
+ *
  * @template T
  * @typedef {Object} Result<T>
  * @property {boolean} success - Operation success
@@ -113,11 +118,12 @@ Verificar arquivos em:
 
 /**
  * Pagination parameters
+ *
  * @typedef {Object} PaginationParams
  * @property {number} page - Page number (0-indexed)
  * @property {number} pageSize - Items per page
  * @property {string} [sortBy] - Sort field
- * @property {'asc'|'desc'} [sortOrder] - Sort direction
+ * @property {'asc' | 'desc'} [sortOrder] - Sort direction
  */
 ```
 

@@ -20,13 +20,13 @@
 | ---------------------------- | ----------------------- |
 | TypeScript                   | **5.9.3** (latest)      |
 | Node.js                      | **v24.13.0**            |
-| Lanes strict (41 no total)   | **41/41 em 0 erros** ✅  |
-| `typecheck:node`             | **0 erros** ✅           |
-| `typecheck:tools`            | **0 erros** ✅           |
-| `typecheck:browser`          | **0 erros** ✅           |
-| `typecheck:declarations`     | **0 erros** ✅           |
-| `typecheck:strict:all`       | **0 erros** ✅           |
-| `typecheck:tests`            | **15 erros** ⚠️ (D.0)    |
+| Lanes strict (41 no total)   | **41/41 em 0 erros** ✅ |
+| `typecheck:node`             | **0 erros** ✅          |
+| `typecheck:tools`            | **0 erros** ✅          |
+| `typecheck:browser`          | **0 erros** ✅          |
+| `typecheck:declarations`     | **0 erros** ✅          |
+| `typecheck:strict:all`       | **0 erros** ✅          |
+| `typecheck:tests`            | **15 erros** ⚠️ (D.0)   |
 | JSDoc cobertura de exports   | **100%** (363 arquivos) |
 | `@type {any}` no código-base | **1.809** (a reduzir)   |
 | `@ts-ignore` real            | **5** (todos em legado) |
@@ -41,12 +41,12 @@ primeira vez, completamente limpo em todos os 41 lanes strict com TypeScript 5.9
 
 | Configuração             | Arquivo                      | Alvo           | Strict | Erros | Status |
 | ------------------------ | ---------------------------- | -------------- | :----: | ----: | ------ |
-| `typecheck:node`         | `tsconfig.node.json`         | src + scripts  |   ❌    |     0 | ✅      |
-| `typecheck:tools`        | `tsconfig.tools.json`        | scripts/\*\*   |   ❌    |     0 | ✅      |
-| `typecheck:browser`      | `tsconfig.browser.json`      | dashboard-ui   |   ❌    |     0 | ✅      |
-| `typecheck:declarations` | `tsconfig.declarations.json` | tipos públicos |   ❌    |     0 | ✅      |
-| `typecheck:strict:all`   | `tsconfig.strict.json`       | 41 lanes       |   ✅    |     0 | ✅      |
-| `typecheck:tests`        | `tsconfig.tests.json`        | tests/\*\*     |   ❌    |    15 | ⚠️      |
+| `typecheck:node`         | `tsconfig.node.json`         | src + scripts  |   ❌   |     0 | ✅     |
+| `typecheck:tools`        | `tsconfig.tools.json`        | scripts/\*\*   |   ❌   |     0 | ✅     |
+| `typecheck:browser`      | `tsconfig.browser.json`      | dashboard-ui   |   ❌   |     0 | ✅     |
+| `typecheck:declarations` | `tsconfig.declarations.json` | tipos públicos |   ❌   |     0 | ✅     |
+| `typecheck:strict:all`   | `tsconfig.strict.json`       | 41 lanes       |   ✅   |     0 | ✅     |
+| `typecheck:tests`        | `tsconfig.tests.json`        | tests/\*\*     |   ❌   |    15 | ⚠️     |
 
 ### 2.1 Erros residuais em `typecheck:tests`
 
@@ -142,47 +142,47 @@ Cada lane é um arquivo `config/typing/strict/tsconfig.strict.<nome>.json` com:
 
 | Lane                    | Diretório coberto        | Fase concluída |
 | ----------------------- | ------------------------ | -------------- |
-| `agents`                | `agents/`                | Início ✅       |
-| `configs`               | `config/`                | Início ✅       |
-| `public`                | `index.js`, raiz         | Início ✅       |
-| `scripts.analysis`      | `scripts/analysis/`      | Fase A ✅       |
-| `scripts.audit`         | `scripts/audit/`         | Fase B ✅       |
-| `scripts.build`         | `scripts/build/`         | Início ✅       |
-| `scripts.ci`            | `scripts/ci/`            | Início ✅       |
-| `scripts.env`           | `scripts/env/`           | Início ✅       |
-| `scripts.health`        | `scripts/health/`        | Fase B ✅       |
-| `scripts.legacy`        | `scripts/legacy/`        | Fase C ✅       |
-| `scripts.ops`           | `scripts/ops/`           | Início ✅       |
-| `scripts.root`          | `scripts/*.{mjs,cjs,js}` | Fase B ✅       |
-| `scripts.setup`         | `scripts/setup/`         | Início ✅       |
-| `src.agent`             | `src/agent/`             | Fase B ✅       |
-| `src.audit_agent`       | `src/audit_agent/`       | Fase A ✅       |
-| `src.core`              | `src/core/`              | Fase B ✅       |
-| `src.dashboard-ui`      | `src/dashboard-ui/`      | Fase A ✅       |
-| `src.driver`            | `src/driver/`            | Fase C ✅       |
-| `src.inference_gateway` | `src/inference_gateway/` | Fase A ✅       |
-| `src.infra`             | `src/infra/`             | Fase C ✅       |
-| `src.integration`       | `src/integration/`       | Fase B ✅       |
-| `src.kernel`            | `src/kernel/`            | Fase B ✅       |
-| `src.logic`             | `src/logic/`             | Fase A ✅       |
-| `src.missions`          | `src/missions/`          | Fase B ✅       |
-| `src.nerv`              | `src/nerv/`              | Fase B ✅       |
-| `src.orchestrator`      | `src/orchestrator/`      | Fase B ✅       |
-| `src.root`              | `src/*.js`               | Início ✅       |
-| `src.server`            | `src/server/`            | Início ✅       |
-| `src.shared`            | `src/shared/`            | Fase B ✅       |
-| `src.types`             | `src/types/`             | Início ✅       |
-| `src.validation`        | `src/validation/`        | Início ✅       |
-| `tests.e2e`             | `tests/e2e/`             | Fase C ✅       |
-| `tests.fixtures`        | `tests/fixtures/`        | Início ✅       |
-| `tests.helpers`         | `tests/helpers/`         | Início ✅       |
-| `tests.integration`     | `tests/integration/`     | Fase C ✅       |
-| `tests.legacy`          | `tests/legacy/`          | Fase C ✅       |
-| `tests.manual`          | `tests/manual/`          | Fase A ✅       |
-| `tests.mocks`           | `tests/mocks/`           | Início ✅       |
-| `tests.regression`      | `tests/regression/`      | Fase C ✅       |
-| `tests.unit`            | `tests/unit/`            | Fase C ✅       |
-| `tools.workspace`       | `tools/`                 | Fase B ✅       |
+| `agents`                | `agents/`                | Início ✅      |
+| `configs`               | `config/`                | Início ✅      |
+| `public`                | `index.js`, raiz         | Início ✅      |
+| `scripts.analysis`      | `scripts/analysis/`      | Fase A ✅      |
+| `scripts.audit`         | `scripts/audit/`         | Fase B ✅      |
+| `scripts.build`         | `scripts/build/`         | Início ✅      |
+| `scripts.ci`            | `scripts/ci/`            | Início ✅      |
+| `scripts.env`           | `scripts/env/`           | Início ✅      |
+| `scripts.health`        | `scripts/health/`        | Fase B ✅      |
+| `scripts.legacy`        | `scripts/legacy/`        | Fase C ✅      |
+| `scripts.ops`           | `scripts/ops/`           | Início ✅      |
+| `scripts.root`          | `scripts/*.{mjs,cjs,js}` | Fase B ✅      |
+| `scripts.setup`         | `scripts/setup/`         | Início ✅      |
+| `src.agent`             | `src/agent/`             | Fase B ✅      |
+| `src.audit_agent`       | `src/audit_agent/`       | Fase A ✅      |
+| `src.core`              | `src/core/`              | Fase B ✅      |
+| `src.dashboard-ui`      | `src/dashboard-ui/`      | Fase A ✅      |
+| `src.driver`            | `src/driver/`            | Fase C ✅      |
+| `src.inference_gateway` | `src/inference_gateway/` | Fase A ✅      |
+| `src.infra`             | `src/infra/`             | Fase C ✅      |
+| `src.integration`       | `src/integration/`       | Fase B ✅      |
+| `src.kernel`            | `src/kernel/`            | Fase B ✅      |
+| `src.logic`             | `src/logic/`             | Fase A ✅      |
+| `src.missions`          | `src/missions/`          | Fase B ✅      |
+| `src.nerv`              | `src/nerv/`              | Fase B ✅      |
+| `src.orchestrator`      | `src/orchestrator/`      | Fase B ✅      |
+| `src.root`              | `src/*.js`               | Início ✅      |
+| `src.server`            | `src/server/`            | Início ✅      |
+| `src.shared`            | `src/shared/`            | Fase B ✅      |
+| `src.types`             | `src/types/`             | Início ✅      |
+| `src.validation`        | `src/validation/`        | Início ✅      |
+| `tests.e2e`             | `tests/e2e/`             | Fase C ✅      |
+| `tests.fixtures`        | `tests/fixtures/`        | Início ✅      |
+| `tests.helpers`         | `tests/helpers/`         | Início ✅      |
+| `tests.integration`     | `tests/integration/`     | Fase C ✅      |
+| `tests.legacy`          | `tests/legacy/`          | Fase C ✅      |
+| `tests.manual`          | `tests/manual/`          | Fase A ✅      |
+| `tests.mocks`           | `tests/mocks/`           | Início ✅      |
+| `tests.regression`      | `tests/regression/`      | Fase C ✅      |
+| `tests.unit`            | `tests/unit/`            | Fase C ✅      |
+| `tools.workspace`       | `tools/`                 | Fase B ✅      |
 
 ---
 
@@ -307,16 +307,16 @@ DOCUMENTAÇÃO/REFERENCIA/TYPING_SCHEMA_TSSERVER_CANON.md ← canon normativo
 
 | Operação            | Schema JSON | Daemon (`.mjs`) | Skill | Status |
 | ------------------- | :---------: | :-------------: | :---: | ------ |
-| `definition`        |      ✅      |        ✅        |   ✅   | OK     |
-| `references`        |      ✅      |        ✅        |   ✅   | OK     |
-| `hover`             |      ✅      |        ✅        |   ✅   | OK     |
-| `document_symbols`  |      ✅      |        ✅        |   ✅   | OK     |
-| `workspace_symbols` |      ✅      |        ✅        |   ✅   | OK     |
-| `diagnostics`       |      ✅      |        ✅        |   ✅   | OK     |
-| `code_actions`      |      ✅      |        ✅        |   ✅   | OK     |
-| `completion`        |      ✅      |        ✅        |   ✅   | OK     |
-| `updateFile`        |      ✅      |        ✅        |   ✅   | OK     |
-| `apply_code_action` |      ✅      |        ✅        |   ✅   | OK     |
+| `definition`        |     ✅      |       ✅        |  ✅   | OK     |
+| `references`        |     ✅      |       ✅        |  ✅   | OK     |
+| `hover`             |     ✅      |       ✅        |  ✅   | OK     |
+| `document_symbols`  |     ✅      |       ✅        |  ✅   | OK     |
+| `workspace_symbols` |     ✅      |       ✅        |  ✅   | OK     |
+| `diagnostics`       |     ✅      |       ✅        |  ✅   | OK     |
+| `code_actions`      |     ✅      |       ✅        |  ✅   | OK     |
+| `completion`        |     ✅      |       ✅        |  ✅   | OK     |
+| `updateFile`        |     ✅      |       ✅        |  ✅   | OK     |
+| `apply_code_action` |     ✅      |       ✅        |  ✅   | OK     |
 
 **Resultado**: contrato 100% alinhado entre as 3 camadas.
 
@@ -348,13 +348,13 @@ operação.
 
 | Recurso TS 5.x                           | Em uso? | Observação                            |
 | ---------------------------------------- | ------- | ------------------------------------- |
-| `verbatimModuleSyntax`                   | ✅       | Em `tsconfig.base.json`               |
-| `resolvePackageJsonExports`              | ✅       | Em `tsconfig.base.json`               |
-| `NodeNext` module resolution             | ✅       | Alinhado com Node 24                  |
-| `@import` type-only imports (TS 5.5+)    | ❌       | Usando `/** @type {import('...')} */` |
-| `isolatedDeclarations` (TS 5.5+)         | ❌       | Não ativado                           |
-| `noUncheckedSideEffectImports` (TS 5.6+) | ❌       | Não necessário no momento             |
-| `declaration + allowJs` (TS 3.7+)        | ✅       | Via `tsconfig.declarations.json`      |
+| `verbatimModuleSyntax`                   | ✅      | Em `tsconfig.base.json`               |
+| `resolvePackageJsonExports`              | ✅      | Em `tsconfig.base.json`               |
+| `NodeNext` module resolution             | ✅      | Alinhado com Node 24                  |
+| `@import` type-only imports (TS 5.5+)    | ❌      | Usando `/** @type {import('...')} */` |
+| `isolatedDeclarations` (TS 5.5+)         | ❌      | Não ativado                           |
+| `noUncheckedSideEffectImports` (TS 5.6+) | ❌      | Não necessário no momento             |
+| `declaration + allowJs` (TS 3.7+)        | ✅      | Via `tsconfig.declarations.json`      |
 
 ### 6.2 Recursos não aproveitados (mas recomendados)
 
@@ -459,8 +459,8 @@ Priorizar `src/agent/` (maior concentração). Template:
 ```js
 /**
  * @typedef {object} QueueWorkerOptions
- * @property {number} [concurrency=1]
- * @property {number} [pollIntervalMs=500]
+ * @property {number} [concurrency=1] Default is `1`
+ * @property {number} [pollIntervalMs=500] Default is `500`
  * @property {AbortSignal} [signal]
  */
 ```
@@ -569,7 +569,7 @@ vez do objeto indexado. O TypeScript ainda avaliava a indexação antes de ver o
 // ANTES (inválido):
 /** @type {any} */ (SEVERITY_RANK[severity] ?? 0)(
   // DEPOIS (correto):
-  /** @type {any} */ (SEVERITY_RANK)
+  /** @type {any} */ (SEVERITY_RANK),
 )[severity] ?? 0;
 ```
 

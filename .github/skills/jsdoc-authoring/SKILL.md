@@ -189,7 +189,7 @@ class Foo {
 com sua forma completa elimina cascata de `never[]` (`TS2345`) em todos os `.push()` da classe:
 
 ```js
-/** @type {{ unused: any[], duplicates: any[], magicValues: any[], enumCandidates: any[], typeCandidates: any[] }} */
+/** @type {{ unused: any[]; duplicates: any[]; magicValues: any[]; enumCandidates: any[]; typeCandidates: any[] }} */
 this.issues = {
   unused: [],
   duplicates: [],
@@ -403,10 +403,10 @@ TypeScript strict mode às vezes não infere o tipo do callback mesmo quando o a
 a anotação inline:
 
 ```js
-names.map(/** @param {string} n */ n => n.trim());
-items.filter(/** @param {any} v */ v => v.active);
-entries.map(/** @param {any} v */ v => ({ name: v.name, file: v.file }));
-new Set(arr.map(/** @param {any} f */ f => path.basename(f)));
+names.map(/** @param {string} n */ (n) => n.trim());
+items.filter(/** @param {any} v */ (v) => v.active);
+entries.map(/** @param {any} v */ (v) => ({ name: v.name, file: v.file }));
+new Set(arr.map(/** @param {any} f */ (f) => path.basename(f)));
 ```
 
 ### Objetos grandes com muitas propriedades
@@ -442,7 +442,14 @@ class ReportGenerator {
 Type annotation completa no construtor elimina cascata de `never[]` em todos os `.push()`:
 
 ```js
-/** @type {{ unused: any[], duplicates: any[], magicValues: any[], redundantLet: any[], enumCandidates: any[], typeCandidates: any[] }} */
+/** @type {{
+  unused: any[];
+  duplicates: any[];
+  magicValues: any[];
+  redundantLet: any[];
+  enumCandidates: any[];
+  typeCandidates: any[];
+}} */
 this.issues = {
   unused: [],
   duplicates: [],

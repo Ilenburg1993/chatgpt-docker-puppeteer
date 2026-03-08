@@ -92,8 +92,8 @@ try {
 // ❌ Evite: misturar then/catch com async/await
 function badPractice() {
   return fetchData()
-    .then(data => processData(data))
-    .catch(err => console.error(err));
+    .then((data) => processData(data))
+    .catch((err) => console.error(err));
 }
 
 // ✅ Prefira: async/await com try/catch estruturado
@@ -134,11 +134,11 @@ const apiKey = config.require('API_KEY');
 // ✅ Valide configurações críticas na inicialização
 function validateConfig() {
   const required = ['API_KEY', 'DATABASE_URL', 'REDIS_URL'];
-  const missing = required.filter(key => !config.has(key));
+  const missing = required.filter((key) => !config.has(key));
 
   if (missing.length > 0) {
     throw new ConfigurationError(
-      `Variáveis de ambiente obrigatórias não definidas: ${missing.join(', ')}`
+      `Variáveis de ambiente obrigatórias não definidas: ${missing.join(', ')}`,
     );
   }
 }
@@ -204,7 +204,7 @@ async function getUserWithCache(userId) {
     async () => {
       return await database.users.findById(userId);
     },
-    { ttl: 60000 }
+    { ttl: 60000 },
   );
 }
 ```

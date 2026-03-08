@@ -287,7 +287,7 @@ make pm2-validate
 // ❌ ANTES: Só monitorava agente-gpt
 const AGENTE_NAME = 'agente-gpt';
 
-bus.on('process:event', data => {
+bus.on('process:event', (data) => {
   if (data.process.name === AGENTE_NAME) {
     const payload = { event, status, ts: Date.now() };
     notify('pm2:process', payload);
@@ -302,7 +302,7 @@ bus.on('process:event', data => {
 const MANAGED_PROCESSES = ['agente-gpt', 'dashboard-web', 'chrome-proxy'];
 let lastProcessStates = new Map();
 
-bus.on('process:event', data => {
+bus.on('process:event', (data) => {
   const processName = data.process.name || data.process.pm2_env?.name;
 
   if (MANAGED_PROCESSES.includes(processName)) {
@@ -476,22 +476,22 @@ curl http://localhost:3008/api/health/pm2
 
 ```javascript
 // Frontend
-socket.on('pm2:process:event', data => {
+socket.on('pm2:process:event', (data) => {
   console.log(`${data.name} → ${data.event} (${data.status})`);
   updateProcessCard(data);
 });
 
-socket.on('pm2:process:critical', data => {
+socket.on('pm2:process:critical', (data) => {
   showAlert(`CRITICAL: ${data.name} ${data.event}`);
 });
 
-socket.on('pm2:metrics', data => {
+socket.on('pm2:metrics', (data) => {
   updateChart(data);
 });
 
 // Initial state
-socket.on('pm2:snapshot', snapshot => {
-  snapshot.forEach(process => renderProcessCard(process));
+socket.on('pm2:snapshot', (snapshot) => {
+  snapshot.forEach((process) => renderProcessCard(process));
 });
 ```
 
@@ -504,9 +504,9 @@ socket.on('pm2:snapshot', snapshot => {
 **Uso**:
 
 ```bash
-bash scripts/pm2-check.sh           # Check apenas
-bash scripts/pm2-check.sh --fix     # Check + auto-fix
-make pm2-check                      # Via Makefile
+bash scripts/pm2-check.sh       # Check apenas
+bash scripts/pm2-check.sh --fix # Check + auto-fix
+make pm2-check                  # Via Makefile
 ```
 
 **6 Checks**:
@@ -611,12 +611,12 @@ Sistema pronto para uso!
 
 ```bash
 # Health
-make health          # pm2-check.sh
-make pm2-check       # pm2-check.sh
-make pm2-check-fix   # pm2-check.sh --fix
+make health        # pm2-check.sh
+make pm2-check     # pm2-check.sh
+make pm2-check-fix # pm2-check.sh --fix
 
 # Startup
-make pm2-startup     # pm2-startup.sh (safe boot)
+make pm2-startup # pm2-startup.sh (safe boot)
 
 # Validação
 npm run daemon:status # Valida estado do daemon PM2

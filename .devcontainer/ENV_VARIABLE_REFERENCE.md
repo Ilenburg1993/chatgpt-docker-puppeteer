@@ -120,8 +120,8 @@ passadas como build args, `remoteEnv` e mounts source
 # Dockerfile
 ARG REMOTE_USER=node
 ENV USER_NAME=${REMOTE_USER} \
-    HOME_DIR=/home/${REMOTE_USER} \
-    APP_DIR=/workspaces/${PROJECT_NAME}
+ HOME_DIR=/home/${REMOTE_USER} \
+ APP_DIR=/workspaces/${PROJECT_NAME}
 
 # Result in container:
 # USER_NAME=node
@@ -249,10 +249,9 @@ USER_NAME=node
 # Dockerfile
 ARG REMOTE_USER=node
 ENV USER_NAME=${REMOTE_USER} \
-    HOME_DIR=/home/${REMOTE_USER}
+ HOME_DIR=/home/${REMOTE_USER}
 
 # Build with different user
-docker build --build-arg REMOTE_USER=testuser ...
 ```
 
 ### ✅ DO: VS Code Variables in Source
@@ -296,12 +295,12 @@ docker build --build-arg REMOTE_USER=testuser ...
 ```dockerfile
 # ❌ AVOID
 ENV USER_NAME=node \
-    HOME_DIR=/home/node
+ HOME_DIR=/home/node
 
 # ✅ PREFER
 ARG REMOTE_USER=node
 ENV USER_NAME=${REMOTE_USER} \
-    HOME_DIR=/home/${REMOTE_USER}
+ HOME_DIR=/home/${REMOTE_USER}
 ```
 
 ---

@@ -512,7 +512,7 @@ if (!protocol.framePath || typeof protocol.framePath !== 'string') {
   return result; // Early return (root context)
 }
 
-const pathParts = protocol.framePath.split(' > ').filter(p => p.trim());
+const pathParts = protocol.framePath.split(' > ').filter((p) => p.trim());
 
 if (pathParts.length === 0) {
   log('WARN', '[FRAME_NAV] Empty framePath after split', correlationId);
@@ -955,7 +955,7 @@ module.exports = {
   FrameNavigator,
   FRAME_NAV_CONFIG,
   FRAME_NAV_EVENTS,
-  create: driver => new FrameNavigator(driver),
+  create: (driver) => new FrameNavigator(driver),
 };
 ```
 

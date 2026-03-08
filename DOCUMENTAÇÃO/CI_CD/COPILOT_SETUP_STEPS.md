@@ -160,49 +160,49 @@ O agente pode executar qualquer script do `package.json`. Os mais relevantes:
 
 ```bash
 # Qualidade de código (obrigatório antes de commit)
-npm run lint                    # ESLint no projeto inteiro
-npm run format:check            # Prettier (verificação)
-npm run format                  # Prettier (auto-fix)
+npm run lint         # ESLint no projeto inteiro
+npm run format:check # Prettier (verificação)
+npm run format       # Prettier (auto-fix)
 
 # Testes
-npm run test:unit               # Testes unitários (node --test)
-npm run test:fast               # Suite rápida
-npm run test:integration        # Testes de integração
-npm run test:all                # Tudo
+npm run test:unit        # Testes unitários (node --test)
+npm run test:fast        # Suite rápida
+npm run test:integration # Testes de integração
+npm run test:all         # Tudo
 
 # TypeScript / Tipagem
-npm run typecheck:node          # tsserver no src/
-npm run typecheck:full          # Todos os tsconfigs
-npm run typecheck:strict        # Modo strict
-npm run typecheck:watch:node    # Watch mode
+npm run typecheck:node       # tsserver no src/
+npm run typecheck:full       # Todos os tsconfigs
+npm run typecheck:strict     # Modo strict
+npm run typecheck:watch:node # Watch mode
 
 # Build
-npm run build                   # Build do projeto
-npm run dashboard:build         # Build do frontend
+npm run build           # Build do projeto
+npm run dashboard:build # Build do frontend
 
 # Validação de infraestrutura
-npm run check:workflows         # Valida workflows
-npm run check:workflows:lint    # actionlint
-npm run check:dockerfile:lint   # hadolint
-npm run check:devcontainer      # devcontainer validate
+npm run check:workflows       # Valida workflows
+npm run check:workflows:lint  # actionlint
+npm run check:dockerfile:lint # hadolint
+npm run check:devcontainer    # devcontainer validate
 
 # Auditoria
-npm run audit:run               # Auditoria noturna completa
-npm run audit:health            # Health check rápido
+npm run audit:run    # Auditoria noturna completa
+npm run audit:health # Health check rápido
 
 # Daemon
-npm run daemon:start            # PM2 start
-npm run daemon:stop             # PM2 stop
-npm run daemon:restart          # PM2 restart
-npm run daemon:status           # PM2 status
+npm run daemon:start   # PM2 start
+npm run daemon:stop    # PM2 stop
+npm run daemon:restart # PM2 restart
+npm run daemon:status  # PM2 status
 
 # Queue
-npm run queue:status            # Status da fila
-npm run queue:add               # Adicionar tarefa
+npm run queue:status # Status da fila
+npm run queue:add    # Adicionar tarefa
 
 # Diagnóstico
-npm run diagnose                # Diagnóstico completo
-npm run analyze:deps            # Dependências circulares
+npm run diagnose     # Diagnóstico completo
+npm run analyze:deps # Dependências circulares
 ```
 
 ---

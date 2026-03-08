@@ -138,7 +138,7 @@ this.items = [];
 this.cache = {};
 
 // Para objeto com múltiplos sub-arrays (elimina TS2345 em todos os .push()):
-/** @type {{ unused: any[], duplicates: any[], enumCandidates: any[], typeCandidates: any[] }} */
+/** @type {{ unused: any[]; duplicates: any[]; enumCandidates: any[]; typeCandidates: any[] }} */
 this.issues = { unused: [], duplicates: [], enumCandidates: [], typeCandidates: [] };
 ```
 
@@ -208,7 +208,7 @@ const analysisData = { files: [], issues: {}, dependencies: new Map() };
 /**
  * @typedef {object} Snippet
  * @property {string} prefix
- * @property {string[]} [include]    ← adicionar propriedade faltante
+ * @property {string[]} [include] ← adicionar propriedade faltante
  */
 ```
 
@@ -342,7 +342,14 @@ print('done')
 Objeto mais complexo que `any[]` simples. Use o typedef inline completo no construtor:
 
 ```js
-/** @type {{ unused: any[], duplicates: any[], magicValues: any[], redundantLet: any[], enumCandidates: any[], typeCandidates: any[] }} */
+/** @type {{
+  unused: any[];
+  duplicates: any[];
+  magicValues: any[];
+  redundantLet: any[];
+  enumCandidates: any[];
+  typeCandidates: any[];
+}} */
 this.issues = {
   unused: [],
   duplicates: [],
@@ -359,7 +366,7 @@ Isso elimina todos os `this.issues.X.push(...)` como TS2345 em cascata.
 
 ```js
 // V vem de iteração de any[] — mas TypeScript ainda pede tipo explícito:
-vars.map(/** @param {any} v */ v => ({ name: v.name, file: v.file }));
+vars.map(/** @param {any} v */ (v) => ({ name: v.name, file: v.file }));
 ```
 
 ### JSDoc de typedef com objeto inline complexo

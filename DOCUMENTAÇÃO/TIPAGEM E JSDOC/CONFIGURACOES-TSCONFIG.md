@@ -30,10 +30,10 @@ tsconfig.base.json                    ← base comum (strict: true, allowJs, che
 | `allowJs`                    | `true`     | Permite arquivos `.js` no projeto                |
 | `checkJs`                    | `true`     | TS verifica JS via JSDoc                         |
 | `noEmit`                     | `true`     | Não gera arquivos — só verifica                  |
-| `strict`                     | **`true`** | ✅ **ATIVO** — ativa todo o strict suite          |
-| `noImplicitAny`              | `true`     | ✅ Via `strict: true`                             |
-| `strictNullChecks`           | `true`     | ✅ Via `strict: true`                             |
-| `useUnknownInCatchVariables` | `true`     | ✅ `catch(err)` retorna `unknown`                 |
+| `strict`                     | **`true`** | ✅ **ATIVO** — ativa todo o strict suite         |
+| `noImplicitAny`              | `true`     | ✅ Via `strict: true`                            |
+| `strictNullChecks`           | `true`     | ✅ Via `strict: true`                            |
+| `useUnknownInCatchVariables` | `true`     | ✅ `catch(err)` retorna `unknown`                |
 | `skipLibCheck`               | `true`     | Ignora tipos de node_modules                     |
 | `target`                     | `ES2024`   | Node.js 24+                                      |
 | `module`                     | herdado    | via tsconfig filho                               |
@@ -109,8 +109,8 @@ Cada lane tem seu `tsconfig.strict.*.json` com `strict: true` e escopo restrito 
 > **Estado**: 7 de março de 2026 — **todas as 41 lanes retornam 0 erros** (`typecheck:strict:all`
 > passa em CI). O número entre parênteses indica os erros eliminados ao longo das fases.
 
-| Lane                    | Alias npm                                | Estado              | Fase concluída |
-| ----------------------- | ---------------------------------------- | ------------------- | -------------- |
+| Lane                    | Alias npm                                | Estado               | Fase concluída |
+| ----------------------- | ---------------------------------------- | -------------------- | -------------- |
 | `src.types`             | `typecheck:strict:src.types`             | **0** ✅             | Grupo 0        |
 | `agents`                | `typecheck:strict:agents`                | **0** ✅             | Grupo 0        |
 | `scripts.ci`            | `typecheck:strict:scripts.ci`            | **0** ✅             | Grupo 0        |
@@ -154,7 +154,8 @@ Cada lane tem seu `tsconfig.strict.*.json` com `strict: true` e escopo restrito 
 
 ### Flags ativas em `tsconfig.base.json` (Fase D concluída ✅)
 
-Todas as lanes `tsconfig.strict.*.json` e também o `tsconfig.base.json` têm `strict: true`, o que ativa:
+Todas as lanes `tsconfig.strict.*.json` e também o `tsconfig.base.json` têm `strict: true`, o que
+ativa:
 
 | Flag incluída em `strict: true` | O que faz                                      |
 | ------------------------------- | ---------------------------------------------- |

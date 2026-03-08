@@ -1,9 +1,7 @@
 # DevContainer Architecture — ChatGPT Docker Puppeteer
 
-**Versão**: 5.4.0
-**Data**: 2026-03-08
-**Status**: Canônico — fonte única da verdade para arquitetura do DevContainer
-**Gerado por**: Auditoria completa pré-rebuild (Copilot)
+**Versão**: 5.4.0 **Data**: 2026-03-08 **Status**: Canônico — fonte única da verdade para
+arquitetura do DevContainer **Gerado por**: Auditoria completa pré-rebuild (Copilot)
 
 ---
 
@@ -27,12 +25,15 @@
 
 ## Visão Geral
 
-O DevContainer provisiona um ambiente Node.js 24 + Debian Bookworm (via imagem Microsoft DevContainers) com:
+O DevContainer provisiona um ambiente Node.js 24 + Debian Bookworm (via imagem Microsoft
+DevContainers) com:
 
-- **Puppeteer em modo `connect`**: sem `puppeteer.launch()` no processo. O Chrome externo (Windows, porta 9225) é exposto ao container via proxy CDP na porta 9224.
+- **Puppeteer em modo `connect`**: sem `puppeteer.launch()` no processo. O Chrome externo (Windows,
+  porta 9225) é exposto ao container via proxy CDP na porta 9224.
 - **PM2**: gerencia 3 processos — `agente-gpt`, `dashboard-web`, `chrome-proxy`.
 - **14 volumes Docker nomeados** para persistência de cache, estado e identidade entre rebuilds.
-- **NSS Wrapper Gatekeeper**: identidade dinâmica de usuário via `libnss_wrapper.so` + artefatos em `/tmp/devcontainer-nss/`.
+- **NSS Wrapper Gatekeeper**: identidade dinâmica de usuário via `libnss_wrapper.so` + artefatos em
+  `/tmp/devcontainer-nss/`.
 - **dumb-init**: entrypoint semântico que garante reaping correto de processos filho.
 
 ---
@@ -40,6 +41,7 @@ O DevContainer provisiona um ambiente Node.js 24 + Debian Bookworm (via imagem M
 ## Stack e Versões
 
 ### Imagem Base
+
 | Campo   | Valor                                                           |
 | ------- | --------------------------------------------------------------- |
 | Imagem  | `mcr.microsoft.com/devcontainers/javascript-node:24-bookworm`   |
@@ -47,6 +49,7 @@ O DevContainer provisiona um ambiente Node.js 24 + Debian Bookworm (via imagem M
 | Node.js | v24 LTS (tag `24-bookworm` atualiza automaticamente no rebuild) |
 
 ### Ferramentas Pinadas no Dockerfile
+
 | Ferramenta                 | Versão Pinada | ARG                        |
 | -------------------------- | ------------- | -------------------------- |
 | npm                        | 11.11.0       | `NPM_VERSION`              |
@@ -62,7 +65,9 @@ O DevContainer provisiona um ambiente Node.js 24 + Debian Bookworm (via imagem M
 **Como atualizar**: editar os ARGs no topo do Dockerfile e fazer rebuild completo.
 
 ### Ferramentas de Sistema (via apt)
+
 Instaladas como pacotes Debian sem pin de versão (usam o que estiver em `stable bookworm`):
+
 - git, vim, htop, bat, ripgrep, fd-find, fzf, sqlite3, redis-tools
 - shellcheck, yamllint, actionlint, hadolint (curated upstream), gh (curated upstream)
 - watchman, hyperfine, socat, mtr-tiny, cloc, ccache, graphviz, graphviz
@@ -95,16 +100,19 @@ O Dockerfile é organizado em 10 seções canônicas:
 | 10    | `USER node`, `WORKDIR /workspaces/chatgpt-docker-puppeteer`, `ENTRYPOINT`, `CMD`                           |
 
 ### Entrypoint
+
 ```
 ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/nss-gatekeeper"]
 CMD ["sleep", "infinity"]
 ```
 
-O `nss-gatekeeper` ativa o NSS wrapper antes de entregar o controle ao VS Code.
-O container fica vivo com `sleep infinity`; o VS Code Server é iniciado pelo DevContainer runtime.
+O `nss-gatekeeper` ativa o NSS wrapper antes de entregar o controle ao VS Code. O container fica
+vivo com `sleep infinity`; o VS Code Server é iniciado pelo DevContainer runtime.
 
 ### BuildKit e Cache de Build
+
 A partir da v5.4.0, o Dockerfile usa `# syntax=docker/dockerfile:1` para habilitar:
+
 - `--mount=type=cache` em todos os blocos `apt-get` → pacotes apt cacheados entre rebuilds
 - `--mount=type=cache` no `npm install -g` global → módulos npm cacheados entre rebuilds
 
@@ -115,6 +123,7 @@ Isso reduz significativamente o tempo de rebuild incremental (quando apenas cama
 ## Configuração do DevContainer (devcontainer.json)
 
 ### Build Args Relevantes
+
 | ARG           | Valor                      | Propósito                    |
 | ------------- | -------------------------- | ---------------------------- |
 | `VERSION`     | `5.4.0`                    | Versão da suite DevContainer |
@@ -123,6 +132,7 @@ Isso reduz significativamente o tempo de rebuild incremental (quando apenas cama
 | `IMAGE_NAME`  | `chatgpt-docker-puppeteer` | Nome da imagem               |
 
 ### runArgs Importantes
+
 ```json
 "--env-file", "${localWorkspaceFolder}/.env.development",
 "--add-host=host.docker.internal:host-gateway",
@@ -137,6 +147,7 @@ Isso reduz significativamente o tempo de rebuild incremental (quando apenas cama
 - `--ulimit nofile=262144:262144`: previne falhas de file descriptor em workloads intensos
 
 ### containerEnv vs remoteEnv
+
 - **`containerEnv`**: injetado no nível do daemon Docker (disponível para todos os processos)
 - **`remoteEnv`**: injetado pelo VS Code Server (disponível para terminais e extensões VS Code)
 
@@ -163,12 +174,16 @@ Variáveis críticas estão em `containerEnv` para garantir disponibilidade ante
 | `devcontainer-gpg-cache`       | `/home/node/.gnupg`            | Chaves GPG                                     |
 | `devcontainer-vscode-server`   | `/home/node/.vscode-server`    | VS Code Server (extensões, estado)             |
 | `devcontainer-bash-history`    | `/home/node-history`           | Histórico de bash                              |
-| *(bind mount)*                 | `/var/run/docker.sock`         | Docker socket do host                          |
+| _(bind mount)_                 | `/var/run/docker.sock`         | Docker socket do host                          |
 
 ### Hierarquia de Prioridade de Mount
-O volume `devcontainer-cache` monta `/home/node/.cache`. Os volumes `devcontainer-puppeteer-cache` e `devcontainer-ts-cache` montam subdiretórios específicos, **sobrepondo** o volume pai. Isso garante que puppeteer e typescript caches sejam persistidos em volumes dedicados.
+
+O volume `devcontainer-cache` monta `/home/node/.cache`. Os volumes `devcontainer-puppeteer-cache` e
+`devcontainer-ts-cache` montam subdiretórios específicos, **sobrepondo** o volume pai. Isso garante
+que puppeteer e typescript caches sejam persistidos em volumes dedicados.
 
 ### Dados NOT Persistidos (sem volume dedicado)
+
 - `~/.ssh`: chaves SSH (transitórias — SSH forwarding via VS Code nativo, não socket)
 - `~/.npm` no nível raiz já está coberto por `devcontainer-npm-cache`
 
@@ -188,6 +203,7 @@ O volume `devcontainer-cache` monta `/home/node/.cache`. Os volumes `devcontaine
 **Política**: `"*": { "onAutoForward": "ignore" }` — deny-by-default para portas não listadas.
 
 ### Fluxo de Conexão Chrome
+
 ```
 Chrome.exe (Windows, porta 9225)
     ↓  TCP/WebSocket
@@ -201,6 +217,7 @@ Puppeteer (Node.js, container)
 ## Variáveis de Ambiente
 
 ### Taxonomia (v6.0)
+
 Variáveis são classificadas em 4 categorias:
 
 | Categoria      | Exemplos                                                         | Ausência                   |
@@ -211,6 +228,7 @@ Variáveis são classificadas em 4 categorias:
 | FEATURE FLAGS  | `MOCK_CHROME`, `PUPPETEER_LOCAL_LAUNCH_DISABLED`                 | INFO                       |
 
 ### Fontes de ENV (ordem de precedência)
+
 1. `runArgs --env-file .env.development` (mais alta prioridade — segredos locais)
 2. `remoteEnv` (VS Code Server — override por usuário/sessão)
 3. `containerEnv` (daemon Docker — disponível para todos os processos)
@@ -218,6 +236,7 @@ Variáveis são classificadas em 4 categorias:
 5. Bootstrap da app (`.env` → `.env.${NODE_ENV}` → `.env.local`)
 
 ### Variáveis de Polling de File Watching (Decisão v5.4.0)
+
 A partir da v5.4.0, as seguintes variáveis foram **removidas de `containerEnv`**:
 
 | Variável              | Valor anterior | Motivo da remoção                                                                                                                                                         |
@@ -226,7 +245,9 @@ A partir da v5.4.0, as seguintes variáveis foram **removidas de `containerEnv`*
 | `CHOKIDAR_INTERVAL`   | `"1000"`       | Removido junto com `CHOKIDAR_USEPOLLING`.                                                                                                                                 |
 | `WATCHPACK_POLLING`   | `"true"`       | Projeto não usa webpack. Completamente não utilizado.                                                                                                                     |
 
-**Nota**: `src/dashboard-ui/vite.config.js` mantém `watch: { usePolling: true, interval: 100 }` hardcoded — isso é suficiente e apropriado para o servidor de desenvolvimento Vite em ambiente Docker.
+**Nota**: `src/dashboard-ui/vite.config.js` mantém `watch: { usePolling: true, interval: 100 }`
+hardcoded — isso é suficiente e apropriado para o servidor de desenvolvimento Vite em ambiente
+Docker.
 
 ---
 
@@ -239,6 +260,7 @@ A partir da v5.4.0, as seguintes variáveis foram **removidas de `containerEnv`*
 | `postAttachCommand` | `scripts/post-attach.sh` | v5.3.1 | `set +e` — nunca bloqueia o attach                  |
 
 ### post-create.sh (v1.0.1)
+
 - Bootstrap completo: identidade, ENV, mounts, NSS, npm install, dependências do projeto
 - Transacional: marker `/tmp/post-create.in-progress` / `/tmp/post-create.done`
 - Modo REPLAY: se marker `in-progress` existir, re-executa com `REEXECUTE_POST_CREATE=true`
@@ -246,18 +268,22 @@ A partir da v5.4.0, as seguintes variáveis foram **removidas de `containerEnv`*
 - Error snapshots: `.devcontainer/logs/env_error_snapshot_*.txt` (criados por `_on_err`)
 
 ### post-start.sh (v1.1)
+
 - Auditoria fail-safe: NSS artifacts, SSH, make info
 - Escreve status em `.devcontainer/state/health.status` (`ok` / `degraded`)
 - Executa `sync-local-auth.sh` se disponível
 
 ### post-attach.sh (v5.3.1)
+
 - UX exclusivo: exibe diagnóstico do ambiente no terminal do dev
 - Suporta flags: `--brief` (suprime detalhes), `--help`, `--version`
 - Nunca falha, nunca bloqueia
 
 ### healthcheck.sh (v2.0)
+
 - Instalado em `/usr/local/bin/devcontainer-healthcheck.sh`
-- Checks: Node.js (CRÍTICO), VS Code Server (informativo), CDP proxy (informativo), Chromium local (informativo)
+- Checks: Node.js (CRÍTICO), VS Code Server (informativo), CDP proxy (informativo), Chromium local
+  (informativo)
 - Exit 0 = healthy, Exit 1 = unhealthy (apenas se Node.js não disponível)
 
 ---
@@ -265,13 +291,16 @@ A partir da v5.4.0, as seguintes variáveis foram **removidas de `containerEnv`*
 ## Contrato de Shell e NSS Gatekeeper
 
 ### Shell Canônico: bash
+
 ```
 SHELL_CANONICAL=bash
 INSTRUMENTAL_SHELLS=pwsh
 ```
+
 PowerShell é **instrumental** (para inspeção/diagnóstico) — não substitui bash para automação.
 
 ### NSS Gatekeeper — Fluxo
+
 ```
 Container start
     ↓
@@ -288,9 +317,11 @@ post-create.sh
     → Ativa NSS em cada shell interativo (se artefatos presentes)
 ```
 
-O NSS wrapper resolve a identidade do usuário (`id -un` retorna `node`) mesmo quando o UID mapeado pelo host difere do UID na imagem.
+O NSS wrapper resolve a identidade do usuário (`id -un` retorna `node`) mesmo quando o UID mapeado
+pelo host difere do UID na imagem.
 
 ### Paths do NSS Wrapper
+
 | Path                                          | Conteúdo                             |
 | --------------------------------------------- | ------------------------------------ |
 | `/tmp/devcontainer-nss/passwd`                | Dados de usuário para libnss_wrapper |
@@ -302,6 +333,7 @@ O NSS wrapper resolve a identidade do usuário (`id -un` retorna `node`) mesmo q
 ## Arquitetura de Browser (Chrome / Puppeteer)
 
 ### Topologia
+
 ```
 [Windows Host]
     Chrome.exe → DevTools (porta 9225) → WSL2
@@ -312,6 +344,7 @@ O NSS wrapper resolve a identidade do usuário (`id -un` retorna `node`) mesmo q
 ```
 
 ### Configuração
+
 | Variável                          | Valor padrão           | Descrição                         |
 | --------------------------------- | ---------------------- | --------------------------------- |
 | `CHROME_HOST`                     | `host.docker.internal` | Endereço do Chrome real (Windows) |
@@ -322,7 +355,10 @@ O NSS wrapper resolve a identidade do usuário (`id -un` retorna `node`) mesmo q
 | `BROWSER_MODE`                    | `wsEndpoint`           | Modo de conexão (CDP)             |
 
 ### Chromium Local (Fallback Técnico)
-O Chromium instalado via apt (`/usr/bin/chromium`) é um **fallback técnico**, não a rota primária. Ele existe para:
+
+O Chromium instalado via apt (`/usr/bin/chromium`) é um **fallback técnico**, não a rota primária.
+Ele existe para:
+
 - Compatibilidade técnica com testes que precisam de um browser local
 - Emergências onde o Chrome Windows não está disponível
 - `MOCK_CHROME=0` mantém o comportamento real
@@ -332,7 +368,9 @@ O Chromium instalado via apt (`/usr/bin/chromium`) é um **fallback técnico**, 
 ## BuildKit e Cache de Build
 
 ### Diagnóstico de Build
+
 Para visualizar layers e cache durante rebuild:
+
 ```bash
 # Build com output detalhado
 docker build --progress=plain --no-cache .devcontainer/
@@ -342,73 +380,94 @@ docker history <imagem>
 ```
 
 ### Cache Mounts (v5.4.0+)
+
 Com `# syntax=docker/dockerfile:1` no topo do Dockerfile, cada bloco `apt-get` usa:
+
 ```dockerfile
-RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends ...
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked apt-get update && apt-get install -y --no-install-recommends ...
 ```
 
 O npm global também usa cache mount:
+
 ```dockerfile
-RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked \
-    npm install -g ...
+RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked npm install -g ...
 ```
 
-**Impacto**: rebuilds com apenas mudanças em camadas tardias (ex: scripts, ENV) se beneficiam do cache apt do BuildKit, sem baixar pacotes novamente.
+**Impacto**: rebuilds com apenas mudanças em camadas tardias (ex: scripts, ENV) se beneficiam do
+cache apt do BuildKit, sem baixar pacotes novamente.
 
 ---
 
 ## Watchdog de Arquivos (File Watching)
 
 ### Filesystem Real do Workspace
-O workspace (`/workspaces/chatgpt-docker-puppeteer`) é montado como **ext4** (inotify nativo funciona):
+
+O workspace (`/workspaces/chatgpt-docker-puppeteer`) é montado como **ext4** (inotify nativo
+funciona):
+
 ```
 /dev/sdf /workspaces/chatgpt-docker-puppeteer ext4 rw,relatime ...
 ```
 
 ### Watchers em Uso
+
 | Componente           | Mecanismo                      | Configuração                                                |
 | -------------------- | ------------------------------ | ----------------------------------------------------------- |
 | Vite HMR             | chokidar (interno, via config) | `watch.usePolling: true, interval: 100` em `vite.config.js` |
 | Server log watcher   | `fs.watch()` nativo Node.js    | Sem dependência de chokidar                                 |
 | Server queue watcher | `fs.watch()` nativo Node.js    | Sem dependência de chokidar                                 |
 
-**Nota**: `CHOKIDAR_USEPOLLING` env var foi removida (v5.4.0) pois `vite.config.js` já gerencia o polling explicitamente e os demais watchers usam `fs.watch()` nativo.
+**Nota**: `CHOKIDAR_USEPOLLING` env var foi removida (v5.4.0) pois `vite.config.js` já gerencia o
+polling explicitamente e os demais watchers usam `fs.watch()` nativo.
 
 ---
 
 ## Gaps e Decisões Registradas
 
 ### [DEC-001] Remoção de CHOKIDAR_USEPOLLING (v5.4.0)
+
 - **Decisão**: Removido de `containerEnv`
-- **Racional**: ext4 nativa funciona com inotify; vite.config.js já configura polling explicitamente; sem outros usuários de chokidar
+- **Racional**: ext4 nativa funciona com inotify; vite.config.js já configura polling
+  explicitamente; sem outros usuários de chokidar
 - **Risco**: Baixo — Vite mantém sua própria configuração de polling
 
 ### [DEC-002] Remoção de WATCHPACK_POLLING (v5.4.0)
+
 - **Decisão**: Removido de `containerEnv`
 - **Racional**: Projeto usa Vite (não webpack); variável não tem efeito detectável
 - **Risco**: Nulo
 
 ### [DEC-003] BuildKit cache mounts (v5.4.0)
+
 - **Decisão**: Adicionado `# syntax=docker/dockerfile:1` + cache mounts em todos os blocos apt/npm
 - **Racional**: Reduz tempo de rebuild significativamente quando layers iniciais não mudam
-- **Impacto**: Requer BuildKit ativo (Docker 23.0+ ou `DOCKER_BUILDKIT=1`). Docker Desktop 4.63.0 habilita BuildKit por default.
+- **Impacto**: Requer BuildKit ativo (Docker 23.0+ ou `DOCKER_BUILDKIT=1`). Docker Desktop 4.63.0
+  habilita BuildKit por default.
 
 ### [DEC-004] SSH via VS Code nativo (v5.3)
+
 - **Decisão**: SSH forwarding via VS Code (não socket bind)
 - **Racional**: Mais seguro, zero configuração, funciona em Windows/WSL2/Linux
 - **Referência**: `MIGRATION_SSH_V5.3.md` (histórico)
 
 ### [DEC-005] npm global split: `/usr/local/share/npm-global` vs `~/.npm-global`
-- **Decisão**: Tooling canônico da imagem fica em `/usr/local/share/npm-global` (imagem). Tooling do usuário em runtime fica em `~/.npm-global` (volume).
-- **Racional**: Volumes mascaram layers da imagem. Tooling de imagem não deve ficar em path volumado.
+
+- **Decisão**: Tooling canônico da imagem fica em `/usr/local/share/npm-global` (imagem). Tooling do
+  usuário em runtime fica em `~/.npm-global` (volume).
+- **Racional**: Volumes mascaram layers da imagem. Tooling de imagem não deve ficar em path
+  volumado.
 
 ### [GAP-001] health.status pode estar vazio
-- **Condição**: `post-start.sh` escreve `ok` ou `degraded` em `.devcontainer/state/health.status`. Se o container for reiniciado sem `post-start.sh` executar (ex: via `docker restart`), o arquivo pode estar vazio.
+
+- **Condição**: `post-start.sh` escreve `ok` ou `degraded` em `.devcontainer/state/health.status`.
+  Se o container for reiniciado sem `post-start.sh` executar (ex: via `docker restart`), o arquivo
+  pode estar vazio.
 - **Impacto**: Apenas diagnóstico — sem impacto operacional.
 
 ### [GAP-002] Error snapshots acumulados em logs/
-- **Condição**: Cada execução interrompida de `post-create.sh` gera `env_error_snapshot_*.txt` em `.devcontainer/logs/`.
-- **Causa comum**: SIGTERM/SIGKILL externo (ex: rebuild de container com container anterior ainda running) — não indica bug no script.
+
+- **Condição**: Cada execução interrompida de `post-create.sh` gera `env_error_snapshot_*.txt` em
+  `.devcontainer/logs/`.
+- **Causa comum**: SIGTERM/SIGKILL externo (ex: rebuild de container com container anterior ainda
+  running) — não indica bug no script.
 - **Ação**: Limpar periodicamente com `rm -f .devcontainer/logs/env_error_snapshot_*.txt`.

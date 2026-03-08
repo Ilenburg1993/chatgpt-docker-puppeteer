@@ -659,7 +659,7 @@ module.exports = {
   HandleManager,
   HANDLE_CONFIG,
   HANDLE_EVENTS,
-  create: driver => new HandleManager(driver),
+  create: (driver) => new HandleManager(driver),
 };
 ```
 

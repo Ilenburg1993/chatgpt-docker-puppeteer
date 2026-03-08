@@ -72,6 +72,7 @@ const HANDLE_EVENTS = {
 
 /**
  * Gerencia lifecycle de handles do Puppeteer com cleanup automático.
+ *
  * @class HandleManager
  * @extends EventEmitter
  */
@@ -350,8 +351,7 @@ getStats() {
 ```javascript
 // ❌ 6 linhas de JSDoc total (apenas clearAll)
 /**
- * Limpa todos os handles com timeout de 3s.
- * [V800] Usa AbortController...
+ * Limpa todos os handles com timeout de 3s. [V800] Usa AbortController...
  */
 ```
 
@@ -364,6 +364,7 @@ getStats() {
  * Gerencia lifecycle de handles do Puppeteer com cleanup automático.
  *
  * v2.0 Features:
+ *
  * - EventEmitter inheritance (observability via eventos locais)
  * - Validação completa (tipo + dispose method + limite)
  * - Timeout protection (clearAll 3s + dispose individual 1s)
@@ -371,28 +372,32 @@ getStats() {
  * - Cleanup seletivo (clearOne method)
  * - Introspection (getStats method)
  *
+ * @example
+ *   const manager = new HandleManager(driver);
+ *   manager.on(HANDLE_EVENTS.HANDLE_REGISTERED, (data) => { ... });
+ *   // ...
+ *
  * @class HandleManager
  * @extends EventEmitter
- *
- * @example
- * const manager = new HandleManager(driver);
- * manager.on(HANDLE_EVENTS.HANDLE_REGISTERED, (data) => { ... });
- * // ...
  */
 
 /**
  * Cria HandleManager instance.
- * @constructor
+ *
+ * @class
  * @param {Object} driver - Driver Puppeteer
  */
 
 /**
  * Registra handle para cleanup automático.
+ *
+ * @example
+ *   ...
+ *
+ * @fires HANDLE_EVENTS.HANDLE_REGISTERED
  * @param {Object} handle - Handle Puppeteer (JSHandle com método dispose)
  * @returns {Object} Handle registrado
  * @throws {Error} Se handle inválido ou limite atingido
- * @emits HANDLE_EVENTS.HANDLE_REGISTERED
- * @example ...
  */
 
 // ... todos métodos com JSDoc completo
@@ -664,7 +669,7 @@ module.exports = {
   HANDLE_EVENTS,
 
   // ✅ Factory function
-  create: driver => {
+  create: (driver) => {
     return new HandleManager(driver);
   },
 };
@@ -835,19 +840,19 @@ const { HandleManager, HANDLE_EVENTS } = require('./driver/modules/handle_manage
 const manager = new HandleManager(driver);
 
 // Escutar eventos locais
-manager.on(HANDLE_EVENTS.HANDLE_REGISTERED, data => {
+manager.on(HANDLE_EVENTS.HANDLE_REGISTERED, (data) => {
   console.log(`Handle registered (${data.count}/${data.limit} active)`);
 });
 
-manager.on(HANDLE_EVENTS.HANDLE_CLEARED, data => {
+manager.on(HANDLE_EVENTS.HANDLE_CLEARED, (data) => {
   console.log(`Handle cleared (${data.remaining} remaining)`);
 });
 
-manager.on(HANDLE_EVENTS.CLEANUP_TIMEOUT, data => {
+manager.on(HANDLE_EVENTS.CLEANUP_TIMEOUT, (data) => {
   console.warn(`Cleanup timeout: ${data.cleaned} cleaned, ${data.remaining} remaining`);
 });
 
-manager.on(HANDLE_EVENTS.CLEANUP_ERROR, data => {
+manager.on(HANDLE_EVENTS.CLEANUP_ERROR, (data) => {
   console.error(`Cleanup error: ${data.error} (timeout: ${data.isTimeout})`);
 });
 
@@ -957,9 +962,9 @@ console.log(stats);
 
 ```bash
 # .env
-HANDLE_CLEANUP_TIMEOUT=5000      # 5s clearAll timeout
-HANDLE_DISPOSE_TIMEOUT=2000      # 2s dispose timeout
-HANDLE_MAX_HANDLES=500           # 500 max handles
+HANDLE_CLEANUP_TIMEOUT=5000 # 5s clearAll timeout
+HANDLE_DISPOSE_TIMEOUT=2000 # 2s dispose timeout
+HANDLE_MAX_HANDLES=500      # 500 max handles
 ```
 
 ```javascript

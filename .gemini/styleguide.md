@@ -137,9 +137,9 @@ de longa duração com LLMs via automação de browser, com arquitetura orientad
 **Comandos de qualidade obrigatórios:**
 
 ```bash
-npm run lint              # ESLint
-npm run format:check      # Prettier
-npm run test:unit         # Testes unitários
-npm run typecheck:node    # TypeScript via tsserver
-node scripts/ci/validate-workflows.mjs  # Validação de workflows
+npm run lint                           # ESLint
+npm run format:check                   # Prettier
+npm run test:unit                      # Testes unitários
+npm run typecheck:node                 # TypeScript via tsserver
+node scripts/ci/validate-workflows.mjs # Validação de workflows
 ```

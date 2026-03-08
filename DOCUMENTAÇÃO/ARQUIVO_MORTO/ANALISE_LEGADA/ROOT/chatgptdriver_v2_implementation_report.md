@@ -168,7 +168,7 @@ while (true) {
     log(
       'ERROR',
       `[${this.name}] waitForCompletion timeout (${MAX_WAIT_TIME_MS}ms)`,
-      this.correlationId
+      this.correlationId,
     );
     throw new Error(`WAIT_TIMEOUT: Elapsed ${elapsed}ms`);
   }
@@ -430,7 +430,7 @@ if (extractionResult.pruned > 0) {
   log(
     'DEBUG',
     `[${this.name}] Pruned ${extractionResult.pruned} thought blocks (${ratio}% text retained)`,
-    this.correlationId
+    this.correlationId,
   );
 }
 ```
@@ -460,7 +460,7 @@ if (didContinue) {
   log(
     'INFO',
     `[${this.name}] Acionando botão de continuação (${continuationCount}x).`,
-    this.correlationId
+    this.correlationId,
   );
 }
 ```
@@ -635,7 +635,7 @@ const thoughts = clone.querySelectorAll(
 
   // UI metadata
   'details', // Collapsible sections (thinking process)
-  '.sr-only' // Screen reader only elements
+  '.sr-only', // Screen reader only elements
 );
 ```
 

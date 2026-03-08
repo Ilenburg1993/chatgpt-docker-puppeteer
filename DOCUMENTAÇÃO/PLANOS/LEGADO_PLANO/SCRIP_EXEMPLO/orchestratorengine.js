@@ -198,7 +198,7 @@ class OrchestratorEngine {
             workflowState.current_step_index = i;
 
             // Check dependencies
-            const dependenciesMet = step.dependencies.every(depId => workflowState.completed_steps.includes(depId));
+            const dependenciesMet = step.dependencies.every((depId) => workflowState.completed_steps.includes(depId));
 
             if (!dependenciesMet) {
                 throw new Error(`Step ${step.id} dependencies not met: ${step.dependencies.join(', ')}`);
@@ -299,7 +299,7 @@ class OrchestratorEngine {
         let prompt = step.config.prompt;
 
         // Replace placeholders with accumulated context
-        Object.keys(workflowState.accumulated_context).forEach(key => {
+        Object.keys(workflowState.accumulated_context).forEach((key) => {
             const value = workflowState.accumulated_context[key];
             prompt = prompt.replace(`{${key}}`, value);
         });
@@ -351,7 +351,7 @@ class OrchestratorEngine {
     _aggregateWorkflowResults(workflowState) {
         // Simple concatenation for now
         // Could be more sophisticated (e.g., structured JSON, markdown sections)
-        return workflowState.results.map(r => r.output).join('\n\n---\n\n');
+        return workflowState.results.map((r) => r.output).join('\n\n---\n\n');
     }
 
     /**

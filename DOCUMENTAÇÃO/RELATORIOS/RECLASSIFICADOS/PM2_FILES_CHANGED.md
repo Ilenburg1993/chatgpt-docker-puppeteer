@@ -309,16 +309,16 @@ arquitetura PM2 Sovereign
 
 ```bash
 # Bash scripts
-bash -n scripts/pm2-check.sh          # ✅ PASS
-bash -n scripts/pm2-startup.sh        # ✅ PASS
+bash -n scripts/pm2-check.sh           # ✅ PASS
+bash -n scripts/pm2-startup.sh         # ✅ PASS
 bash -n scripts/validate-boot-fixes.sh # ✅ PASS
 
 # Node.js
-node --check src/main.js               # ✅ PASS
+node --check src/main.js                           # ✅ PASS
 node --check src/server/realtime/bus/pm2_bridge.js # ✅ PASS
 
 # Makefile
-make --dry-run pm2-check              # ✅ PASS
+make --dry-run pm2-check # ✅ PASS
 ```
 
 ### ESLint

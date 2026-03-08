@@ -335,8 +335,8 @@ const orch = new ConnectionOrchestrator({
 ### Manutenção Periódica:
 
 ```bash
-npm run maintenance              # Verifica cache e limpa /tmp
-npm run maintenance:clean-cache  # Remove cache completo
+npm run maintenance             # Verifica cache e limpa /tmp
+npm run maintenance:clean-cache # Remove cache completo
 ```
 
 ---

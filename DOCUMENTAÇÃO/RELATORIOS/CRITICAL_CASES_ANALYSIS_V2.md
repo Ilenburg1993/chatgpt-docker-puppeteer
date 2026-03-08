@@ -307,7 +307,7 @@ function setupSignalHandlers(context) {
 let _shutdownInProgress = false;
 
 function setupSignalHandlers(context) {
-  const gracefulShutdown = async signal => {
+  const gracefulShutdown = async (signal) => {
     // [P4 FIX] Guard contra shutdown concorrente
     if (_shutdownInProgress) {
       log('WARN', `[SIGNAL] ${signal} ignorado - shutdown já em andamento`);

@@ -747,12 +747,12 @@ app.use('/api/tasks', tasksController);
 app.use('/api/system', systemController);
 
 // 3. Socket.io hub (real-time)
-io.on('connection', socket => {
+io.on('connection', (socket) => {
   socket.emit('mission_progress', data);
 });
 
 // 4. ServerNERVAdapter (NERV ↔ Socket)
-nervAdapter.on('TASK_COMPLETED', event => {
+nervAdapter.on('TASK_COMPLETED', (event) => {
   io.emit('task_update', event);
 });
 
@@ -790,7 +790,7 @@ Server expõe API → Controller valida → Emite NERV event → Kernel processa
 const socket = io('http://localhost:2998');
 
 // 2. Escutar eventos de progresso
-socket.on('mission_progress', data => {
+socket.on('mission_progress', (data) => {
   updateProgressBar(data.currentStep, data.totalSteps);
 });
 
@@ -848,7 +848,7 @@ const isValid = await feedbackProcessor.validate(output, criteria);
 await checkpointManager.save(mission.state);
 
 // 7. Escutar TASK_COMPLETED via NERV
-nerv.on('TASK_COMPLETED', event => {
+nerv.on('TASK_COMPLETED', (event) => {
   this._handleTaskCompleted(event);
 });
 ```
@@ -1203,7 +1203,7 @@ Lifecycle gerencia 1 driver → Driver executa 1 task → Lifecycle limpa recurs
 
 ```javascript
 // 1. Escutar eventos NERV (DRIVER_EXECUTE)
-nerv.on('DRIVER_EXECUTE', async payload => {
+nerv.on('DRIVER_EXECUTE', async (payload) => {
   await this._handleDriverExecute(payload);
 });
 
@@ -1544,7 +1544,7 @@ this._emitBoth(
   ADAPTER_EVENTS.TASK_STARTED, // Local (EventEmitter)
   ActionCode.DRIVER_TASK_STARTED, // NERV (IPC)
   payload,
-  correlationId
+  correlationId,
 );
 ```
 
@@ -2114,7 +2114,7 @@ async _applyDecisions(proposals) {
 
 ```javascript
 // DriverNERVAdapter
-this.nerv.on('DRIVER_EXECUTE', async event => {
+this.nerv.on('DRIVER_EXECUTE', async (event) => {
   const { task, correlationId } = event.payload;
 
   // 1. Aloca página do BrowserPool
@@ -2127,7 +2127,7 @@ this.nerv.on('DRIVER_EXECUTE', async event => {
   this.activeDrivers.set(task.meta.id, { lifecycle, page, listeners: [] });
 
   // 4. Conecta telemetria
-  lifecycle.on('state_change', event => {
+  lifecycle.on('state_change', (event) => {
     this._emitBoth(ADAPTER_EVENTS.STATE_CHANGE, ActionCode.DRIVER_STATE_CHANGED, event);
   });
 
@@ -2229,7 +2229,7 @@ this._emitBoth(ADAPTER_EVENTS.TASK_COMPLETED, ActionCode.DRIVER_TASK_COMPLETED, 
 
 ```javascript
 // ObservationStore
-this.nerv.on('DRIVER_TASK_COMPLETED', event => {
+this.nerv.on('DRIVER_TASK_COMPLETED', (event) => {
   // 1. Registra evento
   this.observations.push({
     event,
@@ -2288,7 +2288,7 @@ _interpretObservations({ task, observations }) {
 
 ```javascript
 // MissionManager
-this.nerv.on('TASK_COMPLETED', async event => {
+this.nerv.on('TASK_COMPLETED', async (event) => {
   const { task, result } = event.payload;
 
   // 1. Busca missão associada
@@ -2359,7 +2359,7 @@ this.nerv.on('TASK_COMPLETED', async event => {
 
 ```javascript
 // ServerNERVAdapter
-this.nerv.on('MISSION_COMPLETED', event => {
+this.nerv.on('MISSION_COMPLETED', (event) => {
   // Emite via Socket.io
   this.io.emit('mission_completed', {
     missionId: event.payload.missionId,
@@ -2376,15 +2376,15 @@ this.nerv.on('MISSION_COMPLETED', event => {
 
 ```javascript
 // Dashboard (React)
-socket.on('mission_completed', data => {
+socket.on('mission_completed', (data) => {
   // 1. Atualiza UI
   showNotification('Mission completed!');
   updateMissionStatus(data.missionId, 'COMPLETED');
 
   // 2. Busca resultado final via API
   fetch(`/api/missions/${data.missionId}`)
-    .then(res => res.json())
-    .then(mission => {
+    .then((res) => res.json())
+    .then((mission) => {
       displayMissionResult(mission);
     });
 });
@@ -2899,7 +2899,7 @@ this.driver = driverFactory.getDriver(
   this.task.spec.target,
   this.page,
   this.config,
-  this.abortController.signal // Signal passado
+  this.abortController.signal, // Signal passado
 );
 
 // ⚠️ Se signal abort DURANTE getDriver():
@@ -3274,7 +3274,7 @@ class DriverPool {
     const pool = this.pools.get(target);
 
     // Get available driver
-    const driver = pool.find(d => !d.busy);
+    const driver = pool.find((d) => !d.busy);
 
     if (!driver) {
       throw new Error('POOL_EXHAUSTED');
@@ -3790,11 +3790,13 @@ Adicionar JSDoc explicativo:
  * RETRY STRATEGY - Apenas para falhas TÉCNICAS
  *
  * ✅ Retryable:
+ *
  * - Timeout (navigation, selector wait)
  * - Selector not found (DOM instável)
  * - Network errors (transient)
  *
  * ❌ Non-retryable:
+ *
  * - Quality issues (output ruim) → MissionManager decide
  * - Validation failures → LLM-as-judge + MissionManager
  * - Abort signals → User cancellation

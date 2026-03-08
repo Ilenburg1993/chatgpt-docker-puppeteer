@@ -367,7 +367,7 @@ const ALERT_THRESHOLDS = {
 
 ```javascript
 // NERV → Socket
-nerv.on('TASK_UPDATED', event => {
+nerv.on('TASK_UPDATED', (event) => {
   // Anti-corruption: translate event structure
   const socketPayload = {
     taskId: event.payload.taskId,
@@ -381,7 +381,7 @@ nerv.on('TASK_UPDATED', event => {
 });
 
 // Socket → NERV
-socket.on('dashboard:execute_task', payload => {
+socket.on('dashboard:execute_task', (payload) => {
   // Anti-corruption: translate to NERV action
   nerv.emit({
     type: 'DRIVER_EXECUTE',
@@ -566,7 +566,7 @@ const { isConnected, subscribe, unsubscribe, connect, disconnect } = useSocket()
 const taskStore = useTaskStore();
 
 // Handler para updates de task
-const handleTaskUpdate = payload => {
+const handleTaskUpdate = (payload) => {
   taskStore.handleRealtimeUpdate(payload);
 };
 
@@ -1308,12 +1308,12 @@ const props = defineProps({
   variant: {
     type: String,
     default: 'primary',
-    validator: v => ['primary', 'secondary', 'ghost', 'danger'].includes(v),
+    validator: (v) => ['primary', 'secondary', 'ghost', 'danger'].includes(v),
   },
   size: {
     type: String,
     default: 'md',
-    validator: v => ['sm', 'md', 'lg'].includes(v),
+    validator: (v) => ['sm', 'md', 'lg'].includes(v),
   },
   disabled: {
     type: Boolean,
@@ -1418,12 +1418,12 @@ defineProps({
   variant: {
     type: String,
     default: 'default',
-    validator: v => ['default', 'success', 'warning', 'error', 'info'].includes(v),
+    validator: (v) => ['default', 'success', 'warning', 'error', 'info'].includes(v),
   },
   size: {
     type: String,
     default: 'md',
-    validator: v => ['sm', 'md', 'lg'].includes(v),
+    validator: (v) => ['sm', 'md', 'lg'].includes(v),
   },
 });
 

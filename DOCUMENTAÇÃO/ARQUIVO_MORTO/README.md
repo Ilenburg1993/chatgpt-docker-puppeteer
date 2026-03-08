@@ -37,5 +37,5 @@ Para tipagem e JSDoc, o ponto de entrada normativo e:
 
 - [../REFERENCIA/TYPING_INDEX.md](../REFERENCIA/TYPING_INDEX.md)
 
-Material daqui nao deve ser usado como fonte de regra ativa para tipagem, JSDoc, schemas, skills
-ou CI.
+Material daqui nao deve ser usado como fonte de regra ativa para tipagem, JSDoc, schemas, skills ou
+CI.

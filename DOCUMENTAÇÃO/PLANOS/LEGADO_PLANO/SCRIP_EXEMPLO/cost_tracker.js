@@ -35,7 +35,7 @@ class CostTracker {
      * Get costs by date range
      */
     async getCostsByDateRange(startTimestamp, endTimestamp) {
-        const filtered = this.costRecords.filter(r => r.timestamp >= startTimestamp && r.timestamp <= endTimestamp);
+        const filtered = this.costRecords.filter((r) => r.timestamp >= startTimestamp && r.timestamp <= endTimestamp);
 
         return {
             total: filtered.reduce((sum, r) => sum + r.cost_usd, 0),

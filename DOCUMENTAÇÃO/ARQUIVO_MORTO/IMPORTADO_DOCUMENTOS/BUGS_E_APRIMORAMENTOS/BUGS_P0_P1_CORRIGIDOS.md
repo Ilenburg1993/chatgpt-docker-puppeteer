@@ -262,11 +262,11 @@ const workersStatus = {
   heartbeatWatchdog: heartbeatWatchdog?.isActive?.() ?? true,
   agentLoop: agentLoop?.isRunning?.() ?? true,
 };
-const allRunning = Object.values(workersStatus).every(status => status);
+const allRunning = Object.values(workersStatus).every((status) => status);
 if (!allRunning) {
   log(
     'WARN',
-    `[BOOT] Alguns workers não confirmaram estado running: ${JSON.stringify(workersStatus)}`
+    `[BOOT] Alguns workers não confirmaram estado running: ${JSON.stringify(workersStatus)}`,
   );
 }
 ```

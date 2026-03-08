@@ -366,7 +366,7 @@ driver emits DRIVER_TASK_COMPLETED { taskId, result }
 // Detecta e remove blocks <thinking>...</thinking> (o1/o3 models)
 const thoughtBlockPattern = /<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi;
 let thoughtBlocksPruned = 0;
-htmlContent = htmlContent.replace(thoughtBlockPattern, match => {
+htmlContent = htmlContent.replace(thoughtBlockPattern, (match) => {
   thoughtBlocksPruned++;
   return '';
 });
@@ -625,7 +625,7 @@ this._emitBoth(
       duration,
     },
   },
-  correlationId
+  correlationId,
 );
 ```
 
@@ -643,7 +643,7 @@ this._emitBoth(
     result: result, // ← MODIFICAR: incluir ResponseV2 completo
     timings: { poolAcquire, contextAttach, execute, total: duration },
   },
-  correlationId
+  correlationId,
 );
 ```
 

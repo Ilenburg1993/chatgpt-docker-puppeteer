@@ -84,7 +84,7 @@ Edition)
 ```javascript
 const AGENTE_NAME = 'agente-gpt';
 
-bus.on('process:event', data => {
+bus.on('process:event', (data) => {
   if (data.process.name === AGENTE_NAME) {
     notify('pm2:process', { event, status, ts });
   }
@@ -96,7 +96,7 @@ bus.on('process:event', data => {
 ```javascript
 const MANAGED_PROCESSES = ['agente-gpt', 'dashboard-web', 'chrome-proxy'];
 
-bus.on('process:event', data => {
+bus.on('process:event', (data) => {
   if (MANAGED_PROCESSES.includes(processName)) {
     const payload = {
       name,
@@ -280,31 +280,31 @@ Inicialização, Validação, Status)
 $ bash scripts/pm2-startup.sh
 
 ╔════════════════════════════════════════════════════════════╗
-║  PM2 Sovereign Mode - Startup Sequence                    ║
+║ PM2 Sovereign Mode - Startup Sequence ║
 ╚════════════════════════════════════════════════════════════╝
 
 [1/5] Pré-voo: Validações...
-  ✓ PM2 instalado
-  ✓ ecosystem.config.js encontrado
-  ✓ Node.js v24.13.0 OK
-  ✓ Estrutura de diretórios OK
+✓ PM2 instalado
+✓ ecosystem.config.js encontrado
+✓ Node.js v24.13.0 OK
+✓ Estrutura de diretórios OK
 
 [2/5] Limpeza: Verificando processos órfãos...
-  ✓ Nenhum processo órfão
+✓ Nenhum processo órfão
 
 [3/5] Inicialização: Iniciando processos PM2...
-  ✓ Processos iniciados
+✓ Processos iniciados
 
 [4/5] Validação: Health checks...
-  ✓ agente-gpt online
-  ✓ dashboard-web online
-  ✓ chrome-proxy online
-  ✓ Servidor HTTP respondendo
+✓ agente-gpt online
+✓ dashboard-web online
+✓ chrome-proxy online
+✓ Servidor HTTP respondendo
 
 [5/5] Status: Resumo do sistema...
 
 ╔════════════════════════════════════════════════════════════╗
-║  ✅ PM2 Sovereign Mode - Sistema Operacional               ║
+║ ✅ PM2 Sovereign Mode - Sistema Operacional ║
 ╚════════════════════════════════════════════════════════════╝
 
 Sistema pronto para uso!
