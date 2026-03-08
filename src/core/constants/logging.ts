@@ -169,7 +169,7 @@ const LOG_CATEGORIES = {
  *
  * @type {ReadonlyArray<string>}
  */
-const LOG_CATEGORIES_ARRAY = Object.values(LOG_CATEGORIES);
+const LOG_CATEGORIES_ARRAY: ReadonlyArray<string> = Object.values(LOG_CATEGORIES);
 
 /**
  * Log categories frozen object (immutable)

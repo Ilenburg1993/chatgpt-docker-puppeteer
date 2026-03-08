@@ -212,14 +212,14 @@ const DRIVER_NAMES = {
  *
  * @type {ReadonlyArray<string>}
  */
-const SHARED_STATUS_ARRAY = Object.values(SHARED_STATUS);
+const SHARED_STATUS_ARRAY: ReadonlyArray<string> = Object.values(SHARED_STATUS);
 
 /**
  * Array of all driver domains
  *
  * @type {ReadonlyArray<string>}
  */
-const DRIVER_DOMAINS_ARRAY = Object.values(DRIVER_DOMAINS);
+const DRIVER_DOMAINS_ARRAY: ReadonlyArray<string> = Object.values(DRIVER_DOMAINS);
 
 /**
  * Frozen objects to prevent accidental modifications

@@ -90,14 +90,14 @@ const STATUS_VALUES = {
  *
  * @type {ReadonlyArray<string>}
  */
-const TASK_STATES_ARRAY = Object.values(TASK_STATES);
+const TASK_STATES_ARRAY: ReadonlyArray<string> = Object.values(TASK_STATES);
 
 /**
  * Array of all valid status values (for validation)
  *
  * @type {ReadonlyArray<string>}
  */
-const STATUS_VALUES_ARRAY = Object.values(STATUS_VALUES);
+const STATUS_VALUES_ARRAY: ReadonlyArray<string> = Object.values(STATUS_VALUES);
 
 /**
  * Task states frozen object (immutable)

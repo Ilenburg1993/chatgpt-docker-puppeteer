@@ -58,14 +58,14 @@ const BROWSER_STATES = {
  *
  * @type {ReadonlyArray<string>}
  */
-const CONNECTION_MODES_ARRAY = Object.values(CONNECTION_MODES);
+const CONNECTION_MODES_ARRAY: ReadonlyArray<string> = Object.values(CONNECTION_MODES);
 
 /**
  * Array of all valid browser states (for validation)
  *
  * @type {ReadonlyArray<string>}
  */
-const BROWSER_STATES_ARRAY = Object.values(BROWSER_STATES);
+const BROWSER_STATES_ARRAY: ReadonlyArray<string> = Object.values(BROWSER_STATES);
 
 /**
  * Connection modes frozen object (immutable)
