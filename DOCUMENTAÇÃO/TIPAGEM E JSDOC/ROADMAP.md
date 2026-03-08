@@ -1,6 +1,6 @@
 # Roadmap de Execução — Tipagem e JSDoc
 
-> **Última revisão**: 7 de março de 2026 **Branch ativa**: `feat/typing-fullstrict-roadmap` **PR
+> **Última revisão**: 8 de março de 2026 **Branch ativa**: `feat/typing-fullstrict-roadmap` **PR
 > ativa**: <https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/pull/99>
 >
 > Este é o documento operacional de execução. As regras normativas vivem em
@@ -11,31 +11,49 @@
 
 ---
 
-## Estado geral — 7 de março de 2026 🎉 FASES 0–D COMPLETAS
+## Estado geral — 8 de março de 2026 🎉 FASES 0–D COMPLETAS + G.4 + G.5
 
-| Indicador                          | Início do roadmap | Agora (7 mar 2026)      |
-| ---------------------------------- | ----------------- | ----------------------- |
-| Arquivos com `// @ts-check`        | **670**           | **721** ✅ (+51 src/)   |
-| `@ts-ignore` em código real        | desconhecido      | **0** ✅                |
-| `@ts-nocheck` em código real       | **0** ✅          | **0** ✅                |
-| Erros `typecheck:node` (base)      | ~2.170            | **0** ✅                |
-| Erros `typecheck:tools`            | ~2                | **0** ✅                |
-| Erros `typecheck:browser`          | ~285              | **0** ✅                |
-| Erros `typecheck:tests`            | 15                | **0** ✅                |
-| Erros `typecheck:isolated`         | N/A               | **0** ✅ (novo)         |
-| Erros `typecheck:strict:all`       | ~7.414            | **0** ✅ 🎉             |
-| Lanes strict com 0 erros           | 11 de 39          | **39 de 39** ✅         |
-| `strict: true` em tsconfig.base    | não               | **sim** ✅              |
-| `useUnknownInCatchVariables`       | não               | **sim** ✅              |
-| `strictNullChecks`                 | não               | **sim** ✅              |
-| `noImplicitAny` (via strict)       | não               | **sim** ✅              |
-| `isolatedDeclarations` (src/types) | não               | **sim** ✅              |
-| Schema tsserver-tool-contract      | v1.0.0            | **v1.1.0** ✅           |
-| JSDoc cobertura exports            | ~70%              | **100%** (1115/1115) ✅ |
-| Tags unsafe restantes (`@any`)     | ~404              | ~404 (manter monit.)    |
+| Indicador                              | Início do roadmap | Agora (8 mar 2026)      |
+| -------------------------------------- | ----------------- | ----------------------- |
+| Arquivos com `// @ts-check`            | **670**           | **721** ✅ (+51 src/)   |
+| `@ts-ignore` em código real            | desconhecido      | **0** ✅                |
+| `@ts-nocheck` em código real           | **0** ✅          | **0** ✅                |
+| Erros `typecheck:node` (base)          | ~2.170            | **0** ✅                |
+| Erros `typecheck:tools`                | ~2                | **0** ✅                |
+| Erros `typecheck:browser`              | ~285              | **0** ✅                |
+| Erros `typecheck:tests`                | 15                | **0** ✅                |
+| Erros `typecheck:isolated`             | N/A               | **0** ✅ (novo)         |
+| Erros `typecheck:strict:all`           | ~7.414            | **0** ✅ 🎉             |
+| Erros `typecheck:repo`                 | N/A               | **0** ✅                |
+| Lanes strict com 0 erros               | 11 de 39          | **39 de 39** ✅         |
+| `strict: true` em tsconfig.base        | não               | **sim** ✅              |
+| `useUnknownInCatchVariables`           | não               | **sim** ✅              |
+| `strictNullChecks`                     | não               | **sim** ✅              |
+| `noImplicitAny` (via strict)           | não               | **sim** ✅              |
+| `exactOptionalPropertyTypes`           | não               | **sim** ✅ (G.2)        |
+| `noUncheckedIndexedAccess`             | não               | **sim** ✅ (G.1)        |
+| `allowUnreachableCode: false`          | não               | **sim** ✅ (G.4)        |
+| `allowUnusedLabels: false`             | não               | **sim** ✅ (G.5)        |
+| `isolatedDeclarations` (src/types)     | não               | **sim** ✅              |
+| Schema tsserver-tool-contract          | v1.0.0            | **v1.1.0** ✅           |
+| JSDoc cobertura exports                | ~70%              | **100%** (1115/1115) ✅ |
+| Tags unsafe restantes (`@any`)         | ~404              | ~511 (manter monit.)    |
 
 **Fases 0–D concluídas em 7 de março de 2026**: `strict: true` ativado globalmente em
 `tsconfig.base.json`, todos os targets em 0, `isolatedDeclarations` ativo para `src/types/`.
+
+**Sessão 8 de março de 2026 — G.4 + G.5 + correções de bugs**:
+
+- G.4 (`allowUnreachableCode: false`) ativado — 0 erros ✅
+- G.5 (`allowUnusedLabels: false`) ativado — 0 erros ✅
+- `apache-arrow@18.1.0` instalado (peer dep do `@lancedb/lancedb`) ✅
+- `@types/babel__traverse` instalado ✅
+- `src/server/api/controllers/dashboard_tasks.js` — TS1003: `@param` sem nome → corrigido ✅
+- `tools/rag/lib/chunking/chunk_js_ast.mjs` — TS2578: `@ts-expect-error` unused → removido ✅
+- `scripts/audit/lib/exec.mjs` — TS1110: `@type` incompleto (×2) → corrigido ✅
+- `tests/regression/test_p3+p4_p5_fixes.spec.js` — TS7027: código morto → removido ✅
+- `tests/unit/rag/test_ollama_embeddings_provider.spec.js` — bug `const receivedInputLength` → corrigido ✅
+- `typecheck:repo` → 0 erros | `test:unit` → pass ✅
 
 **Correções complementares — sessão 7 mar 2026 (2ª parte)**:
 
@@ -492,13 +510,13 @@ Flags que **não entraram no `strict: true`** padrão do TypeScript, mas que adi
 relevantes. Diferente das Fases 0–D, estas podem ser ativadas pontualmente por `.d.ts` tipo override
 ou lane por lane.
 
-| Etapa | Flag                                 | Erros medidos | Padrão de correção                                                | Status |
-| ----- | ------------------------------------ | ------------: | ----------------------------------------------------------------- | ------ |
-| G.1   | `noUncheckedIndexedAccess`           |            45 | `arr[i]!` ou guard `if (v !== undefined)`                         | ✅     |
-| G.2   | `exactOptionalPropertyTypes`         |            31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | ✅     |
-| G.3   | `noPropertyAccessFromIndexSignature` |            ≈0 | Trocar `.prop` por `["prop"]` em `Record<K,V>`                    | [ ]    |
-| G.4   | `allowUnreachableCode: false`        |            ≈0 | Remover código morto após `return`/`throw`                        | [ ]    |
-| G.5   | `allowUnusedLabels: false`           |            ≈0 | Remover labels JS não-utilizados                                  | [ ]    |
+| Etapa | Flag                                 | Erros medidos       | Padrão de correção                                                | Status |
+| ----- | ------------------------------------ | ------------------: | ----------------------------------------------------------------- | ------ |
+| G.1   | `noUncheckedIndexedAccess`           |                  45 | `arr[i]!` ou guard `if (v !== undefined)`                         | ✅     |
+| G.2   | `exactOptionalPropertyTypes`         |                  31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | ✅     |
+| G.3   | `noPropertyAccessFromIndexSignature` | **1784** ⚠️ (≠ ≈0) | Trocar `.prop` por `["prop"]` em `Record<K,V>` (TS4111)           | [ ]    |
+| G.4   | `allowUnreachableCode: false`        |                   0 | Remover código morto após `return`/`throw`                        | ✅     |
+| G.5   | `allowUnusedLabels: false`           |                   0 | Remover labels JS não-utilizados                                  | ✅     |
 
 ### G.1 — `noUncheckedIndexedAccess` (45 erros) ✅ CONCLUÍDA
 
@@ -538,34 +556,100 @@ essa flag, TypeScript aceita `{a: undefined}` como satisfazendo `{a?: string}`.
 
 **Critério de ativação**: independente — pode ativar agora (apenas 31 erros).
 
-### Ordem recomendada de execução
+### G.4 — `allowUnreachableCode: false` ✅ CONCLUÍDA (8 mar 2026)
+
+> **Status**: ativada em `tsconfig.base.json`. 0 erros em todos os targets. Commit: `be7a603a`.
+
+**O que faz**: emite TS7027 para código que nunca pode ser executado (após `return`, `throw`,
+`break` ou `continue`).
+
+**Correções aplicadas**: removido `console.log('')` inalcançável em
+`tests/regression/test_p3_fixes.spec.js` e `test_p4_p5_fixes.spec.js`.
+
+---
+
+### G.5 — `allowUnusedLabels: false` ✅ CONCLUÍDA (8 mar 2026)
+
+> **Status**: ativada em `tsconfig.base.json`. 0 erros em todos os targets. Commit: `be7a603a`.
+
+**O que faz**: emite TS7028 para labels JavaScript declaradas mas não usadas por `break`/`continue`.
+
+**Correções aplicadas**: nenhuma (0 erros já antes da ativação — base de código limpa).
+
+---
+
+### G.3 — `noPropertyAccessFromIndexSignature` ⚠️ 1784 ERROS — PLANEJAMENTO PENDENTE
+
+> **Status**: NÃO ativada. Medição confirmada em 8 mar 2026: **1784 erros TS4111**.
+> Estimativa original (≈0) estava incorreta — a estimativa não levou o volume de `Record<K,V>` em conta.
+
+**O que faz**: força uso de `obj["key"]` em vez de `obj.key` quando o tipo do objeto usa index
+signature (`Record<string, T>`, `{ [k: string]: T }`).
+
+**Padrão de erro**: `TS4111: Property 'X' comes from an index signature, so it must be accessed with ['X']`
+
+**Análise do volume**:
+- 1784 erros distribuídos por toda a codebase
+- Principalmente em: `src/kernel/`, `src/infra/`, `src/driver/`, `src/agent/`, `src/missions/`
+- Padrão recorrente: `config.timeout`, `task.status`, `options.retry` — todos vindos de typedefs
+  JSDoc com index signature implícita
+
+**Estratégias possíveis**:
+
+1. **Refazer typedefs**: converter `@typedef {{ [k: string]: any }}` em interfaces concretas com
+   propriedades nomeadas (prefered — elimina a fonte, não o sintoma)
+2. **Patch por lane**: ativar por `tsconfig.strict.src.kernel.json` etc. e corrigir lane por lane
+3. **Skip temporário**: manter `noPropertyAccessFromIndexSignature: false` (default) até H.1 que
+   migrará arquivos para `.ts` com interfaces explícitas
+
+**Recomendação**: abordar como sub-roadmap separado após H.1 (migração `.ts`), pois a correção
+ideal é ter interfaces TypeScript reais em vez de typedefs `Record<string, any>`.
+
+---
+
+### Ordem recomendada de execução (atualizado 8 mar 2026)
 
 ```
-G.2 (31 erros) → G.1 (45 erros) → G.3–G.5 (≈0)
+G.1 ✅ → G.2 ✅ → G.4 ✅ → G.5 ✅ → H.1 → G.3 (após H.1, com interfaces .ts)
 ```
 
-G.2 primeiro por ter menos erros e ser totalmente independente. G.1 depois por requerer atenção em
-cada acesso de índice (risco de asserção errada `!`).
+G.3 foi reclassificado para execução após H.1 (migração seletiva `.js` → `.ts`), pois a correção
+definitiva exige interfaces TypeScript explícitas nos tipos de dados do domínio.
 
 ---
 
 ## Fase H — Evolução arquitetural (longo prazo)
 
 > **Planejado**: horizonte de 2–3 sprints após conclusão das Fases E–G.
+> **Estado atual** (8 mar 2026): Fases E–G em andamento. H.1 é pré-condição para H.2 e para G.3.
 
 ### H.1 — Migração seletiva de `.js` → `.ts`
+
+> **Status**: Não iniciada. **Bloqueio para H.2**: `isolatedDeclarations: true` é incompatível com
+> `allowJs: true` — arquivos `.js` não podem participar.
 
 Candidatos prioritários (APIs públicas estáveis, sem dependências circulares):
 
 - `src/types/**` — já são `.d.ts`, candidatos a `.ts` gerado
-- `src/core/constants/**` — constantes puras, tipagem trivial
-- `src/validation/**` — schemas Zod já têm inferência nativa TS
+- `src/core/constants/**` — constantes puras, tipagem trivial (~630 LOC)
+- `src/validation/**` — schemas Zod já têm inferência nativa TS (~420 LOC)
 - `src/shared/health-check.js` + `src/shared/inference-gateway-client.js` — já emitem `.d.ts`
 
 **Critério**: módulo tem 0 dependências circulares (`npm run analyze:deps`) e exports com tipos
 explícitos 100%.
 
+**Passo a passo para H.1**:
+1. Verificar `npm run analyze:deps` para confirmar ausência de circulares nos candidatos
+2. Renomear arquivo: `git mv src/core/constants/index.js src/core/constants/index.ts`
+3. Remover `// @ts-check` (desnecessário em `.ts`)
+4. Converter JSDoc types para TS nativo onde conveniente
+5. Atualizar todos os imports no repo: `rg -l "constants/index"` → ajustar extensões se necessário
+6. Verificar `npm run typecheck:node` → 0 erros
+7. Repetir para próximo candidato
+
 ### H.2 — `isolatedDeclarations` para todo `src/`
+
+> **Status**: Não iniciada. **Pré-condição**: H.1 deve ser concluída primeiro (requer arquivos `.ts`).
 
 Expansão incremental de `tsconfig.isolated-declarations.json`:
 
@@ -576,6 +660,10 @@ Expansão incremental de `tsconfig.isolated-declarations.json`:
 
 **Pré-condição**: `isolatedDeclarations` requer que toda função exportada tenha tipo de retorno
 explícito em JSDoc (`@returns {T}` sem inferência). Verificar cobertura antes de ativar.
+
+**Nota**: `isolatedDeclarations: true` é incompatível com `allowJs: true`. Por isso apenas arquivos
+`.ts`/`.d.ts` podem ser incluídos em `tsconfig.isolated-declarations.json`. Atualmente só cobre
+`src/types/**/*.d.ts`.
 
 ### H.3 — `composite: true` + Project References
 
