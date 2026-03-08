@@ -139,10 +139,10 @@ porque muitos TS2345/TS2322 actualmente contados como "cascata" desaparecem.
 
 ### Flags NÃO recomendadas para este projeto agora
 
-| Flag                         | Motivo                                                           |
-| ---------------------------- | ---------------------------------------------------------------- |
-| `noUncheckedIndexedAccess`   | Inflaria erros em todo array/object access — refatoração massiva |
-| `exactOptionalPropertyTypes` | Incompatível com padrões de options-object atuais                |
+| Flag                             | Motivo                                                          |
+| -------------------------------- | --------------------------------------------------------------- |
+| ~~`noUncheckedIndexedAccess`~~   | ✅ **ATIVADO** em `tsconfig.base.json` — 0 erros (G.1 concluído) |
+| ~~`exactOptionalPropertyTypes`~~ | ✅ **ATIVADO** em `tsconfig.base.json` — 0 erros (G.2 concluído) |
 
 ---
 

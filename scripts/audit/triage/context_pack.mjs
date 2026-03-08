@@ -61,7 +61,7 @@ function readMasterHistoryHints(masterPath, contractId) {
  * @property {unknown} [rag]
  * @property {unknown} [lsp]
  * @property {unknown} [history]
- * @property {string} [masterPath]
+ * @property {string | undefined} [masterPath]
  */
 /**
  * @param {import('../lib/schema.mjs').AuditFindingV3} finding

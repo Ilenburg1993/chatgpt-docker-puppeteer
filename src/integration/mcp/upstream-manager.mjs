@@ -70,8 +70,8 @@ function sanitizeToolMetadata(/** @type {any} */ tool) {
  * @property {string} [command]
  * @property {string[]} [args]
  * @property {string[]} [envFrom]
- * @property {number} [initTimeoutMs]
- * @property {number} [callTimeoutMs]
+ * @property {number | undefined} [initTimeoutMs]
+ * @property {number | undefined} [callTimeoutMs]
  */
 
 /**

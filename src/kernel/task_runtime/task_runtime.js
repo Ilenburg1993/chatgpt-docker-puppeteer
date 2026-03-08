@@ -350,7 +350,7 @@ class TaskRuntime extends EventEmitter {
         }
 
         for (const task of this.tasks.values()) {
-            byState[task.state]++;
+            byState[task.state] = (byState[task.state] ?? 0) + 1;
         }
 
         return Object.freeze({

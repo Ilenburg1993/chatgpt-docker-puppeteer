@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import assert from 'node:assert';
 
 console.log('[TEST] ChromeProxyService v2.0 - Starting tests...\n');

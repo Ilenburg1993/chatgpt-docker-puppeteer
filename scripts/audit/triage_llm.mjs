@@ -6,7 +6,7 @@ import { buildTestPlan } from './triage/test_planner.mjs';
 import { buildProposalV3 } from './triage/proposal_engine_v3.mjs';
 
 /**
- * @typedef {import('./lib/schema.mjs').AuditFindingV3} AuditFindingV3
+ * @import { AuditFindingV3 } from './lib/schema.mjs'
  */
 
 const MCP_URL = process.env.MCP_DIAG_URL ? `${process.env.MCP_DIAG_URL}/api/mcp` : 'http://localhost:3008/api/mcp';
@@ -43,9 +43,9 @@ async function callMcp(method, params, id) {
 
 /**
  * @typedef {object} DeterministicFallbackOptions
- * @property {boolean} [proposeDiffs]
- * @property {'basic'|'standard'|'deep'} [proposalDepth]
- * @property {string} [masterPath]
+ * @property {boolean | undefined} [proposeDiffs]
+ * @property {'basic'|'standard'|'deep' | undefined} [proposalDepth]
+ * @property {string | undefined} [masterPath]
  */
 /**
  * @param {AuditFindingV3} finding

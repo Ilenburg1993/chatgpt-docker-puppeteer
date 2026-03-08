@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @ts-nocheck
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';

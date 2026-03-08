@@ -118,7 +118,7 @@ function _pickTarget({ requested, allowedTargets } = {}) {
 
     if (req && allowed && allowed.includes(req)) return req;
     if (req && !allowed) return req;
-    if (allowed && allowed.length) return allowed[0];
+    if (allowed && allowed.length) return allowed[0] ?? 'auto';
     return 'auto';
 }
 

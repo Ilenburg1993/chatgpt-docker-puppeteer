@@ -326,6 +326,7 @@
     "typecheck:full": "npm run typecheck:node && npm run typecheck:tools && npm run typecheck:browser",
     "typecheck:node": "tsc -p tsconfig.node.json",
     "typecheck:declarations": "tsc -p tsconfig.declarations.json",
+    "typecheck:declarations:full": "tsc -p tsconfig.declarations-full.json",
     "typecheck:isolated": "tsc -p tsconfig.isolated-declarations.json",
     "typecheck:repo": "npm run typecheck:full && npm run typecheck:tests && npm run typecheck:dashboard && npm run typecheck:isolated",
     "typecheck:strict": "npm run typecheck:strict:all",

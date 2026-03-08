@@ -42,7 +42,7 @@ function parseHttpStatus(/** @type {any} */ error) {
     const message = String(error?.message || '');
     const match = message.match(/HTTP_(\d{3}):/);
     if (!match) return null;
-    const status = Number.parseInt(match[1], 10);
+    const status = Number.parseInt(match[1] ?? '', 10);
     return Number.isFinite(status) ? status : null;
 }
 

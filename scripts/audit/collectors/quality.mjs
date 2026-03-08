@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { buildQualityExecutionPlan } from '../lib/impact_classifier.mjs';
 import { parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
 
-/** @typedef {import('../normalize/findings.mjs').RawFinding} RawFinding */
+/** @import { RawFinding } from '../normalize/findings.mjs' */
 
 const QUALITY_CONTRACTS = Object.freeze({
     NODE_SYNTAX: 'CONTRACT-QUALITY-NODE-SYNTAX',

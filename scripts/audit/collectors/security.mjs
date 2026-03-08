@@ -3,9 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { evaluateStaticContracts } from '../contracts/evaluate_static.mjs';
 
-/**
- * @typedef {import('../normalize/findings.mjs').RawFinding} RawFinding
- */
+/** @import { RawFinding } from '../normalize/findings.mjs' */
 
 /**
  * @param {string} value

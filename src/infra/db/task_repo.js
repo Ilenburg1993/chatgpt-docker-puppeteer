@@ -868,7 +868,7 @@ function claimNextEligibleTask({ workerId, nowMs = _now(), lockTtlMs = 60000 }) 
  * @returns {any}
  */
 function releaseTaskLock(
-    /** @type {{ taskId: string, workerId?: string, expectedAttemptId?: string }} */ {
+    /** @type {{ taskId: string, workerId?: string | undefined, expectedAttemptId?: string | undefined }} */ {
         taskId,
         workerId,
         expectedAttemptId,

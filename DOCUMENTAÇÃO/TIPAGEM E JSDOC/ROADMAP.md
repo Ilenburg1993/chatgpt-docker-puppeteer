@@ -65,8 +65,75 @@
 - Extra: `tsconfig.isolated-declarations.json` criado, `typecheck:isolated` → 0 ✅
 - Extra: Schema `tsserver-tool-contract` atualizado para v1.1.0 ✅
 
-> **Próximo objetivo (Fase E)**: migração `@import` + redução de `@any` + expansão de
-> `isolatedDeclarations` para outros subdiretórios de `src/types/`.
+> **Próximo objetivo (Fase E)**: migração `@import`, redução de `@type{any}`, expansão de
+> `isolatedDeclarations`, e adição de typedefs para 52 funções com options-param sem typedef.
+
+---
+
+## Fase E — Próximos objetivos (pós 7 mar 2026)
+
+### E.0 — Correções rápidas (alta prioridade, baixo risco)
+
+- [x] Remover `// @ts-nocheck` e converter para `// @ts-check` nos 4 arquivos de tests/:
+  - `tests/nightly/audit/test_contract_chaos.spec.js` ✅
+  - `tests/scripts/corrigir_imports.js` ✅
+  - `tests/support/setup.js` ✅
+  - `tests/support/teardown.js` ✅
+- [x] Adicionar `tests/supertest.d.ts` à lane strict `tests.integration` ✅
+- [x] Migrar 14 `@typedef {import(...)}` legados para sintaxe `@import` (TS 5.5+) ✅
+  - `src/core/validators/prerequisite_validator.js`
+  - `src/driver/guards/DriverReadinessGuard.js`
+  - `src/audit_agent/runtime.js` (redundante — removido)
+  - 7 coletores em `scripts/audit/collectors/*.mjs`
+  - 3 contratos em `scripts/audit/contracts/*.mjs`
+  - `scripts/audit/triage_llm.mjs`
+- [ ] Verificar e migrar 14 arquivos `tests/legacy/node/*.js` para `// @ts-check` (análogo ao acima)
+
+### E.1 — Adicionar typedefs para options params (52 funções pendentes)
+
+Funções com `@param {object} options` sem `@typedef` — adicionar typedef nomeado:
+
+| Arquivo                                        | Funções pendentes |
+| ---------------------------------------------- | ----------------: |
+| `src/server/domain/mission_control_service.js` |                 8 |
+| `src/infra/db/task_repo.js`                    |                 6 |
+| Outros 21 arquivos                             |                38 |
+
+**Critério de conclusão**: `functions_missing_options_typedef: 0`
+
+### E.2 — Redução de unsafe tags JSDoc (511 ocorrências)
+
+Substituir tags imprecisas por tipos reais:
+
+- `@type {any}` → tipos específicos ou `@type {unknown}` + asserção pontual
+- `@param {Object}` → `@param {Record<string, unknown>}` ou typedef
+- `@param {Function}` → assinatura explícita `@param {(arg: T) => R}`
+- `@returns {Promise<any>}` → `@returns {Promise<T>}` com T real
+
+**Critério de conclusão**: `unsafe_generic_tags_total: 0`
+
+### E.3 — Redução de `@type{any}` em src/ (~3.276 ocorrências)
+
+Arquivos com mais ocorrências (prioridade):
+
+| Arquivo                               | Ocorrências |
+| ------------------------------------- | ----------: |
+| `src/main.js`                         |         122 |
+| `src/shared/sadi/analyzer.js`         |          83 |
+| `src/server/api/controllers/tasks.js` |          78 |
+| `src/infra/io.js`                     |          31 |
+| Demais ~280 arquivos                  |      ~2.962 |
+
+**Estratégia**: substituir em blocos por módulo, do menor para o maior. Manter `typecheck:strict:all = 0` a cada commit.
+
+### E.4 — Expansão de `isolatedDeclarations`
+
+Expandir `tsconfig.isolated-declarations.json` para além de `src/types/`:
+- `src/core/` — APIs públicas estáveis
+- `src/nerv/` — interface de eventos
+- `src/kernel/` — API de execução
+
+**Critério**: `typecheck:isolated` continua em 0 após cada expansão.
 
 ---
 
@@ -322,6 +389,198 @@ merge.
 > muito menor que o número de erros reportados.
 
 **Total eliminado**: ~15.402 erros TypeScript (Fases 0–C) em 39 lanes. **Fase D concluída em
-7/3/2026**: `strict: true` ativado globalmente, todos os targets em 0. **Next action**: Fase E —
-migração `@import` + redução de `@any`. Ver [`AUDITORIA-2026-03-07.md`](./AUDITORIA-2026-03-07.md)
-para métricas completas da Fase D.
+7/3/2026**: `strict: true` ativado globalmente, todos os targets em 0. **Next action**: Fase E →
+Fase F → Fase G. Ver [`AUDITORIA-2026-03-07.md`](./AUDITORIA-2026-03-07.md) para métricas
+completas da Fase D.
+
+---
+
+## Fase F — Declaration Emit e análise de `noEmit: false`
+
+> **Planejado em**: 7 de março de 2026. **Status**: em execução (F.1 concluído).
+
+### Análise: o que significa `noEmit: false` neste repositório?
+
+Este repositório é **JS-first**: o Node.js executa os arquivos `.js` diretamente — não há
+transpilação de `.ts` → `.js`. O TypeScript atua exclusivamente como **verificador de tipos via
+JSDoc** + tsserver.
+
+#### Opção F.A — `noEmit: false` global sem `emitDeclarationOnly` ❌ NÃO RECOMENDADO
+
+```json
+// tsconfig.base.json
+{ "compilerOptions": { "noEmit": false, "outDir": "./dist" } }
+```
+
+**O que acontece**: TypeScript compilaria todos os 283 arquivos `.js` de `src/` para `dist/`. Com
+`verbatimModuleSyntax: true` + `allowJs: true`, o resultado seria essencialmente uma _cópia_ dos
+arquivos originais (salvo remoção de `import type` e `@import` comments — já que TS os strip).
+
+**Consequências**:
+
+- `dist/` passaria a ser a build artefact — o runtime precisaria mudar de `src/` para `dist/`.
+- `package.json` main precisaria apontar para `dist/src/main.js`.
+- Toda a infraestrutura (PM2, Docker, scripts) precisaria ser atualizada.
+- Ganho prático: zero (Node.js 24 já roda JS nativo; a "compilação" não muda o código).
+- **Custo**: migração arquitetural completa. **Não recomendado** para este projeto.
+
+#### Opção F.B — `emitDeclarationOnly: true` em `tsconfig.base.json` ❌ INVIÁVEL
+
+```json
+// tsconfig.base.json
+{ "compilerOptions": { "noEmit": false, "emitDeclarationOnly": true, "declaration": true } }
+```
+
+**Problema**: as 41 lanes strict têm `noEmit: true` explícito — isso sobrescreveria a base.
+Conflito: a base emitiria `.d.ts`, mas os filhos cancelariam a emissão. Possível, mas geraria
+comportamento imprevisível entre configs. Além disso, `tsconfig.base.json` inclui todo o projeto —
+emitir `.d.ts` para _tudo_ (incluindo scripts, tests, tools) não é o objetivo.
+
+#### Opção F.C — Novo `tsconfig.declarations-full.json` ✅ RECOMENDADO
+
+Criar um config dedicado que emite `.d.ts` para **todo `src/`**:
+
+```json
+{
+    "extends": "./tsconfig.node.json",
+    "compilerOptions": {
+        "noEmit": false,
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "declarationMap": true,
+        "outDir": "./tmp/types-all"
+    },
+    "include": ["src/**/*.js", "src/types/**/*.d.ts"],
+    "exclude": ["src/dashboard-ui/**"]
+}
+```
+
+**O que emite**: um arquivo `.d.ts` para cada `.js` em `src/` → em `tmp/types-all/`.
+
+**Vantagens**:
+
+- Node.js runtime **não é afetado** — continua usando `src/` diretamente.
+- Ferramentas externas (bundlers, consumers, LSP remoto) podem consumir os tipos.
+- Isola a emissão em `tmp/` — não polui o source.
+- `declarationMap: true` → `.d.ts.map` para navegação "go to definition" em consumers.
+
+**Pré-condição importante**: para emitir `.d.ts` de um arquivo `.js`, TypeScript requer que os
+tipos de **retorno de funções exportadas** sejam inferíveis sem contexto externo. Arquivos com
+retornos complexos (`Promise<inferred>`) podem gerar erros de declaração.
+
+### Checklist Fase F
+
+- [x] F.1 — Criar `tsconfig.declarations-full.json` (Opção F.C) ✅
+- [x] F.2 — Adicionar script `typecheck:declarations:full` no `package.json` ✅
+- [x] F.3 — Executar e atingir 0 erros em `typecheck:declarations:full` ✅
+- [ ] F.4 — Adicionar `declarations-full` ao CI (gate de regressão)
+- [ ] F.5 — Expandir `tsconfig.isolated-declarations.json` para `src/core/` e `src/nerv/`
+
+**Gate F.3**: `npm run typecheck:declarations:full` → 0 erros.
+
+---
+
+## Fase G — Flags adicionais de strictness
+
+> **Planejado em**: 7 de março de 2026. **Erros medidos** com `typecheck:node` atual como baseline.
+
+Flags que **não entraram no `strict: true`** padrão do TypeScript, mas que adicionam verificações
+relevantes. Diferente das Fases 0–D, estas podem ser ativadas pontualmente por `.d.ts` tipo
+override ou lane por lane.
+
+| Etapa | Flag                                 | Erros medidos | Padrão de correção                                                | Status |
+| ----- | ------------------------------------ | ------------: | ----------------------------------------------------------------- | ------ |
+| G.1   | `noUncheckedIndexedAccess`           |            45 | `arr[i]!` ou guard `if (v !== undefined)`                         | [ ]    |
+| G.2   | `exactOptionalPropertyTypes`         |            31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | [ ]    |
+| G.3   | `noPropertyAccessFromIndexSignature` |            ≈0 | Trocar `.prop` por `["prop"]` em `Record<K,V>`                    | [ ]    |
+| G.4   | `allowUnreachableCode: false`        |            ≈0 | Remover código morto após `return`/`throw`                        | [ ]    |
+| G.5   | `allowUnusedLabels: false`           |            ≈0 | Remover labels JS não-utilizados                                  | [ ]    |
+
+### G.1 — `noUncheckedIndexedAccess` (45 erros)
+
+**O que faz**: acesso a array/objeto por índice (`arr[0]`, `obj[key]`) retorna `T | undefined` em
+vez de `T`. Força verificação de limite de array.
+
+**Padrão de erro**: `TS2322: Type 'string | undefined' is not assignable to type 'string'`
+
+**Estratégia de correção**:
+
+1. Asserção não-nula: `arr[0]!` (onde garantido por lógica de negócio)
+2. Guard explícito: `const v = arr[i]; if (v === undefined) return;`
+3. Coalescência: `arr[0] ?? defaultValue`
+
+**Critério de ativação**: após concluir E.2 (redução de unsafe tags). Ativar em `tsconfig.base.json`.
+
+### G.2 — `exactOptionalPropertyTypes` (31 erros)
+
+**O que faz**: `{ a?: string }` significa apenas `{a: string}` ou `{}` — nunca `{a: undefined}`.
+Sem essa flag, TypeScript aceita `{a: undefined}` como satisfazendo `{a?: string}`.
+
+**Padrão de erro**: `TS2379: Argument not assignable ... with exactOptionalPropertyTypes: true`
+
+**Estratégia de correção**:
+
+1. Nos typedefs JSDoc: `@property {string | undefined} [prop]` para propriedades que podem ser
+   `undefined` explicitamente
+2. Nas chamadas: remover propriedades `undefined` do literal antes de passar: `Object.fromEntries(...filter)`
+3. Usar `Partial<T>` quando aplicável
+
+**Critério de ativação**: independente — pode ativar agora (apenas 31 erros).
+
+### Ordem recomendada de execução
+
+```
+G.2 (31 erros) → G.1 (45 erros) → G.3–G.5 (≈0)
+```
+
+G.2 primeiro por ter menos erros e ser totalmente independente. G.1 depois por requerer atenção em
+cada acesso de índice (risco de asserção errada `!`).
+
+---
+
+## Fase H — Evolução arquitetural (longo prazo)
+
+> **Planejado**: horizonte de 2–3 sprints após conclusão das Fases E–G.
+
+### H.1 — Migração seletiva de `.js` → `.ts`
+
+Candidatos prioritários (APIs públicas estáveis, sem dependências circulares):
+
+- `src/types/**` — já são `.d.ts`, candidatos a `.ts` gerado
+- `src/core/constants/**` — constantes puras, tipagem trivial
+- `src/validation/**` — schemas Zod já têm inferência nativa TS
+- `src/shared/health-check.js` + `src/shared/inference-gateway-client.js` — já emitem `.d.ts`
+
+**Critério**: módulo tem 0 dependências circulares (`npm run analyze:deps`) e exports com tipos
+explícitos 100%.
+
+### H.2 — `isolatedDeclarations` para todo `src/`
+
+Expansão incremental de `tsconfig.isolated-declarations.json`:
+
+1. Adicionar `src/core/**` (APIs estáveis, retornos explícitos)
+2. Adicionar `src/nerv/**` (interface de eventos)
+3. Adicionar `src/shared/**` (utilitários públicos)
+4. Avaliar `src/infra/**` (mais complexo, retornos SQLite)
+
+**Pré-condição**: `isolatedDeclarations` requer que toda função exportada tenha tipo de retorno
+explícito em JSDoc (`@returns {T}` sem inferência). Verificar cobertura antes de ativar.
+
+### H.3 — `composite: true` + Project References
+
+Ativar `composite: true` em configs filhos + usar `references` no tsconfig raiz para build
+incremental por subsistema:
+
+```json
+// tsconfig.json (raiz)
+{
+    "references": [
+        { "path": "./tsconfig.node.json" },
+        { "path": "./tsconfig.declarations.json" }
+    ]
+}
+```
+
+**Benefício**: `tsc --build` faz build incremental por projeto — rebuild parcial quando apenas `src/kernel/` muda.
+
+**Pré-condição**: `emitDeclarationOnly: true` deve estar estável em todas as configs participantes.

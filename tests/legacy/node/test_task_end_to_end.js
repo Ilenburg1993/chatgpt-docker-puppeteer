@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import path from 'node:path';
 import fs from 'node:fs';
 import { parseTask } from '#core/schemas';

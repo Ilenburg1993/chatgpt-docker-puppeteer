@@ -163,7 +163,7 @@ export class OllamaClient {
     /**
      * Resolve execution runtime according to policy.
      *
-     * @param {{ operation?: 'embedding'|'generate'|'models'|'model_info', runtimePreference?: 'auto'|'cloud'|'local' }} [options]
+     * @param {{ operation?: 'embedding'|'generate'|'models'|'model_info', runtimePreference?: 'auto'|'cloud'|'local' | undefined }} [options]
      * @returns {{ runtime: 'cloud'|'local', requested: 'auto'|'cloud'|'local', operation: string, reason: string, cloudEnabled: boolean, localFallbackEnabled: boolean }}
      */
     resolveRuntime(options = {}) {

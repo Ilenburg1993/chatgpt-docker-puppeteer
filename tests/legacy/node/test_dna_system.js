@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import * as io from '#infra/io';
 import identityManager from '#core/identity_manager';
 

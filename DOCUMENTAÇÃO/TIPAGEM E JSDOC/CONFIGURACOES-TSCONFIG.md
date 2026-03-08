@@ -1,39 +1,46 @@
 # Configurações TypeScript — Lanes e Flags
 
 > **Status**: Referência operacional — descreve cada arquivo tsconfig, as lanes strict e o
-> significado das flags. **Última revisão**: 4 de março de 2026
+> significado das flags. **Última revisão**: 7 de março de 2026 — **Fases 0–D concluídas**.
+> `strict: true` ativo globalmente em `tsconfig.base.json`.
 
 ---
 
 ## 1. Hierarquia de tsconfig
 
 ```
-tsconfig.base.json          ← base comum (allowJs, checkJs, target, paths)
-├── tsconfig.node.json      ← src/ (module: NodeNext)
-├── tsconfig.browser.json   ← src/dashboard-ui/
-├── tsconfig.tools.json     ← tools/
-├── tsconfig.tests.json     ← tests/
-└── tsconfig.strict.json    ← workspace de lanes strict
-    └── config/typing/strict/tsconfig.strict.*.json  (lanes individuais)
+tsconfig.base.json                    ← base comum (strict: true, allowJs, checkJs, target, paths)
+├── tsconfig.node.json                ← src/ (module: NodeNext)
+├── tsconfig.browser.json             ← src/dashboard-ui/
+├── tsconfig.tools.json               ← tools/
+├── tsconfig.tests.json               ← tests/
+├── tsconfig.isolated-declarations.json ← src/types/ (isolatedDeclarations: true)
+└── tsconfig.strict.json              ← workspace de lanes strict
+    └── config/typing/strict/tsconfig.strict.*.json  (41 lanes individuais)
 ```
 
 ---
 
 ## 2. tsconfig.base.json — base comum
 
-**Flags atuais** (4 mar 2026):
+**Flags atuais** (7 mar 2026 — **Fase D concluída**):
 
-| Flag                   | Valor    | Nota                                           |
-| ---------------------- | -------- | ---------------------------------------------- |
-| `allowJs`              | `true`   | Permite arhivos `.js` no projeto               |
-| `checkJs`              | `true`   | TS verifica JS via JSDoc                       |
-| `noEmit`               | `true`   | Não gera arquivos — só verifica                |
-| `strict`               | `false`  | **Objetivo final**: mudar para `true` (Fase D) |
-| `noImplicitAny`        | `false`  | Ativar em Fase D.2                             |
-| `skipLibCheck`         | `true`   | Ignora tipos de node_modules                   |
-| `target`               | `ES2024` | Node.js 24+                                    |
-| `module`               | herdado  | via tsconfig filho                             |
-| `verbatimModuleSyntax` | `true`   | ESM estrito — `import type` separado           |
+| Flag                         | Valor      | Nota                                             |
+| ---------------------------- | ---------- | ------------------------------------------------ |
+| `allowJs`                    | `true`     | Permite arquivos `.js` no projeto                |
+| `checkJs`                    | `true`     | TS verifica JS via JSDoc                         |
+| `noEmit`                     | `true`     | Não gera arquivos — só verifica                  |
+| `strict`                     | **`true`** | ✅ **ATIVO** — ativa todo o strict suite          |
+| `noImplicitAny`              | `true`     | ✅ Via `strict: true`                             |
+| `strictNullChecks`           | `true`     | ✅ Via `strict: true`                             |
+| `useUnknownInCatchVariables` | `true`     | ✅ `catch(err)` retorna `unknown`                 |
+| `skipLibCheck`               | `true`     | Ignora tipos de node_modules                     |
+| `target`                     | `ES2024`   | Node.js 24+                                      |
+| `module`                     | herdado    | via tsconfig filho                               |
+| `verbatimModuleSyntax`       | `true`     | ESM estrito — `import type` separado             |
+| `resolvePackageJsonExports`  | `true`     | Respeita `exports` em package.json               |
+| `resolvePackageJsonImports`  | `true`     | Respeita `imports` em package.json (aliases `#`) |
+| `incremental`                | `true`     | Cache de verificação para builds incrementais    |
 
 **Aliases de path configurados**:
 
@@ -97,39 +104,57 @@ Cada lane tem seu `tsconfig.strict.*.json` com `strict: true` e escopo restrito 
 | `config/typing/strict/tsconfig.strict.src.validation.json` | `typecheck:strict:src.validation` |
 | `config/typing/strict/tsconfig.strict.tests.mocks.json`    | `typecheck:strict:tests.mocks`    |
 
-### Todas as lanes — mapa completo
+### Todas as lanes — mapa completo (41 lanes — todas verdes ✅)
 
-| Lane                    | Alias npm                                | Erros (mar 2026) | Fase |
-| ----------------------- | ---------------------------------------- | ---------------: | ---- |
-| `src.logic`             | `typecheck:strict:src.logic`             |                2 | A    |
-| `scripts.analysis`      | `typecheck:strict:scripts.analysis`      |              181 | A    |
-| `src.inference_gateway` | `typecheck:strict:src.inference_gateway` |              191 | A    |
-| `src.dashboard-ui`      | `typecheck:strict:src.dashboard-ui`      |              285 | A    |
-| `tests.manual`          | `typecheck:strict:tests.manual`          |              300 | A    |
-| `src.audit_agent`       | `typecheck:strict:src.audit_agent`       |              358 | A    |
-| `src.nerv`              | `typecheck:strict:src.nerv`              |              439 | B    |
-| `scripts.health`        | `typecheck:strict:scripts.health`        |              441 | B    |
-| `src.missions`          | `typecheck:strict:src.missions`          |              608 | B    |
-| `src.shared`            | `typecheck:strict:src.shared`            |              746 | B    |
-| `src.orchestrator`      | `typecheck:strict:src.orchestrator`      |              773 | B    |
-| `src.integration`       | `typecheck:strict:src.integration`       |              924 | B    |
-| `scripts.audit`         | `typecheck:strict:scripts.audit`         |              928 | B    |
-| `scripts.root`          | `typecheck:strict:scripts.root`          |              935 | B    |
-| `tools.workspace`       | `typecheck:strict:tools.workspace`       |            1.013 | B    |
-| `src.core`              | `typecheck:strict:src.core`              |            1.053 | B    |
-| `src.agent`             | `typecheck:strict:src.agent`             |            1.190 | B    |
-| `tests.legacy`          | `typecheck:strict:tests.legacy`          |            1.403 | C    |
-| `src.kernel`            | `typecheck:strict:src.kernel`            |            1.530 | C    |
-| `src.driver`            | `typecheck:strict:src.driver`            |            1.558 | C    |
-| `src.infra`             | `typecheck:strict:src.infra`             |            2.232 | C    |
+> **Estado**: 7 de março de 2026 — **todas as 41 lanes retornam 0 erros** (`typecheck:strict:all`
+> passa em CI). O número entre parênteses indica os erros eliminados ao longo das fases.
+
+| Lane                    | Alias npm                                | Estado              | Fase concluída |
+| ----------------------- | ---------------------------------------- | ------------------- | -------------- |
+| `src.types`             | `typecheck:strict:src.types`             | **0** ✅             | Grupo 0        |
+| `agents`                | `typecheck:strict:agents`                | **0** ✅             | Grupo 0        |
+| `scripts.ci`            | `typecheck:strict:scripts.ci`            | **0** ✅             | Grupo 0        |
+| `scripts.setup`         | `typecheck:strict:scripts.setup`         | **0** ✅             | Grupo 0        |
+| `tests.helpers`         | `typecheck:strict:tests.helpers`         | **0** ✅             | Grupo 0        |
+| `scripts.build`         | `typecheck:strict:scripts.build`         | **0** ✅             | Grupo 0        |
+| `scripts.env`           | `typecheck:strict:scripts.env`           | **0** ✅             | Grupo 0        |
+| `src.validation`        | `typecheck:strict:src.validation`        | **0** ✅             | Grupo 0        |
+| `tests.mocks`           | `typecheck:strict:tests.mocks`           | **0** ✅             | Grupo 0        |
+| `src.logic`             | `typecheck:strict:src.logic`             | **0** ✅ (foi 2)     | Grupo 1        |
+| `scripts.analysis`      | `typecheck:strict:scripts.analysis`      | **0** ✅ (foi 181)   | Grupo 1        |
+| `src.inference_gateway` | `typecheck:strict:src.inference_gateway` | **0** ✅ (foi 191)   | Grupo 1        |
+| `src.dashboard-ui`      | `typecheck:strict:src.dashboard-ui`      | **0** ✅ (foi 285)   | Grupo 1        |
+| `tests.manual`          | `typecheck:strict:tests.manual`          | **0** ✅ (foi 300)   | Grupo 1        |
+| `src.audit_agent`       | `typecheck:strict:src.audit_agent`       | **0** ✅ (foi 358)   | Grupo 1        |
+| `src.nerv`              | `typecheck:strict:src.nerv`              | **0** ✅ (foi 439)   | Grupo 2        |
+| `scripts.health`        | `typecheck:strict:scripts.health`        | **0** ✅ (foi 441)   | Grupo 2        |
+| `src.missions`          | `typecheck:strict:src.missions`          | **0** ✅ (foi 608)   | Grupo 2        |
+| `src.shared`            | `typecheck:strict:src.shared`            | **0** ✅ (foi 746)   | Grupo 2        |
+| `src.orchestrator`      | `typecheck:strict:src.orchestrator`      | **0** ✅ (foi 773)   | Grupo 2        |
+| `src.integration`       | `typecheck:strict:src.integration`       | **0** ✅ (foi 924)   | Grupo 2        |
+| `scripts.audit`         | `typecheck:strict:scripts.audit`         | **0** ✅ (foi 928)   | Grupo 2        |
+| `scripts.root`          | `typecheck:strict:scripts.root`          | **0** ✅ (foi 935)   | Grupo 2        |
+| `tools.workspace`       | `typecheck:strict:tools.workspace`       | **0** ✅ (foi 1.013) | Grupo 2        |
+| `src.core`              | `typecheck:strict:src.core`              | **0** ✅ (foi 1.053) | Grupo 2        |
+| `src.agent`             | `typecheck:strict:src.agent`             | **0** ✅ (foi 1.190) | Grupo 2        |
+| `tests.legacy`          | `typecheck:strict:tests.legacy`          | **0** ✅ (foi 1.403) | Grupo 2        |
+| `src.kernel`            | `typecheck:strict:src.kernel`            | **0** ✅ (foi 1.530) | Grupo 2        |
+| `src.driver`            | `typecheck:strict:src.driver`            | **0** ✅ (foi 1.558) | Grupo 2        |
+| `src.infra`             | `typecheck:strict:src.infra`             | **0** ✅ (foi 2.232) | Grupo 2        |
+| `tests.unit`            | `typecheck:strict:tests.unit`            | **0** ✅             | Fase D         |
+| `tests.integration`     | `typecheck:strict:tests.integration`     | **0** ✅             | Fase D         |
+| `tests.regression`      | `typecheck:strict:tests.regression`      | **0** ✅ (foi 215)   | Fase D         |
+
+> Lanes adicionais (`tests.e2e`, `tests.nightly`, `tests.scripts`, etc.) — ver lista completa em
+> `config/typing/strict/`. O total é **41 configs** em 7 de março de 2026.
 
 ---
 
 ## 5. Flags TypeScript — referência de decisão
 
-### Flags já ativas (via lanes strict)
+### Flags ativas em `tsconfig.base.json` (Fase D concluída ✅)
 
-Todas as lanes `tsconfig.strict.*.json` têm `strict: true`, o que ativa:
+Todas as lanes `tsconfig.strict.*.json` e também o `tsconfig.base.json` têm `strict: true`, o que ativa:
 
 | Flag incluída em `strict: true` | O que faz                                      |
 | ------------------------------- | ---------------------------------------------- |
@@ -139,24 +164,16 @@ Todas as lanes `tsconfig.strict.*.json` têm `strict: true`, o que ativa:
 | `strictPropertyInitialization`  | Propriedades de classe devem ser inicializadas |
 | `noImplicitAny`                 | Parâmetros sem tipo são erro                   |
 | `noImplicitThis`                | `this` sem tipo é erro                         |
-| `useUnknownInCatchVariables`    | `catch(e)` → `e` é `unknown` nao `any`         |
+| `useUnknownInCatchVariables`    | `catch(e)` → `e` é `unknown`, não `any`        |
 | `alwaysStrict`                  | Emite `"use strict"` em todo módulo            |
 
-### Flags ainda desativadas na base
+### Flags NÃO recomendadas (Fase E — análise pendente)
 
-| Flag                         | Estado  | Ativar em | Erros esperados |
-| ---------------------------- | ------- | --------- | --------------- |
-| `strict`                     | `false` | Fase D.4  | consolidação    |
-| `noImplicitAny`              | `false` | Fase D.2  | ~1.675          |
-| `useUnknownInCatchVariables` | `false` | Fase D.1  | 602             |
-| `strictNullChecks`           | `false` | Fase D.3  | ~245            |
-
-### Flags NÃO recomendadas
-
-| Flag                         | Motivo                                                             |
-| ---------------------------- | ------------------------------------------------------------------ |
-| `noUncheckedIndexedAccess`   | Inflaria erros em todo acesso a array/object — refatoração massiva |
-| `exactOptionalPropertyTypes` | Incompatível com padrões de options-object atuais                  |
+| Flag                                 | Motivo                                                                      |
+| ------------------------------------ | --------------------------------------------------------------------------- |
+| `noUncheckedIndexedAccess`           | Inflaria erros em todo acesso a array/object — refatoração massiva pendente |
+| `exactOptionalPropertyTypes`         | Incompatível com padrões de options-object atuais                           |
+| `noPropertyAccessFromIndexSignature` | Pode quebrar padrões de acesso dinâmico legítimo em infra                   |
 
 ---
 

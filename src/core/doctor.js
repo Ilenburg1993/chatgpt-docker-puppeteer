@@ -231,7 +231,7 @@ function getHardwareMetrics() {
     const freeMem = os.freemem();
     const totalMem = os.totalmem();
     const cpus = os.cpus();
-    const load = os.loadavg();
+    const load = /** @type {[number, number, number]} */ (os.loadavg());
     const cores = Math.max(1, cpus.length || 1);
     const normalizedLoadPct = Math.max(0, Math.min(100, (load[0] / cores) * 100));
     const cpuUsagePercent = normalizedLoadPct.toFixed(1);
@@ -425,7 +425,7 @@ async function runFullCheck() {
             status: issues.length === 0 ? STATUS_VALUES.HEALTHY : issues.length > 2 ? 'CRITICAL' : 'DEGRADED',
         },
         telemetry: {
-            network: targets.map((url, i) => ({ url, ...networkResults[i] })),
+            network: targets.map((url, i) => ({ url, ...(/** @type {NetworkProbe} */ (networkResults[i])) })),
             storage: storage,
             dna: dna,
             chrome: Object.assign({}, chrome, { proxyReport }),

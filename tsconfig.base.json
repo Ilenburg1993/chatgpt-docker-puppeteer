@@ -13,6 +13,8 @@
     "strict": true,
     "useUnknownInCatchVariables": true,
     "strictNullChecks": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "maxNodeModuleJsDepth": 0,
     "baseUrl": ".",

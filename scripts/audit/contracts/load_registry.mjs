@@ -80,8 +80,8 @@ function validateContract(contract, index, sourcePath) {
 
 /**
  * @typedef {object} LoadContractRegistryOptions
- * @property {string} [registryPath]
- * @property {string[]} [domainsFilter]
+ * @property {string | undefined} [registryPath]
+ * @property {string[] | undefined} [domainsFilter]
  */
 /**
  * @param {LoadContractRegistryOptions} [options]

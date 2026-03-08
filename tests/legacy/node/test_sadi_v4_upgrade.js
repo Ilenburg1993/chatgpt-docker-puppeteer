@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @ts-nocheck
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import path from 'node:path';
 
 console.log('\n🧪 SADI Analyzer v4.0 - Upgrade Validation\n');

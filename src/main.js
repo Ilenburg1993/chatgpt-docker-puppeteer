@@ -1642,8 +1642,7 @@ async function shutdown(context, options = {}) {
 
     const total = shutdownPhases.length;
 
-    for (let i = 0; i < shutdownPhases.length; i++) {
-        const phase = shutdownPhases[i];
+    for (const [i, phase] of shutdownPhases.entries()) {
         const phaseStartTime = Date.now();
 
         try {

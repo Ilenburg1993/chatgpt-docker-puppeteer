@@ -22,8 +22,8 @@ export function chunkCode(/** @type {any} */ { lines, maxChunkChars = MAX_CHUNK_
     const ranges = [];
 
     for (let s = 0; s < starts.length; s++) {
-        const startIdx = starts[s];
-        const endIdx = s + 1 < starts.length ? starts[s + 1] - 1 : lines.length - 1;
+        const startIdx = /** @type {number} */ (starts[s]);
+        const endIdx = s + 1 < starts.length ? /** @type {number} */ (starts[s + 1]) - 1 : lines.length - 1;
         if (startIdx > endIdx) continue;
 
         const len = estimateCharsForLines(lines, startIdx, endIdx);

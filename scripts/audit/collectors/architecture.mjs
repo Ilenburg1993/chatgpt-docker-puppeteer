@@ -2,9 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * @typedef {import('../normalize/findings.mjs').RawFinding} RawFinding
- */
+/** @import { RawFinding } from '../normalize/findings.mjs' */
 
 /**
  * @param {string} rootDir

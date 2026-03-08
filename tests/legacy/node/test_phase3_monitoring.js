@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @ts-nocheck
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import assert from 'node:assert';
 import EventEmitter from 'node:events';
 

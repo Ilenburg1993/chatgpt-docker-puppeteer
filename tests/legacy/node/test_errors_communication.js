@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 // ============================================================
 // TESTE DE COMUNICAÇÃO VISUAL DE ERROS/WARNINGS
 // ============================================================

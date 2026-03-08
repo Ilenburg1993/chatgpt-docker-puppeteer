@@ -312,7 +312,7 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
  * @typedef {object} PatchTaskCommandOptions
  * @property {string} taskId - ID da task a alterar.
  * @property {object} [actor={}] - Identidade do autor da operação.
- * @property {string} [reason] - Motivo da alteração.
+ * @property {string | undefined} [reason] - Motivo da alteração.
  * @property {string|null} [ifVersion=null] - Guard de versão otimista.
  * @property {object} [patch={}] - Campos a alterar.
  */
@@ -419,7 +419,7 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
  * @property {string} taskId - ID da task.
  * @property {string|null} missionId - ID da missão destino (null para desassociar).
  * @property {object} [actor={}] - Identidade do autor da operação.
- * @property {string} [reason] - Motivo da reassociação.
+ * @property {string | undefined} [reason] - Motivo da reassociação.
  * @property {string|null} [ifVersion=null] - Guard de versão otimista.
  */
 /**
@@ -529,7 +529,7 @@ function reassignTaskMissionCommand({ taskId, missionId, actor = {}, reason, ifV
  * @typedef {object} PauseTaskCommandOptions
  * @property {string} taskId - ID da task a pausar.
  * @property {object} [actor={}] - Identidade do autor da operação.
- * @property {string} [reason] - Motivo da pausa.
+ * @property {string | undefined} [reason] - Motivo da pausa.
  * @property {string|null} [ifVersion=null] - Guard de versão otimista.
  */
 /**
@@ -570,7 +570,7 @@ function pauseTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
  * @typedef {object} ResumeTaskCommandOptions
  * @property {string} taskId - ID da task a retomar.
  * @property {object} [actor={}] - Identidade do autor da operação.
- * @property {string} [reason] - Motivo da retomada.
+ * @property {string | undefined} [reason] - Motivo da retomada.
  * @property {string|null} [ifVersion=null] - Guard de versão otimista.
  */
 /**
@@ -622,7 +622,7 @@ function resumeTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
  * @typedef {object} CancelTaskCommandOptions
  * @property {string} taskId - ID da task a cancelar.
  * @property {object} [actor={}] - Identidade do autor da operação.
- * @property {string} [reason] - Motivo do cancelamento.
+ * @property {string | undefined} [reason] - Motivo do cancelamento.
  * @property {string|null} [ifVersion=null] - Guard de versão otimista.
  */
 /**
@@ -668,7 +668,7 @@ function cancelTaskCommand({ taskId, actor = {}, reason, ifVersion = null }) {
  * @typedef {object} RetryTaskCommandOptions
  * @property {string} taskId - ID da task a retentar.
  * @property {object} [actor={}] - Identidade do autor da operação.
- * @property {string} [reason] - Motivo da retentativa.
+ * @property {string | undefined} [reason] - Motivo da retentativa.
  * @property {string|null} [ifVersion=null] - Guard de versão otimista.
  */
 /**

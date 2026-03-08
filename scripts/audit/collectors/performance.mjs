@@ -3,9 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runCommand } from '../lib/exec.mjs';
 
-/**
- * @typedef {import('../normalize/findings.mjs').RawFinding} RawFinding
- */
+/** @import { RawFinding } from '../normalize/findings.mjs' */
 
 /**
  * @param {string} rootDir

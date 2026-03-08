@@ -9,8 +9,6 @@ import {
     isAuditJobTriggerType,
 } from './contracts.js';
 
-/** @typedef {import('./contracts.js')} _unused */
-
 function nowMs() {
     return Date.now();
 }

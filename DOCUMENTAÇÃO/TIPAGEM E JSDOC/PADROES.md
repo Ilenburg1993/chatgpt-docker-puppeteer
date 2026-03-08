@@ -1,7 +1,7 @@
 # Padrões — JSDoc e Tipagem TypeScript
 
 > **Status**: Normativo — todo código novo ou editado deve seguir estas regras. **Última revisão**:
-> 4 de março de 2026 **Aplica-se a**: `.js`, `.mjs` em `src/`, `scripts/`, `tests/`, `tools/`
+> 7 de março de 2026 **Aplica-se a**: `.js`, `.mjs` em `src/`, `scripts/`, `tests/`, `tools/`
 
 ---
 
@@ -26,7 +26,14 @@ Todo arquivo `.js` ou `.mjs` deve ter na primeira linha (ou logo após shebang):
 // @ts-check
 ```
 
-**Proibido**: `// @ts-nocheck` — sem exceção alguma.
+**Proibido**: `// @ts-nocheck` — sem exceção alguma em código de produção e testes ativos.
+
+> **Exceção documentada — `tests/legacy/`**: arquivos em `tests/legacy/node/*.js` são código em
+> **quarentena** — testes de integração obsoletos não executados na suíte principal. Estes 14
+> arquivos mantêm `// @ts-nocheck` temporariamente, identificado com o marcador:
+> `// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)`
+> Qualquer arquivo fora de `tests/legacy/` que usar `@ts-nocheck` deve ser considerado um bug de
+> tipagem e corrigido imediatamente.
 
 ### 2.2 Funções públicas sempre tipadas
 
@@ -213,12 +220,36 @@ Se nenhuma das condições for verdadeira, mantenha o typedef local no arquivo q
 
 ### Import de tipos compartilhados
 
+**Sintaxe preferida (TS 5.5+ `@import`):**
+
 ```js
 // @ts-check
 /** @import { TaskRecord } from '#types/tasks.js' */
 
-// Ou sintaxe inline:
-/** @type {import('#types/tasks').TaskRecord} */
+// Pode importar múltiplos tipos:
+/** @import { TaskRecord, TaskStatus } from '#types/tasks.js' */
+
+// Import apenas de namespace:
+/** @import * as Types from '#types/index.js' */
+```
+
+**Sintaxe legada (evitar em código novo):**
+
+```js
+// ❌ LEGADO — ainda funciona, mas prefira @import
+/** @typedef {import('#types/tasks.js').TaskRecord} TaskRecord */
+```
+
+**Por que preferir `@import`:**
+- Não cria bindings na estrutura de dados JSDoc (o typedef cria)
+- Mais próxima da sintaxe `import type` do TypeScript
+- Suportada nativamente pelo TypeScript desde 5.5
+- Funciona corretamente com `verbatimModuleSyntax: true`
+
+**Sintaxe inline (allowlist — apenas para usos únicos no arquivo):**
+
+```js
+/** @type {import('#types/tasks.js').TaskRecord} */
 const task = await getTask(id);
 ```
 

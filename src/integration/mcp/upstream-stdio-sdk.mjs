@@ -48,7 +48,7 @@ export class MCPStdioUpstreamClient {
         const transport = new StdioClientTransport({
             command: this.command,
             args: this.args,
-            env: this.env,
+            ...(this.env !== undefined ? { env: this.env } : {}),
             stderr: 'pipe',
         });
 
@@ -65,12 +65,12 @@ export class MCPStdioUpstreamClient {
         } catch (/** @type {any} */ _raw_err) { const err = /** @type {any} */ (_raw_err);
             try {
                 await client.close();
-            } catch (/** @type {any} */ _raw_e) { const e = /** @type {any} */ (_raw_e);
+            } catch (_) {
                 // ignore
             }
             try {
                 await transport.close();
-            } catch (/** @type {any} */ _raw_e) { const e = /** @type {any} */ (_raw_e);
+            } catch (_) {
                 // ignore
             }
             throw err;

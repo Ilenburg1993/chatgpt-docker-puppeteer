@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -54,7 +54,7 @@ async function setup() {
     console.log('[TEST SETUP] Variáveis de ambiente configuradas');
 
     // 3. Configurar configuração global de testes
-    global.testConfig = GLOBAL_TEST_CONFIG;
+    /** @type {any} */ (global).testConfig = GLOBAL_TEST_CONFIG;
     console.log('[TEST SETUP] Configuração global definida');
 
     // 4. Suprimir avisos não críticos
@@ -67,7 +67,7 @@ async function setup() {
         ) {
             return;
         }
-        originalWarning.call(process, warning, ...args);
+        /** @type {Function} */ (originalWarning).call(process, warning, ...args);
     };
 
     // 5. Configurar handlers globais de erro

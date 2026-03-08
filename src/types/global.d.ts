@@ -21,7 +21,7 @@ declare module '@babel/traverse' {
 
 interface Error {
     /** Detalhes adicionais do erro */
-    details?: string | Record<string, unknown>;
+    details?: string | Record<string, unknown> | undefined;
 
     /** Causa raiz do erro (ES2022+) */
     cause?: Error | unknown;
@@ -36,33 +36,33 @@ interface Error {
         action?: string;
         result?: string;
         [key: string]: unknown;
-    }>;
+    }> | undefined;
 
     /** Número de tentativas */
-    attempts?: number;
+    attempts?: number | undefined;
 
     /** Operação que causou o erro */
-    operation?: string;
+    operation?: string | undefined;
 
-    /** Código de erro */
-    code?: string | number;
+    /** Código de erro (pode ser string, número ou undefined conforme exactOptionalPropertyTypes) */
+    code?: string | number | undefined;
 
     /** Contexto adicional */
-    context?: Record<string, unknown>;
+    context?: Record<string, unknown> | undefined;
 
     /** Deprecation warnings */
-    originalFunction?: string;
-    replacedBy?: string;
+    originalFunction?: string | undefined;
+    replacedBy?: string | undefined;
 
     /** Status HTTP ou custom */
-    status?: number | string;
-    statusCode?: number | string;
-    timeoutMs?: number;
+    status?: number | string | undefined;
+    statusCode?: number | string | undefined;
+    timeoutMs?: number | undefined;
     lastError?: unknown;
-    url?: string;
+    url?: string | undefined;
     body?: unknown;
     openaiError?: unknown;
-    reason_code?: string;
+    reason_code?: string | undefined;
 }
 
 // ============================================================

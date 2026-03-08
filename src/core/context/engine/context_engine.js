@@ -107,9 +107,9 @@ async function resolveContext(text, /** @type {any} */ currentTask = null, /** @
             if (criteria === 'LAST') {
                 targetTask = await io.findLast(projectId);
             } else if (criteria.startsWith('FIRST:TAG:')) {
-                targetTask = await io.findFirstByTag(projectId, criteria.split(':')[2]);
+                targetTask = await io.findFirstByTag(projectId, criteria.split(':')[2] ?? '');
             } else if (criteria.startsWith('TAG:')) {
-                targetTask = await io.findLastByTag(projectId, criteria.split(':')[1]);
+                targetTask = await io.findLastByTag(projectId, criteria.split(':')[1] ?? '');
             } else {
                 targetTask = await io.findById(criteria);
             }

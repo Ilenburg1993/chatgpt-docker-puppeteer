@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { log } from '#core/logger';
 
-/** @typedef {import('puppeteer-core').Page} PuppeteerPage */
+/** @import { Page as PuppeteerPage } from 'puppeteer-core' */
 
 /**
  * Resultados de validação de pré-requisitos.

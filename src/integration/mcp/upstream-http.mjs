@@ -35,9 +35,9 @@ export class MCPUpstreamError extends Error {
     constructor(message, { code, data, status } = {}) {
         super(message);
         this.name = 'MCPUpstreamError';
-        this.code = code;
-        this.data = data;
-        this.status = status;
+        if (code !== undefined) this.code = code;
+        if (data !== undefined) this.data = data;
+        if (status !== undefined) this.status = status;
     }
 }
 
@@ -59,7 +59,7 @@ export function createMcpHttpClient(/** @type {any} */ config = {}) {
     const baseHeaders = normalizeHeaders(headers);
 
     /**
-     * @param {{ method: string, params?: Record<string, unknown>, signal?: AbortSignal }} payload
+     * @param {{ method: string, params?: Record<string, unknown> | undefined, signal?: AbortSignal | undefined }} payload
      */
     async function request({ method, params, signal }) {
         const id = Math.random().toString(16).slice(2);
@@ -79,7 +79,7 @@ export function createMcpHttpClient(/** @type {any} */ config = {}) {
                     ...baseHeaders,
                 },
                 body: JSON.stringify(body),
-                signal,
+                ...(signal !== undefined ? { signal } : {}),
             });
         } catch (/** @type {any} */ _raw_error) {
             const error = /** @type {any} */ (_raw_error);

@@ -147,7 +147,7 @@ export class InferenceGateway {
     }
 
     /**
-     * @param {{ clientTag: unknown, profileName?: string, overrides?: unknown }} options
+     * @param {{ clientTag: unknown, profileName?: string | undefined, overrides?: unknown }} options
      */
     resolvePolicy(options) {
         const clientTag = requireInferenceClientTag(options?.clientTag);

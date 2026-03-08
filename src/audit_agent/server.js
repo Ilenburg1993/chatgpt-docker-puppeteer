@@ -67,7 +67,7 @@ export function createAuditAgentServer(deps) {
                 return writeJson(res, 200, { ok: true, items: runtime.listJobs({ status, limit }) });
             }
             if (req.method === 'GET' && url.pathname.match(/^\/jobs\/[^/]+$/)) {
-                const id = decodeURIComponent(url.pathname.split('/')[2]);
+                const id = decodeURIComponent(url.pathname.split('/')[2] ?? '');
                 const job = runtime.getJob(id);
                 if (!job) {
                     return writeJson(res, 404, { ok: false, error: 'not_found', code: 'AUDIT_JOB_NOT_FOUND' });
@@ -80,13 +80,13 @@ export function createAuditAgentServer(deps) {
                 return writeJson(res, 201, { ok: true, job });
             }
             if (req.method === 'POST' && url.pathname.match(/^\/jobs\/[^/]+\/run$/)) {
-                const id = decodeURIComponent(url.pathname.split('/')[2]);
+                const id = decodeURIComponent(url.pathname.split('/')[2] ?? '');
                 const job = runtime.queueJob(id);
                 await runtime.tick();
                 return writeJson(res, 200, { ok: true, job: runtime.getJob(job.id) });
             }
             if (req.method === 'POST' && url.pathname.match(/^\/jobs\/[^/]+\/cancel$/)) {
-                const id = decodeURIComponent(url.pathname.split('/')[2]);
+                const id = decodeURIComponent(url.pathname.split('/')[2] ?? '');
                 const body = /** @type {Record<string, unknown>} */ (await readJsonBody(req));
                 const reason = typeof body.reason === 'string' ? body.reason : 'manual_cancel';
                 const job = runtime.cancelJob(id, reason);

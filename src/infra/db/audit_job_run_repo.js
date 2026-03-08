@@ -74,7 +74,7 @@ function _rowToRun(row) {
  * @typedef {object} CreateAuditJobRunInput
  * @property {string} id
  * @property {string} job_id
- * @property {number} [attempt_seq]
+ * @property {number | undefined} [attempt_seq]
  * @property {string} [status]
  * @property {string} [executor]
  * @property {string} [llm_model]

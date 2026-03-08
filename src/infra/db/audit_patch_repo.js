@@ -145,7 +145,7 @@ function _updatePatch(id, fields = {}) {
  * @property {number|null} [approved_at_ms]
  * @property {string} [applied_by]
  * @property {number|null} [applied_at_ms]
- * @property {string} [rollback_patch]
+ * @property {string | undefined} [rollback_patch]
  */
 /**
  * Função exportada: createAuditPatchProposal.

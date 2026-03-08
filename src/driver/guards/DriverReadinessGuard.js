@@ -4,9 +4,7 @@ import { isDomainMatch } from '#core/domain_matcher';
 import * as stabilizer from '#shared/page_stability/stabilizer';
 import { Triage } from '../modules/triage.js';
 
-/**
- * @typedef {import('#driver/core/BaseDriver').default} BaseDriver
- */
+/** @import BaseDriver from '#driver/core/BaseDriver' */
 
 /**
  * Check types para readiness validation.

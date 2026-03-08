@@ -120,7 +120,7 @@ function measureCpuUsagePercent() {
  */
 function getCPUStats() {
     const cpus = os.cpus();
-    const loadAvg = os.loadavg();
+    const loadAvg = /** @type {[number, number, number]} */ (os.loadavg());
     const usagePercent = measureCpuUsagePercent();
 
     return {

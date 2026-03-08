@@ -5,7 +5,7 @@ import path from 'node:path';
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'backups', 'tests', 'artifacts', 'coverage', 'dist']);
 
 /**
- * @typedef {import('./load_registry.mjs').ContractDefinitionV1} ContractDefinitionV1
+ * @import { ContractDefinitionV1 } from './load_registry.mjs'
  */
 
 /**

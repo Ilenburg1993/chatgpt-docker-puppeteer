@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import { log } from '#core/logger';
 
 // Configuração de teste

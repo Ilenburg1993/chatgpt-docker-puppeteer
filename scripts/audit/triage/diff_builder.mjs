@@ -63,9 +63,9 @@ function buildContractAwareReplacement(finding, oldLine, fallback) {
 
 /**
  * @typedef {object} BuildSuggestedDiffContext
- * @property {string} [title]
- * @property {string} [cause]
- * @property {string} [replacementHint]
+ * @property {string | undefined} [title]
+ * @property {string | undefined} [cause]
+ * @property {string | undefined} [replacementHint]
  */
 /** @typedef {any} BuildSuggestedDiffFinding */
 /**

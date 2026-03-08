@@ -576,15 +576,16 @@ async function humanTypeCore(
             }
         }
 
-        const char = sanitizedText[i];
+        const char = /** @type {string} */ (sanitizedText[i]);
         const lowerChar = char.toLowerCase();
 
         // Typos e Transposição ([v2.0] Use config constants)
         if (i > 2 && Math.random() < BIOMECHANICS_CONFIG.TYPO_RATE) {
             let typoChar;
-            if (Math.random() > BIOMECHANICS_CONFIG.TYPO_TRANSPOSE_RATE && sanitizedText[i + 1]) {
+            const nextChar = sanitizedText[i + 1];
+            if (Math.random() > BIOMECHANICS_CONFIG.TYPO_TRANSPOSE_RATE && nextChar) {
                 // Transposition
-                typoChar = sanitizedText[i + 1] + char;
+                typoChar = nextChar + char;
                 await page.keyboard.type(typoChar);
                 i++;
             } else {

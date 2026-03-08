@@ -180,7 +180,7 @@ class FeedbackProcessor {
             const regexCopy = new RegExp(regex.source, regex.flags); // Clone regex to reset lastIndex
 
             while ((match = regexCopy.exec(feedbackText)) !== null) {
-                const extractedText = match[1].trim();
+                const extractedText = (match[1] ?? '').trim();
                 if (extractedText.length > 0) {
                     patterns.push(template.replace('{match}', extractedText));
                 }

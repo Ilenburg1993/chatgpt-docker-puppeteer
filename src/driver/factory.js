@@ -436,7 +436,7 @@ class DriverFactory extends EventEmitter {
             if (!this.registry[this.defaultTargetKey]) {
                 const availableTargets = Object.keys(this.registry);
                 const originalDefault = CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET;
-                this.defaultTargetKey = availableTargets[0];
+                this.defaultTargetKey = availableTargets[0] ?? '';
                 log(
                     'WARN',
                     `[FACTORY] Default target '${originalDefault}' não encontrado. Usando '${this.defaultTargetKey}'`

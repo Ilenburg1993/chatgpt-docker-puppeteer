@@ -80,7 +80,7 @@ export class AdaptiveThrottler {
 
     estimateFromLoadAvg() {
         const load = os.loadavg?.();
-        const load1 = Array.isArray(load) ? load[0] : 0;
+        const load1 = Array.isArray(load) ? (load[0] ?? 0) : 0;
         const cores = Math.max(1, os.cpus()?.length || 1);
         if (!Number.isFinite(load1) || load1 < 0) return null;
         return clamp((load1 / cores) * 100, 0, 100);

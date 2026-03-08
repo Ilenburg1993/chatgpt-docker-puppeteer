@@ -97,7 +97,7 @@ function normalizeLang(langCode) {
     if (!langCode || typeof langCode !== 'string') {
         return 'en';
     }
-    return langCode.split(/[-_]/)[0].toLowerCase();
+    return (langCode.split(/[-_]/)[0] ?? langCode).toLowerCase();
 }
 
 /* ==========================================================================

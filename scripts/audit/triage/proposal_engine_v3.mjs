@@ -6,9 +6,9 @@ import { buildTestPlan } from './test_planner.mjs';
 /**
  * @typedef {object} BuildProposalV3Options
  * @property {Array<any>} [rankedCauses]
- * @property {number} [score]
- * @property {boolean} [proposeDiffs]
- * @property {'basic'|'standard'|'deep'} [depth]
+ * @property {number | undefined} [score]
+ * @property {boolean | undefined} [proposeDiffs]
+ * @property {'basic'|'standard'|'deep' | undefined} [depth]
  * @property {any} [contextPack]
  */
 /** @typedef {any} BuildProposalV3Finding */
