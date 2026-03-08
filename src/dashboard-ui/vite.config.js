@@ -106,7 +106,7 @@ export default defineConfig({
                     // Application code splitting
                     if (id.includes('/views/')) {
                         // Split each view into its own chunk for better caching
-                        const viewName = id.split('/views/')[1].split('.')[0];
+                        const viewName = (id.split('/views/')[1] ?? '').split('.')[0] ?? '';
                         return `view-${viewName.toLowerCase()}`;
                     }
 

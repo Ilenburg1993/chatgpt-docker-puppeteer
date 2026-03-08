@@ -45,7 +45,7 @@ function extractFunctions(content) {
     ];
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const line = (lines[i] ?? '').trim();
 
         // Pular linhas que já têm JSDOC
         if (line.startsWith('/**') || line.includes('* @')) {
@@ -56,7 +56,7 @@ function extractFunctions(content) {
         for (const pattern of functionPatterns) {
             const match = line.match(pattern);
             if (match) {
-                const funcName = match[1];
+                const funcName = match[1] ?? '';
 
                 // Verificar se esta função faz parte de uma classe
                 let funcType = 'function';
@@ -122,7 +122,7 @@ function generateJSDoc(funcName, funcType) {
 function hasJSDocAbove(lines, funcStartLine) {
     // Procurar para cima até 5 linhas
     for (let i = funcStartLine - 1; i >= Math.max(0, funcStartLine - 5); i--) {
-        const line = lines[i].trim();
+        const line = (lines[i] ?? '').trim();
         if (line.startsWith('/**')) {
             return true;
         }
@@ -149,7 +149,7 @@ function processFile(filepath) {
 
     // Processar funções de trás para frente para manter os índices corretos
     for (let i = functions.length - 1; i >= 0; i--) {
-        const func = functions[i];
+        const func = /** @type {any} */ (functions[i]);
 
         // Verificar se já tem JSDOC acima
         if (!hasJSDocAbove(lines, func.startLine)) {

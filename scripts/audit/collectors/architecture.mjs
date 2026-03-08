@@ -49,7 +49,7 @@ export async function collectArchitectureFindings(rootDir) {
         });
     }
 
-    /** @type {Record<string, number>} */
+    /** @type {any} */
     const findingsByKind = {
         coupling: 0,
         circular: 0,

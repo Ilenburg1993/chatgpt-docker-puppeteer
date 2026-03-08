@@ -290,7 +290,7 @@ function analyzeResults(results) {
             const lines = result.stderr.split('\n');
             lines.forEach((/** @type {string} */ line) => {
                 if (line.includes('Error') || line.includes('Exception') || line.includes('uncaught')) {
-                    const pattern = line.split(':')[0];
+                    const pattern = line.split(':')[0] ?? '';
                     errorPatterns[pattern] = (errorPatterns[pattern] || 0) + 1;
                 }
             });

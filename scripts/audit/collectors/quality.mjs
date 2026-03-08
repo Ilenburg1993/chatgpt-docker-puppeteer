@@ -193,7 +193,7 @@ export function parseTypecheckOutput(output) {
         findings.push(
             finding(
                 'quality:typecheck',
-                normPath(m[1]),
+                normPath(m[1] ?? ''),
                 Number(m[2]),
                 `TS${m[4]}: ${m[5]}`,
                 `TS${m[4]}`,
@@ -225,7 +225,7 @@ export function parsePrettierCheckOutput(output) {
         findings.push(
             finding(
                 'quality:prettier',
-                normPath(m[1]),
+                normPath(m[1] ?? ''),
                 null,
                 clean,
                 'prettier-check',
@@ -353,14 +353,14 @@ export function parseTsIgnoreFindings(stdout, scopeFiles) {
         const m = line.match(/^(.+?):(\d+):(.*)$/);
         if (!m) continue;
         if (!String(m[3] || '').includes(TS_IGNORE_TOKEN)) continue;
-        const file = normPath(m[1]);
+        const file = normPath(m[1] ?? '');
         if (allowedScope.size > 0 && !allowedScope.has(file)) continue;
         findings.push(
             finding(
                 'quality:ts-ignore-scan',
                 file,
                 Number(m[2]),
-                m[3].trim(),
+                (m[3] ?? '').trim(),
                 'ts-ignore-forbidden',
                 'P1',
                 'falha de contrato',

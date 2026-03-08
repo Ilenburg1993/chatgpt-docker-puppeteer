@@ -275,7 +275,7 @@ function getDefaultGatewayIPv4() {
             if (parts.length < 3) continue;
 
             const destination = parts[1];
-            const gatewayHex = parts[2];
+            const gatewayHex = parts[2] ?? '';
 
             // Default route has Destination == 00000000
             if (destination !== '00000000') continue;

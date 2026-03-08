@@ -103,7 +103,7 @@ function auditTmpScripts() {
 
     const files = fs.readdirSync(TMP_DIR).filter(f => f.endsWith('.js'));
 
-    /** @type {Record<string, any[]>} */
+    /** @type {any} */
     const results = {
         SYSTEM: [],
         IMMEDIATE: [],
@@ -158,7 +158,7 @@ function auditTmpScripts() {
         console.log(`\n${icon} ${category} (${items.length} files):`);
         console.log('-'.repeat(80));
 
-        items.forEach(({ filename, classification }) => {
+        items.forEach((/** @type {any} */ { filename, classification }) => {
             console.log(`\n  📄 ${filename}`);
             console.log(`     Action: ${classification.action}`);
             console.log(`     Reason: ${classification.reason}`);
@@ -172,9 +172,9 @@ function auditTmpScripts() {
     console.log('\n' + '='.repeat(80));
     console.log('\n📋 SUMMARY:\n');
 
-    const toMove = results.REUSABLE.filter(r => r.classification.action === 'MOVE');
-    const toDelete = results.IMMEDIATE.filter(r => r.classification.action === 'DELETE');
-    const toReview = [...results.DEV_TOOL, ...results.UNKNOWN].filter(r => r.classification.action !== 'IGNORE');
+    const toMove = results.REUSABLE.filter(/** @param {any} r */ r => r.classification.action === 'MOVE');
+    const toDelete = results.IMMEDIATE.filter(/** @param {any} r */ r => r.classification.action === 'DELETE');
+    const toReview = [...results.DEV_TOOL, ...results.UNKNOWN].filter(/** @param {any} r */ r => r.classification.action !== 'IGNORE');
 
     console.log(`  ♻️  MOVE to scripts/: ${toMove.length} files`);
     console.log(`  🗑️  DELETE (fulfilled): ${toDelete.length} files`);

@@ -24,7 +24,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[jsonc]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -614,7 +614,7 @@
   // Observabilidade do editor e execucao de tarefas.
   // ===========================================================================
   // Subfase 17.1) Debug e problemas
-  "debug.javascript.autoAttachFilter": "smart",
+  "debug.javascript.autoAttachFilter": "always",
   "debug.focusEditorOnBreak": true,
   "debug.inlineValues": "on",
   "debug.showBreakpointsInOverviewRuler": true,

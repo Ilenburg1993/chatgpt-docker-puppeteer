@@ -229,10 +229,10 @@ async function test4_SequentialKills() {
     // Validações
     const checks = [
         { name: '3 kills executados', pass: results.length === 3 },
-        { name: 'Kill 1 completou', pass: results[0].status === 'SUCCESS' },
-        { name: 'Kill 2 timeout', pass: results[1].status === 'TIMEOUT' },
-        { name: 'Kill 3 completou', pass: results[2].status === 'SUCCESS' },
-        { name: 'Isolamento mantido', pass: results[0].status !== results[1].status },
+        { name: 'Kill 1 completou', pass: (/** @type {any} */ (results[0])).status === 'SUCCESS' },
+        { name: 'Kill 2 timeout', pass: (/** @type {any} */ (results[1])).status === 'TIMEOUT' },
+        { name: 'Kill 3 completou', pass: (/** @type {any} */ (results[2])).status === 'SUCCESS' },
+        { name: 'Isolamento mantido', pass: (/** @type {any} */ (results[0])).status !== (/** @type {any} */ (results[1])).status },
     ];
 
     const allPassed = checks.every(c => c.pass);

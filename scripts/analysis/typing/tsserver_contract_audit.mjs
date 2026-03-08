@@ -40,7 +40,7 @@ function extractOperationsFromDaemon(text) {
         Array.from(
             new Set(
                 Array.from(text.matchAll(/case '([A-Za-z_]+)':/g))
-                    .map(match => match[1])
+                    .map(match => match[1] ?? '')
                     .filter(Boolean)
             )
         )
@@ -56,7 +56,7 @@ function extractOperationsFromSkill(text) {
         Array.from(
             new Set(
                 Array.from(text.matchAll(/^- `([A-Za-z_]+)`:/gm))
-                    .map(match => match[1])
+                    .map(match => match[1] ?? '')
                     .filter(Boolean)
             )
         )

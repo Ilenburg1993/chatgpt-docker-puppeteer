@@ -234,14 +234,14 @@ async function test5_CacheInvalidation() {
     let deleteTaskOrderCorrect = false;
 
     if (saveTaskFuncMatch) {
-        const funcBody = saveTaskFuncMatch[1];
+        const funcBody = saveTaskFuncMatch[1] ?? '';
         const markDirtyIndex = funcBody.indexOf('markDirty');
         const saveTaskIndex = funcBody.indexOf('taskStore.saveTask');
         saveTaskOrderCorrect = markDirtyIndex > 0 && markDirtyIndex < saveTaskIndex;
     }
 
     if (deleteTaskFuncMatch) {
-        const funcBody = deleteTaskFuncMatch[1];
+        const funcBody = deleteTaskFuncMatch[1] ?? '';
         const markDirtyIndex = funcBody.indexOf('markDirty');
         const deleteTaskIndex = funcBody.indexOf('taskStore.deleteTask');
         deleteTaskOrderCorrect = markDirtyIndex > 0 && markDirtyIndex < deleteTaskIndex;

@@ -111,7 +111,7 @@ runTest('TEST 3: Driver - Zero acesso direto ao filesystem', () => {
         // Verifica chamadas proibidas (exceto em comentários)
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
+            const line = (lines[i] ?? '').trim();
 
             // Ignora comentários
             if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {
@@ -165,7 +165,7 @@ runTest('TEST 4: DriverNERVAdapter - Comunicação 100% via NERV', () => {
     // NÃO deve fazer emissões externas diretas (fora do NERV)
     const lines = content.split('\n');
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const line = (lines[i] ?? '').trim();
 
         // Ignora comentários e logs normais
         if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {

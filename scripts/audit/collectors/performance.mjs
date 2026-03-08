@@ -245,7 +245,7 @@ export async function collectPerformanceFindings(rootDir) {
         });
     }
 
-    /** @type {Record<string, number>} */
+    /** @type {any} */
     const categories = {
         cpu: 0,
         memory: 0,
@@ -630,7 +630,7 @@ async function analyzeMissionTransitionBypass(rootDir) {
             const content = fs.readFileSync(absolutePath, 'utf8');
             const lines = content.split('\n');
             for (let i = 0; i < lines.length; i += 1) {
-                if (!/updateMission\s*\(/.test(lines[i])) {
+                if (!/updateMission\s*\(/.test(lines[i] ?? '')) {
                     continue;
                 }
                 const window = lines.slice(i, Math.min(i + 12, lines.length)).join('\n');
@@ -643,7 +643,7 @@ async function analyzeMissionTransitionBypass(rootDir) {
                     domain: 'runtime',
                     file: relPath,
                     line: i + 1,
-                    evidence: lines[i].trim(),
+                    evidence: String(lines[i]).trim(),
                     severity_hint: 'P1',
                     type: 'bug',
                     impact: 'Mutação de status fora do serviço único pode causar drift de regras entre controller/runner.',

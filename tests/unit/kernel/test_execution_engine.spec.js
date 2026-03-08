@@ -171,7 +171,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
             };
 
             assert.strictEqual(tarefa.errors.length, 1);
-            assert.strictEqual(tarefa.errors[0].type, 'TIMEOUT');
+            assert.strictEqual((/** @type {any} */ (tarefa.errors[0])).type, 'TIMEOUT');
         });
 
         it('deve acumular múltiplos erros', () => {
@@ -198,8 +198,8 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
 
             const ordenadas = [...tarefas].sort((a, b) => b.priority - a.priority);
 
-            assert.strictEqual(ordenadas[0].id, 't2', 'Maior prioridade primeiro');
-            assert.strictEqual(ordenadas[2].id, 't1', 'Menor prioridade por último');
+            assert.strictEqual((/** @type {any} */ (ordenadas[0])).id, 't2', 'Maior prioridade primeiro');
+            assert.strictEqual((/** @type {any} */ (ordenadas[2])).id, 't1', 'Menor prioridade por último');
         });
 
         it('deve respeitar ordem FIFO para mesma prioridade', () => {
@@ -216,7 +216,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
                 return b.priority - a.priority;
             });
 
-            assert.strictEqual(ordenadas[0].id, 't1', 'Primeira criada primeiro');
+            assert.strictEqual((/** @type {any} */ (ordenadas[0])).id, 't1', 'Primeira criada primeiro');
         });
     });
 

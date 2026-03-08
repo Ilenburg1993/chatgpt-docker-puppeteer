@@ -248,7 +248,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             ];
 
             assert.strictEqual(runtimes.length, 3);
-            assert.notStrictEqual(runtimes[0].id, runtimes[1].id);
+            assert.notStrictEqual((/** @type {any} */ (runtimes[0])).id, (/** @type {any} */ (runtimes[1])).id);
         });
     });
 });

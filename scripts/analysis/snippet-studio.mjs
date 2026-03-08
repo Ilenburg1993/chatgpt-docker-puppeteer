@@ -746,12 +746,12 @@ function analyzeRepositorySignals(roots, { minBlockOccurrences = 4 } = {}) {
         }
 
         for (const [key, regex] of Object.entries(patternMatchers)) {
-            patternCounts[key] += (text.match(regex) || []).length;
+            patternCounts[key] = (patternCounts[key] ?? 0) + (text.match(regex) || []).length;
         }
 
         for (const [key, regex] of Object.entries(sequenceMatchers)) {
             if (regex.test(text)) {
-                sequenceCounts[key] += 1;
+                sequenceCounts[key] = (sequenceCounts[key] ?? 0) + 1;
             }
         }
 

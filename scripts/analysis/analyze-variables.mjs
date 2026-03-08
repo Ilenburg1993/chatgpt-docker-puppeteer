@@ -123,6 +123,7 @@ class VariableParser {
     constructor(content, filePath) {
         this.content = content;
         this.filePath = filePath;
+        /** @type {any[]} */
         this.lines = content.split('\n');
         /** @type {any[]} */
         this.variables = [];
@@ -163,12 +164,12 @@ class VariableParser {
 
             let match = line.match(exportRegex);
             if (match) {
-                this.exports.add(match[2]);
+                this.exports.add(match[2] ?? '');
             }
 
             match = line.match(exportNamedRegex);
             if (match) {
-                const names = match[1].split(',').map(/** @param {string} n */ n => n.trim().split(' as ')[0]);
+                const names = (match[1] ?? '').split(',').map(/** @param {string} n */ n => n.trim().split(' as ')[0] ?? '');
                 names.forEach(/** @param {string} n */ n => this.exports.add(n));
             }
         }
@@ -188,13 +189,13 @@ class VariableParser {
                 if (match[1]) {
                     // named imports
                     const names = match[1].split(',').map(/** @param {string} n */ n => n.trim().split(' as ')[0]);
-                    names.forEach(/** @param {string} n */ n => this.imports.set(n, { line: i + 1, source: match[5] }));
+                    names.forEach(/** @param {string} n */ n => this.imports.set(n, { line: i + 1, source: match[5] ?? '' }));
                 } else if (match[2]) {
                     // default import
-                    this.imports.set(match[2], { line: i + 1, source: match[5] });
+                    this.imports.set(match[2] ?? '', { line: i + 1, source: match[5] ?? '' });
                 } else if (match[4]) {
                     // namespace import
-                    this.imports.set(match[4], { line: i + 1, source: match[5], namespace: true });
+                    this.imports.set(match[4] ?? '', { line: i + 1, source: match[5] ?? '', namespace: true });
                 }
             }
         }
@@ -246,15 +247,19 @@ class VariableParser {
             for (const pattern of patterns) {
                 const match = trimmedLine.match(pattern.regex);
                 if (match) {
+                    const m = /** @type {any} */ (match);
                     if (pattern.type === 'declaration') {
-                        const [, keyword, name, value] = match;
+                        const keyword = /** @type {string} */ (m[1]);
+                        const name = /** @type {string} */ (m[2]);
+                        const value = /** @type {string} */ (m[3]);
                         const varInfo = this.analyzeVariable(name, value.trim(), keyword, lineNum, line);
                         this.variables.push(varInfo);
                     } else if (pattern.type === 'destructuring-object') {
-                        const [, keyword, props] = match;
+                        const keyword = /** @type {string} */ (m[1]);
+                        const props = /** @type {string} */ (m[2]);
                         const propList = props
                             .split(',')
-                            .map(/** @param {string} p */ p => p.trim().split(':')[0].trim());
+                            .map(/** @param {string} p */ p => p.trim().split(':')[0]?.trim() ?? '');
                         propList.forEach(
                             /** @param {string} prop */ prop => {
                                 if (prop && !prop.includes('...')) {
@@ -264,7 +269,8 @@ class VariableParser {
                             }
                         );
                     } else if (pattern.type === 'destructuring-array') {
-                        const [, keyword, props] = match;
+                        const keyword = /** @type {string} */ (m[1]);
+                        const props = /** @type {string} */ (m[2]);
                         const propList = props.split(',').map(/** @param {string} p */ p => p.trim());
                         propList.forEach(
                             /** @param {string} prop */ prop => {
@@ -275,7 +281,8 @@ class VariableParser {
                             }
                         );
                     } else if (pattern.type === 'class-property') {
-                        const [, name, value] = match;
+                        const name = /** @type {string} */ (m[1]);
+                        const value = /** @type {string} */ (m[2]);
                         const varInfo = this.analyzeVariable(name, value.trim(), 'this', lineNum, line);
                         this.variables.push(varInfo);
                     }
@@ -534,7 +541,7 @@ class _DependencyMapper {
     getVariableName(value) {
         // Extrair nome da variável do valor (simplificado)
         const match = value.match(/^(\w+)/);
-        return match ? match[1] : null;
+        return match ? (match[1] ?? null) : null;
     }
 }
 
@@ -864,7 +871,7 @@ ${this.generateTypeDistribution()}
      * @returns {Record<string, any[]>}
      */
     categorizeConstants(constants) {
-        /** @type {Record<string, any[]>} */
+        /** @type {any} */
         const categories = {
             'URLs e Endpoints': [],
             'Timeouts e Números': [],

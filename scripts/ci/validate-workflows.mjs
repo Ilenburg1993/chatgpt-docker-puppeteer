@@ -139,7 +139,7 @@ for (const file of files) {
             }
 
             if (typeof stepObj.uses === 'string') {
-                const [actionRef, ref = ''] = stepObj.uses.split('@');
+                const [actionRef = '', ref = ''] = stepObj.uses.split('@');
                 const expectedRef = requiredPinnedActionRefs.get(actionRef);
                 if (expectedRef && ref !== expectedRef) {
                     throw new Error(

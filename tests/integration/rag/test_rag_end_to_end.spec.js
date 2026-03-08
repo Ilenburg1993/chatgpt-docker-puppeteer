@@ -19,7 +19,7 @@ class FakeEmbeddingsProvider {
     async embed(/** @type {any} */ text) {
         const hash = crypto.createHash('sha256').update(String(text), 'utf8').digest();
         const v = [];
-        for (let i = 0; i < this.dim; i++) v.push(hash[i] / 255);
+        for (let i = 0; i < this.dim; i++) v.push((hash[i] ?? 0) / 255);
         return v;
     }
 }

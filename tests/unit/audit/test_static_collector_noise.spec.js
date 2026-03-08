@@ -86,7 +86,7 @@ test('static collector filters dist cycles and test-only duplication noise', asy
     const jscpdFindings = out.findings.filter(item => item.source_tool === 'jscpd');
 
     assert.equal(madgeFindings.length, 1);
-    assert.equal(madgeFindings[0].file, 'src/server/main.js');
+    assert.equal((/** @type {any} */ (madgeFindings[0])).file, 'src/server/main.js');
     assert.equal(jscpdFindings.length, 1);
-    assert.equal(jscpdFindings[0].file, 'src/server/main.js');
+    assert.equal((/** @type {any} */ (jscpdFindings[0])).file, 'src/server/main.js');
 });

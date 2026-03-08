@@ -56,7 +56,7 @@ function buildCommentLines(indent, exportsAtLine) {
                 ? 'Reexports públicos deste módulo (barrel de compatibilidade).'
                 : `Exports públicos deste módulo (${exportsAtLine.length} símbolos).`;
     } else {
-        const item = exportsAtLine[0];
+        const item = /** @type {any} */ (exportsAtLine[0]);
         const name = item.export_name === 'default' ? 'default' : item.export_name;
         if (item.kind === 'function') text = `Função exportada: ${name}.`;
         else if (item.kind === 'class') text = `Classe exportada: ${name}.`;
@@ -75,13 +75,13 @@ function buildCommentLines(indent, exportsAtLine) {
  */
 function hasNearbyJsDoc(lines, lineIndexZeroBased) {
     let i = lineIndexZeroBased - 1;
-    while (i >= 0 && lines[i].trim() === '') i -= 1;
+    while (i >= 0 && (lines[i] ?? '').trim() === '') i -= 1;
     if (i < 0) return false;
-    const line = lines[i].trim();
+    const line = (lines[i] ?? '').trim();
     if (line.startsWith('/**')) return true;
     if (line.endsWith('*/')) {
         while (i >= 0) {
-            if (lines[i].includes('/**')) return true;
+            if ((lines[i] ?? '').includes('/**')) return true;
             if (i === 0) break;
             i -= 1;
         }

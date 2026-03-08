@@ -39,7 +39,7 @@ const skills = candidates.map(c => {
     let meta = /** @type {any} */ ({});
     if (match) {
         try {
-            meta = yaml.load(match[1]) || {};
+            meta = yaml.load(match[1] ?? '') || {};
         } catch (e) {
             const _e = /** @type {any} */ (e);
             console.error('YAML parse error in', c.md, _e.message || e);

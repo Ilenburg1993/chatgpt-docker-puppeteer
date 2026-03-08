@@ -27,10 +27,10 @@ const requiredTypingCommands = [
 function parseOriginRemote(url) {
     const trimmed = String(url || '').trim();
     const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
-    if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
+    if (sshMatch) return { owner: sshMatch[1] ?? '', repo: sshMatch[2] ?? '' };
 
     const httpsMatch = trimmed.match(/^https:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/);
-    if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
+    if (httpsMatch) return { owner: httpsMatch[1] ?? '', repo: httpsMatch[2] ?? '' };
 
     throw new Error(`[ci] Unable to parse GitHub origin remote: ${trimmed}`);
 }

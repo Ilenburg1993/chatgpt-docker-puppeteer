@@ -94,9 +94,10 @@ test('imports tools from HTTP upstream and proxies calls', async () => {
 
         const st = await registerUpstreams(registry, { env });
         assert.equal(st.upstreams.length, 1);
-        assert.equal(st.upstreams[0].alias, 'core');
-        assert.equal(st.upstreams[0].ready, true);
-        assert.equal(st.upstreams[0].registeredCount, 1);
+        const up0h = /** @type {any} */ (st.upstreams[0]);
+        assert.equal(up0h.alias, 'core');
+        assert.equal(up0h.ready, true);
+        assert.equal(up0h.registeredCount, 1);
 
         assert.equal(registry.has('mcp_core__hello'), true);
 

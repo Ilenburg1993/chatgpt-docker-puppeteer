@@ -174,8 +174,8 @@ function analyzeSnippetCatalog({ snippetFile, expectedFamilies }) {
 
     const scopes = [...new Set(entries.map(([, snippet]) => snippet.scope))].sort();
     const familyCounts = prefixes.reduce((acc, entry) => {
-        const family = String(entry.prefix).split('.')[0];
-        acc[family] = (acc[family] || 0) + 1;
+        const family = String(entry.prefix).split('.')[0] ?? '';
+        acc[family] = (acc[family] ?? 0) + 1;
         return acc;
     }, /** @type {Record<string, number>} */ ({}));
 

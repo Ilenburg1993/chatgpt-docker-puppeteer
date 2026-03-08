@@ -69,7 +69,7 @@ function parseForbiddenOutput(stdoutOrStderr) {
     for (const line of lines) {
         const match = line.match(/^- \[([^\]]+)\] (.+)#L(\d+): (.+)$/);
         if (!match) continue;
-        findings.push({
+        findings.push(/** @type {any} */ ({
             source_tool: 'check:forbidden',
             contract_id: match[1],
             domain: 'logic',
@@ -85,7 +85,7 @@ function parseForbiddenOutput(stdoutOrStderr) {
                 'Substituir o padrão proibido por alternativa canônica do projeto ou justificar em allowlist controlada.',
             test_strategy: 'Executar `npm run check:forbidden` e validar ausência de ocorrências.',
             regression_risk: 'Médio',
-        });
+        }));
     }
     return findings;
 }
@@ -104,7 +104,7 @@ function parseEslintOutput(output) {
             continue;
         }
 
-        findings.push({
+        findings.push(/** @type {any} */ ({
             source_tool: 'lint:quiet',
             file: match[1],
             line: Number(match[2]),
@@ -117,7 +117,7 @@ function parseEslintOutput(output) {
             suggested_patch: 'Corrigir a violação de lint de acordo com a regra indicada.',
             test_strategy: 'Executar `npm run lint:quiet` e confirmar saída limpa.',
             regression_risk: 'Baixo',
-        });
+        }));
     }
 
     return findings;
@@ -137,7 +137,7 @@ function parseTypecheckOutput(output) {
             continue;
         }
 
-        findings.push({
+        findings.push(/** @type {any} */ ({
             source_tool: 'typecheck',
             contract_id: 'CONTRACT-SCHEMA-TYPECHECK',
             domain: 'schemas',
@@ -154,7 +154,7 @@ function parseTypecheckOutput(output) {
             suggested_patch: 'Ajustar tipos/assinaturas para satisfazer o contrato apontado pelo compilador.',
             test_strategy: 'Executar `npm run typecheck` e validar zero erros.',
             regression_risk: 'Médio',
-        });
+        }));
     }
 
     return findings;
@@ -189,7 +189,7 @@ function parseMadgeOutput(output) {
             if (!cyclePrefix) {
                 continue;
             }
-            const parts = cyclePrefix[1]
+            const parts = (cyclePrefix[1] ?? '')
                 .split('>')
                 .map(part => normalizePathLike(part))
                 .filter(Boolean);

@@ -164,11 +164,11 @@ function addCommentBeforeLine(filePath, lineNumber, comment) {
             return false;
         }
 
-        const targetLine = lines[lineNumber - 1];
+        const targetLine = lines[lineNumber - 1] ?? '';
         const indent = targetLine.match(/^(\s*)/)?.[1] ?? '';
 
         // Check if comment already exists
-        if (lines[lineNumber - 2] && lines[lineNumber - 2].includes('eslint-disable')) {
+        if (lines[lineNumber - 2] && (lines[lineNumber - 2] ?? '').includes('eslint-disable')) {
             console.log(`⏭️  Already has eslint-disable: ${filePath}:${lineNumber}`);
             return false;
         }

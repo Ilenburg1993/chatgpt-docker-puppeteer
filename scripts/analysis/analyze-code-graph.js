@@ -110,7 +110,7 @@ function extractDependencies(sourceFile) {
             /** @type {any} */ (node.expression).text === 'require' &&
             node.arguments.length > 0
         ) {
-            const arg = node.arguments[0];
+            const arg = /** @type {any} */ (node.arguments[0]);
             if (ts.isStringLiteral(arg)) {
                 deps.push(arg.text);
             }
@@ -146,9 +146,9 @@ function extractNervEvents(sourceFile) {
                 ts.isPropertyAccessExpression(expr) &&
                 expr.name.text === 'emit' &&
                 node.arguments.length > 0 &&
-                ts.isStringLiteral(node.arguments[0])
+                ts.isStringLiteral(/** @type {any} */ (node.arguments[0]))
             ) {
-                events.emits.push(node.arguments[0].text);
+                events.emits.push(/** @type {any} */ (node.arguments[0]).text);
             }
 
             // nerv.on('EVENT_NAME', ...)
@@ -156,9 +156,9 @@ function extractNervEvents(sourceFile) {
                 ts.isPropertyAccessExpression(expr) &&
                 expr.name.text === 'on' &&
                 node.arguments.length > 0 &&
-                ts.isStringLiteral(node.arguments[0])
-            ) {
-                events.listens.push(node.arguments[0].text);
+                ts.isStringLiteral(/** @type {any} */ (node.arguments[0])))
+            {
+                events.listens.push(/** @type {any} */ (node.arguments[0]).text);
             }
         }
 

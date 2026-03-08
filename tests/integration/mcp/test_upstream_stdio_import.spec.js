@@ -28,9 +28,10 @@ test('imports tools from stdio upstream (SDK) and proxies calls', async () => {
     try {
         const st = await registerUpstreams(registry, { env });
         assert.equal(st.upstreams.length, 1);
-        assert.equal(st.upstreams[0].alias, 'fixture');
-        assert.equal(st.upstreams[0].ready, true);
-        assert.ok(st.upstreams[0].registeredCount >= 2);
+        const up0s = /** @type {any} */ (st.upstreams[0]);
+        assert.equal(up0s.alias, 'fixture');
+        assert.equal(up0s.ready, true);
+        assert.ok(up0s.registeredCount >= 2);
 
         assert.equal(registry.has('mcp_fixture__echo'), true);
         assert.equal(registry.has('mcp_fixture__add'), true);

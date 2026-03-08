@@ -34,7 +34,7 @@ unusedVars.forEach(line => {
         return;
     }
 
-    const [, file, lineNum, , varName, type] = match;
+    const [, file = '', lineNum = '', , varName = '', type = ''] = match;
     if (!changes[file]) {
         changes[file] = [];
     }
@@ -61,7 +61,7 @@ Object.entries(changes).forEach(([file, vars]) => {
             return;
         }
 
-        const lineContent = lines[lineIdx];
+        const lineContent = lines[lineIdx] ?? '';
         let newLine = lineContent;
 
         // Fix pattern 1: catch(e) -> catch(_e)

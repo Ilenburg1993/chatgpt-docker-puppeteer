@@ -24,7 +24,7 @@ test('jsdoc engine marks exported function without returns tag as minimal and re
 
     const report = analyzeJSDocCoverage({ files: [file], scope: 'full' });
     assert.equal(report.exports_total, 1);
-    const sym = report.files[0].exported_symbols[0];
+    const sym = (/** @type {any} */ (report.files[0])).exported_symbols[0];
     assert.equal(sym.export_name, 'f');
     assert.equal(sym.kind, 'function');
     assert.equal(sym.has_jsdoc, true);
@@ -42,7 +42,7 @@ test('jsdoc engine marks exported function with returns tag as complete', () => 
     );
 
     const report = analyzeJSDocCoverage({ files: [file], scope: 'full' });
-    const sym = report.files[0].exported_symbols[0];
+    const sym = (/** @type {any} */ (report.files[0])).exported_symbols[0];
     assert.equal(sym.has_jsdoc, true);
     assert.equal(sym.quality_level, 'complete');
     assert.deepEqual(sym.missing_tags, []);

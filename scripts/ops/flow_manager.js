@@ -31,7 +31,7 @@ function atomicWrite(/** @type {string} */ filepath, /** @type {string} */ conte
 const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
 const afterArgIndex = args.indexOf('--after');
-const executeAfterInput = afterArgIndex !== -1 ? args[afterArgIndex + 1] : null;
+const executeAfterInput = afterArgIndex !== -1 ? (args[afterArgIndex + 1] ?? null) : null;
 const blueprintArg = args.find(a => !a.startsWith('--') && a !== executeAfterInput);
 
 if (!blueprintArg) {
@@ -56,8 +56,8 @@ function parseSchedule(/** @type {string|null} */ input) {
     }
     const match = input.match(/^(\d+)([mh])$/);
     if (match) {
-        const val = parseInt(match[1], 10);
-        const unit = match[2];
+        const val = parseInt(match[1] ?? '0', 10);
+        const unit = match[2] ?? '';
         return new Date(Date.now() + val * (unit === 'm' ? 60000 : 3600000)).toISOString();
     }
     const date = new Date(input);

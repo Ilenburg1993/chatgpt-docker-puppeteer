@@ -42,7 +42,7 @@ function parseEnvFile(filePath) {
 
         const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
         if (match) {
-            const [, key, value] = match;
+            const [, key = '', value = ''] = match;
             env[key] = value.trim();
         }
     });
@@ -349,7 +349,7 @@ function main() {
     } else {
         const fileIndex = args.indexOf('--file');
         if (fileIndex !== -1 && args[fileIndex + 1]) {
-            envFiles = [args[fileIndex + 1]];
+            envFiles = [args[fileIndex + 1] ?? ''];
         } else {
             envFiles = DEFAULT_ENV_FILES;
         }

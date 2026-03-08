@@ -72,9 +72,9 @@ function parseArgs(args) {
     });
 
     for (let i = 0; i < args.length; i++) {
-        const arg = args[i];
+        const arg = args[i] ?? '';
         if (arg === '--prio') {
-            options.prio = parseInt(args[++i], 10) || 5;
+            options.prio = parseInt(args[++i] ?? '0', 10) || 5;
         } else if (arg === '--model') {
             options.model = args[++i];
         } else if (arg === '--target') {
@@ -111,8 +111,8 @@ function parseSchedule(input) {
     }
     const match = input.match(/^(\d+)([mh])$/);
     if (match) {
-        const val = parseInt(match[1], 10);
-        const unit = match[2];
+        const val = parseInt(match[1] ?? '0', 10);
+        const unit = match[2] ?? '';
         return new Date(Date.now() + val * (unit === 'm' ? 60000 : 3600000)).toISOString();
     }
     const date = new Date(input);

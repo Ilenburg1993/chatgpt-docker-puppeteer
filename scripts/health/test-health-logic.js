@@ -99,7 +99,7 @@ async function testHealthLogic() {
                     return 0;
                 }
                 const output = execSync(`du -sb "${dirPath}"`, { encoding: 'utf-8' });
-                return parseInt(output.split('\t')[0]);
+                return parseInt(output.split('\t')[0] ?? '0');
             } catch {
                 return 0;
             }

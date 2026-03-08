@@ -19,8 +19,9 @@ test('parseUpstreamsFromEnv: legacy single HTTP upstream works when enabled', ()
     };
     const upstreams = parseUpstreamsFromEnv(env);
     assert.equal(upstreams.length, 1);
-    assert.equal(upstreams[0].alias, 'core');
-    assert.equal(upstreams[0].transport, 'http');
+    const up0 = /** @type {any} */ (upstreams[0]);
+    assert.equal(up0.alias, 'core');
+    assert.equal(up0.transport, 'http');
 });
 
 test('parseUpstreamsFromEnv: GitHub proxy preset is appended when enabled', () => {
@@ -31,9 +32,10 @@ test('parseUpstreamsFromEnv: GitHub proxy preset is appended when enabled', () =
     };
     const upstreams = parseUpstreamsFromEnv(env);
     assert.equal(upstreams.length, 1);
-    assert.equal(upstreams[0].alias, 'github');
-    assert.equal(upstreams[0].transport, 'stdio');
-    assert.equal(upstreams[0].toolPrefix, 'mcp_github__');
+    const up0b = /** @type {any} */ (upstreams[0]);
+    assert.equal(up0b.alias, 'github');
+    assert.equal(up0b.transport, 'stdio');
+    assert.equal(up0b.toolPrefix, 'mcp_github__');
 });
 
 test('parseUpstreamsFromEnv: MCP_UPSTREAMS_JSON takes precedence over legacy', () => {
@@ -46,6 +48,7 @@ test('parseUpstreamsFromEnv: MCP_UPSTREAMS_JSON takes precedence over legacy', (
     };
     const upstreams = parseUpstreamsFromEnv(env);
     assert.equal(upstreams.length, 1);
-    assert.equal(upstreams[0].alias, 'core');
-    assert.equal(upstreams[0].url, 'http://localhost:4000/api/mcp');
+    const up0c = /** @type {any} */ (upstreams[0]);
+    assert.equal(up0c.alias, 'core');
+    assert.equal(up0c.url, 'http://localhost:4000/api/mcp');
 });

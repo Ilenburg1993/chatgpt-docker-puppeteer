@@ -10,9 +10,9 @@ async function main() {
         process.exit(1);
     }
 
-    const name = argv[0];
+    const name = argv[0] ?? '';
     const rootIndex = argv.indexOf('--root');
-    const root = rootIndex !== -1 && argv[rootIndex + 1] ? path.resolve(argv[rootIndex + 1]) : process.cwd();
+    const root = rootIndex !== -1 && argv[rootIndex + 1] ? path.resolve(argv[rootIndex + 1] ?? '') : process.cwd();
     // skills now live under .github/skills instead of .codex/skills
     const skillDir = path.join(root, '.github', 'skills', name);
 

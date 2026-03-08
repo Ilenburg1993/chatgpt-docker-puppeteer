@@ -107,7 +107,7 @@ function scanFile(filePath) {
             matches.forEach(match => {
                 const lines = content.substring(0, match.index).split('\n');
                 const lineNum = lines.length;
-                const lineContent = lines[lineNum - 1].trim();
+                const lineContent = (lines[lineNum - 1] ?? '').trim();
 
                 results.push({
                     pattern: pattern.name,
@@ -168,7 +168,7 @@ function printResults(results, label) {
     console.log(`\n⚠️  ${label}: FOUND ${results.length} OCCURRENCE(S):\n`);
 
     // Group by file
-    /** @type {Record<string, any[]>} */
+    /** @type {any} */
     const byFile = {};
     results.forEach(
         /** @param {any} r */ r => {
@@ -183,7 +183,7 @@ function printResults(results, label) {
     // Group by severity
     /** @type {Record<string, number>} */
     const bySeverity = { HIGH: 0, MEDIUM: 0, LOW: 0 };
-    results.forEach(/** @param {any} r */ r => bySeverity[r.severity]++);
+    results.forEach(/** @param {any} r */ r => { bySeverity[r.severity] = (bySeverity[r.severity] ?? 0) + 1; });
 
     console.log('📊 SEVERITY BREAKDOWN:');
     console.log(`   🔴 HIGH: ${bySeverity.HIGH} (must fix)`);
@@ -194,7 +194,7 @@ function printResults(results, label) {
     Object.keys(byFile)
         .sort()
         .forEach(file => {
-            const issues = byFile[file];
+            const issues = byFile[file] ?? [];
             /** @type {Record<string, string>} */
             const severityIcon = {
                 HIGH: '🔴',
@@ -243,7 +243,7 @@ function main() {
             console.log(`\nℹ️  TESTS: ${testResults.length} occurrence(s)`);
             console.log('(Note: Tests may legitimately use string literals for validation)\n');
 
-            /** @type {Record<string, any[]>} */
+            /** @type {any} */
             const byFile = {};
             testResults.forEach(
                 /** @param {any} r */ r => {
@@ -258,7 +258,7 @@ function main() {
             Object.keys(byFile)
                 .sort()
                 .forEach(file => {
-                    console.log(`  ${file}: ${byFile[file].length} occurrence(s)`);
+                    console.log(`  ${file}: ${(byFile[file] ?? []).length} occurrence(s)`);
                 });
         }
     }

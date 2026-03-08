@@ -101,7 +101,7 @@ test('jsdoc engine resolves local reexports to declaration JSDoc', () => {
     assert.equal(report.exports_total, 2);
     assert.equal(report.exports_with_jsdoc, 2);
 
-    const names = report.files[0].exported_symbols.map(s => [s.export_name, s.has_jsdoc, s.kind]).sort();
+    const names = (/** @type {any} */ (report.files[0])).exported_symbols.map((/** @type {any} */ s) => [s.export_name, s.has_jsdoc, s.kind]).sort();
     assert.deepEqual(names, [
         ['LocalThing', true, 'class'],
         ['add', true, 'function'],
@@ -122,7 +122,7 @@ test('jsdoc engine resolves export default identifier to local declaration JSDoc
 
     const report = analyzeJSDocCoverage({ files: [file], scope: 'full' });
     assert.equal(report.exports_total, 1);
-    const sym = report.files[0].exported_symbols[0];
+    const sym = (/** @type {any} */ (report.files[0])).exported_symbols[0];
     assert.equal(sym.export_name, 'default');
     assert.equal(sym.has_jsdoc, true);
     assert.equal(sym.kind, 'const');

@@ -246,7 +246,7 @@ export async function triageFindings(findings, options = {}) {
                 `Triage timeout atingido (${maxDurationMs}ms); fallback determinístico aplicado no restante.`
             );
             for (let rest = index; rest < findings.length; rest += 1) {
-                const pending = { ...findings[rest] };
+                const pending = { ...(/** @type {any} */ (findings[rest])) };
                 deterministicFallback(pending, {
                     proposeDiffs,
                     proposalDepth,
@@ -279,7 +279,7 @@ export async function triageFindings(findings, options = {}) {
             break;
         }
 
-        const finding = findings[index];
+        const finding = /** @type {any} */ (findings[index]);
         const working = {
             ...finding,
             proposal: {

@@ -61,7 +61,7 @@ test(
         assert.equal(persisted.status, 'COMPLETED');
         assert.equal(persisted.kind, 'quick_audit');
 
-        const runs = listAuditJobRunsByJobId(job.id);
+        const runs = /** @type {any[]} */ (listAuditJobRunsByJobId(job.id));
         assert.equal(runs.length, 1);
         assert.equal(runs[0].status, 'COMPLETED');
 
@@ -121,15 +121,15 @@ test(
         const persisted = /** @type {any} */ (getAuditJobById(job.id));
         assert.equal(persisted.status, 'WAITING_APPROVAL');
 
-        const runs = listAuditJobRunsByJobId(job.id);
+        const runs = /** @type {any[]} */ (listAuditJobRunsByJobId(job.id));
         assert.equal(runs.length, 1);
         assert.equal(runs[0].status, 'WAITING_APPROVAL');
 
-        const findings = listAuditFindingsByJobId(job.id);
+        const findings = /** @type {any[]} */ (listAuditFindingsByJobId(job.id));
         assert.equal(findings.length, 1);
         assert.equal(findings[0].title, 'Synthetic finding');
 
-        const patches = listAuditPatchProposalsByJobId(job.id);
+        const patches = /** @type {any[]} */ (listAuditPatchProposalsByJobId(job.id));
         assert.equal(patches.length, 1);
         assert.equal(patches[0].status, 'draft');
         assert.equal(patches[0].approval_required, true);

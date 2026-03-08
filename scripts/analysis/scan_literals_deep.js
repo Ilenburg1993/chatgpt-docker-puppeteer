@@ -223,7 +223,7 @@ files.forEach(file => {
     // Log categories
     patterns.logCategory.lastIndex = 0;
     while ((match = patterns.logCategory.exec(content)) !== null) {
-        const value = match[1];
+        const value = match[1] ?? '';
         if (value.length > 3 && !value.match(/^(INFO|WARN|ERROR|DEBUG)$/)) {
             const lineNum = content.substring(0, match.index).split('\n').length;
             if (!analysis.logCategories.values.has(value)) {

@@ -355,7 +355,7 @@ function detectMissionTransitionBypass(rootDir) {
         const content = fs.readFileSync(fullPath, 'utf8');
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i += 1) {
-            const line = lines[i];
+            const line = lines[i] ?? '';
             if (!statusMutationPattern.test(line)) {
                 statusMutationPattern.lastIndex = 0;
                 continue;

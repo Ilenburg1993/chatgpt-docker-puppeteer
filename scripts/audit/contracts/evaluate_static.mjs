@@ -62,8 +62,8 @@ function resolveLineNumber(lineStarts, index) {
     let high = lineStarts.length - 1;
     while (low <= high) {
         const mid = Math.floor((low + high) / 2);
-        const start = lineStarts[mid];
-        const next = mid + 1 < lineStarts.length ? lineStarts[mid + 1] : Number.MAX_SAFE_INTEGER;
+        const start = lineStarts[mid] ?? 0;
+        const next = mid + 1 < lineStarts.length ? (lineStarts[mid + 1] ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
         if (index >= start && index < next) {
             return mid + 1;
         }
@@ -106,7 +106,7 @@ function isIndexInRanges(ranges, index) {
     let high = ranges.length - 1;
     while (low <= high) {
         const mid = Math.floor((low + high) / 2);
-        const [start, end] = ranges[mid];
+        const [start, end] = /** @type {[number, number]} */ (ranges[mid]);
         if (index < start) {
             high = mid - 1;
             continue;

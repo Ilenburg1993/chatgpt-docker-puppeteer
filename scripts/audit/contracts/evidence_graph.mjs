@@ -62,8 +62,8 @@ export function buildEvidenceGraph(findings) {
 
     for (let i = 0; i < nodes.length; i += 1) {
         for (let j = i + 1; j < nodes.length; j += 1) {
-            const left = nodes[i];
-            const right = nodes[j];
+            const left = /** @type {any} */ (nodes[i]);
+            const right = /** @type {any} */ (nodes[j]);
             if (left.contract_id && right.contract_id && left.contract_id === right.contract_id) {
                 edges.push({
                     from: left.id,

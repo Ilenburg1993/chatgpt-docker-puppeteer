@@ -44,7 +44,7 @@ function parseArgs(argv) {
     };
 
     for (let index = 0; index < argv.length; index += 1) {
-        const arg = argv[index];
+        const arg = argv[index] ?? '';
         if (arg === '--omit=dev' || arg === '--omit-dev') {
             options.omitDev = true;
             continue;

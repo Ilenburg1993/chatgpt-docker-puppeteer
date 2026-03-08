@@ -113,6 +113,7 @@ async function runAgent() {
         });
 
         const choice = response.choices[0];
+        if (!choice) throw new Error('Unexpected response structure: no choice');
         const message = choice.message;
 
         /* ---------------------------------------------------------------
