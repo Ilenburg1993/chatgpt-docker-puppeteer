@@ -1,6 +1,5 @@
 // @ts-check
-import fs from 'node:fs';
-import { promises as fsp } from 'node:fs';
+import fs, { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
@@ -54,8 +53,75 @@ function applyTextChanges(/** @type {any} */ originalText, /** @type {any} */ te
     return next;
 }
 
+// ─── LanguageService singleton cache ─────────────────────────────────────────
+// Cada rootDir mantém UMA única instância de LanguageService. As operações de
+// leitura (definition, references, hover, diagnostics…) reutilizam o mesmo
+// serviço em vez de criar + descartar um novo a cada chamada — eliminando o
+// overhead de reanalisar centenas de arquivos do projeto a cada request LSP.
+//
+// Ciclo de vida:
+//  • cache miss / nova extraFile não rastreada → cria e armazena
+//  • operações de leitura → dispose() é no-op (o cache é o dono)
+//  • updateFile → invalida o cache para que o próximo request veja o novo conteúdo
+//  • stop()     → dispose explícito do LanguageService armazenado
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @typedef {{ languageService: ts.LanguageService, scriptVersions: Map<string, string>, fileNames: string[] }} LsCacheEntry
+ */
+
+/** @type {Map<string, LsCacheEntry>} */
+const _lsCache = new Map();
+
+/**
+ * DocumentRegistry compartilhado em nível de módulo.
+ * ts.DocumentRegistry mantém ASTs de source files parseados entre instâncias de
+ * LanguageService. Ao compartilhá-lo, ASTs sobrevivem a invalidações do _lsCache
+ * (provocadas por updateFile), tornando a primeira request pós-invalidação mais
+ * rápida porque os arquivos não modificados não precisam ser re-parseados.
+ * @type {ts.DocumentRegistry}
+ */
+const _documentRegistry = ts.createDocumentRegistry();
+
+/**
+ * Dispose e remove o LanguageService em cache para um dado rootDir.
+ * @param {string} rootDir - Caminho normalizado do root do projeto.
+ */
+function _disposeCachedService(rootDir) {
+    const entry = _lsCache.get(rootDir);
+    if (entry) {
+        try { entry.languageService.dispose(); } catch { /* ignorar erros de dispose */ }
+        _lsCache.delete(rootDir);
+    }
+}
+
 function createLanguageService(/** @type {any} */ rootDir, /** @type {any} */ extraFile) {
+    const normalizedRoot = normalizePath(rootDir);
+    const fullExtra = extraFile ? normalizePath(extraFile) : null;
+
+    // Verificar cache existente
+    const cached = _lsCache.get(normalizedRoot);
+    if (cached) {
+        if (fullExtra && !cached.fileNames.includes(fullExtra)) {
+            // Arquivo não rastreado pelo serviço atual → invalida para recriar com o novo arquivo
+            _disposeCachedService(normalizedRoot);
+        } else {
+            // Cache hit — reutiliza LanguageService existente (dispose é no-op)
+            return {
+                languageService: cached.languageService,
+                dispose: () => {},
+            };
+        }
+    }
+
+    // Cache miss (ou invalidado): constrói novo LanguageService
+    //
+    // Estratégia de tsconfig: preferir tsconfig.node.json sobre tsconfig.json.
+    // O tsconfig.json raiz tem files:[] (solution file com project references), o que
+    // resulta em 0 arquivos incluídos. tsconfig.node.json tem include:["src/**/*"] e
+    // provê cobertura real para operações de workspace (workspace_symbols) e file-level.
     const configPath =
+        ts.findConfigFile(rootDir, ts.sys.fileExists, 'tsconfig.node.json') ||
         ts.findConfigFile(rootDir, ts.sys.fileExists, 'tsconfig.json') ||
         ts.findConfigFile(rootDir, ts.sys.fileExists, 'jsconfig.json');
 
@@ -78,7 +144,6 @@ function createLanguageService(/** @type {any} */ rootDir, /** @type {any} */ ex
         fileNames = parsed.fileNames;
     }
 
-    const fullExtra = extraFile ? normalizePath(extraFile) : null;
     if (fullExtra && !fileNames.includes(fullExtra)) {
         fileNames.push(fullExtra);
     }
@@ -105,10 +170,14 @@ function createLanguageService(/** @type {any} */ rootDir, /** @type {any} */ ex
         getDirectories: ts.sys.getDirectories,
     };
 
-    const languageService = ts.createLanguageService(host, ts.createDocumentRegistry());
+    const languageService = ts.createLanguageService(host, _documentRegistry);
+
+    // Armazenar no cache — o cache é o dono do LanguageService
+    _lsCache.set(normalizedRoot, { languageService, scriptVersions, fileNames: normalizedFileNames });
+
     return {
         languageService,
-        dispose: () => languageService.dispose(),
+        dispose: () => {}, // no-op: ownership stays with _lsCache
     };
 }
 
@@ -139,6 +208,8 @@ class TsserverDaemon {
             controller.abort();
             this.activeRequests.delete(id);
         }
+        // Libera o LanguageService em cache para este rootDir
+        _disposeCachedService(normalizePath(this.rootDir));
         this.started = false;
         return { stopped: true };
     }
@@ -394,6 +465,8 @@ class TsserverDaemon {
         this._assertNotAborted(signal);
         const filePath = ensureWorkspacePath(this.rootDir, params.filePath);
         await fsp.writeFile(filePath, String(params.content || ''), 'utf8');
+        // Invalida o cache: o próximo request verá o conteúdo atualizado do arquivo.
+        _disposeCachedService(normalizePath(this.rootDir));
         return { updated: true };
     }
 

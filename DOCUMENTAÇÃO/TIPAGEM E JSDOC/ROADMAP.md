@@ -490,8 +490,8 @@ override ou lane por lane.
 
 | Etapa | Flag                                 | Erros medidos | Padrão de correção                                                | Status |
 | ----- | ------------------------------------ | ------------: | ----------------------------------------------------------------- | ------ |
-| G.1   | `noUncheckedIndexedAccess`           |            45 | `arr[i]!` ou guard `if (v !== undefined)`                         | ✅     |
-| G.2   | `exactOptionalPropertyTypes`         |            31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | ✅     |
+| G.1   | `noUncheckedIndexedAccess`           |            45 | `arr[i]!` ou guard `if (v !== undefined)`                         | ✅      |
+| G.2   | `exactOptionalPropertyTypes`         |            31 | Adicionar `\| undefined` nos tipos de destino ou usar `Partial<>` | ✅      |
 | G.3   | `noPropertyAccessFromIndexSignature` |            ≈0 | Trocar `.prop` por `["prop"]` em `Record<K,V>`                    | [ ]    |
 | G.4   | `allowUnreachableCode: false`        |            ≈0 | Remover código morto após `return`/`throw`                        | [ ]    |
 | G.5   | `allowUnusedLabels: false`           |            ≈0 | Remover labels JS não-utilizados                                  | [ ]    |

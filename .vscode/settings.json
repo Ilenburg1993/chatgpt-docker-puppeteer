@@ -259,8 +259,16 @@
       "severity": "warn"
     },
     {
+      "rule": "@typescript-eslint/no-unused-vars",
+      "severity": "warn"
+    },
+    {
       "rule": "no-console",
       "severity": "off"
+    },
+    {
+      "rule": "@typescript-eslint/no-floating-promises",
+      "severity": "warn"
     }
   ],
   "eslint.run": "onType",
@@ -312,7 +320,18 @@
 
   // ===========================================================================
   // FASE 12) TYPESCRIPT — LANGUAGE FEATURES / TSSERVER
-  // Preferencias de TypeScript, tsserver e diagnosticos.
+  // Preferências de TypeScript, tsserver e diagnósticos.
+  //
+  // ARQUITETURA DO TSSERVER (VS Code):
+  //   • useSyntaxServer "auto" → inicia syntax server imediato (hover + coloração)
+  //     e promove ao semantic server completo em seguida (diagnósticos + navegação).
+  //     ⚠️  "always" desabilita TODO o servidor semântico — sem erros, sem go-to-def.
+  //   • nodePath "node" → tsserver usa o Node.js 24 do sistema (não o Electron interno).
+  //     Garante alinhamento com o runtime ESM do projeto.
+  //   • maxTsServerMemory 6144 → 6 GB para o heap do servidor TS. Cobre repositórios
+  //     grandes com multi-lane (tsconfig.node + tools + browser + strict).
+  //   • watchOptions "useFsEvents" → inotify nativo (ext4 bind-mount). Sem polling.
+  //     excludeDirectories reduz watches em ~60% (node_modules + cache + logs etc.).
   // ===========================================================================
   // Subfase 12.1) TypeScript
   "typescript.disableAutomaticTypeAcquisition": false,
@@ -329,22 +348,46 @@
   "typescript.preferences.importModuleSpecifier": "shortest",
   "typescript.preferences.importModuleSpecifierEnding": "js",
   "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.preferences.useLabelDetailsInCompletionEntries": true,
   "typescript.referencesCodeLens.enabled": true,
   "typescript.referencesCodeLens.showOnAllFunctions": true,
   "typescript.reportStyleChecksAsWarnings": true,
   "typescript.suggest.autoImports": true,
   "typescript.suggest.completeFunctionCalls": true,
+  "typescript.surveys.enabled": false,
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.tsserver.enableTracing": false,
   "typescript.tsserver.experimental.enableProjectDiagnostics": true,
   "typescript.tsserver.log": "off",
   "typescript.tsserver.maxTsServerMemory": 6144,
-  "typescript.tsserver.useSyntaxServer": "always",
+  // "auto" = syntax server imediato + semantic server completo em paralelo (correto).
+  // "always" desabilita o semantic server — NUNCA usar em projeto com checkJs/strict.
+  "typescript.tsserver.nodePath": "node",
+  "typescript.tsserver.useSyntaxServer": "auto",
   "typescript.tsserver.watchOptions": {
     "fallbackPolling": "dynamicPriorityPolling",
     "watchDirectory": "useFsEvents",
-    "watchFile": "useFsEvents"
+    "watchFile": "useFsEvents",
+    // Exclui diretórios pesados do file watcher do tsserver (reduz inotify watches ~60%).
+    // node_modules é excluído por maxNodeModuleJsDepth=0 no tsconfig, mas o watcher
+    // precisa ser configurado separadamente.
+    "excludeDirectories": [
+      "**/node_modules",
+      "**/.cache",
+      "**/logs",
+      "**/dist",
+      "**/build",
+      "**/backups",
+      "**/respostas",
+      "**/profile",
+      "**/artifacts",
+      "**/monitoring",
+      "**/tmp",
+      "**/.git"
+    ]
   },
+  "typescript.workspaceSymbols.scope": "allOpenProjects",
   "typescript.updateImportsOnFileMove.enabled": "always",
   "typescript.validate.enable": true,
   // Subfase 12.2) Python analysis complementar
@@ -849,7 +892,7 @@
   "inlineChat.finishOnType": true,
   "inlineChat.lineEmptyHint": "Digite uma mensagem para iniciar o chat...",
   "inlineChat.lineNaturalLanguageHint": "Digite uma mensagem em linguagem natural...",
-  "inlineChat.notebookAgent": false,
+  "inlineChat.notebookAgent": true,
   "inlineChat.renderMode": "hover",
 
   // ===========================================================================
@@ -910,7 +953,7 @@
     "D:\\"
   ],
   "js/ts.tsserver.experimental.enableProjectDiagnostics": true,
-  "js/ts.tsserver.useSyntaxServer": "always",
+  "js/ts.tsserver.useSyntaxServer": "auto",
   "js/ts.tsserver.maxMemory": 6144,
   "js/ts.preferences.preferTypeOnlyAutoImports": true,
   "js/ts.preferences.importModuleSpecifierEnding": "js",
