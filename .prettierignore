@@ -52,3 +52,10 @@ public/
 # Config files that should preserve formatting
 ecosystem.config.js
 docker-compose*.yml
+
+# Generated / vendor artifacts (not formatted)
+.codex/
+backups/
+scripts/dist/
+DOCUMENTAÇÃO/PLANOS/LEGADO_PLANO/
+*.tsbuildinfo

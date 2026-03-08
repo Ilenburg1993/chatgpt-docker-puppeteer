@@ -714,15 +714,17 @@ rag-rebuild-code-config-strict:
 # 🔟 FORMATAÇÃO & LINT
 # =============================================================================
 
-.PHONY: format format-check jsdoc-coverage jsdoc-delta jsdoc-gaps lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full typecheck-dashboard typecheck-repo analyze-typing-gaps check-ts-expect-error check-base-strict typing-fullstrict-check test-audit-quality
+.PHONY: format format-fix format-check jsdoc-coverage jsdoc-delta jsdoc-gaps lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full typecheck-dashboard typecheck-repo analyze-typing-gaps check-ts-expect-error check-base-strict typing-fullstrict-check test-audit-quality
 
 format:
-	@echo "$(CYAN)🎨 Formatando código (Prettier)$(NC)"
+	@echo "$(CYAN)🎨 Formatando código (Prettier + cache)$(NC)"
 	@$(NPM) run format
 	@echo "$(GREEN)✅ Código formatado$(NC)"
 
+format-fix: format
+
 format-check:
-	@echo "$(CYAN)🔍 Verificando formatação$(NC)"
+	@echo "$(CYAN)🔍 Verificando formatação (Prettier + cache)$(NC)"
 	@$(NPM) run format:check
 	@echo "$(GREEN)✅ Formatação OK$(NC)"
 
