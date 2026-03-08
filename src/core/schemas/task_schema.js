@@ -1,6 +1,6 @@
 // @ts-check
 import { z as _zImport } from 'zod';
-import { CONNECTION_MODES } from '../constants/browser.js';
+import { CONNECTION_MODES } from '#core/constants/browser';
 /** @type {any} */
 const z = _zImport;
 

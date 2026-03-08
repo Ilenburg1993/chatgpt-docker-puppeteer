@@ -18,6 +18,7 @@
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
     "maxNodeModuleJsDepth": 0,
     "baseUrl": ".",
     "paths": {

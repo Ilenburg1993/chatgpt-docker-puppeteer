@@ -1,4 +1,3 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * Shared system constants Centralized definitions for common values used across multiple modules
  *

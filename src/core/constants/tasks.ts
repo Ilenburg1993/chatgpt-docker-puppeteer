@@ -1,4 +1,3 @@
-// @ts-check - Type checking rigoroso habilitado (arquivo core)
 /**
  * Task-related constants Centralized definitions for task states and status values
  *

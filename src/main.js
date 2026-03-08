@@ -38,8 +38,8 @@
 // =========================================================================
 import * as Authority from './core/authority.js';
 import CONFIG from './core/config.js';
-import { CONNECTION_MODES } from './core/constants/browser.js';
-import { STATUS_VALUES } from './core/constants/tasks.js';
+import { CONNECTION_MODES } from '#core/constants/browser';
+import { STATUS_VALUES } from '#core/constants/tasks';
 import { shouldAutobootEntrypoint } from './core/entrypoint_guard.js';
 import './core/env_bootstrap.js';
 import * as forensics from './core/forensics.js';

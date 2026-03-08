@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { cleanText } from '#infra/fs/fs_utils';
 import { z } from 'zod';
-import { STATUS_VALUES, STATUS_VALUES_ARRAY } from '../constants/tasks.js';
+import { STATUS_VALUES, STATUS_VALUES_ARRAY } from '#core/constants/tasks';
 
 /**
  * ID_SCHEMA: Regra estrita para identificadores. [FIX 1.1] Proíbe IDs que comecem com ponto (.) para evitar arquivos

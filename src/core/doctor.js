@@ -7,7 +7,7 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import CONFIG from './config.js';
-import { STATUS_VALUES } from './constants/tasks.js';
+import { STATUS_VALUES } from '#core/constants/tasks';
 
 const ROOT = path.resolve(import.meta.dirname, '../../');
 const LOG_DIR = path.join(ROOT, 'logs');

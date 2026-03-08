@@ -40,6 +40,7 @@ console.log(`📄 Script: ${scriptPath}`);
 console.log('═══════════════════════════════════════════════════════════════');
 
 const NODE_ARGS_BASE = [
+    '--strip-types', // TypeScript .ts files em src/core/constants/ (H.1 migration)
     '--expose-gc', // GC manual controlado (processos long-lived)
     '--unhandled-rejections=strict', // Promises não tratadas derrubam o processo
     '--enable-source-maps', // Stack traces corretos em produção
