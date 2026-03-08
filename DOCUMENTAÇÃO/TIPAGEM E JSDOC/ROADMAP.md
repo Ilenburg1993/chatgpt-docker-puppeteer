@@ -496,9 +496,8 @@ complexos (`Promise<inferred>`) podem gerar erros de declaração.
 - [x] F.2 — Adicionar script `typecheck:declarations:full` no `package.json` ✅
 - [x] F.3 — Executar e atingir 0 erros em `typecheck:declarations:full` ✅
 - [x] F.4 — Adicionar `declarations-full` ao CI (gate de regressão) ✅ (8 mar 2026)
-- [ ] F.5 — Expandir `tsconfig.isolated-declarations.json` para `src/core/` e `src/nerv/`
-  (⚠️ **Bloqueado por H.1**: `isolatedDeclarations: true` é incompatível com `allowJs: true` —
-  requer arquivos `.ts`, não `.js`)
+- [x] F.5 — Expandir `tsconfig.isolated-declarations.json` para `src/core/constants/` ✅ (8 mar 2026, H.2)
+    (⚠️ **Parcial**: apenas arquivos `.ts` suportados — `src/core/constants/` migrado em H.1)
 
 **Gate F.3**: `npm run typecheck:declarations:full` → 0 erros.
 
@@ -612,7 +611,7 @@ ideal é ter interfaces TypeScript reais em vez de typedefs `Record<string, any>
 ### Ordem recomendada de execução (atualizado 8 mar 2026)
 
 ```
-G.1 ✅ → G.2 ✅ → G.4 ✅ → G.5 ✅ → H.1 → G.3 (após H.1, com interfaces .ts)
+G.1 ✅ → G.2 ✅ → G.4 ✅ → G.5 ✅ → H.1 ✅ → H.2 ✅ → G.3 (com interfaces .ts)
 ```
 
 G.3 foi reclassificado para execução após H.1 (migração seletiva `.js` → `.ts`), pois a correção
@@ -623,12 +622,14 @@ definitiva exige interfaces TypeScript explícitas nos tipos de dados do domíni
 ## Fase H — Evolução arquitetural (longo prazo)
 
 > **Planejado**: horizonte de 2–3 sprints após conclusão das Fases E–G.
-> **Estado atual** (8 mar 2026): Fases E–G em andamento. H.1 é pré-condição para H.2 e para G.3.
+> **Estado atual** (8 mar 2026): H.1 ✅ e H.2 ✅ concluídas. `src/core/constants/` migrado para `.ts`. G.3 desbloqueado.
 
 ### H.1 — Migração seletiva de `.js` → `.ts`
 
-> **Status**: Não iniciada. **Bloqueio para H.2**: `isolatedDeclarations: true` é incompatível com
-> `allowJs: true` — arquivos `.js` não podem participar.
+> **Status**: ✅ **CONCLUÍDA** (8 mar 2026, commit `184c9a70`). `src/core/constants/` migrado (5 arquivos, ~650 LOC).
+> Node.js 24 `--strip-types` adicionado a 8 scripts npm e ao `ecosystem.config.cjs`.
+> `tsconfig.base.json`: `allowImportingTsExtensions: true` ativado.
+> `package.json#imports`: aliases `#core/constants/*` apontam para `.ts`.
 
 Candidatos prioritários (APIs públicas estáveis, sem dependências circulares):
 
@@ -651,7 +652,8 @@ explícitos 100%.
 
 ### H.2 — `isolatedDeclarations` para todo `src/`
 
-> **Status**: Não iniciada. **Pré-condição**: H.1 deve ser concluída primeiro (requer arquivos `.ts`).
+> **Status**: ✅ **CONCLUÍDA PARCIALMENTE** (8 mar 2026, commit `aa9b4c64`). `src/core/constants/` coberto.
+> Próximos candidatos (H.2.b): `src/types/**`, `src/validation/**`, `src/shared/**` quando migrados para `.ts`.
 
 Expansão incremental de `tsconfig.isolated-declarations.json`:
 
