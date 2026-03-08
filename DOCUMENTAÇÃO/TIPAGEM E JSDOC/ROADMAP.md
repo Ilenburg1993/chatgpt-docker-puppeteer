@@ -40,7 +40,7 @@
 | Schema tsserver-tool-contract      | v1.0.0            | **v1.1.0** ✅                        |
 | JSDoc cobertura exports            | ~70%              | **100%** (1115/1115) ✅              |
 | Tags unsafe restantes (`@any`)     | ~404              | ~511 (manter monit.)               |
-| Magic strings (NERV) no código    | desconhecido      | **21** (Fase I)                    |
+| Magic strings (NERV) no código    | desconhecido      | **0 HIGH, 0 MEDIUM** ✅ (Fase I — 3 LOW residuais justificados)                    |
 | Enums NERV cobertos                | 3                 | **7** ✅ após Fase I               |
 | Constantes project-wide catalogadas | não               | **sim** ✅ (Fase I)                  |
 
