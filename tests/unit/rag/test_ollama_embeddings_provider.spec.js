@@ -54,11 +54,14 @@ describe('OllamaEmbeddingsProvider baseURL resolution', () => {
     it('uses OLLAMA_EMBED_MAX_CHARS and truncates when input exceeds configured limit', async () => {
         const prevMax = process.env.OLLAMA_EMBED_MAX_CHARS;
         const prevFetch = global.fetch;
-        const receivedInputLength = 0;
+        let receivedInputLength = 0;
         try {
             process.env.OLLAMA_EMBED_MAX_CHARS = '50';
             /** @type {any} */ (global).fetch = async (/** @type {any} */ _url, /** @type {any} */ options = {}) => {
                 const body = JSON.parse(options.body || '{}');
+                if (typeof body.input === 'string') {
+                    receivedInputLength = body.input.length;
+                }
                 return {
                     ok: true,
                     async json() {

@@ -338,8 +338,6 @@ async function runAllTests() {
         console.log(`${colors.red}⚠️  Alguns testes falharam. Revise as correções.${colors.reset}`);
         process.exit(1);
     }
-
-    console.log('');
 }
 
 // Executa

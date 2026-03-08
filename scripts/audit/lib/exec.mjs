@@ -242,7 +242,7 @@ function tryParseJson(text) {
 function extractBalancedJsonBlocks(text) {
     /** @type {string[]} */
     const blocks = [];
-    /** @type */
+    /** @type {Array<{start: number, opener: string}>} */
     const stack = [];
     let inString = false;
     let stringQuote = '';
@@ -277,7 +277,7 @@ function extractBalancedJsonBlocks(text) {
         if (ch === '{' || ch === '[') {
             stack.push({
                 start: index,
-                opener: /** @type */ (ch),
+                opener: /** @type {string} */ (ch),
             });
             continue;
         }

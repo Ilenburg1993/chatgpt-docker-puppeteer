@@ -1,6 +1,5 @@
 // @ts-check
 import { parse } from '@babel/parser';
-// @ts-expect-error — @babel/traverse não tem typings publicados
 import traverseModule from '@babel/traverse';
 import { RAG_CHUNK_MAX_CHARS, RAG_CHUNK_TARGET_CHARS } from '../contract.mjs';
 import { estimateCharsForLines } from '../text.mjs';
