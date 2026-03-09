@@ -64,6 +64,32 @@ if [ "$RESULT_TYPE" = "failure" ]; then
     fi
 fi
 
+# ── Métricas de tempo por ferramenta ────────────────────────────────────────
+# Calcula duração entre preToolUse (last_tool_ts) e este postToolUse.
+# Grava em tool-metrics.jsonl para análise histórica de performance.
+if [ -f "$CTX_FILE" ]; then
+    LAST_TOOL_TS="$(jq -r '.last_tool_ts // "0"' "$CTX_FILE" 2> /dev/null || echo '0')"
+    if [ "$LAST_TOOL_TS" != "0" ] && [ "$TIMESTAMP" != "0" ]; then
+        DURATION_MS=$((TIMESTAMP - LAST_TOOL_TS))
+        # Sanity: ignora durações negativas ou absurdas (>10min provavelmente é gap entre sessões)
+        if [ "$DURATION_MS" -gt 0 ] && [ "$DURATION_MS" -lt 600000 ]; then
+            jq -cn \
+                --arg sid "$SESSION_ID" \
+                --arg ts "$TIMESTAMP" \
+                --arg tool "$TOOL_NAME" \
+                --argjson dur "$DURATION_MS" \
+                --arg result "$RESULT_TYPE" \
+                '{
+                    session_id:  $sid,
+                    timestamp:   $ts,
+                    toolName:    $tool,
+                    duration_ms: $dur,
+                    resultType:  $result
+                }' >> "$LOG_DIR/tool-metrics.jsonl"
+        fi
+    fi
+fi
+
 # Registra ferramentas de quality gate (lint, typecheck, test) no contexto
 if [ "$TOOL_NAME" = "bash" ]; then
     TOOL_ARGS_RAW="$(echo "$INPUT" | jq -r '.toolArgs // ""' 2> /dev/null || echo '')"

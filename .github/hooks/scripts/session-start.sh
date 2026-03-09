@@ -93,11 +93,68 @@ fi
 OPEN_FINDINGS=0
 CRITICAL_FINDINGS=0
 if [ -f "$FINDINGS_FILE" ]; then
-    OPEN_FINDINGS="$(wc -l < "$FINDINGS_FILE" 2>/dev/null | tr -d ' ')"
-    CRITICAL_FINDINGS="$(jq -r 'select(.severity == "critical" or .severity == "high")' "$FINDINGS_FILE" 2>/dev/null | jq -s 'length' 2>/dev/null || echo 0)"
+    OPEN_FINDINGS="$(wc -l < "$FINDINGS_FILE" 2> /dev/null | tr -d ' ')"
+    CRITICAL_FINDINGS="$(jq -r 'select(.severity == "critical" or .severity == "high")' "$FINDINGS_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0)"
 fi
 
 TOTAL_OPEN=$((COUNT_ALTA + COUNT_MEDIA + COUNT_BACKLOG))
+
+# ─────────────────────────────────────────────────────────────
+# Análise de tendências históricas (audit.jsonl + tool-metrics.jsonl)
+# ─────────────────────────────────────────────────────────────
+AUDIT_FILE="$LOG_DIR/audit.jsonl"
+METRICS_FILE="$LOG_DIR/tool-metrics.jsonl"
+
+TREND_SESSIONS="N/D"
+TREND_TOTAL_TOOLS="N/D"
+TREND_ERROR_RATE="N/D"
+TREND_TOP_TOOLS_TABLE=""
+TREND_TOP_FAILURES="- (nenhuma falha registrada)"
+TREND_PERF_TABLE=""
+
+if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
+    TREND_SESSIONS="$(jq -r '.session_id // empty' "$AUDIT_FILE" 2> /dev/null \
+        | sort -u | awk 'NF{n++} END{print n+0}' || echo 'N/D')"
+
+    TREND_TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse" and (.toolName // "") != "") | .toolName' "$AUDIT_FILE" 2> /dev/null \
+        | wc -l | tr -d ' ' || echo '0')"
+
+    TOTAL_FAILURES="$(jq -r 'select(.event == "toolFailure" and (.toolName // "") != "") | .toolName' "$AUDIT_FILE" 2> /dev/null \
+        | wc -l | tr -d ' ' || echo '0')"
+
+    if [ "$TREND_TOTAL_TOOLS" -gt 0 ] 2> /dev/null; then
+        TREND_ERROR_RATE="$(echo "$TOTAL_FAILURES $TREND_TOTAL_TOOLS" \
+            | awk '{printf "%.1f%% (%d/%d)", ($1/$2)*100, $1, $2}')"
+    fi
+
+    TREND_TOP_TOOLS_TABLE="$(jq -r 'select(.event == "preToolUse" and (.toolName // "") != "") | .toolName' "$AUDIT_FILE" 2> /dev/null \
+        | sort | uniq -c | sort -rn | head -6 \
+        | awk '{printf "| `%-35s` | %5d |\n", $2, $1}' || true)"
+    [ -z "$TREND_TOP_TOOLS_TABLE" ] && TREND_TOP_TOOLS_TABLE="| N/D | 0 |"
+
+    TREND_TOP_FAILURES="$(jq -r 'select(.event == "toolFailure" and (.toolName // "") != "") | .toolName' \
+        "$AUDIT_FILE" 2> /dev/null \
+        | sort | uniq -c | sort -rn | head -3 \
+        | awk '{printf "- `%s`: %d falha(s)\n", $2, $1}' || true)"
+    [ -z "$TREND_TOP_FAILURES" ] && TREND_TOP_FAILURES="- (nenhuma falha registrada)"
+fi
+
+if [ -f "$METRICS_FILE" ] && [ -s "$METRICS_FILE" ]; then
+    TREND_PERF_TABLE="$(jq -r '.toolName' "$METRICS_FILE" 2> /dev/null \
+        | sort -u \
+        | while read -r tool; do
+            AVG_MS="$(jq -r --arg t "$tool" \
+                'select(.toolName == $t) | .duration_ms' \
+                "$METRICS_FILE" 2> /dev/null \
+                | awk '{s+=$1; n++} END {if(n>0) printf "%.0f", s/n; else print "N/D"}')"
+            COUNT_T="$(jq -r --arg t "$tool" \
+                'select(.toolName == $t) | .toolName' \
+                "$METRICS_FILE" 2> /dev/null | wc -l | tr -d ' ')"
+            printf "| \`%-35s\` | %6s ms | %4d |\n" "$tool" "$AVG_MS" "$COUNT_T"
+        done \
+        | sort -t'|' -k3 -rn | head -8 || true)"
+    [ -z "$TREND_PERF_TABLE" ] && TREND_PERF_TABLE="| N/D | - | 0 |"
+fi
 
 # Escreve o briefing
 cat > "$BRIEFING_FILE" << BRIEFING_EOF
@@ -128,6 +185,30 @@ ${NEXT_TASK}
 
 > Se \`CRITICAL_FINDINGS > 0\`, considere priorizar a resolução desses findings
 > antes de selecionar uma nova tarefa do backlog.
+
+## Tendências históricas
+
+| Métrica | Valor |
+|---|---|
+| Sessões registradas | ${TREND_SESSIONS} |
+| Total de chamadas de ferramenta | ${TREND_TOTAL_TOOLS} |
+| Taxa de falha de ferramentas | ${TREND_ERROR_RATE} |
+
+### Top ferramentas (todas as sessões)
+
+| Ferramenta | Chamadas |
+|---|---|
+${TREND_TOP_TOOLS_TABLE}
+
+### Ferramentas com mais falhas
+
+${TREND_TOP_FAILURES}
+
+## Performance por ferramenta (médias históricas)
+
+| Ferramenta | Média | Amostras |
+|---|---|---|
+${TREND_PERF_TABLE}
 
 ## Sessão atual
 
