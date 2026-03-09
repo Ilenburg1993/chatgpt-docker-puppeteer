@@ -46,6 +46,10 @@
 ---
 
 ## Alta Prioridade
+- [ ] **UP2: Integração Findings ↔ Tasks ↔ Docs**: save-finding.sh pode criar tarefa automática; sync-tasks-to-docs.sh exporta concluídas para DOCUMENTAÇÃO/RELATORIOS/. Gate: finding com tag 'task' cria entrada em pending-tasks.md automaticamente. Detalhe em DOCUMENTAÇÃO/HOOKS/MELHORIAS.md#UP2 <!-- auto:20260309 -->
+
+- [ ] **UP1: Analytics Cross-Session de métricas**: Agregar tool-metrics.jsonl + audit.jsonl de múltiplas sessões. Script analytics.sh <início> <fim> gerando top-5 ferramentas, taxa de conformidade histórica, erros por sessão. Gate: report Markdown gerado com dados de 7+ dias. Detalhe em DOCUMENTAÇÃO/HOOKS/MELHORIAS.md#UP1 <!-- auto:20260309 -->
+
 
 > Tarefas críticas com maior impacto imediato no projeto.
 
@@ -93,6 +97,14 @@
 ---
 
 ## Média Prioridade
+- [ ] **UP3: Health Check automático no session-start**: Verificar: sponge instalado, jq >= 1.6, audit.jsonl próximo da rotação (>4500 linhas), JSON válido no session-context. Seção HEALTH WARNINGS no briefing se algum falhar. Detalhe em MELHORIAS.md#UP3 <!-- auto:20260309 -->
+
+- [ ] **M1: Lifecycle de Findings (resolve-finding.sh)**: Script resolve-finding.sh <finding_id> <resolved|wont_fix> [razão]. Findings ganham campo finding_id único em save-finding.sh. Gate: resolve-finding.sh funciona; relatório diário mostra ratio abertos vs resolvidos. Detalhe em MELHORIAS.md#M1 <!-- auto:20260309 -->
+
+- [ ] **M2: Sumarizar tools_used array no session-context**: Substituir array linear crescente por tools_used_counts {tool: count} + tools_used_recent (últimas 10). Evita session-context.json > 50KB. Gate: session-context.json < 50KB após sessão de 200+ tool calls. Detalhe em MELHORIAS.md#M2 <!-- auto:20260309 -->
+
+- [ ] **M3: Alertas de Threshold escalonados por consecutive_unauthorized_closes**: Session-start.sh escala visualmente o bloco de alerta: 1 violação=padrão, 2+=maiúsculas, 3+=bloqueio total do briefing. Gate: com contador=3, briefing mostra bloco de emergência distinto. Detalhe em DOCUMENTAÇÃO/HOOKS/MELHORIAS.md#M3 <!-- auto:20260309 -->
+
 
 > Melhorias significativas mas não urgentes.
 
@@ -140,6 +152,12 @@
 ---
 
 ## Backlog Livre
+- [ ] **UP5: Exportação CSV de Métricas de Performance**: Script export-metrics.sh [csv|json] [início] [fim]. Exporta tool-metrics.jsonl filtrado. Gate: bash export-metrics.sh csv > metricas.csv gera CSV válido. Detalhe em MELHORIAS.md#UP5 <!-- auto:20260309 -->
+
+- [ ] **UP4: Checkpoint de Tarefas com Diff**: Adicionar tasks_hash SHA-256 no checkpoint; se hash changed → tasks_changed=true. Gate: checkpoint.json inclui tasks_hash e tasks_changed. Detalhe em MELHORIAS.md#UP4 <!-- auto:20260309 -->
+
+- [ ] **M5: subagent-stop.sh mais informativo**: Extrair subagent_name, resultado e duração do payload. Logar referência ao tool_use_id. Gate: audit.jsonl mostra campos além de {event, session_id, timestamp}. Detalhe em MELHORIAS.md#M5 <!-- auto:20260309 -->
+
 
 > Itens de melhoria contínua — explore e escolha o que fizer mais sentido.
 

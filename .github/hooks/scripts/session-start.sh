@@ -194,15 +194,15 @@ CONSECUTIVE_VIOLATIONS=0
 
 if [ -f "$AUTH_FLAG_FILE" ]; then
     PREV_UNAUTH_CLOSE=true
-    PREV_UNAUTH_TS="$(jq -r '.timestamp // ""' "$AUTH_FLAG_FILE" 2>/dev/null || echo '')"
-    PREV_UNAUTH_SID="$(jq -r '.session_id // ""' "$AUTH_FLAG_FILE" 2>/dev/null || echo '')"
-    PREV_UNAUTH_TURN="$(jq -r '.turn_count // 0' "$AUTH_FLAG_FILE" 2>/dev/null || echo 0)"
+    PREV_UNAUTH_TS="$(jq -r '.timestamp // ""' "$AUTH_FLAG_FILE" 2> /dev/null || echo '')"
+    PREV_UNAUTH_SID="$(jq -r '.session_id // ""' "$AUTH_FLAG_FILE" 2> /dev/null || echo '')"
+    PREV_UNAUTH_TURN="$(jq -r '.turn_count // 0' "$AUTH_FLAG_FILE" 2> /dev/null || echo 0)"
 fi
 
 # Conta violações consecutivas do contexto anterior (se existir)
 CTX_PREV="$STATE_DIR/session-context.json"
 if [ -f "$CTX_PREV" ]; then
-    CONSECUTIVE_VIOLATIONS="$(jq -r '.consecutive_unauthorized_closes // 0' "$CTX_PREV" 2>/dev/null || echo 0)"
+    CONSECUTIVE_VIOLATIONS="$(jq -r '.consecutive_unauthorized_closes // 0' "$CTX_PREV" 2> /dev/null || echo 0)"
 fi
 
 # Escreve o briefing

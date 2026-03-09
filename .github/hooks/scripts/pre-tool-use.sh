@@ -76,7 +76,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .auth_requested_this_turn = true
              | .auth_requested_at = $ts
              | .tools_used = ((.tools_used // []) + [$tool] | if length > 200 then .[-200:] else . end)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         jq --arg sid "$SESSION_ID" --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" \
             --arg id "$TOOL_USE_ID" \
@@ -85,7 +85,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              | .last_tool = $tool
              | .last_tool_use_id = $id
              | .tools_used = ((.tools_used // []) + [$tool] | if length > 200 then .[-200:] else . end)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
 fi
 

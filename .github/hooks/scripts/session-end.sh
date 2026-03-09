@@ -89,8 +89,8 @@ if [ -f "$AUDIT_FILE" ]; then
     AUDIT_LINES="$(wc -l < "$AUDIT_FILE" | tr -d ' ')"
     if [ "$AUDIT_LINES" -gt "$AUDIT_MAX_LINES" ]; then
         AUDIT_ARCHIVE="$LOG_DIR/audit-archive-$(date -u '+%Y%m%d%H%M%S').jsonl"
-        head -n $((AUDIT_LINES - AUDIT_MAX_LINES)) "$AUDIT_FILE" > "$AUDIT_ARCHIVE" 2>/dev/null || true
-        tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" | sponge "$AUDIT_FILE" 2>/dev/null || true
+        head -n $((AUDIT_LINES - AUDIT_MAX_LINES)) "$AUDIT_FILE" > "$AUDIT_ARCHIVE" 2> /dev/null || true
+        tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" | sponge "$AUDIT_FILE" 2> /dev/null || true
     fi
 fi
 
@@ -148,10 +148,10 @@ fi
 if [ "$SESSION_AUTH_COMPLIANT" = "true" ] && [ -f "$AUDIT_FILE" ]; then
     SESSION_AUTHORIZED_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.event == "turnEnd_authorized" and .session_id == $sid)' \
-        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+        "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     SESSION_VIOLATION_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.event == "turnEnd_UNAUTHORIZED" and .session_id == $sid)' \
-        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+        "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     # Loga o resumo de conformidade desta sessão no audit.jsonl
     jq -cn \
         --arg event "sessionEnd_compliance" \

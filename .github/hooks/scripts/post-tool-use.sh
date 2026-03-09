@@ -56,14 +56,12 @@ jq -cn \
         result_type:  $result
     }' >> "$LOG_DIR/audit.jsonl"
 
-# Em caso de falha aparente (tool_response vazia = possível erro): registra detalhes
-# Nota: sem campo result_type explícito, usamos heurística; ajuste se necessário
+# Quando tool_response está vazia, o resultado é indeterminado — não necessariamente um erro.
+# Muitas ferramentas (e.g. create_file, replace_string_in_file) retornam body vazio em sucesso.
+# Rastreamos apenas para fins de diagnóstico com o nome correto: tool_responses_empty.
 if [ "$RESULT_TYPE" = "unknown" ]; then
-    # Não é forçosamente um erro — apenas desconhecido; não grava em errors.jsonl
-    # para evitar falsos positivos. Se no futuro o schema incluir indicador de
-    # falha, adicionar condição aqui.
     if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-        jq '.failure_count_unknown = (.failure_count_unknown // 0) + 1' \
+        jq '.tool_responses_empty = (.tool_responses_empty // 0) + 1' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
 fi

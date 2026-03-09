@@ -37,18 +37,21 @@ echo "║                 PRE-COMMIT QUALITY GATES                     ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 
 FAILED=0
+# Usa arquivo temporário único (seguro para commits paralelos)
+GATE_OUTPUT="$(mktemp /tmp/pre-commit-gate-XXXXXX.txt)"
+trap 'rm -f "$GATE_OUTPUT"' EXIT
 
 run_gate() {
     local label="$1"
     local cmd="$2"
     printf "  %-30s " "$label..."
-    if eval "$cmd" > /tmp/pre-commit-gate-output.txt 2>&1; then
+    if eval "$cmd" > "$GATE_OUTPUT" 2>&1; then
         echo "✓"
     else
         echo "✗ FALHOU"
         echo ""
         echo "  Saída de erro:"
-        sed 's/^/    /' /tmp/pre-commit-gate-output.txt | head -20
+        sed 's/^/    /' "$GATE_OUTPUT" | head -20
         echo ""
         FAILED=$(( FAILED + 1 ))
     fi
@@ -63,13 +66,11 @@ if [ "$FAILED" -gt 0 ]; then
     echo "  ✗ $FAILED gate(s) falharam. Commit bloqueado."
     echo "  → Corrija os erros acima ou use --no-verify para pular (emergência)."
     echo ""
-    rm -f /tmp/pre-commit-gate-output.txt
     exit 1
 fi
 
 echo "  ✓ Todos os gates passaram — commit autorizado."
 echo ""
-rm -f /tmp/pre-commit-gate-output.txt
 exit 0
 HOOK_EOF
 

@@ -53,4 +53,13 @@ jq -cn \
         prompt_len:  $len
     }' >> "$LOG_DIR/audit.jsonl"
 
+# Reseta auth_requested_this_turn no início de cada novo turno do usuário.
+# Belt-and-suspenders: agent-stop.sh também reset ao final do turno anterior,
+# mas se o hook agentStop não disparar, este reset garante que o próximo turno
+# não herde autorização "fantasma" do turno anterior.
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+    jq '.auth_requested_this_turn = false | .auth_requested_at = null' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+fi
+
 exit 0

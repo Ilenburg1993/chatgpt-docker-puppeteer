@@ -94,7 +94,7 @@ fi
 
 # Estratégia 3 (fallback de contexto): lê flag do session-context.json
 if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
-    CTX_FLAG="$(jq -r '.auth_requested_this_turn // false' "$CTX_FILE" 2>/dev/null || echo false)"
+    CTX_FLAG="$(jq -r '.auth_requested_this_turn // false' "$CTX_FILE" 2> /dev/null || echo false)"
     if [ "$CTX_FLAG" = "true" ]; then
         AUTH_REQUESTED=true
     fi
@@ -141,15 +141,20 @@ else
         >> "$LOG_DIR/audit.jsonl"
 fi
 
-# Incrementa turn_count e salva session_summary no contexto da sessão
+# Incrementa turn_count, reseta auth flag e salva session_summary no contexto da sessão
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     # Contagem de tools usadas neste turno (aproximado via last_tool)
     TOOLS_USED_COUNT="$(jq -r '(.tools_used // []) | length' "$CTX_FILE" 2> /dev/null || echo 0)"
     SESSION_SUMMARY="turn=${TURN_DURATION_S}s tools=${TOOLS_USED_COUNT} last=${LAST_TOOL_TS:-N/D}"
+    # CRÍTICO: reseta auth_requested_this_turn para false após processamento do turno.
+    # Sem este reset, a Estratégia 3 produziria falsos positivos no turno seguinte
+    # caso o agente não chamasse vscode_askQuestions mas o flag ficasse true do turno anterior.
     jq --arg now "$NOW_ISO" --arg summary "$SESSION_SUMMARY" \
         '.turn_count = (.turn_count // 0) + 1
          | .last_turn_ts = $now
-         | .session_summary = $summary' \
+         | .session_summary = $summary
+         | .auth_requested_this_turn = false
+         | .auth_requested_at = null' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 

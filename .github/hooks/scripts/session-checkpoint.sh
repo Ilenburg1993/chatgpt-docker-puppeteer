@@ -127,8 +127,10 @@ LATEST_LINK="$CHECKPOINT_DIR/sess_${SESSION_ID}_latest.json"
 ln -sf "$CHECKPOINT_FILE" "$LATEST_LINK" 2> /dev/null || cp "$CHECKPOINT_FILE" "$LATEST_LINK"
 
 # ── Prune: remove checkpoints antigos mantendo MAX_CHECKPOINTS por sessão ────
-# Ordena por nome (cronológico) e remove os mais antigos
-SESS_FILES=("$CHECKPOINT_DIR"/sess_"${SESSION_ID}"_turn*.json)
+# Ordena por nome (cronológico) e remove os mais antigos.
+# NOTA: usa globbing seguro — se não houver arquivos, o glob literal não é expandido;
+# usamos compgen para evitar o bug clássico de array bash com glob vazio.
+mapfile -t SESS_FILES < <(compgen -G "$CHECKPOINT_DIR/sess_${SESSION_ID}_turn*.json" 2>/dev/null || true)
 FILE_COUNT="${#SESS_FILES[@]}"
 
 if [ "$FILE_COUNT" -gt "$MAX_CHECKPOINTS" ]; then

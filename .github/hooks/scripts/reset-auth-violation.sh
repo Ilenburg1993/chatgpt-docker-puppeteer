@@ -37,8 +37,8 @@ if [ -z "$REASON" ]; then
     exit 1
 fi
 
-NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo '')"
-SESSION_ID="$(jq -r '.session_id // "manual"' "$CTX_FILE" 2>/dev/null || echo 'manual')"
+NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+SESSION_ID="$(jq -r '.session_id // "manual"' "$CTX_FILE" 2> /dev/null || echo 'manual')"
 
 # Verifica se o flag existe
 if [ ! -f "$AUTH_FLAG_FILE" ]; then
@@ -51,16 +51,16 @@ cat "$AUTH_FLAG_FILE"
 echo ""
 
 # Lê dados do flag para o log
-FLAG_TS="$(jq -r '.timestamp // ""' "$AUTH_FLAG_FILE" 2>/dev/null || echo '')"
-FLAG_SID="$(jq -r '.session_id // ""' "$AUTH_FLAG_FILE" 2>/dev/null || echo '')"
+FLAG_TS="$(jq -r '.timestamp // ""' "$AUTH_FLAG_FILE" 2> /dev/null || echo '')"
+FLAG_SID="$(jq -r '.session_id // ""' "$AUTH_FLAG_FILE" 2> /dev/null || echo '')"
 
 # Remove o flag
 rm -f "$AUTH_FLAG_FILE"
 
 # Reseta contadores no contexto
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq '.consecutive_unauthorized_closes = 0 | .last_close_authorized = true' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 # Loga o reset no audit.jsonl

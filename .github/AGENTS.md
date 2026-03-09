@@ -23,7 +23,7 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 
 ### O que NÃO conta como autorização — exemplos de VIOLAÇÃO
 
-| ❌ VIOLAÇÃO — isso NÃO é autorização             | ✅ CORRETO — único método válido              |
+| ❌ VIOLAÇÃO — isso NÃO é autorização              | ✅ CORRETO — único método válido               |
 | ------------------------------------------------ | --------------------------------------------- |
 | Escrever "O que deseja fazer a seguir?" no texto | Chamar a **ferramenta** `vscode_askQuestions` |
 | Terminar a resposta com uma pergunta             | Tool call real, não texto de pergunta         |
