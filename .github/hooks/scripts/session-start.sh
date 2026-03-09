@@ -43,12 +43,17 @@ SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
 # CRÍTICO: session-context.json é sobrescrito logo abaixo; precisamos dos dados
 # anteriores *agora* para preservar o contador de violações consecutivas.
 PREV_CONSEC_UNAUTH=0
-if [ -f "$STATE_DIR/session-context.json" ]; then
+if [ -f "$STATE_DIR/session-context.json" ] && [ -s "$STATE_DIR/session-context.json" ]; then
     # Suporta schema v2 (.compliance.consecutive_unauthorized) e legado
-    PREV_CONSEC_UNAUTH="$(jq -r '
+    # -s verifica se o arquivo tem conteúdo (não é vazio / 0 bytes)
+    _raw="$(jq -r '
         .compliance.consecutive_unauthorized //
         .consecutive_unauthorized_closes //
         0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
+    # Garante que o valor é numérico; fallback para 0 se vazio ou inválido
+    if [[ "$_raw" =~ ^[0-9]+$ ]]; then
+        PREV_CONSEC_UNAUTH="$_raw"
+    fi
 fi
 
 # ── Gera SESSION CLOSE KEY — Schema v3 ───────────────────────────────────────

@@ -65,6 +65,61 @@ jq -cn \
         tool_args:   $args
     }' >> "$LOG_DIR/audit.jsonl"
 
+# ── Auto-recovery: cria contexto mínimo se session-context.json estiver vazio ─
+# Se sessionStart não disparou (bug conhecido), o sistema inteiro fica degradado.
+# Detectamos isso aqui (preToolUse é o primeiro hook frequente) e criamos um
+# contexto Schema v4 mínimo para restaurar funcionalidade dos guards e métricas.
+if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; then
+    NOW_RECOVERY="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "$TIMESTAMP")"
+    jq -cn \
+        --arg sid "$SESSION_ID" \
+        --arg now "$NOW_RECOVERY" \
+        '{
+            session: {
+                id: $sid, started_at: $now, ended_at: null, end_reason: null,
+                close_key: null, close_key_validated: false,
+                source: "auto_recovery", cwd: null
+            },
+            session_stats: {
+                turn_count: 0, turn_authorized: 0, turn_unauthorized: 0,
+                tools_total: 0, tools_by_name: {}, failures_detected: 0,
+                errors_total: 0, subagent_calls: 0, section_count: 1,
+                section_names: ["recovery"]
+            },
+            current_turn: {
+                number: 1, started_at: $now, tools_count: 0, tools_by_name: {},
+                failures_count: 0, auth_requested: false, auth_requested_at: null,
+                last_askquestions_response: null, section_name: "recovery"
+            },
+            current_section: {
+                name: "recovery", started_at: $now, turn_start: 1,
+                description: "Seção criada por auto-recovery (sessionStart não disparou)",
+                section_number: 1
+            },
+            last_tool: { name: null, ts: $now, use_id: null, result: null },
+            compliance: {
+                last_turn_authorized: null, consecutive_unauthorized: 0,
+                flag_file_exists: false
+            }
+        }' > "$CTX_FILE" 2>/dev/null || true
+
+    # Loga o evento de recovery no audit.jsonl
+    jq -cn \
+        --arg event "session_auto_recovery" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_RECOVERY" \
+        --arg trigger "preToolUse" \
+        '{
+            event:   $event,
+            session_id: $sid,
+            timestamp: $ts,
+            trigger: $trigger,
+            message: "session-context.json vazio — estado mínimo criado por auto-recovery"
+        }' >> "$LOG_DIR/audit.jsonl"
+
+    echo "[recovery] session-context.json vazio — criado contexto mínimo para sessão $SESSION_ID" >&2
+fi
+
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # HARDENING v5: previne contaminação cruzada entre sessões.
 # Se o payload carrega session_id diferente do contexto ativo,

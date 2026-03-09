@@ -63,10 +63,14 @@ jq -cn \
     }' >> "$LOG_DIR/audit.jsonl"
 
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
+# F0.3: detecta contexto vazio
+if [ -f "$CTX_FILE" ] && [ ! -s "$CTX_FILE" ]; then
+    echo "[guard] session-context.json vazio — guard desabilitado (aguardando auto-recovery)" >&2
+fi
 # HARDENING v5: previne contaminação cruzada entre sessões.
 # Se o payload carrega session_id diferente do contexto ativo,
 # logamos mismatch e NÃO modificamos session-context.json.
-if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
         jq -cn \

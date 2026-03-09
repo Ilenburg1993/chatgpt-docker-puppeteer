@@ -25,8 +25,12 @@ if [ -f "$CTX_FILE" ]; then
 fi
 
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
+# F0.3: detecta contexto vazio
+if [ -f "$CTX_FILE" ] && [ ! -s "$CTX_FILE" ]; then
+    echo "[guard] session-context.json vazio — guard desabilitado (aguardando auto-recovery)" >&2
+fi
 # HARDENING v5: previne contaminação cruzada entre SESSIONs.
-if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
         jq -cn \

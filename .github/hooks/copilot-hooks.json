@@ -52,10 +52,26 @@
         "timeoutSec": 10
       }
     ],
-    "errorOccurred": [
+    "subagentStart": [
       {
         "type": "command",
-        "bash": "./scripts/error-occurred.sh",
+        "bash": "./scripts/subagent-start.sh",
+        "cwd": ".github/hooks",
+        "timeoutSec": 10
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "./scripts/tool-use-failure.sh",
+        "cwd": ".github/hooks",
+        "timeoutSec": 10
+      }
+    ],
+    "preCompact": [
+      {
+        "type": "command",
+        "bash": "./scripts/pre-compact.sh",
         "cwd": ".github/hooks",
         "timeoutSec": 10
       }

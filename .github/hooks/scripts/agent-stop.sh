@@ -45,7 +45,11 @@ fi
 
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # HARDENING v5: previne contaminação cruzada entre sessões.
-if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
+# F0.3: detecta contexto vazio (sessionStart não disparou ou state foi limpo)
+if [ -f "$CTX_FILE" ] && [ ! -s "$CTX_FILE" ]; then
+    echo "[guard] session-context.json vazio — guard desabilitado (aguardando auto-recovery via preToolUse)" >&2
+fi
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
         jq -cn \
@@ -245,16 +249,27 @@ fi
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     SESSION_SUMMARY="turn=${TURN_NUMBER} dur=${TURN_DURATION_S}s tools=${TURN_TOOLS_COUNT}"
     AUTH_INCR_FIELD="$([ "$AUTH_REQUESTED" = "true" ] && echo 'turn_authorized' || echo 'turn_unauthorized')"
+    NEXT_TURN=$((TURN_NUMBER + 1))
+    SECTION_NAME="$(jq -r '.current_section.name // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
     jq --arg now "$NOW_ISO" \
         --arg summary "$SESSION_SUMMARY" \
         --arg auth_field "$AUTH_INCR_FIELD" \
+        --argjson next_turn "$NEXT_TURN" \
+        --arg section "$SECTION_NAME" \
         '.session_stats.turn_count    = (.session_stats.turn_count // 0) + 1
          | .session_stats[$auth_field] = (.session_stats[$auth_field] // 0) + 1
          | .last_turn_ts              = $now
          | .session_summary           = $summary
+         | .current_turn.number            = $next_turn
+         | .current_turn.started_at        = $now
+         | .current_turn.tools_count       = 0
+         | .current_turn.tools_by_name     = {}
+         | .current_turn.failures_count    = 0
          | .current_turn.auth_requested    = false
          | .current_turn.auth_requested_at = null
-         | .current_turn.block_count       = 0' \
+         | .current_turn.last_askquestions_response = null
+         | .current_turn.block_count       = 0
+         | .current_turn.section_name      = $section' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
