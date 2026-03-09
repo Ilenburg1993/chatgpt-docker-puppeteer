@@ -1,10 +1,35 @@
 # Copilot Instructions — chatgpt-docker-puppeteer
 
 **Propósito**: contexto operacional e arquitetural para agentes de IA neste repositório. **Status**:
-Canônico. **Última atualização**: 8 de março de 2026.
+Canônico. **Última atualização**: 10 de março de 2026.
 
 > Responda sempre em **português brasileiro (pt-BR)** ao interagir com humanos ou escrever
 > documentação.
+
+---
+
+## ⛔ REGRA ABSOLUTA — Encerrar sem autorização é PROIBIDO
+
+> **APLICA-SE A TODA RESPOSTA. SEM EXCEÇÃO.**
+
+Antes de encerrar qualquer turno, bloco de trabalho ou sessão, o agente **obrigatoriamente** deve
+invocar a ferramenta `vscode_askQuestions` e aguardar a resposta do usuário.
+
+**O que NÃO conta como autorização (VIOLAÇÕES):**
+
+- Escrever "O que deseja fazer a seguir?" no texto da resposta
+- Terminar a resposta com uma pergunta em texto livre
+- Dizer "posso continuar?" ou "concluí a tarefa" sem chamar a ferramenta
+
+**O único método válido:**
+
+- Chamar a **ferramenta** `vscode_askQuestions` (tool call real, não texto)
+- Aguardar resposta antes de qualquer ação subsequente
+
+O sistema monitora automaticamente — turnos sem `vscode_askQuestions` geram `turnEnd_UNAUTHORIZED`
+no `audit.jsonl` e ativam alertas na próxima sessão.
+
+---
 
 ## Projeto em uma frase
 

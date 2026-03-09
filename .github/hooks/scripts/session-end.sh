@@ -82,6 +82,18 @@ jq -cn \
         errors_count:     $errors
     }' >> "$AUDIT_FILE"
 
+# ── Rotação do audit.jsonl (mantém últimas 5000 linhas) ──────────────────────
+# Executado a cada session-end para evitar crescimento ilimitado do log.
+AUDIT_MAX_LINES=5000
+if [ -f "$AUDIT_FILE" ]; then
+    AUDIT_LINES="$(wc -l < "$AUDIT_FILE" | tr -d ' ')"
+    if [ "$AUDIT_LINES" -gt "$AUDIT_MAX_LINES" ]; then
+        AUDIT_ARCHIVE="$LOG_DIR/audit-archive-$(date -u '+%Y%m%d%H%M%S').jsonl"
+        head -n $((AUDIT_LINES - AUDIT_MAX_LINES)) "$AUDIT_FILE" > "$AUDIT_ARCHIVE" 2>/dev/null || true
+        tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" | sponge "$AUDIT_FILE" 2>/dev/null || true
+    fi
+fi
+
 # Gera o relatório Markdown via helper
 SUMMARY_MD=""
 SUMMARY_SCRIPT="$SCRIPTS_DIR/generate-session-summary.sh"
@@ -117,6 +129,42 @@ fi
 
 if [ -n "$SUMMARY_MD" ]; then
     echo "$SUMMARY_MD" >> "$DAILY_REPORT"
+fi
+
+# ── Verifica conformidade de autorização no encerramento da sessão ─────────────
+# session-end é disparado quando a sessão fecha (explícito ou timeout).
+# agentStop já verifica turno a turno; session-end verifica o fechamento da sessão inteira.
+AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
+AUDIT_FILE="$LOG_DIR/audit.jsonl"
+SESSION_AUTH_COMPLIANT=true
+
+# Verifica se já existe um flag de violação não resolvido
+if [ -f "$AUTH_FLAG_FILE" ]; then
+    SESSION_AUTH_COMPLIANT=false
+fi
+
+# Se não há flag mas também não há nenhum turnEnd_authorized nesta sessão,
+# verifica no audit se houve vscode_askQuestions recente
+if [ "$SESSION_AUTH_COMPLIANT" = "true" ] && [ -f "$AUDIT_FILE" ]; then
+    SESSION_AUTHORIZED_COUNT="$(jq -r --arg sid "$SESSION_ID" \
+        'select(.event == "turnEnd_authorized" and .session_id == $sid)' \
+        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+    SESSION_VIOLATION_COUNT="$(jq -r --arg sid "$SESSION_ID" \
+        'select(.event == "turnEnd_UNAUTHORIZED" and .session_id == $sid)' \
+        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+    # Loga o resumo de conformidade desta sessão no audit.jsonl
+    jq -cn \
+        --arg event "sessionEnd_compliance" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_MS" \
+        --arg reason "$REASON" \
+        --argjson authorized "$SESSION_AUTHORIZED_COUNT" \
+        --argjson violations "$SESSION_VIOLATION_COUNT" \
+        --argjson compliant "$SESSION_AUTH_COMPLIANT" \
+        '{event: $event, session_id: $sid, timestamp: $ts, reason: $reason,
+          authorized_turns: $authorized, violation_turns: $violations,
+          fully_compliant: $compliant}' \
+        >> "$AUDIT_FILE"
 fi
 
 # Atualiza pending-tasks.md — marca tarefas concluídas com base nos eventos do audit.jsonl

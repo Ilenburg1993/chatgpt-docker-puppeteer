@@ -181,6 +181,33 @@ if [ -f "$FINDINGS_FILE" ] && [ -s "$FINDINGS_FILE" ]; then
     [ -z "$FINDINGS_LIST" ] && FINDINGS_LIST="- (nenhum finding registrado)"
 fi
 
+# ── Compliance de autorização ─────────────────────────────────────────────────
+AUTH_AUTHORIZED_TOTAL=0
+AUTH_UNAUTHORIZED_TOTAL=0
+AUTH_AUTHORIZED_TODAY=0
+AUTH_UNAUTHORIZED_TODAY=0
+AUTH_COMPLIANCE_RATE="N/D"
+
+if [ -f "$AUDIT_FILE" ]; then
+    AUTH_AUTHORIZED_TOTAL="$(jq -r 'select(.event == "turnEnd_authorized")' \
+        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+    AUTH_UNAUTHORIZED_TOTAL="$(jq -r 'select(.event == "turnEnd_UNAUTHORIZED")' \
+        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+    AUTH_AUTHORIZED_TODAY="$(jq -r --arg d "${TODAY_SHORT}" \
+        'select(.event == "turnEnd_authorized" and (.timestamp // "" | startswith($d)))' \
+        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+    AUTH_UNAUTHORIZED_TODAY="$(jq -r --arg d "${TODAY_SHORT}" \
+        'select(.event == "turnEnd_UNAUTHORIZED" and (.timestamp // "" | startswith($d)))' \
+        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+    AUTH_TOTAL=$((AUTH_AUTHORIZED_TOTAL + AUTH_UNAUTHORIZED_TOTAL))
+    if [ "$AUTH_TOTAL" -gt 0 ]; then
+        AUTH_COMPLIANCE_RATE="$(awk "BEGIN {printf \"%.0f%%\", ($AUTH_AUTHORIZED_TOTAL / $AUTH_TOTAL) * 100}")"
+    fi
+fi
+AUTH_CONSECUTIVE="$(jq -r '.consecutive_unauthorized_closes // 0' "$STATE_DIR/session-context.json" 2>/dev/null || echo 0)"
+AUTH_FLAG_EXISTS="não"
+[ -f "$STATE_DIR/UNAUTHORIZED_CLOSE.flag" ] && AUTH_FLAG_EXISTS="⚠️ SIM — última sessão não autorizada"
+
 # ── Quality gates (da sessão mais recente) ────────────────────────────────────
 QUALITY_GATES="- (nenhum gate registrado nesta sessão)"
 CTX_FILE="$STATE_DIR/session-context.json"
@@ -192,6 +219,7 @@ if [ -f "$CTX_FILE" ]; then
     ' "$CTX_FILE" 2> /dev/null || echo "- (nenhum gate registrado)")"
     [ -z "$QUALITY_GATES" ] && QUALITY_GATES="- (nenhum gate registrado nesta sessão)"
 fi
+
 
 # ── Output terminal ──────────────────────────────────────────────────────────
 if [ "$QUIET" = false ]; then
@@ -290,6 +318,18 @@ ${PERF_TABLE}
 \`\`\`
 ${PERF_CHART}
 \`\`\`
+
+---
+
+## Conformidade de Autorização (vscode_askQuestions)
+
+| Métrica | Hoje | Histórico |
+|---|---|---|
+| Turnos autorizados | ${AUTH_AUTHORIZED_TODAY} | ${AUTH_AUTHORIZED_TOTAL} |
+| Violações (turnEnd_UNAUTHORIZED) | ${AUTH_UNAUTHORIZED_TODAY} | ${AUTH_UNAUTHORIZED_TOTAL} |
+| Taxa de conformidade | — | ${AUTH_COMPLIANCE_RATE} |
+| Violações consecutivas (agora) | — | ${AUTH_CONSECUTIVE} |
+| Flag UNAUTHORIZED_CLOSE ativo | ${AUTH_FLAG_EXISTS} | — |
 
 ---
 

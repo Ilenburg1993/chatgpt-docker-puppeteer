@@ -56,33 +56,56 @@ jq -cn \
     }' >> "$LOG_DIR/audit.jsonl"
 
 # ── Detecção de autorização: verifica se vscode_askQuestions foi chamada neste turno ──
-# Procura por chamadas de vscode_askQuestions APÓS o último userPromptSubmitted.
-# Isso determina se o agente pediu autorização antes de encerrar o turno.
+# Estratégia em camadas (do mais preciso ao mais tolerante):
+#   1. Fronteira por userPromptSubmitted (preciso): busca após o último prompt do usuário
+#   2. Fallback por contexto (via session-context.json): flag auth_requested_this_turn
+#   3. Fallback por recência (últimas 150 linhas): se vscode_askQuestions aparece no final do log
+# Se qualquer das três confirmar, o turno é considerado autorizado.
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
 AUTH_REQUESTED=false
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
 
 if [ -f "$AUDIT_FILE" ]; then
-    # Encontra a linha do último userPromptSubmitted (início do turno atual)
+    # Estratégia 1: fronteira por userPromptSubmitted
     LAST_PROMPT_LINE="$(awk '/"userPromptSubmitted"/{last=NR} END{print last+0}' "$AUDIT_FILE")"
     TOTAL_LINES="$(wc -l < "$AUDIT_FILE")"
 
     if [ "$LAST_PROMPT_LINE" -gt 0 ] && [ "$TOTAL_LINES" -gt "$LAST_PROMPT_LINE" ]; then
         LINES_SINCE_PROMPT=$((TOTAL_LINES - LAST_PROMPT_LINE))
-        # Verifica se vscode_askQuestions aparece nas linhas do turno atual
-        if tail -n "$LINES_SINCE_PROMPT" "$AUDIT_FILE" | \
-            jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
+        if tail -n "$LINES_SINCE_PROMPT" "$AUDIT_FILE" \
+            | jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
+            AUTH_REQUESTED=true
+        fi
+    fi
+
+    # Estratégia 2 (fallback): userPromptSubmitted ausente — verifica últimas 150 linhas
+    # Isso protege contra false-positives quando o hook userPromptSubmitted não disparou.
+    if [ "$AUTH_REQUESTED" = "false" ] && [ "$LAST_PROMPT_LINE" -eq 0 ]; then
+        RECENT_LINES=150
+        if [ "$TOTAL_LINES" -lt "$RECENT_LINES" ]; then
+            RECENT_LINES="$TOTAL_LINES"
+        fi
+        if tail -n "$RECENT_LINES" "$AUDIT_FILE" \
+            | jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
             AUTH_REQUESTED=true
         fi
     fi
 fi
 
+# Estratégia 3 (fallback de contexto): lê flag do session-context.json
+if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
+    CTX_FLAG="$(jq -r '.auth_requested_this_turn // false' "$CTX_FILE" 2>/dev/null || echo false)"
+    if [ "$CTX_FLAG" = "true" ]; then
+        AUTH_REQUESTED=true
+    fi
+fi
+
 if [ "$AUTH_REQUESTED" = "true" ]; then
     # Turno encerrado com autorização: remove flag de violação anterior (se existir)
-    rm -f "$AUTH_FLAG_FILE" 2>/dev/null || true
+    rm -f "$AUTH_FLAG_FILE" 2> /dev/null || true
     if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         jq '.last_close_authorized = true | .consecutive_unauthorized_closes = 0' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
     jq -cn \
         --arg event "turnEnd_authorized" \
@@ -92,7 +115,7 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
         >> "$LOG_DIR/audit.jsonl"
 else
     # Turno encerrado SEM autorização: escreve flag persistente
-    TURN_COUNT_NOW="$(jq -r '.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    TURN_COUNT_NOW="$(jq -r '.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     jq -cn \
         --arg ts "$NOW_ISO" \
         --arg sid "$SESSION_ID" \
@@ -107,7 +130,7 @@ else
     if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         jq '.last_close_authorized = false
              | .consecutive_unauthorized_closes = (.consecutive_unauthorized_closes // 0) + 1' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
     jq -cn \
         --arg event "turnEnd_UNAUTHORIZED" \
