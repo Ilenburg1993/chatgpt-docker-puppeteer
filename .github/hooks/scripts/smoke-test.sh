@@ -65,6 +65,7 @@ REQUIRED_SCRIPTS=(
     "session-end.sh"
     "start-section.sh"
     "section-end.sh"
+    "start-turn.sh"
     "session-checkpoint.sh"
     "generate-session-summary.sh"
     "add-task.sh"
@@ -138,13 +139,36 @@ else
     check_key ".current_turn" "auth_requested" && pass ".current_turn.auth_requested" || fail ".current_turn.auth_requested ausente"
     check_key ".current_turn" "last_askquestions_response" && pass ".current_turn.last_askquestions_response (Schema v3)" || fail ".current_turn.last_askquestions_response ausente — Schema v3 não inicializado"
     check_key ".current_section" "name" && pass ".current_section.name" || fail ".current_section.name ausente"
+
+    # Schema v4 — SESSION/SECTION/TURN canônico
+    check_key ".session_stats" "section_count" && pass ".session_stats.section_count (Schema v4)" || fail ".session_stats.section_count ausente — Schema v4 não inicializado"
+    check_key ".session_stats" "section_names" && pass ".session_stats.section_names[] (Schema v4)" || fail ".session_stats.section_names ausente — Schema v4 não inicializado"
+    check_key ".current_section" "section_number" && pass ".current_section.section_number (Schema v4)" || fail ".current_section.section_number ausente — Schema v4 não inicializado"
+    check_key ".current_turn" "section_name" && pass ".current_turn.section_name (Schema v4)" || fail ".current_turn.section_name ausente — Schema v4 não inicializado"
+
+    # Verifica invariante: current_section.name não deve ser null nem vazio
+    ACTIVE_SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    if [ -n "$ACTIVE_SECTION_NAME" ] && [ "$ACTIVE_SECTION_NAME" != "null" ]; then
+        pass ".current_section.name não-nulo: '$ACTIVE_SECTION_NAME' (invariante SECTION ativa)"
+    else
+        fail ".current_section.name é null/vazio — invariante violado: sempre deve haver uma SECTION ativa"
+    fi
+
+    # Verifica que section_names é um array com pelo menos 1 entry
+    SECTION_NAMES_LEN="$(jq '.session_stats.section_names | if type == "array" then length else -1 end' "$CTX_FILE" 2>/dev/null || echo -1)"
+    if [ "$SECTION_NAMES_LEN" -ge 1 ] 2>/dev/null; then
+        pass ".session_stats.section_names array com $SECTION_NAMES_LEN entry(ies) (Schema v4)"
+    else
+        fail ".session_stats.section_names não é array ou está vazio — Schema v4 não inicializado"
+    fi
+
     check_key ".compliance" "consecutive_unauthorized" && pass ".compliance.consecutive_unauthorized" || fail ".compliance.consecutive_unauthorized ausente"
     check_key "." "quality_gates" && pass ".quality_gates" || fail ".quality_gates ausente"
     check_key "." "session_summary" && pass ".session_summary" || fail ".session_summary ausente"
     check_key "." "last_turn_ts" && pass ".last_turn_ts" || fail ".last_turn_ts ausente"
 
     # Verifica formato da close_key (deve ser ENCERRAR-XXXXXXXX)
-    CLOSE_KEY_VAL="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    CLOSE_KEY_VAL="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if echo "$CLOSE_KEY_VAL" | grep -qE '^ENCERRAR-[0-9A-F]{8}$'; then
         pass ".session.close_key formato válido: $CLOSE_KEY_VAL"
     elif [ -z "$CLOSE_KEY_VAL" ]; then

@@ -1,6 +1,46 @@
 # Melhorias e Upgrades Propostos — Sistema de Hooks
 
-> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 6)
+> **Status**: Backlog vivo | **Última atualização**: 2026-03-10 (sessão 7 Phase 2)
+
+---
+
+## Melhorias Implementadas (sessão 7 Phase 2 — 2026-03-10)
+
+### Schema v4 — Fluxo canônico SESSION / SECTION / TURN ✅ IMPLEMENTADO
+
+**Motivação**: o Schema v3 inaugurou a SESSION CLOSE KEY, mas não havia um modelo invariante
+garantindo que SESSION, SECTION e TURN estivessem _sempre_ ativos simultaneamente. `current_section.name`
+podia ser `null`; não havia rastreamento de quantas seções ocorreram por sessão; TURNs não
+tinham início explícito.
+
+**Novos campos (Schema v4)**:
+
+| Campo | Localização | Valor inicial |
+|---|---|---|
+| `section_count` | `session_stats` | `1` |
+| `section_names` | `session_stats` | `["início"]` |
+| `section_number` | `current_section` | `1` |
+| `section_name` | `current_turn` | `"início"` |
+
+**Scripts modificados**:
+- `session-start.sh` — inicializa Schema v4; cria seção padrão `"início"` e loga `sectionStart`; adicionado bloco `📍 Estado Ativo` no briefing com seção + turno em destaque
+- `start-section.sh` — auto-fecha seção anterior (full sectionEnd procedures) antes de abrir nova; incrementa `section_count`; appenda a `section_names[]`
+- `log-prompt.sh` — inclui `section_name` no reset de `current_turn`; loga evento `turnStart`
+- `section-end.sh` — lê e inclui `section_number` no evento `sectionEnd`
+- `session-end.sh` — auto-fecha seção ativa antes de encerrar a sessão
+
+**Novo script**: `start-turn.sh` — enriquecimento explícito de início de TURN; loga `turnStart_enriched`
+
+**Invariante garantida**: sempre deve haver SESSION + SECTION + TURN ativos. `"início"` é criada
+automaticamente na `sessionStart`; `start-section.sh` auto-fecha a anterior; `session-end.sh`
+auto-fecha a ativa.
+
+**Documentação atualizada**: `AUDIT-SCHEMA.md` (sectionStart v4 + evento `turnStart` adicionado);
+`README.md` (Schema v4 + tabela de campos); `AGENTS.md` (protocolo + invariante SECTION/TURN); `smoke-test.sh` (5 novas validações Schema v4)
+
+---
+
+### SESSION CLOSE KEY (sessão 7 Phase 1) ✅ IMPLEMENTADO — veja commit d3442cb8
 >
 > Cada item classifica: prioridade, esforço (S/M/L), e categoria (fix/melhoria/upgrade profundo).
 

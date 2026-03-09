@@ -55,14 +55,14 @@ fi
 # Chave dinâmica por sessão: ENCERRAR-XXXXXXXX (8 hex maiúsculos aleatórios)
 # O usuário DEVE digitar esta chave ao encerrar a sessão (vscode_askQuestions).
 # Detectada por post-tool-use.sh; validada por session-end.sh.
-CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2>/dev/null | tr a-z A-Z || echo "$(date +%s | sha256sum | head -c 8 | tr a-z A-Z)")"
+CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr a-z A-Z || echo "$(date +%s | sha256sum | head -c 8 | tr a-z A-Z)")"
 
-# ── Persiste contexto inicial — Schema v3 (layered) ──────────────────────────
+# ── Persiste contexto inicial — Schema v4 (layered) ──────────────────────────
 # Estrutura em 6 blocos separados por âmbito:
 #   session       → imutável após sessionStart (identidade da sessão)
 #   session_stats → acumuladores agregados ao longo de todos os turnos
 #   current_turn  → estado do turno ATUAL (resetado a cada agentStop)
-#   current_section → seção temática declarada pelo agente (opcional)
+#   current_section → seção temática ativa (sempre >= 1 ativa — invariante Schema v4)
 #   last_tool     → metadados do último tool call (sobrescrito a cada preToolUse)
 #   compliance    → estado do protocolo de autorização
 jq -cn \
@@ -94,7 +94,9 @@ jq -cn \
             "tools_by_name":      {},
             "failures_detected":  0,
             "errors_total":       0,
-            "subagent_calls":     0
+            "subagent_calls":     0,
+            "section_count":      1,
+            "section_names":      ["início"]
         },
         "current_turn": {
             "number":                      1,
@@ -104,13 +106,15 @@ jq -cn \
             "failures_count":              0,
             "auth_requested":              false,
             "auth_requested_at":           null,
-            "last_askquestions_response":  null
+            "last_askquestions_response":  null,
+            "section_name":                "início"
         },
         "current_section": {
-            "name":        null,
-            "started_at":  null,
-            "turn_start":  null,
-            "description": null
+            "name":           "início",
+            "started_at":     $date,
+            "turn_start":     1,
+            "description":    null,
+            "section_number": 1
         },
         "last_tool": {
             "name":   null,
@@ -156,6 +160,17 @@ jq -cn \
     --arg source "$SOURCE" \
     --arg cwd "$CWD" \
     '{event: $event, session_id: $sid, timestamp: $ts, date: $date, source: $source, cwd: $cwd}' \
+    >> "$LOG_DIR/audit.jsonl"
+
+# ── Loga sectionStart da section padrão "início" (Schema v4 — invariante) ────
+jq -cn \
+    --arg event "sectionStart" \
+    --arg sid "$SESSION_ID" \
+    --arg ts "$TIMESTAMP" \
+    --arg name "início" \
+    '{event: $event, session_id: $sid, timestamp: $ts, section_name: $name,
+      section_number: 1, turn_number: 1, description: null, prev_section: null,
+      auto_open: true}' \
     >> "$LOG_DIR/audit.jsonl"
 
 # ─────────────────────────────────────────────────────────────
@@ -426,6 +441,29 @@ ${CLOSE_KEY}
 ---
 
 CLOSE_KEY_EOF
+
+# Continuação do briefing — Estado Ativo (SESSION → SECTION → TURN) proeminente
+cat >> "$BRIEFING_FILE" << ACTIVE_STATE_EOF
+
+---
+
+## 📍 Estado Ativo — SESSION → SECTION → TURN
+
+| Dimensão | Valor |
+|----------|-------|
+| **Sessão** | \`${SESSION_ID}\` |
+| **Turno** | #1 (primeiro turno desta sessão) |
+| **Seção ativa** | \`"início"\` — seção 1 |
+| **Seção iniciada em** | ${SESSION_DATE} |
+
+> **Invariante**: sempre deve haver uma SESSION, uma SECTION e um TURN ativos.
+> A seção \`"início"\` é criada automaticamente em toda nova sessão.
+> Use \`bash .github/hooks/scripts/start-section.sh "nome"\` para abrir uma nova seção
+> (a seção anterior será encerrada automaticamente com \`sectionEnd\`).
+
+---
+
+ACTIVE_STATE_EOF
 
 # Continuação do briefing
 cat >> "$BRIEFING_FILE" << BRIEFING_BODY_EOF

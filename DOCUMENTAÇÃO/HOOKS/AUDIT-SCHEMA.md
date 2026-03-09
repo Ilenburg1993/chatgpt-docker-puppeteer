@@ -151,12 +151,19 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
     "event": "sectionStart",
     "session_id": "...",
     "timestamp": "2026-03-09T...",
-    "section_name": "implementação do schema v2",
-    "turn_number": 3
+    "section_name": "implementação",
+    "section_number": 2,
+    "turn_number": 3,
+    "description": "Fase B do plano — script X e Y",
+    "prev_section": "início",
+    "auto_open": false
 }
 ```
-- Emitido por `start-section.sh` (chamada manual do agente)
-- `turn_number`: turno em que a seção foi iniciada (`session_stats.turn_count + 1`)
+- Emitido por `start-section.sh` (chamada manual do agente) ou por `session-start.sh` (seção padrão `"início"`)
+- `section_number`: número ordinal da seção na sessão (começa em 1)
+- `description`: descrição opcional (arg 2 de `start-section.sh`); `null` se omitida
+- `prev_section`: nome da seção anterior fechada automaticamente; `null` se não havia
+- `auto_open`: `true` se abertura automática pelo `session-start.sh`
 
 #### `sectionEnd`
 ```json
@@ -164,7 +171,8 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
     "event": "sectionEnd",
     "session_id": "...",
     "timestamp": "2026-03-09T...",
-    "section_name": "implementação do schema v2",
+    "section_name": "implementação",
+    "section_number": 2,
     "reason": "concluída",
     "started_at": "2026-03-09T03:10:00Z",
     "turn_start": 3,
@@ -173,8 +181,41 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
     "duration_s": 480
 }
 ```
-- Emitido por `section-end.sh` (chamada manual do agente)
-- `turns_covered`: número de turnos cobertos pela seção (`turn_end - turn_start`)
+- Emitido por `section-end.sh` (manual), `start-section.sh` (auto-close da anterior) ou `session-end.sh` (reason: `session_ended`)
+- `reason` possíveis: `"concluída"`, `"auto_closed_by_new_section"`, `"session_ended"`, customizado
+- `section_number`: número ordinal da seção encerrada
+
+---
+
+### Turnos
+
+#### `turnStart`
+```json
+{
+    "event": "turnStart",
+    "session_id": "...",
+    "timestamp": "...",
+    "turn_number": 3,
+    "section_name": "implementação"
+}
+```
+- Emitido automaticamente por `log-prompt.sh` (hook `userPromptSubmitted`)
+- `section_name`: seção ativa no momento do início do turno (`null` se nenhuma — não deve ocorrer com Schema v4)
+
+#### `turnStart_enriched`
+```json
+{
+    "event": "turnStart_enriched",
+    "session_id": "...",
+    "timestamp": "...",
+    "turn_number": 3,
+    "section_name": "implementação",
+    "intent": "Implementar Fase A + rodar smoke-test"
+}
+```
+- Emitido manualmente via `bash start-turn.sh "intenção"` (primeiro ato do agente no turno)
+- `intent`: descrição da intenção do turno declarada pelo agente; `null` se omitida
+- Complementa `turnStart` — não o substitui
 
 ---
 

@@ -32,13 +32,86 @@ if [ -f "$CHECKPOINT_SCRIPT" ] && [ -x "$CHECKPOINT_SCRIPT" ]; then
     bash "$CHECKPOINT_SCRIPT" 2> /dev/null || true
 fi
 
-# ── Obtém dados da sessão do contexto persistido (schema v2) ─────────────────
+# ── Obtém dados da sessão do contexto persistido (schema v4) ─────────────────
 SESSION_ID="unknown"
 START_ISO=""
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
     START_ISO="$(jq -r '.session.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
+
+# ── Fecha section ativa antes de encerrar sessão (Schema v4 — Fase C) ────────
+# INVARIANTE: sempre deve haver SESSION+SECTION+TURN ativos.
+# Antes de fechar a sessão, fechamos a section em andamento para emitir sectionEnd.
+CLOSE_SECTION_NAME=""
+CLOSE_SECTION_STARTED=""
+CLOSE_SECTION_TURN_START=0
+CLOSE_SECTION_NUMBER=0
+CLOSE_TURN_COUNT=0
+
+if [ -f "$CTX_FILE" ]; then
+    CLOSE_SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    CLOSE_SECTION_STARTED="$(jq -r '.current_section.started_at // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    CLOSE_SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    CLOSE_SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    CLOSE_TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+fi
+
+if [ -n "$CLOSE_SECTION_NAME" ]; then
+    CLOSE_NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    CLOSE_CURRENT_TURN=$((CLOSE_TURN_COUNT + 1))
+
+    # Calcula duration_s da section
+    CLOSE_DURATION_S=0
+    if [ -n "$CLOSE_SECTION_STARTED" ] && command -v python3 &>/dev/null; then
+        CLOSE_DURATION_S="$(python3 -c "
+import sys
+from datetime import datetime, timezone
+try:
+    a = datetime.fromisoformat('${CLOSE_SECTION_STARTED}'.replace('Z','+00:00'))
+    b = datetime.now(timezone.utc)
+    print(int((b - a).total_seconds()))
+except Exception:
+    print(0)
+" 2>/dev/null || echo 0)"
+    fi
+
+    CLOSE_TURNS_COVERED=$((CLOSE_CURRENT_TURN - CLOSE_SECTION_TURN_START))
+    if [ "$CLOSE_TURNS_COVERED" -lt 1 ]; then CLOSE_TURNS_COVERED=1; fi
+
+    # Loga sectionEnd com reason=session_ended
+    jq -cn \
+        --arg event "sectionEnd" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$CLOSE_NOW_ISO" \
+        --arg name "$CLOSE_SECTION_NAME" \
+        --arg reason "session_ended" \
+        --arg started_at "$CLOSE_SECTION_STARTED" \
+        --argjson turn_start "$CLOSE_SECTION_TURN_START" \
+        --argjson turn_end "$CLOSE_CURRENT_TURN" \
+        --argjson turns_covered "$CLOSE_TURNS_COVERED" \
+        --argjson duration_s "$CLOSE_DURATION_S" \
+        --argjson section_number "$CLOSE_SECTION_NUMBER" \
+        '{
+            event:          $event,
+            session_id:     $sid,
+            timestamp:      $ts,
+            section_name:   $name,
+            section_number: $section_number,
+            reason:         $reason,
+            started_at:     $started_at,
+            turn_start:     $turn_start,
+            turn_end:       $turn_end,
+            turns_covered:  $turns_covered,
+            duration_s:     $duration_s
+        }' >> "$LOG_DIR/audit.jsonl"
+
+    # Limpa current_section no contexto
+    if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+        jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null}' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+    fi
 fi
 
 # Calcula duração total da sessão (ISO → epoch → diff)
@@ -178,12 +251,12 @@ TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/nul
 CLOSE_KEY_VALIDATED=false
 
 if [ -f "$CTX_FILE" ]; then
-    CLOSE_KEY_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2>/dev/null || echo false)"
+    CLOSE_KEY_VALIDATED="$(jq -r '.session.close_key_validated // false' "$CTX_FILE" 2> /dev/null || echo false)"
 fi
 
 if [ "$CLOSE_KEY_VALIDATED" = "true" ]; then
     # Encerramento legítimo com chave validada
-    rm -f "$NO_KEY_FLAG_FILE" 2>/dev/null || true
+    rm -f "$NO_KEY_FLAG_FILE" 2> /dev/null || true
     jq -cn \
         --arg sid "$SESSION_ID" \
         --arg ts "$NOW_MS" \

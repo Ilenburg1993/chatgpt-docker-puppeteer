@@ -172,6 +172,10 @@ momentos. **Sem exceção.**
 | `turn_count % 3 == 0` e `turn_count > 0`      | **D — Checkpoint**       | No início do turno       |
 | Usuário pede para encerrar a sessão           | **F — Session Close**    | Antes de encerrar        |
 
+> **Nota de protocolo**: como primeiro ato de cada turno de trabalho, o agente deve chamar
+> `bash .github/hooks/scripts/start-turn.sh "intenção"` para declarar sua intenção antes de
+> invocar qualquer ferramenta. Isso gera o evento `turnStart_enriched` no audit.jsonl.
+
 ---
 
 ### Template E — Session Kickoff (sessão sem prompt)
@@ -524,12 +528,12 @@ garantir continuidade máxima:
 
 **Arquivos de estado (`.github/hooks/state/`):**
 
-| Arquivo                | Propósito                                                           |
-| ---------------------- | ------------------------------------------------------------------- |
-| `session-context.json` | Estado vivo: session_id, tools_used[], turn_count, last_tool_ts     |
-| `session-briefing.md`  | Briefing gerado automaticamente no sessionStart — **ler sempre**    |
-| `pending-tasks.md`     | Backlog canônico de tarefas — fonte de verdade para próximos passos |
-| `UNAUTHORIZED_CLOSE.flag` | Flag de violação: turno encerrado sem `vscode_askQuestions`      |
+| Arquivo                     | Propósito                                                           |
+| --------------------------- | ------------------------------------------------------------------- |
+| `session-context.json`      | Estado vivo: session_id, tools_used[], turn_count, last_tool_ts     |
+| `session-briefing.md`       | Briefing gerado automaticamente no sessionStart — **ler sempre**    |
+| `pending-tasks.md`          | Backlog canônico de tarefas — fonte de verdade para próximos passos |
+| `UNAUTHORIZED_CLOSE.flag`   | Flag de violação: turno encerrado sem `vscode_askQuestions`         |
 | `SESSION_CLOSE_NO_KEY.flag` | Flag: SESSION encerrada sem close_key validada — exige investigação |
 
 **Checkpoints automáticos (`.github/hooks/checkpoints/`):**
@@ -569,6 +573,50 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
 6. **ENCERRAMENTO DE SESSION**: sempre invocar **Template F** antes de encerrar. O usuário DEVE
    digitar a chave `ENCERRAR-XXXXXXXX` (exibida no briefing) para validar o encerramento.
    Sem a chave → `SESSION_CLOSE_NO_KEY.flag` criado → alerta no próximo briefing.
+
+---
+
+### Ciclo de vida canônico: SESSION → SECTION → TURN (Schema v4)
+
+**Invariante absoluto**: sempre deve haver SESSION + SECTION + TURN ativos.
+
+#### SECTION — Gerenciamento de Seções Temáticas
+
+A seção `"início"` é criada **automaticamente** pelo `session-start.sh`. O agente deve abrir
+novas seções ao mudar de fase lógica de trabalho:
+
+```bash
+# Abre nova seção (fecha a anterior automaticamente, se houver)
+bash .github/hooks/scripts/start-section.sh "nome-da-seção"
+bash .github/hooks/scripts/start-section.sh "implementação" "Fase B do plano — script X"
+
+# Fecha seção manualmente (com motivo)
+bash .github/hooks/scripts/section-end.sh "tarefa concluída"
+```
+
+**Quando usar `start-section.sh`**:
+- Ao mudar de fase lógica (ex: análise → implementação → revisão)
+- Ao iniciar um novo grupo temático de tarefas
+- Quando a seção atual ficou grande (> 5 turnos) e o contexto mudou substancialmente
+
+**Comportamento garantido**:
+- Se há seção ativa, `start-section.sh` a fecha com `sectionEnd` antes de abrir a nova
+- `session-end.sh` fecha automaticamente a última seção aberta (reason: `session_ended`)
+- `session_stats.section_count` e `section_names[]` rastreiam todas as seções da sessão
+
+#### TURN — Enriquecimento de Turnos
+
+O início de cada turno é detectado **automaticamente** pelo hook `userPromptSubmitted`.
+O agente pode (e deve) enriquecer o turno chamando `start-turn.sh` como **primeiro ato**:
+
+```bash
+# Declaração de intenção do turno (opcional mas recomendada)
+bash .github/hooks/scripts/start-turn.sh "Implementar Fase A + rodar smoke-test"
+bash .github/hooks/scripts/start-turn.sh
+```
+
+**Quando usar `start-turn.sh`**: idealmente como primeiro ato de todo turno de trabalho real.
+Pode ser omitido em turnos puramente conversacionais (ex: responder uma pergunta simples).
 
 ---
 

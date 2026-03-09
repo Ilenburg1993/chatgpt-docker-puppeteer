@@ -1,6 +1,6 @@
 # Sistema de Hooks — Copilot Automation
 
-> **Status**: Canônico | **Última atualização**: 2026-03-09 | **Versão**: 3.0 (Schema v3)
+> **Status**: Canônico | **Última atualização**: 2026-03-10 | **Versão**: 4.0 (Schema v4)
 
 Sistema de hooks do GitHub Copilot que automatiza: rastreabilidade de sessões, protocolo de
 autorização de encerramento, métricas de ferramentas, checkpoints de estado e relatórios.
@@ -235,6 +235,7 @@ bash .github/hooks/scripts/section-end.sh  # sem args usa "concluída"
 
 **O que faz**:
 - **Schema v3**: lê `session.close_key_validated` de `session-context.json`
+- **Schema v4**: `current_section.name` nunca é `null` (seção `"início"` criada automaticamente); `current_turn.section_name` rastreia a seção ativa no turno; `session_stats.section_count` e `section_names[]` acumulam histórico de seções
   - Se `true` → remove `SESSION_CLOSE_NO_KEY.flag`; loga `sessionEnd_authorized_close`
   - Se `false` → cria `SESSION_CLOSE_NO_KEY.flag`; loga `sessionEnd_no_key`
 - Chama `generate-session-summary.sh` → grava relatório Markdown em `state/`
@@ -401,7 +402,7 @@ sessionStart (nova sessão)
 
 ## Estado Persistido
 
-### `session-context.json` — Schema v3 ← atualizado (2026-03-09)
+### `session-context.json` — Schema v4 ← atualizado (2026-03-10)
 
 O arquivo é inicializado por `session-start.sh` e atualizado atomicamente por cada hook.
 Usa `sponge` para evitar arquivos parcialmente escritos.
@@ -427,7 +428,9 @@ Usa `sponge` para evitar arquivos parcialmente escritos.
     "tools_by_name":     {},
     "failures_detected": 0,
     "errors_total":      0,
-    "subagent_calls":    0
+    "subagent_calls":    0,
+    "section_count":     1,
+    "section_names":     ["início"]
   },
   "current_turn": {
     "number":                     1,
@@ -437,13 +440,15 @@ Usa `sponge` para evitar arquivos parcialmente escritos.
     "failures_count":             0,
     "auth_requested":             false,
     "auth_requested_at":          null,
-    "last_askquestions_response": null
+    "last_askquestions_response": null,
+    "section_name":               "início"
   },
   "current_section": {
-    "name":        null,
-    "started_at":  null,
-    "turn_start":  null,
-    "description": null
+    "name":           "início",
+    "started_at":     "...",
+    "turn_start":     1,
+    "section_number": 1,
+    "description":    null
   },
   "last_tool": {
     "name":   null,
@@ -461,44 +466,48 @@ Usa `sponge` para evitar arquivos parcialmente escritos.
 
 **Campos por sub-objeto:**
 
-| Sub-objeto        | Campo                      | Tipo      | Responsável           |
-| ----------------- | -------------------------- | --------- | --------------------- |
-| `session`         | `id`                       | string    | session-start.sh      |
-| `session`         | `started_at`               | ISO 8601  | session-start.sh      |
-| `session`         | `date_short`               | string    | session-start.sh      |
-| `session`         | `source`                   | enum      | session-start.sh      |
-| `session`         | `close_key`                | string    | session-start.sh ← v3 |
-| `session`         | `close_key_validated`      | boolean   | post-tool-use.sh ← v3 |
-| `session_stats`   | `turn_count`               | number    | agent-stop.sh         |
-| `session_stats`   | `turn_authorized`          | number    | agent-stop.sh         |
-| `session_stats`   | `turn_unauthorized`        | number    | agent-stop.sh         |
-| `session_stats`   | `tools_total`              | number    | pre-tool-use.sh       |
-| `session_stats`   | `tools_by_name`            | object    | pre-tool-use.sh       |
-| `session_stats`   | `failures_detected`        | number    | post-tool-use + error |
-| `session_stats`   | `errors_total`             | number    | error-occurred.sh     |
-| `session_stats`   | `subagent_calls`           | number    | subagent-stop.sh      |
-| `current_turn`    | `number`                   | number    | log-prompt.sh         |
-| `current_turn`    | `tools_count`              | number    | pre-tool-use.sh       |
-| `current_turn`    | `tools_by_name`            | object    | pre-tool-use.sh       |
-| `current_turn`    | `failures_count`           | number    | post-tool-use.sh      |
-| `current_turn`    | `auth_requested`           | boolean   | pre-tool-use.sh       |
-| `current_turn`    | `auth_requested_at`        | ISO/null  | pre-tool-use.sh       |
-| `current_turn`    | `last_askquestions_response` | str/null | post-tool-use.sh ← v3 |
-| `current_section` | `name`                     | str/null  | start-section.sh      |
-| `current_section` | `turn_start`               | number    | start-section.sh      |
-| `last_tool`       | `name`                     | str/null  | pre-tool-use.sh       |
-| `last_tool`       | `result`                   | str/null  | post-tool-use.sh      |
-| `compliance`      | `last_turn_authorized`     | bool/null | agent-stop.sh         |
-| `compliance`      | `consecutive_unauthorized` | number    | agent-stop.sh         |
-| `compliance`      | `flag_file_exists`         | boolean   | agent-stop.sh         |
+| Sub-objeto        | Campo                        | Tipo      | Responsável           |
+| ----------------- | ---------------------------- | --------- | --------------------- |
+| `session`         | `id`                         | string    | session-start.sh      |
+| `session`         | `started_at`                 | ISO 8601  | session-start.sh      |
+| `session`         | `date_short`                 | string    | session-start.sh      |
+| `session`         | `source`                     | enum      | session-start.sh      |
+| `session`         | `close_key`                  | string    | session-start.sh ← v3 |
+| `session`         | `close_key_validated`        | boolean   | post-tool-use.sh ← v3 |
+| `session_stats`   | `turn_count`                 | number    | agent-stop.sh         |
+| `session_stats`   | `turn_authorized`            | number    | agent-stop.sh         |
+| `session_stats`   | `turn_unauthorized`          | number    | agent-stop.sh         |
+| `session_stats`   | `tools_total`                | number    | pre-tool-use.sh       |
+| `session_stats`   | `tools_by_name`              | object    | pre-tool-use.sh       |
+| `session_stats`   | `failures_detected`          | number    | post-tool-use + error |
+| `session_stats`   | `errors_total`               | number    | error-occurred.sh     |
+| `session_stats`   | `subagent_calls`             | number    | subagent-stop.sh      |
+| `current_turn`    | `number`                     | number    | log-prompt.sh         |
+| `current_turn`    | `tools_count`                | number    | pre-tool-use.sh       |
+| `current_turn`    | `tools_by_name`              | object    | pre-tool-use.sh       |
+| `current_turn`    | `failures_count`             | number    | post-tool-use.sh      |
+| `current_turn`    | `auth_requested`             | boolean   | pre-tool-use.sh       |
+| `current_turn`    | `auth_requested_at`          | ISO/null  | pre-tool-use.sh       |
+| `current_turn`    | `last_askquestions_response` | str/null  | post-tool-use.sh ← v3 |
+| `current_turn`    | `section_name`               | string    | log-prompt.sh ← v4    |
+| `current_section` | `name`                       | string    | session-start.sh ← v4 |
+| `current_section` | `turn_start`                 | number    | start-section.sh      |
+| `current_section` | `section_number`             | number    | start-section.sh ← v4 |
+| `session_stats`   | `section_count`              | number    | start-section.sh ← v4 |
+| `session_stats`   | `section_names`              | string[]  | start-section.sh ← v4 |
+| `last_tool`       | `name`                       | str/null  | pre-tool-use.sh       |
+| `last_tool`       | `result`                     | str/null  | post-tool-use.sh      |
+| `compliance`      | `last_turn_authorized`       | bool/null | agent-stop.sh         |
+| `compliance`      | `consecutive_unauthorized`   | number    | agent-stop.sh         |
+| `compliance`      | `flag_file_exists`           | boolean   | agent-stop.sh         |
 
 ### Flags de estado
 
-| Arquivo                         | Significado                                                               |
-| ------------------------------- | ------------------------------------------------------------------------- |
-| `UNAUTHORIZED_CLOSE.flag`       | Violação ativa — turno encerrado sem `vscode_askQuestions`; briefing alertará |
-| `SESSION_CLOSE_NO_KEY.flag`     | SESSION encerrada sem close_key validada — exige investigação ← v3        |
-| (ausência dos flags)            | Sessão em conformidade total                                              |
+| Arquivo                     | Significado                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| `UNAUTHORIZED_CLOSE.flag`   | Violação ativa — turno encerrado sem `vscode_askQuestions`; briefing alertará |
+| `SESSION_CLOSE_NO_KEY.flag` | SESSION encerrada sem close_key validada — exige investigação ← v3            |
+| (ausência dos flags)        | Sessão em conformidade total                                                  |
 
 ---
 
@@ -508,26 +517,26 @@ Usa `sponge` para evitar arquivos parcialmente escritos.
 
 Todos os campos são presentes em cada linha mas alguns podem ser `""` ou `null`.
 
-| `event`                         | Gerado por            | Campos extras                                            |
-| ------------------------------- | --------------------- | -------------------------------------------------------- |
-| `sessionStart`                  | session-start.sh      | `cwd`, `source`                                          |
-| `userPromptSubmitted`           | log-prompt.sh         | `prompt_hash`, `prompt_len`, `cwd`                       |
-| `preToolUse`                    | pre-tool-use.sh       | `tool_name`, `tool_use_id`                               |
-| `postToolUse`                   | post-tool-use.sh      | `tool_name`, `tool_use_id`, `result_type`                |
-| `agentStop`                     | agent-stop.sh         | `turn_duration_s`                                        |
-| `subagentStop`                  | subagent-stop.sh      | —                                                        |
-| `errorOccurred`                 | error-occurred.sh     | `errorName`, `errorMsg`                                  |
-| `sessionCheckpoint`             | session-checkpoint.sh | `turn_count`, `tasks_open`, `checkpoint_file`            |
-| `turnEnd_authorized`            | agent-stop.sh         | —                                                        |
-| `turnEnd_UNAUTHORIZED`          | agent-stop.sh         | `message`                                                |
-| `askQuestions_response`         | post-tool-use.sh      | `response_length`, `close_key_found` ← v3                |
-| `sessionClose_key_validated`    | post-tool-use.sh      | `close_key` ← v3                                         |
-| `sessionEnd_authorized_close`   | session-end.sh        | `close_key_validated: true` ← v3                         |
-| `sessionEnd_no_key`             | session-end.sh        | `close_key_validated: false` ← v3                        |
-| `sessionEnd_compliance`         | session-end.sh        | `authorized_turns`, `violation_turns`, `fully_compliant` |
-| `finding`                       | save-finding.sh       | `module`, `severity`, `type`, `description`              |
-| `taskAdded`                     | add-task.sh           | `priority`, `title`, `description`                       |
-| `taskCompleted`                 | complete-task.sh      | `pattern`, `date`                                        |
+| `event`                       | Gerado por            | Campos extras                                            |
+| ----------------------------- | --------------------- | -------------------------------------------------------- |
+| `sessionStart`                | session-start.sh      | `cwd`, `source`                                          |
+| `userPromptSubmitted`         | log-prompt.sh         | `prompt_hash`, `prompt_len`, `cwd`                       |
+| `preToolUse`                  | pre-tool-use.sh       | `tool_name`, `tool_use_id`                               |
+| `postToolUse`                 | post-tool-use.sh      | `tool_name`, `tool_use_id`, `result_type`                |
+| `agentStop`                   | agent-stop.sh         | `turn_duration_s`                                        |
+| `subagentStop`                | subagent-stop.sh      | —                                                        |
+| `errorOccurred`               | error-occurred.sh     | `errorName`, `errorMsg`                                  |
+| `sessionCheckpoint`           | session-checkpoint.sh | `turn_count`, `tasks_open`, `checkpoint_file`            |
+| `turnEnd_authorized`          | agent-stop.sh         | —                                                        |
+| `turnEnd_UNAUTHORIZED`        | agent-stop.sh         | `message`                                                |
+| `askQuestions_response`       | post-tool-use.sh      | `response_length`, `close_key_found` ← v3                |
+| `sessionClose_key_validated`  | post-tool-use.sh      | `close_key` ← v3                                         |
+| `sessionEnd_authorized_close` | session-end.sh        | `close_key_validated: true` ← v3                         |
+| `sessionEnd_no_key`           | session-end.sh        | `close_key_validated: false` ← v3                        |
+| `sessionEnd_compliance`       | session-end.sh        | `authorized_turns`, `violation_turns`, `fully_compliant` |
+| `finding`                     | save-finding.sh       | `module`, `severity`, `type`, `description`              |
+| `taskAdded`                   | add-task.sh           | `priority`, `title`, `description`                       |
+| `taskCompleted`               | complete-task.sh      | `pattern`, `date`                                        |
 
 **Rotação automática**: quando >5000 linhas, o excesso é arquivado em `audit-archive-<ts>.jsonl`.
 
