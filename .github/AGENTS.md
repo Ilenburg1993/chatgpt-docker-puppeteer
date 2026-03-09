@@ -79,6 +79,46 @@ npm run rag:health       # Saúde do RAG
 npm run lsp:health       # Saúde do LSP
 ```
 
+## Modo Arquiteto — Autonomia e Persistência de Sessão
+
+O **Modo Arquiteto** é o comportamento padrão quando o agente inicia sem um prompt explícito do
+usuário, ou quando o usuário solicita trabalho autônomo.
+
+### Protocolo obrigatório ao iniciar qualquer sessão
+
+1. **Ler `.github/hooks/state/pending-tasks.md`** — este é o backlog canônico de tarefas
+2. Se não houver prompt explícito do usuário: selecionar a **primeira tarefa não marcada** (`- [ ]`)
+   da seção "Alta Prioridade" e executá-la
+3. Ao concluir uma tarefa: marcar como `- [x]` com `<!-- session:YYYYMMDD -->` e avançar para a próxima
+4. **Não aguardar o usuário** entre tarefas — manter sessões longas e contínuas
+
+### Comportamento esperado
+
+- **Persistência máxima**: continuar trabalhando enquanto houver tarefas pendentes e a sessão
+  estiver ativa. Não encerrar por falta de instrução.
+- **Auto-atribuição**: se uma tarefa remete a um bug ou área de melhoria não listada, criar um
+  item em "Backlog Livre" no `pending-tasks.md` antes de executar.
+- **Transparência**: ao final de cada conjunto de mudanças, registrar um breve resumo dentro do
+  próprio commit message e/ou em `DOCUMENTAÇÃO/RELATORIOS/SESSIONS/`.
+
+### Quality gates obrigatórios ao final de cada sessão ou conjunto de mudanças
+
+```bash
+npm run lint             # deve passar sem erros novos
+npm run typecheck:node   # deve manter ou reduzir contagem de erros
+npm run test:unit        # deve manter ou reduzir falhas
+```
+
+> O hook `sessionEnd` registra automaticamente a execução desses gates se forem invocados durante
+> a sessão via `bash` tool. O hook `sessionStart` exibe as tarefas de Alta Prioridade pendentes.
+
+### Sistema de hooks ativo
+
+Este repositório tem hooks do Copilot configurados em `.github/hooks/copilot-hooks.json`. Eles são
+executados automaticamente e **nunca bloqueiam** o agente — todos os hooks são logging-only por
+decisão de projeto. Logs ficam em `.github/hooks/logs/` (gitignored) e resumos diários são
+espelhados para `DOCUMENTAÇÃO/RELATORIOS/SESSIONS/` (commitável).
+
 ## Rotas canônicas
 
 | Necessidade             | Onde ir                                                |

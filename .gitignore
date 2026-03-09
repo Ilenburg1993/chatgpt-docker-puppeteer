@@ -41,6 +41,10 @@ __pycache__/
 logs/
 *.log
 logs/**/*.log
+
+# Copilot Hooks — auditoria local (nunca commitar logs brutos nem estado transitório)
+.github/hooks/logs/
+.github/hooks/state/session-context.json
 audit.log
 crash_reports/
 # Stray file-descriptor redirect artifacts (e.g. devcontainer post-create log captured to fd number)
