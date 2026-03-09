@@ -17,19 +17,19 @@ mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 mkdir -p "$STATE_DIR"
 mkdir -p "$DOCS_SESSIONS_DIR"
 
-INPUT="$(cat 2>/dev/null || true)"
+INPUT="$(cat 2> /dev/null || true)"
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2>/dev/null || echo 0)"
-CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2>/dev/null || echo '')"
-REASON="$(echo "$INPUT" | jq -r '.reason // "complete"' 2>/dev/null || echo 'complete')"
-NOW_MS="$(date +%s000 2>/dev/null || echo "$TIMESTAMP")"
-SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2>/dev/null || echo 'unknown')"
-SESSION_DATE_DAILY="$(date -u '+%Y-%m-%d' 2>/dev/null || echo 'unknown')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
+CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
+REASON="$(echo "$INPUT" | jq -r '.reason // "complete"' 2> /dev/null || echo 'complete')"
+NOW_MS="$(date +%s000 2> /dev/null || echo "$TIMESTAMP")"
+SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
+SESSION_DATE_DAILY="$(date -u '+%Y-%m-%d' 2> /dev/null || echo 'unknown')"
 
 # ── B5: Salva checkpoint final antes de encerrar ─────────────────────────────
 CHECKPOINT_SCRIPT="$SCRIPTS_DIR/session-checkpoint.sh"
 if [ -f "$CHECKPOINT_SCRIPT" ] && [ -x "$CHECKPOINT_SCRIPT" ]; then
-    bash "$CHECKPOINT_SCRIPT" 2>/dev/null || true
+    bash "$CHECKPOINT_SCRIPT" 2> /dev/null || true
 fi
 
 # ── Obtém dados da sessão do contexto persistido (schema v2) ─────────────────
@@ -37,16 +37,17 @@ SESSION_ID="unknown"
 START_ISO=""
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
-    START_ISO="$(jq -r '.session.started_at // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
+    START_ISO="$(jq -r '.session.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Calcula duração total da sessão (ISO → epoch → diff)
 DURATION_S=0
+START_EPOCH=0  # inicializado aqui para evitar unbound variable se START_ISO vazio
 if [ -n "$START_ISO" ]; then
-    START_EPOCH="$(date -d "$START_ISO" '+%s' 2>/dev/null || echo 0)"
-    NOW_EPOCH="$(date -u '+%s' 2>/dev/null || echo 0)"
-    if [ "$NOW_EPOCH" -gt "$START_EPOCH" ] 2>/dev/null; then
+    START_EPOCH="$(date -d "$START_ISO" '+%s' 2> /dev/null || echo 0)"
+    NOW_EPOCH="$(date -u '+%s' 2> /dev/null || echo 0)"
+    if [ "$NOW_EPOCH" -gt "$START_EPOCH" ] 2> /dev/null; then
         DURATION_S=$((NOW_EPOCH - START_EPOCH))
     fi
 fi
@@ -58,17 +59,17 @@ AUDIT_FILE="$LOG_DIR/audit.jsonl"
 if [ -f "$AUDIT_FILE" ]; then
     TOOLS_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.session_id == $sid and .event == "preToolUse")' \
-        "$AUDIT_FILE" 2>/dev/null | jq -s 'length' 2>/dev/null || echo 0)"
+        "$AUDIT_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0)"
     ERRORS_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.session_id == $sid and .event == "errorOccurred")' \
-        "$AUDIT_FILE" 2>/dev/null | jq -s 'length' 2>/dev/null || echo 0)"
+        "$AUDIT_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0)"
 fi
 
 # Registra fim da sessão no session-context.json
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg reason "$REASON" \
-        '. + {end_at: $ts, end_reason: $reason}' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        '.session.ended_at = $ts | .session.end_reason = $reason' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 # Append em audit.jsonl — evento de encerramento
@@ -98,8 +99,8 @@ if [ -f "$AUDIT_FILE" ]; then
     AUDIT_LINES="$(wc -l < "$AUDIT_FILE" | tr -d ' ')"
     if [ "$AUDIT_LINES" -gt "$AUDIT_MAX_LINES" ]; then
         AUDIT_ARCHIVE="$LOG_DIR/audit-archive-$(date -u '+%Y%m%d%H%M%S').jsonl"
-        head -n $((AUDIT_LINES - AUDIT_MAX_LINES)) "$AUDIT_FILE" > "$AUDIT_ARCHIVE" 2>/dev/null || true
-        tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" | sponge "$AUDIT_FILE" 2>/dev/null || true
+        head -n $((AUDIT_LINES - AUDIT_MAX_LINES)) "$AUDIT_FILE" > "$AUDIT_ARCHIVE" 2> /dev/null || true
+        tail -n "$AUDIT_MAX_LINES" "$AUDIT_FILE" | sponge "$AUDIT_FILE" 2> /dev/null || true
     fi
 fi
 
@@ -115,7 +116,7 @@ if [ -f "$SUMMARY_SCRIPT" ] && [ -x "$SUMMARY_SCRIPT" ]; then
         START_TS="$START_TS_MS" \
         END_TS="$NOW_MS" \
         SESSION_REASON="$REASON" \
-        bash "$SUMMARY_SCRIPT" 2>/dev/null || echo '## Resumo indisponível (erro no helper)')"
+        bash "$SUMMARY_SCRIPT" 2> /dev/null || echo '## Resumo indisponível (erro no helper)')"
 fi
 
 # Salva resumo local (gitignored)
@@ -153,10 +154,10 @@ fi
 if [ "$SESSION_AUTH_COMPLIANT" = "true" ] && [ -f "$AUDIT_FILE" ]; then
     SESSION_AUTHORIZED_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.event == "turnEnd_authorized" and .session_id == $sid)' \
-        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+        "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     SESSION_VIOLATION_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.event == "turnEnd_UNAUTHORIZED" and .session_id == $sid)' \
-        "$AUDIT_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+        "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     jq -cn \
         --arg event "sessionEnd_compliance" \
         --arg sid "$SESSION_ID" \
@@ -175,7 +176,7 @@ fi
 TASKS_FILE="$STATE_DIR/pending-tasks.md"
 if [ -f "$TASKS_FILE" ]; then
     SESSION_NOTE="<!-- session-end: ${SESSION_ID} | ${SESSION_DATE_DAILY} | ${REASON} | ${TOOLS_COUNT} tools -->"
-    if ! grep -qF "$SESSION_ID" "$TASKS_FILE" 2>/dev/null; then
+    if ! grep -qF "$SESSION_ID" "$TASKS_FILE" 2> /dev/null; then
         echo "" >> "$TASKS_FILE"
         echo "$SESSION_NOTE" >> "$TASKS_FILE"
     fi

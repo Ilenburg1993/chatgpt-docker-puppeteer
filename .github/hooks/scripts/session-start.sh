@@ -73,6 +73,7 @@ jq -cn \
             "started_at": $date,
             "date_short": $date_short,
             "ended_at":   null,
+            "end_reason": null,
             "source":     $source,
             "cwd":        $cwd
         },
@@ -111,7 +112,10 @@ jq -cn \
             "last_turn_authorized":     null,
             "consecutive_unauthorized": $consec,
             "flag_file_exists":         false
-        }
+        },
+        "quality_gates":   {},
+        "session_summary": null,
+        "last_turn_ts":    null
     }' > "$STATE_DIR/session-context.json"
 
 # ── Recovery: detecta sessão anterior via último checkpoint ─────────────────

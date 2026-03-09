@@ -66,7 +66,7 @@ Oito eventos do ciclo de vida do agente disparam scripts shell correspondentes:
 │   ├── session-briefing.md     # Briefing gerado no inicio da sessão
 │   ├── pending-tasks.md        # Backlog de tarefas do agente
 │   ├── UNAUTHORIZED_CLOSE.flag # Presente quando violação detectada (JSON)
-│   └── AUTHORIZED_CLOSE.flag   # (removido após violação resolvida)
+│   └── AUTHORIZED_CLOSE.flag   # Presente quando último turno foi autorizado (simétrico)
 ├── logs/                       # Logs append-only (chmod 700)
 │   ├── audit.jsonl             # Log principal — todos os eventos (max 5000 linhas)
 │   ├── findings.jsonl          # Findings de auditoria registrados
@@ -186,7 +186,7 @@ bash .github/hooks/scripts/reset-auth-violation.sh "motivo da redefinição"
 - Calcula `duration_ms` entre `last_tool_ts` e `timestamp` atual → `tool-metrics.jsonl`
 - Filtra durações inválidas (negativas ou >10min = gap inter-sessão)
 - Detecta quality gates (`npm run lint/typecheck/test/format`) → registra em `session-context.json.quality_gates`
-- Incrementa `tool_responses_empty` quando `tool_response` vazia (métrica diagnóstica, não é falha)
+- Classifica `result_type`: `success` (resposta não vazia), `failure` (padrão de erro detectado) ou `unknown` (resposta vazia)
 
 ---
 
@@ -204,6 +204,28 @@ bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
 - Emite evento `sectionStart` em `audit.jsonl` com `{section_name, turn_number}`
 
 **Quando usar**: no início de cada fase lógica de trabalho (ex: "correção-de-bugs", "commit-e-documentação"). O checkpoint e o relatório final incluem a seção ativa.
+
+---
+
+### `section-end.sh` — Encerramento de Seção Temática *(utilitário do agente)*
+
+**Quando**: chamado manualmente pelo agente para encerrar explicitamente a seção atual.
+
+**Uso**:
+```bash
+bash .github/hooks/scripts/section-end.sh "motivo opcional"
+# Exemplos:
+bash .github/hooks/scripts/section-end.sh "implementação concluída"
+bash .github/hooks/scripts/section-end.sh  # sem args usa "concluída"
+```
+
+**O que faz**:
+- Calcula a duração da seção em segundos e o número de turnos cobertos
+- Limpa `current_section` no session-context.json (seção encerrada = sem seção ativa)
+- Emite evento `sectionEnd` em `audit.jsonl` com `{section_name, reason, turns_covered, duration_s}`
+- Se não houver seção ativa, avisa e sai sem erro (idempotente)
+
+**Relação com `start-section.sh`**: ao declarar nova seção com `start-section.sh`, a anterior é implicitamente substituída no contexto, mas sem `sectionEnd` registrado. Use `section-end.sh` antes de `start-section.sh` para lifecycle completo com duração calculada.
 
 ---
 
@@ -296,6 +318,27 @@ Instala em `.git/hooks/`:
 
 ---
 
+### `smoke-test.sh` — Verificação de integridade dos hooks
+
+**Uso**:
+```bash
+bash .github/hooks/scripts/smoke-test.sh          # verbose
+bash .github/hooks/scripts/smoke-test.sh --quiet  # só erros
+```
+
+**O que verifica** (43 checks):
+1. Dependências instaladas (`jq`, `sponge`, `date`, `sha256sum`, `wc`)
+2. Todos os scripts existem e são executáveis
+3. `copilot-hooks.json` é JSON válido
+4. Diretórios `state/` e `logs/` existem
+5. Schema canônico de `session-context.json` (todos os campos obrigatórios)
+6. `section-end.sh` sem seção ativa não crasha
+7. `shellcheck` nos scripts principais (se disponível)
+
+**Exit code**: número de falhas (0 = PASS total).
+
+---
+
 ## Fluxo de Dados
 
 ```
@@ -318,7 +361,7 @@ postToolUse (por ferramenta)
     └─► post-tool-use.sh
             │ detect quality gates
             │ calculate duration_ms
-            │ track tool_responses_empty (diagnostic)
+            │ classify result_type (success | failure | unknown)
             ├─► audit.jsonl (postToolUse)
             └─► tool-metrics.jsonl
 
@@ -411,33 +454,33 @@ Usa `sponge` para evitar arquivos parcialmente escritos.
 
 **Campos por sub-objeto:**
 
-| Sub-objeto       | Campo                    | Tipo      | Responsável            |
-| ---------------- | ------------------------ | --------- | ---------------------- |
-| `session`        | `id`                     | string    | session-start.sh       |
-| `session`        | `started_at`             | ISO 8601  | session-start.sh       |
-| `session`        | `date_short`             | string    | session-start.sh       |
-| `session`        | `source`                 | enum      | session-start.sh       |
-| `session_stats`  | `turn_count`             | number    | agent-stop.sh          |
-| `session_stats`  | `turn_authorized`        | number    | agent-stop.sh          |
-| `session_stats`  | `turn_unauthorized`      | number    | agent-stop.sh          |
-| `session_stats`  | `tools_total`            | number    | pre-tool-use.sh        |
-| `session_stats`  | `tools_by_name`          | object    | pre-tool-use.sh        |
-| `session_stats`  | `failures_detected`      | number    | post-tool-use + error  |
-| `session_stats`  | `errors_total`           | number    | error-occurred.sh      |
-| `session_stats`  | `subagent_calls`         | number    | subagent-stop.sh       |
-| `current_turn`   | `number`                 | number    | log-prompt.sh          |
-| `current_turn`   | `tools_count`            | number    | pre-tool-use.sh        |
-| `current_turn`   | `tools_by_name`          | object    | pre-tool-use.sh        |
-| `current_turn`   | `failures_count`         | number    | post-tool-use.sh       |
-| `current_turn`   | `auth_requested`         | boolean   | pre-tool-use.sh        |
-| `current_turn`   | `auth_requested_at`      | ISO/null  | pre-tool-use.sh        |
-| `current_section`| `name`                   | str/null  | start-section.sh       |
-| `current_section`| `turn_start`             | number    | start-section.sh       |
-| `last_tool`      | `name`                   | str/null  | pre-tool-use.sh        |
-| `last_tool`      | `result`                 | str/null  | post-tool-use.sh       |
-| `compliance`     | `last_turn_authorized`   | bool/null | agent-stop.sh          |
-| `compliance`     | `consecutive_unauthorized`| number   | agent-stop.sh          |
-| `compliance`     | `flag_file_exists`       | boolean   | agent-stop.sh          |
+| Sub-objeto        | Campo                      | Tipo      | Responsável           |
+| ----------------- | -------------------------- | --------- | --------------------- |
+| `session`         | `id`                       | string    | session-start.sh      |
+| `session`         | `started_at`               | ISO 8601  | session-start.sh      |
+| `session`         | `date_short`               | string    | session-start.sh      |
+| `session`         | `source`                   | enum      | session-start.sh      |
+| `session_stats`   | `turn_count`               | number    | agent-stop.sh         |
+| `session_stats`   | `turn_authorized`          | number    | agent-stop.sh         |
+| `session_stats`   | `turn_unauthorized`        | number    | agent-stop.sh         |
+| `session_stats`   | `tools_total`              | number    | pre-tool-use.sh       |
+| `session_stats`   | `tools_by_name`            | object    | pre-tool-use.sh       |
+| `session_stats`   | `failures_detected`        | number    | post-tool-use + error |
+| `session_stats`   | `errors_total`             | number    | error-occurred.sh     |
+| `session_stats`   | `subagent_calls`           | number    | subagent-stop.sh      |
+| `current_turn`    | `number`                   | number    | log-prompt.sh         |
+| `current_turn`    | `tools_count`              | number    | pre-tool-use.sh       |
+| `current_turn`    | `tools_by_name`            | object    | pre-tool-use.sh       |
+| `current_turn`    | `failures_count`           | number    | post-tool-use.sh      |
+| `current_turn`    | `auth_requested`           | boolean   | pre-tool-use.sh       |
+| `current_turn`    | `auth_requested_at`        | ISO/null  | pre-tool-use.sh       |
+| `current_section` | `name`                     | str/null  | start-section.sh      |
+| `current_section` | `turn_start`               | number    | start-section.sh      |
+| `last_tool`       | `name`                     | str/null  | pre-tool-use.sh       |
+| `last_tool`       | `result`                   | str/null  | post-tool-use.sh      |
+| `compliance`      | `last_turn_authorized`     | bool/null | agent-stop.sh         |
+| `compliance`      | `consecutive_unauthorized` | number    | agent-stop.sh         |
+| `compliance`      | `flag_file_exists`         | boolean   | agent-stop.sh         |
 
 ### Flags de estado
 

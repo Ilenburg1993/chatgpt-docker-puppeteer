@@ -1,6 +1,17 @@
 # Protocolo de Autorização — Spec Completo
 
-> **Status**: Canônico | **Última atualização**: 2026-03-09 | **Versão**: 2.0
+> **Status**: Canônico | **Última atualização**: 2026-03-09 | **Versão**: 2.1
+
+---
+
+## Fundamento: `vscode_askQuestions` é GRATUITO e deve ser AMPLIADO
+
+> **Ponto crítico de entendimento**: `vscode_askQuestions` é uma ferramenta de UI do VS Code que
+> exibe um seletor de opções ao usuário. Ela **NUNCA consome "premium requests"** do GitHub Copilot.
+> O custo por turno de conversa (LLM) é inerente e não é controlado pelo uso desta ferramenta.
+>
+> **Conclusão**: o agente deve usar `vscode_askQuestions` MAIS, não menos. É o mecanismo principal
+> de controle do usuário sobre o agente. Ver Templates A-E em `.github/AGENTS.md`.
 
 ---
 
@@ -39,7 +50,7 @@ A regra está inscrita no topo de dois arquivos lidos no início de cada sessão
 
 Quando `vscode_askQuestions` é chamado, o hook `pre-tool-use.sh` registra:
 ```json
-{"auth_requested_this_turn": true, "auth_requested_at": "<ISO timestamp>"}
+{"current_turn": {"auth_requested": true, "auth_requested_at": "<ISO timestamp>"}}
 ```
 em `state/session-context.json`.
 
@@ -59,7 +70,7 @@ Estratégia 2 — Recência (fallback quando userPromptSubmitted ausente):
   └── Se vscode_askQuestions presente → AUTH_REQUESTED = true
 
 Estratégia 3 — Contexto (último recurso):
-  ┌── Lê auth_requested_this_turn no session-context.json
+  ┌── Lê current_turn.auth_requested no session-context.json
   └── Se true → AUTH_REQUESTED = true
 ```
 
@@ -82,21 +93,21 @@ MANDATORY FIRST ACTION:
 
 ---
 
-## Reset de `auth_requested_this_turn` — Crítico
+## Reset de `current_turn.auth_requested` — Crítico
 
-O flag `auth_requested_this_turn` deve ser resetado para `false` entre turnos.
+O campo `current_turn.auth_requested` deve ser resetado para `false` entre turnos.
 Sem este reset, autorização do turno N vazaria para o turno N+1 (falso positivo).
 
 **Dois pontos de reset (belt-and-suspenders):**
 
 1. `agent-stop.sh` → ao final do processamento de cada turno:
    ```bash
-   jq '.auth_requested_this_turn = false | .auth_requested_at = null' ...
+   jq '.current_turn.auth_requested = false | .current_turn.auth_requested_at = null' ...
    ```
 
 2. `log-prompt.sh` → ao início de cada novo prompt do usuário:
    ```bash
-   jq '.auth_requested_this_turn = false | .auth_requested_at = null' ...
+   jq '.current_turn.auth_requested = false | .current_turn.auth_requested_at = null' ...
    ```
 
 ---

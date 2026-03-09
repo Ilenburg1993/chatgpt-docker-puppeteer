@@ -70,6 +70,7 @@ jq -cn \
 #   2. Fallback por recência (últimas 150 linhas): quando userPromptSubmitted ausente
 #   3. Fallback de contexto: lê current_turn.auth_requested do session-context.json
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
+AUTHORIZED_FLAG_FILE="$STATE_DIR/AUTHORIZED_CLOSE.flag"
 AUTH_REQUESTED=false
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
 
@@ -118,6 +119,18 @@ fi
 # ── Registra resultado do turno e atualiza compliance ────────────────────────
 if [ "$AUTH_REQUESTED" = "true" ]; then
     rm -f "$AUTH_FLAG_FILE" 2>/dev/null || true
+    # Cria flag de autorização (simétrico ao UNAUTHORIZED_CLOSE.flag para auditoria bidirecional)
+    TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    jq -cn \
+        --arg ts "$NOW_ISO" \
+        --arg sid "$SESSION_ID" \
+        --argjson turn "$TURN_COUNT_NOW" \
+        '{
+            timestamp:  $ts,
+            session_id: $sid,
+            turn_count: $turn,
+            authorized: true
+        }' > "$AUTHORIZED_FLAG_FILE"
     if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
         jq '.compliance.last_turn_authorized     = true
              | .compliance.consecutive_unauthorized = 0
@@ -132,6 +145,7 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
         >> "$LOG_DIR/audit.jsonl"
 else
     TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    rm -f "$AUTHORIZED_FLAG_FILE" 2>/dev/null || true  # remove flag de autorização caso exista
     jq -cn \
         --arg ts "$NOW_ISO" \
         --arg sid "$SESSION_ID" \

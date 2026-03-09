@@ -46,6 +46,9 @@ logs/**/*.log
 .github/hooks/logs/
 .github/hooks/state/session-context.json
 .github/hooks/state/session-briefing.md
+.github/hooks/state/pending-tasks.md
+.github/hooks/state/UNAUTHORIZED_CLOSE.flag
+.github/hooks/state/AUTHORIZED_CLOSE.flag
 .github/hooks/checkpoints/
 audit.log
 crash_reports/

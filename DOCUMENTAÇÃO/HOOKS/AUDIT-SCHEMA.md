@@ -88,7 +88,10 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
     "result_type": "success"
 }
 ```
-- `result_type`: `"success"` (tool_response não vazia) ou `"unknown"` (body vazio — não necessariamente falha)
+- `result_type`:
+  - `"success"` — resposta não vazia, sem padrão de erro detectado
+  - `"failure"` — resposta contém padrão de erro (`Error:`, `ENOENT`, `fatal:`, etc.) → incrementa `failures_detected`
+  - `"unknown"` — resposta vazia (não necessariamente falha)
 
 ---
 
@@ -112,6 +115,41 @@ Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os even
     "timestamp": "2026-03-09T..."
 }
 ```
+
+---
+
+### Seções Temáticas
+
+#### `sectionStart`
+```json
+{
+    "event": "sectionStart",
+    "session_id": "...",
+    "timestamp": "2026-03-09T...",
+    "section_name": "implementação do schema v2",
+    "turn_number": 3
+}
+```
+- Emitido por `start-section.sh` (chamada manual do agente)
+- `turn_number`: turno em que a seção foi iniciada (`session_stats.turn_count + 1`)
+
+#### `sectionEnd`
+```json
+{
+    "event": "sectionEnd",
+    "session_id": "...",
+    "timestamp": "2026-03-09T...",
+    "section_name": "implementação do schema v2",
+    "reason": "concluída",
+    "started_at": "2026-03-09T03:10:00Z",
+    "turn_start": 3,
+    "turn_end": 5,
+    "turns_covered": 2,
+    "duration_s": 480
+}
+```
+- Emitido por `section-end.sh` (chamada manual do agente)
+- `turns_covered`: número de turnos cobertos pela seção (`turn_end - turn_start`)
 
 ---
 
