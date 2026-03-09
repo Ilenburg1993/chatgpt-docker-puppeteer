@@ -28,17 +28,22 @@ NOW_SHORT="$(date -u '+%Y%m%d_%H%M%S')"
 
 mkdir -p "$CHECKPOINT_DIR"
 
-# ── Lê contexto atual ────────────────────────────────────────────────────────
+# ── Lê contexto atual (schema v2) ────────────────────────────────────────────
 if [ ! -f "$CTX_FILE" ]; then
     echo "[checkpoint] AVISO: session-context.json não encontrado — abortando." >&2
     exit 0
 fi
 
-SESSION_ID="$(jq -r '.session_id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
-TURN_COUNT="$(jq -r '.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-LAST_TOOL="$(jq -r '.last_tool // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-LAST_TOOL_TS="$(jq -r '.last_tool_ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-START_DATE="$(jq -r '.start_date // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
+TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+TOOLS_TOTAL="$(jq -r '.session_stats.tools_total // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+FAILURES_TOTAL="$(jq -r '.session_stats.failures_total // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+LAST_TOOL_NAME="$(jq -r '.last_tool.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+SESSION_STARTED="$(jq -r '.session.started_at // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+TOOLS_BY_NAME="$(jq -c '.session_stats.tools_by_name // {}' "$CTX_FILE" 2>/dev/null || echo '{}')"
+ACTIVE_SECTION="$(jq -c '.active_section // null' "$CTX_FILE" 2>/dev/null || echo 'null')"
+CONSECUTIVE_VIOLATIONS="$(jq -r '.conformidade.consecutive_unauthorized_closes // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
 
 # ── Conta tarefas abertas por prioridade ────────────────────────────────────
 TASKS_ALTA=0
@@ -50,7 +55,7 @@ if [ -f "$TASKS_FILE" ]; then
     TASKS_ALTA="$(awk '/^## Alta Prioridade/{f=1} /^## / && !/^## Alta/{f=0} f && /^\- \[ \]/' "$TASKS_FILE" | wc -l | tr -d ' ')"
     TASKS_MEDIA="$(awk '/^## Média Prioridade/{f=1} /^## / && !/^## Média/{f=0} f && /^\- \[ \]/' "$TASKS_FILE" | wc -l | tr -d ' ')"
     TASKS_BACKLOG="$(awk '/^## Backlog/{f=1} /^## / && !/^## Backlog/{f=0} f && /^\- \[ \]/' "$TASKS_FILE" | wc -l | tr -d ' ')"
-    TASKS_DONE="$(grep -c '^\- \[x\]' "$TASKS_FILE" 2> /dev/null | tr -d ' \n' || echo 0)"
+    TASKS_DONE="$(grep -c '^\- \[x\]' "$TASKS_FILE" 2>/dev/null | tr -d ' \n' || echo 0)"
 fi
 
 TASKS_OPEN=$((TASKS_ALTA + TASKS_MEDIA + TASKS_BACKLOG))
@@ -60,16 +65,16 @@ TASKS_HASH=""
 TASKS_CHANGED=false
 PREV_CHECKPOINT_TASKS_HASH=""
 
-if [ -f "$TASKS_FILE" ] && command -v sha256sum > /dev/null 2>&1; then
+if [ -f "$TASKS_FILE" ] && command -v sha256sum >/dev/null 2>&1; then
     TASKS_HASH="$(sha256sum "$TASKS_FILE" | awk '{print $1}')"
 fi
 
 # Compara com checkpoint anterior desta sessão (se existir)
 LATEST_LINK="$CHECKPOINT_DIR/sess_${SESSION_ID}_latest.json"
 if [ -f "$LATEST_LINK" ]; then
-    PREV_CHECKPOINT_TASKS_HASH="$(jq -r '.tasks.hash // ""' "$LATEST_LINK" 2> /dev/null || echo '')"
-    if [ -n "$TASKS_HASH" ] && [ -n "$PREV_CHECKPOINT_TASKS_HASH" ] && \
-       [ "$TASKS_HASH" != "$PREV_CHECKPOINT_TASKS_HASH" ]; then
+    PREV_CHECKPOINT_TASKS_HASH="$(jq -r '.tasks.hash // ""' "$LATEST_LINK" 2>/dev/null || echo '')"
+    if [ -n "$TASKS_HASH" ] && [ -n "$PREV_CHECKPOINT_TASKS_HASH" ] \
+        && [ "$TASKS_HASH" != "$PREV_CHECKPOINT_TASKS_HASH" ]; then
         TASKS_CHANGED=true
     fi
 fi
@@ -80,18 +85,16 @@ FINDINGS_CRITICAL=0
 FINDINGS_HIGH=0
 if [ -f "$FINDINGS_FILE" ]; then
     FINDINGS_TOTAL="$(wc -l < "$FINDINGS_FILE" | tr -d ' ')"
-    FINDINGS_CRITICAL="$(jq -rs '[.[] | select(.severity == "critical")] | length' "$FINDINGS_FILE" 2> /dev/null || echo 0)"
-    FINDINGS_HIGH="$(jq -rs '[.[] | select(.severity == "high")] | length' "$FINDINGS_FILE" 2> /dev/null || echo 0)"
+    FINDINGS_CRITICAL="$(jq -rs '[.[] | select(.severity == "critical")] | length' "$FINDINGS_FILE" 2>/dev/null || echo 0)"
+    FINDINGS_HIGH="$(jq -rs '[.[] | select(.severity == "high")] | length' "$FINDINGS_FILE" 2>/dev/null || echo 0)"
 fi
 
-# ── Métricas da sessão (últimas 50 entradas de tool-metrics.jsonl) ───────────
-TOOLS_TOTAL=0
+# ── Métricas acumuladas de tool-metrics.jsonl ────────────────────────────────
 TOOLS_SUCCESS=0
 AVG_DURATION_MS=0
 if [ -f "$METRICS_FILE" ]; then
-    TOOLS_TOTAL="$(wc -l < "$METRICS_FILE" | tr -d ' ')"
-    TOOLS_SUCCESS="$(jq -rs '[.[] | select(.result_type == "success")] | length' "$METRICS_FILE" 2> /dev/null || echo 0)"
-    AVG_DURATION_MS="$(jq -rs 'if length > 0 then ([.[].duration_ms] | add / length | floor) else 0 end' "$METRICS_FILE" 2> /dev/null || echo 0)"
+    TOOLS_SUCCESS="$(jq -rs '[.[] | select(.result_type == "success")] | length' "$METRICS_FILE" 2>/dev/null || echo 0)"
+    AVG_DURATION_MS="$(jq -rs 'if length > 0 then ([.[].duration_ms] | add / length | floor) else 0 end' "$METRICS_FILE" 2>/dev/null || echo 0)"
 fi
 
 # ── Monta o snapshot ─────────────────────────────────────────────────────────
@@ -100,10 +103,15 @@ CHECKPOINT_FILE="$CHECKPOINT_DIR/sess_${SESSION_ID}_turn${TURN_COUNT}_${NOW_SHOR
 jq -cn \
     --arg checkpoint_ts "$NOW_ISO" \
     --arg session_id "$SESSION_ID" \
-    --arg start_date "$START_DATE" \
-    --arg last_tool "$LAST_TOOL" \
+    --arg session_started "$SESSION_STARTED" \
+    --arg last_tool_name "$LAST_TOOL_NAME" \
     --arg last_tool_ts "$LAST_TOOL_TS" \
     --argjson turn_count "$TURN_COUNT" \
+    --argjson tools_total "$TOOLS_TOTAL" \
+    --argjson failures_total "$FAILURES_TOTAL" \
+    --argjson consecutive_violations "$CONSECUTIVE_VIOLATIONS" \
+    --argjson tools_by_name "$TOOLS_BY_NAME" \
+    --argjson active_section "$ACTIVE_SECTION" \
     --argjson tasks_alta "$TASKS_ALTA" \
     --argjson tasks_media "$TASKS_MEDIA" \
     --argjson tasks_backlog "$TASKS_BACKLOG" \
@@ -114,16 +122,26 @@ jq -cn \
     --argjson findings_total "$FINDINGS_TOTAL" \
     --argjson findings_critical "$FINDINGS_CRITICAL" \
     --argjson findings_high "$FINDINGS_HIGH" \
-    --argjson tools_total "$TOOLS_TOTAL" \
     --argjson tools_success "$TOOLS_SUCCESS" \
     --argjson avg_duration_ms "$AVG_DURATION_MS" \
     '{
-        checkpoint_ts:     $checkpoint_ts,
-        session_id:        $session_id,
-        start_date:        $start_date,
-        turn_count:        $turn_count,
-        last_tool:         $last_tool,
-        last_tool_ts:      $last_tool_ts,
+        checkpoint_ts:    $checkpoint_ts,
+        session_id:       $session_id,
+        session_started:  $session_started,
+        turn_count:       $turn_count,
+        last_tool: {
+            name:         $last_tool_name,
+            ts:           $last_tool_ts
+        },
+        session_stats: {
+            tools_total:         $tools_total,
+            tools_success:       $tools_success,
+            failures_total:      $failures_total,
+            avg_duration_ms:     $avg_duration_ms,
+            tools_by_name:       $tools_by_name,
+            consecutive_violations: $consecutive_violations
+        },
+        active_section:   $active_section,
         tasks: {
             alta:          $tasks_alta,
             media:         $tasks_media,
@@ -137,30 +155,20 @@ jq -cn \
             total:         $findings_total,
             critical:      $findings_critical,
             high:          $findings_high
-        },
-        metrics: {
-            tools_total:   $tools_total,
-            tools_success: $tools_success,
-            avg_duration_ms: $avg_duration_ms
         }
     }' > "$CHECKPOINT_FILE"
 
 # Atualiza link simbólico "latest" para o checkpoint mais recente desta sessão
-LATEST_LINK="$CHECKPOINT_DIR/sess_${SESSION_ID}_latest.json"
-ln -sf "$CHECKPOINT_FILE" "$LATEST_LINK" 2> /dev/null || cp "$CHECKPOINT_FILE" "$LATEST_LINK"
+ln -sf "$CHECKPOINT_FILE" "$LATEST_LINK" 2>/dev/null || cp "$CHECKPOINT_FILE" "$LATEST_LINK"
 
 # ── Prune: remove checkpoints antigos mantendo MAX_CHECKPOINTS por sessão ────
-# Ordena por nome (cronológico) e remove os mais antigos.
-# NOTA: usa globbing seguro — se não houver arquivos, o glob literal não é expandido;
-# usamos compgen para evitar o bug clássico de array bash com glob vazio.
-mapfile -t SESS_FILES < <(compgen -G "$CHECKPOINT_DIR/sess_${SESSION_ID}_turn*.json" 2> /dev/null || true)
+mapfile -t SESS_FILES < <(compgen -G "$CHECKPOINT_DIR/sess_${SESSION_ID}_turn*.json" 2>/dev/null || true)
 FILE_COUNT="${#SESS_FILES[@]}"
 
 if [ "$FILE_COUNT" -gt "$MAX_CHECKPOINTS" ]; then
-    # Quantos remover
     REMOVE_COUNT=$((FILE_COUNT - MAX_CHECKPOINTS))
     for old_file in "${SESS_FILES[@]:0:$REMOVE_COUNT}"; do
-        rm -f "$old_file" 2> /dev/null || true
+        rm -f "$old_file" 2>/dev/null || true
     done
 fi
 
@@ -173,11 +181,11 @@ jq -cn \
     --argjson turn "$TURN_COUNT" \
     --argjson tasks_open "$TASKS_OPEN" \
     '{
-        event:      $event,
-        session_id: $sid,
-        timestamp:  $ts,
-        turn_count: $turn,
-        tasks_open: $tasks_open,
+        event:           $event,
+        session_id:      $sid,
+        timestamp:       $ts,
+        turn_count:      $turn,
+        tasks_open:      $tasks_open,
         checkpoint_file: $file
     }' >> "$LOG_DIR/audit.jsonl"
 

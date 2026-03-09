@@ -39,7 +39,26 @@ fi
 SESSION_DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo 'unknown')"
 SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
 
-# Persiste contexto inicial da sessão
+# ── Lê valores de conformidade da sessão anterior ANTES de sobrescrever ──────
+# CRÍTICO: session-context.json é sobrescrito logo abaixo; precisamos dos dados
+# anteriores *agora* para preservar o contador de violações consecutivas.
+PREV_CONSEC_UNAUTH=0
+if [ -f "$STATE_DIR/session-context.json" ]; then
+    # Suporta schema v2 (.compliance.consecutive_unauthorized) e legado
+    PREV_CONSEC_UNAUTH="$(jq -r '
+        .compliance.consecutive_unauthorized //
+        .consecutive_unauthorized_closes //
+        0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
+fi
+
+# ── Persiste contexto inicial — Schema v2 (layered) ──────────────────────────
+# Estrutura em 6 blocos separados por âmbito:
+#   session       → imutável após sessionStart (identidade da sessão)
+#   session_stats → acumuladores agregados ao longo de todos os turnos
+#   current_turn  → estado do turno ATUAL (resetado a cada agentStop)
+#   current_section → seção temática declarada pelo agente (opcional)
+#   last_tool     → metadados do último tool call (sobrescrito a cada preToolUse)
+#   compliance    → estado do protocolo de autorização
 jq -cn \
     --arg sid "$SESSION_ID" \
     --arg ts "$TIMESTAMP" \
@@ -47,25 +66,52 @@ jq -cn \
     --arg date_short "$SESSION_DATE_SHORT" \
     --arg source "$SOURCE" \
     --arg cwd "$CWD" \
+    --argjson consec "$PREV_CONSEC_UNAUTH" \
     '{
-        session_id:   $sid,
-        start_ts:     $ts,
-        start_date:   $date,
-        date_short:   $date_short,
-        source:       $source,
-        cwd:          $cwd,
-        last_tool_ts:        $ts,
-        last_tool:             "",
-        tools_used_counts:     {},
-        tools_used_recent:     [],
-        tools_used_total:      0,
-        failure_count:         0,
-        tool_responses_empty:  0,
-        tool_failures_detected: 0,
-        last_failure_tool:     null,
-        error_count:           0,
-        turn_count:            0,
-        session_summary:       ""
+        "session": {
+            "id":         $sid,
+            "started_at": $date,
+            "date_short": $date_short,
+            "ended_at":   null,
+            "source":     $source,
+            "cwd":        $cwd
+        },
+        "session_stats": {
+            "turn_count":         0,
+            "turn_authorized":    0,
+            "turn_unauthorized":  0,
+            "tools_total":        0,
+            "tools_by_name":      {},
+            "failures_detected":  0,
+            "errors_total":       0,
+            "subagent_calls":     0
+        },
+        "current_turn": {
+            "number":            1,
+            "started_at":        $date,
+            "tools_count":       0,
+            "tools_by_name":     {},
+            "failures_count":    0,
+            "auth_requested":    false,
+            "auth_requested_at": null
+        },
+        "current_section": {
+            "name":        null,
+            "started_at":  null,
+            "turn_start":  null,
+            "description": null
+        },
+        "last_tool": {
+            "name":   null,
+            "ts":     $ts,
+            "use_id": null,
+            "result": null
+        },
+        "compliance": {
+            "last_turn_authorized":     null,
+            "consecutive_unauthorized": $consec,
+            "flag_file_exists":         false
+        }
     }' > "$STATE_DIR/session-context.json"
 
 # ── Recovery: detecta sessão anterior via último checkpoint ─────────────────
@@ -251,11 +297,9 @@ if [ -f "$AUTH_FLAG_FILE" ]; then
     PREV_UNAUTH_TURN="$(jq -r '.turn_count // 0' "$AUTH_FLAG_FILE" 2> /dev/null || echo 0)"
 fi
 
-# Conta violações consecutivas do contexto anterior (se existir)
-CTX_PREV="$STATE_DIR/session-context.json"
-if [ -f "$CTX_PREV" ]; then
-    CONSECUTIVE_VIOLATIONS="$(jq -r '.consecutive_unauthorized_closes // 0' "$CTX_PREV" 2> /dev/null || echo 0)"
-fi
+# Conta violações consecutivas — preservado da sessão anterior em PREV_CONSEC_UNAUTH
+# e já gravado em compliance.consecutive_unauthorized do novo session-context.json.
+CONSECUTIVE_VIOLATIONS="$PREV_CONSEC_UNAUTH"
 
 # M3: escalona nível de alerta com base em violações consecutivas acumuladas
 if [ "${CONSECUTIVE_VIOLATIONS}" -ge 3 ] 2> /dev/null; then

@@ -51,7 +51,7 @@ fi
 # ── Exportação de tool-metrics.jsonl ────────────────────────────────────────
 export_metrics() {
     local src_file="$1"
-    local label="$2"    # "metrics" ou "compliance"
+    local label="$2" # "metrics" ou "compliance"
 
     if [ ! -f "$src_file" ]; then
         echo "# Aviso: $src_file não encontrado" >&2

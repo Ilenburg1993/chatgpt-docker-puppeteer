@@ -4,40 +4,49 @@
 # Input JSON (stdin): {timestamp, hook_event_name, session_id, ...}
 # Output: ignorado pelo Copilot.
 #
-# PROTOCOLO DE ENCERRAMENTO: este hook detecta fins de turno e registra um
-# aviso no audit.jsonl para rastreabilidade. O agente DEVE usar vscode_askQuestions
-# antes de qualquer encerramento — este hook é complementar, não substitui o protocolo.
+# PROTOCOLO DE ENCERRAMENTO: detecta fins de turno e verifica autorização.
+# O agente DEVE usar vscode_askQuestions antes de encerrar — este hook faz a
+# verificação post-hoc e registra conformidade ou violação.
+#
+# Schema v2:
+#   - Calcula turn_duration a partir de current_turn.started_at (fix B3)
+#   - session_summary usa métricas DO TURNO, não da sessão (fix B4)
+#   - Reseta current_turn.* e incrementa session_stats.* após cada turno
+#   - compliance.* controla o estado de autorização
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"
+CTX_FILE="$STATE_DIR/session-context.json"
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando schema real
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
-SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
-NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2>/dev/null || echo '')"
+SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo '')"
+NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo '')"
 
 # session_id: prioriza payload; fallback para contexto
 SESSION_ID="$SESSION_ID_PAYLOAD"
-CTX_FILE="$STATE_DIR/session-context.json"
 if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
 fi
 
-# Calcula duração aproximada do turno usando last_tool_ts do contexto
+# ── Calcula duração do turno — fix B3 ────────────────────────────────────────
+# Usa current_turn.started_at (timestamp de userPromptSubmitted) em vez de
+# last_tool_ts, que apenas reflete o último tool call (impreciso para o turno todo).
 TURN_DURATION_S=0
+TURN_STARTED_AT=""
 if [ -f "$CTX_FILE" ]; then
-    LAST_TOOL_TS="$(jq -r '.last_tool_ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
-    if [ -n "$LAST_TOOL_TS" ] && [ -n "$NOW_ISO" ]; then
-        LAST_MS="$(date -d "$LAST_TOOL_TS" '+%s' 2> /dev/null || echo 0)"
-        NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
-        if [ "$NOW_S" -gt "$LAST_MS" ] 2> /dev/null; then
-            TURN_DURATION_S=$((NOW_S - LAST_MS))
+    TURN_STARTED_AT="$(jq -r '.current_turn.started_at // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    if [ -n "$TURN_STARTED_AT" ] && [ -n "$NOW_ISO" ]; then
+        TURN_START_S="$(date -d "$TURN_STARTED_AT" '+%s' 2>/dev/null || echo 0)"
+        NOW_S="$(date -d "$NOW_ISO" '+%s' 2>/dev/null || echo 0)"
+        if [ "$NOW_S" -gt "$TURN_START_S" ] 2>/dev/null; then
+            TURN_DURATION_S=$((NOW_S - TURN_START_S))
         fi
     fi
 fi
@@ -55,12 +64,11 @@ jq -cn \
         turn_duration_s: $dur
     }' >> "$LOG_DIR/audit.jsonl"
 
-# ── Detecção de autorização: verifica se vscode_askQuestions foi chamada neste turno ──
+# ── Detecção de autorização ───────────────────────────────────────────────────
 # Estratégia em camadas (do mais preciso ao mais tolerante):
-#   1. Fronteira por userPromptSubmitted (preciso): busca após o último prompt do usuário
-#   2. Fallback por contexto (via session-context.json): flag auth_requested_this_turn
-#   3. Fallback por recência (últimas 150 linhas): se vscode_askQuestions aparece no final do log
-# Se qualquer das três confirmar, o turno é considerado autorizado.
+#   1. Fronteira por userPromptSubmitted (preciso): busca após o último prompt
+#   2. Fallback por recência (últimas 150 linhas): quando userPromptSubmitted ausente
+#   3. Fallback de contexto: lê current_turn.auth_requested do session-context.json
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
 AUTH_REQUESTED=false
 AUDIT_FILE="$LOG_DIR/audit.jsonl"
@@ -73,39 +81,48 @@ if [ -f "$AUDIT_FILE" ]; then
     if [ "$LAST_PROMPT_LINE" -gt 0 ] && [ "$TOTAL_LINES" -gt "$LAST_PROMPT_LINE" ]; then
         LINES_SINCE_PROMPT=$((TOTAL_LINES - LAST_PROMPT_LINE))
         if tail -n "$LINES_SINCE_PROMPT" "$AUDIT_FILE" \
-            | jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
+            | jq -re 'select(.tool_name == "vscode_askQuestions")' >/dev/null 2>&1; then
             AUTH_REQUESTED=true
         fi
     fi
 
     # Estratégia 2 (fallback): userPromptSubmitted ausente — verifica últimas 150 linhas
-    # Isso protege contra false-positives quando o hook userPromptSubmitted não disparou.
     if [ "$AUTH_REQUESTED" = "false" ] && [ "$LAST_PROMPT_LINE" -eq 0 ]; then
         RECENT_LINES=150
-        if [ "$TOTAL_LINES" -lt "$RECENT_LINES" ]; then
-            RECENT_LINES="$TOTAL_LINES"
-        fi
+        if [ "$TOTAL_LINES" -lt "$RECENT_LINES" ]; then RECENT_LINES="$TOTAL_LINES"; fi
         if tail -n "$RECENT_LINES" "$AUDIT_FILE" \
-            | jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
+            | jq -re 'select(.tool_name == "vscode_askQuestions")' >/dev/null 2>&1; then
             AUTH_REQUESTED=true
         fi
     fi
 fi
 
 # Estratégia 3 (fallback de contexto): lê flag do session-context.json
+# Schema v2: current_turn.auth_requested; legado: auth_requested_this_turn
 if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
-    CTX_FLAG="$(jq -r '.auth_requested_this_turn // false' "$CTX_FILE" 2> /dev/null || echo false)"
-    if [ "$CTX_FLAG" = "true" ]; then
-        AUTH_REQUESTED=true
-    fi
+    CTX_FLAG="$(jq -r '
+        .current_turn.auth_requested //
+        .auth_requested_this_turn //
+        false' "$CTX_FILE" 2>/dev/null || echo false)"
+    if [ "$CTX_FLAG" = "true" ]; then AUTH_REQUESTED=true; fi
 fi
 
+# ── Lê métricas do turno atual (para session_summary — fix B4) ───────────────
+TURN_TOOLS_COUNT=0
+TURN_NUMBER=0
+if [ -f "$CTX_FILE" ]; then
+    TURN_TOOLS_COUNT="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    TURN_NUMBER="$(jq -r '.current_turn.number // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+fi
+
+# ── Registra resultado do turno e atualiza compliance ────────────────────────
 if [ "$AUTH_REQUESTED" = "true" ]; then
-    # Turno encerrado com autorização: remove flag de violação anterior (se existir)
-    rm -f "$AUTH_FLAG_FILE" 2> /dev/null || true
-    if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-        jq '.last_close_authorized = true | .consecutive_unauthorized_closes = 0' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    rm -f "$AUTH_FLAG_FILE" 2>/dev/null || true
+    if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+        jq '.compliance.last_turn_authorized     = true
+             | .compliance.consecutive_unauthorized = 0
+             | .compliance.flag_file_exists        = false' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
     fi
     jq -cn \
         --arg event "turnEnd_authorized" \
@@ -114,8 +131,7 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
         '{event: $event, session_id: $sid, timestamp: $ts}' \
         >> "$LOG_DIR/audit.jsonl"
 else
-    # Turno encerrado SEM autorização: escreve flag persistente
-    TURN_COUNT_NOW="$(jq -r '.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
     jq -cn \
         --arg ts "$NOW_ISO" \
         --arg sid "$SESSION_ID" \
@@ -127,10 +143,11 @@ else
             violation:  "Turno encerrado sem chamar vscode_askQuestions",
             severity:   "critical"
         }' > "$AUTH_FLAG_FILE"
-    if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-        jq '.last_close_authorized = false
-             | .consecutive_unauthorized_closes = (.consecutive_unauthorized_closes // 0) + 1' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+        jq '.compliance.last_turn_authorized = false
+             | .compliance.consecutive_unauthorized = (.compliance.consecutive_unauthorized // 0) + 1
+             | .compliance.flag_file_exists = true' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
     fi
     jq -cn \
         --arg event "turnEnd_UNAUTHORIZED" \
@@ -141,36 +158,34 @@ else
         >> "$LOG_DIR/audit.jsonl"
 fi
 
-# Incrementa turn_count, reseta auth flag e salva session_summary no contexto da sessão
-if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    # Contagem de tools usadas neste turno (via tools_used_total)
-    TOOLS_USED_COUNT="$(jq -r '.tools_used_total // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
-    SESSION_SUMMARY="turn=${TURN_DURATION_S}s tools=${TOOLS_USED_COUNT} last=${LAST_TOOL_TS:-N/D}"
-    # CRÍTICO: reseta auth_requested_this_turn para false após processamento do turno.
-    # Sem este reset, a Estratégia 3 produziria falsos positivos no turno seguinte
-    # caso o agente não chamasse vscode_askQuestions mas o flag ficasse true do turno anterior.
-    jq --arg now "$NOW_ISO" --arg summary "$SESSION_SUMMARY" \
-        '.turn_count = (.turn_count // 0) + 1
-         | .last_turn_ts = $now
-         | .session_summary = $summary
-         | .auth_requested_this_turn = false
-         | .auth_requested_at = null' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+# ── Incrementa session_stats, constrói session_summary e reseta current_turn ──
+# CRÍTICO: reseta current_turn.auth_requested para false APÓS processamento.
+# Sem este reset, a Estratégia 3 produziria falsos positivos no turno seguinte.
+# session_summary usa métricas DO TURNO ATUAL (fix B4), não totais da sessão.
+if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+    SESSION_SUMMARY="turn=${TURN_NUMBER} dur=${TURN_DURATION_S}s tools=${TURN_TOOLS_COUNT}"
+    AUTH_INCR_FIELD="$([ "$AUTH_REQUESTED" = "true" ] && echo 'turn_authorized' || echo 'turn_unauthorized')"
+    jq --arg now "$NOW_ISO" \
+       --arg summary "$SESSION_SUMMARY" \
+       --arg auth_field "$AUTH_INCR_FIELD" \
+        '.session_stats.turn_count    = (.session_stats.turn_count // 0) + 1
+         | .session_stats[$auth_field] = (.session_stats[$auth_field] // 0) + 1
+         | .last_turn_ts              = $now
+         | .session_summary           = $summary
+         | .current_turn.auth_requested    = false
+         | .current_turn.auth_requested_at = null' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
 fi
 
-# ── Checkpoint de estado do turno ──────────────────────────────────────────
-# Salva snapshot incremental para persistência máxima entre sessões.
+# ── Checkpoint de estado do turno ────────────────────────────────────────────
 CHECKPOINT_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/session-checkpoint.sh"
 if [ -f "$CHECKPOINT_SCRIPT" ]; then
-    bash "$CHECKPOINT_SCRIPT" 2> /dev/null || true
+    bash "$CHECKPOINT_SCRIPT" 2>/dev/null || true
 fi
 
-# ── Sync automático de tarefas para DOCUMENTACAO/ (a cada 5 turnos) ──────────────
-# Gera relatório de tarefas com cross-reference de findings sem bloquear o turno.
-TURN_COUNT_SYNC="$(jq -r '.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+# ── Sync automático de tarefas para DOCUMENTACAO/ (a cada 5 turnos) ──────────
+TURN_COUNT_SYNC="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
 SYNC_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/sync-tasks-to-docs.sh"
 if [ -f "$SYNC_SCRIPT" ] && [ $((TURN_COUNT_SYNC % 5)) -eq 0 ] && [ "$TURN_COUNT_SYNC" -gt 0 ]; then
-    bash "$SYNC_SCRIPT" 2> /dev/null || true
+    bash "$SYNC_SCRIPT" 2>/dev/null || true
 fi
-
-exit 0
