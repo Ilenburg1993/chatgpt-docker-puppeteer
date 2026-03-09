@@ -38,7 +38,7 @@ if [ -z "$REASON" ]; then
 fi
 
 NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
-SESSION_ID="$(jq -r '.session_id // "manual"' "$CTX_FILE" 2> /dev/null || echo 'manual')"
+SESSION_ID="$(jq -r '.session.id // "manual"' "$CTX_FILE" 2> /dev/null || echo 'manual')"
 
 # Verifica se o flag existe
 if [ ! -f "$AUTH_FLAG_FILE" ]; then
@@ -59,7 +59,7 @@ rm -f "$AUTH_FLAG_FILE"
 
 # Reseta contadores no contexto
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq '.consecutive_unauthorized_closes = 0 | .last_close_authorized = true' \
+    jq '.compliance.consecutive_unauthorized = 0 | .compliance.last_turn_authorized = true' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 

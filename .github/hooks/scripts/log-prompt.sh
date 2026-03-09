@@ -21,7 +21,8 @@ mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 
 INPUT="$(cat 2> /dev/null || true)"
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+_LOCAL_TS="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 PROMPT_RAW="$(echo "$INPUT" | jq -r '.prompt // ""' 2> /dev/null || echo '')"
 SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
@@ -105,7 +106,7 @@ fi
 jq -cn \
     --arg event "userPromptSubmitted" \
     --arg sid "$SESSION_ID" \
-    --arg ts "$TIMESTAMP" \
+    --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
     --arg cwd "$CWD" \
     --arg hash "$PROMPT_HASH" \
     --arg section_id "$SECTION_ID_PRE" \

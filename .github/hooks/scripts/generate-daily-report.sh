@@ -52,6 +52,7 @@ TOTAL_OPEN=$((COUNT_ALTA + COUNT_MEDIA + COUNT_BACKLOG))
 SESSIONS_TODAY=0
 TOOL_CALLS_TODAY=0
 FAILURES_TODAY=0
+ERRORS_TODAY=0
 SUBAGENTS_TODAY=0
 COMPACTIONS_TODAY=0
 
@@ -78,6 +79,11 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
     # Compactações hoje
     COMPACTIONS_TODAY="$(jq -r --arg d "$TODAY" \
         'select(.event == "preCompact" and (.timestamp // "" | startswith($d))) | .event' \
+        "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
+
+    # Erros do agente hoje (evento errorOccurred)
+    ERRORS_TODAY="$(jq -r --arg d "$TODAY" \
+        'select(.event == "errorOccurred" and (.timestamp // "" | startswith($d))) | .event' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
 fi
 

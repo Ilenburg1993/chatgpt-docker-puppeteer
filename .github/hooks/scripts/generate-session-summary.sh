@@ -40,7 +40,12 @@ PROMPTS_COUNT="$(count_event userPromptSubmitted)"
 TOOL_USE_COUNT="$(count_event preToolUse)"
 AGENT_STOP_COUNT="$(count_event agentStop)"
 ERROR_COUNT="$(count_event errorOccurred)"
-FAILURE_COUNT="$(count_event toolFailure)"
+# dual-read: cobre evento legado (toolFailure) e atual (toolUseFailure)
+FAILURE_COUNT="$(if [ -f "$AUDIT_FILE" ]; then
+    jq -r --arg sid "$SESSION_ID" \
+        'select(.session_id == $sid and (.event == "toolUseFailure" or .event == "toolFailure")) | .event' \
+        "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0
+else echo 0; fi)"
 
 # Top 5 ferramentas usadas nesta sessão
 TOP_TOOLS=""

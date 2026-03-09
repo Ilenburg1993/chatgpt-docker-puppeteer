@@ -1,7 +1,7 @@
 #!/bin/bash
 # on-git-push.sh — Processador de evento git push bem-sucedido.
 #
-# Disparado pelo git hook .git/hooks/post-push (instalado via install-git-hooks.sh).
+# Disparado pelo git hook .git/hooks/pre-push (instalado via install-git-hooks.sh).
 #
 # Responsabilidades:
 #   1. Loga evento `gitPush` em audit.jsonl com metadados do push
@@ -14,7 +14,7 @@
 #   bash .github/hooks/scripts/on-git-push.sh [--branch BRANCH] [--remote REMOTE]
 #
 # Uso via git hook (automático):
-#   Chamado por .git/hooks/post-push com $1=remote $2+=refs
+#   Chamado por .git/hooks/pre-push com $1=remote $2=remote-url e refs via stdin
 #
 set -euo pipefail
 

@@ -68,16 +68,29 @@ TOOLS_TOTAL=0
 TOOLS_TOP=""
 
 if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
-    # Conta ferramentas usadas (preToolUse events nesta sessão)
-    TOOLS_TOTAL="$(jq -r --arg sid "$SESSION_ID" \
-        'select(.event == "preToolUse" and .session_id == $sid) | (.tool_name // .toolName // "")' \
-        "$AUDIT_FILE" 2> /dev/null | grep -cv '^$' | tr -d ' ' || echo 0)"
-
-    TOOLS_TOP="$(jq -r --arg sid "$SESSION_ID" \
-        'select(.event == "preToolUse" and .session_id == $sid) | (.tool_name // .toolName // "")' \
-        "$AUDIT_FILE" 2> /dev/null \
-        | grep -v '^$' | sort | uniq -c | sort -rn | head -5 \
-        | awk '{printf "  - `%s`: %d\n", $2, $1}' || true)"
+    # M-002 FIX: usa current_section.tools_by_name do CTX (contagem por seção via pre-tool-use.sh)
+    # em vez de filtrar audit.jsonl por session_id (que conta TODA a sessão, não só a seção).
+    # O fallback para audit.jsonl usa filtragem por session_id como aproximação quando CTX indisponível.
+    if [ -f "$CTX_FILE" ]; then
+        TOOLS_TOTAL="$(jq '(.current_section.tools_by_name // {}) | values | add // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+        TOOLS_TOP="$(jq -r '
+            (.current_section.tools_by_name // {})
+            | to_entries
+            | sort_by(-.value)
+            | .[:5]
+            | .[] | "  - `\(.key)`: \(.value)"
+        ' "$CTX_FILE" 2> /dev/null || true)"
+    else
+        # Fallback: contagem por session_id (aproximação — inclui outras seções da sessão)
+        TOOLS_TOTAL="$(jq -r --arg sid "$SESSION_ID" \
+            'select(.event == "preToolUse" and .session_id == $sid) | (.tool_name // .toolName // "")' \
+            "$AUDIT_FILE" 2> /dev/null | grep -cv '^$' | tr -d ' ' || echo 0)"
+        TOOLS_TOP="$(jq -r --arg sid "$SESSION_ID" \
+            'select(.event == "preToolUse" and .session_id == $sid) | (.tool_name // .toolName // "")' \
+            "$AUDIT_FILE" 2> /dev/null \
+            | grep -v '^$' | sort | uniq -c | sort -rn | head -5 \
+            | awk '{printf "  - `%s`: %d\n", $2, $1}' || true)"
+    fi
 
     [ -n "$TOOLS_TOP" ] && TOOLS_SUMMARY="$TOOLS_TOP" || TOOLS_SUMMARY="  - (nenhuma registrada)"
 fi

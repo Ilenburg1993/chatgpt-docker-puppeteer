@@ -279,7 +279,7 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
     TREND_TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
         | wc -l | tr -d ' ' || echo '0')"
 
-    TOTAL_FAILURES="$(jq -r 'select(.event == "toolFailure" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
+    TOTAL_FAILURES="$(jq -r 'select((.event == "toolFailure" or .event == "toolUseFailure") and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
         | wc -l | tr -d ' ' || echo '0')"
 
     if [ "$TREND_TOTAL_TOOLS" -gt 0 ] 2> /dev/null; then
@@ -292,7 +292,7 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
         | awk '{printf "| `%-35s` | %5d |\n", $2, $1}' || true)"
     [ -z "$TREND_TOP_TOOLS_TABLE" ] && TREND_TOP_TOOLS_TABLE="| N/D | 0 |"
 
-    TREND_TOP_FAILURES="$(jq -r 'select(.event == "toolFailure" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
+    TREND_TOP_FAILURES="$(jq -r 'select((.event == "toolFailure" or .event == "toolUseFailure") and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null \
         | sort | uniq -c | sort -rn | head -3 \
         | awk '{printf "- `%s`: %d falha(s)\n", $2, $1}' || true)"

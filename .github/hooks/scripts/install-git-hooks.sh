@@ -119,21 +119,22 @@ HOOK_EOF
 chmod +x "$COMMIT_MSG_SCRIPT"
 echo "✓ commit-msg instalado em: $COMMIT_MSG_SCRIPT"
 
-# ── Instala post-push (registra push no sistema de hooks) ────────────────────
-POST_PUSH_SCRIPT="$GIT_HOOKS_DIR/post-push"
+# ── Instala pre-push (registra push no sistema de hooks) ─────────────────────
+PRE_PUSH_SCRIPT="$GIT_HOOKS_DIR/pre-push"
 HOOKS_SCRIPT_DIR="$PROJECT_DIR/.github/hooks/scripts"
 
-cat > "$POST_PUSH_SCRIPT" << HOOK_EOF
+cat > "$PRE_PUSH_SCRIPT" << HOOK_EOF
 #!/bin/bash
-# post-push — Registra git push no sistema de hooks do agente.
+# pre-push — Registra git push no sistema de hooks do agente.
 # Instalado por: .github/hooks/scripts/install-git-hooks.sh
 # Dispara on-git-push.sh que loga gitPush e define pending_section_after_push.
+# NOTA: pre-push é hook Git válido; recebe remote em \$1, URL em \$2, refs via stdin.
 set -euo pipefail
 
 ON_PUSH_SCRIPT="${HOOKS_SCRIPT_DIR}/on-git-push.sh"
 if [ -f "\$ON_PUSH_SCRIPT" ]; then
     REMOTE="\${1:-origin}"
-    # Passa a primeira linha de stdin (format: local-ref local-sha remote-ref remote-sha)
+    # Lê a primeira linha de stdin (format: local-ref local-sha remote-ref remote-sha)
     read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA < /dev/stdin 2> /dev/null || true
     BRANCH="\${REMOTE_REF##*/}"
     bash "\$ON_PUSH_SCRIPT" --branch "\$BRANCH" --remote "\$REMOTE" 2>&1 || true
@@ -141,17 +142,17 @@ fi
 exit 0
 HOOK_EOF
 
-chmod +x "$POST_PUSH_SCRIPT"
-echo "✓ post-push instalado em: $POST_PUSH_SCRIPT"
+chmod +x "$PRE_PUSH_SCRIPT"
+echo "✓ pre-push instalado em: $PRE_PUSH_SCRIPT"
 
 echo ""
 echo "✅ Git hooks instalados com sucesso."
 echo "   • pre-commit: lint + format:check + typecheck:node"
 echo "   • commit-msg: validação Conventional Commits"
-echo "   • post-push:  registra push no sistema de hooks (on-git-push.sh)"
+echo "   • pre-push:   registra push no sistema de hooks (on-git-push.sh)"
 echo ""
 echo "   Para desinstalar manualmente:"
-echo "     rm .git/hooks/pre-commit .git/hooks/commit-msg .git/hooks/post-push"
+echo "     rm .git/hooks/pre-commit .git/hooks/commit-msg .git/hooks/pre-push"
 echo ""
 echo "   Para pular em emergência (não abusar!):"
 echo "     git commit --no-verify -m 'mensagem'"

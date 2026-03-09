@@ -416,10 +416,10 @@ if grep -q 'pending_section_after_push' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/nul
 else
     fail "agent-stop.sh não trata pending_section_after_push"
 fi
-if grep -q 'post-push' "$SCRIPTS_DIR/install-git-hooks.sh" 2> /dev/null; then
-    pass "install-git-hooks.sh instala hook post-push"
+if grep -q 'pre-push' "$SCRIPTS_DIR/install-git-hooks.sh" 2> /dev/null; then
+    pass "install-git-hooks.sh instala hook pre-push"
 else
-    fail "install-git-hooks.sh não instala post-push"
+    fail "install-git-hooks.sh não instala pre-push"
 fi
 
 # ── Resumo ───────────────────────────────────────────────────────────────────

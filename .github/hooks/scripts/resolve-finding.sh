@@ -44,7 +44,7 @@ NOW_MS="$(date -u +%s000 2> /dev/null || echo 0)"
 # Obtém session_id do contexto persistido
 SESSION_ID=""
 if [ -f "$STATE_DIR/session-context.json" ]; then
-    SESSION_ID="$(jq -r '.session_id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
 fi
 
 FINDINGS_FILE="$LOG_DIR/findings.jsonl"

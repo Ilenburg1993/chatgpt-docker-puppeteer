@@ -23,6 +23,7 @@ INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando o schema real (snake_case, não camelCase)
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+_LOCAL_TS="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2> /dev/null || echo '')"
 TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2> /dev/null || echo '')"
@@ -50,7 +51,7 @@ REDACTED_ARGS="$(echo "$TOOL_INPUT_RAW" \
 jq -cn \
     --arg event "preToolUse" \
     --arg sid "$SESSION_ID" \
-    --arg ts "$TIMESTAMP" \
+    --arg ts "${TIMESTAMP:-$_LOCAL_TS}" \
     --arg cwd "$CWD" \
     --arg tool "$TOOL_NAME" \
     --arg tool_use_id "$TOOL_USE_ID" \
