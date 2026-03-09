@@ -229,8 +229,11 @@ ${_CONSEC_MSG}
 
 📖 Templates completos em .github/AGENTS.md — seção \"Protocolo vscode_askQuestions\""
 
-        # Emite decision:block no stdout — extensão mantém o agente rodando
-        printf '%s\n' "{\"decision\":\"block\",\"systemMessage\":$(printf '%s' "$_RICH_MSG" | jq -Rs .)}"
+        # Emite decision:block no stdout — formato oficial VS Code Copilot Hooks
+        # Conforme spec: hookSpecificOutput.decision="block" é lido pelo VS Code.
+        # systemMessage é exibido ao usuário (common output format, complementar).
+        # Referência: code.visualstudio.com/docs/copilot/customization/hooks
+        printf '%s\n' "{\"hookSpecificOutput\":{\"hookEventName\":\"Stop\",\"decision\":\"block\",\"reason\":\"Turno não autorizado — vscode_askQuestions não foi chamado\"},\"systemMessage\":$(printf '%s' "$_RICH_MSG" | jq -Rs .)}"
         exit 0
     fi
 fi

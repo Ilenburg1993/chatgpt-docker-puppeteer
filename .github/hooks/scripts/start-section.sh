@@ -44,6 +44,7 @@ PREV_SECTION_STARTED=""
 PREV_SECTION_TURN_START=0
 PREV_SECTION_NUMBER=0
 CURRENT_SECTION_COUNT=0
+PREV_SECTION_PUSH_COUNT=0
 
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
@@ -53,9 +54,8 @@ if [ -f "$CTX_FILE" ]; then
     PREV_SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     PREV_SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     CURRENT_SECTION_COUNT="$(jq -r '.session_stats.section_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    PREV_SECTION_PUSH_COUNT="$(jq -r '.current_section.push_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
-
-# Turno atual (turn_count é incrementado no agentStop, logo atual = count + 1)
 CURRENT_TURN=$((TURN_NUMBER + 1))
 
 # ── Se há uma seção ativa: encerra-a com sectionEnd completo ─────────────────
@@ -105,6 +105,19 @@ if [ -n "$PREV_SECTION_NAME" ]; then
         }' >> "$LOG_DIR/audit.jsonl"
 
     echo "[seção] Encerrando automaticamente: \"$PREV_SECTION_NAME\" (${PREV_DURATION_S}s, ${PREV_TURNS_COVERED} turno(s))" >&2
+
+    # ── Gera sumário da seção encerrada (Schema v6 — section_history) ────────
+    # Lê push_count da seção para passar ao gerador de sumário.
+    # Passa o push_count da seção (rastreado por current_section.push_count)
+    if [ -x "$(dirname "${BASH_SOURCE[0]}")/generate-section-summary.sh" ]; then
+        bash "$(dirname "${BASH_SOURCE[0]}")/generate-section-summary.sh" \
+            "$PREV_SECTION_NAME" \
+            "$PREV_SECTION_NUMBER" \
+            "$PREV_DURATION_S" \
+            "$PREV_TURNS_COVERED" \
+            "$PREV_SECTION_PUSH_COUNT" \
+            2>&2 || true # nunca falha — sumário é opcional
+    fi
 fi
 
 # ── Calcula número da nova seção ─────────────────────────────────────────────
@@ -120,12 +133,12 @@ _JQ_ARGS=(
 if [ -n "$SECTION_DESC" ]; then
     _JQ_ARGS+=(--arg desc "$SECTION_DESC")
     # shellcheck disable=SC2016
-    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num}
+    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num, push_count: 0}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]'
 else
     # shellcheck disable=SC2016
-    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num}
+    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num, push_count: 0}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]'
 fi

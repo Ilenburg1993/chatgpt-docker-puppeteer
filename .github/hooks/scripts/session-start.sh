@@ -1,15 +1,22 @@
 #!/bin/bash
-# session-start.sh — Hook sessionStart do Copilot
+# session-start.sh — Hook sessionStart do Copilot (Schema v6)
 # Executado quando uma nova sessão inicia ou é retomada.
 # Input JSON (stdin): {timestamp, cwd, source, initialPrompt}
-# Output: ignorado pelo Copilot — serve para log, exibição ao dev e geração de session-briefing.md.
+# Output (stdout, fd 3): {"hookSpecificOutput": {"hookEventName": "SessionStart",
+#   "additionalContext": "..."}} — injeta session-briefing.md condensado no LLM.
 #
 # Gera automaticamente .github/hooks/state/session-briefing.md com:
 #   - Contagem de tarefas por prioridade
 #   - Findings não resolvidos da sessão anterior
-#   - Sugestão de primeiro passo
-# O LLM é instruído (via AGENTS.md) a ler este arquivo no início de cada sessão.
+#   - Seção ativa, ID da sessão, close key
+#   - Tendências históricas, saúde do sistema
+# O briefing é injetado via additionalContext (acima) E disponível para leitura manual.
+# Schema v6: session_stats.section_history adicionado para rastrear seções fechadas.
 set -euo pipefail
+# Redireciona stdout → stderr para output visual (banner, logs ao dev).
+# O stdout original é preservado em fd 3 para a resposta JSON do hook
+# (hookSpecificOutput.additionalContext — injetado automaticamente no LLM).
+exec 3>&1 1>&2
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
@@ -109,6 +116,7 @@ jq -cn \
             "subagent_calls":     0,
             "section_count":      1,
             "section_names":      ["início"],
+            "section_history":    [],
             "push_count":         0,
             "last_push_at":       null,
             "last_push_turn":     null,
@@ -131,7 +139,8 @@ jq -cn \
             "turn_start":     1,
             "local_turn":     0,
             "description":    null,
-            "section_number": 1
+            "section_number": 1,
+            "push_count":     0
         },
         "last_tool": {
             "name":   null,
@@ -619,6 +628,27 @@ if [ -f "$TASKS_FILE" ]; then
     fi
     echo "=== session-briefing.md gerado — LLM deve lê-lo como primeiro ato ==="
     echo ""
+fi
+
+# ── SessionStart: emite hookSpecificOutput.additionalContext ─────────────────
+# Injeta o briefing gerado diretamente no contexto do LLM, eliminando a
+# dependência de o agente ler manualmente session-briefing.md.
+# Formato oficial VS Code: {"hookSpecificOutput": {"hookEventName": "SessionStart",
+#   "additionalContext": "..."}}
+# Referência: code.visualstudio.com/docs/copilot/customization/hooks
+#
+# Envia versão condensada do briefing (primeiras 80 linhas sem separadores vazios)
+# para fd 3 (stdout original preservado acima via "exec 3>&1 1>&2").
+if [ -f "$BRIEFING_FILE" ] && command -v jq &> /dev/null; then
+    BRIEFING_CONDENSED="$(grep -v '^---$' "$BRIEFING_FILE" 2> /dev/null \
+        | grep -v '^$' \
+        | head -80 \
+        | grep -v 'Gerado automaticamente' || true)"
+    if [ -n "$BRIEFING_CONDENSED" ]; then
+        printf '%s\n' \
+            "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":$(printf '%s' "$BRIEFING_CONDENSED" | jq -Rs .)}}" \
+            >&3
+    fi
 fi
 
 exit 0

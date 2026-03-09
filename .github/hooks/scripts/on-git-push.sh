@@ -83,7 +83,8 @@ fi
 _JQ_FILTER='.session_stats.push_count                  = $push_count
            | .session_stats.last_push_at               = $ts
            | .session_stats.last_push_turn             = $turn
-           | .session_stats.pending_section_after_push = true'
+           | .session_stats.pending_section_after_push = true
+           | .current_section.push_count              = ((.current_section.push_count // 0) + 1)'
 
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --argjson push_count "$NEW_PUSH_COUNT" \

@@ -50,6 +50,7 @@ logs/**/*.log
 .github/hooks/state/UNAUTHORIZED_CLOSE.flag
 .github/hooks/state/AUTHORIZED_CLOSE.flag
 .github/hooks/state/SESSION_CLOSE_NO_KEY.flag
+.github/hooks/state/section-summaries/
 .github/hooks/checkpoints/
 audit.log
 crash_reports/
