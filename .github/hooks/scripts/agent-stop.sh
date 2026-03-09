@@ -250,7 +250,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     SESSION_SUMMARY="turn=${TURN_NUMBER} dur=${TURN_DURATION_S}s tools=${TURN_TOOLS_COUNT}"
     AUTH_INCR_FIELD="$([ "$AUTH_REQUESTED" = "true" ] && echo 'turn_authorized' || echo 'turn_unauthorized')"
     NEXT_TURN=$((TURN_NUMBER + 1))
-    SECTION_NAME="$(jq -r '.current_section.name // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
+    SECTION_NAME="$(jq -r '.current_section.name // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
     jq --arg now "$NOW_ISO" \
         --arg summary "$SESSION_SUMMARY" \
         --arg auth_field "$AUTH_INCR_FIELD" \

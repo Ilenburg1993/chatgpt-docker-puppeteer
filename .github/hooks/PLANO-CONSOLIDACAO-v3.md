@@ -26,11 +26,11 @@ O **Hardening v5** (commit 1469986e) adicionou:
 
 > **Distinção obrigatória em toda documentação e código.**
 
-| Conceito     | Escopo                          | Boundary                                            | Recurso     |
-| ------------ | ------------------------------- | --------------------------------------------------- | ----------- |
-| **SESSION**  | 1 por ativação do Copilot Chat  | `sessionStart` → `sessionEnd`                       | Premium     |
-| **SECTION**  | Fase lógica dentro da SESSION   | `start-section.sh` → `section-end.sh` / auto-close  | Ilimitado   |
-| **TURN**     | 1 ciclo prompt→resposta         | `userPromptSubmitted` → `agentStop`                  | Automático  |
+| Conceito    | Escopo                         | Boundary                                           | Recurso    |
+| ----------- | ------------------------------ | -------------------------------------------------- | ---------- |
+| **SESSION** | 1 por ativação do Copilot Chat | `sessionStart` → `sessionEnd`                      | Premium    |
+| **SECTION** | Fase lógica dentro da SESSION  | `start-section.sh` → `section-end.sh` / auto-close | Ilimitado  |
+| **TURN**    | 1 ciclo prompt→resposta        | `userPromptSubmitted` → `agentStop`                | Automático |
 
 - Uma SESSION contém ≥1 SECTIONs
 - Uma SECTION contém ≥1 TURNs
@@ -42,35 +42,35 @@ O **Hardening v5** (commit 1469986e) adicionou:
 
 ### 3.1 copilot-instructions.md — sem menção ao sistema de hooks
 
-| ID    | Problema                                              | Severidade  |
-| ----- | ----------------------------------------------------- | ----------- |
-| H1    | Nenhuma menção a SESSION/SECTION/TURN                 | 🔴 CRÍTICO  |
-| H2    | Sem referência a decision:block ou hardening v5       | 🔴 CRÍTICO  |
-| H3    | Sem referência a close_key ou Template F              | 🟡 MÉDIO    |
-| H4    | Regra ⛔ ABSOLUTA existe mas é vaga (sem mecanismo)   | 🟡 MÉDIO    |
+| ID  | Problema                                           | Severidade |
+| --- | -------------------------------------------------- | ---------- |
+| H1  | Nenhuma menção a SESSION/SECTION/TURN              | 🔴 CRÍTICO  |
+| H2  | Sem referência a decision:block ou hardening v5    | 🔴 CRÍTICO  |
+| H3  | Sem referência a close_key ou Template F           | 🟡 MÉDIO    |
+| H4  | Regra ⛔ ABSOLUTA existe mas é vaga (sem mecanismo) | 🟡 MÉDIO    |
 
 ### 3.2 session_id guards incompletos
 
-| ID    | Script               | Estado atual        | Risco                                       |
-| ----- | -------------------- | ------------------- | ------------------------------------------- |
-| S1    | error-occurred.sh    | ❌ SEM guard        | Modifica state (failures_detected) via hook  |
-| S2    | subagent-stop.sh     | ❌ SEM guard        | Modifica state (subagent_calls) via hook     |
-| S3    | log-prompt.sh        | ❌ SEM guard        | Modifica state (current_turn reset) via hook |
-| S4    | session-end.sh       | 🟡 N/A (encerra)   | Baixo — encerramento é legítimo             |
+| ID  | Script            | Estado atual    | Risco                                        |
+| --- | ----------------- | --------------- | -------------------------------------------- |
+| S1  | error-occurred.sh | ❌ SEM guard     | Modifica state (failures_detected) via hook  |
+| S2  | subagent-stop.sh  | ❌ SEM guard     | Modifica state (subagent_calls) via hook     |
+| S3  | log-prompt.sh     | ❌ SEM guard     | Modifica state (current_turn reset) via hook |
+| S4  | session-end.sh    | 🟡 N/A (encerra) | Baixo — encerramento é legítimo              |
 
 ### 3.3 Documentação desatualizada
 
-| ID    | Documento                     | Problema                                        |
-| ----- | ----------------------------- | ----------------------------------------------- |
-| D1    | PROTOCOLO-AUTORIZACAO.md      | Não documenta decision:block (Layer 3 expandido) |
-| D2    | MELHORIAS.md                  | Falta entry para Hardening v5                   |
-| D3    | PLANO-CONSOLIDACAO-v2.md      | Não marcado como concluído/superado             |
+| ID  | Documento                | Problema                                         |
+| --- | ------------------------ | ------------------------------------------------ |
+| D1  | PROTOCOLO-AUTORIZACAO.md | Não documenta decision:block (Layer 3 expandido) |
+| D2  | MELHORIAS.md             | Falta entry para Hardening v5                    |
+| D3  | PLANO-CONSOLIDACAO-v2.md | Não marcado como concluído/superado              |
 
 ### 3.4 Smoke-test
 
-| ID    | Pendência                                      |
-| ----- | ---------------------------------------------- |
-| T1    | Testar presença de session_id guard nos 3 novos scripts |
+| ID  | Pendência                                               |
+| --- | ------------------------------------------------------- |
+| T1  | Testar presença de session_id guard nos 3 novos scripts |
 
 ---
 
@@ -139,7 +139,7 @@ Adicionar nota no topo referenciando v3.
 git commit --no-verify -m "feat(hooks): consolidação v3 — hardening copilot-instructions + guards completos
 
 - copilot-instructions.md: SESSION/SECTION/TURN lifecycle, decision:block, close_key
-- session_id guards: error-occurred.sh, subagent-stop.sh, log-prompt.sh  
+- session_id guards: error-occurred.sh, subagent-stop.sh, log-prompt.sh
 - PROTOCOLO-AUTORIZACAO v3.0: decision:block documentado
 - MELHORIAS.md: entry hardening v5
 - PLANO-CONSOLIDACAO-v2 marcado como concluído
@@ -152,7 +152,7 @@ git commit --no-verify -m "feat(hooks): consolidação v3 — hardening copilot-
 
 ```
 Fase 1 (copilot-instructions) →  independente
-Fase 2 (session_id guards)    →  independente  
+Fase 2 (session_id guards)    →  independente
 Fase 3 (PROTOCOLO v3.0)       →  após Fase 2 (para documentar resultado)
 Fase 4 (MELHORIAS.md)         →  após Fase 1+2 (para documentar tudo)
 Fase 5 (PLANO-v2 concluído)   →  independente

@@ -12,13 +12,13 @@ CTX_FILE="$STATE_DIR/session-context.json"
 
 mkdir -p "$LOG_DIR"
 
-INPUT="$(cat 2>/dev/null || true)"
+INPUT="$(cat 2> /dev/null || true)"
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2>/dev/null || echo '')"
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo '')"
-TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null || echo '')"
-TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2>/dev/null || echo '')"
-ERROR_MSG="$(echo "$INPUT" | jq -r '.error // .message // ""' 2>/dev/null || echo '')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2> /dev/null || echo '')"
+TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2> /dev/null || echo '')"
+ERROR_MSG="$(echo "$INPUT" | jq -r '.error // .message // ""' 2> /dev/null || echo '')"
 
 # Loga evento de falha no audit.jsonl
 jq -cn \
@@ -49,19 +49,19 @@ if [ -f "$CTX_FILE" ] && [ ! -s "$CTX_FILE" ]; then
     echo "[guard] session-context.json vazio — guard desabilitado (aguardando auto-recovery)" >&2
 fi
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
-    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
         exit 0
     fi
 fi
 
 # Atualiza contadores no session-context.json
-if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq \
         '.current_turn.failures_count = ((.current_turn.failures_count // 0) + 1)
          | .session_stats.failures_detected = ((.session_stats.failures_detected // 0) + 1)
          | .session_stats.errors_total = ((.session_stats.errors_total // 0) + 1)' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 echo "[tool-failure] Ferramenta '$TOOL_NAME' falhou: $ERROR_MSG" >&2

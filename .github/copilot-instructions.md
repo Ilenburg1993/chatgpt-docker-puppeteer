@@ -29,8 +29,8 @@ usuário.
 
 **Mecanismos de enforcement (automáticos — não dependem do agente):**
 
-- `agent-stop.sh` detecta ausência de `vscode_askQuestions` no TURN e emite
-  `{"decision":"block"}` forçando o agente a continuar (hardening v5)
+- `agent-stop.sh` detecta ausência de `vscode_askQuestions` no TURN e emite `{"decision":"block"}`
+  forçando o agente a continuar (hardening v5)
 - TURNs não autorizados geram `turnEnd_UNAUTHORIZED` no `audit.jsonl`
 - Violações ativam `UNAUTHORIZED_CLOSE.flag` e alertas no próximo `session-briefing.md`
 - `session_id guards` em todos os hooks impedem contaminação cruzada entre SESSIONs
@@ -47,21 +47,23 @@ Sem a chave → `SESSION_CLOSE_NO_KEY.flag` → alerta na próxima SESSION.
 
 > **Distinção obrigatória**: SESSION ≠ SECTION ≠ TURN. Nunca confundir os três conceitos.
 
-| Conceito     | Escopo                          | Boundary                                            | Cardinalidade |
-| ------------ | ------------------------------- | --------------------------------------------------- | ------------- |
-| **SESSION**  | 1 por ativação do Copilot Chat  | `sessionStart` → `sessionEnd`                       | 1 por dia     |
-| **SECTION**  | Fase lógica dentro da SESSION   | `start-section.sh` → `section-end.sh` / auto-close  | ≥1 por SESSION |
-| **TURN**     | 1 ciclo prompt→resposta         | `userPromptSubmitted` → `agentStop`                  | ≥1 por SECTION |
+| Conceito    | Escopo                         | Boundary                                           | Cardinalidade  |
+| ----------- | ------------------------------ | -------------------------------------------------- | -------------- |
+| **SESSION** | 1 por ativação do Copilot Chat | `sessionStart` → `sessionEnd`                      | 1 por dia      |
+| **SECTION** | Fase lógica dentro da SESSION  | `start-section.sh` → `section-end.sh` / auto-close | ≥1 por SESSION |
+| **TURN**    | 1 ciclo prompt→resposta        | `userPromptSubmitted` → `agentStop`                | ≥1 por SECTION |
 
 **Invariante absoluto**: sempre deve haver SESSION + SECTION + TURN ativos simultaneamente.
 
 **Comportamento automático**:
+
 - `session-start.sh` cria a SECTION `"início"` automaticamente
 - `start-section.sh` auto-fecha a SECTION anterior antes de abrir uma nova
 - `session-end.sh` auto-fecha a SECTION ativa antes de encerrar a SESSION
 - `log-prompt.sh` reseta `current_turn.*` a cada novo prompt (início de TURN)
 
 **Quando o agente deve agir manualmente**:
+
 - Chamar `start-section.sh "nome"` ao mudar de fase lógica de trabalho
 - Chamar `start-turn.sh "intenção"` como primeiro ato de cada TURN de trabalho
 - Chamar `vscode_askQuestions` antes de encerrar cada TURN

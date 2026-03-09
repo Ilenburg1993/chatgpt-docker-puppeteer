@@ -13,18 +13,18 @@ CTX_FILE="$STATE_DIR/session-context.json"
 
 mkdir -p "$LOG_DIR"
 
-INPUT="$(cat 2>/dev/null || true)"
+INPUT="$(cat 2> /dev/null || true)"
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2>/dev/null || echo '')"
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo '')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 
 # Cria checkpoint ANTES da compactação (preserva estado atual)
 if [ -x "$HOOK_DIR/scripts/session-checkpoint.sh" ]; then
-    bash "$HOOK_DIR/scripts/session-checkpoint.sh" 2>/dev/null || true
+    bash "$HOOK_DIR/scripts/session-checkpoint.sh" 2> /dev/null || true
 fi
 
 # Loga evento de compactação no audit.jsonl
-NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "$TIMESTAMP")"
+NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo "$TIMESTAMP")"
 jq -cn \
     --arg event "preCompact" \
     --arg sid "$SESSION_ID" \
@@ -40,7 +40,7 @@ jq -cn \
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
     TMP_CTX="$(mktemp)"
     if jq '.session_stats.compaction_count = ((.session_stats.compaction_count // 0) + 1)' \
-        "$CTX_FILE" > "$TMP_CTX" 2>/dev/null; then
+        "$CTX_FILE" > "$TMP_CTX" 2> /dev/null; then
         mv "$TMP_CTX" "$CTX_FILE"
     else
         rm -f "$TMP_CTX"

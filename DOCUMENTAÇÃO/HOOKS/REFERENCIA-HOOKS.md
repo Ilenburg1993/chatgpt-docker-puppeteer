@@ -129,20 +129,20 @@ porque a conversão ocorre no CLI **antes** de chegar à extensão.
 
 **Chaves camelCase** aceitas no copilot-hooks.json (convertidas para PascalCase pelo CLI):
 
-| copilot-hooks.json    | SDK PascalCase     |
-| --------------------- | ------------------ |
-| `sessionStart`        | `SessionStart`     |
-| `userPromptSubmitted` | `UserPromptSubmit` |
-| `preToolUse`          | `PreToolUse`       |
-| `postToolUse`         | `PostToolUse`      |
-| `agentStop`           | `Stop`             |
-| `subagentStop`        | `SubagentStop`     |
-| `sessionEnd`          | `SessionEnd`       |
-| `subagentStart`       | `SubagentStart`    |
-| `preCompact`          | `PreCompact`       |
+| copilot-hooks.json    | SDK PascalCase       |
+| --------------------- | -------------------- |
+| `sessionStart`        | `SessionStart`       |
+| `userPromptSubmitted` | `UserPromptSubmit`   |
+| `preToolUse`          | `PreToolUse`         |
+| `postToolUse`         | `PostToolUse`        |
+| `agentStop`           | `Stop`               |
+| `subagentStop`        | `SubagentStop`       |
+| `sessionEnd`          | `SessionEnd`         |
+| `subagentStart`       | `SubagentStart`      |
+| `preCompact`          | `PreCompact`         |
 | `postToolUseFailure`  | `PostToolUseFailure` |
-| `subagentStart`       | `SubagentStart`    |
-| `preCompact`          | `PreCompact`       |
+| `subagentStart`       | `SubagentStart`      |
+| `preCompact`          | `PreCompact`         |
 
 > **errorOccurred** foi removido do copilot-hooks.json (commit 4ceb3a52) — nunca
 > disparava (não existe no array `Mti` do SDK). Substituído por `postToolUseFailure`.
@@ -601,7 +601,7 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 | ------------------ | --------------------------------------------------------- |
 | **Quando dispara** | Quando um subagente é iniciado pelo agente principal      |
 | **Mapeamento SDK** | `SubagentStart` (confirmado no array `Mti`)               |
-| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                              |
+| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                             |
 | **Nosso script**   | `.github/hooks/scripts/subagent-start.sh`                 |
 | **Funcionalidade** | Loga início, incrementa subagent_calls no session-context |
 
@@ -611,18 +611,18 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 | ------------------ | ------------------------------------------------------------- |
 | **Quando dispara** | Antes do Copilot compactar o contexto da conversa             |
 | **Mapeamento SDK** | `PreCompact` (confirmado no array `Mti`)                      |
-| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                                  |
+| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                                 |
 | **Nosso script**   | `.github/hooks/scripts/pre-compact.sh`                        |
 | **Funcionalidade** | Cria checkpoint completo, incrementa compaction_count, alerta |
 
 ### 8.11 errorOccurred — REMOVIDO (legacy)
 
-| Aspecto            | Detalhe                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| **Status**         | ❌ Removido do copilot-hooks.json (commit 4ceb3a52)           |
-| **Motivo**         | Não existe no array `Mti` do SDK — nunca disparava           |
-| **Substituído por**| `postToolUseFailure` → `tool-use-failure.sh`                 |
-| **Script legacy**  | `error-occurred.sh` mantido no filesystem (não configurado)  |
+| Aspecto             | Detalhe                                                     |
+| ------------------- | ----------------------------------------------------------- |
+| **Status**          | ❌ Removido do copilot-hooks.json (commit 4ceb3a52)          |
+| **Motivo**          | Não existe no array `Mti` do SDK — nunca disparava          |
+| **Substituído por** | `postToolUseFailure` → `tool-use-failure.sh`                |
+| **Script legacy**   | `error-occurred.sh` mantido no filesystem (não configurado) |
 
 ---
 
@@ -630,18 +630,18 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 
 Estado atual (`copilot-hooks.json` commitado, versão pós-8bacbd21):
 
-| Chave no JSON         | SDK PascalCase     | Nosso script        | Status                 | Frequência       |
-| --------------------- | ------------------ | ------------------- | ---------------------- | ---------------- |
-| `sessionStart`        | `SessionStart`     | `session-start.sh`  | ✅ ativo                | 1/sessão         |
-| `userPromptSubmitted` | `UserPromptSubmit` | `log-prompt.sh`     | ✅ ativo                | Raro (~4/sessão) |
-| `preToolUse`          | `PreToolUse`       | `pre-tool-use.sh`   | ✅ ativo                | ~1000/sessão     |
-| `postToolUse`         | `PostToolUse`      | `post-tool-use.sh`  | ✅ ativo                | ~1000/sessão     |
-| `agentStop`           | `Stop`             | `agent-stop.sh`     | ✅ ativo                | 1/turno          |
-| `subagentStop`        | `SubagentStop`     | `subagent-stop.sh`  | ✅ ativo                | Raro             |
-| `postToolUseFailure`  | `PostToolUseFailure` | `tool-use-failure.sh` | ✅ ativo              | Raro (falhas)    |
-| `subagentStart`       | `SubagentStart`    | `subagent-start.sh` | ✅ ativo                | Raro             |
-| `preCompact`          | `PreCompact`       | `pre-compact.sh`    | ✅ ativo                | Raro (~0-2/sess) |
-| `sessionEnd`          | `SessionEnd`       | `session-end.sh`    | ✅ ativo                | 1/sessão         |
+| Chave no JSON         | SDK PascalCase       | Nosso script          | Status  | Frequência       |
+| --------------------- | -------------------- | --------------------- | ------- | ---------------- |
+| `sessionStart`        | `SessionStart`       | `session-start.sh`    | ✅ ativo | 1/sessão         |
+| `userPromptSubmitted` | `UserPromptSubmit`   | `log-prompt.sh`       | ✅ ativo | Raro (~4/sessão) |
+| `preToolUse`          | `PreToolUse`         | `pre-tool-use.sh`     | ✅ ativo | ~1000/sessão     |
+| `postToolUse`         | `PostToolUse`        | `post-tool-use.sh`    | ✅ ativo | ~1000/sessão     |
+| `agentStop`           | `Stop`               | `agent-stop.sh`       | ✅ ativo | 1/turno          |
+| `subagentStop`        | `SubagentStop`       | `subagent-stop.sh`    | ✅ ativo | Raro             |
+| `postToolUseFailure`  | `PostToolUseFailure` | `tool-use-failure.sh` | ✅ ativo | Raro (falhas)    |
+| `subagentStart`       | `SubagentStart`      | `subagent-start.sh`   | ✅ ativo | Raro             |
+| `preCompact`          | `PreCompact`         | `pre-compact.sh`      | ✅ ativo | Raro (~0-2/sess) |
+| `sessionEnd`          | `SessionEnd`         | `session-end.sh`      | ✅ ativo | 1/sessão         |
 
 > **errorOccurred** removido (commit 4ceb3a52). Script `error-occurred.sh` mantido como legacy.
 

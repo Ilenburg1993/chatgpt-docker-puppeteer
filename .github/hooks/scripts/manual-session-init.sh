@@ -25,8 +25,8 @@ echo "╚═══════════════════════�
 
 # Verifica se session-context.json já tem conteúdo
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ]; then
-    EXISTING_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
-    EXISTING_MODE="$(jq -r '.session.source // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    EXISTING_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    EXISTING_MODE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     echo "[aviso] session-context.json já tem conteúdo (session_id=$EXISTING_SID, mode=$EXISTING_MODE)" >&2
     echo "[aviso] Para forçar reinicialização, limpe o arquivo primeiro: > $CTX_FILE" >&2
     exit 1
@@ -38,7 +38,7 @@ SESSION_ID="${1:-}"
 if [ -z "$SESSION_ID" ]; then
     echo "[info] Nenhum session_id fornecido — buscando no audit.jsonl..." >&2
     if [ -f "$AUDIT_FILE" ]; then
-        SESSION_ID="$(tail -100 "$AUDIT_FILE" | jq -r 'select(.session_id != null and .session_id != "") | .session_id' 2>/dev/null | tail -1)"
+        SESSION_ID="$(tail -100 "$AUDIT_FILE" | jq -r 'select(.session_id != null and .session_id != "") | .session_id' 2> /dev/null | tail -1)"
     fi
 fi
 
@@ -52,8 +52,8 @@ echo "[info] session_id detectado: $SESSION_ID" >&2
 echo "[info] Invocando session-start.sh com source=manual_recovery..." >&2
 
 # Invoca session-start.sh com o session_id detectado
-echo "{\"session_id\":\"$SESSION_ID\",\"timestamp\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"source\":\"manual_recovery\",\"cwd\":\"$(pwd)\"}" | \
-    bash "$HOOK_DIR/scripts/session-start.sh" 2>&1
+echo "{\"session_id\":\"$SESSION_ID\",\"timestamp\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\",\"source\":\"manual_recovery\",\"cwd\":\"$(pwd)\"}" \
+    | bash "$HOOK_DIR/scripts/session-start.sh" 2>&1
 
 # Loga o evento de recovery manual no audit.jsonl
 jq -cn \

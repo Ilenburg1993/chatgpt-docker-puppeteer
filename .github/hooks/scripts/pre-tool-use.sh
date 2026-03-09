@@ -70,7 +70,7 @@ jq -cn \
 # Detectamos isso aqui (preToolUse é o primeiro hook frequente) e criamos um
 # contexto Schema v4 mínimo para restaurar funcionalidade dos guards e métricas.
 if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; then
-    NOW_RECOVERY="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "$TIMESTAMP")"
+    NOW_RECOVERY="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo "$TIMESTAMP")"
     jq -cn \
         --arg sid "$SESSION_ID" \
         --arg now "$NOW_RECOVERY" \
@@ -101,7 +101,7 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
                 last_turn_authorized: null, consecutive_unauthorized: 0,
                 flag_file_exists: false
             }
-        }' > "$CTX_FILE" 2>/dev/null || true
+        }' > "$CTX_FILE" 2> /dev/null || true
 
     # Loga o evento de recovery no audit.jsonl
     jq -cn \

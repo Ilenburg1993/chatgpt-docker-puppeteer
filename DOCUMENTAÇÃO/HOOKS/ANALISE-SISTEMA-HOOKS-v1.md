@@ -516,26 +516,26 @@ a um one-shot manual que não previne recorrência.
 
 Eventos disponíveis na extensão Copilot (array `Mti`) que NÃO temos hooks:
 
-| Evento SDK           | Configurado?  | Recomendação                                       |
-| -------------------- | ------------- | -------------------------------------------------- |
-| `PreToolUse`         | ✅             | —                                                  |
-| `PostToolUse`        | ✅             | —                                                  |
-| `PostToolUseFailure` | ✅                | **Adicionado** (commit 4ceb3a52)               |
-| `Notification`       | ❌             | Opcional (baixo valor)                             |
-| `UserPromptSubmit`   | ✅             | —                                                  |
-| `SessionStart`       | ✅             | —                                                  |
-| `SessionEnd`         | ✅             | —                                                  |
-| `Stop`               | ✅ (agentStop) | —                                                  |
-| `SubagentStart`      | ✅                | **Adicionado** (commit 4ceb3a52)               |
-| `SubagentStop`       | ✅             | —                                                  |
-| `PreCompact`         | ✅                | **Adicionado** (commit 4ceb3a52)               |
-| `PermissionRequest`  | ❌             | Opcional                                           |
-| `Setup`              | ❌             | Opcional (one-time)                                |
-| `TeammateIdle`       | ❌             | N/A (multi-agent)                                  |
-| `TaskCompleted`      | ❌             | Interessante para rastreio                         |
-| `ConfigChange`       | ❌             | Baixo valor                                        |
-| `WorktreeCreate`     | ❌             | Baixo valor                                        |
-| `WorktreeRemove`     | ❌             | Baixo valor                                        |
+| Evento SDK           | Configurado?  | Recomendação                     |
+| -------------------- | ------------- | -------------------------------- |
+| `PreToolUse`         | ✅             | —                                |
+| `PostToolUse`        | ✅             | —                                |
+| `PostToolUseFailure` | ✅             | **Adicionado** (commit 4ceb3a52) |
+| `Notification`       | ❌             | Opcional (baixo valor)           |
+| `UserPromptSubmit`   | ✅             | —                                |
+| `SessionStart`       | ✅             | —                                |
+| `SessionEnd`         | ✅             | —                                |
+| `Stop`               | ✅ (agentStop) | —                                |
+| `SubagentStart`      | ✅             | **Adicionado** (commit 4ceb3a52) |
+| `SubagentStop`       | ✅             | —                                |
+| `PreCompact`         | ✅             | **Adicionado** (commit 4ceb3a52) |
+| `PermissionRequest`  | ❌             | Opcional                         |
+| `Setup`              | ❌             | Opcional (one-time)              |
+| `TeammateIdle`       | ❌             | N/A (multi-agent)                |
+| `TaskCompleted`      | ❌             | Interessante para rastreio       |
+| `ConfigChange`       | ❌             | Baixo valor                      |
+| `WorktreeCreate`     | ❌             | Baixo valor                      |
+| `WorktreeRemove`     | ❌             | Baixo valor                      |
 
 ---
 

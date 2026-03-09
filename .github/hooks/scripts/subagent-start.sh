@@ -12,10 +12,10 @@ CTX_FILE="$STATE_DIR/session-context.json"
 
 mkdir -p "$LOG_DIR"
 
-INPUT="$(cat 2>/dev/null || true)"
+INPUT="$(cat 2> /dev/null || true)"
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2>/dev/null || echo '')"
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo '')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 
 # Loga evento no audit.jsonl
 jq -cn \
@@ -29,9 +29,9 @@ jq -cn \
     }' >> "$LOG_DIR/audit.jsonl"
 
 # Incrementa contagem de subagentes no session-context.json
-if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq '.session_stats.subagent_calls = ((.session_stats.subagent_calls // 0) + 1)' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 echo "[subagent] Subagente iniciado" >&2
