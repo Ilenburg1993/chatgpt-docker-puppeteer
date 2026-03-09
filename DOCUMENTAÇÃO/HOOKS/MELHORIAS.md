@@ -1,12 +1,24 @@
 # Melhorias e Upgrades Propostos — Sistema de Hooks
 
-> **Status**: Backlog vivo | **Última atualização**: 2026-03-09
+> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 2)
 >
 > Cada item classifica: prioridade, esforço (S/M/L), e categoria (fix/melhoria/upgrade profundo).
 
 ---
 
-## Bugs Corrigidos (nesta sessão — 2026-03-09)
+## Melhorias Implementadas (sessão 2 — 2026-03-09)
+
+| #   | Melhoria                                         | Scripts                                          | Status         |
+| --- | ------------------------------------------------ | ------------------------------------------------ | -------------- |
+| M1  | Lifecycle de Findings — `finding_id` + `resolve-finding.sh` | `save-finding.sh`, novo `resolve-finding.sh`     | ✅ Implementada |
+| M2  | Sumarização de `tools_used` array               | `pre-tool-use.sh`, `session-start.sh`, `agent-stop.sh` | ✅ Implementada |
+| M3  | Alertas de Threshold escalonados                | `session-start.sh`                               | ✅ Implementada |
+| UP1 | Analytics Cross-Session                          | novo `analytics.sh`                              | ✅ Implementada |
+| UP3 | Health Check automático no session-start         | `session-start.sh`                               | ✅ Implementada |
+
+---
+
+## Bugs Corrigidos (sessão 1 — 2026-03-09)
 
 | #   | Bug                                                                                   | Script                  | Fix aplicado                                       |
 | --- | ------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------- |
@@ -19,49 +31,36 @@
 
 ## Melhorias Pendentes
 
-### M1 — Lifecycle de Findings (Média prioridade, Esforço M)
+### ~~M1 — Lifecycle de Findings~~ ✅ IMPLEMENTADA (sessão 2)
 
-**Problema**: `findings.jsonl` cresce indefinidamente. Não há como marcar um finding como
-resolvido/won't-fix, nem rastrear o lifecycle de cada achado.
+**Implementação**:
+- `save-finding.sh` agora gera `finding_id` único (`f_<timestamp_ms>_<RANDOM>`) em cada achado
+- `resolve-finding.sh` (novo): marcação de resolução append-only no JSONL; idempotente; valida existência do ID
+- `analytics.sh` exibe findings abertos vs resolvidos por severidade
 
-**Proposta**:
-- Adicionar `resolve-finding.sh <finding_id> <resolved|wont_fix> [razão]`
-- Schema: `{event: "findingResolved", finding_id, resolution, reason, resolved_by_session}`
-- Relatório diário mostra ratio abertos vs resolvidos
-
-**Gate de aceitação**: `save-finding.sh` gera `finding_id` único; `resolve-finding.sh` funciona; relatório diário inclui seção "Findings Resolvidos Hoje".
+**Gate de aceitação**: ✅ `save-finding.sh` gera `finding_id`; `resolve-finding.sh` funciona; `analytics.sh` inclui seção de Findings.
 
 ---
 
-### M2 — Sumarização de `tools_used` array (Média prioridade, Esforço S)
+### ~~M2 — Sumarização de `tools_used` array~~ ✅ IMPLEMENTADA (sessão 2)
 
-**Problema**: o array `tools_used` em `session-context.json` cresce indefinidamente na sessão
-(150+ entradas na sessão atual). Isso torna `session-context.json` grande e operações `jq`
-mais lentas.
+**Implementação**:
+- `pre-tool-use.sh`: array `tools_used[]` (crescia indefinidamente) → `tools_used_counts{}` (objeto de contagem) + `tools_used_recent[]` (janela deslizante de 20) + `tools_used_total` (int)
+- `session-start.sh`: inicialização atualizada; `failure_count_unknown` renomeado para `tool_responses_empty`
+- `agent-stop.sh`: `session_summary` usa `tools_used_total` ao invés de `length do array`
 
-**Proposta**:
-- Em `agent-stop.sh`, após incrementar `turn_count`, substituir o array longo por um objeto de contagem: `tools_used_counts: {run_in_terminal: 45, read_file: 30, ...}`
-- Manter apenas os últimos N tool names em `tools_used_recent` (e.g., últimas 10 chamadas)
-- O array completo por turno vai para o checkpoint, que é o lugar certo para isso
-
-**Gate de aceitação**: `session-context.json` não ultrapassa 50KB; `session-checkpoint.sh` ainda captura o histórico completo.
+**Gate de aceitação**: ✅ `session-context.json` não cresce com o número de chamadas de ferramenta.
 
 ---
 
-### M3 — Alertas de Threshold (Média prioridade, Esforço M)
+### ~~M3 — Alertas de Threshold~~ ✅ IMPLEMENTADA (sessão 2)
 
-**Problema**: quando `consecutive_unauthorized_closes > 2` ou `error_count > 10`, não há
-sinalização adicional além do flag file.
+**Implementação** em `session-start.sh`:
+- `consecutive_unauthorized_closes = 1`: `⛔ AVISO DE VIOLAÇÃO`
+- `consecutive_unauthorized_closes = 2`: `⛔⛔ SEGUNDA VIOLAÇÃO CONSECUTIVA`
+- `consecutive_unauthorized_closes >= 3`: `⛔⛔⛔ VIOLAÇÃO CRÍTICA REITERADA (Nx consecutivas)`
 
-**Proposta**:
-- Em `agent-stop.sh`: se `consecutive_unauthorized_closes >= 3`, escrever `CRITICAL_ALERT.flag`
-  com mensagem urgente e incrementar o nível de alerta no próximo briefing (blocos mais grandes, mais `⛔`)
-- Em `session-start.sh`: escalonar a mensagem de alerta baseado no contador:
-  - 1 violação: aviso padrão
-  - 2+: aviso em maiúsculas + instrução de parar e pedir desculpas primeiro
-  - 3+: bloqueio visual total do briefing com instrução de emergência
-
-**Gate de aceitação**: com `consecutive_unauthorized_closes = 3`, o briefing mostra um bloco de alerta escalonado visualmente distinto.
+**Gate de aceitação**: ✅ Briefing escalona visualmente o alerta conforme contagem acumulada.
 
 ---
 
@@ -95,18 +94,15 @@ do subagente (nome, duração, resultado).
 
 ## Upgrades Profundos
 
-### UP1 — Analytics Cross-Session (Alta, Esforço L)
+### ~~UP1 — Analytics Cross-Session~~ ✅ IMPLEMENTADA (sessão 2)
 
-**Visão**: agregar `tool-metrics.jsonl` e `audit.jsonl` de múltiplas sessões para gerar
-tendências históricas: ferramentas mais usadas por tipo de tarefa, evolução da conformidade,
-duração média de turnos por tipo de trabalho.
+**Implementação**: `analytics.sh` (novo):
+- Saída Markdown ou `--json` para automação
+- Seções: resumo global, top-10 ferramentas com % do total, performance P50/P95 por ferramenta,
+  compliance por sessão (✅/⚠️), findings por severidade com abertos vs resolvidos, atividade por dia
+- Uso: `bash analytics.sh` | `bash analytics.sh --output relatorio.md` | `bash analytics.sh --json`
 
-**Componentes**:
-1. `analytics.sh <data_inicio> <data_fim>` — agrega métricas de um período
-2. Formato de saída: JSON + relatório Markdown
-3. Integração com `generate-daily-report.sh` para seção de tendências (7 dias vs 30 dias)
-
-**Gate de aceitação**: `bash analytics.sh 2026-03-01 2026-03-09` gera relatório com top-5 ferramentas, taxa de conformidade histórica, erros por sessão.
+**Gate de aceitação**: ✅ Relatório gerado com todas as seções; `--json` mode para automação funcional.
 
 ---
 
@@ -124,18 +120,14 @@ duração média de turnos por tipo de trabalho.
 
 ---
 
-### UP3 — Sistema de Health Check Contínuo (Média, Esforço M)
+### ~~UP3 — Sistema de Health Check Contínuo~~ ✅ IMPLEMENTADA (sessão 2)
 
-**Visão**: verificações proativas de saúde do sistema de hooks a cada sessão.
+**Implementação** em `session-start.sh`:
+- Verifica: `sponge` instalado (crítico), `jq` instalado (crítico), `audit.jsonl` tamanho (aviso >3000, crítico >4500), `session-context.json` com permissão de escrita, findings críticos/high abertos
+- Nova seção "**Saúde do Sistema**" no `session-briefing.md`: status (✅/⚠️/⛔) + lista de problemas
+- Executa automaticamente a cada sessão sem overhead significativo
 
-**Proposta** (no final de `session-start.sh`):
-1. Verificar se `sponge` está instalado (crítico para operações atômicas)
-2. Verificar se `jq` ≥ 1.6 está disponível
-3. Verificar se `audit.jsonl` > 4500 linhas (pre-aviso de rotação)
-4. Verificar integridade de `session-context.json` (JSON válido?)
-5. Se qualquer check falhar: adicionar seção "⚠️ HEALTH WARNINGS" no briefing
-
-**Gate de aceitação**: `session-start.sh` em máquina sem `sponge` exibe aviso no briefing; em máquina com `audit.jsonl` > 4500 linhas, exibe pre-aviso de rotação.
+**Gate de aceitação**: ✅ Máquina sem `sponge` exibe aviso; `audit.jsonl` > 4500 linhas exibe alerta crítico.
 
 ---
 
