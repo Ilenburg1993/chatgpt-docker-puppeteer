@@ -46,7 +46,7 @@ FAILURE_COUNT="$(count_event toolFailure)"
 TOP_TOOLS=""
 if [ -f "$AUDIT_FILE" ]; then
     TOP_TOOLS="$(jq -r --arg sid "$SESSION_ID" \
-        'select(.session_id == $sid and .event == "preToolUse") | .toolName' \
+        'select(.session_id == $sid and .event == "preToolUse") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null | sort | uniq -c | sort -rn | head -5 \
         | awk '{print "  - `"$2"`: "$1" chamada(s)"}' || echo "  - (sem dados)")"
 fi

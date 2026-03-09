@@ -18,7 +18,7 @@ STATE_DIR="$HOOK_DIR/state"
 
 PATTERN="${1:-}"
 DATE="$(date -u '+%Y%m%d')"
-NOW_MS="$(date -u +%s000 2>/dev/null || echo 0)"
+NOW_MS="$(date -u +%s000 2> /dev/null || echo 0)"
 
 if [ -z "$PATTERN" ]; then
     echo "Erro: padrão de correspondência é obrigatório." >&2
@@ -34,11 +34,11 @@ fi
 # Obtém session_id do contexto persistido
 SESSION_ID=""
 if [ -f "$STATE_DIR/session-context.json" ]; then
-    SESSION_ID="$(jq -r '.session_id // ""' "$STATE_DIR/session-context.json" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session_id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
 fi
 
 # Conta tarefas abertas antes da operação
-COUNT_BEFORE="$(grep -c '^\- \[ \]' "$TASKS_FILE" 2>/dev/null || echo 0)"
+COUNT_BEFORE="$(grep -c '^\- \[ \]' "$TASKS_FILE" 2> /dev/null || echo 0)"
 
 # Marca a PRIMEIRA ocorrência correspondente como concluída usando awk
 TMPFILE="$(mktemp)"
@@ -59,7 +59,7 @@ awk \
     { print }
     ' "$TASKS_FILE" > "$TMPFILE"
 
-COUNT_AFTER="$(grep -c '^\- \[ \]' "$TMPFILE" 2>/dev/null || echo 0)"
+COUNT_AFTER="$(grep -c '^\- \[ \]' "$TMPFILE" 2> /dev/null || echo 0)"
 
 if [ "$COUNT_BEFORE" -gt "$COUNT_AFTER" ]; then
     mv "$TMPFILE" "$TASKS_FILE"
@@ -88,12 +88,12 @@ if [ "$MATCHED" = "1" ]; then
         }' >> "$LOG_DIR/audit.jsonl"
 
     # Quantas tarefas abertas restam
-    REMAINING="$(grep -c '^\- \[ \]' "$TASKS_FILE" 2>/dev/null || echo 0)"
+    REMAINING="$(grep -c '^\- \[ \]' "$TASKS_FILE" 2> /dev/null || echo 0)"
     echo "   Tarefas abertas restantes: $REMAINING"
 else
     echo "✗ Nenhuma tarefa aberta encontrada com o padrão: '$PATTERN'" >&2
     echo "   Tarefas disponíveis:" >&2
-    grep '^\- \[ \]' "$TASKS_FILE" 2>/dev/null | head -5 >&2 || true
+    grep '^\- \[ \]' "$TASKS_FILE" 2> /dev/null | head -5 >&2 || true
     exit 1
 fi
 

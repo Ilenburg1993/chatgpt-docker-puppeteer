@@ -1,7 +1,7 @@
 # Sessions — Relatórios Diários de Sessão
 
-> **Gerada automaticamente** pelo hook `sessionEnd` do Copilot.
-> Cada arquivo nesta pasta representa um dia de sessões e é acumulado por append.
+> **Gerada automaticamente** pelo hook `sessionEnd` do Copilot. Cada arquivo nesta pasta representa
+> um dia de sessões e é acumulado por append.
 
 ## Estrutura
 
@@ -19,6 +19,7 @@ Quando uma sessão do Copilot (coding agent ou CLI) é encerrada, o hook `sessio
 pasta.
 
 Cada entrada de sessão inclui:
+
 - Session ID e data/hora
 - Motivo de encerramento (`complete`, `error`, `abort`, `timeout`, `user_exit`)
 - Duração e número de turnos do agente
@@ -46,4 +47,4 @@ Cada entrada de sessão inclui:
 
 ---
 
-*Última atualização: 8 de março de 2026 — Implementação inicial dos hooks do Copilot*
+_Última atualização: 8 de março de 2026 — Implementação inicial dos hooks do Copilot_

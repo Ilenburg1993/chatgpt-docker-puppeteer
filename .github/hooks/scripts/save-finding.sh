@@ -27,12 +27,12 @@ MODULE="${1:-unknown}"
 SEVERITY="${2:-medium}"
 TYPE="${3:-bug}"
 DESCRIPTION="${4:-}"
-NOW_MS="$(date -u +%s000 2>/dev/null || echo 0)"
-DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo 'unknown')"
+NOW_MS="$(date -u +%s000 2> /dev/null || echo 0)"
+DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo 'unknown')"
 
 # Valida severity
 case "$SEVERITY" in
-    critical|high|medium|low|info) ;;
+    critical | high | medium | low | info) ;;
     *)
         echo "Severity inválida: '$SEVERITY'. Use: critical | high | medium | low | info" >&2
         exit 1
@@ -41,7 +41,7 @@ esac
 
 # Valida type
 case "$TYPE" in
-    bug|gap|improvement|vulnerability|performance|debt) ;;
+    bug | gap | improvement | vulnerability | performance | debt) ;;
     *)
         echo "Type inválido: '$TYPE'. Use: bug | gap | improvement | vulnerability | performance | debt" >&2
         exit 1
@@ -56,7 +56,7 @@ fi
 # Obtém session_id do contexto persistido
 SESSION_ID=""
 if [ -f "$STATE_DIR/session-context.json" ]; then
-    SESSION_ID="$(jq -r '.session_id // ""' "$STATE_DIR/session-context.json" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session_id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
 fi
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
@@ -86,12 +86,12 @@ jq -cn \
 
 # Indicador visual com ícone de severidade
 case "$SEVERITY" in
-    critical)  ICON="🔴" ;;
-    high)      ICON="🟠" ;;
-    medium)    ICON="🟡" ;;
-    low)       ICON="🔵" ;;
-    info)      ICON="⚪" ;;
-    *)         ICON="⚫" ;;
+    critical) ICON="🔴" ;;
+    high) ICON="🟠" ;;
+    medium) ICON="🟡" ;;
+    low) ICON="🔵" ;;
+    info) ICON="⚪" ;;
+    *) ICON="⚫" ;;
 esac
 
 echo "${ICON} Finding registrado [${SEVERITY}/${TYPE}] em ${MODULE}: ${DESCRIPTION}"

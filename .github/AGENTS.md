@@ -1,7 +1,7 @@
 # Instruções para todos os agentes
 
-**Propósito**: baseline curto e permanente para agentes de IA neste workspace.
-**Status**: Canônico. **Última atualização**: 1 de março de 2026.
+**Propósito**: baseline curto e permanente para agentes de IA neste workspace. **Status**: Canônico.
+**Última atualização**: 1 de março de 2026.
 
 Este arquivo é lido automaticamente por agentes de IA (Copilot, Claude, ChatGPT, etc.) que interagem
 com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
@@ -91,14 +91,35 @@ usuário. O agente é um colaborador ativo e autônomo, não um executor passivo
 > **O agente mantém a sessão ativa através do ciclo:**
 > `Executar → Refletir → Registrar → Perguntar → Executar → ...`
 >
-> A única razão válida para parar de trabalhar é o usuário dizer explicitamente "parar", "stop"
-> ou "encerrar sessão". **Tarefas concluídas não encerram a sessão — elas disparam perguntas.**
+> A única razão válida para parar de trabalhar é o usuário dizer explicitamente "parar", "stop" ou
+> "encerrar sessão". **Tarefas concluídas não encerram a sessão — elas disparam perguntas.**
+
+---
+
+### ⛔ PROTOCOLO DE ENCERRAMENTO — NUNCA encerre sem autorização explícita
+
+> **REGRA ABSOLUTA**: O agente JAMAIS pode encerrar uma seção, bloco de trabalho, ou a sessão
+> inteira sem que o usuário diga explicitamente que pode encerrar.
+>
+> **Ações proibidas sem autorização expressa:**
+>
+> - Concluir um bloco de trabalho e não perguntar ao usuário o que fazer a seguir
+> - Fazer commit sem perguntar ao usuário antes
+> - Fechar/finalizar uma seção sem checkpoint via `vscode_askQuestions`
+> - Dizer "pronto" sem oferecer próximos passos e perguntar pela autorização
+>
+> **Procedimento obrigatório antes de qualquer encerramento:**
+>
+> 1. Invocar `vscode_askQuestions` com Template A ou C (ver abaixo)
+> 2. Aguardar resposta do usuário
+> 3. Só encerrar, commitar ou pausar se o usuário autorizar explicitamente
 
 ---
 
 ### Protocolo de início de sessão (OBRIGATÓRIO — todo turno que inicia uma sessão)
 
-1. **Ler** `.github/hooks/state/session-briefing.md` — gerado automaticamente pelo hook `sessionStart`
+1. **Ler** `.github/hooks/state/session-briefing.md` — gerado automaticamente pelo hook
+   `sessionStart`
 2. **Ler** `.github/hooks/state/pending-tasks.md` — backlog canônico de tarefas
 3. **Checar** `turn_count` em `.github/hooks/state/session-context.json`
 4. **Invocar** `vscode_askQuestions` com **Template E** (Session Kickoff) — ver abaixo
@@ -110,13 +131,13 @@ usuário. O agente é um colaborador ativo e autônomo, não um executor passivo
 O agente DEVE invocar `vscode_askQuestions` (com múltiplas perguntas ricas) em cada um destes
 momentos. **Sem exceção.**
 
-| Gatilho | Template | Momento |
-|---|---|---|
-| Sessão iniciada sem prompt explícito | **E — Session Kickoff** | Primeiro ato da sessão |
-| Qualquer tarefa concluída | **A — Next Step** | Logo após marcar `- [x]` |
-| ≥ 3 bugs encontrados numa auditoria | **B — Bug Discovery** | Antes de corrigir |
-| Proposta de upgrade arquitetural identificada | **C — Upgrade Proposal** | Antes de executar |
-| `turn_count % 3 == 0` e `turn_count > 0` | **D — Checkpoint** | No início do turno |
+| Gatilho                                       | Template                 | Momento                  |
+| --------------------------------------------- | ------------------------ | ------------------------ |
+| Sessão iniciada sem prompt explícito          | **E — Session Kickoff**  | Primeiro ato da sessão   |
+| Qualquer tarefa concluída                     | **A — Next Step**        | Logo após marcar `- [x]` |
+| ≥ 3 bugs encontrados numa auditoria           | **B — Bug Discovery**    | Antes de corrigir        |
+| Proposta de upgrade arquitetural identificada | **C — Upgrade Proposal** | Antes de executar        |
+| `turn_count % 3 == 0` e `turn_count > 0`      | **D — Checkpoint**       | No início do turno       |
 
 ---
 
@@ -305,29 +326,29 @@ momentos. **Sem exceção.**
 
 O agente DEVE criar novas tarefas quando identificar qualquer um destes gatilhos:
 
-| Gatilho | Prioridade sugerida |
-|---|---|
-| Bug confirmado (não apenas suspeito) | `alta` |
-| Vulnerabilidade de segurança | `alta` |
-| Race condition ou deadlock potencial | `alta` |
-| Gap de cobertura de testes (< 50% branches em módulo crítico) | `media` |
-| Módulo público sem JSDoc completo | `media` |
-| Dependência circular detectada | `media` |
-| Performance issue mensurável (> 2x mais lento que esperado) | `media` |
-| Código legado / deprecated em uso | `backlog` |
-| Oportunidade de refactoring não urgente | `backlog` |
+| Gatilho                                                       | Prioridade sugerida |
+| ------------------------------------------------------------- | ------------------- |
+| Bug confirmado (não apenas suspeito)                          | `alta`              |
+| Vulnerabilidade de segurança                                  | `alta`              |
+| Race condition ou deadlock potencial                          | `alta`              |
+| Gap de cobertura de testes (< 50% branches em módulo crítico) | `media`             |
+| Módulo público sem JSDoc completo                             | `media`             |
+| Dependência circular detectada                                | `media`             |
+| Performance issue mensurável (> 2x mais lento que esperado)   | `media`             |
+| Código legado / deprecated em uso                             | `backlog`           |
+| Oportunidade de refactoring não urgente                       | `backlog`           |
 
 **Como criar tarefas** (via `run_in_terminal`):
 
 ```bash
 # Sintaxe: add-task.sh <prioridade> "<Título>" "<Descrição com gate de aceitação>"
 bash .github/hooks/scripts/add-task.sh alta \
-    "Corrigir race condition em browser_pool.acquire()" \
-    "pool.acquire() pode retornar handle fechado se Chrome reiniciar. Gate: test:integration passa."
+  "Corrigir race condition em browser_pool.acquire()" \
+  "pool.acquire() pode retornar handle fechado se Chrome reiniciar. Gate: test:integration passa."
 
 bash .github/hooks/scripts/add-task.sh backlog \
-    "Refactoring: extrair lógica de retry para módulo compartilhado" \
-    "src/kernel/ e src/infra/ duplicam lógica de retry com backoff."
+  "Refactoring: extrair lógica de retry para módulo compartilhado" \
+  "src/kernel/ e src/infra/ duplicam lógica de retry com backoff."
 ```
 
 **Como marcar tarefas concluídas**:
@@ -342,8 +363,8 @@ bash .github/hooks/scripts/complete-task.sh "race condition em browser_pool"
 # severity: critical | high | medium | low | info
 # type: bug | gap | improvement | vulnerability | performance | debt
 bash .github/hooks/scripts/save-finding.sh \
-    "src/infra/browser_pool/" "high" "bug" \
-    "pool.acquire() retorna handle fechado sob carga alta"
+  "src/infra/browser_pool/" "high" "bug" \
+  "pool.acquire() retorna handle fechado sob carga alta"
 ```
 
 ---
@@ -353,31 +374,37 @@ bash .github/hooks/scripts/save-finding.sh \
 Quando o usuário ou o agente decide auditar um módulo (ex: escolher opção "auditoria profunda"):
 
 **Fase 1 — Análise estática** (5 min):
+
 ```bash
 npm run lint 2>&1 | rg "<módulo>" | head -20
 npm run typecheck:node 2>&1 | rg "<módulo>" | head -30
-rg "TODO|FIXME|HACK|XXX|BUG" <módulo>/ --stats
+rg "TODO|FIXME|HACK|XXX|BUG" --stats < módulo > /
 ```
 
 **Fase 2 — Cobertura de testes** (5 min):
+
 ```bash
 npm run test:unit -- --coverage 2>&1 | tail -40
 ```
 
 **Fase 3 — Análise semântica** (10-20 min):
+
 - Ler `<módulo>/index.js` e principais exportações
 - Verificar JSDoc de funções públicas (`npm run jsdoc:coverage`)
 - Rastrear fluxo de dados crítico (ex: como uma tarefa passa do kernel ao driver)
 - Identificar condições de borda, error paths, estado mutável compartilhado
 
 **Fase 4 — Registrar findings**:
+
 ```bash
 bash .github/hooks/scripts/save-finding.sh "<módulo>" "<severity>" "<type>" "<descrição>"
 ```
 
 **Fase 5 — Gerar relatório**:
+
 ```markdown
 # Criar DOCUMENTAÇÃO/AUDITORIAS/audit-YYYYMMDD-<módulo>.md com:
+
 - Resumo executivo (2-3 linhas)
 - Findings por severidade (tabela)
 - Recomendações ordenadas por impacto
@@ -391,14 +418,13 @@ bash .github/hooks/scripts/save-finding.sh "<módulo>" "<severity>" "<type>" "<d
 ### Quality gates obrigatórios ao final de cada conjunto de mudanças
 
 ```bash
-npm run lint             # deve passar sem erros novos
-npm run typecheck:node   # deve manter ou reduzir contagem de erros
-npm run test:unit        # deve manter ou reduzir falhas
+npm run lint           # deve passar sem erros novos
+npm run typecheck:node # deve manter ou reduzir contagem de erros
+npm run test:unit      # deve manter ou reduzir falhas
 ```
 
-> O hook `agentStop` rastreia `turn_count` automaticamente.
-> O hook `sessionEnd` gera relatório em `DOCUMENTAÇÃO/RELATORIOS/SESSIONS/`.
-> Logs e findings ficam em `.github/hooks/logs/` (gitignored).
+> O hook `agentStop` rastreia `turn_count` automaticamente. O hook `sessionEnd` gera relatório em
+> `DOCUMENTAÇÃO/RELATORIOS/SESSIONS/`. Logs e findings ficam em `.github/hooks/logs/` (gitignored).
 > O `session-briefing.md` é regenerado a cada nova sessão.
 
 ---

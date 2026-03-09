@@ -19,7 +19,7 @@ QUIET=false
 NO_FILE=false
 for arg in "$@"; do
     case "$arg" in
-        --quiet)   QUIET=true ;;
+        --quiet) QUIET=true ;;
         --no-file) NO_FILE=true ;;
     esac
 done
@@ -33,7 +33,7 @@ TODAY="$(date -u '+%Y-%m-%d')"
 TODAY_SHORT="$(date -u '+%Y%m%d')"
 NOW="$(date -u '+%d/%m/%Y %H:%M UTC')"
 YESTERDAY_TS="$(date -u -d 'yesterday' '+%s' 2> /dev/null || date -u -v-1d '+%s' 2> /dev/null || echo 0)"
-TODAY_TS_MS="$(( YESTERDAY_TS * 1000 ))"
+TODAY_TS_MS="$((YESTERDAY_TS * 1000))"
 
 # ── Contagem do backlog atual ────────────────────────────────────────────────
 COUNT_ALTA=0
@@ -47,7 +47,7 @@ if [ -f "$TASKS_FILE" ]; then
     COUNT_BACKLOG="$(awk '/^## Backlog/{f=1} /^## / && !/^## Backlog/{f=0} f && /^\- \[ \]/' "$TASKS_FILE" | wc -l | tr -d ' ')"
     COUNT_DONE="$(awk '/^\- \[x\]/{n++} END{print n+0}' "$TASKS_FILE" 2> /dev/null || echo 0)"
 fi
-TOTAL_OPEN=$(( COUNT_ALTA + COUNT_MEDIA + COUNT_BACKLOG ))
+TOTAL_OPEN=$((COUNT_ALTA + COUNT_MEDIA + COUNT_BACKLOG))
 
 # ── Dados de hoje (a partir de audit.jsonl filtrando pelo timestamp do dia) ──
 # Conta sessões hoje
@@ -62,7 +62,7 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
         "$AUDIT_FILE" 2> /dev/null | sort -u | awk 'NF{n++} END{print n+0}' || echo 0)"
 
     TOOL_CALLS_TODAY="$(jq -r --argjson since "$TODAY_TS_MS" \
-        'select(.event == "preToolUse" and (.toolName // "") != "" and ((.timestamp // "0") | tonumber? // 0) >= $since) | .toolName' \
+        'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "" and ((.timestamp // "0") | tonumber? // 0) >= $since) | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
 
     FAILURES_TODAY="$(jq -r --argjson since "$TODAY_TS_MS" \
@@ -82,7 +82,7 @@ TOTAL_FAILURES=0
 if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
     TOTAL_SESSIONS="$(jq -r '.session_id // empty' "$AUDIT_FILE" 2> /dev/null \
         | sort -u | awk 'NF{n++} END{print n+0}' || echo 0)"
-    TOTAL_TOOL_CALLS="$(jq -r 'select(.event == "preToolUse" and (.toolName // "") != "") | .toolName' \
+    TOTAL_TOOL_CALLS="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
     TOTAL_FAILURES="$(jq -r 'select(.event == "toolFailure") | .event' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
@@ -98,18 +98,18 @@ fi
 TOP_TOOLS_TABLE="| (nenhum dado ainda) | 0 |"
 TOP_TOOLS_CHART=""
 if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
-    TOP_TOOLS_TABLE="$(jq -r 'select(.event == "preToolUse" and (.toolName // "") != "") | .toolName' \
+    TOP_TOOLS_TABLE="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null \
         | sort | uniq -c | sort -rn | head -8 \
         | awk '{printf "| `%-35s` | %5d |\n", $2, $1}' || true)"
     [ -z "$TOP_TOOLS_TABLE" ] && TOP_TOOLS_TABLE="| (nenhum dado ainda) | 0 |"
 
     # Gráfico de barras de texto (max 40 chars por barra)
-    MAX_COUNT_LINE="$(jq -r 'select(.event == "preToolUse" and (.toolName // "") != "") | .toolName' \
+    MAX_COUNT_LINE="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null | sort | uniq -c | sort -rn | head -1 | awk '{print $1}' || echo 1)"
     [ "$MAX_COUNT_LINE" -eq 0 ] 2> /dev/null && MAX_COUNT_LINE=1
 
-    TOP_TOOLS_CHART="$(jq -r 'select(.event == "preToolUse" and (.toolName // "") != "") | .toolName' \
+    TOP_TOOLS_CHART="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null \
         | sort | uniq -c | sort -rn | head -8 \
         | awk -v max="$MAX_COUNT_LINE" '{
@@ -125,36 +125,36 @@ fi
 PERF_TABLE="| (nenhum dado ainda) | — | 0 |"
 PERF_CHART=""
 if [ -f "$METRICS_FILE" ] && [ -s "$METRICS_FILE" ]; then
-    PERF_TABLE="$(jq -r '.toolName' "$METRICS_FILE" 2> /dev/null \
+    PERF_TABLE="$(jq -r '(.tool_name // .toolName)' "$METRICS_FILE" 2> /dev/null \
         | sort -u \
         | while read -r tool; do
             AVG_MS="$(jq -r --arg t "$tool" \
-                'select(.toolName == $t) | .duration_ms' \
+                'select((.tool_name // .toolName) == $t) | .duration_ms' \
                 "$METRICS_FILE" 2> /dev/null \
                 | awk '{s+=$1; n++} END {if(n>0) printf "%.0f", s/n; else print "N/D"}')"
             COUNT_T="$(jq -r --arg t "$tool" \
-                'select(.toolName == $t) | .toolName' \
+                'select((.tool_name // .toolName) == $t) | (.tool_name // .toolName)' \
                 "$METRICS_FILE" 2> /dev/null | wc -l | tr -d ' ')"
             printf "| \`%-35s\` | %6s ms | %4d |\n" "$tool" "$AVG_MS" "$COUNT_T"
         done \
         | sort -t'|' -k3 -rn | head -8 || true)"
     [ -z "$PERF_TABLE" ] && PERF_TABLE="| (nenhum dado ainda) | — | 0 |"
 
-    MAX_AVG="$(jq -r '.toolName' "$METRICS_FILE" 2> /dev/null \
+    MAX_AVG="$(jq -r '(.tool_name // .toolName)' "$METRICS_FILE" 2> /dev/null \
         | sort -u \
         | while read -r tool; do
             jq -r --arg t "$tool" \
-                'select(.toolName == $t) | .duration_ms' \
+                'select((.tool_name // .toolName) == $t) | .duration_ms' \
                 "$METRICS_FILE" 2> /dev/null \
                 | awk '{s+=$1; n++} END {if(n>0) printf "%.0f\n", s/n}'
         done | sort -n | tail -1 || echo 1)"
     [ -z "$MAX_AVG" ] || [ "$MAX_AVG" -eq 0 ] 2> /dev/null && MAX_AVG=1
 
-    PERF_CHART="$(jq -r '.toolName' "$METRICS_FILE" 2> /dev/null \
+    PERF_CHART="$(jq -r '(.tool_name // .toolName)' "$METRICS_FILE" 2> /dev/null \
         | sort -u \
         | while read -r tool; do
             AVG_MS="$(jq -r --arg t "$tool" \
-                'select(.toolName == $t) | .duration_ms' \
+                'select((.tool_name // .toolName) == $t) | .duration_ms' \
                 "$METRICS_FILE" 2> /dev/null \
                 | awk '{s+=$1; n++} END {if(n>0) printf "%.0f", s/n; else print "0"}')"
             echo "$AVG_MS $tool"

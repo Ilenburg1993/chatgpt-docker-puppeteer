@@ -24,7 +24,7 @@ PRIORITY="${1:-backlog}"
 TITLE="${2:-}"
 DESCRIPTION="${3:-}"
 DATE="$(date -u '+%Y%m%d')"
-NOW_MS="$(date -u +%s000 2>/dev/null || echo 0)"
+NOW_MS="$(date -u +%s000 2> /dev/null || echo 0)"
 
 if [ -z "$TITLE" ]; then
     echo "Erro: título da tarefa é obrigatório." >&2
@@ -40,13 +40,13 @@ fi
 # Obtém session_id do contexto persistido
 SESSION_ID=""
 if [ -f "$STATE_DIR/session-context.json" ]; then
-    SESSION_ID="$(jq -r '.session_id // ""' "$STATE_DIR/session-context.json" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session_id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
 fi
 
 # Determina a âncora da seção-alvo
 case "$PRIORITY" in
-    alta)    ANCHOR="## Alta Prioridade" ;;
-    media)   ANCHOR="## Média Prioridade" ;;
+    alta) ANCHOR="## Alta Prioridade" ;;
+    media) ANCHOR="## Média Prioridade" ;;
     backlog) ANCHOR="## Backlog Livre" ;;
     *)
         echo "Prioridade inválida: '$PRIORITY'. Use alta | media | backlog." >&2
@@ -62,7 +62,7 @@ else
 fi
 
 # Verifica se a tarefa já existe (evita duplicatas idênticas)
-if grep -qF "$TITLE" "$TASKS_FILE" 2>/dev/null; then
+if grep -qF "$TITLE" "$TASKS_FILE" 2> /dev/null; then
     echo "⚠️  Atenção: tarefa com título similar já existe. Adicionando mesmo assim."
 fi
 

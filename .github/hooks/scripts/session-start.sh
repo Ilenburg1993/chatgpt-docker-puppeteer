@@ -23,12 +23,19 @@ mkdir -p "$STATE_DIR"
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos com fallback seguro
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 SOURCE="$(echo "$INPUT" | jq -r '.source // "new"' 2> /dev/null || echo 'new')"
 
-# Gera um session_id único baseado no timestamp
-SESSION_ID="sess_${TIMESTAMP}"
+# session_id: usa o UUID real enviado pelo Copilot; fallback para timestamp-based
+SESSION_ID_RAW="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
+if [ -n "$SESSION_ID_RAW" ]; then
+    SESSION_ID="$SESSION_ID_RAW"
+else
+    TS_NORM="$(echo "$TIMESTAMP" | sed 's/[^0-9]//g' | head -c 13)"
+    SESSION_ID="sess_${TS_NORM:-$(date +%s%3N)}"
+fi
+
 SESSION_DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo 'unknown')"
 SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
 
@@ -116,10 +123,10 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
     TREND_SESSIONS="$(jq -r '.session_id // empty' "$AUDIT_FILE" 2> /dev/null \
         | sort -u | awk 'NF{n++} END{print n+0}' || echo 'N/D')"
 
-    TREND_TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse" and (.toolName // "") != "") | .toolName' "$AUDIT_FILE" 2> /dev/null \
+    TREND_TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
         | wc -l | tr -d ' ' || echo '0')"
 
-    TOTAL_FAILURES="$(jq -r 'select(.event == "toolFailure" and (.toolName // "") != "") | .toolName' "$AUDIT_FILE" 2> /dev/null \
+    TOTAL_FAILURES="$(jq -r 'select(.event == "toolFailure" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
         | wc -l | tr -d ' ' || echo '0')"
 
     if [ "$TREND_TOTAL_TOOLS" -gt 0 ] 2> /dev/null; then
@@ -127,12 +134,12 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
             | awk '{printf "%.1f%% (%d/%d)", ($1/$2)*100, $1, $2}')"
     fi
 
-    TREND_TOP_TOOLS_TABLE="$(jq -r 'select(.event == "preToolUse" and (.toolName // "") != "") | .toolName' "$AUDIT_FILE" 2> /dev/null \
+    TREND_TOP_TOOLS_TABLE="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' "$AUDIT_FILE" 2> /dev/null \
         | sort | uniq -c | sort -rn | head -6 \
         | awk '{printf "| `%-35s` | %5d |\n", $2, $1}' || true)"
     [ -z "$TREND_TOP_TOOLS_TABLE" ] && TREND_TOP_TOOLS_TABLE="| N/D | 0 |"
 
-    TREND_TOP_FAILURES="$(jq -r 'select(.event == "toolFailure" and (.toolName // "") != "") | .toolName' \
+    TREND_TOP_FAILURES="$(jq -r 'select(.event == "toolFailure" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null \
         | sort | uniq -c | sort -rn | head -3 \
         | awk '{printf "- `%s`: %d falha(s)\n", $2, $1}' || true)"
@@ -140,15 +147,15 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
 fi
 
 if [ -f "$METRICS_FILE" ] && [ -s "$METRICS_FILE" ]; then
-    TREND_PERF_TABLE="$(jq -r '.toolName' "$METRICS_FILE" 2> /dev/null \
+    TREND_PERF_TABLE="$(jq -r '(.tool_name // .toolName)' "$METRICS_FILE" 2> /dev/null \
         | sort -u \
         | while read -r tool; do
             AVG_MS="$(jq -r --arg t "$tool" \
-                'select(.toolName == $t) | .duration_ms' \
+                'select((.tool_name // .toolName) == $t) | .duration_ms' \
                 "$METRICS_FILE" 2> /dev/null \
                 | awk '{s+=$1; n++} END {if(n>0) printf "%.0f", s/n; else print "N/D"}')"
             COUNT_T="$(jq -r --arg t "$tool" \
-                'select(.toolName == $t) | .toolName' \
+                'select((.tool_name // .toolName) == $t) | (.tool_name // .toolName)' \
                 "$METRICS_FILE" 2> /dev/null | wc -l | tr -d ' ')"
             printf "| \`%-35s\` | %6s ms | %4d |\n" "$tool" "$AVG_MS" "$COUNT_T"
         done \

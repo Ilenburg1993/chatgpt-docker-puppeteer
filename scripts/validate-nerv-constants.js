@@ -1,19 +1,15 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * @fileoverview Valida cobertura e uso de todos os enums exportados por
- *               src/shared/nerv/constants.js em relação ao código src/.
+ * @file Valida cobertura e uso de todos os enums exportados por src/shared/nerv/constants.js em relação ao código src/.
  *
- * Flags:
- *   --enum=NAME   Analisa apenas o enum informado
- *   --all         Analisa todos os enums (comportamento padrão)
- *   --strict      Falha se houver constantes não utilizadas
- *   --json        Saída JSON
+ *   Flags: --enum=NAME Analisa apenas o enum informado --all Analisa todos os enums (comportamento padrão) --strict Falha
+ *   se houver constantes não utilizadas --json Saída JSON
  */
-import path from 'node:path';
 import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
@@ -50,14 +46,20 @@ async function findUsedKeys(enumName, keys) {
         const pattern = `${enumName}\\.${key}\\b`;
         try {
             const { stdout } = await execFileAsync('rg', [
-                '--glob', '*.js',
-                '--glob', '*.mjs',
-                '--glob', '*.ts',
+                '--glob',
+                '*.js',
+                '--glob',
+                '*.mjs',
+                '--glob',
+                '*.ts',
                 '-l',
                 pattern,
                 SRC_DIR,
             ]);
-            const files = stdout.split('\n').filter(Boolean).map((f) => path.relative(ROOT, f));
+            const files = stdout
+                .split('\n')
+                .filter(Boolean)
+                .map((f) => path.relative(ROOT, f));
             result.push({ key, files });
         } catch {
             result.push({ key, files: [] });
@@ -69,7 +71,14 @@ async function findUsedKeys(enumName, keys) {
 async function analyzeEnum(enumName) {
     const defined = getEnumKeys(enumName);
     if (defined.length === 0) {
-        return { enumName, error: `Enum "${enumName}" não encontrado.`, defined: [], usedKeys: [], unusedKeys: [], coverage: 0 };
+        return {
+            enumName,
+            error: `Enum "${enumName}" não encontrado.`,
+            defined: [],
+            usedKeys: [],
+            unusedKeys: [],
+            coverage: 0,
+        };
     }
     const usageMap = await findUsedKeys(enumName, defined);
     const usedKeys = usageMap.filter((u) => u.files.length > 0).map((u) => u.key);
@@ -105,7 +114,11 @@ if (JSON_OUTPUT) {
     const summary = {
         timestamp: new Date().toISOString(),
         enums: reports.map(({ enumName, defined = [], usedKeys = [], unusedKeys = [], coverage = 0 }) => ({
-            enumName, defined: defined.length, used: usedKeys.length, unused: unusedKeys.length, coverage: `${coverage}%`,
+            enumName,
+            defined: defined.length,
+            used: usedKeys.length,
+            unused: unusedKeys.length,
+            coverage: `${coverage}%`,
         })),
         detail: reports,
     };
