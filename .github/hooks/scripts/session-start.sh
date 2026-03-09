@@ -184,6 +184,27 @@ if [ -f "$METRICS_FILE" ] && [ -s "$METRICS_FILE" ]; then
     [ -z "$TREND_PERF_TABLE" ] && TREND_PERF_TABLE="| N/D | - | 0 |"
 fi
 
+# ── Verifica violação de autorização da sessão anterior ────────────────────
+AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
+PREV_UNAUTH_CLOSE=false
+PREV_UNAUTH_TS=""
+PREV_UNAUTH_SID=""
+PREV_UNAUTH_TURN=0
+CONSECUTIVE_VIOLATIONS=0
+
+if [ -f "$AUTH_FLAG_FILE" ]; then
+    PREV_UNAUTH_CLOSE=true
+    PREV_UNAUTH_TS="$(jq -r '.timestamp // ""' "$AUTH_FLAG_FILE" 2>/dev/null || echo '')"
+    PREV_UNAUTH_SID="$(jq -r '.session_id // ""' "$AUTH_FLAG_FILE" 2>/dev/null || echo '')"
+    PREV_UNAUTH_TURN="$(jq -r '.turn_count // 0' "$AUTH_FLAG_FILE" 2>/dev/null || echo 0)"
+fi
+
+# Conta violações consecutivas do contexto anterior (se existir)
+CTX_PREV="$STATE_DIR/session-context.json"
+if [ -f "$CTX_PREV" ]; then
+    CONSECUTIVE_VIOLATIONS="$(jq -r '.consecutive_unauthorized_closes // 0' "$CTX_PREV" 2>/dev/null || echo 0)"
+fi
+
 # Escreve o briefing
 cat > "$BRIEFING_FILE" << BRIEFING_EOF
 # Briefing de Sessão — ${SESSION_DATE}
@@ -192,6 +213,41 @@ cat > "$BRIEFING_FILE" << BRIEFING_EOF
 > Leia-o como primeiro ato de toda sessão, antes de qualquer ação.
 > Após lê-lo, **invoque \`vscode_askQuestions\`** com o Template E (Session Kickoff)
 > para definir com o usuário o rumo desta sessão.
+BRIEFING_EOF
+
+# Injeta aviso de violação NO TOPO do briefing, se houver
+if [ "$PREV_UNAUTH_CLOSE" = "true" ]; then
+    cat >> "$BRIEFING_FILE" << VIOLATION_EOF
+
+---
+
+## ⛔⛔⛔ VIOLAÇÃO CRÍTICA — AÇÃO OBRIGATÓRIA IMEDIATA ⛔⛔⛔
+
+> **A sessão anterior encerrou SEM autorização do usuário.**
+> O agente não chamou \`vscode_askQuestions\` antes de finalizar o turno.
+>
+> - **Sessão violadora**: \`${PREV_UNAUTH_SID}\`
+> - **Horário da violação**: \`${PREV_UNAUTH_TS}\`
+> - **Turno**: \`${PREV_UNAUTH_TURN}\`
+> - **Violações consecutivas**: \`${CONSECUTIVE_VIOLATIONS}\`
+>
+> **PRIMEIRA AÇÃO DESTA SESSÃO (antes de qualquer outra coisa):**
+>
+> 1. Informar o usuário sobre esta violação
+> 2. Pedir desculpas explicitamente
+> 3. Invocar \`vscode_askQuestions\` para recuperar a autorização
+>
+> **Esta violação será registrada no audit.jsonl e rastreada.**
+> O arquivo \`.github/hooks/state/UNAUTHORIZED_CLOSE.flag\` SÓ é removido
+> quando o agente chama \`vscode_askQuestions\` corretamente.
+
+---
+
+VIOLATION_EOF
+fi
+
+# Continuação do briefing
+cat >> "$BRIEFING_FILE" << BRIEFING_BODY_EOF
 
 ## Estado do Backlog
 
@@ -269,7 +325,7 @@ fi)
 
 ---
 *Gerado automaticamente. Não editar manualmente.*
-BRIEFING_EOF
+BRIEFING_BODY_EOF
 
 # Banner visível ao desenvolvedor no terminal
 cat << 'EOF'

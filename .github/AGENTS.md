@@ -1,11 +1,48 @@
 # Instruções para todos os agentes
 
 **Propósito**: baseline curto e permanente para agentes de IA neste workspace. **Status**: Canônico.
-**Última atualização**: 1 de março de 2026.
+**Última atualização**: 10 de março de 2026.
 
 Este arquivo é lido automaticamente por agentes de IA (Copilot, Claude, ChatGPT, etc.) que interagem
 com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 `.github/instructions/project-canon.instructions.md` como baseline estável.
+
+---
+
+## ⛔⛔⛔ REGRA ABSOLUTA — ENCERRAMENTO SEM AUTORIZAÇÃO É PROIBIDO ⛔⛔⛔
+
+> **Esta é a regra mais importante deste arquivo. Aplica-se SEMPRE, sem exceção.**
+
+### O que é obrigatório
+
+**ANTES de encerrar qualquer turno, bloco de trabalho ou sessão, o agente DEVE:**
+
+1. Invocar a ferramenta `vscode_askQuestions` com Template A ou E (ver seção abaixo)
+2. Aguardar a resposta do usuário
+3. Só prosseguir, commitar ou encerrar após autorização **explícita**
+
+### O que NÃO conta como autorização — exemplos de VIOLAÇÃO
+
+| ❌ VIOLAÇÃO — isso NÃO é autorização             | ✅ CORRETO — único método válido              |
+| ------------------------------------------------ | --------------------------------------------- |
+| Escrever "O que deseja fazer a seguir?" no texto | Chamar a **ferramenta** `vscode_askQuestions` |
+| Terminar a resposta com uma pergunta             | Tool call real, não texto de pergunta         |
+| Dizer "Posso continuar?" como texto do chat      | A ferramenta DEVE aparecer como tool call     |
+| Resumir o trabalho e encerrar sem perguntar      | Aguardar resposta antes de qualquer ação      |
+
+> **TEXTO PLANO NÃO EQUIVALE A AUTORIZAÇÃO.** Somente o **tool call real** de `vscode_askQuestions`
+> conta. Escrever uma pergunta na resposta é uma violação do protocolo.
+
+### Monitoramento automático
+
+O sistema rastreia violações automaticamente:
+
+- `agent-stop.sh` detecta se `vscode_askQuestions` foi chamado no turno
+- Se NÃO foi chamado → grava `.github/hooks/state/UNAUTHORIZED_CLOSE.flag`
+- A próxima sessão exibe `⛔ ALERTA DE VIOLAÇÃO` no topo do session-briefing.md
+- Violações são registradas em `.github/hooks/logs/audit.jsonl` como `turnEnd_UNAUTHORIZED`
+
+---
 
 ## Regras universais
 
@@ -89,30 +126,20 @@ usuário. O agente é um colaborador ativo e autônomo, não um executor passivo
 ### REGRA FUNDAMENTAL — Sessões NUNCA terminam por falta de instrução
 
 > **O agente mantém a sessão ativa através do ciclo:**
-> `Executar → Refletir → Registrar → Perguntar → Executar → ...`
+> `Executar → Refletir → Registrar → Perguntar (via vscode_askQuestions) → Executar → ...`
 >
 > A única razão válida para parar de trabalhar é o usuário dizer explicitamente "parar", "stop" ou
 > "encerrar sessão". **Tarefas concluídas não encerram a sessão — elas disparam perguntas.**
+>
+> **Lembre-se: "Perguntar" = chamar a ferramenta `vscode_askQuestions`. Texto plano não conta.**
 
 ---
 
-### ⛔ PROTOCOLO DE ENCERRAMENTO — NUNCA encerre sem autorização explícita
+### ⛔ Protocolo de encerramento (resumo — ver regra completa no topo deste arquivo)
 
-> **REGRA ABSOLUTA**: O agente JAMAIS pode encerrar uma seção, bloco de trabalho, ou a sessão
-> inteira sem que o usuário diga explicitamente que pode encerrar.
->
-> **Ações proibidas sem autorização expressa:**
->
-> - Concluir um bloco de trabalho e não perguntar ao usuário o que fazer a seguir
-> - Fazer commit sem perguntar ao usuário antes
-> - Fechar/finalizar uma seção sem checkpoint via `vscode_askQuestions`
-> - Dizer "pronto" sem oferecer próximos passos e perguntar pela autorização
->
-> **Procedimento obrigatório antes de qualquer encerramento:**
->
-> 1. Invocar `vscode_askQuestions` com Template A ou C (ver abaixo)
-> 2. Aguardar resposta do usuário
-> 3. Só encerrar, commitar ou pausar se o usuário autorizar explicitamente
+> Invocar `vscode_askQuestions` ANTES de qualquer encerramento. **TEXTO PLANO NÃO CONTA.** Somente
+> tool call real. O sistema monitora violações automaticamente — ver seção ⛔⛔⛔ no início do
+> arquivo.
 
 ---
 

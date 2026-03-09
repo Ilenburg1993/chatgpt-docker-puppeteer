@@ -62,16 +62,31 @@ jq -cn \
         tool_args:  $args
     }' >> "$LOG_DIR/audit.jsonl"
 
-# Atualiza session_id, last_tool_ts e tools_used no session-context.json (hardening)
+# Atualiza session_id, last_tool_ts, tools_used e rastreia autorização no context
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq --arg sid "$SESSION_ID" --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
-        '.session_id = (if $sid != "" then $sid else .session_id end)
-         | .last_tool_ts = $ts
-         | .last_tool = $tool
-         | .last_tool_use_id = $id
-         | .tools_used = ((.tools_used // []) + [$tool] | if length > 200 then .[-200:] else . end)' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    # Se esta ferramenta é vscode_askQuestions, marca autorização solicitada neste turno
+    if [ "$TOOL_NAME" = "vscode_askQuestions" ]; then
+        jq --arg sid "$SESSION_ID" --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" \
+            --arg id "$TOOL_USE_ID" \
+            '.session_id = (if $sid != "" then $sid else .session_id end)
+             | .last_tool_ts = $ts
+             | .last_tool = $tool
+             | .last_tool_use_id = $id
+             | .auth_requested_this_turn = true
+             | .auth_requested_at = $ts
+             | .tools_used = ((.tools_used // []) + [$tool] | if length > 200 then .[-200:] else . end)' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+    else
+        jq --arg sid "$SESSION_ID" --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" \
+            --arg id "$TOOL_USE_ID" \
+            '.session_id = (if $sid != "" then $sid else .session_id end)
+             | .last_tool_ts = $ts
+             | .last_tool = $tool
+             | .last_tool_use_id = $id
+             | .tools_used = ((.tools_used // []) + [$tool] | if length > 200 then .[-200:] else . end)' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+    fi
 fi
 
 # NÃO emite JSON de decision — autonomia total do agente.

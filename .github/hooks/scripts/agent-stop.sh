@@ -55,21 +55,68 @@ jq -cn \
         turn_duration_s: $dur
     }' >> "$LOG_DIR/audit.jsonl"
 
-# AVISO DE ENCERRAMENTO: registra que o turno está encerrando
-# O agente deve ter invocado vscode_askQuestions antes de chegar aqui;
-# se turn_count > 0 e não houve vscode_askQuestions neste turno, é possível
-# que o protocolo de encerramento não foi seguido. Registra para auditoria.
-jq -cn \
-    --arg event "turnEnd_warning" \
-    --arg sid "$SESSION_ID" \
-    --arg ts "${NOW_ISO}" \
-    --arg msg "Turno encerrado. Agente DEVE ter solicitado autorização via vscode_askQuestions antes de encerrar." \
-    '{
-        event:   $event,
-        session_id: $sid,
-        timestamp: $ts,
-        message: $msg
-    }' >> "$LOG_DIR/audit.jsonl"
+# ── Detecção de autorização: verifica se vscode_askQuestions foi chamada neste turno ──
+# Procura por chamadas de vscode_askQuestions APÓS o último userPromptSubmitted.
+# Isso determina se o agente pediu autorização antes de encerrar o turno.
+AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
+AUTH_REQUESTED=false
+AUDIT_FILE="$LOG_DIR/audit.jsonl"
+
+if [ -f "$AUDIT_FILE" ]; then
+    # Encontra a linha do último userPromptSubmitted (início do turno atual)
+    LAST_PROMPT_LINE="$(awk '/"userPromptSubmitted"/{last=NR} END{print last+0}' "$AUDIT_FILE")"
+    TOTAL_LINES="$(wc -l < "$AUDIT_FILE")"
+
+    if [ "$LAST_PROMPT_LINE" -gt 0 ] && [ "$TOTAL_LINES" -gt "$LAST_PROMPT_LINE" ]; then
+        LINES_SINCE_PROMPT=$((TOTAL_LINES - LAST_PROMPT_LINE))
+        # Verifica se vscode_askQuestions aparece nas linhas do turno atual
+        if tail -n "$LINES_SINCE_PROMPT" "$AUDIT_FILE" | \
+            jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
+            AUTH_REQUESTED=true
+        fi
+    fi
+fi
+
+if [ "$AUTH_REQUESTED" = "true" ]; then
+    # Turno encerrado com autorização: remove flag de violação anterior (se existir)
+    rm -f "$AUTH_FLAG_FILE" 2>/dev/null || true
+    if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+        jq '.last_close_authorized = true | .consecutive_unauthorized_closes = 0' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+    fi
+    jq -cn \
+        --arg event "turnEnd_authorized" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_ISO" \
+        '{event: $event, session_id: $sid, timestamp: $ts}' \
+        >> "$LOG_DIR/audit.jsonl"
+else
+    # Turno encerrado SEM autorização: escreve flag persistente
+    TURN_COUNT_NOW="$(jq -r '.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    jq -cn \
+        --arg ts "$NOW_ISO" \
+        --arg sid "$SESSION_ID" \
+        --argjson turn "$TURN_COUNT_NOW" \
+        '{
+            timestamp:  $ts,
+            session_id: $sid,
+            turn_count: $turn,
+            violation:  "Turno encerrado sem chamar vscode_askQuestions",
+            severity:   "critical"
+        }' > "$AUTH_FLAG_FILE"
+    if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+        jq '.last_close_authorized = false
+             | .consecutive_unauthorized_closes = (.consecutive_unauthorized_closes // 0) + 1' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+    fi
+    jq -cn \
+        --arg event "turnEnd_UNAUTHORIZED" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_ISO" \
+        --arg msg "VIOLAÇÃO: turno encerrado sem vscode_askQuestions. Flag gravada em UNAUTHORIZED_CLOSE.flag" \
+        '{event: $event, session_id: $sid, timestamp: $ts, message: $msg}' \
+        >> "$LOG_DIR/audit.jsonl"
+fi
 
 # Incrementa turn_count e salva session_summary no contexto da sessão
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
