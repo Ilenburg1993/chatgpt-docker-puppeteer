@@ -2,28 +2,40 @@
 
 > **Para agentes de IA lendo este arquivo:**
 >
-> Este arquivo é o backlog do **Modo Arquiteto** — o estado de sessões autônomas do Copilot neste
-> repositório. Quando você inicia uma sessão sem um prompt explícito do usuário (ou quando o
-> usuário não fornece uma direção clara), você deve:
+> Este arquivo é o backlog do **Modo Arquiteto**. Leia sempre junto com
+> `.github/hooks/state/session-briefing.md` (gerado pelo hook sessionStart).
 >
-> 1. **Ler este arquivo completamente** antes de começar qualquer trabalho
-> 2. **Escolher a primeira tarefa não marcada** (`- [ ]`) da seção "Alta Prioridade"
-> 3. **Trabalhar de forma autônoma e persistente** — ao terminar uma tarefa, avance para a próxima
->    sem aguardar instrução do usuário
-> 4. **Ao concluir uma tarefa**, marque-a como `- [x]` e adicione `<!-- session:YYYYMMDD -->`
-> 5. **Ao final da sessão**, documente brevemente o que foi feito (o hook `sessionEnd` também
->    registrará automaticamente)
+> **Protocolo de início de sessão** (obrigatório):
+> 1. Ler `session-briefing.md`
+> 2. Ler este arquivo (`pending-tasks.md`) na íntegra
+> 3. Checar `turn_count` em `session-context.json`
+> 4. Invocar `vscode_askQuestions` com Template E (Session Kickoff) — ver AGENTS.md
 >
-> **Quality gates obrigatórios ao final de cada conjunto de mudanças**:
+> **Ao concluir qualquer tarefa:**
+> ```bash
+> bash .github/hooks/scripts/complete-task.sh "<padrão único do título>"
 > ```
-> npm run lint
-> npm run typecheck:node
-> npm run test:unit
+> Depois, invocar `vscode_askQuestions` com Template A (Next Step).
+>
+> **Para registrar um finding durante análise:**
+> ```bash
+> bash .github/hooks/scripts/save-finding.sh "<módulo>" "<severity>" "<type>" "<descrição>"
 > ```
 >
-> **Filosofia**: você é um arquiteto autônomo. Sua missão padrão é melhorar continuamente este
-> repositório — corrigindo bugs, avançando a tipagem, aumentando cobertura de testes, e documentando.
-> O sistema de hooks garante que toda ação seja auditada. Seja ousado, mas cuidadoso.
+> **Para criar novas tarefas autonomamente:**
+> ```bash
+> bash .github/hooks/scripts/add-task.sh "<alta|media|backlog>" "<Título>" "<Descrição>"
+> ```
+>
+> **Quality gates ao final de cada conjunto de mudanças:**
+> ```bash
+> npm run lint && npm run typecheck:node && npm run test:unit
+> ```
+>
+> **Filosofia**: você é um arquiteto autônomo com plenos poderes para propor e executar
+> upgrades. Quando encontrar um bug, crie a tarefa. Quando ver uma oportunidade de melhoria,
+> proponha via `vscode_askQuestions`. Nunca espere permissão para criar novas tarefas —
+> a permissão está aqui: **crie, proponha e execute.**
 
 ---
 
@@ -101,6 +113,16 @@
 - [ ] **JSDoc coverage**: rodar `npm run jsdoc:coverage`, identificar funções públicas sem documentação em `src/core/` e `src/kernel/`.
 - [ ] **Dependências circulares**: rodar `npm run analyze:circular`, eliminar os ciclos encontrados se houver.
 - [ ] **Env governance**: usar skill `env-governance` — auditar variáveis de ambiente, garantir que `.env.example` está completo e documentado.
+
+---
+
+## LLM-Gerado
+
+> Tarefas criadas autonomamente pelo agente durante sessões de trabalho.
+> Adicionadas via `bash .github/hooks/scripts/add-task.sh`.
+> Cada tarefa inclui a anotação `<!-- auto:YYYYMMDD -->` indicando quando foi gerada.
+
+<!-- Tarefas geradas autonomamente serão inseridas aqui automaticamente -->
 
 ---
 

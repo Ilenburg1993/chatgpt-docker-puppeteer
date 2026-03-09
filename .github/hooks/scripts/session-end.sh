@@ -17,28 +17,28 @@ mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 mkdir -p "$STATE_DIR"
 mkdir -p "$DOCS_SESSIONS_DIR"
 
-INPUT="$(cat 2>/dev/null || true)"
+INPUT="$(cat 2> /dev/null || true)"
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0'            2>/dev/null || echo 0)"
-CWD="$(echo "$INPUT"       | jq -r '.cwd // ""'                 2>/dev/null || echo '')"
-REASON="$(echo "$INPUT"    | jq -r '.reason // "complete"'      2>/dev/null || echo 'complete')"
-NOW_MS="$(date +%s000 2>/dev/null || echo "$TIMESTAMP")"
-SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2>/dev/null || echo 'unknown')"
-SESSION_DATE_DAILY="$(date -u '+%Y-%m-%d' 2>/dev/null || echo 'unknown')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
+CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
+REASON="$(echo "$INPUT" | jq -r '.reason // "complete"' 2> /dev/null || echo 'complete')"
+NOW_MS="$(date +%s000 2> /dev/null || echo "$TIMESTAMP")"
+SESSION_DATE_SHORT="$(date -u '+%Y%m%d_%H%M%S' 2> /dev/null || echo 'unknown')"
+SESSION_DATE_DAILY="$(date -u '+%Y-%m-%d' 2> /dev/null || echo 'unknown')"
 
 # Obtém dados da sessão do contexto persistido
 SESSION_ID="unknown"
 START_TS="0"
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session_id // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
-    START_TS="$(jq -r '.start_ts // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    SESSION_ID="$(jq -r '.session_id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
+    START_TS="$(jq -r '.start_ts // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
 
 # Calcula duração total da sessão
 DURATION_S=0
-if [ "$START_TS" != "0" ] && [ "$NOW_MS" -gt "$START_TS" ] 2>/dev/null; then
-    DURATION_S="$(( (NOW_MS - START_TS) / 1000 ))"
+if [ "$START_TS" != "0" ] && [ "$NOW_MS" -gt "$START_TS" ] 2> /dev/null; then
+    DURATION_S="$(((NOW_MS - START_TS) / 1000))"
 fi
 
 # Conta ferramentas e erros (defensivo se audit.jsonl não existir)
@@ -48,17 +48,17 @@ AUDIT_FILE="$LOG_DIR/audit.jsonl"
 if [ -f "$AUDIT_FILE" ]; then
     TOOLS_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.session_id == $sid and .event == "preToolUse")' \
-        "$AUDIT_FILE" 2>/dev/null | jq -s 'length' 2>/dev/null || echo 0)"
+        "$AUDIT_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0)"
     ERRORS_COUNT="$(jq -r --arg sid "$SESSION_ID" \
         'select(.session_id == $sid and .event == "errorOccurred")' \
-        "$AUDIT_FILE" 2>/dev/null | jq -s 'length' 2>/dev/null || echo 0)"
+        "$AUDIT_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0)"
 fi
 
 # Finaliza o session-context.json
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --arg ts "$NOW_MS" --arg reason "$REASON" \
         '.end_ts = $ts | .end_reason = $reason' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 # Append em audit.jsonl — evento de encerramento
@@ -91,7 +91,7 @@ if [ -f "$SUMMARY_SCRIPT" ] && [ -x "$SUMMARY_SCRIPT" ]; then
         START_TS="$START_TS" \
         END_TS="$NOW_MS" \
         SESSION_REASON="$REASON" \
-        bash "$SUMMARY_SCRIPT" 2>/dev/null || echo '## Resumo indisponível (erro no helper)')"
+        bash "$SUMMARY_SCRIPT" 2> /dev/null || echo '## Resumo indisponível (erro no helper)')"
 fi
 
 # Salva resumo local (gitignored)
@@ -123,12 +123,12 @@ fi
 # Estratégia conservadora: o agente deve marcar explicitamente as tarefas concluídas.
 # Este hook apenas adiciona um comentário de sessão ao final da seção de Alta Prioridade.
 TASKS_FILE="$STATE_DIR/pending-tasks.md"
-if [ -f "$TASKS_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$TASKS_FILE" ] && command -v sponge &> /dev/null; then
     # Adiciona nota de sessão encerrada no rodapé do arquivo (não altera checkboxes)
     SESSION_NOTE="<!-- session-end: ${SESSION_ID} | ${SESSION_DATE_DAILY} | ${REASON} | ${TOOLS_COUNT} tools -->"
 
     # Verifica se nota desta sessão já existe (idempotente)
-    if ! grep -qF "$SESSION_ID" "$TASKS_FILE" 2>/dev/null; then
+    if ! grep -qF "$SESSION_ID" "$TASKS_FILE" 2> /dev/null; then
         echo "" >> "$TASKS_FILE"
         echo "$SESSION_NOTE" >> "$TASKS_FILE"
     fi

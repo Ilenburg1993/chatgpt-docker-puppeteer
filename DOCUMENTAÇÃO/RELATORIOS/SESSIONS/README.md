@@ -29,12 +29,12 @@ Cada entrada de sessão inclui:
 
 ## Arquivos relacionados
 
-| Arquivo | Propósito |
-|---|---|
-| `.github/hooks/copilot-hooks.json` | Configuração dos 8 hooks do Copilot |
-| `.github/hooks/state/pending-tasks.md` | Backlog do Modo Arquiteto (commitado) |
-| `.github/hooks/logs/audit.jsonl` | Log JSONL bruto de todos os eventos (gitignored) |
-| `.github/hooks/logs/errors.jsonl` | Log JSONL de erros e falhas (gitignored) |
+| Arquivo                                | Propósito                                        |
+| -------------------------------------- | ------------------------------------------------ |
+| `.github/hooks/copilot-hooks.json`     | Configuração dos 8 hooks do Copilot              |
+| `.github/hooks/state/pending-tasks.md` | Backlog do Modo Arquiteto (commitado)            |
+| `.github/hooks/logs/audit.jsonl`       | Log JSONL bruto de todos os eventos (gitignored) |
+| `.github/hooks/logs/errors.jsonl`      | Log JSONL de erros e falhas (gitignored)         |
 
 ## Considerações de privacidade
 

@@ -14,25 +14,25 @@ LOG_DIR="$HOOK_DIR/logs"
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 
-INPUT="$(cat 2>/dev/null || true)"
+INPUT="$(cat 2> /dev/null || true)"
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0'   2>/dev/null || echo 0)"
-CWD="$(echo "$INPUT"       | jq -r '.cwd // ""'         2>/dev/null || echo '')"
-PROMPT_RAW="$(echo "$INPUT" | jq -r '.prompt // ""'     2>/dev/null || echo '')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
+CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
+PROMPT_RAW="$(echo "$INPUT" | jq -r '.prompt // ""' 2> /dev/null || echo '')"
 
 # Obtém session_id do contexto persistido (se existir)
 SESSION_ID=""
 CTX_FILE="$HOOK_DIR/state/session-context.json"
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session_id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Calcula hash SHA-256 truncado do prompt (jamais loga o texto completo)
 PROMPT_HASH=""
 PROMPT_LEN="${#PROMPT_RAW}"
-if [ -n "$PROMPT_RAW" ] && command -v sha256sum &>/dev/null; then
+if [ -n "$PROMPT_RAW" ] && command -v sha256sum &> /dev/null; then
     PROMPT_HASH="$(echo -n "$PROMPT_RAW" | sha256sum | cut -c1-16)"
-elif [ -n "$PROMPT_RAW" ] && command -v shasum &>/dev/null; then
+elif [ -n "$PROMPT_RAW" ] && command -v shasum &> /dev/null; then
     PROMPT_HASH="$(echo -n "$PROMPT_RAW" | shasum -a 256 | cut -c1-16)"
 fi
 

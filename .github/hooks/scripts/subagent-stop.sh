@@ -12,15 +12,15 @@ STATE_DIR="$HOOK_DIR/state"
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 
-INPUT="$(cat 2>/dev/null || true)"
+INPUT="$(cat 2> /dev/null || true)"
 
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2>/dev/null || echo 0)"
-NOW_MS="$(date +%s000 2>/dev/null || echo 0)"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
+NOW_MS="$(date +%s000 2> /dev/null || echo 0)"
 
 SESSION_ID=""
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session_id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 jq -cn \

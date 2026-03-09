@@ -20,8 +20,8 @@ AUDIT_FILE="$LOG_DIR/audit.jsonl"
 # Calcula duração em minutos
 DURATION_MIN=0
 if [ "$START_TS" != "0" ] && [ "$END_TS" != "0" ]; then
-    DIFF_S="$(( (END_TS - START_TS) / 1000 ))"
-    DURATION_MIN="$(( DIFF_S / 60 ))"
+    DIFF_S="$(((END_TS - START_TS) / 1000))"
+    DURATION_MIN="$((DIFF_S / 60))"
 fi
 
 # Conta eventos por tipo nesta sessão
@@ -30,7 +30,7 @@ count_event() {
     if [ -f "$AUDIT_FILE" ]; then
         jq -r --arg sid "$SESSION_ID" --arg ev "$event_type" \
             'select(.session_id == $sid and .event == $ev)' \
-            "$AUDIT_FILE" 2>/dev/null | jq -s 'length' 2>/dev/null || echo 0
+            "$AUDIT_FILE" 2> /dev/null | jq -s 'length' 2> /dev/null || echo 0
     else
         echo 0
     fi
@@ -47,8 +47,8 @@ TOP_TOOLS=""
 if [ -f "$AUDIT_FILE" ]; then
     TOP_TOOLS="$(jq -r --arg sid "$SESSION_ID" \
         'select(.session_id == $sid and .event == "preToolUse") | .toolName' \
-        "$AUDIT_FILE" 2>/dev/null | sort | uniq -c | sort -rn | head -5 | \
-        awk '{print "  - `"$2"`: "$1" chamada(s)"}' || echo "  - (sem dados)")"
+        "$AUDIT_FILE" 2> /dev/null | sort | uniq -c | sort -rn | head -5 \
+        | awk '{print "  - `"$2"`: "$1" chamada(s)"}' || echo "  - (sem dados)")"
 fi
 [ -z "$TOP_TOOLS" ] && TOP_TOOLS="  - (sem dados)"
 
@@ -60,7 +60,7 @@ if [ -f "$CTX_FILE" ]; then
         .quality_gates // {} |
         to_entries[] |
         "  - `\(.key | gsub("gate_"; "npm run "))`: \(.value.result)"
-    ' "$CTX_FILE" 2>/dev/null || echo "  - (nenhum gate registrado)")"
+    ' "$CTX_FILE" 2> /dev/null || echo "  - (nenhum gate registrado)")"
 fi
 [ -z "$QUALITY_GATES" ] && QUALITY_GATES="  - (nenhum gate registrado)"
 
@@ -70,7 +70,7 @@ ERRORS_FILE="$LOG_DIR/errors.jsonl"
 if [ -f "$ERRORS_FILE" ]; then
     ERRORS_SUMMARY="$(jq -r --arg sid "$SESSION_ID" \
         'select(.session_id == $sid) | "  - [\(.errorName // .event)]: \(.errorMsg // .resultText // "" | .[0:120])"' \
-        "$ERRORS_FILE" 2>/dev/null | head -10 || echo "  - (sem erros)")"
+        "$ERRORS_FILE" 2> /dev/null | head -10 || echo "  - (sem erros)")"
 fi
 [ -z "$ERRORS_SUMMARY" ] && ERRORS_SUMMARY="  - (sem erros)"
 
@@ -82,12 +82,12 @@ if [ -f "$TASKS_FILE" ]; then
         /^## Alta Prioridade/ { in_section=1; next }
         /^## / && in_section  { in_section=0 }
         in_section && /^\- \[ \]/ { print "  "$0 }
-    ' "$TASKS_FILE" 2>/dev/null | head -5 || echo "  - (ver pending-tasks.md)")"
+    ' "$TASKS_FILE" 2> /dev/null | head -5 || echo "  - (ver pending-tasks.md)")"
 fi
 [ -z "$NEXT_TASKS" ] && NEXT_TASKS="  - (ver .github/hooks/state/pending-tasks.md)"
 
 # Gera o Markdown do relatório
-SESSION_FULL_DATE="$(date -u '+%d/%m/%Y %H:%M UTC' 2>/dev/null || echo "$SESSION_DATE_SHORT")"
+SESSION_FULL_DATE="$(date -u '+%d/%m/%Y %H:%M UTC' 2> /dev/null || echo "$SESSION_DATE_SHORT")"
 
 cat << MARKDOWN
 ## Sessão: ${SESSION_ID} — ${SESSION_FULL_DATE}
