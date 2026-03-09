@@ -1,7 +1,10 @@
 # Plano de Consolidação v2 — SESSION / SECTION / TURN
 
-**Versão**: 2.0 | **Status**: Aprovado → Em implementação
+**Versão**: 2.0 | **Status**: ✅ CONCLUÍDO — superado por v3
 **Data**: Sessão 8 | **Branch**: main | **Predecessor**: d3442cb8, 83db3906 (Sessão 7)
+
+> **Nota**: Todas as 11 fases (A-K) foram implementadas no commit 8bacbd21.
+> O plano v3 (`PLANO-CONSOLIDACAO-v3.md`) cobre o hardening subsequente.
 
 ---
 

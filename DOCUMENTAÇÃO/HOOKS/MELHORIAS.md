@@ -1,6 +1,61 @@
 # Melhorias e Upgrades Propostos — Sistema de Hooks
 
-> **Status**: Backlog vivo | **Última atualização**: 2026-03-10 (sessão 7 Phase 2)
+> **Status**: Backlog vivo | **Última atualização**: 2026-03-10 (sessão 8)
+
+---
+
+## Melhorias Implementadas (sessão 8 — 2026-03-10)
+
+### Consolidação v3 — Hardening copilot-instructions + Guards completos ✅ IMPLEMENTADO
+
+**Motivação**: copilot-instructions.md não mencionava o sistema de hooks, o ciclo de vida
+SESSION/SECTION/TURN, ou os mecanismos de segurança. session_id guards cobriam apenas 3 de 6
+hooks auto-triggered que modificam estado.
+
+**Implementação (Plano de Consolidação v3)**:
+
+1. **copilot-instructions.md hardening**:
+   - Adicionada seção "Ciclo de Vida — SESSION, SECTION, TURN" com glossário, invariante e
+     comportamentos automáticos/manuais
+   - Seção ⛔ REGRA ABSOLUTA expandida com mecanismos de enforcement (decision:block,
+     session_id guards, flags)
+   - Adicionado protocolo de encerramento de SESSION com close_key e Template F
+   - Referências a AGENTS.md, PROTOCOLO-AUTORIZACAO.md e REFERENCIA-HOOKS.md
+
+2. **session_id guards completos** (6 de 6 hooks):
+   - `log-prompt.sh` — valida antes de resetar current_turn (vetor crítico)
+   - `error-occurred.sh` — valida antes de incrementar failures_detected
+   - `subagent-stop.sh` — valida antes de incrementar subagent_calls
+   - Padrão idêntico aos 3 guards anteriores (agent-stop, pre-tool-use, post-tool-use)
+
+3. **PROTOCOLO-AUTORIZACAO.md v3.0**: documentados Layer 3.5 (decision:block com anti-recursão)
+   e Layer 3.6 (session_id guards com lista de 6 scripts cobertos)
+
+4. **PLANO-CONSOLIDACAO-v2.md**: marcado como ✅ CONCLUÍDO e superado por v3
+
+---
+
+### Hardening v5 — decision:block + sandbox + session_id guards ✅ IMPLEMENTADO
+
+**Motivação**: diagnóstico de root cause revelou que testes inline contaminaram
+session-context.json com dados de sessão falsa (`test-sess-001`), fazendo close_key_validated=true
+incorretamente. Adicionalmente, `pre-tool-use.sh` sobrescrevia `.session.id` com dados do payload.
+
+**Implementação** (commit 1469986e):
+
+1. **decision:block em agent-stop.sh**: quando TURN não chamou vscode_askQuestions, emite
+   `{"decision":"block","systemMessage":"..."}` no stdout. Anti-recursão: `stop_hook_active` e
+   `block_count` (max 1 retry).
+
+2. **session_id guards** (3 scripts iniciais): `agent-stop.sh`, `pre-tool-use.sh`,
+   `post-tool-use.sh` validam `session_id` do payload contra o contexto ativo. Mismatch → log
+   `session_id_mismatch` + skip state write.
+
+3. **Remoção de overwrite em pre-tool-use.sh**: removida linha que sobrescrevia `.session.id`
+   com o `session_id` do payload — agora session_id é APENAS definido por `session-start.sh`.
+
+4. **Smoke-test sandbox**: testes funcionais agora usam `mktemp -d` com scripts symlinkados,
+   verificando hash do estado real antes e depois para garantir zero contaminação.
 
 ---
 

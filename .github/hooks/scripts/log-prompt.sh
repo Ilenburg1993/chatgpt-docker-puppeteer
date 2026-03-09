@@ -24,11 +24,33 @@ INPUT="$(cat 2> /dev/null || true)"
 TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
 CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
 PROMPT_RAW="$(echo "$INPUT" | jq -r '.prompt // ""' 2> /dev/null || echo '')"
+SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 
 # Obtém session_id do contexto persistido — fix B6: sem quebra de linha invisível
 SESSION_ID=""
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
+
+# ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
+# HARDENING v5: previne contaminação cruzada entre SESSIONs.
+if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
+    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
+        jq -cn \
+            --arg event "session_id_mismatch" \
+            --arg expected "$CTX_ACTIVE_SID" \
+            --arg got "$SESSION_ID_PAYLOAD" \
+            --arg source "log-prompt.sh" \
+            '{
+                event:   $event,
+                expected: $expected,
+                got:      $got,
+                source:   $source,
+                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+            }' >> "$LOG_DIR/audit.jsonl"
+        exit 0
+    fi
 fi
 
 # Calcula hash SHA-256 truncado do prompt (jamais loga o texto completo)

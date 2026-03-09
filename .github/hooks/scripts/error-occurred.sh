@@ -17,12 +17,34 @@ TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // 0' 2> /dev/null || echo 0)"
 ERROR_NAME="$(echo "$INPUT" | jq -r '.error.name // "Unknown"' 2> /dev/null || echo 'Unknown')"
 ERROR_MSG="$(echo "$INPUT" | jq -r '.error.message // ""' 2> /dev/null || echo '')"
 ERROR_STACK="$(echo "$INPUT" | jq -r '.error.stack // ""' 2> /dev/null | head -c 1000 || echo '')"
+SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 
 # Obtém session_id do contexto persistido
 SESSION_ID=""
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
+
+# ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
+# HARDENING v5: previne contaminação cruzada entre SESSIONs.
+if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
+    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
+        jq -cn \
+            --arg event "session_id_mismatch" \
+            --arg expected "$CTX_ACTIVE_SID" \
+            --arg got "$SESSION_ID_PAYLOAD" \
+            --arg source "error-occurred.sh" \
+            '{
+                event:   $event,
+                expected: $expected,
+                got:      $got,
+                source:   $source,
+                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+            }' >> "$LOG_DIR/audit.jsonl"
+        exit 0
+    fi
 fi
 
 # Append em audit.jsonl (resumido — sem stack)

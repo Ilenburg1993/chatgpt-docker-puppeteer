@@ -267,6 +267,32 @@ else
     done
 fi
 
+# ── 8. Cobertura de session_id guards (Hardening v5) ─────────────────────────
+echo ""
+echo "8. session_id guards (Hardening v5)"
+# Scripts que DEVEM ter session_id guard (hooks auto-triggered que modificam estado)
+GUARD_REQUIRED=(agent-stop.sh pre-tool-use.sh post-tool-use.sh log-prompt.sh error-occurred.sh subagent-stop.sh)
+# Scripts que NÃO devem ter guard (criador de session_id / encerramento legítimo)
+GUARD_EXCLUDED=(session-start.sh session-end.sh)
+
+for s in "${GUARD_REQUIRED[@]}"; do
+    f="$SCRIPTS_DIR/$s"
+    if [ -f "$f" ] && rg -q "session_id_mismatch" "$f" 2> /dev/null; then
+        pass "session_id guard presente: $s"
+    elif [ -f "$f" ]; then
+        fail "session_id guard AUSENTE: $s — vulnerável a contaminação cruzada"
+    fi
+done
+
+for s in "${GUARD_EXCLUDED[@]}"; do
+    f="$SCRIPTS_DIR/$s"
+    if [ -f "$f" ] && ! rg -q "session_id_mismatch" "$f" 2> /dev/null; then
+        pass "session_id guard ausente (correto): $s"
+    elif [ -f "$f" ]; then
+        fail "session_id guard encontrado onde não deveria: $s"
+    fi
+done
+
 # ── Resumo ───────────────────────────────────────────────────────────────────
 echo ""
 echo "══════════════════════════════════════════════════"

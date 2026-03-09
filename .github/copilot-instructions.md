@@ -12,8 +12,9 @@ Canônico. **Última atualização**: 10 de março de 2026.
 
 > **APLICA-SE A TODA RESPOSTA. SEM EXCEÇÃO.**
 
-Antes de encerrar qualquer turno, bloco de trabalho ou sessão, o agente **obrigatoriamente** deve
-invocar a ferramenta `vscode_askQuestions` e aguardar a resposta do usuário.
+Antes de encerrar qualquer **TURN** (turno), bloco de trabalho ou **SESSION** (sessão), o agente
+**obrigatoriamente** deve invocar a ferramenta `vscode_askQuestions` e aguardar a resposta do
+usuário.
 
 **O que NÃO conta como autorização (VIOLAÇÕES):**
 
@@ -26,8 +27,48 @@ invocar a ferramenta `vscode_askQuestions` e aguardar a resposta do usuário.
 - Chamar a **ferramenta** `vscode_askQuestions` (tool call real, não texto)
 - Aguardar resposta antes de qualquer ação subsequente
 
-O sistema monitora automaticamente — turnos sem `vscode_askQuestions` geram `turnEnd_UNAUTHORIZED`
-no `audit.jsonl` e ativam alertas na próxima sessão.
+**Mecanismos de enforcement (automáticos — não dependem do agente):**
+
+- `agent-stop.sh` detecta ausência de `vscode_askQuestions` no TURN e emite
+  `{"decision":"block"}` forçando o agente a continuar (hardening v5)
+- TURNs não autorizados geram `turnEnd_UNAUTHORIZED` no `audit.jsonl`
+- Violações ativam `UNAUTHORIZED_CLOSE.flag` e alertas no próximo `session-briefing.md`
+- `session_id guards` em todos os hooks impedem contaminação cruzada entre SESSIONs
+
+**Encerramento de SESSION (extra-hardening):**
+
+Além do `vscode_askQuestions`, o encerramento de uma SESSION exige que o usuário digite a chave
+`ENCERRAR-XXXXXXXX` (gerada no `session-briefing.md`) via **Template F** (ver `.github/AGENTS.md`).
+Sem a chave → `SESSION_CLOSE_NO_KEY.flag` → alerta na próxima SESSION.
+
+---
+
+## Ciclo de Vida — SESSION, SECTION, TURN
+
+> **Distinção obrigatória**: SESSION ≠ SECTION ≠ TURN. Nunca confundir os três conceitos.
+
+| Conceito     | Escopo                          | Boundary                                            | Cardinalidade |
+| ------------ | ------------------------------- | --------------------------------------------------- | ------------- |
+| **SESSION**  | 1 por ativação do Copilot Chat  | `sessionStart` → `sessionEnd`                       | 1 por dia     |
+| **SECTION**  | Fase lógica dentro da SESSION   | `start-section.sh` → `section-end.sh` / auto-close  | ≥1 por SESSION |
+| **TURN**     | 1 ciclo prompt→resposta         | `userPromptSubmitted` → `agentStop`                  | ≥1 por SECTION |
+
+**Invariante absoluto**: sempre deve haver SESSION + SECTION + TURN ativos simultaneamente.
+
+**Comportamento automático**:
+- `session-start.sh` cria a SECTION `"início"` automaticamente
+- `start-section.sh` auto-fecha a SECTION anterior antes de abrir uma nova
+- `session-end.sh` auto-fecha a SECTION ativa antes de encerrar a SESSION
+- `log-prompt.sh` reseta `current_turn.*` a cada novo prompt (início de TURN)
+
+**Quando o agente deve agir manualmente**:
+- Chamar `start-section.sh "nome"` ao mudar de fase lógica de trabalho
+- Chamar `start-turn.sh "intenção"` como primeiro ato de cada TURN de trabalho
+- Chamar `vscode_askQuestions` antes de encerrar cada TURN
+
+**Referências completas**: `.github/AGENTS.md` (Templates A-F, protocolo completo),
+`DOCUMENTAÇÃO/HOOKS/PROTOCOLO-AUTORIZACAO.md` (spec técnico),
+`DOCUMENTAÇÃO/HOOKS/REFERENCIA-HOOKS.md` (referência de todos os 18 hooks).
 
 ---
 

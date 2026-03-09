@@ -1,6 +1,6 @@
 # Protocolo de Autorização — Spec Completo
 
-> **Status**: Canônico | **Última atualização**: 2026-03-09 | **Versão**: 2.1
+> **Status**: Canônico | **Última atualização**: 2026-03-10 | **Versão**: 3.0
 
 ---
 
@@ -73,6 +73,54 @@ Estratégia 3 — Contexto (último recurso):
   ┌── Lê current_turn.auth_requested no session-context.json
   └── Se true → AUTH_REQUESTED = true
 ```
+
+### Layer 3.5 — decision:block (Hardening v5)
+
+Quando as 3 estratégias acima detectam `AUTH_REQUESTED = false`, o hook **bloqueia o encerramento
+do turno** emitindo `{"decision":"block"}` no stdout. A extensão do Copilot interpreta isso como
+instrução para manter o agente rodando.
+
+```
+Fluxo decision:block:
+  ┌── AUTH_REQUESTED = false?
+  │   ├── stop_hook_active = true?  → NÃO bloquear (anti-recursão)
+  │   ├── block_count >= 1?         → NÃO bloquear (safety valve — max 1 retry)
+  │   └── Caso contrário:
+  │       ├── Incrementa block_count no session-context.json
+  │       ├── Loga turnEnd_BLOCKED no audit.jsonl
+  │       └── Emite no stdout:
+  │           {"decision":"block","systemMessage":"⛔ PROTOCOLO DE ENCERRAMENTO..."}
+  └── A extensão mantém o agente ativo → agente deve chamar vscode_askQuestions
+```
+
+**Anti-recursão**: `stop_hook_active` é `true` quando a parada veio do próprio hook (evita loop
+infinito). `block_count` é incrementado a cada bloqueio e resetado para 0 quando o turno termina
+normalmente — garante que no pior caso o agente encerra após 1 retry.
+
+### Layer 3.6 — session_id guards (Hardening v5)
+
+Todos os hooks que recebem payload com `session_id` validam contra o `session.id` do
+`session-context.json`. Se houver mismatch:
+
+- O evento é logado como `session_id_mismatch` no `audit.jsonl`
+- O hook **PULA** qualquer modificação de estado (state write bloqueado)
+- O hook encerra com `exit 0` (não bloqueia a extensão)
+
+**Scripts com guard ativo** (6 de 8 hooks auto-triggered):
+- `pre-tool-use.sh` — valida antes de gravar tool use
+- `post-tool-use.sh` — valida antes de gravar resultado
+- `agent-stop.sh` — valida antes de processar fim de turno
+- `log-prompt.sh` — valida antes de resetar current_turn
+- `error-occurred.sh` — valida antes de incrementar failures
+- `subagent-stop.sh` — valida antes de incrementar subagent_calls
+
+**Scripts sem guard (por design)**:
+- `session-start.sh` — é o criador do session.id (cria o contexto)
+- `session-end.sh` — encerramento é legítimo mesmo com session_id diferente
+
+**Vetor de ataque mitigado**: testes inline ou prompts de outra sessão que sobrescreviam
+`session-context.json` com dados de uma sessão diferente. Agora, qualquer payload com
+`session_id` diferente do contexto ativo é ignorado silenciosamente (mas auditado).
 
 ### Layer 4 — Alerta na próxima sessão
 

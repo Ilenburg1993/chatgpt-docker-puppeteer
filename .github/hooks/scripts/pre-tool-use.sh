@@ -22,16 +22,16 @@ mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando o schema real (snake_case, não camelCase)
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2>/dev/null || echo '')"
-CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2>/dev/null || echo '')"
-TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null || echo '')"
-TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2>/dev/null || echo '')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+CWD="$(echo "$INPUT" | jq -r '.cwd // ""' 2> /dev/null || echo '')"
+TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2> /dev/null || echo '')"
+TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2> /dev/null || echo '')"
 
 # session_id vem diretamente do payload (UUID real do Copilot)
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo '')"
+SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 
 # Serializa tool_input (objeto JSON) para string redactável
-TOOL_INPUT_RAW="$(echo "$INPUT" | jq -c '.tool_input // {}' 2>/dev/null || echo '{}')"
+TOOL_INPUT_RAW="$(echo "$INPUT" | jq -c '.tool_input // {}' 2> /dev/null || echo '{}')"
 
 # Redacta credentials e tokens antes de qualquer log
 # Padrões: GitHub tokens, Bearer tokens, senhas em flags CLI
@@ -98,10 +98,10 @@ fi
 # Quando vscode_askQuestions: seta current_turn.auth_requested = true
 # NOTA: NÃO sobrescreve .session.id (removido no HARDENING v5 — session_id é
 #       definido apenas por session-start.sh; sobrescrever aqui causava contaminação).
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     if [ "$TOOL_NAME" = "vscode_askQuestions" ]; then
         jq --arg ts "$TIMESTAMP" \
-           --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
+            --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
             '.last_tool.name   = $tool
              | .last_tool.ts     = $ts
              | .last_tool.use_id = $id
@@ -112,10 +112,10 @@ if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         jq --arg ts "$TIMESTAMP" \
-           --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
+            --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
             '.last_tool.name   = $tool
              | .last_tool.ts     = $ts
              | .last_tool.use_id = $id
@@ -124,7 +124,7 @@ if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
              | .current_turn.tools_by_name = ((.current_turn.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)
              | .session_stats.tools_total   = ((.session_stats.tools_total // 0) + 1)
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
 fi
 
