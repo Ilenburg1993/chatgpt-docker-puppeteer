@@ -46,6 +46,7 @@ logs/**/*.log
 .github/hooks/logs/
 .github/hooks/state/session-context.json
 .github/hooks/state/session-briefing.md
+.github/hooks/checkpoints/
 audit.log
 crash_reports/
 # Stray file-descriptor redirect artifacts (e.g. devcontainer post-create log captured to fd number)

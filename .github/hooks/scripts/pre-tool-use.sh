@@ -62,14 +62,15 @@ jq -cn \
         tool_args:  $args
     }' >> "$LOG_DIR/audit.jsonl"
 
-# Atualiza session_id e last_tool_ts no session-context.json para métricas de duração
+# Atualiza session_id, last_tool_ts e tools_used no session-context.json (hardening)
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --arg sid "$SESSION_ID" --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
         '.session_id = (if $sid != "" then $sid else .session_id end)
          | .last_tool_ts = $ts
          | .last_tool = $tool
-         | .last_tool_use_id = $id' \
+         | .last_tool_use_id = $id
+         | .tools_used = ((.tools_used // []) + [$tool] | if length > 200 then .[-200:] else . end)' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 

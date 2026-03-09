@@ -58,9 +58,30 @@ jq -cn \
         last_tool:    "",
         tools_used:   [],
         failure_count: 0,
+        failure_count_unknown: 0,
         error_count:  0,
-        turn_count:   0
+        turn_count:   0,
+        session_summary: ""
     }' > "$STATE_DIR/session-context.json"
+
+# ── Recovery: detecta sessão anterior via último checkpoint ─────────────────
+CHECKPOINT_DIR="$HOOK_DIR/checkpoints"
+PREV_CHECKPOINT=""
+PREV_SESSION_ID=""
+PREV_TURN_COUNT=0
+PREV_TASKS_OPEN=0
+
+# Busca o checkpoint mais recente de qualquer sessão anterior
+if [ -d "$CHECKPOINT_DIR" ]; then
+    PREV_CHECKPOINT="$(find "$CHECKPOINT_DIR" -maxdepth 1 -name 'sess_*_turn*.json' -printf '%T@ %p\n' 2> /dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
+fi
+
+if [ -n "$PREV_CHECKPOINT" ] && [ -f "$PREV_CHECKPOINT" ]; then
+    PREV_SESSION_ID="$(jq -r '.session_id // ""' "$PREV_CHECKPOINT" 2> /dev/null || echo '')"
+    PREV_TURN_COUNT="$(jq -r '.turn_count // 0' "$PREV_CHECKPOINT" 2> /dev/null || echo 0)"
+    PREV_TASKS_OPEN="$(jq -r '.tasks.open_total // 0' "$PREV_CHECKPOINT" 2> /dev/null || echo 0)"
+    PREV_CHECKPOINT_TS="$(jq -r '.checkpoint_ts // ""' "$PREV_CHECKPOINT" 2> /dev/null || echo '')"
+fi
 
 # Append em audit.jsonl
 jq -cn \
@@ -224,11 +245,27 @@ ${TREND_PERF_TABLE}
 - **Origem**: ${SOURCE}
 - **Workspace**: ${CWD}
 
+## Continuidade — Sessão Anterior
+
+$(if [ -n "$PREV_SESSION_ID" ] && [ "$PREV_SESSION_ID" != "$SESSION_ID" ]; then
+    echo "> **Recovery ativo.** Dados recuperados do último checkpoint da sessão anterior."
+    echo ""
+    echo "- **Sessão anterior**: \`${PREV_SESSION_ID}\`"
+    echo "- **Checkpoint**: \`${PREV_CHECKPOINT_TS:-N/D}\`"
+    echo "- **Turnos concluídos**: ${PREV_TURN_COUNT}"
+    echo "- **Tarefas abertas**: ${PREV_TASKS_OPEN}"
+    echo ""
+    echo "> Verifique \`.github/hooks/state/pending-tasks.md\` para retomar de onde parou."
+else
+    echo "> Nenhuma sessão anterior identificada, ou sessão continuando (\`source=${SOURCE}\`)."
+fi)
+
 ## Ação imediata recomendada
 
 1. **SE** \`initialPrompt\` está vazio → invocar \`vscode_askQuestions\` com Template E (Session Kickoff)
 2. **SE** há findings críticos → apresentá-los ao usuário antes de prosseguir
 3. **SE** a sessão tem prompt explícito → executar o prompt e, ao concluir, invocar Template A
+4. **SE** sessão anterior detectada → confirmar com usuário se deseja retomar tarefas abertas
 
 ---
 *Gerado automaticamente. Não editar manualmente.*

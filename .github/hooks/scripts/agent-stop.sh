@@ -71,11 +71,23 @@ jq -cn \
         message: $msg
     }' >> "$LOG_DIR/audit.jsonl"
 
-# Incrementa turn_count no contexto da sessão
+# Incrementa turn_count e salva session_summary no contexto da sessão
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq --arg now "$NOW_ISO" \
-        '.turn_count = (.turn_count // 0) + 1 | .last_turn_ts = $now' \
+    # Contagem de tools usadas neste turno (aproximado via last_tool)
+    TOOLS_USED_COUNT="$(jq -r '(.tools_used // []) | length' "$CTX_FILE" 2> /dev/null || echo 0)"
+    SESSION_SUMMARY="turn=${TURN_DURATION_S}s tools=${TOOLS_USED_COUNT} last=${LAST_TOOL_TS:-N/D}"
+    jq --arg now "$NOW_ISO" --arg summary "$SESSION_SUMMARY" \
+        '.turn_count = (.turn_count // 0) + 1
+         | .last_turn_ts = $now
+         | .session_summary = $summary' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+fi
+
+# ── Checkpoint de estado do turno ──────────────────────────────────────────
+# Salva snapshot incremental para persistência máxima entre sessões.
+CHECKPOINT_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/session-checkpoint.sh"
+if [ -f "$CHECKPOINT_SCRIPT" ]; then
+    bash "$CHECKPOINT_SCRIPT" 2> /dev/null || true
 fi
 
 exit 0

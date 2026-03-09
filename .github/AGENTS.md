@@ -434,6 +434,128 @@ npm run test:unit      # deve manter ou reduzir falhas
 Este repositório tem hooks do Copilot em `.github/hooks/copilot-hooks.json`. Eles **nunca
 bloqueiam** o agente — são logging-only por decisão de projeto.
 
+**Schema real do payload (verificado empiricamente — 2026-03-09):**
+
+| Campo             | Tipo     | Descrição                                                   |
+| ----------------- | -------- | ----------------------------------------------------------- |
+| `tool_name`       | `string` | Nome da ferramenta em snake_case (ex: `run_in_terminal`)    |
+| `tool_input`      | `object` | Parâmetros da ferramenta (varia por ferramenta)             |
+| `tool_response`   | `string` | Saída da ferramenta (texto plano)                           |
+| `session_id`      | `string` | UUID real da sessão Copilot                                 |
+| `tool_use_id`     | `string` | UUID único por chamada de ferramenta                        |
+| `transcript_path` | `string` | Caminho para o transcript JSONL da conversa                 |
+| `timestamp`       | `string` | ISO 8601 (`"2026-03-09T02:19:42.040Z"`) — NÃO epoch integer |
+| `hook_event_name` | `string` | `"PreToolUse"` ou `"PostToolUse"` (PascalCase)              |
+| `cwd`             | `string` | Diretório de trabalho atual                                 |
+
+> **Nota**: A documentação oficial em `docs.github.com/en/copilot/reference/hooks-configuration` usa
+> convenção camelCase (`.toolName`, `.toolResult.resultType`). O payload **real** no VS Code Copilot
+> usa snake_case. Sempre consultar os logs empíricos em `.github/hooks/logs/raw-*.jsonl`.
+
+---
+
+### Hardening de persistência de sessão
+
+O sistema de hooks mantém estado incremental entre sessões. O agente DEVE usar esses mecanismos para
+garantir continuidade máxima:
+
+**Arquivos de estado (`.github/hooks/state/`):**
+
+| Arquivo                | Propósito                                                           |
+| ---------------------- | ------------------------------------------------------------------- |
+| `session-context.json` | Estado vivo: session_id, tools_used[], turn_count, last_tool_ts     |
+| `session-briefing.md`  | Briefing gerado automaticamente no sessionStart — **ler sempre**    |
+| `pending-tasks.md`     | Backlog canônico de tarefas — fonte de verdade para próximos passos |
+
+**Checkpoints automáticos (`.github/hooks/checkpoints/`):**
+
+O hook `agentStop` chama `session-checkpoint.sh` ao final de cada turno, salvando:
+
+```json
+{
+  "checkpoint_ts": "2026-03-09T...",
+  "session_id": "uuid",
+  "turn_count": 5,
+  "tasks": { "alta": 3, "media": 7, "backlog": 12, "open_total": 22, "done_total": 4 },
+  "findings": { "total": 8, "critical": 0, "high": 2 },
+  "metrics": { "tools_total": 87, "tools_success": 86, "avg_duration_ms": 1234 }
+}
+```
+
+**Forçar um checkpoint manual** (útil antes de qualquer encerramento):
+
+```bash
+bash .github/hooks/scripts/session-checkpoint.sh
+```
+
+**Recovery automático**: o `session-start.sh` detecta e carrega o último checkpoint disponível e
+inclui automaticamente as informações de continuidade no `session-briefing.md`.
+
+**Regras de persistência máxima:**
+
+1. NUNCA encerrar sem antes rodar `bash .github/hooks/scripts/session-checkpoint.sh`
+2. AO INICIAR, sempre ler `session-briefing.md` — contém estado e tarefas da sessão anterior
+3. Ao completar tarefa, usar `bash .github/hooks/scripts/complete-task.sh "<padrão>"` — atualiza
+   `pending-tasks.md` e garante que o progresso é persistido
+4. `session_context.json` é atualizado a cada ferramenta via `pre-tool-use.sh` (campo
+   `tools_used[]`) — não sobrescreva manualmente
+5. Findings em `findings.jsonl` são cumulativos — nunca deletar; usar `resolve-finding.sh` se
+   disponível
+
+---
+
+### Consulta obrigatória à documentação oficial
+
+Antes de tomar decisões técnicas sobre tecnologias externas, o agente SEMPRE deve verificar a
+documentação oficial. Esta regra aplica-se a Copilot hooks, APIs, dependências, frameworks etc.
+
+**Fluxo de pesquisa obrigatório:**
+
+1. **Primeira tentativa — Context7 MCP** (documentação versionada e estruturada):
+
+   ```
+   mcp_io_github_ups_resolve-library-id: "<nome da biblioteca ou site>"
+   mcp_io_github_ups_get-library-docs: context7CompatibleLibraryID + topic específico
+   ```
+
+   IDs Context7 relevantes para este projeto:
+
+   | Recurso               | ID Context7                                          |
+   | --------------------- | ---------------------------------------------------- |
+   | GitHub Copilot hooks  | `/websites/github_en_copilot`                        |
+   | VS Code customization | `/websites/code_visualstudio_copilot_copilot-custom` |
+   | Node.js 24 API        | `/nodejs/node`                                       |
+   | Puppeteer             | `/puppeteer/puppeteer`                               |
+   | Zod (validação)       | `/colinhacks/zod`                                    |
+   | Socket.io             | `/socketio/socket.io`                                |
+   | Express.js            | `/expressjs/express`                                 |
+   | better-sqlite3        | `/WiseLibs/better-sqlite3`                           |
+
+2. **Segunda tentativa — web fetch direta** (se Context7 não resolver):
+
+   URLs canônicas para referência:
+   - Copilot hooks: `https://docs.github.com/en/copilot/reference/hooks-configuration`
+   - Copilot customization: `https://docs.github.com/en/copilot/customizing-copilot`
+   - Node.js API: `https://nodejs.org/api/`
+   - Puppeteer: `https://pptr.dev/`
+   - TypeScript JSDoc: `https://www.typescriptlang.org/docs/handbook/jsdoc-supported-types.html`
+
+3. **Nunca assumir** schema, API ou comportamento sem verificação — especialmente em campos de
+   payloads externos (vide o bug `toolName` vs `tool_name` desta sessão).
+
+4. **Registrar descobertas** em `DOCUMENTAÇÃO/REFERENCIAS/` quando encontrar schema ou contrato não
+   documentado localmente.
+
+**Quando usar Context7 vs web fetch:**
+
+| Situação                                | Use                          |
+| --------------------------------------- | ---------------------------- |
+| API de biblioteca (método, tipo, opção) | Context7 primeiro            |
+| Schema de payload de serviço externo    | Web fetch (docs oficiais)    |
+| Comportamento de versão específica      | Context7 com topic de versão |
+| Changelog ou novidades recentes         | Web fetch                    |
+| Dúvida sobre qual variante usar         | Ambos em paralelo            |
+
 ## Rotas canônicas
 
 | Necessidade             | Onde ir                                                |
