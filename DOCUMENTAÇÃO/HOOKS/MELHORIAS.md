@@ -8,12 +8,12 @@
 
 ## Bugs Corrigidos (nesta sessão — 2026-03-09)
 
-| # | Bug | Script | Fix aplicado |
-|---|-----|--------|--------------|
-| B1 | `auth_requested_this_turn` não resetado entre turnos → falso positivo na Estratégia 3 | `agent-stop.sh` | Reset no final do turno + reset em `log-prompt.sh` |
-| B2 | `failure_count_unknown` nome enganoso (a maioria são sucessos com body vazio) | `post-tool-use.sh` | Renomeado para `tool_responses_empty` |
-| B3 | Glob vazio em bash → array com literal do pattern quando não há checkpoints | `session-checkpoint.sh` | Substituído por `mapfile + compgen` |
-| B4 | `/tmp/pre-commit-gate-output.txt` path fixo → race condition em commits paralelos | `install-git-hooks.sh` | Substituído por `mktemp` + `trap EXIT` |
+| #   | Bug                                                                                   | Script                  | Fix aplicado                                       |
+| --- | ------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------- |
+| B1  | `auth_requested_this_turn` não resetado entre turnos → falso positivo na Estratégia 3 | `agent-stop.sh`         | Reset no final do turno + reset em `log-prompt.sh` |
+| B2  | `failure_count_unknown` nome enganoso (a maioria são sucessos com body vazio)         | `post-tool-use.sh`      | Renomeado para `tool_responses_empty`              |
+| B3  | Glob vazio em bash → array com literal do pattern quando não há checkpoints           | `session-checkpoint.sh` | Substituído por `mapfile + compgen`                |
+| B4  | `/tmp/pre-commit-gate-output.txt` path fixo → race condition em commits paralelos     | `install-git-hooks.sh`  | Substituído por `mktemp` + `trap EXIT`             |
 
 ---
 
@@ -168,21 +168,21 @@ quais tarefas foram adicionadas ou concluídas desde o checkpoint anterior.
 
 ## Tabela de Priorização
 
-| ID  | Título                              | Prioridade | Esforço | Categoria      |
-| --- | ----------------------------------- | ---------- | ------- | -------------- |
-| M1  | Lifecycle de Findings               | Média      | M       | Melhoria       |
-| M2  | Sumarização de tools_used           | Média      | S       | Melhoria       |
-| M3  | Alertas de Threshold                | Média      | M       | Melhoria       |
-| M4  | Detection real de falhas            | Backlog    | L       | Melhoria       |
-| M5  | subagent-stop mais informativo      | Backlog    | S       | Melhoria       |
-| UP1 | Analytics Cross-Session             | Alta       | L       | Upgrade Profundo |
-| UP2 | Integração Tarefas ↔ Docs           | Alta       | L       | Upgrade Profundo |
-| UP3 | Health Check Contínuo               | Média      | M       | Upgrade Profundo |
-| UP4 | Checkpoint com Diff de Tarefas      | Backlog    | M       | Upgrade Profundo |
-| UP5 | Exportação CSV de Métricas          | Backlog    | S       | Upgrade Profundo |
+| ID  | Título                         | Prioridade | Esforço | Categoria        |
+| --- | ------------------------------ | ---------- | ------- | ---------------- |
+| M1  | Lifecycle de Findings          | Média      | M       | Melhoria         |
+| M2  | Sumarização de tools_used      | Média      | S       | Melhoria         |
+| M3  | Alertas de Threshold           | Média      | M       | Melhoria         |
+| M4  | Detection real de falhas       | Backlog    | L       | Melhoria         |
+| M5  | subagent-stop mais informativo | Backlog    | S       | Melhoria         |
+| UP1 | Analytics Cross-Session        | Alta       | L       | Upgrade Profundo |
+| UP2 | Integração Tarefas ↔ Docs      | Alta       | L       | Upgrade Profundo |
+| UP3 | Health Check Contínuo          | Média      | M       | Upgrade Profundo |
+| UP4 | Checkpoint com Diff de Tarefas | Backlog    | M       | Upgrade Profundo |
+| UP5 | Exportação CSV de Métricas     | Backlog    | S       | Upgrade Profundo |
 
 ---
 
-*Atualizar este documento ao aprovar ou implementar qualquer item.  
-Para registrar novos achados de bug: `bash .github/hooks/scripts/save-finding.sh ...`  
+*Atualizar este documento ao aprovar ou implementar qualquer item.
+Para registrar novos achados de bug: `bash .github/hooks/scripts/save-finding.sh ...`
 Para nova tarefa aprovada: `bash .github/hooks/scripts/add-task.sh ...`*

@@ -26,16 +26,16 @@ autorização de encerramento, métricas de ferramentas, checkpoints de estado e
 O sistema é ativado automaticamente pelo GitHub Copilot via `.github/hooks/copilot-hooks.json`.
 Oito eventos do ciclo de vida do agente disparam scripts shell correspondentes:
 
-| Evento Copilot    | Script                    | Propósito                             |
-| ----------------- | ------------------------- | ------------------------------------- |
-| `sessionStart`    | `session-start.sh`        | Inicialização + briefing da sessão    |
-| `userPromptSubmit`| `log-prompt.sh`           | Log de metadados + reset de auth flag |
-| `preToolUse`      | `pre-tool-use.sh`         | Rastreia tool calls + redação de cred |
-| `postToolUse`     | `post-tool-use.sh`        | Métricas de duração + quality gates   |
-| `agentStop`       | `agent-stop.sh`           | Detecção de autorização + checkpoint  |
-| `subagentStop`    | `subagent-stop.sh`        | Registro mínimo do subagente          |
-| `errorOccurred`   | `error-occurred.sh`       | Log de erros no audit + errors.jsonl  |
-| `sessionEnd`      | `session-end.sh`          | Relatório final + conformidade        |
+| Evento Copilot     | Script              | Propósito                             |
+| ------------------ | ------------------- | ------------------------------------- |
+| `sessionStart`     | `session-start.sh`  | Inicialização + briefing da sessão    |
+| `userPromptSubmit` | `log-prompt.sh`     | Log de metadados + reset de auth flag |
+| `preToolUse`       | `pre-tool-use.sh`   | Rastreia tool calls + redação de cred |
+| `postToolUse`      | `post-tool-use.sh`  | Métricas de duração + quality gates   |
+| `agentStop`        | `agent-stop.sh`     | Detecção de autorização + checkpoint  |
+| `subagentStop`     | `subagent-stop.sh`  | Registro mínimo do subagente          |
+| `errorOccurred`    | `error-occurred.sh` | Log de erros no audit + errors.jsonl  |
+| `sessionEnd`       | `session-end.sh`    | Relatório final + conformidade        |
 
 ---
 
@@ -90,22 +90,22 @@ Oito eventos do ciclo de vida do agente disparam scripts shell correspondentes:
 
 O `agent-stop.sh` detecta autorização via:
 
-1. **Estratégia 1 — Fronteira por userPromptSubmitted** (mais precisa):  
+1. **Estratégia 1 — Fronteira por userPromptSubmitted** (mais precisa):
    Encontra a última entrada `userPromptSubmitted` em `audit.jsonl` e verifica se
    `vscode_askQuestions` aparece em algum `preToolUse` após essa linha.
 
-2. **Estratégia 2 — Fallback por recência** (quando userPromptSubmitted ausente):  
+2. **Estratégia 2 — Fallback por recência** (quando userPromptSubmitted ausente):
    Varre as últimas 150 linhas de `audit.jsonl` procurando `vscode_askQuestions`.
 
-3. **Estratégia 3 — Fallback de contexto** (último recurso):  
+3. **Estratégia 3 — Fallback de contexto** (último recurso):
    Lê `auth_requested_this_turn` em `session-context.json`.
 
 ### Reset de flag entre turnos
 
 **Crítico**: a flag `auth_requested_this_turn` é resetada em dois momentos:
 
-- **`agent-stop.sh`** — ao final do turno, após verificar conformidade.  
-- **`log-prompt.sh`** — ao inicio de cada novo turno do usuário (belt-and-suspenders).  
+- **`agent-stop.sh`** — ao final do turno, após verificar conformidade.
+- **`log-prompt.sh`** — ao inicio de cada novo turno do usuário (belt-and-suspenders).
 
 Isso garante que autorização de turno N não "vaze" para o turno N+1.
 
@@ -226,7 +226,7 @@ bash .github/hooks/scripts/save-finding.sh \
     "<módulo>" "<severity>" "<type>" "<descrição>"
 ```
 
-**Severidades**: `critical | high | medium | low | info`  
+**Severidades**: `critical | high | medium | low | info`
 **Tipos**: `bug | gap | improvement | vulnerability | performance | debt`
 
 Grava em `findings.jsonl` + `audit.jsonl` (dupla visibilidade).
@@ -342,32 +342,32 @@ sessionStart (nova sessão)
 
 ### `session-context.json` — Schema
 
-| Campo                           | Tipo      | Descrição                                        |
-| ------------------------------- | --------- | ------------------------------------------------ |
-| `session_id`                    | `string`  | UUID da sessão Copilot                           |
-| `start_ts`                      | `string`  | Timestamp epoch ms do inicio                     |
-| `start_date`                    | `string`  | ISO 8601                                         |
-| `turn_count`                    | `number`  | Turnos completos do agente                       |
-| `last_tool`                     | `string`  | Nome da última ferramenta usada                  |
-| `last_tool_ts`                  | `string`  | Timestamp ISO da última ferramenta               |
-| `last_tool_use_id`              | `string`  | ID único do tool use                             |
-| `tools_used`                    | `array`   | Lista de tool names usados na sessão             |
-| `auth_requested_this_turn`      | `boolean` | Flag: `vscode_askQuestions` chamada neste turno  |
-| `auth_requested_at`             | `string?` | Timestamp da última chamada de askQuestions      |
-| `last_close_authorized`         | `boolean` | Último turno foi autorizado?                     |
-| `consecutive_unauthorized_closes` | `number` | Violações consecutivas sem autorização          |
-| `failure_count`                 | `number`  | Erros de ferramentas confirmados                 |
-| `error_count`                   | `number`  | Erros do agente (hook errorOccurred)             |
-| `tool_responses_empty`          | `number`  | Tool calls sem body de resposta (diagnóstico)    |
-| `quality_gates`                 | `object`  | Gates executados: `{gate_name: {result, ts}}`   |
-| `session_summary`               | `string`  | Resumo do último turno                           |
+| Campo                             | Tipo      | Descrição                                       |
+| --------------------------------- | --------- | ----------------------------------------------- |
+| `session_id`                      | `string`  | UUID da sessão Copilot                          |
+| `start_ts`                        | `string`  | Timestamp epoch ms do inicio                    |
+| `start_date`                      | `string`  | ISO 8601                                        |
+| `turn_count`                      | `number`  | Turnos completos do agente                      |
+| `last_tool`                       | `string`  | Nome da última ferramenta usada                 |
+| `last_tool_ts`                    | `string`  | Timestamp ISO da última ferramenta              |
+| `last_tool_use_id`                | `string`  | ID único do tool use                            |
+| `tools_used`                      | `array`   | Lista de tool names usados na sessão            |
+| `auth_requested_this_turn`        | `boolean` | Flag: `vscode_askQuestions` chamada neste turno |
+| `auth_requested_at`               | `string?` | Timestamp da última chamada de askQuestions     |
+| `last_close_authorized`           | `boolean` | Último turno foi autorizado?                    |
+| `consecutive_unauthorized_closes` | `number`  | Violações consecutivas sem autorização          |
+| `failure_count`                   | `number`  | Erros de ferramentas confirmados                |
+| `error_count`                     | `number`  | Erros do agente (hook errorOccurred)            |
+| `tool_responses_empty`            | `number`  | Tool calls sem body de resposta (diagnóstico)   |
+| `quality_gates`                   | `object`  | Gates executados: `{gate_name: {result, ts}}`   |
+| `session_summary`                 | `string`  | Resumo do último turno                          |
 
 ### Flags de estado
 
-| Arquivo                      | Significado                                    |
-| ---------------------------- | ---------------------------------------------- |
-| `UNAUTHORIZED_CLOSE.flag`    | Violação ativa — briefing injetará alerta crítico |
-| (ausência do flag)           | Sessão em conformidade                         |
+| Arquivo                   | Significado                                       |
+| ------------------------- | ------------------------------------------------- |
+| `UNAUTHORIZED_CLOSE.flag` | Violação ativa — briefing injetará alerta crítico |
+| (ausência do flag)        | Sessão em conformidade                            |
 
 ---
 
@@ -377,22 +377,22 @@ sessionStart (nova sessão)
 
 Todos os campos são presentes em cada linha mas alguns podem ser `""` ou `null`.
 
-| `event`                 | Gerado por            | Campos extras                            |
-| ----------------------- | --------------------- | ---------------------------------------- |
-| `sessionStart`          | session-start.sh      | `cwd`, `source`                          |
-| `userPromptSubmitted`   | log-prompt.sh         | `prompt_hash`, `prompt_len`, `cwd`       |
-| `preToolUse`            | pre-tool-use.sh       | `tool_name`, `tool_use_id`               |
-| `postToolUse`           | post-tool-use.sh      | `tool_name`, `tool_use_id`, `result_type` |
-| `agentStop`             | agent-stop.sh         | `turn_duration_s`                        |
-| `subagentStop`          | subagent-stop.sh      | —                                        |
-| `errorOccurred`         | error-occurred.sh     | `errorName`, `errorMsg`                  |
-| `sessionCheckpoint`     | session-checkpoint.sh | `turn_count`, `tasks_open`, `checkpoint_file` |
-| `turnEnd_authorized`    | agent-stop.sh         | —                                        |
-| `turnEnd_UNAUTHORIZED`  | agent-stop.sh         | `message`                                |
+| `event`                 | Gerado por            | Campos extras                                            |
+| ----------------------- | --------------------- | -------------------------------------------------------- |
+| `sessionStart`          | session-start.sh      | `cwd`, `source`                                          |
+| `userPromptSubmitted`   | log-prompt.sh         | `prompt_hash`, `prompt_len`, `cwd`                       |
+| `preToolUse`            | pre-tool-use.sh       | `tool_name`, `tool_use_id`                               |
+| `postToolUse`           | post-tool-use.sh      | `tool_name`, `tool_use_id`, `result_type`                |
+| `agentStop`             | agent-stop.sh         | `turn_duration_s`                                        |
+| `subagentStop`          | subagent-stop.sh      | —                                                        |
+| `errorOccurred`         | error-occurred.sh     | `errorName`, `errorMsg`                                  |
+| `sessionCheckpoint`     | session-checkpoint.sh | `turn_count`, `tasks_open`, `checkpoint_file`            |
+| `turnEnd_authorized`    | agent-stop.sh         | —                                                        |
+| `turnEnd_UNAUTHORIZED`  | agent-stop.sh         | `message`                                                |
 | `sessionEnd_compliance` | session-end.sh        | `authorized_turns`, `violation_turns`, `fully_compliant` |
-| `finding`               | save-finding.sh       | `module`, `severity`, `type`, `description` |
-| `taskAdded`             | add-task.sh           | `priority`, `title`, `description`       |
-| `taskCompleted`         | complete-task.sh      | `pattern`, `date`                        |
+| `finding`               | save-finding.sh       | `module`, `severity`, `type`, `description`              |
+| `taskAdded`             | add-task.sh           | `priority`, `title`, `description`                       |
+| `taskCompleted`         | complete-task.sh      | `pattern`, `date`                                        |
 
 **Rotação automática**: quando >5000 linhas, o excesso é arquivado em `audit-archive-<ts>.jsonl`.
 
@@ -456,14 +456,14 @@ tail -20 .github/hooks/logs/audit.jsonl | jq -r '[.timestamp, .event, .tool_name
 
 ## Documentos Relacionados
 
-| Documento                                            | Conteúdo                                  |
-| ---------------------------------------------------- | ----------------------------------------- |
-| [SCRIPTS.md](./SCRIPTS.md)                           | Referência detalhada de cada script       |
-| [PROTOCOLO-AUTORIZACAO.md](./PROTOCOLO-AUTORIZACAO.md) | Spec completo do protocolo de autorização |
-| [AUDIT-SCHEMA.md](./AUDIT-SCHEMA.md)                | Schema completo de audit.jsonl            |
-| [MELHORIAS.md](./MELHORIAS.md)                       | Backlog de melhorias e upgrades propostos |
-| [.github/AGENTS.md](../../AGENTS.md)                 | Instruções para agentes de IA             |
-| [.github/copilot-instructions.md](../../copilot-instructions.md) | Instruções principais do Copilot |
+| Documento                                                        | Conteúdo                                  |
+| ---------------------------------------------------------------- | ----------------------------------------- |
+| [SCRIPTS.md](./SCRIPTS.md)                                       | Referência detalhada de cada script       |
+| [PROTOCOLO-AUTORIZACAO.md](./PROTOCOLO-AUTORIZACAO.md)           | Spec completo do protocolo de autorização |
+| [AUDIT-SCHEMA.md](./AUDIT-SCHEMA.md)                             | Schema completo de audit.jsonl            |
+| [MELHORIAS.md](./MELHORIAS.md)                                   | Backlog de melhorias e upgrades propostos |
+| [.github/AGENTS.md](../../AGENTS.md)                             | Instruções para agentes de IA             |
+| [.github/copilot-instructions.md](../../copilot-instructions.md) | Instruções principais do Copilot          |
 
 ---
 

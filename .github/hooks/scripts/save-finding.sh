@@ -29,6 +29,8 @@ TYPE="${3:-bug}"
 DESCRIPTION="${4:-}"
 NOW_MS="$(date -u +%s000 2> /dev/null || echo 0)"
 DATE="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo 'unknown')"
+# ID único: timestamp_ms + RANDOM (bash built-in) garante unicidade mesmo no mesmo segundo
+FINDING_ID="f_$(date +%s%3N 2> /dev/null || echo 0)_${RANDOM}"
 
 # Valida severity
 case "$SEVERITY" in
@@ -67,22 +69,24 @@ jq -cn \
     --arg sid "$SESSION_ID" \
     --arg ts "$NOW_MS" \
     --arg date "$DATE" \
+    --arg fid "$FINDING_ID" \
     --arg mod "$MODULE" \
     --arg severity "$SEVERITY" \
     --arg type "$TYPE" \
     --arg desc "$DESCRIPTION" \
-    '{event:$event,session_id:$sid,timestamp:$ts,date:$date,module:$mod,severity:$severity,type:$type,description:$desc}' >> "$LOG_DIR/findings.jsonl"
+    '{event:$event,session_id:$sid,timestamp:$ts,date:$date,finding_id:$fid,module:$mod,severity:$severity,type:$type,description:$desc}' >> "$LOG_DIR/findings.jsonl"
 
 # Também registra no audit.jsonl para visibilidade geral
 jq -cn \
     --arg event "finding" \
     --arg sid "$SESSION_ID" \
     --arg ts "$NOW_MS" \
+    --arg fid "$FINDING_ID" \
     --arg mod "$MODULE" \
     --arg severity "$SEVERITY" \
     --arg type "$TYPE" \
     --arg desc "$DESCRIPTION" \
-    '{event:$event,session_id:$sid,timestamp:$ts,module:$mod,severity:$severity,type:$type,description:$desc}' >> "$LOG_DIR/audit.jsonl"
+    '{event:$event,session_id:$sid,timestamp:$ts,finding_id:$fid,module:$mod,severity:$severity,type:$type,description:$desc}' >> "$LOG_DIR/audit.jsonl"
 
 # Indicador visual com ícone de severidade
 case "$SEVERITY" in
@@ -94,5 +98,5 @@ case "$SEVERITY" in
     *) ICON="⚫" ;;
 esac
 
-echo "${ICON} Finding registrado [${SEVERITY}/${TYPE}] em ${MODULE}: ${DESCRIPTION}"
+echo "${ICON} Finding registrado [${SEVERITY}/${TYPE}] ${FINDING_ID} em ${MODULE}: ${DESCRIPTION}"
 exit 0

@@ -9,11 +9,11 @@
 
 Cada linha é um objeto JSON independente (JSONL). Campos comuns a todos os eventos:
 
-| Campo        | Tipo     | Descrição                                |
-| ------------ | -------- | ---------------------------------------- |
-| `event`      | `string` | Tipo do evento (ver tabela abaixo)       |
+| Campo        | Tipo     | Descrição                                 |
+| ------------ | -------- | ----------------------------------------- |
+| `event`      | `string` | Tipo do evento (ver tabela abaixo)        |
 | `session_id` | `string` | UUID da sessão (pode ser `""` se ausente) |
-| `timestamp`  | `string` | ISO 8601 ou epoch ms (depende do hook)   |
+| `timestamp`  | `string` | ISO 8601 ou epoch ms (depende do hook)    |
 
 ---
 
@@ -262,13 +262,13 @@ Gerado por `save-finding.sh`. Schema:
 
 ### Inconsistências conhecidas (observadas)
 
-1. **`timestamp` em `preToolUse`/`postToolUse`**: formato ISO 8601 com milissegundos  
+1. **`timestamp` em `preToolUse`/`postToolUse`**: formato ISO 8601 com milissegundos
    **`timestamp` em `agentStop`/`sessionStart`**: alguns eventos usam epoch string
 
-2. **`result_type` sem campo explícito no payload**: determinado por heurística  
+2. **`result_type` sem campo explícito no payload**: determinado por heurística
    (tool_response vazia → `"unknown"`, não vazia → `"success"`)
 
-3. **`session_id` em preToolUse**: vem do payload do Copilot (campo `.session_id`)  
+3. **`session_id` em preToolUse**: vem do payload do Copilot (campo `.session_id`)
    **`session_id` em error-occurred**: lido de `session-context.json` (pode ser stale se for erro de outra sessão)
 
 4. **`userPromptSubmitted` é raro** no audit.jsonl: o hook `userPromptSubmitted` só dispara quando o Copilot recebe foco. Em sessões longas, pode haver múltiplos turnos sem nenhum `userPromptSubmitted` — por isso existem as Estratégias 2 e 3 no protocolo de autorização.

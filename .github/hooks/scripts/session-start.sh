@@ -54,14 +54,16 @@ jq -cn \
         date_short:   $date_short,
         source:       $source,
         cwd:          $cwd,
-        last_tool_ts: $ts,
-        last_tool:    "",
-        tools_used:   [],
-        failure_count: 0,
-        failure_count_unknown: 0,
-        error_count:  0,
-        turn_count:   0,
-        session_summary: ""
+        last_tool_ts:        $ts,
+        last_tool:           "",
+        tools_used_counts:   {},
+        tools_used_recent:   [],
+        tools_used_total:    0,
+        failure_count:       0,
+        tool_responses_empty: 0,
+        error_count:         0,
+        turn_count:          0,
+        session_summary:     ""
     }' > "$STATE_DIR/session-context.json"
 
 # ── Recovery: detecta sessão anterior via último checkpoint ─────────────────
@@ -184,6 +186,54 @@ if [ -f "$METRICS_FILE" ] && [ -s "$METRICS_FILE" ]; then
     [ -z "$TREND_PERF_TABLE" ] && TREND_PERF_TABLE="| N/D | - | 0 |"
 fi
 
+# ── UP3: Health check do ambiente ─────────────────────────────────────────
+HEALTH_CRITICAL=""
+HEALTH_WARNINGS=""
+
+# sponge é crítico: sem ele nenhuma atualização do session-context.json funciona
+if ! command -v sponge &> /dev/null; then
+    HEALTH_CRITICAL="${HEALTH_CRITICAL}
+- ⛔ **sponge não instalado** — instale com \`sudo apt install moreutils\`. Atualizações de estado da sessão inoperantes."
+fi
+
+# jq é crítico: sem ele nenhum hook funciona
+if ! command -v jq &> /dev/null; then
+    HEALTH_CRITICAL="${HEALTH_CRITICAL}
+- ⛔ **jq não instalado** — instale com \`sudo apt install jq\`. Sistema de hooks completamente inoperante."
+fi
+
+# audit.jsonl: rotação automática ocorre em 5000 linhas (session-end.sh)
+AUDIT_LINES=0
+if [ -f "$AUDIT_FILE" ]; then
+    AUDIT_LINES="$(wc -l < "$AUDIT_FILE" | tr -d ' ')"
+    if [ "${AUDIT_LINES}" -gt 4500 ] 2> /dev/null; then
+        HEALTH_CRITICAL="${HEALTH_CRITICAL}
+- ⛔ **audit.jsonl crítico** (${AUDIT_LINES}/5000 linhas). Rotação iminente — arquive logs antigos urgentemente."
+    elif [ "${AUDIT_LINES}" -gt 3000 ] 2> /dev/null; then
+        HEALTH_WARNINGS="${HEALTH_WARNINGS}
+- ⚠️ **audit.jsonl crescendo** (${AUDIT_LINES}/5000 linhas). Rotação automática em breve."
+    fi
+fi
+
+# session-context.json: verifica permissão de escrita
+if [ -f "$STATE_DIR/session-context.json" ] && [ ! -w "$STATE_DIR/session-context.json" ]; then
+    HEALTH_CRITICAL="${HEALTH_CRITICAL}
+- ⛔ **session-context.json sem permissão de escrita** — estado da sessão não pode ser atualizado."
+fi
+
+# Findings críticos/high abertos requerem atenção antes de nova tarefa
+if [ "${CRITICAL_FINDINGS:-0}" -gt 0 ] 2> /dev/null; then
+    HEALTH_WARNINGS="${HEALTH_WARNINGS}
+- ⚠️ **${CRITICAL_FINDINGS} finding(s) crítico/high abertos** — verifique \`logs/findings.jsonl\` antes de iniciar nova tarefa."
+fi
+
+HEALTH_STATUS="✅ Sistema operacional"
+if [ -n "$HEALTH_CRITICAL" ]; then
+    HEALTH_STATUS="⛔ CRÍTICO — verificação imediata necessária"
+elif [ -n "$HEALTH_WARNINGS" ]; then
+    HEALTH_STATUS="⚠️ Avisos presentes"
+fi
+
 # ── Verifica violação de autorização da sessão anterior ────────────────────
 AUTH_FLAG_FILE="$STATE_DIR/UNAUTHORIZED_CLOSE.flag"
 PREV_UNAUTH_CLOSE=false
@@ -205,6 +255,18 @@ if [ -f "$CTX_PREV" ]; then
     CONSECUTIVE_VIOLATIONS="$(jq -r '.consecutive_unauthorized_closes // 0' "$CTX_PREV" 2> /dev/null || echo 0)"
 fi
 
+# M3: escalona nível de alerta com base em violações consecutivas acumuladas
+if [ "${CONSECUTIVE_VIOLATIONS}" -ge 3 ] 2> /dev/null; then
+    VIOLATION_EMOJIS="⛔⛔⛔"
+    VIOLATION_LEVEL="VIOLAÇÃO CRÍTICA REITERADA (${CONSECUTIVE_VIOLATIONS}x consecutivas)"
+elif [ "${CONSECUTIVE_VIOLATIONS}" -ge 2 ] 2> /dev/null; then
+    VIOLATION_EMOJIS="⛔⛔"
+    VIOLATION_LEVEL="SEGUNDA VIOLAÇÃO CONSECUTIVA"
+else
+    VIOLATION_EMOJIS="⛔"
+    VIOLATION_LEVEL="AVISO DE VIOLAÇÃO"
+fi
+
 # Escreve o briefing
 cat > "$BRIEFING_FILE" << BRIEFING_EOF
 # Briefing de Sessão — ${SESSION_DATE}
@@ -215,13 +277,13 @@ cat > "$BRIEFING_FILE" << BRIEFING_EOF
 > para definir com o usuário o rumo desta sessão.
 BRIEFING_EOF
 
-# Injeta aviso de violação NO TOPO do briefing, se houver
+# Injeta aviso de violação NO TOPO do briefing, se houver (nível escalona com CONSECUTIVE_VIOLATIONS)
 if [ "$PREV_UNAUTH_CLOSE" = "true" ]; then
     cat >> "$BRIEFING_FILE" << VIOLATION_EOF
 
 ---
 
-## ⛔⛔⛔ VIOLAÇÃO CRÍTICA — AÇÃO OBRIGATÓRIA IMEDIATA ⛔⛔⛔
+## ${VIOLATION_EMOJIS} ${VIOLATION_LEVEL} — AÇÃO OBRIGATÓRIA IMEDIATA ${VIOLATION_EMOJIS}
 
 > **A sessão anterior encerrou SEM autorização do usuário.**
 > O agente não chamou \`vscode_askQuestions\` antes de finalizar o turno.
@@ -269,6 +331,13 @@ ${NEXT_TASK}
 
 > Se \`CRITICAL_FINDINGS > 0\`, considere priorizar a resolução desses findings
 > antes de selecionar uma nova tarefa do backlog.
+
+## Saúde do Sistema
+
+**Status**: ${HEALTH_STATUS}
+
+$([ -n "$HEALTH_CRITICAL" ] && printf '%s\n' "$HEALTH_CRITICAL" || true)
+$([ -n "$HEALTH_WARNINGS" ] && printf '%s\n' "$HEALTH_WARNINGS" || true)
 
 ## Tendências históricas
 

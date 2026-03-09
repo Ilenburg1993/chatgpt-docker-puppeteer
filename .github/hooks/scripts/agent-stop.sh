@@ -143,8 +143,8 @@ fi
 
 # Incrementa turn_count, reseta auth flag e salva session_summary no contexto da sessão
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    # Contagem de tools usadas neste turno (aproximado via last_tool)
-    TOOLS_USED_COUNT="$(jq -r '(.tools_used // []) | length' "$CTX_FILE" 2> /dev/null || echo 0)"
+    # Contagem de tools usadas neste turno (via tools_used_total)
+    TOOLS_USED_COUNT="$(jq -r '.tools_used_total // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     SESSION_SUMMARY="turn=${TURN_DURATION_S}s tools=${TOOLS_USED_COUNT} last=${LAST_TOOL_TS:-N/D}"
     # CRÍTICO: reseta auth_requested_this_turn para false após processamento do turno.
     # Sem este reset, a Estratégia 3 produziria falsos positivos no turno seguinte

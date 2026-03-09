@@ -128,12 +128,12 @@ Presente quando há violação ativa. Schema:
 
 Todos registrados em `logs/audit.jsonl`:
 
-| Evento                  | Quando ocorre                         |
-| ----------------------- | ------------------------------------- |
+| Evento                  | Quando ocorre                                   |
+| ----------------------- | ----------------------------------------------- |
 | `turnEnd_authorized`    | Turno encerrado com vscode_askQuestions chamado |
-| `turnEnd_UNAUTHORIZED`  | Turno encerrado sem vscode_askQuestions |
-| `sessionEnd_compliance` | Fim de sessão — resumo de conformidade |
-| `authViolation_reset`   | Flag resetada manualmente             |
+| `turnEnd_UNAUTHORIZED`  | Turno encerrado sem vscode_askQuestions         |
+| `sessionEnd_compliance` | Fim de sessão — resumo de conformidade          |
+| `authViolation_reset`   | Flag resetada manualmente                       |
 
 ---
 
@@ -166,7 +166,7 @@ controlados pelo agente pai. A violação (se houver) é detectada quando o agen
 
 ### Restart do container
 
-`session-start.sh` recupera `session-context.json` existente (incluindo `consecutive_unauthorized_closes`).  
+`session-start.sh` recupera `session-context.json` existente (incluindo `consecutive_unauthorized_closes`).
 O `UNAUTHORIZED_CLOSE.flag` persiste em disco — sobrevive a restarts.
 
 ---
