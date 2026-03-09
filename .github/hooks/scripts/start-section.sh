@@ -63,19 +63,14 @@ AUTO_CLOSED_PREV=""
 if [ -n "$PREV_SECTION_NAME" ]; then
     AUTO_CLOSED_PREV="$PREV_SECTION_NAME"
 
-    # Calcula duration_s da seção anterior
+    # Calcula duration_s da seção anterior (bash puro — sem dependência de python3)
     PREV_DURATION_S=0
-    if [ -n "$PREV_SECTION_STARTED" ] && command -v python3 &> /dev/null; then
-        PREV_DURATION_S="$(python3 -c "
-import sys
-from datetime import datetime, timezone
-try:
-    a = datetime.fromisoformat('${PREV_SECTION_STARTED}'.replace('Z','+00:00'))
-    b = datetime.now(timezone.utc)
-    print(int((b - a).total_seconds()))
-except Exception:
-    print(0)
-" 2> /dev/null || echo 0)"
+    if [ -n "$PREV_SECTION_STARTED" ]; then
+        START_S="$(date -d "$PREV_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
+        NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
+        if [ "$NOW_S" -gt "$START_S" ] 2> /dev/null; then
+            PREV_DURATION_S=$((NOW_S - START_S))
+        fi
     fi
 
     # Calcula turns_covered
@@ -124,11 +119,13 @@ _JQ_ARGS=(
 )
 if [ -n "$SECTION_DESC" ]; then
     _JQ_ARGS+=(--arg desc "$SECTION_DESC")
-    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, description: $desc, section_number: $section_num}
+    # shellcheck disable=SC2016
+    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]'
 else
-    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, description: null, section_number: $section_num}
+    # shellcheck disable=SC2016
+    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num}
                 | .session_stats.section_count = $section_num
                 | .session_stats.section_names += [$name]'
 fi

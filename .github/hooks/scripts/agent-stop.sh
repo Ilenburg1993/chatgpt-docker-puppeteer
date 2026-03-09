@@ -116,9 +116,13 @@ if [ -f "$AUDIT_FILE" ]; then
 
     if [ "$LAST_PROMPT_LINE" -gt 0 ] && [ "$TOTAL_LINES" -gt "$LAST_PROMPT_LINE" ]; then
         LINES_SINCE_PROMPT=$((TOTAL_LINES - LAST_PROMPT_LINE))
-        if tail -n "$LINES_SINCE_PROMPT" "$AUDIT_FILE" \
-            | jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
-            AUTH_REQUESTED=true
+        # Hardening defensivo: garante LINES_SINCE_PROMPT > 0 antes de chamar tail -n 0
+        # (matematicamente redundante dado a condição acima, mas previne tail -n 0 acidental)
+        if [ "$LINES_SINCE_PROMPT" -gt 0 ]; then
+            if tail -n "$LINES_SINCE_PROMPT" "$AUDIT_FILE" \
+                | jq -re 'select(.tool_name == "vscode_askQuestions")' > /dev/null 2>&1; then
+                AUTH_REQUESTED=true
+            fi
         fi
     fi
 
@@ -175,9 +179,13 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
 
         # ── Monta systemMessage rico com estado contextualizado ───────────────
         _RICH_SECTION="$(jq -r '.current_section.name // "(nenhuma)"' "$CTX_FILE" 2> /dev/null || echo '(nenhuma)')"
+        _RICH_SECTION_NUM="$(jq -r '.current_section.section_number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
         _RICH_TURN="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        _RICH_SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
         _RICH_TOOLS="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
         _RICH_CONSEC="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+        _RICH_PUSH_PENDING="$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')"
+        _RICH_PUSH_COUNT="$(jq -r '.session_stats.push_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
         _RICH_ALTA=0
         _RICH_MEDIA=0
         _RICH_BACKLOG=0
@@ -193,15 +201,25 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
         if [ "$_RICH_CONSEC" -gt 1 ] 2> /dev/null; then
             _CONSEC_MSG="⚠ ATENÇÃO: ${_RICH_CONSEC} violações consecutivas detectadas nesta sessão. "
         fi
+        _PUSH_MSG=""
+        if [ "$_RICH_PUSH_PENDING" = "true" ] 2> /dev/null; then
+            _PUSH_MSG="
+
+🔀 GIT PUSH DETECTADO (push #${_RICH_PUSH_COUNT}) — AÇÃO OBRIGATÓRIA:
+  Execute UMA das opções abaixo usando run_in_terminal ANTES de prosseguir:
+  → Declarar nova fase:  bash .github/hooks/scripts/start-section.sh \"nome-da-fase\"
+  → Continuar na seção atual:  npm run hooks:continue-section
+  Sem declarar/confirmar a seção, esta exigência reaparecerá nos próximos TURNs bloqueados."
+        fi
         _RICH_MSG="⛔ BLOQUEIO — ENCERRAMENTO NÃO AUTORIZADO
 
 Você tentou encerrar este turno sem chamar vscode_askQuestions.
 ${_CONSEC_MSG}
 📍 ESTADO ATUAL:
-  • Seção: \"${_RICH_SECTION}\"
-  • Turno: #${_RICH_TURN} | Ferramentas usadas: ${_RICH_TOOLS}
+  • Seção: \"${_RICH_SECTION}\" (#${_RICH_SECTION_NUM}) | TURN: ${_RICH_SECTION_TURN}/${_RICH_TURN} (local/global)
+  • Ferramentas usadas: ${_RICH_TOOLS}
   • Backlog: ${_RICH_ALTA} alta | ${_RICH_MEDIA} média | ${_RICH_BACKLOG} backlog
-  • Próxima tarefa: ${_RICH_NEXT_TASK}
+  • Próxima tarefa: ${_RICH_NEXT_TASK}${_PUSH_MSG}
 
 ✅ AÇÃO OBRIGATÓRIA:
   1. Chame a ferramenta vscode_askQuestions (tool call real, não texto)
@@ -277,7 +295,8 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
         --arg event "turnEnd_authorized" \
         --arg sid "$SESSION_ID" \
         --arg ts "$NOW_ISO" \
-        '{event: $event, session_id: $sid, timestamp: $ts}' \
+        --argjson push_pending "$(jq -r '.session_stats.pending_section_after_push // false' "$CTX_FILE" 2> /dev/null || echo 'false')" \
+        '{event: $event, session_id: $sid, timestamp: $ts, push_pending: $push_pending}' \
         >> "$LOG_DIR/audit.jsonl"
 else
     TURN_COUNT_NOW="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
@@ -353,7 +372,7 @@ if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ]; then
     _NEXT_SECTION_NUM=1
     if [ -f "$CTX_FILE" ]; then
         _NEXT_SECTION_NUM="$(jq -r '(.session_stats.section_count // 0) + 1' "$CTX_FILE" 2> /dev/null || echo 1)"
-        _NEXT_TURN_AUTO="$(jq -r '.session_stats.turn_count // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        _NEXT_TURN_AUTO="$(jq -r '(.session_stats.turn_count // 0) + 1' "$CTX_FILE" 2> /dev/null || echo 1)"
         jq --arg ts "$_AUTO_SECTION_NOW" \
             --argjson snum "$_NEXT_SECTION_NUM" \
             --argjson tnum "${_NEXT_TURN_AUTO:-1}" \

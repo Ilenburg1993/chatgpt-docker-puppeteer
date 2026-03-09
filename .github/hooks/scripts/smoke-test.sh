@@ -262,7 +262,8 @@ else
     SHELLCHECK_FAILS=0
     for s in session-start.sh agent-stop.sh session-end.sh post-tool-use.sh pre-tool-use.sh \
         subagent-stop.sh subagent-start.sh tool-use-failure.sh pre-compact.sh \
-        watchdog.sh generate-daily-report.sh install-git-hooks.sh; do
+        watchdog.sh generate-daily-report.sh install-git-hooks.sh \
+        log-prompt.sh start-section.sh on-git-push.sh continue-section.sh; do
         f="$SCRIPTS_DIR/$s"
         [ -f "$f" ] || continue
         if shellcheck -S warning "$f" &> /dev/null; then
@@ -366,6 +367,59 @@ if grep -q '_RICH_SECTION' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
     pass "agent-stop.sh emite systemMessage rico com estado contextualizado"
 else
     fail "agent-stop.sh usa systemMessage genérico (não contextualizado)"
+fi
+
+# ── 13. Dual numbering — section_turn ────────────────────────────────────────
+echo ""
+echo "13. Dual numbering — section_turn e local_turn"
+if grep -q 'local_turn' "$SCRIPTS_DIR/start-section.sh" 2> /dev/null; then
+    pass "start-section.sh define local_turn=0 ao criar nova section"
+else
+    fail "start-section.sh não reseta local_turn na nova section"
+fi
+if grep -q 'section_turn' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
+    pass "log-prompt.sh calcula current_turn.section_turn (numeração local)"
+else
+    fail "log-prompt.sh não calcula section_turn"
+fi
+if grep -q '_RICH_SECTION_TURN' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "agent-stop.sh exibe TURN local/global no systemMessage"
+else
+    fail "agent-stop.sh não exibe dual turn no systemMessage"
+fi
+
+# ── 14. Git push — on-git-push.sh e continue-section.sh ─────────────────────
+echo ""
+echo "14. Git push — on-git-push.sh e continue-section.sh"
+if [ -f "$SCRIPTS_DIR/on-git-push.sh" ]; then
+    pass "on-git-push.sh existe"
+else
+    fail "on-git-push.sh não encontrado"
+fi
+if grep -q 'gitPush' "$SCRIPTS_DIR/on-git-push.sh" 2> /dev/null; then
+    pass "on-git-push.sh loga evento gitPush em audit.jsonl"
+else
+    fail "on-git-push.sh não loga evento gitPush"
+fi
+if grep -q 'pending_section_after_push' "$SCRIPTS_DIR/on-git-push.sh" 2> /dev/null; then
+    pass "on-git-push.sh define flag pending_section_after_push"
+else
+    fail "on-git-push.sh não define pending_section_after_push"
+fi
+if [ -f "$SCRIPTS_DIR/continue-section.sh" ]; then
+    pass "continue-section.sh existe"
+else
+    fail "continue-section.sh não encontrado"
+fi
+if grep -q 'pending_section_after_push' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "agent-stop.sh lê flag pending_section_after_push e avisa no systemMessage"
+else
+    fail "agent-stop.sh não trata pending_section_after_push"
+fi
+if grep -q 'post-push' "$SCRIPTS_DIR/install-git-hooks.sh" 2> /dev/null; then
+    pass "install-git-hooks.sh instala hook post-push"
+else
+    fail "install-git-hooks.sh não instala post-push"
 fi
 
 # ── Resumo ───────────────────────────────────────────────────────────────────

@@ -91,6 +91,7 @@ jq -cn \
 # Schema v4: section_name capturado da section ativa; last_askquestions_response resetado.
 NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
 TURN_NUMBER=1
+SECTION_TURN=1
 SECTION_NAME=""
 
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
@@ -105,11 +106,35 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.number                    = ((.session_stats.turn_count // 0) + 1)
          | .current_turn.section_name              = .current_section.name
          | .current_turn.intent_declared           = false
-         | .current_turn.intent                    = null' \
+         | .current_turn.intent                    = null
+         | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
+         | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 
     # Lê valores pós-reset para logar turnStart
     TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+elif [ -f "$CTX_FILE" ]; then
+    TMP="$(mktemp)"
+    jq --arg ts "${TIMESTAMP:-$NOW_ISO}" \
+        '.current_turn.started_at                = $ts
+         | .current_turn.tools_count               = 0
+         | .current_turn.tools_by_name             = {}
+         | .current_turn.failures_count            = 0
+         | .current_turn.auth_requested            = false
+         | .current_turn.auth_requested_at         = null
+         | .current_turn.last_askquestions_response = null
+         | .current_turn.number                    = ((.session_stats.turn_count // 0) + 1)
+         | .current_turn.section_name              = .current_section.name
+         | .current_turn.intent_declared           = false
+         | .current_turn.intent                    = null
+         | .current_section.local_turn             = ((.current_section.local_turn // 0) + 1)
+         | .current_turn.section_turn              = (.current_section.local_turn // 1)' \
+        "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
+
+    TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
     SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
@@ -119,12 +144,14 @@ jq -cn \
     --arg sid "$SESSION_ID" \
     --arg ts "${TIMESTAMP:-$NOW_ISO}" \
     --argjson turn_number "$TURN_NUMBER" \
+    --argjson section_turn "${SECTION_TURN:-1}" \
     --arg section_name "$SECTION_NAME" \
     '{
         event:        $event,
         session_id:   $sid,
         timestamp:    $ts,
         turn_number:  $turn_number,
+        section_turn: $section_turn,
         section_name: (if $section_name == "" then null else $section_name end)
     }' >> "$LOG_DIR/audit.jsonl"
 

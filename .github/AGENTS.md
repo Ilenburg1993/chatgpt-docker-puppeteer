@@ -9,28 +9,46 @@ com o workspace. Ele complementa `.github/copilot-instructions.md` e usa
 
 ---
 
-## ⛔⛔⛔ REGRA ABSOLUTA — ENCERRAMENTO SEM AUTORIZAÇÃO É PROIBIDO ⛔⛔⛔
+## ⛔⛔⛔ REGRA ABSOLUTA — PROTOCOLO DE ENCERRAMENTO POR NÍVEL ⛔⛔⛔
 
 > **Esta é a regra mais importante deste arquivo. Aplica-se SEMPRE, sem exceção.**
 
-### O que é obrigatório
+### O que é obrigatório — por nível
 
-**ANTES de encerrar qualquer turno, bloco de trabalho ou sessão, o agente DEVE:**
+**TURN (turno)** — Protocolo de comunicação obrigatório, sem autorização explícita do usuário:
 
-1. Invocar a ferramenta `vscode_askQuestions` com Template A ou E (ver seção abaixo)
-2. Aguardar a resposta do usuário
-3. Só prosseguir, commitar ou encerrar após autorização **explícita**
+1. Invocar a ferramenta `vscode_askQuestions` (tool call real, não texto)
+2. O turno encerra após a chamada — o usuário não precisa dizer "pode encerrar"
+3. A resposta do usuário orienta o próximo passo, não "autoriza" o encerramento
 
-### O que NÃO conta como autorização — exemplos de VIOLAÇÃO
+**SECTION (seção temática)** — Autônoma, sem autorização do usuário:
 
-| ❌ VIOLAÇÃO — isso NÃO é autorização              | ✅ CORRETO — único método válido               |
+- O agente abre e fecha seções livrement com `start-section.sh "nome"` / `section-end.sh "motivo"`
+- Sem necessidade de pedir permissão — a mudança de contexto semântico é decisão do agente
+
+**SESSION (sessão)** — Autorização explícita **obrigatória** com close_key:
+
+1. Invocar `vscode_askQuestions` com Template F
+2. O usuário digita a chave `ENCERRAR-XXXXXXXX` no campo livre
+3. Sem a chave → `SESSION_CLOSE_NO_KEY.flag` → sessão NÃO encerrada validamente
+
+**Commit e/ou Push** — Protocolo obrigatório com Template G:
+
+1. Antes de qualquer `git commit` e/ou `git push`, invocar `vscode_askQuestions` com Template G
+2. O usuário orienta se deve: commitar+pushar, revisar com subagente, continuar melhorando, etc.
+3. Executar apenas a ação autorizada pelo usuário
+
+### O que NÃO conta como protocolo — exemplos de VIOLAÇÃO
+
+| ❌ VIOLAÇÃO — isso NÃO cumpre o protocolo         | ✅ CORRETO — único método válido               |
 | ------------------------------------------------ | --------------------------------------------- |
 | Escrever "O que deseja fazer a seguir?" no texto | Chamar a **ferramenta** `vscode_askQuestions` |
 | Terminar a resposta com uma pergunta             | Tool call real, não texto de pergunta         |
 | Dizer "Posso continuar?" como texto do chat      | A ferramenta DEVE aparecer como tool call     |
 | Resumir o trabalho e encerrar sem perguntar      | Aguardar resposta antes de qualquer ação      |
+| Commitar ou fazer push sem chamar Template G     | Sempre invocar Template G antes de git ops    |
 
-> **TEXTO PLANO NÃO EQUIVALE A AUTORIZAÇÃO.** Somente o **tool call real** de `vscode_askQuestions`
+> **TEXTO PLANO NÃO EQUIVALE A PROTOCOLO.** Somente o **tool call real** de `vscode_askQuestions`
 > conta. Escrever uma pergunta na resposta é uma violação do protocolo.
 
 ### Monitoramento automático
@@ -163,14 +181,15 @@ usuário. O agente é um colaborador ativo e autônomo, não um executor passivo
 O agente DEVE invocar `vscode_askQuestions` (com múltiplas perguntas ricas) em cada um destes
 momentos. **Sem exceção.**
 
-| Gatilho                                       | Template                 | Momento                  |
-| --------------------------------------------- | ------------------------ | ------------------------ |
-| Sessão iniciada sem prompt explícito          | **E — Session Kickoff**  | Primeiro ato da sessão   |
-| Qualquer tarefa concluída                     | **A — Next Step**        | Logo após marcar `- [x]` |
-| ≥ 3 bugs encontrados numa auditoria           | **B — Bug Discovery**    | Antes de corrigir        |
-| Proposta de upgrade arquitetural identificada | **C — Upgrade Proposal** | Antes de executar        |
-| `turn_count % 3 == 0` e `turn_count > 0`      | **D — Checkpoint**       | No início do turno       |
-| Usuário pede para encerrar a sessão           | **F — Session Close**    | Antes de encerrar        |
+| Gatilho                                       | Template                 | Momento                      |
+| --------------------------------------------- | ------------------------ | ---------------------------- |
+| Sessão iniciada sem prompt explícito          | **E — Session Kickoff**  | Primeiro ato da sessão       |
+| Qualquer tarefa concluída                     | **A — Next Step**        | Logo após marcar `- [x]`     |
+| ≥ 3 bugs encontrados numa auditoria           | **B — Bug Discovery**    | Antes de corrigir            |
+| Proposta de upgrade arquitetural identificada | **C — Upgrade Proposal** | Antes de executar            |
+| `turn_count % 3 == 0` e `turn_count > 0`      | **D — Checkpoint**       | No início do turno           |
+| Usuário pede para encerrar a sessão           | **F — Session Close**    | Antes de encerrar SESSION    |
+| Antes de qualquer commit e/ou push            | **G — Commit/Push**      | Antes de `git commit`/`push` |
 
 > **Nota de protocolo**: como primeiro ato de cada turno de trabalho, o agente deve chamar
 > `bash .github/hooks/scripts/start-turn.sh "intenção"` para declarar sua intenção antes de
@@ -382,6 +401,51 @@ momentos. **Sem exceção.**
     "options": [
       "Cancelar — quero continuar trabalhando",
       "Salvar estado e encerrar (sem digitar a chave — encerramento NÃO será validado)"
+    ]
+  }
+]
+```
+
+---
+
+### Template G — Commit/Push Pre-Authorization (antes de git commit e/ou push)
+
+> **USO OBRIGATÓRIO**: invocar antes de qualquer `git commit` e/ou `git push`. Apresenta o estado
+> das mudanças pendentes e oferece 5 rotas diferentes, incluindo revisão por subagente antes de
+> commitar. O agente substitui os placeholders `[...]` com dados reais do contexto atual.
+>
+> **TURN/SECTION não requerem Template G** — apenas operações git (commit e push).
+>
+> **⚠️ OBRIGATÓRIO: o agente DEVE substituir todos os `[PLACEHOLDER]` com dados reais antes de
+> invocar a ferramenta.** Placeholders crus na tela do usuário são considerados violação de protocolo.
+> Use `git status --short | wc -l` para N_MODIFICADOS, `git diff --stat HEAD` para resumo, etc.
+
+```json
+[
+  {
+    "id": "commit_review",
+    "prompt": "🔀 Pré-autorização de commit e/ou push\n\nArquivos modificados: [N_MODIFICADOS] | Novos: [N_NOVOS] | Deletados: [N_DELETADOS]\nQuality gates: lint=[STATUS] | typecheck=[STATUS] | testes=[STATUS]\n\nResumo das mudanças: [RESUMO_BREVE]\n\nComo devo prosseguir?",
+    "type": "selectOne",
+    "allowFreeformInput": true,
+    "options": [
+      "✅ Commitar + push agora (git add -A && git commit && git push)",
+      "✅ Apenas push (código já commitado localmente, só precisa de push)",
+      "🔍 Revisão de subagente → corrigir issues → commit + push",
+      "🔍 Revisão de subagente → corrigir issues → continuar melhorando (commit depois)",
+      "🚀 Prosseguir com mais melhorias e upgrades antes de commitar"
+    ]
+  },
+  {
+    "id": "commit_message_hint",
+    "prompt": "Se for commitar: qual o escopo principal das mudanças? (campo livre para instrução adicional ao agente)",
+    "allowFreeformInput": true,
+    "options": [
+      "feat: nova funcionalidade",
+      "fix: correção de bug",
+      "refactor: refatoração sem mudança de comportamento",
+      "docs: atualização de documentação",
+      "chore: manutenção, scripts, configuração",
+      "Deixar o agente decidir com base nas mudanças"
     ]
   }
 ]

@@ -108,7 +108,11 @@ jq -cn \
             "errors_total":       0,
             "subagent_calls":     0,
             "section_count":      1,
-            "section_names":      ["início"]
+            "section_names":      ["início"],
+            "push_count":         0,
+            "last_push_at":       null,
+            "last_push_turn":     null,
+            "pending_section_after_push": false
         },
         "current_turn": {
             "number":                      1,
@@ -125,6 +129,7 @@ jq -cn \
             "name":           "início",
             "started_at":     $date,
             "turn_start":     1,
+            "local_turn":     0,
             "description":    null,
             "section_number": 1
         },
