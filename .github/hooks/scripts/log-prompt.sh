@@ -103,7 +103,9 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.auth_requested_at         = null
          | .current_turn.last_askquestions_response = null
          | .current_turn.number                    = ((.session_stats.turn_count // 0) + 1)
-         | .current_turn.section_name              = .current_section.name' \
+         | .current_turn.section_name              = .current_section.name
+         | .current_turn.intent_declared           = false
+         | .current_turn.intent                    = null' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 
     # Lê valores pós-reset para logar turnStart

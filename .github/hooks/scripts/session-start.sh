@@ -56,6 +56,13 @@ if [ -f "$STATE_DIR/session-context.json" ] && [ -s "$STATE_DIR/session-context.
     fi
 fi
 
+# ── Watchdog: verifica estado anterior antes de sobrescrever ─────────────────
+# Detecta sessões estagnadas, flags órfãos e context corrompido.
+# Roda em modo silencioso (só salva watchdog-report.json); output vai p/ stderr.
+if [ -x "$HOOK_DIR/scripts/watchdog.sh" ]; then
+    bash "$HOOK_DIR/scripts/watchdog.sh" --quiet 2> /dev/null || true
+fi
+
 # ── Gera SESSION CLOSE KEY — Schema v3 ───────────────────────────────────────
 # Chave dinâmica por sessão: ENCERRAR-XXXXXXXX (8 hex maiúsculos aleatórios)
 # O usuário DEVE digitar esta chave ao encerrar a sessão (vscode_askQuestions).
@@ -446,6 +453,35 @@ ${CLOSE_KEY}
 ---
 
 CLOSE_KEY_EOF
+
+# ── Injeta alertas do watchdog no briefing (se houver problemas detectados) ──
+WD_REPORT="$STATE_DIR/watchdog-report.json"
+if [ -f "$WD_REPORT" ] && jq empty "$WD_REPORT" 2> /dev/null; then
+    WD_STATUS="$(jq -r '.status // "healthy"' "$WD_REPORT" 2> /dev/null || echo 'healthy')"
+    if [ "$WD_STATUS" != "healthy" ]; then
+        WD_CRITICAL="$(jq -r '.summary.critical // 0' "$WD_REPORT" 2> /dev/null || echo 0)"
+        WD_WARN="$(jq -r '.summary.warnings // 0' "$WD_REPORT" 2> /dev/null || echo 0)"
+        WD_EMOJI="⚠️"
+        [ "$WD_STATUS" = "critical" ] && WD_EMOJI="🚨"
+        WD_ALERTS_MD="$(jq -r '.alerts[] | "- **[\(.level | ascii_upcase)]** `\(.code)`: \(.message)"' \
+            "$WD_REPORT" 2> /dev/null || echo '- (detalhes não disponíveis)')"
+        [ -z "$WD_ALERTS_MD" ] && WD_ALERTS_MD="- (detalhes não disponíveis)"
+        cat >> "$BRIEFING_FILE" << WD_EOF
+
+---
+
+## ${WD_EMOJI} Watchdog — ${WD_STATUS^^} (${WD_CRITICAL} crítico(s), ${WD_WARN} aviso(s))
+
+> O watchdog detectou anomalias no início desta sessão.
+> Veja o relatório completo em \`state/watchdog-report.json\`.
+
+${WD_ALERTS_MD}
+
+---
+
+WD_EOF
+    fi
+fi
 
 # Continuação do briefing — Estado Ativo (SESSION → SECTION → TURN) proeminente
 cat >> "$BRIEFING_FILE" << ACTIVE_STATE_EOF

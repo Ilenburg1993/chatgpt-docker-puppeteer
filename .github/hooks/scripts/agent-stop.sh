@@ -172,8 +172,47 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
                 block_count: $bc,
                 message:     "Agente tentou encerrar sem askQuestions — bloqueado para retry"
             }' >> "$LOG_DIR/audit.jsonl"
+
+        # ── Monta systemMessage rico com estado contextualizado ───────────────
+        _RICH_SECTION="$(jq -r '.current_section.name // "(nenhuma)"' "$CTX_FILE" 2> /dev/null || echo '(nenhuma)')"
+        _RICH_TURN="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        _RICH_TOOLS="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+        _RICH_CONSEC="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+        _RICH_ALTA=0
+        _RICH_MEDIA=0
+        _RICH_BACKLOG=0
+        _RICH_NEXT_TASK="(sem tarefas)"
+        TASKS_FILE_RT="$STATE_DIR/pending-tasks.md"
+        if [ -f "$TASKS_FILE_RT" ]; then
+            _RICH_ALTA="$(grep -c '^- \[ \].*\[alta\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
+            _RICH_MEDIA="$(grep -c '^- \[ \].*\[media\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
+            _RICH_BACKLOG="$(grep -c '^- \[ \].*\[backlog\]' "$TASKS_FILE_RT" 2> /dev/null || echo 0)"
+            _RICH_NEXT_TASK="$(grep '^- \[ \].*\[alta\]' "$TASKS_FILE_RT" 2> /dev/null | head -1 | sed 's/^- \[ \] //' || echo '(sem tarefas alta)')"
+        fi
+        _CONSEC_MSG=""
+        if [ "$_RICH_CONSEC" -gt 1 ] 2> /dev/null; then
+            _CONSEC_MSG="⚠ ATENÇÃO: ${_RICH_CONSEC} violações consecutivas detectadas nesta sessão. "
+        fi
+        _RICH_MSG="⛔ BLOQUEIO — ENCERRAMENTO NÃO AUTORIZADO
+
+Você tentou encerrar este turno sem chamar vscode_askQuestions.
+${_CONSEC_MSG}
+📍 ESTADO ATUAL:
+  • Seção: \"${_RICH_SECTION}\"
+  • Turno: #${_RICH_TURN} | Ferramentas usadas: ${_RICH_TOOLS}
+  • Backlog: ${_RICH_ALTA} alta | ${_RICH_MEDIA} média | ${_RICH_BACKLOG} backlog
+  • Próxima tarefa: ${_RICH_NEXT_TASK}
+
+✅ AÇÃO OBRIGATÓRIA:
+  1. Chame a ferramenta vscode_askQuestions (tool call real, não texto)
+  2. Use Template A se concluiu uma tarefa
+  3. Use Template F (com close_key) se quer encerrar a sessão
+  4. Use Template E se está retomando após inatividade
+
+📖 Templates completos em .github/AGENTS.md — seção \"Protocolo vscode_askQuestions\""
+
         # Emite decision:block no stdout — extensão mantém o agente rodando
-        printf '{"decision":"block","systemMessage":"⛔ PROTOCOLO DE ENCERRAMENTO OBRIGATÓRIO: Você DEVE chamar a ferramenta vscode_askQuestions antes de encerrar este turno. Apresente Template A (pergunta aberta sobre próximos passos) ou Template F (encerramento de sessão com close_key) conforme documentado em .github/AGENTS.md. NÃO encerre sem essa chamada."}\n'
+        printf '%s\n' "{\"decision\":\"block\",\"systemMessage\":$(printf '%s' "$_RICH_MSG" | jq -Rs .)}"
         exit 0
     fi
 fi
@@ -181,9 +220,36 @@ fi
 # ── Lê métricas do turno atual (para session_summary — fix B4) ───────────────
 TURN_TOOLS_COUNT=0
 TURN_NUMBER=0
+INTENT_DECLARED=false
 if [ -f "$CTX_FILE" ]; then
     TURN_TOOLS_COUNT="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     TURN_NUMBER="$(jq -r '.current_turn.number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    INTENT_DECLARED="$(jq -r '.current_turn.intent_declared // false' "$CTX_FILE" 2> /dev/null || echo false)"
+fi
+
+# ── Auto-enrich: gera turnStart_enriched_auto se start-turn.sh não foi chamado ──
+if [ "$INTENT_DECLARED" = "false" ] && [ "$TURN_NUMBER" -gt 0 ]; then
+    AUTO_INTENT="(não declarada)"
+    if [ -f "$CTX_FILE" ]; then
+        # Usa as ferramentas do turno como proxy de intenção
+        TOP_TOOLS="$(jq -r '.current_turn.tools_by_name | to_entries | sort_by(-.value) | .[0:3] | map(.key) | join(", ")' \
+            "$CTX_FILE" 2> /dev/null || echo '')"
+        [ -n "$TOP_TOOLS" ] && AUTO_INTENT="ferramentas: ${TOP_TOOLS}"
+    fi
+    jq -cn \
+        --arg event "turnStart_enriched_auto" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$NOW_ISO" \
+        --argjson turn_number "$TURN_NUMBER" \
+        --arg intent "$AUTO_INTENT" \
+        '{
+            event:          $event,
+            session_id:     $sid,
+            timestamp:      $ts,
+            turn_number:    $turn_number,
+            intent:         $intent,
+            auto_generated: true
+        }' >> "$LOG_DIR/audit.jsonl"
 fi
 
 # ── Registra resultado do turno e atualiza compliance ────────────────────────
@@ -269,8 +335,48 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .current_turn.auth_requested_at = null
          | .current_turn.last_askquestions_response = null
          | .current_turn.block_count       = 0
-         | .current_turn.section_name      = $section' \
+         | .current_turn.section_name      = $section
+         | .current_turn.intent_declared   = false
+         | .current_turn.intent            = null' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+fi
+
+# ── Invariante SESSION+SECTION+TURN: auto-cria seção 'retomada' se null ──────
+# Garante que a invariante nunca seja violada mesmo após section-end.sh manual.
+# A seção auto-criada recebe auto_open:true no evento sectionStart no audit.jsonl.
+CURR_SECTION_CHECK=""
+if [ -f "$CTX_FILE" ]; then
+    CURR_SECTION_CHECK="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
+if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ]; then
+    _AUTO_SECTION_NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    _NEXT_SECTION_NUM=1
+    if [ -f "$CTX_FILE" ]; then
+        _NEXT_SECTION_NUM="$(jq -r '(.session_stats.section_count // 0) + 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        _NEXT_TURN_AUTO="$(jq -r '.session_stats.turn_count // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+        jq --arg ts "$_AUTO_SECTION_NOW" \
+            --argjson snum "$_NEXT_SECTION_NUM" \
+            --argjson tnum "${_NEXT_TURN_AUTO:-1}" \
+            '.current_section = {name: "retomada", started_at: $ts, turn_start: $tnum, description: "Seção automática criada pela invariante SESSION+SECTION+TURN", section_number: $snum}
+             | .session_stats.section_count = $snum
+             | .session_stats.section_names += ["retomada"]' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    fi
+    jq -cn \
+        --arg event "sectionStart" \
+        --arg sid "$SESSION_ID" \
+        --arg ts "$_AUTO_SECTION_NOW" \
+        --argjson section_num "$_NEXT_SECTION_NUM" \
+        '{
+            event:          $event,
+            session_id:     $sid,
+            timestamp:      $ts,
+            section_name:   "retomada",
+            section_number: $section_num,
+            description:    "Seção automática criada pela invariante SESSION+SECTION+TURN",
+            auto_open:      true
+        }' >> "$LOG_DIR/audit.jsonl"
+    echo "[invariante] Seção 'retomada' auto-criada para garantir SESSION+SECTION+TURN ativo" >&2
 fi
 
 # ── Checkpoint de estado do turno ────────────────────────────────────────────

@@ -59,14 +59,20 @@ jq -cn \
         timestamp:    $ts,
         turn_number:  $turn_number,
         section_name: (if $section_name == "" then null else $section_name end),
-        intent:       (if $intent == "" then null else $intent end)
+        intent:       (if $intent == "" then null else $intent end),
+        auto_generated: false
     }' >> "$LOG_DIR/audit.jsonl"
 
-# Exibe confirmação no terminal
-if [ -n "$TURN_INTENT" ]; then
-    echo "[turno] #${TURN_NUMBER} | seção: \"${SECTION_NAME:-sem seção}\" | intenção: ${TURN_INTENT}" >&2
-else
-    echo "[turno] #${TURN_NUMBER} | seção: \"${SECTION_NAME:-sem seção}\" | (intenção não declarada)" >&2
+# Sinaliza que a intenção foi declarada para o rastreamento de turno
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+    jq '.current_turn.intent_declared = true
+         | .current_turn.intent = $intent' \
+        --arg intent "$TURN_INTENT" \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+elif [ -f "$CTX_FILE" ]; then
+    TMP="$(mktemp)"
+    jq '.current_turn.intent_declared = true
+         | .current_turn.intent = $intent' \
+        --arg intent "$TURN_INTENT" \
+        "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi
-
-exit 0

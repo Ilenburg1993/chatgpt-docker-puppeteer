@@ -593,13 +593,14 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
 
 ### Scripts manuais de emergência
 
-| Script                   | Quando usar                                                    |
-| ------------------------ | -------------------------------------------------------------- |
-| `manual-session-init.sh` | sessionStart não disparou — inicializa sessão manualmente      |
-| `session-checkpoint.sh`  | Antes de qualquer encerramento ou mudança crítica              |
-| `start-section.sh`       | Mudar de fase lógica de trabalho                               |
-| `section-end.sh`         | Fechar seção manualmente com motivo                            |
-| `start-turn.sh`          | Declarar intenção do turno (primeiro ato de turno de trabalho) |
+| Script                   | Quando usar                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `manual-session-init.sh` | sessionStart não disparou — inicializa sessão manualmente                       |
+| `session-checkpoint.sh`  | Antes de qualquer encerramento ou mudança crítica                               |
+| `start-section.sh`       | Mudar de fase lógica de trabalho                                                |
+| `section-end.sh`         | Fechar seção manualmente com motivo                                             |
+| `start-turn.sh`          | Declarar intenção do turno (primeiro ato de turno de trabalho)                  |
+| `watchdog.sh`            | Verificar saúde do sistema: `--json` para relatório completo, `--quiet` para CI |
 
 ---
 
@@ -712,6 +713,7 @@ documentação oficial. Esta regra aplica-se a Copilot hooks, APIs, dependência
 | Skills especializadas   | `.github/skills/README.md`                             |
 | Hub de automação GitHub | `.github/README.md`                                    |
 | Baseline curto          | `.github/instructions/project-canon.instructions.md`   |
+| Protocolo de hooks      | `.github/instructions/hooks-protocol.instructions.md`  |
 
 > Estas instruções têm prioridade equivalente às do `copilot-instructions.md` e são carregadas
 > automaticamente pelo VS Code via `chat.useAgentsMdFile`.

@@ -61,7 +61,7 @@ TOTAL_UNAUTH=0
 if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
     TOTAL_SESSIONS="$(jq -r '.session_id // empty' "$AUDIT_FILE" 2> /dev/null | sort -u | wc -l | tr -d ' ')"
     TOTAL_TOOLS="$(jq -r 'select(.event == "preToolUse") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
-    TOTAL_ERRORS="$(jq -r 'select(.event == "errorOccurred") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
+    TOTAL_ERRORS="$(jq -r 'select(.event == "toolUseFailure") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     TOTAL_AUTH="$(jq -r 'select(.event == "turnEnd_authorized") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     TOTAL_UNAUTH="$(jq -r 'select(.event == "turnEnd_UNAUTHORIZED") | .event' "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
 fi
@@ -228,10 +228,10 @@ generate_report() {
         for SEV in critical high medium low info; do
             case "$SEV" in
                 critical) ICON="🔴" ;;
-                high)     ICON="🟠" ;;
-                medium)   ICON="🟡" ;;
-                low)      ICON="🔵" ;;
-                info)     ICON="⚪" ;;
+                high) ICON="🟠" ;;
+                medium) ICON="🟡" ;;
+                low) ICON="🔵" ;;
+                info) ICON="⚪" ;;
             esac
             SEV_TOTAL="$(jq -r --arg s "$SEV" \
                 'select(.event == "finding" and .severity == $s) | .event' \

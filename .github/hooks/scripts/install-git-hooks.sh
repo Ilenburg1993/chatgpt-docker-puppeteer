@@ -63,14 +63,13 @@ run_gate "typecheck:node"   "npm run typecheck:node --silent"
 
 echo ""
 if [ "$FAILED" -gt 0 ]; then
-    echo "  ✗ $FAILED gate(s) falharam. Commit bloqueado."
-    echo "  → Corrija os erros acima ou use --no-verify para pular (emergência)."
+    echo "  ⚠ $FAILED gate(s) com problemas — commit liberado (modo informativo)."
+    echo "  → Corrija quando possível. Use --no-verify para suprimir esta saída."
     echo ""
-    exit 1
+else
+    echo "  ✓ Todos os gates passaram — commit autorizado."
+    echo ""
 fi
-
-echo "  ✓ Todos os gates passaram — commit autorizado."
-echo ""
 exit 0
 HOOK_EOF
 

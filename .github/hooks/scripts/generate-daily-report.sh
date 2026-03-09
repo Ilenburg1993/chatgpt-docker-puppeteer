@@ -32,8 +32,6 @@ FINDINGS_FILE="$LOG_DIR/findings.jsonl"
 TODAY="$(date -u '+%Y-%m-%d')"
 TODAY_SHORT="$(date -u '+%Y%m%d')"
 NOW="$(date -u '+%d/%m/%Y %H:%M UTC')"
-YESTERDAY_TS="$(date -u -d 'yesterday' '+%s' 2> /dev/null || date -u -v-1d '+%s' 2> /dev/null || echo 0)"
-TODAY_TS_MS="$((YESTERDAY_TS * 1000))"
 
 # ── Contagem do backlog atual ────────────────────────────────────────────────
 COUNT_ALTA=0
@@ -54,23 +52,32 @@ TOTAL_OPEN=$((COUNT_ALTA + COUNT_MEDIA + COUNT_BACKLOG))
 SESSIONS_TODAY=0
 TOOL_CALLS_TODAY=0
 FAILURES_TODAY=0
-ERRORS_TODAY=0
+SUBAGENTS_TODAY=0
+COMPACTIONS_TODAY=0
 
 if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
-    SESSIONS_TODAY="$(jq -r --argjson since "$TODAY_TS_MS" \
-        'select(.event == "sessionStart" and ((.timestamp // "0") | tonumber? // 0) >= $since) | .session_id' \
+    # Filtra por prefixo ISO ("2026-03-15") — compatível com todos os eventos
+    SESSIONS_TODAY="$(jq -r --arg d "$TODAY" \
+        'select(.event == "sessionStart" and (.timestamp // "" | startswith($d))) | .session_id' \
         "$AUDIT_FILE" 2> /dev/null | sort -u | awk 'NF{n++} END{print n+0}' || echo 0)"
 
-    TOOL_CALLS_TODAY="$(jq -r --argjson since "$TODAY_TS_MS" \
-        'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "" and ((.timestamp // "0") | tonumber? // 0) >= $since) | (.tool_name // .toolName)' \
+    TOOL_CALLS_TODAY="$(jq -r --arg d "$TODAY" \
+        'select(.event == "preToolUse" and (.timestamp // "" | startswith($d)) and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
 
-    FAILURES_TODAY="$(jq -r --argjson since "$TODAY_TS_MS" \
-        'select(.event == "toolFailure" and ((.timestamp // "0") | tonumber? // 0) >= $since) | .event' \
+    # toolUseFailure = evento atual (tool-use-failure.sh); toolFailure = legado
+    FAILURES_TODAY="$(jq -r --arg d "$TODAY" \
+        'select((.event == "toolUseFailure" or .event == "toolFailure") and (.timestamp // "" | startswith($d))) | .event' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
 
-    ERRORS_TODAY="$(jq -r --argjson since "$TODAY_TS_MS" \
-        'select(.event == "errorOccurred" and ((.timestamp // "0") | tonumber? // 0) >= $since) | .event' \
+    # Subagentes iniciados hoje
+    SUBAGENTS_TODAY="$(jq -r --arg d "$TODAY" \
+        'select(.event == "subagentStart" and (.timestamp // "" | startswith($d))) | .event' \
+        "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
+
+    # Compactações hoje
+    COMPACTIONS_TODAY="$(jq -r --arg d "$TODAY" \
+        'select(.event == "preCompact" and (.timestamp // "" | startswith($d))) | .event' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
 fi
 
@@ -84,7 +91,7 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
         | sort -u | awk 'NF{n++} END{print n+0}' || echo 0)"
     TOTAL_TOOL_CALLS="$(jq -r 'select(.event == "preToolUse" and ((.tool_name // .toolName) // "") != "") | (.tool_name // .toolName)' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
-    TOTAL_FAILURES="$(jq -r 'select(.event == "toolFailure") | .event' \
+    TOTAL_FAILURES="$(jq -r 'select(.event == "toolUseFailure" or .event == "toolFailure") | .event' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ' || echo 0)"
 fi
 
@@ -193,10 +200,10 @@ if [ -f "$AUDIT_FILE" ]; then
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     AUTH_UNAUTHORIZED_TOTAL="$(jq -r 'select(.event == "turnEnd_UNAUTHORIZED")' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
-    AUTH_AUTHORIZED_TODAY="$(jq -r --arg d "${TODAY_SHORT}" \
+    AUTH_AUTHORIZED_TODAY="$(jq -r --arg d "${TODAY}" \
         'select(.event == "turnEnd_authorized" and (.timestamp // "" | startswith($d)))' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
-    AUTH_UNAUTHORIZED_TODAY="$(jq -r --arg d "${TODAY_SHORT}" \
+    AUTH_UNAUTHORIZED_TODAY="$(jq -r --arg d "${TODAY}" \
         'select(.event == "turnEnd_UNAUTHORIZED" and (.timestamp // "" | startswith($d)))' \
         "$AUDIT_FILE" 2> /dev/null | wc -l | tr -d ' ')"
     AUTH_TOTAL=$((AUTH_AUTHORIZED_TOTAL + AUTH_UNAUTHORIZED_TOTAL))
@@ -204,7 +211,7 @@ if [ -f "$AUDIT_FILE" ]; then
         AUTH_COMPLIANCE_RATE="$(awk "BEGIN {printf \"%.0f%%\", ($AUTH_AUTHORIZED_TOTAL / $AUTH_TOTAL) * 100}")"
     fi
 fi
-AUTH_CONSECUTIVE="$(jq -r '.consecutive_unauthorized_closes // 0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
+AUTH_CONSECUTIVE="$(jq -r '.compliance.consecutive_unauthorized // 0' "$STATE_DIR/session-context.json" 2> /dev/null || echo 0)"
 AUTH_FLAG_EXISTS="não"
 [ -f "$STATE_DIR/UNAUTHORIZED_CLOSE.flag" ] && AUTH_FLAG_EXISTS="⚠️ SIM — última sessão não autorizada"
 
@@ -232,7 +239,7 @@ if [ "$QUIET" = false ]; then
     printf "  🔴 Alta:      %-4s tarefas abertas    Sessões: %-6s   Total sessões: %s\n" "$COUNT_ALTA" "$SESSIONS_TODAY" "$TOTAL_SESSIONS"
     printf "  🟡 Média:     %-4s tarefas abertas    Ferramentas: %-4s Total chamadas: %s\n" "$COUNT_MEDIA" "$TOOL_CALLS_TODAY" "$TOTAL_TOOL_CALLS"
     printf "  🔵 Backlog:   %-4s tarefas abertas    Falhas: %-6s   Taxa falha: %s\n" "$COUNT_BACKLOG" "$FAILURES_TODAY" "$ERROR_RATE"
-    printf "  ✅ Concluídas: %-4s                   Erros: %-7s   Findings: %s (%s crit/high)\n" "$COUNT_DONE" "$ERRORS_TODAY" "$FINDINGS_TOTAL" "$FINDINGS_CRITICAL"
+    printf "  ✅ Concluídas: %-4s                   Subagentes: %-4s Compactações: %s\n" "$COUNT_DONE" "$SUBAGENTS_TODAY" "$COMPACTIONS_TODAY"
     echo ""
     echo "  TOP FERRAMENTAS (chamadas, histór.)"
     echo "  ────────────────────────────────────────────────────────────"

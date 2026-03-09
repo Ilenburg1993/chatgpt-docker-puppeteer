@@ -72,6 +72,7 @@ REQUIRED_SCRIPTS=(
     "session-checkpoint.sh"
     "generate-session-summary.sh"
     "manual-session-init.sh"
+    "watchdog.sh"
     "add-task.sh"
     "complete-task.sh"
     "save-finding.sh"
@@ -259,7 +260,9 @@ if ! command -v shellcheck &> /dev/null; then
     [ "$QUIET" = "--quiet" ] || echo "  - shellcheck não instalado — pulando"
 else
     SHELLCHECK_FAILS=0
-    for s in session-start.sh agent-stop.sh session-end.sh post-tool-use.sh pre-tool-use.sh subagent-stop.sh subagent-start.sh tool-use-failure.sh pre-compact.sh; do
+    for s in session-start.sh agent-stop.sh session-end.sh post-tool-use.sh pre-tool-use.sh \
+        subagent-stop.sh subagent-start.sh tool-use-failure.sh pre-compact.sh \
+        watchdog.sh generate-daily-report.sh install-git-hooks.sh; do
         f="$SCRIPTS_DIR/$s"
         [ -f "$f" ] || continue
         if shellcheck -S warning "$f" &> /dev/null; then
@@ -296,6 +299,74 @@ for s in "${GUARD_EXCLUDED[@]}"; do
         fail "session_id guard encontrado onde não deveria: $s"
     fi
 done
+
+# ── 9. Watchdog (F2.1) ────────────────────────────────────────────────────────
+echo ""
+echo "9. Watchdog (F2.1)"
+WATCHDOG_SCRIPT="$SCRIPTS_DIR/watchdog.sh"
+WATCHDOG_REPORT="$STATE_DIR/watchdog-report.json"
+if [ ! -f "$WATCHDOG_SCRIPT" ]; then
+    fail "watchdog.sh não encontrado"
+elif ! bash "$WATCHDOG_SCRIPT" --quiet 2> /dev/null; then
+    fail "watchdog.sh falhou ao executar"
+else
+    pass "watchdog.sh executa sem erros"
+fi
+if [ -f "$WATCHDOG_REPORT" ] && jq empty "$WATCHDOG_REPORT" 2> /dev/null; then
+    WD_STATUS="$(jq -r '.status // "unknown"' "$WATCHDOG_REPORT" 2> /dev/null || echo 'unknown')"
+    WD_CRITICAL="$(jq -r '.summary.critical // 0' "$WATCHDOG_REPORT" 2> /dev/null || echo 0)"
+    WD_WARN="$(jq -r '.summary.warnings // 0' "$WATCHDOG_REPORT" 2> /dev/null || echo 0)"
+    pass "watchdog-report.json válido — status=$WD_STATUS, critical=$WD_CRITICAL, warnings=$WD_WARN"
+else
+    fail "watchdog-report.json não gerado ou inválido"
+fi
+
+# ── 10. Instruções de hooks (applyTo: **/*) ────────────────────────────────────
+echo ""
+echo "10. Instructions — hooks-protocol"
+HOOKS_INSTR="$HOOK_DIR/../../.github/instructions/hooks-protocol.instructions.md"
+if [ -f "$HOOKS_INSTR" ]; then
+    if grep -q 'applyTo.*\*\*/\*' "$HOOKS_INSTR" 2> /dev/null; then
+        pass "hooks-protocol.instructions.md existe com applyTo: '**/*'"
+    else
+        fail "hooks-protocol.instructions.md existe mas sem applyTo: '**/*'"
+    fi
+else
+    fail "hooks-protocol.instructions.md não encontrado"
+fi
+
+# ── 11. start-turn.sh — campo intent_declared ──────────────────────────────────
+echo ""
+echo "11. start-turn.sh — intent_declared"
+if grep -q 'intent_declared' "$SCRIPTS_DIR/start-turn.sh" 2> /dev/null; then
+    pass "start-turn.sh define intent_declared no session-context.json"
+else
+    fail "start-turn.sh não define intent_declared"
+fi
+if grep -q 'intent_declared' "$SCRIPTS_DIR/log-prompt.sh" 2> /dev/null; then
+    pass "log-prompt.sh reseta intent_declared no início do turno"
+else
+    fail "log-prompt.sh não reseta intent_declared"
+fi
+
+# ── 12. agent-stop.sh — invariante + auto-enrich ───────────────────────────────
+echo ""
+echo "12. agent-stop.sh — invariante e feedback"
+if grep -q 'turnStart_enriched_auto' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "agent-stop.sh gera turnStart_enriched_auto para turnos sem intenção declarada"
+else
+    fail "agent-stop.sh não tem auto-enrich de intenção"
+fi
+if grep -q '"retomada"' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "agent-stop.sh auto-cria seção 'retomada' para garantir invariante"
+else
+    fail "agent-stop.sh não implementa invariante SESSION+SECTION+TURN"
+fi
+if grep -q '_RICH_SECTION' "$SCRIPTS_DIR/agent-stop.sh" 2> /dev/null; then
+    pass "agent-stop.sh emite systemMessage rico com estado contextualizado"
+else
+    fail "agent-stop.sh usa systemMessage genérico (não contextualizado)"
+fi
 
 # ── Resumo ───────────────────────────────────────────────────────────────────
 echo ""
