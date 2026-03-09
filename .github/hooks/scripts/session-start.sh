@@ -55,15 +55,17 @@ jq -cn \
         source:       $source,
         cwd:          $cwd,
         last_tool_ts:        $ts,
-        last_tool:           "",
-        tools_used_counts:   {},
-        tools_used_recent:   [],
-        tools_used_total:    0,
-        failure_count:       0,
-        tool_responses_empty: 0,
-        error_count:         0,
-        turn_count:          0,
-        session_summary:     ""
+        last_tool:             "",
+        tools_used_counts:     {},
+        tools_used_recent:     [],
+        tools_used_total:      0,
+        failure_count:         0,
+        tool_responses_empty:  0,
+        tool_failures_detected: 0,
+        last_failure_tool:     null,
+        error_count:           0,
+        turn_count:            0,
+        session_summary:       ""
     }' > "$STATE_DIR/session-context.json"
 
 # ── Recovery: detecta sessão anterior via último checkpoint ─────────────────

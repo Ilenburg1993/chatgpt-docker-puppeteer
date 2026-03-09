@@ -165,4 +165,12 @@ if [ -f "$CHECKPOINT_SCRIPT" ]; then
     bash "$CHECKPOINT_SCRIPT" 2> /dev/null || true
 fi
 
+# ── Sync automático de tarefas para DOCUMENTACAO/ (a cada 5 turnos) ──────────────
+# Gera relatório de tarefas com cross-reference de findings sem bloquear o turno.
+TURN_COUNT_SYNC="$(jq -r '.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+SYNC_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/sync-tasks-to-docs.sh"
+if [ -f "$SYNC_SCRIPT" ] && [ $((TURN_COUNT_SYNC % 5)) -eq 0 ] && [ "$TURN_COUNT_SYNC" -gt 0 ]; then
+    bash "$SYNC_SCRIPT" 2> /dev/null || true
+fi
+
 exit 0

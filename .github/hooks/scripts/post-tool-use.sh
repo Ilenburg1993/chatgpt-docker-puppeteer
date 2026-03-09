@@ -24,12 +24,18 @@ TOOL_RESPONSE="$(echo "$INPUT" | jq -r '.tool_response // ""' 2> /dev/null || ec
 # session_id vem diretamente do payload (UUID real do Copilot)
 SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 
-# Determina result_type: sem campo explícito, usa presença de tool_response
-# Se tool_response não vazio = success; se vazia = indeterminate
-if [ -n "$TOOL_RESPONSE" ]; then
-    RESULT_TYPE="success"
-else
+# Determina result_type usando heurística progressiva (M4):
+#   1. Resposta vazia → "unknown" (maioria são sucessos sem body)
+#   2. Padrões explícitos de falha → "failure"
+#   3. Padrões explícitos de sucesso → "success"
+#   4. Resposta não-vazia sem padrão → "success" (default otimista)
+if [ -z "$TOOL_RESPONSE" ]; then
     RESULT_TYPE="unknown"
+elif echo "$TOOL_RESPONSE" | grep -qiE \
+    "String replacement failed|No such file or directory|Permission denied|command not found|ENOENT|EACCES|fatal:|Error:.*failed|cannot|not found|failed to"; then
+    RESULT_TYPE="failure"
+else
+    RESULT_TYPE="success"
 fi
 
 CTX_FILE="$STATE_DIR/session-context.json"
@@ -56,12 +62,18 @@ jq -cn \
         result_type:  $result
     }' >> "$LOG_DIR/audit.jsonl"
 
-# Quando tool_response está vazia, o resultado é indeterminado — não necessariamente um erro.
-# Muitas ferramentas (e.g. create_file, replace_string_in_file) retornam body vazio em sucesso.
-# Rastreamos apenas para fins de diagnóstico com o nome correto: tool_responses_empty.
-if [ "$RESULT_TYPE" = "unknown" ]; then
-    if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+# Mantém contadores no session-context.json para diagnóstico
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+    if [ "$RESULT_TYPE" = "unknown" ]; then
+        # Quando tool_response está vazia, o resultado é indeterminado — não necessariamente um erro.
+        # Muitas ferramentas (e.g. create_file, replace_string_in_file) retornam body vazio em sucesso.
         jq '.tool_responses_empty = (.tool_responses_empty // 0) + 1' \
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+    elif [ "$RESULT_TYPE" = "failure" ]; then
+        # Falha detectada via padrão no tool_response (M4)
+        jq --arg tool "$TOOL_NAME" \
+            '.tool_failures_detected = (.tool_failures_detected // 0) + 1
+             | .last_failure_tool = $tool' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
 fi

@@ -55,6 +55,25 @@ fi
 
 TASKS_OPEN=$((TASKS_ALTA + TASKS_MEDIA + TASKS_BACKLOG))
 
+# ── Hash do pending-tasks.md para detectar mudanças entre checkpoints ─────
+TASKS_HASH=""
+TASKS_CHANGED=false
+PREV_CHECKPOINT_TASKS_HASH=""
+
+if [ -f "$TASKS_FILE" ] && command -v sha256sum > /dev/null 2>&1; then
+    TASKS_HASH="$(sha256sum "$TASKS_FILE" | awk '{print $1}')"
+fi
+
+# Compara com checkpoint anterior desta sessão (se existir)
+LATEST_LINK="$CHECKPOINT_DIR/sess_${SESSION_ID}_latest.json"
+if [ -f "$LATEST_LINK" ]; then
+    PREV_CHECKPOINT_TASKS_HASH="$(jq -r '.tasks.hash // ""' "$LATEST_LINK" 2> /dev/null || echo '')"
+    if [ -n "$TASKS_HASH" ] && [ -n "$PREV_CHECKPOINT_TASKS_HASH" ] && \
+       [ "$TASKS_HASH" != "$PREV_CHECKPOINT_TASKS_HASH" ]; then
+        TASKS_CHANGED=true
+    fi
+fi
+
 # ── Conta findings abertos ────────────────────────────────────────────────────
 FINDINGS_TOTAL=0
 FINDINGS_CRITICAL=0
@@ -90,6 +109,8 @@ jq -cn \
     --argjson tasks_backlog "$TASKS_BACKLOG" \
     --argjson tasks_open "$TASKS_OPEN" \
     --argjson tasks_done "$TASKS_DONE" \
+    --arg tasks_hash "$TASKS_HASH" \
+    --argjson tasks_changed "$TASKS_CHANGED" \
     --argjson findings_total "$FINDINGS_TOTAL" \
     --argjson findings_critical "$FINDINGS_CRITICAL" \
     --argjson findings_high "$FINDINGS_HIGH" \
@@ -108,7 +129,9 @@ jq -cn \
             media:         $tasks_media,
             backlog:       $tasks_backlog,
             open_total:    $tasks_open,
-            done_total:    $tasks_done
+            done_total:    $tasks_done,
+            hash:          $tasks_hash,
+            changed:       $tasks_changed
         },
         findings: {
             total:         $findings_total,
