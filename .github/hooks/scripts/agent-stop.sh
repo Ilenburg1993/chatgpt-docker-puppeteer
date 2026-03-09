@@ -29,6 +29,10 @@ TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
 SESSION_ID_PAYLOAD="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
 
+# stop_hook_active: true quando esta parada foi iniciada por um hook (prevenção de recursão).
+# IMPORTANTE: não tentar bloquear (decision: block) quando stop_hook_active=true.
+STOP_HOOK_ACTIVE="$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2> /dev/null || echo 'false')"
+
 # session_id: prioriza payload; fallback para contexto
 SESSION_ID="$SESSION_ID_PAYLOAD"
 if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
@@ -57,11 +61,13 @@ jq -cn \
     --arg sid "$SESSION_ID" \
     --arg ts "${TIMESTAMP:-$NOW_ISO}" \
     --argjson dur "$TURN_DURATION_S" \
+    --argjson sha "$STOP_HOOK_ACTIVE" \
     '{
-        event:           $event,
-        session_id:      $sid,
-        timestamp:       $ts,
-        turn_duration_s: $dur
+        event:            $event,
+        session_id:       $sid,
+        timestamp:        $ts,
+        turn_duration_s:  $dur,
+        stop_hook_active: $sha
     }' >> "$LOG_DIR/audit.jsonl"
 
 # ── Detecção de autorização ───────────────────────────────────────────────────
