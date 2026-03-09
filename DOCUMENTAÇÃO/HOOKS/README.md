@@ -98,11 +98,11 @@ O `agent-stop.sh` detecta autorização via:
    Varre as últimas 150 linhas de `audit.jsonl` procurando `vscode_askQuestions`.
 
 3. **Estratégia 3 — Fallback de contexto** (último recurso):
-   Lê `auth_requested_this_turn` em `session-context.json`.
+   Lê `current_turn.auth_requested` em `session-context.json`.
 
 ### Reset de flag entre turnos
 
-**Crítico**: a flag `auth_requested_this_turn` é resetada em dois momentos:
+**Crítico**: o campo `current_turn.auth_requested` é resetado em dois momentos:
 
 - **`agent-stop.sh`** — ao final do turno, após verificar conformidade.
 - **`log-prompt.sh`** — ao inicio de cada novo turno do usuário (belt-and-suspenders).
@@ -115,7 +115,7 @@ Quando o turno termina sem `vscode_askQuestions`:
 
 1. `UNAUTHORIZED_CLOSE.flag` é gravado em `state/` com `{timestamp, session_id, turn_count, severity: "critical"}`
 2. `turnEnd_UNAUTHORIZED` é appendado em `audit.jsonl`
-3. `session-context.json` → `consecutive_unauthorized_closes + 1`
+   3. `session-context.json` → `compliance.consecutive_unauthorized + 1`
 4. **Na próxima sessão**: `session-start.sh` detecta o flag e injeta bloco `⛔⛔⛔ VIOLAÇÃO CRÍTICA` no topo do `session-briefing.md`, com instrução de pedir desculpas e chamar `vscode_askQuestions` imediatamente.
 
 ### Reset manual
@@ -151,7 +151,7 @@ bash .github/hooks/scripts/reset-auth-violation.sh "motivo da redefinição"
 2. Detecta autorização (3 estratégias — veja seção Protocolo)
 3. Grava/remove `UNAUTHORIZED_CLOSE.flag` conforme resultado
 4. Loga `turnEnd_authorized` ou `turnEnd_UNAUTHORIZED`
-5. **Reseta `auth_requested_this_turn = false`** e incrementa `turn_count`
+- **Reseta `current_turn.auth_requested = false`** e incrementa `session_stats.turn_count`
 6. Salva checkpoint via `session-checkpoint.sh`
 
 ---
@@ -163,7 +163,7 @@ bash .github/hooks/scripts/reset-auth-violation.sh "motivo da redefinição"
 **O que faz**:
 - Calcula hash SHA-256 truncado (16 chars) do prompt — jamais loga o texto
 - Registra `{event: userPromptSubmitted, prompt_hash, prompt_len}` em audit.jsonl
-- **Reseta `auth_requested_this_turn = false`** (belt-and-suspenders contra falso positivo inter-turn)
+- **Reseta `current_turn.auth_requested = false`** (belt-and-suspenders contra falso positivo inter-turn)
 
 ---
 
@@ -174,10 +174,8 @@ bash .github/hooks/scripts/reset-auth-violation.sh "motivo da redefinição"
 **O que faz**:
 - Redação de credenciais (`ghp_*`, `gho_*`, `Bearer *`, `--password`, `--token`)
 - Loga `preToolUse` em audit.jsonl com `tool_name`, `tool_use_id`
-- Atualiza `last_tool`, `last_tool_ts`, `tools_used[]` em session-context.json
-- **Quando `vscode_askQuestions`**: define `auth_requested_this_turn = true` e `auth_requested_at`
-
----
+- Atualiza `last_tool.*`, `session_stats.tools_*`, `current_turn.tools_*` em session-context.json
+- **Quando `vscode_askQuestions`**: define `current_turn.auth_requested = true` e `auth_requested_at`
 
 ### `post-tool-use.sh` — Métricas de ferramentas
 
@@ -189,6 +187,23 @@ bash .github/hooks/scripts/reset-auth-violation.sh "motivo da redefinição"
 - Filtra durações inválidas (negativas ou >10min = gap inter-sessão)
 - Detecta quality gates (`npm run lint/typecheck/test/format`) → registra em `session-context.json.quality_gates`
 - Incrementa `tool_responses_empty` quando `tool_response` vazia (métrica diagnóstica, não é falha)
+
+---
+
+### `start-section.sh` — Seção Temática *(utilitário do agente)*
+
+**Quando**: chamado manualmente pelo agente para declarar uma fase lógica nomeada.
+
+**Uso**:
+```bash
+bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
+```
+
+**O que faz**:
+- Grava `current_section = {name, started_at, turn_start, description}` em session-context.json
+- Emite evento `sectionStart` em `audit.jsonl` com `{section_name, turn_number}`
+
+**Quando usar**: no início de cada fase lógica de trabalho (ex: "correção-de-bugs", "commit-e-documentação"). O checkpoint e o relatório final incluem a seção ativa.
 
 ---
 
@@ -287,15 +302,15 @@ Instala em `.git/hooks/`:
 userPromptSubmitted
     │
     └─► log-prompt.sh
-            │ reset auth_requested_this_turn=false
+            │ reset current_turn.auth_requested=false
             └─► audit.jsonl (userPromptSubmitted)
 
 preToolUse (por ferramenta)
     │
     └─► pre-tool-use.sh
             │ redact credentials
-            │ update session-context (last_tool, tools_used)
-            │ IF vscode_askQuestions: auth_requested_this_turn=true
+            │ update session-context (last_tool.*, session_stats.tools_*, current_turn.tools_*)
+            │ IF vscode_askQuestions: current_turn.auth_requested=true
             └─► audit.jsonl (preToolUse)
 
 postToolUse (por ferramenta)
@@ -314,8 +329,8 @@ agentStop (fim de turno)
             │ detect authorization (3 strategies)
             │ write/remove UNAUTHORIZED_CLOSE.flag
             │ log turnEnd_authorized OR turnEnd_UNAUTHORIZED
-            │ reset auth_requested_this_turn=false
-            │ increment turn_count
+            │ reset current_turn.auth_requested=false
+            │ increment session_stats.turn_count
             └─► session-checkpoint.sh
                     └─► checkpoints/sess_<uuid>_turn<N>_<ts>.json
 
@@ -340,27 +355,89 @@ sessionStart (nova sessão)
 
 ## Estado Persistido
 
-### `session-context.json` — Schema
+### `session-context.json` — Schema v2
 
-| Campo                             | Tipo      | Descrição                                       |
-| --------------------------------- | --------- | ----------------------------------------------- |
-| `session_id`                      | `string`  | UUID da sessão Copilot                          |
-| `start_ts`                        | `string`  | Timestamp epoch ms do inicio                    |
-| `start_date`                      | `string`  | ISO 8601                                        |
-| `turn_count`                      | `number`  | Turnos completos do agente                      |
-| `last_tool`                       | `string`  | Nome da última ferramenta usada                 |
-| `last_tool_ts`                    | `string`  | Timestamp ISO da última ferramenta              |
-| `last_tool_use_id`                | `string`  | ID único do tool use                            |
-| `tools_used`                      | `array`   | Lista de tool names usados na sessão            |
-| `auth_requested_this_turn`        | `boolean` | Flag: `vscode_askQuestions` chamada neste turno |
-| `auth_requested_at`               | `string?` | Timestamp da última chamada de askQuestions     |
-| `last_close_authorized`           | `boolean` | Último turno foi autorizado?                    |
-| `consecutive_unauthorized_closes` | `number`  | Violações consecutivas sem autorização          |
-| `failure_count`                   | `number`  | Erros de ferramentas confirmados                |
-| `error_count`                     | `number`  | Erros do agente (hook errorOccurred)            |
-| `tool_responses_empty`            | `number`  | Tool calls sem body de resposta (diagnóstico)   |
-| `quality_gates`                   | `object`  | Gates executados: `{gate_name: {result, ts}}`   |
-| `session_summary`                 | `string`  | Resumo do último turno                          |
+O arquivo é inicializado por `session-start.sh` e atualizado atomicamente por cada hook.
+Usa `sponge` para evitar arquivos parcialmente escritos.
+
+```json
+{
+  "session": {
+    "id":         "sess_...",
+    "started_at": "2026-03-09T04:43:00Z",
+    "date_short": "20260309_044300",
+    "ended_at":   null,
+    "source":     "payload | test | resume",
+    "cwd":        "/workspaces/..."
+  },
+  "session_stats": {
+    "turn_count":        0,
+    "turn_authorized":   0,
+    "turn_unauthorized": 0,
+    "tools_total":       0,
+    "tools_by_name":     {},
+    "failures_detected": 0,
+    "errors_total":      0,
+    "subagent_calls":    0
+  },
+  "current_turn": {
+    "number":           1,
+    "started_at":       "...",
+    "tools_count":      0,
+    "tools_by_name":    {},
+    "failures_count":   0,
+    "auth_requested":   false,
+    "auth_requested_at": null
+  },
+  "current_section": {
+    "name":        null,
+    "started_at":  null,
+    "turn_start":  null,
+    "description": null
+  },
+  "last_tool": {
+    "name":   null,
+    "ts":     "...",
+    "use_id": null,
+    "result": null
+  },
+  "compliance": {
+    "last_turn_authorized":    null,
+    "consecutive_unauthorized": 0,
+    "flag_file_exists":        false
+  }
+}
+```
+
+**Campos por sub-objeto:**
+
+| Sub-objeto       | Campo                    | Tipo      | Responsável            |
+| ---------------- | ------------------------ | --------- | ---------------------- |
+| `session`        | `id`                     | string    | session-start.sh       |
+| `session`        | `started_at`             | ISO 8601  | session-start.sh       |
+| `session`        | `date_short`             | string    | session-start.sh       |
+| `session`        | `source`                 | enum      | session-start.sh       |
+| `session_stats`  | `turn_count`             | number    | agent-stop.sh          |
+| `session_stats`  | `turn_authorized`        | number    | agent-stop.sh          |
+| `session_stats`  | `turn_unauthorized`      | number    | agent-stop.sh          |
+| `session_stats`  | `tools_total`            | number    | pre-tool-use.sh        |
+| `session_stats`  | `tools_by_name`          | object    | pre-tool-use.sh        |
+| `session_stats`  | `failures_detected`      | number    | post-tool-use + error  |
+| `session_stats`  | `errors_total`           | number    | error-occurred.sh      |
+| `session_stats`  | `subagent_calls`         | number    | subagent-stop.sh       |
+| `current_turn`   | `number`                 | number    | log-prompt.sh          |
+| `current_turn`   | `tools_count`            | number    | pre-tool-use.sh        |
+| `current_turn`   | `tools_by_name`          | object    | pre-tool-use.sh        |
+| `current_turn`   | `failures_count`         | number    | post-tool-use.sh       |
+| `current_turn`   | `auth_requested`         | boolean   | pre-tool-use.sh        |
+| `current_turn`   | `auth_requested_at`      | ISO/null  | pre-tool-use.sh        |
+| `current_section`| `name`                   | str/null  | start-section.sh       |
+| `current_section`| `turn_start`             | number    | start-section.sh       |
+| `last_tool`      | `name`                   | str/null  | pre-tool-use.sh        |
+| `last_tool`      | `result`                 | str/null  | post-tool-use.sh       |
+| `compliance`     | `last_turn_authorized`   | bool/null | agent-stop.sh          |
+| `compliance`     | `consecutive_unauthorized`| number   | agent-stop.sh          |
+| `compliance`     | `flag_file_exists`       | boolean   | agent-stop.sh          |
 
 ### Flags de estado
 

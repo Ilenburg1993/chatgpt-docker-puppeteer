@@ -1,8 +1,43 @@
 # Melhorias e Upgrades Propostos — Sistema de Hooks
 
-> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 4)
+> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 5)
 >
 > Cada item classifica: prioridade, esforço (S/M/L), e categoria (fix/melhoria/upgrade profundo).
+
+---
+
+## Melhorias Implementadas (sessão 5 — 2026-03-09)
+
+### Correção de Inconsistências de Campo — Schema v2 vs Implementação
+
+**Motivação**: A sessão 4 planejou campos com nomes diferentes dos que `session-start.sh` (fonte
+canônica) efetivamente escrevia. Os scripts foram reescritos com os nomes planejados, não os reais.
+Teste e2e revelou todas as discrepâncias.
+
+**Mapeamento de erros corrigidos** (nome planejado → nome canônico real):
+
+| Campo planejado (errado)                          | Campo canônico (session-start.sh) | Script corrigido        |
+| ------------------------------------------------- | --------------------------------- | ----------------------- |
+| `session_stats.failures_total`                    | `session_stats.failures_detected` | session-checkpoint.sh   |
+| `session_stats.failures_total`                    | `session_stats.failures_detected` | error-occurred.sh       |
+| `session_stats.unauthorized_turns`                | `session_stats.turn_unauthorized` | (não chegou a ser usado)|
+| `last_tool.result_type`                           | `last_tool.result`                | (já estava correto)     |
+| `active_section.*`                                | `current_section.*`               | session-checkpoint.sh   |
+| `active_section.*`                                | `current_section.*`               | start-section.sh        |
+| `active_section.turn_number`                      | `current_section.turn_start`      | start-section.sh        |
+| `conformidade.consecutive_unauthorized_closes`    | `compliance.consecutive_unauthorized` | session-checkpoint.sh |
+
+**Correções adicionais descobertas**:
+
+| #  | Correção                                                                   | Script           | Commit      |
+| -- | -------------------------------------------------------------------------- | ---------------- | ----------- |
+| C1 | `session-end.sh` passava `START_ISO` para helper que esperava `START_TS` (ms) | session-end.sh | `72c5a19a`  |
+| C2 | `subagent-stop.sh` não incrementava `session_stats.subagent_calls`          | subagent-stop.sh | `72c5a19a`  |
+| C3 | `error-occurred.sh` não incrementava `session_stats.errors_total`           | error-occurred.sh | `72c5a19a` |
+| C4 | `session-checkpoint.sh` output usava `failures_total` (inconsistente)      | session-checkpoint.sh | `72c5a19a` |
+| C5 | Comentário `active_section.{name, started_at, turn_number}` desatualizado  | start-section.sh | `72c5a19a`  |
+
+**Validação**: shellcheck 0 warnings em todos os 14+ scripts · análise estática via grep/read_file.
 
 ---
 
@@ -15,40 +50,42 @@ dificultando consultas, causando bugs sutis e tornando o contexto confuso para o
 
 **Conceitos canônicos** (fixos pelo Copilot):
 
-| Conceito  | Escopo                          | Boundary                                        |
-| --------- | ------------------------------- | ----------------------------------------------- |
-| Sessão    | UUID gerado pelo Copilot        | `sessionStart` → `sessionEnd`                   |
-| Turno     | Ciclo completo prompt→resposta  | `userPromptSubmitted` → `agentStop`             |
-| Chamada   | Uso de uma ferramenta           | `preToolUse` → `postToolUse`                    |
-| **Seção Temática** | Fase lógica nomeada   | Declarada pelo agente via `start-section.sh` *(NOVO)* |
+| Conceito           | Escopo                         | Boundary                                              |
+| ------------------ | ------------------------------ | ----------------------------------------------------- |
+| Sessão             | UUID gerado pelo Copilot       | `sessionStart` → `sessionEnd`                         |
+| Turno              | Ciclo completo prompt→resposta | `userPromptSubmitted` → `agentStop`                   |
+| Chamada            | Uso de uma ferramenta          | `preToolUse` → `postToolUse`                          |
+| **Seção Temática** | Fase lógica nomeada            | Declarada pelo agente via `start-section.sh` *(NOVO)* |
 
-**Estrutura do schema v2** (`session-context.json`):
+**Estrutura do schema v2** (`session-context.json`) — campos canônicos verificados em 2026-03-09:
 ```json
 {
-  "session":       { "id", "started_at", "source", "cwd" },
-  "session_stats": { "turn_count", "tools_total", "tools_by_name", "failures_total", "unauthorized_turns" },
-  "current_turn":  { "number", "started_at", "tools_count", "tools_by_name", "failures_count", "auth_requested", "auth_requested_at" },
-  "last_tool":     { "name", "ts", "use_id", "result_type" },
-  "conformidade":  { "consecutive_unauthorized_closes", "last_close_authorized", "last_turn_ts" },
-  "active_section": { "name", "started_at", "turn_number" }
+  "session":        { "id", "started_at", "date_short", "ended_at", "source", "cwd" },
+  "session_stats":  { "turn_count", "turn_authorized", "turn_unauthorized", "tools_total",
+                      "tools_by_name", "failures_detected", "errors_total", "subagent_calls" },
+  "current_turn":   { "number", "started_at", "tools_count", "tools_by_name",
+                      "failures_count", "auth_requested", "auth_requested_at" },
+  "current_section": { "name", "started_at", "turn_start", "description" },
+  "last_tool":      { "name", "ts", "use_id", "result" },
+  "compliance":     { "last_turn_authorized", "consecutive_unauthorized", "flag_file_exists" }
 }
 ```
 
-| #   | Mudança                                                                      | Scripts | Status |
-| --- | ---------------------------------------------------------------------------- | ------- | ------ |
-| —   | Schema v2: structs aninhadas substituem campo flat                           | todos   | ✅      |
-| B1  | Remove `tools_used[]` array ilimitado → substituído por `tools_by_name {}`  | `session-start.sh`, `pre-tool-use.sh` | ✅ |
-| B2  | Remove `failure_count_unknown` fantasma → era campo inexistente no spec      | `post-tool-use.sh` | ✅ |
-| B3  | `turn_duration_s` usava `last_tool.ts` em vez de `current_turn.started_at`  | `agent-stop.sh` | ✅ |
-| B4  | `session_summary` exibia dados de sessão acumulados, não do turno atual      | `agent-stop.sh` | ✅ |
-| B5  | `session-end.sh` não chamava `session-checkpoint.sh` antes de encerrar      | `session-end.sh` | ✅ |
-| B6  | Newline rogue em `log-prompt.sh` SESSION_ID read corrompía o UUID            | `log-prompt.sh` | ✅ |
-| —   | **Novo**: `start-section.sh` — agente declara Seção Temática nomeada         | novo `start-section.sh` | ✅ |
+| #   | Mudança                                                                    | Scripts                               | Status |
+| --- | -------------------------------------------------------------------------- | ------------------------------------- | ------ |
+| —   | Schema v2: structs aninhadas substituem campo flat                         | todos                                 | ✅      |
+| B1  | Remove `tools_used[]` array ilimitado → substituído por `tools_by_name {}` | `session-start.sh`, `pre-tool-use.sh` | ✅      |
+| B2  | Remove `failure_count_unknown` fantasma → era campo inexistente no spec    | `post-tool-use.sh`                    | ✅      |
+| B3  | `turn_duration_s` usava `last_tool.ts` em vez de `current_turn.started_at` | `agent-stop.sh`                       | ✅      |
+| B4  | `session_summary` exibia dados de sessão acumulados, não do turno atual    | `agent-stop.sh`                       | ✅      |
+| B5  | `session-end.sh` não chamava `session-checkpoint.sh` antes de encerrar     | `session-end.sh`                      | ✅      |
+| B6  | Newline rogue em `log-prompt.sh` SESSION_ID read corrompía o UUID          | `log-prompt.sh`                       | ✅      |
+| —   | **Novo**: `start-section.sh` — agente declara Seção Temática nomeada       | novo `start-section.sh`               | ✅      |
 
 **Uso da Seção Temática**:
 ```bash
 bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
-# → grava active_section em session-context.json
+# → grava current_section em session-context.json
 # → emite evento sectionStart no audit.jsonl
 ```
 
