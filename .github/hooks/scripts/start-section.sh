@@ -45,6 +45,7 @@ PREV_SECTION_TURN_START=0
 PREV_SECTION_NUMBER=0
 CURRENT_SECTION_COUNT=0
 PREV_SECTION_PUSH_COUNT=0
+PREV_SECTION_ID=""
 
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
@@ -55,6 +56,7 @@ if [ -f "$CTX_FILE" ]; then
     PREV_SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     CURRENT_SECTION_COUNT="$(jq -r '.session_stats.section_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     PREV_SECTION_PUSH_COUNT="$(jq -r '.current_section.push_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    PREV_SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 CURRENT_TURN=$((TURN_NUMBER + 1))
 
@@ -85,6 +87,7 @@ if [ -n "$PREV_SECTION_NAME" ]; then
         --arg name "$PREV_SECTION_NAME" \
         --arg reason "auto_closed_by_new_section" \
         --arg started_at "$PREV_SECTION_STARTED" \
+        --arg section_id "${PREV_SECTION_ID:-}" \
         --argjson turn_start "$PREV_SECTION_TURN_START" \
         --argjson turn_end "$CURRENT_TURN" \
         --argjson turns_covered "$PREV_TURNS_COVERED" \
@@ -96,6 +99,7 @@ if [ -n "$PREV_SECTION_NAME" ]; then
             timestamp:      $ts,
             section_name:   $name,
             section_number: $section_number,
+            section_id:     (if $section_id == "" then null else $section_id end),
             reason:         $reason,
             started_at:     $started_at,
             turn_start:     $turn_start,
@@ -116,12 +120,14 @@ if [ -n "$PREV_SECTION_NAME" ]; then
             "$PREV_DURATION_S" \
             "$PREV_TURNS_COVERED" \
             "$PREV_SECTION_PUSH_COUNT" \
+            "${PREV_SECTION_ID:-}" \
             2>&2 || true # nunca falha — sumário é opcional
     fi
 fi
 
-# ── Calcula número da nova seção ─────────────────────────────────────────────
+# ── Calcula número da nova seção e gera section_id UUID ─────────────────────
 NEW_SECTION_NUMBER=$((CURRENT_SECTION_COUNT + 1))
+NEW_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
 
 # ── Atualiza session-context.json com nova seção + session_stats ──────────────
 _JQ_ARGS=(
@@ -129,18 +135,21 @@ _JQ_ARGS=(
     --arg ts "$NOW_ISO"
     --argjson turn "$CURRENT_TURN"
     --argjson section_num "$NEW_SECTION_NUMBER"
+    --arg section_id "$NEW_SECTION_ID"
 )
 if [ -n "$SECTION_DESC" ]; then
     _JQ_ARGS+=(--arg desc "$SECTION_DESC")
     # shellcheck disable=SC2016
-    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
+    _JQ_FILTER='.current_section = {name: $name, section_id: $section_id, started_at: $ts, turn_start: $turn, local_turn: 0, description: $desc, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
                 | .session_stats.section_count = $section_num
-                | .session_stats.section_names += [$name]'
+                | .session_stats.section_names += [$name]
+                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > 50 then .[-50:] else . end)'
 else
     # shellcheck disable=SC2016
-    _JQ_FILTER='.current_section = {name: $name, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
+    _JQ_FILTER='.current_section = {name: $name, section_id: $section_id, started_at: $ts, turn_start: $turn, local_turn: 0, description: null, section_number: $section_num, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
                 | .session_stats.section_count = $section_num
-                | .session_stats.section_names += [$name]'
+                | .session_stats.section_names += [$name]
+                | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: $name, section_id: $section_id, section_number: $section_num, started_at: $ts}] | if length > 50 then .[-50:] else . end)'
 fi
 
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
@@ -156,6 +165,7 @@ jq -cn \
     --arg sid "$SESSION_ID" \
     --arg ts "$NOW_ISO" \
     --arg name "$SECTION_NAME" \
+    --arg section_id "$NEW_SECTION_ID" \
     --argjson turn "$CURRENT_TURN" \
     --argjson section_num "$NEW_SECTION_NUMBER" \
     --arg prev_section "${AUTO_CLOSED_PREV}" \
@@ -165,6 +175,7 @@ jq -cn \
         session_id:     $sid,
         timestamp:      $ts,
         section_name:   $name,
+        section_id:     $section_id,
         section_number: $section_num,
         turn_number:    $turn,
         description:    (if $desc == "" then null else $desc end),

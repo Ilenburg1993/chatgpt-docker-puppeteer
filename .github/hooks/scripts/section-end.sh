@@ -32,6 +32,7 @@ SECTION_STARTED_AT=""
 SECTION_TURN_START=0
 SECTION_NUMBER=0
 TURN_COUNT=0
+SECTION_ID=""
 
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
@@ -40,6 +41,7 @@ if [ -f "$CTX_FILE" ]; then
     SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Sem seção ativa — avisa e sai sem erro
@@ -67,11 +69,11 @@ fi
 
 # Limpa current_section no session-context.json (Schema v4: inclui section_number)
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-    jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null}' \
+    jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null, section_id: null}' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
-    jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null}' \
+    jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null, section_id: null}' \
         "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi
 
@@ -83,6 +85,7 @@ jq -cn \
     --arg name "$SECTION_NAME" \
     --arg reason "$REASON" \
     --arg started_at "$SECTION_STARTED_AT" \
+    --arg section_id "${SECTION_ID:-}" \
     --argjson turn_start "$SECTION_TURN_START" \
     --argjson turn_end "$CURRENT_TURN" \
     --argjson turns_covered "$TURNS_COVERED" \
@@ -94,6 +97,7 @@ jq -cn \
         timestamp:      $ts,
         section_name:   $name,
         section_number: $section_number,
+        section_id:     (if $section_id == "" then null else $section_id end),
         reason:         $reason,
         started_at:     $started_at,
         turn_start:     $turn_start,

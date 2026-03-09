@@ -184,6 +184,8 @@
     "hooks:install-git": "bash .github/hooks/scripts/install-git-hooks.sh",
     "hooks:on-git-push": "bash .github/hooks/scripts/on-git-push.sh",
     "hooks:status": "bash scripts/hooks-status.sh",
+    "hooks:trace": "bash scripts/trace-commit.sh",
+    "hooks:trace:recent": "bash scripts/trace-commit.sh --recent 10",
     "inference-gateway:run": "node src/inference_gateway/main.js",
     "preinstall": "NODE_OPTIONS= node --input-type=module -e \"if(process.env.npm_execpath.includes('yarn')) throw new Error('Use npm instead of yarn')\"",
     "postinstall": "echo '✅ Dependencies installed successfully'",

@@ -84,17 +84,25 @@ if [ -n "$SESSION_ID" ] && { [ ! -f "$CTX_FILE" ] || [ ! -s "$CTX_FILE" ]; }; th
                 turn_count: 0, turn_authorized: 0, turn_unauthorized: 0,
                 tools_total: 0, tools_by_name: {}, failures_detected: 0,
                 errors_total: 0, subagent_calls: 0, section_count: 1,
-                section_names: ["recovery"]
+                section_names: ["recovery"],
+                section_history: [], turn_history: [],
+                push_count: 0, commit_history: [],
+                pending_section_after_push: false,
+                recovery_hints: {last_intent: null, last_section: null, last_commit_sha: null, last_commit_ts: null}
             },
             current_turn: {
                 number: 1, started_at: $now, tools_count: 0, tools_by_name: {},
                 failures_count: 0, auth_requested: false, auth_requested_at: null,
-                last_askquestions_response: null, section_name: "recovery"
+                last_askquestions_response: null, section_name: "recovery",
+                turn_id: null, section_turn: 1, block_count: 0,
+                intent_declared: false, intent: null
             },
             current_section: {
                 name: "recovery", started_at: $now, turn_start: 1,
                 description: "Seção criada por auto-recovery (sessionStart não disparou)",
-                section_number: 1
+                section_number: 1, section_id: null, local_turn: 0,
+                push_count: 0, tools_by_name: {}, intent_history: [],
+                failures_count: 0, blocked_turns: 0
             },
             last_tool: { name: null, ts: $now, use_id: null, result: null },
             compliance: {
@@ -122,26 +130,59 @@ fi
 
 # ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
 # HARDENING v5: previne contaminação cruzada entre sessões.
+# HEAL v1: quando CTX_FILE é de manual_recovery, adota session_id real do Copilot.
 # Se o payload carrega session_id diferente do contexto ativo,
 # ainda loga no audit.jsonl (read-append), mas NÃO modifica session-context.json.
 if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
-        jq -cn \
-            --arg event "session_id_mismatch" \
-            --arg expected "$CTX_ACTIVE_SID" \
-            --arg got "$SESSION_ID" \
-            --arg source "pre-tool-use.sh" \
-            --arg tool "$TOOL_NAME" \
-            '{
-                event:   $event,
-                expected: $expected,
-                got:      $got,
-                source:   $source,
-                tool:     $tool,
-                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-            }' >> "$LOG_DIR/audit.jsonl"
-        exit 0
+        CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
+            NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+            if command -v sponge &> /dev/null; then
+                jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
+                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            else
+                _TMP_HEAL="$(mktemp)"
+                if jq --arg real_sid "$SESSION_ID" --arg ts "$NOW_HEAL" \
+                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
+                    mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
+                else
+                    rm -f "$_TMP_HEAL"
+                fi
+            fi
+            jq -cn \
+                --arg event "session_id_healed" \
+                --arg old "$CTX_ACTIVE_SID" \
+                --arg new "$SESSION_ID" \
+                --arg source "pre-tool-use.sh" \
+                --arg tool "$TOOL_NAME" \
+                --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
+                '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, tool: $tool, timestamp: $ts,
+                  message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
+                >> "$LOG_DIR/audit.jsonl"
+            # SESSION_ID já tem o valor correto — continua
+        else
+            jq -cn \
+                --arg event "session_id_mismatch" \
+                --arg expected "$CTX_ACTIVE_SID" \
+                --arg got "$SESSION_ID" \
+                --arg source "pre-tool-use.sh" \
+                --arg tool "$TOOL_NAME" \
+                --arg ts "${TIMESTAMP:-}" \
+                '{
+                    event:   $event,
+                    expected: $expected,
+                    got:      $got,
+                    source:   $source,
+                    tool:     $tool,
+                    timestamp: $ts,
+                    message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+                }' >> "$LOG_DIR/audit.jsonl"
+            exit 0
+        fi
     fi
 fi
 

@@ -135,6 +135,8 @@ else
     CONSEC_UNAUTH="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     COMPACTION_COUNT="$(jq -r '.session_stats.compaction_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     SESSION_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_NAME_WD="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_ID_WD="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     # SESSION_SOURCE disponível para expansão futura (ex: "manual_recovery" indica auto-recovery)
     : "${SESSION_SOURCE}"
 
@@ -266,6 +268,8 @@ REPORT="$(jq -cn \
     --argjson turn_count "$TURN_COUNT" \
     --argjson consec_unauth "$CONSEC_UNAUTH" \
     --argjson compaction_count "$COMPACTION_COUNT" \
+    --arg section_name "${SECTION_NAME_WD:-}" \
+    --arg section_id "${SECTION_ID_WD:-}" \
     --argjson alerts "$ALERTS_JSON" \
     --argjson fixes "$FIXES_JSON" \
     --argjson infos "$INFOS_JSON" \
@@ -281,7 +285,9 @@ REPORT="$(jq -cn \
             active:       $session_active,
             turn_count:   $turn_count,
             consec_unauth: $consec_unauth,
-            compaction_count: $compaction_count
+            compaction_count: $compaction_count,
+            section_name: (if $section_name == "" then null else $section_name end),
+            section_id:   (if $section_id == "" then null else $section_id end)
         },
         alerts: $alerts,
         fixes:  $fixes,

@@ -47,6 +47,9 @@ SESSION_ID=""
 TURN_COUNT=0
 PUSH_COUNT=0
 SECTION_NAME=""
+SECTION_ID=""
+SECTION_NUMBER=0
+TURN_ID=""
 SECTION_TURN=1
 
 if [ -f "$CTX_FILE" ]; then
@@ -54,6 +57,9 @@ if [ -f "$CTX_FILE" ]; then
     TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     PUSH_COUNT="$(jq -r '(.session_stats.push_count // 0)' "$CTX_FILE" 2> /dev/null || echo 0)"
     SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    TURN_ID="$(jq -r '.current_turn.turn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
 fi
 
@@ -89,10 +95,14 @@ _JQ_FILTER='.session_stats.push_count                  = $push_count
            | .session_stats.recovery_hints.last_commit_ts  = $ts
            | .session_stats.commit_history = (
                (.session_stats.commit_history // []) + [{
-                   sha:    $sha,
-                   branch: $branch,
-                   ts:     $ts,
-                   push_n: $push_count
+                   sha:            $sha,
+                   branch:         $branch,
+                   ts:             $ts,
+                   push_n:         $push_count,
+                   section_name:   $sec_name,
+                   section_id:     (if $sec_id == "" then null else $sec_id end),
+                   section_number: $sec_num,
+                   turn_id:        (if $turn_id_s == "" then null else $turn_id_s end)
                }]
                | if length > 30 then .[-30:] else . end)'
 
@@ -102,6 +112,10 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         --argjson turn "$CURRENT_TURN" \
         --arg sha "${LOCAL_SHA:-}" \
         --arg branch "${BRANCH:-}" \
+        --arg sec_name "${SECTION_NAME:-}" \
+        --arg sec_id "${SECTION_ID:-}" \
+        --argjson sec_num "${SECTION_NUMBER:-0}" \
+        --arg turn_id_s "${TURN_ID:-}" \
         "$_JQ_FILTER" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || {
         echo "[on-git-push] ERRO: falha ao atualizar session-context.json via sponge — push_count e pending_section não atualizados!" >&2
         exit 1
@@ -113,6 +127,10 @@ elif [ -f "$CTX_FILE" ]; then
         --argjson turn "$CURRENT_TURN" \
         --arg sha "${LOCAL_SHA:-}" \
         --arg branch "${BRANCH:-}" \
+        --arg sec_name "${SECTION_NAME:-}" \
+        --arg sec_id "${SECTION_ID:-}" \
+        --argjson sec_num "${SECTION_NUMBER:-0}" \
+        --arg turn_id_s "${TURN_ID:-}" \
         "$_JQ_FILTER" "$CTX_FILE" > "$TMP" || {
         rm -f "$TMP"
         echo "[on-git-push] ERRO: jq falhou ao atualizar session-context.json — state intacto" >&2
@@ -133,21 +151,27 @@ jq -cn \
     --argjson turn "$CURRENT_TURN" \
     --argjson section_turn "$SECTION_TURN" \
     --arg section_name "$SECTION_NAME" \
+    --arg section_id "$SECTION_ID" \
+    --argjson section_number "$SECTION_NUMBER" \
+    --arg turn_id "$TURN_ID" \
     --arg remote "$REMOTE" \
     --arg branch "$BRANCH" \
     --arg sha "$LOCAL_SHA" \
     --argjson push_num "$NEW_PUSH_COUNT" \
     '{
-        event:        $event,
-        session_id:   $sid,
-        timestamp:    $ts,
-        turn_number:  $turn,
-        section_turn: $section_turn,
-        section_name: (if $section_name == "" then null else $section_name end),
-        remote:       (if $remote == "" then null else $remote end),
-        branch:       (if $branch == "" then null else $branch end),
-        sha:          (if $sha == "" then null else $sha end),
-        push_number:  $push_num
+        event:          $event,
+        session_id:     $sid,
+        timestamp:      $ts,
+        turn_number:    $turn,
+        section_turn:   $section_turn,
+        section_name:   (if $section_name == "" then null else $section_name end),
+        section_id:     (if $section_id == "" then null else $section_id end),
+        section_number: $section_number,
+        turn_id:        (if $turn_id == "" then null else $turn_id end),
+        remote:         (if $remote == "" then null else $remote end),
+        branch:         (if $branch == "" then null else $branch end),
+        sha:            (if $sha == "" then null else $sha end),
+        push_number:    $push_num
     }' >> "$LOG_DIR/audit.jsonl"
 
 echo "[git-push] Push #${NEW_PUSH_COUNT} registrado (turno ~${CURRENT_TURN}, section: \"${SECTION_NAME}\") — agent-stop exigirá declaração de seção." >&2

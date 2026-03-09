@@ -70,10 +70,14 @@ if [ -z "$DESCRIPTION" ]; then
     exit 1
 fi
 
-# Obtém session_id do contexto persistido
+# Obtém session_id, section_id e turn_id do contexto persistido
 SESSION_ID=""
+SECTION_ID=""
+TURN_ID=""
 if [ -f "$STATE_DIR/session-context.json" ]; then
-    SESSION_ID="$(jq -r '.session_id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // .session_id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
+    SECTION_ID="$(jq -r '.current_section.section_id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
+    TURN_ID="$(jq -r '.current_turn.turn_id // ""' "$STATE_DIR/session-context.json" 2> /dev/null || echo '')"
 fi
 
 mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
@@ -89,7 +93,9 @@ jq -cn \
     --arg severity "$SEVERITY" \
     --arg type "$TYPE" \
     --arg desc "$DESCRIPTION" \
-    '{event:$event,session_id:$sid,timestamp:$ts,date:$date,finding_id:$fid,module:$mod,severity:$severity,type:$type,description:$desc}' >> "$LOG_DIR/findings.jsonl"
+    --arg section_id "${SECTION_ID:-}" \
+    --arg turn_id "${TURN_ID:-}" \
+    '{event:$event,session_id:$sid,timestamp:$ts,date:$date,finding_id:$fid,module:$mod,severity:$severity,type:$type,description:$desc,section_id:(if $section_id=="" then null else $section_id end),turn_id:(if $turn_id=="" then null else $turn_id end)}' >> "$LOG_DIR/findings.jsonl"
 
 # Também registra no audit.jsonl para visibilidade geral
 jq -cn \
@@ -101,7 +107,9 @@ jq -cn \
     --arg severity "$SEVERITY" \
     --arg type "$TYPE" \
     --arg desc "$DESCRIPTION" \
-    '{event:$event,session_id:$sid,timestamp:$ts,finding_id:$fid,module:$mod,severity:$severity,type:$type,description:$desc}' >> "$LOG_DIR/audit.jsonl"
+    --arg section_id "${SECTION_ID:-}" \
+    --arg turn_id "${TURN_ID:-}" \
+    '{event:$event,session_id:$sid,timestamp:$ts,finding_id:$fid,module:$mod,severity:$severity,type:$type,description:$desc,section_id:(if $section_id=="" then null else $section_id end),turn_id:(if $turn_id=="" then null else $turn_id end)}' >> "$LOG_DIR/audit.jsonl"
 
 # Indicador visual com ícone de severidade
 case "$SEVERITY" in

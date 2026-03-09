@@ -52,19 +52,50 @@ fi
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
-        jq -cn \
-            --arg event "session_id_mismatch" \
-            --arg expected "$CTX_ACTIVE_SID" \
-            --arg got "$SESSION_ID_PAYLOAD" \
-            --arg source "agent-stop.sh" \
-            '{
-                event:   $event,
-                expected: $expected,
-                got:      $got,
-                source:   $source,
-                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
-            }' >> "$LOG_DIR/audit.jsonl"
-        exit 0
+        CTX_SOURCE="$(jq -r '.session.source // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+        if [ "$CTX_SOURCE" = "manual_recovery" ]; then
+            NOW_HEAL="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
+            if command -v sponge &> /dev/null; then
+                jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
+                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+            else
+                _TMP_HEAL="$(mktemp)"
+                if jq --arg real_sid "$SESSION_ID_PAYLOAD" --arg ts "$NOW_HEAL" \
+                    '.session.id = $real_sid | .session.source = "healed_from_real_session" | .session.healed_at = $ts' \
+                    "$CTX_FILE" > "$_TMP_HEAL" 2> /dev/null; then
+                    mv "$_TMP_HEAL" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_HEAL"
+                else
+                    rm -f "$_TMP_HEAL"
+                fi
+            fi
+            jq -cn \
+                --arg event "session_id_healed" \
+                --arg old "$CTX_ACTIVE_SID" \
+                --arg new "$SESSION_ID_PAYLOAD" \
+                --arg source "agent-stop.sh" \
+                --arg ts "${TIMESTAMP:-$NOW_HEAL}" \
+                '{event: $event, old_session_id: $old, new_session_id: $new, source: $source, timestamp: $ts,
+                  message: "CTX manual_recovery adotado: session_id atualizado para sessão real do Copilot"}' \
+                >> "$LOG_DIR/audit.jsonl"
+            SESSION_ID="$SESSION_ID_PAYLOAD" # continua com ID correto
+        else
+            jq -cn \
+                --arg event "session_id_mismatch" \
+                --arg expected "$CTX_ACTIVE_SID" \
+                --arg got "$SESSION_ID_PAYLOAD" \
+                --arg source "agent-stop.sh" \
+                --arg ts "${TIMESTAMP:-}" \
+                '{
+                    event:   $event,
+                    expected: $expected,
+                    got:      $got,
+                    source:   $source,
+                    timestamp: $ts,
+                    message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+                }' >> "$LOG_DIR/audit.jsonl"
+            exit 0
+        fi
     fi
 fi
 
@@ -88,8 +119,10 @@ fi
 TURN_NUMBER=1
 SECTION_TURN=1
 SECTION_NAME=""
+SECTION_ID=""
 TURN_INTENT=""
 TURN_INTENT_DECLARED=false
+TURN_ID=""
 TURN_TOOLS_COUNT=0
 TURN_FAILURES_COUNT=0
 TURN_BLOCK_COUNT=0
@@ -97,8 +130,10 @@ if [ -f "$CTX_FILE" ]; then
     TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
     SECTION_TURN="$(jq -r '.current_turn.section_turn // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
     SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     TURN_INTENT="$(jq -r '.current_turn.intent // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     TURN_INTENT_DECLARED="$(jq -r '.current_turn.intent_declared // false' "$CTX_FILE" 2> /dev/null || echo false)"
+    TURN_ID="$(jq -r '.current_turn.turn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     TURN_TOOLS_COUNT="$(jq -r '.current_turn.tools_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     TURN_FAILURES_COUNT="$(jq -r '.current_turn.failures_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     TURN_BLOCK_COUNT="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
@@ -114,6 +149,8 @@ jq -cn \
     --argjson turn_number "$TURN_NUMBER" \
     --argjson section_turn "$SECTION_TURN" \
     --arg section_name "$SECTION_NAME" \
+    --arg section_id "$SECTION_ID" \
+    --arg turn_id "$TURN_ID" \
     --arg intent "$TURN_INTENT" \
     --argjson intent_declared "${TURN_INTENT_DECLARED:-false}" \
     --argjson tools_count "$TURN_TOOLS_COUNT" \
@@ -128,6 +165,8 @@ jq -cn \
         turn_number:      $turn_number,
         section_turn:     $section_turn,
         section_name:     (if $section_name == "" then null else $section_name end),
+        section_id:       (if $section_id == "" then null else $section_id end),
+        turn_id:          (if $turn_id == "" then null else $turn_id end),
         intent:           (if $intent == "" then null else $intent end),
         intent_declared:  $intent_declared,
         tools_count:      $tools_count,
@@ -198,6 +237,14 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
         if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
             jq '.current_turn.block_count = (.current_turn.block_count // 0) + 1' \
                 "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        elif [ -f "$CTX_FILE" ]; then
+            _TMP_BC="$(mktemp)"
+            if jq '.current_turn.block_count = (.current_turn.block_count // 0) + 1' \
+                "$CTX_FILE" > "$_TMP_BC" 2> /dev/null; then
+                mv "$_TMP_BC" "$CTX_FILE" 2> /dev/null || rm -f "$_TMP_BC"
+            else
+                rm -f "$_TMP_BC"
+            fi
         fi
         # Registra bloqueio no audit
         jq -cn \
@@ -205,11 +252,15 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
             --arg sid "$SESSION_ID" \
             --arg ts "$NOW_ISO" \
             --argjson bc "$((BLOCK_COUNT + 1))" \
+            --arg section_id "$SECTION_ID" \
+            --arg turn_id "$TURN_ID" \
             '{
                 event:       $event,
                 session_id:  $sid,
                 timestamp:   $ts,
                 block_count: $bc,
+                section_id:  (if $section_id == "" then null else $section_id end),
+                turn_id:     (if $turn_id == "" then null else $turn_id end),
                 message:     "Agente tentou encerrar sem askQuestions — bloqueado para retry"
             }' >> "$LOG_DIR/audit.jsonl"
 
@@ -288,12 +339,18 @@ if [ "$TURN_INTENT_DECLARED" = "false" ] && [ "$TURN_NUMBER" -gt 0 ]; then
         --arg sid "$SESSION_ID" \
         --arg ts "$NOW_ISO" \
         --argjson turn_number "$TURN_NUMBER" \
+        --arg section_name "$SECTION_NAME" \
+        --arg section_id "$SECTION_ID" \
+        --arg turn_id "$TURN_ID" \
         --arg intent "$AUTO_INTENT" \
         '{
             event:          $event,
             session_id:     $sid,
             timestamp:      $ts,
             turn_number:    $turn_number,
+            section_name:   (if $section_name == "" then null else $section_name end),
+            section_id:     (if $section_id == "" then null else $section_id end),
+            turn_id:        (if $turn_id == "" then null else $turn_id end),
             intent:         $intent,
             auto_generated: true
         }' >> "$LOG_DIR/audit.jsonl"
@@ -327,6 +384,8 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
         --argjson turn_number "$TURN_NUMBER" \
         --argjson section_turn "$SECTION_TURN" \
         --arg section_name "$SECTION_NAME" \
+        --arg section_id "$SECTION_ID" \
+        --arg turn_id "$TURN_ID" \
         --argjson dur "$TURN_DURATION_S" \
         --argjson tools "$TURN_TOOLS_COUNT" \
         --arg intent "$TURN_INTENT" \
@@ -335,6 +394,8 @@ if [ "$AUTH_REQUESTED" = "true" ]; then
         '{event: $event, session_id: $sid, timestamp: $ts,
           turn_number: $turn_number, section_turn: $section_turn,
           section_name: (if $section_name == "" then null else $section_name end),
+          section_id:   (if $section_id == "" then null else $section_id end),
+          turn_id:      (if $turn_id == "" then null else $turn_id end),
           turn_duration_s: $dur, tools_count: $tools,
           intent: (if $intent == "" then null else $intent end),
           failures_count: $failures, push_pending: $push_pending}' \
@@ -366,6 +427,8 @@ else
         --argjson turn_number "$TURN_NUMBER" \
         --argjson section_turn "$SECTION_TURN" \
         --arg section_name "$SECTION_NAME" \
+        --arg section_id "$SECTION_ID" \
+        --arg turn_id "$TURN_ID" \
         --argjson dur "$TURN_DURATION_S" \
         --argjson tools "$TURN_TOOLS_COUNT" \
         --arg intent "$TURN_INTENT" \
@@ -374,6 +437,8 @@ else
         '{event: $event, session_id: $sid, timestamp: $ts, message: $msg,
           turn_number: $turn_number, section_turn: $section_turn,
           section_name: (if $section_name == "" then null else $section_name end),
+          section_id:   (if $section_id == "" then null else $section_id end),
+          turn_id:      (if $turn_id == "" then null else $turn_id end),
           turn_duration_s: $dur, tools_count: $tools,
           intent: (if $intent == "" then null else $intent end),
           failures_count: $failures}' \
@@ -394,6 +459,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         --arg auth_field "$AUTH_INCR_FIELD" \
         --argjson next_turn "$NEXT_TURN" \
         --arg section "$SECTION_NAME" \
+        --arg sec_id "$SECTION_ID" \
+        --arg turn_id_s "$TURN_ID" \
         --argjson turn_num "$TURN_NUMBER" \
         --argjson sec_turn "$SECTION_TURN" \
         --argjson dur_s "$TURN_DURATION_S" \
@@ -409,6 +476,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
              (.session_stats.turn_history // []) + [{
                  number:       $turn_num,
                  section:      $section,
+                 section_id:   (if $sec_id == "" then null else $sec_id end),
+                 turn_id:      (if $turn_id_s == "" then null else $turn_id_s end),
                  section_turn: $sec_turn,
                  duration_s:   $dur_s,
                  tools_count:  $tools_n,
@@ -447,28 +516,34 @@ if [ -f "$CTX_FILE" ]; then
 fi
 if [ -z "$CURR_SECTION_CHECK" ] || [ "$CURR_SECTION_CHECK" = "null" ]; then
     _AUTO_SECTION_NOW="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    _AUTO_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
     _NEXT_SECTION_NUM=1
+    _NEXT_TURN_AUTO=1
     if [ -f "$CTX_FILE" ]; then
         _NEXT_SECTION_NUM="$(jq -r '(.session_stats.section_count // 0) + 1' "$CTX_FILE" 2> /dev/null || echo 1)"
         _NEXT_TURN_AUTO="$(jq -r '(.session_stats.turn_count // 0) + 1' "$CTX_FILE" 2> /dev/null || echo 1)"
         jq --arg ts "$_AUTO_SECTION_NOW" \
+            --arg auto_section_id "$_AUTO_SECTION_ID" \
             --argjson snum "$_NEXT_SECTION_NUM" \
             --argjson tnum "${_NEXT_TURN_AUTO:-1}" \
-            '.current_section = {name: "retomada", started_at: $ts, turn_start: $tnum, description: "Seção automática criada pela invariante SESSION+SECTION+TURN", section_number: $snum}
+            '.current_section = {name: "retomada", section_id: $auto_section_id, started_at: $ts, turn_start: $tnum, description: "Seção automática criada pela invariante SESSION+SECTION+TURN", section_number: $snum, push_count: 0, tools_by_name: {}, intent_history: [], failures_count: 0, blocked_turns: 0}
              | .session_stats.section_count = $snum
-             | .session_stats.section_names += ["retomada"]' \
+             | .session_stats.section_names += ["retomada"]
+             | .session_stats.section_history = ((.session_stats.section_history // []) + [{name: "retomada", section_id: $auto_section_id, section_number: $snum, started_at: $ts}] | if length > 50 then .[-50:] else . end)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
     jq -cn \
         --arg event "sectionStart" \
         --arg sid "$SESSION_ID" \
         --arg ts "$_AUTO_SECTION_NOW" \
+        --arg auto_section_id "$_AUTO_SECTION_ID" \
         --argjson section_num "$_NEXT_SECTION_NUM" \
         '{
             event:          $event,
             session_id:     $sid,
             timestamp:      $ts,
             section_name:   "retomada",
+            section_id:     $auto_section_id,
             section_number: $section_num,
             description:    "Seção automática criada pela invariante SESSION+SECTION+TURN",
             auto_open:      true

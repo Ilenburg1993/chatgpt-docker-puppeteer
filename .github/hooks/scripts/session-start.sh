@@ -1,5 +1,5 @@
 #!/bin/bash
-# session-start.sh — Hook sessionStart do Copilot (Schema v7)
+# session-start.sh — Hook sessionStart do Copilot (Schema v8)
 # Executado quando uma nova sessão inicia ou é retomada.
 # Input JSON (stdin): {timestamp, cwd, source, initialPrompt}
 # Output (stdout, fd 3): {"hookSpecificOutput": {"hookEventName": "SessionStart",
@@ -11,6 +11,7 @@
 #   - Seção ativa, ID da sessão, close key
 #   - Tendências históricas, saúde do sistema
 # O briefing é injetado via additionalContext (acima) E disponível para leitura manual.
+# Schema v8: section_id UUID na secão inicial, turn_id UUID no current_turn;
 # Schema v7: turn_history[], recovery_hints{}, commit_history[], current_section.tools_by_name{},
 #             current_section.intent_history[], current_section.failures_count, blocked_turns;
 #             current_turn.intent_declared, current_turn.intent adicionados.
@@ -76,7 +77,11 @@ fi
 # Chave dinâmica por sessão: ENCERRAR-XXXXXXXX (8 hex maiúsculos aleatórios)
 # O usuário DEVE digitar esta chave ao encerrar a sessão (vscode_askQuestions).
 # Detectada por post-tool-use.sh; validada por session-end.sh.
-CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr a-z A-Z || echo "$(date +%s | sha256sum | head -c 8 | tr a-z A-Z)")"
+CLOSE_KEY="ENCERRAR-$(openssl rand -hex 4 2> /dev/null | tr '[:lower:]' '[:upper:]' || date +%s | sha256sum | head -c 8 | tr '[:lower:]' '[:upper:]')"
+
+# Gera IDs UUID para a secão e turno iniciais
+INITIAL_SECTION_ID="$(uuidgen 2> /dev/null || printf 'sect_%s_%s' "$(date +%s)" "$$")"
+INITIAL_TURN_ID="$(uuidgen 2> /dev/null || printf 'turn_%s_%s' "$(date +%s)" "$$")"
 
 # ── Persiste contexto inicial — Schema v4 (layered) ──────────────────────────
 # Estrutura em 6 blocos separados por âmbito:
@@ -94,6 +99,8 @@ jq -cn \
     --arg source "$SOURCE" \
     --arg cwd "$CWD" \
     --arg close_key "$CLOSE_KEY" \
+    --arg initial_section_id "$INITIAL_SECTION_ID" \
+    --arg initial_turn_id "$INITIAL_TURN_ID" \
     --argjson consec "$PREV_CONSEC_UNAUTH" \
     '{
         "session": {
@@ -118,7 +125,7 @@ jq -cn \
             "subagent_calls":     0,
             "section_count":      1,
             "section_names":      ["início"],
-            "section_history":    [],
+            "section_history":    [{"name": "início", "section_id": $initial_section_id, "section_number": 1, "started_at": $date}],
             "turn_history":       [],
             "push_count":         0,
             "last_push_at":       null,
@@ -143,7 +150,8 @@ jq -cn \
             "last_askquestions_response":  null,
             "section_name":                "início",
             "intent_declared":             false,
-            "intent":                      null
+            "intent":                      null,
+            "turn_id":                     $initial_turn_id
         },
         "current_section": {
             "name":           "início",
@@ -152,6 +160,7 @@ jq -cn \
             "local_turn":     0,
             "description":    null,
             "section_number": 1,
+            "section_id":     $initial_section_id,
             "push_count":     0,
             "tools_by_name":  {},
             "intent_history": [],
@@ -210,7 +219,9 @@ jq -cn \
     --arg sid "$SESSION_ID" \
     --arg ts "$TIMESTAMP" \
     --arg name "início" \
+    --arg section_id "$INITIAL_SECTION_ID" \
     '{event: $event, session_id: $sid, timestamp: $ts, section_name: $name,
+      section_id: $section_id,
       section_number: 1, turn_number: 1, description: null, prev_section: null,
       auto_open: true}' \
     >> "$LOG_DIR/audit.jsonl"
@@ -564,8 +575,8 @@ ${NEXT_TASK}
 
 **Status**: ${HEALTH_STATUS}
 
-$([ -n "$HEALTH_CRITICAL" ] && printf '%s\n' "$HEALTH_CRITICAL" || true)
-$([ -n "$HEALTH_WARNINGS" ] && printf '%s\n' "$HEALTH_WARNINGS" || true)
+$(if [ -n "$HEALTH_CRITICAL" ]; then printf '%s\n' "$HEALTH_CRITICAL"; fi)
+$(if [ -n "$HEALTH_WARNINGS" ]; then printf '%s\n' "$HEALTH_WARNINGS"; fi)
 
 ## Tendências históricas
 

@@ -14,6 +14,7 @@
 #   $3 = duration_s (ex: 1823)
 #   $4 = turns_covered (ex: 5)
 #   $5 = push_count nesta seção (ex: 1 — calculado externamente)
+#   $6 = section_id UUID da seção (opcional; lido de CTX_FILE como fallback)
 #
 # Saída:
 #   .github/hooks/state/section-summaries/section-{N}-{slug}-{date}.md
@@ -33,12 +34,14 @@ SECTION_NUM="${2:-0}"
 DURATION_S="${3:-0}"
 TURNS_COVERED="${4:-0}"
 PUSH_COUNT_SECTION="${5:-0}"
+SECTION_ID="${6:-}"
 
 if [ -z "$SECTION_NAME" ]; then
     # Fallback: lê da seção atual do session-context.json (caso seja chamado isoladamente)
     if [ -f "$CTX_FILE" ]; then
         SECTION_NAME="$(jq -r '.current_section.name // "desconhecida"' "$CTX_FILE" 2> /dev/null || echo 'desconhecida')"
         SECTION_NUM="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+        [ -z "$SECTION_ID" ] && SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     else
         SECTION_NAME="desconhecida"
     fi
@@ -68,7 +71,7 @@ if [ -f "$AUDIT_FILE" ] && [ -s "$AUDIT_FILE" ]; then
     # Conta ferramentas usadas (preToolUse events nesta sessão)
     TOOLS_TOTAL="$(jq -r --arg sid "$SESSION_ID" \
         'select(.event == "preToolUse" and .session_id == $sid) | (.tool_name // .toolName // "")' \
-        "$AUDIT_FILE" 2> /dev/null | grep -v '^$' | wc -l | tr -d ' ' || echo 0)"
+        "$AUDIT_FILE" 2> /dev/null | grep -cv '^$' | tr -d ' ' || echo 0)"
 
     TOOLS_TOP="$(jq -r --arg sid "$SESSION_ID" \
         'select(.event == "preToolUse" and .session_id == $sid) | (.tool_name // .toolName // "")' \
@@ -142,6 +145,7 @@ cat > "$SUMMARY_FILE" << SUMMARY_EOF
 | Sessão            | \`${SESSION_ID}\`            |
 | Número da seção   | \`#${SECTION_NUM}\`          |
 | Nome              | \`${SECTION_NAME}\`          |
+| ID (UUID)         | \`${SECTION_ID:-N/A}\`       |
 | Encerrada em      | \`${NOW_ISO}\`               |
 | Duração           | ${DURATION_HUMAN}            |
 | Turnos cobertos   | ${TURNS_COVERED}             |
@@ -176,6 +180,37 @@ SUMMARY_EOF
 
 # Atualiza session-context.json com section_history (Schema v6)
 # Apenas se sponge disponível (atomic write)
+# Filtro jq: atualiza entrada existente em section_history (match por section_id ou number+name)
+# se não houver entrada correspondente, appenda nova. Cap: 50 entradas.
+# Isso previne duplicatas: start-section.sh cria entrada mínima ao ABRIR;
+# generate-section-summary.sh ENRIQUECE a mesma entrada ao FECHAR.
+# shellcheck disable=SC2016  # $section_id/$num/$name são variáveis jq, não shell
+_JQ_HISTORY_FILTER='
+    .session_stats.section_history =
+        ((.session_stats.section_history // [])
+         | if (map(select(
+                   ($section_id != "" and .section_id == $section_id) or
+                   ($section_id == "" and .section_number == $num and .name == $name)
+               )) | length) > 0
+           then map(
+               if ($section_id != "" and .section_id == $section_id) or
+                  ($section_id == "" and .section_number == $num and .name == $name)
+               then . + {turns: $turns, duration_s: $dur, pushes: $pushes,
+                          summary_file: $summary_file, closed_at: $ts}
+               else . end)
+           else . + [{
+               name:           $name,
+               section_number: $num,
+               section_id:     (if $section_id == "" then null else $section_id end),
+               turns:        $turns,
+               duration_s:   $dur,
+               pushes:       $pushes,
+               summary_file: $summary_file,
+               closed_at:    $ts
+           }]
+           end
+         | if length > 50 then .[-50:] else . end)'
+
 if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq \
         --arg name "$SECTION_NAME" \
@@ -183,17 +218,10 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         --argjson turns "$TURNS_COVERED" \
         --argjson dur "$DURATION_S" \
         --argjson pushes "$PUSH_COUNT_SECTION" \
+        --arg section_id "${SECTION_ID:-}" \
         --arg ts "$NOW_ISO" \
         --arg summary_file "section-summaries/section-${SECTION_NUM}-${SECTION_SLUG}-${NOW_SHORT}.md" \
-        '.session_stats.section_history = (.session_stats.section_history // []) + [{
-            name:         $name,
-            number:       $num,
-            turns:        $turns,
-            duration_s:   $dur,
-            pushes:       $pushes,
-            summary_file: $summary_file,
-            closed_at:    $ts
-        }]' "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || {
+        "$_JQ_HISTORY_FILTER" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || {
         echo "[section-summary] ⚠️ Falha ao persistir section_history (sponge) — context.json não atualizado" >&2
     }
 elif [ -f "$CTX_FILE" ]; then
@@ -204,20 +232,16 @@ elif [ -f "$CTX_FILE" ]; then
         --argjson turns "$TURNS_COVERED" \
         --argjson dur "$DURATION_S" \
         --argjson pushes "$PUSH_COUNT_SECTION" \
+        --arg section_id "${SECTION_ID:-}" \
         --arg ts "$NOW_ISO" \
         --arg summary_file "section-summaries/section-${SECTION_NUM}-${SECTION_SLUG}-${NOW_SHORT}.md" \
-        '.session_stats.section_history = (.session_stats.section_history // []) + [{
-            name:         $name,
-            number:       $num,
-            turns:        $turns,
-            duration_s:   $dur,
-            pushes:       $pushes,
-            summary_file: $summary_file,
-            closed_at:    $ts
-        }]' "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE" 2> /dev/null || {
+        "$_JQ_HISTORY_FILTER" "$CTX_FILE" > "$TMP" 2> /dev/null
+    if mv "$TMP" "$CTX_FILE" 2> /dev/null; then
+        : # persistido com sucesso
+    else
         rm -f "$TMP" 2> /dev/null || true
-        echo "[section-summary] ⚠️ Falha ao persistir section_history (mv) — context.json não atualizado" >&2
-    }
+        echo "[section-summary] \u26a0\ufe0f Falha ao persistir section_history (mv) \u2014 context.json n\u00e3o atualizado" >&2
+    fi
 fi
 
 echo "[section-summary] Gerado: $SUMMARY_FILE (${DURATION_HUMAN}, ${TURNS_COVERED} turnos, ${TOOLS_TOTAL} ferramentas)" >&2

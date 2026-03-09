@@ -21,11 +21,13 @@ REASON="${1:-continuar na section atual}"
 # ── Lê state ─────────────────────────────────────────────────────────────────
 SESSION_ID=""
 SECTION_NAME=""
+SECTION_ID=""
 TURN_COUNT=0
 
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
 
@@ -76,6 +78,7 @@ jq -cn \
     --arg ts "$NOW_ISO" \
     --argjson turn "$CURRENT_TURN" \
     --arg section_name "$SECTION_NAME" \
+    --arg section_id "${SECTION_ID:-}" \
     --arg reason "$REASON" \
     '{
         event:        $event,
@@ -83,6 +86,7 @@ jq -cn \
         timestamp:    $ts,
         turn_number:  $turn,
         section_name: (if $section_name == "" then null else $section_name end),
+        section_id:   (if $section_id == "" then null else $section_id end),
         reason:       $reason
     }' >> "$LOG_DIR/audit.jsonl"
 

@@ -56,25 +56,21 @@ if [ -f "$CTX_FILE" ]; then
     CLOSE_SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     CLOSE_SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
     CLOSE_TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    CLOSE_SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 if [ -n "$CLOSE_SECTION_NAME" ]; then
     CLOSE_NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     CLOSE_CURRENT_TURN=$((CLOSE_TURN_COUNT + 1))
 
-    # Calcula duration_s da section
+    # Calcula duration_s da section via date -d (evita injeção de shell em subprocess Python)
     CLOSE_DURATION_S=0
-    if [ -n "$CLOSE_SECTION_STARTED" ] && command -v python3 &> /dev/null; then
-        CLOSE_DURATION_S="$(python3 -c "
-import sys
-from datetime import datetime, timezone
-try:
-    a = datetime.fromisoformat('${CLOSE_SECTION_STARTED}'.replace('Z','+00:00'))
-    b = datetime.now(timezone.utc)
-    print(int((b - a).total_seconds()))
-except Exception:
-    print(0)
-" 2> /dev/null || echo 0)"
+    if [ -n "$CLOSE_SECTION_STARTED" ]; then
+        _ep_start="$(date -d "$CLOSE_SECTION_STARTED" '+%s' 2> /dev/null || echo 0)"
+        _ep_now="$(date -u '+%s' 2> /dev/null || echo 0)"
+        if [ "$_ep_now" -gt "$_ep_start" ] 2> /dev/null; then
+            CLOSE_DURATION_S=$((_ep_now - _ep_start))
+        fi
     fi
 
     CLOSE_TURNS_COVERED=$((CLOSE_CURRENT_TURN - CLOSE_SECTION_TURN_START))
@@ -88,6 +84,7 @@ except Exception:
         --arg name "$CLOSE_SECTION_NAME" \
         --arg reason "session_ended" \
         --arg started_at "$CLOSE_SECTION_STARTED" \
+        --arg section_id "${CLOSE_SECTION_ID:-}" \
         --argjson turn_start "$CLOSE_SECTION_TURN_START" \
         --argjson turn_end "$CLOSE_CURRENT_TURN" \
         --argjson turns_covered "$CLOSE_TURNS_COVERED" \
@@ -99,6 +96,7 @@ except Exception:
             timestamp:      $ts,
             section_name:   $name,
             section_number: $section_number,
+            section_id:     (if $section_id == "" then null else $section_id end),
             reason:         $reason,
             started_at:     $started_at,
             turn_start:     $turn_start,
@@ -109,7 +107,7 @@ except Exception:
 
     # Limpa current_section no contexto
     if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
-        jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null}' \
+        jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null, section_id: null}' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
 fi

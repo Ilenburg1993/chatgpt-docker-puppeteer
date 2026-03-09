@@ -38,11 +38,15 @@ NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 SESSION_ID="unknown"
 TURN_NUMBER=1
 SECTION_NAME=""
+SECTION_ID=""
+TURN_ID=""
 
 if [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
     TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
     SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    SECTION_ID="$(jq -r '.current_section.section_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    TURN_ID="$(jq -r '.current_turn.turn_id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Loga turnStart_enriched no audit.jsonl
@@ -52,6 +56,8 @@ jq -cn \
     --arg ts "$NOW_ISO" \
     --argjson turn_number "$TURN_NUMBER" \
     --arg section_name "$SECTION_NAME" \
+    --arg section_id "$SECTION_ID" \
+    --arg turn_id "$TURN_ID" \
     --arg intent "$TURN_INTENT" \
     '{
         event:        $event,
@@ -59,6 +65,8 @@ jq -cn \
         timestamp:    $ts,
         turn_number:  $turn_number,
         section_name: (if $section_name == "" then null else $section_name end),
+        section_id:   (if $section_id == "" then null else $section_id end),
+        turn_id:      (if $turn_id == "" then null else $turn_id end),
         intent:       (if $intent == "" then null else $intent end),
         auto_generated: false
     }' >> "$LOG_DIR/audit.jsonl"
