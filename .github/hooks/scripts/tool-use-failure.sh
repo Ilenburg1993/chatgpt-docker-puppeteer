@@ -51,6 +51,18 @@ fi
 if [ -f "$CTX_FILE" ] && [ -s "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
     CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
+        jq -cn \
+            --arg event "session_id_mismatch" \
+            --arg expected "$CTX_ACTIVE_SID" \
+            --arg got "$SESSION_ID" \
+            --arg source "tool-use-failure.sh" \
+            '{
+                event:    $event,
+                expected: $expected,
+                got:      $got,
+                source:   $source,
+                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+            }' >> "$LOG_DIR/audit.jsonl"
         exit 0
     fi
 fi

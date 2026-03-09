@@ -61,13 +61,17 @@ REQUIRED_SCRIPTS=(
     "post-tool-use.sh"
     "agent-stop.sh"
     "subagent-stop.sh"
+    "subagent-start.sh"
     "error-occurred.sh"
+    "tool-use-failure.sh"
+    "pre-compact.sh"
     "session-end.sh"
     "start-section.sh"
     "section-end.sh"
     "start-turn.sh"
     "session-checkpoint.sh"
     "generate-session-summary.sh"
+    "manual-session-init.sh"
     "add-task.sh"
     "complete-task.sh"
     "save-finding.sh"
@@ -255,7 +259,7 @@ if ! command -v shellcheck &> /dev/null; then
     [ "$QUIET" = "--quiet" ] || echo "  - shellcheck não instalado — pulando"
 else
     SHELLCHECK_FAILS=0
-    for s in session-start.sh agent-stop.sh session-end.sh post-tool-use.sh pre-tool-use.sh; do
+    for s in session-start.sh agent-stop.sh session-end.sh post-tool-use.sh pre-tool-use.sh subagent-stop.sh subagent-start.sh tool-use-failure.sh pre-compact.sh; do
         f="$SCRIPTS_DIR/$s"
         [ -f "$f" ] || continue
         if shellcheck -S warning "$f" &> /dev/null; then
@@ -271,7 +275,7 @@ fi
 echo ""
 echo "8. session_id guards (Hardening v5)"
 # Scripts que DEVEM ter session_id guard (hooks auto-triggered que modificam estado)
-GUARD_REQUIRED=(agent-stop.sh pre-tool-use.sh post-tool-use.sh log-prompt.sh error-occurred.sh subagent-stop.sh)
+GUARD_REQUIRED=(agent-stop.sh pre-tool-use.sh post-tool-use.sh log-prompt.sh error-occurred.sh subagent-stop.sh subagent-start.sh tool-use-failure.sh pre-compact.sh)
 # Scripts que NÃO devem ter guard (criador de session_id / encerramento legítimo)
 GUARD_EXCLUDED=(session-start.sh session-end.sh)
 
