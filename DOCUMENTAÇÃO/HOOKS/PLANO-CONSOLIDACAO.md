@@ -9,15 +9,15 @@
 
 ### SESSION (Sessão)
 
-| Atributo | Valor |
-|---|---|
-| **Criação** | Hook `sessionStart` disparado pelo Copilot ao abrir chat |
-| **Término** | Hook `sessionEnd` disparado ao fechar chat (qualquer razão) |
-| **UUID** | Fornecido pelo Copilot — imutável durante a sessão |
-| **Custo** | **Premium requests ocorrem APENAS na inicialização** (carregamento de contexto) |
-| **Frequência esperada** | Uma por dia |
-| **Scripts** | `session-start.sh`, `session-end.sh` |
-| **Duração típica** | Horas — pode cruzar múltiplas Sections e centenas de Turns |
+| Atributo                | Valor                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| **Criação**             | Hook `sessionStart` disparado pelo Copilot ao abrir chat                        |
+| **Término**             | Hook `sessionEnd` disparado ao fechar chat (qualquer razão)                     |
+| **UUID**                | Fornecido pelo Copilot — imutável durante a sessão                              |
+| **Custo**               | **Premium requests ocorrem APENAS na inicialização** (carregamento de contexto) |
+| **Frequência esperada** | Uma por dia                                                                     |
+| **Scripts**             | `session-start.sh`, `session-end.sh`                                            |
+| **Duração típica**      | Horas — pode cruzar múltiplas Sections e centenas de Turns                      |
 
 > ⚠️ **Regra**: uma SESSION deve ser iniciada o mínimo possível (idealmente só uma vez por dia).
 > Qualquer fechamento acidental desperdiça context loading premium.
@@ -26,14 +26,14 @@
 
 ### SECTION (Seção Temática)
 
-| Atributo | Valor |
-|---|---|
-| **Criação** | Manual pelo agente via `start-section.sh` |
-| **Término** | Manual via `section-end.sh`, ou implícito ao abrir nova Section |
-| **Custo** | **Gratuito** — sem consumo de premium |
-| **Frequência esperada** | Múltiplas por SESSION (virtualmente infinitas) |
-| **Scripts** | `start-section.sh`, `section-end.sh` |
-| **Propósito** | Agrupar Turns por tema; registrar duração temática; organizar audit.jsonl |
+| Atributo                | Valor                                                                     |
+| ----------------------- | ------------------------------------------------------------------------- |
+| **Criação**             | Manual pelo agente via `start-section.sh`                                 |
+| **Término**             | Manual via `section-end.sh`, ou implícito ao abrir nova Section           |
+| **Custo**               | **Gratuito** — sem consumo de premium                                     |
+| **Frequência esperada** | Múltiplas por SESSION (virtualmente infinitas)                            |
+| **Scripts**             | `start-section.sh`, `section-end.sh`                                      |
+| **Propósito**           | Agrupar Turns por tema; registrar duração temática; organizar audit.jsonl |
 
 > Uma Section pode conter virtualmente infinitos Turns.
 
@@ -41,14 +41,14 @@
 
 ### TURN (Turno)
 
-| Atributo | Valor |
-|---|---|
-| **Criação** | Hook `userPromptSubmitted` |
-| **Término** | Hook `agentStop` |
-| **Custo** | **Gratuito** — sem consumo de premium |
-| **Frequência esperada** | Múltiplos por Section (virtualmente infinitos) |
-| **Scripts** | `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh` |
-| **Regra crítica** | NUNCA encerrar sem chamar `vscode_askQuestions` |
+| Atributo                | Valor                                                  |
+| ----------------------- | ------------------------------------------------------ |
+| **Criação**             | Hook `userPromptSubmitted`                             |
+| **Término**             | Hook `agentStop`                                       |
+| **Custo**               | **Gratuito** — sem consumo de premium                  |
+| **Frequência esperada** | Múltiplos por Section (virtualmente infinitos)         |
+| **Scripts**             | `pre-tool-use.sh`, `post-tool-use.sh`, `agent-stop.sh` |
+| **Regra crítica**       | NUNCA encerrar sem chamar `vscode_askQuestions`        |
 
 ---
 
@@ -160,12 +160,12 @@ session-end.sh:
 
 ### Novos eventos no audit.jsonl
 
-| Evento | Quando |
-|---|---|
-| `askQuestions_response` | Toda resposta de `vscode_askQuestions` (post-tool-use.sh) |
-| `sessionClose_key_validated` | Quando a close_key é detectada na resposta |
-| `sessionEnd_authorized_with_key` | session-end.sh com chave válida |
-| `sessionEnd_no_key` | session-end.sh sem chave registrada |
+| Evento                           | Quando                                                    |
+| -------------------------------- | --------------------------------------------------------- |
+| `askQuestions_response`          | Toda resposta de `vscode_askQuestions` (post-tool-use.sh) |
+| `sessionClose_key_validated`     | Quando a close_key é detectada na resposta                |
+| `sessionEnd_authorized_with_key` | session-end.sh com chave válida                           |
+| `sessionEnd_no_key`              | session-end.sh sem chave registrada                       |
 
 ---
 
@@ -198,29 +198,29 @@ O Template E já existe no AGENTS.md. Adicionar:
 
 ### Fase A — Scripts (sessão atual)
 
-| # | Arquivo | Mudança | Dependência |
-|---|---|---|---|
-| A1 | `session-start.sh` | Gerar close_key, schema v3, alerta SESSION_CLOSE_NO_KEY, anúncio no briefing | — |
-| A2 | `post-tool-use.sh` | Capturar tool_response de vscode_askQuestions, detectar close_key | A1 |
-| A3 | `session-end.sh` | Validar close_key_validated, criar/remover SESSION_CLOSE_NO_KEY.flag | A1, A2 |
+| #   | Arquivo            | Mudança                                                                      | Dependência |
+| --- | ------------------ | ---------------------------------------------------------------------------- | ----------- |
+| A1  | `session-start.sh` | Gerar close_key, schema v3, alerta SESSION_CLOSE_NO_KEY, anúncio no briefing | —           |
+| A2  | `post-tool-use.sh` | Capturar tool_response de vscode_askQuestions, detectar close_key            | A1          |
+| A3  | `session-end.sh`   | Validar close_key_validated, criar/remover SESSION_CLOSE_NO_KEY.flag         | A1, A2      |
 
 ### Fase B — Documentação (sessão atual)
 
-| # | Arquivo | Mudança |
-|---|---|---|
-| B1 | `AGENTS.md` | Definições SESSION/SECTION/TURN, Template F (Session Close), atualizar Template E |
-| B2 | `PROTOCOLO-AUTORIZACAO.md` | Seção sobre SESSION CLOSE KEY |
-| B3 | `README.md` | Schema v3, novos eventos, fluxo atualizado |
-| B4 | `AUDIT-SCHEMA.md` | Novos eventos: askQuestions_response, sessionClose_key_validated, etc. |
+| #   | Arquivo                    | Mudança                                                                           |
+| --- | -------------------------- | --------------------------------------------------------------------------------- |
+| B1  | `AGENTS.md`                | Definições SESSION/SECTION/TURN, Template F (Session Close), atualizar Template E |
+| B2  | `PROTOCOLO-AUTORIZACAO.md` | Seção sobre SESSION CLOSE KEY                                                     |
+| B3  | `README.md`                | Schema v3, novos eventos, fluxo atualizado                                        |
+| B4  | `AUDIT-SCHEMA.md`          | Novos eventos: askQuestions_response, sessionClose_key_validated, etc.            |
 
 ### Fase C — Validação (sessão atual)
 
-| # | Ação |
-|---|---|
-| C1 | Atualizar `smoke-test.sh` com checks para close_key e close_key_validated |
-| C2 | Rodar smoke-test — 43+ checks devem passar |
-| C3 | Simular encerramento com chave correta |
-| C4 | Simular encerramento sem chave (verificar flag) |
+| #   | Ação                                                                      |
+| --- | ------------------------------------------------------------------------- |
+| C1  | Atualizar `smoke-test.sh` com checks para close_key e close_key_validated |
+| C2  | Rodar smoke-test — 43+ checks devem passar                                |
+| C3  | Simular encerramento com chave correta                                    |
+| C4  | Simular encerramento sem chave (verificar flag)                           |
 
 ---
 

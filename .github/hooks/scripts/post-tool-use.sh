@@ -19,17 +19,17 @@ mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
 INPUT="$(cat 2> /dev/null || true)"
 
 # Extrai campos usando o schema real (snake_case)
-TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2>/dev/null || echo '')"
-TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null || echo '')"
-TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2>/dev/null || echo '')"
-TOOL_RESPONSE="$(echo "$INPUT" | jq -r '.tool_response // ""' 2>/dev/null || echo '')"
+TIMESTAMP="$(echo "$INPUT" | jq -r '.timestamp // ""' 2> /dev/null || echo '')"
+TOOL_NAME="$(echo "$INPUT" | jq -r '.tool_name // ""' 2> /dev/null || echo '')"
+TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // ""' 2> /dev/null || echo '')"
+TOOL_RESPONSE="$(echo "$INPUT" | jq -r '.tool_response // ""' 2> /dev/null || echo '')"
 
 # session_id vem diretamente do payload (UUID real do Copilot)
-SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null || echo '')"
+SESSION_ID="$(echo "$INPUT" | jq -r '.session_id // ""' 2> /dev/null || echo '')"
 
 # Fallback: se session_id não veio do payload, usa o do contexto
 if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # ── Determina result_type (heurística progressiva) ───────────────────────────
@@ -62,19 +62,44 @@ jq -cn \
         result_type:  $result
     }' >> "$LOG_DIR/audit.jsonl"
 
+# ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
+# HARDENING v5: previne contaminação cruzada entre sessões.
+# Se o payload carrega session_id diferente do contexto ativo,
+# logamos mismatch e NÃO modificamos session-context.json.
+if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
+    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
+        jq -cn \
+            --arg event "session_id_mismatch" \
+            --arg expected "$CTX_ACTIVE_SID" \
+            --arg got "$SESSION_ID" \
+            --arg source "post-tool-use.sh" \
+            --arg tool "$TOOL_NAME" \
+            '{
+                event:    $event,
+                expected: $expected,
+                got:      $got,
+                source:   $source,
+                tool:     $tool,
+                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+            }' >> "$LOG_DIR/audit.jsonl"
+        exit 0
+    fi
+fi
+
 # ── Atualiza contexto — Schema v3 ────────────────────────────────────────────
 # last_tool.result: resultado desta chamada específica
 # current_turn.failures_count: acumula falhas do turno atual
 # session_stats.failures_detected: acumula falhas da sessão
 # current_turn.last_askquestions_response: captura todas as respostas de vscode_askQuestions
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     if [ "$TOOL_NAME" = "vscode_askQuestions" ] && [ -n "$TOOL_RESPONSE" ]; then
         # Captura resposta completa do usuário ao vscode_askQuestions
         # tool_response para askQuestions é JSON: {answers:{...}} — normaliza para string
-        RESPONSE_STR="$(echo "$TOOL_RESPONSE" | jq -c '.' 2>/dev/null || echo "$TOOL_RESPONSE")"
+        RESPONSE_STR="$(echo "$TOOL_RESPONSE" | jq -c '.' 2> /dev/null || echo "$TOOL_RESPONSE")"
 
         # Lê close_key atual do contexto para verificar se a resposta contém a chave de encerramento
-        CURRENT_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+        CURRENT_CLOSE_KEY="$(jq -r '.session.close_key // ""' "$CTX_FILE" 2> /dev/null || echo '')"
         KEY_FOUND=false
         if [ -n "$CURRENT_CLOSE_KEY" ] && echo "$TOOL_RESPONSE" | grep -qF "$CURRENT_CLOSE_KEY"; then
             KEY_FOUND=true
@@ -100,11 +125,11 @@ if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
         # Atualiza contexto com resposta e, se necessário, valida a close_key
         if [ "$KEY_FOUND" = "true" ]; then
             jq --arg result "$RESULT_TYPE" \
-               --arg response "$RESPONSE_STR" \
+                --arg response "$RESPONSE_STR" \
                 '.last_tool.result = $result
                  | .current_turn.last_askquestions_response = $response
                  | .session.close_key_validated = true' \
-                "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 
             # Log do evento de validação da chave
             jq -cn \
@@ -119,21 +144,21 @@ if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
                 }' >> "$LOG_DIR/audit.jsonl"
         else
             jq --arg result "$RESULT_TYPE" \
-               --arg response "$RESPONSE_STR" \
+                --arg response "$RESPONSE_STR" \
                 '.last_tool.result = $result
                  | .current_turn.last_askquestions_response = $response' \
-                "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
         fi
     elif [ "$RESULT_TYPE" = "failure" ]; then
         jq --arg result "$RESULT_TYPE" --arg tool "$TOOL_NAME" \
             '.last_tool.result = $result
              | .current_turn.failures_count = ((.current_turn.failures_count // 0) + 1)
              | .session_stats.failures_detected = ((.session_stats.failures_detected // 0) + 1)' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     else
         jq --arg result "$RESULT_TYPE" \
             '.last_tool.result = $result' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
 fi
 
@@ -141,10 +166,10 @@ fi
 # Calcula duração entre preToolUse (last_tool.ts) e este postToolUse.
 # Ambos os timestamps são ISO strings — converte para epoch ms com date -d.
 if [ -f "$CTX_FILE" ]; then
-    LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$LAST_TOOL_TS" ] && [ -n "$TIMESTAMP" ]; then
-        TS_MS="$(date -d "$TIMESTAMP" '+%s%3N' 2>/dev/null || echo '')"
-        LAST_MS="$(date -d "$LAST_TOOL_TS" '+%s%3N' 2>/dev/null || echo '')"
+        TS_MS="$(date -d "$TIMESTAMP" '+%s%3N' 2> /dev/null || echo '')"
+        LAST_MS="$(date -d "$LAST_TOOL_TS" '+%s%3N' 2> /dev/null || echo '')"
         if [ -n "$TS_MS" ] && [ -n "$LAST_MS" ] && [ "$TS_MS" -gt 0 ] && [ "$LAST_MS" -gt 0 ]; then
             DURATION_MS=$((TS_MS - LAST_MS))
             # Sanity: ignora durações negativas ou absurdas (>10min = gap entre sessões)
@@ -170,15 +195,15 @@ fi
 # ── Quality gates: registra execuções de lint/typecheck/test/format ──────────
 # tool_input é objeto JSON; extrai .command para identificar gates de qualidade
 if [ "$TOOL_NAME" = "run_in_terminal" ] || [ "$TOOL_NAME" = "bash" ]; then
-    COMMAND="$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null || echo '')"
+    COMMAND="$(echo "$INPUT" | jq -r '.tool_input.command // ""' 2> /dev/null || echo '')"
 
     for GATE_PATTERN in "npm run lint" "npm run typecheck" "npm run test" "npm run format"; do
         if echo "$COMMAND" | grep -qF "$GATE_PATTERN"; then
-            if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+            if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
                 GATE_KEY="$(echo "$GATE_PATTERN" | sed 's/npm run //' | sed 's/:/_/g')"
                 jq --arg key "gate_${GATE_KEY}" --arg ts "$TIMESTAMP" --arg result "$RESULT_TYPE" \
                     '.quality_gates[$key] = {timestamp: $ts, result: $result}' \
-                    "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+                    "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
             fi
             break
         fi

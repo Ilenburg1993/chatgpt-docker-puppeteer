@@ -46,13 +46,13 @@ PREV_SECTION_NUMBER=0
 CURRENT_SECTION_COUNT=0
 
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
-    TURN_NUMBER="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
-    PREV_SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
-    PREV_SECTION_STARTED="$(jq -r '.current_section.started_at // ""' "$CTX_FILE" 2>/dev/null || echo '')"
-    PREV_SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
-    PREV_SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
-    CURRENT_SECTION_COUNT="$(jq -r '.session_stats.section_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
+    TURN_NUMBER="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    PREV_SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    PREV_SECTION_STARTED="$(jq -r '.current_section.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    PREV_SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    PREV_SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    CURRENT_SECTION_COUNT="$(jq -r '.session_stats.section_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
 
 # Turno atual (turn_count é incrementado no agentStop, logo atual = count + 1)
@@ -65,7 +65,7 @@ if [ -n "$PREV_SECTION_NAME" ]; then
 
     # Calcula duration_s da seção anterior
     PREV_DURATION_S=0
-    if [ -n "$PREV_SECTION_STARTED" ] && command -v python3 &>/dev/null; then
+    if [ -n "$PREV_SECTION_STARTED" ] && command -v python3 &> /dev/null; then
         PREV_DURATION_S="$(python3 -c "
 import sys
 from datetime import datetime, timezone
@@ -75,7 +75,7 @@ try:
     print(int((b - a).total_seconds()))
 except Exception:
     print(0)
-" 2>/dev/null || echo 0)"
+" 2> /dev/null || echo 0)"
     fi
 
     # Calcula turns_covered
@@ -133,8 +133,8 @@ else
                 | .session_stats.section_names += [$name]'
 fi
 
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
-    jq "${_JQ_ARGS[@]}" "$_JQ_FILTER" "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+    jq "${_JQ_ARGS[@]}" "$_JQ_FILTER" "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
     jq "${_JQ_ARGS[@]}" "$_JQ_FILTER" "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
@@ -168,4 +168,3 @@ else
     echo "[seção] Iniciando: \"$SECTION_NAME\" (seção #${NEW_SECTION_NUMBER}, turno ~$CURRENT_TURN)" >&2
 fi
 exit 0
-

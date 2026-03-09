@@ -40,9 +40,9 @@ TURN_NUMBER=1
 SECTION_NAME=""
 
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
-    TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2>/dev/null || echo 1)"
-    SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2> /dev/null || echo 'unknown')"
+    TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Loga turnStart_enriched no audit.jsonl

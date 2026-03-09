@@ -189,16 +189,16 @@ Fluxo de encerramento autorizado:
 
 Todos registrados em `logs/audit.jsonl`:
 
-| Evento                          | Quando ocorre                                          |
-| ------------------------------- | ------------------------------------------------------ |
-| `turnEnd_authorized`            | Turno encerrado com vscode_askQuestions chamado        |
-| `turnEnd_UNAUTHORIZED`          | Turno encerrado sem vscode_askQuestions                |
-| `sessionEnd_compliance`         | Fim de sessão — resumo de conformidade                 |
-| `authViolation_reset`           | Flag resetada manualmente                              |
-| `askQuestions_response`         | Resposta de vscode_askQuestions capturada              |
-| `sessionClose_key_validated`    | close_key encontrada na resposta — SESSION pode fechar |
-| `sessionEnd_authorized_close`   | SESSION encerrada com close_key validada               |
-| `sessionEnd_no_key`             | SESSION encerrada sem close_key — flag criada          |
+| Evento                        | Quando ocorre                                          |
+| ----------------------------- | ------------------------------------------------------ |
+| `turnEnd_authorized`          | Turno encerrado com vscode_askQuestions chamado        |
+| `turnEnd_UNAUTHORIZED`        | Turno encerrado sem vscode_askQuestions                |
+| `sessionEnd_compliance`       | Fim de sessão — resumo de conformidade                 |
+| `authViolation_reset`         | Flag resetada manualmente                              |
+| `askQuestions_response`       | Resposta de vscode_askQuestions capturada              |
+| `sessionClose_key_validated`  | close_key encontrada na resposta — SESSION pode fechar |
+| `sessionEnd_authorized_close` | SESSION encerrada com close_key validada               |
+| `sessionEnd_no_key`           | SESSION encerrada sem close_key — flag criada          |
 
 ---
 

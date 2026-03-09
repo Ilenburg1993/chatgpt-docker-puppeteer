@@ -105,7 +105,6 @@ jq -cn \
 echo "[seção] Encerrada: \"$SECTION_NAME\" (seção #${SECTION_NUMBER}, ${TURNS_COVERED} turno(s), ${DURATION_S}s) — $REASON" >&2
 exit 0
 
-
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$HOOK_DIR/logs"
 STATE_DIR="$HOOK_DIR/state"

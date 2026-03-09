@@ -28,15 +28,15 @@ PROMPT_RAW="$(echo "$INPUT" | jq -r '.prompt // ""' 2> /dev/null || echo '')"
 # Obtém session_id do contexto persistido — fix B6: sem quebra de linha invisível
 SESSION_ID=""
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Calcula hash SHA-256 truncado do prompt (jamais loga o texto completo)
 PROMPT_HASH=""
 PROMPT_LEN="${#PROMPT_RAW}"
-if [ -n "$PROMPT_RAW" ] && command -v sha256sum &>/dev/null; then
+if [ -n "$PROMPT_RAW" ] && command -v sha256sum &> /dev/null; then
     PROMPT_HASH="$(echo -n "$PROMPT_RAW" | sha256sum | cut -c1-16)"
-elif [ -n "$PROMPT_RAW" ] && command -v shasum &>/dev/null; then
+elif [ -n "$PROMPT_RAW" ] && command -v shasum &> /dev/null; then
     PROMPT_HASH="$(echo -n "$PROMPT_RAW" | shasum -a 256 | cut -c1-16)"
 fi
 
@@ -63,11 +63,11 @@ jq -cn \
 # não herde estado "fantasma" do turno anterior.
 # current_turn.number = session_stats.turn_count + 1 (turno que está começando)
 # Schema v4: section_name capturado da section ativa; last_askquestions_response resetado.
-NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo '')"
+NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
 TURN_NUMBER=1
 SECTION_NAME=""
 
-if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
     jq --arg ts "${TIMESTAMP:-$NOW_ISO}" \
         '.current_turn.started_at                = $ts
          | .current_turn.tools_count               = 0
@@ -78,11 +78,11 @@ if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
          | .current_turn.last_askquestions_response = null
          | .current_turn.number                    = ((.session_stats.turn_count // 0) + 1)
          | .current_turn.section_name              = .current_section.name' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 
     # Lê valores pós-reset para logar turnStart
-    TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2>/dev/null || echo 1)"
-    SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    TURN_NUMBER="$(jq -r '.current_turn.number // 1' "$CTX_FILE" 2> /dev/null || echo 1)"
+    SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Loga evento turnStart (automático — complementado por start-turn.sh para intenção)
@@ -101,4 +101,3 @@ jq -cn \
     }' >> "$LOG_DIR/audit.jsonl"
 
 exit 0
-

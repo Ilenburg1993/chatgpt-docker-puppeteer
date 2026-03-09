@@ -65,18 +65,44 @@ jq -cn \
         tool_args:   $args
     }' >> "$LOG_DIR/audit.jsonl"
 
+# ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
+# HARDENING v5: previne contaminação cruzada entre sessões.
+# Se o payload carrega session_id diferente do contexto ativo,
+# ainda loga no audit.jsonl (read-append), mas NÃO modifica session-context.json.
+if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID" ]; then
+    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID" != "$CTX_ACTIVE_SID" ]; then
+        jq -cn \
+            --arg event "session_id_mismatch" \
+            --arg expected "$CTX_ACTIVE_SID" \
+            --arg got "$SESSION_ID" \
+            --arg source "pre-tool-use.sh" \
+            --arg tool "$TOOL_NAME" \
+            '{
+                event:   $event,
+                expected: $expected,
+                got:      $got,
+                source:   $source,
+                tool:     $tool,
+                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+            }' >> "$LOG_DIR/audit.jsonl"
+        exit 0
+    fi
+fi
+
 # ── Atualiza contexto — Schema v2 ────────────────────────────────────────────
 # Atualiza 3 blocos separados:
 #   last_tool.*       → sobrescrito a cada chamada (âmbito: chamada)
 #   current_turn.*    → acumula até agentStop (âmbito: turno)
 #   session_stats.*   → acumula até sessionEnd (âmbito: sessão)
 # Quando vscode_askQuestions: seta current_turn.auth_requested = true
+# NOTA: NÃO sobrescreve .session.id (removido no HARDENING v5 — session_id é
+#       definido apenas por session-start.sh; sobrescrever aqui causava contaminação).
 if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
     if [ "$TOOL_NAME" = "vscode_askQuestions" ]; then
-        jq --arg sid "$SESSION_ID" --arg ts "$TIMESTAMP" \
+        jq --arg ts "$TIMESTAMP" \
            --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
-            '.session.id = (if $sid != "" then $sid else .session.id end)
-             | .last_tool.name   = $tool
+            '.last_tool.name   = $tool
              | .last_tool.ts     = $ts
              | .last_tool.use_id = $id
              | .last_tool.result = null
@@ -88,10 +114,9 @@ if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
              | .session_stats.tools_by_name = ((.session_stats.tools_by_name // {}) | .[$tool] = ((. // {})[$tool] // 0) + 1)' \
             "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
     else
-        jq --arg sid "$SESSION_ID" --arg ts "$TIMESTAMP" \
+        jq --arg ts "$TIMESTAMP" \
            --arg tool "$TOOL_NAME" --arg id "$TOOL_USE_ID" \
-            '.session.id = (if $sid != "" then $sid else .session.id end)
-             | .last_tool.name   = $tool
+            '.last_tool.name   = $tool
              | .last_tool.ts     = $ts
              | .last_tool.use_id = $id
              | .last_tool.result = null

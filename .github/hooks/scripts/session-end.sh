@@ -51,11 +51,11 @@ CLOSE_SECTION_NUMBER=0
 CLOSE_TURN_COUNT=0
 
 if [ -f "$CTX_FILE" ]; then
-    CLOSE_SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
-    CLOSE_SECTION_STARTED="$(jq -r '.current_section.started_at // ""' "$CTX_FILE" 2>/dev/null || echo '')"
-    CLOSE_SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
-    CLOSE_SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
-    CLOSE_TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+    CLOSE_SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    CLOSE_SECTION_STARTED="$(jq -r '.current_section.started_at // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    CLOSE_SECTION_TURN_START="$(jq -r '.current_section.turn_start // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    CLOSE_SECTION_NUMBER="$(jq -r '.current_section.section_number // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    CLOSE_TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
 fi
 
 if [ -n "$CLOSE_SECTION_NAME" ]; then
@@ -64,7 +64,7 @@ if [ -n "$CLOSE_SECTION_NAME" ]; then
 
     # Calcula duration_s da section
     CLOSE_DURATION_S=0
-    if [ -n "$CLOSE_SECTION_STARTED" ] && command -v python3 &>/dev/null; then
+    if [ -n "$CLOSE_SECTION_STARTED" ] && command -v python3 &> /dev/null; then
         CLOSE_DURATION_S="$(python3 -c "
 import sys
 from datetime import datetime, timezone
@@ -74,7 +74,7 @@ try:
     print(int((b - a).total_seconds()))
 except Exception:
     print(0)
-" 2>/dev/null || echo 0)"
+" 2> /dev/null || echo 0)"
     fi
 
     CLOSE_TURNS_COVERED=$((CLOSE_CURRENT_TURN - CLOSE_SECTION_TURN_START))
@@ -108,9 +108,9 @@ except Exception:
         }' >> "$LOG_DIR/audit.jsonl"
 
     # Limpa current_section no contexto
-    if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+    if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
         jq '.current_section = {name: null, started_at: null, turn_start: null, description: null, section_number: null}' \
-            "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+            "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
     fi
 fi
 

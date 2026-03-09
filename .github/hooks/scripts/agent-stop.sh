@@ -1,14 +1,18 @@
 #!/bin/bash
-# agent-stop.sh — Hook agentStop do Copilot
+# agent-stop.sh — Hook agentStop do Copilot (Stop event)
 # Executado quando o agente termina de responder ao prompt (fim de turno).
-# Input JSON (stdin): {timestamp, hook_event_name, session_id, ...}
-# Output: ignorado pelo Copilot.
+# Input JSON (stdin): {timestamp, hook_event_name, session_id, stop_hook_active, ...}
+# Output JSON (stdout): quando o turno não chamou vscode_askQuestions, emite
+#   {"decision":"block","systemMessage":"..."} para forçar o agente a continuar.
+#   Caso contrário, não emite nada (saída vazia → agente encerra normalmente).
 #
 # PROTOCOLO DE ENCERRAMENTO: detecta fins de turno e verifica autorização.
 # O agente DEVE usar vscode_askQuestions antes de encerrar — este hook faz a
 # verificação post-hoc e registra conformidade ou violação.
 #
-# Schema v2:
+# HARDENING v5:
+#   - decision:block quando agente tenta encerrar sem vscode_askQuestions
+#   - Anti-recursão: respeita stop_hook_active e block_count (max 1 retry)
 #   - Calcula turn_duration a partir de current_turn.started_at (fix B3)
 #   - session_summary usa métricas DO TURNO, não da sessão (fix B4)
 #   - Reseta current_turn.* e incrementa session_stats.* após cada turno
@@ -37,6 +41,27 @@ STOP_HOOK_ACTIVE="$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2> /dev/n
 SESSION_ID="$SESSION_ID_PAYLOAD"
 if [ -z "$SESSION_ID" ] && [ -f "$CTX_FILE" ]; then
     SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+fi
+
+# ── Guard: session_id deve corresponder ao contexto ativo ─────────────────────
+# HARDENING v5: previne contaminação cruzada entre sessões.
+if [ -f "$CTX_FILE" ] && [ -n "$SESSION_ID_PAYLOAD" ]; then
+    CTX_ACTIVE_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ -n "$CTX_ACTIVE_SID" ] && [ "$SESSION_ID_PAYLOAD" != "$CTX_ACTIVE_SID" ]; then
+        jq -cn \
+            --arg event "session_id_mismatch" \
+            --arg expected "$CTX_ACTIVE_SID" \
+            --arg got "$SESSION_ID_PAYLOAD" \
+            --arg source "agent-stop.sh" \
+            '{
+                event:   $event,
+                expected: $expected,
+                got:      $got,
+                source:   $source,
+                message:  "Payload session_id diferente do contexto ativo — state write bloqueado"
+            }' >> "$LOG_DIR/audit.jsonl"
+        exit 0
+    fi
 fi
 
 # ── Calcula duração do turno — fix B3 ────────────────────────────────────────
@@ -112,6 +137,41 @@ if [ "$AUTH_REQUESTED" = "false" ] && [ -f "$CTX_FILE" ]; then
         .auth_requested_this_turn //
         false' "$CTX_FILE" 2> /dev/null || echo false)"
     if [ "$CTX_FLAG" = "true" ]; then AUTH_REQUESTED=true; fi
+fi
+
+# ── HARDENING: decision:block para turnos não autorizados ─────────────────────
+# Quando o agente tenta encerrar sem vscode_askQuestions:
+#   1. stop_hook_active=true → hook iniciou esta parada, não bloquear (anti-recursão)
+#   2. block_count >= 1 → já tentamos, safety valve — permitir encerramento
+#   3. Caso contrário → emitir {"decision":"block"} no stdout forçando continuação
+if [ "$AUTH_REQUESTED" = "false" ] && [ "$STOP_HOOK_ACTIVE" != "true" ]; then
+    BLOCK_COUNT=0
+    if [ -f "$CTX_FILE" ]; then
+        BLOCK_COUNT="$(jq -r '.current_turn.block_count // 0' "$CTX_FILE" 2> /dev/null || echo 0)"
+    fi
+    if [ "$BLOCK_COUNT" -lt 1 ]; then
+        # Incrementa block_count (safety valve: na próxima vez permite encerrar)
+        if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
+            jq '.current_turn.block_count = (.current_turn.block_count // 0) + 1' \
+                "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
+        fi
+        # Registra bloqueio no audit
+        jq -cn \
+            --arg event "turnEnd_BLOCKED" \
+            --arg sid "$SESSION_ID" \
+            --arg ts "$NOW_ISO" \
+            --argjson bc "$((BLOCK_COUNT + 1))" \
+            '{
+                event:       $event,
+                session_id:  $sid,
+                timestamp:   $ts,
+                block_count: $bc,
+                message:     "Agente tentou encerrar sem askQuestions — bloqueado para retry"
+            }' >> "$LOG_DIR/audit.jsonl"
+        # Emite decision:block no stdout — extensão mantém o agente rodando
+        printf '{"decision":"block","systemMessage":"⛔ PROTOCOLO DE ENCERRAMENTO OBRIGATÓRIO: Você DEVE chamar a ferramenta vscode_askQuestions antes de encerrar este turno. Apresente Template A (pergunta aberta sobre próximos passos) ou Template F (encerramento de sessão com close_key) conforme documentado em .github/AGENTS.md. NÃO encerre sem essa chamada."}\n'
+        exit 0
+    fi
 fi
 
 # ── Lê métricas do turno atual (para session_summary — fix B4) ───────────────
@@ -193,7 +253,8 @@ if [ -f "$CTX_FILE" ] && command -v sponge &> /dev/null; then
          | .last_turn_ts              = $now
          | .session_summary           = $summary
          | .current_turn.auth_requested    = false
-         | .current_turn.auth_requested_at = null' \
+         | .current_turn.auth_requested_at = null
+         | .current_turn.block_count       = 0' \
         "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 

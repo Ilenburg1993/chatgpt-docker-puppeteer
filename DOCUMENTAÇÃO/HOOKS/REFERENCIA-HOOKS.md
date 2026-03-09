@@ -1,12 +1,12 @@
 # Referência Definitiva — Hooks do GitHub Copilot Chat
 
-**Versão**: 1.0 — github.copilot-chat-0.38.2  
-**Última atualização**: 2026-01  
+**Versão**: 1.0 — github.copilot-chat-0.38.2
+**Última atualização**: 2026-01
 **Status**: Canônico. Baseado em documentação oficial + análise empírica do source.
 
 > Este documento combina:
-> - Documentação oficial em `hooks.md` (bundled na extensão)  
-> - Análise direta do source `extension.js` (~18MB) e `cli.js` (~12MB)  
+> - Documentação oficial em `hooks.md` (bundled na extensão)
+> - Análise direta do source `extension.js` (~18MB) e `cli.js` (~12MB)
 > - Confirmação empírica via `audit.jsonl` (1990+ eventos de sessão real)
 
 ---
@@ -82,12 +82,12 @@ porque a conversão ocorre no CLI **antes** de chegar à extensão.
 
 ## 2. Localidades de configuração
 
-| Caminho | Escopo | Notas |
-|---------|--------|-------|
-| `.github/hooks/*.json` | Workspace compartilhado | Commitado. Lido pelo CLI ao ativar `chat.useClaudeHooks`. |
-| `.claude/settings.json` | Workspace | Padrão Claude Code — PascalCase nativo. |
-| `.claude/settings.local.json` | Workspace local | Não deve ser commitado (segredos). |
-| `~/.claude/settings.json` | Perfil do usuário | Global, todos os workspaces. |
+| Caminho                       | Escopo                  | Notas                                                     |
+| ----------------------------- | ----------------------- | --------------------------------------------------------- |
+| `.github/hooks/*.json`        | Workspace compartilhado | Commitado. Lido pelo CLI ao ativar `chat.useClaudeHooks`. |
+| `.claude/settings.json`       | Workspace               | Padrão Claude Code — PascalCase nativo.                   |
+| `.claude/settings.local.json` | Workspace local         | Não deve ser commitado (segredos).                        |
+| `~/.claude/settings.json`     | Perfil do usuário       | Global, todos os workspaces.                              |
 
 **Nosso workspace usa**: `.github/hooks/copilot-hooks.json` (via `chat.useClaudeHooks: true`).
 
@@ -114,33 +114,33 @@ porque a conversão ocorre no CLI **antes** de chegar à extensão.
 }
 ```
 
-| Campo | Tipo | Aliases | Descrição |
-|-------|------|---------|-----------|
-| `type` | string | — | Deve ser `"command"`. Único valor suportado. |
-| `bash` | string | alias de `command` | Comando ou script a executar. CLI converte para `command`. |
-| `command` | string | — | Nome padrão SDK (PascalCase nativo). |
-| `timeoutSec` | number | alias de `timeout` | Timeout em segundos. CLI converte para `timeout`. |
-| `timeout` | number | — | Nome padrão SDK. Padrão interno: **30 segundos**. |
-| `cwd` | string | — | Diretório de trabalho para o processo filho. |
-| `env` | object | — | Variáveis de ambiente extras (merged com process.env). |
-| `windows` | string | — | Comando específico para Windows (override de `command`). |
-| `linux` | string | — | Comando específico para Linux (override de `command`). |
-| `osx` | string | — | Comando específico para macOS (override de `command`). |
+| Campo        | Tipo   | Aliases            | Descrição                                                  |
+| ------------ | ------ | ------------------ | ---------------------------------------------------------- |
+| `type`       | string | —                  | Deve ser `"command"`. Único valor suportado.               |
+| `bash`       | string | alias de `command` | Comando ou script a executar. CLI converte para `command`. |
+| `command`    | string | —                  | Nome padrão SDK (PascalCase nativo).                       |
+| `timeoutSec` | number | alias de `timeout` | Timeout em segundos. CLI converte para `timeout`.          |
+| `timeout`    | number | —                  | Nome padrão SDK. Padrão interno: **30 segundos**.          |
+| `cwd`        | string | —                  | Diretório de trabalho para o processo filho.               |
+| `env`        | object | —                  | Variáveis de ambiente extras (merged com process.env).     |
+| `windows`    | string | —                  | Comando específico para Windows (override de `command`).   |
+| `linux`      | string | —                  | Comando específico para Linux (override de `command`).     |
+| `osx`        | string | —                  | Comando específico para macOS (override de `command`).     |
 
 **Chaves camelCase** aceitas no copilot-hooks.json (convertidas para PascalCase pelo CLI):
 
-| copilot-hooks.json | SDK PascalCase |
-|--------------------|----------------|
-| `sessionStart` | `SessionStart` |
+| copilot-hooks.json    | SDK PascalCase     |
+| --------------------- | ------------------ |
+| `sessionStart`        | `SessionStart`     |
 | `userPromptSubmitted` | `UserPromptSubmit` |
-| `preToolUse` | `PreToolUse` |
-| `postToolUse` | `PostToolUse` |
-| `agentStop` | `Stop` |
-| `subagentStop` | `SubagentStop` |
-| `sessionEnd` | `SessionEnd` |
-| `subagentStart` | `SubagentStart` |
-| `preCompact` | `PreCompact` |
-| `errorOccurred` | **❓ desconhecido** |
+| `preToolUse`          | `PreToolUse`       |
+| `postToolUse`         | `PostToolUse`      |
+| `agentStop`           | `Stop`             |
+| `subagentStop`        | `SubagentStop`     |
+| `sessionEnd`          | `SessionEnd`       |
+| `subagentStart`       | `SubagentStart`    |
+| `preCompact`          | `PreCompact`       |
+| `errorOccurred`       | **❓ desconhecido** |
 
 ### 3.2 Formato .claude/settings.json (SDK nativo, PascalCase)
 
@@ -424,11 +424,11 @@ O hook escreve JSON no stdout (exit 0). A extensão faz JSON.parse do stdout.
 
 ### 6.3 Códigos de saída
 
-| Exit code | Significado | Efeito |
-|-----------|-------------|--------|
-| `0` | Sucesso | Stdout parseado como JSON |
-| `2` | Erro bloqueante | Interrompe a operação (stderr como mensagem) |
-| Outros | Aviso não-bloqueante | Operação continua; stderr exibido como warning |
+| Exit code | Significado          | Efeito                                         |
+| --------- | -------------------- | ---------------------------------------------- |
+| `0`       | Sucesso              | Stdout parseado como JSON                      |
+| `2`       | Erro bloqueante      | Interrompe a operação (stderr como mensagem)   |
+| Outros    | Aviso não-bloqueante | Operação continua; stderr exibido como warning |
 
 ---
 
@@ -436,26 +436,26 @@ O hook escreve JSON no stdout (exit 0). A extensão faz JSON.parse do stdout.
 
 Lista completa extraída do source (array `Mti` em `extension.js`, pos ~1066861):
 
-| Evento SDK (PascalCase) | Documentado oficialmente | Configurável em nosso hooks |
-|-------------------------|--------------------------|------------------------------|
-| `SessionStart` | ✅ Sim | ✅ via `sessionStart` |
-| `UserPromptSubmit` | ✅ Sim | ✅ via `userPromptSubmitted` (RARO) |
-| `PreToolUse` | ✅ Sim | ✅ via `preToolUse` |
-| `PostToolUse` | ✅ Sim | ✅ via `postToolUse` |
-| `PostToolUseFailure` | ❌ Não documentado | ❌ não configurado |
-| `Stop` | ✅ Sim (como "Stop") | ✅ via `agentStop` |
-| `SubagentStart` | ✅ Sim | ❌ não configurado |
-| `SubagentStop` | ✅ Sim | ✅ via `subagentStop` |
-| `PreCompact` | ✅ Sim | ❌ não configurado |
-| `SessionEnd` | ❌ Não documentado oficialmente | ✅ via `sessionEnd` |
-| `Notification` | ❌ Não documentado | ❌ não configurado |
-| `PermissionRequest` | ❌ Não documentado | ❌ não configurado |
-| `Setup` | ❌ Não documentado | ❌ não configurado |
-| `TeammateIdle` | ❌ Não documentado | ❌ não configurado |
-| `TaskCompleted` | ❌ Não documentado | ❌ não configurado |
-| `ConfigChange` | ❌ Não documentado | ❌ não configurado |
-| `WorktreeCreate` | ❌ Não documentado | ❌ não configurado |
-| `WorktreeRemove` | ❌ Não documentado | ❌ não configurado |
+| Evento SDK (PascalCase) | Documentado oficialmente       | Configurável em nosso hooks        |
+| ----------------------- | ------------------------------ | ---------------------------------- |
+| `SessionStart`          | ✅ Sim                          | ✅ via `sessionStart`               |
+| `UserPromptSubmit`      | ✅ Sim                          | ✅ via `userPromptSubmitted` (RARO) |
+| `PreToolUse`            | ✅ Sim                          | ✅ via `preToolUse`                 |
+| `PostToolUse`           | ✅ Sim                          | ✅ via `postToolUse`                |
+| `PostToolUseFailure`    | ❌ Não documentado              | ❌ não configurado                  |
+| `Stop`                  | ✅ Sim (como "Stop")            | ✅ via `agentStop`                  |
+| `SubagentStart`         | ✅ Sim                          | ❌ não configurado                  |
+| `SubagentStop`          | ✅ Sim                          | ✅ via `subagentStop`               |
+| `PreCompact`            | ✅ Sim                          | ❌ não configurado                  |
+| `SessionEnd`            | ❌ Não documentado oficialmente | ✅ via `sessionEnd`                 |
+| `Notification`          | ❌ Não documentado              | ❌ não configurado                  |
+| `PermissionRequest`     | ❌ Não documentado              | ❌ não configurado                  |
+| `Setup`                 | ❌ Não documentado              | ❌ não configurado                  |
+| `TeammateIdle`          | ❌ Não documentado              | ❌ não configurado                  |
+| `TaskCompleted`         | ❌ Não documentado              | ❌ não configurado                  |
+| `ConfigChange`          | ❌ Não documentado              | ❌ não configurado                  |
+| `WorktreeCreate`        | ❌ Não documentado              | ❌ não configurado                  |
+| `WorktreeRemove`        | ❌ Não documentado              | ❌ não configurado                  |
 
 > **errorOccurred** (nosso copilot-hooks.json): ❓ mapeamento SDK **desconhecido**.
 > Não está na lista `Mti`. Provavelmente ignorado silenciosamente pelo CLI.
@@ -467,15 +467,15 @@ Lista completa extraída do source (array `Mti` em `extension.js`, pos ~1066861)
 
 ### 8.1 SessionStart — início de sessão
 
-| Aspecto | Detalhe |
-|---------|---------|
-| **Quando dispara** | Primeiro prompt de uma nova sessão do agente |
-| **Frequência** | 1x por sessão |
-| **Campo específico** | `source`: `"startup"`, `"resume"`, `"clear"`, `"compact"` |
-| **Saída útil** | `hookSpecificOutput.additionalContext` → injetado na sessão |
-| **Handler interno** | `executeSessionStartHook()` em extension.js |
-| **Nosso script** | `.github/hooks/scripts/session-start.sh` |
-| **Uso atual** | Inicializa session-context.json com novo session_id |
+| Aspecto              | Detalhe                                                     |
+| -------------------- | ----------------------------------------------------------- |
+| **Quando dispara**   | Primeiro prompt de uma nova sessão do agente                |
+| **Frequência**       | 1x por sessão                                               |
+| **Campo específico** | `source`: `"startup"`, `"resume"`, `"clear"`, `"compact"`   |
+| **Saída útil**       | `hookSpecificOutput.additionalContext` → injetado na sessão |
+| **Handler interno**  | `executeSessionStartHook()` em extension.js                 |
+| **Nosso script**     | `.github/hooks/scripts/session-start.sh`                    |
+| **Uso atual**        | Inicializa session-context.json com novo session_id         |
 
 **Confirmação empírica**: 1 evento por sessão em audit.jsonl.
 
@@ -483,15 +483,15 @@ Lista completa extraída do source (array `Mti` em `extension.js`, pos ~1066861)
 
 ### 8.2 UserPromptSubmit — prompt do usuário ⚠️ RARO
 
-| Aspecto | Detalhe |
-|---------|---------|
-| **Quando dispara** | Usuário digita diretamente no chat do Copilot e pressiona Enter |
+| Aspecto                | Detalhe                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| **Quando dispara**     | Usuário digita diretamente no chat do Copilot e pressiona Enter                    |
 | **Quando NÃO dispara** | Resposta a `vscode_askQuestions`, continuações por compactação, operações internas |
-| **Frequência** | ~4 eventos em 1990+ eventos totais (sessão real) — **muito raro** |
-| **Campo específico** | `prompt`: texto digitado pelo usuário |
-| **Saída** | Campos comuns (`systemMessage`, etc.) |
-| **Nosso script** | `.github/hooks/scripts/log-prompt.sh` |
-| **Uso atual** | Registra prompt, marca `current_turn.started_at` |
+| **Frequência**         | ~4 eventos em 1990+ eventos totais (sessão real) — **muito raro**                  |
+| **Campo específico**   | `prompt`: texto digitado pelo usuário                                              |
+| **Saída**              | Campos comuns (`systemMessage`, etc.)                                              |
+| **Nosso script**       | `.github/hooks/scripts/log-prompt.sh`                                              |
+| **Uso atual**          | Registra prompt, marca `current_turn.started_at`                                   |
 
 **IMPORTANTE PARA ARQUITETURA**: Não usar `userPromptSubmitted` como marcador de início de turno.
 A maioria das interações (via `vscode_askQuestions`) **não dispara** este hook.
@@ -502,28 +502,28 @@ A maioria das interações (via `vscode_askQuestions`) **não dispara** este hoo
 
 ### 8.3 PreToolUse — antes de cada tool ⚡ FREQUENTE
 
-| Aspecto | Detalhe |
-|---------|---------|
-| **Quando dispara** | Imediatamente antes de cada invocação de tool |
-| **Frequência** | ~1000 por sessão (mais frequente de todos) |
-| **Campo específico** | `tool_name`, `tool_input` |
-| **Saída útil** | `hookSpecificOutput.permissionDecision`: `"allow"`, `"ask"`, `"deny"` |
-| **Exit 2** | Bloqueia o uso do tool |
-| **Nosso script** | `.github/hooks/scripts/pre-tool-use.sh` |
-| **Uso atual** | Registra tool call em audit.jsonl |
+| Aspecto              | Detalhe                                                               |
+| -------------------- | --------------------------------------------------------------------- |
+| **Quando dispara**   | Imediatamente antes de cada invocação de tool                         |
+| **Frequência**       | ~1000 por sessão (mais frequente de todos)                            |
+| **Campo específico** | `tool_name`, `tool_input`                                             |
+| **Saída útil**       | `hookSpecificOutput.permissionDecision`: `"allow"`, `"ask"`, `"deny"` |
+| **Exit 2**           | Bloqueia o uso do tool                                                |
+| **Nosso script**     | `.github/hooks/scripts/pre-tool-use.sh`                               |
+| **Uso atual**        | Registra tool call em audit.jsonl                                     |
 
 ---
 
 ### 8.4 PostToolUse — após cada tool ⚡ FREQUENTE
 
-| Aspecto | Detalhe |
-|---------|---------|
-| **Quando dispara** | Após invocação bem-sucedida de tool |
-| **Frequência** | ~1000 por sessão (em par com PreToolUse) |
-| **Campos específicos** | `tool_name`, `tool_input`, `tool_response` |
-| **Saída útil** | `decision: "block"` para interromper processamento do resultado |
-| **Nosso script** | `.github/hooks/scripts/post-tool-use.sh` |
-| **Uso atual** | Detecta `vscode_askQuestions` → seta `auth_requested: true` no contexto |
+| Aspecto                | Detalhe                                                                 |
+| ---------------------- | ----------------------------------------------------------------------- |
+| **Quando dispara**     | Após invocação bem-sucedida de tool                                     |
+| **Frequência**         | ~1000 por sessão (em par com PreToolUse)                                |
+| **Campos específicos** | `tool_name`, `tool_input`, `tool_response`                              |
+| **Saída útil**         | `decision: "block"` para interromper processamento do resultado         |
+| **Nosso script**       | `.github/hooks/scripts/post-tool-use.sh`                                |
+| **Uso atual**          | Detecta `vscode_askQuestions` → seta `auth_requested: true` no contexto |
 
 **CRÍTICO**: É via PostToolUse que detectamos `vscode_askQuestions` e marcamos
 `current_turn.auth_requested = true` em session-context.json.
@@ -532,15 +532,15 @@ A maioria das interações (via `vscode_askQuestions`) **não dispara** este hoo
 
 ### 8.5 Stop (agentStop) — fim de turno ✅ CONFIÁVEL
 
-| Aspecto | Detalhe |
-|---------|---------|
-| **Quando dispara** | Fim de cada turno de resposta do agente |
-| **Frequência** | 1x por turno (após TODAS as ferramentas do turno) |
-| **Campo específico** | `stop_hook_active: boolean` |
-| **Saída útil** | `decision: "block"` → `shouldContinue: true` → agente continua |
-| **Handler interno** | `executeStopHook()` em extension.js |
-| **Nosso script** | `.github/hooks/scripts/agent-stop.sh` |
-| **Uso atual** | Verifica autorização, registra fim de turno, reseta estado |
+| Aspecto              | Detalhe                                                        |
+| -------------------- | -------------------------------------------------------------- |
+| **Quando dispara**   | Fim de cada turno de resposta do agente                        |
+| **Frequência**       | 1x por turno (após TODAS as ferramentas do turno)              |
+| **Campo específico** | `stop_hook_active: boolean`                                    |
+| **Saída útil**       | `decision: "block"` → `shouldContinue: true` → agente continua |
+| **Handler interno**  | `executeStopHook()` em extension.js                            |
+| **Nosso script**     | `.github/hooks/scripts/agent-stop.sh`                          |
+| **Uso atual**        | Verifica autorização, registra fim de turno, reseta estado     |
 
 **`stop_hook_active` explicado**:
 - `false` → parada normal do agente (caso padrão)
@@ -555,25 +555,25 @@ causará recursão infinita. **Sempre verificar este campo antes de bloquear.**
 
 ### 8.6 SubagentStop — fim de subagente
 
-| Aspecto | Detalhe |
-|---------|---------|
-| **Quando dispara** | Quando um subagente encerra |
-| **Frequência** | Raro (apenas quando há subagentes) |
+| Aspecto                | Detalhe                                                 |
+| ---------------------- | ------------------------------------------------------- |
+| **Quando dispara**     | Quando um subagente encerra                             |
+| **Frequência**         | Raro (apenas quando há subagentes)                      |
 | **Campos específicos** | `agent_id`, `agent_transcript_path`, `stop_hook_active` |
-| **Nosso script** | `.github/hooks/scripts/subagent-stop.sh` |
-| **Uso atual** | Registro básico |
+| **Nosso script**       | `.github/hooks/scripts/subagent-stop.sh`                |
+| **Uso atual**          | Registro básico                                         |
 
 ---
 
 ### 8.7 SessionEnd — fim de sessão
 
-| Aspecto | Detalhe |
-|---------|---------|
-| **Quando dispara** | Quando a sessão do agente encerra |
-| **Frequência** | 1x por sessão |
+| Aspecto              | Detalhe                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| **Quando dispara**   | Quando a sessão do agente encerra                                 |
+| **Frequência**       | 1x por sessão                                                     |
 | **Campo específico** | `reason`: `"clear"`, `"logout"`, `"prompt_input_exit"`, `"other"` |
-| **Nosso script** | `.github/hooks/scripts/session-end.sh` |
-| **Uso atual** | Gera relatório final da sessão |
+| **Nosso script**     | `.github/hooks/scripts/session-end.sh`                            |
+| **Uso atual**        | Gera relatório final da sessão                                    |
 
 **Nota**: `SessionEnd` não está na documentação oficial bundled (`hooks.md`),
 mas existe na lista `Mti` do source e funciona empiricamente.
@@ -582,13 +582,13 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 
 ### 8.8 errorOccurred — status desconhecido ❓
 
-| Aspecto | Detalhe |
-|---------|---------|
-| **Quando dispara** | **Desconhecido** |
-| **Mapeamento SDK** | **❓ não encontrado** na lista `Mti` |
-| **Status atual** | Configurado em copilot-hooks.json mas provavelmente ignorado |
-| **Nosso script** | `.github/hooks/scripts/error-occurred.sh` |
-| **Recomendação** | Manter mas monitorar se algum dia disparar em audit.jsonl |
+| Aspecto            | Detalhe                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| **Quando dispara** | **Desconhecido**                                             |
+| **Mapeamento SDK** | **❓ não encontrado** na lista `Mti`                          |
+| **Status atual**   | Configurado em copilot-hooks.json mas provavelmente ignorado |
+| **Nosso script**   | `.github/hooks/scripts/error-occurred.sh`                    |
+| **Recomendação**   | Manter mas monitorar se algum dia disparar em audit.jsonl    |
 
 ---
 
@@ -596,16 +596,16 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 
 Estado atual (`copilot-hooks.json` commitado, versão pós-8bacbd21):
 
-| Chave no JSON | SDK PascalCase | Nosso script | Status | Frequência |
-|---------------|----------------|--------------|--------|------------|
-| `sessionStart` | `SessionStart` | `session-start.sh` | ✅ ativo | 1/sessão |
-| `userPromptSubmitted` | `UserPromptSubmit` | `log-prompt.sh` | ✅ ativo | Raro (~4/sessão) |
-| `preToolUse` | `PreToolUse` | `pre-tool-use.sh` | ✅ ativo | ~1000/sessão |
-| `postToolUse` | `PostToolUse` | `post-tool-use.sh` | ✅ ativo | ~1000/sessão |
-| `agentStop` | `Stop` | `agent-stop.sh` | ✅ ativo | 1/turno |
-| `subagentStop` | `SubagentStop` | `subagent-stop.sh` | ✅ ativo | Raro |
-| `errorOccurred` | **❓** | `error-occurred.sh` | ❓ mapping desconhecido | Nunca observado |
-| `sessionEnd` | `SessionEnd` | `session-end.sh` | ✅ ativo | 1/sessão |
+| Chave no JSON         | SDK PascalCase     | Nosso script        | Status                 | Frequência       |
+| --------------------- | ------------------ | ------------------- | ---------------------- | ---------------- |
+| `sessionStart`        | `SessionStart`     | `session-start.sh`  | ✅ ativo                | 1/sessão         |
+| `userPromptSubmitted` | `UserPromptSubmit` | `log-prompt.sh`     | ✅ ativo                | Raro (~4/sessão) |
+| `preToolUse`          | `PreToolUse`       | `pre-tool-use.sh`   | ✅ ativo                | ~1000/sessão     |
+| `postToolUse`         | `PostToolUse`      | `post-tool-use.sh`  | ✅ ativo                | ~1000/sessão     |
+| `agentStop`           | `Stop`             | `agent-stop.sh`     | ✅ ativo                | 1/turno          |
+| `subagentStop`        | `SubagentStop`     | `subagent-stop.sh`  | ✅ ativo                | Raro             |
+| `errorOccurred`       | **❓**              | `error-occurred.sh` | ❓ mapping desconhecido | Nunca observado  |
+| `sessionEnd`          | `SessionEnd`       | `session-end.sh`    | ✅ ativo                | 1/sessão         |
 
 ### 9.1 Ativação
 
@@ -625,13 +625,13 @@ e repassar os hooks à extensão VSCode.
 
 ### 10.1 Marcadores confiáveis de entrada/saída
 
-| Evento de ciclo | Hook usado | Confiabilidade |
-|-----------------|------------|----------------|
-| Início de SESSION | `sessionStart` → `session-start.sh` | ✅ 100% (1/sessão) |
-| Início de TURN | `preToolUse` do 1º tool OU `start-turn.sh` | ⚠️ Indireto |
-| Início de TURN (ideal) | `userPromptSubmitted` | ❌ Raro — só prompt direto |
-| Fim de TURN | `agentStop` → `agent-stop.sh` | ✅ 100% (1/turno) |
-| Fim de SESSION | `sessionEnd` → `session-end.sh` | ✅ Sim |
+| Evento de ciclo        | Hook usado                                 | Confiabilidade            |
+| ---------------------- | ------------------------------------------ | ------------------------- |
+| Início de SESSION      | `sessionStart` → `session-start.sh`        | ✅ 100% (1/sessão)         |
+| Início de TURN         | `preToolUse` do 1º tool OU `start-turn.sh` | ⚠️ Indireto                |
+| Início de TURN (ideal) | `userPromptSubmitted`                      | ❌ Raro — só prompt direto |
+| Fim de TURN            | `agentStop` → `agent-stop.sh`              | ✅ 100% (1/turno)          |
+| Fim de SESSION         | `sessionEnd` → `session-end.sh`            | ✅ Sim                     |
 
 ### 10.2 Por que não usar userPromptSubmitted como start-turn
 

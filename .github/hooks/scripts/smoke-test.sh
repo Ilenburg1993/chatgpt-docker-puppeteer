@@ -147,7 +147,7 @@ else
     check_key ".current_turn" "section_name" && pass ".current_turn.section_name (Schema v4)" || fail ".current_turn.section_name ausente — Schema v4 não inicializado"
 
     # Verifica invariante: current_section.name não deve ser null nem vazio
-    ACTIVE_SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    ACTIVE_SECTION_NAME="$(jq -r '.current_section.name // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$ACTIVE_SECTION_NAME" ] && [ "$ACTIVE_SECTION_NAME" != "null" ]; then
         pass ".current_section.name não-nulo: '$ACTIVE_SECTION_NAME' (invariante SECTION ativa)"
     else
@@ -155,8 +155,8 @@ else
     fi
 
     # Verifica que section_names é um array com pelo menos 1 entry
-    SECTION_NAMES_LEN="$(jq '.session_stats.section_names | if type == "array" then length else -1 end' "$CTX_FILE" 2>/dev/null || echo -1)"
-    if [ "$SECTION_NAMES_LEN" -ge 1 ] 2>/dev/null; then
+    SECTION_NAMES_LEN="$(jq '.session_stats.section_names | if type == "array" then length else -1 end' "$CTX_FILE" 2> /dev/null || echo -1)"
+    if [ "$SECTION_NAMES_LEN" -ge 1 ] 2> /dev/null; then
         pass ".session_stats.section_names array com $SECTION_NAMES_LEN entry(ies) (Schema v4)"
     else
         fail ".session_stats.section_names não é array ou está vazio — Schema v4 não inicializado"
@@ -179,13 +179,74 @@ else
 fi
 
 # ── 6. Teste funcional: section-end.sh sem seção ativa não crasha ────────────
+# HARDENING: usa sandbox isolado para não contaminar estado real.
+# Os scripts resolvem HOOK_DIR via dirname($BASH_SOURCE) — ao copiar scripts para
+# um diretório temporário, HOOK_DIR aponta para o sandbox automaticamente.
 echo ""
-echo "6. Testes funcionais (dry-run)"
-if bash "$SCRIPTS_DIR/section-end.sh" "smoke-test" 2> /dev/null; then
-    pass "section-end.sh sem seção ativa — encerra sem crash"
+echo "6. Testes funcionais (dry-run, sandbox isolado)"
+
+SANDBOX="$(mktemp -d)"
+SANDBOX_SCRIPTS="$SANDBOX/scripts"
+SANDBOX_STATE="$SANDBOX/state"
+SANDBOX_LOGS="$SANDBOX/logs"
+mkdir -p "$SANDBOX_SCRIPTS" "$SANDBOX_STATE" "$SANDBOX_LOGS"
+
+# Copia scripts para sandbox (HOOK_DIR será resolvido como $SANDBOX)
+cp -a "$SCRIPTS_DIR"/*.sh "$SANDBOX_SCRIPTS/" 2> /dev/null || true
+
+# Seed: session-context.json mínimo para Schema v4
+jq -cn '{
+    session: {
+        id: "smoke-sandbox-001",
+        started_at: (now | strftime("%Y-%m-%dT%H:%M:%SZ")),
+        ended_at: null,
+        end_reason: null,
+        close_key: "ENCERRAR-00000000",
+        close_key_validated: false
+    },
+    session_stats: {
+        turn_count: 0, tools_total: 0, failures_detected: 0,
+        turn_authorized: 0, turn_unauthorized: 0,
+        section_count: 1, section_names: ["smoke-test"]
+    },
+    current_turn: {
+        number: 0, started_at: null, tools_count: 0,
+        auth_requested: false, auth_requested_at: null,
+        last_askquestions_response: null, section_name: "smoke-test",
+        block_count: 0
+    },
+    current_section: {
+        name: null, section_number: 0, started_at: null, turn_count: 0
+    },
+    compliance: {
+        last_turn_authorized: true, consecutive_unauthorized: 0,
+        flag_file_exists: false
+    },
+    quality_gates: {lint: null, typecheck: null, test: null, format: null},
+    session_summary: "",
+    last_turn_ts: null,
+    tasks: [], findings: []
+}' > "$SANDBOX_STATE/session-context.json"
+
+# Executa section-end.sh no sandbox
+if bash "$SANDBOX_SCRIPTS/section-end.sh" "smoke-test" 2> /dev/null; then
+    pass "section-end.sh (sandbox) sem seção ativa — encerra sem crash"
 else
-    fail "section-end.sh sem seção ativa — crashou inesperadamente"
+    fail "section-end.sh (sandbox) sem seção ativa — crashou inesperadamente"
 fi
+
+# Verifica que estado REAL não foi modificado
+if [ -f "$CTX_FILE" ]; then
+    REAL_SID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
+    if [ "$REAL_SID" != "smoke-sandbox-001" ]; then
+        pass "sandbox isolado — session-context.json real não contaminado"
+    else
+        fail "sandbox VAZOU para session-context.json real — isolamento falhou"
+    fi
+fi
+
+# Cleanup sandbox
+rm -rf "$SANDBOX"
 
 # ── 7. shellcheck nos scripts principais (se disponível) ─────────────────────
 echo ""

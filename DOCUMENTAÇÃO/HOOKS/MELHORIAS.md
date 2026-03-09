@@ -15,12 +15,12 @@ tinham início explícito.
 
 **Novos campos (Schema v4)**:
 
-| Campo | Localização | Valor inicial |
-|---|---|---|
-| `section_count` | `session_stats` | `1` |
-| `section_names` | `session_stats` | `["início"]` |
-| `section_number` | `current_section` | `1` |
-| `section_name` | `current_turn` | `"início"` |
+| Campo            | Localização       | Valor inicial |
+| ---------------- | ----------------- | ------------- |
+| `section_count`  | `session_stats`   | `1`           |
+| `section_names`  | `session_stats`   | `["início"]`  |
+| `section_number` | `current_section` | `1`           |
+| `section_name`   | `current_turn`    | `"início"`    |
 
 **Scripts modificados**:
 - `session-start.sh` — inicializa Schema v4; cria seção padrão `"início"` e loga `sectionStart`; adicionado bloco `📍 Estado Ativo` no briefing com seção + turno em destaque

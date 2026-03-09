@@ -40,19 +40,19 @@ SESSION (1 por dia — Premium Request)
 
 ### 2.1 Quem chama o quê
 
-| Gatilho | Script | Modo |
-|---------|--------|------|
-| Copilot dispara `sessionStart` | `session-start.sh` | AUTOMÁTICO |
-| Copilot dispara `userPromptSubmitted` | `log-prompt.sh` | AUTOMÁTICO |
-| Copilot dispara `preToolUse` | `pre-tool-use.sh` | AUTOMÁTICO |
-| Copilot dispara `postToolUse` | `post-tool-use.sh` | AUTOMÁTICO |
-| Copilot dispara `agentStop` | `agent-stop.sh` | AUTOMÁTICO |
-| Copilot dispara `subagentStop` | `subagent-stop.sh` | AUTOMÁTICO |
-| Copilot dispara `errorOccurred` | `error-occurred.sh` | AUTOMÁTICO |
-| Copilot dispara `sessionEnd` | `session-end.sh` | AUTOMÁTICO |
-| Agente decide abrir nova SECTION | `start-section.sh "nome" ["desc"]` | MANUAL |
-| Agente decide fechar SECTION | `section-end.sh "motivo"` | MANUAL |
-| Agente inicia enriquecimento de TURN | `start-turn.sh ["intenção"]` | MANUAL |
+| Gatilho                               | Script                             | Modo       |
+| ------------------------------------- | ---------------------------------- | ---------- |
+| Copilot dispara `sessionStart`        | `session-start.sh`                 | AUTOMÁTICO |
+| Copilot dispara `userPromptSubmitted` | `log-prompt.sh`                    | AUTOMÁTICO |
+| Copilot dispara `preToolUse`          | `pre-tool-use.sh`                  | AUTOMÁTICO |
+| Copilot dispara `postToolUse`         | `post-tool-use.sh`                 | AUTOMÁTICO |
+| Copilot dispara `agentStop`           | `agent-stop.sh`                    | AUTOMÁTICO |
+| Copilot dispara `subagentStop`        | `subagent-stop.sh`                 | AUTOMÁTICO |
+| Copilot dispara `errorOccurred`       | `error-occurred.sh`                | AUTOMÁTICO |
+| Copilot dispara `sessionEnd`          | `session-end.sh`                   | AUTOMÁTICO |
+| Agente decide abrir nova SECTION      | `start-section.sh "nome" ["desc"]` | MANUAL     |
+| Agente decide fechar SECTION          | `section-end.sh "motivo"`          | MANUAL     |
+| Agente inicia enriquecimento de TURN  | `start-turn.sh ["intenção"]`       | MANUAL     |
 
 ---
 
@@ -85,17 +85,17 @@ SESSION (1 por dia — Premium Request)
 
 ### 3.2 Tabela de Gaps
 
-| ID | Script afetado | Gap | Severidade |
-|----|----------------|-----|-----------|
-| G1 | `start-section.sh` | Sobrescreve section ativa silenciosamente — sem `sectionEnd` | 🔴 CRÍTICO |
-| G2 | `session-start.sh` | Sessão inicia com `current_section.name = null` | 🔴 CRÍTICO |
-| G3 | `session-end.sh` | Não fecha section aberta antes de encerrar sessão | 🔴 CRÍTICO |
-| G4 | `log-prompt.sh` | Não reseta `last_askquestions_response = null` no turno novo | 🟡 MÉDIO |
-| G5 | `log-prompt.sh` | Não registra `section_name` em `current_turn` | 🟡 MÉDIO |
-| G6 | `session_stats` | Sem `section_count` e `section_names[]` | 🟡 MÉDIO |
-| G7 | —              | Sem `start-turn.sh` — enriquecimento de turno inexistente | 🟡 MÉDIO |
-| G8 | `session-start.sh` | Briefing não exibe section + turn prominentemente | 🟢 MÍNIMO |
-| G9 | `current_section` | Campo `description` sempre null — orphan | 🟢 MÍNIMO |
+| ID  | Script afetado     | Gap                                                          | Severidade |
+| --- | ------------------ | ------------------------------------------------------------ | ---------- |
+| G1  | `start-section.sh` | Sobrescreve section ativa silenciosamente — sem `sectionEnd` | 🔴 CRÍTICO  |
+| G2  | `session-start.sh` | Sessão inicia com `current_section.name = null`              | 🔴 CRÍTICO  |
+| G3  | `session-end.sh`   | Não fecha section aberta antes de encerrar sessão            | 🔴 CRÍTICO  |
+| G4  | `log-prompt.sh`    | Não reseta `last_askquestions_response = null` no turno novo | 🟡 MÉDIO    |
+| G5  | `log-prompt.sh`    | Não registra `section_name` em `current_turn`                | 🟡 MÉDIO    |
+| G6  | `session_stats`    | Sem `section_count` e `section_names[]`                      | 🟡 MÉDIO    |
+| G7  | —                  | Sem `start-turn.sh` — enriquecimento de turno inexistente    | 🟡 MÉDIO    |
+| G8  | `session-start.sh` | Briefing não exibe section + turn prominentemente            | 🟢 MÍNIMO   |
+| G9  | `current_section`  | Campo `description` sempre null — orphan                     | 🟢 MÍNIMO   |
 
 ---
 
@@ -130,12 +130,12 @@ SESSION (1 por dia — Premium Request)
 
 ### 4.2 Novos eventos de auditoria
 
-| Evento | Quando | Campos |
-|--------|--------|--------|
-| `sectionStart` | Abertura de qualquer section | `section_name`, `section_number`, `description`, `turn_number`, `prev_section` (se auto-fechou) |
-| `sectionEnd` | Fechamento de qualquer section | `section_name`, `reason`, `duration_s`, `turn_start`, `turn_end`, `turns_covered` |
-| `turnStart` | `log-prompt.sh` — automático | `turn_number`, `section_name` |
-| `turnStart_enriched` | `start-turn.sh` — manual | `turn_number`, `section_name`, `intent` |
+| Evento               | Quando                         | Campos                                                                                          |
+| -------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `sectionStart`       | Abertura de qualquer section   | `section_name`, `section_number`, `description`, `turn_number`, `prev_section` (se auto-fechou) |
+| `sectionEnd`         | Fechamento de qualquer section | `section_name`, `reason`, `duration_s`, `turn_start`, `turn_end`, `turns_covered`               |
+| `turnStart`          | `log-prompt.sh` — automático   | `turn_number`, `section_name`                                                                   |
+| `turnStart_enriched` | `start-turn.sh` — manual       | `turn_number`, `section_name`, `intent`                                                         |
 
 > `sectionStart` e `sectionEnd` já existem. Apenas ampliar seus campos.
 > `turnStart` (automático via log-prompt.sh) e `turnStart_enriched` (manual via start-turn.sh) são novos.
@@ -220,12 +220,12 @@ antes de qualquer ferramenta de trabalho (pode ser omitido em turnos triviais).
 ```markdown
 ## 📍 Estado Ativo (SESSION → SECTION → TURN)
 
-| Dimensão | Valor |
-|----------|-------|
-| **Sessão** | `SESSION_ID` |
-| **Turno** | #1 (primeiro turno desta sessão) |
-| **Seção** | `"início"` — seção 1 de 1 |
-| **Seção iniciada em** | SESSION_DATE |
+| Dimensão              | Valor                            |
+| --------------------- | -------------------------------- |
+| **Sessão**            | `SESSION_ID`                     |
+| **Turno**             | #1 (primeiro turno desta sessão) |
+| **Seção**             | `"início"` — seção 1 de 1        |
+| **Seção iniciada em** | SESSION_DATE                     |
 ```
 
 ### Fase G — `section-end.sh` — Revisão (sem mudança de comportamento)
@@ -270,9 +270,9 @@ antes de qualquer ferramenta de trabalho (pode ser omitido em turnos triviais).
 Fase A → B → C → D → E → F → G → H → I → J → K
 ```
 
-**Prioridade crítica** (gaps vermelhos): A, B, C  
-**Médio** (G4-G7): D, E, F  
-**Qualidade** (G8-G9): G, H, I, J, K  
+**Prioridade crítica** (gaps vermelhos): A, B, C
+**Médio** (G4-G7): D, E, F
+**Qualidade** (G8-G9): G, H, I, J, K
 
 ---
 
@@ -301,13 +301,13 @@ o nome não se perde. A section ativa já está contabilizada em `session_stats.
 
 > Todas respondidas antes da criação deste plano. Nenhuma pendente.
 
-| Questão | Resposta |
-|---------|----------|
+| Questão                                                 | Resposta       |
+| ------------------------------------------------------- | -------------- |
 | SECTION auto-close ao chamar start-section.sh com ativa | ✅ Sim — sempre |
-| Invariante SESSION+SECTION+TURN sempre ativos | ✅ Sempre |
-| section_count + section_names em session_stats | ✅ Sim |
-| Briefing: section + turno em destaque proeminente | ✅ Sim |
-| Criar start-turn.sh | ✅ Sim |
+| Invariante SESSION+SECTION+TURN sempre ativos           | ✅ Sempre       |
+| section_count + section_names em session_stats          | ✅ Sim          |
+| Briefing: section + turno em destaque proeminente       | ✅ Sim          |
+| Criar start-turn.sh                                     | ✅ Sim          |
 
 ---
 
