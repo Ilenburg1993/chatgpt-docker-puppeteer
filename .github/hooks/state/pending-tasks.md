@@ -154,11 +154,11 @@
 ## Backlog Livre
 - [ ] **Fix [medium/improvement] .github/hooks/scripts: 
 - [ ] **Fix [medium/improvement] .github/hooks/scripts: 
-- [ ] **UP5: Exportação CSV de Métricas de Performance**: Script export-metrics.sh [csv|json] [início] [fim]. Exporta tool-metrics.jsonl filtrado. Gate: bash export-metrics.sh csv > metricas.csv gera CSV válido. Detalhe em MELHORIAS.md#UP5 <!-- auto:20260309 -->
+- [x] **UP5: Exportação CSV de Métricas de Performance**: Script export-metrics.sh [csv|json] [início] [fim]. Exporta tool-metrics.jsonl filtrado. Gate: bash export-metrics.sh csv > metricas.csv gera CSV válido. Detalhe em MELHORIAS.md#UP5 <!-- auto:20260309 --> <!-- session:20260309 -->
 
-- [ ] **UP4: Checkpoint de Tarefas com Diff**: Adicionar tasks_hash SHA-256 no checkpoint; se hash changed → tasks_changed=true. Gate: checkpoint.json inclui tasks_hash e tasks_changed. Detalhe em MELHORIAS.md#UP4 <!-- auto:20260309 -->
+- [x] **UP4: Checkpoint de Tarefas com Diff**: Adicionar tasks_hash SHA-256 no checkpoint; se hash changed → tasks_changed=true. Gate: checkpoint.json inclui tasks_hash e tasks_changed. Detalhe em MELHORIAS.md#UP4 <!-- auto:20260309 --> <!-- session:20260309 -->
 
-- [ ] **M5: subagent-stop.sh mais informativo**: Extrair subagent_name, resultado e duração do payload. Logar referência ao tool_use_id. Gate: audit.jsonl mostra campos além de {event, session_id, timestamp}. Detalhe em MELHORIAS.md#M5 <!-- auto:20260309 -->
+- [x] **M5: subagent-stop.sh mais informativo**: Extrair subagent_name, resultado e duração do payload. Logar referência ao tool_use_id. Gate: audit.jsonl mostra campos além de {event, session_id, timestamp}. Detalhe em MELHORIAS.md#M5 <!-- auto:20260309 --> <!-- session:20260309 -->
 
 
 > Itens de melhoria contínua — explore e escolha o que fizer mais sentido.

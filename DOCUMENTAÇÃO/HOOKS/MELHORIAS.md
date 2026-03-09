@@ -1,20 +1,33 @@
 # Melhorias e Upgrades Propostos — Sistema de Hooks
 
-> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 2)
+> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 3)
 >
 > Cada item classifica: prioridade, esforço (S/M/L), e categoria (fix/melhoria/upgrade profundo).
 
 ---
 
+## Melhorias Implementadas (sessão 3 — 2026-03-09)
+
+| #   | Melhoria                                                            | Scripts                                                                        | Status         |
+| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------- |
+| UP2 | Integração Findings ↔ Tasks (`--finding-id`, `--create-task`, sync) | `add-task.sh`, `save-finding.sh`, novo `sync-tasks-to-docs.sh`                 | ✅ Implementada |
+| UP4 | Checkpoint de tarefas com diff (SHA-256 hash + `tasks_changed`)     | `session-checkpoint.sh`                                                        | ✅ Implementada |
+| UP5 | Exportação de métricas CSV/JSON                                     | novo `export-metrics.sh`                                                       | ✅ Implementada |
+| M4  | Quality gates: detecção real de sucesso/falha em `tool_response`    | `post-tool-use.sh`, `session-start.sh`                                         | ✅ Implementada |
+| M5  | `subagent-stop.sh` mais informativo                                 | `subagent-stop.sh`                                                             | ✅ Implementada |
+| —   | Sync automático de tarefas (a cada 5 turnos)                         | `agent-stop.sh`                                                                | ✅ Implementada |
+
+---
+
 ## Melhorias Implementadas (sessão 2 — 2026-03-09)
 
-| #   | Melhoria                                         | Scripts                                          | Status         |
-| --- | ------------------------------------------------ | ------------------------------------------------ | -------------- |
-| M1  | Lifecycle de Findings — `finding_id` + `resolve-finding.sh` | `save-finding.sh`, novo `resolve-finding.sh`     | ✅ Implementada |
-| M2  | Sumarização de `tools_used` array               | `pre-tool-use.sh`, `session-start.sh`, `agent-stop.sh` | ✅ Implementada |
-| M3  | Alertas de Threshold escalonados                | `session-start.sh`                               | ✅ Implementada |
-| UP1 | Analytics Cross-Session                          | novo `analytics.sh`                              | ✅ Implementada |
-| UP3 | Health Check automático no session-start         | `session-start.sh`                               | ✅ Implementada |
+| #   | Melhoria                                                    | Scripts                                                | Status         |
+| --- | ----------------------------------------------------------- | ------------------------------------------------------ | -------------- |
+| M1  | Lifecycle de Findings — `finding_id` + `resolve-finding.sh` | `save-finding.sh`, novo `resolve-finding.sh`           | ✅ Implementada |
+| M2  | Sumarização de `tools_used` array                           | `pre-tool-use.sh`, `session-start.sh`, `agent-stop.sh` | ✅ Implementada |
+| M3  | Alertas de Threshold escalonados                            | `session-start.sh`                                     | ✅ Implementada |
+| UP1 | Analytics Cross-Session                                     | novo `analytics.sh`                                    | ✅ Implementada |
+| UP3 | Health Check automático no session-start                    | `session-start.sh`                                     | ✅ Implementada |
 
 ---
 
