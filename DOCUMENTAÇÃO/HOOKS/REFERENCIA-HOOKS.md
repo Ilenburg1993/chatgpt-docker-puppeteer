@@ -140,7 +140,12 @@ porque a conversão ocorre no CLI **antes** de chegar à extensão.
 | `sessionEnd`          | `SessionEnd`       |
 | `subagentStart`       | `SubagentStart`    |
 | `preCompact`          | `PreCompact`       |
-| `errorOccurred`       | **❓ desconhecido** |
+| `postToolUseFailure`  | `PostToolUseFailure` |
+| `subagentStart`       | `SubagentStart`    |
+| `preCompact`          | `PreCompact`       |
+
+> **errorOccurred** foi removido do copilot-hooks.json (commit 4ceb3a52) — nunca
+> disparava (não existe no array `Mti` do SDK). Substituído por `postToolUseFailure`.
 
 ### 3.2 Formato .claude/settings.json (SDK nativo, PascalCase)
 
@@ -442,11 +447,11 @@ Lista completa extraída do source (array `Mti` em `extension.js`, pos ~1066861)
 | `UserPromptSubmit`      | ✅ Sim                          | ✅ via `userPromptSubmitted` (RARO) |
 | `PreToolUse`            | ✅ Sim                          | ✅ via `preToolUse`                 |
 | `PostToolUse`           | ✅ Sim                          | ✅ via `postToolUse`                |
-| `PostToolUseFailure`    | ❌ Não documentado              | ❌ não configurado                  |
+| `PostToolUseFailure`    | ✅ Sim                          | ✅ via `postToolUseFailure`         |
 | `Stop`                  | ✅ Sim (como "Stop")            | ✅ via `agentStop`                  |
-| `SubagentStart`         | ✅ Sim                          | ❌ não configurado                  |
+| `SubagentStart`         | ✅ Sim                          | ✅ via `subagentStart`              |
 | `SubagentStop`          | ✅ Sim                          | ✅ via `subagentStop`               |
-| `PreCompact`            | ✅ Sim                          | ❌ não configurado                  |
+| `PreCompact`            | ✅ Sim                          | ✅ via `preCompact`                 |
 | `SessionEnd`            | ❌ Não documentado oficialmente | ✅ via `sessionEnd`                 |
 | `Notification`          | ❌ Não documentado              | ❌ não configurado                  |
 | `PermissionRequest`     | ❌ Não documentado              | ❌ não configurado                  |
@@ -457,9 +462,9 @@ Lista completa extraída do source (array `Mti` em `extension.js`, pos ~1066861)
 | `WorktreeCreate`        | ❌ Não documentado              | ❌ não configurado                  |
 | `WorktreeRemove`        | ❌ Não documentado              | ❌ não configurado                  |
 
-> **errorOccurred** (nosso copilot-hooks.json): ❓ mapeamento SDK **desconhecido**.
-> Não está na lista `Mti`. Provavelmente ignorado silenciosamente pelo CLI.
-> Remover ou manter inerte até confirmação.
+> **errorOccurred** foi removido do copilot-hooks.json (commit 4ceb3a52).
+> Substituído por `postToolUseFailure` (SDK `PostToolUseFailure`).
+> O script `error-occurred.sh` permanece no filesystem como legacy.
 
 ---
 
@@ -580,15 +585,44 @@ mas existe na lista `Mti` do source e funciona empiricamente.
 
 ---
 
-### 8.8 errorOccurred — status desconhecido ❓
+### 8.8 PostToolUseFailure — falha em ferramenta
+
+| Aspecto            | Detalhe                                                          |
+| ------------------ | ---------------------------------------------------------------- |
+| **Quando dispara** | Após uma chamada de ferramenta falhar (erro, timeout)            |
+| **Mapeamento SDK** | `PostToolUseFailure` (confirmado no array `Mti`)                 |
+| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                                    |
+| **Nosso script**   | `.github/hooks/scripts/tool-use-failure.sh`                      |
+| **Funcionalidade** | Loga falha, incrementa failures_detected/errors_total no context |
+
+### 8.9 SubagentStart — início de subagente
+
+| Aspecto            | Detalhe                                                   |
+| ------------------ | --------------------------------------------------------- |
+| **Quando dispara** | Quando um subagente é iniciado pelo agente principal      |
+| **Mapeamento SDK** | `SubagentStart` (confirmado no array `Mti`)               |
+| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                              |
+| **Nosso script**   | `.github/hooks/scripts/subagent-start.sh`                 |
+| **Funcionalidade** | Loga início, incrementa subagent_calls no session-context |
+
+### 8.10 PreCompact — antes de compactação de contexto
+
+| Aspecto            | Detalhe                                                       |
+| ------------------ | ------------------------------------------------------------- |
+| **Quando dispara** | Antes do Copilot compactar o contexto da conversa             |
+| **Mapeamento SDK** | `PreCompact` (confirmado no array `Mti`)                      |
+| **Status atual**   | ✅ Ativo desde commit 4ceb3a52                                  |
+| **Nosso script**   | `.github/hooks/scripts/pre-compact.sh`                        |
+| **Funcionalidade** | Cria checkpoint completo, incrementa compaction_count, alerta |
+
+### 8.11 errorOccurred — REMOVIDO (legacy)
 
 | Aspecto            | Detalhe                                                      |
 | ------------------ | ------------------------------------------------------------ |
-| **Quando dispara** | **Desconhecido**                                             |
-| **Mapeamento SDK** | **❓ não encontrado** na lista `Mti`                          |
-| **Status atual**   | Configurado em copilot-hooks.json mas provavelmente ignorado |
-| **Nosso script**   | `.github/hooks/scripts/error-occurred.sh`                    |
-| **Recomendação**   | Manter mas monitorar se algum dia disparar em audit.jsonl    |
+| **Status**         | ❌ Removido do copilot-hooks.json (commit 4ceb3a52)           |
+| **Motivo**         | Não existe no array `Mti` do SDK — nunca disparava           |
+| **Substituído por**| `postToolUseFailure` → `tool-use-failure.sh`                 |
+| **Script legacy**  | `error-occurred.sh` mantido no filesystem (não configurado)  |
 
 ---
 
@@ -604,8 +638,12 @@ Estado atual (`copilot-hooks.json` commitado, versão pós-8bacbd21):
 | `postToolUse`         | `PostToolUse`      | `post-tool-use.sh`  | ✅ ativo                | ~1000/sessão     |
 | `agentStop`           | `Stop`             | `agent-stop.sh`     | ✅ ativo                | 1/turno          |
 | `subagentStop`        | `SubagentStop`     | `subagent-stop.sh`  | ✅ ativo                | Raro             |
-| `errorOccurred`       | **❓**              | `error-occurred.sh` | ❓ mapping desconhecido | Nunca observado  |
+| `postToolUseFailure`  | `PostToolUseFailure` | `tool-use-failure.sh` | ✅ ativo              | Raro (falhas)    |
+| `subagentStart`       | `SubagentStart`    | `subagent-start.sh` | ✅ ativo                | Raro             |
+| `preCompact`          | `PreCompact`       | `pre-compact.sh`    | ✅ ativo                | Raro (~0-2/sess) |
 | `sessionEnd`          | `SessionEnd`       | `session-end.sh`    | ✅ ativo                | 1/sessão         |
+
+> **errorOccurred** removido (commit 4ceb3a52). Script `error-occurred.sh` mantido como legacy.
 
 ### 9.1 Ativação
 

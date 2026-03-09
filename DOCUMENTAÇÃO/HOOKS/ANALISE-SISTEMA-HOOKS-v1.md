@@ -259,14 +259,14 @@ autorização de turno FUNCIONA mesmo na situação degradada atual.
 
 ## 5. Plano de Correções, Aprimoramentos e Upgrades
 
-### Fase 0: Correções Imediatas (Cirúrgicas)
+### Fase 0: Correções Imediatas (Cirúrgicas) — ✅ IMPLEMENTADA (commit 4ceb3a52)
 
-#### F0.1 — Corrigir `section-end.sh` duplicado
+#### F0.1 — Corrigir `section-end.sh` duplicado ✅
 - **Ação**: Remover linhas 107-192 (dead code legado)
 - **Risco**: Zero (code unreachable após `exit 0` na linha 106)
 - **Tempo**: Imediato
 
-#### F0.2 — Criar mecanismo de auto-recovery para session-context vazio
+#### F0.2 — Criar mecanismo de auto-recovery para session-context vazio ✅
 - **Problema**: Se `sessionStart` não disparar, o sistema inteiro fica degradado
 - **Ação**: Em `pre-tool-use.sh` (primeiro hook a disparar), adicionar:
   ```bash
@@ -287,7 +287,7 @@ autorização de turno FUNCIONA mesmo na situação degradada atual.
 - **Benefício**: Sistema se auto-recupera em vez de rodar degradado indefinidamente
 - **Risco**: Baixo — o contexto de recovery é menos rico que o de session-start.sh, mas funcional
 
-#### F0.3 — Fortalecer session_id guard para contexto vazio
+#### F0.3 — Fortalecer session_id guard para contexto vazio ✅
 - **Problema**: Guard não bloqueia quando `CTX_ACTIVE_SID` está vazio
 - **Ação**: Em todos os 6 scripts com guard, adicionar:
   ```bash
@@ -298,21 +298,19 @@ autorização de turno FUNCIONA mesmo na situação degradada atual.
   ```
 - **Risco**: Baixo — é apenas log, não bloqueia funcionalidade
 
-### Fase 1: Aprimoramentos Funcionais
+### Fase 1: Aprimoramentos Funcionais — ✅ IMPLEMENTADA (commit 4ceb3a52)
 
-#### F1.1 — Remover ou remapear hook `errorOccurred`
-- **Opção A**: Remover de `copilot-hooks.json` (hook inerte gasta CPU a cada erro)
-- **Opção B**: Mapear para o evento SDK `PostToolUseFailure` (se a extensão aceitar)
-- **Investigação necessária**: Testar se `"event": "postToolUseFailure"` funciona no JSON
+#### F1.1 — Remover ou remapear hook `errorOccurred` ✅
+- **Implementado**: Removido de `copilot-hooks.json`. Adicionados 3 novos hooks:
+  - `postToolUseFailure` → `tool-use-failure.sh`
+  - `subagentStart` → `subagent-start.sh`
+  - `preCompact` → `pre-compact.sh`
 
-#### F1.2 — Compensar raridade do `userPromptSubmitted`
-- **Problema**: `log-prompt.sh` reseta turno, mas é chamado raramente
-- **Ação**: Mover o reset de turno para `agent-stop.sh` (que sempre dispara no fim do turno)
-  - agent-stop.sh já incrementa `turn_count` — adicionar reset de `current_turn` para o
-    próximo turno
-  - Isso garante que cada turno comece limpo, independente de `userPromptSubmitted`
+#### F1.2 — Compensar raridade do `userPromptSubmitted` ✅
+- **Implementado**: agent-stop.sh agora reseta `current_turn` completamente para o próximo turno
 
-#### F1.3 — Adicionar hooks não-configurados de alto valor
+#### F1.3 — Adicionar hooks não-configurados de alto valor ✅
+- **Implementado**: SubagentStart, PostToolUseFailure e PreCompact adicionados ao copilot-hooks.json
 Hooks SDK disponíveis mas não configurados:
 
 | Hook SDK             | Valor | Justificativa                                                    |
@@ -322,7 +320,8 @@ Hooks SDK disponíveis mas não configurados:
 | `PreCompact`         | Médio | Detecta quando o contexto vai ser compactado (perda de memória)  |
 | `Notification`       | Baixo | Notificações do sistema (informativo)                            |
 
-#### F1.4 — Script de inicialização manual de sessão
+#### F1.4 — Script de inicialização manual de sessão ✅
+- **Implementado**: `manual-session-init.sh` criado com auto-detecção de session_id
 - **Situação**: Quando `sessionStart` não dispara, o operador precisa de um caminho
 - **Ação**: Criar `manual-session-init.sh` que:
   1. Verifica se `session-context.json` está vazio
@@ -521,15 +520,15 @@ Eventos disponíveis na extensão Copilot (array `Mti`) que NÃO temos hooks:
 | -------------------- | ------------- | -------------------------------------------------- |
 | `PreToolUse`         | ✅             | —                                                  |
 | `PostToolUse`        | ✅             | —                                                  |
-| `PostToolUseFailure` | ❌             | **ADICIONAR** — substitui errorOccurred            |
+| `PostToolUseFailure` | ✅                | **Adicionado** (commit 4ceb3a52)               |
 | `Notification`       | ❌             | Opcional (baixo valor)                             |
 | `UserPromptSubmit`   | ✅             | —                                                  |
 | `SessionStart`       | ✅             | —                                                  |
 | `SessionEnd`         | ✅             | —                                                  |
 | `Stop`               | ✅ (agentStop) | —                                                  |
-| `SubagentStart`      | ❌             | **ADICIONAR** — par com SubagentStop               |
+| `SubagentStart`      | ✅                | **Adicionado** (commit 4ceb3a52)               |
 | `SubagentStop`       | ✅             | —                                                  |
-| `PreCompact`         | ❌             | ADICIONAR (médio valor — alerta perda de contexto) |
+| `PreCompact`         | ✅                | **Adicionado** (commit 4ceb3a52)               |
 | `PermissionRequest`  | ❌             | Opcional                                           |
 | `Setup`              | ❌             | Opcional (one-time)                                |
 | `TeammateIdle`       | ❌             | N/A (multi-agent)                                  |
@@ -540,4 +539,4 @@ Eventos disponíveis na extensão Copilot (array `Mti`) que NÃO temos hooks:
 
 ---
 
-*Documento gerado em 2026-03-09. Próxima atualização: após implementação da Fase 0.*
+*Documento gerado em 2026-03-09. Atualizado em 2026-03-10 após implementação das Fases 0 e 1 (commit 4ceb3a52).*

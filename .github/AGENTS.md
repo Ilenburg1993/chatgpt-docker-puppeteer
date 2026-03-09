@@ -576,6 +576,33 @@ inclui automaticamente as informações de continuidade no `session-briefing.md`
 
 ---
 
+### Hooks configurados (10 hooks — copilot-hooks.json)
+
+| Hook                   | Script                  | Tipo       | Descrição                                         |
+| ---------------------- | ----------------------- | ---------- | ------------------------------------------------- |
+| `sessionStart`         | `session-start.sh`      | Automático | Cria session-context.json e session-briefing.md    |
+| `userPromptSubmitted`  | `log-prompt.sh`         | Automático | Hash do prompt, início de turno                    |
+| `preToolUse`           | `pre-tool-use.sh`       | Automático | Logging, redação de credenciais, auto-recovery     |
+| `postToolUse`          | `post-tool-use.sh`      | Automático | Resultado, detecção de close_key, quality gates    |
+| `postToolUseFailure`   | `tool-use-failure.sh`   | Automático | Loga falhas de ferramentas, incrementa contadores  |
+| `agentStop`            | `agent-stop.sh`         | Automático | Autorização, checkpoint, reset de turno            |
+| `subagentStart`        | `subagent-start.sh`     | Automático | Loga início de subagente                           |
+| `subagentStop`         | `subagent-stop.sh`      | Automático | Loga fim de subagente                              |
+| `preCompact`           | `pre-compact.sh`        | Automático | Checkpoint antes de compactação de contexto        |
+| `sessionEnd`           | `session-end.sh`        | Automático | Fecha seção, finaliza sessão, gera resumo          |
+
+### Scripts manuais de emergência
+
+| Script                   | Quando usar                                                    |
+| ------------------------ | -------------------------------------------------------------- |
+| `manual-session-init.sh` | sessionStart não disparou — inicializa sessão manualmente      |
+| `session-checkpoint.sh`  | Antes de qualquer encerramento ou mudança crítica              |
+| `start-section.sh`       | Mudar de fase lógica de trabalho                               |
+| `section-end.sh`         | Fechar seção manualmente com motivo                            |
+| `start-turn.sh`          | Declarar intenção do turno (primeiro ato de turno de trabalho) |
+
+---
+
 ### Ciclo de vida canônico: SESSION → SECTION → TURN (Schema v4)
 
 **Invariante absoluto**: sempre deve haver SESSION + SECTION + TURN ativos.
