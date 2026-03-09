@@ -14,7 +14,7 @@
 # Uso: bash start-section.sh "<nome da seção>"
 # Exemplo: bash start-section.sh "implementação do schema v2"
 #
-# Armazena em session-context.json: active_section.{name, started_at, turn_number}
+# Armazena em session-context.json: current_section.{name, started_at, turn_start}
 # Logs em audit.jsonl: evento "sectionStart"
 set -euo pipefail
 
@@ -51,14 +51,14 @@ if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
     jq --arg name "$SECTION_NAME" \
        --arg ts "$NOW_ISO" \
        --argjson turn "$CURRENT_TURN" \
-       '.active_section = {name: $name, started_at: $ts, turn_number: $turn}' \
+       '.current_section = {name: $name, started_at: $ts, turn_start: $turn, description: null}' \
        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null
 elif [ -f "$CTX_FILE" ]; then
     TMP="$(mktemp)"
     jq --arg name "$SECTION_NAME" \
        --arg ts "$NOW_ISO" \
        --argjson turn "$CURRENT_TURN" \
-       '.active_section = {name: $name, started_at: $ts, turn_number: $turn}' \
+       '.current_section = {name: $name, started_at: $ts, turn_start: $turn, description: null}' \
        "$CTX_FILE" > "$TMP" && mv "$TMP" "$CTX_FILE"
 fi
 

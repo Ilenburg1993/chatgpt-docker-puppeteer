@@ -22,7 +22,7 @@ ERROR_STACK="$(echo "$INPUT" | jq -r '.error.stack // ""' 2> /dev/null | head -c
 SESSION_ID=""
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Append em audit.jsonl (resumido — sem stack)
@@ -57,10 +57,11 @@ jq -cn \
         stack:      $stack
     }' >> "$LOG_DIR/errors.jsonl"
 
-# Incrementa failures_total no contexto da sessão (schema v2)
+# Incrementa failures_detected no contexto da sessão (schema v2)
 if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
-    jq '.session_stats.failures_total = (.session_stats.failures_total // 0) + 1' \
-        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+    jq '.session_stats.failures_detected = (.session_stats.failures_detected // 0) + 1
+         | .session_stats.errors_total = (.session_stats.errors_total // 0) + 1' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2> /dev/null || true
 fi
 
 exit 0

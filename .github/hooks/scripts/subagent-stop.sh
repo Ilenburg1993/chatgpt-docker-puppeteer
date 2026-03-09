@@ -20,7 +20,7 @@ NOW_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2> /dev/null || echo '')"
 SESSION_ID=""
 CTX_FILE="$STATE_DIR/session-context.json"
 if [ -f "$CTX_FILE" ]; then
-    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    SESSION_ID="$(jq -r '.session.id // ""' "$CTX_FILE" 2> /dev/null || echo '')"
 fi
 
 # Extrai campos do payload do subagente (schema não documentado — tratamento defensivo)
@@ -31,7 +31,7 @@ TOOL_USE_ID="$(echo "$INPUT" | jq -r '.tool_use_id // .toolUseId // ""' 2> /dev/
 # Calcula duração aproximada usando last_tool_ts do contexto
 DURATION_S=0
 if [ -f "$CTX_FILE" ]; then
-    LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2>/dev/null || echo '')"
+    LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2> /dev/null || echo '')"
     if [ -n "$LAST_TOOL_TS" ] && [ -n "$NOW_ISO" ]; then
         LAST_S="$(date -d "$LAST_TOOL_TS" '+%s' 2> /dev/null || echo 0)"
         NOW_S="$(date -d "$NOW_ISO" '+%s' 2> /dev/null || echo 0)"
@@ -58,5 +58,11 @@ jq -cn \
         tool_use_id:  (if $tool_use_id != "" then $tool_use_id else null end),
         duration_s:   $duration_s
     }' >> "$LOG_DIR/audit.jsonl"
+
+# Incrementa subagent_calls no contexto da sessão
+if [ -f "$CTX_FILE" ] && command -v sponge &>/dev/null; then
+    jq '.session_stats.subagent_calls = (.session_stats.subagent_calls // 0) + 1' \
+        "$CTX_FILE" | sponge "$CTX_FILE" 2>/dev/null || true
+fi
 
 exit 0

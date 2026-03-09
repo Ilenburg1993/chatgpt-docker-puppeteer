@@ -104,12 +104,15 @@ if [ -f "$AUDIT_FILE" ]; then
 fi
 
 # ── Gera o relatório Markdown via helper ─────────────────────────────────────
+# generate-session-summary.sh espera START_TS em milissegundos (reutiliza START_EPOCH já computado)
+START_TS_MS="$((START_EPOCH * 1000))"
+
 SUMMARY_MD=""
 SUMMARY_SCRIPT="$SCRIPTS_DIR/generate-session-summary.sh"
 if [ -f "$SUMMARY_SCRIPT" ] && [ -x "$SUMMARY_SCRIPT" ]; then
     SUMMARY_MD="$(SESSION_ID="$SESSION_ID" \
         SESSION_DATE_SHORT="$SESSION_DATE_SHORT" \
-        START_ISO="$START_ISO" \
+        START_TS="$START_TS_MS" \
         END_TS="$NOW_MS" \
         SESSION_REASON="$REASON" \
         bash "$SUMMARY_SCRIPT" 2>/dev/null || echo '## Resumo indisponível (erro no helper)')"

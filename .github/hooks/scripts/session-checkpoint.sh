@@ -37,13 +37,13 @@ fi
 SESSION_ID="$(jq -r '.session.id // "unknown"' "$CTX_FILE" 2>/dev/null || echo 'unknown')"
 TURN_COUNT="$(jq -r '.session_stats.turn_count // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
 TOOLS_TOTAL="$(jq -r '.session_stats.tools_total // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
-FAILURES_TOTAL="$(jq -r '.session_stats.failures_total // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+FAILURES_TOTAL="$(jq -r '.session_stats.failures_detected // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
 LAST_TOOL_NAME="$(jq -r '.last_tool.name // ""' "$CTX_FILE" 2>/dev/null || echo '')"
 LAST_TOOL_TS="$(jq -r '.last_tool.ts // ""' "$CTX_FILE" 2>/dev/null || echo '')"
 SESSION_STARTED="$(jq -r '.session.started_at // ""' "$CTX_FILE" 2>/dev/null || echo '')"
 TOOLS_BY_NAME="$(jq -c '.session_stats.tools_by_name // {}' "$CTX_FILE" 2>/dev/null || echo '{}')"
-ACTIVE_SECTION="$(jq -c '.active_section // null' "$CTX_FILE" 2>/dev/null || echo 'null')"
-CONSECUTIVE_VIOLATIONS="$(jq -r '.conformidade.consecutive_unauthorized_closes // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
+CURRENT_SECTION="$(jq -c '.current_section // null' "$CTX_FILE" 2>/dev/null || echo 'null')"
+CONSECUTIVE_VIOLATIONS="$(jq -r '.compliance.consecutive_unauthorized // 0' "$CTX_FILE" 2>/dev/null || echo 0)"
 
 # ── Conta tarefas abertas por prioridade ────────────────────────────────────
 TASKS_ALTA=0
@@ -108,10 +108,10 @@ jq -cn \
     --arg last_tool_ts "$LAST_TOOL_TS" \
     --argjson turn_count "$TURN_COUNT" \
     --argjson tools_total "$TOOLS_TOTAL" \
-    --argjson failures_total "$FAILURES_TOTAL" \
+    --argjson failures_detected "$FAILURES_TOTAL" \
     --argjson consecutive_violations "$CONSECUTIVE_VIOLATIONS" \
     --argjson tools_by_name "$TOOLS_BY_NAME" \
-    --argjson active_section "$ACTIVE_SECTION" \
+    --argjson current_section "$CURRENT_SECTION" \
     --argjson tasks_alta "$TASKS_ALTA" \
     --argjson tasks_media "$TASKS_MEDIA" \
     --argjson tasks_backlog "$TASKS_BACKLOG" \
@@ -136,12 +136,12 @@ jq -cn \
         session_stats: {
             tools_total:         $tools_total,
             tools_success:       $tools_success,
-            failures_total:      $failures_total,
+            failures_detected:   $failures_detected,
             avg_duration_ms:     $avg_duration_ms,
             tools_by_name:       $tools_by_name,
             consecutive_violations: $consecutive_violations
         },
-        active_section:   $active_section,
+        current_section:  $current_section,
         tasks: {
             alta:          $tasks_alta,
             media:         $tasks_media,
