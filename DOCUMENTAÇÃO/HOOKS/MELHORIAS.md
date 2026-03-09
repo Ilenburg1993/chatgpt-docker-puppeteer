@@ -1,21 +1,69 @@
 # Melhorias e Upgrades Propostos — Sistema de Hooks
 
-> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 3)
+> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 4)
 >
 > Cada item classifica: prioridade, esforço (S/M/L), e categoria (fix/melhoria/upgrade profundo).
 
 ---
 
+## Melhorias Implementadas (sessão 4 — 2026-03-09)
+
+### Schema v2 — Conceitos Claros e Arquitetura de Dados
+
+**Motivação**: O schema anterior misturava dados de sessão, turno e chamada num nível flat,
+dificultando consultas, causando bugs sutis e tornando o contexto confuso para o agente.
+
+**Conceitos canônicos** (fixos pelo Copilot):
+
+| Conceito  | Escopo                          | Boundary                                        |
+| --------- | ------------------------------- | ----------------------------------------------- |
+| Sessão    | UUID gerado pelo Copilot        | `sessionStart` → `sessionEnd`                   |
+| Turno     | Ciclo completo prompt→resposta  | `userPromptSubmitted` → `agentStop`             |
+| Chamada   | Uso de uma ferramenta           | `preToolUse` → `postToolUse`                    |
+| **Seção Temática** | Fase lógica nomeada   | Declarada pelo agente via `start-section.sh` *(NOVO)* |
+
+**Estrutura do schema v2** (`session-context.json`):
+```json
+{
+  "session":       { "id", "started_at", "source", "cwd" },
+  "session_stats": { "turn_count", "tools_total", "tools_by_name", "failures_total", "unauthorized_turns" },
+  "current_turn":  { "number", "started_at", "tools_count", "tools_by_name", "failures_count", "auth_requested", "auth_requested_at" },
+  "last_tool":     { "name", "ts", "use_id", "result_type" },
+  "conformidade":  { "consecutive_unauthorized_closes", "last_close_authorized", "last_turn_ts" },
+  "active_section": { "name", "started_at", "turn_number" }
+}
+```
+
+| #   | Mudança                                                                      | Scripts | Status |
+| --- | ---------------------------------------------------------------------------- | ------- | ------ |
+| —   | Schema v2: structs aninhadas substituem campo flat                           | todos   | ✅      |
+| B1  | Remove `tools_used[]` array ilimitado → substituído por `tools_by_name {}`  | `session-start.sh`, `pre-tool-use.sh` | ✅ |
+| B2  | Remove `failure_count_unknown` fantasma → era campo inexistente no spec      | `post-tool-use.sh` | ✅ |
+| B3  | `turn_duration_s` usava `last_tool.ts` em vez de `current_turn.started_at`  | `agent-stop.sh` | ✅ |
+| B4  | `session_summary` exibia dados de sessão acumulados, não do turno atual      | `agent-stop.sh` | ✅ |
+| B5  | `session-end.sh` não chamava `session-checkpoint.sh` antes de encerrar      | `session-end.sh` | ✅ |
+| B6  | Newline rogue em `log-prompt.sh` SESSION_ID read corrompía o UUID            | `log-prompt.sh` | ✅ |
+| —   | **Novo**: `start-section.sh` — agente declara Seção Temática nomeada         | novo `start-section.sh` | ✅ |
+
+**Uso da Seção Temática**:
+```bash
+bash .github/hooks/scripts/start-section.sh "implementação do schema v2"
+# → grava active_section em session-context.json
+# → emite evento sectionStart no audit.jsonl
+```
+
+---
+
 ## Melhorias Implementadas (sessão 3 — 2026-03-09)
 
-| #   | Melhoria                                                            | Scripts                                                                        | Status         |
-| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------- |
-| UP2 | Integração Findings ↔ Tasks (`--finding-id`, `--create-task`, sync) | `add-task.sh`, `save-finding.sh`, novo `sync-tasks-to-docs.sh`                 | ✅ Implementada |
-| UP4 | Checkpoint de tarefas com diff (SHA-256 hash + `tasks_changed`)     | `session-checkpoint.sh`                                                        | ✅ Implementada |
-| UP5 | Exportação de métricas CSV/JSON                                     | novo `export-metrics.sh`                                                       | ✅ Implementada |
-| M4  | Quality gates: detecção real de sucesso/falha em `tool_response`    | `post-tool-use.sh`, `session-start.sh`                                         | ✅ Implementada |
-| M5  | `subagent-stop.sh` mais informativo                                 | `subagent-stop.sh`                                                             | ✅ Implementada |
-| —   | Sync automático de tarefas (a cada 5 turnos)                         | `agent-stop.sh`                                                                | ✅ Implementada |
+| #   | Melhoria                                                            | Scripts                                                        | Status         |
+| --- | ------------------------------------------------------------------- | -------------------------------------------------------------- | -------------- |
+| UP2 | Integração Findings ↔ Tasks (`--finding-id`, `--create-task`, sync) | `add-task.sh`, `save-finding.sh`, novo `sync-tasks-to-docs.sh` | ✅ Implementada |
+| UP4 | Checkpoint de tarefas com diff (SHA-256 hash + `tasks_changed`)     | `session-checkpoint.sh`                                        | ✅ Implementada |
+| UP5 | Exportação de métricas CSV/JSON                                     | novo `export-metrics.sh`                                       | ✅ Implementada |
+| M4  | Quality gates: detecção real de sucesso/falha em `tool_response`    | `post-tool-use.sh`, `session-start.sh`                         | ✅ Implementada |
+| M5  | `subagent-stop.sh` mais informativo                                 | `subagent-stop.sh`                                             | ✅ Implementada |
+| —   | Sync automático de tarefas (a cada 5 turnos)                        | `agent-stop.sh`                                                | ✅ Implementada |
 
 ---
 
