@@ -1,8 +1,107 @@
 # Melhorias e Upgrades Propostos — Sistema de Hooks
 
-> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 5)
+> **Status**: Backlog vivo | **Última atualização**: 2026-03-09 (sessão 6)
 >
 > Cada item classifica: prioridade, esforço (S/M/L), e categoria (fix/melhoria/upgrade profundo).
+
+---
+
+## Melhorias Implementadas (sessão 6 — 2026-03-09)
+
+### BUG-A — `START_EPOCH` unbound variable em `session-end.sh` ✅ CORRIGIDO
+
+**Problema**: com `set -euo pipefail`, se `START_ISO` estiver vazio, o script crashava pois
+`START_EPOCH` era definido somente dentro do bloco `if [ -n "$START_ISO" ]` mas usado fora dele.
+
+**Fix**: adicionado `START_EPOCH=0` antes do bloco `if`, garantindo valor seguro mesmo quando
+a sessão não tem `started_at` registrado.
+
+---
+
+### BUG-B — `end_at` escrito na raiz do JSON em vez de `.session.ended_at` ✅ CORRIGIDO
+
+**Problema**: `session-end.sh` usava `. + {end_at: $ts, end_reason: $reason}` que adiciona
+os campos à raiz do JSON, violando o schema canônico v2.
+
+**Fix**: expressão jq alterada para `.session.ended_at = $ts | .session.end_reason = $reason`.
+
+---
+
+### BUG-C — Arquivos de estado não gitignored ✅ CORRIGIDO
+
+**Problema**: `UNAUTHORIZED_CLOSE.flag`, `AUTHORIZED_CLOSE.flag` e `pending-tasks.md` não
+estavam no `.gitignore` e poderiam vazar estado volátil para o repositório.
+
+**Fix**: os três adicionados ao `.gitignore`; `pending-tasks.md` destracado com `git rm --cached`.
+
+---
+
+### Schema Drift — 4 campos ausentes do schema canônico ✅ CORRIGIDO
+
+**Problema**: `agent-stop.sh` e `post-tool-use.sh` escrevem campos (`quality_gates`,
+`session_summary`, `last_turn_ts`, `session.end_reason`) que não eram inicializados por
+`session-start.sh`, causando comportamento imprevisível em sessões novas.
+
+**Fix**: todos os 4 campos adicionados à inicialização canônica em `session-start.sh`.
+
+---
+
+### AUTHORIZED_CLOSE.flag — Simetria de flags ✅ IMPLEMENTADO
+
+**Motivação**: existia `UNAUTHORIZED_CLOSE.flag` para sinalizar fechamentos não autorizados,
+mas não havia o equivalente positivo. Isso dificultava auditoria e inspeção de estado.
+
+**Implementação** em `agent-stop.sh`:
+- Quando turno autorizado: cria `AUTHORIZED_CLOSE.flag` com `{authorized_at, session_id, turn_number}`
+- Quando não autorizado: remove `AUTHORIZED_CLOSE.flag` (limpa sinal positivo)
+- Ambos os flags são mutuamente exclusivos e sempre sincronizados
+
+---
+
+### `section-end.sh` — Novo script para fechar Seção Temática ✅ IMPLEMENTADO
+
+**Motivação**: `start-section.sh` abria Seções Temáticas, mas não havia contrapartida para
+fechá-las explicitamente. O encerramento implícito (abertura de nova seção) não logava duração.
+
+**Implementação** (`section-end.sh`):
+- Lê `current_section.{name, started_at}` do `session-context.json`
+- Calcula duração em segundos
+- Reseta `current_section` para todos os campos `null`
+- Loga evento `sectionEnd` no `audit.jsonl` com `{section_name, turn_number, duration_s}`
+- Saída graciosa se nenhuma seção estiver ativa
+- Uso: `bash .github/hooks/scripts/section-end.sh`
+
+---
+
+### `smoke-test.sh` — Validação de integridade do sistema ✅ IMPLEMENTADO
+
+**Motivação**: não havia meio rápido de verificar se toda a infraestrutura de hooks estava
+íntegra antes de uma sessão ou após alterações.
+
+**Implementação** (`smoke-test.sh`) — **43 checks** em 7 seções:
+1. **Dependências**: jq, sponge, date, sha256sum, wc
+2. **Scripts**: 16 scripts — presença + bit executável
+3. **copilot-hooks.json**: parse jq + contagem de hooks
+4. **Diretórios**: state/, logs/
+5. **Schema**: 13 campos obrigatórios no `session-context.json` (usa `has()` para distinguir `null` de ausente)
+6. **Funcional**: `section-end.sh` sem seção ativa (dry-run)
+7. **shellcheck**: 5 scripts críticos
+
+Uso: `bash .github/hooks/scripts/smoke-test.sh` (exit code = nº de falhas; 0 = tudo ok)
+
+---
+
+### Documentação — Múltiplas correções ✅ CORRIGIDO
+
+| Arquivo | Problema | Fix |
+| --- | --- | --- |
+| `PROTOCOLO-AUTORIZACAO.md` | `auth_requested_this_turn` (nome v1) em todo o doc | Alterado para `current_turn.auth_requested` |
+| `PROTOCOLO-AUTORIZACAO.md` | Nenhuma menção de que `vscode_askQuestions` é gratuito | Adicionada nota proeminente no cabeçalho |
+| `README.md` | `AUTHORIZED_CLOSE.flag` descrito incorretamente | Descrição corrigida |
+| `README.md` | `tool_responses_empty` referenciado (campo inexistente) | Todas as referências removidas |
+| `AUDIT-SCHEMA.md` | `result_type` mostrava só `"success"` | Adicionados `"failure"` e `"unknown"` |
+| `AUDIT-SCHEMA.md` | Eventos `sectionStart`/`sectionEnd` não documentados | Schemas completos adicionados |
+| `README.md` | `section-end.sh` e `smoke-test.sh` não documentados | Seções adicionadas |
 
 ---
 
@@ -16,26 +115,26 @@ Teste e2e revelou todas as discrepâncias.
 
 **Mapeamento de erros corrigidos** (nome planejado → nome canônico real):
 
-| Campo planejado (errado)                          | Campo canônico (session-start.sh) | Script corrigido        |
-| ------------------------------------------------- | --------------------------------- | ----------------------- |
-| `session_stats.failures_total`                    | `session_stats.failures_detected` | session-checkpoint.sh   |
-| `session_stats.failures_total`                    | `session_stats.failures_detected` | error-occurred.sh       |
-| `session_stats.unauthorized_turns`                | `session_stats.turn_unauthorized` | (não chegou a ser usado)|
-| `last_tool.result_type`                           | `last_tool.result`                | (já estava correto)     |
-| `active_section.*`                                | `current_section.*`               | session-checkpoint.sh   |
-| `active_section.*`                                | `current_section.*`               | start-section.sh        |
-| `active_section.turn_number`                      | `current_section.turn_start`      | start-section.sh        |
-| `conformidade.consecutive_unauthorized_closes`    | `compliance.consecutive_unauthorized` | session-checkpoint.sh |
+| Campo planejado (errado)                       | Campo canônico (session-start.sh)     | Script corrigido         |
+| ---------------------------------------------- | ------------------------------------- | ------------------------ |
+| `session_stats.failures_total`                 | `session_stats.failures_detected`     | session-checkpoint.sh    |
+| `session_stats.failures_total`                 | `session_stats.failures_detected`     | error-occurred.sh        |
+| `session_stats.unauthorized_turns`             | `session_stats.turn_unauthorized`     | (não chegou a ser usado) |
+| `last_tool.result_type`                        | `last_tool.result`                    | (já estava correto)      |
+| `active_section.*`                             | `current_section.*`                   | session-checkpoint.sh    |
+| `active_section.*`                             | `current_section.*`                   | start-section.sh         |
+| `active_section.turn_number`                   | `current_section.turn_start`          | start-section.sh         |
+| `conformidade.consecutive_unauthorized_closes` | `compliance.consecutive_unauthorized` | session-checkpoint.sh    |
 
 **Correções adicionais descobertas**:
 
-| #  | Correção                                                                   | Script           | Commit      |
-| -- | -------------------------------------------------------------------------- | ---------------- | ----------- |
-| C1 | `session-end.sh` passava `START_ISO` para helper que esperava `START_TS` (ms) | session-end.sh | `72c5a19a`  |
-| C2 | `subagent-stop.sh` não incrementava `session_stats.subagent_calls`          | subagent-stop.sh | `72c5a19a`  |
-| C3 | `error-occurred.sh` não incrementava `session_stats.errors_total`           | error-occurred.sh | `72c5a19a` |
-| C4 | `session-checkpoint.sh` output usava `failures_total` (inconsistente)      | session-checkpoint.sh | `72c5a19a` |
-| C5 | Comentário `active_section.{name, started_at, turn_number}` desatualizado  | start-section.sh | `72c5a19a`  |
+| #   | Correção                                                                      | Script                | Commit     |
+| --- | ----------------------------------------------------------------------------- | --------------------- | ---------- |
+| C1  | `session-end.sh` passava `START_ISO` para helper que esperava `START_TS` (ms) | session-end.sh        | `72c5a19a` |
+| C2  | `subagent-stop.sh` não incrementava `session_stats.subagent_calls`            | subagent-stop.sh      | `72c5a19a` |
+| C3  | `error-occurred.sh` não incrementava `session_stats.errors_total`             | error-occurred.sh     | `72c5a19a` |
+| C4  | `session-checkpoint.sh` output usava `failures_total` (inconsistente)         | session-checkpoint.sh | `72c5a19a` |
+| C5  | Comentário `active_section.{name, started_at, turn_number}` desatualizado     | start-section.sh      | `72c5a19a` |
 
 **Validação**: shellcheck 0 warnings em todos os 14+ scripts · análise estática via grep/read_file.
 
